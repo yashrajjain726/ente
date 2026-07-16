@@ -10,15 +10,18 @@ members = [
     "bindings/uniffi/ensu",
     "bindings/wasm/ente-wasm",
     "bindings/wasm/core",
+    "bindings/wasm/space",
     "crates/accounts",
     "crates/contacts",
     "crates/core",
     "crates/ensu",
     "crates/paste",
     "crates/image",
+    "crates/model-download",
     "crates/photos",
     "crates/test-support",
     "e2e",
+    "space",
 ]
 
 [workspace.dependencies]
@@ -27,9 +30,11 @@ ente-accounts = { path = "crates/accounts" }
 ente-contacts = { path = "crates/contacts" }
 ente-core = { path = "crates/core" }
 ente-image = { path = "crates/image" }
+ente-model-download = { path = "crates/model-download" }
 ente-paste = { path = "crates/paste" }
 ente-photos = { path = "crates/photos" }
 ente-rs = { path = "apps/cli" }
+ente-space = { path = "space" }
 ente-test-support = { path = "crates/test-support" }
 ort = { git = "https://github.com/pykeio/ort.git", rev = "31c8f1443bb579bfddb82705288347697e468fb3", default-features = false }
 serde = { version = "1.0.228", features = ["derive"] }

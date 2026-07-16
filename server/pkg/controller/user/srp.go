@@ -79,6 +79,11 @@ func (c *UserController) UpdateSrpAndKeyAttributes(context *gin.Context,
 	if err != nil {
 		return nil, err
 	}
+	if shouldClearTokens && c.SpaceAccessResetter != nil {
+		if err = c.SpaceAccessResetter.RevokeBrowserSessions(context, userID); err != nil {
+			return nil, err
+		}
+	}
 	err = c.UserAuthRepo.InsertOrUpdateSRPAuthAndKeyAttr(context, userID, req, setup)
 	if err != nil {
 		return nil, stacktrace.Propagate(err, "failed to add entry in srp auth")
@@ -89,6 +94,11 @@ func (c *UserController) UpdateSrpAndKeyAttributes(context *gin.Context,
 		err = c.UserAuthRepo.RemoveAllOtherTokens(userID, token)
 		if err != nil {
 			return nil, err
+		}
+		if c.SpaceAccessResetter != nil {
+			if sweepErr := c.SpaceAccessResetter.RevokeBrowserSessions(context, userID); sweepErr != nil {
+				logrus.WithError(sweepErr).WithField("user_id", userID).Warn("failed to sweep space browser sessions after password update")
+			}
 		}
 	} else {
 		logrus.WithField("user_id", userID).Info("not clearing tokens")

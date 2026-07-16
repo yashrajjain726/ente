@@ -14,6 +14,7 @@ ente-accounts.workspace = true
 ente-contacts.workspace = true
 ente-core = { workspace = true, features = ["srp"] }
 ente-rs.workspace = true
+ente-space.workspace = true
 ente-test-support.workspace = true
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "time"] }
 reqwest = { version = "0.12", features = ["json", "rustls-tls-native-roots"] }

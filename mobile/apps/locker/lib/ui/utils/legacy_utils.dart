@@ -1,5 +1,3 @@
-// ignore_for_file: use_build_context_synchronously
-
 import "package:ente_legacy/pages/create_legacy_kit_sheet.dart";
 import "package:ente_legacy/pages/emergency_page.dart";
 import "package:ente_legacy/pages/legacy_kit_intro_page.dart";
