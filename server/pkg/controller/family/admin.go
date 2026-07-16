@@ -81,6 +81,9 @@ func (c *Controller) InviteMember(ctx *gin.Context, adminUserID int64, email str
 	potentialMemberID, err := c.UserLookup.LookupUserID(adminUserID, email)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
+			if len(members) >= maxFamilyMemberLimit {
+				return stacktrace.Propagate(ente.ErrFamilySizeLimitReached, "family invite limit exceeded")
+			}
 			return stacktrace.Propagate(ente.ErrNotFound, "invited member is not on ente")
 		} else {
 			return stacktrace.Propagate(err, "")

@@ -29,6 +29,9 @@ func TestInviteMemberAllowsResendWhenFamilyIsFull(t *testing.T) {
 	if got := performInviteMemberRequest(t, router, adminID, pendingEmail).Code; got != http.StatusOK {
 		t.Fatalf("resend status = %d, want %d", got, http.StatusOK)
 	}
+	if got := performInviteMemberRequest(t, router, adminID, "not-on-ente@ente.com").Code; got != http.StatusPreconditionFailed {
+		t.Fatalf("unregistered invite status = %d, want %d", got, http.StatusPreconditionFailed)
+	}
 }
 
 func setupFullFamilyTest(t *testing.T) (http.Handler, int64, string, string) {
