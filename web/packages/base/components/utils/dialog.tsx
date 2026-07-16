@@ -65,11 +65,3 @@ export const genericErrorDialogAttributes = () =>
 
 export const genericRetriableErrorDialogAttributes = () =>
     errorDialogAttributes(t("generic_error_retry"));
-
-export const logoutDialogAttributes = (
-    logout: () => void,
-): MiniDialogAttributes => ({
-    message: t("logout_message"),
-    continue: { text: t("logout"), color: "critical", action: logout },
-    buttonDirection: "row",
-});

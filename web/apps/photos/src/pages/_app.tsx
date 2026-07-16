@@ -1,17 +1,17 @@
+import { AppLockSetupError } from "@/components/app-lock/LockScreenContents";
 import { useDesktopAppLockRoute } from "@/components/utils/use-app-lock-route";
 import { photosLogout } from "@/services/logout";
 import "@fontsource-variable/inter";
 import "@fontsource/outfit/700.css";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
-import { Button, CssBaseline, Typography } from "@mui/material";
+import { CssBaseline, Typography } from "@mui/material";
 import { styled, ThemeProvider } from "@mui/material/styles";
 import {
     isLocalStorageAndIndexedDBMismatch,
     savedLocalUser,
 } from "ente-accounts/services/accounts-db";
 import { isDesktop, staticAppTitle } from "ente-base/app";
-import { CenteredRow, Stack100vhCenter } from "ente-base/components/containers";
-import { ActivityErrorIndicator } from "ente-base/components/ErrorIndicator";
+import { CenteredRow } from "ente-base/components/containers";
 import { CustomHead } from "ente-base/components/Head";
 import {
     LoadingIndicator,
@@ -20,10 +20,7 @@ import {
 import { AttributedMiniDialog } from "ente-base/components/MiniDialog";
 import { Notification } from "ente-base/components/Notification";
 import { ThemedLoadingBar } from "ente-base/components/ThemedLoadingBar";
-import {
-    logoutDialogAttributes,
-    useAttributedMiniDialog,
-} from "ente-base/components/utils/dialog";
+import { useAttributedMiniDialog } from "ente-base/components/utils/dialog";
 import {
     useIsRouteChangeInProgress,
     useNotification,
@@ -32,11 +29,7 @@ import {
 } from "ente-base/components/utils/hooks-app";
 import { photosTheme } from "ente-base/components/utils/theme";
 import { useLoadingBar } from "ente-base/components/utils/use-loading-bar";
-import {
-    BaseContext,
-    deriveBaseContext,
-    useBaseContext,
-} from "ente-base/context";
+import { BaseContext, deriveBaseContext } from "ente-base/context";
 import log from "ente-base/log";
 import { logStartupBanner } from "ente-base/log-web";
 import type { AppUpdate } from "ente-base/types/ipc";
@@ -255,27 +248,6 @@ const DesktopMainContent: React.FC<MainContentProps> = ({
             <Component {...pageProps} />
             <AppLockReauthenticationDialog />
         </>
-    );
-};
-
-const AppLockSetupError: React.FC<{ onRetry: () => void }> = ({ onRetry }) => {
-    const { logout, showMiniDialog } = useBaseContext();
-
-    return (
-        <Stack100vhCenter sx={{ gap: 2 }}>
-            <ActivityErrorIndicator>
-                {t("app_lock_unavailable")}
-            </ActivityErrorIndicator>
-            <Button color="accent" onClick={onRetry}>
-                {t("retry")}
-            </Button>
-            <Button
-                color="secondary"
-                onClick={() => showMiniDialog(logoutDialogAttributes(logout))}
-            >
-                {t("logout")}
-            </Button>
-        </Stack100vhCenter>
     );
 };
 
