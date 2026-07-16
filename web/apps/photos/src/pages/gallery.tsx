@@ -1118,6 +1118,7 @@ const Page: React.FC = () => {
                         albumId: collection.id,
                         albumName: collection.name,
                     });
+                    setOpenCollectionSelector(false);
                     setPostCreateAlbumOp(undefined);
                     return;
                 }
@@ -1901,10 +1902,10 @@ const Page: React.FC = () => {
         [handleUpdateCollectionCover],
     );
 
-    const handleCloseCollectionSelector = useCallback(() => {
-        setOpenCollectionSelector(false);
-        setCollectionSelectorAttributes(undefined);
-    }, []);
+    const handleCloseCollectionSelector = useCallback(
+        () => setOpenCollectionSelector(false),
+        [],
+    );
 
     /**
      * Handles adding a single file to a collection by opening a collection selector dialog.
