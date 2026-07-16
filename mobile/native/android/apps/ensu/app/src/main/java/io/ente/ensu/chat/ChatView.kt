@@ -124,12 +124,14 @@ fun ChatView(
 
     val showDownloadOnboarding by remember(
         chatState.isModelDownloaded,
+        chatState.isModelStateKnown,
         chatState.messages,
         chatState.isGenerating,
         isChatUnsupported
     ) {
         derivedStateOf {
-            !chatState.isModelDownloaded &&
+            chatState.isModelStateKnown &&
+                !chatState.isModelDownloaded &&
                 chatState.messages.isEmpty() &&
                 !chatState.isGenerating &&
                 !isChatUnsupported
@@ -217,6 +219,7 @@ fun ChatView(
                         streamingParentId = chatState.streamingParentId,
                         isGenerating = chatState.isGenerating,
                         isModelDownloaded = chatState.isModelDownloaded,
+                        isModelStateKnown = chatState.isModelStateKnown,
                         isChatUnsupported = isChatUnsupported,
                         isDownloading = chatState.isDownloading,
                         downloadPercent = chatState.downloadPercent,
@@ -250,7 +253,7 @@ fun ChatView(
                             inputBarHeightDp = with(density) { coords.size.height.toDp() }
                         }
                 )
-            } else if (!showDownloadOnboarding) {
+            } else if (chatState.isModelStateKnown && !showDownloadOnboarding) {
                 MessageInput(
                     modifier = Modifier
                         .fillMaxWidth()

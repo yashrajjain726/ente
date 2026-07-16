@@ -104,6 +104,32 @@ fn gemma_4_e2b_q4km() -> ModelPreset {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashMap;
+
+    #[test]
+    fn preset_ids_key_unique_artifacts() {
+        let defaults = defaults();
+        let all = std::iter::once(&defaults.mobile_default_model)
+            .chain(defaults.mobile_model_presets.iter())
+            .chain(std::iter::once(&defaults.desktop_default_model))
+            .chain(defaults.desktop_model_presets.iter());
+        let mut seen: HashMap<&str, (&str, Option<&str>)> = HashMap::new();
+        for preset in all {
+            let artifact = (preset.url.as_str(), preset.mmproj_url.as_deref());
+            if let Some(existing) = seen.insert(preset.id.as_str(), artifact) {
+                assert_eq!(
+                    existing, artifact,
+                    "preset id {} aliases different artifacts",
+                    preset.id
+                );
+            }
+        }
+    }
+}
+
 pub fn defaults() -> Defaults {
     let mobile_default_model = lfm_vl_1_6b();
     let desktop_default_model = gemma_4_e4b_q4km();

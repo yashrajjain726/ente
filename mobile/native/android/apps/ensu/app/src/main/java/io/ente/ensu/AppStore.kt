@@ -62,6 +62,9 @@ class AppStore(
         refreshDeviceCapability(scope)
         chatActions.bootstrap(scope)
         modelSettingsActions.refreshModelDownloadInfo()
+        _state.value = _state.value.copy(
+            chat = _state.value.chat.copy(isModelStateKnown = true)
+        )
     }
 
     fun refreshDeviceCapability(scope: CoroutineScope? = null) {

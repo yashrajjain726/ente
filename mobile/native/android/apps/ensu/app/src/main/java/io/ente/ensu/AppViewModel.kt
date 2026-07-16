@@ -73,7 +73,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 developerSettings = initialSettings.developerSettings,
                 modelSettings = initialSettings.modelSettings
             )
-            store.hydrateModelDownloadRequested(sessionPreferences.modelDownloadRequested.first())
+            store.hydrateModelDownloadRequested(
+                runCatching { sessionPreferences.modelDownloadRequested.first() }.getOrDefault(false)
+            )
             store.bootstrap(viewModelScope)
             _isReady.value = true
 
