@@ -38,20 +38,28 @@ import 'package:photos/utils/dialog_util.dart';
 
 final _logger = Logger("DeleteFileUtil");
 
-Future<Set<String>> _tryTrashOrDeleteFiles(List<String> assetIDs) async {
+Future<(bool, Set<String>)> _tryTrashOrDeleteFiles(
+  List<String> assetIDs,
+) async {
   try {
     if (!flagService.internalUser ||
         !Platform.isAndroid ||
         await isAndroidSDKVersionLowerThan(android11SDKINT)) {
-      return (await PhotoManager.editor.deleteWithIds(assetIDs)).toSet();
+      return (
+        false,
+        (await PhotoManager.editor.deleteWithIds(assetIDs)).toSet(),
+      );
     }
     final assets = (await Future.wait(
       assetIDs.map(AssetEntity.fromId),
     )).whereType<AssetEntity>().toList();
-    return (await PhotoManager.editor.android.moveToTrash(assets)).toSet();
+    return (
+      true,
+      (await PhotoManager.editor.android.moveToTrash(assets)).toSet(),
+    );
   } catch (e, s) {
     _logger.severe("Could not delete file", e, s);
-    return {};
+    return (false, <String>{});
   }
 }
 
@@ -79,7 +87,7 @@ Future<void> deleteFilesFromEverywhere(
       hasLocalOnlyFiles = true;
     }
   }
-  final deletedIDs = await _tryTrashOrDeleteFiles(localAssetIDs);
+  final (trashed, deletedIDs) = await _tryTrashOrDeleteFiles(localAssetIDs);
   deletedIDs.addAll(await _tryDeleteSharedMediaFiles(localSharedMediaIDs));
   final updatedCollectionIDs = <int>{};
   final List<TrashRequest> uploadedFilesToBeTrashed = [];
@@ -140,7 +148,7 @@ Future<void> deleteFilesFromEverywhere(
       ),
     );
     if (context.mounted) {
-      if (hasLocalOnlyFiles && Platform.isAndroid) {
+      if (hasLocalOnlyFiles && Platform.isAndroid && !trashed) {
         showShortToast(context, AppLocalizations.of(context).filesDeleted);
       } else {
         showShortToast(context, AppLocalizations.of(context).movedToTrash);
@@ -231,7 +239,7 @@ Future<List<EnteFile>> deleteFilesOnDeviceOnly(
       localOnlyIDs.add(file.localID);
     }
   }
-  final deletedIDs = await _tryTrashOrDeleteFiles(localAssetIDs);
+  final (trashed, deletedIDs) = await _tryTrashOrDeleteFiles(localAssetIDs);
   deletedIDs.addAll(await _tryDeleteSharedMediaFiles(localSharedMediaIDs));
   final List<EnteFile> deletedFiles = [];
   for (final file in files) {
@@ -255,6 +263,15 @@ Future<List<EnteFile>> deleteFilesOnDeviceOnly(
         source: "deleteFilesOnDeviceOnly",
       ),
     );
+  }
+  if (deletedIDs.isNotEmpty && Platform.isAndroid && !trashed) {
+    if (context.mounted) {
+      showShortToast(context, AppLocalizations.of(context).filesDeleted);
+    }
+  } else if (deletedIDs.isNotEmpty) {
+    if (context.mounted) {
+      showToast(context, AppLocalizations.of(context).movedToTrash);
+    }
   }
   return deletedFiles;
 }
