@@ -274,6 +274,7 @@ export const Page: React.FC<PageProps> = ({ invitePreview }) => {
         profile,
         profileLoadError,
         profileLoadStatus,
+        refreshProfile,
         setOnboardingEntrySource,
     } = useSpaceAppState();
     const [routeMode, setRouteMode] = useState<RouteMode>({ kind: "checking" });
@@ -376,7 +377,7 @@ export const Page: React.FC<PageProps> = ({ invitePreview }) => {
             fullName: "",
             username: publicIdentity.username,
         };
-        const addFriend = () => {
+        const addFriend = async () => {
             const invite = {
                 spaceId: publicIdentity.spaceId,
                 spaceUsername: publicIdentity.username,
@@ -384,24 +385,28 @@ export const Page: React.FC<PageProps> = ({ invitePreview }) => {
             savePendingSpaceInvite(invite);
             savePendingSpaceInviteFriend(inviteFriend);
             setOnboardingEntrySource("add-friend-link");
-            if (profile) {
-                setIsAddingFriend(true);
-                void joinSpaceInvite(invite)
-                    .then((status) => {
-                        clearPendingSpaceInvite();
-                        clearPendingSpaceInviteFriend();
-                        if (status == "requested") {
-                            saveSentSpaceInviteFriend(inviteFriend);
-                        }
-                        void router.push(spaceRoutes.home);
-                    })
-                    .catch((error: unknown) => {
-                        setIsAddingFriend(false);
-                        console.error("Failed to send friend request", error);
-                    });
-                return;
+            setIsAddingFriend(true);
+            try {
+                const readyProfile =
+                    profileLoadStatus == "ready"
+                        ? profile
+                        : await refreshProfile({ throwOnError: true });
+                if (!readyProfile) {
+                    window.location.assign("/");
+                    return;
+                }
+
+                const status = await joinSpaceInvite(invite);
+                clearPendingSpaceInvite();
+                clearPendingSpaceInviteFriend();
+                if (status == "requested") {
+                    saveSentSpaceInviteFriend(inviteFriend);
+                }
+                void router.push(spaceRoutes.home);
+            } catch (error) {
+                setIsAddingFriend(false);
+                console.error("Failed to send friend request", error);
             }
-            window.location.assign("/");
         };
 
         return (
@@ -413,7 +418,7 @@ export const Page: React.FC<PageProps> = ({ invitePreview }) => {
                 <PublicFriendRequestScreen
                     identity={publicIdentity}
                     isAddingFriend={isAddingFriend}
-                    onAddFriend={addFriend}
+                    onAddFriend={() => void addFriend()}
                 />
             </>
         );
