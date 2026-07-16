@@ -297,10 +297,7 @@ interface SpaceFriendRequestContext {
         spaceId: string,
         requestId: bigint,
     ) => Promise<unknown>;
-    deleteFriendRequest: (
-        spaceId: string,
-        requestId: bigint,
-    ) => Promise<void>;
+    deleteFriendRequest: (spaceId: string, requestId: bigint) => Promise<void>;
     requestFriendByUsername: (
         spaceId: string,
         username: string,
@@ -308,9 +305,7 @@ interface SpaceFriendRequestContext {
 }
 
 interface SpaceConversationsContext {
-    listConversations: (
-        spaceId: string,
-    ) => Promise<SpaceConversationsResponse>;
+    listConversations: (spaceId: string) => Promise<SpaceConversationsResponse>;
 }
 
 const timestampMsFromSpaceDate = (value: string) => {
@@ -831,9 +826,7 @@ export const loadCurrentSpaceFriends = async (spaceId: string) => {
 
     const ctx = await ensureCurrentSpaceContext();
     const promise = (async () => {
-        const friends = (await ctx.listSpaceFriends(
-            spaceId,
-        )) as SpaceFriend[];
+        const friends = (await ctx.listSpaceFriends(spaceId)) as SpaceFriend[];
         return friends.map(({ friend }) => actorProfile(friend));
     })();
     spaceFriendsCache.set(spaceId, promise);

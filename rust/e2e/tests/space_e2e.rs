@@ -1,10 +1,8 @@
-#[path = "support/space.rs"]
-mod space;
 mod support;
 
 use ente_space::{AccountSpaceCtx, PostPhotoAssetOptions};
 
-use support::auth;
+use support::{auth, space};
 
 const TEST_WEBP_BYTES: &[u8] = b"RIFF0000WEBP";
 

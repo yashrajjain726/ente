@@ -114,14 +114,6 @@ func selectedSpace(c *gin.Context) (*spacerepo.SpaceRecord, error) {
 	return selected.Space, nil
 }
 
-func mustSelectedSpace(c *gin.Context) *spacerepo.SpaceRecord {
-	space, err := selectedSpace(c)
-	if err != nil {
-		panic(err)
-	}
-	return space
-}
-
 func (a authDeps) requireSpaceOwner(ctx context.Context, ownerID int64, spaceID string) (*spacerepo.SpaceRecord, error) {
 	space, err := a.SpacesRepo.GetSpaceByID(ctx, spaceID)
 	if err != nil {

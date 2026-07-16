@@ -1,7 +1,6 @@
 package controller
 
 import (
-	"context"
 	"time"
 
 	"github.com/ente/museum/space/models"
@@ -73,34 +72,6 @@ func toActorResponse(actor spacerepo.SpaceActorRecord, includePrivate bool) mode
 	resp.EncryptedProfile = encodeSpaceField(actor.EncryptedProfile)
 	resp.Avatar = toActorAvatarResponse(actor)
 	return resp
-}
-
-func actorVisibility(ctx context.Context, auth authDeps, viewer *viewerAuth, actors ...spacerepo.SpaceActorRecord) (map[string]bool, error) {
-	visible := make(map[string]bool)
-	if len(actors) == 0 || viewer == nil {
-		return visible, nil
-	}
-	spaceIDSet := make(map[string]struct{}, len(actors))
-	for _, actor := range actors {
-		if actor.SpaceID != "" {
-			spaceIDSet[actor.SpaceID] = struct{}{}
-		}
-	}
-	if len(spaceIDSet) == 0 {
-		return visible, nil
-	}
-	if viewer.UserID <= 0 || viewer.SpaceID == "" || auth.FriendsRepo == nil {
-		return visible, nil
-	}
-	spaceIDs := make([]string, 0, len(spaceIDSet))
-	for spaceID := range spaceIDSet {
-		spaceIDs = append(spaceIDs, spaceID)
-	}
-	return auth.FriendsRepo.ListAccessibleSpaceIDs(ctx, viewer.UserID, viewer.SpaceID, spaceIDs)
-}
-
-func visibleActor(visible map[string]bool, actor spacerepo.SpaceActorRecord) bool {
-	return visible[actor.SpaceID]
 }
 
 func toSpaceKeyResponse(space *spacerepo.SpaceRecord) *models.SpaceKeyResponse {

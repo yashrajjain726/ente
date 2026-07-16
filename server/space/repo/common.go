@@ -1,7 +1,6 @@
 package repo
 
 import (
-	"database/sql"
 	"fmt"
 	"strings"
 
@@ -11,14 +10,6 @@ import (
 
 func normalizeSlug(input string) string {
 	return strings.ToLower(strings.TrimSpace(input))
-}
-
-func nullString(value string) sql.NullString {
-	value = strings.TrimSpace(value)
-	if value == "" {
-		return sql.NullString{}
-	}
-	return sql.NullString{String: value, Valid: true}
 }
 
 func optionalInt(limit int, fallback int) int {
