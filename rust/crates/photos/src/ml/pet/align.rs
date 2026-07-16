@@ -109,8 +109,6 @@ pub(crate) fn run_pet_face_alignment(
             let local_cx = (box_x1 + box_x2) as f64 / 2.0 - region_x1 as f64;
             let local_cy = (box_y1 + box_y2) as f64 / 2.0 - region_y1 as f64;
 
-            let rotated = rotate_around_center(&region, angle_rad as f64, local_cx, local_cy);
-
             // Crop coordinates relative to the region
             let nx1 = (box_x1 as f32 - bw * CROP_EXPAND - region_x1 as f32).max(0.0) as u32;
             let ny1 = (box_y1 as f32 - bh * CROP_EXPAND - region_y1 as f32).max(0.0) as u32;
@@ -123,7 +121,19 @@ pub(crate) fn run_pet_face_alignment(
             if crop_w == 0 || crop_h == 0 {
                 continue;
             }
-            crop_and_resize_rgb(&mut crop_resizer, &rotated, nx1, ny1, crop_w, crop_h)?
+            let rotated_crop = rotate_crop_around_center(
+                &region,
+                angle_rad as f64,
+                local_cx,
+                local_cy,
+                PixelCrop {
+                    x: nx1,
+                    y: ny1,
+                    width: crop_w,
+                    height: crop_h,
+                },
+            );
+            crop_and_resize_rgb(&mut crop_resizer, &rotated_crop, 0, 0, crop_w, crop_h)?
         };
 
         let result_index = face_results.len();
@@ -158,11 +168,15 @@ pub(crate) fn run_pet_face_alignment(
     Ok((aligned_inputs, face_results))
 }
 
-/// Rotate an image around a center point using bilinear interpolation
-/// with BORDER_REPLICATE behaviour (clamp to nearest edge pixel).
-fn rotate_around_center(source: &RgbRegion<'_>, angle_rad: f64, cx: f64, cy: f64) -> RgbImage {
-    let w = source.width;
-    let h = source.height;
+/// Render a crop of an image rotated around a center point using bilinear
+/// interpolation with BORDER_REPLICATE behaviour.
+fn rotate_crop_around_center(
+    source: &RgbRegion<'_>,
+    angle_rad: f64,
+    cx: f64,
+    cy: f64,
+    crop: PixelCrop,
+) -> RgbImage {
     let cos_a = angle_rad.cos();
     let sin_a = angle_rad.sin();
 
@@ -170,12 +184,14 @@ fn rotate_around_center(source: &RgbRegion<'_>, angle_rad: f64, cx: f64, cy: f64
     //   x_in = cos_a * (x_out - cx) + sin_a * (y_out - cy) + cx
     //   y_in = -sin_a * (x_out - cx) + cos_a * (y_out - cy) + cy
 
-    let mut output = RgbImage::new(w, h);
-    let w_f = w as f64;
-    let h_f = h as f64;
+    let mut output = RgbImage::new(crop.width, crop.height);
+    let w_f = source.width as f64;
+    let h_f = source.height as f64;
 
-    for out_y in 0..h {
-        for out_x in 0..w {
+    for crop_y in 0..crop.height {
+        let out_y = crop.y + crop_y;
+        for crop_x in 0..crop.width {
+            let out_x = crop.x + crop_x;
             let dx = out_x as f64 - cx;
             let dy = out_y as f64 - cy;
             let src_x = cos_a * dx + sin_a * dy + cx;
@@ -188,8 +204,8 @@ fn rotate_around_center(source: &RgbRegion<'_>, angle_rad: f64, cx: f64, cy: f64
             // Bilinear interpolation
             let x0 = sx.floor() as u32;
             let y0 = sy.floor() as u32;
-            let x1 = (x0 + 1).min(w - 1);
-            let y1 = (y0 + 1).min(h - 1);
+            let x1 = (x0 + 1).min(source.width - 1);
+            let y1 = (y0 + 1).min(source.height - 1);
             let fx = (sx - sx.floor()) as f32;
             let fy = (sy - sy.floor()) as f32;
 
@@ -206,7 +222,7 @@ fn rotate_around_center(source: &RgbRegion<'_>, angle_rad: f64, cx: f64, cy: f64
                     + p11[c] as f32 * fx * fy;
                 px[c] = v.round().clamp(0.0, 255.0) as u8;
             }
-            output.put_pixel(out_x, out_y, Rgb(px));
+            output.put_pixel(crop_x, crop_y, Rgb(px));
         }
     }
 
@@ -325,5 +341,52 @@ impl<'a> RgbRegion<'a> {
     fn get_pixel(&self, x: u32, y: u32) -> [u8; 3] {
         let pixel = ((self.y + y) as usize * self.image_width + (self.x + x) as usize) * 3;
         [self.rgb[pixel], self.rgb[pixel + 1], self.rgb[pixel + 2]]
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{PixelCrop, RgbRegion, rotate_crop_around_center};
+    use crate::ml::types::{DecodedImage, Dimensions};
+
+    #[test]
+    fn cropped_rotation_matches_the_same_region_of_a_full_rotation() {
+        let decoded = DecodedImage {
+            dimensions: Dimensions {
+                width: 11,
+                height: 9,
+            },
+            rgb: (0..11 * 9 * 3).map(|value| (value % 251) as u8).collect(),
+        };
+        let source = RgbRegion::new(&decoded, 1, 1, 9, 7).unwrap();
+        let crop = PixelCrop {
+            x: 2,
+            y: 1,
+            width: 5,
+            height: 4,
+        };
+
+        let full = rotate_crop_around_center(
+            &source,
+            0.37,
+            4.25,
+            3.75,
+            PixelCrop {
+                x: 0,
+                y: 0,
+                width: source.width,
+                height: source.height,
+            },
+        );
+        let cropped = rotate_crop_around_center(&source, 0.37, 4.25, 3.75, crop);
+
+        for y in 0..crop.height {
+            for x in 0..crop.width {
+                assert_eq!(
+                    cropped.get_pixel(x, y),
+                    full.get_pixel(crop.x + x, crop.y + y)
+                );
+            }
+        }
     }
 }

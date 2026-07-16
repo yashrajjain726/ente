@@ -32,7 +32,7 @@ pub(crate) fn run_pet_face_detection(
     input: &YoloInput,
 ) -> MlResult<Vec<PetFaceDetection>> {
     let mut pet_face_detection = runtime.pet_face_detection_session()?;
-    onnx::with_prepared_f32_output(
+    onnx::with_prepared_float_output(
         &mut pet_face_detection,
         &input.tensor,
         [1, 3, YOLO_INPUT_SIZE as i64, YOLO_INPUT_SIZE as i64],
@@ -44,7 +44,22 @@ pub(crate) fn run_pet_face_detection(
 
 fn postprocess_pet_face_detections(
     output_shape: &[i64],
-    output_data: &[f32],
+    output_data: onnx::BorrowedFloatTensor<'_>,
+    input: &YoloInput,
+) -> MlResult<Vec<PetFaceDetection>> {
+    match output_data {
+        onnx::BorrowedFloatTensor::F32(data) => {
+            postprocess_pet_face_tensor(output_shape, data, input)
+        }
+        onnx::BorrowedFloatTensor::F16(data) => {
+            postprocess_pet_face_tensor(output_shape, data, input)
+        }
+    }
+}
+
+fn postprocess_pet_face_tensor<T: onnx::FloatTensorData>(
+    output_shape: &[i64],
+    output_data: T,
     input: &YoloInput,
 ) -> MlResult<Vec<PetFaceDetection>> {
     // Row format: [x, y, w, h, conf, lm_x1, lm_y1, lm_x2, lm_y2, lm_x3, lm_y3, cls0, cls1]
@@ -95,20 +110,23 @@ fn postprocess_pet_face_detections(
     }
 
     let detection_rows = output_data.len() / row_len;
-    let mut detections = Vec::with_capacity(detection_rows);
+    let mut detections = Vec::new();
 
     for i in 0..detection_rows {
         let start = i * row_len;
-        let row = &output_data[start..(start + row_len)];
-        let score = row[4];
+        let score = output_data.value(start + 4);
         if score < PET_FACE_MIN_SCORE {
             continue;
         }
 
-        let x_min_abs = row[0] - row[2] / 2.0;
-        let y_min_abs = row[1] - row[3] / 2.0;
-        let x_max_abs = row[0] + row[2] / 2.0;
-        let y_max_abs = row[1] + row[3] / 2.0;
+        let x = output_data.value(start);
+        let y = output_data.value(start + 1);
+        let width = output_data.value(start + 2);
+        let height = output_data.value(start + 3);
+        let x_min_abs = x - width / 2.0;
+        let y_min_abs = y - height / 2.0;
+        let x_max_abs = x + width / 2.0;
+        let y_max_abs = y + height / 2.0;
 
         let mut box_xyxy = [
             x_min_abs / YOLO_INPUT_SIZE as f32,
@@ -120,16 +138,16 @@ fn postprocess_pet_face_detections(
         // 3 keypoints: left_eye, right_eye, nose
         let mut keypoints = [
             [
-                row[5] / YOLO_INPUT_SIZE as f32,
-                row[6] / YOLO_INPUT_SIZE as f32,
+                output_data.value(start + 5) / YOLO_INPUT_SIZE as f32,
+                output_data.value(start + 6) / YOLO_INPUT_SIZE as f32,
             ],
             [
-                row[7] / YOLO_INPUT_SIZE as f32,
-                row[8] / YOLO_INPUT_SIZE as f32,
+                output_data.value(start + 7) / YOLO_INPUT_SIZE as f32,
+                output_data.value(start + 8) / YOLO_INPUT_SIZE as f32,
             ],
             [
-                row[9] / YOLO_INPUT_SIZE as f32,
-                row[10] / YOLO_INPUT_SIZE as f32,
+                output_data.value(start + 9) / YOLO_INPUT_SIZE as f32,
+                output_data.value(start + 10) / YOLO_INPUT_SIZE as f32,
             ],
         ];
 
@@ -140,7 +158,7 @@ fn postprocess_pet_face_detections(
         // For a 1-class model (row_len == 12): row[11] is the single class
         // score; class is always 0 (dog).
         let class_id: u8 = if row_len >= 13 {
-            if row[12] > row[11] {
+            if output_data.value(start + 12) > output_data.value(start + 11) {
                 PET_SPECIES_DOG
             } else {
                 PET_SPECIES_CAT
@@ -171,7 +189,7 @@ pub(crate) fn run_pet_body_detection(
     input: &YoloInput,
 ) -> MlResult<Vec<PetBodyDetection>> {
     let mut body_detection = runtime.pet_body_detection_session()?;
-    onnx::with_prepared_f32_output(
+    onnx::with_prepared_float_output(
         &mut body_detection,
         &input.tensor,
         [1, 3, YOLO_INPUT_SIZE as i64, YOLO_INPUT_SIZE as i64],
@@ -180,7 +198,17 @@ pub(crate) fn run_pet_body_detection(
 }
 
 fn postprocess_pet_body_detections(
-    output_data: &[f32],
+    output_data: onnx::BorrowedFloatTensor<'_>,
+    input: &YoloInput,
+) -> MlResult<Vec<PetBodyDetection>> {
+    match output_data {
+        onnx::BorrowedFloatTensor::F32(data) => postprocess_pet_body_tensor(data, input),
+        onnx::BorrowedFloatTensor::F16(data) => postprocess_pet_body_tensor(data, input),
+    }
+}
+
+fn postprocess_pet_body_tensor<T: onnx::FloatTensorData>(
+    output_data: T,
     input: &YoloInput,
 ) -> MlResult<Vec<PetBodyDetection>> {
     // YOLOv5 output format: [x, y, w, h, obj_conf, cls0, cls1, ..., cls79]
@@ -195,31 +223,18 @@ fn postprocess_pet_body_detections(
 
     for i in 0..detection_rows {
         let start = i * row_len;
-        let row = &output_data[start..(start + row_len)];
-        let obj_conf = row[4];
-
-        // Find the winning class across all 80 COCO classes and only
-        // keep detections whose predicted class is cat (15) or dog (16).
-        let class_logits = &row[5..85];
-        let (best_cls, best_logit) = class_logits
-            .iter()
-            .enumerate()
-            .max_by(|a, b| a.1.total_cmp(b.1))
-            .unwrap();
-        let best_cls = best_cls as u8;
-        if best_cls != COCO_CAT && best_cls != COCO_DOG {
+        let Some((class_id, class_score)) = winning_pet_body_class(output_data, start) else {
             continue;
-        }
-        let class_score = best_logit * obj_conf;
-        if class_score < BODY_MIN_SCORE {
-            continue;
-        }
-        let class_id = best_cls;
+        };
 
-        let x_min_abs = row[0] - row[2] / 2.0;
-        let y_min_abs = row[1] - row[3] / 2.0;
-        let x_max_abs = row[0] + row[2] / 2.0;
-        let y_max_abs = row[1] + row[3] / 2.0;
+        let x = output_data.value(start);
+        let y = output_data.value(start + 1);
+        let width = output_data.value(start + 2);
+        let height = output_data.value(start + 3);
+        let x_min_abs = x - width / 2.0;
+        let y_min_abs = y - height / 2.0;
+        let x_max_abs = x + width / 2.0;
+        let y_max_abs = y + height / 2.0;
 
         let mut box_xyxy = [
             x_min_abs / YOLO_INPUT_SIZE as f32,
@@ -238,6 +253,43 @@ fn postprocess_pet_body_detections(
     }
 
     Ok(naive_nms_pet_body(detections, BODY_IOU_THRESHOLD))
+}
+
+fn winning_pet_body_class<T: onnx::FloatTensorData>(
+    output_data: T,
+    row_start: usize,
+) -> Option<(u8, f32)> {
+    let obj_conf = output_data.value(row_start + 4);
+
+    // Most detector rows cannot produce a cat or dog above the score
+    // threshold. Reject those before scanning all 80 COCO classes.
+    let cat_logit = output_data.value(row_start + 5 + COCO_CAT as usize);
+    let dog_logit = output_data.value(row_start + 5 + COCO_DOG as usize);
+    let best_pet_logit = if dog_logit.total_cmp(&cat_logit).is_ge() {
+        dog_logit
+    } else {
+        cat_logit
+    };
+    if best_pet_logit * obj_conf < BODY_MIN_SCORE {
+        return None;
+    }
+
+    // A sufficiently strong pet score still needs to win against every other
+    // COCO class. Keep the original total ordering and tie behaviour here.
+    let mut best_cls = 0u8;
+    let mut best_logit = output_data.value(row_start + 5);
+    for class in 1u8..80 {
+        let logit = output_data.value(row_start + 5 + class as usize);
+        if logit.total_cmp(&best_logit).is_ge() {
+            best_cls = class;
+            best_logit = logit;
+        }
+    }
+    if best_cls != COCO_CAT && best_cls != COCO_DOG {
+        return None;
+    }
+
+    Some((best_cls, best_logit * obj_conf))
 }
 
 fn calculate_iou_4(a: &[f32; 4], b: &[f32; 4]) -> f32 {
@@ -322,4 +374,66 @@ fn naive_nms_pet_body(
         .zip(suppressed)
         .filter_map(|(d, s)| if s { None } else { Some(d) })
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{BODY_MIN_SCORE, COCO_CAT, COCO_DOG, winning_pet_body_class};
+
+    #[test]
+    fn pet_body_class_prefilter_matches_full_scan() {
+        let mut rows = Vec::new();
+
+        rows.push(body_row(0.9, &[(COCO_CAT, 0.2), (COCO_DOG, 0.1)]));
+        rows.push(body_row(0.9, &[(COCO_CAT, 0.8), (COCO_DOG, 0.7)]));
+        rows.push(body_row(0.9, &[(COCO_CAT, 0.8), (3, 0.9)]));
+        rows.push(body_row(1.0, &[(COCO_CAT, BODY_MIN_SCORE)]));
+        rows.push(body_row(
+            1.0,
+            &[(COCO_CAT, BODY_MIN_SCORE), (COCO_DOG, BODY_MIN_SCORE)],
+        ));
+        rows.push(body_row(1.0, &[(COCO_DOG, 0.8), (79, 0.8)]));
+
+        for row in rows {
+            assert_eq!(winning_pet_body_class(row.as_slice(), 0), full_scan(&row));
+
+            let f16_row = row
+                .iter()
+                .copied()
+                .map(half::f16::from_f32)
+                .collect::<Vec<_>>();
+            let converted_row = f16_row
+                .iter()
+                .map(|value| value.to_f32())
+                .collect::<Vec<_>>();
+            assert_eq!(
+                winning_pet_body_class(f16_row.as_slice(), 0),
+                full_scan(&converted_row),
+            );
+        }
+    }
+
+    fn body_row(object_confidence: f32, scores: &[(u8, f32)]) -> Vec<f32> {
+        let mut row = vec![0.0; 85];
+        row[4] = object_confidence;
+        for &(class, score) in scores {
+            row[5 + class as usize] = score;
+        }
+        row
+    }
+
+    fn full_scan(row: &[f32]) -> Option<(u8, f32)> {
+        let (best_class, best_logit) = row[5..85]
+            .iter()
+            .enumerate()
+            .max_by(|a, b| a.1.total_cmp(b.1))
+            .unwrap();
+        let best_class = best_class as u8;
+        if best_class != COCO_CAT && best_class != COCO_DOG {
+            return None;
+        }
+
+        let score = best_logit * row[4];
+        (score >= BODY_MIN_SCORE).then_some((best_class, score))
+    }
 }

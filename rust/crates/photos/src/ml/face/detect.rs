@@ -14,7 +14,7 @@ pub(crate) fn run_face_detection(
     input: &YoloInput,
 ) -> MlResult<Vec<FaceDetection>> {
     let mut face_detection = runtime.face_detection_session()?;
-    onnx::with_prepared_f32_output(
+    onnx::with_prepared_float_output(
         &mut face_detection,
         &input.tensor,
         [1, 3, YOLO_INPUT_SIZE as i64, YOLO_INPUT_SIZE as i64],
@@ -23,7 +23,17 @@ pub(crate) fn run_face_detection(
 }
 
 fn postprocess_face_detections(
-    output_data: &[f32],
+    output_data: onnx::BorrowedFloatTensor<'_>,
+    input: &YoloInput,
+) -> MlResult<Vec<FaceDetection>> {
+    match output_data {
+        onnx::BorrowedFloatTensor::F32(data) => postprocess_face_tensor(data, input),
+        onnx::BorrowedFloatTensor::F16(data) => postprocess_face_tensor(data, input),
+    }
+}
+
+fn postprocess_face_tensor<T: onnx::FloatTensorData>(
+    output_data: T,
     input: &YoloInput,
 ) -> MlResult<Vec<FaceDetection>> {
     let row_len = 16usize;
@@ -34,19 +44,22 @@ fn postprocess_face_detections(
     }
 
     let detection_rows = output_data.len() / row_len;
-    let mut detections = Vec::with_capacity(detection_rows);
+    let mut detections = Vec::new();
     for i in 0..detection_rows {
         let start = i * row_len;
-        let row = &output_data[start..(start + row_len)];
-        let score = row[4];
+        let score = output_data.value(start + 4);
         if score < MIN_SCORE_THRESHOLD {
             continue;
         }
 
-        let x_min_abs = row[0] - row[2] / 2.0;
-        let y_min_abs = row[1] - row[3] / 2.0;
-        let x_max_abs = row[0] + row[2] / 2.0;
-        let y_max_abs = row[1] + row[3] / 2.0;
+        let x = output_data.value(start);
+        let y = output_data.value(start + 1);
+        let width = output_data.value(start + 2);
+        let height = output_data.value(start + 3);
+        let x_min_abs = x - width / 2.0;
+        let y_min_abs = y - height / 2.0;
+        let x_max_abs = x + width / 2.0;
+        let y_max_abs = y + height / 2.0;
 
         let mut box_xyxy = [
             x_min_abs / YOLO_INPUT_SIZE as f32,
@@ -56,24 +69,24 @@ fn postprocess_face_detections(
         ];
         let mut keypoints = [
             [
-                row[5] / YOLO_INPUT_SIZE as f32,
-                row[6] / YOLO_INPUT_SIZE as f32,
+                output_data.value(start + 5) / YOLO_INPUT_SIZE as f32,
+                output_data.value(start + 6) / YOLO_INPUT_SIZE as f32,
             ],
             [
-                row[7] / YOLO_INPUT_SIZE as f32,
-                row[8] / YOLO_INPUT_SIZE as f32,
+                output_data.value(start + 7) / YOLO_INPUT_SIZE as f32,
+                output_data.value(start + 8) / YOLO_INPUT_SIZE as f32,
             ],
             [
-                row[9] / YOLO_INPUT_SIZE as f32,
-                row[10] / YOLO_INPUT_SIZE as f32,
+                output_data.value(start + 9) / YOLO_INPUT_SIZE as f32,
+                output_data.value(start + 10) / YOLO_INPUT_SIZE as f32,
             ],
             [
-                row[11] / YOLO_INPUT_SIZE as f32,
-                row[12] / YOLO_INPUT_SIZE as f32,
+                output_data.value(start + 11) / YOLO_INPUT_SIZE as f32,
+                output_data.value(start + 12) / YOLO_INPUT_SIZE as f32,
             ],
             [
-                row[13] / YOLO_INPUT_SIZE as f32,
-                row[14] / YOLO_INPUT_SIZE as f32,
+                output_data.value(start + 13) / YOLO_INPUT_SIZE as f32,
+                output_data.value(start + 14) / YOLO_INPUT_SIZE as f32,
             ],
         ];
 

@@ -35,6 +35,39 @@ pub(crate) struct PreparedF32Input {
     f16_data: OnceCell<Vec<half::f16>>,
 }
 
+#[derive(Clone, Copy)]
+pub(crate) enum BorrowedFloatTensor<'a> {
+    F32(&'a [f32]),
+    F16(&'a [half::f16]),
+}
+
+pub(crate) trait FloatTensorData: Copy {
+    fn len(self) -> usize;
+    fn value(self, index: usize) -> f32;
+}
+
+impl FloatTensorData for &[f32] {
+    fn len(self) -> usize {
+        <[f32]>::len(self)
+    }
+
+    #[inline]
+    fn value(self, index: usize) -> f32 {
+        self[index]
+    }
+}
+
+impl FloatTensorData for &[half::f16] {
+    fn len(self) -> usize {
+        <[half::f16]>::len(self)
+    }
+
+    #[inline]
+    fn value(self, index: usize) -> f32 {
+        self[index].to_f32()
+    }
+}
+
 impl PreparedF32Input {
     pub(crate) fn new(data: Vec<f32>) -> Self {
         Self {
@@ -394,14 +427,13 @@ pub(crate) fn run_f32<const N: usize>(
 }
 
 /// Run inference using a reusable input and process the first output in place.
-///
-/// Native f32 output is borrowed directly from ONNX Runtime. FP16 output uses
-/// a temporary f32 conversion buffer because postprocessing operates on f32.
-pub(crate) fn with_prepared_f32_output<const N: usize, T>(
+/// Both f32 and f16 outputs remain borrowed from ONNX Runtime; consumers
+/// convert only the values they inspect.
+pub(crate) fn with_prepared_float_output<const N: usize, T>(
     session: &mut Session,
     input: &PreparedF32Input,
     input_shape: [i64; N],
-    consume: impl FnOnce(&[i64], &[f32]) -> MlResult<T>,
+    consume: impl FnOnce(&[i64], BorrowedFloatTensor<'_>) -> MlResult<T>,
 ) -> MlResult<T> {
     let outputs = if session_expects_f16(session) {
         let input_tensor =
@@ -418,12 +450,10 @@ pub(crate) fn with_prepared_f32_output<const N: usize, T>(
     }
     let output = &outputs[0];
     if let Ok((tensor_shape, tensor_data)) = output.try_extract_tensor::<f32>() {
-        consume(tensor_shape, tensor_data)
+        consume(tensor_shape, BorrowedFloatTensor::F32(tensor_data))
     } else {
         let (tensor_shape, tensor_data) = output.try_extract_tensor::<half::f16>()?;
-        let mut data = vec![0.0; tensor_data.len()];
-        tensor_data.convert_to_f32_slice(&mut data);
-        consume(tensor_shape, &data)
+        consume(tensor_shape, BorrowedFloatTensor::F16(tensor_data))
     }
 }
 
