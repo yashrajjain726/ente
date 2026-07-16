@@ -1118,6 +1118,8 @@ const Page: React.FC = () => {
                         albumId: collection.id,
                         albumName: collection.name,
                     });
+                    setPostCreateAlbumOp(undefined);
+                    return;
                 }
 
                 setPostCreateAlbumOp((postCreateAlbumOp) => {
