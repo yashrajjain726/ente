@@ -49,6 +49,7 @@ const Page: React.FC = () => {
         setPendingPasskeyVerification,
         signupEmail,
     } = useSpaceAppState();
+    const [codeResetKey, setCodeResetKey] = useState(0);
     const [verificationError, setVerificationError] = useState<string>();
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isResending, setIsResending] = useState(false);
@@ -144,6 +145,9 @@ const Page: React.FC = () => {
             if (!isExpectedVerificationError(error)) {
                 console.error("Space signup verification failed", error);
             }
+            if (isHTTPErrorWithStatus(error, 401)) {
+                setCodeResetKey((key) => key + 1);
+            }
             setVerificationError(verificationErrorMessage(error));
             setIsSubmitting(false);
         }
@@ -165,6 +169,9 @@ const Page: React.FC = () => {
         } catch (error) {
             if (!isExpectedVerificationError(error)) {
                 console.error("Space login email verification failed", error);
+            }
+            if (isHTTPErrorWithStatus(error, 401)) {
+                setCodeResetKey((key) => key + 1);
             }
             setVerificationError(verificationErrorMessage(error));
             setIsSubmitting(false);
@@ -206,6 +213,7 @@ const Page: React.FC = () => {
         <>
             <SpacePageMeta themeColor={verifyEmailBackground} />
             <VerifyEmailScreen
+                codeResetKey={codeResetKey}
                 email={email}
                 errorMessage={verificationError}
                 initialCode={

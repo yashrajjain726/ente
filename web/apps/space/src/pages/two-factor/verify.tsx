@@ -31,6 +31,7 @@ const isExpectedTwoFactorError = (error: unknown) =>
 const Page: React.FC = () => {
     const router = useSpaceRouter();
     const { refreshProfile } = useSpaceAppState();
+    const [codeResetKey, setCodeResetKey] = useState(0);
     const [twoFactorSessionID, setTwoFactorSessionID] = useState("");
     const [errorMessage, setErrorMessage] = useState<string>();
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -57,6 +58,9 @@ const Page: React.FC = () => {
             if (!isExpectedTwoFactorError(error)) {
                 console.error("Space 2FA verification failed", error);
             }
+            if (isHTTPErrorWithStatus(error, 401)) {
+                setCodeResetKey((key) => key + 1);
+            }
             setErrorMessage(twoFactorErrorMessage(error));
             setIsSubmitting(false);
         }
@@ -70,6 +74,7 @@ const Page: React.FC = () => {
         <>
             <SpacePageMeta themeColor={verifyTwoFactorBackground} />
             <VerifyTwoFactorScreen
+                codeResetKey={codeResetKey}
                 errorMessage={errorMessage}
                 isSubmitting={isSubmitting}
                 onBack={() => void router.push(spaceRoutes.login)}
