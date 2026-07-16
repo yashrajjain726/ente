@@ -4,6 +4,7 @@ import "dart:typed_data";
 import "package:flutter/foundation.dart" show kDebugMode;
 import "package:flutter/material.dart";
 import "package:logging/logging.dart";
+import "package:photos/core/configuration.dart";
 import "package:photos/core/event_bus.dart";
 import "package:photos/db/files_db.dart";
 import "package:photos/db/ml/db.dart";
@@ -20,6 +21,7 @@ import "package:photos/services/photos_contacts_service.dart";
 import "package:photos/services/search_service.dart";
 import "package:photos/theme/ente_theme.dart";
 import "package:photos/ui/common/loading_widget.dart";
+import "package:photos/utils/avatar_util.dart";
 import "package:photos/utils/face/face_thumbnail_cache.dart";
 
 final _logger = Logger("PersonFaceWidget");
@@ -64,7 +66,7 @@ class _PersonFaceWidgetState extends State<PersonFaceWidget>
     with AutomaticKeepAliveClientMixin {
   Future<Uint8List?>? faceCropFuture;
   int? _faceCropFileId;
-  String? _personName;
+  AvatarIdentity? _personIdentity;
   bool _showingFallback = false;
   bool _fallbackEverUsed = false;
   bool _personHasContactLink = false;
@@ -102,6 +104,7 @@ class _PersonFaceWidgetState extends State<PersonFaceWidget>
         oldWidget.useFullFile != widget.useFullFile) {
       _personHasContactLink = false;
       _linkedContactUserId = null;
+      _personIdentity = null;
       faceCropFuture = _startFaceCropLoad();
     }
   }
@@ -209,7 +212,7 @@ class _PersonFaceWidgetState extends State<PersonFaceWidget>
             "faceCropFuture is null, no cover face found for person or cluster.",
           );
         }
-        return _EmptyPersonThumbnail(initial: isPerson ? _personName : null);
+        return _EmptyPersonThumbnail(identity: _personIdentity);
       },
     );
   }
@@ -290,11 +293,26 @@ class _PersonFaceWidgetState extends State<PersonFaceWidget>
         if (!_isCurrentLoad(generation)) {
           return null;
         }
-        _personName = personEntity.data.name;
         _personHasContactLink = _hasContactLink(personEntity);
         final contactPhotoBytes = await _getLinkedContactPhotoBytes(
           personEntity,
           generation: generation,
+        );
+        if (!_isCurrentLoad(generation)) {
+          return null;
+        }
+        final personData = personEntity.data;
+        final resolvedEmail = PhotosContactsService.instance
+            .getCachedResolvedEmail(
+              contactUserId: personData.userID,
+              email: personData.userID == null ? personData.email : null,
+            );
+        _personIdentity = AvatarIdentity.account(
+          label: personData.name,
+          email: resolvedEmail ?? personData.email,
+          userID: personData.userID,
+          personID: personEntity.remoteID,
+          currentUserEmail: Configuration.instance.getEmail(),
         );
         if (contactPhotoBytes != null) {
           return contactPhotoBytes;
@@ -303,6 +321,7 @@ class _PersonFaceWidgetState extends State<PersonFaceWidget>
       } else {
         _personHasContactLink = false;
         _linkedContactUserId = null;
+        _personIdentity = null;
       }
       final tryInMemoryCachedCrop = checkInMemoryCachedCropForPersonOrClusterID(
         personOrClusterId,
@@ -526,23 +545,24 @@ class _PersonFaceWidgetState extends State<PersonFaceWidget>
 }
 
 class _EmptyPersonThumbnail extends StatelessWidget {
-  final String? initial;
+  final AvatarIdentity? identity;
 
-  const _EmptyPersonThumbnail({this.initial});
+  const _EmptyPersonThumbnail({this.identity});
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = getEnteColorScheme(context);
     final textTheme = getEnteTextTheme(context);
-    final trimmed = initial?.trim();
-    final hasInitial = trimmed != null && trimmed.isNotEmpty;
+    final hasIdentity = identity != null;
     return Container(
       decoration: BoxDecoration(
-        color: colorScheme.fillFaint,
+        color: hasIdentity
+            ? avatarBackgroundColor(context, identity!)
+            : colorScheme.fillFaint,
         border: Border.all(color: colorScheme.strokeFaint, width: 1),
       ),
       child: Center(
-        child: hasInitial
+        child: hasIdentity
             ? LayoutBuilder(
                 builder: (context, constraints) {
                   final shortestSide = constraints.biggest.shortestSide.isFinite
@@ -552,9 +572,9 @@ class _EmptyPersonThumbnail extends StatelessWidget {
                       ? shortestSide * 0.42
                       : textTheme.h2.fontSize ?? 24;
                   return Text(
-                    trimmed.substring(0, 1).toUpperCase(),
+                    identity!.initial,
                     style: textTheme.h2Bold.copyWith(
-                      color: colorScheme.textMuted,
+                      color: Colors.white,
                       fontSize: fontSize,
                       height: 1,
                     ),

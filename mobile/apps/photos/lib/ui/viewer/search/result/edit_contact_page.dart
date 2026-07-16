@@ -6,6 +6,7 @@ import "package:ente_pure_utils/ente_pure_utils.dart";
 import "package:flutter/material.dart";
 import "package:hugeicons/hugeicons.dart";
 import "package:logging/logging.dart";
+import "package:photos/core/configuration.dart";
 import "package:photos/core/event_bus.dart";
 import "package:photos/events/people_changed_event.dart";
 import "package:photos/generated/l10n.dart";
@@ -26,6 +27,7 @@ import "package:photos/ui/viewer/people/face_thumbnail_squircle.dart";
 import "package:photos/ui/viewer/search/result/contact_person_picker_page.dart";
 import "package:photos/ui/viewer/search/result/contact_photo_adjust_page.dart";
 import "package:photos/ui/viewer/search/result/contact_photo_picker_sheet.dart";
+import "package:photos/utils/avatar_util.dart";
 import "package:photos/utils/contact_photo_util.dart";
 import "package:photos/utils/dialog_util.dart";
 import "package:photos/utils/person_contact_linking_util.dart";
@@ -218,14 +220,12 @@ class _EditContactPageState extends State<EditContactPage> {
     final colorScheme = getEnteColorScheme(context);
     final textTheme = getEnteTextTheme(context);
     final trimmedName = _nameController.text.trim();
-    final initial = trimmedName.isNotEmpty
-        ? trimmedName.characters.first.toUpperCase()
-        : widget.email.characters.first.toUpperCase();
-    final avatarSeed = trimmedName.isNotEmpty ? trimmedName : widget.email;
-    final avatarColor =
-        colorScheme.avatarColors[avatarSeed.length.remainder(
-          colorScheme.avatarColors.length,
-        )];
+    final identity = AvatarIdentity.account(
+      label: trimmedName.isNotEmpty ? trimmedName : widget.email,
+      email: widget.email,
+      userID: widget.contactUserId,
+      currentUserEmail: Configuration.instance.getEmail(),
+    );
 
     if (_isLoadingPhoto) {
       return _ContactThumbnailShell(
@@ -244,10 +244,10 @@ class _EditContactPageState extends State<EditContactPage> {
 
     return _ContactThumbnailShell(
       size: size,
-      backgroundColor: avatarColor,
+      backgroundColor: avatarBackgroundColor(context, identity),
       child: Center(
         child: Text(
-          initial,
+          identity.initial,
           style: textTheme.h1Bold.copyWith(
             fontSize: 38.25,
             height: 47.813 / 38.25,
