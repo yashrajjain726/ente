@@ -76,7 +76,7 @@ Future<void> deleteFilesFromEverywhere(
   _logger.info("Trying to deleteFilesFromEverywhere " + files.toString());
   final List<String> localAssetIDs = [];
   final List<String> localSharedMediaIDs = [];
-  final List<String> alreadyDeletedIDs = []; // to ignore already deleted files
+  final List<String> alreadyDeletedIDs = []; // Files already missing from disk.
   bool hasLocalOnlyFiles = false;
   for (final file in files) {
     if (file.localID != null) {
@@ -102,7 +102,7 @@ Future<void> deleteFilesFromEverywhere(
   final List<EnteFile> deletedFiles = [];
   for (final file in files) {
     if (file.localID != null) {
-      // Remove only those files that have already been removed from disk
+      // Handle only files deleted, moved to trash, or already missing.
       if (removedIDs.contains(file.localID) ||
           alreadyDeletedIDs.contains(file.localID)) {
         deletedFiles.add(file);
@@ -227,7 +227,7 @@ Future<List<EnteFile>> deleteFilesOnDeviceOnly(
   _logger.info("Trying to deleteFilesOnDeviceOnly" + files.toString());
   final List<String> localAssetIDs = [];
   final List<String> localSharedMediaIDs = [];
-  final List<String> alreadyDeletedIDs = []; // to ignore already deleted files
+  final List<String> alreadyDeletedIDs = []; // Files already missing from disk.
   final localOnlyIDs = <String?>{};
   for (final file in files) {
     if (file.localID != null) {
@@ -250,7 +250,7 @@ Future<List<EnteFile>> deleteFilesOnDeviceOnly(
   final removedIDs = deletedIDs.union(result.trashedIDs);
   final List<EnteFile> deletedFiles = [];
   for (final file in files) {
-    // Remove only those files that have been removed from disk
+    // Handle only files deleted, moved to trash, or already missing.
     if (removedIDs.contains(file.localID) ||
         alreadyDeletedIDs.contains(file.localID)) {
       deletedFiles.add(file);
