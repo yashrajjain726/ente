@@ -108,14 +108,17 @@ class SearchService {
     User user,
     List<Collection> collections,
   ) {
-    final contactUserId = user.id != null && user.id! > 0 ? user.id : null;
-    final cachedContact = PhotosContactsService.instance.getCachedContact(
-      contactUserId: contactUserId,
-      email: contactUserId == null ? user.email : null,
-    );
+    final contactUserId = user.id;
+    if (contactUserId == null || contactUserId <= 0) {
+      throw ArgumentError.value(
+        contactUserId,
+        "user.id",
+        "Contact search results require a positive user ID",
+      );
+    }
     final params = <String, dynamic>{
       kPersonParamID: user.linkedPersonID,
-      kContactUserId: contactUserId ?? cachedContact?.contactUserId,
+      kContactUserId: contactUserId,
       kContactEmail: resolveKnownEmail(user) ?? user.email,
       kContactCollections: collections,
     };

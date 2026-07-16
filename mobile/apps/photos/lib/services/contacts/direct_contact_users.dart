@@ -17,6 +17,10 @@ List<User> buildDirectContactUsers({
   final usersByEmail = <String, User>{};
 
   void addUser(User user) {
+    final userId = user.id;
+    if (userId == null || userId <= 0) {
+      return;
+    }
     final normalizedEmail = normalizeContactLinkEmail(
       knownContactEmailOrNull(user.email),
     );
@@ -24,12 +28,7 @@ List<User> buildDirectContactUsers({
       return;
     }
 
-    final existing = usersByEmail[normalizedEmail];
-    final hasUserId = user.id != null && user.id! > 0;
-    final existingHasUserId = existing?.id != null && existing!.id! > 0;
-    if (existing == null || (!existingHasUserId && hasUserId)) {
-      usersByEmail[normalizedEmail] = user;
-    }
+    usersByEmail.putIfAbsent(normalizedEmail, () => user);
   }
 
   for (final collection in collections) {
