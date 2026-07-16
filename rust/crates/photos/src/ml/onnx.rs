@@ -3,7 +3,10 @@ use ort::{
     session::{Session, builder::GraphOptimizationLevel},
     value::{Tensor, TensorElementType, TensorRef, ValueType},
 };
-use std::cell::OnceCell;
+use std::{
+    cell::OnceCell,
+    path::{Path, PathBuf},
+};
 
 use half::prelude::{HalfFloatSliceExt, HalfFloatVecExt};
 
@@ -18,6 +21,10 @@ use ort::ep::{
 use std::num::NonZeroUsize;
 
 use crate::ml::error::{MlError, MlResult};
+
+#[cfg(any(target_os = "ios", test))]
+const COREML_CACHE_SCHEMA: &str = "ort-1_27-mlprogram-all-default-v1";
+const COREML_CACHE_COMPLETE_MARKER: &str = ".ente-cache-complete";
 
 /// An f32 model input that can be borrowed by multiple sessions.
 ///
@@ -48,8 +55,12 @@ pub(crate) enum ExecutionMode {
     CpuOnly,
 }
 
-pub(crate) fn build_session(model_path: &str, mode: ExecutionMode) -> MlResult<Session> {
-    let primary = provider_attempt(mode);
+pub(crate) fn build_session(
+    model_path: &str,
+    mode: ExecutionMode,
+    coreml_cache_namespace: &str,
+) -> MlResult<Session> {
+    let primary = provider_attempt(mode, model_path, coreml_cache_namespace);
     let retry_with_cpu_only = primary.retry_with_cpu_only;
     let mut attempts = vec![primary];
     if retry_with_cpu_only {
@@ -58,9 +69,30 @@ pub(crate) fn build_session(model_path: &str, mode: ExecutionMode) -> MlResult<S
 
     let mut errors = Vec::new();
     for attempt in attempts {
+        let coreml_cache_dir = attempt.coreml_cache_dir.clone();
         match build_session_with_providers(model_path, attempt) {
-            Ok(session) => return Ok(session),
-            Err(error) => errors.push(format!("{error}")),
+            Ok(session) => {
+                if let Some(cache_dir) = coreml_cache_dir
+                    && let Err(error) = mark_coreml_cache_complete(&cache_dir)
+                {
+                    eprintln!(
+                        "[ml][rt] failed to mark CoreML cache complete at '{}': {error}",
+                        cache_dir.display()
+                    );
+                }
+                return Ok(session);
+            }
+            Err(error) => {
+                if let Some(cache_dir) = coreml_cache_dir
+                    && let Err(cleanup_error) = invalidate_coreml_cache(&cache_dir)
+                {
+                    eprintln!(
+                        "[ml][rt] failed to invalidate CoreML cache at '{}' after session construction failed: {cleanup_error}",
+                        cache_dir.display()
+                    );
+                }
+                errors.push(format!("{error}"));
+            }
         }
     }
 
@@ -86,6 +118,7 @@ struct ProviderAttempt {
     providers: Vec<ExecutionProviderDispatch>,
     retry_with_cpu_only: bool,
     disable_intra_op_spinning: bool,
+    coreml_cache_dir: Option<PathBuf>,
 }
 
 impl ProviderAttempt {
@@ -94,36 +127,66 @@ impl ProviderAttempt {
             providers: vec![CPU::default().with_arena_allocator(true).build()],
             retry_with_cpu_only: false,
             disable_intra_op_spinning: false,
+            coreml_cache_dir: None,
         }
     }
 }
 
-fn provider_attempt(mode: ExecutionMode) -> ProviderAttempt {
+fn provider_attempt(
+    mode: ExecutionMode,
+    model_path: &str,
+    coreml_cache_namespace: &str,
+) -> ProviderAttempt {
     match mode {
-        ExecutionMode::PlatformDefault => platform_default_attempt(),
+        ExecutionMode::PlatformDefault => {
+            platform_default_attempt(model_path, coreml_cache_namespace)
+        }
         ExecutionMode::CpuOnly => ProviderAttempt::cpu_only(),
     }
 }
 
 #[cfg(target_os = "ios")]
-fn platform_default_attempt() -> ProviderAttempt {
+fn platform_default_attempt(model_path: &str, coreml_cache_namespace: &str) -> ProviderAttempt {
+    let (coreml_provider, coreml_cache_dir) = coreml_provider(model_path, coreml_cache_namespace);
     ProviderAttempt {
         providers: vec![
-            CoreML::default()
-                .with_model_format(ModelFormat::MLProgram)
-                .with_compute_units(ComputeUnits::All)
-                .with_specialization_strategy(SpecializationStrategy::Default)
-                .build()
-                .error_on_failure(),
+            coreml_provider,
             CPU::default().with_arena_allocator(true).build(),
         ],
         retry_with_cpu_only: true,
         disable_intra_op_spinning: false,
+        coreml_cache_dir,
     }
 }
 
+#[cfg(target_os = "ios")]
+fn coreml_provider(
+    model_path: &str,
+    cache_namespace: &str,
+) -> (ExecutionProviderDispatch, Option<PathBuf>) {
+    let mut provider = CoreML::default()
+        .with_model_format(ModelFormat::MLProgram)
+        .with_compute_units(ComputeUnits::All)
+        .with_specialization_strategy(SpecializationStrategy::Default);
+
+    let mut prepared_cache_dir = None;
+    match prepare_coreml_cache_directory(model_path, cache_namespace) {
+        Ok(cache_dir) => {
+            provider = provider.with_model_cache_dir(cache_dir.to_string_lossy());
+            prepared_cache_dir = Some(cache_dir);
+        }
+        Err(error) => {
+            eprintln!(
+                "[ml][rt] failed to prepare persistent CoreML cache for '{model_path}'; continuing without it: {error}"
+            );
+        }
+    }
+
+    (provider.build().error_on_failure(), prepared_cache_dir)
+}
+
 #[cfg(target_os = "android")]
-fn platform_default_attempt() -> ProviderAttempt {
+fn platform_default_attempt(_model_path: &str, _coreml_cache_namespace: &str) -> ProviderAttempt {
     ProviderAttempt {
         providers: vec![
             xnnpack_provider(),
@@ -131,12 +194,133 @@ fn platform_default_attempt() -> ProviderAttempt {
         ],
         retry_with_cpu_only: true,
         disable_intra_op_spinning: true,
+        coreml_cache_dir: None,
     }
 }
 
 #[cfg(not(any(target_os = "ios", target_os = "android")))]
-fn platform_default_attempt() -> ProviderAttempt {
+fn platform_default_attempt(_model_path: &str, _coreml_cache_namespace: &str) -> ProviderAttempt {
     ProviderAttempt::cpu_only()
+}
+
+#[cfg(target_os = "ios")]
+fn prepare_coreml_cache_directory(
+    model_path: &str,
+    cache_namespace: &str,
+) -> std::io::Result<PathBuf> {
+    let model_path = Path::new(model_path);
+    let model_cache_root =
+        coreml_cache_root(model_path).join(sanitize_cache_component(cache_namespace));
+    std::fs::create_dir_all(&model_cache_root)?;
+
+    let cache_key = coreml_model_cache_key(model_path)?;
+    prune_superseded_coreml_cache_directories(&model_cache_root, &cache_key)?;
+
+    let cache_dir = model_cache_root.join(cache_key);
+    prepare_coreml_cache_entry(&cache_dir)?;
+    Ok(cache_dir)
+}
+
+/// A missing completion marker means the process stopped before ONNX Runtime
+/// finished constructing the session. Recreate the directory so ORT cannot
+/// mistake a partial model package for a valid cache hit.
+#[cfg(any(target_os = "ios", test))]
+fn prepare_coreml_cache_entry(cache_dir: &Path) -> std::io::Result<()> {
+    if cache_dir.exists() && !coreml_cache_complete_marker(cache_dir).is_file() {
+        std::fs::remove_dir_all(cache_dir)?;
+    }
+    std::fs::create_dir_all(cache_dir)
+}
+
+fn mark_coreml_cache_complete(cache_dir: &Path) -> std::io::Result<()> {
+    std::fs::write(coreml_cache_complete_marker(cache_dir), [])
+}
+
+fn invalidate_coreml_cache(cache_dir: &Path) -> std::io::Result<()> {
+    match std::fs::remove_dir_all(cache_dir) {
+        Ok(()) => Ok(()),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(error) => Err(error),
+    }
+}
+
+fn coreml_cache_complete_marker(cache_dir: &Path) -> PathBuf {
+    cache_dir.join(COREML_CACHE_COMPLETE_MARKER)
+}
+
+/// Keep generated CoreML artifacts in Library/Caches so iOS can evict them and
+/// exclude them from backups. Model files are stored below Library/Application
+/// Support; fall back to the process temporary directory for unusual layouts.
+#[cfg(any(target_os = "ios", test))]
+fn coreml_cache_root(model_path: &Path) -> PathBuf {
+    let cache_base = model_path
+        .ancestors()
+        .find(|ancestor| ancestor.file_name().is_some_and(|name| name == "Library"))
+        .map(|library| library.join("Caches"))
+        .unwrap_or_else(std::env::temp_dir);
+
+    cache_base
+        .join("ente")
+        .join("ml")
+        .join("coreml")
+        .join(COREML_CACHE_SCHEMA)
+}
+
+/// Include the filename and file metadata in the directory name because ONNX
+/// Runtime's internal CoreML cache key does not necessarily change when only
+/// model weights change.
+#[cfg(any(target_os = "ios", test))]
+fn coreml_model_cache_key(model_path: &Path) -> std::io::Result<String> {
+    use std::time::UNIX_EPOCH;
+
+    let metadata = std::fs::metadata(model_path)?;
+    let modified = metadata
+        .modified()?
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default();
+    Ok(format!(
+        "{}-{}-{}-{}",
+        sanitize_cache_component(
+            model_path
+                .file_name()
+                .and_then(|name| name.to_str())
+                .unwrap_or("model")
+        ),
+        metadata.len(),
+        modified.as_secs(),
+        modified.subsec_nanos()
+    ))
+}
+
+#[cfg(any(target_os = "ios", test))]
+fn sanitize_cache_component(value: &str) -> String {
+    value
+        .chars()
+        .map(|character| {
+            if character.is_ascii_alphanumeric() || matches!(character, '-' | '_' | '.') {
+                character
+            } else {
+                '_'
+            }
+        })
+        .collect()
+}
+
+/// Retain exactly one generated cache for each logical model slot. The active
+/// directory is identity-specific so ONNX Runtime cannot reuse stale output.
+#[cfg(any(target_os = "ios", test))]
+fn prune_superseded_coreml_cache_directories(
+    model_cache_root: &Path,
+    current_cache_key: &str,
+) -> std::io::Result<()> {
+    for entry in std::fs::read_dir(model_cache_root)? {
+        let entry = entry?;
+        if entry.file_name() == current_cache_key || !entry.file_type()?.is_dir() {
+            continue;
+        }
+        std::fs::remove_dir_all(entry.path())?;
+    }
+    Ok(())
 }
 
 #[cfg(target_os = "android")]
@@ -262,7 +446,13 @@ pub(crate) fn run_i32_f32<const N: usize>(
 
 #[cfg(test)]
 mod tests {
-    use super::has_protobuf_parse_failure;
+    use std::{io::Write, path::Path};
+
+    use super::{
+        coreml_cache_root, coreml_model_cache_key, has_protobuf_parse_failure,
+        invalidate_coreml_cache, mark_coreml_cache_complete, prepare_coreml_cache_entry,
+        prune_superseded_coreml_cache_directories, sanitize_cache_component,
+    };
 
     #[test]
     fn detects_protobuf_parse_failure() {
@@ -276,5 +466,97 @@ mod tests {
         assert!(!has_protobuf_parse_failure(&[String::from(
             "Load model failed: missing initializer",
         )]));
+    }
+
+    #[test]
+    fn places_coreml_cache_in_library_caches() {
+        let model = Path::new(
+            "/var/mobile/Containers/Data/Application/APP/Library/Application Support/assets/model.onnx",
+        );
+
+        assert_eq!(
+            coreml_cache_root(model),
+            Path::new(
+                "/var/mobile/Containers/Data/Application/APP/Library/Caches/ente/ml/coreml/ort-1_27-mlprogram-all-default-v1"
+            )
+        );
+    }
+
+    #[test]
+    fn coreml_cache_key_changes_when_model_file_changes() {
+        let mut model = tempfile::NamedTempFile::new().unwrap();
+        model.write_all(b"first").unwrap();
+        model.flush().unwrap();
+        let first_key = coreml_model_cache_key(model.path()).unwrap();
+
+        model.write_all(b" version").unwrap();
+        model.flush().unwrap();
+        let second_key = coreml_model_cache_key(model.path()).unwrap();
+
+        assert_ne!(first_key, second_key);
+    }
+
+    #[test]
+    fn sanitizes_coreml_cache_component() {
+        assert_eq!(
+            sanitize_cache_component("model name.onnx"),
+            "model_name.onnx"
+        );
+    }
+
+    #[test]
+    fn prunes_only_superseded_directories_for_one_model() {
+        let root = tempfile::tempdir().unwrap();
+        let old_cache = root.path().join("old");
+        let current_cache = root.path().join("current");
+        std::fs::create_dir(&old_cache).unwrap();
+        std::fs::create_dir(&current_cache).unwrap();
+        std::fs::write(root.path().join("marker"), b"keep").unwrap();
+
+        prune_superseded_coreml_cache_directories(root.path(), "current").unwrap();
+
+        assert!(!old_cache.exists());
+        assert!(current_cache.exists());
+        assert!(root.path().join("marker").exists());
+    }
+
+    #[test]
+    fn replaces_an_incomplete_coreml_cache_entry() {
+        let root = tempfile::tempdir().unwrap();
+        let cache_dir = root.path().join("current");
+        std::fs::create_dir(&cache_dir).unwrap();
+        let partial_artifact = cache_dir.join("partial.mlmodelc");
+        std::fs::write(&partial_artifact, b"partial").unwrap();
+
+        prepare_coreml_cache_entry(&cache_dir).unwrap();
+
+        assert!(cache_dir.is_dir());
+        assert!(!partial_artifact.exists());
+    }
+
+    #[test]
+    fn preserves_a_completed_coreml_cache_entry() {
+        let root = tempfile::tempdir().unwrap();
+        let cache_dir = root.path().join("current");
+        std::fs::create_dir(&cache_dir).unwrap();
+        let artifact = cache_dir.join("model.mlmodelc");
+        std::fs::write(&artifact, b"complete").unwrap();
+        mark_coreml_cache_complete(&cache_dir).unwrap();
+
+        prepare_coreml_cache_entry(&cache_dir).unwrap();
+
+        assert!(artifact.exists());
+    }
+
+    #[test]
+    fn invalidates_a_failed_coreml_cache_entry() {
+        let root = tempfile::tempdir().unwrap();
+        let cache_dir = root.path().join("current");
+        std::fs::create_dir(&cache_dir).unwrap();
+
+        invalidate_coreml_cache(&cache_dir).unwrap();
+
+        assert!(!cache_dir.exists());
+        invalidate_coreml_cache(&cache_dir).unwrap();
     }
 }

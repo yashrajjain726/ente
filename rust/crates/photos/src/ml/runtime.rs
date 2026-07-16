@@ -60,6 +60,7 @@ struct ModelSlotState {
 #[derive(Debug)]
 struct ModelSlot {
     default_execution_mode: onnx::ExecutionMode,
+    coreml_cache_namespace: &'static str,
     state: Mutex<ModelSlotState>,
 }
 
@@ -93,9 +94,13 @@ impl DerefMut for ModelSessionGuard<'_> {
 }
 
 impl ModelSlot {
-    fn new(default_execution_mode: onnx::ExecutionMode) -> Self {
+    fn new(
+        default_execution_mode: onnx::ExecutionMode,
+        coreml_cache_namespace: &'static str,
+    ) -> Self {
         Self {
             default_execution_mode,
+            coreml_cache_namespace,
             state: Mutex::new(ModelSlotState {
                 path: String::new(),
                 fell_back_to_cpu: false,
@@ -205,7 +210,8 @@ impl ModelSlot {
         } else {
             self.default_execution_mode
         };
-        let session = onnx::build_session(&state.path, execution_mode)?;
+        let session =
+            onnx::build_session(&state.path, execution_mode, self.coreml_cache_namespace)?;
         rt_log(&format!("loaded {model_name} in {:?}", t.elapsed()));
         state.session = Some(session);
         Ok(())
@@ -234,20 +240,20 @@ impl MlRuntime {
         let cpu_only = onnx::ExecutionMode::CpuOnly;
 
         Self {
-            face_detection: ModelSlot::new(platform_default),
-            face_embedding: ModelSlot::new(platform_default),
-            clip_image: ModelSlot::new(platform_default),
-            clip_text: ModelSlot::new(platform_default),
+            face_detection: ModelSlot::new(platform_default, "face-detection"),
+            face_embedding: ModelSlot::new(platform_default, "face-embedding"),
+            clip_image: ModelSlot::new(platform_default, "clip-image"),
+            clip_text: ModelSlot::new(platform_default, "clip-text"),
             // Pet models previously had device-specific FP16 driver failures.
             // TODO: Benchmark every pet model with the platform-default providers
             // on supported iOS and Android devices before release, then remove
             // this CPU-only exception if parity and stability are preserved.
-            pet_face_detection: ModelSlot::new(cpu_only),
-            pet_face_embedding_dog: ModelSlot::new(cpu_only),
-            pet_face_embedding_cat: ModelSlot::new(cpu_only),
-            pet_body_detection: ModelSlot::new(cpu_only),
-            pet_body_embedding_dog: ModelSlot::new(cpu_only),
-            pet_body_embedding_cat: ModelSlot::new(cpu_only),
+            pet_face_detection: ModelSlot::new(cpu_only, "pet-face-detection"),
+            pet_face_embedding_dog: ModelSlot::new(cpu_only, "pet-face-embedding-dog"),
+            pet_face_embedding_cat: ModelSlot::new(cpu_only, "pet-face-embedding-cat"),
+            pet_body_detection: ModelSlot::new(cpu_only, "pet-body-detection"),
+            pet_body_embedding_dog: ModelSlot::new(cpu_only, "pet-body-embedding-dog"),
+            pet_body_embedding_cat: ModelSlot::new(cpu_only, "pet-body-embedding-cat"),
         }
     }
 
@@ -555,7 +561,7 @@ mod tests {
 
     #[test]
     fn sync_indexing_residency_clears_disabled_slots() {
-        let slot = ModelSlot::new(onnx::ExecutionMode::PlatformDefault);
+        let slot = ModelSlot::new(onnx::ExecutionMode::PlatformDefault, "test-model");
 
         {
             let mut state = slot.lock_state();
@@ -575,7 +581,7 @@ mod tests {
 
     #[test]
     fn release_residency_resets_transient_cpu_fallback_for_any_slot() {
-        let slot = ModelSlot::new(onnx::ExecutionMode::PlatformDefault);
+        let slot = ModelSlot::new(onnx::ExecutionMode::PlatformDefault, "test-model");
 
         {
             let mut state = slot.lock_state();
