@@ -3,8 +3,8 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-use ente_ensu::download;
 use ente_ensu::llm;
+use ente_model_download::download;
 use ente_model_download::{ModelDownloadTarget, ModelDownloader, migrate_flat_models_dir};
 use serde::{Deserialize, Serialize};
 use tauri::async_runtime;
@@ -81,7 +81,6 @@ fn llm_api_error(err: llm::Error) -> ApiError {
         llm::Error::Unsupported(_) => "unsupported",
         llm::Error::PromptTooLong { .. } => "prompt_too_long",
         llm::Error::Llama { .. } => "llm",
-        llm::Error::Download(err) => download_code(err),
     };
     ApiError::new(code, err.to_string())
 }
@@ -303,7 +302,7 @@ pub async fn llm_download_model(
     async_runtime::spawn_blocking(move || {
         downloader
             .download(
-                &target,
+                std::slice::from_ref(&target),
                 |progress| {
                     if let Some(line) = &progress.log_line {
                         logging::log("LLMDownload", line.clone());

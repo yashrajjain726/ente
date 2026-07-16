@@ -2379,7 +2379,6 @@ dependencies = [
  "ente-core",
  "ente-image",
  "ente-model-download",
- "flate2",
  "llama-cpp-2",
  "ort",
  "parking_lot",
@@ -2389,7 +2388,6 @@ dependencies = [
  "self_cell",
  "serde",
  "serde_json",
- "tar",
  "thiserror 2.0.18",
  "tokio",
  "transcribe-rs",
@@ -2426,11 +2424,13 @@ dependencies = [
 name = "ente-model-download"
 version = "0.0.0"
 dependencies = [
+ "flate2",
  "futures-util",
  "reqwest 0.12.28",
  "serde",
  "serde_json",
  "sha2 0.11.0",
+ "tar",
  "thiserror 2.0.18",
  "tokio",
 ]

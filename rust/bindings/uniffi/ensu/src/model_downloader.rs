@@ -11,6 +11,14 @@ pub enum ModelDownloadTarget {
         url: String,
         mmproj_url: Option<String>,
     },
+    TarGz {
+        id: String,
+        url: String,
+    },
+    Onnx {
+        id: String,
+        url: String,
+    },
 }
 
 impl From<ModelDownloadTarget> for ente_model_download::ModelDownloadTarget {
@@ -25,6 +33,8 @@ impl From<ModelDownloadTarget> for ente_model_download::ModelDownloadTarget {
                 url,
                 mmproj_url,
             },
+            ModelDownloadTarget::TarGz { id, url } => Self::TarGz { id, url },
+            ModelDownloadTarget::Onnx { id, url } => Self::Onnx { id, url },
         }
     }
 }
@@ -56,6 +66,21 @@ impl From<ente_model_download::ModelDownloadProgress> for ModelDownloadProgress 
 pub trait ModelDownloadCallback: Send + Sync {
     fn on_progress(&self, progress: ModelDownloadProgress);
     fn is_cancelled(&self) -> bool;
+}
+
+#[uniffi::export]
+pub fn migrate_legacy_transcription_dir(
+    models_dir: String,
+    legacy_dir: String,
+    model: ModelDownloadTarget,
+    vad: ModelDownloadTarget,
+) {
+    ente_model_download::migrate_legacy_transcription_dir(
+        Path::new(&models_dir),
+        Path::new(&legacy_dir),
+        &model.into(),
+        &vad.into(),
+    );
 }
 
 #[uniffi::export]
@@ -119,15 +144,17 @@ impl ModelDownloadCore {
 
     pub fn download(
         &self,
-        target: ModelDownloadTarget,
+        targets: Vec<ModelDownloadTarget>,
         callback: Box<dyn ModelDownloadCallback>,
     ) -> Result<bool, LlmError> {
         let callback: Arc<dyn ModelDownloadCallback> = Arc::from(callback);
         let progress_callback = Arc::clone(&callback);
         let cancel_callback = Arc::clone(&callback);
+        let targets: Vec<ente_model_download::ModelDownloadTarget> =
+            targets.into_iter().map(Into::into).collect();
         self.inner
             .download(
-                &target.into(),
+                &targets,
                 move |progress| progress_callback.on_progress(progress.into()),
                 move || cancel_callback.is_cancelled(),
             )

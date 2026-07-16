@@ -6,6 +6,7 @@ use std::time::Duration;
 
 use tokio::runtime::Builder;
 
+use crate::archive;
 use crate::download::{self, Progress, Target};
 use crate::gguf;
 
@@ -15,6 +16,14 @@ pub enum ModelDownloadTarget {
         id: String,
         url: String,
         mmproj_url: Option<String>,
+    },
+    TarGz {
+        id: String,
+        url: String,
+    },
+    Onnx {
+        id: String,
+        url: String,
     },
 }
 
@@ -45,28 +54,29 @@ impl ModelDownloader {
     }
 
     pub fn model_path(&self, target: &ModelDownloadTarget) -> PathBuf {
-        let ModelDownloadTarget::Gguf {
-            id,
-            url,
-            mmproj_url,
-        } = target;
-        gguf::model_path(&self.models_dir, id, url, mmproj_url.as_deref())
+        model_path(&self.models_dir, target)
     }
 
     pub fn mmproj_path(&self, target: &ModelDownloadTarget) -> Option<PathBuf> {
-        let ModelDownloadTarget::Gguf {
-            id,
-            url,
-            mmproj_url,
-        } = target;
-        gguf::mmproj_path(&self.models_dir, id, url, mmproj_url.as_deref())
+        match target {
+            ModelDownloadTarget::Gguf {
+                id,
+                url,
+                mmproj_url,
+            } => gguf::mmproj_path(&self.models_dir, id, url, mmproj_url.as_deref()),
+            ModelDownloadTarget::TarGz { .. } | ModelDownloadTarget::Onnx { .. } => None,
+        }
     }
 
     pub fn is_downloaded(&self, target: &ModelDownloadTarget) -> bool {
-        self.expected_targets(target).iter().all(|entry| {
-            let path = Path::new(&entry.destination_path);
-            path.exists() && gguf::looks_like_gguf(path)
-        })
+        match target {
+            ModelDownloadTarget::Gguf { .. } => self.fetch_targets(target).iter().all(|entry| {
+                let path = Path::new(&entry.destination_path);
+                path.exists() && gguf::looks_like_gguf(path)
+            }),
+            ModelDownloadTarget::TarGz { .. } => self.model_path(target).is_dir(),
+            ModelDownloadTarget::Onnx { .. } => is_non_empty_file(&self.model_path(target)),
+        }
     }
 
     pub fn is_download_active(&self) -> bool {
@@ -78,8 +88,12 @@ impl ModelDownloader {
     }
 
     pub fn remove_downloaded(&self, target: &ModelDownloadTarget) -> bool {
+        if let ModelDownloadTarget::TarGz { .. } = target {
+            let dir = self.model_path(target);
+            return dir.exists() && fs::remove_dir_all(dir).is_ok();
+        }
         let mut removed = false;
-        for entry in self.expected_targets(target) {
+        for entry in self.fetch_targets(target) {
             let path = Path::new(&entry.destination_path);
             if path.exists() {
                 let _ = fs::remove_file(path);
@@ -96,23 +110,67 @@ impl ModelDownloader {
     /// already present.
     pub fn download(
         &self,
-        target: &ModelDownloadTarget,
+        targets: &[ModelDownloadTarget],
         mut on_progress: impl FnMut(ModelDownloadProgress),
         is_cancelled: impl Fn() -> bool,
     ) -> Result<bool, download::Error> {
-        if self.is_downloaded(target) {
+        let pending = targets
+            .iter()
+            .filter(|target| !self.is_downloaded(target))
+            .collect::<Vec<_>>();
+        if pending.is_empty() {
             return Ok(false);
         }
 
         self.cancelled.store(false, Ordering::SeqCst);
         self.active.store(true, Ordering::SeqCst);
-        let result = gguf::download_model_files(
-            self.expected_targets(target),
+        let result = download::fetch(
+            pending
+                .iter()
+                .flat_map(|target| self.fetch_targets(target))
+                .collect(),
+            validate_target,
             |progress| on_progress(display_progress(progress)),
             || self.cancelled.load(Ordering::SeqCst) || is_cancelled(),
-        );
+        )
+        .and_then(|()| {
+            for target in &pending {
+                self.extract_if_archive(target, &mut on_progress)?;
+            }
+            Ok(())
+        });
         self.active.store(false, Ordering::SeqCst);
         result.map(|()| true)
+    }
+
+    fn extract_if_archive(
+        &self,
+        target: &ModelDownloadTarget,
+        on_progress: &mut impl FnMut(ModelDownloadProgress),
+    ) -> Result<(), download::Error> {
+        let ModelDownloadTarget::TarGz { id, .. } = target else {
+            return Ok(());
+        };
+        on_progress(ModelDownloadProgress {
+            downloaded_bytes: 0,
+            total_bytes: None,
+            percent: 99,
+            status: "Extracting...".to_string(),
+            log_line: Some(format!("Extracting model archive id={id}")),
+        });
+        let archive_path = self.staging_dir().join(format!("{id}.tar.gz"));
+        let result = archive::extract_tar_gz(
+            &archive_path,
+            &self.staging_dir().join(id),
+            &self.model_path(target),
+        );
+        let _ = fs::remove_file(download::metadata_path_for(&archive_path));
+        let _ = fs::remove_file(&archive_path);
+        result
+    }
+
+    fn staging_dir(&self) -> PathBuf {
+        self.models_dir.join(".staging")
     }
 
     pub fn estimated_download_size(&self, target: &ModelDownloadTarget) -> Option<i64> {
@@ -128,7 +186,7 @@ impl ModelDownloader {
                 .ok()?;
             let mut total: i64 = 0;
             let mut any = false;
-            for entry in self.expected_targets(target) {
+            for entry in self.fetch_targets(target) {
                 let path = Path::new(&entry.destination_path);
                 let size = if path.exists() {
                     fs::metadata(path).ok().map(|m| m.len()).filter(|s| *s > 0)
@@ -144,14 +202,69 @@ impl ModelDownloader {
         })
     }
 
-    fn expected_targets(&self, target: &ModelDownloadTarget) -> Vec<Target> {
-        let ModelDownloadTarget::Gguf {
+    fn fetch_targets(&self, target: &ModelDownloadTarget) -> Vec<Target> {
+        match target {
+            ModelDownloadTarget::Gguf {
+                id,
+                url,
+                mmproj_url,
+            } => gguf::expected_targets(&self.models_dir, id, url, mmproj_url.as_deref()),
+            ModelDownloadTarget::TarGz { id, url } => vec![Target {
+                label: "Model".to_string(),
+                url: url.clone(),
+                destination_path: self
+                    .staging_dir()
+                    .join(format!("{id}.tar.gz"))
+                    .display()
+                    .to_string(),
+            }],
+            ModelDownloadTarget::Onnx { url, .. } => vec![Target {
+                label: "Model".to_string(),
+                url: url.clone(),
+                destination_path: self.model_path(target).display().to_string(),
+            }],
+        }
+    }
+}
+
+fn model_path(models_dir: &Path, target: &ModelDownloadTarget) -> PathBuf {
+    match target {
+        ModelDownloadTarget::Gguf {
             id,
             url,
             mmproj_url,
-        } = target;
-        gguf::expected_targets(&self.models_dir, id, url, mmproj_url.as_deref())
+        } => gguf::model_path(models_dir, id, url, mmproj_url.as_deref()),
+        ModelDownloadTarget::TarGz { id, .. } => models_dir.join(id),
+        ModelDownloadTarget::Onnx { id, .. } => models_dir.join(id).join("model.onnx"),
     }
+}
+
+fn validate_target(target: &Target, path: &Path) -> Result<(), download::Error> {
+    if target.destination_path.ends_with(".tar.gz") {
+        if !archive::looks_like_gzip(path) {
+            return Err(download::Error::Validation(format!(
+                "{} is not a gzip archive",
+                path.display()
+            )));
+        }
+        return Ok(());
+    }
+    if target.destination_path.ends_with(".onnx") {
+        if !is_non_empty_file(path) {
+            return Err(download::Error::Validation(format!(
+                "{} is empty",
+                path.display()
+            )));
+        }
+        return Ok(());
+    }
+    gguf::validate_gguf(path)
+}
+
+fn is_non_empty_file(path: &Path) -> bool {
+    path.metadata()
+        .map(|metadata| metadata.is_file() && metadata.len() > 0)
+        .unwrap_or(false)
 }
 
 fn display_progress(progress: Progress) -> ModelDownloadProgress {
@@ -255,6 +368,45 @@ pub fn migrate_flat_models_dir(models_dir: &Path, targets: &[ModelDownloadTarget
     }
 }
 
+pub fn migrate_legacy_transcription_dir(
+    models_dir: &Path,
+    legacy_dir: &Path,
+    model: &ModelDownloadTarget,
+    vad: &ModelDownloadTarget,
+) {
+    const LEGACY_MODEL_DIR_NAME: &str = "parakeet-tdt-0.6b-v3-int8";
+    if !legacy_dir.exists() {
+        return;
+    }
+    let mut all_moved = true;
+
+    let dest = model_path(models_dir, model);
+    if !dest.exists() {
+        let source = legacy_dir.join(LEGACY_MODEL_DIR_NAME);
+        if source.is_dir() {
+            let _ = fs::create_dir_all(models_dir);
+            if fs::rename(&source, &dest).is_err() {
+                all_moved = false;
+            }
+        }
+    }
+
+    let ModelDownloadTarget::Onnx { url, .. } = vad else {
+        return;
+    };
+    let dest = model_path(models_dir, vad);
+    if !dest.exists() {
+        let source = legacy_dir.join(gguf::filename_for_url(url, "model.onnx"));
+        if is_non_empty_file(&source) && !move_file(&source, &dest) {
+            all_moved = false;
+        }
+    }
+
+    if all_moved {
+        let _ = fs::remove_dir_all(legacy_dir);
+    }
+}
+
 fn sidecar_url(path: &Path) -> Option<String> {
     let sidecar = PathBuf::from(format!("{}.metadata.json", path.display()));
     let text = fs::read_to_string(sidecar).ok()?;
@@ -274,7 +426,10 @@ fn adopt_targets(
             id,
             url,
             mmproj_url,
-        } = target;
+        } = target
+        else {
+            continue;
+        };
         let mmproj_url = mmproj_url.as_deref();
         let mut plan = vec![(
             url.clone(),
@@ -341,23 +496,30 @@ fn adopt_targets(
             let Some(Some(source)) = source else {
                 continue;
             };
-            if let Some(parent) = dest.parent() {
-                let _ = fs::create_dir_all(parent);
-            }
-            if fs::rename(&source, dest).is_ok() {
-                continue;
-            }
-            let staged = PathBuf::from(format!("{}.migrating", dest.display()));
-            if fs::copy(&source, &staged)
-                .and_then(|_| fs::rename(&staged, dest))
-                .is_err()
-            {
-                let _ = fs::remove_file(&staged);
+            if !move_file(&source, dest) {
                 all_moved = false;
             }
         }
     }
     all_moved
+}
+
+fn move_file(source: &Path, dest: &Path) -> bool {
+    if let Some(parent) = dest.parent() {
+        let _ = fs::create_dir_all(parent);
+    }
+    if fs::rename(source, dest).is_ok() {
+        return true;
+    }
+    let staged = PathBuf::from(format!("{}.migrating", dest.display()));
+    if fs::copy(source, &staged)
+        .and_then(|_| fs::rename(&staged, dest))
+        .is_err()
+    {
+        let _ = fs::remove_file(&staged);
+        return false;
+    }
+    true
 }
 
 #[cfg(test)]
@@ -460,11 +622,180 @@ mod tests {
         write_gguf(&downloader.mmproj_path(&target).unwrap(), b"GGUFdata");
 
         let downloaded = downloader
-            .download(&target, |_| {}, || false)
+            .download(std::slice::from_ref(&target), |_| {}, || false)
             .expect("skip without network");
         assert!(!downloaded);
 
         let _ = fs::remove_dir_all(dir);
+    }
+
+    fn tar_gz_target(id: &str) -> ModelDownloadTarget {
+        ModelDownloadTarget::TarGz {
+            id: id.to_string(),
+            url: format!("https://models.example.org/{id}.tar.gz"),
+        }
+    }
+
+    fn onnx_target(id: &str) -> ModelDownloadTarget {
+        ModelDownloadTarget::Onnx {
+            id: id.to_string(),
+            url: format!("https://models.example.org/{id}.onnx"),
+        }
+    }
+
+    fn write_tar_gz(path: &Path, dir_name: &str, files: &[(&str, &[u8])]) {
+        let file = fs::File::create(path).unwrap();
+        let encoder = flate2::write::GzEncoder::new(file, flate2::Compression::fast());
+        let mut builder = tar::Builder::new(encoder);
+        for (name, content) in files {
+            let mut header = tar::Header::new_gnu();
+            header.set_size(content.len() as u64);
+            header.set_mode(0o644);
+            header.set_cksum();
+            builder
+                .append_data(&mut header, format!("{dir_name}/{name}"), *content)
+                .unwrap();
+        }
+        builder.into_inner().unwrap().finish().unwrap();
+    }
+
+    #[test]
+    fn archive_and_onnx_targets_use_per_model_dirs() {
+        let dir = scratch_dir("variant-paths");
+        let downloader = ModelDownloader::new(&dir);
+
+        let archive = tar_gz_target("parakeet-v3-int8");
+        assert_eq!(
+            downloader.model_path(&archive),
+            dir.join("parakeet-v3-int8")
+        );
+        assert_eq!(downloader.mmproj_path(&archive), None);
+
+        let onnx = onnx_target("silero-vad-v4");
+        assert_eq!(
+            downloader.model_path(&onnx),
+            dir.join("silero-vad-v4/model.onnx")
+        );
+        assert_eq!(downloader.mmproj_path(&onnx), None);
+
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn archive_download_extracts_into_model_dir() {
+        let dir = scratch_dir("variant-extract");
+        let downloader = ModelDownloader::new(&dir);
+        let target = tar_gz_target("parakeet-v3-int8");
+        assert!(!downloader.is_downloaded(&target));
+
+        fs::create_dir_all(dir.join(".staging")).unwrap();
+        write_tar_gz(
+            &dir.join(".staging/parakeet-v3-int8.tar.gz"),
+            "parakeet-tdt-0.6b-v3-int8",
+            &[("encoder.onnx", b"enc"), ("tokens.txt", b"tok")],
+        );
+        let mut statuses = Vec::new();
+        downloader
+            .extract_if_archive(&target, &mut |progress| statuses.push(progress.status))
+            .expect("extract");
+
+        assert!(downloader.is_downloaded(&target));
+        assert_eq!(
+            fs::read(dir.join("parakeet-v3-int8/encoder.onnx")).unwrap(),
+            b"enc"
+        );
+        assert_eq!(statuses, ["Extracting..."]);
+        assert!(!dir.join(".staging/parakeet-v3-int8.tar.gz").exists());
+
+        assert!(downloader.remove_downloaded(&target));
+        assert!(!downloader.is_downloaded(&target));
+
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn onnx_target_downloaded_and_removed_via_model_file() {
+        let dir = scratch_dir("variant-onnx");
+        let downloader = ModelDownloader::new(&dir);
+        let target = onnx_target("silero-vad-v4");
+        assert!(!downloader.is_downloaded(&target));
+
+        write_gguf(&downloader.model_path(&target), b"onnxbytes");
+        assert!(downloader.is_downloaded(&target));
+
+        assert!(downloader.remove_downloaded(&target));
+        assert!(!downloader.is_downloaded(&target));
+        assert!(!dir.join("silero-vad-v4").exists());
+
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn migrate_transcription_moves_model_dir_and_vad_file() {
+        let base = scratch_dir("migrate-transcription");
+        let legacy = base.join("transcription");
+        fs::create_dir_all(legacy.join("parakeet-tdt-0.6b-v3-int8")).unwrap();
+        fs::write(
+            legacy.join("parakeet-tdt-0.6b-v3-int8/encoder.onnx"),
+            b"enc",
+        )
+        .unwrap();
+        fs::write(legacy.join("silero_vad_v4.onnx"), b"vad").unwrap();
+        fs::write(legacy.join("stale.partial"), b"junk").unwrap();
+
+        let models_dir = base.join("models");
+        let model = tar_gz_target("parakeet-v3-int8");
+        let vad = ModelDownloadTarget::Onnx {
+            id: "silero-vad-v4".to_string(),
+            url: "https://models.example.org/silero_vad_v4.onnx".to_string(),
+        };
+        migrate_legacy_transcription_dir(&models_dir, &legacy, &model, &vad);
+
+        let downloader = ModelDownloader::new(&models_dir);
+        assert!(downloader.is_downloaded(&model));
+        assert!(downloader.is_downloaded(&vad));
+        assert_eq!(
+            fs::read(models_dir.join("parakeet-v3-int8/encoder.onnx")).unwrap(),
+            b"enc"
+        );
+        assert_eq!(
+            fs::read(models_dir.join("silero-vad-v4/model.onnx")).unwrap(),
+            b"vad"
+        );
+        assert!(!legacy.exists());
+
+        migrate_legacy_transcription_dir(&models_dir, &legacy, &model, &vad);
+        assert!(downloader.is_downloaded(&model));
+
+        let _ = fs::remove_dir_all(base);
+    }
+
+    #[test]
+    fn migrate_transcription_keeps_existing_destinations() {
+        let base = scratch_dir("migrate-transcription-existing");
+        let legacy = base.join("transcription");
+        fs::create_dir_all(legacy.join("parakeet-tdt-0.6b-v3-int8")).unwrap();
+        fs::write(
+            legacy.join("parakeet-tdt-0.6b-v3-int8/encoder.onnx"),
+            b"old",
+        )
+        .unwrap();
+
+        let models_dir = base.join("models");
+        let model = tar_gz_target("parakeet-v3-int8");
+        let vad = onnx_target("silero-vad-v4");
+        fs::create_dir_all(models_dir.join("parakeet-v3-int8")).unwrap();
+        fs::write(models_dir.join("parakeet-v3-int8/encoder.onnx"), b"new").unwrap();
+
+        migrate_legacy_transcription_dir(&models_dir, &legacy, &model, &vad);
+
+        assert_eq!(
+            fs::read(models_dir.join("parakeet-v3-int8/encoder.onnx")).unwrap(),
+            b"new"
+        );
+        assert!(!legacy.exists());
+
+        let _ = fs::remove_dir_all(base);
     }
 
     #[test]

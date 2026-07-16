@@ -8,7 +8,9 @@ import io.ente.ensu.bindings.ModelDownloadCore
 import io.ente.ensu.bindings.ModelDownloadProgress
 import io.ente.ensu.bindings.ModelDownloadTarget
 import io.ente.ensu.bindings.migrateLegacyDir
+import io.ente.ensu.bindings.migrateLegacyTranscriptionDir
 import io.ente.ensu.bindings.uniffiEnsureInitialized
+import io.ente.ensu.config.loadConfigDefaults
 import java.io.File
 import kotlin.coroutines.coroutineContext
 import kotlinx.coroutines.Dispatchers
@@ -21,11 +23,22 @@ class ModelDownloader(context: Context) {
     private val legacyDir = appContext.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
         ?.let { File(it, "llm") }
     private val core: ModelDownloadCore
+    val transcriptionModelTarget: ModelDownloadTarget
+    val voiceActivityModelTarget: ModelDownloadTarget
 
     init {
         uniffiEnsureInitialized()
         ModelDownloadJobService.attach(appContext)
         core = ModelDownloadCore(modelsDir.absolutePath)
+        val defaults = loadConfigDefaults()
+        transcriptionModelTarget = ModelDownloadTarget.TarGz(
+            defaults.transcriptionModel.id,
+            defaults.transcriptionModel.url
+        )
+        voiceActivityModelTarget = ModelDownloadTarget.Onnx(
+            defaults.voiceActivityModel.id,
+            defaults.voiceActivityModel.url
+        )
     }
 
     fun needsMigration(): Boolean = legacyDir?.exists() == true
@@ -33,6 +46,12 @@ class ModelDownloader(context: Context) {
     fun migrate(targets: List<ModelDownloadTarget>) {
         File(appContext.filesDir, "llm").deleteRecursively()
         legacyDir?.let { migrateLegacyDir(modelsDir.absolutePath, it.absolutePath, targets) }
+        migrateLegacyTranscriptionDir(
+            modelsDir.absolutePath,
+            File(appContext.dataDir, "app_ensu_transcription_models").absolutePath,
+            transcriptionModelTarget,
+            voiceActivityModelTarget
+        )
     }
 
     val isDownloadActive: Boolean get() = core.isDownloadActive()
@@ -51,14 +70,14 @@ class ModelDownloader(context: Context) {
         core.estimatedDownloadSize(target)
     }
 
-    suspend fun download(target: ModelDownloadTarget, onProgress: (DownloadProgress) -> Unit): Boolean {
+    suspend fun download(targets: List<ModelDownloadTarget>, onProgress: (DownloadProgress) -> Unit): Boolean {
         val downloadJob = coroutineContext[Job]
-        if (core.isDownloaded(target)) return false
+        if (targets.all { core.isDownloaded(it) }) return false
 
         ModelDownloadJobService.begin { core.cancel() }
         return try {
             core.download(
-                target,
+                targets,
                 object : ModelDownloadCallback {
                     override fun onProgress(progress: ModelDownloadProgress) {
                         progress.logLine?.let { Log.i("ModelDownloader", it) }

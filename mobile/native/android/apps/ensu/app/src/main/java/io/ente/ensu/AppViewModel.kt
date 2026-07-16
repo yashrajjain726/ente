@@ -37,7 +37,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private val transcriber = (application as EnsuApplication).transcriber
 
     val logRepository = FileLogRepository(application)
-    private val modelDownloader = ModelDownloader(application)
+    private val modelDownloader = (application as EnsuApplication).modelDownloader
     private val _isReady = MutableStateFlow(!modelDownloader.needsMigration())
     val isReady = _isReady.asStateFlow()
     private val llmProvider = LlmProvider(
