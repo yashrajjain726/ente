@@ -202,8 +202,8 @@ func (c *SpaceDripController) processSpaceDripStage(ctx context.Context, stage s
 		}
 		if err := sendSpaceDripEmail(
 			[]string{user.Email},
-			"Ente",
-			"team@ente.com",
+			"Ente Space",
+			"space@ente.com",
 			stage.Subject,
 			spaceDripTemplate,
 			map[string]interface{}{

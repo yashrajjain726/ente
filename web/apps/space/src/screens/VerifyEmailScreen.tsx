@@ -16,6 +16,7 @@ const warning = "#F63A3A";
 const verifyEmailFormID = "space-verify-email-form";
 
 interface VerifyEmailScreenProps {
+    codeResetKey?: number;
     email: string;
     errorMessage?: string;
     initialCode?: string;
@@ -28,6 +29,7 @@ interface VerifyEmailScreenProps {
 }
 
 export const VerifyEmailScreen: React.FC<VerifyEmailScreenProps> = ({
+    codeResetKey = 0,
     email,
     errorMessage,
     initialCode = "",
@@ -54,6 +56,13 @@ export const VerifyEmailScreen: React.FC<VerifyEmailScreenProps> = ({
 
         return () => window.cancelAnimationFrame(animationFrame);
     }, [initialOTP]);
+
+    useEffect(() => {
+        if (!codeResetKey) return;
+
+        setOtp("");
+        inputRef.current?.focus();
+    }, [codeResetKey]);
 
     const handleResendCode = () => {
         if (isResending) return;

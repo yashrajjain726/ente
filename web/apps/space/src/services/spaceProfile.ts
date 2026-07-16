@@ -22,7 +22,7 @@ import {
 import { spaceRootKeyFromSpaceSession } from "services/spaceSecureSessionStorage";
 
 const usernamePattern = /^[a-z0-9][a-z0-9._]*$/;
-const minUsernameLength = 3;
+const minUsernameLength = 4;
 const maxUsernameLength = 30;
 
 interface SpaceAvatar {
@@ -71,7 +71,7 @@ export const normalizeSpaceUsername = (username: string) =>
 export const spaceUsernameValidationError = (username: string) => {
     const normalized = normalizeSpaceUsername(username);
     if (normalized.length < minUsernameLength) {
-        return "Username must be at least 3 characters.";
+        return "Username must be at least 4 characters.";
     }
     if (normalized.length > maxUsernameLength) {
         return "Username must be 30 characters or less.";

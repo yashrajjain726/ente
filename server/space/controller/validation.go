@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	minSpaceSlugLength                   = 3
+	minSpaceSlugLength                   = 4
 	maxSpaceSlugLength                   = 30
 	maxSpaceEncryptedProfileEncodedBytes = 32 * 1024
 	maxSpaceEncryptedProfileDecodedBytes = 24 * 1024
@@ -45,7 +45,7 @@ func validateSpaceSlug(input string) (string, error) {
 		return "", ente.NewBadRequestWithMessage("spaceSlug is required")
 	}
 	if len(slug) < minSpaceSlugLength || len(slug) > maxSpaceSlugLength {
-		return "", ente.NewBadRequestWithMessage("spaceSlug must be 3-30 characters")
+		return "", ente.NewBadRequestWithMessage("spaceSlug must be 4-30 characters")
 	}
 	if isReservedSpaceSlug(slug) {
 		return "", ente.NewBadRequestWithMessage("spaceSlug is reserved")

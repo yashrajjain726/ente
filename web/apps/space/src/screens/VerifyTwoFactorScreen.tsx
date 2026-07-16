@@ -18,6 +18,7 @@ const warning = "#F63A3A";
 const verifyTwoFactorFormID = "space-verify-two-factor-form";
 
 interface VerifyTwoFactorScreenProps {
+    codeResetKey?: number;
     errorMessage?: string;
     initialCode?: string;
     isSubmitting?: boolean;
@@ -26,6 +27,7 @@ interface VerifyTwoFactorScreenProps {
 }
 
 export const VerifyTwoFactorScreen: React.FC<VerifyTwoFactorScreenProps> = ({
+    codeResetKey = 0,
     errorMessage,
     initialCode = "",
     isSubmitting = false,
@@ -48,6 +50,13 @@ export const VerifyTwoFactorScreen: React.FC<VerifyTwoFactorScreenProps> = ({
 
         return () => window.cancelAnimationFrame(animationFrame);
     }, [initialOTP]);
+
+    useEffect(() => {
+        if (!codeResetKey) return;
+
+        setOtp("");
+        inputRef.current?.focus();
+    }, [codeResetKey]);
 
     const submitVerification = () => {
         if (canVerify) onVerify?.(otp);

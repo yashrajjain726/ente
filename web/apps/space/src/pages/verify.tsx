@@ -49,6 +49,7 @@ const Page: React.FC = () => {
         setPendingPasskeyVerification,
         signupEmail,
     } = useSpaceAppState();
+    const [codeResetKey, setCodeResetKey] = useState(0);
     const [verificationError, setVerificationError] = useState<string>();
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isResending, setIsResending] = useState(false);
@@ -99,9 +100,8 @@ const Page: React.FC = () => {
     const handleLoginResult = async (result: SpaceLoginResult) => {
         switch (result.status) {
             case "complete":
-                setLoginCredentials(null);
-                setPendingLoginCredentials(null);
                 await routeAfterCompletedLogin(router, refreshProfile);
+                setPendingLoginCredentials(null);
                 break;
             case "totp":
                 setLoginCredentials(null);
@@ -132,17 +132,20 @@ const Page: React.FC = () => {
 
     const verifySignupEmail = async (code: string) => {
         if (!isLiveSignupVerification) {
-            void router.push(spaceRoutes.setupProfile());
+            void router.push(spaceRoutes.createProfile());
             return;
         }
 
         try {
             await completeSpaceSignup(signupEmail, code);
             setIsLiveSignupVerification(false);
-            void router.push(spaceRoutes.setupProfile());
+            void router.push(spaceRoutes.createProfile());
         } catch (error) {
             if (!isExpectedVerificationError(error)) {
                 console.error("Space signup verification failed", error);
+            }
+            if (isHTTPErrorWithStatus(error, 401)) {
+                setCodeResetKey((key) => key + 1);
             }
             setVerificationError(verificationErrorMessage(error));
             setIsSubmitting(false);
@@ -165,6 +168,9 @@ const Page: React.FC = () => {
         } catch (error) {
             if (!isExpectedVerificationError(error)) {
                 console.error("Space login email verification failed", error);
+            }
+            if (isHTTPErrorWithStatus(error, 401)) {
+                setCodeResetKey((key) => key + 1);
             }
             setVerificationError(verificationErrorMessage(error));
             setIsSubmitting(false);
@@ -206,6 +212,7 @@ const Page: React.FC = () => {
         <>
             <SpacePageMeta themeColor={verifyEmailBackground} />
             <VerifyEmailScreen
+                codeResetKey={codeResetKey}
                 email={email}
                 errorMessage={verificationError}
                 initialCode={

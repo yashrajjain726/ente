@@ -10,6 +10,12 @@ const textBase = "#000";
 const textLight = "#969696";
 const warning = "#F63A3A";
 
+export const spaceAppAvatarCropSize =
+    "min(calc(100vw - 48px), calc(100dvh - 308px), 342px)";
+export const spaceSetupAvatarCropSize =
+    "min(calc(100vw - 48px), calc(100dvh - 294px), 342px)";
+export const spaceSetupAvatarCropFooterHeight = "130px";
+
 interface SpaceAvatarCropPageProps {
     aspect?: number;
     background: string;
@@ -26,6 +32,7 @@ interface SpaceAvatarCropPageProps {
     onCropComplete: (croppedArea: Area, croppedAreaPixels: Area) => void;
     onDone: () => void;
     onZoomChange: (zoom: number) => void;
+    secondaryActionVariant?: "button" | "text";
     title?: string;
     zoom: number;
 }
@@ -33,9 +40,16 @@ interface SpaceAvatarCropPageProps {
 const SpaceAvatarCropPageButton: React.FC<{
     children: React.ReactNode;
     disabled?: boolean;
+    height?: number;
     loading?: boolean;
     onClick?: () => void;
-}> = ({ children, disabled = false, loading = false, onClick }) => (
+}> = ({
+    children,
+    disabled = false,
+    height = 44,
+    loading = false,
+    onClick,
+}) => (
     <Box
         className={!disabled || loading ? "green-bg" : undefined}
         component="button"
@@ -56,7 +70,7 @@ const SpaceAvatarCropPageButton: React.FC<{
             fontFamily: '"Inter Variable", Inter, sans-serif',
             fontSize: 14,
             fontWeight: 500,
-            height: 44,
+            height,
             justifyContent: "center",
             lineHeight: "20px",
             minWidth: 0,
@@ -73,11 +87,12 @@ const SpaceAvatarCropPageButton: React.FC<{
     </Box>
 );
 
-const SpaceAvatarCropPageLinkButton: React.FC<{
+const SpaceAvatarCropPageSecondaryAction: React.FC<{
     children: React.ReactNode;
     disabled?: boolean;
     onClick?: () => void;
-}> = ({ children, disabled = false, onClick }) => (
+    variant: "button" | "text";
+}> = ({ children, disabled = false, onClick, variant }) => (
     <Box
         component="button"
         type="button"
@@ -85,31 +100,38 @@ const SpaceAvatarCropPageLinkButton: React.FC<{
         onClick={onClick}
         sx={{
             alignItems: "center",
-            bgcolor: "transparent",
+            alignSelf: "center",
+            bgcolor: variant == "button" ? "#F2F2F2" : "transparent",
             border: 0,
+            borderRadius: variant == "button" ? "20px" : 0,
             color: "#666",
             cursor: disabled ? "default" : "pointer",
             display: "flex",
             fontFamily: '"Inter Variable", Inter, sans-serif',
             fontSize: 14,
-            fontWeight: 500,
+            fontWeight: variant == "button" ? 600 : 500,
+            height: variant == "button" ? 48 : undefined,
             justifyContent: "center",
             lineHeight: "20px",
             minWidth: 0,
-            opacity: 0.8,
-            p: 0,
+            opacity: disabled ? 0.56 : variant == "button" ? 1 : 0.8,
+            p: variant == "button" ? undefined : 0,
+            px: variant == "button" ? 2 : undefined,
             textAlign: "center",
-            textDecoration: "underline",
+            textDecoration: variant == "text" ? "underline" : "none",
             textDecorationSkipInk: "none",
             textUnderlineOffset: "2px",
             textUnderlinePosition: "from-font",
-            width: "fit-content",
-            alignSelf: "center",
+            width: variant == "button" ? "100%" : "fit-content",
             "&:focus-visible": {
-                borderRadius: "4px",
+                borderRadius: variant == "button" ? "20px" : "4px",
                 outline: `2px solid ${green}`,
-                outlineOffset: 4,
+                outlineOffset: variant == "button" ? 2 : 4,
             },
+            "&:hover":
+                !disabled && variant == "button"
+                    ? { bgcolor: "#ECECEC" }
+                    : undefined,
         }}
     >
         {children}
@@ -130,6 +152,7 @@ export const SpaceAvatarCropPage: React.FC<SpaceAvatarCropPageProps> = ({
     onCropComplete,
     onDone,
     onZoomChange,
+    secondaryActionVariant = "text",
     title = "Edit profile picture",
     zoom,
     aspect = 1,
@@ -144,8 +167,8 @@ export const SpaceAvatarCropPage: React.FC<SpaceAvatarCropPageProps> = ({
             component="main"
             sx={{
                 "--avatar-crop-size": isAppHeader
-                    ? "min(calc(100vw - 48px), calc(100dvh - 308px), 342px)"
-                    : "min(calc(100vw - 48px), calc(100dvh - 294px), 342px)",
+                    ? spaceAppAvatarCropSize
+                    : spaceSetupAvatarCropSize,
                 "--profile-crop-width": isCoverCrop
                     ? "100%"
                     : "min(calc(100vw - 48px), 342px)",
@@ -167,13 +190,15 @@ export const SpaceAvatarCropPage: React.FC<SpaceAvatarCropPageProps> = ({
                     display: "grid",
                     gridTemplateRows: isAppHeader
                         ? "56px minmax(0, 1fr) auto auto"
-                        : "42px minmax(0, 1fr) auto auto",
+                        : `42px minmax(0, 1fr) auto ${spaceSetupAvatarCropFooterHeight}`,
                     height: "100%",
                     minHeight: 0,
                     mx: "auto",
                     overflowX: "hidden",
                     overflowY: "hidden",
-                    pb: "calc(24px + env(safe-area-inset-bottom))",
+                    pb: isAppHeader
+                        ? "calc(24px + env(safe-area-inset-bottom))"
+                        : "calc(20px + env(safe-area-inset-bottom))",
                     pt: isAppHeader ? 0 : "32px",
                     px: isAppHeader ? 0 : 3,
                     width: "100%",
@@ -341,7 +366,10 @@ export const SpaceAvatarCropPage: React.FC<SpaceAvatarCropPageProps> = ({
                         boxSizing: "border-box",
                         display: "flex",
                         flexDirection: "column",
-                        gap: "16px",
+                        gap:
+                            secondaryActionVariant == "button"
+                                ? "10px"
+                                : "16px",
                         gridRow: 4,
                         pt: 3,
                         px: isAppHeader ? 3 : 0,
@@ -350,17 +378,21 @@ export const SpaceAvatarCropPage: React.FC<SpaceAvatarCropPageProps> = ({
                 >
                     <SpaceAvatarCropPageButton
                         disabled={isSaving || isDoneDisabled}
+                        height={
+                            secondaryActionVariant == "button" ? 48 : undefined
+                        }
                         loading={isSaving}
                         onClick={onDone}
                     >
                         {isSaving ? <SpaceButtonSpinner /> : "Done"}
                     </SpaceAvatarCropPageButton>
-                    <SpaceAvatarCropPageLinkButton
+                    <SpaceAvatarCropPageSecondaryAction
                         disabled={isSaving}
                         onClick={onChooseAnother}
+                        variant={secondaryActionVariant}
                     >
                         Change picture
-                    </SpaceAvatarCropPageLinkButton>
+                    </SpaceAvatarCropPageSecondaryAction>
                 </Box>
             </Box>
         </Box>

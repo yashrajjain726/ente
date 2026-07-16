@@ -28,5 +28,5 @@ export const routeAfterCompletedLogin = async (
         return;
     }
 
-    await routeTo(spaceRoutes.setupProfile("login"));
+    await routeTo(spaceRoutes.createProfile("login"));
 };

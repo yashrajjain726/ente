@@ -23,6 +23,7 @@ import {
 import {
     type LocalSpaceFeedPost,
     type OnboardingEntrySource,
+    type PendingCreateProfile,
     type RefreshSpaceProfileOptions,
     type SpaceAppState,
     SpaceAppStateContext,
@@ -49,6 +50,8 @@ export const SpaceAppStateProvider: React.FC<React.PropsWithChildren> = ({
         useState<File | null>(null);
     const [pendingProfileCoverFile, setPendingProfileCoverFile] =
         useState<File | null>(null);
+    const [pendingCreateProfile, setPendingCreateProfile] =
+        useState<PendingCreateProfile | null>(null);
     const [profile, setProfile] = useState<SetupProfile | null>(null);
     const [profileLoadError, setProfileLoadError] = useState<string>();
     const [profileLoadStatus, setProfileLoadStatus] =
@@ -214,6 +217,7 @@ export const SpaceAppStateProvider: React.FC<React.PropsWithChildren> = ({
         setPendingPasskeyVerification(null);
         setPendingProfileAvatarFile(null);
         setPendingProfileCoverFile(null);
+        setPendingCreateProfile(null);
         setOnboardingEntrySource("direct");
         setSkipNextHomeFeedSkeleton(false);
         setLocalFeedPosts([]);
@@ -265,6 +269,7 @@ export const SpaceAppStateProvider: React.FC<React.PropsWithChildren> = ({
             pendingPasskeyVerification,
             pendingProfileAvatarFile,
             pendingProfileCoverFile,
+            pendingCreateProfile,
             profile,
             profileLoadError,
             profileLoadStatus,
@@ -279,6 +284,7 @@ export const SpaceAppStateProvider: React.FC<React.PropsWithChildren> = ({
             setPendingPasskeyVerification,
             setPendingProfileAvatarFile,
             setPendingProfileCoverFile,
+            setPendingCreateProfile,
             setProfile: applyProfile,
             setSkipNextHomeFeedSkeleton,
             setSignupEmail,
@@ -293,6 +299,7 @@ export const SpaceAppStateProvider: React.FC<React.PropsWithChildren> = ({
             pendingPasskeyVerification,
             pendingProfileAvatarFile,
             pendingProfileCoverFile,
+            pendingCreateProfile,
             profile,
             profileLoadError,
             profileLoadStatus,
