@@ -1038,7 +1038,7 @@
   "appleId": "Apple ID",
   "playstoreSubscription": "PlayStore subscription",
   "appstoreSubscription": "AppStore subscription",
-  "subAlreadyLinkedErrMessage": "Your {id} is already linked to another Ente account.\nIf you would like to use your {id} with this account, please contact our support''",
+  "subAlreadyLinkedErrMessage": "Your {id} is already linked to another Ente account.\nIf you would like to use your {id} with this account, please contact our support.",
   "visitWebToManage": "Please visit {webUrl} to manage your subscription",
   "@visitWebToManage": {
     "description": "Shown when a Stripe subscriber needs to manage their subscription on the web.",
