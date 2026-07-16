@@ -153,7 +153,7 @@ final class LlmProvider {
             backendInitialized = true
         }
 
-        let downloaded = try await downloader.download(target: target.downloadTarget, onProgress: onProgress)
+        let downloaded = try await downloader.download(targets: [target.downloadTarget], onProgress: onProgress)
 
         onProgress(DownloadProgress(percent: 100, status: "Loading model...", phase: .loading))
         do {

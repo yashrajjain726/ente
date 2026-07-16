@@ -5,6 +5,10 @@ private let logger = EnsuLogging.shared.logger("ModelDownloader")
 
 final class ModelDownloader {
     private let core: ModelDownloadCore
+    private let activeLock = NSLock()
+    private var downloadActive = false
+    let transcriptionModelTarget: ModelDownloadTarget
+    let voiceActivityModelTarget: ModelDownloadTarget
 
     @MainActor
     init() {
@@ -12,10 +16,22 @@ final class ModelDownloader {
             ?? FileManager.default.temporaryDirectory
         let modelsDir = baseDir.appendingPathComponent("models", isDirectory: true)
         core = ModelDownloadCore(modelsDir: modelsDir.path)
-        migrateLegacyDir(
+        let defaults = ConfigDefaults.shared
+        transcriptionModelTarget = .tarGz(
+            id: defaults.transcriptionModel.id,
+            url: defaults.transcriptionModel.url
+        )
+        voiceActivityModelTarget = .onnx(
+            id: defaults.voiceActivityModel.id,
+            url: defaults.voiceActivityModel.url
+        )
+        migrateEnsuLegacyModels(
             modelsDir: modelsDir.path,
-            legacyDir: baseDir.appendingPathComponent("llm", isDirectory: true).path,
-            targets: Self.migrationTargets()
+            llmLegacyDir: baseDir.appendingPathComponent("llm", isDirectory: true).path,
+            transcriptionLegacyDir: baseDir.appendingPathComponent("transcription", isDirectory: true).path,
+            llmTargets: Self.migrationTargets(),
+            transcriptionModel: transcriptionModelTarget,
+            voiceActivityModel: voiceActivityModelTarget
         )
         var excludedDir = modelsDir
         var values = URLResourceValues()
@@ -74,10 +90,18 @@ final class ModelDownloader {
 
     @discardableResult
     func download(
-        target: ModelDownloadTarget,
+        targets: [ModelDownloadTarget],
         onProgress: @escaping (DownloadProgress) -> Void
     ) async throws -> Bool {
-        if core.isDownloaded(target: target) {
+        let started = activeLock.withLock { () -> Bool in
+            if downloadActive { return false }
+            downloadActive = true
+            return true
+        }
+        guard started else { throw DownloadAlreadyActiveError() }
+        defer { activeLock.withLock { downloadActive = false } }
+
+        if targets.allSatisfy({ self.core.isDownloaded(target: $0) }) {
             return false
         }
 
@@ -112,7 +136,7 @@ final class ModelDownloader {
                 },
                 isCancelled: { Task.isCancelled }
             )
-            _ = try core.download(target: target, callback: callback)
+            _ = try core.download(targets: targets, callback: callback)
         }
 
         try await withTaskCancellationHandler {
@@ -125,6 +149,8 @@ final class ModelDownloader {
         return true
     }
 }
+
+private struct DownloadAlreadyActiveError: Error {}
 
 private final class ModelDownloadCallbackSink: ModelDownloadCallback, @unchecked Sendable {
     private let onProgressHandler: (ModelDownloadProgress) -> Void

@@ -11,6 +11,14 @@ pub enum ModelDownloadTarget {
         url: String,
         mmproj_url: Option<String>,
     },
+    TarGz {
+        id: String,
+        url: String,
+    },
+    Onnx {
+        id: String,
+        url: String,
+    },
 }
 
 impl From<ModelDownloadTarget> for ente_model_download::ModelDownloadTarget {
@@ -25,6 +33,8 @@ impl From<ModelDownloadTarget> for ente_model_download::ModelDownloadTarget {
                 url,
                 mmproj_url,
             },
+            ModelDownloadTarget::TarGz { id, url } => Self::TarGz { id, url },
+            ModelDownloadTarget::Onnx { id, url } => Self::Onnx { id, url },
         }
     }
 }
@@ -59,17 +69,23 @@ pub trait ModelDownloadCallback: Send + Sync {
 }
 
 #[uniffi::export]
-pub fn migrate_legacy_dir(
+pub fn migrate_ensu_legacy_models(
     models_dir: String,
-    legacy_dir: String,
-    targets: Vec<ModelDownloadTarget>,
+    llm_legacy_dir: Option<String>,
+    transcription_legacy_dir: String,
+    llm_targets: Vec<ModelDownloadTarget>,
+    transcription_model: ModelDownloadTarget,
+    voice_activity_model: ModelDownloadTarget,
 ) {
-    let targets: Vec<ente_model_download::ModelDownloadTarget> =
-        targets.into_iter().map(Into::into).collect();
-    ente_model_download::migrate_legacy_dir(
+    let llm_targets: Vec<ente_model_download::ModelDownloadTarget> =
+        llm_targets.into_iter().map(Into::into).collect();
+    ente_model_download::migrate_ensu_legacy_models(
         Path::new(&models_dir),
-        Path::new(&legacy_dir),
-        &targets,
+        llm_legacy_dir.as_deref().map(Path::new),
+        Path::new(&transcription_legacy_dir),
+        &llm_targets,
+        &transcription_model.into(),
+        &voice_activity_model.into(),
     );
 }
 
@@ -119,15 +135,17 @@ impl ModelDownloadCore {
 
     pub fn download(
         &self,
-        target: ModelDownloadTarget,
+        targets: Vec<ModelDownloadTarget>,
         callback: Box<dyn ModelDownloadCallback>,
     ) -> Result<bool, LlmError> {
         let callback: Arc<dyn ModelDownloadCallback> = Arc::from(callback);
         let progress_callback = Arc::clone(&callback);
         let cancel_callback = Arc::clone(&callback);
+        let targets: Vec<ente_model_download::ModelDownloadTarget> =
+            targets.into_iter().map(Into::into).collect();
         self.inner
             .download(
-                &target.into(),
+                &targets,
                 move |progress| progress_callback.on_progress(progress.into()),
                 move || cancel_callback.is_cancelled(),
             )

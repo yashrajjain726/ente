@@ -187,7 +187,7 @@ class LlmProvider(
 
         unloadModel()
 
-        val downloaded = downloader.download(target.downloadTarget, onProgress)
+        val downloaded = downloader.download(listOf(target.downloadTarget), onProgress)
 
         onProgress(DownloadProgress(100, "Loading model...", phase = DownloadPhase.Loading))
         try {

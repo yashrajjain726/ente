@@ -29,7 +29,7 @@ class AppStore(
     private val sessionPreferences: SessionPreferencesDataStore,
     private val chatRepository: ChatRepository,
     private val llmProvider: LlmProvider,
-    private val modelDownloader: ModelDownloader,
+    val modelDownloader: ModelDownloader,
     val transcriber: Transcriber,
     private val deviceCapabilityProvider: AndroidDeviceCapabilityProvider,
     val configDefaults: ConfigDefaults,
