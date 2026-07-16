@@ -188,7 +188,7 @@ const conversationPreview = (conversation: SpaceMessageConversation) => {
         return "You're now friends. Say hello!";
     }
     if (activity.type == "friend_request") {
-        return "Friend request";
+        return "Sent you a friend request";
     }
     if (activity.type == "friend_added") {
         return "You're now friends. Say hello!";
@@ -615,23 +615,28 @@ const ConversationListItem: React.FC<{
                         <Box
                             component="button"
                             type="button"
+                            aria-label={`Dismiss friend request from ${name}`}
                             onClick={deleteFriendRequest}
                             sx={{
-                                bgcolor: "#F1F1F1",
+                                alignItems: "center",
+                                bgcolor: "transparent",
                                 border: 0,
-                                borderRadius: "12px",
+                                borderRadius: "50%",
                                 color: textBase,
                                 cursor: "pointer",
-                                fontFamily:
-                                    '"Inter Variable", Inter, sans-serif',
-                                fontSize: 12,
-                                fontWeight: 700,
+                                display: "flex",
                                 height: 34,
-                                px: "12px",
-                                "&:hover": { bgcolor: "#E7E7E7" },
+                                justifyContent: "center",
+                                p: 0,
+                                width: 34,
+                                "&:hover": { bgcolor: "#F1F1F1" },
                             }}
                         >
-                            Delete
+                            <HugeiconsIcon
+                                icon={Cancel01Icon}
+                                size={18}
+                                strokeWidth={2}
+                            />
                         </Box>
                     </Box>
                 )}
