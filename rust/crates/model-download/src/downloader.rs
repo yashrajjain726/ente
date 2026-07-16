@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -228,7 +228,46 @@ pub fn migrate_legacy_dir(models_dir: &Path, legacy_dir: &Path, targets: &[Model
         return;
     }
     let legacy_models = legacy_dir.join("models");
+    let hashed_dirs = [legacy_models.join("custom")];
+    if adopt_targets(models_dir, targets, &hashed_dirs, &legacy_models) {
+        let _ = fs::remove_dir_all(legacy_dir);
+    }
+}
 
+pub fn migrate_flat_models_dir(models_dir: &Path, targets: &[ModelDownloadTarget]) {
+    if !models_dir.exists() {
+        return;
+    }
+    let hashed_dirs = [models_dir.join("custom"), models_dir.to_path_buf()];
+    if !adopt_targets(models_dir, targets, &hashed_dirs, models_dir) {
+        return;
+    }
+    let Ok(entries) = fs::read_dir(models_dir) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_file() {
+            let _ = fs::remove_file(&path);
+        } else if path.file_name().is_some_and(|name| name == "custom") {
+            let _ = fs::remove_dir_all(&path);
+        }
+    }
+}
+
+fn sidecar_url(path: &Path) -> Option<String> {
+    let sidecar = PathBuf::from(format!("{}.metadata.json", path.display()));
+    let text = fs::read_to_string(sidecar).ok()?;
+    let value: serde_json::Value = serde_json::from_str(&text).ok()?;
+    value["url"].as_str().map(String::from)
+}
+
+fn adopt_targets(
+    models_dir: &Path,
+    targets: &[ModelDownloadTarget],
+    hashed_dirs: &[PathBuf],
+    flat_dir: &Path,
+) -> bool {
     let mut plans: Vec<Vec<(String, &str, PathBuf)>> = Vec::new();
     for target in targets {
         let ModelDownloadTarget::Gguf {
@@ -252,12 +291,13 @@ pub fn migrate_legacy_dir(models_dir: &Path, legacy_dir: &Path, targets: &[Model
         plans.push(plan);
     }
 
-    let mut basename_counts: HashMap<String, u32> = HashMap::new();
+    let mut basename_urls: HashMap<String, HashSet<&str>> = HashMap::new();
     for plan in &plans {
         for (url, fallback, _) in plan {
-            *basename_counts
+            basename_urls
                 .entry(gguf::filename_for_url(url, fallback))
-                .or_insert(0) += 1;
+                .or_default()
+                .insert(url.as_str());
         }
     }
 
@@ -270,15 +310,26 @@ pub fn migrate_legacy_dir(models_dir: &Path, legacy_dir: &Path, targets: &[Model
                     return Some(None);
                 }
                 let basename = gguf::filename_for_url(url, fallback);
-                let hashed = legacy_models
-                    .join("custom")
-                    .join(format!("{}_{basename}", gguf::sha256_hex(url)));
-                if gguf::looks_like_gguf(&hashed) {
-                    return Some(Some(hashed));
+                for dir in hashed_dirs {
+                    let hashed = dir.join(format!("{}_{basename}", gguf::sha256_hex(url)));
+                    if gguf::looks_like_gguf(&hashed) {
+                        return Some(Some(hashed));
+                    }
                 }
-                let flat = legacy_models.join(&basename);
-                if basename_counts[&basename] == 1 && gguf::looks_like_gguf(&flat) {
-                    return Some(Some(flat));
+                let flat = flat_dir.join(&basename);
+                if gguf::looks_like_gguf(&flat) {
+                    match sidecar_url(&flat) {
+                        Some(sidecar) => {
+                            if sidecar == *url {
+                                return Some(Some(flat));
+                            }
+                        }
+                        None => {
+                            if basename_urls[&basename].len() == 1 {
+                                return Some(Some(flat));
+                            }
+                        }
+                    }
                 }
                 None
             })
@@ -306,9 +357,7 @@ pub fn migrate_legacy_dir(models_dir: &Path, legacy_dir: &Path, targets: &[Model
             }
         }
     }
-    if all_moved {
-        let _ = fs::remove_dir_all(legacy_dir);
-    }
+    all_moved
 }
 
 #[cfg(test)]
@@ -492,6 +541,180 @@ mod tests {
         assert!(!legacy.exists());
 
         let _ = fs::remove_dir_all(base);
+    }
+
+    #[test]
+    fn migrate_flat_models_dir_adopts_known_files_and_cleans_root() {
+        let models_dir = scratch_dir("flat-migrate");
+        fs::create_dir_all(models_dir.join("custom")).unwrap();
+
+        let preset = target("qwen-2b-q8");
+        fs::write(models_dir.join("main.gguf"), b"GGUFmain").unwrap();
+        let mmproj_hashed = format!(
+            "{}_mmproj.gguf",
+            gguf::sha256_hex("https://example.org/models/mmproj.gguf")
+        );
+        fs::write(models_dir.join(mmproj_hashed), b"GGUFmm").unwrap();
+
+        let custom_url = "https://example.org/custom/other-main.gguf";
+        let custom = ModelDownloadTarget::Gguf {
+            id: "custom:1".to_string(),
+            url: custom_url.to_string(),
+            mmproj_url: None,
+        };
+        fs::write(
+            models_dir
+                .join("custom")
+                .join(format!("{}_other-main.gguf", gguf::sha256_hex(custom_url))),
+            b"GGUFcustom",
+        )
+        .unwrap();
+
+        fs::write(models_dir.join("orphan.gguf"), b"GGUForphan").unwrap();
+        fs::write(models_dir.join("main.gguf.tmp"), b"GGUFpartial").unwrap();
+        let downloader = ModelDownloader::new(&models_dir);
+        write_gguf(
+            &models_dir.join("other-key").join("model.gguf"),
+            b"GGUFkeep",
+        );
+
+        migrate_flat_models_dir(&models_dir, &[preset.clone(), custom.clone()]);
+
+        assert_eq!(
+            fs::read(downloader.model_path(&preset)).unwrap(),
+            b"GGUFmain"
+        );
+        assert_eq!(
+            fs::read(downloader.mmproj_path(&preset).unwrap()).unwrap(),
+            b"GGUFmm"
+        );
+        assert_eq!(
+            fs::read(downloader.model_path(&custom)).unwrap(),
+            b"GGUFcustom"
+        );
+        assert_eq!(
+            fs::read(models_dir.join("other-key/model.gguf")).unwrap(),
+            b"GGUFkeep"
+        );
+        assert!(!models_dir.join("custom").exists());
+        let root_files = fs::read_dir(&models_dir)
+            .unwrap()
+            .flatten()
+            .filter(|entry| entry.path().is_file())
+            .count();
+        assert_eq!(root_files, 0);
+
+        migrate_flat_models_dir(&models_dir, &[preset.clone(), custom]);
+        assert_eq!(
+            fs::read(downloader.model_path(&preset)).unwrap(),
+            b"GGUFmain"
+        );
+
+        let _ = fs::remove_dir_all(models_dir);
+    }
+
+    #[test]
+    fn migrate_flat_models_dir_adopts_sidecarless_files_for_duplicated_targets() {
+        let models_dir = scratch_dir("flat-duplicate-targets");
+        fs::create_dir_all(&models_dir).unwrap();
+        fs::write(models_dir.join("main.gguf"), b"GGUFmain").unwrap();
+        fs::write(models_dir.join("mmproj.gguf"), b"GGUFmm").unwrap();
+
+        let preset = target("lfm-vl-1.6b");
+        migrate_flat_models_dir(&models_dir, &[preset.clone(), preset.clone()]);
+
+        let downloader = ModelDownloader::new(&models_dir);
+        assert_eq!(
+            fs::read(downloader.model_path(&preset)).unwrap(),
+            b"GGUFmain"
+        );
+        assert_eq!(
+            fs::read(downloader.mmproj_path(&preset).unwrap()).unwrap(),
+            b"GGUFmm"
+        );
+
+        let _ = fs::remove_dir_all(models_dir);
+    }
+
+    #[test]
+    fn migrate_flat_models_dir_resolves_ambiguity_via_metadata_sidecars() {
+        let models_dir = scratch_dir("flat-sidecar");
+        fs::create_dir_all(&models_dir).unwrap();
+
+        let targets = ["a", "b"].map(|name| ModelDownloadTarget::Gguf {
+            id: format!("preset-{name}"),
+            url: format!("https://example.org/{name}/{name}.gguf"),
+            mmproj_url: Some(format!("https://example.org/{name}/mmproj-F16.gguf")),
+        });
+
+        fs::write(models_dir.join("a.gguf"), b"GGUFa").unwrap();
+        fs::write(
+            models_dir.join("a.gguf.metadata.json"),
+            br#"{"url": "https://example.org/a/a.gguf"}"#,
+        )
+        .unwrap();
+        fs::write(models_dir.join("mmproj-F16.gguf"), b"GGUFmma").unwrap();
+        fs::write(
+            models_dir.join("mmproj-F16.gguf.metadata.json"),
+            br#"{"url": "https://example.org/a/mmproj-F16.gguf"}"#,
+        )
+        .unwrap();
+
+        migrate_flat_models_dir(&models_dir, &targets);
+
+        let downloader = ModelDownloader::new(&models_dir);
+        assert_eq!(
+            fs::read(downloader.model_path(&targets[0])).unwrap(),
+            b"GGUFa"
+        );
+        assert_eq!(
+            fs::read(downloader.mmproj_path(&targets[0]).unwrap()).unwrap(),
+            b"GGUFmma"
+        );
+        assert!(!downloader.model_path(&targets[1]).exists());
+
+        let _ = fs::remove_dir_all(models_dir);
+    }
+
+    #[test]
+    fn migrate_flat_models_dir_rejects_files_whose_sidecar_disagrees() {
+        let models_dir = scratch_dir("flat-sidecar-mismatch");
+        fs::create_dir_all(&models_dir).unwrap();
+
+        let preset = target("qwen-2b-q8");
+        fs::write(models_dir.join("main.gguf"), b"GGUFstale").unwrap();
+        fs::write(
+            models_dir.join("main.gguf.metadata.json"),
+            br#"{"url": "https://example.org/elsewhere/main.gguf"}"#,
+        )
+        .unwrap();
+
+        migrate_flat_models_dir(&models_dir, std::slice::from_ref(&preset));
+
+        let downloader = ModelDownloader::new(&models_dir);
+        assert!(!downloader.model_path(&preset).exists());
+
+        let _ = fs::remove_dir_all(models_dir);
+    }
+
+    #[test]
+    fn migrate_flat_models_dir_drops_targets_with_ambiguous_basenames() {
+        let models_dir = scratch_dir("flat-ambiguous");
+        fs::create_dir_all(&models_dir).unwrap();
+        fs::write(models_dir.join("a.gguf"), b"GGUFa").unwrap();
+        fs::write(models_dir.join("mmproj-F16.gguf"), b"GGUFshared").unwrap();
+
+        let targets = ["a", "b"].map(|name| ModelDownloadTarget::Gguf {
+            id: format!("preset-{name}"),
+            url: format!("https://example.org/{name}/{name}.gguf"),
+            mmproj_url: Some(format!("https://example.org/{name}/mmproj-F16.gguf")),
+        });
+
+        migrate_flat_models_dir(&models_dir, &targets);
+
+        assert_eq!(fs::read_dir(&models_dir).unwrap().count(), 0);
+
+        let _ = fs::remove_dir_all(models_dir);
     }
 
     #[test]

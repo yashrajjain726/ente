@@ -1,7 +1,8 @@
 pub mod download;
 mod downloader;
-pub mod gguf;
+mod gguf;
 
 pub use downloader::{
-    ModelDownloadProgress, ModelDownloadTarget, ModelDownloader, migrate_legacy_dir,
+    ModelDownloadProgress, ModelDownloadTarget, ModelDownloader, migrate_flat_models_dir,
+    migrate_legacy_dir,
 };
