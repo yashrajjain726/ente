@@ -30,7 +30,7 @@ fun App(appViewModel: AppViewModel) {
         ) {
             CircularProgressIndicator(color = EnsuColor.action())
             Spacer(Modifier.height(16.dp))
-            Text("Preparing your model...", color = EnsuColor.textMuted())
+            Text("Preparing...", color = EnsuColor.textMuted())
         }
         return
     }

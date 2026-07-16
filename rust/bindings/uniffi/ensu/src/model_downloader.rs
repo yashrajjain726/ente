@@ -59,8 +59,18 @@ pub trait ModelDownloadCallback: Send + Sync {
 }
 
 #[uniffi::export]
-pub fn migrate_legacy_dir(models_dir: String, legacy_dir: String) {
-    ente_model_download::migrate_legacy_dir(Path::new(&models_dir), Path::new(&legacy_dir));
+pub fn migrate_legacy_dir(
+    models_dir: String,
+    legacy_dir: String,
+    targets: Vec<ModelDownloadTarget>,
+) {
+    let targets: Vec<ente_model_download::ModelDownloadTarget> =
+        targets.into_iter().map(Into::into).collect();
+    ente_model_download::migrate_legacy_dir(
+        Path::new(&models_dir),
+        Path::new(&legacy_dir),
+        &targets,
+    );
 }
 
 #[derive(uniffi::Object)]

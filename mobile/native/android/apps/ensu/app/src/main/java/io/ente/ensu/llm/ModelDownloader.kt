@@ -30,9 +30,9 @@ class ModelDownloader(context: Context) {
 
     fun needsMigration(): Boolean = legacyDir?.exists() == true
 
-    fun migrate() {
+    fun migrate(targets: List<ModelDownloadTarget>) {
         File(appContext.filesDir, "llm").deleteRecursively()
-        legacyDir?.let { migrateLegacyDir(modelsDir.absolutePath, it.absolutePath) }
+        legacyDir?.let { migrateLegacyDir(modelsDir.absolutePath, it.absolutePath, targets) }
     }
 
     val isDownloadActive: Boolean get() = core.isDownloadActive()

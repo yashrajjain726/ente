@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -44,13 +45,21 @@ impl ModelDownloader {
     }
 
     pub fn model_path(&self, target: &ModelDownloadTarget) -> PathBuf {
-        let ModelDownloadTarget::Gguf { id, url, .. } = target;
-        gguf::model_path(&self.models_dir, id, url)
+        let ModelDownloadTarget::Gguf {
+            id,
+            url,
+            mmproj_url,
+        } = target;
+        gguf::model_path(&self.models_dir, id, url, mmproj_url.as_deref())
     }
 
     pub fn mmproj_path(&self, target: &ModelDownloadTarget) -> Option<PathBuf> {
-        let ModelDownloadTarget::Gguf { id, mmproj_url, .. } = target;
-        gguf::mmproj_path(&self.models_dir, id, mmproj_url.as_deref())
+        let ModelDownloadTarget::Gguf {
+            id,
+            url,
+            mmproj_url,
+        } = target;
+        gguf::mmproj_path(&self.models_dir, id, url, mmproj_url.as_deref())
     }
 
     pub fn is_downloaded(&self, target: &ModelDownloadTarget) -> bool {
@@ -75,6 +84,9 @@ impl ModelDownloader {
             if path.exists() {
                 let _ = fs::remove_file(path);
                 removed = true;
+            }
+            if let Some(parent) = path.parent() {
+                let _ = fs::remove_dir(parent);
             }
         }
         removed
@@ -211,55 +223,92 @@ pub fn format_bytes(bytes: u64) -> String {
     format!("{size:.1} {}", UNITS[unit])
 }
 
-pub fn migrate_legacy_dir(models_dir: &Path, legacy_dir: &Path) {
+pub fn migrate_legacy_dir(models_dir: &Path, legacy_dir: &Path, targets: &[ModelDownloadTarget]) {
     if !legacy_dir.exists() {
         return;
     }
     let legacy_models = legacy_dir.join("models");
+
+    let mut plans: Vec<Vec<(String, &str, PathBuf)>> = Vec::new();
+    for target in targets {
+        let ModelDownloadTarget::Gguf {
+            id,
+            url,
+            mmproj_url,
+        } = target;
+        let mmproj_url = mmproj_url.as_deref();
+        let mut plan = vec![(
+            url.clone(),
+            "model.gguf",
+            gguf::model_path(models_dir, id, url, mmproj_url),
+        )];
+        if let Some(dest) = gguf::mmproj_path(models_dir, id, url, mmproj_url) {
+            plan.push((
+                gguf::trimmed(mmproj_url).unwrap().to_string(),
+                "mmproj.gguf",
+                dest,
+            ));
+        }
+        plans.push(plan);
+    }
+
+    let mut basename_counts: HashMap<String, u32> = HashMap::new();
+    for plan in &plans {
+        for (url, fallback, _) in plan {
+            *basename_counts
+                .entry(gguf::filename_for_url(url, fallback))
+                .or_insert(0) += 1;
+        }
+    }
+
     let mut all_moved = true;
-    for file in walk_files(&legacy_models) {
-        if file.extension().is_some_and(|ext| ext == "tmp") || !gguf::looks_like_gguf(&file) {
+    for plan in &plans {
+        let sources: Vec<Option<Option<PathBuf>>> = plan
+            .iter()
+            .map(|(url, fallback, dest)| {
+                if dest.exists() {
+                    return Some(None);
+                }
+                let basename = gguf::filename_for_url(url, fallback);
+                let hashed = legacy_models
+                    .join("custom")
+                    .join(format!("{}_{basename}", gguf::sha256_hex(url)));
+                if gguf::looks_like_gguf(&hashed) {
+                    return Some(Some(hashed));
+                }
+                let flat = legacy_models.join(&basename);
+                if basename_counts[&basename] == 1 && gguf::looks_like_gguf(&flat) {
+                    return Some(Some(flat));
+                }
+                None
+            })
+            .collect();
+        if sources.iter().any(Option::is_none) {
             continue;
         }
-        let Ok(relative) = file.strip_prefix(&legacy_models) else {
-            continue;
-        };
-        let dest = models_dir.join(relative);
-        if dest.exists() {
-            continue;
-        }
-        if let Some(parent) = dest.parent() {
-            let _ = fs::create_dir_all(parent);
-        }
-        if fs::rename(&file, &dest).is_ok() {
-            continue;
-        }
-        let staged = PathBuf::from(format!("{}.migrating", dest.display()));
-        let copied = fs::copy(&file, &staged).and_then(|_| fs::rename(&staged, &dest));
-        if copied.is_err() {
-            let _ = fs::remove_file(&staged);
-            all_moved = false;
+        for ((_, _, dest), source) in plan.iter().zip(sources) {
+            let Some(Some(source)) = source else {
+                continue;
+            };
+            if let Some(parent) = dest.parent() {
+                let _ = fs::create_dir_all(parent);
+            }
+            if fs::rename(&source, dest).is_ok() {
+                continue;
+            }
+            let staged = PathBuf::from(format!("{}.migrating", dest.display()));
+            if fs::copy(&source, &staged)
+                .and_then(|_| fs::rename(&staged, dest))
+                .is_err()
+            {
+                let _ = fs::remove_file(&staged);
+                all_moved = false;
+            }
         }
     }
     if all_moved {
         let _ = fs::remove_dir_all(legacy_dir);
     }
-}
-
-fn walk_files(dir: &Path) -> Vec<PathBuf> {
-    let mut files = Vec::new();
-    let Ok(entries) = fs::read_dir(dir) else {
-        return files;
-    };
-    for entry in entries.flatten() {
-        let path = entry.path();
-        if path.is_dir() {
-            files.extend(walk_files(&path));
-        } else if path.is_file() {
-            files.push(path);
-        }
-    }
-    files
 }
 
 #[cfg(test)]
@@ -286,27 +335,47 @@ mod tests {
         }
     }
 
+    fn write_gguf(path: &Path, content: &[u8]) {
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(path, content).unwrap();
+    }
+
     #[test]
-    fn paths_use_url_filenames_and_hash_custom_models() {
+    fn paths_are_keyed_by_preset_id_or_custom_pair_hash() {
         let dir = scratch_dir("paths");
         let downloader = ModelDownloader::new(&dir);
 
         assert_eq!(
-            downloader.model_path(&target("default:1")),
-            dir.join("main.gguf")
+            downloader.model_path(&target("qwen-2b-q8")),
+            dir.join("qwen-2b-q8/model.gguf")
         );
         assert_eq!(
-            downloader.mmproj_path(&target("default:1")),
-            Some(dir.join("mmproj.gguf"))
+            downloader.mmproj_path(&target("qwen-2b-q8")),
+            Some(dir.join("qwen-2b-q8/mmproj.gguf"))
         );
 
         let custom = downloader.model_path(&target("custom:1"));
-        assert_eq!(custom.parent(), Some(dir.join("custom").as_path()));
-        let name = custom.file_name().unwrap().to_string_lossy().into_owned();
-        let (hash, filename) = name.split_once('_').expect("hash prefix");
-        assert_eq!(hash.len(), 64);
-        assert!(hash.chars().all(|c| c.is_ascii_hexdigit()));
-        assert_eq!(filename, "main.gguf");
+        let key = custom
+            .parent()
+            .unwrap()
+            .file_name()
+            .unwrap()
+            .to_string_lossy()
+            .into_owned();
+        assert!(key.starts_with("custom-"));
+        assert_eq!(key.len(), "custom-".len() + 16);
+        assert_eq!(custom.file_name().unwrap(), "model.gguf");
+        assert_eq!(
+            downloader.mmproj_path(&target("custom:1")),
+            Some(custom.with_file_name("mmproj.gguf"))
+        );
+
+        let other_mmproj = ModelDownloadTarget::Gguf {
+            id: "custom:1".to_string(),
+            url: "https://example.org/models/main.gguf?download=true".to_string(),
+            mmproj_url: Some("https://example.org/models/other.gguf".to_string()),
+        };
+        assert_ne!(downloader.model_path(&other_mmproj), custom);
 
         let _ = fs::remove_dir_all(dir);
     }
@@ -315,17 +384,19 @@ mod tests {
     fn is_downloaded_requires_gguf_magic_on_all_files() {
         let dir = scratch_dir("is-downloaded");
         let downloader = ModelDownloader::new(&dir);
-        let target = target("default:1");
+        let target = target("qwen-2b-q8");
+        let model = downloader.model_path(&target);
+        let mmproj = downloader.mmproj_path(&target).unwrap();
 
         assert!(!downloader.is_downloaded(&target));
 
-        fs::write(dir.join("main.gguf"), b"GGUFdata").unwrap();
+        write_gguf(&model, b"GGUFdata");
         assert!(!downloader.is_downloaded(&target));
 
-        fs::write(dir.join("mmproj.gguf"), b"not-a-model").unwrap();
+        write_gguf(&mmproj, b"not-a-model");
         assert!(!downloader.is_downloaded(&target));
 
-        fs::write(dir.join("mmproj.gguf"), b"GGUFdata").unwrap();
+        write_gguf(&mmproj, b"GGUFdata");
         assert!(downloader.is_downloaded(&target));
 
         let _ = fs::remove_dir_all(dir);
@@ -335,9 +406,9 @@ mod tests {
     fn download_skips_when_already_present() {
         let dir = scratch_dir("skip");
         let downloader = ModelDownloader::new(&dir);
-        let target = target("default:1");
-        fs::write(dir.join("main.gguf"), b"GGUFdata").unwrap();
-        fs::write(dir.join("mmproj.gguf"), b"GGUFdata").unwrap();
+        let target = target("qwen-2b-q8");
+        write_gguf(&downloader.model_path(&target), b"GGUFdata");
+        write_gguf(&downloader.mmproj_path(&target).unwrap(), b"GGUFdata");
 
         let downloaded = downloader
             .download(&target, |_| {}, || false)
@@ -348,28 +419,76 @@ mod tests {
     }
 
     #[test]
-    fn migrate_moves_models_and_discards_legacy_dir() {
+    fn migrate_adopts_known_files_and_discards_legacy_dir() {
         let base = scratch_dir("migrate");
         let legacy = base.join("llm");
         let legacy_models = legacy.join("models");
         fs::create_dir_all(legacy_models.join("custom")).unwrap();
+
         fs::write(legacy_models.join("main.gguf"), b"GGUFmain").unwrap();
-        fs::write(legacy_models.join("custom/abc_x.gguf"), b"GGUFcustom").unwrap();
+        fs::write(legacy_models.join("mmproj.gguf"), b"GGUFmmproj").unwrap();
+
+        let custom_url = "https://example.org/custom/other-main.gguf";
+        let custom = ModelDownloadTarget::Gguf {
+            id: "custom:1".to_string(),
+            url: custom_url.to_string(),
+            mmproj_url: None,
+        };
+        fs::write(
+            legacy_models
+                .join("custom")
+                .join(format!("{}_other-main.gguf", gguf::sha256_hex(custom_url))),
+            b"GGUFcustom",
+        )
+        .unwrap();
+
         fs::write(legacy_models.join("main.gguf.tmp"), b"GGUFpartial").unwrap();
-        fs::write(legacy_models.join("main.gguf.tmp.ranges.json"), b"{}").unwrap();
         fs::write(legacy_models.join("main.gguf.metadata.json"), b"{}").unwrap();
+        fs::write(legacy_models.join("orphan.gguf"), b"GGUForphan").unwrap();
 
         let models_dir = base.join("models");
-        migrate_legacy_dir(&models_dir, &legacy);
+        let preset = target("qwen-2b-q8");
+        migrate_legacy_dir(&models_dir, &legacy, &[preset.clone(), custom.clone()]);
 
-        assert_eq!(fs::read(models_dir.join("main.gguf")).unwrap(), b"GGUFmain");
+        let downloader = ModelDownloader::new(&models_dir);
         assert_eq!(
-            fs::read(models_dir.join("custom/abc_x.gguf")).unwrap(),
+            fs::read(downloader.model_path(&preset)).unwrap(),
+            b"GGUFmain"
+        );
+        assert_eq!(
+            fs::read(downloader.mmproj_path(&preset).unwrap()).unwrap(),
+            b"GGUFmmproj"
+        );
+        assert_eq!(
+            fs::read(downloader.model_path(&custom)).unwrap(),
             b"GGUFcustom"
         );
-        assert!(!models_dir.join("main.gguf.tmp").exists());
-        assert!(!models_dir.join("main.gguf.tmp.ranges.json").exists());
-        assert!(!models_dir.join("main.gguf.metadata.json").exists());
+        assert_eq!(fs::read_dir(&models_dir).unwrap().count(), 2);
+        assert!(!legacy.exists());
+
+        let _ = fs::remove_dir_all(base);
+    }
+
+    #[test]
+    fn migrate_adopts_targets_only_when_every_file_resolves() {
+        let base = scratch_dir("migrate-ambiguous");
+        let legacy = base.join("llm");
+        let legacy_models = legacy.join("models");
+        fs::create_dir_all(&legacy_models).unwrap();
+        fs::write(legacy_models.join("a.gguf"), b"GGUFa").unwrap();
+        fs::write(legacy_models.join("b.gguf"), b"GGUFb").unwrap();
+        fs::write(legacy_models.join("mmproj-F16.gguf"), b"GGUFshared").unwrap();
+
+        let targets = ["a", "b"].map(|name| ModelDownloadTarget::Gguf {
+            id: format!("preset-{name}"),
+            url: format!("https://example.org/{name}/{name}.gguf"),
+            mmproj_url: Some(format!("https://example.org/{name}/mmproj-F16.gguf")),
+        });
+
+        let models_dir = base.join("models");
+        migrate_legacy_dir(&models_dir, &legacy, &targets);
+
+        assert!(!models_dir.exists() || fs::read_dir(&models_dir).unwrap().count() == 0);
         assert!(!legacy.exists());
 
         let _ = fs::remove_dir_all(base);
@@ -381,14 +500,23 @@ mod tests {
         let legacy = base.join("llm");
         fs::create_dir_all(legacy.join("models")).unwrap();
         fs::write(legacy.join("models/main.gguf"), b"GGUFold").unwrap();
+        fs::write(legacy.join("models/mmproj.gguf"), b"GGUFmm").unwrap();
 
         let models_dir = base.join("models");
-        fs::create_dir_all(&models_dir).unwrap();
-        fs::write(models_dir.join("main.gguf"), b"GGUFnew").unwrap();
+        let preset = target("qwen-2b-q8");
+        let downloader = ModelDownloader::new(&models_dir);
+        write_gguf(&downloader.model_path(&preset), b"GGUFnew");
 
-        migrate_legacy_dir(&models_dir, &legacy);
+        migrate_legacy_dir(&models_dir, &legacy, std::slice::from_ref(&preset));
 
-        assert_eq!(fs::read(models_dir.join("main.gguf")).unwrap(), b"GGUFnew");
+        assert_eq!(
+            fs::read(downloader.model_path(&preset)).unwrap(),
+            b"GGUFnew"
+        );
+        assert_eq!(
+            fs::read(downloader.mmproj_path(&preset).unwrap()).unwrap(),
+            b"GGUFmm"
+        );
         assert!(!legacy.exists());
 
         let _ = fs::remove_dir_all(base);

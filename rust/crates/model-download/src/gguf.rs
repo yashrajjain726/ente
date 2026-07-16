@@ -25,30 +25,52 @@ pub(crate) fn expected_targets(
     let mut targets = vec![Target {
         label: "Model".to_string(),
         url: url.to_string(),
-        destination_path: model_path(models_dir, id, url).display().to_string(),
+        destination_path: model_path(models_dir, id, url, mmproj_url)
+            .display()
+            .to_string(),
     }];
-    if let Some(mmproj_url) = trimmed(mmproj_url) {
+    if let Some(mmproj) = mmproj_path(models_dir, id, url, mmproj_url) {
         targets.push(Target {
             label: "Mmproj".to_string(),
-            url: mmproj_url.to_string(),
-            destination_path: path_for_url(models_dir, id, mmproj_url, "mmproj.gguf")
-                .display()
-                .to_string(),
+            url: trimmed(mmproj_url).unwrap().to_string(),
+            destination_path: mmproj.display().to_string(),
         });
     }
     targets
 }
 
-pub(crate) fn model_path(models_dir: &Path, id: &str, url: &str) -> PathBuf {
-    path_for_url(models_dir, id, url, "model.gguf")
+pub(crate) fn model_dir(
+    models_dir: &Path,
+    id: &str,
+    url: &str,
+    mmproj_url: Option<&str>,
+) -> PathBuf {
+    let key = if id.starts_with("custom") {
+        let pair = format!("{url}\n{}", trimmed(mmproj_url).unwrap_or(""));
+        format!("custom-{}", &sha256_hex(&pair)[..16])
+    } else {
+        id.to_string()
+    };
+    models_dir.join(key)
+}
+
+pub(crate) fn model_path(
+    models_dir: &Path,
+    id: &str,
+    url: &str,
+    mmproj_url: Option<&str>,
+) -> PathBuf {
+    model_dir(models_dir, id, url, mmproj_url).join("model.gguf")
 }
 
 pub(crate) fn mmproj_path(
     models_dir: &Path,
     id: &str,
+    url: &str,
     mmproj_url: Option<&str>,
 ) -> Option<PathBuf> {
-    trimmed(mmproj_url).map(|url| path_for_url(models_dir, id, url, "mmproj.gguf"))
+    trimmed(mmproj_url)?;
+    Some(model_dir(models_dir, id, url, mmproj_url).join("mmproj.gguf"))
 }
 
 pub(crate) fn looks_like_gguf(path: &Path) -> bool {
@@ -76,22 +98,11 @@ fn validate_gguf(_target: &Target, path: &Path) -> Result<(), download::Error> {
     Ok(())
 }
 
-fn trimmed(url: Option<&str>) -> Option<&str> {
+pub(crate) fn trimmed(url: Option<&str>) -> Option<&str> {
     url.map(str::trim).filter(|url| !url.is_empty())
 }
 
-fn path_for_url(models_dir: &Path, id: &str, url: &str, fallback: &str) -> PathBuf {
-    let filename = filename_for_url(url, fallback);
-    if id.starts_with("custom:") {
-        models_dir
-            .join("custom")
-            .join(format!("{}_{filename}", sha256_hex(url)))
-    } else {
-        models_dir.join(filename)
-    }
-}
-
-fn filename_for_url(url: &str, fallback: &str) -> String {
+pub(crate) fn filename_for_url(url: &str, fallback: &str) -> String {
     let without_query = url.split(['?', '#']).next().unwrap_or(url);
     let name = without_query.rsplit('/').next().unwrap_or("");
     if name.trim().is_empty() {
@@ -101,7 +112,7 @@ fn filename_for_url(url: &str, fallback: &str) -> String {
     }
 }
 
-fn sha256_hex(value: &str) -> String {
+pub(crate) fn sha256_hex(value: &str) -> String {
     Sha256::digest(value.as_bytes())
         .iter()
         .map(|byte| format!("{byte:02x}"))

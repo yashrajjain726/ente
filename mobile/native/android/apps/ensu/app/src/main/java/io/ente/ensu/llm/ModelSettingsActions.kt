@@ -324,7 +324,14 @@ internal class ModelSettingsActions(
         }
         val contextLength = settings.contextLength.toIntOrNull()
         val maxTokens = settings.maxTokens.toIntOrNull()?.takeIf { it > 0 }
-        val id = if (useCustom) "custom:${url.hashCode()}" else "default:${url.hashCode()}"
+        val id = if (useCustom) {
+            (listOf(configDefaults.mobileDefaultModel) + configDefaults.mobileModelPresets)
+                .firstOrNull { it.url == url && it.mmprojUrl == mmproj }
+                ?.id
+                ?: "custom:$url"
+        } else {
+            configDefaults.mobileDefaultModel.id
+        }
 
         return LlmModelTarget(
             id = id,

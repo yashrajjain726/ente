@@ -6,6 +6,7 @@ private let logger = EnsuLogging.shared.logger("ModelDownloader")
 final class ModelDownloader {
     private let core: ModelDownloadCore
 
+    @MainActor
     init() {
         let baseDir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
             ?? FileManager.default.temporaryDirectory
@@ -13,7 +14,8 @@ final class ModelDownloader {
         core = ModelDownloadCore(modelsDir: modelsDir.path)
         migrateLegacyDir(
             modelsDir: modelsDir.path,
-            legacyDir: baseDir.appendingPathComponent("llm", isDirectory: true).path
+            legacyDir: baseDir.appendingPathComponent("llm", isDirectory: true).path,
+            targets: Self.migrationTargets()
         )
         var excludedDir = modelsDir
         var values = URLResourceValues()
@@ -25,6 +27,23 @@ final class ModelDownloader {
         if #available(iOS 26.0, *) {
             ModelDownloadBackgroundTask.register()
         }
+    }
+
+    @MainActor
+    private static func migrationTargets() -> [ModelDownloadTarget] {
+        let config = ConfigDefaults.shared
+        var targets = ([config.mobileDefaultModel] + config.mobileModelPresets).map {
+            ModelDownloadTarget.gguf(id: $0.id, url: $0.url, mmprojUrl: $0.mmprojUrl)
+        }
+        let settings = ModelSettingsStore.shared
+        if settings.useCustomModel && !settings.modelUrl.isEmpty {
+            targets.append(.gguf(
+                id: "custom:\(settings.modelUrl)",
+                url: settings.modelUrl,
+                mmprojUrl: settings.mmprojUrl.isEmpty ? nil : settings.mmprojUrl
+            ))
+        }
+        return targets
     }
 
     func modelPath(target: ModelDownloadTarget) -> URL {
