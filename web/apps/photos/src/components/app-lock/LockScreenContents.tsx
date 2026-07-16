@@ -42,11 +42,14 @@ export const AppLockScreen = ({ children }: PropsWithChildren) => (
 );
 
 interface LockScreenHeaderProps {
-    showLogout: boolean;
+    showLogoutButton: boolean;
     onLogout: () => void;
 }
 
-const LockScreenHeader = ({ showLogout, onLogout }: LockScreenHeaderProps) => (
+const LockScreenHeader = ({
+    showLogoutButton,
+    onLogout,
+}: LockScreenHeaderProps) => (
     <Box
         sx={{
             position: "absolute",
@@ -60,7 +63,7 @@ const LockScreenHeader = ({ showLogout, onLogout }: LockScreenHeaderProps) => (
         }}
     >
         <EnteLogo />
-        {showLogout && (
+        {showLogoutButton && (
             <FocusVisibleButton
                 variant="text"
                 color="secondary"
@@ -84,7 +87,7 @@ export const LockScreenContents = () => (
         lockScreenMode="lock"
         renderHeader={({ showLogoutConfirm, showLogout }) => (
             <LockScreenHeader
-                showLogout={!showLogoutConfirm}
+                showLogoutButton={!showLogoutConfirm}
                 onLogout={showLogout}
             />
         )}
@@ -98,7 +101,7 @@ export const AppLockSetupError = ({ onRetry }: { onRetry: () => void }) => {
     return (
         <AppLockScreen>
             <LockScreenHeader
-                showLogout={!showLogoutConfirm}
+                showLogoutButton={!showLogoutConfirm}
                 onLogout={() => setShowLogoutConfirm(true)}
             />
             {showLogoutConfirm ? (
@@ -110,11 +113,7 @@ export const AppLockSetupError = ({ onRetry }: { onRetry: () => void }) => {
                 <AppLockCard>
                     <Stack
                         spacing={0}
-                        sx={{
-                            width: 376,
-                            maxWidth: "100%",
-                            alignItems: "center",
-                        }}
+                        sx={{ width: "100%", alignItems: "center" }}
                     >
                         <ErrorOutlinedIcon
                             sx={{ fontSize: 48, color: "text.muted", mb: 3 }}
