@@ -6,6 +6,9 @@ import "package:ente_lock_screen/local_authentication_service.dart";
 import "package:flutter/material.dart";
 import "package:locker/l10n/l10n.dart";
 import "package:locker/services/configuration.dart";
+import "package:logging/logging.dart";
+
+final _logger = Logger("LegacyUtils");
 
 /// Opens the Legacy (Emergency contacts) page after authenticating the user.
 Future<void> openLegacyPage(BuildContext context) async {
@@ -47,7 +50,7 @@ Future<void> _openLegacy(
     return hasAuthenticatedForLegacyFlow;
   }
 
-  if (showIntroWhenNoKits && await _hasNoLegacyKits()) {
+  if (showIntroWhenNoKits && await hasLegacyKit() == false) {
     if (!context.mounted) {
       return;
     }
@@ -79,15 +82,15 @@ Future<void> _openLegacy(
   );
 }
 
-Future<bool> _hasNoLegacyKits() async {
+Future<bool?> hasLegacyKit() async {
   if (!LegacyKitService.instance.isInitialized) {
-    return false;
+    return null;
   }
   try {
-    return (await LegacyKitService.instance.getKits()).isEmpty;
-  } catch (_) {
-    // Fall back to EmergencyPage, which owns the existing fetch error handling.
-    return false;
+    return (await LegacyKitService.instance.getKits()).isNotEmpty;
+  } catch (e, s) {
+    _logger.warning("Failed to fetch legacy kits", e, s);
+    return null;
   }
 }
 
