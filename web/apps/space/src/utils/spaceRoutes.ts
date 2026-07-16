@@ -1,4 +1,4 @@
-export type SetupProfileSource = "login" | "verify";
+export type CreateProfileSource = "login" | "verify";
 export type ProfileImageFlowSource = "profile" | "settings";
 export type VerifyFlow = "login" | "signup";
 
@@ -40,8 +40,9 @@ export const spaceRoutes = {
     settings: "/app/settings",
     settingsProfile: "/app/settings/profile",
     settingsProfileName: "/app/settings/profile/name",
-    setupProfile: (from?: SetupProfileSource) =>
-        from == "login" ? "/setup-profile?from=login" : "/setup-profile",
+    createProfile: (from?: CreateProfileSource) =>
+        from == "login" ? "/create-profile?from=login" : "/create-profile",
+    addProfilePhoto: "/add-profile-photo",
     signup: "/signup",
     twoFactorVerify: "/two-factor/verify",
     verify: "/verify",
@@ -52,9 +53,9 @@ export const verifyFlowFromQuery = (
     value: string | string[] | undefined,
 ): VerifyFlow => (valueFromQuery(value) == "login" ? "login" : "signup");
 
-export const setupProfileSourceFromQuery = (
+export const createProfileSourceFromQuery = (
     value: string | string[] | undefined,
-): SetupProfileSource =>
+): CreateProfileSource =>
     valueFromQuery(value) == "login" ? "login" : "verify";
 
 export const profileImageFlowSourceFromQuery = (

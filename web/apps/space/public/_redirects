@@ -17,7 +17,8 @@
 /manifest.webmanifest    /manifest.webmanifest    200
 /passkeys/finish    /passkeys/finish    200
 /passkeys/verify    /passkeys/verify    200
-/setup-profile    /setup-profile    200
+/create-profile    /create-profile    200
+/add-profile-photo    /add-profile-photo    200
 /signup    /signup    200
 /two-factor/verify    /two-factor/verify    200
 /verify    /verify    200

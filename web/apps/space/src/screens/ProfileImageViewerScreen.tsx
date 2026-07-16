@@ -1,6 +1,7 @@
 import { ArrowLeft02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Box, Skeleton } from "@mui/material";
+import { spaceAppAvatarCropSize } from "components/SpaceAvatarCropPage";
 import { SpaceAvatarImage } from "components/SpaceAvatarImage";
 import React, { useRef } from "react";
 import type { SetupProfile } from "screens/SetupProfileScreen";
@@ -203,7 +204,7 @@ export const ProfileImageViewerScreen: React.FC<
                                 display: "flex",
                                 justifyContent: "center",
                                 overflow: "hidden",
-                                width: "min(64vw, 240px)",
+                                width: spaceAppAvatarCropSize,
                             }}
                         >
                             {isAvatarURLPending ? (

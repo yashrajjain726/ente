@@ -5,35 +5,32 @@ import {
     SetupProfileScreen,
     setupProfileBackground,
 } from "screens/SetupProfileScreen";
-import { savedPendingSpaceInvite } from "services/spaceInvite";
 import {
-    saveSpaceProfile,
-    spaceProfileErrorMessage,
     spaceUsernameAvailability,
     spaceUsernameValidationError,
 } from "services/spaceProfile";
 import { useSpaceAppState } from "state/spaceAppState";
 import { acceptPendingSpaceInvite } from "utils/spacePendingInvite";
-import { setupProfileSourceFromQuery, spaceRoutes } from "utils/spaceRoutes";
+import { createProfileSourceFromQuery, spaceRoutes } from "utils/spaceRoutes";
 import { useSpaceRouter } from "utils/spaceRouteTransitions";
 
 const Page: React.FC = () => {
     const router = useSpaceRouter();
     const {
         onboardingEntrySource,
+        pendingCreateProfile,
         profile,
         profileLoadError,
         profileLoadStatus,
         refreshProfile,
-        setProfile,
-        setSkipNextHomeFeedSkeleton,
+        setPendingCreateProfile,
     } = useSpaceAppState();
-    const backSource = setupProfileSourceFromQuery(router.query.from);
+    const backSource = createProfileSourceFromQuery(router.query.from);
     const isAddFriendLinkOnboarding =
         onboardingEntrySource == "add-friend-link";
-    const [setupError, setSetupError] = useState<string>();
-    const [isSubmitting, setIsSubmitting] = useState(false);
-    const [draftUsername, setDraftUsername] = useState("");
+    const [draftUsername, setDraftUsername] = useState(
+        pendingCreateProfile?.username ?? "",
+    );
     const [usernameStatus, setUsernameStatus] = useState<
         "available" | "unavailable"
     >();
@@ -112,9 +109,7 @@ const Page: React.FC = () => {
         <>
             <SpacePageMeta themeColor={setupProfileBackground} />
             <SetupProfileScreen
-                ctaLabel={isAddFriendLinkOnboarding ? "Done" : "Next"}
-                errorMessage={setupError}
-                isSubmitting={isSubmitting}
+                initialProfile={pendingCreateProfile}
                 onBack={() =>
                     void router.push(
                         backSource == "login"
@@ -122,29 +117,12 @@ const Page: React.FC = () => {
                             : spaceRoutes.verify,
                     )
                 }
-                onContinue={async (nextProfile) => {
-                    setIsSubmitting(true);
-                    setSetupError(undefined);
-                    try {
-                        const savedProfile = await saveSpaceProfile(
-                            nextProfile,
-                            savedPendingSpaceInvite()?.spaceId,
-                        );
-                        const acceptedInvite = await acceptPendingSpaceInvite();
-                        setProfile(savedProfile);
-                        if (!acceptedInvite) {
-                            setSkipNextHomeFeedSkeleton(true);
-                        }
-                        void router.push(
-                            isAddFriendLinkOnboarding
-                                ? spaceRoutes.home
-                                : spaceRoutes.invite,
-                        );
-                    } catch (error) {
-                        console.error("Space profile setup failed", error);
-                        setSetupError(spaceProfileErrorMessage(error));
-                        setIsSubmitting(false);
-                    }
+                onContinue={(nextProfile) => {
+                    setPendingCreateProfile({
+                        ...nextProfile,
+                        source: backSource,
+                    });
+                    void router.push(spaceRoutes.addProfilePhoto);
                 }}
                 onUsernameChange={setDraftUsername}
                 usernameStatus={usernameStatus}

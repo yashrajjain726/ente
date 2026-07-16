@@ -133,14 +133,14 @@ const Page: React.FC = () => {
 
     const verifySignupEmail = async (code: string) => {
         if (!isLiveSignupVerification) {
-            void router.push(spaceRoutes.setupProfile());
+            void router.push(spaceRoutes.createProfile());
             return;
         }
 
         try {
             await completeSpaceSignup(signupEmail, code);
             setIsLiveSignupVerification(false);
-            void router.push(spaceRoutes.setupProfile());
+            void router.push(spaceRoutes.createProfile());
         } catch (error) {
             if (!isExpectedVerificationError(error)) {
                 console.error("Space signup verification failed", error);

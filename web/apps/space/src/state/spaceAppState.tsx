@@ -1,12 +1,19 @@
 import type { FriendProfile } from "data/friends";
 import React, { createContext, useContext } from "react";
 import type { SpaceLoginCredentials } from "screens/LoginScreen";
-import type { SetupProfile } from "screens/SetupProfileScreen";
+import type {
+    SetupProfile,
+    SetupProfileDetails,
+} from "screens/SetupProfileScreen";
 import type { SpacePost } from "services/space";
 import type { PendingSpacePasskeyVerification } from "services/spacePasskeyVerification";
+import type { CreateProfileSource } from "utils/spaceRoutes";
 
 export type OnboardingEntrySource = "direct" | "add-friend-link";
 export type SpaceProfileLoadStatus = "error" | "loading" | "ready";
+export type PendingCreateProfile = SetupProfileDetails & {
+    source: CreateProfileSource;
+};
 
 export interface RefreshSpaceProfileOptions {
     throwOnError?: boolean;
@@ -58,6 +65,7 @@ export interface SpaceAppState {
     pendingPasskeyVerification: PendingSpacePasskeyVerification | null;
     pendingProfileAvatarFile: File | null;
     pendingProfileCoverFile: File | null;
+    pendingCreateProfile: PendingCreateProfile | null;
     profile: SetupProfile | null;
     profileLoadError?: string;
     profileLoadStatus: SpaceProfileLoadStatus;
@@ -86,6 +94,9 @@ export interface SpaceAppState {
     >;
     setPendingProfileCoverFile: React.Dispatch<
         React.SetStateAction<File | null>
+    >;
+    setPendingCreateProfile: React.Dispatch<
+        React.SetStateAction<PendingCreateProfile | null>
     >;
     setProfile: (profile: SetupProfile | null) => void;
     setSkipNextHomeFeedSkeleton: React.Dispatch<React.SetStateAction<boolean>>;

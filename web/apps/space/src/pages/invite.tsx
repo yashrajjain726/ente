@@ -16,7 +16,7 @@ const Page: React.FC = () => {
 
     useEffect(() => {
         if (profileLoadStatus == "ready" && !profile) {
-            void router.replace(spaceRoutes.setupProfile());
+            void router.replace(spaceRoutes.createProfile());
         }
     }, [profile, profileLoadStatus, router]);
 
