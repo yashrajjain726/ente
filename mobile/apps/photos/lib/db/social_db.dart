@@ -153,6 +153,28 @@ class SocialDB {
     return rows.map(_rowToComment).toList();
   }
 
+  Future<Comment?> getLatestCommentForFile(
+    int fileID, {
+    required List<int> collectionIDs,
+  }) async {
+    if (collectionIDs.isEmpty) {
+      return null;
+    }
+
+    final placeholders = List.filled(collectionIDs.length, '?').join(',');
+    final db = await database;
+    final rows = await db.query(
+      _commentsTable,
+      where:
+          'file_id = ? AND is_deleted = 0 '
+          'AND collection_id IN ($placeholders)',
+      whereArgs: [fileID, ...collectionIDs],
+      orderBy: 'created_at DESC',
+      limit: 1,
+    );
+    return rows.isEmpty ? null : _rowToComment(rows.first);
+  }
+
   Future<int> getCommentCountForFile(int fileID) async {
     final db = await database;
     final result = await db.rawQuery(

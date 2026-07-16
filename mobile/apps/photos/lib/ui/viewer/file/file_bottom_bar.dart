@@ -397,9 +397,7 @@ class FileBottomBarState extends State<FileBottomBar> {
 
   Future<void> _toggleReaction() async {
     final file = widget.file;
-    if (file.uploadedFileID == null ||
-        file.collectionID == null ||
-        widget.userID == null) {
+    if (file.uploadedFileID == null || widget.userID == null) {
       return;
     }
 
@@ -409,11 +407,14 @@ class FileBottomBarState extends State<FileBottomBar> {
       return;
     }
 
-    // Check how many shared collections contain this file
-    final sharedCount = await CollectionsService.instance
-        .getSharedCollectionCountForFile(file.uploadedFileID!);
+    final sharedCollections = await CollectionsService.instance
+        .getSharedCollectionsForFile(file.uploadedFileID!, includeHidden: true);
 
-    if (sharedCount <= 1) {
+    if (sharedCollections.isEmpty) {
+      return;
+    }
+
+    if (sharedCollections.length == 1) {
       // Single shared collection: like directly
       final previousState = _hasLiked;
       _hasLiked = true;
@@ -422,7 +423,7 @@ class FileBottomBarState extends State<FileBottomBar> {
       try {
         await SocialDataProvider.instance.toggleReaction(
           userID: widget.userID!,
-          collectionID: file.collectionID!,
+          collectionID: sharedCollections.single.id,
           fileID: file.uploadedFileID,
         );
       } catch (e) {

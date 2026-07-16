@@ -295,6 +295,43 @@ class CollectionsService {
     return false;
   }
 
+  /// Returns the shared collections containing [uploadedFileID].
+  ///
+  /// A collection is considered shared if it has sharees, has a public link,
+  /// or is owned by someone else (incoming share). Results are sorted by ID so
+  /// callers have a deterministic primary collection.
+  Future<List<Collection>> getSharedCollectionsForFile(
+    int uploadedFileID, {
+    bool includeHidden = false,
+  }) async {
+    final Set<int> collectionIDs = await _filesDB.getAllCollectionIDsOfFile(
+      uploadedFileID,
+    );
+    final int? currentUserID = _config.getUserID();
+    if (collectionIDs.isEmpty || currentUserID == null) {
+      return [];
+    }
+
+    final hiddenCollectionIDs = includeHidden
+        ? const <int>{}
+        : getHiddenCollectionIds();
+    final sharedCollections =
+        collectionIDs
+            .map((collectionID) => _collectionIDToCollections[collectionID])
+            .whereType<Collection>()
+            .where(
+              (collection) =>
+                  !collection.isDeleted &&
+                  !hiddenCollectionIDs.contains(collection.id) &&
+                  (collection.hasSharees ||
+                      collection.hasLink ||
+                      !collection.isOwner(currentUserID)),
+            )
+            .toList()
+          ..sort((first, second) => first.id.compareTo(second.id));
+    return sharedCollections;
+  }
+
   /// Returns the count of shared collections containing this file.
   /// Uses early exit optimization - stops counting at 2.
   ///

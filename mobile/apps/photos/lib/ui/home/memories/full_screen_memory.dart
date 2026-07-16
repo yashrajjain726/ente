@@ -35,6 +35,7 @@ import "package:photos/ui/components/base_bottom_sheet.dart";
 import "package:photos/ui/home/memories/custom_listener.dart";
 import "package:photos/ui/home/memories/memory_progress_indicator.dart";
 import "package:photos/ui/home/memories/memory_video_prefetcher.dart";
+import "package:photos/ui/social/widgets/file_social_overlay.dart";
 import "package:photos/ui/viewer/file/file_widget.dart";
 import "package:photos/ui/viewer/file/thumbnail_widget.dart";
 import "package:photos/ui/viewer/file_details/favorite_widget.dart";
@@ -873,6 +874,28 @@ class _FullScreenMemoryState extends State<FullScreenMemory> {
                       ),
                       const BottomIcons(),
                     ],
+                  ),
+                  ValueListenableBuilder<int>(
+                    valueListenable: inheritedData.indexNotifier,
+                    builder: (context, index, _) {
+                      final safeIndex = _clampedMemoryIndex(
+                        index,
+                        inheritedData.memories.length,
+                      );
+                      if (safeIndex == null) return const SizedBox.shrink();
+                      return FileSocialOverlay(
+                        file: inheritedData.memories[safeIndex].file,
+                        currentUserID: Configuration.instance.getUserID(),
+                        onInteractionStart: () {
+                          _toggleAnimation(pause: true);
+                          Bus.instance.fire(PauseVideoEvent());
+                        },
+                        onInteractionEnd: () {
+                          Bus.instance.fire(ResumeVideoEvent());
+                          _toggleAnimation(pause: false);
+                        },
+                      );
+                    },
                   ),
                 ],
               ),

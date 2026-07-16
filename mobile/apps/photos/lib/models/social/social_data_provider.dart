@@ -24,6 +24,13 @@ class SocialDataProvider {
     return _db.getCommentsForFile(fileID);
   }
 
+  Future<Comment?> getLatestCommentForFile(
+    int fileID, {
+    required List<int> collectionIDs,
+  }) {
+    return _db.getLatestCommentForFile(fileID, collectionIDs: collectionIDs);
+  }
+
   Future<int> getCommentCountForFile(int fileID) {
     return _db.getCommentCountForFile(fileID);
   }

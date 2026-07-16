@@ -38,6 +38,7 @@ Future<void> showLikeCollectionSelectorSheet(
   required int fileID,
   required int currentUserID,
   EnteFile? file,
+  Set<int>? allowedCollectionIDs,
 }) {
   return showModalBottomSheet(
     context: context,
@@ -47,6 +48,7 @@ Future<void> showLikeCollectionSelectorSheet(
       fileID: fileID,
       currentUserID: currentUserID,
       file: file,
+      allowedCollectionIDs: allowedCollectionIDs,
     ),
   );
 }
@@ -55,11 +57,13 @@ class LikeCollectionSelectorSheet extends StatefulWidget {
   final int fileID;
   final int currentUserID;
   final EnteFile? file;
+  final Set<int>? allowedCollectionIDs;
 
   const LikeCollectionSelectorSheet({
     required this.fileID,
     required this.currentUserID,
     this.file,
+    this.allowedCollectionIDs,
     super.key,
   });
 
@@ -100,7 +104,11 @@ class _LikeCollectionSelectorSheetState
           .whereType<Collection>()
           .where(
             (c) =>
-                c.hasSharees || c.hasLink || !c.isOwner(widget.currentUserID),
+                (c.hasSharees ||
+                    c.hasLink ||
+                    !c.isOwner(widget.currentUserID)) &&
+                (widget.allowedCollectionIDs == null ||
+                    widget.allowedCollectionIDs!.contains(c.id)),
           )
           .toList();
 
