@@ -39,7 +39,7 @@ You can view your 2FA codes at [auth.ente.com](https://auth.ente.com). For addin
 
 2. Pull in submodules with `git submodule update --init --recursive`
 
-3. From any folder inside `mobile/`, install the workspace dependencies with `dart pub get --enforce-lockfile`.
+3. From any folder inside `mobile/`, install the workspace dependencies with `flutter pub get --enforce-lockfile`.
 
 4. Run the app:
    - Android: `flutter run --flavor independent`

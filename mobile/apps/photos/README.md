@@ -39,7 +39,7 @@ You can alternatively install the build from PlayStore or F-Droid.
 
 1. Install [Flutter v3.38.10](https://flutter.dev/docs/get-started/install) and [Rust](https://www.rust-lang.org/tools/install).
 
-2. From any folder inside `mobile/`, install the workspace dependencies with `dart pub get --enforce-lockfile`. Then, from `rust/`, generate the Rust bindings with `cargo codegen frb`.
+2. From any folder inside `mobile/`, install the workspace dependencies with `flutter pub get --enforce-lockfile`. Then, from `rust/`, generate the Rust bindings with `cargo codegen frb`.
 
 3. Run the app:
    - Android: `flutter run --flavor independent`
