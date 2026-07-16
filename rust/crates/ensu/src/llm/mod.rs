@@ -1,14 +1,21 @@
 mod context;
-mod download;
 mod event;
 mod generate;
 mod model;
 
 pub use context::*;
-pub use download::*;
 pub use event::*;
 pub use generate::*;
 pub use model::*;
+
+pub fn download_model_files(
+    targets: Vec<crate::download::Target>,
+    on_progress: impl FnMut(crate::download::Progress),
+    is_cancelled: impl Fn() -> bool,
+) -> Result<(), Error> {
+    ente_model_download::gguf::download_model_files(targets, on_progress, is_cancelled)
+        .map_err(Error::Download)
+}
 
 use llama_cpp_2::llama_backend::LlamaBackend;
 use std::sync::OnceLock;

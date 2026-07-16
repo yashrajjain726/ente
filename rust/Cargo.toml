@@ -17,6 +17,7 @@ members = [
     "crates/ensu",
     "crates/paste",
     "crates/image",
+    "crates/model-download",
     "crates/photos",
     "crates/test-support",
     "e2e",
@@ -29,6 +30,7 @@ ente-accounts = { path = "crates/accounts" }
 ente-contacts = { path = "crates/contacts" }
 ente-core = { path = "crates/core" }
 ente-image = { path = "crates/image" }
+ente-model-download = { path = "crates/model-download" }
 ente-paste = { path = "crates/paste" }
 ente-photos = { path = "crates/photos" }
 ente-rs = { path = "apps/cli" }
