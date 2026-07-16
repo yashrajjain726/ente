@@ -4,6 +4,7 @@ import FileDownloadIcon from "@mui/icons-material/FileDownloadOutlined";
 import { Paper, Stack, styled, Typography } from "@mui/material";
 import { EnteLogo } from "ente-base/components/EnteLogo";
 import { FocusVisibleButton } from "ente-base/components/mui/FocusVisibleButton";
+import { apiURL, customAPIOrigin } from "ente-base/origins";
 import type { UploadTypeSelectorIntent } from "ente-gallery/components/Upload";
 import { t } from "i18next";
 import React, { useEffect, useState } from "react";
@@ -24,7 +25,6 @@ interface GalleryEmptyStateV2Props {
 
 const galleryEmptyStateShelfTiles = Array.from({ length: 20 }, (_, i) => i);
 const galleryEmptyStateGridTiles = Array.from({ length: 56 }, (_, i) => i);
-const memoriesPreservedCountEndpoint = "https://api.ente.com/files/count";
 const memoriesPreservedCountRefreshInterval = 15_000;
 
 const parseMemoriesPreservedCount = (response: unknown) =>
@@ -185,34 +185,42 @@ function MemoriesPreservedCount(): React.JSX.Element | null {
         let initialCount: number | undefined;
 
         const refreshCount = () => {
-            void fetch(memoriesPreservedCountEndpoint, {
-                signal: abortController.signal,
-            })
+            void apiURL("/files/count")
+                .then((url) => fetch(url, { signal: abortController.signal }))
                 .then((response) => (response.ok ? response.json() : undefined))
                 .then((response: unknown) => {
                     const nextCount = parseMemoriesPreservedCount(response);
                     if (nextCount == undefined) return;
 
-                    setCount(memoriesPreservedSince(initialCount, nextCount));
                     initialCount ??= nextCount;
+                    const sinceCount = memoriesPreservedSince(
+                        initialCount,
+                        nextCount,
+                    );
+                    setCount((count) => Math.max(count ?? 0, sinceCount));
                 })
                 .catch(() => undefined);
         };
 
-        refreshCount();
-        const initialRefreshTimeoutID = window.setTimeout(refreshCount, 4_000);
-        const intervalID = window.setInterval(() => {
-            if (!document.hidden) refreshCount();
-        }, memoriesPreservedCountRefreshInterval);
+        // The count is a fleet-wide number from Ente's production servers, so
+        // it is only meaningful (and only shown) when connecting to them.
+        let intervalID: number | undefined;
+        void customAPIOrigin().then((origin) => {
+            if (origin || abortController.signal.aborted) return;
+
+            refreshCount();
+            intervalID = window.setInterval(() => {
+                if (!document.hidden) refreshCount();
+            }, memoriesPreservedCountRefreshInterval);
+        });
 
         return () => {
             abortController.abort();
-            window.clearTimeout(initialRefreshTimeoutID);
-            window.clearInterval(intervalID);
+            if (intervalID != undefined) window.clearInterval(intervalID);
         };
     }, []);
 
-    return count == undefined ? null : (
+    return !count ? null : (
         <Typography
             sx={{
                 mt: "32px",
