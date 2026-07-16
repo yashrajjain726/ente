@@ -610,7 +610,7 @@ const ConversationListItem: React.FC<{
                                 "&:hover": { bgcolor: "#07A820" },
                             }}
                         >
-                            Confirm
+                            Accept
                         </Box>
                         <Box
                             component="button"
