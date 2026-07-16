@@ -182,12 +182,20 @@ class _OtherContactPageState extends State<OtherContactPage> {
                     ) = await EmergencyContactService.instance.getRecoveryInfo(
                       recoverySession!,
                     );
+                    if (!context.mounted) {
+                      return;
+                    }
                     routeToPage(
                       context,
                       RecoverOthersAccount(key, attributes, recoverySession!),
                     ).ignore();
                   } catch (e) {
-                    showGenericErrorDialog(context: context, error: e).ignore();
+                    if (context.mounted) {
+                      showGenericErrorDialog(
+                        context: context,
+                        error: e,
+                      ).ignore();
+                    }
                   }
                 },
               ),
