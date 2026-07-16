@@ -38,6 +38,23 @@ import 'package:photos/utils/dialog_util.dart';
 
 final _logger = Logger("DeleteFileUtil");
 
+Future<Set<String>> _tryTrashOrDeleteFiles(List<String> assetIDs) async {
+  try {
+    if (!flagService.internalUser ||
+        !Platform.isAndroid ||
+        await isAndroidSDKVersionLowerThan(android11SDKINT)) {
+      return (await PhotoManager.editor.deleteWithIds(assetIDs)).toSet();
+    }
+    final assets = (await Future.wait(
+      assetIDs.map(AssetEntity.fromId),
+    )).whereType<AssetEntity>().toList();
+    return (await PhotoManager.editor.android.moveToTrash(assets)).toSet();
+  } catch (e, s) {
+    _logger.severe("Could not delete file", e, s);
+    return {};
+  }
+}
+
 Future<void> deleteFilesFromEverywhere(
   BuildContext context,
   List<EnteFile> files,
@@ -62,14 +79,7 @@ Future<void> deleteFilesFromEverywhere(
       hasLocalOnlyFiles = true;
     }
   }
-  Set<String> deletedIDs = <String>{};
-  try {
-    deletedIDs = (await PhotoManager.editor.deleteWithIds(
-      localAssetIDs,
-    )).toSet();
-  } catch (e, s) {
-    _logger.severe("Could not delete file", e, s);
-  }
+  final deletedIDs = await _tryTrashOrDeleteFiles(localAssetIDs);
   deletedIDs.addAll(await _tryDeleteSharedMediaFiles(localSharedMediaIDs));
   final updatedCollectionIDs = <int>{};
   final List<TrashRequest> uploadedFilesToBeTrashed = [];
@@ -221,14 +231,7 @@ Future<List<EnteFile>> deleteFilesOnDeviceOnly(
       localOnlyIDs.add(file.localID);
     }
   }
-  Set<String> deletedIDs = <String>{};
-  try {
-    deletedIDs = (await PhotoManager.editor.deleteWithIds(
-      localAssetIDs,
-    )).toSet();
-  } catch (e, s) {
-    _logger.severe("Could not delete file", e, s);
-  }
+  final deletedIDs = await _tryTrashOrDeleteFiles(localAssetIDs);
   deletedIDs.addAll(await _tryDeleteSharedMediaFiles(localSharedMediaIDs));
   final List<EnteFile> deletedFiles = [];
   for (final file in files) {
