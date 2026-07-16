@@ -70,6 +70,7 @@ void main() {
     expect(service.getCachedSavedName(contactUserId: 7), 'Alice');
     expect(service.getCachedSavedName(email: 'ALICE@test.test'), 'Alice');
     expect(service.getCachedResolvedEmail(contactUserId: 7), 'alice@test.test');
+    expect(service.getCachedContacts().single.contactUserId, 7);
     expect(
       service.getCachedResolvedEmail(email: 'ALICE@test.test'),
       'alice@test.test',
@@ -106,6 +107,7 @@ void main() {
 
     expect(service.getCachedContact(contactUserId: 7), isNull);
     expect(service.getCachedContact(email: 'ALICE@test.test'), isNull);
+    expect(service.getCachedContacts(), isEmpty);
   });
 
   test(

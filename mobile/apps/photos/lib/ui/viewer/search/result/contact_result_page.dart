@@ -500,7 +500,7 @@ class _UnsavedContactHeader extends StatelessWidget {
     final colorScheme = getEnteColorScheme(context);
     final l10n = AppLocalizations.of(context);
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
       child: SizedBox(
         height: 60,
         child: MenuComponent(
