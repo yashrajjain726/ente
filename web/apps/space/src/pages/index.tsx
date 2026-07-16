@@ -1,4 +1,5 @@
 import { Box } from "@mui/material";
+import { SpaceButtonSpinner } from "components/SpaceButtonSpinner";
 import { SpaceMobileBestToast } from "components/SpaceMobileBestToast";
 import { SpacePageMeta } from "components/SpacePageMeta";
 import { SpaceRouteFallback } from "components/SpaceRouteFallback";
@@ -82,11 +83,13 @@ const onboardingEntrySourceFromPendingInvite = (
 
 interface PublicFriendRequestScreenProps {
     identity: PublicSpaceIdentity;
+    isAddingFriend: boolean;
     onAddFriend: () => void;
 }
 
 const PublicFriendRequestScreen: React.FC<PublicFriendRequestScreenProps> = ({
     identity,
+    isAddingFriend,
     onAddFriend,
 }) => (
     <Box
@@ -225,6 +228,9 @@ const PublicFriendRequestScreen: React.FC<PublicFriendRequestScreenProps> = ({
                 <Box
                     component="button"
                     type="button"
+                    disabled={isAddingFriend}
+                    aria-label={isAddingFriend ? "Adding friend" : undefined}
+                    aria-busy={isAddingFriend ? true : undefined}
                     onClick={onAddFriend}
                     sx={{
                         alignItems: "center",
@@ -233,7 +239,7 @@ const PublicFriendRequestScreen: React.FC<PublicFriendRequestScreenProps> = ({
                         border: 0,
                         borderRadius: "24px",
                         color: { xs: "black", sm: "white" },
-                        cursor: "pointer",
+                        cursor: isAddingFriend ? "default" : "pointer",
                         display: "flex",
                         fontFamily: '"Inter Variable", Inter, sans-serif',
                         fontSize: 16,
@@ -244,16 +250,16 @@ const PublicFriendRequestScreen: React.FC<PublicFriendRequestScreenProps> = ({
                         p: "18px 24px",
                         mx: "auto",
                         width: "min(100%, 300px)",
-                        "&:hover": {
-                            bgcolor: { xs: "#F4F4F4", sm: "#121212" },
-                        },
+                        "&:hover": isAddingFriend
+                            ? undefined
+                            : { bgcolor: { xs: "#F4F4F4", sm: "#121212" } },
                         "&:focus-visible": {
                             outline: "2px solid rgba(255 255 255 / 0.88)",
                             outlineOffset: 3,
                         },
                     }}
                 >
-                    Add Friend
+                    {isAddingFriend ? <SpaceButtonSpinner /> : "Add Friend"}
                 </Box>
             </Box>
         </Box>
@@ -275,6 +281,7 @@ export const Page: React.FC<PageProps> = ({ invitePreview }) => {
         useState<PublicSpaceIdentity | null>(null);
     const [publicError, setPublicError] = useState<string>();
     const [pendingInviteUsername, setPendingInviteUsername] = useState("");
+    const [isAddingFriend, setIsAddingFriend] = useState(false);
 
     useEffect(() => {
         const publicInvite = spaceInviteFromLocation();
@@ -378,6 +385,7 @@ export const Page: React.FC<PageProps> = ({ invitePreview }) => {
             savePendingSpaceInviteFriend(inviteFriend);
             setOnboardingEntrySource("add-friend-link");
             if (profile) {
+                setIsAddingFriend(true);
                 void joinSpaceInvite(invite)
                     .then((status) => {
                         clearPendingSpaceInvite();
@@ -387,9 +395,10 @@ export const Page: React.FC<PageProps> = ({ invitePreview }) => {
                         }
                         void router.push(spaceRoutes.home);
                     })
-                    .catch((error: unknown) =>
-                        console.error("Failed to send friend request", error),
-                    );
+                    .catch((error: unknown) => {
+                        setIsAddingFriend(false);
+                        console.error("Failed to send friend request", error);
+                    });
                 return;
             }
             window.location.assign("/");
@@ -403,6 +412,7 @@ export const Page: React.FC<PageProps> = ({ invitePreview }) => {
                 />
                 <PublicFriendRequestScreen
                     identity={publicIdentity}
+                    isAddingFriend={isAddingFriend}
                     onAddFriend={addFriend}
                 />
             </>
