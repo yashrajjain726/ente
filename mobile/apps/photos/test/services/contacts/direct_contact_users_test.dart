@@ -31,17 +31,8 @@ void main() {
         ),
         _familyMember("pending@example.com", FamilyMemberStatus.invited),
       ],
-      savedContacts: const [
-        contacts.ContactRecord(
-          id: "contact-1",
-          contactUserId: 5,
-          email: "saved@example.com",
-          data: contacts.ContactData(contactUserId: 5, name: "Saved"),
-          profilePictureAttachmentId: null,
-          isDeleted: false,
-          createdAt: 1,
-          updatedAt: 1,
-        ),
+      savedContacts: [
+        _savedContact(id: "contact-1", userID: 5, email: "saved@example.com"),
       ],
     );
 
@@ -69,16 +60,12 @@ void main() {
         ),
       ],
       familyMembers: const [],
-      savedContacts: const [
-        contacts.ContactRecord(
+      savedContacts: [
+        _savedContact(
           id: "contact-1",
-          contactUserId: 5,
+          userID: 5,
           email: "new@example.com",
-          data: contacts.ContactData(contactUserId: 5, name: "Same"),
-          profilePictureAttachmentId: null,
-          isDeleted: false,
-          createdAt: 1,
-          updatedAt: 1,
+          name: "Same",
         ),
       ],
     );
@@ -108,22 +95,60 @@ void main() {
           FamilyMemberStatus.accepted,
         ),
       ],
-      savedContacts: const [
-        contacts.ContactRecord(
+      savedContacts: [
+        _savedContact(
           id: "contact-1",
-          contactUserId: 0,
+          userID: 0,
           email: "saved-without-id@example.com",
-          data: contacts.ContactData(contactUserId: 0, name: "Saved"),
-          profilePictureAttachmentId: null,
-          isDeleted: false,
-          createdAt: 1,
-          updatedAt: 1,
         ),
       ],
     );
 
     expect(users, isEmpty);
   });
+
+  test("excludes saved contacts without a known email", () {
+    final users = buildDirectContactUsers(
+      ownerUserId: 1,
+      ownerEmail: "me@example.com",
+      collections: const [],
+      familyMembers: const [],
+      savedContacts: [
+        _savedContact(
+          id: "missing-email",
+          userID: 2,
+          email: null,
+          name: "Missing",
+        ),
+        _savedContact(
+          id: "placeholder-email",
+          userID: 3,
+          email: "placeholder@unknown.com",
+          name: "Placeholder",
+        ),
+      ],
+    );
+
+    expect(users, isEmpty);
+  });
+}
+
+contacts.ContactRecord _savedContact({
+  required String id,
+  required int userID,
+  required String? email,
+  String name = "Saved",
+}) {
+  return contacts.ContactRecord(
+    id: id,
+    contactUserId: userID,
+    email: email,
+    data: contacts.ContactData(contactUserId: userID, name: name),
+    profilePictureAttachmentId: null,
+    isDeleted: false,
+    createdAt: 1,
+    updatedAt: 1,
+  );
 }
 
 Collection _collection({required User owner, required List<User> sharees}) {
