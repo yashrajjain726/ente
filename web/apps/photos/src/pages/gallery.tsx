@@ -1899,10 +1899,10 @@ const Page: React.FC = () => {
         [handleUpdateCollectionCover],
     );
 
-    const handleCloseCollectionSelector = useCallback(
-        () => setOpenCollectionSelector(false),
-        [],
-    );
+    const handleCloseCollectionSelector = useCallback(() => {
+        setOpenCollectionSelector(false);
+        setCollectionSelectorAttributes(undefined);
+    }, []);
 
     /**
      * Handles adding a single file to a collection by opening a collection selector dialog.
