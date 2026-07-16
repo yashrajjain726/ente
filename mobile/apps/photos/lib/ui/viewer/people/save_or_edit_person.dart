@@ -12,6 +12,7 @@ import "package:photos/generated/l10n.dart";
 import "package:photos/l10n/l10n.dart";
 import "package:photos/models/file/file.dart";
 import "package:photos/models/ml/face/person.dart";
+import "package:photos/models/search/generic_search_result.dart";
 import "package:photos/services/machine_learning/face_ml/feedback/cluster_feedback.dart";
 import "package:photos/services/machine_learning/face_ml/person/person_service.dart";
 import "package:photos/theme/ente_theme.dart";
@@ -67,6 +68,7 @@ class _SaveOrEditPersonState extends State<SaveOrEditPerson> {
   String? _mergeSuggestionPersonId;
   final _nameFocsNode = FocusNode();
   List<PersonEntity> _allPersons = [];
+  List<GenericSearchResult> _mergeablePersons = [];
 
   String? get _emailToSave => trimToNull(_email);
 
@@ -173,8 +175,7 @@ class _SaveOrEditPersonState extends State<SaveOrEditPerson> {
                           children: [
                             Center(child: _buildAvatar()),
                             const SizedBox(height: Spacing.xxl),
-                            if (!widget.isEditing &&
-                                _allPersons.isNotEmpty) ...[
+                            if (_mergeablePersons.isNotEmpty) ...[
                               _MergeWithExistingSection(
                                 clusterId: widget.clusterID!,
                                 suggestedPersonId: _mergeSuggestionPersonId,
@@ -369,6 +370,7 @@ class _SaveOrEditPersonState extends State<SaveOrEditPerson> {
     }
     final selection = await showMergeClustersToPersonPage(
       context,
+      initialPersons: _mergeablePersons,
       seedClusterId: clusterId,
     );
     if (!mounted || selection == null || selection.personId.isEmpty) {
@@ -419,8 +421,15 @@ class _SaveOrEditPersonState extends State<SaveOrEditPerson> {
             ),
       );
     });
-    if (!widget.isEditing && persons.isNotEmpty) {
-      await _loadMergeSuggestion();
+    if (!widget.isEditing) {
+      final mergeablePersons = await loadMergeablePersons();
+      if (!mounted) {
+        return;
+      }
+      setState(() => _mergeablePersons = mergeablePersons);
+      if (mergeablePersons.isNotEmpty) {
+        await _loadMergeSuggestion();
+      }
     }
   }
 
