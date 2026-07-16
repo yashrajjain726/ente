@@ -100,9 +100,8 @@ const Page: React.FC = () => {
     const handleLoginResult = async (result: SpaceLoginResult) => {
         switch (result.status) {
             case "complete":
-                setLoginCredentials(null);
-                setPendingLoginCredentials(null);
                 await routeAfterCompletedLogin(router, refreshProfile);
+                setPendingLoginCredentials(null);
                 break;
             case "totp":
                 setLoginCredentials(null);
