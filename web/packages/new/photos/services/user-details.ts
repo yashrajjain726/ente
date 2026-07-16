@@ -64,6 +64,12 @@ const FamilyMember = z.object({
     email: z.string(),
     status: z.enum(["SELF", "INVITED", "ACCEPTED"]),
     /**
+     * ID of the family member's Ente account.
+     *
+     * This is not available until the member joins the family.
+     */
+    userID: z.number().nullish().transform(nullToUndefined),
+    /**
      * `true` if this is the admin.
      *
      * This field will not be sent for invited members until they accept.
