@@ -68,7 +68,10 @@ func TestSpaceDripsSendMatureProfileNudgeOnly(t *testing.T) {
 		sendSpaceDripEmail = originalSend
 	})
 	var subjects []string
-	sendSpaceDripEmail = func(_ []string, _ string, _ string, subject string, _ string, _ map[string]interface{}, _ []map[string]interface{}) error {
+	var fromName, fromEmail string
+	sendSpaceDripEmail = func(_ []string, name string, email string, subject string, _ string, _ map[string]interface{}, _ []map[string]interface{}) error {
+		fromName = name
+		fromEmail = email
 		subjects = append(subjects, subject)
 		return nil
 	}
@@ -85,6 +88,8 @@ func TestSpaceDripsSendMatureProfileNudgeOnly(t *testing.T) {
 	}
 	stats, err := controller.processSpaceDrips(ctx, now)
 	require.NoError(t, err)
+	require.Equal(t, "Ente Space", fromName)
+	require.Equal(t, "space@ente.com", fromEmail)
 	require.Equal(t, []string{"Your Space setup is incomplete"}, subjects)
 	require.Equal(t, 1, stats.SentByTemplate[SpaceDripProfileMissing4dTemplateID])
 
