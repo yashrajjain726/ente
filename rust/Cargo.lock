@@ -2261,6 +2261,7 @@ version = "0.1.18-beta"
 dependencies = [
  "ente-core",
  "ente-ensu",
+ "ente-model-download",
  "keyring",
  "libc",
  "serde",
