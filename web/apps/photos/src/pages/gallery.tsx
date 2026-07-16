@@ -1906,6 +1906,10 @@ const Page: React.FC = () => {
         () => setOpenCollectionSelector(false),
         [],
     );
+    const handleCollectionSelectorExited = useCallback(
+        () => setCollectionSelectorAttributes(undefined),
+        [],
+    );
 
     /**
      * Handles adding a single file to a collection by opening a collection selector dialog.
@@ -2019,6 +2023,7 @@ const Page: React.FC = () => {
             <CollectionSelector
                 open={openCollectionSelector}
                 onClose={handleCloseCollectionSelector}
+                onExited={handleCollectionSelectorExited}
                 attributes={collectionSelectorAttributes}
                 collectionSummaries={
                     collectionSelectorAttributes?.showHiddenCollections
