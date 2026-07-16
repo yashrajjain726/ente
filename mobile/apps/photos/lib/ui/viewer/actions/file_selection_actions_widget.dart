@@ -609,30 +609,38 @@ class _FileSelectionActionsWidgetState
         skipNotify: true,
       );
     }
-    showCollectionActionSheet(
-      context,
-      selectedFiles: widget.selectedFiles,
-      actionType: CollectionActionType.moveFiles,
+    unawaited(
+      showCollectionActionSheet(
+        context,
+        selectedFiles: widget.selectedFiles,
+        actionType: CollectionActionType.moveFiles,
+      ),
     );
   }
 
   Future<void> _moveFilesToHiddenAlbum() async {
-    showCollectionActionSheet(
-      context,
-      selectedFiles: widget.selectedFiles,
-      actionType: CollectionActionType.moveToHiddenCollection,
+    unawaited(
+      showCollectionActionSheet(
+        context,
+        selectedFiles: widget.selectedFiles,
+        actionType: CollectionActionType.moveToHiddenCollection,
+      ),
     );
   }
 
   Future<void> _addToAlbum() async {
-    showCollectionActionSheet(context, selectedFiles: widget.selectedFiles);
+    unawaited(
+      showCollectionActionSheet(context, selectedFiles: widget.selectedFiles),
+    );
   }
 
   Future<void> _addToHiddenAlbum() async {
-    showCollectionActionSheet(
-      context,
-      selectedFiles: widget.selectedFiles,
-      actionType: CollectionActionType.addToHiddenAlbum,
+    unawaited(
+      showCollectionActionSheet(
+        context,
+        selectedFiles: widget.selectedFiles,
+        actionType: CollectionActionType.addToHiddenAlbum,
+      ),
     );
   }
 
@@ -883,10 +891,12 @@ class _FileSelectionActionsWidgetState
         skipNotify: true,
       );
     }
-    showCollectionActionSheet(
-      context,
-      selectedFiles: widget.selectedFiles,
-      actionType: CollectionActionType.unHide,
+    unawaited(
+      showCollectionActionSheet(
+        context,
+        selectedFiles: widget.selectedFiles,
+        actionType: CollectionActionType.unHide,
+      ),
     );
   }
 

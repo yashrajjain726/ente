@@ -1,6 +1,7 @@
 import "dart:async";
 
 import "package:collection/collection.dart";
+import "package:ente_components/theme/text_styles.dart" as component;
 import "package:ente_icons/ente_icons.dart";
 import "package:flutter/material.dart";
 import "package:logging/logging.dart";
@@ -24,6 +25,9 @@ import "package:photos/ui/social/likes_bottom_sheet.dart";
 final _logger = Logger("FileSocialOverlay");
 
 const _likedColor = Color(0xFF08C225);
+const _socialControlsSize = 40.0;
+const _bottomActionBarHeight = 80.0;
+const _socialToActionBarGap = 14.0;
 
 class FileSocialOverlay extends StatefulWidget {
   final EnteFile file;
@@ -332,15 +336,17 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
       return const SizedBox.shrink();
     }
 
+    final safePadding = MediaQuery.paddingOf(context);
     return Positioned(
-      right: 16,
-      bottom: 80,
+      right: safePadding.right + 24,
+      bottom:
+          safePadding.bottom + _bottomActionBarHeight + _socialToActionBarGap,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           if (_latestComment != null && _latestCommentAuthor != null)
             Padding(
-              padding: const EdgeInsets.only(right: 8, bottom: 4),
+              padding: const EdgeInsets.only(right: 12, bottom: 4),
               child: _buildLatestCommentPill(
                 _latestComment!,
                 _latestCommentAuthor!,
@@ -353,23 +359,40 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
                 message: AppLocalizations.of(context).like,
                 child: GestureDetector(
                   onLongPress: () => unawaited(_showLikes()),
-                  child: IconButton(
-                    style: IconButton.styleFrom(
-                      overlayColor: WidgetStateColor.transparent,
-                    ),
-                    onPressed: () => unawaited(_toggleReaction()),
-                    icon: Icon(
-                      _hasLiked ? EnteIcons.likeFilled : EnteIcons.likeStroke,
-                      color: _hasLiked ? _likedColor : Colors.white,
+                  child: SizedBox.square(
+                    dimension: _socialControlsSize,
+                    child: IconButton(
+                      padding: const EdgeInsets.all(8),
+                      style: IconButton.styleFrom(
+                        minimumSize: const Size.square(_socialControlsSize),
+                        maximumSize: const Size.square(_socialControlsSize),
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        overlayColor: WidgetStateColor.transparent,
+                      ),
+                      onPressed: () => unawaited(_toggleReaction()),
+                      icon: Icon(
+                        _hasLiked ? EnteIcons.likeFilled : EnteIcons.likeStroke,
+                        color: _hasLiked ? _likedColor : Colors.white,
+                      ),
                     ),
                   ),
                 ),
               ),
+              const SizedBox(height: 16),
               Tooltip(
                 message: AppLocalizations.of(context).comments,
-                child: IconButton(
-                  onPressed: () => unawaited(_openComments()),
-                  icon: _buildCommentIcon(),
+                child: SizedBox.square(
+                  dimension: _socialControlsSize,
+                  child: IconButton(
+                    padding: const EdgeInsets.all(8),
+                    style: IconButton.styleFrom(
+                      minimumSize: const Size.square(_socialControlsSize),
+                      maximumSize: const Size.square(_socialControlsSize),
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    onPressed: () => unawaited(_openComments()),
+                    icon: _buildCommentIcon(),
+                  ),
                 ),
               ),
             ],
@@ -390,34 +413,44 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
         constraints: BoxConstraints(
           maxWidth: MediaQuery.sizeOf(context).width * 0.55,
         ),
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: Colors.black.withValues(alpha: 0.65),
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                UserAvatarWidget(
-                  author,
-                  type: AvatarType.small,
-                  currentUserID: currentUserID,
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            DecoratedBox(
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(20),
+                  topRight: Radius.circular(6),
+                  bottomLeft: Radius.circular(20),
+                  bottomRight: Radius.circular(20),
                 ),
-                const SizedBox(width: 6),
-                Flexible(
-                  child: Text(
-                    comment.data,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(color: Colors.white, fontSize: 12),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
+                child: Text(
+                  comment.data,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: component.TextStyles.mini.copyWith(
+                    color: Colors.black,
                   ),
                 ),
-              ],
+              ),
             ),
-          ),
+            Positioned(
+              left: -10,
+              top: -10,
+              child: UserAvatarWidget(
+                author,
+                type: AvatarType.small,
+                currentUserID: currentUserID,
+              ),
+            ),
+          ],
         ),
       ),
     );

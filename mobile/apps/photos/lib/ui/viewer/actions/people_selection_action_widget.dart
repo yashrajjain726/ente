@@ -1,3 +1,5 @@
+import "dart:async";
+
 import "package:ente_pure_utils/ente_pure_utils.dart";
 import "package:flutter/material.dart";
 import "package:hugeicons/hugeicons.dart";
@@ -352,10 +354,12 @@ class _PeopleSelectionActionWidgetState
     final selectedPersonIds = _getSelectedPersonIds(personMap);
     if (selectedPersonIds.isEmpty) return;
     if (!mounted) return;
-    showCollectionActionSheet(
-      context,
-      selectedPeople: selectedPersonIds,
-      actionType: CollectionActionType.autoAddPeople,
+    unawaited(
+      showCollectionActionSheet(
+        context,
+        selectedPeople: selectedPersonIds,
+        actionType: CollectionActionType.autoAddPeople,
+      ),
     );
     widget.selectedPeople.clearAll();
   }
