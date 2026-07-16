@@ -58,6 +58,7 @@ interface SetupProfileScreenProps {
 }
 
 interface TextInputProps {
+    autoCapitalize?: React.HTMLAttributes<HTMLInputElement>["autoCapitalize"];
     endAdornment?: React.ReactNode;
     id: string;
     label: string;
@@ -137,6 +138,7 @@ const UsernameStatusIcon: React.FC<{
 };
 
 const TextInput: React.FC<TextInputProps> = ({
+    autoCapitalize,
     endAdornment,
     id,
     label,
@@ -186,6 +188,7 @@ const TextInput: React.FC<TextInputProps> = ({
             {startAdornment}
             <Box
                 component="input"
+                autoCapitalize={autoCapitalize}
                 id={id}
                 onChange={(event) => onChange?.(event.target.value)}
                 placeholder={placeholder}
@@ -574,6 +577,7 @@ export const SetupProfileScreen: React.FC<SetupProfileScreenProps> = ({
                         }}
                     >
                         <TextInput
+                            autoCapitalize="none"
                             endAdornment={
                                 <UsernameStatusIcon status={usernameStatus} />
                             }
