@@ -56,11 +56,11 @@ fn postprocess_pet_face_detections(
         // Flat output: total_elements, must infer row_len.
         // Prefer 13 (2-class model) as the expected format, then fall back.
         let total = output_data.len();
-        let inferred = if total % 13 == 0 {
+        let inferred = if total.is_multiple_of(13) {
             13
-        } else if total % 12 == 0 {
+        } else if total.is_multiple_of(12) {
             12
-        } else if total % 11 == 0 {
+        } else if total.is_multiple_of(11) {
             11
         } else {
             return Err(MlError::Postprocess(format!(
@@ -70,7 +70,10 @@ fn postprocess_pet_face_detections(
         };
         // Warn if the total is ambiguously divisible by multiple candidates.
         let candidates = [11usize, 12, 13];
-        let valid_count = candidates.iter().filter(|&&c| total % c == 0).count();
+        let valid_count = candidates
+            .iter()
+            .filter(|&&c| total.is_multiple_of(c))
+            .count();
         if valid_count > 1 {
             eprintln!(
                 "[ml][pet] WARNING: flat output len={total} is divisible by {valid_count} row-length candidates; using {inferred}. \
