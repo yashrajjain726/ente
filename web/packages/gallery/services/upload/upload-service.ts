@@ -742,7 +742,7 @@ export const upload = async (
 ): Promise<UploadResult> => {
     const {
         abortIfCancelled,
-        includePartnerSharedFiles,
+        includePartnerSharedFiles = true,
         skipDuplicateAddToUploadCollection,
     } = uploadContext;
 
