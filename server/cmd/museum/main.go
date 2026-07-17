@@ -1408,7 +1408,8 @@ func setupAndStartCrons(userAuthRepo *repo.UserAuthRepository, collectionLinkRep
 
 func cors() gin.HandlerFunc {
 	origins := []string{"ente://app"}
-	for _, value := range viper.GetStringMap("apps") {
+	apps, _ := viper.AllSettings()["apps"].(map[string]interface{})
+	for _, value := range apps {
 		if origin, ok := value.(string); ok {
 			origins = append(origins, origin)
 		}

@@ -79,6 +79,7 @@ func TestCORS(t *testing.T) {
 
 func TestCORSProductionOriginsAreDefaults(t *testing.T) {
 	viper.Reset()
+	viper.Set("apps", map[string]interface{}{"accounts": "https://accounts.ente.com"})
 	setAppDefaults()
 	t.Cleanup(viper.Reset)
 
