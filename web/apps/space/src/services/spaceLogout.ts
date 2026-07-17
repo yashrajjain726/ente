@@ -5,10 +5,7 @@ import {
 } from "services/spacePersistentSession";
 
 export const spaceLogout = async () => {
-    try {
-        await revokeSpaceBrowserSessions();
-    } finally {
-        clearSpaceBrowserSession();
-        await accountLogout();
-    }
+    await revokeSpaceBrowserSessions();
+    clearSpaceBrowserSession();
+    await accountLogout();
 };
