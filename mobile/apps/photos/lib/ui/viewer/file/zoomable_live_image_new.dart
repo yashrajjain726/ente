@@ -50,9 +50,10 @@ class _ZoomableLiveImageNewState extends State<ZoomableLiveImageNew>
     with SingleTickerProviderStateMixin {
   final Logger _logger = Logger("ZoomableLiveImageNew");
   late EnteFile _enteFile;
+  late final LiveImageLongPressRouter _longPressRouter;
   bool _showVideo = false;
-  bool _isLoadingVideoPlayer = false;
   bool _isVideoFrameReady = true;
+  Future<MotionPhotoAvailability>? _videoLoad;
 
   late final _player = Player();
   VideoController? _videoController;
@@ -65,6 +66,13 @@ class _ZoomableLiveImageNewState extends State<ZoomableLiveImageNew>
     super.initState();
 
     _enteFile = widget.enteFile;
+    _longPressRouter = LiveImageLongPressRouter(
+      initialAvailability: switch (_enteFile.pubMagicMetadata?.mvi) {
+        final index? when index > 0 => MotionPhotoAvailability.present,
+        _ => MotionPhotoAvailability.unknown,
+      },
+      probeMotionPhoto: _loadLiveVideo,
+    );
     _logger.info(
       'initState for ${_enteFile.generatedID} with tag ${_enteFile.tag} and name ${_enteFile.displayName}',
     );
@@ -118,7 +126,7 @@ class _ZoomableLiveImageNewState extends State<ZoomableLiveImageNew>
     return false;
   }
 
-  void _onLongPressEvent(bool isPressed, [Offset? localPosition]) {
+  bool _isLongPressInVisibleQrRegion(Offset localPosition) {
     // If pressing within a QR code region, let the QR overlay handle it,
     // but only when the overlay is actually visible (not in fullscreen mode).
     final isQrOverlayVisible =
@@ -126,28 +134,60 @@ class _ZoomableLiveImageNewState extends State<ZoomableLiveImageNew>
               context,
             )?.enableFullScreenNotifier.value ??
             true);
-    if (isPressed &&
-        isQrOverlayVisible &&
-        localPosition != null &&
-        _isPositionInQrRegion(localPosition)) {
-      return;
-    }
+    return isQrOverlayVisible && _isPositionInQrRegion(localPosition);
+  }
 
-    if (isPressed) {
-      if (_videoController == null) {
-        unawaited(_loadLiveVideo());
-      } else {
-        _videoController!.player.seek(Duration.zero).ignore();
-        _videoController!.player.play().ignore();
-      }
-    } else if (_videoController != null) {
-      // stop playing video
-      _videoController!.player.pause().ignore();
+  void _setPlaybackPressed(bool isPressed) {
+    if (!isPressed) {
+      _videoController?.player.pause().ignore();
     }
     if (mounted) {
       setState(() {
         _showVideo = isPressed;
       });
+    }
+  }
+
+  void _playOrLoadVideo() {
+    if (!_showVideo) return;
+    if (_videoController == null) {
+      unawaited(_loadLiveVideo());
+      return;
+    }
+    _videoController!.player.seek(Duration.zero).ignore();
+    _videoController!.player.play().ignore();
+  }
+
+  void _onLongPressStart(LongPressStartDetails details) {
+    if (_isLongPressInVisibleQrRegion(details.localPosition)) return;
+
+    final onTextSelectionStart = widget.onLongPressStart;
+    if (onTextSelectionStart == null || _enteFile.isLivePhoto) {
+      _setPlaybackPressed(true);
+      _playOrLoadVideo();
+      return;
+    }
+
+    _setPlaybackPressed(true);
+    unawaited(_routeLongPress(details, onTextSelectionStart));
+  }
+
+  Future<void> _routeLongPress(
+    LongPressStartDetails details,
+    GestureLongPressStartCallback onTextSelectionStart,
+  ) async {
+    var action = LiveImageLongPressAction.textSelection;
+    try {
+      action = await _longPressRouter.resolve();
+    } catch (error, stackTrace) {
+      _logger.warning("Motion photo probe failed", error, stackTrace);
+    }
+    if (!mounted) return;
+    if (action == LiveImageLongPressAction.playback) {
+      _playOrLoadVideo();
+    } else {
+      _setPlaybackPressed(false);
+      onTextSelectionStart(details);
     }
   }
 
@@ -184,11 +224,9 @@ class _ZoomableLiveImageNewState extends State<ZoomableLiveImageNew>
     );
 
     if (!widget.isFromMemories) {
-      return buildLiveImageLongPressGesture(
-        onTextSelectionStart: widget.onLongPressStart,
-        onPlaybackStart: (details) =>
-            _onLongPressEvent(true, details.localPosition),
-        onPlaybackEnd: (_) => _onLongPressEvent(false),
+      return GestureDetector(
+        onLongPressStart: _onLongPressStart,
+        onLongPressEnd: (_) => _setPlaybackPressed(false),
         child: content,
       );
     }
@@ -212,29 +250,45 @@ class _ZoomableLiveImageNewState extends State<ZoomableLiveImageNew>
     );
   }
 
-  Future<void> _loadLiveVideo() async {
-    // do nothing is already loading or loaded
-    if (_isLoadingVideoPlayer || _videoController != null) {
-      return;
+  Future<MotionPhotoAvailability> _loadLiveVideo() {
+    if (_videoController != null) {
+      return Future.value(MotionPhotoAvailability.present);
     }
-    _isLoadingVideoPlayer = true;
-    try {
-      // For non-live photo, with fileType as Image, we still call _getMotionPhoto
-      // to check if it is a motion photo. This is needed to handle earlier
-      // uploads and upload from desktop
-      final File? videoFile = _enteFile.isLivePhoto
-          ? await _getLivePhotoVideo()
-          : await _getMotionPhotoVideo();
+    final activeLoad = _videoLoad;
+    if (activeLoad != null) return activeLoad;
 
-      if (!mounted) return;
-      if (videoFile != null && videoFile.existsSync()) {
-        await _setVideoController(videoFile.path);
-      } else if (_enteFile.isLivePhoto) {
-        showShortToast(context, AppLocalizations.of(context).downloadFailed);
+    late final Future<MotionPhotoAvailability> load;
+    load = _loadLiveVideoOnce().whenComplete(() {
+      if (identical(_videoLoad, load)) {
+        _videoLoad = null;
       }
-    } finally {
-      _isLoadingVideoPlayer = false;
+    });
+    _videoLoad = load;
+    return load;
+  }
+
+  Future<MotionPhotoAvailability> _loadLiveVideoOnce() async {
+    // For non-live photo, with fileType as Image, we still call _getMotionPhoto
+    // to check if it is a motion photo. This is needed to handle earlier
+    // uploads and upload from desktop.
+    final _MotionPhotoVideoResult result;
+    if (_enteFile.isLivePhoto) {
+      result = _MotionPhotoVideoResult(
+        MotionPhotoAvailability.present,
+        await _getLivePhotoVideo(),
+      );
+    } else {
+      result = await _getMotionPhotoVideo();
     }
+
+    if (!mounted) return result.availability;
+    final videoFile = result.videoFile;
+    if (videoFile != null && videoFile.existsSync()) {
+      await _setVideoController(videoFile.path);
+    } else if (_enteFile.isLivePhoto) {
+      showShortToast(context, AppLocalizations.of(context).downloadFailed);
+    }
+    return result.availability;
   }
 
   Future<File?> _getLivePhotoVideo() async {
@@ -266,9 +320,14 @@ class _ZoomableLiveImageNewState extends State<ZoomableLiveImageNew>
     return videoFile;
   }
 
-  Future<File?> _getMotionPhotoVideo() async {
+  Future<_MotionPhotoVideoResult> _getMotionPhotoVideo() async {
     if (_enteFile.isRemoteOnlyFile && !(await isFileCached(_enteFile))) {
-      if (!mounted) return null;
+      if (!mounted) {
+        return const _MotionPhotoVideoResult(
+          MotionPhotoAvailability.unknown,
+          null,
+        );
+      }
       showShortToast(context, AppLocalizations.of(context).downloading);
     }
 
@@ -298,16 +357,27 @@ class _ZoomableLiveImageNewState extends State<ZoomableLiveImageNew>
           index: index,
         );
         if (outputPath != null) {
-          return File(outputPath);
+          return _MotionPhotoVideoResult(
+            MotionPhotoAvailability.present,
+            File(outputPath),
+          );
         }
+        return const _MotionPhotoVideoResult(
+          MotionPhotoAvailability.present,
+          null,
+        );
       } else if (_enteFile.isMotionPhoto && _enteFile.canEditMetaInfo) {
         _logger.info('Incorrectly tagged as MP, reset tag ${_enteFile.tag}');
         FileMagicService.instance
             .updatePublicMagicMetadata([_enteFile], {motionVideoIndexKey: 0})
             .ignore();
       }
+      return const _MotionPhotoVideoResult(
+        MotionPhotoAvailability.absent,
+        null,
+      );
     }
-    return null;
+    return const _MotionPhotoVideoResult(MotionPhotoAvailability.unknown, null);
   }
 
   Future<void> _setVideoController(String url) async {
@@ -361,15 +431,46 @@ class _ZoomableLiveImageNewState extends State<ZoomableLiveImageNew>
   }
 }
 
-GestureDetector buildLiveImageLongPressGesture({
-  required Widget child,
-  required GestureLongPressStartCallback onPlaybackStart,
-  required GestureLongPressEndCallback onPlaybackEnd,
-  GestureLongPressStartCallback? onTextSelectionStart,
-}) {
-  return GestureDetector(
-    onLongPressStart: onTextSelectionStart ?? onPlaybackStart,
-    onLongPressEnd: onTextSelectionStart == null ? onPlaybackEnd : null,
-    child: child,
-  );
+enum MotionPhotoAvailability { unknown, absent, present }
+
+enum LiveImageLongPressAction { playback, textSelection }
+
+class LiveImageLongPressRouter {
+  LiveImageLongPressRouter({
+    required MotionPhotoAvailability initialAvailability,
+    required Future<MotionPhotoAvailability> Function() probeMotionPhoto,
+  }) : _availability = initialAvailability,
+       _probeMotionPhoto = probeMotionPhoto;
+
+  MotionPhotoAvailability _availability;
+  final Future<MotionPhotoAvailability> Function() _probeMotionPhoto;
+  Future<MotionPhotoAvailability>? _activeProbe;
+
+  Future<LiveImageLongPressAction> resolve() async {
+    var availability = _availability;
+    if (availability == MotionPhotoAvailability.unknown) {
+      final probe = _activeProbe ?? _probeMotionPhoto();
+      _activeProbe = probe;
+      try {
+        availability = await probe;
+        if (availability != MotionPhotoAvailability.unknown) {
+          _availability = availability;
+        }
+      } finally {
+        if (identical(_activeProbe, probe)) {
+          _activeProbe = null;
+        }
+      }
+    }
+    return availability == MotionPhotoAvailability.present
+        ? LiveImageLongPressAction.playback
+        : LiveImageLongPressAction.textSelection;
+  }
+}
+
+class _MotionPhotoVideoResult {
+  final MotionPhotoAvailability availability;
+  final File? videoFile;
+
+  const _MotionPhotoVideoResult(this.availability, this.videoFile);
 }

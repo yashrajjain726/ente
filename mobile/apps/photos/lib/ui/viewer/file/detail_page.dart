@@ -427,7 +427,7 @@ class _BodyState extends State<_Body> {
                   widget.config.mode != DetailPageMode.minimalistic &&
                   !file.isLiveOrMotionPhoto
               ? (details) => _inlineTextDetectionController
-                    .startTextSelectionAt(details.globalPosition)
+                    .startTextSelectionAt(file, details.globalPosition)
               : null,
         );
         return GestureDetector(

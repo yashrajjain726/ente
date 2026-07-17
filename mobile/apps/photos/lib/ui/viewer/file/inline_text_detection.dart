@@ -41,8 +41,10 @@ class InlineTextDetectionController {
     }
   }
 
-  void startTextSelectionAt(Offset globalPosition) {
-    _state?._handleLongPressAt(globalPosition);
+  void startTextSelectionAt(EnteFile file, Offset globalPosition) {
+    final state = _state;
+    if (state == null || state._didFileChange(file, state.widget.file)) return;
+    state._handleLongPressAt(globalPosition);
   }
 }
 

@@ -26,51 +26,34 @@ void main() {
     );
   });
 
-  testWidgets("text selection owns the long press when provided", (
-    tester,
-  ) async {
-    var textSelectionStarts = 0;
-    var playbackStarts = 0;
-    var playbackEnds = 0;
-
-    await tester.pumpWidget(
-      MaterialApp(
-        home: buildLiveImageLongPressGesture(
-          onTextSelectionStart: (_) => textSelectionStarts++,
-          onPlaybackStart: (_) => playbackStarts++,
-          onPlaybackEnd: (_) => playbackEnds++,
-          child: const ColoredBox(key: Key("image"), color: Colors.black),
-        ),
-      ),
+  test("untagged motion photos retain playback after probing", () async {
+    var probes = 0;
+    final router = LiveImageLongPressRouter(
+      initialAvailability: MotionPhotoAvailability.unknown,
+      probeMotionPhoto: () async {
+        probes++;
+        return MotionPhotoAvailability.present;
+      },
     );
 
-    await tester.longPress(find.byKey(const Key("image")));
-
-    expect(textSelectionStarts, 1);
-    expect(playbackStarts, 0);
-    expect(playbackEnds, 0);
+    expect(await router.resolve(), LiveImageLongPressAction.playback);
+    expect(await router.resolve(), LiveImageLongPressAction.playback);
+    expect(probes, 1);
   });
 
-  testWidgets("live-photo playback keeps its long-press lifecycle", (
-    tester,
-  ) async {
-    var playbackStarts = 0;
-    var playbackEnds = 0;
-
-    await tester.pumpWidget(
-      MaterialApp(
-        home: buildLiveImageLongPressGesture(
-          onPlaybackStart: (_) => playbackStarts++,
-          onPlaybackEnd: (_) => playbackEnds++,
-          child: const ColoredBox(key: Key("image"), color: Colors.black),
-        ),
-      ),
+  test("untagged still photos fall back to text selection", () async {
+    var probes = 0;
+    final router = LiveImageLongPressRouter(
+      initialAvailability: MotionPhotoAvailability.unknown,
+      probeMotionPhoto: () async {
+        probes++;
+        return MotionPhotoAvailability.absent;
+      },
     );
 
-    await tester.longPress(find.byKey(const Key("image")));
-
-    expect(playbackStarts, 1);
-    expect(playbackEnds, 1);
+    expect(await router.resolve(), LiveImageLongPressAction.textSelection);
+    expect(await router.resolve(), LiveImageLongPressAction.textSelection);
+    expect(probes, 1);
   });
 }
 
