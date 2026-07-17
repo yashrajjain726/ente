@@ -19,6 +19,20 @@ enum FamilyMemberAction {
   revokeInvite,
 }
 
+AvatarComponentColor familyMemberAvatarComponentColor(
+  FamilyMember member, {
+  required String currentUserEmail,
+}) {
+  return avatarComponentColorForAvatarIdentity(
+    AvatarIdentity.account(
+      label: member.email,
+      email: member.email,
+      userID: member.userID,
+      currentUserEmail: currentUserEmail,
+    ),
+  );
+}
+
 List<FamilyMemberAction> familyMemberActions({
   required bool isAdmin,
   required bool isCurrentUser,
@@ -90,6 +104,7 @@ class FamilyDashboard extends StatelessWidget {
           userDetails: userDetails,
           members: activeMembers,
           labelFor: _storageLabelFor,
+          avatarColorFor: _avatarColorFor,
         ),
         const SizedBox(height: Spacing.xl),
         Text(l10n.members, style: TextStyles.h2),
@@ -103,6 +118,7 @@ class FamilyDashboard extends StatelessWidget {
             profilePictureBytes: profilePictureBytesByUserId[member.userID],
             linkedPersonId: linkedPersonIdsByUserId[member.userID],
             hasSavedContact: contactsByUserId[member.userID] != null,
+            avatarColor: _avatarColorFor(member),
             onTap: () => onMemberTap(member),
           ),
           if (index < members.length - 1) const SizedBox(height: Spacing.sm),
@@ -137,6 +153,12 @@ class FamilyDashboard extends StatelessWidget {
     final savedName = contactsByUserId[member.userID]?.data?.name.trim();
     return savedName == null || savedName.isEmpty ? null : savedName;
   }
+
+  AvatarComponentColor _avatarColorFor(FamilyMember member) =>
+      familyMemberAvatarComponentColor(
+        member,
+        currentUserEmail: userDetails.email,
+      );
 }
 
 class _FamilyStorageCard extends StatelessWidget {
@@ -144,11 +166,13 @@ class _FamilyStorageCard extends StatelessWidget {
     required this.userDetails,
     required this.members,
     required this.labelFor,
+    required this.avatarColorFor,
   });
 
   final UserDetails userDetails;
   final List<FamilyMember> members;
   final String Function(FamilyMember member) labelFor;
+  final AvatarComponentColor Function(FamilyMember member) avatarColorFor;
 
   @override
   Widget build(BuildContext context) {
@@ -157,6 +181,8 @@ class _FamilyStorageCard extends StatelessWidget {
     final totalStorage = userDetails.getTotalStorage();
     final totalUsed =
         userDetails.familyData?.getTotalUsage() ?? userDetails.usage;
+    Color memberColor(FamilyMember member) =>
+        avatarComponentColorValue(context, avatarColorFor(member));
 
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -184,7 +210,11 @@ class _FamilyStorageCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: Spacing.md),
-            _StorageBar(members: members, totalStorage: totalStorage),
+            _StorageBar(
+              members: members,
+              totalStorage: totalStorage,
+              colorFor: memberColor,
+            ),
             const SizedBox(height: Spacing.sm),
             Wrap(
               spacing: 10,
@@ -192,7 +222,7 @@ class _FamilyStorageCard extends StatelessWidget {
               children: [
                 for (final member in members)
                   _StorageLegend(
-                    color: _memberColor(context, member),
+                    color: memberColor(member),
                     label: labelFor(member),
                   ),
               ],
@@ -205,10 +235,15 @@ class _FamilyStorageCard extends StatelessWidget {
 }
 
 class _StorageBar extends StatelessWidget {
-  const _StorageBar({required this.members, required this.totalStorage});
+  const _StorageBar({
+    required this.members,
+    required this.totalStorage,
+    required this.colorFor,
+  });
 
   final List<FamilyMember> members;
   final int totalStorage;
+  final Color Function(FamilyMember member) colorFor;
 
   @override
   Widget build(BuildContext context) {
@@ -235,7 +270,7 @@ class _StorageBar extends StatelessWidget {
                   width: visibleWidth,
                   height: 5,
                   decoration: BoxDecoration(
-                    color: _memberColor(context, member),
+                    color: colorFor(member),
                     borderRadius: BorderRadius.circular(16),
                   ),
                 ),
@@ -296,6 +331,7 @@ class _FamilyMemberRow extends StatelessWidget {
     required this.profilePictureBytes,
     required this.linkedPersonId,
     required this.hasSavedContact,
+    required this.avatarColor,
     required this.onTap,
   });
 
@@ -306,6 +342,7 @@ class _FamilyMemberRow extends StatelessWidget {
   final Uint8List? profilePictureBytes;
   final String? linkedPersonId;
   final bool hasSavedContact;
+  final AvatarComponentColor avatarColor;
   final VoidCallback onTap;
 
   @override
@@ -333,6 +370,7 @@ class _FamilyMemberRow extends StatelessWidget {
         displayName: displayName,
         profilePictureBytes: profilePictureBytes,
         linkedPersonId: linkedPersonId,
+        avatarColor: avatarColor,
       ),
       trailing: isInteractive
           ? const Icon(Icons.chevron_right_rounded, size: IconSizes.medium)
@@ -347,12 +385,14 @@ class _MemberAvatar extends StatelessWidget {
     required this.displayName,
     required this.profilePictureBytes,
     required this.linkedPersonId,
+    required this.avatarColor,
   });
 
   final FamilyMember member;
   final String displayName;
   final Uint8List? profilePictureBytes;
   final String? linkedPersonId;
+  final AvatarComponentColor avatarColor;
 
   @override
   Widget build(BuildContext context) {
@@ -381,7 +421,7 @@ class _MemberAvatar extends StatelessWidget {
           )
         : AvatarComponent(
             initials: _initials(displayName),
-            color: _memberAvatarColor(member),
+            color: avatarColor,
             size: AvatarComponentSize.large,
             semanticLabel: displayName,
           );
@@ -397,25 +437,20 @@ class _MemberAvatar extends StatelessWidget {
         Positioned(
           right: -4,
           bottom: -4,
-          child: HugeIcon(
-            icon: HugeIcons.strokeRoundedCrown02,
-            color: context.componentColors.primary,
-            size: IconSizes.small,
+          child: Semantics(
+            label: AppLocalizations.of(context).admin,
+            child: ExcludeSemantics(
+              child: HugeIcon(
+                icon: HugeIcons.strokeRoundedCrown02,
+                color: context.componentColors.primary,
+                size: IconSizes.small,
+              ),
+            ),
           ),
         ),
       ],
     );
   }
-}
-
-Color _memberColor(BuildContext context, FamilyMember member) {
-  return avatarComponentColorValue(context, _memberAvatarColor(member));
-}
-
-AvatarComponentColor _memberAvatarColor(FamilyMember member) {
-  return avatarComponentColorForIdentity(
-    avatarIdentityKey(email: member.email, userID: member.userID),
-  );
 }
 
 String _initials(String value) {

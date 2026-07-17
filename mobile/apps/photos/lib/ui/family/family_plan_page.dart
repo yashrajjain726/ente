@@ -9,6 +9,7 @@ import 'package:ente_pure_utils/ente_pure_utils.dart';
 import 'package:flutter/material.dart';
 import 'package:hugeicons/hugeicons.dart';
 import 'package:photos/core/event_bus.dart';
+import 'package:photos/events/contacts_changed_event.dart';
 import 'package:photos/events/people_changed_event.dart';
 import 'package:photos/gateways/billing/models/billing_plan.dart';
 import 'package:photos/gateways/billing/models/subscription.dart';
@@ -57,6 +58,8 @@ class _FamilyPlanPageState extends State<FamilyPlanPage> {
   final Map<int, Uint8List?> _profilePictureBytesByUserId = {};
   String? _startingPrice;
   bool _isRefreshing = false;
+  int _memberContactsLoadGeneration = 0;
+  StreamSubscription<ContactsChangedEvent>? _contactsChangedSubscription;
   StreamSubscription<PeopleChangedEvent>? _peopleChangedSubscription;
 
   bool get _isFreeUser =>
@@ -93,6 +96,9 @@ class _FamilyPlanPageState extends State<FamilyPlanPage> {
       unawaited(_refreshUserDetails());
     }
     unawaited(_loadMemberContacts());
+    _contactsChangedSubscription = Bus.instance
+        .on<ContactsChangedEvent>()
+        .listen(_onContactsChanged);
     _peopleChangedSubscription = Bus.instance.on<PeopleChangedEvent>().listen((
       _,
     ) {
@@ -107,8 +113,19 @@ class _FamilyPlanPageState extends State<FamilyPlanPage> {
 
   @override
   void dispose() {
+    _contactsChangedSubscription?.cancel();
     _peopleChangedSubscription?.cancel();
     super.dispose();
+  }
+
+  void _onContactsChanged(ContactsChangedEvent event) {
+    if (!mounted || !_showsDashboard) {
+      return;
+    }
+    if (!_familyMemberUserIDs().any(event.matchesContactUserId)) {
+      return;
+    }
+    unawaited(_loadMemberContacts());
   }
 
   @override
@@ -124,6 +141,7 @@ class _FamilyPlanPageState extends State<FamilyPlanPage> {
     return FamilyPageScaffold(
       title: _showsDashboard ? AppLocalizations.of(context).family : null,
       actions: _showsDashboard ? [_buildDashboardOverflow(context)] : const [],
+      scrollable: _showsDashboard,
       child: content,
     );
   }
@@ -548,7 +566,13 @@ class _FamilyPlanPageState extends State<FamilyPlanPage> {
               EditStorageLimitPage(
                 member: member,
                 totalStorageInBytes: _userDetails.getTotalStorage(),
-                avatarColor: context.componentColors.primary,
+                avatarColor: avatarComponentColorValue(
+                  context,
+                  familyMemberAvatarComponentColor(
+                    member,
+                    currentUserEmail: _userDetails.email,
+                  ),
+                ),
               ),
             );
             if (!mounted) {
@@ -631,14 +655,10 @@ class _FamilyPlanPageState extends State<FamilyPlanPage> {
   }
 
   Future<void> _loadMemberContacts() async {
-    final userIDs =
-        _userDetails.familyData?.members
-            ?.map((member) => member.userID)
-            .whereType<int>()
-            .toSet() ??
-        const <int>{};
+    final generation = ++_memberContactsLoadGeneration;
+    final userIDs = _familyMemberUserIDs();
     final resolvedContacts = await Future.wait(userIDs.map(_loadMemberContact));
-    if (!mounted) {
+    if (!mounted || generation != _memberContactsLoadGeneration) {
       return;
     }
     setState(() {
@@ -653,6 +673,13 @@ class _FamilyPlanPageState extends State<FamilyPlanPage> {
       }
     });
   }
+
+  Set<int> _familyMemberUserIDs() =>
+      _userDetails.familyData?.members
+          ?.map((member) => member.userID)
+          .whereType<int>()
+          .toSet() ??
+      const <int>{};
 
   Future<_ResolvedMemberContact> _loadMemberContact(int userID) async {
     final contact = await PhotosContactsService.instance.getContact(

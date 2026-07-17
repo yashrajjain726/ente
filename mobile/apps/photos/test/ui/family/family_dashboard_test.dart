@@ -126,11 +126,39 @@ void main() {
     );
   });
 
+  group('familyMemberAvatarComponentColor', () {
+    test('uses black for the current user and hashes other members', () {
+      final currentUser = _member(email: 'admin@example.com', userID: 1);
+      final otherMember = _member(email: 'saved@example.com', userID: 42);
+
+      expect(
+        familyMemberAvatarComponentColor(
+          currentUser,
+          currentUserEmail: 'ADMIN@example.com',
+        ),
+        AvatarComponentColor.black,
+      );
+      expect(
+        familyMemberAvatarComponentColor(
+          otherMember,
+          currentUserEmail: currentUser.email,
+        ),
+        avatarComponentColorForIdentity(
+          avatarIdentityKey(
+            email: otherMember.email,
+            userID: otherMember.userID,
+          ),
+        ),
+      );
+    });
+  });
+
   testWidgets(
     'renders saved contacts and no shared-album content at 375 pixels',
     (tester) async {
       await tester.binding.setSurfaceSize(const Size(375, 812));
       addTearDown(() => tester.binding.setSurfaceSize(null));
+      final semantics = tester.ensureSemantics();
 
       final savedMember = _member(email: 'saved@example.com', userID: 42);
       final pendingMember = _member(
@@ -214,10 +242,15 @@ void main() {
             AvatarComponentColor.purple,
             AvatarComponentColor.blue,
             AvatarComponentColor.cyan,
+            AvatarComponentColor.black,
           ]),
         ),
       );
       expect(avatars.map((avatar) => avatar.seed), everyElement(isNull));
+      final currentUserAvatar = avatars.singleWhere(
+        (avatar) => avatar.semanticLabel == 'admin@example.com',
+      );
+      expect(currentUserAvatar.color, AvatarComponentColor.black);
       final savedMemberAvatar = avatars.singleWhere(
         (avatar) => avatar.semanticLabel == 'Saved member',
       );
@@ -236,6 +269,8 @@ void main() {
             (icon) => identical(icon.icon, HugeIcons.strokeRoundedCrown02),
           );
       expect(crown.icon, HugeIcons.strokeRoundedCrown02);
+      expect(find.bySemanticsLabel(RegExp(r'Admin')), findsOneWidget);
+      semantics.dispose();
 
       await tester.tap(find.byType(MenuComponent).at(1));
       expect(selectedMember, same(savedMember));
