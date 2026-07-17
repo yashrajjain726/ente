@@ -28,7 +28,7 @@ func TestCORS(t *testing.T) {
 		{"unknown origin", http.MethodGet, "/users/details", "https://unknown.example", "api.ente.com", http.StatusNoContent, true, true},
 		{"malformed origin", http.MethodGet, "/users/details", "%", "api.ente.com", http.StatusNoContent, true, true},
 		{"native client", http.MethodGet, "/users/details", "", "api.ente.com", http.StatusNoContent, true, false},
-		{"same host", http.MethodPost, "/users/ott", "https://ente.example", "ente.example", http.StatusNoContent, true, false},
+		{"unconfigured same host", http.MethodPost, "/users/ott", "https://ente.example", "ente.example", http.StatusNoContent, true, true},
 		{"desktop app", http.MethodGet, "/users/details", "ente://app", "api.ente.com", http.StatusNoContent, true, false},
 		{"custom album domain", http.MethodGet, "/public-collection/info", "https://gallery.example", "api.ente.com", http.StatusNoContent, true, false},
 		{"album prefix lookalike", http.MethodGet, "/public-collection-evil", "https://gallery.example", "api.ente.com", http.StatusNoContent, true, true},

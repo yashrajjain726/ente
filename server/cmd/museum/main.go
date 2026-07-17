@@ -1429,10 +1429,6 @@ func corsForOrigins(origins []string) gin.HandlerFunc {
 		if origin == "" || knownOrigins[normalizeOrigin(origin)] {
 			return true
 		}
-		parsed, err := url.Parse(origin)
-		if err == nil && strings.EqualFold(parsed.Host, c.Request.Host) {
-			return true
-		}
 		// CollectionLinkMiddleware validates custom album domains.
 		path := c.Request.URL.Path
 		return path == "/public-collection" || strings.HasPrefix(path, "/public-collection/")
