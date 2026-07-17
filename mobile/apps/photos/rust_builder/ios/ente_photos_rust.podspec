@@ -20,7 +20,7 @@ A new Flutter FFI plugin project.
   s.source           = { :path => '.' }
   s.source_files = 'Classes/**/*'
   s.dependency 'Flutter'
-  s.platform = :ios, '11.0'
+  s.platform = :ios, '15.1'
 
   # Flutter.framework does not contain an i386 slice, and ONNX Runtime 1.27
   # does not publish an x86_64 iOS Simulator binary.

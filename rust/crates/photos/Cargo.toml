@@ -25,6 +25,7 @@ thiserror.workspace = true
 
 # ORT source and revision are pinned once in the workspace manifest; only the
 # per-target feature sets are declared here.
+# The iOS Cargokit build sets ORT_LIB_PATH to the verified custom static archive.
 [target.'cfg(target_os = "ios")'.dependencies]
 ort = { workspace = true, features = [
     "std",
@@ -33,10 +34,6 @@ ort = { workspace = true, features = [
     # CoreML is the preferred iOS execution provider for Rust ML sessions.
     "coreml",
     "api-27",
-    # Link the revision-pinned crate's verified 1.27 archive directly into the
-    # Rust ML library.
-    "download-binaries",
-    "tls-native",
 ] }
 
 [target.'cfg(target_os = "android")'.dependencies]
