@@ -171,11 +171,27 @@ export const collectionTypes = [
  *   corresponding operation moves the file to the user's special
  *   "uncategorized" collection, creating it if needed.
  *
- *   Similar to "favorites", the user can have only one "uncategorized"
- *   collection. However, unlike "favorites", the "uncategorized" collection
- *   cannot be shared.
+ *   Similar to "favorites", the user can own only one "uncategorized"
+ *   collection. Shared collections of this type can also be present locally,
+ *   so callers must include the owner when resolving the user's collection.
  */
 export type CollectionType = (typeof collectionTypes)[number];
+
+interface CollectionTypeAndOwner {
+    type: string;
+    owner: { id: number };
+}
+
+export const findUserUncategorizedCollection = <
+    T extends CollectionTypeAndOwner,
+>(
+    collections: readonly T[],
+    userID: number,
+) =>
+    collections.find(
+        (collection) =>
+            collection.type == "uncategorized" && collection.owner.id == userID,
+    );
 
 /**
  * The privilege level of a participant associated with a collection.
