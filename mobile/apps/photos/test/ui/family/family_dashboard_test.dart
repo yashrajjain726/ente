@@ -191,19 +191,7 @@ void main() {
                   members: members,
                   isAdmin: true,
                   contactsByUserId: {
-                    42: contacts.ContactRecord(
-                      id: 'saved-contact',
-                      contactUserId: 42,
-                      email: savedMember.email,
-                      data: const contacts.ContactData(
-                        contactUserId: 42,
-                        name: 'Saved member',
-                      ),
-                      profilePictureAttachmentId: null,
-                      isDeleted: false,
-                      createdAt: 1,
-                      updatedAt: 1,
-                    ),
+                    42: _contact(savedMember, name: 'Saved member'),
                   },
                   profilePictureBytesByUserId: const {},
                   linkedPersonIdsByUserId: const {},
@@ -310,6 +298,67 @@ void main() {
     );
     expect(personAvatar.personId, 'person-42');
   });
+
+  testWidgets('sorts other members by their displayed name or email', (
+    tester,
+  ) async {
+    final currentUser = _member(
+      email: 'admin@example.com',
+      userID: 1,
+      isAdmin: true,
+      status: FamilyMemberStatus.self,
+    );
+    final zoe = _member(email: 'a@example.com', userID: 2);
+    final amy = _member(email: 'z@example.com', userID: 3);
+    final bob = _member(email: 'bob@example.com', userID: 4);
+    final members = [currentUser, zoe, amy, bob];
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: lightThemeData,
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Scaffold(
+          body: SingleChildScrollView(
+            child: FamilyDashboard(
+              userDetails: _userDetails(members),
+              members: members,
+              isAdmin: true,
+              contactsByUserId: {
+                2: _contact(zoe, name: 'Zoe'),
+                3: _contact(amy, name: 'Amy'),
+              },
+              profilePictureBytesByUserId: const {},
+              linkedPersonIdsByUserId: const {},
+              onMemberTap: (_) {},
+              onAddMember: () {},
+              remainingSlots: 0,
+            ),
+          ),
+        ),
+      ),
+    );
+
+    expect(
+      tester
+          .widgetList<MenuComponent>(find.byType(MenuComponent))
+          .map((item) => item.title),
+      ['admin@example.com', 'Amy', 'bob@example.com', 'Zoe'],
+    );
+  });
+}
+
+contacts.ContactRecord _contact(FamilyMember member, {required String name}) {
+  return contacts.ContactRecord(
+    id: 'contact-${member.userID}',
+    contactUserId: member.userID!,
+    email: member.email,
+    data: contacts.ContactData(contactUserId: member.userID!, name: name),
+    profilePictureAttachmentId: null,
+    isDeleted: false,
+    createdAt: 1,
+    updatedAt: 1,
+  );
 }
 
 FamilyMember _member({

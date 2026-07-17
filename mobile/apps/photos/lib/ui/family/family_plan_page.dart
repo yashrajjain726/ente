@@ -347,7 +347,7 @@ class _FamilyPlanPageState extends State<FamilyPlanPage> {
   }
 
   Widget _buildDashboard(BuildContext context, {required bool isAdminView}) {
-    final members = _sortedMembersForDashboard(isAdminView: isAdminView);
+    final members = _userDetails.familyData?.members ?? const <FamilyMember>[];
     return FamilyDashboard(
       userDetails: _userDetails,
       members: members,
@@ -796,28 +796,6 @@ class _FamilyPlanPageState extends State<FamilyPlanPage> {
         await showGenericErrorDialog(context: context, error: error);
       }
     }
-  }
-
-  List<FamilyMember> _sortedMembersForDashboard({required bool isAdminView}) {
-    final members = List<FamilyMember>.from(
-      _userDetails.familyData?.members ?? const <FamilyMember>[],
-    );
-    final currentEmail = _userDetails.email.trim().toLowerCase();
-
-    if (!isAdminView) {
-      members.removeWhere((member) => !member.isActive);
-    }
-
-    members.sort((a, b) {
-      if (a.email.trim().toLowerCase() == currentEmail) return -1;
-      if (b.email.trim().toLowerCase() == currentEmail) return 1;
-      if (isAdminView && a.isPending != b.isPending) {
-        return a.isPending ? 1 : -1;
-      }
-      if (a.isAdmin != b.isAdmin) return a.isAdmin ? -1 : 1;
-      return a.email.compareTo(b.email);
-    });
-    return members;
   }
 
   _MonthlyPrice? _monthlyPriceForPlan(BillingPlan plan) {

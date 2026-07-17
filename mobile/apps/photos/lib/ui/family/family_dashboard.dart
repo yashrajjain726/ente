@@ -94,7 +94,12 @@ class FamilyDashboard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final activeMembers = members.where((member) => member.isActive).toList();
+    final visibleMembers =
+        members.where((member) => isAdmin || member.isActive).toList()
+          ..sort(_compareMembers);
+    final activeMembers = visibleMembers
+        .where((member) => member.isActive)
+        .toList();
     final l10n = AppLocalizations.of(context);
 
     return Column(
@@ -109,7 +114,7 @@ class FamilyDashboard extends StatelessWidget {
         const SizedBox(height: Spacing.xl),
         Text(l10n.members, style: TextStyles.h2),
         const SizedBox(height: Spacing.md),
-        for (final (index, member) in members.indexed) ...[
+        for (final (index, member) in visibleMembers.indexed) ...[
           _FamilyMemberRow(
             member: member,
             isCurrentUser: _isCurrentUser(member),
@@ -121,7 +126,8 @@ class FamilyDashboard extends StatelessWidget {
             avatarColor: _avatarColorFor(member),
             onTap: () => onMemberTap(member),
           ),
-          if (index < members.length - 1) const SizedBox(height: Spacing.sm),
+          if (index < visibleMembers.length - 1)
+            const SizedBox(height: Spacing.sm),
         ],
         if (isAdmin && remainingSlots > 0) ...[
           const SizedBox(height: Spacing.xl),
@@ -142,6 +148,22 @@ class FamilyDashboard extends StatelessWidget {
   bool _isCurrentUser(FamilyMember member) =>
       member.email.trim().toLowerCase() ==
       userDetails.email.trim().toLowerCase();
+
+  int _compareMembers(FamilyMember a, FamilyMember b) {
+    if (_isCurrentUser(a)) return -1;
+    if (_isCurrentUser(b)) return 1;
+    if (isAdmin && a.isPending != b.isPending) {
+      return a.isPending ? 1 : -1;
+    }
+    if (a.isAdmin != b.isAdmin) return a.isAdmin ? -1 : 1;
+
+    final displayNameComparison = _displayNameFor(
+      a,
+    ).toLowerCase().compareTo(_displayNameFor(b).toLowerCase());
+    return displayNameComparison != 0
+        ? displayNameComparison
+        : a.email.toLowerCase().compareTo(b.email.toLowerCase());
+  }
 
   String _displayNameFor(FamilyMember member) =>
       _savedNameFor(member) ?? member.email;
