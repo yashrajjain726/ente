@@ -100,6 +100,7 @@ class _InlineTextDetectionState extends State<InlineTextDetection> {
   bool _trackedGlobalPointerMoved = false;
   bool _trackedGlobalLongPressTriggered = false;
   Timer? _globalLongPressTimer;
+  final Set<int> _ocrHitPointers = <int>{};
   String? _resolvedImageSizePath;
   Size? _resolvedImageSize;
   int _imageSizeRequestId = 0;
@@ -145,6 +146,7 @@ class _InlineTextDetectionState extends State<InlineTextDetection> {
     _evaluationGeneration++;
     _cancelActiveRegionRequest();
     _cancelTrackedGlobalPointer();
+    _ocrHitPointers.clear();
     _imageSizeRequestId++;
     setState(() {
       _localFilePath = null;
@@ -465,6 +467,7 @@ class _InlineTextDetectionState extends State<InlineTextDetection> {
             _trackedGlobalPointer != pointer ||
             _trackedGlobalPointerMoved ||
             _globalActivePointers != 1 ||
+            !_ocrHitPointers.contains(pointer) ||
             (longPressCanSelect && !_canTrackZoomedPanFirstLongPress)) {
           return;
         }
@@ -665,7 +668,8 @@ class _InlineTextDetectionState extends State<InlineTextDetection> {
       child: _buildOcrGestureRegion(
         Listener(
           behavior: HitTestBehavior.translucent,
-          onPointerDown: (_) {
+          onPointerDown: (event) {
+            _ocrHitPointers.add(event.pointer);
             _activePointers++;
             if (_activePointers >= 2 && !_isPinching) {
               setState(() {
@@ -674,13 +678,15 @@ class _InlineTextDetectionState extends State<InlineTextDetection> {
               });
             }
           },
-          onPointerUp: (_) {
+          onPointerUp: (event) {
+            _ocrHitPointers.remove(event.pointer);
             if (_activePointers > 0) _activePointers--;
             if (_activePointers < 2 && _isPinching) {
               setState(() => _isPinching = false);
             }
           },
-          onPointerCancel: (_) {
+          onPointerCancel: (event) {
+            _ocrHitPointers.remove(event.pointer);
             if (_activePointers > 0) _activePointers--;
             if (_activePointers < 2 && _isPinching) {
               setState(() => _isPinching = false);
