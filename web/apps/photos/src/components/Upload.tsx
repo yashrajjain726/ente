@@ -177,6 +177,8 @@ interface UploadFilesOptions {
     postUploadTargetCollection?: Collection;
     /** Whether Takeout-favorited uploads should be added to Favorites. */
     importTakeoutFavorites?: boolean;
+    /** Whether media originating from Google Photos partner sharing is uploaded. */
+    includePartnerSharedFiles?: boolean;
 }
 
 interface NewCollectionsOptions {
@@ -184,6 +186,8 @@ interface NewCollectionsOptions {
     includeHiddenCollections?: boolean;
     createHidden?: boolean;
     skipConfirmation?: boolean;
+    importTakeoutFavorites?: boolean;
+    includePartnerSharedFiles?: boolean;
 }
 
 type PendingUpload =
@@ -206,6 +210,7 @@ interface UploadConfirmation {
     albumCount: number;
     isTakeout: boolean;
     importFavorites: boolean;
+    includePartnerSharedFiles: boolean;
 }
 
 /**
@@ -330,6 +335,12 @@ export const Upload: React.FC<UploadProps> = ({
     const pendingDesktopUploadCollectionName = useRef<string | undefined>(
         undefined,
     );
+    const pendingDesktopUploadConfirmationOptions = useRef<
+        Pick<
+            NewCollectionsOptions,
+            "importTakeoutFavorites" | "includePartnerSharedFiles"
+        >
+    >({});
 
     /**
      * This is set to thue user's choice when the user chooses one of the
@@ -350,6 +361,8 @@ export const Upload: React.FC<UploadProps> = ({
     );
     /** The confirmed favorites choice for retrying the current batch. */
     const retryImportTakeoutFavorites = useRef(true);
+    /** The confirmed partner-sharing choice for retrying the current batch. */
+    const retryIncludePartnerSharedFiles = useRef(true);
 
     /**
      * `true` if we've activated one hidden {@link Inputs} that allow the user
@@ -447,6 +460,7 @@ export const Upload: React.FC<UploadProps> = ({
         if (electron) {
             const upload = (collectionName: string, filePaths: string[]) => {
                 isPendingDesktopUpload.current = true;
+                pendingDesktopUploadConfirmationOptions.current = {};
                 pendingDesktopUploadCollectionName.current = collectionName;
                 setDesktopFilePaths(filePaths);
             };
@@ -464,12 +478,18 @@ export const Upload: React.FC<UploadProps> = ({
                     filePaths,
                     zipItems,
                     preUploadSkippedFiles,
+                    importTakeoutFavorites,
+                    includePartnerSharedFiles,
                 } = pending;
 
                 log.info(
                     `Resuming pending of upload of ${filePaths.length + zipItems.length} items${collectionName ? " to collection " + collectionName : ""}`,
                 );
                 isPendingDesktopUpload.current = true;
+                pendingDesktopUploadConfirmationOptions.current = {
+                    importTakeoutFavorites,
+                    includePartnerSharedFiles,
+                };
                 pendingDesktopUploadCollectionName.current = collectionName;
                 setDesktopFilePaths(filePaths);
                 setDesktopZipItems(zipItems);
@@ -630,6 +650,9 @@ export const Upload: React.FC<UploadProps> = ({
 
             if (isPendingDesktopUpload.current) {
                 isPendingDesktopUpload.current = false;
+                const confirmationOptions =
+                    pendingDesktopUploadConfirmationOptions.current;
+                pendingDesktopUploadConfirmationOptions.current = {};
                 if (pendingDesktopUploadCollectionName.current) {
                     // Include hidden collections so watch folder syncs add
                     // files to existing hidden albums instead of creating new
@@ -639,12 +662,14 @@ export const Upload: React.FC<UploadProps> = ({
                             pendingDesktopUploadCollectionName.current,
                         includeHiddenCollections: true,
                         skipConfirmation: true,
+                        ...confirmationOptions,
                     });
                     pendingDesktopUploadCollectionName.current = undefined;
                 } else {
                     uploadFilesToNewCollections("parent", {
                         includeHiddenCollections: true,
                         skipConfirmation: true,
+                        ...confirmationOptions,
                     });
                 }
                 return;
@@ -846,6 +871,14 @@ export const Upload: React.FC<UploadProps> = ({
                 uploadItemAndPaths,
             ]);
             if (uploadItemsAndPaths.current !== uploadItemAndPaths) return;
+            if (fileCount == 1 && !isTakeout) {
+                void commitUploadToExistingCollection(
+                    collection,
+                    uploadItemAndPaths,
+                    true,
+                );
+                return;
+            }
             setUploadConfirmation({
                 pendingUpload: {
                     type: "existing-collection",
@@ -856,6 +889,7 @@ export const Upload: React.FC<UploadProps> = ({
                 albumCount: 1,
                 isTakeout,
                 importFavorites: true,
+                includePartnerSharedFiles: true,
             });
         } catch (e) {
             if (uploadItemsAndPaths.current !== uploadItemAndPaths) return;
@@ -868,6 +902,7 @@ export const Upload: React.FC<UploadProps> = ({
         collection: Collection,
         uploadItemAndPaths: UploadItemAndPath[],
         importTakeoutFavorites: boolean,
+        includePartnerSharedFiles = true,
     ) => {
         try {
             preCollectionCreationAction();
@@ -899,6 +934,7 @@ export const Upload: React.FC<UploadProps> = ({
                             ? undefined
                             : collection,
                     importTakeoutFavorites,
+                    includePartnerSharedFiles,
                 },
             );
             if (uploadItemsAndPaths.current === uploadItemAndPaths) {
@@ -919,6 +955,8 @@ export const Upload: React.FC<UploadProps> = ({
             includeHiddenCollections,
             createHidden,
             skipConfirmation,
+            importTakeoutFavorites,
+            includePartnerSharedFiles,
         }: NewCollectionsOptions = {},
     ) => {
         const uploadItemAndPaths = uploadItemsAndPaths.current;
@@ -955,7 +993,8 @@ export const Upload: React.FC<UploadProps> = ({
                 uploadItemAndPaths,
                 collectionNameToUploadItems,
                 { includeHiddenCollections, createHidden },
-                true,
+                importTakeoutFavorites ?? true,
+                includePartnerSharedFiles ?? true,
             );
             return;
         }
@@ -965,6 +1004,16 @@ export const Upload: React.FC<UploadProps> = ({
                 ...collectionNameToUploadItems.values(),
             ]);
             if (uploadItemsAndPaths.current !== uploadItemAndPaths) return;
+            if (fileCount == 1 && !isTakeout) {
+                void commitUploadToNewCollections(
+                    uploadItemAndPaths,
+                    collectionNameToUploadItems,
+                    { includeHiddenCollections, createHidden },
+                    importTakeoutFavorites ?? true,
+                    includePartnerSharedFiles ?? true,
+                );
+                return;
+            }
             setUploadConfirmation({
                 pendingUpload: {
                     type: "new-collections",
@@ -976,7 +1025,8 @@ export const Upload: React.FC<UploadProps> = ({
                 fileCount,
                 albumCount: collectionNameToUploadItems.size,
                 isTakeout,
-                importFavorites: true,
+                importFavorites: importTakeoutFavorites ?? true,
+                includePartnerSharedFiles: includePartnerSharedFiles ?? true,
             });
         } catch (e) {
             if (uploadItemsAndPaths.current !== uploadItemAndPaths) return;
@@ -990,6 +1040,7 @@ export const Upload: React.FC<UploadProps> = ({
         collectionNameToUploadItems: Map<string, UploadItemAndPath[]>,
         { includeHiddenCollections, createHidden }: NewCollectionsOptions,
         importTakeoutFavorites: boolean,
+        includePartnerSharedFiles = true,
     ) => {
         preCollectionCreationAction();
         let uploadItemsWithCollection: UploadItemWithCollection[] = [];
@@ -1042,6 +1093,7 @@ export const Upload: React.FC<UploadProps> = ({
                 persistPendingUploads: true,
                 postUploadTargetCollection: undefined,
                 importTakeoutFavorites,
+                includePartnerSharedFiles,
             },
         );
         if (uploadItemsAndPaths.current === uploadItemAndPaths) {
@@ -1054,12 +1106,14 @@ export const Upload: React.FC<UploadProps> = ({
         if (!confirmation) return;
 
         setUploadConfirmation(undefined);
-        const { pendingUpload, importFavorites } = confirmation;
+        const { pendingUpload, importFavorites, includePartnerSharedFiles } =
+            confirmation;
         if (pendingUpload.type == "existing-collection") {
             void commitUploadToExistingCollection(
                 pendingUpload.collection,
                 pendingUpload.uploadItemAndPaths,
                 importFavorites,
+                includePartnerSharedFiles,
             );
         } else {
             void commitUploadToNewCollections(
@@ -1071,6 +1125,7 @@ export const Upload: React.FC<UploadProps> = ({
                     createHidden: pendingUpload.createHidden,
                 },
                 importFavorites,
+                includePartnerSharedFiles,
             );
         }
     };
@@ -1089,6 +1144,16 @@ export const Upload: React.FC<UploadProps> = ({
         setUploadConfirmation((confirmation) =>
             confirmation
                 ? { ...confirmation, importFavorites: checked }
+                : undefined,
+        );
+
+    const handleIncludePartnerSharedFilesChange = (
+        _event: React.ChangeEvent<HTMLInputElement>,
+        checked: boolean,
+    ) =>
+        setUploadConfirmation((confirmation) =>
+            confirmation
+                ? { ...confirmation, includePartnerSharedFiles: checked }
                 : undefined,
         );
 
@@ -1128,6 +1193,8 @@ export const Upload: React.FC<UploadProps> = ({
                 opts?.postUploadTargetCollection;
             retryImportTakeoutFavorites.current =
                 opts?.importTakeoutFavorites ?? true;
+            retryIncludePartnerSharedFiles.current =
+                opts?.includePartnerSharedFiles ?? true;
             await preUploadAction();
             if (
                 opts?.persistPendingUploads &&
@@ -1142,6 +1209,8 @@ export const Upload: React.FC<UploadProps> = ({
                         .map(({ uploadItem }) => uploadItem)
                         .filter((x) => x !== undefined),
                     preUploadSkippedFiles,
+                    opts.importTakeoutFavorites ?? true,
+                    opts.includePartnerSharedFiles ?? true,
                 );
             }
             const batchResult = await uploadManager.uploadItems(
@@ -1150,6 +1219,7 @@ export const Upload: React.FC<UploadProps> = ({
                 {
                     skipDuplicateAddToUploadCollection:
                         !!opts?.postUploadTargetCollection,
+                    includePartnerSharedFiles: opts?.includePartnerSharedFiles,
                 },
             );
             if (!batchResult.processedAny) closeUploadProgress();
@@ -1192,6 +1262,8 @@ export const Upload: React.FC<UploadProps> = ({
                 {
                     skipDuplicateAddToUploadCollection:
                         !!retrySharedAlbumUploadTarget.current,
+                    includePartnerSharedFiles:
+                        retryIncludePartnerSharedFiles.current,
                 },
             );
             if (!batchResult.processedAny) closeUploadProgress();
@@ -1368,6 +1440,12 @@ export const Upload: React.FC<UploadProps> = ({
                         uploadConfirmation?.importFavorites ?? true
                     }
                     onImportFavoritesChange={handleImportFavoritesChange}
+                    includePartnerSharedFiles={
+                        uploadConfirmation?.includePartnerSharedFiles ?? true
+                    }
+                    onIncludePartnerSharedFilesChange={
+                        handleIncludePartnerSharedFilesChange
+                    }
                     onConfirm={handleUploadConfirm}
                     onCancel={cancelPendingUpload}
                 />
@@ -1617,6 +1695,8 @@ const setPendingUploads = async (
     collections: Collection[],
     uploadItems: UploadItem[],
     preUploadSkippedFiles: PreUploadSkippedFile[],
+    importTakeoutFavorites: boolean,
+    includePartnerSharedFiles: boolean,
 ) => {
     let collectionName: string | undefined;
     /* collection being one suggest one of two things
@@ -1651,6 +1731,8 @@ const setPendingUploads = async (
         filePaths,
         zipItems,
         preUploadSkippedFiles,
+        importTakeoutFavorites,
+        includePartnerSharedFiles,
     });
 };
 
