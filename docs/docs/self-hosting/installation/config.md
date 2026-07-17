@@ -70,7 +70,7 @@ The `apps` section tells Museum where each Ente web app is hosted. Configure the
 | `apps.family`          | Family web app base endpoint                            | `https://family.ente.io`    |
 | `apps.space`           | Space web app base endpoint                             | `https://ente.space`        |
 | `apps.legacy`          | Legacy recovery web app base endpoint                   | `https://legacy.ente.com`   |
-| `apps.extra-origins`   | Additional trusted browser origins                      | `["https://embed.ente.io"]` |
+| `apps.extra-origins`   | Additional trusted browser origins                      | `["https://ente.com", "https://embed.ente.io"]` |
 
 ### Database
 

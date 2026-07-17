@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	b64 "encoding/base64"
 	"fmt"
-	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -74,6 +73,7 @@ import (
 	userEntityRepo "github.com/ente/museum/pkg/repo/userentity"
 	"github.com/ente/museum/pkg/utils/billing"
 	"github.com/ente/museum/pkg/utils/config"
+	"github.com/ente/museum/pkg/utils/network"
 	"github.com/ente/museum/pkg/utils/s3config"
 	timeUtil "github.com/ente/museum/pkg/utils/time"
 	spaceapi "github.com/ente/museum/space/api"
@@ -1427,15 +1427,7 @@ func corsForOrigins(origins []string) gin.HandlerFunc {
 		}
 	}
 	isKnownOrigin := func(c *gin.Context, origin string) bool {
-		normalizedOrigin := normalizeOrigin(origin)
-		if origin == "" || knownOrigins[normalizedOrigin] {
-			return true
-		}
-		parsedOrigin, _ := url.Parse(normalizedOrigin)
-		host := strings.TrimSuffix(parsedOrigin.Hostname(), ".")
-		ip := net.ParseIP(host)
-		if (parsedOrigin.Scheme == "http" || parsedOrigin.Scheme == "https") &&
-			(host == "localhost" || strings.HasSuffix(host, ".localhost") || ip != nil && ip.IsLoopback()) {
+		if origin == "" || knownOrigins[normalizeOrigin(origin)] || network.IsLoopbackOrigin(origin) {
 			return true
 		}
 		// CollectionLinkMiddleware validates custom album domains.
