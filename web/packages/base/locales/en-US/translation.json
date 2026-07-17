@@ -877,6 +877,7 @@
     "search_location": "Search for a location",
     "app_lock": "App lock",
     "app_locked": "App locked",
+    "app_lock_unavailable": "App lock is unavailable. Check the system keychain.",
     "enter_pin": "Enter your PIN",
     "enter_password": "Enter your password",
     "confirm_pin": "Confirm your PIN",
