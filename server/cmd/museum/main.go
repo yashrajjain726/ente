@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	b64 "encoding/base64"
 	"fmt"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -1091,7 +1092,7 @@ func setAppDefaults() {
 	viper.SetDefault("apps.photos", "https://photos.ente.com")
 	viper.SetDefault("apps.public-albums", "https://albums.ente.com")
 	viper.SetDefault("apps.embed-albums", "https://embed.ente.com")
-	viper.SetDefault("apps.extra-origins", []string{"https://embed.ente.io"})
+	viper.SetDefault("apps.extra-origins", []string{"https://ente.com", "https://embed.ente.io"})
 	viper.SetDefault("apps.auth", "https://auth.ente.com")
 	viper.SetDefault("apps.locker", "https://locker.ente.com")
 	viper.SetDefault("apps.public-locker", "https://share.ente.com")
@@ -1426,7 +1427,15 @@ func corsForOrigins(origins []string) gin.HandlerFunc {
 		}
 	}
 	isKnownOrigin := func(c *gin.Context, origin string) bool {
-		if origin == "" || knownOrigins[normalizeOrigin(origin)] {
+		normalizedOrigin := normalizeOrigin(origin)
+		if origin == "" || knownOrigins[normalizedOrigin] {
+			return true
+		}
+		parsedOrigin, _ := url.Parse(normalizedOrigin)
+		host := strings.TrimSuffix(parsedOrigin.Hostname(), ".")
+		ip := net.ParseIP(host)
+		if (parsedOrigin.Scheme == "http" || parsedOrigin.Scheme == "https") &&
+			(host == "localhost" || strings.HasSuffix(host, ".localhost") || ip != nil && ip.IsLoopback()) {
 			return true
 		}
 		// CollectionLinkMiddleware validates custom album domains.

@@ -148,6 +148,7 @@ apps:
     # Additional trusted browser origins not represented by an app above.
     #
     # Default is:
+    #     - https://ente.com
     #     - https://embed.ente.io
     extra-origins:
     custom-domain:
