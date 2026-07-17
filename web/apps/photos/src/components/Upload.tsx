@@ -175,6 +175,8 @@ type UploadType = "files" | "folders" | "zips";
 interface UploadFilesOptions {
     persistPendingUploads?: boolean;
     postUploadTargetCollection?: Collection;
+    /** Whether Takeout-favorited uploads should be added to Favorites. */
+    importTakeoutFavorites?: boolean;
 }
 
 interface NewCollectionsOptions {
@@ -182,6 +184,28 @@ interface NewCollectionsOptions {
     includeHiddenCollections?: boolean;
     createHidden?: boolean;
     skipConfirmation?: boolean;
+}
+
+type PendingUpload =
+    | {
+          type: "existing-collection";
+          collection: Collection;
+          uploadItemAndPaths: UploadItemAndPath[];
+      }
+    | {
+          type: "new-collections";
+          uploadItemAndPaths: UploadItemAndPath[];
+          collectionNameToUploadItems: Map<string, UploadItemAndPath[]>;
+          includeHiddenCollections?: boolean;
+          createHidden?: boolean;
+      };
+
+interface UploadConfirmation {
+    pendingUpload: PendingUpload;
+    fileCount: number;
+    albumCount: number;
+    isTakeout: boolean;
+    importFavorites: boolean;
 }
 
 /**
@@ -224,13 +248,8 @@ export const Upload: React.FC<UploadProps> = ({
     const [percentComplete, setPercentComplete] = useState(0);
     const [hasLivePhotos, setHasLivePhotos] = useState(false);
     const [prefilledNewAlbumName, setPrefilledNewAlbumName] = useState("");
-    const [uploadConfirmation, setUploadConfirmation] = useState<{
-        fileCount: number;
-        albumCount: number;
-        isTakeout: boolean;
-        importFavorites: boolean;
-        resolve: (confirmed: boolean) => void;
-    }>();
+    const [uploadConfirmation, setUploadConfirmation] =
+        useState<UploadConfirmation>();
 
     const [openCollectionMappingChoice, setOpenCollectionMappingChoice] =
         useState(false);
@@ -321,7 +340,6 @@ export const Upload: React.FC<UploadProps> = ({
     const currentUploadPromise = useRef<Promise<void> | undefined>(undefined);
     const uploadRunning = useRef(false);
     const isDragAndDrop = useRef(false);
-    const shouldImportTakeoutFavorites = useRef(true);
 
     /**
      * Used to remember a deferred "real destination" collectionf or the current upload flow.
@@ -330,6 +348,8 @@ export const Upload: React.FC<UploadProps> = ({
     const retrySharedAlbumUploadTarget = useRef<Collection | undefined>(
         undefined,
     );
+    /** The confirmed favorites choice for retrying the current batch. */
+    const retryImportTakeoutFavorites = useRef(true);
 
     /**
      * `true` if we've activated one hidden {@link Inputs} that allow the user
@@ -579,6 +599,8 @@ export const Upload: React.FC<UploadProps> = ({
         props.closeUploadTypeSelector();
         props.setLoading(true);
 
+        // Starting a new upload discards any stale pending confirmation.
+        setUploadConfirmation(undefined);
         setWebFiles([]);
         setDesktopFiles([]);
         setDesktopFilePaths([]);
@@ -732,8 +754,9 @@ export const Upload: React.FC<UploadProps> = ({
     const handleTakeoutFavoritesPostUpload = async (
         batchResult: UploadBatchResult,
         postUploadTargetCollection: Collection | undefined,
+        importTakeoutFavorites: boolean,
     ) => {
-        if (!shouldImportTakeoutFavorites.current) return;
+        if (!importTakeoutFavorites) return;
 
         // Checking if any of the uploaded items have their takeoutFavorited as true.
         if (
@@ -807,18 +830,46 @@ export const Upload: React.FC<UploadProps> = ({
         collection: Collection,
         uploadItemAndPaths: UploadItemAndPath[],
     ) => {
-        try {
-            const uploadConfirmed = await confirmUpload(
-                [uploadItemAndPaths],
-                1,
+        if (uploadItemsAndPaths.current !== uploadItemAndPaths) return;
+
+        if (!isInternalUser) {
+            void commitUploadToExistingCollection(
+                collection,
+                uploadItemAndPaths,
+                true,
             );
+            return;
+        }
 
-            if (!uploadConfirmed) {
-                uploadItemsAndPaths.current = [];
-                resetUploadUIState();
-                return;
-            }
+        try {
+            const { count: fileCount, isTakeout } = await uploadableMediaCount([
+                uploadItemAndPaths,
+            ]);
+            if (uploadItemsAndPaths.current !== uploadItemAndPaths) return;
+            setUploadConfirmation({
+                pendingUpload: {
+                    type: "existing-collection",
+                    collection,
+                    uploadItemAndPaths,
+                },
+                fileCount,
+                albumCount: 1,
+                isTakeout,
+                importFavorites: true,
+            });
+        } catch (e) {
+            if (uploadItemsAndPaths.current !== uploadItemAndPaths) return;
+            cancelPendingUpload();
+            onGenericError(e);
+        }
+    };
 
+    const commitUploadToExistingCollection = async (
+        collection: Collection,
+        uploadItemAndPaths: UploadItemAndPath[],
+        importTakeoutFavorites: boolean,
+    ) => {
+        try {
             preCollectionCreationAction();
             const uploadCollection = canDirectlyUploadToCollection(collection)
                 ? collection
@@ -847,6 +898,7 @@ export const Upload: React.FC<UploadProps> = ({
                         uploadCollection.id == collection.id
                             ? undefined
                             : collection,
+                    importTakeoutFavorites,
                 },
             );
             if (uploadItemsAndPaths.current === uploadItemAndPaths) {
@@ -869,12 +921,7 @@ export const Upload: React.FC<UploadProps> = ({
             skipConfirmation,
         }: NewCollectionsOptions = {},
     ) => {
-        if (skipConfirmation) {
-            shouldImportTakeoutFavorites.current = true;
-            preCollectionCreationAction();
-        }
-
-        let uploadItemsWithCollection: UploadItemWithCollection[] = [];
+        const uploadItemAndPaths = uploadItemsAndPaths.current;
         let collectionNameToUploadItems = new Map<
             string,
             UploadItemAndPath[]
@@ -884,29 +931,68 @@ export const Upload: React.FC<UploadProps> = ({
                 // Un-enforced convention is that collectionName is always set
                 // when mapping is "root". TODO: Reflect this in types.
                 collectionName!,
-                uploadItemsAndPaths.current,
+                uploadItemAndPaths,
             );
         } else {
-            collectionNameToUploadItems = await groupItemsBasedOnParentFolder(
-                uploadItemsAndPaths.current,
-                collectionName,
-            );
+            try {
+                collectionNameToUploadItems =
+                    await groupItemsBasedOnParentFolder(
+                        uploadItemAndPaths,
+                        collectionName,
+                    );
+            } catch (e) {
+                if (uploadItemsAndPaths.current !== uploadItemAndPaths) return;
+                cancelPendingUpload();
+                onGenericError(e);
+                return;
+            }
         }
 
-        const uploadConfirmed =
-            skipConfirmation ||
-            (await confirmUpload(
-                [...collectionNameToUploadItems.values()],
-                collectionNameToUploadItems.size,
-            ));
+        if (uploadItemsAndPaths.current !== uploadItemAndPaths) return;
 
-        if (!uploadConfirmed) {
-            uploadItemsAndPaths.current = [];
-            resetUploadUIState();
+        if (skipConfirmation || !isInternalUser) {
+            void commitUploadToNewCollections(
+                uploadItemAndPaths,
+                collectionNameToUploadItems,
+                { includeHiddenCollections, createHidden },
+                true,
+            );
             return;
         }
 
-        if (!skipConfirmation) preCollectionCreationAction();
+        try {
+            const { count: fileCount, isTakeout } = await uploadableMediaCount([
+                ...collectionNameToUploadItems.values(),
+            ]);
+            if (uploadItemsAndPaths.current !== uploadItemAndPaths) return;
+            setUploadConfirmation({
+                pendingUpload: {
+                    type: "new-collections",
+                    uploadItemAndPaths,
+                    collectionNameToUploadItems,
+                    includeHiddenCollections,
+                    createHidden,
+                },
+                fileCount,
+                albumCount: collectionNameToUploadItems.size,
+                isTakeout,
+                importFavorites: true,
+            });
+        } catch (e) {
+            if (uploadItemsAndPaths.current !== uploadItemAndPaths) return;
+            cancelPendingUpload();
+            onGenericError(e);
+        }
+    };
+
+    const commitUploadToNewCollections = async (
+        uploadItemAndPaths: UploadItemAndPath[],
+        collectionNameToUploadItems: Map<string, UploadItemAndPath[]>,
+        { includeHiddenCollections, createHidden }: NewCollectionsOptions,
+        importTakeoutFavorites: boolean,
+    ) => {
+        preCollectionCreationAction();
+        let uploadItemsWithCollection: UploadItemWithCollection[] = [];
         const collections: Collection[] = [];
         try {
             await onRemoteFilesPull();
@@ -955,45 +1041,47 @@ export const Upload: React.FC<UploadProps> = ({
             {
                 persistPendingUploads: true,
                 postUploadTargetCollection: undefined,
+                importTakeoutFavorites,
             },
         );
-        uploadItemsAndPaths.current = [];
+        if (uploadItemsAndPaths.current === uploadItemAndPaths) {
+            uploadItemsAndPaths.current = [];
+        }
     };
 
-    async function confirmUpload(
-        itemGroups: UploadItemAndPath[][],
-        albumCount: number,
-    ): Promise<boolean> {
-        if (!isInternalUser) {
-            shouldImportTakeoutFavorites.current = true;
-            return true;
-        }
+    const handleUploadConfirm = () => {
+        const confirmation = uploadConfirmation;
+        if (!confirmation) return;
 
-        const { count: fileCount, isTakeout } =
-            await uploadableMediaCount(itemGroups);
-        return new Promise<boolean>((resolve) => {
-            setUploadConfirmation({
-                fileCount,
-                albumCount,
-                isTakeout,
-                importFavorites: true,
-                resolve,
-            });
-        });
-    }
-
-    const closeUploadConfirmation = (confirmed: boolean) => {
-        if (!confirmed) onCloseCollectionSelector?.();
-        if (confirmed) {
-            shouldImportTakeoutFavorites.current =
-                uploadConfirmation?.importFavorites ?? true;
-        }
-        uploadConfirmation?.resolve(confirmed);
         setUploadConfirmation(undefined);
+        const { pendingUpload, importFavorites } = confirmation;
+        if (pendingUpload.type == "existing-collection") {
+            void commitUploadToExistingCollection(
+                pendingUpload.collection,
+                pendingUpload.uploadItemAndPaths,
+                importFavorites,
+            );
+        } else {
+            void commitUploadToNewCollections(
+                pendingUpload.uploadItemAndPaths,
+                pendingUpload.collectionNameToUploadItems,
+                {
+                    includeHiddenCollections:
+                        pendingUpload.includeHiddenCollections,
+                    createHidden: pendingUpload.createHidden,
+                },
+                importFavorites,
+            );
+        }
     };
 
-    const handleUploadConfirmation = () => closeUploadConfirmation(true);
-    const handleUploadConfirmationCancel = () => closeUploadConfirmation(false);
+    const cancelPendingUpload = () => {
+        setUploadConfirmation(undefined);
+        uploadItemsAndPaths.current = [];
+        onCloseCollectionSelector?.();
+        resetUploadUIState();
+    };
+
     const handleImportFavoritesChange = (
         _event: React.ChangeEvent<HTMLInputElement>,
         checked: boolean,
@@ -1038,6 +1126,8 @@ export const Upload: React.FC<UploadProps> = ({
         try {
             retrySharedAlbumUploadTarget.current =
                 opts?.postUploadTargetCollection;
+            retryImportTakeoutFavorites.current =
+                opts?.importTakeoutFavorites ?? true;
             await preUploadAction();
             if (
                 opts?.persistPendingUploads &&
@@ -1070,6 +1160,7 @@ export const Upload: React.FC<UploadProps> = ({
             await handleTakeoutFavoritesPostUpload(
                 batchResult,
                 opts?.postUploadTargetCollection,
+                opts?.importTakeoutFavorites ?? true,
             );
             if (isDesktop) {
                 if (watcher.isUploadRunning()) {
@@ -1111,6 +1202,7 @@ export const Upload: React.FC<UploadProps> = ({
             await handleTakeoutFavoritesPostUpload(
                 batchResult,
                 retrySharedAlbumUploadTarget.current,
+                retryImportTakeoutFavorites.current,
             );
         } catch (e) {
             log.error("Retrying failed uploads failed", e);
@@ -1276,8 +1368,8 @@ export const Upload: React.FC<UploadProps> = ({
                         uploadConfirmation?.importFavorites ?? true
                     }
                     onImportFavoritesChange={handleImportFavoritesChange}
-                    onConfirm={handleUploadConfirmation}
-                    onCancel={handleUploadConfirmationCancel}
+                    onConfirm={handleUploadConfirm}
+                    onCancel={cancelPendingUpload}
                 />
             )}
             <SingleInputDialog
