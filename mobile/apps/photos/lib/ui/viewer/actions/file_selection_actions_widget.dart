@@ -1097,9 +1097,6 @@ class _FileSelectionActionsWidgetState
           onTap: () async {
             try {
               await deleteFilesOnDeviceOnly(context, filesToDelete);
-              if (mounted) {
-                await showMediaManagementHintSheet(context);
-              }
             } catch (e) {
               if (mounted) {
                 await showGenericErrorDialog(context: context, error: e);
@@ -1123,6 +1120,9 @@ class _FileSelectionActionsWidgetState
 
     if (actionResult?.action == ButtonAction.first) {
       widget.selectedFiles.clearAll();
+      if (mounted) {
+        await showMediaManagementHintSheet(context);
+      }
     }
   }
 
