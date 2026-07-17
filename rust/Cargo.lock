@@ -2261,6 +2261,7 @@ version = "0.1.18-beta"
 dependencies = [
  "ente-core",
  "ente-ensu",
+ "ente-model-download",
  "keyring",
  "libc",
  "serde",
@@ -2359,6 +2360,7 @@ dependencies = [
  "ente-contacts",
  "ente-core",
  "ente-rs",
+ "ente-space",
  "ente-test-support",
  "hmac 0.13.0",
  "reqwest 0.12.28",
@@ -2376,19 +2378,16 @@ version = "0.0.0"
 dependencies = [
  "ente-core",
  "ente-image",
- "flate2",
- "futures-util",
+ "ente-model-download",
  "llama-cpp-2",
  "ort",
  "parking_lot",
  "regex",
- "reqwest 0.12.28",
  "rubato",
  "rusqlite",
  "self_cell",
  "serde",
  "serde_json",
- "tar",
  "thiserror 2.0.18",
  "tokio",
  "transcribe-rs",
@@ -2401,6 +2400,7 @@ name = "ente-ensu-uniffi"
 version = "0.0.0"
 dependencies = [
  "ente-ensu",
+ "ente-model-download",
  "thiserror 2.0.18",
  "uniffi",
  "uuid",
@@ -2418,6 +2418,21 @@ dependencies = [
  "moxcms",
  "thiserror 2.0.18",
  "tiff 0.10.3",
+]
+
+[[package]]
+name = "ente-model-download"
+version = "0.0.0"
+dependencies = [
+ "flate2",
+ "futures-util",
+ "reqwest 0.12.28",
+ "serde",
+ "serde_json",
+ "sha2 0.11.0",
+ "tar",
+ "thiserror 2.0.18",
+ "tokio",
 ]
 
 [[package]]
@@ -2492,6 +2507,33 @@ dependencies = [
  "uuid",
  "zeroize",
  "zip 2.4.2",
+]
+
+[[package]]
+name = "ente-space"
+version = "0.0.1"
+dependencies = [
+ "ente-core",
+ "md-5 0.11.0",
+ "mockito",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "tokio",
+ "urlencoding",
+ "zeroize",
+]
+
+[[package]]
+name = "ente-space-wasm"
+version = "0.0.0"
+dependencies = [
+ "ente-core",
+ "ente-space",
+ "serde",
+ "serde-wasm-bindgen",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
 ]
 
 [[package]]

@@ -7,6 +7,7 @@ import {
     Box,
     CircularProgress,
     IconButton,
+    Link,
     Stack,
     Typography,
 } from "@mui/material";
@@ -23,6 +24,47 @@ interface DefaultOptionsV2Props {
     onSelectGooglePhotos: () => void;
     onSelectFolder: () => void;
 }
+
+const importHelp = (
+    <Typography
+        sx={{
+            color: "text.faint",
+            fontSize: "14px",
+            fontWeight: 500,
+            lineHeight: "20px",
+            textAlign: "center",
+        }}
+    >
+        <Link
+            href="https://ente.com/help/photos/migration/#import-your-photos-into-ente"
+            target="_blank"
+            rel="noopener"
+            sx={{
+                color: "accent.main",
+                fontWeight: 500,
+                textDecoration: "underline",
+            }}
+        >
+            Need help?
+        </Link>{" "}
+        <span style={{ opacity: 0.7 }}>Not seeing your provider</span>
+    </Typography>
+);
+
+const dragAndDropHint = (
+    <Typography
+        sx={{
+            color: "text.faint",
+            fontSize: "12px",
+            fontWeight: 500,
+            lineHeight: "16px",
+            opacity: 0.7,
+            textAlign: "center",
+        }}
+    >
+        Or just drag and drop here
+    </Typography>
+);
 
 export function DefaultOptionsV2({
     intent,
@@ -41,7 +83,7 @@ export function DefaultOptionsV2({
             <SpacedRow>
                 <Typography
                     sx={{
-                        fontFamily: "'Outfit', sans-serif",
+                        fontFamily: "'Outfit Variable', sans-serif",
                         fontSize: "24px",
                         fontWeight: 600,
                         lineHeight: "32px",
@@ -67,7 +109,13 @@ export function DefaultOptionsV2({
             </SpacedRow>
 
             {intent == "import" ? (
-                <ImportOptions {...{ onSelectGooglePhotos }} />
+                <ImportOptions
+                    {...{
+                        isFolderSelectionPending,
+                        onSelectGooglePhotos,
+                        onSelectFolder,
+                    }}
+                />
             ) : (
                 <UploadOptions
                     {...{
@@ -83,24 +131,45 @@ export function DefaultOptionsV2({
     );
 }
 
-type ImportOptionsProps = Pick<DefaultOptionsV2Props, "onSelectGooglePhotos">;
+type ImportOptionsProps = Pick<
+    DefaultOptionsV2Props,
+    "isFolderSelectionPending" | "onSelectGooglePhotos" | "onSelectFolder"
+>;
 
 function ImportOptions({
+    isFolderSelectionPending,
     onSelectGooglePhotos,
+    onSelectFolder,
 }: ImportOptionsProps): React.JSX.Element {
     return (
-        <Stack direction="row" sx={{ gap: "10px", pb: "12px" }}>
-            <ImportProviderButton
-                icon={
-                    <HugeiconsIcon
-                        icon={Album02Icon}
-                        size={22}
-                        color="var(--mui-palette-text-muted)"
-                    />
-                }
-                label="Google Photos"
-                onClick={onSelectGooglePhotos}
-            />
+        <Stack sx={{ gap: "20px" }}>
+            <Stack direction="row" sx={{ gap: "10px" }}>
+                <ImportProviderButton
+                    icon={
+                        <HugeiconsIcon
+                            icon={Album02Icon}
+                            size={22}
+                            color="var(--mui-palette-text-muted)"
+                        />
+                    }
+                    label="Google Photos"
+                    onClick={onSelectGooglePhotos}
+                />
+                <ImportProviderButton
+                    icon={
+                        <HugeiconsIcon
+                            icon={Folder01Icon}
+                            size={22}
+                            color="var(--mui-palette-text-muted)"
+                        />
+                    }
+                    label="Folder"
+                    pending={isFolderSelectionPending}
+                    onClick={onSelectFolder}
+                />
+            </Stack>
+            {dragAndDropHint}
+            {importHelp}
         </Stack>
     );
 }
@@ -122,7 +191,7 @@ function UploadOptions({
     onSelectFolder,
 }: UploadOptionsProps): React.JSX.Element {
     return (
-        <Stack sx={{ gap: "36px" }}>
+        <Stack sx={{ gap: "24px" }}>
             <ImportSection title="Upload from">
                 <Stack direction="row" sx={{ gap: "10px" }}>
                     <ImportProviderButton
@@ -150,6 +219,7 @@ function UploadOptions({
                         onClick={onSelectFolder}
                     />
                 </Stack>
+                {dragAndDropHint}
             </ImportSection>
 
             <ImportSection title="Import from" gap="20px">
@@ -163,6 +233,7 @@ function UploadOptions({
                     onClick={onSelectGooglePhotos}
                 />
             </ImportSection>
+            {importHelp}
         </Stack>
     );
 }

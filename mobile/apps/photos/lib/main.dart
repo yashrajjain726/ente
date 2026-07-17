@@ -515,7 +515,7 @@ Future<void> _init(
     unawaited(MLService.instance.init());
     PersonService.init(entityService, MLDataDB.instance, preferences);
     await PersonService.instance.refreshPersonCache();
-    if (!isBackground && flagService.enableContact) {
+    if (!isBackground) {
       unawaited(_warmContactsCacheInBackground());
     }
     wrappedService.scheduleInitialLoad();
