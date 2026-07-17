@@ -46,6 +46,7 @@ ort = { workspace = true, features = [
     "api-27",
     "load-dynamic",
     "copy-dylibs",
+    "webgpu",
     "xnnpack",
 ] }
 

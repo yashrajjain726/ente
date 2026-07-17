@@ -9,6 +9,18 @@ val knownAbis = listOf("arm64-v8a", "armeabi-v7a", "x86_64")
 
 val debugJniLibsDir = layout.buildDirectory.dir("generated/jniLibs/debug")
 val releaseJniLibsDir = layout.buildDirectory.dir("generated/jniLibs/release")
+val onnxRuntimeAar = gradle.gradleUserHomeDir.resolve(
+    "caches/io.ente/onnxruntime/ort-1.27.0-webgpu-pilot.5/" +
+        "onnxruntime-webgpu-android-1.27.0-pilot.5.aar",
+)
+val prepareOnnxRuntimeAndroid = tasks.register<Exec>("prepareOnnxRuntimeAndroid") {
+    val prepareScript = file("../../../../onnxruntime/prepare-android.sh")
+    inputs.file(prepareScript)
+    outputs.file(onnxRuntimeAar)
+    outputs.upToDateWhen { false }
+    commandLine("sh", prepareScript, onnxRuntimeAar)
+}
+val onnxRuntimeFiles = files(onnxRuntimeAar).builtBy(prepareOnnxRuntimeAndroid)
 
 fun capture(vararg cmd: String): String? = runCatching {
     val out = ByteArrayOutputStream()
@@ -131,5 +143,7 @@ tasks.matching { it.name == "preReleaseBuild" }.configureEach {
 dependencies {
     api("net.java.dev.jna:jna:5.18.1@aar")
     api("androidx.annotation:annotation:1.7.1")
-    api("com.microsoft.onnxruntime:onnxruntime-android:1.27.0")
+    // Custom WebGPU/XNNPACK build; the Rust runtime dynamically loads its
+    // libonnxruntime.so.
+    api(onnxRuntimeFiles)
 }

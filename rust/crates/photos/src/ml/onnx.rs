@@ -10,12 +10,15 @@ use std::{
 
 use half::prelude::{HalfFloatSliceExt, HalfFloatVecExt};
 
-#[cfg(target_os = "android")]
-use ort::ep::XNNPACK;
 #[cfg(target_os = "ios")]
 use ort::ep::{
     CoreML,
     coreml::{ComputeUnits, ModelFormat, SpecializationStrategy},
+};
+#[cfg(target_os = "android")]
+use ort::ep::{
+    WebGPU, XNNPACK,
+    webgpu::{DawnBackendType, PreferredLayout},
 };
 #[cfg(target_os = "android")]
 use std::num::NonZeroUsize;
@@ -85,7 +88,23 @@ impl PreparedF32Input {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum ExecutionMode {
     PlatformDefault,
+    #[cfg(target_os = "android")]
+    Xnnpack,
     CpuOnly,
+}
+
+impl ExecutionMode {
+    pub(crate) fn fallback(self) -> Option<Self> {
+        match self {
+            #[cfg(target_os = "android")]
+            Self::PlatformDefault => Some(Self::Xnnpack),
+            #[cfg(not(target_os = "android"))]
+            Self::PlatformDefault => Some(Self::CpuOnly),
+            #[cfg(target_os = "android")]
+            Self::Xnnpack => Some(Self::CpuOnly),
+            Self::CpuOnly => None,
+        }
+    }
 }
 
 pub(crate) fn build_session(
@@ -93,12 +112,7 @@ pub(crate) fn build_session(
     mode: ExecutionMode,
     coreml_cache_namespace: &str,
 ) -> MlResult<Session> {
-    let primary = provider_attempt(mode, model_path, coreml_cache_namespace);
-    let retry_with_cpu_only = primary.retry_with_cpu_only;
-    let mut attempts = vec![primary];
-    if retry_with_cpu_only {
-        attempts.push(ProviderAttempt::cpu_only());
-    }
+    let attempts = provider_attempts(mode, model_path, coreml_cache_namespace);
 
     let mut errors = Vec::new();
     for attempt in attempts {
@@ -149,7 +163,6 @@ fn has_protobuf_parse_failure(errors: &[String]) -> bool {
 
 struct ProviderAttempt {
     providers: Vec<ExecutionProviderDispatch>,
-    retry_with_cpu_only: bool,
     disable_intra_op_spinning: bool,
     coreml_cache_dir: Option<PathBuf>,
 }
@@ -158,38 +171,44 @@ impl ProviderAttempt {
     fn cpu_only() -> Self {
         Self {
             providers: vec![CPU::default().with_arena_allocator(true).build()],
-            retry_with_cpu_only: false,
             disable_intra_op_spinning: false,
             coreml_cache_dir: None,
         }
     }
 }
 
-fn provider_attempt(
+fn provider_attempts(
     mode: ExecutionMode,
     model_path: &str,
     coreml_cache_namespace: &str,
-) -> ProviderAttempt {
+) -> Vec<ProviderAttempt> {
     match mode {
         ExecutionMode::PlatformDefault => {
-            platform_default_attempt(model_path, coreml_cache_namespace)
+            platform_default_attempts(model_path, coreml_cache_namespace)
         }
-        ExecutionMode::CpuOnly => ProviderAttempt::cpu_only(),
+        #[cfg(target_os = "android")]
+        ExecutionMode::Xnnpack => vec![xnnpack_attempt(), ProviderAttempt::cpu_only()],
+        ExecutionMode::CpuOnly => vec![ProviderAttempt::cpu_only()],
     }
 }
 
 #[cfg(target_os = "ios")]
-fn platform_default_attempt(model_path: &str, coreml_cache_namespace: &str) -> ProviderAttempt {
+fn platform_default_attempts(
+    model_path: &str,
+    coreml_cache_namespace: &str,
+) -> Vec<ProviderAttempt> {
     let (coreml_provider, coreml_cache_dir) = coreml_provider(model_path, coreml_cache_namespace);
-    ProviderAttempt {
-        providers: vec![
-            coreml_provider,
-            CPU::default().with_arena_allocator(true).build(),
-        ],
-        retry_with_cpu_only: true,
-        disable_intra_op_spinning: false,
-        coreml_cache_dir,
-    }
+    vec![
+        ProviderAttempt {
+            providers: vec![
+                coreml_provider,
+                CPU::default().with_arena_allocator(true).build(),
+            ],
+            disable_intra_op_spinning: false,
+            coreml_cache_dir,
+        },
+        ProviderAttempt::cpu_only(),
+    ]
 }
 
 #[cfg(target_os = "ios")]
@@ -219,21 +238,44 @@ fn coreml_provider(
 }
 
 #[cfg(target_os = "android")]
-fn platform_default_attempt(_model_path: &str, _coreml_cache_namespace: &str) -> ProviderAttempt {
-    ProviderAttempt {
-        providers: vec![
-            xnnpack_provider(),
-            CPU::default().with_arena_allocator(true).build(),
-        ],
-        retry_with_cpu_only: true,
-        disable_intra_op_spinning: true,
-        coreml_cache_dir: None,
-    }
+fn platform_default_attempts(
+    _model_path: &str,
+    _coreml_cache_namespace: &str,
+) -> Vec<ProviderAttempt> {
+    vec![
+        ProviderAttempt {
+            // EP priority follows registration order. Unsupported WebGPU nodes
+            // fall through to XNNPACK and then CPU in the same session.
+            providers: vec![
+                webgpu_provider(),
+                xnnpack_provider().fail_silently(),
+                CPU::default().with_arena_allocator(true).build(),
+            ],
+            disable_intra_op_spinning: true,
+            coreml_cache_dir: None,
+        },
+        // Retain clean-session fallbacks for provider or driver failures that
+        // prevent the primary session from being constructed at all.
+        xnnpack_attempt(),
+        ProviderAttempt::cpu_only(),
+    ]
+}
+
+#[cfg(target_os = "android")]
+fn webgpu_provider() -> ExecutionProviderDispatch {
+    WebGPU::default()
+        .with_dawn_backend_type(DawnBackendType::Vulkan)
+        .with_preferred_layout(PreferredLayout::NCHW)
+        .build()
+        .error_on_failure()
 }
 
 #[cfg(not(any(target_os = "ios", target_os = "android")))]
-fn platform_default_attempt(_model_path: &str, _coreml_cache_namespace: &str) -> ProviderAttempt {
-    ProviderAttempt::cpu_only()
+fn platform_default_attempts(
+    _model_path: &str,
+    _coreml_cache_namespace: &str,
+) -> Vec<ProviderAttempt> {
+    vec![ProviderAttempt::cpu_only()]
 }
 
 #[cfg(target_os = "ios")]
@@ -362,6 +404,18 @@ fn xnnpack_provider() -> ExecutionProviderDispatch {
         .with_intra_op_num_threads(NonZeroUsize::new(4).expect("four is non-zero"))
         .build()
         .error_on_failure()
+}
+
+#[cfg(target_os = "android")]
+fn xnnpack_attempt() -> ProviderAttempt {
+    ProviderAttempt {
+        providers: vec![
+            xnnpack_provider(),
+            CPU::default().with_arena_allocator(true).build(),
+        ],
+        disable_intra_op_spinning: true,
+        coreml_cache_dir: None,
+    }
 }
 
 fn build_session_with_providers(model_path: &str, attempt: ProviderAttempt) -> MlResult<Session> {

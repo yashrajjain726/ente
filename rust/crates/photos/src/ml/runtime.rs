@@ -52,7 +52,7 @@ pub struct ModelPaths {
 #[derive(Debug)]
 struct ModelSlotState {
     path: String,
-    fell_back_to_cpu: bool,
+    fallback_execution_mode: Option<onnx::ExecutionMode>,
     pin_count: usize,
     session: Option<Session>,
 }
@@ -103,7 +103,7 @@ impl ModelSlot {
             coreml_cache_namespace,
             state: Mutex::new(ModelSlotState {
                 path: String::new(),
-                fell_back_to_cpu: false,
+                fallback_execution_mode: None,
                 pin_count: 0,
                 session: None,
             }),
@@ -146,21 +146,25 @@ impl ModelSlot {
         }
     }
 
-    fn force_cpu_fallback_if_configured(&self, path: &str) {
-        if self.default_execution_mode == onnx::ExecutionMode::CpuOnly || path.trim().is_empty() {
-            return;
+    fn advance_provider_fallback_if_configured(&self, path: &str) -> bool {
+        if path.trim().is_empty() {
+            return false;
         }
 
         let mut state = self.lock_state();
         if state.path != path {
-            return;
+            return false;
         }
-        if state.fell_back_to_cpu {
-            return;
-        }
+        let current_mode = state
+            .fallback_execution_mode
+            .unwrap_or(self.default_execution_mode);
+        let Some(fallback_mode) = current_mode.fallback() else {
+            return false;
+        };
 
-        state.fell_back_to_cpu = true;
+        state.fallback_execution_mode = Some(fallback_mode);
         state.session = None;
+        true
     }
 
     fn session_guard_for(&self, path: &str, error_msg: &str) -> MlResult<ModelSessionGuard<'_>> {
@@ -179,12 +183,12 @@ impl ModelSlot {
             return;
         }
         state.path = path.to_string();
-        state.fell_back_to_cpu = false;
+        state.fallback_execution_mode = None;
         state.session = None;
     }
 
     fn clear_transient_runtime_state_locked(state: &mut ModelSlotState) {
-        state.fell_back_to_cpu = false;
+        state.fallback_execution_mode = None;
         state.session = None;
     }
 
@@ -192,6 +196,12 @@ impl ModelSlot {
         state.path.clear();
         state.pin_count = 0;
         Self::clear_transient_runtime_state_locked(state);
+    }
+
+    fn effective_execution_mode(&self, state: &ModelSlotState) -> onnx::ExecutionMode {
+        state
+            .fallback_execution_mode
+            .unwrap_or(self.default_execution_mode)
     }
 
     fn ensure_loaded_locked(&self, state: &mut ModelSlotState, error_msg: &str) -> MlResult<()> {
@@ -202,14 +212,12 @@ impl ModelSlot {
             return Ok(());
         }
 
+        let execution_mode = self.effective_execution_mode(state);
         let model_name = state.path.rsplit('/').next().unwrap_or(&state.path);
-        rt_log(&format!("loading {model_name}"));
+        rt_log(&format!(
+            "loading {model_name} with {execution_mode:?} execution"
+        ));
         let t = std::time::Instant::now();
-        let execution_mode = if state.fell_back_to_cpu {
-            onnx::ExecutionMode::CpuOnly
-        } else {
-            self.default_execution_mode
-        };
         let session =
             onnx::build_session(&state.path, execution_mode, self.coreml_cache_namespace)?;
         rt_log(&format!("loaded {model_name} in {:?}", t.elapsed()));
@@ -237,23 +245,24 @@ static GLOBAL_RUNTIME: Lazy<MlRuntime> = Lazy::new(MlRuntime::new);
 impl MlRuntime {
     fn new() -> Self {
         let platform_default = onnx::ExecutionMode::PlatformDefault;
-        let cpu_only = onnx::ExecutionMode::CpuOnly;
+        #[cfg(target_os = "android")]
+        let pet_default = platform_default;
+        #[cfg(not(target_os = "android"))]
+        let pet_default = onnx::ExecutionMode::CpuOnly;
 
         Self {
             face_detection: ModelSlot::new(platform_default, "face-detection"),
             face_embedding: ModelSlot::new(platform_default, "face-embedding"),
             clip_image: ModelSlot::new(platform_default, "clip-image"),
             clip_text: ModelSlot::new(platform_default, "clip-text"),
-            // Pet models previously had device-specific FP16 driver failures.
-            // TODO: Benchmark every pet model with the platform-default providers
-            // on supported iOS and Android devices before release, then remove
-            // this CPU-only exception if parity and stability are preserved.
-            pet_face_detection: ModelSlot::new(cpu_only, "pet-face-detection"),
-            pet_face_embedding_dog: ModelSlot::new(cpu_only, "pet-face-embedding-dog"),
-            pet_face_embedding_cat: ModelSlot::new(cpu_only, "pet-face-embedding-cat"),
-            pet_body_detection: ModelSlot::new(cpu_only, "pet-body-detection"),
-            pet_body_embedding_dog: ModelSlot::new(cpu_only, "pet-body-embedding-dog"),
-            pet_body_embedding_cat: ModelSlot::new(cpu_only, "pet-body-embedding-cat"),
+            // Android uses the same WebGPU-first chain for every model. Keep
+            // the existing CPU-only pet policy on other platforms.
+            pet_face_detection: ModelSlot::new(pet_default, "pet-face-detection"),
+            pet_face_embedding_dog: ModelSlot::new(pet_default, "pet-face-embedding-dog"),
+            pet_face_embedding_cat: ModelSlot::new(pet_default, "pet-face-embedding-cat"),
+            pet_body_detection: ModelSlot::new(pet_default, "pet-body-detection"),
+            pet_body_embedding_dog: ModelSlot::new(pet_default, "pet-body-embedding-dog"),
+            pet_body_embedding_cat: ModelSlot::new(pet_default, "pet-body-embedding-cat"),
         }
     }
 
@@ -313,27 +322,39 @@ impl MlRuntime {
         self.pet_body_embedding_cat.release_residency();
     }
 
-    fn force_cpu_only_for_requested_models(&self, model_paths: &ModelPaths) {
-        self.face_detection
-            .force_cpu_fallback_if_configured(&model_paths.face_detection);
-        self.face_embedding
-            .force_cpu_fallback_if_configured(&model_paths.face_embedding);
-        self.clip_image
-            .force_cpu_fallback_if_configured(&model_paths.clip_image);
-        self.clip_text
-            .force_cpu_fallback_if_configured(&model_paths.clip_text);
-        self.pet_face_detection
-            .force_cpu_fallback_if_configured(&model_paths.pet_face_detection);
-        self.pet_face_embedding_dog
-            .force_cpu_fallback_if_configured(&model_paths.pet_face_embedding_dog);
-        self.pet_face_embedding_cat
-            .force_cpu_fallback_if_configured(&model_paths.pet_face_embedding_cat);
-        self.pet_body_detection
-            .force_cpu_fallback_if_configured(&model_paths.pet_body_detection);
-        self.pet_body_embedding_dog
-            .force_cpu_fallback_if_configured(&model_paths.pet_body_embedding_dog);
-        self.pet_body_embedding_cat
-            .force_cpu_fallback_if_configured(&model_paths.pet_body_embedding_cat);
+    fn advance_provider_fallbacks_for_requested_models(&self, model_paths: &ModelPaths) -> bool {
+        let mut advanced = false;
+        advanced |= self
+            .face_detection
+            .advance_provider_fallback_if_configured(&model_paths.face_detection);
+        advanced |= self
+            .face_embedding
+            .advance_provider_fallback_if_configured(&model_paths.face_embedding);
+        advanced |= self
+            .clip_image
+            .advance_provider_fallback_if_configured(&model_paths.clip_image);
+        advanced |= self
+            .clip_text
+            .advance_provider_fallback_if_configured(&model_paths.clip_text);
+        advanced |= self
+            .pet_face_detection
+            .advance_provider_fallback_if_configured(&model_paths.pet_face_detection);
+        advanced |= self
+            .pet_face_embedding_dog
+            .advance_provider_fallback_if_configured(&model_paths.pet_face_embedding_dog);
+        advanced |= self
+            .pet_face_embedding_cat
+            .advance_provider_fallback_if_configured(&model_paths.pet_face_embedding_cat);
+        advanced |= self
+            .pet_body_detection
+            .advance_provider_fallback_if_configured(&model_paths.pet_body_detection);
+        advanced |= self
+            .pet_body_embedding_dog
+            .advance_provider_fallback_if_configured(&model_paths.pet_body_embedding_dog);
+        advanced |= self
+            .pet_body_embedding_cat
+            .advance_provider_fallback_if_configured(&model_paths.pet_body_embedding_cat);
+        advanced
     }
 
     fn view<'a>(&'a self, model_paths: &'a ModelPaths) -> MlRuntimeView<'a> {
@@ -431,20 +452,22 @@ where
     ensure_runtime(model_paths);
 
     let runtime_view = GLOBAL_RUNTIME.view(model_paths);
-    let first_result = func(&runtime_view);
-    match first_result {
-        Ok(result) => Ok(result),
-        Err(first_error) => {
-            if !should_retry_with_cpu_only_runtime(&first_error) {
-                return Err(first_error);
-            }
+    let mut result = func(&runtime_view);
+    loop {
+        match result {
+            Ok(value) => return Ok(value),
+            Err(error) => {
+                if !should_retry_execution_provider_runtime(&error)
+                    || !GLOBAL_RUNTIME.advance_provider_fallbacks_for_requested_models(model_paths)
+                {
+                    return Err(error);
+                }
 
-            rt_log(&format!(
-                "execution provider failed, retrying with CPU-only runtime: {first_error}"
-            ));
-            GLOBAL_RUNTIME.force_cpu_only_for_requested_models(model_paths);
-            let runtime_view = GLOBAL_RUNTIME.view(model_paths);
-            func(&runtime_view)
+                rt_log(&format!(
+                    "execution provider failed, retrying with the next provider fallback: {error}"
+                ));
+                result = func(&runtime_view);
+            }
         }
     }
 }
@@ -453,7 +476,7 @@ pub(crate) fn release_runtime() {
     GLOBAL_RUNTIME.release_indexing_models();
 }
 
-fn should_retry_with_cpu_only_runtime(error: &MlError) -> bool {
+fn should_retry_execution_provider_runtime(error: &MlError) -> bool {
     cfg!(any(target_os = "ios", target_os = "android")) && is_execution_provider_failure(error)
 }
 
@@ -466,6 +489,11 @@ fn is_execution_provider_failure(error: &MlError) -> bool {
         || normalized.contains("unknown allocation device")
         || normalized.contains("xnnpackexecutionprovider")
         || normalized.contains("coremlexecutionprovider")
+        || normalized.contains("webgpu")
+        || normalized.contains("wgpu")
+        || normalized.contains("dawn")
+        || normalized.contains("vulkan")
+        || normalized.contains("vk_error")
         || normalized.contains("ep error")
 }
 
@@ -514,13 +542,13 @@ mod tests {
             let mut clip_text = runtime.clip_text.lock_state();
             clip_text.path = "clip_text.onnx".to_string();
             clip_text.pin_count = 0;
-            clip_text.fell_back_to_cpu = true;
+            clip_text.fallback_execution_mode = Some(onnx::ExecutionMode::CpuOnly);
         }
         {
             let mut face_detection = runtime.face_detection.lock_state();
             face_detection.path = "face.onnx".to_string();
             face_detection.pin_count = 1;
-            face_detection.fell_back_to_cpu = true;
+            face_detection.fallback_execution_mode = Some(onnx::ExecutionMode::CpuOnly);
         }
 
         runtime.release_indexing_models();
@@ -528,11 +556,14 @@ mod tests {
         let clip_text = runtime.clip_text.lock_state();
         assert_eq!(clip_text.path, "clip_text.onnx");
         assert_eq!(clip_text.pin_count, 0);
-        assert!(clip_text.fell_back_to_cpu);
+        assert_eq!(
+            clip_text.fallback_execution_mode,
+            Some(onnx::ExecutionMode::CpuOnly)
+        );
 
         let face_detection = runtime.face_detection.lock_state();
         assert_eq!(face_detection.pin_count, 0);
-        assert!(!face_detection.fell_back_to_cpu);
+        assert_eq!(face_detection.fallback_execution_mode, None);
     }
 
     #[test]
@@ -567,7 +598,7 @@ mod tests {
             let mut state = slot.lock_state();
             state.path = "pet.onnx".to_string();
             state.pin_count = 1;
-            state.fell_back_to_cpu = true;
+            state.fallback_execution_mode = Some(onnx::ExecutionMode::CpuOnly);
         }
 
         slot.sync_indexing_residency("");
@@ -575,7 +606,7 @@ mod tests {
         let state = slot.lock_state();
         assert!(state.path.is_empty());
         assert_eq!(state.pin_count, 0);
-        assert!(!state.fell_back_to_cpu);
+        assert_eq!(state.fallback_execution_mode, None);
         assert!(state.session.is_none());
     }
 
@@ -587,20 +618,45 @@ mod tests {
             let mut state = slot.lock_state();
             state.path = "clip_text.onnx".to_string();
             state.pin_count = 1;
-            state.fell_back_to_cpu = true;
+            state.fallback_execution_mode = Some(onnx::ExecutionMode::CpuOnly);
         }
 
         slot.release_residency();
 
         let state = slot.lock_state();
         assert_eq!(state.pin_count, 0);
-        assert!(!state.fell_back_to_cpu);
+        assert_eq!(state.fallback_execution_mode, None);
         assert!(state.session.is_none());
     }
 
     #[test]
-    fn only_pet_models_default_to_cpu_only() {
+    fn execution_provider_fallback_order_matches_platform_policy() {
+        #[cfg(target_os = "android")]
+        {
+            assert_eq!(
+                onnx::ExecutionMode::PlatformDefault.fallback(),
+                Some(onnx::ExecutionMode::Xnnpack)
+            );
+            assert_eq!(
+                onnx::ExecutionMode::Xnnpack.fallback(),
+                Some(onnx::ExecutionMode::CpuOnly)
+            );
+        }
+        #[cfg(not(target_os = "android"))]
+        assert_eq!(
+            onnx::ExecutionMode::PlatformDefault.fallback(),
+            Some(onnx::ExecutionMode::CpuOnly)
+        );
+        assert_eq!(onnx::ExecutionMode::CpuOnly.fallback(), None);
+    }
+
+    #[test]
+    fn model_execution_modes_match_platform_policy() {
         let runtime = MlRuntime::new();
+        #[cfg(target_os = "android")]
+        let expected_pet_mode = onnx::ExecutionMode::PlatformDefault;
+        #[cfg(not(target_os = "android"))]
+        let expected_pet_mode = onnx::ExecutionMode::CpuOnly;
 
         assert_eq!(
             runtime.face_detection.default_execution_mode,
@@ -620,27 +676,27 @@ mod tests {
         );
         assert_eq!(
             runtime.pet_face_detection.default_execution_mode,
-            onnx::ExecutionMode::CpuOnly
+            expected_pet_mode
         );
         assert_eq!(
             runtime.pet_face_embedding_dog.default_execution_mode,
-            onnx::ExecutionMode::CpuOnly
+            expected_pet_mode
         );
         assert_eq!(
             runtime.pet_face_embedding_cat.default_execution_mode,
-            onnx::ExecutionMode::CpuOnly
+            expected_pet_mode
         );
         assert_eq!(
             runtime.pet_body_detection.default_execution_mode,
-            onnx::ExecutionMode::CpuOnly
+            expected_pet_mode
         );
         assert_eq!(
             runtime.pet_body_embedding_dog.default_execution_mode,
-            onnx::ExecutionMode::CpuOnly
+            expected_pet_mode
         );
         assert_eq!(
             runtime.pet_body_embedding_cat.default_execution_mode,
-            onnx::ExecutionMode::CpuOnly
+            expected_pet_mode
         );
     }
 }

@@ -29,6 +29,27 @@ if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
 }
 
+def onnxRuntimeAar = new File(
+    gradle.gradleUserHomeDir,
+    'caches/io.ente/onnxruntime/ort-1.27.0-webgpu-pilot.5/' +
+        'onnxruntime-webgpu-android-1.27.0-pilot.5.aar',
+)
+def prepareOnnxRuntimeAndroid = tasks.register('prepareOnnxRuntimeAndroid', Exec) {
+    def prepareScript = file('../../../../native/onnxruntime/prepare-android.sh')
+    inputs.file(prepareScript)
+    outputs.file(onnxRuntimeAar)
+    outputs.upToDateWhen { false }
+    commandLine 'sh', prepareScript, onnxRuntimeAar
+}
+def onnxRuntimeFiles = files(onnxRuntimeAar)
+onnxRuntimeFiles.builtBy(prepareOnnxRuntimeAndroid)
+
+configurations.configureEach {
+    // mobile_ocr also declares Microsoft's stock AAR. The custom AAR exposes
+    // the same Java API and must be the sole source of libonnxruntime.so.
+    exclude group: 'com.microsoft.onnxruntime', module: 'onnxruntime-android'
+}
+
 android {
     namespace = "io.ente.photos"
     compileSdk = 36
@@ -173,8 +194,9 @@ dependencies {
     implementation 'org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.0'
     implementation 'com.android.support:multidex:1.0.3'
     implementation 'com.google.guava:listenablefuture:9999.0-empty-to-avoid-conflict-with-guava'
-    // Required by Rust ML, which dynamically loads libonnxruntime.so.
-    implementation 'com.microsoft.onnxruntime:onnxruntime-android:1.27.0'
+    // Custom WebGPU/XNNPACK build required by Rust ML, which dynamically
+    // loads libonnxruntime.so.
+    implementation(onnxRuntimeFiles)
     testImplementation 'junit:junit:4.12'
     androidTestImplementation 'androidx.test:runner:1.1.1'
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.1.1'

@@ -6113,6 +6113,7 @@ name = "ort-sys"
 version = "2.0.0-rc.12"
 source = "git+https://github.com/pykeio/ort.git?rev=31c8f1443bb579bfddb82705288347697e468fb3#31c8f1443bb579bfddb82705288347697e468fb3"
 dependencies = [
+ "glob",
  "hmac-sha256",
  "lzma-rust2",
  "ureq",
