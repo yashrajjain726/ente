@@ -6,6 +6,7 @@ import "package:connectivity_plus/connectivity_plus.dart";
 import "package:ente_components/theme/text_styles.dart" as component;
 import "package:ente_icons/ente_icons.dart";
 import "package:ente_pure_utils/ente_pure_utils.dart";
+import "package:flutter/foundation.dart" show ValueListenable;
 import "package:flutter/material.dart";
 import "package:flutter/services.dart";
 import "package:flutter_svg/flutter_svg.dart";
@@ -69,6 +70,9 @@ int? _clampedMemoryIndex(int index, int length) {
 bool _isValidMemoryIndex(int index, int length) {
   return index >= 0 && index < length;
 }
+
+const _memoryBottomActionBarHeight = 80.0;
+const _memorySocialScrimHeight = 296.0;
 
 class FullScreenMemoryDataUpdater extends StatefulWidget {
   final List<Memory> memories;
@@ -358,6 +362,7 @@ class _FullScreenMemoryState extends State<FullScreenMemory> {
   // invalidates the prior delayed forward.
   Object? _kenBurnsStartToken;
   bool _isAnimationPaused = false;
+  final _socialControlsVisible = ValueNotifier<bool>(false);
 
   /// Used to check if any pointer is on the screen.
   final hasPointerOnScreenNotifier = ValueNotifier<bool>(false);
@@ -400,6 +405,7 @@ class _FullScreenMemoryState extends State<FullScreenMemory> {
   void dispose() {
     hasPointerOnScreenNotifier.removeListener(_hasPointerListener);
     _detailSheetEventSubscription.cancel();
+    _socialControlsVisible.dispose();
     _progressAnimationController = null;
     _zoomAnimationController = null;
     _kenBurnsStartToken = null;
@@ -531,6 +537,7 @@ class _FullScreenMemoryState extends State<FullScreenMemory> {
       inheritedData.indexNotifier.value += 1;
       _onPageChange(inheritedData, currentIndex + 1);
     } else if (widget.onNextMemory != null) {
+      _setSocialControlsVisible(false);
       widget.onNextMemory!();
     } else {
       isAtFirstOrLastFile = true;
@@ -550,6 +557,7 @@ class _FullScreenMemoryState extends State<FullScreenMemory> {
       inheritedData.indexNotifier.value -= 1;
       _onPageChange(inheritedData, currentIndex - 1);
     } else if (widget.onPreviousMemory != null) {
+      _setSocialControlsVisible(false);
       widget.onPreviousMemory!();
     } else {
       isAtFirstOrLastFile = true;
@@ -560,6 +568,7 @@ class _FullScreenMemoryState extends State<FullScreenMemory> {
 
   void _onPageChange(FullScreenMemoryData inheritedData, int index) {
     if (!_isValidMemoryIndex(index, inheritedData.memories.length)) return;
+    _setSocialControlsVisible(false);
     isAtFirstOrLastFile = false;
     unawaited(
       memoriesCacheService.markMemoryAsSeen(
@@ -569,6 +578,12 @@ class _FullScreenMemoryState extends State<FullScreenMemory> {
     );
     inheritedData.indexNotifier.value = index;
     _resetAnimation();
+  }
+
+  void _setSocialControlsVisible(bool visible) {
+    if (_socialControlsVisible.value != visible) {
+      _socialControlsVisible.value = visible;
+    }
   }
 
   Future<T?> _runWithViewerPaused<T>(Future<T> Function() action) async {
@@ -699,7 +714,7 @@ class _FullScreenMemoryState extends State<FullScreenMemory> {
                 );
               },
             ),
-            const _MemoryViewerScrims(),
+            _MemoryViewerScrims(socialControlsVisible: _socialControlsVisible),
             ValueListenableBuilder<int>(
               valueListenable: inheritedData.indexNotifier,
               builder: (context, index, _) {
@@ -713,6 +728,7 @@ class _FullScreenMemoryState extends State<FullScreenMemory> {
                   currentUserID: Configuration.instance.getUserID(),
                   onInteractionStart: _pauseViewer,
                   onInteractionEnd: _resumeViewer,
+                  onVisibilityChanged: _setSocialControlsVisible,
                 );
               },
             ),
@@ -850,6 +866,7 @@ class BottomIcons extends StatelessWidget {
                       context,
                       actionFile,
                       onFileRemoved: (file) {
+                        fullScreenState._setSocialControlsVisible(false);
                         fullScreenState.hasFinalFileLoaded = false;
                         fullScreenState._resetAnimation();
                         inheritedData.removeCurrentMemory();
@@ -1069,7 +1086,9 @@ class _MemoryTopChrome extends StatelessWidget {
 }
 
 class _MemoryViewerScrims extends StatelessWidget {
-  const _MemoryViewerScrims();
+  final ValueListenable<bool> socialControlsVisible;
+
+  const _MemoryViewerScrims({required this.socialControlsVisible});
 
   @override
   Widget build(BuildContext context) {
@@ -1099,25 +1118,33 @@ class _MemoryViewerScrims extends StatelessWidget {
               ),
             ),
           ),
-          const Align(
+          Align(
             alignment: Alignment.bottomCenter,
-            child: SizedBox(
-              width: double.infinity,
-              height: 200,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Colors.transparent,
-                      Color(0x8A000000),
-                      Colors.black,
-                    ],
-                    stops: [0, 0.55, 1],
+            child: ValueListenableBuilder<bool>(
+              valueListenable: socialControlsVisible,
+              builder: (context, isVisible, _) {
+                final bottomInset = MediaQuery.paddingOf(context).bottom;
+                return AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  curve: Curves.easeOut,
+                  width: double.infinity,
+                  height: isVisible
+                      ? _memorySocialScrimHeight
+                      : bottomInset + _memoryBottomActionBarHeight,
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.bottomCenter,
+                      end: Alignment.topCenter,
+                      colors: [
+                        Color.fromARGB(97, 0, 0, 0),
+                        Color.fromARGB(42, 0, 0, 0),
+                        Colors.transparent,
+                      ],
+                      stops: [0, 0.5, 1],
+                    ),
                   ),
-                ),
-              ),
+                );
+              },
             ),
           ),
         ],

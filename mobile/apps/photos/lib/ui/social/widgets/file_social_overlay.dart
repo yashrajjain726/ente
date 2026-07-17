@@ -34,6 +34,7 @@ class FileSocialOverlay extends StatefulWidget {
   final int? currentUserID;
   final VoidCallback onInteractionStart;
   final VoidCallback onInteractionEnd;
+  final ValueChanged<bool> onVisibilityChanged;
   final bool includeHiddenCollections;
 
   const FileSocialOverlay({
@@ -41,6 +42,7 @@ class FileSocialOverlay extends StatefulWidget {
     required this.currentUserID,
     required this.onInteractionStart,
     required this.onInteractionEnd,
+    required this.onVisibilityChanged,
     this.includeHiddenCollections = false,
     super.key,
   });
@@ -124,6 +126,7 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
 
       if (sharedCollections.isEmpty) {
         setState(_clearSocialState);
+        widget.onVisibilityChanged(false);
         return;
       }
 
@@ -168,6 +171,7 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
         _latestComment = latestComment;
         _latestCommentAuthor = latestCommentAuthor;
       });
+      widget.onVisibilityChanged(true);
     } catch (error, stackTrace) {
       _logger.warning(
         "Failed to refresh social overlay for file $fileID",
