@@ -28,6 +28,7 @@ class ZoomableLiveImageNew extends StatefulWidget {
   final bool isFromMemories;
   final Function({required int memoryDuration})? onFinalFileLoad;
   final ValueNotifier<List<QrDetection>>? qrDetectionsNotifier;
+  final GestureLongPressStartCallback? onLongPressStart;
 
   const ZoomableLiveImageNew(
     this.enteFile, {
@@ -38,6 +39,7 @@ class ZoomableLiveImageNew extends StatefulWidget {
     this.isFromMemories = false,
     this.onFinalFileLoad,
     this.qrDetectionsNotifier,
+    this.onLongPressStart,
   });
 
   @override
@@ -182,10 +184,11 @@ class _ZoomableLiveImageNewState extends State<ZoomableLiveImageNew>
     );
 
     if (!widget.isFromMemories) {
-      return GestureDetector(
-        onLongPressStart: (details) =>
+      return buildLiveImageLongPressGesture(
+        onTextSelectionStart: widget.onLongPressStart,
+        onPlaybackStart: (details) =>
             _onLongPressEvent(true, details.localPosition),
-        onLongPressEnd: (_) => _onLongPressEvent(false),
+        onPlaybackEnd: (_) => _onLongPressEvent(false),
         child: content,
       );
     }
@@ -356,4 +359,17 @@ class _ZoomableLiveImageNewState extends State<ZoomableLiveImageNew>
       _isVideoFrameReady = true;
     });
   }
+}
+
+GestureDetector buildLiveImageLongPressGesture({
+  required Widget child,
+  required GestureLongPressStartCallback onPlaybackStart,
+  required GestureLongPressEndCallback onPlaybackEnd,
+  GestureLongPressStartCallback? onTextSelectionStart,
+}) {
+  return GestureDetector(
+    onLongPressStart: onTextSelectionStart ?? onPlaybackStart,
+    onLongPressEnd: onTextSelectionStart == null ? onPlaybackEnd : null,
+    child: child,
+  );
 }

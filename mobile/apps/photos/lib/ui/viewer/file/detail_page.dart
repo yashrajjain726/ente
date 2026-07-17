@@ -422,8 +422,6 @@ class _BodyState extends State<_Body> {
           },
           backgroundDecoration: const BoxDecoration(color: Colors.black),
           qrDetectionsNotifier: _qrHelper?.qrDetectionsNotifier,
-        );
-        return GestureDetector(
           onLongPressStart:
               flagService.ocrOverlayEnabled &&
                   widget.config.mode != DetailPageMode.minimalistic &&
@@ -431,6 +429,8 @@ class _BodyState extends State<_Body> {
               ? (details) => _inlineTextDetectionController
                     .startTextSelectionAt(details.globalPosition)
               : null,
+        );
+        return GestureDetector(
           onTap: () {
             file.fileType != FileType.video
                 ? InheritedDetailPageState.of(context).toggleFullScreenByUser()
