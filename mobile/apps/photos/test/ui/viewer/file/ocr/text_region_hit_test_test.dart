@@ -66,6 +66,47 @@ void main() {
     );
   });
 
+  test("maps zoomed and panned viewport points back to text regions", () {
+    const scale = 2.0;
+    const offset = Offset(20, -10);
+
+    expect(
+      isZoomedViewportPointInTextRegions(
+        point: const Offset(120, 65),
+        viewportSize: viewportSize,
+        imageSize: imageSize,
+        regions: const [region],
+        scale: scale,
+        offset: offset,
+      ),
+      isTrue,
+    );
+    expect(
+      isViewportPointInTextRegions(
+        point: const Offset(120, 65),
+        viewportSize: viewportSize,
+        imageSize: imageSize,
+        regions: const [region],
+      ),
+      isFalse,
+    );
+  });
+
+  test("keeps region hit slop constant on screen while zoomed", () {
+    expect(
+      isZoomedViewportPointInTextRegions(
+        point: const Offset(10, 75),
+        viewportSize: viewportSize,
+        imageSize: imageSize,
+        regions: const [region],
+        scale: 2,
+        offset: const Offset(20, -10),
+        hitSlop: 8,
+      ),
+      isFalse,
+    );
+  });
+
   test("does not claim corners outside a rotated text region", () {
     const rotatedRegion = TextRegion(
       confidence: 0.9,

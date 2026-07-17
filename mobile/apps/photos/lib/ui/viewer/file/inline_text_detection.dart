@@ -546,17 +546,19 @@ class _InlineTextDetectionState extends State<InlineTextDetection> {
   bool _isLocalPointInDetectedTextRegion(
     Offset localPosition,
     Size viewportSize,
+    ZoomTransform zoomTransform,
   ) {
     final detection = _detectedRegions;
     if (detection == null || detection.regions.isEmpty) {
       return false;
     }
-    final imageSize = detection.imageSize;
-    return isViewportPointInTextRegions(
+    return isZoomedViewportPointInTextRegions(
       point: localPosition,
       viewportSize: viewportSize,
-      imageSize: imageSize,
+      imageSize: detection.imageSize,
       regions: detection.regions,
+      scale: zoomTransform.scale,
+      offset: zoomTransform.offset,
       hitSlop: _textRegionHitSlop,
     );
   }
@@ -564,13 +566,23 @@ class _InlineTextDetectionState extends State<InlineTextDetection> {
   bool _isLocalPointEligibleForOcrGesture(
     Offset localPosition,
     Size viewportSize,
+    ZoomTransform zoomTransform,
   ) {
     if (viewportSize.width <= 0 || viewportSize.height <= 0) {
       return false;
     }
+    if (zoomTransform.scale <= 0 || !zoomTransform.scale.isFinite) {
+      return false;
+    }
+    final point = viewportPointBeforeZoom(
+      point: localPosition,
+      viewportSize: viewportSize,
+      scale: zoomTransform.scale,
+      offset: zoomTransform.offset,
+    );
     return _displayedPhotoRect(
       viewportSize,
-    ).inflate(_photoGestureEdgeSlop).contains(localPosition);
+    ).inflate(_photoGestureEdgeSlop / zoomTransform.scale).contains(point);
   }
 
   bool _isGlobalPointEligibleForOcrGesture(Offset globalPosition) {
@@ -582,6 +594,7 @@ class _InlineTextDetectionState extends State<InlineTextDetection> {
       return _isLocalPointEligibleForOcrGesture(
         renderObject.globalToLocal(globalPosition),
         renderObject.size,
+        InheritedDetailPageState.of(context).zoomTransformNotifier.value,
       );
     }
 
@@ -589,7 +602,11 @@ class _InlineTextDetectionState extends State<InlineTextDetection> {
     if (viewportSize == null) {
       return false;
     }
-    return _isLocalPointEligibleForOcrGesture(globalPosition, viewportSize);
+    return _isLocalPointEligibleForOcrGesture(
+      globalPosition,
+      viewportSize,
+      InheritedDetailPageState.of(context).zoomTransformNotifier.value,
+    );
   }
 
   Widget _buildOcrGestureRegion(Widget child, {bool textRegionsOnly = false}) {
@@ -598,14 +615,22 @@ class _InlineTextDetectionState extends State<InlineTextDetection> {
         final Size viewportSize = constraints.biggest;
         return _OcrGestureHitTestBox(
           hitTest: (localPosition) {
+            final zoomTransform = InheritedDetailPageState.of(
+              context,
+            ).zoomTransformNotifier.value;
             if (!_isLocalPointEligibleForOcrGesture(
               localPosition,
               viewportSize,
+              zoomTransform,
             )) {
               return false;
             }
             return !textRegionsOnly ||
-                _isLocalPointInDetectedTextRegion(localPosition, viewportSize);
+                _isLocalPointInDetectedTextRegion(
+                  localPosition,
+                  viewportSize,
+                  zoomTransform,
+                );
           },
           child: child,
         );

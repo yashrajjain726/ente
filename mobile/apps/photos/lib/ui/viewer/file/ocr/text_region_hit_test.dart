@@ -1,6 +1,41 @@
 import "package:flutter/widgets.dart";
 import "package:mobile_ocr/models/text_region.dart";
 
+Offset viewportPointBeforeZoom({
+  required Offset point,
+  required Size viewportSize,
+  required double scale,
+  required Offset offset,
+}) {
+  assert(scale > 0 && scale.isFinite);
+  final center = viewportSize.center(Offset.zero);
+  return center + (point - center - offset) / scale;
+}
+
+bool isZoomedViewportPointInTextRegions({
+  required Offset point,
+  required Size viewportSize,
+  required Size imageSize,
+  required List<TextRegion> regions,
+  required double scale,
+  required Offset offset,
+  double hitSlop = 0,
+}) {
+  if (scale <= 0 || !scale.isFinite) return false;
+  return isViewportPointInTextRegions(
+    point: viewportPointBeforeZoom(
+      point: point,
+      viewportSize: viewportSize,
+      scale: scale,
+      offset: offset,
+    ),
+    viewportSize: viewportSize,
+    imageSize: imageSize,
+    regions: regions,
+    hitSlop: hitSlop / scale,
+  );
+}
+
 Rect containedImageRect(Size viewportSize, Size imageSize) {
   if (viewportSize.width <= 0 ||
       viewportSize.height <= 0 ||
