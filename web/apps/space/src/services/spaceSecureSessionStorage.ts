@@ -1,3 +1,4 @@
+import { clearStashedKeyEncryptionKeyFromSession } from "ente-accounts-rs/services/session-storage";
 import { z } from "zod";
 
 const windowNamePrefix = "ente-space-secure-session:";
@@ -41,6 +42,12 @@ const hasSecret = (state: SecureSessionState) =>
 
 const clearLegacyAccountsSessionKeys = () => {
     for (const key of legacyAccountsSessionKeys) sessionStorage.removeItem(key);
+};
+
+const clearSecureSessionState = () => {
+    if (window.name.startsWith(windowNamePrefix)) window.name = "";
+    sessionStorage.removeItem(sessionStorageKey);
+    clearLegacyAccountsSessionKeys();
 };
 
 const readWindowShare = () => {
@@ -107,7 +114,7 @@ const secureSessionState = (): SecureSessionState => {
     try {
         return SecureSessionState.parse(JSON.parse(secret));
     } catch {
-        clearSpaceSecureSessionStorage();
+        clearSecureSessionState();
         return {};
     }
 };
@@ -115,7 +122,7 @@ const secureSessionState = (): SecureSessionState => {
 const saveSecureSessionState = (state: SecureSessionState) => {
     clearLegacyAccountsSessionKeys();
     if (!hasSecret(state)) {
-        clearSpaceSecureSessionStorage();
+        clearSecureSessionState();
         return;
     }
     const [windowShare, sessionShare] = splitSecret(JSON.stringify(state));
@@ -124,9 +131,8 @@ const saveSecureSessionState = (state: SecureSessionState) => {
 };
 
 export const clearSpaceSecureSessionStorage = () => {
-    if (window.name.startsWith(windowNamePrefix)) window.name = "";
-    sessionStorage.removeItem(sessionStorageKey);
-    clearLegacyAccountsSessionKeys();
+    clearSecureSessionState();
+    clearStashedKeyEncryptionKeyFromSession();
 };
 
 export const authMasterKeyFromSpaceSession = () =>
