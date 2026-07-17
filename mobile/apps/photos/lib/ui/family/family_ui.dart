@@ -1,11 +1,13 @@
 import 'package:ente_components/ente_components.dart';
 import 'package:flutter/material.dart';
+import 'package:photos/theme/ente_theme.dart';
 
 class FamilyPageScaffold extends StatelessWidget {
   const FamilyPageScaffold({
     required this.child,
     this.title,
     this.actions = const [],
+    this.scrollable = false,
     this.padding = const EdgeInsets.fromLTRB(16, 12, 16, 16),
     super.key,
   });
@@ -13,12 +15,14 @@ class FamilyPageScaffold extends StatelessWidget {
   final Widget child;
   final String? title;
   final List<Widget> actions;
+  final bool scrollable;
   final EdgeInsetsGeometry padding;
 
   @override
   Widget build(BuildContext context) {
     final backgroundColor = context.componentColors.backgroundBase;
-    if (title != null) {
+    if (scrollable) {
+      assert(title != null);
       return Scaffold(
         backgroundColor: backgroundColor,
         body: AppBarComponent(
@@ -35,6 +39,7 @@ class FamilyPageScaffold extends StatelessWidget {
       );
     }
 
+    final textTheme = getEnteTextTheme(context);
     return Scaffold(
       backgroundColor: backgroundColor,
       body: SafeArea(
@@ -57,6 +62,9 @@ class FamilyPageScaffold extends StatelessWidget {
                       ),
                     ),
                   ),
+                  if (title != null) const SizedBox(width: 8),
+                  if (title != null)
+                    Expanded(child: Text(title!, style: textTheme.largeBold)),
                 ],
               ),
               const SizedBox(height: 16),
