@@ -48,10 +48,6 @@ impl From<llm::Error> for LlmError {
                 op: op.to_string(),
                 detail: message,
             },
-            llm::Error::Download(err) => match DownloadError::from(err) {
-                DownloadError::Cancelled => Self::Cancelled,
-                error => Self::Download { error },
-            },
         }
     }
 }

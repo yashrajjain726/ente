@@ -210,7 +210,7 @@ class ContactRecommendation extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.componentColors;
     final personId = contactSearchResult.params[kPersonParamID] as String?;
-    final contactUserId = contactSearchResult.params[kContactUserId] as int?;
+    final contactUserId = contactSearchResult.params[kContactUserId] as int;
     final contactEmail = contactSearchResult.params[kContactEmail] as String;
     final displayName = contactSearchResult.hierarchicalSearchFilter.name();
     return GestureDetector(

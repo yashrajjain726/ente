@@ -27,8 +27,6 @@ pub enum Error {
     PromptTooLong { tokens: usize, context_size: u32 },
     #[error("{op}: {message}")]
     Llama { op: &'static str, message: String },
-    #[error(transparent)]
-    Download(#[from] crate::download::Error),
 }
 
 static BACKEND: OnceLock<Result<LlamaBackend, String>> = OnceLock::new();
