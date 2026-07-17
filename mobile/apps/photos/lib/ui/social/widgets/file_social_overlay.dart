@@ -1,4 +1,5 @@
 import "dart:async";
+import "dart:math" as math;
 
 import "package:collection/collection.dart";
 import "package:ente_components/theme/text_styles.dart" as component;
@@ -26,6 +27,7 @@ final _logger = Logger("FileSocialOverlay");
 
 const _likedColor = Color(0xFF08C225);
 const _socialControlsSize = 40.0;
+const _socialIconSize = 32.0;
 const _bottomActionBarHeight = 80.0;
 const _socialToActionBarGap = 14.0;
 
@@ -366,7 +368,7 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
                   child: SizedBox.square(
                     dimension: _socialControlsSize,
                     child: IconButton(
-                      padding: const EdgeInsets.all(8),
+                      padding: const EdgeInsets.all(4),
                       style: IconButton.styleFrom(
                         minimumSize: const Size.square(_socialControlsSize),
                         maximumSize: const Size.square(_socialControlsSize),
@@ -377,6 +379,7 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
                       icon: Icon(
                         _hasLiked ? EnteIcons.likeFilled : EnteIcons.likeStroke,
                         color: _hasLiked ? _likedColor : Colors.white,
+                        size: _socialIconSize,
                       ),
                     ),
                   ),
@@ -388,7 +391,7 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
                 child: SizedBox.square(
                   dimension: _socialControlsSize,
                   child: IconButton(
-                    padding: const EdgeInsets.all(8),
+                    padding: const EdgeInsets.all(4),
                     style: IconButton.styleFrom(
                       minimumSize: const Size.square(_socialControlsSize),
                       maximumSize: const Size.square(_socialControlsSize),
@@ -415,7 +418,7 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
       onTap: () => unawaited(_openComments(comment: comment)),
       child: ConstrainedBox(
         constraints: BoxConstraints(
-          maxWidth: MediaQuery.sizeOf(context).width * 0.55,
+          maxWidth: math.min(MediaQuery.sizeOf(context).width * 0.5, 200),
         ),
         child: Stack(
           clipBehavior: Clip.none,
@@ -446,12 +449,21 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
               ),
             ),
             Positioned(
-              left: -10,
-              top: -10,
-              child: UserAvatarWidget(
-                author,
-                type: AvatarType.small,
-                currentUserID: currentUserID,
+              left: -3,
+              top: -6,
+              child: Container(
+                width: 22,
+                height: 22,
+                padding: const EdgeInsets.all(1),
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                ),
+                child: UserAvatarWidget(
+                  author,
+                  type: AvatarType.small,
+                  currentUserID: currentUserID,
+                ),
               ),
             ),
           ],
@@ -464,30 +476,33 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
     return Stack(
       clipBehavior: Clip.none,
       children: [
-        const Icon(EnteIcons.commentBubbleStroke, color: Colors.white),
+        const Icon(
+          EnteIcons.commentBubbleStroke,
+          color: Colors.white,
+          size: _socialIconSize,
+        ),
         if (_commentCount > 0)
           Positioned(
-            right: -4,
-            top: -4,
+            right: -5,
+            top: -5,
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-              decoration: BoxDecoration(
+              constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
+              padding: const EdgeInsets.symmetric(horizontal: 6),
+              decoration: const BoxDecoration(
                 color: Colors.white,
-                borderRadius: const BorderRadius.all(Radius.circular(16)),
-                border: Border.all(
-                  color: Colors.black,
-                  width: 2,
-                  strokeAlign: BorderSide.strokeAlignOutside,
-                ),
+                borderRadius: BorderRadius.all(Radius.circular(19)),
               ),
-              child: Text(
-                _commentCount > 99 ? "99+" : _commentCount.toString(),
-                style: const TextStyle(
-                  color: Colors.black,
-                  fontSize: 8,
-                  fontWeight: FontWeight.w500,
+              child: Center(
+                child: Text(
+                  _commentCount > 99 ? "99+" : _commentCount.toString(),
+                  style: const TextStyle(
+                    color: Colors.black,
+                    fontSize: 10,
+                    height: 1.2,
+                    fontWeight: FontWeight.w700,
+                  ),
+                  textAlign: TextAlign.center,
                 ),
-                textAlign: TextAlign.center,
               ),
             ),
           ),

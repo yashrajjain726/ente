@@ -1,0 +1,1 @@
+- Refined memory viewer controls, comments, and swipe-up file details.

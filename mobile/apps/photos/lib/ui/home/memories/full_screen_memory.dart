@@ -4,7 +4,6 @@ import "dart:ui";
 
 import "package:connectivity_plus/connectivity_plus.dart";
 import "package:ente_components/theme/text_styles.dart" as component;
-import "package:ente_icons/ente_icons.dart";
 import "package:ente_pure_utils/ente_pure_utils.dart";
 import "package:flutter/foundation.dart" show ValueListenable;
 import "package:flutter/material.dart";
@@ -362,6 +361,7 @@ class _FullScreenMemoryState extends State<FullScreenMemory> {
   // invalidates the prior delayed forward.
   Object? _kenBurnsStartToken;
   bool _isAnimationPaused = false;
+  bool _isMediaZoomed = false;
   final _socialControlsVisible = ValueNotifier<bool>(false);
 
   /// Used to check if any pointer is on the screen.
@@ -527,6 +527,7 @@ class _FullScreenMemoryState extends State<FullScreenMemory> {
 
   void _goToNext(FullScreenMemoryData inheritedData) {
     if (inheritedData.memories.isEmpty) return;
+    _isMediaZoomed = false;
     hasFinalFileLoaded = false;
     final currentIndex = _clampedMemoryIndex(
       inheritedData.indexNotifier.value,
@@ -547,6 +548,7 @@ class _FullScreenMemoryState extends State<FullScreenMemory> {
 
   void _goToPrevious(FullScreenMemoryData inheritedData) {
     if (inheritedData.memories.isEmpty) return;
+    _isMediaZoomed = false;
     hasFinalFileLoaded = false;
     final currentIndex = _clampedMemoryIndex(
       inheritedData.indexNotifier.value,
@@ -568,6 +570,7 @@ class _FullScreenMemoryState extends State<FullScreenMemory> {
 
   void _onPageChange(FullScreenMemoryData inheritedData, int index) {
     if (!_isValidMemoryIndex(index, inheritedData.memories.length)) return;
+    _isMediaZoomed = false;
     _setSocialControlsVisible(false);
     isAtFirstOrLastFile = false;
     unawaited(
@@ -667,6 +670,15 @@ class _FullScreenMemoryState extends State<FullScreenMemory> {
                       _goToNext(inheritedData);
                     }
                   },
+                  onSwipeUp: () {
+                    if (!(ModalRoute.of(context)?.isCurrent ?? false)) return;
+                    unawaited(
+                      _runWithViewerPaused(
+                        () => showDetailsSheet(context, currentFile),
+                      ),
+                    );
+                  },
+                  canSwipeUp: () => !_isMediaZoomed,
                   hasPointerNotifier: hasPointerOnScreenNotifier,
                   child: AnimatedOpacity(
                     opacity: _firstPhotoOpacity,
@@ -701,6 +713,9 @@ class _FullScreenMemoryState extends State<FullScreenMemory> {
                             color: Colors.transparent,
                           ),
                           isFromMemories: true,
+                          shouldDisableScroll: (isZoomed) {
+                            _isMediaZoomed = isZoomed;
+                          },
                           playbackCallback: (shouldEnable, _) {
                             _toggleAnimation(pause: !shouldEnable);
                           },
@@ -827,8 +842,8 @@ class BottomIcons extends StatelessWidget {
             if (currentFile.isUploaded && !isHidden)
               _MemoryActionButton(
                 tooltip: l10n.addToAlbum,
-                icon: const Icon(
-                  EnteIcons.addToAlbum,
+                icon: const HugeIcon(
+                  icon: HugeIcons.strokeRoundedAddSquare,
                   color: Colors.white,
                   size: 24,
                 ),
@@ -1006,7 +1021,7 @@ class _MemoryTopChrome extends StatelessWidget {
                           dimension: 48,
                           child: IconButton(
                             tooltip: AppLocalizations.of(context).close,
-                            padding: const EdgeInsets.all(15),
+                            padding: const EdgeInsets.all(8),
                             style: IconButton.styleFrom(
                               minimumSize: const Size.square(48),
                               maximumSize: const Size.square(48),
@@ -1016,10 +1031,10 @@ class _MemoryTopChrome extends StatelessWidget {
                               ),
                             ),
                             onPressed: onClose,
-                            icon: const Icon(
-                              Icons.close,
+                            icon: const HugeIcon(
+                              icon: HugeIcons.strokeRoundedCancel01,
                               color: Colors.white,
-                              size: 18,
+                              size: 32,
                             ),
                           ),
                         ),
@@ -1042,16 +1057,31 @@ class _MemoryTopChrome extends StatelessWidget {
                                         .copyWith(color: Colors.white),
                                   ),
                                 ),
-                                Text(
-                                  SmartMemoriesService.getDateFormatted(
-                                    creationTime: currentFile.creationTime!,
-                                    context: context,
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: component.TextStyles.mini.copyWith(
-                                    color: Colors.white,
-                                  ),
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Flexible(
+                                      child: Text(
+                                        SmartMemoriesService.getDateFormatted(
+                                          creationTime:
+                                              currentFile.creationTime!,
+                                          context: context,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: component.TextStyles.mini
+                                            .copyWith(color: Colors.white),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    const SizedBox(
+                                      width: 4,
+                                      height: 8,
+                                      child: CustomPaint(
+                                        painter: _MemoryDateChevronPainter(),
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ],
                             ),
@@ -1064,6 +1094,8 @@ class _MemoryTopChrome extends StatelessWidget {
                             child: Center(
                               child: FavoriteWidget(
                                 currentFile,
+                                iconSize: 24,
+                                tapTargetSize: 48,
                                 key: ValueKey(
                                   currentFile.uploadedFileID ??
                                       currentFile.localID,
@@ -1083,6 +1115,28 @@ class _MemoryTopChrome extends StatelessWidget {
       ),
     );
   }
+}
+
+class _MemoryDateChevronPainter extends CustomPainter {
+  const _MemoryDateChevronPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.25
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+    final path = Path()
+      ..moveTo(0.5, 0.5)
+      ..lineTo(size.width - 0.5, size.height / 2)
+      ..lineTo(0.5, size.height - 0.5);
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 class _MemoryViewerScrims extends StatelessWidget {
