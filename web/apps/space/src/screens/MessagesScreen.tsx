@@ -463,32 +463,41 @@ const ConversationListItem: React.FC<{
                         width: 44,
                     }}
                 >
-                    <Box
-                        component="button"
-                        type="button"
-                        aria-label={`Open ${name}'s profile`}
-                        onClick={() => onOpenFriendProfile(conversation.friend)}
-                        sx={{
-                            appearance: "none",
-                            bgcolor: "transparent",
-                            border: 0,
-                            borderRadius: "50%",
-                            cursor: "pointer",
-                            display: "block",
-                            height: 44,
-                            p: 0,
-                            width: 44,
-                            "&:focus-visible": {
-                                outline: `2px solid ${green}`,
-                                outlineOffset: 2,
-                            },
-                        }}
-                    >
+                    {isFriendRequest ? (
                         <Avatar
                             avatarUrl={conversation.friend.avatarUrl}
                             size={44}
                         />
-                    </Box>
+                    ) : (
+                        <Box
+                            component="button"
+                            type="button"
+                            aria-label={`Open ${name}'s profile`}
+                            onClick={() =>
+                                onOpenFriendProfile(conversation.friend)
+                            }
+                            sx={{
+                                appearance: "none",
+                                bgcolor: "transparent",
+                                border: 0,
+                                borderRadius: "50%",
+                                cursor: "pointer",
+                                display: "block",
+                                height: 44,
+                                p: 0,
+                                width: 44,
+                                "&:focus-visible": {
+                                    outline: `2px solid ${green}`,
+                                    outlineOffset: 2,
+                                },
+                            }}
+                        >
+                            <Avatar
+                                avatarUrl={conversation.friend.avatarUrl}
+                                size={44}
+                            />
+                        </Box>
+                    )}
                     {unreadCount > 0 && !isFriendRequest && (
                         <Box
                             aria-label={`${unreadCount} unread update${unreadCount == 1 ? "" : "s"}`}
