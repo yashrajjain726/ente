@@ -2,11 +2,10 @@ import { z } from "zod";
 
 const windowNamePrefix = "ente-space-secure-session:";
 const sessionStorageKey = "enteSpaceSecureSession";
-const legacyAccountsSessionKeys = ["encryptionKey", "keyEncryptionKey"];
+const legacyAccountsSessionKeys = ["encryptionKey"];
 
 const SecureSessionState = z.object({
     authMasterKey: z.string().optional(),
-    keyEncryptionKey: z.string().optional(),
     spaceRootKey: z.string().optional(),
 });
 
@@ -38,9 +37,7 @@ const base64ToBytes = (value: string) => {
 };
 
 const hasSecret = (state: SecureSessionState) =>
-    state.authMasterKey !== undefined ||
-    state.keyEncryptionKey !== undefined ||
-    state.spaceRootKey !== undefined;
+    state.authMasterKey !== undefined || state.spaceRootKey !== undefined;
 
 const clearLegacyAccountsSessionKeys = () => {
     for (const key of legacyAccountsSessionKeys) sessionStorage.removeItem(key);
@@ -151,16 +148,4 @@ export const spaceRootKeyFromSpaceSession = () =>
 
 export const saveSpaceRootKeyInSpaceSession = (spaceRootKey: string) => {
     saveSecureSessionState({ ...secureSessionState(), spaceRootKey });
-};
-
-export const stashSpaceKeyEncryptionKeyInSessionStore = (kek: string) => {
-    saveSecureSessionState({ ...secureSessionState(), keyEncryptionKey: kek });
-};
-
-export const unstashSpaceKeyEncryptionKeyFromSession = () => {
-    const state = secureSessionState();
-    const kek = state.keyEncryptionKey;
-    if (kek === undefined) return undefined;
-    saveSecureSessionState({ ...state, keyEncryptionKey: undefined });
-    return kek;
 };
