@@ -1,164 +1,261 @@
-# iOS Rust ML indexing pipeline benchmark
+# iOS Rust ML indexing and HEIC decoder benchmark
 
-Date: 2026-07-16  
-Code revision: `7571009d6e` (`ort_opt_ios`) plus temporary, uncommitted timing instrumentation  
-Device: iPhone 15 Pro (A17 Pro), iOS 26.5, wired device ID `00008130-00067DD02212001C`  
-Build: Flutter profile mode with the Rust release library  
-Workload: the 14 fixtures used by the Rust ML indexing parity test, faces + CLIP enabled, pets disabled
+Date: 2026-07-16
+
+Code revision: `7571009d6e` plus temporary, uncommitted benchmark instrumentation and decoder prototypes
+
+Device: iPhone 15 Pro (A17 Pro), iOS 26.5, wired device ID `00008130-00067DD02212001C`
+
+Build: Flutter profile mode with the Rust release library
+
+Workload: all 14 Rust ML indexing parity fixtures, faces + CLIP enabled, pets disabled
 
 ## Executive summary
 
-Decoding is now overwhelmingly the bottleneck. For one representative pass over the corpus (the sum of the per-image medians), the Rust pipeline took 53.73 seconds, of which 50.83 seconds (94.6%) was image decoding. Preprocessing took 2.06 seconds (3.8%), warmed ONNX inference took 0.70 seconds (1.3%), and alignment plus postprocessing took 0.14 seconds (0.3%).
+The four implemented pure-Rust decoder improvements cut the five-fixture HEIC
+decode sum from 3,021.6 ms to 1,918.4 ms (**36.5% less time, 1.58× as fast**)
+and cut the full-corpus Rust total from 3,868.8 ms to 2,776.7 ms (**28.2% less
+time**). The largest gains are on the grid-heavy fixtures: pano decode is 53.1%
+faster and the text/grid fixture is 50.0% faster. All five HEICs retain face and
+CLIP parity.
 
-The largest single fixture, `IMG_0682_pano.HEIC`, spent 23.35 of 23.70 seconds decoding. Even on ordinary HEIC fixtures, decode was 5.7–7.2 seconds while the complete warmed face and CLIP inference work was about 50 milliseconds. Further postprocessing work cannot materially improve ordinary indexing latency; the next meaningful work should be in the decoder path, especially HEIC.
+In an optimized device build, the current decoder spends 3,256 ms of a 3,869 ms representative corpus pass decoding (84.2%). The five HEIC files account for 3,022 ms of decode time. The earlier debug-build measurements overstated absolute latency by roughly an order of magnitude; all results and recommendations in this report use fresh profile/Rust-release runs.
 
-The temporary instrumentation did not change model outputs. The device parity run passed all face metrics for all fixtures and passed CLIP for 13 of 14 fixtures. The sole failure was the existing CR2 fallback path: Rust cannot decode the CR2 directly, Dart decodes and re-encodes it as JPEG, and that derived image has CLIP cosine distance 0.1961 from the Python RAW ground truth. This is a correctness limitation of the fallback, not a timing-related result.
+Four alternatives were benchmarked on the same phone:
 
-## Method
+| Decoder | HEIC decode sum | HEIC speedup | Full-corpus Rust total | Corpus reduction | HEIC parity |
+|---|---:|---:|---:|---:|---|
+| Current `heic-decoder` | 3,021.6 ms | 1.00× | 3,868.8 ms | — | 5/5 pass |
+| `speed_improvements` (four cumulative changes) | **1,918.4 ms** | **1.58×** | **2,776.7 ms** | **28.2%** | 5/5 pass |
+| ImageIO + current-decoder fallback | 1,846.9 ms | 1.64× | 2,695.1 ms | 30.3% | 5/5 pass |
+| `heic` 0.1.6 | 1,875.5 ms | 1.61× | 2,721.7 ms | 29.7% | 5/5 pass |
+| `libheif-rs` 2.7.0 + libde265 | **1,625.3 ms** | **1.86×** | **2,492.8 ms** | **35.6%** | 5/5 pass |
 
-The benchmark added `Instant` spans around:
+`libheif-rs` is the fastest complete decoder in this corpus. ImageIO is much faster on the three HEICs it accepts (4.1–7.2×), but rejects the two deliberately problematic/grid fixtures. An ImageIO-first path with the current decoder as fallback is therefore nearly as fast as the pure-Rust `heic` crate across the whole corpus, preserves parity, and avoids adding a third-party decoder to the iOS application.
 
-- total Rust analysis and image decode;
-- codec decode, ICC conversion, EXIF/container orientation, and conversion to RGB8;
-- YOLO resize and tensor construction;
-- face detection, each face alignment substage, each face embedding, and their postprocessing;
-- CLIP resize, tensor construction, inference, and embedding normalization;
-- equivalent pet stages (instrumented but not exercised because the canonical test has `run_pets = false`);
-- lazy model session creation and every synchronous `Session::run` call.
+The `heic` crate is particularly strong on the two problematic fixtures, but its `AGPL-3.0-only OR commercial` license is a shipping blocker without an appropriate commercial license. `libheif-rs` itself is MIT, while the native libheif/libde265 stack and its static-linking implications require a separate license and distribution review.
 
-All 14 fixtures and models were staged before measurement. The runner then performed one complete warm-up pass followed by five measured passes per image. Tables below use the median of those five passes. This avoids treating CoreML/ORT model compilation and the first inference as steady-state work. End-to-end Dart time is the five-run average reported by the parity runner; Rust stage time is the median, so small rounding differences are expected.
+## Method and important correction
 
-The logging itself uses synchronous `eprintln!`, so very short spans include some observer overhead. It does not affect the conclusion: the measured gaps are seconds of decode time versus tens of milliseconds elsewhere. Final optimization comparisons should use an uninstrumented A/B wall-clock run after attribution is complete.
+Each run used one full warm-up pass followed by five measured passes per fixture. Tables report the median of those five passes. `Rust total` starts immediately before decoding and ends after face and CLIP analysis, so it measures exactly the interval requested. `Decode` includes file access, container/codec work, RGB output, color handling, and orientation. Model session creation is excluded by the warm-up.
 
-## Results by image
+The first version of this report mistakenly described the iOS run as profile mode because the test harness printed its Android build-mode setting. The actual iOS command defaulted to debug, and Rust was unoptimized. I discarded those absolute measurements and reran the current decoder and all alternatives with `flutter drive --profile` and the Rust release library. The release results below are internally comparable.
 
-Times are milliseconds. “Preprocess” combines YOLO and CLIP preprocessing. “Inference” combines face detection, all face embeddings, and CLIP image inference. The CR2 Rust total is the successful JPEG retry only; its Dart total also includes the failed Rust attempt and Dart decode/JPEG conversion.
+Runs were sequential rather than randomized. Medians limit transient noise, but thermal state and background phone activity can still move results by a few percent. The large differences are robust; close differences such as ImageIO hybrid versus `heic` should be treated as a tie until an uninstrumented randomized A/B run.
 
-| Fixture | End-to-end Dart | Rust total median (range) | Decode | Preprocess | Inference | Align + postprocess |
+The instrumentation logs synchronously, so it adds a small common overhead. Final production validation should remove logging and compare wall-clock throughput.
+
+## Current decoder baseline
+
+Times are milliseconds. File size is compressed on-disk size; megapixels are final oriented dimensions. `Rest` is all warmed preprocessing, inference, alignment, postprocessing, and small unassigned overhead after subtracting decode from Rust total.
+
+| Fixture | File size | Resolution | MP | Rust total | Decode | Rest | Decode share |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| `1343_rotate_90_cw.jpg` | 2.75 MiB | 2835×2200 | 6.24 | 76.8 | 39.1 | 37.7 | 50.9% |
+| `1718_rotate_90_cw.HEIC` | 4.75 MiB | 3504×2439 | 8.55 | 600.4 | 555.8 | 44.6 | 92.6% |
+| `7765_horizontal_normal.HEIC` | 4.67 MiB | 3250×4333 | 14.08 | 760.0 | 715.3 | 44.7 | 94.1% |
+| `7949_mirror_horizontal_rotate_270_cw.HEIC` | 0.63 MiB | 1547×1209 | 1.87 | 145.4 | 100.5 | 44.9 | 69.1% |
+| `IMG_0682_pano.HEIC` | 7.52 MiB | 14604×3826 | 55.87 | 1,365.6 | 1,316.4 | 49.2 | 96.4% |
+| `IMG_8606_rotate_90_cw_contains_text.HEIC` | 1.34 MiB | 3024×4032 | 12.19 | 380.8 | 333.7 | 47.2 | 87.6% |
+| `IMG_8905.CR2` | 25.14 MiB | 5184×3456 | 17.92 | 135.2 | 85.6 | 49.6 | 63.3% |
+| `IMG_pano.jpg` | 5.93 MiB | 7872×1280 | 10.08 | 107.9 | 66.2 | 41.8 | 61.3% |
+| `astronaut.png` | 0.40 MiB | 512×512 | 0.26 | 40.1 | 2.6 | 37.6 | 6.4% |
+| `man.jpeg` | 0.004 MiB | 275×183 | 0.05 | 37.7 | 0.3 | 37.4 | 0.7% |
+| `people.jpeg` | 0.009 MiB | 275×183 | 0.05 | 50.5 | 0.4 | 50.1 | 0.9% |
+| `singapore.jpg` | 0.59 MiB | 1920×1200 | 2.30 | 47.4 | 11.1 | 36.2 | 23.5% |
+| `starwatchers.jpg` | 0.08 MiB | 500×724 | 0.36 | 42.0 | 4.5 | 37.5 | 10.7% |
+| `ui_app.webp` | 0.11 MiB | 1070×1974 | 2.11 | 79.0 | 25.1 | 53.9 | 31.7% |
+| **Corpus total** | — | — | — | **3,868.8** | **3,256.4** | **612.4** | **84.2%** |
+
+Among only the five HEIC fixtures, compressed file size and pixel count are both strongly associated with current decode time (Pearson `r=0.958` and `r=0.931`, respectively), but five deliberately varied samples are too few for a predictive model. File size alone is not sufficient because compression structure and grid/tile layout matter.
+
+The pano should not be treated as a pathological per-pixel result. It is 55.9 MP—roughly four to seven times the ordinary HEICs—and takes 23.6 ms/MP, versus 50.8–65.0 ms/MP for the first three HEICs. Its absolute time is large because the output is enormous, not because it decodes unusually poorly per pixel.
+
+## Detailed current-decoder pipeline breakdown
+
+This is the release-mode equivalent of the original detailed table. Times are milliseconds. `Preprocess` combines YOLO and CLIP preprocessing. `Inference` combines face detection, all face embeddings, and CLIP image inference. `Align + postprocess` combines face alignment and all measured detection/embedding postprocessing.
+
+`End-to-end Dart` is the five-run average recorded by the parity runner. Each Rust stage is the median of its five measured samples, so component columns may differ slightly from the Rust total because medians are calculated independently. The CR2 Rust row represents the successful JPEG retry; its Dart time also includes the failed direct Rust attempt and Dart RAW decode/JPEG conversion.
+
+| Fixture | File size | Resolution | MP | End-to-end Dart | Rust total median (range) | Decode | Preprocess | Inference | Align + postprocess |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| `1343_rotate_90_cw.jpg` | 2.75 MiB | 2835×2200 | 6.24 | 78 | 76.8 (76.1–84.9) | 39.1 | 3.8 | 33.4 | 0.0 |
+| `1718_rotate_90_cw.HEIC` | 4.75 MiB | 3504×2439 | 8.55 | 603 | 600.4 (598.8–607.6) | 555.8 | 4.4 | 41.4 | 0.4 |
+| `7765_horizontal_normal.HEIC` | 4.67 MiB | 3250×4333 | 14.08 | 762 | 760.0 (756.9–767.1) | 715.3 | 5.5 | 41.6 | 0.5 |
+| `7949_mirror_horizontal_rotate_270_cw.HEIC` | 0.63 MiB | 1547×1209 | 1.87 | 146 | 145.4 (143.0–148.0) | 100.5 | 2.7 | 41.8 | 0.4 |
+| `IMG_0682_pano.HEIC` | 7.52 MiB | 14604×3826 | 55.87 | 1,360 | 1,365.6 (1,343.0–1,368.0) | 1,316.4 | 6.1 | 43.0 | 0.4 |
+| `IMG_8606_rotate_90_cw_contains_text.HEIC` | 1.34 MiB | 3024×4032 | 12.19 | 380 | 380.8 (375.0–382.8) | 333.7 | 5.3 | 39.1 | 0.0 |
+| `IMG_8905.CR2` | 25.14 MiB | 5184×3456 | 17.92 | 3,666 | 135.2 (132.9–136.9) | 85.6 | 6.5 | 42.0 | 0.0 |
+| `IMG_pano.jpg` | 5.93 MiB | 7872×1280 | 10.08 | 109 | 107.9 (107.5–113.0) | 66.2 | 1.8 | 40.0 | 0.3 |
+| `astronaut.png` | 0.40 MiB | 512×512 | 0.26 | 40 | 40.1 (39.6–40.4) | 2.6 | 2.3 | 34.8 | 0.4 |
+| `man.jpeg` | 0.004 MiB | 275×183 | 0.05 | 38 | 37.7 (37.5–38.4) | 0.3 | 2.0 | 34.9 | 0.4 |
+| `people.jpeg` | 0.009 MiB | 275×183 | 0.05 | 52 | 50.5 (50.0–51.1) | 0.4 | 2.1 | 44.7 | 2.9 |
+| `singapore.jpg` | 0.59 MiB | 1920×1200 | 2.30 | 48 | 47.4 (46.7–48.9) | 11.1 | 2.4 | 33.9 | 0.0 |
+| `starwatchers.jpg` | 0.08 MiB | 500×724 | 0.36 | 43 | 42.0 (41.8–42.4) | 4.5 | 2.0 | 35.2 | 0.4 |
+| `ui_app.webp` | 0.11 MiB | 1070×1974 | 2.11 | 81 | 79.0 (77.7–85.8) | 25.1 | 2.0 | 48.9 | 2.9 |
+| **Corpus total** | — | — | — | **7,406** | **3,868.8** | **3,256.4** | **49.1** | **554.6** | **9.0** |
+
+The summed Rust stage medians account for 3,869.1 ms versus the 3,868.8 ms sum of per-image Rust total medians; the 0.3 ms difference is the expected independent-median and rounding effect. Excluding the CR2 Dart fallback, Dart and Rust totals track closely. The release data confirms that warmed inference is comparatively stable at roughly 34–49 ms per fixture, while HEIC decode varies from 100 ms to 1.32 seconds with image size and structure.
+
+## Cumulative `speed_improvements` benchmark
+
+This run uses the local `speed_improvements` decoder through a temporary path
+dependency at revision `1ac5834` and exercises all four committed changes:
+
+1. production builds compile out diagnostic counters and CTU tracking;
+2. grid tiles decode in bounded deterministic parallel batches;
+3. the Ente path consumes the decoder's direct RGB8 output before applying the
+   existing ICC and orientation steps; and
+4. exact ARM NEON kernels accelerate dequantization and residual addition.
+
+Unlike the older baseline, this validation is a genuine Flutter release build:
+Xcode built `Release-iphoneos`, Dart reported `dart.vm.product=true` and
+`dart.vm.profile=false`, and both Rust bridge pods used Cargo `--release` for
+`aarch64-apple-ios`. The physical device was the same wired iPhone 15 Pro. Each
+row discards one fixture-local warmup and reports the median and range of five
+measured native Rust calls. The transcript contains exactly 84 structured
+samples (14 fixtures × 6 calls).
+
+The old baseline used Flutter profile with the same Rust release optimization.
+The table therefore compares timings recorded wholly inside the optimized Rust
+call, not Dart wall time. Non-HEIC rows act as a control and are mostly within a
+few milliseconds; small percentage changes on sub-millisecond decode rows are
+not meaningful.
+
+| Fixture | New Rust total median (range) | Baseline | Change | New decode median (range) | Baseline | Change |
 |---|---:|---:|---:|---:|---:|---:|
-| `1343_rotate_90_cw.jpg` | 1,292 | 1,291.7 (1,282.8–1,298.3) | 1,082.9 | 160.3 | 49.5 | 0.2 |
-| `1718_rotate_90_cw.HEIC` | 5,969 | 5,967.3 (5,932.6–6,007.3) | 5,737.6 | 170.6 | 52.6 | 4.7 |
-| `7765_horizontal_normal.HEIC` | 7,566 | 7,534.0 (7,266.2–7,875.0) | 7,239.9 | 240.4 | 52.6 | 5.5 |
-| `7949_mirror_horizontal_rotate_270_cw.HEIC` | 1,418 | 1,412.9 (1,405.4–1,433.5) | 1,247.7 | 115.9 | 45.0 | 5.6 |
-| `IMG_0682_pano.HEIC` | 23,615 | 23,695.0 (23,245.9–23,760.8) | 23,350.7 | 279.6 | 53.9 | 5.3 |
-| `IMG_8606_rotate_90_cw_contains_text.HEIC` | 6,144 | 6,126.3 (6,092.0–6,239.9) | 5,842.9 | 233.1 | 49.1 | 0.2 |
-| `IMG_8905.CR2` | 5,803 | 3,496.7 (3,468.0–3,558.3) | 3,179.4 | 267.5 | 52.4 | 0.2 |
-| `IMG_pano.jpg` | 1,916 | 1,905.7 (1,891.0–1,978.8) | 1,778.2 | 79.0 | 44.7 | 5.3 |
-| `astronaut.png` | 164 | 164.3 (157.2–166.6) | 23.7 | 92.5 | 41.0 | 5.4 |
-| `man.jpeg` | 122 | 122.1 (116.9–123.9) | 5.8 | 68.4 | 42.0 | 5.8 |
-| `people.jpeg` | 191 | 178.6 (167.6–216.0) | 8.7 | 74.5 | 52.8 | 42.0 |
-| `singapore.jpg` | 541 | 536.7 (507.1–595.2) | 385.0 | 111.2 | 40.2 | 0.3 |
-| `starwatchers.jpg` | 211 | 208.6 (206.6–214.1) | 86.8 | 76.0 | 40.7 | 5.7 |
-| `ui_app.webp` | 1,104 | 1,089.5 (1,068.0–1,153.5) | 863.2 | 92.8 | 86.8 | 50.1 |
-| **Corpus total** | **56,056** | **53,729.5** | **50,832.5** | **2,061.8** | **703.4** | **136.3** |
+| `1343_rotate_90_cw.jpg` | 77.4 (75.0–85.6) | 76.8 | +0.8% | 40.0 (38.3–41.7) | 39.1 | +2.4% |
+| `1718_rotate_90_cw.HEIC` | 516.2 (515.6–521.9) | 600.4 | **−14.0%** | 473.5 (471.8–473.8) | 555.8 | **−14.8%** |
+| `7765_horizontal_normal.HEIC` | 624.3 (622.7–625.6) | 760.0 | **−17.9%** | 576.2 (574.1–579.2) | 715.3 | **−19.5%** |
+| `7949_mirror_horizontal_rotate_270_cw.HEIC` | 130.3 (126.3–130.5) | 145.4 | **−10.4%** | 84.8 (84.8–84.8) | 100.5 | **−15.6%** |
+| `IMG_0682_pano.HEIC` | 665.5 (660.0–667.0) | 1,365.6 | **−51.3%** | 617.0 (613.3–620.4) | 1,316.4 | **−53.1%** |
+| `IMG_8606_rotate_90_cw_contains_text.HEIC` | 214.5 (208.8–215.5) | 380.8 | **−43.7%** | 166.9 (164.7–168.5) | 333.7 | **−50.0%** |
+| `IMG_8905.CR2` | 129.7 (124.7–130.3) | 135.2 | −4.1% | 79.9 (79.2–80.1) | 85.6 | −6.7% |
+| `IMG_pano.jpg` | 115.1 (110.3–116.0) | 107.9 | +6.7% | 69.6 (69.4–70.0) | 66.2 | +5.1% |
+| `astronaut.png` | 40.0 (39.6–40.9) | 40.1 | −0.2% | 2.7 (2.4–3.2) | 2.6 | +2.4% |
+| `man.jpeg` | 39.4 (37.9–42.9) | 37.7 | +4.4% | 0.3 (0.3–0.6) | 0.3 | +12.7% |
+| `people.jpeg` | 56.0 (55.5–56.8) | 50.5 | +11.0% | 0.7 (0.6–0.7) | 0.4 | +62.5% |
+| `singapore.jpg` | 47.6 (47.0–49.3) | 47.4 | +0.4% | 11.6 (11.1–12.9) | 11.1 | +4.3% |
+| `starwatchers.jpg` | 42.3 (41.9–43.2) | 42.0 | +0.8% | 5.0 (4.5–5.3) | 4.5 | +10.4% |
+| `ui_app.webp` | 78.2 (78.1–80.5) | 79.0 | −1.0% | 24.7 (24.6–26.8) | 25.1 | −1.8% |
+| **HEIC total** | **2,150.9** | **3,252.2** | **−33.9%** | **1,918.4** | **3,021.6** | **−36.5%** |
+| **Corpus total** | **2,776.7** | **3,868.8** | **−28.2%** | **2,152.7** | **3,256.4** | **−33.9%** |
 
-The unassigned Rust overhead was only 2.2 ms across the summed medians. This confirms that the spans account for effectively the whole Rust call.
+The result strongly validates bounded grid parallelism: the two grid-heavy
+fixtures account for most of the absolute saving and are roughly twice as fast
+to decode. The 14.8–19.5% decode reductions on the two large ordinary HEICs,
+plus 15.6% on the smaller transformed HEIC, show that direct RGB8 output and the
+profile-guided NEON kernels also matter outside grids. This cumulative run does
+not independently attribute those ordinary-file gains between RGB8 and NEON;
+the decoder repository's sequential A/B notes provide that attribution.
 
-## Decode breakdown
+The optimized pure-Rust path is now close to the ImageIO hybrid: its HEIC decode
+sum is 71.5 ms (3.9%) slower and its full-corpus Rust total is 81.6 ms (3.0%)
+slower in these sequential runs. It remains 293.1 ms slower than the
+libheif/libde265 HEIC sum, but avoids that native dependency and license-review
+surface. Decode still represents about 77.5% of the new corpus Rust total, so
+there is useful headroom, but the four changes remove over one third of the
+original HEIC decode cost without changing parity.
 
-Within the 50.84 seconds covered by the decode substages:
+## ImageIO hybrid benchmark
 
-| Decode substage | Corpus time | Share of decode | Share of Rust total |
-|---|---:|---:|---:|
-| Codec/container decode | 48,118.4 ms | 94.7% | 89.6% |
-| RGBA/dynamic image to RGB8 | 1,876.6 ms | 3.7% | 3.5% |
-| Orientation | 839.5 ms | 1.7% | 1.6% |
-| ICC conversion | 1.0 ms | ~0.0% | ~0.0% |
+The final ImageIO prototype uses full-resolution `CGImageSourceCreateImageAtIndex`, draws into an RGB buffer, and then applies the same explicit Rust orientation handling as the other paths. The earlier thumbnail-based prototype was discarded because it changed pixels/orientation and failed parity.
 
-Notable decode medians:
+Full-resolution ImageIO preserves face and CLIP parity for every HEIC it can decode. It rejects `IMG_0682_pano.HEIC` and `IMG_8606...HEIC`; the benchmark below retries those with the current Rust decoder so every fixture completes.
 
-- `IMG_0682_pano.HEIC`: 22,217 ms codec + 1,133 ms RGB8 conversion.
-- `7765_horizontal_normal.HEIC`: 6,972 ms codec + 267 ms RGB8 conversion.
-- `1718_rotate_90_cw.HEIC`: 5,217 ms codec + 369 ms orientation + 153 ms RGB8 conversion.
-- `1343_rotate_90_cw.jpg`: 800 ms codec + 286 ms orientation.
-- `ui_app.webp`: 820 ms codec + 43 ms RGB8 conversion.
+| HEIC fixture | File size | Resolution | Rust total | Decode | Decode speedup | Path | Parity |
+|---|---:|---:|---:|---:|---:|---|---|
+| `1718_rotate_90_cw.HEIC` | 4.75 MiB | 3504×2439 | 157.8 | 114.0 | 4.88× | ImageIO | Pass |
+| `7765_horizontal_normal.HEIC` | 4.67 MiB | 3250×4333 | 148.8 | 98.8 | 7.24× | ImageIO | Pass |
+| `7949_mirror_horizontal_rotate_270_cw.HEIC` | 0.63 MiB | 1547×1209 | 62.6 | 24.5 | 4.09× | ImageIO | Pass |
+| `IMG_0682_pano.HEIC` | 7.52 MiB | 14604×3826 | 1,331.7 | 1,280.8 | 1.03× | Current fallback | Pass |
+| `IMG_8606_rotate_90_cw_contains_text.HEIC` | 1.34 MiB | 3024×4032 | 374.0 | 328.7 | 1.02× | Current fallback | Pass |
+| **HEIC total** | — | — | **2,075.0** | **1,846.9** | **1.64×** | 3 ImageIO / 2 fallback | **5/5 pass** |
 
-The current HEIC integration decodes through `heic_decoder` into an RGBA8/RGBA16 `DynamicImage`; ML then converts the complete frame to RGB8. That explains the separately visible full-frame RGB conversion cost. ICC conversion is not a useful optimization target in this corpus.
+The fallback errors occur before meaningful decoding work (under 1 ms), so they do not materially inflate the two fallback rows. This hybrid reduces the full-corpus Rust total by 30.3%.
 
-## Preprocessing, inference, and postprocessing
+## `heic` crate benchmark
 
-For a typical image, YOLO resize was about 60 ms and YOLO tensor creation about 17 ms. CLIP resize was about 37 ms and tensor creation about 2.5 ms. Across the corpus, resize work accounts for roughly 1.80 of the 2.06 preprocessing seconds; tensor allocation/layout conversion is comparatively small.
+The [`heic` 0.1.6 crate](https://docs.rs/heic/latest/heic/) was built with its `parallel` feature, decoded directly to RGB8, and used the device's available parallelism. It completed every fixture and preserved parity.
 
-After warm-up:
+| HEIC fixture | File size | Resolution | Rust total | Decode | Decode speedup | Parity |
+|---|---:|---:|---:|---:|---:|---|
+| `1718_rotate_90_cw.HEIC` | 4.75 MiB | 3504×2439 | 630.8 | 584.6 | 0.95× | Pass |
+| `7765_horizontal_normal.HEIC` | 4.67 MiB | 3250×4333 | 702.0 | 654.0 | 1.09× | Pass |
+| `7949_mirror_horizontal_rotate_270_cw.HEIC` | 0.63 MiB | 1547×1209 | 140.5 | 95.3 | 1.05× | Pass |
+| `IMG_0682_pano.HEIC` | 7.52 MiB | 14604×3826 | 463.5 | 416.7 | 3.16× | Pass |
+| `IMG_8606_rotate_90_cw_contains_text.HEIC` | 1.34 MiB | 3024×4032 | 169.8 | 124.9 | 2.67× | Pass |
+| **HEIC total** | — | — | **2,106.5** | **1,875.5** | **1.61×** | **5/5 pass** |
 
-- face detection inference was generally 21–26 ms per image;
-- CLIP image inference was generally 18–32 ms per image;
-- face embedding inference was roughly 1.4–1.9 ms per face, with higher aggregate time on face-heavy images;
-- face detection and CLIP postprocessing were effectively free at this scale;
-- face alignment was about 5 ms per face. It became visible only for `people.jpeg` (7 faces) and `ui_app.webp` (10 faces).
+This decoder is roughly even with the current implementation on the three ordinary HEICs, but dramatically better on the two grid/problem fixtures. It reduces the full-corpus Rust total by 29.7%. Its crate metadata declares `AGPL-3.0-only OR LicenseRef-Imazen-Commercial`, so it should not be adopted without an explicit licensing decision.
 
-This validates the recently implemented borrowed-output and detection postprocessing changes: postprocessing is no longer a consequential whole-corpus cost. Face-heavy images still pay linearly for alignment and embedding, as expected.
+## `libheif-rs` benchmark
 
-## Cold start
+[`libheif-rs` 2.7.0](https://docs.rs/libheif-rs/latest/libheif_rs/) was benchmarked with a minimal release-built native libheif, libde265 1.0.16 as its HEVC codec, direct RGB output, and maximum decoding threads set to device parallelism. Every HEIC completed and preserved parity.
 
-The first warm-up image took 8.97 seconds. Excluding its 1.04-second decode and 0.10-second YOLO preprocessing, the important cold costs were:
+| HEIC fixture | File size | Resolution | Rust total | Decode | Decode speedup | Parity |
+|---|---:|---:|---:|---:|---:|---|
+| `1718_rotate_90_cw.HEIC` | 4.75 MiB | 3504×2439 | 473.3 | 427.5 | 1.30× | Pass |
+| `7765_horizontal_normal.HEIC` | 4.67 MiB | 3250×4333 | 566.7 | 519.5 | 1.38× | Pass |
+| `7949_mirror_horizontal_rotate_270_cw.HEIC` | 0.63 MiB | 1547×1209 | 123.6 | 78.8 | 1.27× | Pass |
+| `IMG_0682_pano.HEIC` | 7.52 MiB | 14604×3826 | 524.6 | 475.4 | 2.77× | Pass |
+| `IMG_8606_rotate_90_cw_contains_text.HEIC` | 1.34 MiB | 3024×4032 | 167.2 | 124.0 | 2.69× | Pass |
+| **HEIC total** | — | — | **1,855.3** | **1,625.3** | **1.86×** | **5/5 pass** |
 
-| Operation | Session creation | First inference | Warmed inference |
-|---|---:|---:|---:|
-| Face detection | 546 ms | 1,292 ms | 21–26 ms |
-| CLIP image | 3,831 ms | 2,091 ms | 18–32 ms |
-| Face embedding | 172 ms | 959 ms | 1.4–1.9 ms/face |
-
-These costs matter to perceived first-index latency, but they are ORT/CoreML initialization costs and are intentionally outside the Rust-side recommendations below.
+This is the fastest complete option and reduces the full-corpus Rust total by 35.6%. The cost is integration complexity: `libheif-rs` wraps a C++ native library, the HEVC codec is a separate native dependency, and the initial embedded build pulled in unnecessary codecs until it was configured as a minimal HEIC-decode-only archive. The [libheif project](https://github.com/strukturag/libheif) documents libde265 as its default HEIC decoder and supports parallel tile decoding.
 
 ## Correctness
 
-The parity comparison checked 14 files and 16 detected faces:
+The current, ImageIO-hybrid, `heic`, and `libheif-rs` runs all produced the same parity result:
 
-- face boxes: pass, maximum IoU error 0;
-- landmarks: pass, maximum error 0.001165 against a 0.03 threshold;
-- face embeddings: pass, maximum cosine distance 0.009906 against a 0.015 threshold;
-- scores: pass, maximum delta 0.003269 against a 0.05 threshold;
-- CLIP: 13/14 files pass; `IMG_8905.CR2` fails at cosine distance 0.196097.
+- all five HEIC fixtures pass face and CLIP thresholds;
+- all non-RAW fixtures pass;
+- the sole failure is the pre-existing `IMG_8905.CR2` fallback, whose JPEG re-encode has CLIP cosine distance 0.196097 from the Python RAW ground truth.
 
-Rust unit tests also passed (`cargo test -p ente-photos --lib`: 52 passed).
+The temporary decoder work did not change that CR2 path. The ImageIO-only run without fallback also confirmed that the three supported ImageIO HEICs pass before the hybrid was measured.
+
+The cumulative `speed_improvements` release run has the same correctness
+result: all five HEICs and all other non-RAW fixtures pass. The only finding is
+the same pre-existing `IMG_8905.CR2` CLIP cosine distance of `0.196097`; there
+are no new errors or HEIC threshold regressions.
 
 ## Recommendations
 
-### 1. Prioritize an iOS-native or substantially faster HEIC decode path
+### 1. Prefer an ImageIO-first iOS path with the current decoder as fallback
 
-This is the only change with order-of-magnitude upside. Benchmark a full-resolution Apple ImageIO/ImageIO-backed decode against the current pure-Rust HEIC path, or optimize the `heic_decoder` codec itself (including independent grid/tile decode where applicable). Keep color-space handling and orientation explicit rather than relying on UIKit defaults.
+This is the best practical first implementation for iOS. It removes 30.3% of measured corpus time, is 4.1–7.2× faster for supported HEICs, preserves parity, adds no decoder licensing burden, and keeps the unusual files on the already-tested Rust path. The fallback boundary is small and readable: one iOS-specific decoder returning the same `DecodedImage` type.
 
-Accuracy must be the gate: compare oriented RGB buffers first, then run the complete 14-image parity suite. If native decode produces material pixel or embedding differences, do not ship it merely for speed. Even a large decoder implementation is justified only behind a clean `DecodedImage` abstraction so the indexing code remains readable.
+Before shipping, package the ImageIO bridge cleanly (preferably behind the image crate's decoder abstraction), add explicit tests for all EXIF orientations and the two fallback fixtures, and run a larger real-library sample to establish ImageIO's fallback rate. Do not use the thumbnail API; the full-image API plus explicit orientation is required for parity.
 
-### 2. Add a direct RGB8 output path to `heic_decoder`
+### 2. Keep `libheif-rs` as the performance-maximizing alternative
 
-HEIC currently produces full-frame RGBA and ML immediately allocates/copies a second full frame to discard alpha. A decoder API that writes the same RGB values directly into the final RGB8 buffer can recover up to 1.88 seconds across this corpus (3.5% of Rust time), including about 1.13 seconds on the panoramic HEIC alone. For images with alpha, preserve the current exact “drop alpha” semantics.
+If the additional 202 ms per test corpus versus ImageIO hybrid is valuable, `libheif-rs` is the fastest complete option and handles every problematic fixture. A production integration should build a minimal release-only libheif + libde265 artifact, measure binary-size impact, document native update ownership, and complete an LGPL/static-linking compliance review. The wrapper's MIT license does not remove the native libraries' obligations.
 
-This is lower risk than changing decode resolution or using embedded thumbnails because it can be made byte-for-byte equivalent.
+The 7.5% corpus advantage over ImageIO hybrid is real in this run but modest relative to the added build and maintenance surface. It becomes more compelling if a larger photo sample shows frequent ImageIO fallback.
 
-### 3. Fuse or eliminate full-frame orientation copies
+### 3. Do not adopt `heic` without resolving its license
 
-Orientation costs 0.84 seconds across the corpus and 182–369 ms on the rotated HEICs. The best exact approach is to have the decoder write RGB8 in final orientation in one pass. A second option is an oriented pixel view used by preprocessing and alignment, avoiding a physical rotation while keeping coordinate conversion in one well-tested abstraction.
+Technically, `heic` is attractive: pure Rust integration, direct RGB8 output, full parity, and the best pano result. Its overall performance is essentially tied with ImageIO hybrid. Legally, the published AGPL/commercial license requires either a compatible product decision or a commercial license; it is not a drop-in dependency decision.
 
-Add byte-equivalence tests for all eight EXIF orientations. This is worth doing after direct RGB output because the two transformations can naturally be fused.
+### 4. Use the problem-fixture results to guide the current decoder
 
-### 4. Prototype concurrent YOLO and CLIP preprocessing, but treat it as secondary
+Both alternative complete decoders improve the pano/text fixtures far more than the ordinary files. The highest-value work in the current `heic-decoder` is therefore grid/tile scheduling and direct RGB output, not generic container parsing. The `heic` result shows that parallel grid decode can cut the 55.9 MP pano from 1,316 ms to 417 ms while preserving embeddings.
 
-The two resize/tensor pipelines are independent reads of the decoded image. Running them concurrently has a measured theoretical ceiling of only 786 ms across the corpus (1.46% of total Rust time), before thread scheduling and memory-bandwidth contention. It may help small JPEG/PNG images more than HEIC-heavy workloads.
+### 5. Make release-mode enforcement part of future benchmarks
 
-Use scoped, bounded concurrency and benchmark on device; do not add a global thread pool or obscure ownership merely for this small ceiling. Running complete face and CLIP inference pipelines concurrently may have a larger wall-clock effect, but should be evaluated separately because CoreML/ORT contention could erase the gain.
-
-### 5. Reuse preprocessing scratch allocations only after the decode work
-
-YOLO tensor construction totals about 219 ms and CLIP tensor construction about 34 ms across the corpus. Reusing `Resizer`, resized-image buffers, and tensor buffers can reduce allocations, but the total possible gain is under 0.5% here and complicates ownership because tensors are retained through inference. It is a cleanup optimization, not the next project.
-
-### 6. Fix the CR2 path for correctness first, then performance
-
-CR2 currently incurs a failed Rust decode followed by Dart `package:image` decode, JPEG quality-95 re-encoding, a temporary file write, and a second Rust decode. That adds about 2.3 seconds outside the successful Rust call and is the only parity failure. A native Rust RAW/CR2 implementation or a shared canonical preview extraction could avoid the round trip, but it must first define which pixels are authoritative. Removing the temporary file alone will not address the expensive decode/re-encode or the accuracy mismatch.
-
-## Changes not recommended now
-
-- More face/CLIP detection postprocessing optimization: measured at only a few milliseconds for the entire corpus.
-- ICC optimization: approximately 1 ms for the corpus.
-- Embedded-thumbnail or reduced-resolution decode without a strict parity experiment: likely fast, but it can alter detections and embeddings and therefore violates the accuracy requirement by default.
-- Broad unsafe/SIMD rewrites of tensor loops: the measured ceiling is too small relative to readability and maintenance cost.
+The debug/profile mismatch changed absolute decode times by about 10× and would have produced misleading prioritization. The runner should print and assert the actual iOS Flutter mode and Rust Cargo profile, and benchmark artifact paths should include both. Future decoder A/B runs should be uninstrumented, randomized by decoder or fixture, and repeated enough to report confidence intervals.
 
 ## Artifacts
 
-- Raw combined device log: `infra/ml/test/out/rust_pipeline_ios_2026-07-16/device_benchmark.log`
-- iOS results: `infra/ml/test/out/rust_pipeline_ios_2026-07-16/ios/results.json`
-- Machine-readable comparison: `infra/ml/test/out/rust_pipeline_ios_2026-07-16/comparison_report.json`
-- HTML parity report: `infra/ml/test/out/rust_pipeline_ios_2026-07-16/parity_report.html`
+- Current release: `infra/ml/test/out/rust_pipeline_ios_current_release_2026-07-16/`
+- ImageIO full-image validation: `infra/ml/test/out/rust_pipeline_ios_imageio_full_release_2026-07-16/`
+- ImageIO hybrid: `infra/ml/test/out/rust_pipeline_ios_imageio_hybrid_release_2026-07-16/`
+- `heic` release: `infra/ml/test/out/rust_pipeline_ios_heic_crate_release_2026-07-16/`
+- `libheif-rs` release: `infra/ml/test/out/rust_pipeline_ios_libheif_rs_release_2026-07-16/`
+- Four cumulative decoder improvements, true Flutter/Rust release:
+  `infra/ml/test/out/rust_pipeline_ios_speed_improvements_release_2026-07-16/`
 
-All timing instrumentation and benchmark-runner changes remain uncommitted and are intentionally temporary.
+The local path override, direct-RGB caller shim, timing instrumentation, and
+standalone release runner were removed after the run. The four decoder changes
+are committed on `speed_improvements`; the pre-existing experimental artifacts
+described elsewhere in this report retain their original status.
