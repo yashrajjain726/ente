@@ -66,6 +66,7 @@ var reservedSpaceSlugList = []string{
 	"download-app",
 	"download-ente",
 	"downloads",
+	"ducky",
 	"edit",
 	"email",
 	"email-verification",
