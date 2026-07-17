@@ -600,6 +600,8 @@ const Page: React.FC = () => {
     >(null);
     const [modelUrl, setModelUrl] = useState("");
     const [mmprojUrl, setMmprojUrl] = useState("");
+    const [modelSha256, setModelSha256] = useState("");
+    const [mmprojSha256, setMmprojSha256] = useState("");
     const [contextLength, setContextLength] = useState("");
     const [maxTokens, setMaxTokens] = useState("");
     const [systemPrompt, setSystemPrompt] = useState(
@@ -980,6 +982,8 @@ const Page: React.FC = () => {
                         useCustomModel?: boolean;
                         modelUrl?: string;
                         mmprojUrl?: string;
+                        modelSha256?: string;
+                        mmprojSha256?: string;
                         contextLength?: string;
                         maxTokens?: string;
                     };
@@ -1005,6 +1009,10 @@ const Page: React.FC = () => {
                     setUseCustomModel(!!parsed.useCustomModel);
                     setModelUrl(parsed.modelUrl ?? "");
                     setMmprojUrl(canMmproj ? (parsed.mmprojUrl ?? "") : "");
+                    setModelSha256(parsed.modelSha256 ?? "");
+                    setMmprojSha256(
+                        canMmproj ? (parsed.mmprojSha256 ?? "") : "",
+                    );
                     setContextLength(clampedContextLength);
                     setMaxTokens(parsed.maxTokens ?? "");
                     void removeKV(MODEL_SETTINGS_STORAGE_KEY);
@@ -1024,6 +1032,8 @@ const Page: React.FC = () => {
                 useCustomModel?: boolean;
                 modelUrl?: string;
                 mmprojUrl?: string;
+                modelSha256?: string;
+                mmprojSha256?: string;
                 contextLength?: string;
                 maxTokens?: string;
             };
@@ -1052,6 +1062,8 @@ const Page: React.FC = () => {
             setUseCustomModel(!!parsed.useCustomModel);
             setModelUrl(parsed.modelUrl ?? "");
             setMmprojUrl(canMmproj ? (parsed.mmprojUrl ?? "") : "");
+            setModelSha256(parsed.modelSha256 ?? "");
+            setMmprojSha256(canMmproj ? (parsed.mmprojSha256 ?? "") : "");
             setContextLength(clampedContextLength);
             setMaxTokens(parsed.maxTokens ?? "");
         } catch (error) {
@@ -1726,6 +1738,14 @@ const Page: React.FC = () => {
                 customModelEnabled && allowMmproj && mmprojUrl.trim()
                     ? mmprojUrl.trim()
                     : undefined,
+            modelSha256:
+                customModelEnabled && modelSha256.trim()
+                    ? modelSha256.trim()
+                    : undefined,
+            mmprojSha256:
+                customModelEnabled && allowMmproj && mmprojSha256.trim()
+                    ? mmprojSha256.trim()
+                    : undefined,
             contextLength: contextLength ? Number(contextLength) : undefined,
             maxTokens:
                 maxTokens && Number(maxTokens) > 0
@@ -1736,6 +1756,8 @@ const Page: React.FC = () => {
         useCustomModel,
         modelUrl,
         mmprojUrl,
+        modelSha256,
+        mmprojSha256,
         contextLength,
         maxTokens,
         allowMmproj,
@@ -3203,6 +3225,8 @@ const Page: React.FC = () => {
             useCustomModel: boolean;
             modelUrl: string;
             mmprojUrl: string;
+            modelSha256: string;
+            mmprojSha256: string;
             contextLength: string;
             maxTokens: string;
         }) => {
@@ -3213,6 +3237,11 @@ const Page: React.FC = () => {
                 mmprojUrl:
                     draft.useCustomModel && isTauriRuntime
                         ? draft.mmprojUrl
+                        : "",
+                modelSha256: draft.useCustomModel ? draft.modelSha256 : "",
+                mmprojSha256:
+                    draft.useCustomModel && isTauriRuntime
+                        ? draft.mmprojSha256
                         : "",
                 contextLength: draft.contextLength,
                 maxTokens: draft.maxTokens,
@@ -3227,6 +3256,8 @@ const Page: React.FC = () => {
             setUseCustomModel(draft.useCustomModel);
             setModelUrl(draft.modelUrl);
             setMmprojUrl(draft.mmprojUrl);
+            setModelSha256(draft.modelSha256);
+            setMmprojSha256(draft.mmprojSha256);
             setContextLength(draft.contextLength);
             setMaxTokens(draft.maxTokens);
             setLoadedModelName(null);
@@ -3244,6 +3275,8 @@ const Page: React.FC = () => {
                     useCustomModel: false,
                     modelUrl: "",
                     mmprojUrl: "",
+                    modelSha256: "",
+                    mmprojSha256: "",
                     contextLength: "",
                     maxTokens: "",
                 }),
@@ -3253,6 +3286,8 @@ const Page: React.FC = () => {
         setUseCustomModel(false);
         setModelUrl("");
         setMmprojUrl("");
+        setModelSha256("");
+        setMmprojSha256("");
         setContextLength("");
         setMaxTokens("");
         setLoadedModelName(null);
@@ -4250,6 +4285,8 @@ const Page: React.FC = () => {
                 isTauriRuntime={isTauriRuntime}
                 modelUrl={modelUrl}
                 mmprojUrl={mmprojUrl}
+                modelSha256={modelSha256}
+                mmprojSha256={mmprojSha256}
                 suggestedModels={suggestedModels}
                 contextLength={contextLength}
                 maxTokens={maxTokens}

@@ -22,8 +22,11 @@ export const DEFAULT_MODEL: ModelInfo = {
     id: "lfm-vl-1.6b",
     name: "LFM 2.5 VL 1.6B (Q4_0)",
     url: "https://huggingface.co/LiquidAI/LFM2.5-VL-1.6B-GGUF/resolve/main/LFM2.5-VL-1.6B-Q4_0.gguf?download=true",
+    sha256: "8186364a4e7c3ad30f6dd3d3b7a4e0074c77dd91eed6cad5d8be9090ce285804",
     mmprojUrl:
         "https://huggingface.co/LiquidAI/LFM2.5-VL-1.6B-GGUF/resolve/main/mmproj-LFM2.5-VL-1.6b-Q8_0.gguf",
+    mmprojSha256:
+        "2ce89e610c56f3198ece2b86cf61743a08b9307279c89125eb2412ebb908689d",
     sizeBytes: 695_752_160,
     mmprojSizeBytes: 583_109_888,
     sizeHuman: "~664 MB",
@@ -33,8 +36,11 @@ const DESKTOP_DEFAULT_MODEL: ModelInfo = {
     id: "gemma-4-e4b-q4km",
     name: "Gemma 4 E4B (Q4_K_M)",
     url: "https://huggingface.co/unsloth/gemma-4-E4B-it-GGUF/resolve/main/gemma-4-E4B-it-Q4_K_M.gguf?download=true",
+    sha256: "519b9793ed6ce0ff530f1b7c96e848e08e49e7af4d57bb97f76215963a54146d",
     mmprojUrl:
         "https://huggingface.co/unsloth/gemma-4-E4B-it-GGUF/resolve/main/mmproj-F16.gguf",
+    mmprojSha256:
+        "ddf46c21d7078e95338cfc22306b19b276a29a5ad089023449dd54d4b6170a51",
     sizeBytes: 4_977_169_088,
     mmprojSizeBytes: 990_372_800,
     sizeHuman: "5.97 GB",
@@ -44,7 +50,9 @@ interface ConfigModelPreset {
     id: string;
     title: string;
     url: string;
+    sha256?: string | null;
     mmprojUrl?: string | null;
+    mmprojSha256?: string | null;
 }
 
 interface ConfigDefaults {
@@ -68,7 +76,9 @@ interface TauriLlmModelDownloadProgress {
 interface ModelTarget {
     id: string;
     url: string;
+    sha256?: string | null;
     mmprojUrl?: string | null;
+    mmprojSha256?: string | null;
 }
 
 interface TauriModelStatus {
@@ -504,7 +514,9 @@ export class LlmProvider {
                     id: rustPreset.id,
                     name: rustPreset.title,
                     url: rustPreset.url,
+                    sha256: rustPreset.sha256 ?? undefined,
                     mmprojUrl: rustPreset.mmprojUrl ?? undefined,
+                    mmprojSha256: rustPreset.mmprojSha256 ?? undefined,
                 };
                 this.configDefaults = defaults;
             } catch (defaultsError) {
@@ -530,7 +542,9 @@ export class LlmProvider {
                 id: `custom:${settings.modelUrl}`,
                 name: "Custom model",
                 url: settings.modelUrl,
+                sha256: settings.modelSha256,
                 mmprojUrl: settings.mmprojUrl,
+                mmprojSha256: settings.mmprojSha256,
             };
         }
         return this.defaultModel;
@@ -566,7 +580,13 @@ export class LlmProvider {
                 preset.url == model.url &&
                 (preset.mmprojUrl ?? null) == mmprojUrl,
         );
-        return { id: preset?.id ?? model.id, url: model.url, mmprojUrl };
+        return {
+            id: preset?.id ?? model.id,
+            url: model.url,
+            sha256: preset?.sha256 ?? model.sha256 ?? null,
+            mmprojUrl,
+            mmprojSha256: preset?.mmprojSha256 ?? model.mmprojSha256 ?? null,
+        };
     }
 
     private ensureMigrated(settings: ModelSettings): Promise<void> {

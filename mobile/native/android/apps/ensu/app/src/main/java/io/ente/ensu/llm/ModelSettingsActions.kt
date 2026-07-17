@@ -324,19 +324,25 @@ internal class ModelSettingsActions(
         }
         val contextLength = settings.contextLength.toIntOrNull()
         val maxTokens = settings.maxTokens.toIntOrNull()?.takeIf { it > 0 }
-        val id = if (useCustom) {
+        val preset = if (useCustom) {
             (listOf(configDefaults.mobileDefaultModel) + configDefaults.mobileModelPresets)
                 .firstOrNull { it.url == url && it.mmprojUrl == mmproj }
-                ?.id
-                ?: "custom:$url"
         } else {
-            configDefaults.mobileDefaultModel.id
+            configDefaults.mobileDefaultModel
         }
 
         return LlmModelTarget(
-            id = id,
+            id = preset?.id ?: "custom:$url",
             url = url,
+            sha256 = preset?.sha256
+                ?: settings.modelSha256.trim().takeIf { it.isNotEmpty() },
             mmprojUrl = mmproj,
+            mmprojSha256 = if (mmproj == null) {
+                null
+            } else {
+                preset?.mmprojSha256
+                    ?: settings.mmprojSha256.trim().takeIf { it.isNotEmpty() }
+            },
             contextLength = contextLength,
             maxTokens = maxTokens
         )

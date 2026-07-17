@@ -38,7 +38,9 @@ impl ModelDownloadState {
 pub struct ModelTarget {
     id: String,
     url: String,
+    sha256: Option<String>,
     mmproj_url: Option<String>,
+    mmproj_sha256: Option<String>,
 }
 
 impl From<ModelTarget> for ModelDownloadTarget {
@@ -46,7 +48,9 @@ impl From<ModelTarget> for ModelDownloadTarget {
         Self::Gguf {
             id: value.id,
             url: value.url,
+            sha256: value.sha256,
             mmproj_url: value.mmproj_url,
+            mmproj_sha256: value.mmproj_sha256,
         }
     }
 }
@@ -281,7 +285,9 @@ pub async fn llm_migrate_models(
         .map(|preset| ModelDownloadTarget::Gguf {
             id: preset.id,
             url: preset.url,
+            sha256: preset.sha256,
             mmproj_url: preset.mmproj_url,
+            mmproj_sha256: preset.mmproj_sha256,
         })
         .collect();
     targets.extend(custom_targets.into_iter().map(Into::into));

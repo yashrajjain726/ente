@@ -33,7 +33,9 @@ class AdvancedSettingsDataStore(private val context: Context) {
             modelSettings = ModelSettingsState(
                 useCustomModel = prefs[Keys.useCustomModel] ?: false,
                 modelUrl = prefs[Keys.modelUrl].orEmpty(),
+                modelSha256 = prefs[Keys.modelSha256].orEmpty(),
                 mmprojUrl = prefs[Keys.mmprojUrl].orEmpty(),
+                mmprojSha256 = prefs[Keys.mmprojSha256].orEmpty(),
                 contextLength = prefs[Keys.contextLength].orEmpty(),
                 maxTokens = prefs[Keys.maxTokens].orEmpty(),
                 temperature = prefs[Keys.temperature].orEmpty()
@@ -69,7 +71,9 @@ class AdvancedSettingsDataStore(private val context: Context) {
         context.advancedSettingsPreferences.edit { prefs ->
             prefs[Keys.useCustomModel] = settings.useCustomModel
             prefs[Keys.modelUrl] = settings.modelUrl
+            prefs[Keys.modelSha256] = settings.modelSha256
             prefs[Keys.mmprojUrl] = settings.mmprojUrl
+            prefs[Keys.mmprojSha256] = settings.mmprojSha256
             prefs[Keys.contextLength] = settings.contextLength
             prefs[Keys.maxTokens] = settings.maxTokens
             prefs[Keys.temperature] = settings.temperature
@@ -86,7 +90,9 @@ class AdvancedSettingsDataStore(private val context: Context) {
         context.advancedSettingsPreferences.edit { prefs ->
             prefs[Keys.useCustomModel] = false
             prefs[Keys.modelUrl] = ""
+            prefs[Keys.modelSha256] = ""
             prefs[Keys.mmprojUrl] = ""
+            prefs[Keys.mmprojSha256] = ""
             prefs[Keys.contextLength] = ""
             prefs[Keys.maxTokens] = ""
             prefs[Keys.temperature] = ""
@@ -105,7 +111,9 @@ class AdvancedSettingsDataStore(private val context: Context) {
             val systemPrompt = stringPreferencesKey("system_prompt")
             val useCustomModel = booleanPreferencesKey("use_custom_model")
             val modelUrl = stringPreferencesKey("model_url")
+            val modelSha256 = stringPreferencesKey("model_sha256")
             val mmprojUrl = stringPreferencesKey("mmproj_url")
+            val mmprojSha256 = stringPreferencesKey("mmproj_sha256")
             val contextLength = stringPreferencesKey("context_length")
             val maxTokens = stringPreferencesKey("max_tokens")
             val temperature = stringPreferencesKey("temperature")

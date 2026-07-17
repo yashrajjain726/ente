@@ -553,11 +553,11 @@ fn fetch_fixtures(
                 )?
                 .display()
                 .to_string(),
-                sha256: Some(normalize_sha256(&fixture.sha256)),
+                sha256: normalize_sha256(&fixture.sha256),
             })
         })
         .collect::<Result<Vec<_>>>()?;
-    download::fetch(targets, |_, _| Ok(()), |_| {}, || false).context("fetch fixtures")
+    download::fetch(targets, |_| {}, || false).context("fetch fixtures")
 }
 
 fn resolve_onnx_runtime_library(cache_dir: &Path, assets: &OnnxRuntimeAssets) -> Result<PathBuf> {
@@ -707,9 +707,8 @@ fn ensure_remote_asset(
             label: label.to_string(),
             url: url.to_string(),
             destination_path: target.display().to_string(),
-            sha256: Some(normalize_sha256(expected_sha256)),
+            sha256: normalize_sha256(expected_sha256),
         }],
-        |_, _| Ok(()),
         |_| {},
         || false,
     )

@@ -93,6 +93,24 @@ fun ModelSettingsScreen(
             }
         )
     }
+    var customModelSha by remember(state) {
+        mutableStateOf(
+            if (state.useCustomModel && modelChoices.none { !it.isCustom && it.url == state.modelUrl }) {
+                state.modelSha256
+            } else {
+                ""
+            }
+        )
+    }
+    var customMmprojSha by remember(state) {
+        mutableStateOf(
+            if (state.useCustomModel && modelChoices.none { !it.isCustom && it.url == state.modelUrl }) {
+                state.mmprojSha256
+            } else {
+                ""
+            }
+        )
+    }
     var contextLength by remember(state) { mutableStateOf(state.contextLength) }
     var maxTokens by remember(state) { mutableStateOf(state.maxTokens) }
     var temperature by remember(state) { mutableStateOf(state.temperature) }
@@ -107,7 +125,13 @@ fun ModelSettingsScreen(
 
     val selectedModel = modelChoices.firstOrNull { it.id == selectedModelId } ?: modelChoices.first()
     val isCustomSelected = selectedModel.isCustom
-    val canSave = !isCustomSelected || customModelUrl.isNotBlank()
+    val shaPattern = remember { Regex("[0-9a-fA-F]{64}") }
+    val canSave = !isCustomSelected ||
+        (
+            customModelUrl.isNotBlank() &&
+                shaPattern.matches(customModelSha.trim()) &&
+                (customMmprojUrl.isBlank() || shaPattern.matches(customMmprojSha.trim()))
+            )
 
     Column(
         modifier = Modifier
@@ -153,6 +177,8 @@ fun ModelSettingsScreen(
                             if (choice.isCustom) {
                                 customModelUrl = ""
                                 customMmprojUrl = ""
+                                customModelSha = ""
+                                customMmprojSha = ""
                             }
                         }
                     )
@@ -173,6 +199,16 @@ fun ModelSettingsScreen(
                 )
 
                 Spacer(modifier = Modifier.height(EnsuSpacing.md.dp))
+                Text(text = "Model SHA-256", style = EnsuTypography.small, color = EnsuColor.textMuted())
+                Spacer(modifier = Modifier.height(EnsuSpacing.xs.dp))
+                OutlinedTextField(
+                    value = customModelSha,
+                    onValueChange = { customModelSha = it },
+                    placeholder = { Text(text = "Checksum from the model page") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(modifier = Modifier.height(EnsuSpacing.md.dp))
                 Text(text = "mmproj .gguf URL", style = EnsuTypography.small, color = EnsuColor.textMuted())
                 Spacer(modifier = Modifier.height(EnsuSpacing.xs.dp))
                 OutlinedTextField(
@@ -181,6 +217,20 @@ fun ModelSettingsScreen(
                     placeholder = { Text(text = "(optional for multimodal)") },
                     modifier = Modifier.fillMaxWidth()
                 )
+
+                AnimatedVisibility(customMmprojUrl.isNotBlank()) {
+                    Column {
+                        Spacer(modifier = Modifier.height(EnsuSpacing.md.dp))
+                        Text(text = "mmproj SHA-256", style = EnsuTypography.small, color = EnsuColor.textMuted())
+                        Spacer(modifier = Modifier.height(EnsuSpacing.xs.dp))
+                        OutlinedTextField(
+                            value = customMmprojSha,
+                            onValueChange = { customMmprojSha = it },
+                            placeholder = { Text(text = "Checksum from the model page") },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                }
             }
         }
 
@@ -252,7 +302,9 @@ fun ModelSettingsScreen(
                     selectedModel.isDefault -> state.copy(
                         useCustomModel = false,
                         modelUrl = "",
+                        modelSha256 = "",
                         mmprojUrl = "",
+                        mmprojSha256 = "",
                         contextLength = contextLength,
                         maxTokens = maxTokens,
                         temperature = temperature
@@ -260,7 +312,9 @@ fun ModelSettingsScreen(
                     selectedModel.isCustom -> state.copy(
                         useCustomModel = true,
                         modelUrl = customModelUrl,
+                        modelSha256 = customModelSha.trim(),
                         mmprojUrl = customMmprojUrl,
+                        mmprojSha256 = customMmprojSha.trim(),
                         contextLength = contextLength,
                         maxTokens = maxTokens,
                         temperature = temperature
@@ -268,7 +322,9 @@ fun ModelSettingsScreen(
                     else -> state.copy(
                         useCustomModel = true,
                         modelUrl = selectedModel.url.orEmpty(),
+                        modelSha256 = "",
                         mmprojUrl = selectedModel.mmproj.orEmpty(),
+                        mmprojSha256 = "",
                         contextLength = contextLength,
                         maxTokens = maxTokens,
                         temperature = temperature

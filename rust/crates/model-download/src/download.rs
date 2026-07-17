@@ -71,7 +71,7 @@ pub struct Target {
     pub label: String,
     pub url: String,
     pub destination_path: String,
-    pub sha256: Option<String>,
+    pub sha256: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -192,7 +192,6 @@ struct ContentRange {
 
 pub fn fetch(
     targets: Vec<Target>,
-    validate: impl Fn(&Target, &Path) -> Result<(), Error>,
     on_progress: impl FnMut(Progress),
     is_cancelled: impl Fn() -> bool,
 ) -> Result<(), Error> {
@@ -200,17 +199,25 @@ pub fn fetch(
         .enable_io()
         .enable_time()
         .build()?;
-    runtime.block_on(fetch_async(targets, validate, on_progress, is_cancelled))
+    runtime.block_on(fetch_async(targets, on_progress, is_cancelled))
 }
 
 async fn fetch_async(
     targets: Vec<Target>,
-    validate: impl Fn(&Target, &Path) -> Result<(), Error>,
     on_progress: impl FnMut(Progress),
     is_cancelled: impl Fn() -> bool,
 ) -> Result<(), Error> {
     if targets.is_empty() {
         return Ok(());
+    }
+
+    for target in &targets {
+        let sha256 = &target.sha256;
+        if sha256.len() != 64 || !sha256.chars().all(|c| c.is_ascii_hexdigit()) {
+            return Err(Error::InvalidTarget(format!(
+                "'{sha256}' is not a SHA-256 digest"
+            )));
+        }
     }
 
     let client = Client::builder()
@@ -223,7 +230,7 @@ async fn fetch_async(
 
     for target in &targets {
         let destination = Path::new(&target.destination_path);
-        let is_cached = prepare_cached_download(target, destination, &validate);
+        let is_cached = prepare_cached_download(target, destination);
         cached.push(is_cached);
         if is_cached {
             download_probes.push(DownloadProbe {
@@ -306,7 +313,6 @@ async fn fetch_async(
         let target_label = target.label.clone();
         let client = &client;
         let is_cancelled = &is_cancelled;
-        let validate = &validate;
 
         downloads.push(async move {
             if is_cancelled() {
@@ -318,7 +324,6 @@ async fn fetch_async(
                 target,
                 &destination,
                 &download_probe,
-                validate,
                 |file_progress| {
                     {
                         let mut states = progress_states.borrow_mut();
@@ -409,7 +414,6 @@ async fn download_file(
     target: &Target,
     destination: &Path,
     download_probe: &DownloadProbe,
-    validate: &impl Fn(&Target, &Path) -> Result<(), Error>,
     mut on_progress: impl FnMut(FileDownloadProgress),
     is_cancelled: &impl Fn() -> bool,
 ) -> Result<FileDownloadReport, Error> {
@@ -427,7 +431,6 @@ async fn download_file(
                 destination,
                 total,
                 download_probe.response_metadata.clone(),
-                validate,
                 &mut on_progress,
                 is_cancelled,
             )
@@ -452,7 +455,6 @@ async fn download_file(
         target,
         destination,
         download_probe.content_length,
-        validate,
         &mut on_progress,
         is_cancelled,
     )
@@ -473,7 +475,6 @@ async fn download_file_single(
     target: &Target,
     destination: &Path,
     expected_file_total: Option<u64>,
-    validate: &impl Fn(&Target, &Path) -> Result<(), Error>,
     on_progress: &mut dyn FnMut(FileDownloadProgress),
     is_cancelled: &impl Fn() -> bool,
 ) -> Result<FileDownloadReport, Error> {
@@ -662,15 +663,7 @@ async fn download_file_single(
             continue;
         }
 
-        if let Some(expected) = &target.sha256
-            && let Err(err) = check_sha256(&tmp_path, expected, &target.label)
-        {
-            let _ = fs::remove_file(&tmp_path);
-            let _ = fs::remove_file(&partial_metadata_path);
-            return Err(err);
-        }
-
-        if let Err(err) = validate(target, &tmp_path) {
+        if let Err(err) = check_sha256(&tmp_path, &target.sha256, &target.label) {
             let _ = fs::remove_file(&tmp_path);
             let _ = fs::remove_file(&partial_metadata_path);
             return Err(err);
@@ -712,7 +705,6 @@ async fn download_file_ranged(
     destination: &Path,
     total: u64,
     response_metadata: Option<ResponseMetadata>,
-    validate: &impl Fn(&Target, &Path) -> Result<(), Error>,
     on_progress: &mut dyn FnMut(FileDownloadProgress),
     is_cancelled: &impl Fn() -> bool,
 ) -> Result<FileDownloadReport, Error> {
@@ -791,15 +783,7 @@ async fn download_file_ranged(
 
     emit_range_file_progress(total, file_started_at, &range_states, &on_progress);
 
-    if let Some(expected) = &target.sha256
-        && let Err(err) = check_sha256(&tmp_path, expected, &target.label)
-    {
-        let _ = fs::remove_file(&tmp_path);
-        let _ = fs::remove_file(&range_metadata_path);
-        return Err(err);
-    }
-
-    if let Err(err) = validate(target, &tmp_path) {
+    if let Err(err) = check_sha256(&tmp_path, &target.sha256, &target.label) {
         let _ = fs::remove_file(&tmp_path);
         let _ = fs::remove_file(&range_metadata_path);
         return Err(err);
@@ -1528,47 +1512,17 @@ fn bytes_per_second(bytes: u64, elapsed: Duration) -> f64 {
     }
 }
 
-fn prepare_cached_download(
-    target: &Target,
-    destination: &Path,
-    validate: &impl Fn(&Target, &Path) -> Result<(), Error>,
-) -> bool {
-    if !destination.exists() || validate(target, destination).is_err() {
+fn prepare_cached_download(target: &Target, destination: &Path) -> bool {
+    if !destination.exists() || check_sha256(destination, &target.sha256, &target.label).is_err() {
         return false;
     }
-    if let Some(expected) = &target.sha256 {
-        if check_sha256(destination, expected, &target.label).is_err() {
-            return false;
-        }
-        cleanup_range_download(destination);
-        return true;
-    }
-    let adopted = if !metadata_path_for(destination).exists() {
-        let size = file_size(destination).unwrap_or(0);
-        let _ = write_download_metadata(destination, target, size, None);
-        true
-    } else {
-        download_metadata_matches(destination, &target.url)
-    };
-    if adopted {
-        cleanup_range_download(destination);
-    }
-    adopted
+    cleanup_range_download(destination);
+    true
 }
 
 fn read_download_metadata(path: &Path) -> Option<DownloadMetadata> {
     let text = fs::read_to_string(metadata_path_for(path)).ok()?;
     serde_json::from_str(&text).ok()
-}
-
-fn download_metadata_matches(path: &Path, url: &str) -> bool {
-    let Some(metadata) = read_download_metadata(path) else {
-        return false;
-    };
-    let Some(size) = file_size(path) else {
-        return false;
-    };
-    metadata.url == url && metadata.size_bytes == size
 }
 
 fn write_download_metadata(
@@ -1946,9 +1900,8 @@ mod tests {
                 label: "Model".to_string(),
                 url,
                 destination_path: destination.display().to_string(),
-                sha256: None,
+                sha256: sha_hex(&bytes),
             }],
-            |_, _| Ok(()),
             |_| {},
             || false,
         );
@@ -1996,9 +1949,8 @@ mod tests {
                 label: "Model".to_string(),
                 url: server.url("/model.bin"),
                 destination_path: destination.display().to_string(),
-                sha256: None,
+                sha256: sha_hex(&bytes),
             }],
-            |_, _| Ok(()),
             |_| {},
             || false,
         );
@@ -2009,52 +1961,6 @@ mod tests {
             *bytes
         );
         assert_eq!(get_count.load(Ordering::SeqCst), 1);
-
-        let _ = fs::remove_dir_all(test_dir);
-    }
-
-    #[test]
-    fn rejected_validation_leaves_no_cached_file() {
-        let bytes = Arc::new(sample_bytes(MIN_RANGE_DOWNLOAD_BYTES as usize + 123));
-        let get_count = Arc::new(AtomicUsize::new(0));
-
-        let server = {
-            let bytes = Arc::clone(&bytes);
-            let get_count = Arc::clone(&get_count);
-            TestServer::spawn(move |stream| {
-                handle_no_range_test_request(stream, Arc::clone(&bytes), Arc::clone(&get_count));
-            })
-        };
-
-        let test_dir = scratch_dir("reject-download");
-        let destination = test_dir.join("model.bin");
-
-        let result = fetch(
-            vec![Target {
-                label: "Model".to_string(),
-                url: server.url("/model.bin"),
-                destination_path: destination.display().to_string(),
-                sha256: None,
-            }],
-            |_, _| Err(Error::Validation("rejected".to_string())),
-            |_| {},
-            || false,
-        );
-
-        assert!(result.is_err(), "validation failure should fail the fetch");
-        assert_eq!(get_count.load(Ordering::SeqCst), 1);
-        assert!(
-            !destination.exists(),
-            "rejected download must not be committed"
-        );
-        assert!(
-            !metadata_path_for(&destination).exists(),
-            "rejected download must not be cached"
-        );
-        assert!(
-            !tmp_path_for(&destination).exists(),
-            "temp file must be cleaned up"
-        );
 
         let _ = fs::remove_dir_all(test_dir);
     }
@@ -2088,16 +1994,15 @@ mod tests {
             label: "Model".to_string(),
             url: server.url("/model.bin"),
             destination_path: destination.display().to_string(),
-            sha256: None,
+            sha256: sha_hex(&bytes),
         };
 
-        fetch(vec![target.clone()], |_, _| Ok(()), |_| {}, || false)
-            .expect("first download succeeds");
+        fetch(vec![target.clone()], |_| {}, || false).expect("first download succeeds");
         let requests_after_first =
             head_count.load(Ordering::SeqCst) + range_get_count.load(Ordering::SeqCst);
         assert!(requests_after_first > 0);
 
-        fetch(vec![target], |_, _| Ok(()), |_| {}, || false).expect("second download succeeds");
+        fetch(vec![target], |_| {}, || false).expect("second download succeeds");
         assert_eq!(
             head_count.load(Ordering::SeqCst) + range_get_count.load(Ordering::SeqCst),
             requests_after_first,
@@ -2127,26 +2032,17 @@ mod tests {
             label: "Model".to_string(),
             url: server.url("/model.bin"),
             destination_path: destination.display().to_string(),
-            sha256: None,
-        };
-        let require_zero_header = |_: &Target, path: &Path| match fs::read(path)
-            .ok()
-            .and_then(|data| data.first().copied())
-        {
-            Some(0) => Ok(()),
-            _ => Err(Error::Validation("bad header".to_string())),
+            sha256: sha_hex(&bytes),
         };
 
-        fetch(vec![target.clone()], require_zero_header, |_| {}, || false)
-            .expect("first download succeeds");
+        fetch(vec![target.clone()], |_| {}, || false).expect("first download succeeds");
         assert_eq!(get_count.load(Ordering::SeqCst), 1);
 
         let mut data = fs::read(&destination).expect("read cached file");
-        data[0] = 0xFF;
+        data[0] = data[0].wrapping_add(1);
         fs::write(&destination, &data).expect("corrupt cached file");
 
-        fetch(vec![target], require_zero_header, |_| {}, || false)
-            .expect("second download re-heals the corrupt cache");
+        fetch(vec![target], |_| {}, || false).expect("second download re-heals the corrupt cache");
         assert_eq!(
             get_count.load(Ordering::SeqCst),
             2,
@@ -2179,108 +2075,17 @@ mod tests {
             label: "Model".to_string(),
             url: server.url("/model.bin"),
             destination_path: destination.display().to_string(),
-            sha256: None,
+            sha256: sha_hex(&bytes),
         };
 
-        fetch(vec![target], |_, _| Ok(()), |_| {}, || false).expect("fetch adopts existing file");
+        fetch(vec![target], |_| {}, || false).expect("fetch adopts existing file");
 
         assert_eq!(
             get_count.load(Ordering::SeqCst),
             0,
             "an existing valid file must not be re-downloaded"
         );
-        assert!(
-            metadata_path_for(&destination).exists(),
-            "adopting the file writes its metadata sidecar"
-        );
         assert_eq!(fs::read(&destination).expect("read adopted file"), *bytes);
-
-        let _ = fs::remove_dir_all(test_dir);
-    }
-
-    #[test]
-    fn existing_file_with_corrupt_sidecar_is_redownloaded() {
-        let bytes = Arc::new(sample_bytes(512));
-        let get_count = Arc::new(AtomicUsize::new(0));
-
-        let server = {
-            let bytes = Arc::clone(&bytes);
-            let get_count = Arc::clone(&get_count);
-            TestServer::spawn(move |stream| {
-                handle_no_range_test_request(stream, Arc::clone(&bytes), Arc::clone(&get_count));
-            })
-        };
-
-        let test_dir = scratch_dir("corrupt-sidecar-download");
-        let destination = test_dir.join("model.bin");
-        fs::write(&destination, bytes.as_slice()).expect("place existing file");
-        fs::write(metadata_path_for(&destination), "{ truncated").expect("write corrupt sidecar");
-
-        let target = Target {
-            label: "Model".to_string(),
-            url: server.url("/model.bin"),
-            destination_path: destination.display().to_string(),
-            sha256: None,
-        };
-
-        fetch(vec![target], |_, _| Ok(()), |_| {}, || false).expect("fetch redownloads");
-
-        assert_eq!(
-            get_count.load(Ordering::SeqCst),
-            1,
-            "a corrupt sidecar must trigger a re-download, not adoption"
-        );
-        assert_eq!(
-            fs::read(&destination).expect("read downloaded file"),
-            *bytes
-        );
-
-        let _ = fs::remove_dir_all(test_dir);
-    }
-
-    #[test]
-    fn existing_file_with_stale_sidecar_is_redownloaded() {
-        let bytes = Arc::new(sample_bytes(512));
-        let get_count = Arc::new(AtomicUsize::new(0));
-
-        let server = {
-            let bytes = Arc::clone(&bytes);
-            let get_count = Arc::clone(&get_count);
-            TestServer::spawn(move |stream| {
-                handle_no_range_test_request(stream, Arc::clone(&bytes), Arc::clone(&get_count));
-            })
-        };
-
-        let test_dir = scratch_dir("stale-sidecar-download");
-        let destination = test_dir.join("model.bin");
-        fs::write(&destination, bytes.as_slice()).expect("place existing file");
-        let stale_target = Target {
-            label: "Model".to_string(),
-            url: "http://127.0.0.1:1/old-model.bin".to_string(),
-            destination_path: destination.display().to_string(),
-            sha256: None,
-        };
-        write_download_metadata(&destination, &stale_target, bytes.len() as u64, None)
-            .expect("write stale sidecar");
-
-        let target = Target {
-            label: "Model".to_string(),
-            url: server.url("/model.bin"),
-            destination_path: destination.display().to_string(),
-            sha256: None,
-        };
-
-        fetch(vec![target], |_, _| Ok(()), |_| {}, || false).expect("fetch redownloads");
-
-        assert_eq!(
-            get_count.load(Ordering::SeqCst),
-            1,
-            "a stale sidecar must trigger a re-download, not adoption"
-        );
-        assert_eq!(
-            fs::read(&destination).expect("read downloaded file"),
-            *bytes
-        );
 
         let _ = fs::remove_dir_all(test_dir);
     }
@@ -2314,7 +2119,7 @@ mod tests {
             label: "Model".to_string(),
             url: server.url("/model.bin"),
             destination_path: destination.display().to_string(),
-            sha256: None,
+            sha256: sha_hex(&bytes),
         };
         fs::write(tmp_path_for(&destination), &bytes[..256]).expect("place partial tmp");
         write_partial_download_metadata(
@@ -2327,7 +2132,7 @@ mod tests {
         )
         .expect("write partial sidecar");
 
-        fetch(vec![target], |_, _| Ok(()), |_| {}, || false).expect("resume succeeds");
+        fetch(vec![target], |_| {}, || false).expect("resume succeeds");
 
         assert_eq!(
             fs::read(&destination).expect("read downloaded file"),
@@ -2374,7 +2179,7 @@ mod tests {
             label: "Model".to_string(),
             url: server.url("/model.bin"),
             destination_path: destination.display().to_string(),
-            sha256: None,
+            sha256: sha_hex(&bytes),
         };
         fs::write(tmp_path_for(&destination), vec![0xAAu8; 256]).expect("place stale tmp");
         write_partial_download_metadata(
@@ -2387,7 +2192,7 @@ mod tests {
         )
         .expect("write stale partial sidecar");
 
-        fetch(vec![target], |_, _| Ok(()), |_| {}, || false).expect("restart succeeds");
+        fetch(vec![target], |_| {}, || false).expect("restart succeeds");
 
         assert_eq!(
             fs::read(&destination).expect("read downloaded file"),
@@ -2424,10 +2229,10 @@ mod tests {
             label: "Model".to_string(),
             url: server.url("/model.bin"),
             destination_path: destination.display().to_string(),
-            sha256: None,
+            sha256: sha_hex(&bytes),
         };
 
-        fetch(vec![target], |_, _| Ok(()), |_| {}, || false).expect("fresh download succeeds");
+        fetch(vec![target], |_| {}, || false).expect("fresh download succeeds");
 
         assert_eq!(
             fs::read(&destination).expect("read downloaded file"),
@@ -2468,7 +2273,7 @@ mod tests {
             label: "Model".to_string(),
             url: server.url("/model.bin"),
             destination_path: destination.display().to_string(),
-            sha256: None,
+            sha256: sha_hex(&bytes),
         };
         fs::write(tmp_path_for(&destination), &bytes[..256]).expect("place partial tmp");
         write_partial_download_metadata(
@@ -2481,8 +2286,7 @@ mod tests {
         )
         .expect("write partial sidecar");
 
-        fetch(vec![target], |_, _| Ok(()), |_| {}, || false)
-            .expect("restart after bad 206 succeeds");
+        fetch(vec![target], |_| {}, || false).expect("restart after bad 206 succeeds");
 
         assert_eq!(
             fs::read(&destination).expect("read downloaded file"),
@@ -2562,9 +2366,8 @@ mod tests {
                 label: "Model".to_string(),
                 url: "http://127.0.0.1:1/model.bin".to_string(),
                 destination_path: destination.display().to_string(),
-                sha256: None,
+                sha256: "0".repeat(64),
             }],
-            |_, _| Ok(()),
             |_| {},
             || true,
         );
@@ -2588,9 +2391,8 @@ mod tests {
                 label: "Model".to_string(),
                 url: "http://127.0.0.1:1/model.bin".to_string(),
                 destination_path: destination.display().to_string(),
-                sha256: None,
+                sha256: sha_hex(b"complete-model"),
             }],
-            |_, _| Ok(()),
             |_| {},
             || false,
         );
@@ -2628,9 +2430,8 @@ mod tests {
                 label: "Model".to_string(),
                 url: server.url("/model.bin"),
                 destination_path: destination.display().to_string(),
-                sha256: Some(expected),
+                sha256: expected,
             }],
-            |_, _| Ok(()),
             |_| {},
             || false,
         )
@@ -2663,9 +2464,8 @@ mod tests {
                 label: "Model".to_string(),
                 url: server.url("/model.bin"),
                 destination_path: destination.display().to_string(),
-                sha256: Some("0".repeat(64)),
+                sha256: "0".repeat(64),
             }],
-            |_, _| Ok(()),
             |_| {},
             || false,
         );
@@ -2707,9 +2507,8 @@ mod tests {
                 label: "Model".to_string(),
                 url: server.url("/model.bin"),
                 destination_path: destination.display().to_string(),
-                sha256: Some("0".repeat(64)),
+                sha256: "0".repeat(64),
             }],
-            |_, _| Ok(()),
             |_| {},
             || false,
         );
@@ -2736,7 +2535,7 @@ mod tests {
             label: "Model".to_string(),
             url: "http://cache.example.org/old-location".to_string(),
             destination_path: destination.display().to_string(),
-            sha256: Some(sha.clone()),
+            sha256: sha.clone(),
         };
         write_download_metadata(&destination, &old_target, 11, None).expect("write stale metadata");
 
@@ -2745,7 +2544,6 @@ mod tests {
                 url: "http://127.0.0.1:9/new-location".to_string(),
                 ..old_target.clone()
             }],
-            |_, _| Ok(()),
             |_| {},
             || false,
         )
@@ -2757,7 +2555,6 @@ mod tests {
                 url: "http://127.0.0.1:9/new-location".to_string(),
                 ..old_target
             }],
-            |_, _| Ok(()),
             |_| {},
             || false,
         );
@@ -2768,6 +2565,14 @@ mod tests {
 
     fn sample_bytes(len: usize) -> Vec<u8> {
         (0..len).map(|index| (index % 251) as u8).collect()
+    }
+
+    fn sha_hex(bytes: &[u8]) -> String {
+        let mut hex = String::with_capacity(64);
+        for byte in Sha256::digest(bytes) {
+            hex.push_str(&format!("{byte:02x}"));
+        }
+        hex
     }
 
     fn scratch_dir(name: &str) -> PathBuf {

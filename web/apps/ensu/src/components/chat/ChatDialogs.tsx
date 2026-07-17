@@ -57,6 +57,8 @@ export interface ModelSettingsDraft {
     useCustomModel: boolean;
     modelUrl: string;
     mmprojUrl: string;
+    modelSha256: string;
+    mmprojSha256: string;
     contextLength: string;
     maxTokens: string;
 }
@@ -93,6 +95,8 @@ export interface ChatDialogsProps {
     isTauriRuntime: boolean;
     modelUrl: string;
     mmprojUrl: string;
+    modelSha256: string;
+    mmprojSha256: string;
     suggestedModels: SuggestedModel[];
     contextLength: string;
     maxTokens: string;
@@ -145,6 +149,8 @@ export const ChatDialogs = memo(
         isTauriRuntime,
         modelUrl,
         mmprojUrl,
+        modelSha256,
+        mmprojSha256,
         suggestedModels,
         contextLength,
         maxTokens,
@@ -188,6 +194,14 @@ export const ChatDialogs = memo(
             React.useState(false);
         const [draftModelUrl, setDraftModelUrl] = React.useState("");
         const [draftMmprojUrl, setDraftMmprojUrl] = React.useState("");
+        const [draftModelSha, setDraftModelSha] = React.useState("");
+        const [draftMmprojSha, setDraftMmprojSha] = React.useState("");
+        const [draftModelShaError, setDraftModelShaError] = React.useState<
+            string | null
+        >(null);
+        const [draftMmprojShaError, setDraftMmprojShaError] = React.useState<
+            string | null
+        >(null);
         const [draftContextLength, setDraftContextLength] = React.useState("");
         const [draftMaxTokens, setDraftMaxTokens] = React.useState("");
         const [draftModelUrlError, setDraftModelUrlError] = React.useState<
@@ -241,7 +255,10 @@ export const ChatDialogs = memo(
         );
         const isCustomSelected = selectedModelId === "custom";
         const canSaveModelSettings =
-            !isCustomSelected || draftModelUrl.trim().length > 0;
+            !isCustomSelected ||
+            (draftModelUrl.trim().length > 0 &&
+                draftModelSha.trim().length > 0 &&
+                (!draftMmprojUrl.trim() || draftMmprojSha.trim().length > 0));
 
         // Initialize model settings draft from parent state when dialog opens
         React.useEffect(() => {
@@ -249,10 +266,14 @@ export const ChatDialogs = memo(
             setDraftUseCustomModel(useCustomModel);
             setDraftModelUrl(modelUrl);
             setDraftMmprojUrl(mmprojUrl);
+            setDraftModelSha(modelSha256);
+            setDraftMmprojSha(mmprojSha256);
             setDraftContextLength(contextLength);
             setDraftMaxTokens(maxTokens);
             setDraftModelUrlError(null);
             setDraftMmprojError(null);
+            setDraftModelShaError(null);
+            setDraftMmprojShaError(null);
             setDraftContextError(null);
             setDraftMaxTokensError(null);
             const matchedOption = useCustomModel
@@ -268,6 +289,8 @@ export const ChatDialogs = memo(
             mmprojUrl,
             modelOptions,
             modelUrl,
+            modelSha256,
+            mmprojSha256,
             showModelSettings,
             useCustomModel,
         ]);
@@ -311,6 +334,20 @@ export const ChatDialogs = memo(
                     ? validateUrl(draftMmprojUrl)
                     : undefined;
 
+            const validateSha = (value: string) =>
+                /^[0-9a-fA-F]{64}$/.test(value.trim())
+                    ? undefined
+                    : "Enter the file's SHA-256 checksum";
+            const modelShaError = isCustomSelected
+                ? validateSha(draftModelSha)
+                : undefined;
+            const mmprojShaErr =
+                isCustomSelected &&
+                isTauriRuntime &&
+                draftMmprojUrl.trim().length > 0
+                    ? validateSha(draftMmprojSha)
+                    : undefined;
+
             const contextErrorValue =
                 draftContextLength && !/^\d+$/.test(draftContextLength)
                     ? "Enter a number"
@@ -334,6 +371,8 @@ export const ChatDialogs = memo(
 
             setDraftModelUrlError(modelError ?? null);
             setDraftMmprojError(mmprojErr ?? null);
+            setDraftModelShaError(modelShaError ?? null);
+            setDraftMmprojShaError(mmprojShaErr ?? null);
             setDraftContextError(contextErrorValue ?? null);
             setDraftMaxTokensError(
                 maxTokensErrorValue ?? maxTokensLimitError ?? null,
@@ -342,6 +381,8 @@ export const ChatDialogs = memo(
             return !(
                 modelError ||
                 mmprojErr ||
+                modelShaError ||
+                mmprojShaErr ||
                 contextErrorValue ||
                 maxTokensErrorValue ||
                 maxTokensLimitError
@@ -351,7 +392,10 @@ export const ChatDialogs = memo(
             draftMaxTokens,
             draftMmprojUrl,
             draftModelUrl,
+            draftModelSha,
+            draftMmprojSha,
             draftUseCustomModel,
+            isCustomSelected,
             isTauriRuntime,
         ]);
 
@@ -795,15 +839,21 @@ export const ChatDialogs = memo(
                                                 setDraftUseCustomModel(false);
                                                 setDraftModelUrl("");
                                                 setDraftMmprojUrl("");
+                                                setDraftModelSha("");
+                                                setDraftMmprojSha("");
                                                 return;
                                             }
                                             setDraftUseCustomModel(true);
                                             if (nextId === "custom") {
                                                 setDraftModelUrl("");
                                                 setDraftMmprojUrl("");
+                                                setDraftModelSha("");
+                                                setDraftMmprojSha("");
                                                 return;
                                             }
                                             setDraftModelUrl(nextModel.url);
+                                            setDraftModelSha("");
+                                            setDraftMmprojSha("");
                                             setDraftMmprojUrl(
                                                 allowMmproj
                                                     ? (nextModel.mmproj ?? "")
@@ -844,6 +894,21 @@ export const ChatDialogs = memo(
                                                 draftModelUrlError ?? " "
                                             }
                                         />
+                                        <TextField
+                                            fullWidth
+                                            label="Model SHA-256"
+                                            placeholder="Checksum from the model page"
+                                            value={draftModelSha}
+                                            onChange={(event) =>
+                                                setDraftModelSha(
+                                                    event.target.value,
+                                                )
+                                            }
+                                            error={!!draftModelShaError}
+                                            helperText={
+                                                draftModelShaError ?? " "
+                                            }
+                                        />
                                         {allowMmproj && (
                                             <TextField
                                                 fullWidth
@@ -861,6 +926,28 @@ export const ChatDialogs = memo(
                                                 }
                                             />
                                         )}
+                                        {allowMmproj &&
+                                            draftMmprojUrl.trim().length >
+                                                0 && (
+                                                <TextField
+                                                    fullWidth
+                                                    label="mmproj SHA-256"
+                                                    placeholder="Checksum from the model page"
+                                                    value={draftMmprojSha}
+                                                    onChange={(event) =>
+                                                        setDraftMmprojSha(
+                                                            event.target.value,
+                                                        )
+                                                    }
+                                                    error={
+                                                        !!draftMmprojShaError
+                                                    }
+                                                    helperText={
+                                                        draftMmprojShaError ??
+                                                        " "
+                                                    }
+                                                />
+                                            )}
                                     </Stack>
                                 )}
 
@@ -947,6 +1034,8 @@ export const ChatDialogs = memo(
                                             useCustomModel: draftUseCustomModel,
                                             modelUrl: draftModelUrl,
                                             mmprojUrl: draftMmprojUrl,
+                                            modelSha256: draftModelSha.trim(),
+                                            mmprojSha256: draftMmprojSha.trim(),
                                             contextLength: draftContextLength,
                                             maxTokens: draftMaxTokens,
                                         });

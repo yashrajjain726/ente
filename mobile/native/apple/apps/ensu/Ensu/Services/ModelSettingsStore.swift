@@ -62,6 +62,12 @@ final class ModelSettingsStore: ObservableObject {
     @Published var mmprojUrl: String {
         didSet { persist() }
     }
+    @Published var modelSha256: String {
+        didSet { persist() }
+    }
+    @Published var mmprojSha256: String {
+        didSet { persist() }
+    }
     @Published var contextLength: String {
         didSet { persist() }
     }
@@ -81,16 +87,28 @@ final class ModelSettingsStore: ObservableObject {
         self.useCustomModel = defaults.bool(forKey: Keys.useCustomModel)
         self.modelUrl = defaults.string(forKey: Keys.modelUrl) ?? ""
         self.mmprojUrl = defaults.string(forKey: Keys.mmprojUrl) ?? ""
+        self.modelSha256 = defaults.string(forKey: Keys.modelSha256) ?? ""
+        self.mmprojSha256 = defaults.string(forKey: Keys.mmprojSha256) ?? ""
         self.contextLength = defaults.string(forKey: Keys.contextLength) ?? ""
         self.maxTokens = defaults.string(forKey: Keys.maxTokens) ?? ""
         self.temperature = defaults.string(forKey: Keys.temperature) ?? ""
         self.systemPromptBody = defaults.string(forKey: Keys.systemPromptBody) ?? ""
     }
 
-    func saveCustomModel(url: String, mmproj: String, contextLength: String, maxTokens: String, temperature: String) {
+    func saveCustomModel(
+        url: String,
+        sha256: String,
+        mmproj: String,
+        mmprojSha256: String,
+        contextLength: String,
+        maxTokens: String,
+        temperature: String
+    ) {
         useCustomModel = true
         modelUrl = url
         mmprojUrl = mmproj
+        self.modelSha256 = sha256
+        self.mmprojSha256 = mmprojSha256
         self.contextLength = contextLength
         self.maxTokens = maxTokens
         self.temperature = temperature
@@ -100,6 +118,8 @@ final class ModelSettingsStore: ObservableObject {
         useCustomModel = false
         modelUrl = ""
         mmprojUrl = ""
+        modelSha256 = ""
+        mmprojSha256 = ""
         contextLength = ""
         maxTokens = ""
         temperature = ""
@@ -113,14 +133,26 @@ final class ModelSettingsStore: ObservableObject {
         let mmproj = useCustom ? (mmprojUrl.isEmpty ? nil : mmprojUrl) : defaultModel.mmprojUrl
         let context = Int(contextLength)
         let maxOutput = Int(maxTokens).flatMap { $0 > 0 ? $0 : nil }
-        let id: String
+        let preset: ConfigModelPreset?
         if useCustom {
             let presets = [defaultModel] + defaults.mobileModelPresets
-            id = presets.first(where: { $0.url == url && $0.mmprojUrl == mmproj })?.id ?? "custom:\(url)"
+            preset = presets.first(where: { $0.url == url && $0.mmprojUrl == mmproj })
         } else {
-            id = defaultModel.id
+            preset = defaultModel
         }
-        return LlmModelTarget(id: id, url: url, mmprojUrl: mmproj, contextLength: context, maxTokens: maxOutput)
+        let trimmedSha = modelSha256.trimmingCharacters(in: .whitespaces)
+        let trimmedMmprojSha = mmprojSha256.trimmingCharacters(in: .whitespaces)
+        return LlmModelTarget(
+            id: preset?.id ?? "custom:\(url)",
+            url: url,
+            sha256: preset?.sha256 ?? (trimmedSha.isEmpty ? nil : trimmedSha),
+            mmprojUrl: mmproj,
+            mmprojSha256: mmproj == nil
+                ? nil
+                : preset?.mmprojSha256 ?? (trimmedMmprojSha.isEmpty ? nil : trimmedMmprojSha),
+            contextLength: context,
+            maxTokens: maxOutput
+        )
     }
 
     static var defaultModelName: String { platformDefaultModel.title }
@@ -150,6 +182,8 @@ final class ModelSettingsStore: ObservableObject {
         defaults.set(useCustomModel, forKey: Keys.useCustomModel)
         defaults.set(modelUrl, forKey: Keys.modelUrl)
         defaults.set(mmprojUrl, forKey: Keys.mmprojUrl)
+        defaults.set(modelSha256, forKey: Keys.modelSha256)
+        defaults.set(mmprojSha256, forKey: Keys.mmprojSha256)
         defaults.set(contextLength, forKey: Keys.contextLength)
         defaults.set(maxTokens, forKey: Keys.maxTokens)
         defaults.set(temperature, forKey: Keys.temperature)
@@ -160,6 +194,8 @@ final class ModelSettingsStore: ObservableObject {
         static let useCustomModel = "ensu.model.use_custom"
         static let modelUrl = "ensu.model.url"
         static let mmprojUrl = "ensu.model.mmproj"
+        static let modelSha256 = "ensu.model.sha256"
+        static let mmprojSha256 = "ensu.model.mmproj_sha256"
         static let contextLength = "ensu.model.context"
         static let maxTokens = "ensu.model.max_tokens"
         static let temperature = "ensu.model.temperature"

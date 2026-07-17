@@ -4,33 +4,13 @@ use std::path::{Path, PathBuf};
 
 use sha2::{Digest, Sha256};
 
-use crate::download::{self, Target};
-
-const MIN_MODEL_BYTES: u64 = 1024 * 1024;
-
-pub(crate) fn expected_targets(
-    models_dir: &Path,
-    id: &str,
-    url: &str,
-    mmproj_url: Option<&str>,
-) -> Vec<Target> {
-    let mut targets = vec![Target {
-        label: "Model".to_string(),
-        url: url.to_string(),
-        destination_path: model_path(models_dir, id, url, mmproj_url)
-            .display()
-            .to_string(),
-        sha256: None,
-    }];
-    if let Some(mmproj) = mmproj_path(models_dir, id, url, mmproj_url) {
-        targets.push(Target {
-            label: "Mmproj".to_string(),
-            url: trimmed(mmproj_url).unwrap().to_string(),
-            destination_path: mmproj.display().to_string(),
-            sha256: None,
-        });
+pub(crate) fn storage_key(id: &str, url: &str, mmproj_url: Option<&str>) -> String {
+    if id.starts_with("custom") {
+        let pair = format!("{url}\n{}", trimmed(mmproj_url).unwrap_or(""));
+        format!("custom-{}", &sha256_hex(&pair)[..16])
+    } else {
+        id.to_string()
     }
-    targets
 }
 
 pub(crate) fn model_dir(
@@ -39,13 +19,7 @@ pub(crate) fn model_dir(
     url: &str,
     mmproj_url: Option<&str>,
 ) -> PathBuf {
-    let key = if id.starts_with("custom") {
-        let pair = format!("{url}\n{}", trimmed(mmproj_url).unwrap_or(""));
-        format!("custom-{}", &sha256_hex(&pair)[..16])
-    } else {
-        id.to_string()
-    };
-    models_dir.join(key)
+    models_dir.join(storage_key(id, url, mmproj_url))
 }
 
 pub(crate) fn model_path(
@@ -76,22 +50,6 @@ pub(crate) fn looks_like_gguf(path: &Path) -> bool {
     file.read_exact(&mut header).is_ok() && &header == b"GGUF"
 }
 
-pub(crate) fn validate_gguf(path: &Path) -> Result<(), download::Error> {
-    if file_size(path).is_none_or(|size| size < MIN_MODEL_BYTES) {
-        return Err(download::Error::Validation(format!(
-            "{} is too small to be a model file",
-            path.display()
-        )));
-    }
-    if !looks_like_gguf(path) {
-        return Err(download::Error::Validation(format!(
-            "{} is not a valid GGUF file",
-            path.display()
-        )));
-    }
-    Ok(())
-}
-
 pub(crate) fn trimmed(url: Option<&str>) -> Option<&str> {
     url.map(str::trim).filter(|url| !url.is_empty())
 }
@@ -111,8 +69,4 @@ pub(crate) fn sha256_hex(value: &str) -> String {
         .iter()
         .map(|byte| format!("{byte:02x}"))
         .collect()
-}
-
-fn file_size(path: &Path) -> Option<u64> {
-    std::fs::metadata(path).ok().map(|metadata| metadata.len())
 }

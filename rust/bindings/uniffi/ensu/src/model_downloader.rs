@@ -9,15 +9,20 @@ pub enum ModelDownloadTarget {
     Gguf {
         id: String,
         url: String,
+        sha256: Option<String>,
         mmproj_url: Option<String>,
+        mmproj_sha256: Option<String>,
     },
     TarGz {
         id: String,
         url: String,
+        sha256: String,
     },
-    Onnx {
+    File {
         id: String,
+        name: String,
         url: String,
+        sha256: String,
     },
 }
 
@@ -27,14 +32,23 @@ impl From<ModelDownloadTarget> for ente_model_download::ModelDownloadTarget {
             ModelDownloadTarget::Gguf {
                 id,
                 url,
+                sha256,
                 mmproj_url,
+                mmproj_sha256,
             } => Self::Gguf {
                 id,
                 url,
+                sha256,
                 mmproj_url,
+                mmproj_sha256,
             },
-            ModelDownloadTarget::TarGz { id, url } => Self::TarGz { id, url },
-            ModelDownloadTarget::Onnx { id, url } => Self::Onnx { id, url },
+            ModelDownloadTarget::TarGz { id, url, sha256 } => Self::TarGz { id, url, sha256 },
+            ModelDownloadTarget::File {
+                id,
+                name,
+                url,
+                sha256,
+            } => ente_model_download::ModelDownloadTarget::file(id, name, url, sha256),
         }
     }
 }
@@ -104,7 +118,18 @@ impl ModelDownloadCore {
     }
 
     pub fn model_path(&self, target: ModelDownloadTarget) -> String {
-        self.inner.model_path(&target.into()).display().to_string()
+        let name = match &target {
+            ModelDownloadTarget::File { name, .. } => Some(name.clone()),
+            _ => None,
+        };
+        let target = target.into();
+        let path = match name {
+            Some(name) => self.inner.file_path(&target, &name),
+            None => None,
+        };
+        path.unwrap_or_else(|| self.inner.model_path(&target))
+            .display()
+            .to_string()
     }
 
     pub fn mmproj_path(&self, target: ModelDownloadTarget) -> Option<String> {

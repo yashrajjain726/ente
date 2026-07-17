@@ -91,13 +91,15 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private fun migrationTargets(settings: ModelSettingsState): List<ModelDownloadTarget> {
         val presets = listOf(configDefaults.mobileDefaultModel) + configDefaults.mobileModelPresets
         val targets = presets
-            .map { ModelDownloadTarget.Gguf(it.id, it.url, it.mmprojUrl) }
+            .map { ModelDownloadTarget.Gguf(it.id, it.url, it.sha256, it.mmprojUrl, it.mmprojSha256) }
             .toMutableList()
         if (settings.useCustomModel && settings.modelUrl.isNotBlank()) {
             targets += ModelDownloadTarget.Gguf(
                 "custom:${settings.modelUrl}",
                 settings.modelUrl,
-                settings.mmprojUrl.takeIf { it.isNotBlank() }
+                settings.modelSha256.trim().takeIf { it.isNotEmpty() },
+                settings.mmprojUrl.takeIf { it.isNotBlank() },
+                settings.mmprojSha256.trim().takeIf { it.isNotEmpty() }
             )
         }
         return targets

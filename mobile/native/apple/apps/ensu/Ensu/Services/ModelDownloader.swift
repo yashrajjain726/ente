@@ -19,11 +19,14 @@ final class ModelDownloader {
         let defaults = ConfigDefaults.shared
         transcriptionModelTarget = .tarGz(
             id: defaults.transcriptionModel.id,
-            url: defaults.transcriptionModel.url
+            url: defaults.transcriptionModel.url,
+            sha256: defaults.transcriptionModel.sha256!
         )
-        voiceActivityModelTarget = .onnx(
+        voiceActivityModelTarget = .file(
             id: defaults.voiceActivityModel.id,
-            url: defaults.voiceActivityModel.url
+            name: "model.onnx",
+            url: defaults.voiceActivityModel.url,
+            sha256: defaults.voiceActivityModel.sha256!
         )
         migrateEnsuLegacyModels(
             modelsDir: modelsDir.path,
@@ -49,14 +52,22 @@ final class ModelDownloader {
     private static func migrationTargets() -> [ModelDownloadTarget] {
         let config = ConfigDefaults.shared
         var targets = ([config.mobileDefaultModel] + config.mobileModelPresets).map {
-            ModelDownloadTarget.gguf(id: $0.id, url: $0.url, mmprojUrl: $0.mmprojUrl)
+            ModelDownloadTarget.gguf(
+                id: $0.id,
+                url: $0.url,
+                sha256: $0.sha256,
+                mmprojUrl: $0.mmprojUrl,
+                mmprojSha256: $0.mmprojSha256
+            )
         }
         let settings = ModelSettingsStore.shared
         if settings.useCustomModel && !settings.modelUrl.isEmpty {
             targets.append(.gguf(
                 id: "custom:\(settings.modelUrl)",
                 url: settings.modelUrl,
-                mmprojUrl: settings.mmprojUrl.isEmpty ? nil : settings.mmprojUrl
+                sha256: nil,
+                mmprojUrl: settings.mmprojUrl.isEmpty ? nil : settings.mmprojUrl,
+                mmprojSha256: nil
             ))
         }
         return targets

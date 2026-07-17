@@ -3,12 +3,14 @@ import Foundation
 struct LlmModelTarget: Equatable {
     let id: String
     let url: String
+    let sha256: String?
     let mmprojUrl: String?
+    let mmprojSha256: String?
     let contextLength: Int?
     let maxTokens: Int?
 
     var downloadTarget: ModelDownloadTarget {
-        .gguf(id: id, url: url, mmprojUrl: mmprojUrl)
+        .gguf(id: id, url: url, sha256: sha256, mmprojUrl: mmprojUrl, mmprojSha256: mmprojSha256)
     }
 }
 

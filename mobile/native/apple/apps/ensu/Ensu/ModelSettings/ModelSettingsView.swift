@@ -9,12 +9,16 @@ struct ModelSettingsView: View {
     @State private var selectedModelId: String = defaultOptionId
     @State private var customModelUrl: String = ""
     @State private var customMmprojUrl: String = ""
+    @State private var customModelSha: String = ""
+    @State private var customMmprojSha: String = ""
     @State private var contextLength: String = ""
     @State private var maxTokens: String = ""
     @State private var temperature: String = ""
 
     @State private var urlError: String?
     @State private var mmprojError: String?
+    @State private var shaError: String?
+    @State private var mmprojShaError: String?
     @State private var contextError: String?
     @State private var maxTokensError: String?
     @State private var temperatureError: String?
@@ -88,6 +92,8 @@ struct ModelSettingsView: View {
             selectedModelId = initialSelectionId()
             customModelUrl = isStoredCustomModel ? settings.modelUrl : ""
             customMmprojUrl = isStoredCustomModel ? settings.mmprojUrl : ""
+            customModelSha = isStoredCustomModel ? settings.modelSha256 : ""
+            customMmprojSha = isStoredCustomModel ? settings.mmprojSha256 : ""
             contextLength = settings.contextLength
             maxTokens = settings.maxTokens
             temperature = settings.temperature
@@ -136,6 +142,8 @@ struct ModelSettingsView: View {
                     if newValue == Self.customOptionId {
                         customModelUrl = ""
                         customMmprojUrl = ""
+                        customModelSha = ""
+                        customMmprojSha = ""
                     }
                 }
 
@@ -150,12 +158,30 @@ struct ModelSettingsView: View {
                         )
 
                         field(
+                            label: "Model SHA-256",
+                            hint: "Checksum from the model page",
+                            text: $customModelSha,
+                            error: shaError,
+                            keyboardType: .default
+                        )
+
+                        field(
                             label: "mmproj .gguf URL",
                             hint: "(optional for multimodal)",
                             text: $customMmprojUrl,
                             error: mmprojError,
                             keyboardType: .URL
                         )
+
+                        if !customMmprojUrl.isEmpty {
+                            field(
+                                label: "mmproj SHA-256",
+                                hint: "Checksum from the model page",
+                                text: $customMmprojSha,
+                                error: mmprojShaError,
+                                keyboardType: .default
+                            )
+                        }
                     }
                 }
 
@@ -292,6 +318,8 @@ struct ModelSettingsView: View {
     private func saveTapped() {
         urlError = nil
         mmprojError = nil
+        shaError = nil
+        mmprojShaError = nil
         contextError = nil
         maxTokensError = nil
         temperatureError = nil
@@ -311,7 +339,9 @@ struct ModelSettingsView: View {
             } else if selectedModel.isCustom {
                 settings.saveCustomModel(
                     url: customModelUrl,
+                    sha256: customModelSha.trimmingCharacters(in: .whitespaces),
                     mmproj: customMmprojUrl,
+                    mmprojSha256: customMmprojSha.trimmingCharacters(in: .whitespaces),
                     contextLength: contextLength,
                     maxTokens: maxTokens,
                     temperature: temperature
@@ -319,7 +349,9 @@ struct ModelSettingsView: View {
             } else {
                 settings.saveCustomModel(
                     url: selectedModel.url ?? "",
+                    sha256: "",
                     mmproj: selectedModel.mmproj ?? "",
+                    mmprojSha256: "",
                     contextLength: contextLength,
                     maxTokens: maxTokens,
                     temperature: temperature
@@ -338,6 +370,8 @@ struct ModelSettingsView: View {
         selectedModelId = Self.defaultOptionId
         customModelUrl = ""
         customMmprojUrl = ""
+        customModelSha = ""
+        customMmprojSha = ""
         contextLength = ""
         maxTokens = ""
         temperature = ""
@@ -365,6 +399,16 @@ struct ModelSettingsView: View {
             isValid = false
         }
 
+        if selectedModel.isCustom && !isValidSha256(customModelSha) {
+            shaError = "Enter the model's SHA-256 checksum"
+            isValid = false
+        }
+
+        if selectedModel.isCustom && !customMmprojUrl.isEmpty && !isValidSha256(customMmprojSha) {
+            mmprojShaError = "Enter the mmproj's SHA-256 checksum"
+            isValid = false
+        }
+
         if !contextLength.isEmpty, Int(contextLength) == nil {
             contextError = "Enter a valid integer"
             isValid = false
@@ -386,6 +430,11 @@ struct ModelSettingsView: View {
         }
 
         return isValid
+    }
+
+    private func isValidSha256(_ value: String) -> Bool {
+        let trimmed = value.trimmingCharacters(in: .whitespaces)
+        return trimmed.count == 64 && trimmed.allSatisfy(\.isHexDigit)
     }
 
     private func isValidHuggingFaceUrl(_ urlString: String) -> Bool {

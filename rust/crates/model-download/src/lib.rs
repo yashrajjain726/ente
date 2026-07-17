@@ -4,6 +4,6 @@ mod downloader;
 mod gguf;
 
 pub use downloader::{
-    ModelDownloadProgress, ModelDownloadTarget, ModelDownloader, migrate_ensu_legacy_models,
-    migrate_flat_models_dir,
+    ModelDownloadProgress, ModelDownloadTarget, ModelDownloader, ModelFile,
+    migrate_ensu_legacy_models, migrate_flat_models_dir,
 };

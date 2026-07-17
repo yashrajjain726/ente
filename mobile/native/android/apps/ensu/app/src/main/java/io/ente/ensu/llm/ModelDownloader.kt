@@ -36,11 +36,14 @@ class ModelDownloader(context: Context) {
         val defaults = loadConfigDefaults()
         transcriptionModelTarget = ModelDownloadTarget.TarGz(
             defaults.transcriptionModel.id,
-            defaults.transcriptionModel.url
+            defaults.transcriptionModel.url,
+            requireNotNull(defaults.transcriptionModel.sha256)
         )
-        voiceActivityModelTarget = ModelDownloadTarget.Onnx(
+        voiceActivityModelTarget = ModelDownloadTarget.File(
             defaults.voiceActivityModel.id,
-            defaults.voiceActivityModel.url
+            "model.onnx",
+            defaults.voiceActivityModel.url,
+            requireNotNull(defaults.voiceActivityModel.sha256)
         )
     }
 

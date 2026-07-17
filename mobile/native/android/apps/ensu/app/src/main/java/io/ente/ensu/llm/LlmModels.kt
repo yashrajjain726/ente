@@ -5,12 +5,20 @@ import io.ente.ensu.bindings.ModelDownloadTarget
 data class LlmModelTarget(
     val id: String,
     val url: String,
+    val sha256: String? = null,
     val mmprojUrl: String? = null,
+    val mmprojSha256: String? = null,
     val contextLength: Int? = null,
     val maxTokens: Int? = null
 ) {
     val downloadTarget: ModelDownloadTarget
-        get() = ModelDownloadTarget.Gguf(id = id, url = url, mmprojUrl = mmprojUrl)
+        get() = ModelDownloadTarget.Gguf(
+            id = id,
+            url = url,
+            sha256 = sha256,
+            mmprojUrl = mmprojUrl,
+            mmprojSha256 = mmprojSha256
+        )
 }
 
 data class DownloadProgress(

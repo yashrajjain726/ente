@@ -16,16 +16,35 @@ pub enum ModelDownloadTarget {
     Gguf {
         id: String,
         url: String,
+        sha256: Option<String>,
         mmproj_url: Option<String>,
+        mmproj_sha256: Option<String>,
     },
     TarGz {
         id: String,
         url: String,
+        sha256: String,
     },
-    Onnx {
+    Files {
         id: String,
-        url: String,
+        files: Vec<ModelFile>,
     },
+}
+
+impl ModelDownloadTarget {
+    pub fn file(id: String, name: String, url: String, sha256: String) -> Self {
+        Self::Files {
+            id,
+            files: vec![ModelFile { name, url, sha256 }],
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct ModelFile {
+    pub name: String,
+    pub url: String,
+    pub sha256: String,
 }
 
 #[derive(Debug, Clone)]
@@ -66,20 +85,29 @@ impl ModelDownloader {
                 id,
                 url,
                 mmproj_url,
+                ..
             } => gguf::mmproj_path(&self.models_dir, id, url, mmproj_url.as_deref()),
-            ModelDownloadTarget::TarGz { .. } | ModelDownloadTarget::Onnx { .. } => None,
+            _ => None,
+        }
+    }
+
+    pub fn file_path(&self, target: &ModelDownloadTarget, name: &str) -> Option<PathBuf> {
+        match target {
+            ModelDownloadTarget::Files { files, .. }
+                if files.iter().any(|file| file.name == name) =>
+            {
+                Some(storage_dir(&self.models_dir, target).join(name))
+            }
+            _ => None,
         }
     }
 
     pub fn is_downloaded(&self, target: &ModelDownloadTarget) -> bool {
-        match target {
-            ModelDownloadTarget::Gguf { .. } => self.fetch_targets(target).iter().all(|entry| {
-                let path = Path::new(&entry.destination_path);
-                path.exists() && gguf::looks_like_gguf(path)
-            }),
-            ModelDownloadTarget::TarGz { .. } => self.model_path(target).is_dir(),
-            ModelDownloadTarget::Onnx { .. } => is_non_empty_file(&self.model_path(target)),
+        if let ModelDownloadTarget::TarGz { .. } = target {
+            return storage_dir(&self.models_dir, target).is_dir();
         }
+        let paths = expected_paths(&self.models_dir, target);
+        !paths.is_empty() && paths.iter().all(|path| path.is_file())
     }
 
     pub fn is_download_active(&self) -> bool {
@@ -91,22 +119,11 @@ impl ModelDownloader {
     }
 
     pub fn remove_downloaded(&self, target: &ModelDownloadTarget) -> bool {
-        if let ModelDownloadTarget::TarGz { .. } = target {
-            let dir = self.model_path(target);
-            return dir.exists() && fs::remove_dir_all(dir).is_ok();
+        if checked_file_name(&storage_key(target)).is_err() {
+            return false;
         }
-        let mut removed = false;
-        for entry in self.fetch_targets(target) {
-            let path = Path::new(&entry.destination_path);
-            if path.exists() {
-                let _ = fs::remove_file(path);
-                removed = true;
-            }
-            if let Some(parent) = path.parent() {
-                let _ = fs::remove_dir(parent);
-            }
-        }
-        removed
+        let dir = storage_dir(&self.models_dir, target);
+        dir.exists() && fs::remove_dir_all(dir).is_ok()
     }
 
     /// Returns whether a network download ran; false when everything was
@@ -129,14 +146,15 @@ impl ModelDownloader {
             return Ok(false);
         }
 
+        let mut transfers = Vec::new();
+        for target in &pending {
+            transfers.extend(download_targets(&self.models_dir, target)?);
+        }
+
         self.cancelled.store(false, Ordering::SeqCst);
         self.active.store(true, Ordering::SeqCst);
         let result = download::fetch(
-            pending
-                .iter()
-                .flat_map(|target| self.fetch_targets(target))
-                .collect(),
-            validate_target,
+            transfers,
             |progress| on_progress(display_progress(progress)),
             || self.cancelled.load(Ordering::SeqCst) || is_cancelled(),
         )
@@ -193,7 +211,7 @@ impl ModelDownloader {
                 .ok()?;
             let mut total: i64 = 0;
             let mut any = false;
-            for entry in self.fetch_targets(target) {
+            for entry in download_targets(&self.models_dir, target).ok()? {
                 let path = Path::new(&entry.destination_path);
                 let size = if path.exists() {
                     fs::metadata(path).ok().map(|m| m.len()).filter(|s| *s > 0)
@@ -208,66 +226,147 @@ impl ModelDownloader {
             any.then_some(total)
         })
     }
-
-    fn fetch_targets(&self, target: &ModelDownloadTarget) -> Vec<Target> {
-        match target {
-            ModelDownloadTarget::Gguf {
-                id,
-                url,
-                mmproj_url,
-            } => gguf::expected_targets(&self.models_dir, id, url, mmproj_url.as_deref()),
-            ModelDownloadTarget::TarGz { id, url } => vec![Target {
-                label: "Model".to_string(),
-                url: url.clone(),
-                destination_path: self
-                    .staging_dir()
-                    .join(format!("{id}.tar.gz"))
-                    .display()
-                    .to_string(),
-                sha256: None,
-            }],
-            ModelDownloadTarget::Onnx { url, .. } => vec![Target {
-                label: "Model".to_string(),
-                url: url.clone(),
-                destination_path: self.model_path(target).display().to_string(),
-                sha256: None,
-            }],
-        }
-    }
 }
 
-fn model_path(models_dir: &Path, target: &ModelDownloadTarget) -> PathBuf {
+fn storage_key(target: &ModelDownloadTarget) -> String {
     match target {
         ModelDownloadTarget::Gguf {
             id,
             url,
             mmproj_url,
-        } => gguf::model_path(models_dir, id, url, mmproj_url.as_deref()),
-        ModelDownloadTarget::TarGz { id, .. } => models_dir.join(id),
-        ModelDownloadTarget::Onnx { id, .. } => models_dir.join(id).join("model.onnx"),
+            ..
+        } => gguf::storage_key(id, url, mmproj_url.as_deref()),
+        ModelDownloadTarget::TarGz { id, .. } | ModelDownloadTarget::Files { id, .. } => id.clone(),
     }
 }
 
-fn validate_target(target: &Target, path: &Path) -> Result<(), download::Error> {
-    if target.destination_path.ends_with(".tar.gz") {
-        if !archive::looks_like_gzip(path) {
-            return Err(download::Error::Validation(format!(
-                "{} is not a gzip archive",
-                path.display()
-            )));
+fn storage_dir(models_dir: &Path, target: &ModelDownloadTarget) -> PathBuf {
+    models_dir.join(storage_key(target))
+}
+
+fn expected_paths(models_dir: &Path, target: &ModelDownloadTarget) -> Vec<PathBuf> {
+    let dir = storage_dir(models_dir, target);
+    match target {
+        ModelDownloadTarget::Gguf { mmproj_url, .. } => {
+            let mut paths = vec![dir.join("model.gguf")];
+            if gguf::trimmed(mmproj_url.as_deref()).is_some() {
+                paths.push(dir.join("mmproj.gguf"));
+            }
+            paths
         }
+        ModelDownloadTarget::TarGz { .. } => vec![dir],
+        ModelDownloadTarget::Files { files, .. } => {
+            files.iter().map(|file| dir.join(&file.name)).collect()
+        }
+    }
+}
+
+fn download_targets(
+    models_dir: &Path,
+    target: &ModelDownloadTarget,
+) -> Result<Vec<Target>, download::Error> {
+    let dir = storage_dir(models_dir, target);
+    match target {
+        ModelDownloadTarget::Gguf {
+            id,
+            url,
+            sha256,
+            mmproj_url,
+            mmproj_sha256,
+        } => {
+            checked_file_name(&storage_key(target))?;
+            let sha256 = sha256
+                .as_deref()
+                .ok_or_else(|| checksum_required(id, url))?;
+            let mut targets = vec![Target {
+                label: "Model".to_string(),
+                url: url.clone(),
+                destination_path: dir.join("model.gguf").display().to_string(),
+                sha256: sha256.to_string(),
+            }];
+            if let Some(mmproj_url) = gguf::trimmed(mmproj_url.as_deref()) {
+                let mmproj_sha256 = mmproj_sha256
+                    .as_deref()
+                    .ok_or_else(|| checksum_required(id, mmproj_url))?;
+                targets.push(Target {
+                    label: "Mmproj".to_string(),
+                    url: mmproj_url.to_string(),
+                    destination_path: dir.join("mmproj.gguf").display().to_string(),
+                    sha256: mmproj_sha256.to_string(),
+                });
+            } else if gguf::trimmed(mmproj_sha256.as_deref()).is_some() {
+                return Err(download::Error::InvalidTarget(format!(
+                    "{id} has a mmproj checksum without a mmproj URL"
+                )));
+            }
+            Ok(targets)
+        }
+        ModelDownloadTarget::TarGz { id, url, sha256 } => {
+            checked_file_name(id)?;
+            Ok(vec![Target {
+                label: "Model".to_string(),
+                url: url.clone(),
+                destination_path: models_dir
+                    .join(".staging")
+                    .join(format!("{id}.tar.gz"))
+                    .display()
+                    .to_string(),
+                sha256: sha256.clone(),
+            }])
+        }
+        ModelDownloadTarget::Files { id, files } => {
+            checked_file_name(id)?;
+            checked_file_name(&storage_key(target))?;
+            if files.is_empty() {
+                return Err(download::Error::InvalidTarget(format!("{id} has no files")));
+            }
+            let mut names = HashSet::new();
+            files
+                .iter()
+                .map(|file| {
+                    checked_file_name(&file.name)?;
+                    if !names.insert(file.name.as_str()) {
+                        return Err(download::Error::InvalidTarget(format!(
+                            "{id} has a duplicate file name {}",
+                            file.name
+                        )));
+                    }
+                    Ok(Target {
+                        label: file.name.clone(),
+                        url: file.url.clone(),
+                        destination_path: dir.join(&file.name).display().to_string(),
+                        sha256: file.sha256.clone(),
+                    })
+                })
+                .collect()
+        }
+    }
+}
+
+fn checksum_required(id: &str, url: &str) -> download::Error {
+    download::Error::Validation(format!("{id} needs a checksum to download {url}"))
+}
+
+fn checked_file_name(name: &str) -> Result<(), download::Error> {
+    if !name.is_empty()
+        && name != "."
+        && name != ".."
+        && !name.contains('/')
+        && !name.contains('\\')
+    {
         return Ok(());
     }
-    if target.destination_path.ends_with(".onnx") {
-        if !is_non_empty_file(path) {
-            return Err(download::Error::Validation(format!(
-                "{} is empty",
-                path.display()
-            )));
-        }
-        return Ok(());
+    Err(download::Error::InvalidTarget(format!(
+        "'{name}' is not a safe file name"
+    )))
+}
+
+fn model_path(models_dir: &Path, target: &ModelDownloadTarget) -> PathBuf {
+    let dir = storage_dir(models_dir, target);
+    match target {
+        ModelDownloadTarget::Gguf { .. } => dir.join("model.gguf"),
+        ModelDownloadTarget::TarGz { .. } | ModelDownloadTarget::Files { .. } => dir,
     }
-    gguf::validate_gguf(path)
 }
 
 fn is_non_empty_file(path: &Path) -> bool {
@@ -424,8 +523,11 @@ fn migrate_legacy_transcription_dir(
         }
     }
 
-    if matches!(vad, ModelDownloadTarget::Onnx { id, .. } if id == LEGACY_VAD_ID) {
-        let dest = model_path(models_dir, vad);
+    if let ModelDownloadTarget::Files { id, files } = vad
+        && id == LEGACY_VAD_ID
+        && let [file] = files.as_slice()
+    {
+        let dest = models_dir.join(id).join(&file.name);
         if !dest.exists() {
             let source = legacy_dir.join(LEGACY_VAD_FILE_NAME);
             if is_non_empty_file(&source) && !move_file(&source, &dest) {
@@ -458,6 +560,7 @@ fn adopt_targets(
             id,
             url,
             mmproj_url,
+            ..
         } = target
         else {
             continue;
@@ -570,11 +673,17 @@ mod tests {
         dir
     }
 
+    fn test_sha() -> String {
+        "0".repeat(64)
+    }
+
     fn target(id: &str) -> ModelDownloadTarget {
         ModelDownloadTarget::Gguf {
             id: id.to_string(),
             url: "https://example.org/models/main.gguf?download=true".to_string(),
+            sha256: Some(test_sha()),
             mmproj_url: Some("https://example.org/models/mmproj.gguf".to_string()),
+            mmproj_sha256: Some(test_sha()),
         }
     }
 
@@ -616,7 +725,9 @@ mod tests {
         let other_mmproj = ModelDownloadTarget::Gguf {
             id: "custom:1".to_string(),
             url: "https://example.org/models/main.gguf?download=true".to_string(),
+            sha256: Some(test_sha()),
             mmproj_url: Some("https://example.org/models/other.gguf".to_string()),
+            mmproj_sha256: Some(test_sha()),
         };
         assert_ne!(downloader.model_path(&other_mmproj), custom);
 
@@ -624,7 +735,7 @@ mod tests {
     }
 
     #[test]
-    fn is_downloaded_requires_gguf_magic_on_all_files() {
+    fn is_downloaded_requires_every_member_file() {
         let dir = scratch_dir("is-downloaded");
         let downloader = ModelDownloader::new(&dir);
         let target = target("qwen-2b-q8");
@@ -634,9 +745,6 @@ mod tests {
         assert!(!downloader.is_downloaded(&target));
 
         write_gguf(&model, b"GGUFdata");
-        assert!(!downloader.is_downloaded(&target));
-
-        write_gguf(&mmproj, b"not-a-model");
         assert!(!downloader.is_downloaded(&target));
 
         write_gguf(&mmproj, b"GGUFdata");
@@ -665,14 +773,17 @@ mod tests {
         ModelDownloadTarget::TarGz {
             id: id.to_string(),
             url: format!("https://models.example.org/{id}.tar.gz"),
+            sha256: test_sha(),
         }
     }
 
-    fn onnx_target(id: &str) -> ModelDownloadTarget {
-        ModelDownloadTarget::Onnx {
-            id: id.to_string(),
-            url: format!("https://models.example.org/{id}.onnx"),
-        }
+    fn file_target(id: &str) -> ModelDownloadTarget {
+        ModelDownloadTarget::file(
+            id.to_string(),
+            "model.onnx".to_string(),
+            format!("https://models.example.org/{id}.onnx"),
+            test_sha(),
+        )
     }
 
     fn write_tar_gz(path: &Path, dir_name: &str, files: &[(&str, &[u8])]) {
@@ -703,11 +814,13 @@ mod tests {
         );
         assert_eq!(downloader.mmproj_path(&archive), None);
 
-        let onnx = onnx_target("silero-vad-v4");
+        let onnx = file_target("silero-vad-v4");
+        assert_eq!(downloader.model_path(&onnx), dir.join("silero-vad-v4"));
         assert_eq!(
-            downloader.model_path(&onnx),
-            dir.join("silero-vad-v4/model.onnx")
+            downloader.file_path(&onnx, "model.onnx"),
+            Some(dir.join("silero-vad-v4/model.onnx"))
         );
+        assert_eq!(downloader.file_path(&onnx, "missing.onnx"), None);
         assert_eq!(downloader.mmproj_path(&onnx), None);
 
         let _ = fs::remove_dir_all(dir);
@@ -749,10 +862,13 @@ mod tests {
     fn onnx_target_downloaded_and_removed_via_model_file() {
         let dir = scratch_dir("variant-onnx");
         let downloader = ModelDownloader::new(&dir);
-        let target = onnx_target("silero-vad-v4");
+        let target = file_target("silero-vad-v4");
         assert!(!downloader.is_downloaded(&target));
 
-        write_gguf(&downloader.model_path(&target), b"onnxbytes");
+        write_gguf(
+            &downloader.file_path(&target, "model.onnx").unwrap(),
+            b"onnxbytes",
+        );
         assert!(downloader.is_downloaded(&target));
 
         assert!(downloader.remove_downloaded(&target));
@@ -777,10 +893,12 @@ mod tests {
 
         let models_dir = base.join("models");
         let model = tar_gz_target("parakeet-v3-int8");
-        let vad = ModelDownloadTarget::Onnx {
-            id: "silero-vad-v4".to_string(),
-            url: "https://models.example.org/silero_vad_v4.onnx".to_string(),
-        };
+        let vad = ModelDownloadTarget::file(
+            "silero-vad-v4".to_string(),
+            "model.onnx".to_string(),
+            "https://models.example.org/silero_vad_v4.onnx".to_string(),
+            test_sha(),
+        );
         migrate_legacy_transcription_dir(&models_dir, &legacy, &model, &vad);
 
         let downloader = ModelDownloader::new(&models_dir);
@@ -815,7 +933,7 @@ mod tests {
 
         let models_dir = base.join("models");
         let model = tar_gz_target("parakeet-v3-int8");
-        let vad = onnx_target("silero-vad-v4");
+        let vad = file_target("silero-vad-v4");
         fs::create_dir_all(models_dir.join("parakeet-v3-int8")).unwrap();
         fs::write(models_dir.join("parakeet-v3-int8/encoder.onnx"), b"new").unwrap();
 
@@ -844,7 +962,7 @@ mod tests {
 
         let models_dir = base.join("models");
         let model = tar_gz_target("parakeet-v4-int8");
-        let vad = onnx_target("silero-vad-v5");
+        let vad = file_target("silero-vad-v5");
         migrate_legacy_transcription_dir(&models_dir, &legacy, &model, &vad);
 
         let downloader = ModelDownloader::new(&models_dir);
@@ -869,7 +987,9 @@ mod tests {
         let custom = ModelDownloadTarget::Gguf {
             id: "custom:1".to_string(),
             url: custom_url.to_string(),
+            sha256: Some(test_sha()),
             mmproj_url: None,
+            mmproj_sha256: Some(test_sha()),
         };
         fs::write(
             legacy_models
@@ -919,7 +1039,9 @@ mod tests {
         let targets = ["a", "b"].map(|name| ModelDownloadTarget::Gguf {
             id: format!("preset-{name}"),
             url: format!("https://example.org/{name}/{name}.gguf"),
+            sha256: Some(test_sha()),
             mmproj_url: Some(format!("https://example.org/{name}/mmproj-F16.gguf")),
+            mmproj_sha256: Some(test_sha()),
         });
 
         let models_dir = base.join("models");
@@ -948,7 +1070,9 @@ mod tests {
         let custom = ModelDownloadTarget::Gguf {
             id: "custom:1".to_string(),
             url: custom_url.to_string(),
+            sha256: Some(test_sha()),
             mmproj_url: None,
+            mmproj_sha256: Some(test_sha()),
         };
         fs::write(
             models_dir
@@ -1032,7 +1156,9 @@ mod tests {
         let targets = ["a", "b"].map(|name| ModelDownloadTarget::Gguf {
             id: format!("preset-{name}"),
             url: format!("https://example.org/{name}/{name}.gguf"),
+            sha256: Some(test_sha()),
             mmproj_url: Some(format!("https://example.org/{name}/mmproj-F16.gguf")),
+            mmproj_sha256: Some(test_sha()),
         });
 
         fs::write(models_dir.join("a.gguf"), b"GGUFa").unwrap();
@@ -1095,7 +1221,9 @@ mod tests {
         let targets = ["a", "b"].map(|name| ModelDownloadTarget::Gguf {
             id: format!("preset-{name}"),
             url: format!("https://example.org/{name}/{name}.gguf"),
+            sha256: Some(test_sha()),
             mmproj_url: Some(format!("https://example.org/{name}/mmproj-F16.gguf")),
+            mmproj_sha256: Some(test_sha()),
         });
 
         migrate_flat_models_dir(&models_dir, &targets);
