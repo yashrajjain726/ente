@@ -69,6 +69,13 @@
 # It must be specified if running in a non-local environment.
 log-file: ""
 
+# The minimum level of logs to emit: "panic", "fatal", "error", "warn", "info",
+# "debug" or "trace".
+#
+# Anything below the configured level is dropped, e.g. "warn" suppresses info
+# and debug logs. If not specified or invalid defaults to "info".
+#log-level: info
+
 # HTTP connection parameters
 http:
     # The port to bind to.
