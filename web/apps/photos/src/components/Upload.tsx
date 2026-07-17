@@ -871,6 +871,14 @@ export const Upload: React.FC<UploadProps> = ({
                 uploadItemAndPaths,
             ]);
             if (uploadItemsAndPaths.current !== uploadItemAndPaths) return;
+            if (fileCount == 1 && !isTakeout) {
+                void commitUploadToExistingCollection(
+                    collection,
+                    uploadItemAndPaths,
+                    true,
+                );
+                return;
+            }
             setUploadConfirmation({
                 pendingUpload: {
                     type: "existing-collection",
@@ -996,6 +1004,16 @@ export const Upload: React.FC<UploadProps> = ({
                 ...collectionNameToUploadItems.values(),
             ]);
             if (uploadItemsAndPaths.current !== uploadItemAndPaths) return;
+            if (fileCount == 1 && !isTakeout) {
+                void commitUploadToNewCollections(
+                    uploadItemAndPaths,
+                    collectionNameToUploadItems,
+                    { includeHiddenCollections, createHidden },
+                    importTakeoutFavorites ?? true,
+                    includePartnerSharedFiles ?? true,
+                );
+                return;
+            }
             setUploadConfirmation({
                 pendingUpload: {
                     type: "new-collections",
