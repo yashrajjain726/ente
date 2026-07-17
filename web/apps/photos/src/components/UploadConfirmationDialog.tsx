@@ -1,8 +1,8 @@
 import {
-    ArrowLeft02Icon,
     Cancel01Icon,
     StarIcon,
     Tick02Icon,
+    UserMultipleIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
@@ -31,6 +31,11 @@ interface UploadConfirmationDialogProps {
         event: ChangeEvent<HTMLInputElement>,
         checked: boolean,
     ) => void;
+    includePartnerSharedFiles: boolean;
+    onIncludePartnerSharedFilesChange: (
+        event: ChangeEvent<HTMLInputElement>,
+        checked: boolean,
+    ) => void;
     onConfirm: () => void;
     onCancel: () => void;
 }
@@ -42,6 +47,8 @@ export function UploadConfirmationDialog({
     albumCount,
     importFavorites,
     onImportFavoritesChange,
+    includePartnerSharedFiles,
+    onIncludePartnerSharedFilesChange,
     onConfirm,
     onCancel,
 }: UploadConfirmationDialogProps): ReactElement {
@@ -61,13 +68,6 @@ export function UploadConfirmationDialog({
                             : "Upload to Ente"}
                     </Typography>
                     <Stack direction="row" sx={headerActionsSx}>
-                        <IconButton
-                            aria-label="Back"
-                            onClick={onCancel}
-                            sx={headerButtonSx}
-                        >
-                            <HugeiconsIcon icon={ArrowLeft02Icon} size={24} />
-                        </IconButton>
                         <IconButton
                             aria-label="Close"
                             onClick={onCancel}
@@ -134,6 +134,35 @@ export function UploadConfirmationDialog({
                                     onChange={onImportFavoritesChange}
                                     slotProps={{
                                         input: { "aria-label": "Favourites" },
+                                    }}
+                                    sx={switchSx}
+                                />
+                            </Stack>
+                            <Stack direction="row" sx={optionSx}>
+                                <Box sx={optionIconSx}>
+                                    <HugeiconsIcon
+                                        icon={UserMultipleIcon}
+                                        size={18}
+                                    />
+                                </Box>
+                                <Stack sx={optionTextSx}>
+                                    <Typography sx={bodySx}>
+                                        Partner shared photos
+                                    </Typography>
+                                    <Typography sx={captionSx}>
+                                        Import photos that were shared by your
+                                        partner on Google Photos
+                                    </Typography>
+                                </Stack>
+                                <EnteSwitch
+                                    color="accent"
+                                    checked={includePartnerSharedFiles}
+                                    onChange={onIncludePartnerSharedFilesChange}
+                                    slotProps={{
+                                        input: {
+                                            "aria-label":
+                                                "Partner shared photos",
+                                        },
                                     }}
                                     sx={switchSx}
                                 />
@@ -295,14 +324,14 @@ const optionIconSx = {
 const optionTextSx = { flex: 1, minWidth: 0, gap: "4px" };
 
 const switchSx = {
-    width: 36,
-    height: 21,
+    width: 31,
+    height: 18,
     flexShrink: 0,
     "& .MuiSwitch-switchBase": {
         m: "2px",
-        "&.Mui-checked": { transform: "translateX(15px)" },
+        "&.Mui-checked": { transform: "translateX(13px)" },
     },
-    "& .MuiSwitch-thumb": { width: 17, height: 17 },
+    "& .MuiSwitch-thumb": { width: 14, height: 14 },
 };
 
 const bodySx = { fontSize: 14, fontWeight: 500, lineHeight: "20px" };

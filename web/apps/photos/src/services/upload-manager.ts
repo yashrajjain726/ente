@@ -91,6 +91,7 @@ export interface UploadBatchResult {
 
 interface UploadItemsOptions {
     skipDuplicateAddToUploadCollection?: boolean;
+    includePartnerSharedFiles?: boolean;
 }
 
 export const successfulFilesFromUploadBatchResult = (
@@ -601,6 +602,7 @@ class UploadManager {
             isCFUploadProxyDisabled: shouldDisableCFUploadProxy(),
             skipDuplicateAddToUploadCollection:
                 options?.skipDuplicateAddToUploadCollection,
+            includePartnerSharedFiles: options?.includePartnerSharedFiles,
             abortIfCancelled: this.abortIfCancelled.bind(this),
             updateUploadProgress:
                 uiService.updateUploadProgress.bind(uiService),
