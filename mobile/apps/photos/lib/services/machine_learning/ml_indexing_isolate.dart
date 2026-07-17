@@ -176,6 +176,9 @@ class MLIndexingIsolate extends SuperIsolate {
     }
 
     return {
+      // WebGPU is only enabled for internal users while the custom Android
+      // ONNX Runtime build is being validated. Ignored on other platforms.
+      "enableWebGpu": flagService.webGPUEnabled,
       "faceDetectionModelPath": faceDetectionPath,
       "faceEmbeddingModelPath": faceEmbeddingPath,
       "clipImageModelPath": clipImagePath,

@@ -25,7 +25,9 @@ thiserror.workspace = true
 
 # ORT source and revision are pinned once in the workspace manifest; only the
 # per-target feature sets are declared here.
-# The iOS Cargokit build sets ORT_LIB_PATH to the verified custom static archive.
+# The iOS Cargokit build sets ORT_LIB_PATH to the directory containing the
+# verified custom static archive; see mobile/native/onnxruntime/README.md for
+# building outside Xcode.
 [target.'cfg(target_os = "ios")'.dependencies]
 ort = { workspace = true, features = [
     "std",
@@ -37,6 +39,8 @@ ort = { workspace = true, features = [
 ] }
 
 [target.'cfg(target_os = "android")'.dependencies]
+# Used to gate the WebGPU execution provider to Android 12+ (SDK 31).
+android_system_properties = "0.1.5"
 ort = { workspace = true, features = [
     "ndarray",
     "half",

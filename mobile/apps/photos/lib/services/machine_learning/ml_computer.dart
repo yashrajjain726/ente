@@ -6,6 +6,7 @@ import "package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart"
 import "package:logging/logging.dart";
 import "package:photos/core/errors.dart";
 import "package:photos/models/ml/vector.dart";
+import "package:photos/service_locator.dart" show flagService;
 import "package:photos/services/machine_learning/ml_constants.dart";
 import "package:photos/services/machine_learning/ml_model_assets.dart";
 import "package:photos/services/machine_learning/ml_model_download_service.dart";
@@ -86,6 +87,10 @@ class MLComputer extends SuperIsolate {
         "text": query,
         "clipTextModelPath": modelPath,
         "clipTextVocabPath": vocabPath,
+        // Keep in sync with MLIndexingIsolate: WebGPU is only enabled for
+        // internal users while the custom Android ONNX Runtime build is
+        // being validated. Ignored on other platforms.
+        "enableWebGpu": flagService.webGPUEnabled,
       });
       if (isolateResult is RustCorruptModelCacheDeletedException) {
         _clipTextModelPath = null;

@@ -821,6 +821,13 @@ Future<MLResult> analyzeImageRust(Map args) async {
       );
     }
 
+    // The Rust runtime creates sessions lazily, so configure execution
+    // behavior here as well in case the runtime was not prepared explicitly
+    // in this isolate.
+    await rust_ml.setMlExecutionConfig(
+      enableWebgpu: (args["enableWebGpu"] as bool?) ?? false,
+    );
+
     final modelPaths = rust_ml.RustModelPaths(
       faceDetection: faceDetectionModelPath ?? "",
       faceEmbedding: faceEmbeddingModelPath ?? "",

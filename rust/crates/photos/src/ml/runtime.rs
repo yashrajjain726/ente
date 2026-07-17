@@ -245,24 +245,22 @@ static GLOBAL_RUNTIME: Lazy<MlRuntime> = Lazy::new(MlRuntime::new);
 impl MlRuntime {
     fn new() -> Self {
         let platform_default = onnx::ExecutionMode::PlatformDefault;
-        #[cfg(target_os = "android")]
-        let pet_default = platform_default;
-        #[cfg(not(target_os = "android"))]
-        let pet_default = onnx::ExecutionMode::CpuOnly;
+        let cpu_only = onnx::ExecutionMode::CpuOnly;
 
         Self {
             face_detection: ModelSlot::new(platform_default, "face-detection"),
             face_embedding: ModelSlot::new(platform_default, "face-embedding"),
             clip_image: ModelSlot::new(platform_default, "clip-image"),
             clip_text: ModelSlot::new(platform_default, "clip-text"),
-            // Android uses the same WebGPU-first chain for every model. Keep
-            // the existing CPU-only pet policy on other platforms.
-            pet_face_detection: ModelSlot::new(pet_default, "pet-face-detection"),
-            pet_face_embedding_dog: ModelSlot::new(pet_default, "pet-face-embedding-dog"),
-            pet_face_embedding_cat: ModelSlot::new(pet_default, "pet-face-embedding-cat"),
-            pet_body_detection: ModelSlot::new(pet_default, "pet-body-detection"),
-            pet_body_embedding_dog: ModelSlot::new(pet_default, "pet-body-embedding-dog"),
-            pet_body_embedding_cat: ModelSlot::new(pet_default, "pet-body-embedding-cat"),
+            // Pet models previously had device-specific FP16 driver failures.
+            // Keep them CPU-only until they have been validated on the GPU
+            // execution providers of supported iOS and Android devices.
+            pet_face_detection: ModelSlot::new(cpu_only, "pet-face-detection"),
+            pet_face_embedding_dog: ModelSlot::new(cpu_only, "pet-face-embedding-dog"),
+            pet_face_embedding_cat: ModelSlot::new(cpu_only, "pet-face-embedding-cat"),
+            pet_body_detection: ModelSlot::new(cpu_only, "pet-body-detection"),
+            pet_body_embedding_dog: ModelSlot::new(cpu_only, "pet-body-embedding-dog"),
+            pet_body_embedding_cat: ModelSlot::new(cpu_only, "pet-body-embedding-cat"),
         }
     }
 
@@ -494,6 +492,7 @@ fn is_execution_provider_failure(error: &MlError) -> bool {
         || normalized.contains("dawn")
         || normalized.contains("vulkan")
         || normalized.contains("vk_error")
+        || normalized.contains("non-finite")
         || normalized.contains("ep error")
 }
 
@@ -653,9 +652,8 @@ mod tests {
     #[test]
     fn model_execution_modes_match_platform_policy() {
         let runtime = MlRuntime::new();
-        #[cfg(target_os = "android")]
-        let expected_pet_mode = onnx::ExecutionMode::PlatformDefault;
-        #[cfg(not(target_os = "android"))]
+        // Pet models stay CPU-only on every platform until they are
+        // validated on the GPU execution providers.
         let expected_pet_mode = onnx::ExecutionMode::CpuOnly;
 
         assert_eq!(

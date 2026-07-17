@@ -182,6 +182,13 @@ Future<dynamic> isolateFunction(
         );
       }
 
+      // Configure execution behavior before the CLIP text session is
+      // created; the session is process-global and cannot be reconfigured
+      // once built.
+      await rust_ml.setMlExecutionConfig(
+        enableWebgpu: (args["enableWebGpu"] as bool?) ?? false,
+      );
+
       final rust_ml.RunClipTextResult result;
       try {
         result = await rust_ml.runClipTextRust(
@@ -379,6 +386,10 @@ Future<void> _ensureRustDisposed() async {
 }
 
 Future<void> _ensureRustRuntimePrepared(Map<String, dynamic> args) async {
+  // Configure execution behavior before any ONNX session is created.
+  await rust_ml.setMlExecutionConfig(
+    enableWebgpu: (args["enableWebGpu"] as bool?) ?? false,
+  );
   final modelPaths = rust_ml.RustModelPaths(
     faceDetection: (args["faceDetectionModelPath"] as String?) ?? "",
     faceEmbedding: (args["faceEmbeddingModelPath"] as String?) ?? "",

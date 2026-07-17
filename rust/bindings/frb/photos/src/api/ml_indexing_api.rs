@@ -130,6 +130,14 @@ pub struct RunClipTextResult {
     pub embedding: Vec<f64>,
 }
 
+/// Configures process-wide ML execution behavior. `enable_webgpu` opts
+/// Android into the WebGPU execution provider (off by default, and only
+/// honored on Android 12+); it has no effect on other platforms. Call this
+/// before the runtime creates its first session.
+pub fn set_ml_execution_config(enable_webgpu: bool) {
+    shared_indexing::set_ml_execution_config(enable_webgpu);
+}
+
 pub fn init_ml_runtime(model_paths: RustModelPaths) {
     shared_indexing::init_ml_runtime(to_model_paths(&model_paths));
 }

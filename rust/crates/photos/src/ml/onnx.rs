@@ -22,8 +22,43 @@ use ort::ep::{
 };
 #[cfg(target_os = "android")]
 use std::num::NonZeroUsize;
+#[cfg(target_os = "android")]
+use std::sync::{
+    OnceLock,
+    atomic::{AtomicBool, Ordering},
+};
 
 use crate::ml::error::{MlError, MlResult};
+
+/// WebGPU is opt-in while the custom Android ONNX Runtime build is being
+/// validated: the app currently enables it for internal users only.
+#[cfg(target_os = "android")]
+static WEBGPU_ENABLED: AtomicBool = AtomicBool::new(false);
+
+pub(crate) fn set_webgpu_enabled(enabled: bool) {
+    #[cfg(target_os = "android")]
+    WEBGPU_ENABLED.store(enabled, Ordering::Relaxed);
+    #[cfg(not(target_os = "android"))]
+    let _ = enabled;
+}
+
+#[cfg(target_os = "android")]
+fn webgpu_allowed() -> bool {
+    WEBGPU_ENABLED.load(Ordering::Relaxed) && android_supports_webgpu()
+}
+
+/// Dawn's Vulkan backend is only trusted on Android 12+ (SDK 31). This fails
+/// closed: if the SDK level cannot be read, WebGPU stays disabled.
+#[cfg(target_os = "android")]
+fn android_supports_webgpu() -> bool {
+    static SDK_AT_LEAST_31: OnceLock<bool> = OnceLock::new();
+    *SDK_AT_LEAST_31.get_or_init(|| {
+        android_system_properties::AndroidSystemProperties::new()
+            .get("ro.build.version.sdk")
+            .and_then(|value| value.trim().parse::<u32>().ok())
+            .is_some_and(|sdk| sdk >= 31)
+    })
+}
 
 #[cfg(any(target_os = "ios", test))]
 const COREML_CACHE_SCHEMA: &str = "ort-1_27-mlprogram-all-default-v1";
@@ -242,8 +277,9 @@ fn platform_default_attempts(
     _model_path: &str,
     _coreml_cache_namespace: &str,
 ) -> Vec<ProviderAttempt> {
-    vec![
-        ProviderAttempt {
+    let mut attempts = Vec::new();
+    if webgpu_allowed() {
+        attempts.push(ProviderAttempt {
             // EP priority follows registration order. Unsupported WebGPU nodes
             // fall through to XNNPACK and then CPU in the same session.
             providers: vec![
@@ -253,12 +289,13 @@ fn platform_default_attempts(
             ],
             disable_intra_op_spinning: true,
             coreml_cache_dir: None,
-        },
-        // Retain clean-session fallbacks for provider or driver failures that
-        // prevent the primary session from being constructed at all.
-        xnnpack_attempt(),
-        ProviderAttempt::cpu_only(),
-    ]
+        });
+    }
+    // Clean-session fallbacks for provider or driver failures that prevent
+    // the primary session from being constructed at all.
+    attempts.push(xnnpack_attempt());
+    attempts.push(ProviderAttempt::cpu_only());
+    attempts
 }
 
 #[cfg(target_os = "android")]
@@ -433,6 +470,27 @@ fn build_session_with_providers(model_path: &str, attempt: ProviderAttempt) -> M
     Ok(session)
 }
 
+/// Guard against execution providers that return NaN or infinity instead of
+/// failing. The error message matches `is_execution_provider_failure` so the
+/// runtime advances to the next execution provider fallback.
+fn ensure_finite_f32(data: &[f32]) -> MlResult<()> {
+    if data.iter().copied().all(f32::is_finite) {
+        return Ok(());
+    }
+    Err(MlError::Ort(
+        "model produced non-finite output values".to_string(),
+    ))
+}
+
+fn ensure_finite_f16(data: &[half::f16]) -> MlResult<()> {
+    if data.iter().all(|value| value.is_finite()) {
+        return Ok(());
+    }
+    Err(MlError::Ort(
+        "model produced non-finite output values".to_string(),
+    ))
+}
+
 /// Returns true if the session's first input expects FP16 tensors.
 fn session_expects_f16(session: &Session) -> bool {
     session
@@ -470,12 +528,14 @@ pub(crate) fn run_f32<const N: usize>(
     if let Ok((tensor_shape, tensor_data)) = output.try_extract_tensor::<f32>() {
         let shape = tensor_shape.iter().copied().collect::<Vec<_>>();
         let data = tensor_data.to_vec();
+        ensure_finite_f32(&data)?;
         Ok((shape, data))
     } else {
         let (tensor_shape, tensor_data) = output.try_extract_tensor::<half::f16>()?;
         let shape = tensor_shape.iter().copied().collect::<Vec<_>>();
         let mut data = vec![0.0; tensor_data.len()];
         tensor_data.convert_to_f32_slice(&mut data);
+        ensure_finite_f32(&data)?;
         Ok((shape, data))
     }
 }
@@ -504,9 +564,11 @@ pub(crate) fn with_prepared_float_output<const N: usize, T>(
     }
     let output = &outputs[0];
     if let Ok((tensor_shape, tensor_data)) = output.try_extract_tensor::<f32>() {
+        ensure_finite_f32(tensor_data)?;
         consume(tensor_shape, BorrowedFloatTensor::F32(tensor_data))
     } else {
         let (tensor_shape, tensor_data) = output.try_extract_tensor::<half::f16>()?;
+        ensure_finite_f16(tensor_data)?;
         consume(tensor_shape, BorrowedFloatTensor::F16(tensor_data))
     }
 }
@@ -525,6 +587,7 @@ pub(crate) fn run_i32_f32<const N: usize>(
     let (tensor_shape, tensor_data) = output.try_extract_tensor::<f32>()?;
     let shape = tensor_shape.iter().copied().collect::<Vec<_>>();
     let data = tensor_data.to_vec();
+    ensure_finite_f32(&data)?;
     Ok((shape, data))
 }
 
@@ -533,10 +596,27 @@ mod tests {
     use std::{io::Write, path::Path};
 
     use super::{
-        coreml_cache_root, coreml_model_cache_key, has_protobuf_parse_failure,
-        invalidate_coreml_cache, mark_coreml_cache_complete, prepare_coreml_cache_entry,
-        prune_superseded_coreml_cache_directories, sanitize_cache_component,
+        coreml_cache_root, coreml_model_cache_key, ensure_finite_f16, ensure_finite_f32,
+        has_protobuf_parse_failure, invalidate_coreml_cache, mark_coreml_cache_complete,
+        prepare_coreml_cache_entry, prune_superseded_coreml_cache_directories,
+        sanitize_cache_component,
     };
+
+    #[test]
+    fn accepts_finite_model_outputs() {
+        assert!(ensure_finite_f32(&[0.0, -1.5, f32::MAX]).is_ok());
+        assert!(ensure_finite_f16(&[half::f16::from_f32(0.25)]).is_ok());
+    }
+
+    #[test]
+    fn rejects_non_finite_model_outputs() {
+        for bad in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY] {
+            let error = ensure_finite_f32(&[1.0, bad]).unwrap_err();
+            assert!(error.to_string().contains("non-finite"));
+        }
+        let error = ensure_finite_f16(&[half::f16::NAN]).unwrap_err();
+        assert!(error.to_string().contains("non-finite"));
+    }
 
     #[test]
     fn detects_protobuf_parse_failure() {

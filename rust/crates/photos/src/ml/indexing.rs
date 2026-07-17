@@ -44,6 +44,16 @@ pub struct RunClipTextResult {
     pub embedding: Vec<f32>,
 }
 
+/// Configures process-wide ML execution behavior. Must be called before the
+/// first session is created to take effect for that session.
+///
+/// `enable_webgpu` opts Android into the WebGPU execution provider; it is off
+/// by default and additionally requires Android 12+ (SDK 31). It has no
+/// effect on other platforms.
+pub fn set_ml_execution_config(enable_webgpu: bool) {
+    crate::ml::onnx::set_webgpu_enabled(enable_webgpu);
+}
+
 pub fn init_ml_runtime(model_paths: ModelPaths) {
     runtime::prepare_runtime(&model_paths);
 }
