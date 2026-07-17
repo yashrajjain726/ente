@@ -18,6 +18,7 @@ import "package:photos/services/file_magic_service.dart";
 import "package:photos/src/rust/api/motion_photo_api.dart";
 import "package:photos/states/detail_page_state.dart";
 import 'package:photos/ui/notification/toast.dart';
+import "package:photos/ui/viewer/file/live_image_long_press_router.dart";
 import 'package:photos/ui/viewer/file/zoomable_image.dart';
 
 class ZoomableLiveImageNew extends StatefulWidget {
@@ -28,7 +29,7 @@ class ZoomableLiveImageNew extends StatefulWidget {
   final bool isFromMemories;
   final Function({required int memoryDuration})? onFinalFileLoad;
   final ValueNotifier<List<QrDetection>>? qrDetectionsNotifier;
-  final GestureLongPressStartCallback? onLongPressStart;
+  final GestureLongPressStartCallback? onTextSelectionStart;
 
   const ZoomableLiveImageNew(
     this.enteFile, {
@@ -39,7 +40,7 @@ class ZoomableLiveImageNew extends StatefulWidget {
     this.isFromMemories = false,
     this.onFinalFileLoad,
     this.qrDetectionsNotifier,
-    this.onLongPressStart,
+    this.onTextSelectionStart,
   });
 
   @override
@@ -161,7 +162,7 @@ class _ZoomableLiveImageNewState extends State<ZoomableLiveImageNew>
   void _onLongPressStart(LongPressStartDetails details) {
     if (_isLongPressInVisibleQrRegion(details.localPosition)) return;
 
-    final onTextSelectionStart = widget.onLongPressStart;
+    final onTextSelectionStart = widget.onTextSelectionStart;
     if (onTextSelectionStart == null || _enteFile.isLivePhoto) {
       _setPlaybackPressed(true);
       _playOrLoadVideo();
@@ -428,43 +429,6 @@ class _ZoomableLiveImageNewState extends State<ZoomableLiveImageNew>
     setState(() {
       _isVideoFrameReady = true;
     });
-  }
-}
-
-enum MotionPhotoAvailability { unknown, absent, present }
-
-enum LiveImageLongPressAction { playback, textSelection }
-
-class LiveImageLongPressRouter {
-  LiveImageLongPressRouter({
-    required MotionPhotoAvailability initialAvailability,
-    required Future<MotionPhotoAvailability> Function() probeMotionPhoto,
-  }) : _availability = initialAvailability,
-       _probeMotionPhoto = probeMotionPhoto;
-
-  MotionPhotoAvailability _availability;
-  final Future<MotionPhotoAvailability> Function() _probeMotionPhoto;
-  Future<MotionPhotoAvailability>? _activeProbe;
-
-  Future<LiveImageLongPressAction> resolve() async {
-    var availability = _availability;
-    if (availability == MotionPhotoAvailability.unknown) {
-      final probe = _activeProbe ?? _probeMotionPhoto();
-      _activeProbe = probe;
-      try {
-        availability = await probe;
-        if (availability != MotionPhotoAvailability.unknown) {
-          _availability = availability;
-        }
-      } finally {
-        if (identical(_activeProbe, probe)) {
-          _activeProbe = null;
-        }
-      }
-    }
-    return availability == MotionPhotoAvailability.present
-        ? LiveImageLongPressAction.playback
-        : LiveImageLongPressAction.textSelection;
   }
 }
 

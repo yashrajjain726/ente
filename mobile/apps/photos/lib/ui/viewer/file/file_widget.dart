@@ -17,7 +17,7 @@ class FileWidget extends StatelessWidget {
   final bool? isFromMemories;
   final Function({required int memoryDuration})? onFinalFileLoad;
   final ValueNotifier<List<QrDetection>>? qrDetectionsNotifier;
-  final GestureLongPressStartCallback? onLongPressStart;
+  final GestureLongPressStartCallback? onTextSelectionStart;
 
   const FileWidget(
     this.file, {
@@ -29,7 +29,7 @@ class FileWidget extends StatelessWidget {
     this.isFromMemories = false,
     this.onFinalFileLoad,
     this.qrDetectionsNotifier,
-    this.onLongPressStart,
+    this.onTextSelectionStart,
     super.key,
   });
 
@@ -50,7 +50,7 @@ class FileWidget extends StatelessWidget {
         key: key ?? ValueKey(fileKey),
         onFinalFileLoad: onFinalFileLoad,
         qrDetectionsNotifier: qrDetectionsNotifier,
-        onLongPressStart: onLongPressStart,
+        onTextSelectionStart: onTextSelectionStart,
       );
     } else if (file.fileType == FileType.video) {
       // use old video widget on iOS simulator as the new one crashes while

@@ -11,49 +11,19 @@ void main() {
     final file = EnteFile()
       ..generatedID = 1
       ..fileType = FileType.image;
-    void onLongPressStart(LongPressStartDetails _) {}
+    void onTextSelectionStart(LongPressStartDetails _) {}
 
     final built = FileWidget(
       file,
       tagPrefix: "test",
-      onLongPressStart: onLongPressStart,
+      onTextSelectionStart: onTextSelectionStart,
     ).build(_MockBuildContext());
 
     expect(built, isA<ZoomableLiveImageNew>());
     expect(
-      (built as ZoomableLiveImageNew).onLongPressStart,
-      same(onLongPressStart),
+      (built as ZoomableLiveImageNew).onTextSelectionStart,
+      same(onTextSelectionStart),
     );
-  });
-
-  test("untagged motion photos retain playback after probing", () async {
-    var probes = 0;
-    final router = LiveImageLongPressRouter(
-      initialAvailability: MotionPhotoAvailability.unknown,
-      probeMotionPhoto: () async {
-        probes++;
-        return MotionPhotoAvailability.present;
-      },
-    );
-
-    expect(await router.resolve(), LiveImageLongPressAction.playback);
-    expect(await router.resolve(), LiveImageLongPressAction.playback);
-    expect(probes, 1);
-  });
-
-  test("untagged still photos fall back to text selection", () async {
-    var probes = 0;
-    final router = LiveImageLongPressRouter(
-      initialAvailability: MotionPhotoAvailability.unknown,
-      probeMotionPhoto: () async {
-        probes++;
-        return MotionPhotoAvailability.absent;
-      },
-    );
-
-    expect(await router.resolve(), LiveImageLongPressAction.textSelection);
-    expect(await router.resolve(), LiveImageLongPressAction.textSelection);
-    expect(probes, 1);
   });
 }
 
