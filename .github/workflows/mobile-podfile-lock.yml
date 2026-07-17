@@ -35,9 +35,7 @@ jobs:
 
             - name: Verify Podfile.lock is current
               run: |
-                  pod_version="$(pod --version)"
                   for app in photos auth locker; do
                       echo "Checking $app"
-                      sed -i '' "s/^COCOAPODS: .*/COCOAPODS: $pod_version/" "mobile/apps/$app/ios/Podfile.lock"
                       ( cd "mobile/apps/$app/ios" && pod install --deployment )
                   done
