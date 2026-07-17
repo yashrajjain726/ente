@@ -6,6 +6,7 @@ import (
 	b64 "encoding/base64"
 	"fmt"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"path"
@@ -107,17 +108,7 @@ func main() {
 		panic(err)
 	}
 
-	viper.SetDefault("apps.public-albums", "https://albums.ente.com")
-	viper.SetDefault("apps.embed-albums", "https://embed.ente.com")
-	viper.SetDefault("apps.custom-domain.cname", "my.ente.com")
-	viper.SetDefault("apps.public-locker", "https://share.ente.com")
-	viper.SetDefault("apps.public-paste", "https://paste.ente.com")
-	viper.SetDefault("apps.public-memories", "https://memories.ente.com")
-	viper.SetDefault("apps.accounts", "https://accounts.ente.com")
-	viper.SetDefault("apps.accounts-legacy", "https://accounts.ente.io")
-	viper.SetDefault("apps.cast", "https://cast.ente.com")
-	viper.SetDefault("apps.family", "https://family.ente.io")
-	viper.SetDefault("apps.space", "https://ente.space")
+	setAppDefaults()
 
 	setupLogger(environment)
 	log.Infof("Booting up %s server with commit #%s", environment, os.Getenv("GIT_COMMIT"))
@@ -1096,6 +1087,26 @@ func main() {
 	discordController.NotifyShutdown()
 }
 
+func setAppDefaults() {
+	viper.SetDefault("apps.photos", "https://photos.ente.com")
+	viper.SetDefault("apps.public-albums", "https://albums.ente.com")
+	viper.SetDefault("apps.embed-albums", "https://embed.ente.com")
+	viper.SetDefault("apps.extra-origins", []string{"https://embed.ente.io"})
+	viper.SetDefault("apps.auth", "https://auth.ente.com")
+	viper.SetDefault("apps.locker", "https://locker.ente.com")
+	viper.SetDefault("apps.public-locker", "https://share.ente.com")
+	viper.SetDefault("apps.public-paste", "https://paste.ente.com")
+	viper.SetDefault("apps.public-memories", "https://memories.ente.com")
+	viper.SetDefault("apps.accounts", "https://accounts.ente.com")
+	viper.SetDefault("apps.accounts-legacy", "https://accounts.ente.io")
+	viper.SetDefault("apps.payments", "https://payments.ente.com")
+	viper.SetDefault("apps.cast", "https://cast.ente.com")
+	viper.SetDefault("apps.family", "https://family.ente.io")
+	viper.SetDefault("apps.space", "https://ente.space")
+	viper.SetDefault("apps.legacy", "https://legacy.ente.com")
+	viper.SetDefault("apps.custom-domain.cname", "my.ente.com")
+}
+
 func runServer(environment string, server *gin.Engine) {
 	useTLS := viper.GetBool("http.use-tls")
 	if useTLS {
@@ -1396,8 +1407,48 @@ func setupAndStartCrons(userAuthRepo *repo.UserAuthRepository, collectionLinkRep
 }
 
 func cors() gin.HandlerFunc {
+	origins := []string{"ente://app"}
+	for _, value := range viper.GetStringMap("apps") {
+		if origin, ok := value.(string); ok {
+			origins = append(origins, origin)
+		}
+	}
+	origins = append(origins, viper.GetStringSlice("apps.extra-origins")...)
+	return corsForOrigins(origins)
+}
+
+func corsForOrigins(origins []string) gin.HandlerFunc {
+	knownOrigins := make(map[string]bool, len(origins))
+	for _, origin := range origins {
+		if origin = normalizeOrigin(origin); origin != "" {
+			knownOrigins[origin] = true
+		}
+	}
+	isKnownOrigin := func(c *gin.Context, origin string) bool {
+		if origin == "" || knownOrigins[normalizeOrigin(origin)] {
+			return true
+		}
+		parsed, err := url.Parse(origin)
+		if err == nil && strings.EqualFold(parsed.Host, c.Request.Host) {
+			return true
+		}
+		// CollectionLinkMiddleware validates custom album domains.
+		path := c.Request.URL.Path
+		return path == "/public-collection" || strings.HasPrefix(path, "/public-collection/")
+	}
+
 	return func(c *gin.Context) {
-		c.Writer.Header().Set("Access-Control-Allow-Origin", c.GetHeader("Origin"))
+		origin := c.GetHeader("Origin")
+		knownOrigin := isKnownOrigin(c, origin)
+		if c.Request.Method != http.MethodOptions && !knownOrigin {
+			log.WithFields(log.Fields{
+				"clientPackage": c.GetHeader("X-Client-Package"),
+				"origin":        origin,
+				"path":          c.FullPath(),
+			}).Warn("unknown CORS origin")
+		}
+
+		c.Writer.Header().Set("Access-Control-Allow-Origin", origin)
 		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
 		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, X-Auth-Token, X-Space-Session-Token, X-Auth-Access-Token, X-Cast-Access-Token, X-Auth-Access-Token-JWT, X-Auth-Link-Device-Token, X-Client-Package, X-Client-Version, X-Paste-Consume, Authorization, accept, origin, Cache-Control, X-Requested-With, upgrade-insecure-requests, Range")
 		c.Writer.Header().Set("Access-Control-Expose-Headers", "X-Request-Id, X-Ente-Link-Device-Token")
@@ -1412,6 +1463,14 @@ func cors() gin.HandlerFunc {
 		}
 		c.Next()
 	}
+}
+
+func normalizeOrigin(origin string) string {
+	parsed, err := url.Parse(strings.TrimSpace(origin))
+	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
+		return ""
+	}
+	return strings.ToLower(parsed.Scheme + "://" + parsed.Host)
 }
 
 func cacheHeaders() gin.HandlerFunc {
