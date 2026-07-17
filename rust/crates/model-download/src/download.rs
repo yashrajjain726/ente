@@ -9,6 +9,7 @@ use futures_util::future::try_join_all;
 use reqwest::header::{ACCEPT_RANGES, CONTENT_RANGE, ETAG, IF_RANGE, LAST_MODIFIED, RANGE};
 use reqwest::{Client, Response, StatusCode};
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use tokio::runtime::Builder;
 use tokio::time::timeout;
 
@@ -70,6 +71,7 @@ pub struct Target {
     pub label: String,
     pub url: String,
     pub destination_path: String,
+    pub sha256: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -432,7 +434,7 @@ async fn download_file(
             .await
             {
                 Ok(report) => return Ok(report),
-                Err(Error::Cancelled) => return Err(Error::Cancelled),
+                Err(err @ (Error::Cancelled | Error::Validation(_))) => return Err(err),
                 Err(err) => {
                     range_error = Some(err);
                     cleanup_range_download(destination);
@@ -660,6 +662,14 @@ async fn download_file_single(
             continue;
         }
 
+        if let Some(expected) = &target.sha256
+            && let Err(err) = check_sha256(&tmp_path, expected, &target.label)
+        {
+            let _ = fs::remove_file(&tmp_path);
+            let _ = fs::remove_file(&partial_metadata_path);
+            return Err(err);
+        }
+
         if let Err(err) = validate(target, &tmp_path) {
             let _ = fs::remove_file(&tmp_path);
             let _ = fs::remove_file(&partial_metadata_path);
@@ -780,6 +790,14 @@ async fn download_file_ranged(
     drop(file);
 
     emit_range_file_progress(total, file_started_at, &range_states, &on_progress);
+
+    if let Some(expected) = &target.sha256
+        && let Err(err) = check_sha256(&tmp_path, expected, &target.label)
+    {
+        let _ = fs::remove_file(&tmp_path);
+        let _ = fs::remove_file(&range_metadata_path);
+        return Err(err);
+    }
 
     if let Err(err) = validate(target, &tmp_path) {
         let _ = fs::remove_file(&tmp_path);
@@ -1518,6 +1536,13 @@ fn prepare_cached_download(
     if !destination.exists() || validate(target, destination).is_err() {
         return false;
     }
+    if let Some(expected) = &target.sha256 {
+        if check_sha256(destination, expected, &target.label).is_err() {
+            return false;
+        }
+        cleanup_range_download(destination);
+        return true;
+    }
     let adopted = if !metadata_path_for(destination).exists() {
         let size = file_size(destination).unwrap_or(0);
         let _ = write_download_metadata(destination, target, size, None);
@@ -1602,6 +1627,35 @@ fn write_range_download_metadata(
 
 pub fn metadata_path_for(path: &Path) -> PathBuf {
     PathBuf::from(format!("{}.metadata.json", path.display()))
+}
+
+pub fn sha256_file(path: &Path) -> Result<String, Error> {
+    use std::io::Read;
+    let mut file = File::open(path)?;
+    let mut hasher = Sha256::new();
+    let mut buffer = [0u8; 1024 * 1024];
+    loop {
+        let read = file.read(&mut buffer)?;
+        if read == 0 {
+            break;
+        }
+        hasher.update(&buffer[..read]);
+    }
+    let mut hex = String::with_capacity(64);
+    for byte in hasher.finalize() {
+        hex.push_str(&format!("{byte:02x}"));
+    }
+    Ok(hex)
+}
+
+fn check_sha256(path: &Path, expected: &str, label: &str) -> Result<(), Error> {
+    let actual = sha256_file(path)?;
+    if actual != expected.trim().to_ascii_lowercase() {
+        return Err(Error::Validation(format!(
+            "{label} checksum mismatch: expected {expected}, got {actual}"
+        )));
+    }
+    Ok(())
 }
 
 fn range_metadata_path_for(path: &Path) -> PathBuf {
@@ -1892,6 +1946,7 @@ mod tests {
                 label: "Model".to_string(),
                 url,
                 destination_path: destination.display().to_string(),
+                sha256: None,
             }],
             |_, _| Ok(()),
             |_| {},
@@ -1941,6 +1996,7 @@ mod tests {
                 label: "Model".to_string(),
                 url: server.url("/model.bin"),
                 destination_path: destination.display().to_string(),
+                sha256: None,
             }],
             |_, _| Ok(()),
             |_| {},
@@ -1978,6 +2034,7 @@ mod tests {
                 label: "Model".to_string(),
                 url: server.url("/model.bin"),
                 destination_path: destination.display().to_string(),
+                sha256: None,
             }],
             |_, _| Err(Error::Validation("rejected".to_string())),
             |_| {},
@@ -2031,6 +2088,7 @@ mod tests {
             label: "Model".to_string(),
             url: server.url("/model.bin"),
             destination_path: destination.display().to_string(),
+            sha256: None,
         };
 
         fetch(vec![target.clone()], |_, _| Ok(()), |_| {}, || false)
@@ -2069,6 +2127,7 @@ mod tests {
             label: "Model".to_string(),
             url: server.url("/model.bin"),
             destination_path: destination.display().to_string(),
+            sha256: None,
         };
         let require_zero_header = |_: &Target, path: &Path| match fs::read(path)
             .ok()
@@ -2120,6 +2179,7 @@ mod tests {
             label: "Model".to_string(),
             url: server.url("/model.bin"),
             destination_path: destination.display().to_string(),
+            sha256: None,
         };
 
         fetch(vec![target], |_, _| Ok(()), |_| {}, || false).expect("fetch adopts existing file");
@@ -2160,6 +2220,7 @@ mod tests {
             label: "Model".to_string(),
             url: server.url("/model.bin"),
             destination_path: destination.display().to_string(),
+            sha256: None,
         };
 
         fetch(vec![target], |_, _| Ok(()), |_| {}, || false).expect("fetch redownloads");
@@ -2197,6 +2258,7 @@ mod tests {
             label: "Model".to_string(),
             url: "http://127.0.0.1:1/old-model.bin".to_string(),
             destination_path: destination.display().to_string(),
+            sha256: None,
         };
         write_download_metadata(&destination, &stale_target, bytes.len() as u64, None)
             .expect("write stale sidecar");
@@ -2205,6 +2267,7 @@ mod tests {
             label: "Model".to_string(),
             url: server.url("/model.bin"),
             destination_path: destination.display().to_string(),
+            sha256: None,
         };
 
         fetch(vec![target], |_, _| Ok(()), |_| {}, || false).expect("fetch redownloads");
@@ -2251,6 +2314,7 @@ mod tests {
             label: "Model".to_string(),
             url: server.url("/model.bin"),
             destination_path: destination.display().to_string(),
+            sha256: None,
         };
         fs::write(tmp_path_for(&destination), &bytes[..256]).expect("place partial tmp");
         write_partial_download_metadata(
@@ -2310,6 +2374,7 @@ mod tests {
             label: "Model".to_string(),
             url: server.url("/model.bin"),
             destination_path: destination.display().to_string(),
+            sha256: None,
         };
         fs::write(tmp_path_for(&destination), vec![0xAAu8; 256]).expect("place stale tmp");
         write_partial_download_metadata(
@@ -2359,6 +2424,7 @@ mod tests {
             label: "Model".to_string(),
             url: server.url("/model.bin"),
             destination_path: destination.display().to_string(),
+            sha256: None,
         };
 
         fetch(vec![target], |_, _| Ok(()), |_| {}, || false).expect("fresh download succeeds");
@@ -2402,6 +2468,7 @@ mod tests {
             label: "Model".to_string(),
             url: server.url("/model.bin"),
             destination_path: destination.display().to_string(),
+            sha256: None,
         };
         fs::write(tmp_path_for(&destination), &bytes[..256]).expect("place partial tmp");
         write_partial_download_metadata(
@@ -2495,6 +2562,7 @@ mod tests {
                 label: "Model".to_string(),
                 url: "http://127.0.0.1:1/model.bin".to_string(),
                 destination_path: destination.display().to_string(),
+                sha256: None,
             }],
             |_, _| Ok(()),
             |_| {},
@@ -2520,6 +2588,7 @@ mod tests {
                 label: "Model".to_string(),
                 url: "http://127.0.0.1:1/model.bin".to_string(),
                 destination_path: destination.display().to_string(),
+                sha256: None,
             }],
             |_, _| Ok(()),
             |_| {},
@@ -2531,6 +2600,168 @@ mod tests {
         assert!(!tmp_path_for(&destination).exists());
         assert!(!range_metadata_path_for(&destination).exists());
         assert!(!partial_metadata_path_for(&destination).exists());
+
+        let _ = fs::remove_dir_all(test_dir);
+    }
+
+    #[test]
+    fn sha_pinned_download_verifies_content() {
+        let bytes = Arc::new(sample_bytes(2048));
+        let get_count = Arc::new(AtomicUsize::new(0));
+        let server = {
+            let bytes = Arc::clone(&bytes);
+            let get_count = Arc::clone(&get_count);
+            TestServer::spawn(move |stream| {
+                handle_no_range_test_request(stream, Arc::clone(&bytes), Arc::clone(&get_count));
+            })
+        };
+
+        let test_dir = scratch_dir("sha-download");
+        let destination = test_dir.join("model.bin");
+        let mut expected = String::new();
+        for byte in Sha256::digest(bytes.as_slice()) {
+            expected.push_str(&format!("{byte:02x}"));
+        }
+
+        fetch(
+            vec![Target {
+                label: "Model".to_string(),
+                url: server.url("/model.bin"),
+                destination_path: destination.display().to_string(),
+                sha256: Some(expected),
+            }],
+            |_, _| Ok(()),
+            |_| {},
+            || false,
+        )
+        .expect("sha-pinned download succeeds");
+        assert_eq!(
+            fs::read(&destination).expect("read downloaded file"),
+            *bytes
+        );
+
+        let _ = fs::remove_dir_all(test_dir);
+    }
+
+    #[test]
+    fn sha_mismatch_fails_immediately_without_installing() {
+        let bytes = Arc::new(sample_bytes(2048));
+        let get_count = Arc::new(AtomicUsize::new(0));
+        let server = {
+            let bytes = Arc::clone(&bytes);
+            let get_count = Arc::clone(&get_count);
+            TestServer::spawn(move |stream| {
+                handle_no_range_test_request(stream, Arc::clone(&bytes), Arc::clone(&get_count));
+            })
+        };
+
+        let test_dir = scratch_dir("sha-mismatch");
+        let destination = test_dir.join("model.bin");
+
+        let result = fetch(
+            vec![Target {
+                label: "Model".to_string(),
+                url: server.url("/model.bin"),
+                destination_path: destination.display().to_string(),
+                sha256: Some("0".repeat(64)),
+            }],
+            |_, _| Ok(()),
+            |_| {},
+            || false,
+        );
+
+        assert!(result.is_err());
+        assert!(!destination.exists());
+        assert_eq!(get_count.load(Ordering::SeqCst), 1);
+
+        let _ = fs::remove_dir_all(test_dir);
+    }
+
+    #[test]
+    fn ranged_sha_mismatch_fails_without_single_stream_fallback() {
+        let bytes = Arc::new(sample_bytes(MIN_RANGE_DOWNLOAD_BYTES as usize + 123));
+        let head_count = Arc::new(AtomicUsize::new(0));
+        let range_get_count = Arc::new(AtomicUsize::new(0));
+        let full_get_count = Arc::new(AtomicUsize::new(0));
+        let server = {
+            let bytes = Arc::clone(&bytes);
+            let head_count = Arc::clone(&head_count);
+            let range_get_count = Arc::clone(&range_get_count);
+            let full_get_count = Arc::clone(&full_get_count);
+            TestServer::spawn(move |stream| {
+                handle_range_test_request(
+                    stream,
+                    Arc::clone(&bytes),
+                    Arc::clone(&head_count),
+                    Arc::clone(&range_get_count),
+                    Arc::clone(&full_get_count),
+                );
+            })
+        };
+
+        let test_dir = scratch_dir("ranged-sha-mismatch");
+        let destination = test_dir.join("model.bin");
+
+        let result = fetch(
+            vec![Target {
+                label: "Model".to_string(),
+                url: server.url("/model.bin"),
+                destination_path: destination.display().to_string(),
+                sha256: Some("0".repeat(64)),
+            }],
+            |_, _| Ok(()),
+            |_| {},
+            || false,
+        );
+
+        assert!(result.is_err());
+        assert!(!destination.exists());
+        assert!(!tmp_path_for(&destination).exists());
+        assert_eq!(
+            range_get_count.load(Ordering::SeqCst),
+            RANGE_DOWNLOAD_CONCURRENCY
+        );
+        assert_eq!(full_get_count.load(Ordering::SeqCst), 0);
+
+        let _ = fs::remove_dir_all(test_dir);
+    }
+
+    #[test]
+    fn sha_pinned_target_adopts_cached_file_regardless_of_url() {
+        let test_dir = scratch_dir("sha-cached");
+        let destination = test_dir.join("model.bin");
+        fs::write(&destination, b"model-bytes").expect("write cached file");
+        let sha = sha256_file(&destination).expect("hash cached file");
+        let old_target = Target {
+            label: "Model".to_string(),
+            url: "http://cache.example.org/old-location".to_string(),
+            destination_path: destination.display().to_string(),
+            sha256: Some(sha.clone()),
+        };
+        write_download_metadata(&destination, &old_target, 11, None).expect("write stale metadata");
+
+        fetch(
+            vec![Target {
+                url: "http://127.0.0.1:9/new-location".to_string(),
+                ..old_target.clone()
+            }],
+            |_, _| Ok(()),
+            |_| {},
+            || false,
+        )
+        .expect("cached file adopted by checksum despite changed URL");
+
+        fs::write(&destination, b"corrupted").expect("corrupt cached file");
+        let result = fetch(
+            vec![Target {
+                url: "http://127.0.0.1:9/new-location".to_string(),
+                ..old_target
+            }],
+            |_, _| Ok(()),
+            |_| {},
+            || false,
+        );
+        assert!(result.is_err());
 
         let _ = fs::remove_dir_all(test_dir);
     }

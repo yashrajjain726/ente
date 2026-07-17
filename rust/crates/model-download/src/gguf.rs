@@ -20,12 +20,14 @@ pub(crate) fn expected_targets(
         destination_path: model_path(models_dir, id, url, mmproj_url)
             .display()
             .to_string(),
+        sha256: None,
     }];
     if let Some(mmproj) = mmproj_path(models_dir, id, url, mmproj_url) {
         targets.push(Target {
             label: "Mmproj".to_string(),
             url: trimmed(mmproj_url).unwrap().to_string(),
             destination_path: mmproj.display().to_string(),
+            sha256: None,
         });
     }
     targets

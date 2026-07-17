@@ -224,11 +224,13 @@ impl ModelDownloader {
                     .join(format!("{id}.tar.gz"))
                     .display()
                     .to_string(),
+                sha256: None,
             }],
             ModelDownloadTarget::Onnx { url, .. } => vec![Target {
                 label: "Model".to_string(),
                 url: url.clone(),
                 destination_path: self.model_path(target).display().to_string(),
+                sha256: None,
             }],
         }
     }

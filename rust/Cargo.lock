@@ -2454,6 +2454,7 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "ente-image",
+ "ente-model-download",
  "fast_image_resize",
  "flate2",
  "half",
@@ -2466,13 +2467,12 @@ dependencies = [
  "plsfix",
  "quick-xml",
  "regex",
- "reqwest 0.12.28",
  "serde",
  "serde_json",
- "sha2 0.10.9",
  "tar",
  "tempfile",
  "thiserror 2.0.18",
+ "url",
  "usearch",
 ]
 
@@ -7134,7 +7134,6 @@ dependencies = [
  "base64 0.22.1",
  "bytes",
  "encoding_rs",
- "futures-channel",
  "futures-core",
  "futures-util",
  "h2",
