@@ -401,6 +401,7 @@ class _ShareLegacyKitPageState extends State<ShareLegacyKitPage> {
   }
 
   Future<void> _editRecoveryWaitTime() async {
+    final authReason = context.strings.authToManageLegacyKit;
     if (_kit.hasActiveRecoverySession) {
       await showAlertBottomSheet(
         context,
@@ -417,7 +418,7 @@ class _ShareLegacyKitPageState extends State<ShareLegacyKitPage> {
     if (selectedDays == null || selectedDays * 24 == _kit.noticePeriodInHours) {
       return;
     }
-    if (!await _authenticate(context.strings.authToManageLegacyKit)) {
+    if (!await _authenticate(authReason)) {
       return;
     }
     if (!mounted) {
