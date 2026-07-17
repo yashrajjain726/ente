@@ -4,9 +4,13 @@ enum LiveImageLongPressAction { playback, textSelection }
 
 class LiveImageLongPressRouter {
   LiveImageLongPressRouter({
-    required MotionPhotoAvailability initialAvailability,
+    required int? motionVideoIndex,
     required Future<MotionPhotoAvailability> Function() probeMotionPhoto,
-  }) : _availability = initialAvailability,
+  }) : _availability = switch (motionVideoIndex) {
+         final index? when index > 0 => MotionPhotoAvailability.present,
+         0 => MotionPhotoAvailability.absent,
+         _ => MotionPhotoAvailability.unknown,
+       },
        _probeMotionPhoto = probeMotionPhoto;
 
   MotionPhotoAvailability _availability;

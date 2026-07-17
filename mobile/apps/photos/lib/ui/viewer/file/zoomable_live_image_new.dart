@@ -68,10 +68,7 @@ class _ZoomableLiveImageNewState extends State<ZoomableLiveImageNew>
 
     _enteFile = widget.enteFile;
     _longPressRouter = LiveImageLongPressRouter(
-      initialAvailability: switch (_enteFile.pubMagicMetadata?.mvi) {
-        final index? when index > 0 => MotionPhotoAvailability.present,
-        _ => MotionPhotoAvailability.unknown,
-      },
+      motionVideoIndex: _enteFile.pubMagicMetadata?.mvi,
       probeMotionPhoto: _loadLiveVideo,
     );
     _logger.info(

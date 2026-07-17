@@ -5,7 +5,7 @@ void main() {
   test("untagged motion photos retain playback after probing", () async {
     var probes = 0;
     final router = LiveImageLongPressRouter(
-      initialAvailability: MotionPhotoAvailability.unknown,
+      motionVideoIndex: null,
       probeMotionPhoto: () async {
         probes++;
         return MotionPhotoAvailability.present;
@@ -20,7 +20,7 @@ void main() {
   test("untagged still photos fall back to text selection", () async {
     var probes = 0;
     final router = LiveImageLongPressRouter(
-      initialAvailability: MotionPhotoAvailability.unknown,
+      motionVideoIndex: null,
       probeMotionPhoto: () async {
         probes++;
         return MotionPhotoAvailability.absent;
@@ -30,5 +30,19 @@ void main() {
     expect(await router.resolve(), LiveImageLongPressAction.textSelection);
     expect(await router.resolve(), LiveImageLongPressAction.textSelection);
     expect(probes, 1);
+  });
+
+  test("an explicit absent marker skips the motion photo probe", () async {
+    var probes = 0;
+    final router = LiveImageLongPressRouter(
+      motionVideoIndex: 0,
+      probeMotionPhoto: () async {
+        probes++;
+        return MotionPhotoAvailability.present;
+      },
+    );
+
+    expect(await router.resolve(), LiveImageLongPressAction.textSelection);
+    expect(probes, 0);
   });
 }
