@@ -9,13 +9,7 @@ double memoryProgressSegmentWidthForLayout({
   required double availableWidth,
   double gap = kMemoryProgressGap,
 }) {
-  if (totalSteps <= 0 ||
-      !availableWidth.isFinite ||
-      availableWidth <= 0 ||
-      !gap.isFinite ||
-      gap < 0) {
-    return 0;
-  }
+  if (totalSteps <= 0) return 0;
 
   final availableSegmentWidth = availableWidth - ((totalSteps - 1) * gap);
   if (availableSegmentWidth <= 0) return 0;

@@ -35,6 +35,7 @@ import "package:photos/ui/components/base_bottom_sheet.dart";
 import "package:photos/ui/home/memories/custom_listener.dart";
 import "package:photos/ui/home/memories/memory_progress_indicator.dart";
 import "package:photos/ui/home/memories/memory_video_prefetcher.dart";
+import "package:photos/ui/home/memories/memory_viewer_constants.dart";
 import "package:photos/ui/social/widgets/file_social_overlay.dart";
 import "package:photos/ui/viewer/file/file_widget.dart";
 import "package:photos/ui/viewer/file/thumbnail_widget.dart";
@@ -69,9 +70,6 @@ int? _clampedMemoryIndex(int index, int length) {
 bool _isValidMemoryIndex(int index, int length) {
   return index >= 0 && index < length;
 }
-
-const _memoryBottomActionBarHeight = 80.0;
-const _memorySocialScrimHeight = 296.0;
 
 class FullScreenMemoryDataUpdater extends StatefulWidget {
   final List<Memory> memories;
@@ -406,9 +404,6 @@ class _FullScreenMemoryState extends State<FullScreenMemory> {
     hasPointerOnScreenNotifier.removeListener(_hasPointerListener);
     _detailSheetEventSubscription.cancel();
     _socialControlsVisible.dispose();
-    _progressAnimationController = null;
-    _zoomAnimationController = null;
-    _kenBurnsStartToken = null;
     super.dispose();
   }
 
@@ -491,9 +486,6 @@ class _FullScreenMemoryState extends State<FullScreenMemory> {
     if (!mounted) return;
     hasFinalFileLoaded = true;
     isAtFirstOrLastFile = false;
-    if (_progressAnimationController?.isAnimating == true) {
-      _progressAnimationController!.stop();
-    }
     final memoryDuration = Duration(seconds: duration);
     _progressAnimationController
       ?..stop()
@@ -521,7 +513,9 @@ class _FullScreenMemoryState extends State<FullScreenMemory> {
       });
     } else {
       _kenBurnsStartToken = null;
-      _zoomAnimationController?.forward();
+      if (!_isAnimationPaused) {
+        _zoomAnimationController?.forward();
+      }
     }
   }
 
@@ -535,9 +529,9 @@ class _FullScreenMemoryState extends State<FullScreenMemory> {
     )!;
     inheritedData.indexNotifier.value = currentIndex;
     if (currentIndex < inheritedData.memories.length - 1) {
-      inheritedData.indexNotifier.value += 1;
       _onPageChange(inheritedData, currentIndex + 1);
     } else if (widget.onNextMemory != null) {
+      _resetAnimation();
       _setSocialControlsVisible(false);
       widget.onNextMemory!();
     } else {
@@ -556,9 +550,9 @@ class _FullScreenMemoryState extends State<FullScreenMemory> {
     )!;
     inheritedData.indexNotifier.value = currentIndex;
     if (currentIndex > 0) {
-      inheritedData.indexNotifier.value -= 1;
       _onPageChange(inheritedData, currentIndex - 1);
     } else if (widget.onPreviousMemory != null) {
+      _resetAnimation();
       _setSocialControlsVisible(false);
       widget.onPreviousMemory!();
     } else {
@@ -720,6 +714,15 @@ class _FullScreenMemoryState extends State<FullScreenMemory> {
                             _toggleAnimation(pause: !shouldEnable);
                           },
                           onFinalFileLoad: ({required int memoryDuration}) {
+                            final activeIndex = _clampedMemoryIndex(
+                              inheritedData.indexNotifier.value,
+                              inheritedData.memories.length,
+                            );
+                            if (activeIndex == null ||
+                                inheritedData.memories[activeIndex].file !=
+                                    currentFile) {
+                              return;
+                            }
                             onFinalFileLoad(memoryDuration);
                           },
                         ),
@@ -1089,18 +1092,12 @@ class _MemoryTopChrome extends StatelessWidget {
                         ),
                         if (showFavorite) ...[
                           const SizedBox(width: 8),
-                          SizedBox.square(
-                            dimension: 48,
-                            child: Center(
-                              child: FavoriteWidget(
-                                currentFile,
-                                iconSize: 24,
-                                tapTargetSize: 48,
-                                key: ValueKey(
-                                  currentFile.uploadedFileID ??
-                                      currentFile.localID,
-                                ),
-                              ),
+                          FavoriteWidget(
+                            currentFile,
+                            iconSize: 24,
+                            tapTargetSize: 48,
+                            key: ValueKey(
+                              currentFile.uploadedFileID ?? currentFile.localID,
                             ),
                           ),
                         ],
@@ -1183,8 +1180,8 @@ class _MemoryViewerScrims extends StatelessWidget {
                   curve: Curves.easeOut,
                   width: double.infinity,
                   height: isVisible
-                      ? _memorySocialScrimHeight
-                      : bottomInset + _memoryBottomActionBarHeight,
+                      ? kMemorySocialScrimHeight
+                      : bottomInset + kMemoryBottomActionBarHeight,
                   decoration: const BoxDecoration(
                     gradient: LinearGradient(
                       begin: Alignment.bottomCenter,

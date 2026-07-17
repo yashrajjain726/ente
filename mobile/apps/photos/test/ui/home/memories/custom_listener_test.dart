@@ -36,6 +36,33 @@ void main() {
     expect(swipeCount, 1);
   });
 
+  testWidgets("opens details when an upward swipe follows a hold", (
+    tester,
+  ) async {
+    var swipeCount = 0;
+    await pumpListener(tester, onSwipeUp: () => swipeCount++);
+    final gesture = await tester.startGesture(
+      tester.getCenter(find.byKey(targetKey)),
+    );
+
+    await tester.pump(const Duration(milliseconds: 600));
+    await gesture.moveBy(const Offset(0, -60));
+    await gesture.up();
+
+    expect(swipeCount, 1);
+  });
+
+  testWidgets("does not open details after horizontal page displacement", (
+    tester,
+  ) async {
+    var swipeCount = 0;
+    await pumpListener(tester, onSwipeUp: () => swipeCount++);
+
+    await tester.drag(find.byKey(targetKey), const Offset(20, -60));
+
+    expect(swipeCount, 0);
+  });
+
   testWidgets("does not open details while media is zoomed", (tester) async {
     var swipeCount = 0;
     await pumpListener(

@@ -125,24 +125,23 @@ class MemoriesPointerGestureListenerState
     _longPressTimer = null;
     final wasPartOfMultitouch =
         _activePointers.activePointerWasPartOfMultitouch;
-    final displacement = _downPosition == null
-        ? Offset.zero
-        : event.localPosition - _downPosition!;
+    final displacement = event.localPosition - _downPosition!;
     final isSwipeUp =
         widget.onSwipeUp != null &&
         (widget.canSwipeUp?.call() ?? true) &&
         !wasPartOfMultitouch &&
         displacement.dy <= -widget.swipeUpThreshold &&
-        displacement.dy.abs() > displacement.dx.abs();
+        displacement.dy.abs() > displacement.dx.abs() &&
+        displacement.dx.abs() <= widget.touchSlop;
 
     // Release the pointer before callbacks so opening a sheet can take over
     // the viewer's pause state without the release immediately resuming it.
     _removePointer(event.pointer);
 
-    if (_longPressFired) {
-      // widget.onLongPressUp?.call();
-    } else if (isSwipeUp) {
+    if (isSwipeUp) {
       widget.onSwipeUp?.call();
+    } else if (_longPressFired) {
+      // widget.onLongPressUp?.call();
     } else {
       if (!wasPartOfMultitouch && !hasPointerMoved) {
         widget.onTap?.call(event);

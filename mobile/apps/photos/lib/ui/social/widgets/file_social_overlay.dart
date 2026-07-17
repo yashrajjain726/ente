@@ -17,6 +17,7 @@ import "package:photos/models/social/comment_author_utils.dart";
 import "package:photos/models/social/reaction.dart";
 import "package:photos/models/social/social_data_provider.dart";
 import "package:photos/services/collections_service.dart";
+import "package:photos/ui/home/memories/memory_viewer_constants.dart";
 import "package:photos/ui/notification/toast.dart";
 import "package:photos/ui/sharing/user_avator_widget.dart";
 import "package:photos/ui/social/comments_screen.dart";
@@ -28,7 +29,6 @@ final _logger = Logger("FileSocialOverlay");
 const _likedColor = Color(0xFF08C225);
 const _socialControlsSize = 40.0;
 const _socialIconSize = 32.0;
-const _bottomActionBarHeight = 80.0;
 const _socialToActionBarGap = 14.0;
 
 class FileSocialOverlay extends StatefulWidget {
@@ -37,7 +37,6 @@ class FileSocialOverlay extends StatefulWidget {
   final VoidCallback onInteractionStart;
   final VoidCallback onInteractionEnd;
   final ValueChanged<bool> onVisibilityChanged;
-  final bool includeHiddenCollections;
 
   const FileSocialOverlay({
     required this.file,
@@ -45,7 +44,6 @@ class FileSocialOverlay extends StatefulWidget {
     required this.onInteractionStart,
     required this.onInteractionEnd,
     required this.onVisibilityChanged,
-    this.includeHiddenCollections = false,
     super.key,
   });
 
@@ -63,7 +61,7 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
   Comment? _latestComment;
   User? _latestCommentAuthor;
   int _loadGeneration = 0;
-  int? _reactionUpdateFileID;
+  final _reactionUpdateFileIDs = <int>{};
 
   @override
   void initState() {
@@ -78,10 +76,7 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
   void didUpdateWidget(covariant FileSocialOverlay oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.file.uploadedFileID != widget.file.uploadedFileID ||
-        oldWidget.currentUserID != widget.currentUserID ||
-        oldWidget.includeHiddenCollections != widget.includeHiddenCollections) {
-      _loadGeneration++;
-      _reactionUpdateFileID = null;
+        oldWidget.currentUserID != widget.currentUserID) {
       _clearSocialState();
       unawaited(_refreshSocialState());
     }
@@ -89,7 +84,6 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
 
   @override
   void dispose() {
-    _loadGeneration++;
     _socialDataUpdatedSubscription.cancel();
     super.dispose();
   }
@@ -115,15 +109,22 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
 
     if (fileID == null || currentUserID == null) {
       _clearSocialState();
+      // Defer because a user-null transition can arrive from didUpdateWidget.
+      scheduleMicrotask(() {
+        if (!mounted ||
+            generation != _loadGeneration ||
+            widget.file.uploadedFileID != fileID ||
+            widget.currentUserID != currentUserID) {
+          return;
+        }
+        widget.onVisibilityChanged(false);
+      });
       return;
     }
 
     try {
       final sharedCollections = await CollectionsService.instance
-          .getSharedCollectionsForFile(
-            fileID,
-            includeHidden: widget.includeHiddenCollections,
-          );
+          .getSharedCollectionsForFile(fileID);
       if (!_isCurrentLoad(fileID, generation)) return;
 
       if (sharedCollections.isEmpty) {
@@ -167,7 +168,7 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
       setState(() {
         _sharedCollections = sharedCollections;
         _hasLiked = reactions.any(
-          (reaction) => reaction.userID == currentUserID && !reaction.isDeleted,
+          (reaction) => reaction.userID == currentUserID,
         );
         _commentCount = commentCount;
         _latestComment = latestComment;
@@ -175,6 +176,7 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
       });
       widget.onVisibilityChanged(true);
     } catch (error, stackTrace) {
+      // Preserve last-good state; page changes clear state and visibility.
       _logger.warning(
         "Failed to refresh social overlay for file $fileID",
         error,
@@ -190,11 +192,11 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
     if (fileID == null ||
         currentUserID == null ||
         _sharedCollections.isEmpty ||
-        _reactionUpdateFileID == fileID) {
+        _reactionUpdateFileIDs.contains(fileID)) {
       return;
     }
 
-    _reactionUpdateFileID = fileID;
+    _reactionUpdateFileIDs.add(fileID);
     try {
       if (_hasLiked) {
         await _unlikeFromAllCollections(fileID, currentUserID);
@@ -235,9 +237,7 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
         ),
       );
     } finally {
-      if (_reactionUpdateFileID == fileID) {
-        _reactionUpdateFileID = null;
-      }
+      _reactionUpdateFileIDs.remove(fileID);
     }
   }
 
@@ -254,8 +254,7 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
           final reactions = await SocialDataProvider.instance
               .getReactionsForFileInCollection(fileID, collection.id);
           final userReaction = reactions.firstWhereOrNull(
-            (reaction) =>
-                reaction.userID == currentUserID && !reaction.isDeleted,
+            (reaction) => reaction.userID == currentUserID,
           );
           if (userReaction != null) {
             await SocialDataProvider.instance.toggleReaction(
@@ -346,7 +345,9 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
     return Positioned(
       right: safePadding.right + 24,
       bottom:
-          safePadding.bottom + _bottomActionBarHeight + _socialToActionBarGap,
+          safePadding.bottom +
+          kMemoryBottomActionBarHeight +
+          _socialToActionBarGap,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
@@ -410,9 +411,6 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
   }
 
   Widget _buildLatestCommentPill(Comment comment, User author) {
-    final currentUserID = widget.currentUserID;
-    if (currentUserID == null) return const SizedBox.shrink();
-
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: () => unawaited(_openComments(comment: comment)),
@@ -462,7 +460,7 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
                 child: UserAvatarWidget(
                   author,
                   type: AvatarType.small,
-                  currentUserID: currentUserID,
+                  currentUserID: widget.currentUserID!,
                 ),
               ),
             ),

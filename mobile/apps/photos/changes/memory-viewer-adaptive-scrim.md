@@ -1,1 +1,0 @@
-- Improved memory controls with a lighter backdrop that adapts to social actions.
