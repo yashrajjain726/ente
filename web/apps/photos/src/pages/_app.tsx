@@ -1,3 +1,4 @@
+import { AppLockSetupError } from "@/components/app-lock/LockScreenContents";
 import { useDesktopAppLockRoute } from "@/components/utils/use-app-lock-route";
 import { photosLogout } from "@/services/logout";
 import "@fontsource-variable/inter";
@@ -220,7 +221,8 @@ const DesktopMainContent: React.FC<MainContentProps> = ({
     pageProps,
     isChangingRoute,
 }) => {
-    const isAppLockReady = useSetupAppLock();
+    const { isAppLockReady, appLockSetupFailed, retryAppLockSetup } =
+        useSetupAppLock();
     const appLock = useAppLockSnapshot();
     const { shouldBlockAppLockRouteTransition } = useDesktopAppLockRoute(
         isAppLockReady,
@@ -234,6 +236,9 @@ const DesktopMainContent: React.FC<MainContentProps> = ({
         appLock.autoLockTimeMs,
     );
 
+    if (appLockSetupFailed) {
+        return <AppLockSetupError onRetry={retryAppLockSetup} />;
+    }
     if (!isAppLockReady) return <LoadingIndicator />;
     if (shouldBlockAppLockRouteTransition) return <LoadingIndicator />;
 
