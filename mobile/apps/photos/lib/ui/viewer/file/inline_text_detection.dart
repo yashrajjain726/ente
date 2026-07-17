@@ -616,7 +616,13 @@ class _InlineTextDetectionState extends State<InlineTextDetection> {
       builder: (context, constraints) {
         final Size viewportSize = constraints.biggest;
         return _OcrGestureHitTestBox(
-          hitTest: (localPosition) {
+          hitTest: (localPosition, globalPosition) {
+            if (textRegionsOnly &&
+                _detectorController.isPointOnInteractiveSelectionUi(
+                  globalPosition,
+                )) {
+              return true;
+            }
             final zoomTransform = InheritedDetailPageState.of(
               context,
             ).zoomTransformNotifier.value;
@@ -628,6 +634,7 @@ class _InlineTextDetectionState extends State<InlineTextDetection> {
               return false;
             }
             return !textRegionsOnly ||
+                _detectorController.isPointOnSelectableText(globalPosition) ||
                 _isLocalPointInDetectedTextRegion(
                   localPosition,
                   viewportSize,
@@ -681,6 +688,7 @@ class _InlineTextDetectionState extends State<InlineTextDetection> {
           },
           child: IgnorePointer(ignoring: ignoring, child: overlay),
         ),
+        textRegionsOnly: _requiresRegionRouting,
       ),
     );
   }
@@ -891,7 +899,7 @@ class _RegionCacheEntry {
 }
 
 class _OcrGestureHitTestBox extends SingleChildRenderObjectWidget {
-  final bool Function(Offset localPosition) hitTest;
+  final bool Function(Offset localPosition, Offset globalPosition) hitTest;
 
   const _OcrGestureHitTestBox({required this.hitTest, required super.child});
 
@@ -910,13 +918,15 @@ class _OcrGestureHitTestBox extends SingleChildRenderObjectWidget {
 }
 
 class _RenderOcrGestureHitTestBox extends RenderProxyBox {
-  bool Function(Offset localPosition) hitTestCallback;
+  bool Function(Offset localPosition, Offset globalPosition) hitTestCallback;
 
   _RenderOcrGestureHitTestBox(this.hitTestCallback);
 
   @override
   bool hitTest(BoxHitTestResult result, {required Offset position}) {
-    if (size.width <= 0 || size.height <= 0 || !hitTestCallback(position)) {
+    if (size.width <= 0 ||
+        size.height <= 0 ||
+        !hitTestCallback(position, localToGlobal(position))) {
       return false;
     }
     return super.hitTest(result, position: position);
