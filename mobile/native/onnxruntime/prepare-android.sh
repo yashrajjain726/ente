@@ -1,9 +1,22 @@
 #!/bin/sh
 set -eu
 
-asset_name="onnxruntime-webgpu-android-1.27.0-pilot.5.aar"
-asset_url="https://github.com/laurens-pilot/ort-packaging/releases/download/ort-1.27.0-webgpu-pilot.5/$asset_name"
-expected_sha256="f40ef31bb6ff8399c556872bcad272bddb650b0845f3026c56a065de9b1ec579"
+script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+properties_file="$script_dir/version.properties"
+
+read_property() {
+  sed -n "s/^$1=//p" "$properties_file" | head -n 1
+}
+
+base_url=$(read_property ortReleaseBaseUrl)
+release=$(read_property ortRelease)
+asset_name=$(read_property ortAndroidAsset)
+expected_sha256=$(read_property ortAndroidSha256)
+if [ -z "$base_url" ] || [ -z "$release" ] || [ -z "$asset_name" ] || [ -z "$expected_sha256" ]; then
+  echo "Failed to read the ONNX Runtime release from $properties_file" >&2
+  exit 1
+fi
+asset_url="$base_url/$release/$asset_name"
 
 destination=${1:?"usage: prepare-android.sh <destination.aar>"}
 

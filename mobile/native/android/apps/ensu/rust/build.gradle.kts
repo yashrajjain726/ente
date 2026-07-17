@@ -1,4 +1,5 @@
 import java.io.ByteArrayOutputStream
+import java.util.Properties
 
 plugins {
     id("com.android.library")
@@ -9,13 +10,20 @@ val knownAbis = listOf("arm64-v8a", "armeabi-v7a", "x86_64")
 
 val debugJniLibsDir = layout.buildDirectory.dir("generated/jniLibs/debug")
 val releaseJniLibsDir = layout.buildDirectory.dir("generated/jniLibs/release")
+// The pinned custom ONNX Runtime release is defined once in
+// mobile/native/onnxruntime/version.properties.
+val onnxRuntimeVersionFile = file("../../../../onnxruntime/version.properties")
+val onnxRuntimeVersions = Properties().apply {
+    onnxRuntimeVersionFile.inputStream().use { load(it) }
+}
 val onnxRuntimeAar = gradle.gradleUserHomeDir.resolve(
-    "caches/io.ente/onnxruntime/ort-1.27.0-webgpu-pilot.5/" +
-        "onnxruntime-webgpu-android-1.27.0-pilot.5.aar",
+    "caches/io.ente/onnxruntime/${onnxRuntimeVersions.getProperty("ortRelease")}/" +
+        onnxRuntimeVersions.getProperty("ortAndroidAsset"),
 )
 val prepareOnnxRuntimeAndroid = tasks.register<Exec>("prepareOnnxRuntimeAndroid") {
     val prepareScript = file("../../../../onnxruntime/prepare-android.sh")
     inputs.file(prepareScript)
+    inputs.file(onnxRuntimeVersionFile)
     outputs.file(onnxRuntimeAar)
     outputs.upToDateWhen { false }
     commandLine("sh", prepareScript, onnxRuntimeAar)

@@ -1,9 +1,22 @@
 #!/bin/sh
 set -eu
 
-asset_name="onnxruntime-coreml-ios-1.27.0-pilot.5.zip"
-asset_url="https://github.com/laurens-pilot/ort-packaging/releases/download/ort-1.27.0-webgpu-pilot.5/$asset_name"
-expected_sha256="fc820547f8e328ed501112be06b23d26329676d4e6a78978fc64971f8f05555d"
+script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+properties_file="$script_dir/version.properties"
+
+read_property() {
+  sed -n "s/^$1=//p" "$properties_file" | head -n 1
+}
+
+base_url=$(read_property ortReleaseBaseUrl)
+release=$(read_property ortRelease)
+asset_name=$(read_property ortIosAsset)
+expected_sha256=$(read_property ortIosSha256)
+if [ -z "$base_url" ] || [ -z "$release" ] || [ -z "$asset_name" ] || [ -z "$expected_sha256" ]; then
+  echo "Failed to read the ONNX Runtime release from $properties_file" >&2
+  exit 1
+fi
+asset_url="$base_url/$release/$asset_name"
 
 cache_root=${1:?"usage: prepare-ios.sh <cache-root> <iphoneos|iphonesimulator>"}
 platform=${2:?"usage: prepare-ios.sh <cache-root> <iphoneos|iphonesimulator>"}
@@ -32,7 +45,7 @@ sha256_file() {
   fi
 }
 
-asset_cache="$cache_root/ort-1.27.0-webgpu-pilot.5"
+asset_cache="$cache_root/$release"
 archive="$asset_cache/$asset_name"
 extract_root="$asset_cache/$expected_sha256"
 verified_marker="$extract_root/.verified"
