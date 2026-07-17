@@ -1,0 +1,1 @@
+- Improved the memories viewer with a full-screen blurred backdrop and evenly sized progress indicators.

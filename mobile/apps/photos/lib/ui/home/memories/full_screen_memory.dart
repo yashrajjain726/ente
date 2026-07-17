@@ -37,6 +37,7 @@ import "package:photos/ui/home/memories/memory_progress_indicator.dart";
 import "package:photos/ui/home/memories/memory_video_prefetcher.dart";
 import "package:photos/ui/social/widgets/file_social_overlay.dart";
 import "package:photos/ui/viewer/file/file_widget.dart";
+import "package:photos/ui/viewer/file/thumbnail_widget.dart";
 import "package:photos/ui/viewer/file_details/favorite_widget.dart";
 import "package:photos/ui/viewer/gallery/jump_to_date_gallery.dart";
 import "package:photos/utils/dialog_util.dart";
@@ -605,6 +606,7 @@ class _FullScreenMemoryState extends State<FullScreenMemory> {
         body: Stack(
           fit: StackFit.expand,
           children: [
+            const _MemoryBlur(),
             ValueListenableBuilder<int>(
               valueListenable: inheritedData.indexNotifier,
               builder: (context, index, _) {
@@ -681,7 +683,7 @@ class _FullScreenMemoryState extends State<FullScreenMemory> {
                           autoPlay: false,
                           tagPrefix: "memories",
                           backgroundDecoration: const BoxDecoration(
-                            color: Colors.black,
+                            color: Colors.transparent,
                           ),
                           isFromMemories: true,
                           playbackCallback: (shouldEnable, _) {
@@ -1081,22 +1083,17 @@ class _MemoryViewerScrims extends StatelessWidget {
             child: SizedBox(
               width: double.infinity,
               height: topHeight,
-              child: ClipRect(
-                child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-                  child: const DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          Color(0xB8000000),
-                          Color(0x70000000),
-                          Colors.transparent,
-                        ],
-                        stops: [0, 0.6, 1],
-                      ),
-                    ),
+              child: const DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Color(0xB8000000),
+                      Color(0x70000000),
+                      Colors.transparent,
+                    ],
+                    stops: [0, 0.6, 1],
                   ),
                 ),
               ),
@@ -1125,6 +1122,56 @@ class _MemoryViewerScrims extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _MemoryBlur extends StatelessWidget {
+  const _MemoryBlur();
+
+  @override
+  Widget build(BuildContext context) {
+    final inheritedData = FullScreenMemoryData.of(context);
+    if (inheritedData == null || inheritedData.memories.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    return ValueListenableBuilder<int>(
+      valueListenable: inheritedData.indexNotifier,
+      builder: (context, index, _) {
+        final safeIndex = _clampedMemoryIndex(
+          index,
+          inheritedData.memories.length,
+        );
+        if (safeIndex == null) return const SizedBox.shrink();
+        final currentFile = inheritedData.memories[safeIndex].file;
+        if (currentFile.fileType == FileType.video) {
+          return const SizedBox.shrink();
+        }
+        return AnimatedSwitcher(
+          duration: const Duration(milliseconds: 750),
+          switchInCurve: Curves.easeOutExpo,
+          switchOutCurve: Curves.easeInExpo,
+          layoutBuilder: (currentChild, previousChildren) {
+            return Stack(
+              fit: StackFit.expand,
+              children: [...previousChildren, ?currentChild],
+            );
+          },
+          child: ImageFiltered(
+            key: ValueKey(
+              "memory-blur-${currentFile.uploadedFileID ?? currentFile.localID ?? safeIndex}",
+            ),
+            imageFilter: ImageFilter.blur(sigmaX: 100, sigmaY: 100),
+            child: ThumbnailWidget(
+              currentFile,
+              placeholderColor: Colors.black,
+              shouldShowSyncStatus: false,
+              shouldShowFavoriteIcon: false,
+              shouldShowVideoOverlayIcon: false,
+            ),
+          ),
+        );
+      },
     );
   }
 }

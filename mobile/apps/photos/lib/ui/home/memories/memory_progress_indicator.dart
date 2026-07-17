@@ -1,47 +1,40 @@
 import "package:flutter/material.dart";
 
-const double kMemoryProgressSegmentWidth = 8.0;
 const double kMemoryProgressGap = 10.0;
 const double kMemoryProgressHeight = 4.0;
-const double kMemoryProgressMinimumCurrentWidth = 24.0;
+const double kMemoryProgressMinSegmentWidth = 8.0;
 
-int memoryProgressCapacityForWidth(
-  double availableWidth, {
-  double segmentWidth = kMemoryProgressSegmentWidth,
+double memoryProgressSegmentWidthForLayout({
+  required int totalSteps,
+  required double availableWidth,
   double gap = kMemoryProgressGap,
-  double minimumCurrentWidth = kMemoryProgressMinimumCurrentWidth,
 }) {
-  if (!availableWidth.isFinite ||
+  if (totalSteps <= 0 ||
+      !availableWidth.isFinite ||
       availableWidth <= 0 ||
-      !segmentWidth.isFinite ||
-      segmentWidth <= 0 ||
       !gap.isFinite ||
-      gap < 0 ||
-      !minimumCurrentWidth.isFinite ||
-      minimumCurrentWidth <= 0) {
-    return 1;
+      gap < 0) {
+    return 0;
   }
 
-  final capacity =
-      1 +
-      ((availableWidth - minimumCurrentWidth) / (segmentWidth + gap)).floor();
-  return capacity < 1 ? 1 : capacity;
+  final availableSegmentWidth = availableWidth - ((totalSteps - 1) * gap);
+  if (availableSegmentWidth <= 0) return 0;
+
+  return availableSegmentWidth / totalSteps;
 }
 
 bool memoryProgressUsesContinuousTrack({
   required int totalSteps,
   required double availableWidth,
-  double segmentWidth = kMemoryProgressSegmentWidth,
   double gap = kMemoryProgressGap,
-  double minimumCurrentWidth = kMemoryProgressMinimumCurrentWidth,
 }) =>
-    totalSteps >
-    memoryProgressCapacityForWidth(
-      availableWidth,
-      segmentWidth: segmentWidth,
-      gap: gap,
-      minimumCurrentWidth: minimumCurrentWidth,
-    );
+    totalSteps > 1 &&
+    memoryProgressSegmentWidthForLayout(
+          totalSteps: totalSteps,
+          availableWidth: availableWidth,
+          gap: gap,
+        ) <
+        kMemoryProgressMinSegmentWidth;
 
 class MemoryProgressIndicator extends StatefulWidget {
   final int totalSteps;
@@ -168,9 +161,10 @@ class _MemoryProgressIndicatorState extends State<MemoryProgressIndicator>
                 );
 
           segments.add(
-            index == widget.currentIndex
-                ? Expanded(child: segment)
-                : SizedBox(width: kMemoryProgressSegmentWidth, child: segment),
+            Expanded(
+              key: ValueKey("memory-progress-segment-$index"),
+              child: segment,
+            ),
           );
         }
         return Row(children: segments);

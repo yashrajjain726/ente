@@ -6,6 +6,7 @@ import "package:flutter/cupertino.dart";
 import "package:flutter/foundation.dart" show kDebugMode;
 import "package:logging/logging.dart";
 import "package:path_provider/path_provider.dart";
+import "package:photos/core/configuration.dart";
 import "package:photos/core/event_bus.dart";
 import "package:photos/db/files_db.dart";
 import "package:photos/db/memories_db.dart";
@@ -50,6 +51,12 @@ class MemoriesCacheService {
   static const _shouldUpdateCacheKey = "memories.shouldUpdateCache";
   static const _tripMemoryCarryForwardLimit = kTripSurfaceSlots;
 
+  // TEMP(memory-viewer-verification): remove before merge.
+  static const _kTempLibraryMemories = bool.fromEnvironment(
+    "debugSocialMemoriesMix",
+    defaultValue: false,
+  );
+
   /// Delay is for cache update to be done not during app init, during which a
   /// lot of other things are happening.
   static const _kCacheUpdateDelay = Duration(seconds: 20);
@@ -62,6 +69,11 @@ class MemoriesCacheService {
       : MemoriesDB.instance;
 
   List<SmartMemory>? _cachedMemories;
+  List<SmartMemory>? _debugLibraryMemories;
+  List<SmartMemory>? _debugLibraryMemoriesSource;
+  int? _debugLibraryMemoriesUserID;
+  String? _debugLibraryMemoriesInputSignature;
+  bool _debugLibraryMemoriesAttempted = false;
   List<SmartMemory>? get currentMemoriesSync => _cachedMemories;
   bool _shouldUpdate = false;
   bool _pendingInitialOfflineCacheUpgrade = false;
@@ -72,6 +84,7 @@ class MemoriesCacheService {
 
   final _memoriesUpdateLock = Lock();
   final _memoriesGetLock = Lock();
+  final _debugLibraryMemoriesLock = Lock();
 
   MemoriesCacheService(this._prefs) {
     _logger.info("MemoriesCacheService constructor");
@@ -616,82 +629,223 @@ class MemoriesCacheService {
       _logger.info('Showing memories is disabled in settings, showing none');
       return [];
     }
-    return _memoriesGetLock.synchronized(() async {
-      if (_cachedMemories != null && _cachedMemories!.isNotEmpty) {
-        final currentMemories = _cachedMemories!
-            .where((memory) => memory.shouldShowNow())
-            .toList();
-        if (currentMemories.isNotEmpty) {
-          _logger.info("Found memories in memory cache");
-          return currentMemories;
-        }
-        _logger.info(
-          "In-memory memories not valid for current window, refreshing cache",
-        );
-      } else if (onlyUseCache) {
-        _logger.info("Only using cache, no memories found");
-        return [];
-      }
-      try {
-        if (!enableSmartMemories) {
-          await _calculateRegularFillers();
-          return _cachedMemories!;
-        }
-        final cacheFileExists = await _cacheFileExists();
-        _cachedMemories = await _getMemoriesFromCache();
-        if (_cachedMemories == null || _cachedMemories!.isEmpty) {
-          final shouldRefreshEmptyCache =
-              _cachedMemories == null ||
-              _shouldUpdate ||
-              _timeToUpdateCache() ||
-              lastMemoriesCacheUpdateTime == 0;
-          if (onlyUseCache) {
-            _logger.info("Only using cache, no memories found");
-            return [];
+    final memories = await _memoriesGetLock.synchronized<List<SmartMemory>>(
+      () async {
+        if (_cachedMemories != null && _cachedMemories!.isNotEmpty) {
+          final currentMemories = _cachedMemories!
+              .where((memory) => memory.shouldShowNow())
+              .toList();
+          if (currentMemories.isNotEmpty) {
+            _logger.info("Found memories in memory cache");
+            return currentMemories;
           }
-          if (!shouldRefreshEmptyCache) {
-            _logger.info("Found fresh empty memories cache");
-            return [];
-          }
-          if (!cacheFileExists) {
-            _logger.info(
-              "No disk cache (fresh install): serving simple memories, "
-              "smart memories will upgrade in background",
-            );
-            _cachedMemories = await smartMemoriesService.calcSimpleMemories();
-            if (_shouldDeferInitialOfflineCacheUpgrade()) {
-              _pendingInitialOfflineCacheUpgrade = true;
-              _logger.info(
-                "Deferring initial offline memories cache upgrade until first import metadata is ready",
-              );
-            } else {
-              unawaited(
-                updateCache(
-                  forced: true,
-                ).whenComplete(() => Bus.instance.fire(MemoriesChangedEvent())),
-              );
-            }
+          _logger.info(
+            "In-memory memories not valid for current window, refreshing cache",
+          );
+        } else if (onlyUseCache) {
+          _logger.info("Only using cache, no memories found");
+          return [];
+        }
+        try {
+          if (!enableSmartMemories) {
+            await _calculateRegularFillers();
             return _cachedMemories!;
           }
-          _logger.warning(
-            "No memories found in cache, force updating cache. Possible severe caching issue",
-          );
-          await updateCache(forced: true);
-        } else {
-          _logger.info("Found memories in cache");
+          final cacheFileExists = await _cacheFileExists();
+          _cachedMemories = await _getMemoriesFromCache();
+          if (_cachedMemories == null || _cachedMemories!.isEmpty) {
+            final shouldRefreshEmptyCache =
+                _cachedMemories == null ||
+                _shouldUpdate ||
+                _timeToUpdateCache() ||
+                lastMemoriesCacheUpdateTime == 0;
+            if (onlyUseCache) {
+              _logger.info("Only using cache, no memories found");
+              return [];
+            }
+            if (!shouldRefreshEmptyCache) {
+              _logger.info("Found fresh empty memories cache");
+              return [];
+            }
+            if (!cacheFileExists) {
+              _logger.info(
+                "No disk cache (fresh install): serving simple memories, "
+                "smart memories will upgrade in background",
+              );
+              _cachedMemories = await smartMemoriesService.calcSimpleMemories();
+              if (_shouldDeferInitialOfflineCacheUpgrade()) {
+                _pendingInitialOfflineCacheUpgrade = true;
+                _logger.info(
+                  "Deferring initial offline memories cache upgrade until first import metadata is ready",
+                );
+              } else {
+                unawaited(
+                  updateCache(forced: true).whenComplete(
+                    () => Bus.instance.fire(MemoriesChangedEvent()),
+                  ),
+                );
+              }
+              return _cachedMemories!;
+            }
+            _logger.warning(
+              "No memories found in cache, force updating cache. Possible severe caching issue",
+            );
+            await updateCache(forced: true);
+          } else {
+            _logger.info("Found memories in cache");
+          }
+          if (_cachedMemories == null || _cachedMemories!.isEmpty) {
+            _logger.severe(
+              "No memories found in (computed) cache, getting fillers",
+            );
+            await _calculateRegularFillers();
+          }
+          return _cachedMemories!;
+        } catch (e, s) {
+          _logger.severe("Error in getMemories", e, s);
+          return [];
         }
-        if (_cachedMemories == null || _cachedMemories!.isEmpty) {
-          _logger.severe(
-            "No memories found in (computed) cache, getting fillers",
-          );
-          await _calculateRegularFillers();
-        }
-        return _cachedMemories!;
-      } catch (e, s) {
-        _logger.severe("Error in getMemories", e, s);
-        return [];
+      },
+    );
+    return _debugBuildLibraryMemories(memories);
+  }
+
+  // TEMP(memory-viewer-verification): remove before merge. This exposes a
+  // broad sample of the account library as several memory cards so that the
+  // viewer can be exercised with varied media and sharing states.
+  Future<List<SmartMemory>> _debugBuildLibraryMemories(
+    List<SmartMemory> memories,
+  ) async {
+    if (!_kTempLibraryMemories || isLocalGalleryMode || memories.isEmpty) {
+      return memories;
+    }
+    return _debugLibraryMemoriesLock.synchronized(
+      () => _debugBuildLibraryMemoriesLocked(memories),
+    );
+  }
+
+  Future<List<SmartMemory>> _debugBuildLibraryMemoriesLocked(
+    List<SmartMemory> memories,
+  ) async {
+    final source = _cachedMemories ?? memories;
+    final userID = Configuration.instance.getUserID();
+    final inputSignature = memories
+        .map((memory) => "${memory.id}:${memory.memories.length}")
+        .join("|");
+    final sameContext =
+        identical(_debugLibraryMemoriesSource, source) &&
+        _debugLibraryMemoriesUserID == userID &&
+        _debugLibraryMemoriesInputSignature == inputSignature;
+    if (!sameContext) {
+      _debugLibraryMemories = null;
+      _debugLibraryMemoriesAttempted = false;
+      _debugLibraryMemoriesSource = source;
+      _debugLibraryMemoriesUserID = userID;
+      _debugLibraryMemoriesInputSignature = inputSignature;
+    }
+    if (_debugLibraryMemoriesAttempted) {
+      return _debugLibraryMemories ?? memories;
+    }
+    _debugLibraryMemoriesAttempted = true;
+
+    final searchFiles = await SearchService.instance.getAllFilesForSearch();
+    final localOnlyFiles = await FilesDB.instance.getUnUploadedLocalFiles();
+    final uniqueFiles = <String, EnteFile>{};
+    String debugFileID(EnteFile file) {
+      final uploadedFileID = file.uploadedFileID;
+      if (uploadedFileID != null && uploadedFileID != -1) {
+        return "uploaded:$uploadedFileID";
       }
-    });
+      final localID = file.localID;
+      if (localID != null && localID.isNotEmpty) {
+        return "local:$localID";
+      }
+      final generatedID = file.generatedID;
+      return generatedID != null
+          ? "generated:$generatedID"
+          : "object:${identityHashCode(file)}";
+    }
+
+    void addFiles(Iterable<EnteFile> files) {
+      for (final file in files) {
+        if (file.creationTime == null) continue;
+        uniqueFiles.putIfAbsent(debugFileID(file), () => file);
+      }
+    }
+
+    addFiles(searchFiles);
+    addFiles(localOnlyFiles);
+    if (uniqueFiles.isEmpty) {
+      _logger.warning("TEMP library memories unavailable: no usable files");
+      return memories;
+    }
+
+    final sortedFiles = uniqueFiles.values.toList()
+      ..sort((first, second) {
+        final creationOrder = second.creationTime!.compareTo(
+          first.creationTime!,
+        );
+        if (creationOrder != 0) return creationOrder;
+        return (second.generatedID ?? -1).compareTo(first.generatedID ?? -1);
+      });
+    const maxFiles = 600;
+    const targetFilesPerMemory = 20;
+    const maxMemoryGroups = 12;
+    final selectedFiles = sortedFiles.take(maxFiles).toList();
+    var groupCount =
+        (selectedFiles.length + targetFilesPerMemory - 1) ~/
+        targetFilesPerMemory;
+    if (groupCount > maxMemoryGroups) groupCount = maxMemoryGroups;
+
+    final now = DateTime.now().microsecondsSinceEpoch;
+    final firstDateToShow = now - const Duration(days: 1).inMicroseconds;
+    final lastDateToShow = now + const Duration(days: 1).inMicroseconds;
+    final languageCode = (await getLocale())?.languageCode ?? "en";
+    final seenTimes = await _memoriesDB.getSeenTimes();
+    final filesPerGroup = selectedFiles.length ~/ groupCount;
+    final groupsWithExtraFile = selectedFiles.length % groupCount;
+    final debugMemories = <SmartMemory>[];
+    var offset = 0;
+    for (var groupIndex = 0; groupIndex < groupCount; groupIndex++) {
+      final groupSize =
+          filesPerGroup + (groupIndex < groupsWithExtraFile ? 1 : 0);
+      final groupFiles = selectedFiles.sublist(offset, offset + groupSize);
+      offset += groupSize;
+      final newestCreationTime = groupFiles.first.creationTime!;
+      final oldestCreationTime = groupFiles.last.creationTime!;
+      final newestDate = SmartMemoriesService.getDateFormatted(
+        creationTime: newestCreationTime,
+        languageCode: languageCode,
+      );
+      final oldestDate = SmartMemoriesService.getDateFormatted(
+        creationTime: oldestCreationTime,
+        languageCode: languageCode,
+      );
+      final title = oldestDate == newestDate
+          ? newestDate
+          : "$oldestDate – $newestDate";
+      debugMemories.add(
+        SmartMemory(
+          Memory.fromFiles(groupFiles, seenTimes),
+          MemoryType.filler,
+          title,
+          firstDateToShow,
+          lastDateToShow,
+          id: "debug-library-$userID-$groupIndex",
+          firstCreationTime: oldestCreationTime,
+          lastCreationTime: newestCreationTime,
+        ),
+      );
+    }
+
+    _debugLibraryMemories = debugMemories;
+    _logger.info(
+      "TEMP library memories enabled: ${selectedFiles.length} of "
+      "${uniqueFiles.length} files across ${debugMemories.length} memories "
+      "(${searchFiles.length} search files, "
+      "${localOnlyFiles.length} local-only files)",
+    );
+    return debugMemories;
   }
 
   Future<void> _calculateRegularFillers() async {
