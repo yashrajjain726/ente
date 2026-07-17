@@ -55,27 +55,27 @@ export function UploadConfirmationDialog({
         >
             <Stack sx={contentSx}>
                 <Stack direction="row" sx={headerSx}>
-                    <Stack direction="row" sx={headerTitleSx}>
+                    <Typography sx={displayTitleSx}>
+                        {isTakeout
+                            ? "Import from Google Photos"
+                            : "Upload to Ente"}
+                    </Typography>
+                    <Stack direction="row" sx={headerActionsSx}>
                         <IconButton
                             aria-label="Back"
                             onClick={onCancel}
-                            sx={backButtonSx}
+                            sx={headerButtonSx}
                         >
                             <HugeiconsIcon icon={ArrowLeft02Icon} size={24} />
                         </IconButton>
-                        <Typography sx={displayTitleSx}>
-                            {isTakeout
-                                ? "Import from Google Photos"
-                                : "Upload to Ente"}
-                        </Typography>
+                        <IconButton
+                            aria-label="Close"
+                            onClick={onCancel}
+                            sx={headerButtonSx}
+                        >
+                            <HugeiconsIcon icon={Cancel01Icon} size={18} />
+                        </IconButton>
                     </Stack>
-                    <IconButton
-                        aria-label="Close"
-                        onClick={onCancel}
-                        sx={closeButtonSx}
-                    >
-                        <HugeiconsIcon icon={Cancel01Icon} size={18} />
-                    </IconButton>
                 </Stack>
 
                 <Stack sx={mainSx}>
@@ -191,17 +191,9 @@ const headerSx = {
     minWidth: 0,
 };
 
-const headerTitleSx = { alignItems: "center", gap: 1, minWidth: 0 };
+const headerActionsSx = { alignItems: "center", gap: 1, flexShrink: 0 };
 
-const backButtonSx = {
-    width: 38,
-    height: 38,
-    flexShrink: 0,
-    p: 0,
-    color: "text.base",
-};
-
-const closeButtonSx = (theme: Theme) => ({
+const headerButtonSx = (theme: Theme) => ({
     width: 38,
     height: 38,
     flexShrink: 0,
