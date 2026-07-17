@@ -180,6 +180,7 @@ impl MlIndexingTestContext {
             resolve_document_asset(&cache_dir, "python-golden", &asset_lock.python_golden)?;
         let manifest = load_manifest(&manifest_path)?;
         let golden_results = load_golden_results(&golden_path)?;
+        fetch_fixtures(&cache_dir, &asset_lock.fixture_base_url, &manifest)?;
 
         let onnx_runtime_library =
             resolve_onnx_runtime_library(&cache_dir, &asset_lock.onnx_runtime)?;
@@ -338,7 +339,7 @@ impl MlIndexingTestContext {
     }
 
     fn resolve_fixture(&self, fixture: &FixtureFile) -> Result<PathBuf> {
-        resolve_fixture_asset(&self.cache_dir, &self.asset_lock.fixture_base_url, fixture)
+        cache_path_for(&self.cache_dir, "fixtures", &fixture.path, &fixture.sha256)
     }
 
     fn unsupported_decode_file_ids(&self) -> HashSet<String> {
@@ -524,19 +525,39 @@ fn resolve_document_asset(cache_dir: &Path, label: &str, asset: &DocumentAsset) 
     ensure_remote_asset(&asset.url, &asset.sha256, &target, label)
 }
 
-fn resolve_fixture_asset(
+fn fixture_url(fixture_base_url: &str, path: &str) -> Result<String> {
+    Ok(Url::parse(fixture_base_url)
+        .with_context(|| format!("parse fixture base URL '{fixture_base_url}'"))?
+        .join(path)
+        .with_context(|| format!("join fixture URL for {path}"))?
+        .to_string())
+}
+
+fn fetch_fixtures(
     cache_dir: &Path,
     fixture_base_url: &str,
-    fixture: &FixtureFile,
-) -> Result<PathBuf> {
-    let file_id = file_id_for_manifest_path(&fixture.path)?;
-    let url = Url::parse(fixture_base_url)
-        .with_context(|| format!("parse fixture base URL '{fixture_base_url}'"))?
-        .join(&fixture.path)
-        .with_context(|| format!("join fixture URL for {}", fixture.path))?
-        .to_string();
-    let target = cache_path_for(cache_dir, "fixtures", &fixture.path, &fixture.sha256)?;
-    ensure_remote_asset(&url, &fixture.sha256, &target, &file_id)
+    manifest: &FixtureManifest,
+) -> Result<()> {
+    let targets = manifest
+        .files
+        .iter()
+        .map(|fixture| {
+            Ok(download::Target {
+                label: file_id_for_manifest_path(&fixture.path)?,
+                url: fixture_url(fixture_base_url, &fixture.path)?,
+                destination_path: cache_path_for(
+                    cache_dir,
+                    "fixtures",
+                    &fixture.path,
+                    &fixture.sha256,
+                )?
+                .display()
+                .to_string(),
+                sha256: Some(normalize_sha256(&fixture.sha256)),
+            })
+        })
+        .collect::<Result<Vec<_>>>()?;
+    download::fetch(targets, |_, _| Ok(()), |_| {}, || false).context("fetch fixtures")
 }
 
 fn resolve_onnx_runtime_library(cache_dir: &Path, assets: &OnnxRuntimeAssets) -> Result<PathBuf> {
