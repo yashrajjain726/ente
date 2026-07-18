@@ -132,8 +132,9 @@ class _EditContactPageState extends State<EditContactPage> {
           children: [
             Expanded(
               child: NotificationListener<ScrollStartNotification>(
-                onNotification: (_) {
-                  if (_nameFocusNode.hasFocus) {
+                onNotification: (notification) {
+                  if (notification.dragDetails != null &&
+                      _nameFocusNode.hasFocus) {
                     _nameFocusNode.unfocus();
                   }
                   return false;
