@@ -71,7 +71,9 @@ class InlineTextDetection extends StatefulWidget {
 
 class _InlineTextDetectionState extends State<InlineTextDetection> {
   static const int _maxCacheSize = 200;
+  static const int _maxRegionDetectionAttempts = 2;
   static const Duration _regionDetectionTimeout = Duration(seconds: 15);
+  static const Duration _regionDetectionRetryDelay = Duration(seconds: 1);
   static const double _globalGestureSlop = 18.0;
   static const double _photoGestureEdgeSlop = 8.0;
   static const double _textRegionHitSlop = 8.0;
@@ -83,7 +85,9 @@ class _InlineTextDetectionState extends State<InlineTextDetection> {
   bool _isEligible = false;
   String? _localFilePath;
   int _evaluationGeneration = 0;
+  int _regionDetectionAttempt = 0;
   String? _activeRegionRequestId;
+  Timer? _regionRetryTimer;
   TextRegionDetectionResult? _detectedRegions;
   bool _overlayActive = false;
   bool _isPreparingOnDemand = false;
@@ -132,6 +136,7 @@ class _InlineTextDetectionState extends State<InlineTextDetection> {
   @override
   void dispose() {
     _cancelActiveRegionRequest();
+    _regionRetryTimer?.cancel();
     _zoomSettleTimer?.cancel();
     _globalLongPressTimer?.cancel();
     GestureBinding.instance.pointerRouter.removeGlobalRoute(
@@ -145,6 +150,9 @@ class _InlineTextDetectionState extends State<InlineTextDetection> {
   void _resetState() {
     _evaluationGeneration++;
     _cancelActiveRegionRequest();
+    _regionRetryTimer?.cancel();
+    _regionRetryTimer = null;
+    _regionDetectionAttempt = 0;
     _cancelTrackedGlobalPointer();
     _ocrHitPointers.clear();
     _imageSizeRequestId++;
@@ -196,50 +204,60 @@ class _InlineTextDetectionState extends State<InlineTextDetection> {
     }
   }
 
-  Future<void> _evaluateFile() async {
+  Future<void> _evaluateFile({bool isRetry = false}) async {
     final bool isEligible = _isFileEligible(widget.file);
-    final int generation = ++_evaluationGeneration;
+    final int generation = isRetry
+        ? _evaluationGeneration
+        : ++_evaluationGeneration;
     _logger.info(
       "evaluateFile: eligible=$isEligible, type=${widget.file.fileType}",
     );
 
     if (!isEligible) {
-      setState(() {
-        _isEligible = false;
-        _localFilePath = null;
-        _detectedRegions = null;
-      });
+      if (!isRetry) {
+        setState(() {
+          _isEligible = false;
+          _localFilePath = null;
+          _detectedRegions = null;
+        });
+      }
       return;
     }
 
-    setState(() {
-      _isEligible = true;
-      _localFilePath = null;
-      _detectedRegions = null;
-    });
+    if (!isRetry) {
+      _regionDetectionAttempt = 0;
+      setState(() {
+        _isEligible = true;
+        _localFilePath = null;
+        _detectedRegions = null;
+      });
+    }
     if (!_requiresRegionRouting) {
       return;
     }
 
     final String cacheKey = _cacheKey(widget.file);
-    final _RegionCacheEntry? cached = _regionCache[cacheKey];
-    if (cached != null && File(cached.localPath).existsSync()) {
-      if (!mounted || generation != _evaluationGeneration) return;
-      setState(() {
-        _localFilePath = cached.localPath;
-        _detectedRegions = cached.result;
-      });
-      return;
-    }
-    if (cached != null) {
-      _regionCache.remove(cacheKey);
+    if (!isRetry) {
+      final _RegionCacheEntry? cached = _regionCache[cacheKey];
+      if (cached != null && File(cached.localPath).existsSync()) {
+        if (!mounted || generation != _evaluationGeneration) return;
+        setState(() {
+          _localFilePath = cached.localPath;
+          _detectedRegions = cached.result;
+        });
+        return;
+      }
+      if (cached != null) {
+        _regionCache.remove(cacheKey);
+      }
     }
 
+    _regionDetectionAttempt++;
     try {
       final File? localFile = await getFile(widget.file);
       if (!mounted || generation != _evaluationGeneration) return;
       if (localFile == null || !localFile.existsSync()) {
-        return;
+        throw StateError("Live-photo still is unavailable");
       }
 
       setState(() {
@@ -288,7 +306,22 @@ class _InlineTextDetectionState extends State<InlineTextDetection> {
         error,
         stackTrace,
       );
+      _scheduleRegionRetry(generation);
     }
+  }
+
+  void _scheduleRegionRetry(int generation) {
+    if (_regionDetectionAttempt >= _maxRegionDetectionAttempts ||
+        _regionRetryTimer != null) {
+      return;
+    }
+
+    _regionRetryTimer = Timer(_regionDetectionRetryDelay, () {
+      _regionRetryTimer = null;
+      if (!mounted || generation != _evaluationGeneration) return;
+      _logger.info("Retrying live-photo text region detection");
+      unawaited(_evaluateFile(isRetry: true));
+    });
   }
 
   void _activateOverlay() {
