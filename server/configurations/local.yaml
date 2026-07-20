@@ -154,11 +154,7 @@ apps:
     legacy:
     # Additional trusted browser origins not represented by an app above.
     #
-    # Default is:
-    #     - https://ente.com
-    #     - https://embed.ente.io
-    #     - https://cast.ente.io
-    #     - https://staff.ente.sh
+    # Default is a list of Ente domains: ente.com and older production aliases.
     extra-origins:
     # Default is true if none of photos, auth, locker or extra-origins above
     # are set, and false otherwise.
