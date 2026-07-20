@@ -751,7 +751,7 @@ class _FullScreenMemoryState extends State<FullScreenMemory> {
               },
             ),
             const BottomIcons(),
-            _MemoryTopChrome(
+            _MemoryTopOverlay(
               title: widget.title,
               onClose: () => Navigator.pop(context),
               onDateTap: (file) {
@@ -949,7 +949,7 @@ class _MemoryActionButton extends StatelessWidget {
   }
 }
 
-class _MemoryTopChrome extends StatelessWidget {
+class _MemoryTopOverlay extends StatelessWidget {
   final String title;
   final VoidCallback onClose;
   final ValueChanged<EnteFile> onDateTap;
@@ -957,7 +957,7 @@ class _MemoryTopChrome extends StatelessWidget {
   final void Function(AnimationController) onAnimationControllerDisposed;
   final VoidCallback onComplete;
 
-  const _MemoryTopChrome({
+  const _MemoryTopOverlay({
     required this.title,
     required this.onClose,
     required this.onDateTap,
