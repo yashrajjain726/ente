@@ -4,7 +4,20 @@ type DecodeQR = (typeof import("qr/decode.js"))["default"];
 
 const legacyKitShareMetadataPrefix = "ente-legacy-kit-share-v1:";
 const legacyKitBundleMetadataPrefix = "ente-legacy-kit-shares-v1:";
+const maxTextFileBytes = 64 * 1024;
+const maxPDFFileBytes = 32 * 1024 * 1024;
+const maxImageFileBytes = 32 * 1024 * 1024;
+const maxInputImagePixels = 64 * 1024 * 1024;
+const maxInputImageSide = 16_000;
+const maxCanvasPixels = 6 * 1024 * 1024;
+const maxCanvasSide = 2_400;
+const maxPDFPagesToScan = 5;
+const maxPDFTextChars = 128 * 1024;
 const pdfFallbackTimeoutMS = 15_000;
+const pdfPageTimeoutMS = 5_000;
+
+const tooLargeMessage =
+    "This recovery sheet is too large to scan safely. Try the original PDF or a smaller, clearer photo.";
 
 interface DecodableImage {
     data: Uint8ClampedArray | number[];
@@ -53,6 +66,12 @@ const withTimeout = async <T>(
         ]);
     } finally {
         if (timeout) clearTimeout(timeout);
+    }
+};
+
+const assertFileSize = (file: File, maxBytes: number) => {
+    if (file.size > maxBytes) {
+        throw new Error(tooLargeMessage);
     }
 };
 
@@ -174,9 +193,26 @@ const loadDrawableFromFile = async (file: File): Promise<DrawableImage> => {
 };
 
 const imageDataFromDrawable = (drawable: DrawableImage) => {
+    if (
+        drawable.width <= 0 ||
+        drawable.height <= 0 ||
+        drawable.width > maxInputImageSide ||
+        drawable.height > maxInputImageSide ||
+        drawable.width * drawable.height > maxInputImagePixels
+    ) {
+        throw new Error(tooLargeMessage);
+    }
+
+    const scale = Math.min(
+        1,
+        maxCanvasSide / Math.max(drawable.width, drawable.height),
+        Math.sqrt(maxCanvasPixels / (drawable.width * drawable.height)),
+    );
+    const width = Math.max(1, Math.floor(drawable.width * scale));
+    const height = Math.max(1, Math.floor(drawable.height * scale));
     const canvas = document.createElement("canvas");
-    canvas.width = drawable.width;
-    canvas.height = drawable.height;
+    canvas.width = width;
+    canvas.height = height;
     const context = canvas.getContext("2d", { willReadFrequently: true });
     if (!context) {
         throw new Error("Could not read that image.");
@@ -270,40 +306,92 @@ const decodeQrImage = async (image: DecodableImage) => {
 
 const textFromPDF = async (pdf: PDFDocumentProxy) => {
     const chunks: string[] = [];
-    for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
+    let charCount = 0;
+    const pageCount = Math.min(pdf.numPages, maxPDFPagesToScan);
+    for (let pageNumber = 1; pageNumber <= pageCount; pageNumber++) {
         const page = await pdf.getPage(pageNumber);
-        const textContent = await page.getTextContent();
-        chunks.push(
-            textContent.items
+        try {
+            const textContent = await withTimeout(
+                page.getTextContent(),
+                pdfPageTimeoutMS,
+                "Could not read that PDF page.",
+            );
+            const pageText = textContent.items
                 .map((item) => ("str" in item ? item.str : ""))
-                .join(""),
-        );
+                .join("")
+                .slice(0, maxPDFTextChars - charCount);
+            chunks.push(pageText);
+            charCount += pageText.length;
+        } finally {
+            page.cleanup();
+        }
+        if (charCount >= maxPDFTextChars) {
+            break;
+        }
     }
     return chunks.join("\n");
 };
 
-const renderPDFPage = async (page: PDFPageProxy) => {
+const pdfRenderScale = (page: PDFPageProxy) => {
     const baseViewport = page.getViewport({ scale: 1 });
-    const scale = Math.min(
-        3,
-        Math.max(2, 1800 / Math.max(baseViewport.width, baseViewport.height)),
+    if (
+        !Number.isFinite(baseViewport.width) ||
+        !Number.isFinite(baseViewport.height) ||
+        baseViewport.width <= 0 ||
+        baseViewport.height <= 0
+    ) {
+        throw new Error(tooLargeMessage);
+    }
+    const pixelScale = Math.sqrt(
+        maxCanvasPixels / (baseViewport.width * baseViewport.height),
     );
-    const viewport = page.getViewport({ scale });
+    return Math.min(
+        3,
+        maxCanvasSide / Math.max(baseViewport.width, baseViewport.height),
+        pixelScale,
+    );
+};
+
+const renderPDFPage = async (page: PDFPageProxy) => {
+    const viewport = page.getViewport({ scale: pdfRenderScale(page) });
+    const width = Math.max(1, Math.ceil(viewport.width));
+    const height = Math.max(1, Math.ceil(viewport.height));
+    if (width * height > maxCanvasPixels) {
+        throw new Error(tooLargeMessage);
+    }
+
     const canvas = document.createElement("canvas");
-    canvas.width = Math.ceil(viewport.width);
-    canvas.height = Math.ceil(viewport.height);
+    canvas.width = width;
+    canvas.height = height;
     const context = canvas.getContext("2d", { willReadFrequently: true });
     if (!context) {
         throw new Error("Could not render that PDF.");
     }
-    await page.render({ canvas, canvasContext: context, viewport }).promise;
+    const renderTask = page.render({
+        canvas,
+        canvasContext: context,
+        viewport,
+    });
+    try {
+        await withTimeout(
+            renderTask.promise,
+            pdfPageTimeoutMS,
+            "Could not render that PDF page.",
+        );
+    } catch (error) {
+        renderTask.cancel();
+        throw error;
+    }
     return context.getImageData(0, 0, canvas.width, canvas.height);
 };
 
 const decodeQrFromPDFBytes = async (bytes: Uint8Array) => {
     const pdfjs =
         (await import("pdfjs-dist/legacy/webpack.mjs")) as unknown as typeof import("pdfjs-dist");
-    const loadingTask = pdfjs.getDocument({ data: bytes.slice() });
+    const loadingTask = pdfjs.getDocument({
+        data: bytes.slice(),
+        disableFontFace: true,
+    });
     let pdf: PDFDocumentProxy;
     try {
         pdf = await withTimeout(
@@ -317,17 +405,25 @@ const decodeQrFromPDFBytes = async (bytes: Uint8Array) => {
     }
 
     try {
-        const textCode = findJsonObject(await textFromPDF(pdf));
+        let textCode: string | undefined;
+        try {
+            textCode = findJsonObject(await textFromPDF(pdf));
+        } catch {
+            // Text extraction is a fast path; scanned PDFs should still use QR rendering.
+        }
         if (textCode) {
             return textCode;
         }
 
-        for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
+        const pageCount = Math.min(pdf.numPages, maxPDFPagesToScan);
+        for (let pageNumber = 1; pageNumber <= pageCount; pageNumber++) {
             const page = await pdf.getPage(pageNumber);
             try {
                 return await decodeQrImage(await renderPDFPage(page));
             } catch {
                 // Try the next page before surfacing a failure.
+            } finally {
+                page.cleanup();
             }
         }
     } finally {
@@ -338,6 +434,7 @@ const decodeQrFromPDFBytes = async (bytes: Uint8Array) => {
 };
 
 const decodeQrFromPDF = async (file: File) => {
+    assertFileSize(file, maxPDFFileBytes);
     const bytes = new Uint8Array(await file.arrayBuffer());
     const metadataCode = codeFromPDFMetadata(bytes);
     if (metadataCode) return metadataCode;
@@ -347,8 +444,10 @@ const decodeQrFromPDF = async (file: File) => {
 export const readLegacyKitCodeFromFile = async (file: File) => {
     if (isPDF(file)) return decodeQrFromPDF(file);
     if (isPlainText(file)) {
+        assertFileSize(file, maxTextFileBytes);
         const value = await file.text();
         return findJsonObject(value) ?? value.trim();
     }
+    assertFileSize(file, maxImageFileBytes);
     return decodeQrImage(await imageDataFromFile(file));
 };
