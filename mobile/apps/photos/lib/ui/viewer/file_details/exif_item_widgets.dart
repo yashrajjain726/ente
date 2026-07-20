@@ -65,6 +65,7 @@ class _AllExifItemWidgetState extends State<AllExifItemWidget> {
       title: AppLocalizations.of(context).exif,
       subtitleSection: _exifButton(context, widget.file, widget.exif),
       onTap: _onTap,
+      useMenuStyle: true,
     );
   }
 

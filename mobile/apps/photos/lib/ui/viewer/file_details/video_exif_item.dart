@@ -34,6 +34,7 @@ class _VideoProbeInfoState extends State<VideoExifRowItem> {
       title: AppLocalizations.of(context).videoInfo,
       subtitleSection: _exifButton(context, widget.file, widget.props),
       onTap: _onTap,
+      useMenuStyle: true,
     );
   }
 
