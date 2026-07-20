@@ -1173,6 +1173,9 @@ func setupLogger(environment string) {
 			Compress: true,
 		})
 	}
+	if level, err := log.ParseLevel(viper.GetString("log-level")); err == nil {
+		log.SetLevel(level)
+	}
 }
 
 func setupDatabase() *sql.DB {
