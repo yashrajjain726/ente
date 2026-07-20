@@ -24,11 +24,16 @@ class SocialDataProvider {
     return _db.getCommentsForFile(fileID);
   }
 
+  /// [candidateCollectionIDs] narrows the indexed lookup to collections the
+  /// caller already knows are eligible.
   Future<Comment?> getLatestCommentForFile(
     int fileID, {
-    required List<int> collectionIDs,
+    required List<int> candidateCollectionIDs,
   }) {
-    return _db.getLatestCommentForFile(fileID, collectionIDs: collectionIDs);
+    return _db.getLatestCommentForFile(
+      fileID,
+      candidateCollectionIDs: candidateCollectionIDs,
+    );
   }
 
   Future<int> getCommentCountForFile(int fileID) {

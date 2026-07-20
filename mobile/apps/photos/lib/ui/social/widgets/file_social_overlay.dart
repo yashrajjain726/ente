@@ -140,7 +140,10 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
       final results = await Future.wait<Object?>([
         provider.getReactionsForFile(fileID),
         provider.getCommentCountForFile(fileID),
-        provider.getLatestCommentForFile(fileID, collectionIDs: collectionIDs),
+        provider.getLatestCommentForFile(
+          fileID,
+          candidateCollectionIDs: collectionIDs,
+        ),
       ]);
       if (!_isCurrentLoad(fileID, generation)) return;
 

@@ -153,22 +153,27 @@ class SocialDB {
     return rows.map(_rowToComment).toList();
   }
 
+  /// Restricts the lookup to [candidateCollectionIDs] so the composite
+  /// file/collection index can narrow the rows considered for the latest item.
   Future<Comment?> getLatestCommentForFile(
     int fileID, {
-    required List<int> collectionIDs,
+    required List<int> candidateCollectionIDs,
   }) async {
-    if (collectionIDs.isEmpty) {
+    if (candidateCollectionIDs.isEmpty) {
       return null;
     }
 
-    final placeholders = List.filled(collectionIDs.length, '?').join(',');
+    final placeholders = List.filled(
+      candidateCollectionIDs.length,
+      '?',
+    ).join(',');
     final db = await database;
     final rows = await db.query(
       _commentsTable,
       where:
           'file_id = ? AND is_deleted = 0 '
           'AND collection_id IN ($placeholders)',
-      whereArgs: [fileID, ...collectionIDs],
+      whereArgs: [fileID, ...candidateCollectionIDs],
       orderBy: 'created_at DESC',
       limit: 1,
     );
