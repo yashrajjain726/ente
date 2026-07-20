@@ -441,6 +441,7 @@ class FileBottomBarState extends State<FileBottomBar> {
         context,
         fileID: file.uploadedFileID!,
         currentUserID: widget.userID!,
+        collections: sharedCollections,
         file: file,
       );
       // Refresh state after sheet closes to sync heart icon

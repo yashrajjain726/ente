@@ -10,7 +10,6 @@ import "package:photos/core/event_bus.dart";
 import "package:photos/events/social_data_updated_event.dart";
 import "package:photos/generated/l10n.dart";
 import "package:photos/models/api/collection/user.dart";
-import "package:photos/models/collection/collection.dart";
 import "package:photos/models/file/file.dart";
 import "package:photos/models/social/comment.dart";
 import "package:photos/models/social/comment_author_utils.dart";
@@ -55,7 +54,7 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
   late final StreamSubscription<SocialDataUpdatedEvent>
   _socialDataUpdatedSubscription;
 
-  List<Collection> _sharedCollections = const [];
+  List<int> _visibleSharedCollectionIDs = const [];
   bool _hasLiked = false;
   int _commentCount = 0;
   Comment? _latestComment;
@@ -89,7 +88,7 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
   }
 
   void _clearSocialState() {
-    _sharedCollections = const [];
+    _visibleSharedCollectionIDs = const [];
     _hasLiked = false;
     _commentCount = 0;
     _latestComment = null;
@@ -123,20 +122,17 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
     }
 
     try {
-      final sharedCollections = await CollectionsService.instance
-          .getSharedCollectionsForFile(fileID);
+      final collectionIDs = await CollectionsService.instance
+          .getVisibleSharedCollectionIDsForFile(fileID);
       if (!_isCurrentLoad(fileID, generation)) return;
 
-      if (sharedCollections.isEmpty) {
+      if (collectionIDs.isEmpty) {
         setState(_clearSocialState);
         widget.onVisibilityChanged(false);
         return;
       }
 
       final provider = SocialDataProvider.instance;
-      final collectionIDs = sharedCollections
-          .map((collection) => collection.id)
-          .toList();
       final results = await Future.wait<Object?>([
         provider.getReactionsForFile(fileID),
         provider.getCommentCountForFile(fileID),
@@ -169,7 +165,7 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
 
       if (!_isCurrentLoad(fileID, generation)) return;
       setState(() {
-        _sharedCollections = sharedCollections;
+        _visibleSharedCollectionIDs = collectionIDs;
         _hasLiked = reactions.any(
           (reaction) => reaction.userID == currentUserID,
         );
@@ -194,7 +190,7 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
     final currentUserID = widget.currentUserID;
     if (fileID == null ||
         currentUserID == null ||
-        _sharedCollections.isEmpty ||
+        _visibleSharedCollectionIDs.isEmpty ||
         _reactionUpdateFileIDs.contains(fileID)) {
       return;
     }
@@ -206,13 +202,22 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
         return;
       }
 
-      if (_sharedCollections.length == 1) {
+      final sharedCollections = await CollectionsService.instance
+          .getSharedCollectionsForFile(fileID);
+      if (!mounted ||
+          widget.file.uploadedFileID != fileID ||
+          widget.currentUserID != currentUserID ||
+          sharedCollections.isEmpty) {
+        return;
+      }
+
+      if (sharedCollections.length == 1) {
         final previousState = _hasLiked;
         setState(() => _hasLiked = true);
         try {
           await SocialDataProvider.instance.toggleReaction(
             userID: currentUserID,
-            collectionID: _sharedCollections.single.id,
+            collectionID: sharedCollections.single.id,
             fileID: fileID,
           );
         } catch (error, stackTrace) {
@@ -233,10 +238,8 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
           context,
           fileID: fileID,
           currentUserID: currentUserID,
+          collections: sharedCollections,
           file: file,
-          allowedCollectionIDs: _sharedCollections
-              .map((collection) => collection.id)
-              .toSet(),
         ),
       );
     } finally {
@@ -301,31 +304,48 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
 
   Future<void> _showLikes() async {
     final fileID = widget.file.uploadedFileID;
-    if (fileID == null || _sharedCollections.isEmpty) return;
-    final initialCollectionID = _sharedCollections.first.id;
-    await _runSheetAndRefresh(
-      () => showLikesBottomSheet(
+    if (fileID == null || _visibleSharedCollectionIDs.isEmpty) return;
+    await _runSheetAndRefresh(() async {
+      final sharedCollections = await CollectionsService.instance
+          .getSharedCollectionsForFile(fileID);
+      if (!mounted ||
+          widget.file.uploadedFileID != fileID ||
+          sharedCollections.isEmpty) {
+        return;
+      }
+      await showLikesBottomSheet(
         context,
         fileID: fileID,
-        initialCollectionID: initialCollectionID,
-      ),
-    );
+        initialCollectionID: sharedCollections.first.id,
+      );
+    });
   }
 
   Future<void> _openComments({Comment? comment}) async {
     final fileID = widget.file.uploadedFileID;
-    if (fileID == null || _sharedCollections.isEmpty) return;
-    await _runSheetAndRefresh(
-      () => showFileCommentsBottomSheet(
+    if (fileID == null || _visibleSharedCollectionIDs.isEmpty) return;
+    await _runSheetAndRefresh(() async {
+      final sharedCollections = await CollectionsService.instance
+          .getSharedCollectionsForFile(fileID);
+      if (!mounted ||
+          widget.file.uploadedFileID != fileID ||
+          sharedCollections.isEmpty) {
+        return;
+      }
+
+      final preferredCollectionID =
+          comment?.collectionID ?? _latestComment?.collectionID;
+      final preferredCollection = sharedCollections.firstWhereOrNull(
+        (collection) => collection.id == preferredCollectionID,
+      );
+
+      await showFileCommentsBottomSheet(
         context,
-        collectionID:
-            comment?.collectionID ??
-            _latestComment?.collectionID ??
-            _sharedCollections.first.id,
+        collectionID: preferredCollection?.id ?? sharedCollections.first.id,
         fileID: fileID,
-        highlightCommentID: comment?.id,
-      ),
-    );
+        highlightCommentID: preferredCollection == null ? null : comment?.id,
+      );
+    });
   }
 
   Future<void> _runSheetAndRefresh(Future<void> Function() showSheet) async {
@@ -340,7 +360,7 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
 
   @override
   Widget build(BuildContext context) {
-    if (_sharedCollections.isEmpty) {
+    if (_visibleSharedCollectionIDs.isEmpty) {
       return const SizedBox.shrink();
     }
 

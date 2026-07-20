@@ -312,24 +312,60 @@ class CollectionsService {
       return [];
     }
 
-    final hiddenCollectionIDs = includeHidden
-        ? const <int>{}
-        : getHiddenCollectionIds();
-    final sharedCollections =
-        collectionIDs
-            .map((collectionID) => _collectionIDToCollections[collectionID])
-            .whereType<Collection>()
-            .where(
-              (collection) =>
-                  !collection.isDeleted &&
-                  !hiddenCollectionIDs.contains(collection.id) &&
-                  (collection.hasSharees ||
-                      collection.hasLink ||
-                      !collection.isOwner(currentUserID)),
-            )
-            .toList()
-          ..sort((first, second) => first.id.compareTo(second.id));
+    final sharedCollections = <Collection>[];
+    for (final collectionID in collectionIDs) {
+      final collection = _collectionIDToCollections[collectionID];
+      if (_isEligibleSharedCollection(
+        collection,
+        currentUserID,
+        includeHidden: includeHidden,
+      )) {
+        sharedCollections.add(collection!);
+      }
+    }
+    sharedCollections.sort((first, second) => first.id.compareTo(second.id));
     return sharedCollections;
+  }
+
+  /// Returns IDs of visible shared collections containing [uploadedFileID].
+  ///
+  /// Use this to scope social content that may be rendered in the UI without
+  /// constructing a list of collection objects on the view path.
+  Future<List<int>> getVisibleSharedCollectionIDsForFile(
+    int uploadedFileID,
+  ) async {
+    final collectionIDs = await _filesDB.getAllCollectionIDsOfFile(
+      uploadedFileID,
+    );
+    final currentUserID = _config.getUserID();
+    if (collectionIDs.isEmpty || currentUserID == null) {
+      return [];
+    }
+
+    final sharedCollectionIDs = <int>[];
+    for (final collectionID in collectionIDs) {
+      if (_isEligibleSharedCollection(
+        _collectionIDToCollections[collectionID],
+        currentUserID,
+        includeHidden: false,
+      )) {
+        sharedCollectionIDs.add(collectionID);
+      }
+    }
+    return sharedCollectionIDs;
+  }
+
+  bool _isEligibleSharedCollection(
+    Collection? collection,
+    int currentUserID, {
+    required bool includeHidden,
+  }) {
+    return collection != null &&
+        !collection.isDeleted &&
+        (includeHidden || !collection.isHidden()) &&
+        (collection.hasSharees ||
+            collection.hasLink ||
+            !collection.isOwner(currentUserID));
   }
 
   Future<List<Collection>> getArchivedCollection() async {

@@ -8,7 +8,6 @@ import "package:photos/models/collection/collection.dart";
 import "package:photos/models/file/extensions/file_props.dart";
 import "package:photos/models/file/file.dart";
 import "package:photos/models/social/social_data_provider.dart";
-import "package:photos/services/collections_service.dart";
 import "package:photos/theme/ente_theme.dart";
 import "package:photos/ui/common/loading_widget.dart";
 import "package:photos/ui/components/buttons/icon_button_widget.dart";
@@ -32,13 +31,14 @@ class _CollectionLikeState {
 /// Parameters:
 /// - [fileID]: The uploaded file ID to like
 /// - [currentUserID]: Current user's ID for checking existing likes
+/// - [collections]: Shared collections eligible for this action
 /// - [file]: The EnteFile for displaying thumbnail (optional, will fetch if null)
 Future<void> showLikeCollectionSelectorSheet(
   BuildContext context, {
   required int fileID,
   required int currentUserID,
+  required List<Collection> collections,
   EnteFile? file,
-  Set<int>? allowedCollectionIDs,
 }) {
   return showModalBottomSheet(
     context: context,
@@ -47,8 +47,8 @@ Future<void> showLikeCollectionSelectorSheet(
     builder: (_) => LikeCollectionSelectorSheet(
       fileID: fileID,
       currentUserID: currentUserID,
+      collections: collections,
       file: file,
-      allowedCollectionIDs: allowedCollectionIDs,
     ),
   );
 }
@@ -56,14 +56,14 @@ Future<void> showLikeCollectionSelectorSheet(
 class LikeCollectionSelectorSheet extends StatefulWidget {
   final int fileID;
   final int currentUserID;
+  final List<Collection> collections;
   final EnteFile? file;
-  final Set<int>? allowedCollectionIDs;
 
   const LikeCollectionSelectorSheet({
     required this.fileID,
     required this.currentUserID,
+    required this.collections,
     this.file,
-    this.allowedCollectionIDs,
     super.key,
   });
 
@@ -93,27 +93,9 @@ class _LikeCollectionSelectorSheetState
       // Load file if not provided (for thumbnail)
       _file ??= await FilesDB.instance.getAnyUploadedFile(widget.fileID);
 
-      final sharedCollections =
-          (await CollectionsService.instance.getSharedCollectionsForFile(
-                widget.fileID,
-                includeHidden: true,
-              ))
-              .where(
-                (c) =>
-                    (widget.allowedCollectionIDs == null ||
-                    widget.allowedCollectionIDs!.contains(c.id)),
-              )
-              .toList();
-
-      // If no shared collections, close the sheet
-      if (sharedCollections.isEmpty) {
-        if (mounted) Navigator.of(context).pop();
-        return;
-      }
-
       // Fetch like states in parallel
       final collectionStates = await Future.wait(
-        sharedCollections.map((collection) async {
+        widget.collections.map((collection) async {
           final reactions = await SocialDataProvider.instance
               .getReactionsForFileInCollection(widget.fileID, collection.id);
           final isLiked = reactions.any(
