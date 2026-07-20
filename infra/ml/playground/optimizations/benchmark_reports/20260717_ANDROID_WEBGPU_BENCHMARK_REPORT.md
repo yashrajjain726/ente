@@ -11,6 +11,143 @@
 - **Follow-up revision:** `18e246ff6432`, plus the model rewrite and temporary tuning instrumentation described below
 - **Follow-up evidence:** [`infra/ml/test/out/android_webgpu_tuning_2026-07-17/`](../../../test/out/android_webgpu_tuning_2026-07-17/)
 - **Follow-up summary:** [`benchmark_summary.json`](../../../test/out/android_webgpu_tuning_2026-07-17/benchmark_summary.json)
+- **Fusion follow-up revision:** `0ee9992b7a0c`, plus temporary release benchmark instrumentation
+- **Fusion follow-up evidence:** [`infra/ml/test/out/android_webgpu_fusions_2026-07-17/`](../../../test/out/android_webgpu_fusions_2026-07-17/)
+- **Fusion follow-up summary:** [`benchmark_summary.json`](../../../test/out/android_webgpu_fusions_2026-07-17/benchmark_summary.json)
+
+## Fusion follow-up outcome: exact GELU and native PReLU are real wins
+
+Two further FP32 experiments improved the model hot paths without changing
+application-level output on the 14-fixture corpus:
+
+- Replacing MobileCLIP's 54 expanded exact-GELU expressions with the standard
+  ONNX `Gelu(approximate="none")` operator reduced median MobileCLIP inference
+  from **135.505 ms to 127.103 ms**, a **6.20% improvement**. Its p95 improved
+  by 5.13%. YOLO was unchanged, confirming that this was a CLIP-local gain.
+- Adding native WebGPU `PRelu` support and a WebGPU YOLO SiLU fusion to the
+  custom ONNX Runtime reduced MobileFaceNet from **14.369 ms to 10.772 ms per
+  face**, a **25.03% improvement**. YOLO improved from **107.844 ms to
+  106.271 ms**, or 1.46%.
+
+The GELU result is large and isolated enough to recommend adopting after an
+iOS/CoreML device check. Native WebGPU PReLU is also compelling, but requires
+an Android-specific MobileFaceNet artifact or retaining separate Android and
+iOS graphs: the portable arithmetic rewrite remains necessary for the shared
+CoreML-compatible model. The YOLO SiLU change is directionally positive but
+small enough that it should be repeated across run order and more Android
+devices before being credited as a stable 1.46% gain.
+
+### FP32 exact GELU fusion
+
+The benchmark-only generator, retained with the
+[raw evidence](../../../test/out/android_webgpu_fusions_2026-07-17/optimize_clip_model.py),
+recognizes the exact expression:
+
+```text
+0.5 * x * (1 + Erf(x / sqrt(2)))
+```
+
+and replaces it with the standard opset-20 `Gelu` operator using
+`approximate="none"`. This is not a tanh or QuickGELU approximation. The
+operator is implemented by both the WebGPU and CoreML execution providers in
+the ONNX Runtime source used for this investigation.
+
+| Property | Original MobileCLIP | Exact-GELU MobileCLIP |
+|---|---:|---:|
+| ONNX opset | 16 | 20 |
+| Serialized nodes | 879 | 504 |
+| Exact GELU sites | 54 expanded expressions | 54 `Gelu` nodes |
+| `Erf` / `Div` nodes | 54 / 54 | 0 / 0 |
+| Model bytes | 143,061,211 | 143,057,352 |
+| SHA-256 | `ef54ec66…7752` | `205a430a…ce7e` |
+| MobileCLIP inference p50 | 135.505 ms | **127.103 ms** |
+| MobileCLIP inference p95 | 144.448 ms | **137.039 ms** |
+
+The output model passes `onnx.checker.check_model(..., full_check=True)`. Five
+deterministic random CPU inputs had minimum raw-output cosine
+`0.999999999492`; the maximum absolute difference was `0.0733948`, caused by
+the different floating-point evaluation path. More importantly for the app,
+all 14 normalized Android CLIP embeddings were byte-for-byte equal to the FP32
+baseline. Face counts, detections, and all 25 face embeddings were also exact.
+
+The timing controls support a model-local interpretation: YOLO changed by
+-0.01%, while MobileFaceNet changed by +0.66%. At this corpus frequency, 14
+CLIP calls save approximately **117.6 ms of aggregate model inference**.
+
+### WebGPU-local PReLU and YOLO SiLU fusion
+
+The custom release AAR added three WebGPU capabilities:
+
+1. A broadcast-capable PReLU binary elementwise kernel.
+2. WebGPU execution-provider registrations for ONNX `PRelu`.
+3. Recognition of `x * Sigmoid(x)` as QuickGELU with alpha `1.0`, which is
+   exactly SiLU, followed by `ConvActivationFusion` support for that activation.
+
+This allowed Android to use the compact canonical MobileFaceNet graph with 33
+PReLU nodes instead of the five-operator portable expression at every site.
+The YOLO model itself was unchanged; only the custom runtime could fuse its
+SiLU pattern.
+
+| Model/control | Portable FP32 baseline p50 | Custom WebGPU runtime p50 | Change | Baseline p95 | Custom p95 | Corpus parity |
+|---|---:|---:|---:|---:|---:|---|
+| YOLO, SiLU fusion target | 107.844 ms | **106.271 ms** | **-1.46%** | 112.334 ms | 110.977 ms | Exact |
+| MobileFaceNet, native PReLU | 14.369 ms | **10.772 ms** | **-25.03%** | 17.740 ms | 13.755 ms | Exact |
+| MobileCLIP, unchanged control | 135.505 ms | 136.892 ms | +1.02% | 144.448 ms | 143.465 ms | Exact |
+
+The 25 face calls in this corpus save approximately **89.9 ms** from native
+PReLU alone. Including YOLO, the two targeted models save about **111.9 ms**
+of aggregate inference per corpus. The unchanged CLIP control moved in the
+opposite direction by 1.02%, which is why the smaller YOLO result is treated
+as provisional rather than conclusive.
+
+All 14 fixture IDs and face counts matched. Detection boxes, landmarks, and
+scores had maximum absolute difference `0.0`; the 25 face embeddings and all
+CLIP embeddings were byte-for-byte equal to baseline.
+
+The custom ONNX Runtime AAR was built in release mode with SHA-256
+`fa99ac56…9468`. Its `libonnxruntime.so` build ID was
+`765ed4f44a9e67c8d4246e3a59420eab6c084279`, and the same build ID was present
+inside the benchmark APK. Dawn initialized its Vulkan backend in the app
+process, all three sessions loaded with the forced platform-default WebGPU
+policy, and no provider-construction fallback was logged. Unlike the earlier
+placement audit, this follow-up did not enable verbose per-node assignment
+logging; the evidence proves the patched WebGPU runtime executed successfully
+but does not provide a second node-by-node placement count.
+
+### Fusion benchmark method and recommendation
+
+Both timing experiments used a non-debuggable `independentRelease` APK,
+Flutter AOT product mode (`dart.vm.product == true`, profile false), and Rust
+release builds. WebGPU was temporarily forced on. Each full timing run covered
+one warm-up plus five measured passes for every fixture: 84 raw YOLO calls, 84
+raw MobileCLIP calls, and 150 raw MobileFaceNet calls, leaving 70, 70, and 125
+measured calls after warm-up removal. Timers covered input tensor creation,
+synchronous `Session::run`, output access/copy, and their complete total.
+Android thermal status was `0` before and after each retained run.
+
+The exact-GELU timing run completed the full five-pass protocol. Because its
+first result-file transport was removed by Gradle together with the test APK,
+its correctness JSON was recaptured in a separate full-corpus run with one
+warm-up and one measured pass; the preserved five-pass native timing log is
+the source of the latency values above. The custom PReLU/SiLU run retained both
+five-pass timings and correctness output in one run. The baseline latency log
+was also newly captured with the five-pass protocol; its correctness reference
+was reused from the immediately preceding same-device FP32 run, whose model
+hashes, runtime, and provider configuration were identical.
+
+Recommended next steps:
+
+1. **Adopt the exact-GELU MobileCLIP graph** after running the same generated
+   model on the iOS/CoreML benchmark corpus. It is FP32, parity-safe at the app
+   boundary, and produced the clearest new CLIP gain.
+2. **Upstream or carry the WebGPU PReLU kernel**, and ship a compact
+   Android-specific PReLU MobileFaceNet model if maintaining per-platform
+   artifacts is acceptable. Keep the portable arithmetic graph for CoreML.
+3. **Keep the YOLO SiLU fusion in the candidate runtime**, but repeat it in
+   randomized A/B/A order and on at least one additional Mali or Adreno device
+   before treating the 1.46% result as a production forecast.
+4. Keep the production precision policy at **FP32**, as requested. No FP16
+   result is needed to obtain either of these gains.
 
 ## Follow-up outcome: MobileFaceNet fixed; provider tuning is effectively neutral
 
@@ -628,6 +765,22 @@ The follow-up evidence is kept under the gitignored
 - `models/fp16/`: the checked FP16 experiment artifacts.
 - `apks/`: the exact release APKs used for FP32, FP16, and the final FP32
   combination.
+
+The fusion follow-up evidence is kept under the gitignored
+`infra/ml/test/out/android_webgpu_fusions_2026-07-17/` tree:
+
+- `runs/baseline_fp32/`, `runs/gelu_fp32/`, and
+  `runs/webgpu_local_fusions_fp32/`: retained results, native timing logs,
+  release APKs, and thermal snapshots for the two reported experiments and
+  their control.
+- `models/mobileclip_s2_image_gelu_opset20.onnx`: the exact-GELU model used on
+  device.
+- `benchmark_summary.json` and `analyze_fusions.py`: parsed distributions,
+  detailed parity metrics, and the reproducible analyzer.
+- `optimize_clip_model.py`: the benchmark-only exact-GELU model generator.
+- `custom_ort_webgpu_fusions.patch`: the tested ONNX Runtime source diff,
+  including the WebGPU PReLU and SiLU-fusion changes.
+- `pixel8_vkjson.json`: the Pixel 8 Vulkan device/driver capability snapshot.
 
 The forced WebGPU flag, system-property variants, I/O-binding pilot, and all
 benchmark-only Dart/Rust instrumentation were removed after collecting and
