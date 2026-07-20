@@ -185,7 +185,6 @@ impl ModelDownloader {
             &self.staging_dir().join(id),
             &self.model_path(target),
         );
-        let _ = fs::remove_file(download::metadata_path_for(&archive_path));
         let _ = fs::remove_file(&archive_path);
         result
     }

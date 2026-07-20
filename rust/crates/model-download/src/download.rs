@@ -3,7 +3,7 @@ use std::fs::{self, File, OpenOptions};
 use std::io::{ErrorKind, Write};
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant};
 
 use futures_util::future::try_join_all;
 use reqwest::header::{ACCEPT_RANGES, CONTENT_RANGE, ETAG, IF_RANGE, LAST_MODIFIED, RANGE};
@@ -122,16 +122,6 @@ struct FileDownloadReport {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-struct DownloadMetadata {
-    url: String,
-    label: String,
-    size_bytes: u64,
-    etag: Option<String>,
-    last_modified: Option<String>,
-    downloaded_at_ms: u64,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 struct PartialDownloadMetadata {
     url: String,
     etag: Option<String>,
@@ -236,12 +226,7 @@ async fn fetch_async(
             download_probes.push(DownloadProbe {
                 content_length: file_size(destination),
                 supports_ranges: false,
-                response_metadata: read_download_metadata(destination).map(|metadata| {
-                    ResponseMetadata {
-                        etag: metadata.etag,
-                        last_modified: metadata.last_modified,
-                    }
-                }),
+                response_metadata: None,
             });
         } else {
             download_probes.push(fetch_download_probe(&client, &target.url).await);
@@ -685,8 +670,6 @@ async fn download_file_single(
             });
         }
 
-        let _ = write_download_metadata(destination, target, final_size, Some(response_metadata));
-
         return Ok(FileDownloadReport {
             final_size,
             network_downloaded_bytes,
@@ -815,8 +798,6 @@ async fn download_file_ranged(
         .map(|state| state.retry_count)
         .fold(0u32, u32::saturating_add);
     let elapsed = file_started_at.elapsed();
-    let _ = write_download_metadata(destination, target, final_size, response_metadata);
-
     Ok(FileDownloadReport {
         final_size,
         network_downloaded_bytes,
@@ -1519,36 +1500,6 @@ fn prepare_cached_download(target: &Target, destination: &Path) -> bool {
     true
 }
 
-fn read_download_metadata(path: &Path) -> Option<DownloadMetadata> {
-    let text = fs::read_to_string(metadata_path_for(path)).ok()?;
-    serde_json::from_str(&text).ok()
-}
-
-fn write_download_metadata(
-    path: &Path,
-    target: &Target,
-    size_bytes: u64,
-    response_metadata: Option<ResponseMetadata>,
-) -> Result<(), Error> {
-    let (etag, last_modified) = response_metadata
-        .map(|metadata| (metadata.etag, metadata.last_modified))
-        .unwrap_or((None, None));
-    let metadata = DownloadMetadata {
-        url: target.url.clone(),
-        label: target.label.clone(),
-        size_bytes,
-        etag,
-        last_modified,
-        downloaded_at_ms: now_ms(),
-    };
-    let text = serde_json::to_string_pretty(&metadata)?;
-    let metadata_path = metadata_path_for(path);
-    let tmp_path = PathBuf::from(format!("{}.tmp", metadata_path.display()));
-    fs::write(&tmp_path, text)?;
-    fs::rename(&tmp_path, &metadata_path)?;
-    Ok(())
-}
-
 fn response_metadata(response: &Response) -> ResponseMetadata {
     ResponseMetadata {
         etag: response
@@ -1576,10 +1527,6 @@ fn write_range_download_metadata(
     let text = serde_json::to_string_pretty(metadata)?;
     fs::write(path, text)?;
     Ok(())
-}
-
-pub fn metadata_path_for(path: &Path) -> PathBuf {
-    PathBuf::from(format!("{}.metadata.json", path.display()))
 }
 
 pub fn sha256_file(path: &Path) -> Result<String, Error> {
@@ -1649,7 +1596,9 @@ fn cleanup_range_download(destination: &Path) {
     let _ = fs::remove_file(partial_metadata_path_for(destination));
 }
 
+#[cfg(test)]
 fn now_ms() -> u64 {
+    use std::time::{SystemTime, UNIX_EPOCH};
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map(|duration| u64::try_from(duration.as_millis()).unwrap_or(u64::MAX))
@@ -2067,8 +2016,7 @@ mod tests {
 
         let test_dir = scratch_dir("adopt-download");
         let destination = test_dir.join("model.bin");
-        fs::write(&destination, bytes.as_slice()).expect("place existing file without sidecar");
-        assert!(!metadata_path_for(&destination).exists());
+        fs::write(&destination, bytes.as_slice()).expect("place existing file");
 
         let target = Target {
             label: "Model".to_string(),
@@ -2536,7 +2484,6 @@ mod tests {
             destination_path: destination.display().to_string(),
             sha256: sha.clone(),
         };
-        write_download_metadata(&destination, &old_target, 11, None).expect("write stale metadata");
 
         fetch(
             vec![Target {
