@@ -1,5 +1,3 @@
-import "dart:async";
-
 import "package:ente_components/ente_components.dart";
 import "package:flutter/material.dart";
 import "package:photos/generated/l10n.dart";
@@ -65,14 +63,10 @@ class SharedEmptyState extends StatelessWidget {
             ButtonComponent(
               label: strings.shareAnAlbum,
               shouldSurfaceExecutionStates: false,
-              onTap: () async {
-                unawaited(
-                  showCollectionActionSheet(
-                    context,
-                    actionType: CollectionActionType.shareCollection,
-                  ),
-                );
-              },
+              onTap: () => showCollectionActionSheet(
+                context,
+                actionType: CollectionActionType.shareCollection,
+              ),
             ),
           ],
         ),

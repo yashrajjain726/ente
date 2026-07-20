@@ -26,14 +26,6 @@ const _likedColor = Color(0xFF08C225);
 const _socialControlsSize = 40.0;
 const _socialIconSize = 32.0;
 
-bool fileSocialContextIncludesHiddenCollections(
-  int? openingCollectionID,
-  Set<int> hiddenCollectionIDs,
-) {
-  return openingCollectionID != null &&
-      hiddenCollectionIDs.contains(openingCollectionID);
-}
-
 /// Social content for a file. The host owns placement and visibility effects.
 class FileSocialOverlay extends StatefulWidget {
   final EnteFile file;
@@ -62,7 +54,7 @@ class FileSocialOverlay extends StatefulWidget {
 }
 
 class _FileSocialOverlayState extends State<FileSocialOverlay> {
-  List<int> _eligibleSharedCollectionIDs = const [];
+  bool _hasEligibleSharedCollections = false;
   bool _hasLiked = false;
   int _commentCount = 0;
   Comment? _latestComment;
@@ -86,46 +78,34 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
   }
 
   void _clearSocialState() {
-    _eligibleSharedCollectionIDs = const [];
+    _hasEligibleSharedCollections = false;
     _hasLiked = false;
     _commentCount = 0;
     _latestComment = null;
     _latestCommentAuthor = null;
   }
 
-  bool _canApplySocialRefresh({
-    required int requestedFileID,
-    required int refreshID,
-  }) {
-    return mounted &&
-        refreshID == _latestRefreshID &&
-        widget.file.uploadedFileID == requestedFileID;
+  bool _isCurrentSocialRefresh(int refreshID) {
+    return mounted && refreshID == _latestRefreshID;
   }
 
   bool get _includeHiddenCollections {
-    return fileSocialContextIncludesHiddenCollections(
-      widget.openingCollectionID,
-      CollectionsService.instance.getHiddenCollectionIds(),
-    );
+    final openingCollectionID = widget.openingCollectionID;
+    return openingCollectionID != null &&
+        CollectionsService.instance.getHiddenCollectionIds().contains(
+          openingCollectionID,
+        );
   }
 
   Future<void> _refreshSocialState() async {
-    // Recheck the captured file after every await before touching state.
+    // Recheck that this refresh is still current after every await.
     final fileID = widget.file.uploadedFileID;
     final currentUserID = widget.currentUserID;
     final refreshID = ++_latestRefreshID;
 
     if (fileID == null || currentUserID == null) {
       _clearSocialState();
-      // Defer because a user-null transition can arrive from didUpdateWidget.
-      scheduleMicrotask(() {
-        if (!mounted ||
-            refreshID != _latestRefreshID ||
-            widget.file.uploadedFileID != fileID) {
-          return;
-        }
-        widget.onVisibilityChanged?.call(false);
-      });
+      widget.onVisibilityChanged?.call(false);
       return;
     }
 
@@ -135,10 +115,7 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
             fileID,
             includeHidden: _includeHiddenCollections,
           );
-      if (!_canApplySocialRefresh(
-        requestedFileID: fileID,
-        refreshID: refreshID,
-      )) {
+      if (!_isCurrentSocialRefresh(refreshID)) {
         return;
       }
 
@@ -157,10 +134,7 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
           candidateCollectionIDs: collectionIDs,
         ),
       ]);
-      if (!_canApplySocialRefresh(
-        requestedFileID: fileID,
-        refreshID: refreshID,
-      )) {
+      if (!_isCurrentSocialRefresh(refreshID)) {
         return;
       }
 
@@ -174,10 +148,7 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
                 latestComment.collectionID,
               )
             : const <String, String>{};
-        if (!_canApplySocialRefresh(
-          requestedFileID: fileID,
-          refreshID: refreshID,
-        )) {
+        if (!_isCurrentSocialRefresh(refreshID)) {
           return;
         }
 
@@ -189,14 +160,11 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
         );
       }
 
-      if (!_canApplySocialRefresh(
-        requestedFileID: fileID,
-        refreshID: refreshID,
-      )) {
+      if (!_isCurrentSocialRefresh(refreshID)) {
         return;
       }
       setState(() {
-        _eligibleSharedCollectionIDs = collectionIDs;
+        _hasEligibleSharedCollections = true;
         _hasLiked = hasLiked;
         _commentCount = commentCount;
         _latestComment = latestComment;
@@ -219,7 +187,7 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
     final currentUserID = widget.currentUserID;
     if (fileID == null ||
         currentUserID == null ||
-        _eligibleSharedCollectionIDs.isEmpty ||
+        !_hasEligibleSharedCollections ||
         _reactionUpdateFileIDs.contains(fileID)) {
       return;
     }
@@ -335,7 +303,7 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
 
   Future<void> _showLikes() async {
     final fileID = widget.file.uploadedFileID;
-    if (fileID == null || _eligibleSharedCollectionIDs.isEmpty) return;
+    if (fileID == null || !_hasEligibleSharedCollections) return;
     await _runSheetAndRefresh(() async {
       final sharedCollections = await CollectionsService.instance
           .getSharedCollectionsForFile(
@@ -362,7 +330,7 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
 
   Future<void> _openComments({Comment? comment}) async {
     final fileID = widget.file.uploadedFileID;
-    if (fileID == null || _eligibleSharedCollectionIDs.isEmpty) return;
+    if (fileID == null || !_hasEligibleSharedCollections) return;
     await _runSheetAndRefresh(() async {
       final sharedCollections = await CollectionsService.instance
           .getSharedCollectionsForFile(
@@ -417,7 +385,7 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
 
   @override
   Widget build(BuildContext context) {
-    if (_eligibleSharedCollectionIDs.isEmpty) {
+    if (!_hasEligibleSharedCollections) {
       return const SizedBox.shrink();
     }
 
@@ -440,7 +408,7 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
               Tooltip(
                 message: AppLocalizations.of(context).like,
                 child: GestureDetector(
-                  onLongPress: () => unawaited(_showLikes()),
+                  onLongPress: _showLikes,
                   child: SizedBox.square(
                     dimension: _socialControlsSize,
                     child: IconButton(
@@ -451,7 +419,7 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
                         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                         overlayColor: WidgetStateColor.transparent,
                       ),
-                      onPressed: () => unawaited(_toggleReaction()),
+                      onPressed: _toggleReaction,
                       icon: Icon(
                         _hasLiked ? EnteIcons.likeFilled : EnteIcons.likeStroke,
                         color: _hasLiked ? _likedColor : Colors.white,
@@ -473,7 +441,7 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
                       maximumSize: const Size.square(_socialControlsSize),
                       tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     ),
-                    onPressed: () => unawaited(_openComments()),
+                    onPressed: _openComments,
                     icon: _buildCommentIcon(),
                   ),
                 ),
@@ -492,7 +460,7 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
   ) {
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTap: () => unawaited(_openComments(comment: comment)),
+      onTap: () => _openComments(comment: comment),
       child: ConstrainedBox(
         constraints: BoxConstraints(maxWidth: maxWidth),
         child: Stack(

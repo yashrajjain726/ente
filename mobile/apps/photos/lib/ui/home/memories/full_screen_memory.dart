@@ -680,10 +680,8 @@ class _FullScreenMemoryState extends State<FullScreenMemory> {
                   },
                   onSwipeUp: () {
                     if (!(ModalRoute.of(context)?.isCurrent ?? false)) return;
-                    unawaited(
-                      _runWithViewerPaused(
-                        () => showDetailsSheet(context, currentFile),
-                      ),
+                    _runWithViewerPaused(
+                      () => showDetailsSheet(context, currentFile),
                     );
                   },
                   canSwipeUp: () => !_isMediaZoomed,
@@ -787,12 +785,10 @@ class _FullScreenMemoryState extends State<FullScreenMemory> {
               title: widget.title,
               onClose: () => Navigator.pop(context),
               onDateTap: (file) {
-                unawaited(
-                  _runWithViewerPaused(
-                    () => routeToPage(
-                      context,
-                      JumpToDateGallery(fileToJumpTo: file),
-                    ),
+                _runWithViewerPaused(
+                  () => routeToPage(
+                    context,
+                    JumpToDateGallery(fileToJumpTo: file),
                   ),
                 );
               },
@@ -974,7 +970,7 @@ class _MemoryActionButton extends StatelessWidget {
           tapTargetSize: MaterialTapTargetSize.shrinkWrap,
           overlayColor: Colors.white.withValues(alpha: 0.08),
         ),
-        onPressed: () => unawaited(onPressed()),
+        onPressed: onPressed,
         icon: icon,
       ),
     );

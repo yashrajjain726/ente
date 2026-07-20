@@ -565,12 +565,10 @@ class FileAppBarState extends State<FileAppBar> {
     } else if (value == 10) {
       final selectedFiles = SelectedFiles();
       selectedFiles.files.add(widget.file);
-      unawaited(
-        showCollectionActionSheet(
-          context,
-          selectedFiles: selectedFiles,
-          actionType: CollectionActionType.addFiles,
-        ),
+      await showCollectionActionSheet(
+        context,
+        selectedFiles: selectedFiles,
+        actionType: CollectionActionType.addFiles,
       );
     }
   }
@@ -617,12 +615,10 @@ class FileAppBarState extends State<FileAppBar> {
   Future<void> _handleUnHideRequest(BuildContext context) async {
     final selectedFiles = SelectedFiles();
     selectedFiles.files.add(widget.file);
-    unawaited(
-      showCollectionActionSheet(
-        context,
-        selectedFiles: selectedFiles,
-        actionType: CollectionActionType.unHide,
-      ),
+    await showCollectionActionSheet(
+      context,
+      selectedFiles: selectedFiles,
+      actionType: CollectionActionType.unHide,
     );
   }
 
