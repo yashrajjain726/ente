@@ -219,7 +219,7 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
             fileID: fileID,
           );
         } catch (error, stackTrace) {
-          _logger.severe("Failed to like photo", error, stackTrace);
+          _logger.warning("Failed to like photo", error, stackTrace);
           if (mounted && widget.file.uploadedFileID == fileID) {
             setState(() => _hasLiked = previousState);
             showShortToast(
@@ -285,7 +285,7 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
         );
       }
     } catch (error, stackTrace) {
-      _logger.severe(
+      _logger.warning(
         "Failed to unlike from all collections",
         error,
         stackTrace,
