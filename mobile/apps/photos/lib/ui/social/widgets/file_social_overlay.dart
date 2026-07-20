@@ -60,7 +60,7 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
   Comment? _latestComment;
   User? _latestCommentAuthor;
   int _latestRefreshID = 0;
-  final _reactionUpdateFileIDs = <int>{};
+  final _fileIDsWithReactionUpdateInProgress = <int>{};
 
   @override
   void initState() {
@@ -187,11 +187,11 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
     final currentUserID = widget.currentUserID;
     if (fileID == null ||
         currentUserID == null ||
-        _reactionUpdateFileIDs.contains(fileID)) {
+        _fileIDsWithReactionUpdateInProgress.contains(fileID)) {
       return;
     }
 
-    _reactionUpdateFileIDs.add(fileID);
+    _fileIDsWithReactionUpdateInProgress.add(fileID);
     try {
       if (_hasLiked) {
         await _unlikeFromAllCollections(fileID, currentUserID);
@@ -241,7 +241,7 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
         ),
       );
     } finally {
-      _reactionUpdateFileIDs.remove(fileID);
+      _fileIDsWithReactionUpdateInProgress.remove(fileID);
     }
   }
 
