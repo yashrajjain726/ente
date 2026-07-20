@@ -82,7 +82,7 @@ final class ChatViewModel: ObservableObject {
     private let attachmentsDir: URL
     private let chatDbPath: String
     private let chatDbKey: Data
-    private let modelSettings = ModelSettingsStore.shared
+    private let modelSettings: ModelSettingsStore
 
     private var messageStore: [UUID: [MessageNode]] = [:]
     private var branchSelections: [UUID: [String: UUID]] = [:]
@@ -114,6 +114,8 @@ final class ChatViewModel: ObservableObject {
             ?? FileManager.default.temporaryDirectory
 
         let downloader = ModelDownloader()
+        // Must initialize after the downloader migrates the persisted selection.
+        self.modelSettings = ModelSettingsStore.shared
         let transcriber = Transcriber(
             modelDir: downloader.modelPath(target: downloader.transcriptionModelTarget).path,
             vadModelPath: downloader.modelPath(target: downloader.voiceActivityModelTarget).path

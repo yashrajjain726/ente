@@ -9,7 +9,7 @@ pub enum ModelDownloadTarget {
     Gguf {
         id: String,
         url: String,
-        sha256: Option<String>,
+        sha256: String,
         mmproj_url: Option<String>,
         mmproj_sha256: Option<String>,
     },
@@ -87,10 +87,12 @@ pub fn migrate_ensu_legacy_models(
     models_dir: String,
     llm_legacy_dir: Option<String>,
     transcription_legacy_dir: String,
+    legacy_model_url: Option<String>,
+    legacy_mmproj_url: Option<String>,
     llm_targets: Vec<ModelDownloadTarget>,
     transcription_model: ModelDownloadTarget,
     voice_activity_model: ModelDownloadTarget,
-) {
+) -> Option<String> {
     let llm_targets: Vec<ente_model_download::ModelDownloadTarget> =
         llm_targets.into_iter().map(Into::into).collect();
     ente_model_download::migrate_ensu_legacy_models(
@@ -101,6 +103,12 @@ pub fn migrate_ensu_legacy_models(
         &transcription_model.into(),
         &voice_activity_model.into(),
     );
+    let defaults = ente_ensu::config::defaults();
+    ente_ensu::config::legacy_selected_preset_id(
+        &defaults.mobile_model_presets,
+        legacy_model_url.as_deref()?,
+        legacy_mmproj_url.as_deref(),
+    )
 }
 
 #[derive(uniffi::Object)]

@@ -50,7 +50,7 @@ interface ConfigModelPreset {
     id: string;
     title: string;
     url: string;
-    sha256?: string | null;
+    sha256: string;
     mmprojUrl?: string | null;
     mmprojSha256?: string | null;
 }
@@ -76,7 +76,7 @@ interface TauriLlmModelDownloadProgress {
 interface ModelTarget {
     id: string;
     url: string;
-    sha256?: string | null;
+    sha256: string;
     mmprojUrl?: string | null;
     mmprojSha256?: string | null;
 }
@@ -88,48 +88,59 @@ interface TauriModelStatus {
 }
 
 export interface ResolvedModelPreset {
+    id: string;
     name: string;
-    url: string;
-    mmproj?: string;
 }
 
-const FALLBACK_SHARED_MODEL_PRESETS: ResolvedModelPreset[] = [
+const FALLBACK_SHARED_MODEL_PRESETS: ModelInfo[] = [
     {
-        name: "LFM 2.5 1.2B Instruct (Q4_0)",
-        url: "https://huggingface.co/LiquidAI/LFM2.5-1.2B-GGUF/resolve/main/LFM2.5-1.2B-Q4_0.gguf?download=true",
-    },
-    {
+        id: "qwen-0.8b",
         name: "Qwen 3.5 0.8B (Q4_K_M)",
         url: "https://huggingface.co/unsloth/Qwen3.5-0.8B-GGUF/resolve/main/Qwen3.5-0.8B-Q4_K_M.gguf?download=true",
-        mmproj: "https://huggingface.co/unsloth/Qwen3.5-0.8B-GGUF/resolve/main/mmproj-F16.gguf",
+        sha256: "bd258782e35f7f458f8aced1adc053e6e92e89bc735ba3be89d38a06121dc517",
+        mmprojUrl:
+            "https://huggingface.co/unsloth/Qwen3.5-0.8B-GGUF/resolve/main/mmproj-F16.gguf",
+        mmprojSha256:
+            "56e4c6cfe73b0c82e3e82bc518d7591997e61d81f723fc41a586f4fa69ea2453",
     },
     {
+        id: "qwen-2b-q8",
         name: "Qwen 3.5 2B (Q8_0)",
         url: "https://huggingface.co/unsloth/Qwen3.5-2B-GGUF/resolve/main/Qwen3.5-2B-Q8_0.gguf?download=true",
-        mmproj: "https://huggingface.co/unsloth/Qwen3.5-2B-GGUF/resolve/main/mmproj-F16.gguf",
+        sha256: "1b04acba824817554f4ce23639bc8495ff70453b8fcb047900c731521021f2c1",
+        mmprojUrl:
+            "https://huggingface.co/unsloth/Qwen3.5-2B-GGUF/resolve/main/mmproj-F16.gguf",
+        mmprojSha256:
+            "7035e9cb8d7c6a9681d07eef9a364783e86ea4cd73faab2eabb4f43a101830c7",
     },
     {
+        id: "gemma-4-e2b-q4km",
         name: "Gemma 4 E2B (Q4_K_M)",
         url: "https://huggingface.co/unsloth/gemma-4-E2B-it-GGUF/resolve/main/gemma-4-E2B-it-Q4_K_M.gguf?download=true",
-        mmproj: "https://huggingface.co/unsloth/gemma-4-E2B-it-GGUF/resolve/main/mmproj-F16.gguf",
+        sha256: "9378bc471710229ef165709b62e34bfb62231420ddaf6d729e727305b5b8672d",
+        mmprojUrl:
+            "https://huggingface.co/unsloth/gemma-4-E2B-it-GGUF/resolve/main/mmproj-F16.gguf",
+        mmprojSha256:
+            "140be8d7849741f88c50757d529b84373ee8e27052cc2236855b537f4a8215fa",
     },
 ];
 
-export const FALLBACK_MOBILE_MODEL_PRESETS: ResolvedModelPreset[] = [
+export const FALLBACK_MOBILE_MODEL_PRESETS: ModelInfo[] = [
     ...FALLBACK_SHARED_MODEL_PRESETS,
 ];
 
-export const FALLBACK_DESKTOP_MODEL_PRESETS: ResolvedModelPreset[] = [
+export const FALLBACK_DESKTOP_MODEL_PRESETS: ModelInfo[] = [
     {
+        id: "qwen-4b-q4km",
         name: "Qwen 3.5 4B (Q4_K_M)",
         url: "https://huggingface.co/unsloth/Qwen3.5-4B-GGUF/resolve/main/Qwen3.5-4B-Q4_K_M.gguf?download=true",
-        mmproj: "https://huggingface.co/unsloth/Qwen3.5-4B-GGUF/resolve/main/mmproj-F16.gguf",
+        sha256: "00fe7986ff5f6b463e62455821146049db6f9313603938a70800d1fb69ef11a4",
+        mmprojUrl:
+            "https://huggingface.co/unsloth/Qwen3.5-4B-GGUF/resolve/main/mmproj-F16.gguf",
+        mmprojSha256:
+            "cd88edcf8d031894960bb0c9c5b9b7e1fea6ebee02b9f7ce925a00d12891f864",
     },
-    {
-        name: "LFM 2.5 VL 1.6B (Q4_0)",
-        url: "https://huggingface.co/LiquidAI/LFM2.5-VL-1.6B-GGUF/resolve/main/LFM2.5-VL-1.6B-Q4_0.gguf?download=true",
-        mmproj: "https://huggingface.co/LiquidAI/LFM2.5-VL-1.6B-GGUF/resolve/main/mmproj-LFM2.5-VL-1.6b-Q8_0.gguf",
-    },
+    DEFAULT_MODEL,
     ...FALLBACK_SHARED_MODEL_PRESETS,
 ];
 
@@ -149,7 +160,6 @@ export class LlmProvider {
     private useDesktopRustDefaults = false;
 
     private downloadActive = false;
-    private migrated?: Promise<void>;
     private progressListeners = new Set<(progress: DownloadProgress) => void>();
     private modelReady = false;
     private ensureInFlight?: {
@@ -192,11 +202,7 @@ export class LlmProvider {
         const presets = this.useDesktopRustDefaults
             ? this.configDefaults.desktopModelPresets
             : this.configDefaults.mobileModelPresets;
-        return presets.map((preset) => ({
-            name: preset.title,
-            url: preset.url,
-            mmproj: preset.mmprojUrl ?? undefined,
-        }));
+        return presets.map((preset) => ({ id: preset.id, name: preset.title }));
     }
 
     public getBackendKind() {
@@ -253,10 +259,7 @@ export class LlmProvider {
             };
         }
 
-        await this.ensureMigrated(settings);
-        const status = await this.modelStatus(
-            this.resolveTarget(model, settings),
-        );
+        const status = await this.modelStatus(this.resolveTarget(model));
         return {
             model,
             modelPath: status.modelPath,
@@ -278,11 +281,8 @@ export class LlmProvider {
 
         const target =
             this.backend.kind === "tauri"
-                ? this.resolveTarget(model, settings)
+                ? this.resolveTarget(model)
                 : undefined;
-        if (target) {
-            await this.ensureMigrated(settings);
-        }
         const status = target ? await this.modelStatus(target) : undefined;
         const modelPath = status?.modelPath ?? model.url;
         const mmprojPath = status?.mmprojPath ?? undefined;
@@ -514,7 +514,7 @@ export class LlmProvider {
                     id: rustPreset.id,
                     name: rustPreset.title,
                     url: rustPreset.url,
-                    sha256: rustPreset.sha256 ?? undefined,
+                    sha256: rustPreset.sha256,
                     mmprojUrl: rustPreset.mmprojUrl ?? undefined,
                     mmprojSha256: rustPreset.mmprojSha256 ?? undefined,
                 };
@@ -537,78 +537,50 @@ export class LlmProvider {
     }
 
     private resolveTargetModel(settings: ModelSettings): ModelInfo {
-        if (settings.useCustomModel && settings.modelUrl) {
+        const preset = this.resolveConfigPreset(settings.modelId);
+        if (preset) {
             return {
-                id: `custom:${settings.modelUrl}`,
-                name: "Custom model",
-                url: settings.modelUrl,
-                sha256: settings.modelSha256,
-                mmprojUrl: settings.mmprojUrl,
-                mmprojSha256: settings.mmprojSha256,
+                id: preset.id,
+                name: preset.title,
+                url: preset.url,
+                sha256: preset.sha256,
+                mmprojUrl: preset.mmprojUrl ?? undefined,
+                mmprojSha256: preset.mmprojSha256 ?? undefined,
             };
+        }
+        if (settings.modelId && !this.configDefaults) {
+            const fallback = [
+                ...FALLBACK_DESKTOP_MODEL_PRESETS,
+                ...FALLBACK_MOBILE_MODEL_PRESETS,
+            ].find((preset) => preset.id === settings.modelId);
+            if (fallback) {
+                return fallback;
+            }
         }
         return this.defaultModel;
     }
 
-    private resolveMmprojUrl(model: ModelInfo, settings: ModelSettings) {
-        const override = settings.mmprojUrl;
-        if (settings.useCustomModel) {
-            return override && override.trim() ? override : undefined;
-        }
-        if (override !== undefined) {
-            return override && override.trim() ? override : undefined;
-        }
-        return model.mmprojUrl;
-    }
-
-    private resolveTarget(
-        model: ModelInfo,
-        settings: ModelSettings,
-    ): ModelTarget {
-        const mmprojUrl = this.resolveMmprojUrl(model, settings) ?? null;
+    private resolveConfigPreset(modelId: string | undefined) {
         const defaults = this.configDefaults;
-        const presets = defaults
-            ? [
-                  defaults.mobileDefaultModel,
-                  defaults.desktopDefaultModel,
-                  ...defaults.mobileModelPresets,
-                  ...defaults.desktopModelPresets,
-              ]
-            : [];
-        const preset = presets.find(
-            (preset) =>
-                preset.url == model.url &&
-                (preset.mmprojUrl ?? null) == mmprojUrl,
-        );
-        return {
-            id: preset?.id ?? model.id,
-            url: model.url,
-            sha256: preset?.sha256 ?? model.sha256 ?? null,
-            mmprojUrl,
-            mmprojSha256: preset?.mmprojSha256 ?? model.mmprojSha256 ?? null,
-        };
+        if (!defaults || !modelId) {
+            return undefined;
+        }
+        return [
+            defaults.mobileDefaultModel,
+            defaults.desktopDefaultModel,
+            ...defaults.mobileModelPresets,
+            ...defaults.desktopModelPresets,
+        ].find((preset) => preset.id == modelId);
     }
 
-    private ensureMigrated(settings: ModelSettings): Promise<void> {
-        this.migrated ??= (async () => {
-            const { invoke } = await import("@tauri-apps/api/core");
-            const customTargets: ModelTarget[] =
-                settings.useCustomModel && settings.modelUrl
-                    ? [
-                          {
-                              id: `custom:${settings.modelUrl}`,
-                              url: settings.modelUrl,
-                              mmprojUrl: settings.mmprojUrl?.trim() || null,
-                          },
-                      ]
-                    : [];
-            await invoke("llm_migrate_models", { customTargets }).catch(
-                (error: unknown) => {
-                    log.warn("LLM model migration failed", { error });
-                },
-            );
-        })();
-        return this.migrated;
+    private resolveTarget(model: ModelInfo): ModelTarget {
+        return {
+            id: model.id,
+            url: model.url,
+            sha256: model.sha256,
+            mmprojUrl: model.mmprojUrl ?? null,
+            mmprojSha256: model.mmprojSha256 ?? null,
+        };
     }
 
     private async modelStatus(target: ModelTarget): Promise<TauriModelStatus> {

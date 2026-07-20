@@ -3,7 +3,7 @@ pub struct ModelPreset {
     pub id: String,
     pub title: String,
     pub url: String,
-    pub sha256: Option<String>,
+    pub sha256: String,
     pub mmproj_url: Option<String>,
     pub mmproj_sha256: Option<String>,
 }
@@ -27,12 +27,27 @@ const MOBILE_SYSTEM_PROMPT_BODY: &str = "You are Ensu, an AI assistant built by 
 const DESKTOP_SYSTEM_PROMPT_BODY: &str = MOBILE_SYSTEM_PROMPT_BODY;
 const SESSION_SUMMARY_SYSTEM_PROMPT: &str = "You create concise chat titles. Given the provided message, summarize the user's goal in 5-7 words. Use plain words. Don't use markdown characters in the title. No quotes, no emojis, no trailing punctuation, and output only the title.";
 
+pub fn legacy_selected_preset_id<'a>(
+    presets: impl IntoIterator<Item = &'a ModelPreset>,
+    model_url: &str,
+    mmproj_url: Option<&str>,
+) -> Option<String> {
+    fn trim(url: Option<&str>) -> Option<&str> {
+        url.map(str::trim).filter(|url| !url.is_empty())
+    }
+    let mmproj_url = trim(mmproj_url);
+    presets
+        .into_iter()
+        .find(|preset| preset.url == model_url && trim(preset.mmproj_url.as_deref()) == mmproj_url)
+        .map(|preset| preset.id.clone())
+}
+
 fn lfm_vl_1_6b() -> ModelPreset {
     ModelPreset {
         id: "lfm-vl-1.6b".to_string(),
         title: "LFM 2.5 VL 1.6B (Q4_0)".to_string(),
         url: "https://huggingface.co/LiquidAI/LFM2.5-VL-1.6B-GGUF/resolve/main/LFM2.5-VL-1.6B-Q4_0.gguf?download=true".to_string(),
-        sha256: Some("8186364a4e7c3ad30f6dd3d3b7a4e0074c77dd91eed6cad5d8be9090ce285804".to_string()),
+        sha256: "8186364a4e7c3ad30f6dd3d3b7a4e0074c77dd91eed6cad5d8be9090ce285804".to_string(),
         mmproj_url: Some(
             "https://huggingface.co/LiquidAI/LFM2.5-VL-1.6B-GGUF/resolve/main/mmproj-LFM2.5-VL-1.6b-Q8_0.gguf"
                 .to_string(),
@@ -41,23 +56,12 @@ fn lfm_vl_1_6b() -> ModelPreset {
     }
 }
 
-fn lfm_1_2b() -> ModelPreset {
-    ModelPreset {
-        id: "lfm-1.2b".to_string(),
-        title: "LFM 2.5 1.2B Instruct (Q4_0)".to_string(),
-        url: "https://huggingface.co/LiquidAI/LFM2.5-1.2B-GGUF/resolve/main/LFM2.5-1.2B-Q4_0.gguf?download=true".to_string(),
-        sha256: None,
-        mmproj_url: None,
-        mmproj_sha256: None,
-    }
-}
-
 fn qwen_0_8b() -> ModelPreset {
     ModelPreset {
         id: "qwen-0.8b".to_string(),
         title: "Qwen 3.5 0.8B (Q4_K_M)".to_string(),
         url: "https://huggingface.co/unsloth/Qwen3.5-0.8B-GGUF/resolve/main/Qwen3.5-0.8B-Q4_K_M.gguf?download=true".to_string(),
-        sha256: Some("bd258782e35f7f458f8aced1adc053e6e92e89bc735ba3be89d38a06121dc517".to_string()),
+        sha256: "bd258782e35f7f458f8aced1adc053e6e92e89bc735ba3be89d38a06121dc517".to_string(),
         mmproj_url: Some(
             "https://huggingface.co/unsloth/Qwen3.5-0.8B-GGUF/resolve/main/mmproj-F16.gguf"
                 .to_string(),
@@ -71,7 +75,7 @@ fn qwen_2b_q8() -> ModelPreset {
         id: "qwen-2b-q8".to_string(),
         title: "Qwen 3.5 2B (Q8_0)".to_string(),
         url: "https://huggingface.co/unsloth/Qwen3.5-2B-GGUF/resolve/main/Qwen3.5-2B-Q8_0.gguf?download=true".to_string(),
-        sha256: Some("1b04acba824817554f4ce23639bc8495ff70453b8fcb047900c731521021f2c1".to_string()),
+        sha256: "1b04acba824817554f4ce23639bc8495ff70453b8fcb047900c731521021f2c1".to_string(),
         mmproj_url: Some(
             "https://huggingface.co/unsloth/Qwen3.5-2B-GGUF/resolve/main/mmproj-F16.gguf"
                 .to_string(),
@@ -85,7 +89,7 @@ fn qwen_4b_q4km() -> ModelPreset {
         id: "qwen-4b-q4km".to_string(),
         title: "Qwen 3.5 4B (Q4_K_M)".to_string(),
         url: "https://huggingface.co/unsloth/Qwen3.5-4B-GGUF/resolve/main/Qwen3.5-4B-Q4_K_M.gguf?download=true".to_string(),
-        sha256: Some("00fe7986ff5f6b463e62455821146049db6f9313603938a70800d1fb69ef11a4".to_string()),
+        sha256: "00fe7986ff5f6b463e62455821146049db6f9313603938a70800d1fb69ef11a4".to_string(),
         mmproj_url: Some(
             "https://huggingface.co/unsloth/Qwen3.5-4B-GGUF/resolve/main/mmproj-F16.gguf"
                 .to_string(),
@@ -99,7 +103,7 @@ fn gemma_4_e4b_q4km() -> ModelPreset {
         id: "gemma-4-e4b-q4km".to_string(),
         title: "Gemma 4 E4B (Q4_K_M)".to_string(),
         url: "https://huggingface.co/unsloth/gemma-4-E4B-it-GGUF/resolve/main/gemma-4-E4B-it-Q4_K_M.gguf?download=true".to_string(),
-        sha256: Some("519b9793ed6ce0ff530f1b7c96e848e08e49e7af4d57bb97f76215963a54146d".to_string()),
+        sha256: "519b9793ed6ce0ff530f1b7c96e848e08e49e7af4d57bb97f76215963a54146d".to_string(),
         mmproj_url: Some(
             "https://huggingface.co/unsloth/gemma-4-E4B-it-GGUF/resolve/main/mmproj-F16.gguf"
                 .to_string(),
@@ -113,7 +117,7 @@ fn gemma_4_e2b_q4km() -> ModelPreset {
         id: "gemma-4-e2b-q4km".to_string(),
         title: "Gemma 4 E2B (Q4_K_M)".to_string(),
         url: "https://huggingface.co/unsloth/gemma-4-E2B-it-GGUF/resolve/main/gemma-4-E2B-it-Q4_K_M.gguf?download=true".to_string(),
-        sha256: Some("9378bc471710229ef165709b62e34bfb62231420ddaf6d729e727305b5b8672d".to_string()),
+        sha256: "9378bc471710229ef165709b62e34bfb62231420ddaf6d729e727305b5b8672d".to_string(),
         mmproj_url: Some(
             "https://huggingface.co/unsloth/gemma-4-E2B-it-GGUF/resolve/main/mmproj-F16.gguf"
                 .to_string(),
@@ -127,9 +131,7 @@ fn parakeet_v3_int8() -> ModelPreset {
         id: "parakeet-v3-int8".to_string(),
         title: "Transcription model".to_string(),
         url: "https://models.ente.io/parakeet-v3-int8.tar.gz".to_string(),
-        sha256: Some(
-            "43d37191602727524a7d8c6da0eef11c4ba24320f5b4730f1a2497befc2efa77".to_string(),
-        ),
+        sha256: "43d37191602727524a7d8c6da0eef11c4ba24320f5b4730f1a2497befc2efa77".to_string(),
         mmproj_url: None,
         mmproj_sha256: None,
     }
@@ -140,9 +142,7 @@ fn silero_vad_v4() -> ModelPreset {
         id: "silero-vad-v4".to_string(),
         title: "Voice activity model".to_string(),
         url: "https://models.ente.io/silero_vad_v4.onnx".to_string(),
-        sha256: Some(
-            "a35ebf52fd3ce5f1469b2a36158dba761bc47b973ea3382b3186ca15b1f5af28".to_string(),
-        ),
+        sha256: "a35ebf52fd3ce5f1469b2a36158dba761bc47b973ea3382b3186ca15b1f5af28".to_string(),
         mmproj_url: None,
         mmproj_sha256: None,
     }
@@ -158,15 +158,9 @@ pub fn defaults() -> Defaults {
         system_prompt_date_placeholder: SYSTEM_PROMPT_DATE_PLACEHOLDER.to_string(),
         session_summary_system_prompt: SESSION_SUMMARY_SYSTEM_PROMPT.to_string(),
         mobile_default_model,
-        mobile_model_presets: vec![lfm_1_2b(), qwen_0_8b(), qwen_2b_q8(), gemma_4_e2b_q4km()],
+        mobile_model_presets: vec![qwen_0_8b(), qwen_2b_q8(), gemma_4_e2b_q4km()],
         desktop_default_model,
-        desktop_model_presets: vec![
-            qwen_4b_q4km(),
-            lfm_vl_1_6b(),
-            lfm_1_2b(),
-            qwen_0_8b(),
-            qwen_2b_q8(),
-        ],
+        desktop_model_presets: vec![qwen_4b_q4km(), lfm_vl_1_6b(), qwen_0_8b(), qwen_2b_q8()],
         transcription_model: parakeet_v3_int8(),
         voice_activity_model: silero_vad_v4(),
     }
@@ -195,6 +189,26 @@ mod tests {
                 assert_eq!(
                     existing, artifact,
                     "preset id {} aliases different artifacts",
+                    preset.id
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn preset_artifacts_resolve_unambiguously() {
+        let defaults = defaults();
+        let mut seen: HashMap<(&str, Option<&str>), &str> = HashMap::new();
+        for preset in defaults
+            .mobile_model_presets
+            .iter()
+            .chain(defaults.desktop_model_presets.iter())
+        {
+            let artifact = (preset.url.as_str(), preset.mmproj_url.as_deref());
+            if let Some(existing) = seen.insert(artifact, preset.id.as_str()) {
+                assert_eq!(
+                    existing, preset.id,
+                    "presets {existing} and {} share an artifact",
                     preset.id
                 );
             }

@@ -7,18 +7,10 @@ struct ModelSettingsView: View {
 
     @ObservedObject private var settings = ModelSettingsStore.shared
     @State private var selectedModelId: String = defaultOptionId
-    @State private var customModelUrl: String = ""
-    @State private var customMmprojUrl: String = ""
-    @State private var customModelSha: String = ""
-    @State private var customMmprojSha: String = ""
     @State private var contextLength: String = ""
     @State private var maxTokens: String = ""
     @State private var temperature: String = ""
 
-    @State private var urlError: String?
-    @State private var mmprojError: String?
-    @State private var shaError: String?
-    @State private var mmprojShaError: String?
     @State private var contextError: String?
     @State private var maxTokensError: String?
     @State private var temperatureError: String?
@@ -32,27 +24,10 @@ struct ModelSettingsView: View {
         let defaultModel = defaults.mobileDefaultModel
         let presets = defaults.mobileModelPresets
         return [
-            ModelChoice(
-                id: Self.defaultOptionId,
-                name: defaultModel.title,
-                url: defaultModel.url,
-                mmproj: defaultModel.mmprojUrl,
-                isDefault: true
-            )
+            ModelChoice(id: Self.defaultOptionId, name: defaultModel.title, isDefault: true)
         ] + presets.map { preset in
-            ModelChoice(
-                id: preset.id,
-                name: preset.title,
-                url: preset.url,
-                mmproj: preset.mmprojUrl
-            )
-        } + [
-            ModelChoice(
-                id: Self.customOptionId,
-                name: "Custom",
-                isCustom: true
-            )
-        ]
+            ModelChoice(id: preset.id, name: preset.title)
+        }
     }()
 
     init(embeddedInNavigation: Bool = false) {
@@ -90,10 +65,6 @@ struct ModelSettingsView: View {
         }
         .onAppear {
             selectedModelId = initialSelectionId()
-            customModelUrl = isStoredCustomModel ? settings.modelUrl : ""
-            customMmprojUrl = isStoredCustomModel ? settings.mmprojUrl : ""
-            customModelSha = isStoredCustomModel ? settings.modelSha256 : ""
-            customMmprojSha = isStoredCustomModel ? settings.mmprojSha256 : ""
             contextLength = settings.contextLength
             maxTokens = settings.maxTokens
             temperature = settings.temperature
@@ -108,18 +79,8 @@ struct ModelSettingsView: View {
         }
     }
 
-    private var isStoredCustomModel: Bool {
-        settings.useCustomModel &&
-            !settings.modelUrl.isEmpty &&
-            !modelChoices.contains(where: { !$0.isCustom && $0.url == settings.modelUrl })
-    }
-
     private var selectedModel: ModelChoice {
         modelChoices.first(where: { $0.id == selectedModelId }) ?? modelChoices[0]
-    }
-
-    private var canSave: Bool {
-        !selectedModel.isCustom || !customModelUrl.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     private var content: some View {
@@ -127,7 +88,7 @@ struct ModelSettingsView: View {
             VStack(alignment: .leading, spacing: EnsuSpacing.xxl) {
                 sectionHeader("Select model")
 
-                Text("Choose a built-in model or switch to Custom.")
+                Text("Choose a built-in model.")
                     .font(EnsuTypography.small)
                     .foregroundStyle(EnsuColor.textMuted)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -138,52 +99,6 @@ struct ModelSettingsView: View {
                     }
                 }
                 .pickerStyle(.menu)
-                .onChange(of: selectedModelId) { newValue in
-                    if newValue == Self.customOptionId {
-                        customModelUrl = ""
-                        customMmprojUrl = ""
-                        customModelSha = ""
-                        customMmprojSha = ""
-                    }
-                }
-
-                if selectedModel.isCustom {
-                    VStack(spacing: EnsuSpacing.md) {
-                        field(
-                            label: "Model .gguf URL",
-                            hint: "https://huggingface.co/...",
-                            text: $customModelUrl,
-                            error: urlError,
-                            keyboardType: .URL
-                        )
-
-                        field(
-                            label: "Model SHA-256",
-                            hint: "Checksum from the model page",
-                            text: $customModelSha,
-                            error: shaError,
-                            keyboardType: .default
-                        )
-
-                        field(
-                            label: "mmproj .gguf URL",
-                            hint: "(optional for multimodal)",
-                            text: $customMmprojUrl,
-                            error: mmprojError,
-                            keyboardType: .URL
-                        )
-
-                        if !customMmprojUrl.isEmpty {
-                            field(
-                                label: "mmproj SHA-256",
-                                hint: "Checksum from the model page",
-                                text: $customMmprojSha,
-                                error: mmprojShaError,
-                                keyboardType: .default
-                            )
-                        }
-                    }
-                }
 
                 sectionToggle(
                     title: "Advanced limits",
@@ -231,7 +146,7 @@ struct ModelSettingsView: View {
                 Divider().background(EnsuColor.border)
 
                 VStack(spacing: EnsuSpacing.md) {
-                    PrimaryButton(text: "Save Model Settings", isLoading: isSaving, isEnabled: !isSaving && canSave) {
+                    PrimaryButton(text: "Save Model Settings", isLoading: isSaving, isEnabled: !isSaving) {
                         saveTapped()
                     }
 
@@ -252,10 +167,7 @@ struct ModelSettingsView: View {
     }
 
     private func initialSelectionId() -> String {
-        if !settings.useCustomModel || settings.modelUrl.isEmpty {
-            return Self.defaultOptionId
-        }
-        return modelChoices.first(where: { !$0.isCustom && $0.url == settings.modelUrl })?.id ?? Self.customOptionId
+        modelChoices.first(where: { $0.id == settings.modelId })?.id ?? Self.defaultOptionId
     }
 
     private func sectionHeader(_ title: String) -> some View {
@@ -316,10 +228,6 @@ struct ModelSettingsView: View {
     }
 
     private func saveTapped() {
-        urlError = nil
-        mmprojError = nil
-        shaError = nil
-        mmprojShaError = nil
         contextError = nil
         maxTokensError = nil
         temperatureError = nil
@@ -329,34 +237,12 @@ struct ModelSettingsView: View {
         isSaving = true
         Task { @MainActor in
             try? await Task.sleep(nanoseconds: 200_000_000)
-            if selectedModel.isDefault {
-                settings.useCustomModel = false
-                settings.modelUrl = ""
-                settings.mmprojUrl = ""
-                settings.contextLength = contextLength
-                settings.maxTokens = maxTokens
-                settings.temperature = temperature
-            } else if selectedModel.isCustom {
-                settings.saveCustomModel(
-                    url: customModelUrl,
-                    sha256: customModelSha.trimmingCharacters(in: .whitespaces),
-                    mmproj: customMmprojUrl,
-                    mmprojSha256: customMmprojSha.trimmingCharacters(in: .whitespaces),
-                    contextLength: contextLength,
-                    maxTokens: maxTokens,
-                    temperature: temperature
-                )
-            } else {
-                settings.saveCustomModel(
-                    url: selectedModel.url ?? "",
-                    sha256: "",
-                    mmproj: selectedModel.mmproj ?? "",
-                    mmprojSha256: "",
-                    contextLength: contextLength,
-                    maxTokens: maxTokens,
-                    temperature: temperature
-                )
-            }
+            settings.saveModel(
+                id: selectedModel.isDefault ? "" : selectedModel.id,
+                contextLength: contextLength,
+                maxTokens: maxTokens,
+                temperature: temperature
+            )
             isSaving = false
             toastTask?.cancel()
             toastTask = presentToast("Model settings saved") { message in
@@ -368,10 +254,6 @@ struct ModelSettingsView: View {
     private func resetTapped() {
         settings.resetToDefault()
         selectedModelId = Self.defaultOptionId
-        customModelUrl = ""
-        customMmprojUrl = ""
-        customModelSha = ""
-        customMmprojSha = ""
         contextLength = ""
         maxTokens = ""
         temperature = ""
@@ -383,31 +265,6 @@ struct ModelSettingsView: View {
 
     private func validate() -> Bool {
         var isValid = true
-
-        if selectedModel.isCustom && customModelUrl.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            urlError = "Enter a Hugging Face .gguf URL"
-            isValid = false
-        }
-
-        if selectedModel.isCustom && !customModelUrl.isEmpty && !isValidHuggingFaceUrl(customModelUrl) {
-            urlError = "Enter a valid Hugging Face .gguf URL"
-            isValid = false
-        }
-
-        if selectedModel.isCustom && !customMmprojUrl.isEmpty && !isValidHuggingFaceUrl(customMmprojUrl) {
-            mmprojError = "Enter a valid Hugging Face .gguf URL"
-            isValid = false
-        }
-
-        if selectedModel.isCustom && !isValidSha256(customModelSha) {
-            shaError = "Enter the model's SHA-256 checksum"
-            isValid = false
-        }
-
-        if selectedModel.isCustom && !customMmprojUrl.isEmpty && !isValidSha256(customMmprojSha) {
-            mmprojShaError = "Enter the mmproj's SHA-256 checksum"
-            isValid = false
-        }
 
         if !contextLength.isEmpty, Int(contextLength) == nil {
             contextError = "Enter a valid integer"
@@ -432,42 +289,17 @@ struct ModelSettingsView: View {
         return isValid
     }
 
-    private func isValidSha256(_ value: String) -> Bool {
-        let trimmed = value.trimmingCharacters(in: .whitespaces)
-        return trimmed.count == 64 && trimmed.allSatisfy(\.isHexDigit)
-    }
-
-    private func isValidHuggingFaceUrl(_ urlString: String) -> Bool {
-        guard let url = URL(string: urlString) else { return false }
-        guard url.host?.contains("huggingface.co") == true else { return false }
-        return url.path.lowercased().hasSuffix(".gguf")
-    }
-
     private static let defaultOptionId = "default"
-    private static let customOptionId = "custom"
 }
 
 private struct ModelChoice: Identifiable {
     let id: String
     let name: String
-    let url: String?
-    let mmproj: String?
     let isDefault: Bool
-    let isCustom: Bool
 
-    init(
-        id: String,
-        name: String,
-        url: String? = nil,
-        mmproj: String? = nil,
-        isDefault: Bool = false,
-        isCustom: Bool = false
-    ) {
+    init(id: String, name: String, isDefault: Bool = false) {
         self.id = id
         self.name = name
-        self.url = url
-        self.mmproj = mmproj
         self.isDefault = isDefault
-        self.isCustom = isCustom
     }
 }

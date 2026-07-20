@@ -9,7 +9,7 @@ export interface ModelInfo {
     id: string;
     name: string;
     url: string;
-    sha256?: string;
+    sha256: string;
     mmprojUrl?: string;
     mmprojSha256?: string;
     sizeHuman?: string;
@@ -20,11 +20,7 @@ export interface ModelInfo {
 }
 
 export interface ModelSettings {
-    useCustomModel: boolean;
-    modelUrl?: string;
-    mmprojUrl?: string;
-    modelSha256?: string;
-    mmprojSha256?: string;
+    modelId?: string;
     contextLength?: number;
     maxTokens?: number;
 }

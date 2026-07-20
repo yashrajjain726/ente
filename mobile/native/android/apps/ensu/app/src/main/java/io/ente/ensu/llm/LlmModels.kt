@@ -5,7 +5,7 @@ import io.ente.ensu.bindings.ModelDownloadTarget
 data class LlmModelTarget(
     val id: String,
     val url: String,
-    val sha256: String? = null,
+    val sha256: String,
     val mmprojUrl: String? = null,
     val mmprojSha256: String? = null,
     val contextLength: Int? = null,

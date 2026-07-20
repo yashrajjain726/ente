@@ -16,7 +16,7 @@ pub enum ModelDownloadTarget {
     Gguf {
         id: String,
         url: String,
-        sha256: Option<String>,
+        sha256: String,
         mmproj_url: Option<String>,
         mmproj_sha256: Option<String>,
     },
@@ -81,12 +81,8 @@ impl ModelDownloader {
 
     pub fn mmproj_path(&self, target: &ModelDownloadTarget) -> Option<PathBuf> {
         match target {
-            ModelDownloadTarget::Gguf {
-                id,
-                url,
-                mmproj_url,
-                ..
-            } => gguf::mmproj_path(&self.models_dir, id, url, mmproj_url.as_deref()),
+            ModelDownloadTarget::Gguf { mmproj_url, .. } => gguf::trimmed(mmproj_url.as_deref())
+                .map(|_| storage_dir(&self.models_dir, target).join("mmproj.gguf")),
             _ => None,
         }
     }
@@ -119,7 +115,7 @@ impl ModelDownloader {
     }
 
     pub fn remove_downloaded(&self, target: &ModelDownloadTarget) -> bool {
-        if checked_file_name(&storage_key(target)).is_err() {
+        if checked_file_name(storage_key(target)).is_err() {
             return false;
         }
         let dir = storage_dir(&self.models_dir, target);
@@ -228,15 +224,11 @@ impl ModelDownloader {
     }
 }
 
-fn storage_key(target: &ModelDownloadTarget) -> String {
+fn storage_key(target: &ModelDownloadTarget) -> &str {
     match target {
-        ModelDownloadTarget::Gguf {
-            id,
-            url,
-            mmproj_url,
-            ..
-        } => gguf::storage_key(id, url, mmproj_url.as_deref()),
-        ModelDownloadTarget::TarGz { id, .. } | ModelDownloadTarget::Files { id, .. } => id.clone(),
+        ModelDownloadTarget::Gguf { id, .. }
+        | ModelDownloadTarget::TarGz { id, .. }
+        | ModelDownloadTarget::Files { id, .. } => id,
     }
 }
 
@@ -274,20 +266,19 @@ fn download_targets(
             mmproj_url,
             mmproj_sha256,
         } => {
-            checked_file_name(&storage_key(target))?;
-            let sha256 = sha256
-                .as_deref()
-                .ok_or_else(|| checksum_required(id, url))?;
+            checked_file_name(id)?;
             let mut targets = vec![Target {
                 label: "Model".to_string(),
                 url: url.clone(),
                 destination_path: dir.join("model.gguf").display().to_string(),
-                sha256: sha256.to_string(),
+                sha256: sha256.clone(),
             }];
             if let Some(mmproj_url) = gguf::trimmed(mmproj_url.as_deref()) {
-                let mmproj_sha256 = mmproj_sha256
-                    .as_deref()
-                    .ok_or_else(|| checksum_required(id, mmproj_url))?;
+                let mmproj_sha256 = gguf::trimmed(mmproj_sha256.as_deref()).ok_or_else(|| {
+                    download::Error::InvalidTarget(format!(
+                        "{id} has a mmproj URL without a mmproj checksum"
+                    ))
+                })?;
                 targets.push(Target {
                     label: "Mmproj".to_string(),
                     url: mmproj_url.to_string(),
@@ -316,7 +307,6 @@ fn download_targets(
         }
         ModelDownloadTarget::Files { id, files } => {
             checked_file_name(id)?;
-            checked_file_name(&storage_key(target))?;
             if files.is_empty() {
                 return Err(download::Error::InvalidTarget(format!("{id} has no files")));
             }
@@ -341,10 +331,6 @@ fn download_targets(
                 .collect()
         }
     }
-}
-
-fn checksum_required(id: &str, url: &str) -> download::Error {
-    download::Error::Validation(format!("{id} needs a checksum to download {url}"))
 }
 
 fn checked_file_name(name: &str) -> Result<(), download::Error> {
@@ -448,9 +434,7 @@ fn migrate_legacy_dir(models_dir: &Path, legacy_dir: &Path, targets: &[ModelDown
     if !legacy_dir.exists() {
         return;
     }
-    let legacy_models = legacy_dir.join("models");
-    let hashed_dirs = [legacy_models.join("custom")];
-    if adopt_targets(models_dir, targets, &hashed_dirs, &legacy_models) {
+    if adopt_targets(models_dir, targets, &[], &legacy_dir.join("models")) {
         let _ = fs::remove_dir_all(legacy_dir);
     }
 }
@@ -459,7 +443,7 @@ pub fn migrate_flat_models_dir(models_dir: &Path, targets: &[ModelDownloadTarget
     if !models_dir.exists() {
         return;
     }
-    let hashed_dirs = [models_dir.join("custom"), models_dir.to_path_buf()];
+    let hashed_dirs = [models_dir.to_path_buf()];
     if !adopt_targets(models_dir, targets, &hashed_dirs, models_dir) {
         return;
     }
@@ -557,37 +541,36 @@ fn adopt_targets(
     let mut plans: Vec<Vec<(String, &str, PathBuf)>> = Vec::new();
     for target in targets {
         let ModelDownloadTarget::Gguf {
-            id,
-            url,
-            mmproj_url,
-            ..
+            url, mmproj_url, ..
         } = target
         else {
             continue;
         };
-        let mmproj_url = mmproj_url.as_deref();
-        let mut plan = vec![(
-            url.clone(),
-            "model.gguf",
-            gguf::model_path(models_dir, id, url, mmproj_url),
-        )];
-        if let Some(dest) = gguf::mmproj_path(models_dir, id, url, mmproj_url) {
-            plan.push((
-                gguf::trimmed(mmproj_url).unwrap().to_string(),
-                "mmproj.gguf",
-                dest,
-            ));
+        let dir = storage_dir(models_dir, target);
+        let mut plan = vec![(url.clone(), "model.gguf", dir.join("model.gguf"))];
+        if let Some(mmproj) = gguf::trimmed(mmproj_url.as_deref()) {
+            plan.push((mmproj.to_string(), "mmproj.gguf", dir.join("mmproj.gguf")));
         }
         plans.push(plan);
     }
 
     let mut basename_urls: HashMap<String, HashSet<&str>> = HashMap::new();
-    for plan in &plans {
-        for (url, fallback, _) in plan {
+    for target in targets {
+        let ModelDownloadTarget::Gguf {
+            url, mmproj_url, ..
+        } = target
+        else {
+            continue;
+        };
+        let files = [
+            Some((url.as_str(), "model.gguf")),
+            gguf::trimmed(mmproj_url.as_deref()).map(|url| (url, "mmproj.gguf")),
+        ];
+        for (url, fallback) in files.into_iter().flatten() {
             basename_urls
                 .entry(gguf::filename_for_url(url, fallback))
                 .or_default()
-                .insert(url.as_str());
+                .insert(url);
         }
     }
 
@@ -681,9 +664,16 @@ mod tests {
         ModelDownloadTarget::Gguf {
             id: id.to_string(),
             url: "https://example.org/models/main.gguf?download=true".to_string(),
-            sha256: Some(test_sha()),
+            sha256: test_sha(),
             mmproj_url: Some("https://example.org/models/mmproj.gguf".to_string()),
             mmproj_sha256: Some(test_sha()),
+        }
+    }
+
+    fn target_id(target: &ModelDownloadTarget) -> Option<&str> {
+        match target {
+            ModelDownloadTarget::Gguf { id, .. } => Some(id),
+            _ => None,
         }
     }
 
@@ -693,7 +683,7 @@ mod tests {
     }
 
     #[test]
-    fn paths_are_keyed_by_preset_id_or_custom_pair_hash() {
+    fn paths_are_keyed_by_preset_id() {
         let dir = scratch_dir("paths");
         let downloader = ModelDownloader::new(&dir);
 
@@ -705,31 +695,6 @@ mod tests {
             downloader.mmproj_path(&target("qwen-2b-q8")),
             Some(dir.join("qwen-2b-q8/mmproj.gguf"))
         );
-
-        let custom = downloader.model_path(&target("custom:1"));
-        let key = custom
-            .parent()
-            .unwrap()
-            .file_name()
-            .unwrap()
-            .to_string_lossy()
-            .into_owned();
-        assert!(key.starts_with("custom-"));
-        assert_eq!(key.len(), "custom-".len() + 16);
-        assert_eq!(custom.file_name().unwrap(), "model.gguf");
-        assert_eq!(
-            downloader.mmproj_path(&target("custom:1")),
-            Some(custom.with_file_name("mmproj.gguf"))
-        );
-
-        let other_mmproj = ModelDownloadTarget::Gguf {
-            id: "custom:1".to_string(),
-            url: "https://example.org/models/main.gguf?download=true".to_string(),
-            sha256: Some(test_sha()),
-            mmproj_url: Some("https://example.org/models/other.gguf".to_string()),
-            mmproj_sha256: Some(test_sha()),
-        };
-        assert_ne!(downloader.model_path(&other_mmproj), custom);
 
         let _ = fs::remove_dir_all(dir);
     }
@@ -978,34 +943,17 @@ mod tests {
         let base = scratch_dir("migrate");
         let legacy = base.join("llm");
         let legacy_models = legacy.join("models");
-        fs::create_dir_all(legacy_models.join("custom")).unwrap();
+        fs::create_dir_all(&legacy_models).unwrap();
 
         fs::write(legacy_models.join("main.gguf"), b"GGUFmain").unwrap();
         fs::write(legacy_models.join("mmproj.gguf"), b"GGUFmmproj").unwrap();
-
-        let custom_url = "https://example.org/custom/other-main.gguf";
-        let custom = ModelDownloadTarget::Gguf {
-            id: "custom:1".to_string(),
-            url: custom_url.to_string(),
-            sha256: Some(test_sha()),
-            mmproj_url: None,
-            mmproj_sha256: Some(test_sha()),
-        };
-        fs::write(
-            legacy_models
-                .join("custom")
-                .join(format!("{}_other-main.gguf", gguf::sha256_hex(custom_url))),
-            b"GGUFcustom",
-        )
-        .unwrap();
-
         fs::write(legacy_models.join("main.gguf.tmp"), b"GGUFpartial").unwrap();
         fs::write(legacy_models.join("main.gguf.metadata.json"), b"{}").unwrap();
         fs::write(legacy_models.join("orphan.gguf"), b"GGUForphan").unwrap();
 
         let models_dir = base.join("models");
         let preset = target("qwen-2b-q8");
-        migrate_legacy_dir(&models_dir, &legacy, &[preset.clone(), custom.clone()]);
+        migrate_legacy_dir(&models_dir, &legacy, &[preset.clone()]);
 
         let downloader = ModelDownloader::new(&models_dir);
         assert_eq!(
@@ -1016,11 +964,7 @@ mod tests {
             fs::read(downloader.mmproj_path(&preset).unwrap()).unwrap(),
             b"GGUFmmproj"
         );
-        assert_eq!(
-            fs::read(downloader.model_path(&custom)).unwrap(),
-            b"GGUFcustom"
-        );
-        assert_eq!(fs::read_dir(&models_dir).unwrap().count(), 2);
+        assert_eq!(fs::read_dir(&models_dir).unwrap().count(), 1);
         assert!(!legacy.exists());
 
         let _ = fs::remove_dir_all(base);
@@ -1039,7 +983,7 @@ mod tests {
         let targets = ["a", "b"].map(|name| ModelDownloadTarget::Gguf {
             id: format!("preset-{name}"),
             url: format!("https://example.org/{name}/{name}.gguf"),
-            sha256: Some(test_sha()),
+            sha256: test_sha(),
             mmproj_url: Some(format!("https://example.org/{name}/mmproj-F16.gguf")),
             mmproj_sha256: Some(test_sha()),
         });
@@ -1066,22 +1010,6 @@ mod tests {
         );
         fs::write(models_dir.join(mmproj_hashed), b"GGUFmm").unwrap();
 
-        let custom_url = "https://example.org/custom/other-main.gguf";
-        let custom = ModelDownloadTarget::Gguf {
-            id: "custom:1".to_string(),
-            url: custom_url.to_string(),
-            sha256: Some(test_sha()),
-            mmproj_url: None,
-            mmproj_sha256: Some(test_sha()),
-        };
-        fs::write(
-            models_dir
-                .join("custom")
-                .join(format!("{}_other-main.gguf", gguf::sha256_hex(custom_url))),
-            b"GGUFcustom",
-        )
-        .unwrap();
-
         fs::write(models_dir.join("orphan.gguf"), b"GGUForphan").unwrap();
         fs::write(models_dir.join("main.gguf.tmp"), b"GGUFpartial").unwrap();
         let downloader = ModelDownloader::new(&models_dir);
@@ -1090,7 +1018,7 @@ mod tests {
             b"GGUFkeep",
         );
 
-        migrate_flat_models_dir(&models_dir, &[preset.clone(), custom.clone()]);
+        migrate_flat_models_dir(&models_dir, &[preset.clone()]);
 
         assert_eq!(
             fs::read(downloader.model_path(&preset)).unwrap(),
@@ -1099,10 +1027,6 @@ mod tests {
         assert_eq!(
             fs::read(downloader.mmproj_path(&preset).unwrap()).unwrap(),
             b"GGUFmm"
-        );
-        assert_eq!(
-            fs::read(downloader.model_path(&custom)).unwrap(),
-            b"GGUFcustom"
         );
         assert_eq!(
             fs::read(models_dir.join("other-key/model.gguf")).unwrap(),
@@ -1116,7 +1040,7 @@ mod tests {
             .count();
         assert_eq!(root_files, 0);
 
-        migrate_flat_models_dir(&models_dir, &[preset.clone(), custom]);
+        migrate_flat_models_dir(&models_dir, &[preset.clone()]);
         assert_eq!(
             fs::read(downloader.model_path(&preset)).unwrap(),
             b"GGUFmain"
@@ -1156,7 +1080,7 @@ mod tests {
         let targets = ["a", "b"].map(|name| ModelDownloadTarget::Gguf {
             id: format!("preset-{name}"),
             url: format!("https://example.org/{name}/{name}.gguf"),
-            sha256: Some(test_sha()),
+            sha256: test_sha(),
             mmproj_url: Some(format!("https://example.org/{name}/mmproj-F16.gguf")),
             mmproj_sha256: Some(test_sha()),
         });
@@ -1221,7 +1145,7 @@ mod tests {
         let targets = ["a", "b"].map(|name| ModelDownloadTarget::Gguf {
             id: format!("preset-{name}"),
             url: format!("https://example.org/{name}/{name}.gguf"),
-            sha256: Some(test_sha()),
+            sha256: test_sha(),
             mmproj_url: Some(format!("https://example.org/{name}/mmproj-F16.gguf")),
             mmproj_sha256: Some(test_sha()),
         });

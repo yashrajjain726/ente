@@ -3,7 +3,7 @@ import Foundation
 struct LlmModelTarget: Equatable {
     let id: String
     let url: String
-    let sha256: String?
+    let sha256: String
     let mmprojUrl: String?
     let mmprojSha256: String?
     let contextLength: Int?

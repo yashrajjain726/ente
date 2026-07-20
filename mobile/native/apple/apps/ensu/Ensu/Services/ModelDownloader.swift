@@ -20,22 +20,35 @@ final class ModelDownloader {
         transcriptionModelTarget = .tarGz(
             id: defaults.transcriptionModel.id,
             url: defaults.transcriptionModel.url,
-            sha256: defaults.transcriptionModel.sha256!
+            sha256: defaults.transcriptionModel.sha256
         )
         voiceActivityModelTarget = .file(
             id: defaults.voiceActivityModel.id,
             name: "model.onnx",
             url: defaults.voiceActivityModel.url,
-            sha256: defaults.voiceActivityModel.sha256!
+            sha256: defaults.voiceActivityModel.sha256
         )
-        migrateEnsuLegacyModels(
+        let settings = UserDefaults.standard
+        let pendingSelection = settings.object(forKey: "ensu.model.id") == nil
+        let legacyModelUrl = pendingSelection && settings.bool(forKey: "ensu.model.use_custom")
+            ? settings.string(forKey: "ensu.model.url")
+            : nil
+        let presetId = migrateEnsuLegacyModels(
             modelsDir: modelsDir.path,
             llmLegacyDir: baseDir.appendingPathComponent("llm", isDirectory: true).path,
             transcriptionLegacyDir: baseDir.appendingPathComponent("transcription", isDirectory: true).path,
+            legacyModelUrl: legacyModelUrl,
+            legacyMmprojUrl: settings.string(forKey: "ensu.model.mmproj"),
             llmTargets: Self.migrationTargets(),
             transcriptionModel: transcriptionModelTarget,
             voiceActivityModel: voiceActivityModelTarget
         )
+        if pendingSelection {
+            settings.set(presetId ?? "", forKey: "ensu.model.id")
+        }
+        settings.removeObject(forKey: "ensu.model.use_custom")
+        settings.removeObject(forKey: "ensu.model.url")
+        settings.removeObject(forKey: "ensu.model.mmproj")
         var excludedDir = modelsDir
         var values = URLResourceValues()
         values.isExcludedFromBackup = true
@@ -51,7 +64,7 @@ final class ModelDownloader {
     @MainActor
     private static func migrationTargets() -> [ModelDownloadTarget] {
         let config = ConfigDefaults.shared
-        var targets = ([config.mobileDefaultModel] + config.mobileModelPresets).map {
+        return ([config.mobileDefaultModel] + config.mobileModelPresets).map {
             ModelDownloadTarget.gguf(
                 id: $0.id,
                 url: $0.url,
@@ -60,17 +73,6 @@ final class ModelDownloader {
                 mmprojSha256: $0.mmprojSha256
             )
         }
-        let settings = ModelSettingsStore.shared
-        if settings.useCustomModel && !settings.modelUrl.isEmpty {
-            targets.append(.gguf(
-                id: "custom:\(settings.modelUrl)",
-                url: settings.modelUrl,
-                sha256: nil,
-                mmprojUrl: settings.mmprojUrl.isEmpty ? nil : settings.mmprojUrl,
-                mmprojSha256: nil
-            ))
-        }
-        return targets
     }
 
     func modelPath(target: ModelDownloadTarget) -> URL {

@@ -37,25 +37,31 @@ class ModelDownloader(context: Context) {
         transcriptionModelTarget = ModelDownloadTarget.TarGz(
             defaults.transcriptionModel.id,
             defaults.transcriptionModel.url,
-            requireNotNull(defaults.transcriptionModel.sha256)
+            defaults.transcriptionModel.sha256
         )
         voiceActivityModelTarget = ModelDownloadTarget.File(
             defaults.voiceActivityModel.id,
             "model.onnx",
             defaults.voiceActivityModel.url,
-            requireNotNull(defaults.voiceActivityModel.sha256)
+            defaults.voiceActivityModel.sha256
         )
     }
 
     fun needsMigration(): Boolean =
         legacyDir?.exists() == true || legacyTranscriptionDir.exists()
 
-    fun migrate(targets: List<ModelDownloadTarget>) {
+    fun migrate(
+        targets: List<ModelDownloadTarget>,
+        legacyModelUrl: String?,
+        legacyMmprojUrl: String?
+    ): String? {
         File(appContext.filesDir, "llm").deleteRecursively()
-        migrateEnsuLegacyModels(
+        return migrateEnsuLegacyModels(
             modelsDir.absolutePath,
             legacyDir?.absolutePath,
             legacyTranscriptionDir.absolutePath,
+            legacyModelUrl,
+            legacyMmprojUrl,
             targets,
             transcriptionModelTarget,
             voiceActivityModelTarget

@@ -315,34 +315,18 @@ internal class ModelSettingsActions(
     }
 
     fun resolveTarget(settings: ModelSettingsState): LlmModelTarget {
-        val useCustom = settings.useCustomModel && settings.modelUrl.isNotBlank()
-        val url = if (useCustom) settings.modelUrl else configDefaults.mobileDefaultModel.url
-        val mmproj = if (useCustom) {
-            settings.mmprojUrl.takeIf { it.isNotBlank() }
-        } else {
-            configDefaults.mobileDefaultModel.mmprojUrl
-        }
+        val presets = listOf(configDefaults.mobileDefaultModel) + configDefaults.mobileModelPresets
+        val preset = presets.firstOrNull { it.id == settings.modelId }
+            ?: configDefaults.mobileDefaultModel
         val contextLength = settings.contextLength.toIntOrNull()
         val maxTokens = settings.maxTokens.toIntOrNull()?.takeIf { it > 0 }
-        val preset = if (useCustom) {
-            (listOf(configDefaults.mobileDefaultModel) + configDefaults.mobileModelPresets)
-                .firstOrNull { it.url == url && it.mmprojUrl == mmproj }
-        } else {
-            configDefaults.mobileDefaultModel
-        }
 
         return LlmModelTarget(
-            id = preset?.id ?: "custom:$url",
-            url = url,
-            sha256 = preset?.sha256
-                ?: settings.modelSha256.trim().takeIf { it.isNotEmpty() },
-            mmprojUrl = mmproj,
-            mmprojSha256 = if (mmproj == null) {
-                null
-            } else {
-                preset?.mmprojSha256
-                    ?: settings.mmprojSha256.trim().takeIf { it.isNotEmpty() }
-            },
+            id = preset.id,
+            url = preset.url,
+            sha256 = preset.sha256,
+            mmprojUrl = preset.mmprojUrl,
+            mmprojSha256 = preset.mmprojSha256,
             contextLength = contextLength,
             maxTokens = maxTokens
         )

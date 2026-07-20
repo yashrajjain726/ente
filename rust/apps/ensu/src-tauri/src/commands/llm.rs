@@ -38,7 +38,7 @@ impl ModelDownloadState {
 pub struct ModelTarget {
     id: String,
     url: String,
-    sha256: Option<String>,
+    sha256: String,
     mmproj_url: Option<String>,
     mmproj_sha256: Option<String>,
 }
@@ -274,11 +274,22 @@ pub fn llm_model_status(
 #[tauri::command]
 pub async fn llm_migrate_models(
     state: TauriState<'_, ModelDownloadState>,
-    custom_targets: Vec<ModelTarget>,
-) -> Result<(), ApiError> {
+    legacy_model_url: Option<String>,
+    legacy_mmproj_url: Option<String>,
+) -> Result<Option<String>, ApiError> {
     let models_dir = state.models_dir.clone();
     let defaults = ente_ensu::config::defaults();
-    let mut targets: Vec<ModelDownloadTarget> = std::iter::once(defaults.mobile_default_model)
+    let selected = legacy_model_url.as_deref().and_then(|model_url| {
+        ente_ensu::config::legacy_selected_preset_id(
+            defaults
+                .mobile_model_presets
+                .iter()
+                .chain(defaults.desktop_model_presets.iter()),
+            model_url,
+            legacy_mmproj_url.as_deref(),
+        )
+    });
+    let targets: Vec<ModelDownloadTarget> = std::iter::once(defaults.mobile_default_model)
         .chain(defaults.mobile_model_presets)
         .chain(std::iter::once(defaults.desktop_default_model))
         .chain(defaults.desktop_model_presets)
@@ -290,11 +301,11 @@ pub async fn llm_migrate_models(
             mmproj_sha256: preset.mmproj_sha256,
         })
         .collect();
-    targets.extend(custom_targets.into_iter().map(Into::into));
 
     async_runtime::spawn_blocking(move || migrate_flat_models_dir(&models_dir, &targets))
         .await
-        .map_err(|_| fs_thread_error())
+        .map_err(|_| fs_thread_error())?;
+    Ok(selected)
 }
 
 #[tauri::command]

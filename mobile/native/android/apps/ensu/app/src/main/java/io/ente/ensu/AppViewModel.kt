@@ -63,12 +63,16 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         logRepository.log(LogLevel.Info, launchMessage, tag = "App")
 
         viewModelScope.launch {
+            runCatching {
+                advancedSettingsDataStore.migrateLegacyModelSelection { url, mmproj ->
+                    withContext(Dispatchers.IO) {
+                        modelDownloader.migrate(migrationTargets(), url, mmproj)
+                    }
+                }
+            }
             val initialSettings = runCatching {
                 advancedSettingsDataStore.settingsFlow.first()
             }.getOrDefault(AdvancedSettingsSnapshot())
-            withContext(Dispatchers.IO) {
-                modelDownloader.migrate(migrationTargets(initialSettings.modelSettings))
-            }
             store.applyPersistedSettings(
                 developerSettings = initialSettings.developerSettings,
                 modelSettings = initialSettings.modelSettings
@@ -88,21 +92,11 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    private fun migrationTargets(settings: ModelSettingsState): List<ModelDownloadTarget> {
+    private fun migrationTargets(): List<ModelDownloadTarget> {
         val presets = listOf(configDefaults.mobileDefaultModel) + configDefaults.mobileModelPresets
-        val targets = presets
-            .map { ModelDownloadTarget.Gguf(it.id, it.url, it.sha256, it.mmprojUrl, it.mmprojSha256) }
-            .toMutableList()
-        if (settings.useCustomModel && settings.modelUrl.isNotBlank()) {
-            targets += ModelDownloadTarget.Gguf(
-                "custom:${settings.modelUrl}",
-                settings.modelUrl,
-                settings.modelSha256.trim().takeIf { it.isNotEmpty() },
-                settings.mmprojUrl.takeIf { it.isNotBlank() },
-                settings.mmprojSha256.trim().takeIf { it.isNotEmpty() }
-            )
+        return presets.map {
+            ModelDownloadTarget.Gguf(it.id, it.url, it.sha256, it.mmprojUrl, it.mmprojSha256)
         }
-        return targets
     }
 
     @Suppress("DEPRECATION")

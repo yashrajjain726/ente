@@ -5,7 +5,7 @@ pub struct ConfigModelPreset {
     pub id: String,
     pub title: String,
     pub url: String,
-    pub sha256: Option<String>,
+    pub sha256: String,
     pub mmproj_url: Option<String>,
     pub mmproj_sha256: Option<String>,
 }
