@@ -123,7 +123,7 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
 
     try {
       final collectionIDs = await CollectionsService.instance
-          .getVisibleSharedCollectionIDsForFile(fileID);
+          .getNonHiddenSharedCollectionIDsForFile(fileID);
       if (!_isCurrentLoad(fileID, generation)) return;
 
       if (collectionIDs.isEmpty) {
