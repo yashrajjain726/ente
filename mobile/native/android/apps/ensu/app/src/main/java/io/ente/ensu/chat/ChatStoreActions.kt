@@ -1099,31 +1099,37 @@ internal class ChatStoreActions(
         val promptTokens = estimatePromptTokens(promptText, promptImageCount)
         val historyTokens = historyMessages.sumOf { estimateTokens(historyText(it)) }
         val inputTokens = systemTokens + promptTokens + historyTokens
-        var remaining = inputBudget - systemTokens - promptTokens
+        val remaining = inputBudget - systemTokens - promptTokens
 
         if (remaining <= 0 || historyMessages.isEmpty()) {
             return HistorySelection(emptyList(), inputTokens, inputBudget, inputTokens > inputBudget)
         }
 
-        val selected = mutableListOf<LlmMessage>()
-        for (message in historyMessages.asReversed()) {
-            val text = historyText(message)
-            val cost = estimateTokens(text)
-            if (cost <= remaining) {
-                selected.add(
-                    LlmMessage(
-                        text = text,
-                        role = if (message.author == MessageAuthor.User) LlmMessageRole.User else LlmMessageRole.Assistant,
-                        hasAttachments = message.attachments.isNotEmpty()
-                    )
-                )
-                remaining -= cost
-            } else {
-                break
-            }
+        val quantum = max(1, inputBudget / 4)
+        val overflow = max(0, historyTokens - remaining)
+        val quantaToDiscard = (overflow + quantum - 1) / quantum
+        val discardTarget = quantaToDiscard * quantum
+        var discarded = 0
+        var startIndex = 0
+        while (startIndex < historyMessages.size && discarded < discardTarget) {
+            discarded += estimateTokens(historyText(historyMessages[startIndex]))
+            startIndex++
         }
 
-        return HistorySelection(selected.reversed(), inputTokens, inputBudget, inputTokens > inputBudget)
+        val retained = historyMessages.drop(startIndex).ifEmpty {
+            historyMessages.takeLast(1).filter { estimateTokens(historyText(it)) <= remaining }
+        }
+
+        val selected = retained.map { message ->
+            val text = historyText(message)
+            LlmMessage(
+                text = text,
+                role = if (message.author == MessageAuthor.User) LlmMessageRole.User else LlmMessageRole.Assistant,
+                hasAttachments = message.attachments.isNotEmpty()
+            )
+        }
+
+        return HistorySelection(selected, inputTokens, inputBudget, inputTokens > inputBudget)
     }
 
     private fun resolveGenerationLimits(target: LlmModelTarget): GenerationLimits {
