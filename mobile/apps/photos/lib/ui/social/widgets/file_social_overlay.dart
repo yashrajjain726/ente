@@ -187,7 +187,6 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
     final currentUserID = widget.currentUserID;
     if (fileID == null ||
         currentUserID == null ||
-        !_hasEligibleSharedCollections ||
         _reactionUpdateFileIDs.contains(fileID)) {
       return;
     }
@@ -303,7 +302,7 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
 
   Future<void> _showLikes() async {
     final fileID = widget.file.uploadedFileID;
-    if (fileID == null || !_hasEligibleSharedCollections) return;
+    if (fileID == null) return;
     await _runSheetAndRefresh(() async {
       final sharedCollections = await CollectionsService.instance
           .getSharedCollectionsForFile(
@@ -330,7 +329,7 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
 
   Future<void> _openComments({Comment? comment}) async {
     final fileID = widget.file.uploadedFileID;
-    if (fileID == null || !_hasEligibleSharedCollections) return;
+    if (fileID == null) return;
     await _runSheetAndRefresh(() async {
       final sharedCollections = await CollectionsService.instance
           .getSharedCollectionsForFile(
