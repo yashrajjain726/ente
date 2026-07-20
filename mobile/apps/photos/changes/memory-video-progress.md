@@ -1,0 +1,1 @@
+- Fixed memory progress remaining paused when a video starts playing.

@@ -358,7 +358,9 @@ class _FullScreenMemoryState extends State<FullScreenMemory> {
   // Tokenises a pending zoom-start so a newer onFinalFileLoad cleanly
   // invalidates the prior delayed forward.
   Object? _kenBurnsStartToken;
-  bool _isAnimationPaused = false;
+  bool _isViewerPaused = false;
+  bool _isPlaybackPaused = false;
+  bool get _isAnimationPaused => _isViewerPaused || _isPlaybackPaused;
   bool _isMediaZoomed = false;
   final _socialControlsVisible = ValueNotifier<bool>(false);
 
@@ -433,16 +435,24 @@ class _FullScreenMemoryState extends State<FullScreenMemory> {
 
   void _toggleAnimation({required bool pause}) {
     if (!mounted) return;
-    _isAnimationPaused = pause;
-    if (pause) {
+    _isViewerPaused = pause;
+    _syncAnimationState();
+  }
+
+  void _togglePlaybackAnimation({required bool pause}) {
+    if (!mounted) return;
+    _isPlaybackPaused = pause;
+    _syncAnimationState();
+  }
+
+  void _syncAnimationState() {
+    if (_isAnimationPaused) {
       _progressAnimationController?.stop();
       _zoomAnimationController?.stop();
-    } else {
-      if (hasFinalFileLoaded || isAtFirstOrLastFile) {
-        _progressAnimationController?.forward();
-        if (_kenBurnsStartToken == null) {
-          _zoomAnimationController?.forward();
-        }
+    } else if (hasFinalFileLoaded || isAtFirstOrLastFile) {
+      _progressAnimationController?.forward();
+      if (_kenBurnsStartToken == null) {
+        _zoomAnimationController?.forward();
       }
     }
   }
@@ -484,6 +494,7 @@ class _FullScreenMemoryState extends State<FullScreenMemory> {
 
   void onFinalFileLoad(int duration) {
     if (!mounted) return;
+    _isPlaybackPaused = false;
     hasFinalFileLoaded = true;
     isAtFirstOrLastFile = false;
     final memoryDuration = Duration(seconds: duration);
@@ -711,7 +722,16 @@ class _FullScreenMemoryState extends State<FullScreenMemory> {
                             _isMediaZoomed = isZoomed;
                           },
                           playbackCallback: (shouldEnable, _) {
-                            _toggleAnimation(pause: !shouldEnable);
+                            final activeIndex = _clampedMemoryIndex(
+                              inheritedData.indexNotifier.value,
+                              inheritedData.memories.length,
+                            );
+                            if (activeIndex == null ||
+                                inheritedData.memories[activeIndex].file !=
+                                    currentFile) {
+                              return;
+                            }
+                            _togglePlaybackAnimation(pause: !shouldEnable);
                           },
                           onFinalFileLoad: ({required int memoryDuration}) {
                             final activeIndex = _clampedMemoryIndex(
