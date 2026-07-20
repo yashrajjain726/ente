@@ -18,9 +18,9 @@ class FaceDetectionModel extends MlModelAsset {
 }
 
 class FaceEmbeddingModel extends MlModelAsset {
-  static const remoteFileName = "mobilefacenet_prelu_static_b1.onnx";
+  static const remoteFileName = "mobilefacenet_portable_static_b1.onnx";
   static const _sha256 =
-      "f525daf3089ec41c938a66c47cd8278c2a443f31ee2bd2dac987db531c58ccfd";
+      "0763fc33f54e138476194da95987e133b3e976075a6b1d3e1b2caedb251b1a36";
 
   FaceEmbeddingModel._();
   static final instance = FaceEmbeddingModel._();
@@ -33,15 +33,15 @@ class FaceEmbeddingModel extends MlModelAsset {
 }
 
 class ClipImageModel extends MlModelAsset {
-  static const remoteFileName = "mobileclip_s2_image.onnx";
+  static const remoteFileName = "mobileclip_s2_image_gelu_opset20.onnx";
   static const _sha256 =
-      "ef54ec66c687603eb4dd303e20d9b67e81069d3133b1c69a70028c76718b7752";
+      "205a430af825e501c5138e5bb9abea942482a7a4fd4a680e98e47cf0830dce7e";
 
   ClipImageModel._();
   static final instance = ClipImageModel._();
 
   @override
-  String get modelRemotePath => kModelBucketEndpoint + remoteFileName;
+  String get modelRemotePath => _optimizedModelBucketEndpoint + remoteFileName;
 
   @override
   String get modelSha256 => _sha256;
