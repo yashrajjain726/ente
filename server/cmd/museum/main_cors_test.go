@@ -23,24 +23,28 @@ func TestCORS(t *testing.T) {
 		wantStatus int
 		wantHandle bool
 		wantWarn   bool
+		enforce    bool
 	}{
-		{"configured origin", http.MethodGet, "/users/details", "https://photos.ente.com", "api.ente.com", http.StatusNoContent, true, false},
-		{"unknown origin", http.MethodGet, "/users/details", "https://unknown.example", "api.ente.com", http.StatusNoContent, true, true},
-		{"malformed origin", http.MethodGet, "/users/details", "%", "api.ente.com", http.StatusNoContent, true, true},
-		{"native client", http.MethodGet, "/users/details", "", "api.ente.com", http.StatusNoContent, true, false},
-		{"unconfigured same host", http.MethodPost, "/users/ott", "https://ente.example", "ente.example", http.StatusNoContent, true, true},
-		{"desktop app", http.MethodGet, "/users/details", "ente://app", "api.ente.com", http.StatusNoContent, true, false},
-		{"localhost", http.MethodGet, "/users/details", "http://localhost:3000", "api.ente.com", http.StatusNoContent, true, false},
-		{"localhost subdomain", http.MethodGet, "/users/details", "https://photos.localhost:3000", "api.ente.com", http.StatusNoContent, true, false},
-		{"IPv4 loopback", http.MethodGet, "/users/details", "http://127.1.2.3:3000", "api.ente.com", http.StatusNoContent, true, false},
-		{"IPv6 loopback", http.MethodGet, "/users/details", "http://[::1]:3000", "api.ente.com", http.StatusNoContent, true, false},
-		{"opaque origin", http.MethodGet, "/users/details", "null", "api.ente.com", http.StatusNoContent, true, true},
-		{"private address", http.MethodGet, "/users/details", "http://192.168.1.2:3000", "api.ente.com", http.StatusNoContent, true, true},
-		{"localhost lookalike", http.MethodGet, "/users/details", "http://localhost.example:3000", "api.ente.com", http.StatusNoContent, true, true},
-		{"non-HTTP loopback", http.MethodGet, "/users/details", "ftp://localhost", "api.ente.com", http.StatusNoContent, true, true},
-		{"custom album domain", http.MethodGet, "/public-collection/info", "https://gallery.example", "api.ente.com", http.StatusNoContent, true, false},
-		{"album prefix lookalike", http.MethodGet, "/public-collection-evil", "https://gallery.example", "api.ente.com", http.StatusNoContent, true, true},
-		{"unknown preflight", http.MethodOptions, "/users/details", "https://unknown.example", "api.ente.com", http.StatusOK, false, false},
+		{"configured origin", http.MethodGet, "/users/details", "https://photos.ente.com", "api.ente.com", http.StatusNoContent, true, false, false},
+		{"unknown origin", http.MethodGet, "/users/details", "https://unknown.example", "api.ente.com", http.StatusNoContent, true, true, false},
+		{"malformed origin", http.MethodGet, "/users/details", "%", "api.ente.com", http.StatusNoContent, true, true, false},
+		{"native client", http.MethodGet, "/users/details", "", "api.ente.com", http.StatusNoContent, true, false, false},
+		{"unconfigured same host", http.MethodPost, "/users/ott", "https://ente.example", "ente.example", http.StatusNoContent, true, true, false},
+		{"desktop app", http.MethodGet, "/users/details", "ente://app", "api.ente.com", http.StatusNoContent, true, false, false},
+		{"localhost", http.MethodGet, "/users/details", "http://localhost:3000", "api.ente.com", http.StatusNoContent, true, false, false},
+		{"localhost subdomain", http.MethodGet, "/users/details", "https://photos.localhost:3000", "api.ente.com", http.StatusNoContent, true, false, false},
+		{"IPv4 loopback", http.MethodGet, "/users/details", "http://127.1.2.3:3000", "api.ente.com", http.StatusNoContent, true, false, false},
+		{"IPv6 loopback", http.MethodGet, "/users/details", "http://[::1]:3000", "api.ente.com", http.StatusNoContent, true, false, false},
+		{"opaque origin", http.MethodGet, "/users/details", "null", "api.ente.com", http.StatusNoContent, true, true, false},
+		{"private address", http.MethodGet, "/users/details", "http://192.168.1.2:3000", "api.ente.com", http.StatusNoContent, true, true, false},
+		{"localhost lookalike", http.MethodGet, "/users/details", "http://localhost.example:3000", "api.ente.com", http.StatusNoContent, true, true, false},
+		{"non-HTTP loopback", http.MethodGet, "/users/details", "ftp://localhost", "api.ente.com", http.StatusNoContent, true, true, false},
+		{"custom album domain", http.MethodGet, "/public-collection/info", "https://gallery.example", "api.ente.com", http.StatusNoContent, true, false, false},
+		{"album prefix lookalike", http.MethodGet, "/public-collection-evil", "https://gallery.example", "api.ente.com", http.StatusNoContent, true, true, false},
+		{"unknown preflight", http.MethodOptions, "/users/details", "https://unknown.example", "api.ente.com", http.StatusOK, false, false, false},
+		{"enforced configured origin", http.MethodGet, "/users/details", "https://photos.ente.com", "api.ente.com", http.StatusNoContent, true, false, true},
+		{"enforced unknown origin", http.MethodGet, "/users/details", "https://unknown.example", "api.ente.com", http.StatusForbidden, false, true, true},
+		{"enforced unknown preflight", http.MethodOptions, "/users/details", "https://unknown.example", "api.ente.com", http.StatusForbidden, false, true, true},
 	}
 
 	for _, tt := range tests {
@@ -53,7 +57,7 @@ func TestCORS(t *testing.T) {
 
 			handled := false
 			server := gin.New()
-			server.Use(corsForOrigins([]string{"https://photos.ente.com", "ente://app"}))
+			server.Use(corsForOrigins([]string{"https://photos.ente.com", "ente://app"}, tt.enforce))
 			handler := func(c *gin.Context) {
 				handled = true
 				c.Status(http.StatusNoContent)
@@ -72,8 +76,12 @@ func TestCORS(t *testing.T) {
 			if resp.Code != tt.wantStatus {
 				t.Errorf("status = %d, want %d", resp.Code, tt.wantStatus)
 			}
-			if got := resp.Header().Get("Access-Control-Allow-Origin"); got != tt.origin {
-				t.Errorf("allowed origin = %q, want %q", got, tt.origin)
+			wantOrigin := tt.origin
+			if tt.wantStatus == http.StatusForbidden {
+				wantOrigin = ""
+			}
+			if got := resp.Header().Get("Access-Control-Allow-Origin"); got != wantOrigin {
+				t.Errorf("allowed origin = %q, want %q", got, wantOrigin)
 			}
 			if handled != tt.wantHandle {
 				t.Errorf("handler called = %t, want %t", handled, tt.wantHandle)
@@ -107,6 +115,8 @@ func TestCORSProductionOriginsAreDefaults(t *testing.T) {
 		"https://embed.ente.com",
 		"https://ente.com",
 		"https://embed.ente.io",
+		"https://cast.ente.io",
+		"https://staff.ente.sh",
 		"https://auth.ente.com",
 		"https://locker.ente.com",
 		"https://share.ente.com",
@@ -132,6 +142,37 @@ func TestCORSProductionOriginsAreDefaults(t *testing.T) {
 	}
 	if logs.Len() != 0 {
 		t.Errorf("production origins logged warnings: %s", logs.String())
+	}
+}
+
+func TestCORSReportOnlyDefault(t *testing.T) {
+	tests := []struct {
+		name       string
+		values     map[string]interface{}
+		reportOnly bool
+	}{
+		{"legacy configuration", nil, true},
+		{"blank web apps", map[string]interface{}{"apps.photos": "", "apps.auth": "", "apps.locker": ""}, true},
+		{"photos configured", map[string]interface{}{"apps.photos": "https://photos.example"}, false},
+		{"auth configured", map[string]interface{}{"apps.auth": "https://auth.example"}, false},
+		{"locker configured", map[string]interface{}{"apps.locker": "https://locker.example"}, false},
+		{"extra origin configured", map[string]interface{}{"apps.extra-origins": []string{"https://extra.example"}}, false},
+		{"explicit report-only", map[string]interface{}{"apps.photos": "https://photos.example", "apps.cors-report-only": true}, true},
+		{"explicit enforcement", map[string]interface{}{"apps.cors-report-only": false}, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			viper.Reset()
+			t.Cleanup(viper.Reset)
+			for key, value := range tt.values {
+				viper.Set(key, value)
+			}
+			setAppDefaults()
+			if got := viper.GetBool("apps.cors-report-only"); got != tt.reportOnly {
+				t.Errorf("report-only = %t, want %t", got, tt.reportOnly)
+			}
+		})
 	}
 }
 

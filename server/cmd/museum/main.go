@@ -113,6 +113,11 @@ func main() {
 
 	setupLogger(environment)
 	log.Infof("Booting up %s server with commit #%s", environment, os.Getenv("GIT_COMMIT"))
+	if viper.GetBool("apps.cors-report-only") {
+		log.Info("CORS report-only: allowing unknown browser origins (configure apps.* to enforce)")
+	} else {
+		log.Info("CORS: rejecting unknown browser origins")
+	}
 
 	secretEncryptionKey := viper.GetString("key.encryption")
 	hashingKey := viper.GetString("key.hash")
@@ -1089,10 +1094,16 @@ func main() {
 }
 
 func setAppDefaults() {
+	// In the future, the default will become:
+	// viper.SetDefault("apps.cors-report-only", false)
+	viper.SetDefault("apps.cors-report-only", viper.GetString("apps.photos") == "" &&
+		viper.GetString("apps.auth") == "" &&
+		viper.GetString("apps.locker") == "" &&
+		len(viper.GetStringSlice("apps.extra-origins")) == 0)
+
 	viper.SetDefault("apps.photos", "https://photos.ente.com")
 	viper.SetDefault("apps.public-albums", "https://albums.ente.com")
 	viper.SetDefault("apps.embed-albums", "https://embed.ente.com")
-	viper.SetDefault("apps.extra-origins", []string{"https://ente.com", "https://embed.ente.io"})
 	viper.SetDefault("apps.auth", "https://auth.ente.com")
 	viper.SetDefault("apps.locker", "https://locker.ente.com")
 	viper.SetDefault("apps.public-locker", "https://share.ente.com")
@@ -1105,6 +1116,7 @@ func setAppDefaults() {
 	viper.SetDefault("apps.family", "https://family.ente.io")
 	viper.SetDefault("apps.space", "https://ente.space")
 	viper.SetDefault("apps.legacy", "https://legacy.ente.com")
+	viper.SetDefault("apps.extra-origins", []string{"https://ente.com", "https://embed.ente.io", "https://cast.ente.io", "https://staff.ente.sh"})
 	viper.SetDefault("apps.custom-domain.cname", "my.ente.com")
 }
 
@@ -1416,10 +1428,10 @@ func cors() gin.HandlerFunc {
 		}
 	}
 	origins = append(origins, viper.GetStringSlice("apps.extra-origins")...)
-	return corsForOrigins(origins)
+	return corsForOrigins(origins, !viper.GetBool("apps.cors-report-only"))
 }
 
-func corsForOrigins(origins []string) gin.HandlerFunc {
+func corsForOrigins(origins []string, enforce bool) gin.HandlerFunc {
 	knownOrigins := make(map[string]bool, len(origins))
 	for _, origin := range origins {
 		if origin = normalizeOrigin(origin); origin != "" {
@@ -1438,12 +1450,22 @@ func corsForOrigins(origins []string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		origin := c.GetHeader("Origin")
 		knownOrigin := isKnownOrigin(c, origin)
-		if c.Request.Method != http.MethodOptions && !knownOrigin {
-			log.WithFields(log.Fields{
-				"clientPackage": c.GetHeader("X-Client-Package"),
-				"origin":        origin,
-				"path":          c.FullPath(),
-			}).Warn("unknown CORS origin")
+		if !knownOrigin {
+			if c.Request.Method != http.MethodOptions || enforce {
+				message := "unknown CORS origin"
+				if enforce {
+					message = "rejecting unknown CORS origin"
+				}
+				log.WithFields(log.Fields{
+					"clientPackage": c.GetHeader("X-Client-Package"),
+					"origin":        origin,
+					"path":          c.FullPath(),
+				}).Warn(message)
+			}
+			if enforce {
+				c.AbortWithStatus(http.StatusForbidden)
+				return
+			}
 		}
 
 		c.Writer.Header().Set("Access-Control-Allow-Origin", origin)

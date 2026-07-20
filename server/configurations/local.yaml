@@ -150,7 +150,15 @@ apps:
     # Default is:
     #     - https://ente.com
     #     - https://embed.ente.io
+    #     - https://cast.ente.io
+    #     - https://staff.ente.sh
     extra-origins:
+    # Default is true if none of photos, auth, locker or extra-origins above
+    # are set, and false otherwise.
+    #
+    # When false, museum rejects browser requests from origins not listed in
+    # this section. When true, it only logs them.
+    cors-report-only:
     custom-domain:
         # Default is my.ente.com
         cname:

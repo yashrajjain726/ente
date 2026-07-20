@@ -15,6 +15,10 @@ By default, Museum runs in local environment, thus `local.yaml` configuration is
 
 If `ENVIRONMENT` environment variable is set (say, to `production`), Museum will attempt to load `configurations/production.yaml`.
 
+> [!NOTE]
+>
+> Ente uses the `production` configuration for its own deployments, and it may change between releases.
+
 If `credentials-file` is defined and found, it overrides the defaults.
 
 Use `museum.yaml` file for declaring configuration over `local.yaml`.
@@ -53,6 +57,8 @@ in `museum.yaml` is read as `s3.b2-eu-cen.endpoint` by Museum.
 
 The `apps` section tells Museum where each Ente web app is hosted. Configure the public URL of every web app you deploy; these URLs form Museum's list of trusted browser origins.
 
+If you set any of `apps.photos`, `apps.auth`, `apps.locker` or `apps.extra-origins`, Museum rejects browser requests from origins that are not in this list. If you set none of these keys, Museum only logs the unknown origins. This is a fallback so that older setups do not break; a future version of Museum will reject unknown origins by default. To choose the behavior explicitly, set `apps.cors-report-only` to `true` or `false`.
+
 | Variable               | Description                                             | Default                     |
 | ---------------------- | ------------------------------------------------------- | --------------------------- |
 | `apps.photos`          | Photos web app base endpoint                            | `https://photos.ente.com`   |
@@ -70,7 +76,7 @@ The `apps` section tells Museum where each Ente web app is hosted. Configure the
 | `apps.family`          | Family web app base endpoint                            | `https://family.ente.io`    |
 | `apps.space`           | Space web app base endpoint                             | `https://ente.space`        |
 | `apps.legacy`          | Legacy recovery web app base endpoint                   | `https://legacy.ente.com`   |
-| `apps.extra-origins`   | Additional trusted browser origins                      | `["https://ente.com", "https://embed.ente.io"]` |
+| `apps.extra-origins`   | Additional trusted browser origins                      | Ente's other production origins |
 
 ### Database
 

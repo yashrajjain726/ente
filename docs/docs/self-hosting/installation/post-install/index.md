@@ -107,7 +107,9 @@ apps:
     legacy: https://legacy.ente.yourdomain.tld
 ```
 
-If you are using quickstart, note that only Photos and Albums are exposed by default in `compose.yaml`. Uncomment the Share / Paste / Memories port mappings there, or deploy them separately, before pointing `apps.public-locker` / `apps.public-paste` / `apps.public-memories` to those URLs.
+When you set these keys, Museum rejects browser requests from origins that are not in the list. List every web app that you deploy. A web app that is not in the list will get 403 errors in the browser.
+
+If you are using quickstart, note that only Photos and Albums are exposed by default in `compose.yaml`. Uncomment the port mappings of the other apps there, or deploy them separately, before pointing their `apps.*` keys to those URLs.
 
 ## Step 4: Make it publicly accessible
 
