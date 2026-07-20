@@ -59,7 +59,7 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
   int _commentCount = 0;
   Comment? _latestComment;
   User? _latestCommentAuthor;
-  int _loadGeneration = 0;
+  int _latestRefreshID = 0;
   final _reactionUpdateFileIDs = <int>{};
 
   @override
@@ -95,23 +95,26 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
     _latestCommentAuthor = null;
   }
 
-  bool _isCurrentLoad(int fileID, int generation) {
+  bool _canApplySocialRefresh({
+    required int requestedFileID,
+    required int refreshID,
+  }) {
     return mounted &&
-        generation == _loadGeneration &&
-        widget.file.uploadedFileID == fileID;
+        refreshID == _latestRefreshID &&
+        widget.file.uploadedFileID == requestedFileID;
   }
 
   Future<void> _refreshSocialState() async {
     final fileID = widget.file.uploadedFileID;
     final currentUserID = widget.currentUserID;
-    final generation = ++_loadGeneration;
+    final refreshID = ++_latestRefreshID;
 
     if (fileID == null || currentUserID == null) {
       _clearSocialState();
       // Defer because a user-null transition can arrive from didUpdateWidget.
       scheduleMicrotask(() {
         if (!mounted ||
-            generation != _loadGeneration ||
+            refreshID != _latestRefreshID ||
             widget.file.uploadedFileID != fileID ||
             widget.currentUserID != currentUserID) {
           return;
@@ -124,7 +127,12 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
     try {
       final collectionIDs = await CollectionsService.instance
           .getNonHiddenSharedCollectionIDsForFile(fileID);
-      if (!_isCurrentLoad(fileID, generation)) return;
+      if (!_canApplySocialRefresh(
+        requestedFileID: fileID,
+        refreshID: refreshID,
+      )) {
+        return;
+      }
 
       if (collectionIDs.isEmpty) {
         setState(_clearSocialState);
@@ -141,7 +149,12 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
           candidateCollectionIDs: collectionIDs,
         ),
       ]);
-      if (!_isCurrentLoad(fileID, generation)) return;
+      if (!_canApplySocialRefresh(
+        requestedFileID: fileID,
+        refreshID: refreshID,
+      )) {
+        return;
+      }
 
       final reactions = results[0] as List<Reaction>;
       final commentCount = results[1] as int;
@@ -153,7 +166,12 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
                 latestComment.collectionID,
               )
             : const <String, String>{};
-        if (!_isCurrentLoad(fileID, generation)) return;
+        if (!_canApplySocialRefresh(
+          requestedFileID: fileID,
+          refreshID: refreshID,
+        )) {
+          return;
+        }
 
         latestCommentAuthor = CommentAuthorResolver().resolve(
           comment: latestComment,
@@ -163,7 +181,12 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
         );
       }
 
-      if (!_isCurrentLoad(fileID, generation)) return;
+      if (!_canApplySocialRefresh(
+        requestedFileID: fileID,
+        refreshID: refreshID,
+      )) {
+        return;
+      }
       setState(() {
         _visibleSharedCollectionIDs = collectionIDs;
         _hasLiked = reactions.any(
