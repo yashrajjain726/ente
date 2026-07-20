@@ -309,12 +309,6 @@ class _FileDetailsWidgetState extends State<FileDetailsWidget> {
       }
     }
 
-    if (file.uploadedFileID != null && file.updationTime != null) {
-      fileDetailsTiles.addAll([
-        BackedUpTimeItemWidget(file),
-        const FileDetailsDivider(),
-      ]);
-    }
     if (!file.isTrash) {
       fileDetailsTiles.add(AlbumsItemWidget(file, _currentUserID));
     }

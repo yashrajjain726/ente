@@ -1,3 +1,4 @@
+import "package:ente_components/ente_components.dart";
 import "package:exif_reader/exif_reader.dart";
 import "package:flutter/material.dart";
 import "package:hugeicons/hugeicons.dart";
@@ -15,24 +16,27 @@ class BasicExifItemWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final subtitleTextTheme = getEnteTextTheme(context).miniMuted;
+    final colors = context.componentColors;
+    final subtitleTextStyle = TextStyles.mini.copyWith(color: colors.textLight);
     return InfoItemWidget(
       key: const ValueKey("Basic EXIF"),
-      leadingIconWidget: const HugeIcon(icon: HugeIcons.strokeRoundedLicense),
+      leadingIconWidget: HugeIcon(
+        icon: HugeIcons.strokeRoundedCamera01,
+        size: IconSizes.small,
+        color: colors.textLight,
+      ),
       title: exifData["takenOnDevice"] ?? "--",
       subtitleSection: Future.value([
         if (exifData["fNumber"] != null)
-          Text('ƒ/' + exifData["fNumber"].toString(), style: subtitleTextTheme),
+          Text('ƒ/${exifData["fNumber"]}', style: subtitleTextStyle),
         if (exifData["exposureTime"] != null)
-          Text(exifData["exposureTime"], style: subtitleTextTheme),
+          Text(exifData["exposureTime"].toString(), style: subtitleTextStyle),
         if (exifData["focalLength"] != null)
-          Text(
-            exifData["focalLength"].toString() + "mm",
-            style: subtitleTextTheme,
-          ),
+          Text('${exifData["focalLength"]}mm', style: subtitleTextStyle),
         if (exifData["ISO"] != null)
-          Text("ISO" + exifData["ISO"].toString(), style: subtitleTextTheme),
+          Text('ISO${exifData["ISO"]}', style: subtitleTextStyle),
       ]),
+      useMenuStyle: true,
     );
   }
 }
