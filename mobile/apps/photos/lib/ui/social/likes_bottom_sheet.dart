@@ -3,7 +3,6 @@ import "dart:async";
 import "package:ente_icons/ente_icons.dart";
 import "package:flutter/material.dart";
 import "package:photos/core/configuration.dart";
-import "package:photos/db/files_db.dart";
 import "package:photos/generated/l10n.dart";
 import "package:photos/models/api/collection/user.dart";
 import "package:photos/models/collection/collection.dart";
@@ -26,6 +25,7 @@ Future<void> showLikesBottomSheet(
   BuildContext context, {
   required int fileID,
   required int initialCollectionID,
+  List<Collection>? sharedCollections,
 }) {
   return showModalBottomSheet(
     context: context,
@@ -35,6 +35,7 @@ Future<void> showLikesBottomSheet(
       launchContext: context,
       fileID: fileID,
       initialCollectionID: initialCollectionID,
+      sharedCollections: sharedCollections,
     ),
   );
 }
@@ -43,11 +44,13 @@ class LikesBottomSheet extends StatefulWidget {
   final BuildContext launchContext;
   final int fileID;
   final int initialCollectionID;
+  final List<Collection>? sharedCollections;
 
   const LikesBottomSheet({
     required this.launchContext,
     required this.fileID,
     required this.initialCollectionID,
+    this.sharedCollections,
     super.key,
   });
 
@@ -78,29 +81,14 @@ class _LikesBottomSheetState extends State<LikesBottomSheet> {
 
   Future<void> _loadSharedCollections() async {
     try {
-      // Get all collections containing this file
-      final collectionIDs = await FilesDB.instance.getAllCollectionIDsOfFile(
-        widget.fileID,
-      );
-
-      // Filter to shared collections only
-      var sharedCollectionsList = collectionIDs
-          .map((id) => CollectionsService.instance.getCollectionByID(id))
-          .whereType<Collection>()
-          .where((c) => c.hasSharees || c.hasLink || !c.isOwner(_currentUserID))
-          .toList();
-
-      // Filter out hidden collections unless viewing from a hidden collection
-      final hiddenCollectionIds = CollectionsService.instance
-          .getHiddenCollectionIds();
-      final isInitialCollectionHidden = hiddenCollectionIds.contains(
-        widget.initialCollectionID,
-      );
-      if (!isInitialCollectionHidden) {
-        sharedCollectionsList = sharedCollectionsList
-            .where((c) => !hiddenCollectionIds.contains(c.id))
-            .toList();
-      }
+      final sharedCollectionsList =
+          widget.sharedCollections ??
+          await CollectionsService.instance.getSharedCollectionsForFile(
+            widget.fileID,
+            includeHidden: CollectionsService.instance
+                .getHiddenCollectionIds()
+                .contains(widget.initialCollectionID),
+          );
 
       // Fetch like counts and thumbnails in parallel
       final sharedCollections = await Future.wait(

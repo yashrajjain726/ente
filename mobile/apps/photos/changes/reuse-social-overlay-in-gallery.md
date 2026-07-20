@@ -1,0 +1,1 @@
+- Added consistent likes and comments controls to the gallery photo viewer.

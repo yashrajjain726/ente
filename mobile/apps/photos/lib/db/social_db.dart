@@ -296,6 +296,20 @@ class SocialDB {
     return rows.map(_rowToReaction).toList();
   }
 
+  Future<bool> hasUserReactedToFile(int fileID, int userID) async {
+    final db = await database;
+    final rows = await db.rawQuery(
+      '''
+      SELECT 1 FROM $_reactionsTable
+      WHERE file_id = ? AND user_id = ?
+        AND comment_id IS NULL AND is_deleted = 0
+      LIMIT 1
+      ''',
+      [fileID, userID],
+    );
+    return rows.isNotEmpty;
+  }
+
   Future<List<Reaction>> getReactionsForFileInCollection(
     int fileID,
     int collectionID,

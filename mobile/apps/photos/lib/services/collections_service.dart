@@ -325,13 +325,14 @@ class CollectionsService {
     return sharedCollections;
   }
 
-  /// Returns IDs of non-hidden shared collections containing [uploadedFileID].
+  /// Returns IDs of shared collections containing [uploadedFileID].
   ///
-  /// Use this to scope social content that may be rendered in the UI without
-  /// constructing a list of collection objects on the view path.
-  Future<List<int>> getNonHiddenSharedCollectionIDsForFile(
-    int uploadedFileID,
-  ) async {
+  /// Use this to scope social content on the view path without constructing a
+  /// list of collection objects.
+  Future<List<int>> getSharedCollectionIDsForFile(
+    int uploadedFileID, {
+    bool includeHidden = false,
+  }) async {
     final collectionIDs = await _filesDB.getAllCollectionIDsOfFile(
       uploadedFileID,
     );
@@ -345,7 +346,7 @@ class CollectionsService {
       if (_isEligibleSharedCollection(
         _collectionIDToCollections[collectionID],
         currentUserID,
-        includeHidden: false,
+        includeHidden: includeHidden,
       )) {
         sharedCollectionIDs.add(collectionID);
       }

@@ -44,6 +44,9 @@ import "package:photos/ui/viewer/gallery/jump_to_date_gallery.dart";
 import "package:photos/utils/dialog_util.dart";
 import "package:photos/utils/share_util.dart";
 
+const _socialRightInset = 24.0;
+const _socialToActionBarGap = 14.0;
+
 //There are two states of variables that FullScreenMemory depends on:
 //1. The list of memories
 //2. The current index of the page view
@@ -761,12 +764,21 @@ class _FullScreenMemoryState extends State<FullScreenMemory> {
                   inheritedData.memories.length,
                 );
                 if (safeIndex == null) return const SizedBox.shrink();
-                return FileSocialOverlay(
-                  file: inheritedData.memories[safeIndex].file,
-                  currentUserID: Configuration.instance.getUserID(),
-                  onInteractionStart: _pauseViewer,
-                  onInteractionEnd: _resumeViewer,
-                  onVisibilityChanged: _setSocialControlsVisible,
+                final padding = MediaQuery.paddingOf(context);
+                return Positioned(
+                  right: padding.right + _socialRightInset,
+                  bottom:
+                      padding.bottom +
+                      kMemoryBottomActionBarHeight +
+                      _socialToActionBarGap,
+                  child: FileSocialOverlay(
+                    file: inheritedData.memories[safeIndex].file,
+                    currentUserID: Configuration.instance.getUserID(),
+                    openingCollectionID: null,
+                    onInteractionStart: _pauseViewer,
+                    onInteractionEnd: _resumeViewer,
+                    onVisibilityChanged: _setSocialControlsVisible,
+                  ),
                 );
               },
             ),

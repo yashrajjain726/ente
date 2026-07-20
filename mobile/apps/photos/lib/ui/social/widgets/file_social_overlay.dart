@@ -10,13 +10,12 @@ import "package:photos/core/event_bus.dart";
 import "package:photos/events/social_data_updated_event.dart";
 import "package:photos/generated/l10n.dart";
 import "package:photos/models/api/collection/user.dart";
+import "package:photos/models/collection/collection.dart";
 import "package:photos/models/file/file.dart";
 import "package:photos/models/social/comment.dart";
 import "package:photos/models/social/comment_author_utils.dart";
-import "package:photos/models/social/reaction.dart";
 import "package:photos/models/social/social_data_provider.dart";
 import "package:photos/services/collections_service.dart";
-import "package:photos/ui/home/memories/memory_viewer_constants.dart";
 import "package:photos/ui/notification/toast.dart";
 import "package:photos/ui/sharing/user_avator_widget.dart";
 import "package:photos/ui/social/comments_screen.dart";
@@ -28,23 +27,49 @@ final _logger = Logger("FileSocialOverlay");
 const _likedColor = Color(0xFF08C225);
 const _socialControlsSize = 40.0;
 const _socialIconSize = 32.0;
-const _socialToActionBarGap = 14.0;
 
+typedef FileSocialContextIdentity = ({
+  int? uploadedFileID,
+  int? openingCollectionID,
+  int? currentUserID,
+});
+
+bool fileSocialContextIncludesHiddenCollections(
+  int? openingCollectionID,
+  Set<int> hiddenCollectionIDs,
+) {
+  return openingCollectionID != null &&
+      hiddenCollectionIDs.contains(openingCollectionID);
+}
+
+/// Social content for a file. The host owns placement and visibility effects.
 class FileSocialOverlay extends StatefulWidget {
   final EnteFile file;
   final int? currentUserID;
-  final VoidCallback onInteractionStart;
-  final VoidCallback onInteractionEnd;
-  final ValueChanged<bool> onVisibilityChanged;
+
+  /// The collection the viewer was opened from, or null when there is no
+  /// opening collection context. Memories must not pass a deduped file row's
+  /// collection ID here.
+  final int? openingCollectionID;
+  final VoidCallback? onInteractionStart;
+  final VoidCallback? onInteractionEnd;
+  final ValueChanged<bool>? onVisibilityChanged;
 
   const FileSocialOverlay({
     required this.file,
     required this.currentUserID,
-    required this.onInteractionStart,
-    required this.onInteractionEnd,
-    required this.onVisibilityChanged,
+    required this.openingCollectionID,
+    this.onInteractionStart,
+    this.onInteractionEnd,
+    this.onVisibilityChanged,
     super.key,
   });
+
+  FileSocialContextIdentity get contextIdentity => (
+    uploadedFileID: file.uploadedFileID,
+    openingCollectionID: openingCollectionID,
+    currentUserID: currentUserID,
+  );
 
   @override
   State<FileSocialOverlay> createState() => _FileSocialOverlayState();
@@ -54,7 +79,7 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
   late final StreamSubscription<SocialDataUpdatedEvent>
   _socialDataUpdatedSubscription;
 
-  List<int> _visibleSharedCollectionIDs = const [];
+  List<int> _eligibleSharedCollectionIDs = const [];
   bool _hasLiked = false;
   int _commentCount = 0;
   Comment? _latestComment;
@@ -74,8 +99,7 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
   @override
   void didUpdateWidget(covariant FileSocialOverlay oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.file.uploadedFileID != widget.file.uploadedFileID ||
-        oldWidget.currentUserID != widget.currentUserID) {
+    if (oldWidget.contextIdentity != widget.contextIdentity) {
       _clearSocialState();
       unawaited(_refreshSocialState());
     }
@@ -88,7 +112,7 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
   }
 
   void _clearSocialState() {
-    _visibleSharedCollectionIDs = const [];
+    _eligibleSharedCollectionIDs = const [];
     _hasLiked = false;
     _commentCount = 0;
     _latestComment = null;
@@ -96,17 +120,26 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
   }
 
   bool _canApplySocialRefresh({
-    required int requestedFileID,
+    required FileSocialContextIdentity requestedContext,
     required int refreshID,
   }) {
     return mounted &&
         refreshID == _latestRefreshID &&
-        widget.file.uploadedFileID == requestedFileID;
+        widget.contextIdentity == requestedContext;
+  }
+
+  bool get _includeHiddenCollections {
+    return fileSocialContextIncludesHiddenCollections(
+      widget.openingCollectionID,
+      CollectionsService.instance.getHiddenCollectionIds(),
+    );
   }
 
   Future<void> _refreshSocialState() async {
+    // Recheck the captured context after every await before touching state.
     final fileID = widget.file.uploadedFileID;
     final currentUserID = widget.currentUserID;
+    final requestedContext = widget.contextIdentity;
     final refreshID = ++_latestRefreshID;
 
     if (fileID == null || currentUserID == null) {
@@ -115,20 +148,22 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
       scheduleMicrotask(() {
         if (!mounted ||
             refreshID != _latestRefreshID ||
-            widget.file.uploadedFileID != fileID ||
-            widget.currentUserID != currentUserID) {
+            widget.contextIdentity != requestedContext) {
           return;
         }
-        widget.onVisibilityChanged(false);
+        widget.onVisibilityChanged?.call(false);
       });
       return;
     }
 
     try {
       final collectionIDs = await CollectionsService.instance
-          .getNonHiddenSharedCollectionIDsForFile(fileID);
+          .getSharedCollectionIDsForFile(
+            fileID,
+            includeHidden: _includeHiddenCollections,
+          );
       if (!_canApplySocialRefresh(
-        requestedFileID: fileID,
+        requestedContext: requestedContext,
         refreshID: refreshID,
       )) {
         return;
@@ -136,13 +171,13 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
 
       if (collectionIDs.isEmpty) {
         setState(_clearSocialState);
-        widget.onVisibilityChanged(false);
+        widget.onVisibilityChanged?.call(false);
         return;
       }
 
       final provider = SocialDataProvider.instance;
       final results = await Future.wait<Object?>([
-        provider.getReactionsForFile(fileID),
+        provider.hasUserReactedToFile(fileID, currentUserID),
         provider.getCommentCountForFile(fileID),
         provider.getLatestCommentForFile(
           fileID,
@@ -150,13 +185,13 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
         ),
       ]);
       if (!_canApplySocialRefresh(
-        requestedFileID: fileID,
+        requestedContext: requestedContext,
         refreshID: refreshID,
       )) {
         return;
       }
 
-      final reactions = results[0] as List<Reaction>;
+      final hasLiked = results[0] as bool;
       final commentCount = results[1] as int;
       final latestComment = results[2] as Comment?;
       User? latestCommentAuthor;
@@ -167,7 +202,7 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
               )
             : const <String, String>{};
         if (!_canApplySocialRefresh(
-          requestedFileID: fileID,
+          requestedContext: requestedContext,
           refreshID: refreshID,
         )) {
           return;
@@ -182,21 +217,19 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
       }
 
       if (!_canApplySocialRefresh(
-        requestedFileID: fileID,
+        requestedContext: requestedContext,
         refreshID: refreshID,
       )) {
         return;
       }
       setState(() {
-        _visibleSharedCollectionIDs = collectionIDs;
-        _hasLiked = reactions.any(
-          (reaction) => reaction.userID == currentUserID,
-        );
+        _eligibleSharedCollectionIDs = collectionIDs;
+        _hasLiked = hasLiked;
         _commentCount = commentCount;
         _latestComment = latestComment;
         _latestCommentAuthor = latestCommentAuthor;
       });
-      widget.onVisibilityChanged(true);
+      widget.onVisibilityChanged?.call(true);
     } catch (error, stackTrace) {
       // Preserve last-good state; page changes clear state and visibility.
       _logger.warning(
@@ -211,9 +244,10 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
     final file = widget.file;
     final fileID = file.uploadedFileID;
     final currentUserID = widget.currentUserID;
+    final actionContext = widget.contextIdentity;
     if (fileID == null ||
         currentUserID == null ||
-        _visibleSharedCollectionIDs.isEmpty ||
+        _eligibleSharedCollectionIDs.isEmpty ||
         _reactionUpdateFileIDs.contains(fileID)) {
       return;
     }
@@ -221,15 +255,17 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
     _reactionUpdateFileIDs.add(fileID);
     try {
       if (_hasLiked) {
-        await _unlikeFromAllCollections(fileID, currentUserID);
+        await _unlikeFromAllCollections(fileID, currentUserID, actionContext);
         return;
       }
 
       final sharedCollections = await CollectionsService.instance
-          .getSharedCollectionsForFile(fileID);
+          .getSharedCollectionsForFile(
+            fileID,
+            includeHidden: _includeHiddenCollections,
+          );
       if (!mounted ||
-          widget.file.uploadedFileID != fileID ||
-          widget.currentUserID != currentUserID ||
+          widget.contextIdentity != actionContext ||
           sharedCollections.isEmpty) {
         return;
       }
@@ -245,7 +281,7 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
           );
         } catch (error, stackTrace) {
           _logger.severe("Failed to like photo", error, stackTrace);
-          if (mounted && widget.file.uploadedFileID == fileID) {
+          if (mounted && widget.contextIdentity == actionContext) {
             setState(() => _hasLiked = previousState);
             showShortToast(
               context,
@@ -270,7 +306,11 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
     }
   }
 
-  Future<void> _unlikeFromAllCollections(int fileID, int currentUserID) async {
+  Future<void> _unlikeFromAllCollections(
+    int fileID,
+    int currentUserID,
+    FileSocialContextIdentity actionContext,
+  ) async {
     final previousState = _hasLiked;
     setState(() => _hasLiked = false);
 
@@ -302,7 +342,9 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
         }
       }
 
-      if (failedCount > 0 && mounted && widget.file.uploadedFileID == fileID) {
+      if (failedCount > 0 &&
+          mounted &&
+          widget.contextIdentity == actionContext) {
         setState(() => _hasLiked = previousState);
         showShortToast(
           context,
@@ -315,7 +357,7 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
         error,
         stackTrace,
       );
-      if (mounted && widget.file.uploadedFileID == fileID) {
+      if (mounted && widget.contextIdentity == actionContext) {
         setState(() => _hasLiked = previousState);
         showShortToast(
           context,
@@ -327,74 +369,96 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
 
   Future<void> _showLikes() async {
     final fileID = widget.file.uploadedFileID;
-    if (fileID == null || _visibleSharedCollectionIDs.isEmpty) return;
+    final actionContext = widget.contextIdentity;
+    if (fileID == null || _eligibleSharedCollectionIDs.isEmpty) return;
     await _runSheetAndRefresh(() async {
       final sharedCollections = await CollectionsService.instance
-          .getSharedCollectionsForFile(fileID);
+          .getSharedCollectionsForFile(
+            fileID,
+            includeHidden: _includeHiddenCollections,
+          );
       if (!mounted ||
-          widget.file.uploadedFileID != fileID ||
+          widget.contextIdentity != actionContext ||
           sharedCollections.isEmpty) {
         return;
       }
+      final initialCollection = sharedCollections.firstWhereOrNull(
+        (collection) => collection.id == actionContext.openingCollectionID,
+      );
       await showLikesBottomSheet(
         context,
         fileID: fileID,
-        initialCollectionID: sharedCollections.first.id,
+        initialCollectionID:
+            initialCollection?.id ?? sharedCollections.first.id,
+        sharedCollections: sharedCollections,
       );
     });
   }
 
   Future<void> _openComments({Comment? comment}) async {
     final fileID = widget.file.uploadedFileID;
-    if (fileID == null || _visibleSharedCollectionIDs.isEmpty) return;
+    final actionContext = widget.contextIdentity;
+    if (fileID == null || _eligibleSharedCollectionIDs.isEmpty) return;
     await _runSheetAndRefresh(() async {
       final sharedCollections = await CollectionsService.instance
-          .getSharedCollectionsForFile(fileID);
+          .getSharedCollectionsForFile(
+            fileID,
+            includeHidden: _includeHiddenCollections,
+          );
       if (!mounted ||
-          widget.file.uploadedFileID != fileID ||
+          widget.contextIdentity != actionContext ||
           sharedCollections.isEmpty) {
         return;
       }
 
-      final preferredCollectionID =
-          comment?.collectionID ?? _latestComment?.collectionID;
-      final preferredCollection = sharedCollections.firstWhereOrNull(
-        (collection) => collection.id == preferredCollectionID,
-      );
+      Collection? commentCollection;
+      Collection? openingCollection;
+      Collection? latestCommentCollection;
+      for (final collection in sharedCollections) {
+        if (collection.id == comment?.collectionID) {
+          commentCollection = collection;
+        }
+        if (collection.id == actionContext.openingCollectionID) {
+          openingCollection = collection;
+        }
+        if (collection.id == _latestComment?.collectionID) {
+          latestCommentCollection = collection;
+        }
+      }
+      final initialCollection =
+          commentCollection ??
+          openingCollection ??
+          latestCommentCollection ??
+          sharedCollections.first;
 
       await showFileCommentsBottomSheet(
         context,
-        collectionID: preferredCollection?.id ?? sharedCollections.first.id,
+        collectionID: initialCollection.id,
         fileID: fileID,
-        highlightCommentID: preferredCollection == null ? null : comment?.id,
+        highlightCommentID: commentCollection == null ? null : comment?.id,
+        sharedCollections: sharedCollections,
       );
     });
   }
 
   Future<void> _runSheetAndRefresh(Future<void> Function() showSheet) async {
-    widget.onInteractionStart();
+    widget.onInteractionStart?.call();
     try {
       await showSheet();
       await _refreshSocialState();
     } finally {
-      widget.onInteractionEnd();
+      widget.onInteractionEnd?.call();
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_visibleSharedCollectionIDs.isEmpty) {
+    if (_eligibleSharedCollectionIDs.isEmpty) {
       return const SizedBox.shrink();
     }
 
-    final safePadding = MediaQuery.paddingOf(context);
-    return Positioned(
-      right: safePadding.right + 24,
-      bottom:
-          safePadding.bottom +
-          kMemoryBottomActionBarHeight +
-          _socialToActionBarGap,
-      child: Row(
+    return LayoutBuilder(
+      builder: (context, constraints) => Row(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           if (_latestComment != null && _latestCommentAuthor != null)
@@ -403,6 +467,7 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
               child: _buildLatestCommentPill(
                 _latestComment!,
                 _latestCommentAuthor!,
+                math.min(constraints.maxWidth * 0.5, 200),
               ),
             ),
           Column(
@@ -456,14 +521,16 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
     );
   }
 
-  Widget _buildLatestCommentPill(Comment comment, User author) {
+  Widget _buildLatestCommentPill(
+    Comment comment,
+    User author,
+    double maxWidth,
+  ) {
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: () => unawaited(_openComments(comment: comment)),
       child: ConstrainedBox(
-        constraints: BoxConstraints(
-          maxWidth: math.min(MediaQuery.sizeOf(context).width * 0.5, 200),
-        ),
+        constraints: BoxConstraints(maxWidth: maxWidth),
         child: Stack(
           clipBehavior: Clip.none,
           children: [

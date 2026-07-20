@@ -48,6 +48,10 @@ class SocialDataProvider {
     return _db.getReactionsForFile(fileID);
   }
 
+  Future<bool> hasUserReactedToFile(int fileID, int userID) {
+    return _db.hasUserReactedToFile(fileID, userID);
+  }
+
   Future<List<Reaction>> getReactionsForFileInCollection(
     int fileID,
     int collectionID,
