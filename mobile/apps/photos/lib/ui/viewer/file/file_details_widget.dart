@@ -253,7 +253,7 @@ class _FileDetailsWidgetState extends State<FileDetailsWidget> {
     if (hasGrantedMLConsent) {
       fileDetailsTiles.addAll([
         FacesItemWidget(file),
-        const FileDetailsDivider(),
+        const SizedBox(height: Spacing.xxl),
       ]);
       if (flagService.petEnabled && localSettings.petRecognitionEnabled) {
         fileDetailsTiles.addAll([
