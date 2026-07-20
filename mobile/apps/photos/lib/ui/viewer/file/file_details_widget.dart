@@ -195,6 +195,19 @@ class _FileDetailsWidgetState extends State<FileDetailsWidget> {
       const SizedBox(height: Spacing.xxl),
     ]);
 
+    if (hasGrantedMLConsent) {
+      fileDetailsTiles.addAll([
+        FacesItemWidget(file),
+        const SizedBox(height: Spacing.xxl),
+      ]);
+      if (flagService.petEnabled && localSettings.petRecognitionEnabled) {
+        fileDetailsTiles.addAll([
+          PetsItemWidget(file),
+          const FileDetailsDivider(),
+        ]);
+      }
+    }
+
     fileDetailsTiles.addAll([
       ValueListenableBuilder(
         valueListenable: hasLocationData,
@@ -203,7 +216,7 @@ class _FileDetailsWidgetState extends State<FileDetailsWidget> {
               ? Column(
                   children: [
                     LocationTagsWidget(widget.file),
-                    const FileDetailsDivider(),
+                    const SizedBox(height: Spacing.xxl),
                   ],
                 )
               : const SizedBox.shrink();
@@ -250,18 +263,6 @@ class _FileDetailsWidgetState extends State<FileDetailsWidget> {
         },
       ),
     ]);
-    if (hasGrantedMLConsent) {
-      fileDetailsTiles.addAll([
-        FacesItemWidget(file),
-        const SizedBox(height: Spacing.xxl),
-      ]);
-      if (flagService.petEnabled && localSettings.petRecognitionEnabled) {
-        fileDetailsTiles.addAll([
-          PetsItemWidget(file),
-          const FileDetailsDivider(),
-        ]);
-      }
-    }
 
     if (!file.isTrash) {
       fileDetailsTiles.addAll([
