@@ -8,6 +8,7 @@ import io.ente.ensu.bindings.ModelDownloadCore
 import io.ente.ensu.bindings.ModelDownloadProgress
 import io.ente.ensu.bindings.LlmException
 import io.ente.ensu.bindings.ModelDownloadTarget
+import io.ente.ensu.bindings.EnsuLegacyModels
 import io.ente.ensu.bindings.migrateEnsuLegacyModels
 import io.ente.ensu.bindings.uniffiEnsureInitialized
 import io.ente.ensu.config.loadConfigDefaults
@@ -58,10 +59,12 @@ class ModelDownloader(context: Context) {
         File(appContext.filesDir, "llm").deleteRecursively()
         return migrateEnsuLegacyModels(
             modelsDir.absolutePath,
-            legacyDir?.absolutePath,
-            legacyTranscriptionDir.absolutePath,
-            legacyModelUrl,
-            legacyMmprojUrl,
+            EnsuLegacyModels(
+                legacyDir?.absolutePath,
+                legacyTranscriptionDir.absolutePath,
+                legacyModelUrl,
+                legacyMmprojUrl
+            ),
             targets,
             transcriptionModelTarget,
             voiceActivityModelTarget

@@ -82,13 +82,18 @@ pub trait ModelDownloadCallback: Send + Sync {
     fn is_cancelled(&self) -> bool;
 }
 
+#[derive(uniffi::Record)]
+pub struct EnsuLegacyModels {
+    pub llm_dir: Option<String>,
+    pub transcription_dir: String,
+    pub model_url: Option<String>,
+    pub mmproj_url: Option<String>,
+}
+
 #[uniffi::export]
 pub fn migrate_ensu_legacy_models(
     models_dir: String,
-    llm_legacy_dir: Option<String>,
-    transcription_legacy_dir: String,
-    legacy_model_url: Option<String>,
-    legacy_mmproj_url: Option<String>,
+    legacy: EnsuLegacyModels,
     llm_targets: Vec<ModelDownloadTarget>,
     transcription_model: ModelDownloadTarget,
     voice_activity_model: ModelDownloadTarget,
@@ -97,8 +102,8 @@ pub fn migrate_ensu_legacy_models(
         llm_targets.into_iter().map(Into::into).collect();
     ente_model_download::migrate_ensu_legacy_models(
         Path::new(&models_dir),
-        llm_legacy_dir.as_deref().map(Path::new),
-        Path::new(&transcription_legacy_dir),
+        legacy.llm_dir.as_deref().map(Path::new),
+        Path::new(&legacy.transcription_dir),
         &llm_targets,
         &transcription_model.into(),
         &voice_activity_model.into(),
@@ -106,8 +111,8 @@ pub fn migrate_ensu_legacy_models(
     let defaults = ente_ensu::config::defaults();
     ente_ensu::config::legacy_selected_preset_id(
         &defaults.mobile_model_presets,
-        legacy_model_url.as_deref()?,
-        legacy_mmproj_url.as_deref(),
+        legacy.model_url.as_deref()?,
+        legacy.mmproj_url.as_deref(),
     )
 }
 

@@ -670,13 +670,6 @@ mod tests {
         }
     }
 
-    fn target_id(target: &ModelDownloadTarget) -> Option<&str> {
-        match target {
-            ModelDownloadTarget::Gguf { id, .. } => Some(id),
-            _ => None,
-        }
-    }
-
     fn write_gguf(path: &Path, content: &[u8]) {
         fs::create_dir_all(path.parent().unwrap()).unwrap();
         fs::write(path, content).unwrap();
@@ -953,7 +946,7 @@ mod tests {
 
         let models_dir = base.join("models");
         let preset = target("qwen-2b-q8");
-        migrate_legacy_dir(&models_dir, &legacy, &[preset.clone()]);
+        migrate_legacy_dir(&models_dir, &legacy, std::slice::from_ref(&preset));
 
         let downloader = ModelDownloader::new(&models_dir);
         assert_eq!(
@@ -1018,7 +1011,7 @@ mod tests {
             b"GGUFkeep",
         );
 
-        migrate_flat_models_dir(&models_dir, &[preset.clone()]);
+        migrate_flat_models_dir(&models_dir, std::slice::from_ref(&preset));
 
         assert_eq!(
             fs::read(downloader.model_path(&preset)).unwrap(),
@@ -1040,7 +1033,7 @@ mod tests {
             .count();
         assert_eq!(root_files, 0);
 
-        migrate_flat_models_dir(&models_dir, &[preset.clone()]);
+        migrate_flat_models_dir(&models_dir, std::slice::from_ref(&preset));
         assert_eq!(
             fs::read(downloader.model_path(&preset)).unwrap(),
             b"GGUFmain"

@@ -35,10 +35,12 @@ final class ModelDownloader {
             : nil
         let presetId = migrateEnsuLegacyModels(
             modelsDir: modelsDir.path,
-            llmLegacyDir: baseDir.appendingPathComponent("llm", isDirectory: true).path,
-            transcriptionLegacyDir: baseDir.appendingPathComponent("transcription", isDirectory: true).path,
-            legacyModelUrl: legacyModelUrl,
-            legacyMmprojUrl: settings.string(forKey: "ensu.model.mmproj"),
+            legacy: EnsuLegacyModels(
+                llmDir: baseDir.appendingPathComponent("llm", isDirectory: true).path,
+                transcriptionDir: baseDir.appendingPathComponent("transcription", isDirectory: true).path,
+                modelUrl: legacyModelUrl,
+                mmprojUrl: settings.string(forKey: "ensu.model.mmproj")
+            ),
             llmTargets: Self.migrationTargets(),
             transcriptionModel: transcriptionModelTarget,
             voiceActivityModel: voiceActivityModelTarget

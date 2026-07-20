@@ -698,7 +698,6 @@ async fn download_file_single(
     unreachable!("the final attempt returns")
 }
 
-#[allow(clippy::too_many_arguments)]
 async fn download_file_ranged(
     client: &Client,
     target: &Target,
@@ -1587,7 +1586,7 @@ pub fn sha256_file(path: &Path) -> Result<String, Error> {
     use std::io::Read;
     let mut file = File::open(path)?;
     let mut hasher = Sha256::new();
-    let mut buffer = [0u8; 1024 * 1024];
+    let mut buffer = vec![0u8; 1024 * 1024];
     loop {
         let read = file.read(&mut buffer)?;
         if read == 0 {
