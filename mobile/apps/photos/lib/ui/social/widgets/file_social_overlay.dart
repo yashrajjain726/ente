@@ -4,6 +4,7 @@ import "dart:math" as math;
 import "package:collection/collection.dart";
 import "package:ente_components/theme/text_styles.dart" as component;
 import "package:ente_icons/ente_icons.dart";
+import "package:flutter/foundation.dart";
 import "package:flutter/material.dart";
 import "package:logging/logging.dart";
 import "package:photos/generated/l10n.dart";
@@ -13,6 +14,7 @@ import "package:photos/models/file/file.dart";
 import "package:photos/models/social/comment.dart";
 import "package:photos/models/social/comment_author_utils.dart";
 import "package:photos/models/social/social_data_provider.dart";
+import "package:photos/service_locator.dart";
 import "package:photos/services/collections_service.dart";
 import "package:photos/ui/notification/toast.dart";
 import "package:photos/ui/sharing/user_avator_widget.dart";
@@ -222,10 +224,7 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
           _logger.warning("Failed to like photo", error, stackTrace);
           if (mounted && widget.file.uploadedFileID == fileID) {
             setState(() => _hasLiked = previousState);
-            showShortToast(
-              context,
-              AppLocalizations.of(context).failedToUpdateLike,
-            );
+            _showFailedToUpdateLikeToast();
           }
         }
         return;
@@ -279,10 +278,7 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
 
       if (failedCount > 0 && mounted && widget.file.uploadedFileID == fileID) {
         setState(() => _hasLiked = previousState);
-        showShortToast(
-          context,
-          AppLocalizations.of(context).failedToUpdateLike,
-        );
+        _showFailedToUpdateLikeToast();
       }
     } catch (error, stackTrace) {
       _logger.warning(
@@ -292,11 +288,14 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
       );
       if (mounted && widget.file.uploadedFileID == fileID) {
         setState(() => _hasLiked = previousState);
-        showShortToast(
-          context,
-          AppLocalizations.of(context).failedToUpdateLike,
-        );
+        _showFailedToUpdateLikeToast();
       }
+    }
+  }
+
+  void _showFailedToUpdateLikeToast() {
+    if (flagService.internalUser || kDebugMode) {
+      showShortToast(context, AppLocalizations.of(context).failedToUpdateLike);
     }
   }
 
