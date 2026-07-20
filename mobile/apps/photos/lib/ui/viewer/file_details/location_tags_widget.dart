@@ -1,7 +1,6 @@
 import "dart:async";
 import "dart:ui";
 
-import "package:ente_components/ente_components.dart";
 import "package:ente_pure_utils/ente_pure_utils.dart";
 import "package:flutter/material.dart";
 import "package:flutter_animate/flutter_animate.dart";
@@ -16,6 +15,8 @@ import "package:photos/service_locator.dart";
 import "package:photos/services/search_service.dart";
 import "package:photos/states/location_screen_state.dart";
 import "package:photos/theme/ente_theme.dart";
+import "package:photos/ui/components/buttons/chip_button_widget.dart";
+import "package:photos/ui/components/info_item_widget.dart";
 import "package:photos/ui/map/image_marker.dart";
 import "package:photos/ui/map/map_screen.dart";
 import "package:photos/ui/map/map_view.dart";
@@ -34,19 +35,24 @@ class LocationTagsWidget extends StatefulWidget {
 }
 
 class _LocationTagsWidgetState extends State<LocationTagsWidget> {
+  String? title;
   late Future<List<Widget>> locationTagChips;
   late StreamSubscription<LocationTagUpdatedEvent> _locTagUpdateListener;
+  VoidCallback? onTap;
+  bool _loadedLocationTags = false;
 
   @override
   void initState() {
-    locationTagChips = _getLocationTags();
+    locationTagChips = _getLocationTags().then((value) {
+      _loadedLocationTags = true;
+      return value;
+    });
     _locTagUpdateListener = Bus.instance.on<LocationTagUpdatedEvent>().listen((
       event,
     ) {
-      setState(() {
-        locationTagChips = _getLocationTags();
-      });
+      locationTagChips = _getLocationTags();
     });
+
     super.initState();
   }
 
@@ -58,60 +64,97 @@ class _LocationTagsWidgetState extends State<LocationTagsWidget> {
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.componentColors;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(AppLocalizations.of(context).location, style: TextStyles.h2),
-        const SizedBox(height: Spacing.lg),
-        FutureBuilder<List<Widget>>(
-          future: locationTagChips,
-          builder: (context, snapshot) {
-            final placeChips = snapshot.data ?? const <Widget>[];
-            return Wrap(
-              spacing: Spacing.sm,
-              runSpacing: Spacing.sm,
-              children: [
-                ...placeChips,
-                IconButtonComponent(
-                  icon: HugeIcon(
-                    icon: HugeIcons.strokeRoundedPlusSign,
-                    size: IconSizes.small,
-                    color: colors.textBase,
-                  ),
-                  variant: IconButtonComponentVariant.circular,
-                  shouldSurfaceExecutionStates: false,
-                  onTap: () =>
-                      showAddLocationSheet(context, widget.file.location!),
-                ),
-              ],
-            );
-          },
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 500),
+      switchInCurve: Curves.easeInOutExpo,
+      switchOutCurve: Curves.easeInOutExpo,
+      child: InfoItemWidget(
+        key: ValueKey(title),
+        leadingIconWidget: const HugeIcon(
+          icon: HugeIcons.strokeRoundedLocation01,
         ),
-        InfoMap(widget.file),
-      ],
+        title: title,
+        subtitleSection: locationTagChips,
+        onTap: onTap,
+        endSection: _loadedLocationTags
+            ? InfoMap(widget.file)
+            : const SizedBox.shrink(),
+
+        /// to be used when state issues are fixed when location is updated
+        // editOnTap: widget.file.ownerID == Configuration.instance.getUserID()!
+        //     ? () {
+        //         showBarModalBottomSheet(
+        //           shape: const RoundedRectangleBorder(
+        //             borderRadius: BorderRadius.vertical(
+        //               top: Radius.circular(5),
+        //             ),
+        //           ),
+        //           backgroundColor:
+        //               getEnteColorScheme(context).backgroundElevated,
+        //           barrierColor: backdropFaintDark,
+        //           context: context,
+        //           builder: (context) {
+        //             return UpdateLocationDataWidget([widget.file]);
+        //           },
+        //         );
+        //       }
+        //     : null,
+      ),
     );
   }
 
   Future<List<Widget>> _getLocationTags() async {
+    // await Future.delayed(const Duration(seconds: 1));
     final locationTags = await locationService.enclosingLocationTags(
       widget.file.location!,
     );
-    return locationTags
-        .map(
-          (locationTagEntity) => FilterChipComponent(
-            label: locationTagEntity.item.name,
-            onChanged: (_) => routeToPage(
-              context,
-              LocationScreenStateProvider(
-                locationTagEntity,
-                const LocationScreen(),
-              ),
+    if (locationTags.isEmpty) {
+      if (mounted) {
+        setState(() {
+          title = AppLocalizations.of(context).location;
+          onTap = null;
+        });
+      }
+      if (!mounted) return const [];
+      return [
+        ChipButtonWidget(
+          AppLocalizations.of(context).addLocation,
+          onTap: () => showAddLocationSheet(context, widget.file.location!),
+        ),
+      ];
+    } else {
+      if (mounted) {
+        setState(() {
+          title = AppLocalizations.of(context).location;
+          onTap = null;
+        });
+      }
+      final result = locationTags
+          .map(
+            (locationTagEntity) => ChipButtonWidget(
+              locationTagEntity.item.name,
+              onTap: () {
+                routeToPage(
+                  context,
+                  LocationScreenStateProvider(
+                    locationTagEntity,
+                    const LocationScreen(),
+                  ),
+                );
+              },
             ),
-          ),
-        )
-        .toList();
+          )
+          .toList();
+      result.add(
+        ChipButtonWidget(
+          null,
+          leadingIcon: Icons.add,
+          iconSize: 15,
+          onTap: () => showAddLocationSheet(context, widget.file.location!),
+        ),
+      );
+      return result;
+    }
   }
 }
 
@@ -158,7 +201,7 @@ class _InfoMapState extends State<InfoMap> {
           padding: const EdgeInsets.only(top: 8),
           child: ClipRRect(
             clipBehavior: Clip.antiAliasWithSaveLayer,
-            borderRadius: const BorderRadius.all(Radius.circular(Radii.button)),
+            borderRadius: const BorderRadius.all(Radius.circular(8)),
             child: SizedBox(
               height: 124,
               child: _hasEnabledMap
@@ -194,7 +237,7 @@ class _InfoMapState extends State<InfoMap> {
                         IgnorePointer(
                           child: Container(
                             decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(Radii.button),
+                              borderRadius: BorderRadius.circular(8),
                               border: Border.all(
                                 color: getEnteColorScheme(context).strokeFaint,
                               ),
@@ -240,9 +283,7 @@ class _InfoMapState extends State<InfoMap> {
                                   ),
                                   Container(
                                     decoration: BoxDecoration(
-                                      borderRadius: BorderRadius.circular(
-                                        Radii.button,
-                                      ),
+                                      borderRadius: BorderRadius.circular(8),
                                       border: Border.all(
                                         color: getEnteColorScheme(
                                           context,

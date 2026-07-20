@@ -1,9 +1,11 @@
-import "package:ente_components/ente_components.dart";
 import "package:exif_reader/exif_reader.dart";
 import "package:flutter/material.dart";
 import "package:hugeicons/hugeicons.dart";
 import "package:photos/generated/l10n.dart";
 import 'package:photos/models/file/file.dart';
+import "package:photos/theme/colors.dart";
+import "package:photos/theme/ente_theme.dart";
+import "package:photos/ui/components/info_item_widget.dart";
 import "package:photos/ui/notification/toast.dart";
 import "package:photos/ui/viewer/file/exif_info_dialog.dart";
 
@@ -13,67 +15,87 @@ class BasicExifItemWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.componentColors;
-    final parts = <String>[];
-    if (exifData["fNumber"] != null) {
-      parts.add('ƒ/${exifData["fNumber"]}');
-    }
-    if (exifData["exposureTime"] != null) {
-      parts.add(exifData["exposureTime"].toString());
-    }
-    if (exifData["focalLength"] != null) {
-      parts.add('${exifData["focalLength"]}mm');
-    }
-    if (exifData["ISO"] != null) {
-      parts.add('ISO${exifData["ISO"]}');
-    }
-    return MenuComponent(
+    final subtitleTextTheme = getEnteTextTheme(context).miniMuted;
+    return InfoItemWidget(
       key: const ValueKey("Basic EXIF"),
-      leading: HugeIcon(
-        icon: HugeIcons.strokeRoundedCamera01,
-        size: IconSizes.small,
-        color: colors.textLight,
-      ),
+      leadingIconWidget: const HugeIcon(icon: HugeIcons.strokeRoundedLicense),
       title: exifData["takenOnDevice"] ?? "--",
-      subtitle: parts.isEmpty ? null : parts.join("   "),
+      subtitleSection: Future.value([
+        if (exifData["fNumber"] != null)
+          Text('ƒ/' + exifData["fNumber"].toString(), style: subtitleTextTheme),
+        if (exifData["exposureTime"] != null)
+          Text(exifData["exposureTime"], style: subtitleTextTheme),
+        if (exifData["focalLength"] != null)
+          Text(
+            exifData["focalLength"].toString() + "mm",
+            style: subtitleTextTheme,
+          ),
+        if (exifData["ISO"] != null)
+          Text("ISO" + exifData["ISO"].toString(), style: subtitleTextTheme),
+      ]),
     );
   }
 }
 
-class AllExifItemWidget extends StatelessWidget {
+class AllExifItemWidget extends StatefulWidget {
   final EnteFile file;
   final Map<String, IfdTag>? exif;
   const AllExifItemWidget(this.file, this.exif, {super.key});
 
   @override
+  State<AllExifItemWidget> createState() => _AllExifItemWidgetState();
+}
+
+class _AllExifItemWidgetState extends State<AllExifItemWidget> {
+  VoidCallback? _onTap;
+
+  @override
+  void initState() {
+    super.initState();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final colors = context.componentColors;
-    final l10n = AppLocalizations.of(context);
-    final String subtitle;
-    final VoidCallback? onTap;
+    return InfoItemWidget(
+      leadingIconWidget: const HugeIcon(icon: HugeIcons.strokeRoundedLicense),
+      title: AppLocalizations.of(context).exif,
+      subtitleSection: _exifButton(context, widget.file, widget.exif),
+      onTap: _onTap,
+    );
+  }
+
+  Future<List<Widget>> _exifButton(
+    BuildContext context,
+    EnteFile file,
+    Map<String, IfdTag>? exif,
+  ) async {
+    late final String label;
+    late final VoidCallback? onTap;
     if (exif == null) {
-      subtitle = l10n.loadingExifData;
+      label = AppLocalizations.of(context).loadingExifData;
       onTap = null;
-    } else if (exif!.isNotEmpty) {
-      subtitle = l10n.viewAllExifData;
-      onTap = () => showBottomSheetComponent(
+    } else if (exif.isNotEmpty) {
+      label = AppLocalizations.of(context).viewAllExifData;
+      onTap = () => showDialog(
+        useRootNavigator: false,
         context: context,
-        builder: (context) => ExifInfoDialog(file),
+        builder: (BuildContext context) {
+          return ExifInfoDialog(file);
+        },
+        barrierColor: backdropFaintDark,
       );
     } else {
-      subtitle = l10n.noExifData;
-      onTap = () => showShortToast(context, l10n.thisImageHasNoExifData);
+      label = AppLocalizations.of(context).noExifData;
+      onTap = () => showShortToast(
+        context,
+        AppLocalizations.of(context).thisImageHasNoExifData,
+      );
     }
-    return MenuComponent(
-      key: const ValueKey("All EXIF"),
-      leading: HugeIcon(
-        icon: HugeIcons.strokeRoundedCameraLens,
-        size: IconSizes.small,
-        color: colors.textLight,
-      ),
-      title: l10n.exif,
-      subtitle: subtitle,
-      onTap: onTap,
-    );
+    setState(() {
+      _onTap = onTap;
+    });
+    return Future.value([
+      Text(label, style: getEnteTextTheme(context).miniBoldMuted),
+    ]);
   }
 }

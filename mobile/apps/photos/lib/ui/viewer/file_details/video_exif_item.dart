@@ -1,4 +1,3 @@
-import "package:ente_components/ente_components.dart";
 import "package:flutter/material.dart";
 import "package:hugeicons/hugeicons.dart";
 import "package:modal_bottom_sheet/modal_bottom_sheet.dart";
@@ -7,26 +6,49 @@ import "package:photos/models/ffmpeg/ffprobe_props.dart";
 import 'package:photos/models/file/file.dart';
 import "package:photos/theme/colors.dart";
 import "package:photos/theme/ente_theme.dart";
+import "package:photos/ui/components/info_item_widget.dart";
 import "package:photos/ui/notification/toast.dart";
 import "package:photos/ui/viewer/file/video_exif_dialog.dart";
 
-class VideoExifRowItem extends StatelessWidget {
+class VideoExifRowItem extends StatefulWidget {
   final EnteFile file;
   final FFProbeProps? props;
   const VideoExifRowItem(this.file, this.props, {super.key});
 
   @override
+  State<VideoExifRowItem> createState() => _VideoProbeInfoState();
+}
+
+class _VideoProbeInfoState extends State<VideoExifRowItem> {
+  VoidCallback? _onTap;
+
+  @override
+  void initState() {
+    super.initState();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final colors = context.componentColors;
-    final l10n = AppLocalizations.of(context);
-    final props = this.props;
-    final String? subtitle;
-    final VoidCallback? onTap;
-    if (props == null || props.propData == null) {
-      subtitle = l10n.loadingExifData;
+    return InfoItemWidget(
+      leadingIconWidget: const HugeIcon(icon: HugeIcons.strokeRoundedLicense),
+      title: AppLocalizations.of(context).videoInfo,
+      subtitleSection: _exifButton(context, widget.file, widget.props),
+      onTap: _onTap,
+    );
+  }
+
+  Future<List<Widget>> _exifButton(
+    BuildContext context,
+    EnteFile file,
+    FFProbeProps? props,
+  ) async {
+    late final String label;
+    late final VoidCallback? onTap;
+    if (props?.propData == null) {
+      label = AppLocalizations.of(context).loadingExifData;
       onTap = null;
-    } else if (props.propData!.isNotEmpty) {
-      subtitle = props.bitrate;
+    } else if (props!.propData!.isNotEmpty) {
+      label = "${widget.props?.videoInfo ?? ''} ..";
       onTap = () => showBarModalBottomSheet(
         context: context,
         builder: (BuildContext context) {
@@ -42,19 +64,17 @@ class VideoExifRowItem extends StatelessWidget {
         enableDrag: true,
       );
     } else {
-      subtitle = l10n.noExifData;
-      onTap = () => showShortToast(context, l10n.thisImageHasNoExifData);
+      label = AppLocalizations.of(context).noExifData;
+      onTap = () => showShortToast(
+        context,
+        AppLocalizations.of(context).thisImageHasNoExifData,
+      );
     }
-    return MenuComponent(
-      key: const ValueKey("Video info"),
-      leading: HugeIcon(
-        icon: HugeIcons.strokeRoundedVideo02,
-        size: IconSizes.small,
-        color: colors.textLight,
-      ),
-      title: l10n.videoInfo,
-      subtitle: subtitle,
-      onTap: onTap,
-    );
+    setState(() {
+      _onTap = onTap;
+    });
+    return Future.value([
+      Text(label, style: getEnteTextTheme(context).miniBoldMuted),
+    ]);
   }
 }
