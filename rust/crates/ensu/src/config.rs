@@ -196,6 +196,30 @@ mod tests {
     }
 
     #[test]
+    fn presets_pair_mmproj_url_with_checksum() {
+        let defaults = defaults();
+        let all = std::iter::once(&defaults.mobile_default_model)
+            .chain(defaults.mobile_model_presets.iter())
+            .chain(std::iter::once(&defaults.desktop_default_model))
+            .chain(defaults.desktop_model_presets.iter());
+        for preset in all {
+            let has_url = preset
+                .mmproj_url
+                .as_deref()
+                .is_some_and(|u| !u.trim().is_empty());
+            let has_sha = preset
+                .mmproj_sha256
+                .as_deref()
+                .is_some_and(|s| !s.trim().is_empty());
+            assert_eq!(
+                has_url, has_sha,
+                "preset {} must pair mmproj URL with its checksum",
+                preset.id
+            );
+        }
+    }
+
+    #[test]
     fn preset_artifacts_resolve_unambiguously() {
         let defaults = defaults();
         let mut seen: HashMap<(&str, Option<&str>), &str> = HashMap::new();

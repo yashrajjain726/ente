@@ -45,13 +45,13 @@ pub struct ModelTarget {
 
 impl From<ModelTarget> for ModelDownloadTarget {
     fn from(value: ModelTarget) -> Self {
-        Self::Gguf {
-            id: value.id,
-            url: value.url,
-            sha256: value.sha256,
-            mmproj_url: value.mmproj_url,
-            mmproj_sha256: value.mmproj_sha256,
-        }
+        Self::gguf(
+            value.id,
+            value.url,
+            value.sha256,
+            value.mmproj_url,
+            value.mmproj_sha256,
+        )
     }
 }
 
@@ -265,7 +265,7 @@ pub fn llm_model_status(
         model_path: state.downloader.model_path(&target).display().to_string(),
         mmproj_path: state
             .downloader
-            .mmproj_path(&target)
+            .file_path(&target, "mmproj.gguf")
             .map(|path| path.display().to_string()),
         downloaded: state.downloader.is_downloaded(&target),
     }
@@ -293,12 +293,14 @@ pub async fn llm_migrate_models(
         .chain(defaults.mobile_model_presets)
         .chain(std::iter::once(defaults.desktop_default_model))
         .chain(defaults.desktop_model_presets)
-        .map(|preset| ModelDownloadTarget::Gguf {
-            id: preset.id,
-            url: preset.url,
-            sha256: preset.sha256,
-            mmproj_url: preset.mmproj_url,
-            mmproj_sha256: preset.mmproj_sha256,
+        .map(|preset| {
+            ModelDownloadTarget::gguf(
+                preset.id,
+                preset.url,
+                preset.sha256,
+                preset.mmproj_url,
+                preset.mmproj_sha256,
+            )
         })
         .collect();
 

@@ -35,13 +35,13 @@ impl From<ModelDownloadTarget> for ente_model_download::ModelDownloadTarget {
                 sha256,
                 mmproj_url,
                 mmproj_sha256,
-            } => Self::Gguf {
+            } => ente_model_download::ModelDownloadTarget::gguf(
                 id,
                 url,
                 sha256,
                 mmproj_url,
                 mmproj_sha256,
-            },
+            ),
             ModelDownloadTarget::TarGz { id, url, sha256 } => Self::TarGz { id, url, sha256 },
             ModelDownloadTarget::File {
                 id,
@@ -131,23 +131,12 @@ impl ModelDownloadCore {
     }
 
     pub fn model_path(&self, target: ModelDownloadTarget) -> String {
-        let name = match &target {
-            ModelDownloadTarget::File { name, .. } => Some(name.clone()),
-            _ => None,
-        };
-        let target = target.into();
-        let path = match name {
-            Some(name) => self.inner.file_path(&target, &name),
-            None => None,
-        };
-        path.unwrap_or_else(|| self.inner.model_path(&target))
-            .display()
-            .to_string()
+        self.inner.model_path(&target.into()).display().to_string()
     }
 
     pub fn mmproj_path(&self, target: ModelDownloadTarget) -> Option<String> {
         self.inner
-            .mmproj_path(&target.into())
+            .file_path(&target.into(), "mmproj.gguf")
             .map(|path| path.display().to_string())
     }
 
