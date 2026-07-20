@@ -298,8 +298,7 @@ class CollectionsService {
   /// Returns the shared collections containing [uploadedFileID].
   ///
   /// A collection is considered shared if it has sharees, has a public link,
-  /// or is owned by someone else (incoming share). Results are sorted by ID so
-  /// callers have a deterministic primary collection.
+  /// or is owned by someone else (incoming share).
   Future<List<Collection>> getSharedCollectionsForFile(
     int uploadedFileID, {
     bool includeHidden = false,
@@ -323,7 +322,6 @@ class CollectionsService {
         sharedCollections.add(collection!);
       }
     }
-    sharedCollections.sort((first, second) => first.id.compareTo(second.id));
     return sharedCollections;
   }
 
