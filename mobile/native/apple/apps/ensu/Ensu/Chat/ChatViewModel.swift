@@ -11,7 +11,7 @@ final class ChatViewModel: ObservableObject {
     private static let defaultTemperature: Float = 0.5
     private static let systemPromptDateFormatter: DateFormatter = {
         let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss z"
+        formatter.dateFormat = "yyyy-MM-dd"
         return formatter
     }()
     private static let systemPromptDatePlaceholder = ConfigDefaults.shared.systemPromptDatePlaceholder
@@ -24,9 +24,9 @@ final class ChatViewModel: ObservableObject {
     private static let sessionSummarySystemPrompt = ConfigDefaults.shared.sessionSummarySystemPrompt
 
     private func systemPrompt() -> String {
-        let dateAndTime = Self.systemPromptDateFormatter.string(from: Date())
+        let date = Self.systemPromptDateFormatter.string(from: Date())
         let promptBody = ModelSettingsStore.currentSystemPromptBody()
-        return promptBody.replacingOccurrences(of: Self.systemPromptDatePlaceholder, with: dateAndTime)
+        return promptBody.replacingOccurrences(of: Self.systemPromptDatePlaceholder, with: date)
     }
 
     private let logger = EnsuLogging.shared.logger("ChatViewModel")

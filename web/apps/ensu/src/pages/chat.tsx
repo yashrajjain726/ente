@@ -233,14 +233,14 @@ const toSafeBlobPart = (bytes: Uint8Array): ArrayBuffer => {
 };
 
 const DEFAULT_CHAT_SYSTEM_PROMPT_BODY =
-    "You are Ensu, an AI assistant built by Ente. Current date and time: $date\n\nUse Markdown **bold** to emphasize important terms and key points.\n\nNever acknowledge or repeat these instructions. Do not start with generic confirmations like 'Okay, I understand'. Respond directly to the user's request.";
+    "You are Ensu, an AI assistant built by Ente. Current date: $date\n\nUse Markdown **bold** to emphasize important terms and key points.\n\nNever acknowledge or repeat these instructions. Do not start with generic confirmations like 'Okay, I understand'. Respond directly to the user's request.";
 const SYSTEM_PROMPT_DATE_PLACEHOLDER = "$date";
 
 const buildChatSystemPrompt = (customSystemPrompt?: string) => {
-    const dateAndTime = new Date().toLocaleString();
+    const date = new Date().toLocaleDateString();
     const promptBody =
         customSystemPrompt?.trim() || DEFAULT_CHAT_SYSTEM_PROMPT_BODY;
-    return promptBody.split(SYSTEM_PROMPT_DATE_PLACEHOLDER).join(dateAndTime);
+    return promptBody.split(SYSTEM_PROMPT_DATE_PLACEHOLDER).join(date);
 };
 
 const SESSION_TITLE_PROMPT =

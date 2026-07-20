@@ -1234,11 +1234,11 @@ internal class ChatStoreActions(
     )
 
     private fun buildSystemPrompt(nowMillis: Long = clock()): String {
-        val dateAndTime = SimpleDateFormat("yyyy-MM-dd HH:mm:ss z", Locale.getDefault())
+        val date = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
             .format(Date(nowMillis))
         val promptBody = state.value.developerSettings.systemPrompt.trim()
             .ifEmpty { configDefaults.mobileSystemPromptBody }
-        return promptBody.replace(configDefaults.systemPromptDatePlaceholder, dateAndTime)
+        return promptBody.replace(configDefaults.systemPromptDatePlaceholder, date)
     }
 
     companion object {
