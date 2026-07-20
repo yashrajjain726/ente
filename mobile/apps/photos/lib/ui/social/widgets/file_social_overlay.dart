@@ -26,12 +26,6 @@ const _likedColor = Color(0xFF08C225);
 const _socialControlsSize = 40.0;
 const _socialIconSize = 32.0;
 
-typedef FileSocialContextIdentity = ({
-  int? uploadedFileID,
-  int? openingCollectionID,
-  int? currentUserID,
-});
-
 bool fileSocialContextIncludesHiddenCollections(
   int? openingCollectionID,
   Set<int> hiddenCollectionIDs,
@@ -63,12 +57,6 @@ class FileSocialOverlay extends StatefulWidget {
     super.key,
   });
 
-  FileSocialContextIdentity get contextIdentity => (
-    uploadedFileID: file.uploadedFileID,
-    openingCollectionID: openingCollectionID,
-    currentUserID: currentUserID,
-  );
-
   @override
   State<FileSocialOverlay> createState() => _FileSocialOverlayState();
 }
@@ -91,7 +79,7 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
   @override
   void didUpdateWidget(covariant FileSocialOverlay oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.contextIdentity != widget.contextIdentity) {
+    if (oldWidget.file.uploadedFileID != widget.file.uploadedFileID) {
       _clearSocialState();
       unawaited(_refreshSocialState());
     }
@@ -106,12 +94,12 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
   }
 
   bool _canApplySocialRefresh({
-    required FileSocialContextIdentity requestedContext,
+    required int requestedFileID,
     required int refreshID,
   }) {
     return mounted &&
         refreshID == _latestRefreshID &&
-        widget.contextIdentity == requestedContext;
+        widget.file.uploadedFileID == requestedFileID;
   }
 
   bool get _includeHiddenCollections {
@@ -122,10 +110,9 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
   }
 
   Future<void> _refreshSocialState() async {
-    // Recheck the captured context after every await before touching state.
+    // Recheck the captured file after every await before touching state.
     final fileID = widget.file.uploadedFileID;
     final currentUserID = widget.currentUserID;
-    final requestedContext = widget.contextIdentity;
     final refreshID = ++_latestRefreshID;
 
     if (fileID == null || currentUserID == null) {
@@ -134,7 +121,7 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
       scheduleMicrotask(() {
         if (!mounted ||
             refreshID != _latestRefreshID ||
-            widget.contextIdentity != requestedContext) {
+            widget.file.uploadedFileID != fileID) {
           return;
         }
         widget.onVisibilityChanged?.call(false);
@@ -149,7 +136,7 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
             includeHidden: _includeHiddenCollections,
           );
       if (!_canApplySocialRefresh(
-        requestedContext: requestedContext,
+        requestedFileID: fileID,
         refreshID: refreshID,
       )) {
         return;
@@ -171,7 +158,7 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
         ),
       ]);
       if (!_canApplySocialRefresh(
-        requestedContext: requestedContext,
+        requestedFileID: fileID,
         refreshID: refreshID,
       )) {
         return;
@@ -188,7 +175,7 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
               )
             : const <String, String>{};
         if (!_canApplySocialRefresh(
-          requestedContext: requestedContext,
+          requestedFileID: fileID,
           refreshID: refreshID,
         )) {
           return;
@@ -203,7 +190,7 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
       }
 
       if (!_canApplySocialRefresh(
-        requestedContext: requestedContext,
+        requestedFileID: fileID,
         refreshID: refreshID,
       )) {
         return;
@@ -230,7 +217,6 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
     final file = widget.file;
     final fileID = file.uploadedFileID;
     final currentUserID = widget.currentUserID;
-    final actionContext = widget.contextIdentity;
     if (fileID == null ||
         currentUserID == null ||
         _eligibleSharedCollectionIDs.isEmpty ||
@@ -241,7 +227,7 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
     _reactionUpdateFileIDs.add(fileID);
     try {
       if (_hasLiked) {
-        await _unlikeFromAllCollections(fileID, currentUserID, actionContext);
+        await _unlikeFromAllCollections(fileID, currentUserID);
         return;
       }
 
@@ -251,7 +237,7 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
             includeHidden: _includeHiddenCollections,
           );
       if (!mounted ||
-          widget.contextIdentity != actionContext ||
+          widget.file.uploadedFileID != fileID ||
           sharedCollections.isEmpty) {
         return;
       }
@@ -267,7 +253,7 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
           );
         } catch (error, stackTrace) {
           _logger.severe("Failed to like photo", error, stackTrace);
-          if (mounted && widget.contextIdentity == actionContext) {
+          if (mounted && widget.file.uploadedFileID == fileID) {
             setState(() => _hasLiked = previousState);
             showShortToast(
               context,
@@ -292,11 +278,7 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
     }
   }
 
-  Future<void> _unlikeFromAllCollections(
-    int fileID,
-    int currentUserID,
-    FileSocialContextIdentity actionContext,
-  ) async {
+  Future<void> _unlikeFromAllCollections(int fileID, int currentUserID) async {
     final previousState = _hasLiked;
     setState(() => _hasLiked = false);
 
@@ -328,9 +310,7 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
         }
       }
 
-      if (failedCount > 0 &&
-          mounted &&
-          widget.contextIdentity == actionContext) {
+      if (failedCount > 0 && mounted && widget.file.uploadedFileID == fileID) {
         setState(() => _hasLiked = previousState);
         showShortToast(
           context,
@@ -343,7 +323,7 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
         error,
         stackTrace,
       );
-      if (mounted && widget.contextIdentity == actionContext) {
+      if (mounted && widget.file.uploadedFileID == fileID) {
         setState(() => _hasLiked = previousState);
         showShortToast(
           context,
@@ -355,7 +335,6 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
 
   Future<void> _showLikes() async {
     final fileID = widget.file.uploadedFileID;
-    final actionContext = widget.contextIdentity;
     if (fileID == null || _eligibleSharedCollectionIDs.isEmpty) return;
     await _runSheetAndRefresh(() async {
       final sharedCollections = await CollectionsService.instance
@@ -364,12 +343,12 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
             includeHidden: _includeHiddenCollections,
           );
       if (!mounted ||
-          widget.contextIdentity != actionContext ||
+          widget.file.uploadedFileID != fileID ||
           sharedCollections.isEmpty) {
         return;
       }
       final initialCollection = sharedCollections.firstWhereOrNull(
-        (collection) => collection.id == actionContext.openingCollectionID,
+        (collection) => collection.id == widget.openingCollectionID,
       );
       await showLikesBottomSheet(
         context,
@@ -383,7 +362,6 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
 
   Future<void> _openComments({Comment? comment}) async {
     final fileID = widget.file.uploadedFileID;
-    final actionContext = widget.contextIdentity;
     if (fileID == null || _eligibleSharedCollectionIDs.isEmpty) return;
     await _runSheetAndRefresh(() async {
       final sharedCollections = await CollectionsService.instance
@@ -392,7 +370,7 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
             includeHidden: _includeHiddenCollections,
           );
       if (!mounted ||
-          widget.contextIdentity != actionContext ||
+          widget.file.uploadedFileID != fileID ||
           sharedCollections.isEmpty) {
         return;
       }
@@ -404,7 +382,7 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
         if (collection.id == comment?.collectionID) {
           commentCollection = collection;
         }
-        if (collection.id == actionContext.openingCollectionID) {
+        if (collection.id == widget.openingCollectionID) {
           openingCollection = collection;
         }
         if (collection.id == _latestComment?.collectionID) {
