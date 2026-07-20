@@ -202,8 +202,9 @@ class _EditContactPageState extends State<EditContactPage> {
                 ),
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
+            SafeArea(
+              top: false,
+              minimum: const EdgeInsets.fromLTRB(24, 24, 24, 24),
               child: ButtonComponent(
                 label: l10n.saveContact,
                 isDisabled: !_canSave,
