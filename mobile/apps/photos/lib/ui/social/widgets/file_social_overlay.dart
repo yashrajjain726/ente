@@ -6,8 +6,6 @@ import "package:ente_components/theme/text_styles.dart" as component;
 import "package:ente_icons/ente_icons.dart";
 import "package:flutter/material.dart";
 import "package:logging/logging.dart";
-import "package:photos/core/event_bus.dart";
-import "package:photos/events/social_data_updated_event.dart";
 import "package:photos/generated/l10n.dart";
 import "package:photos/models/api/collection/user.dart";
 import "package:photos/models/collection/collection.dart";
@@ -76,9 +74,6 @@ class FileSocialOverlay extends StatefulWidget {
 }
 
 class _FileSocialOverlayState extends State<FileSocialOverlay> {
-  late final StreamSubscription<SocialDataUpdatedEvent>
-  _socialDataUpdatedSubscription;
-
   List<int> _eligibleSharedCollectionIDs = const [];
   bool _hasLiked = false;
   int _commentCount = 0;
@@ -90,9 +85,6 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
   @override
   void initState() {
     super.initState();
-    _socialDataUpdatedSubscription = Bus.instance
-        .on<SocialDataUpdatedEvent>()
-        .listen((_) => unawaited(_refreshSocialState()));
     unawaited(_refreshSocialState());
   }
 
@@ -103,12 +95,6 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
       _clearSocialState();
       unawaited(_refreshSocialState());
     }
-  }
-
-  @override
-  void dispose() {
-    _socialDataUpdatedSubscription.cancel();
-    super.dispose();
   }
 
   void _clearSocialState() {
