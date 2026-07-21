@@ -280,106 +280,91 @@ async fn fetch_async(
         &on_progress,
     );
 
-    let mut downloads = Vec::new();
-
     for (index, target) in targets.iter().enumerate() {
         if cached[index] {
             continue;
         }
+        if is_cancelled() {
+            return Err(Error::Cancelled);
+        }
         let destination = PathBuf::from(&target.destination_path);
-
         let download_probe = download_probes
             .get(index)
             .cloned()
             .unwrap_or_else(DownloadProbe::default);
         let expected_file_total = download_probe.content_length;
-        let progress_states = Rc::clone(&file_states);
-        let progress_callback = Rc::clone(&on_progress);
         let target_label = target.label.clone();
-        let client = &client;
-        let is_cancelled = &is_cancelled;
-
-        downloads.push(async move {
-            if is_cancelled() {
-                return Err(Error::Cancelled);
-            }
-
-            let file_report = download_file(
-                client,
-                target,
-                &destination,
-                &download_probe,
-                |file_progress| {
-                    {
-                        let mut states = progress_states.borrow_mut();
-                        if let Some(state) = states.get_mut(index) {
-                            state.downloaded_bytes = file_progress.downloaded_bytes;
-                            state.total_bytes = file_progress.total_bytes;
-                            state.network_downloaded_bytes = file_progress.network_downloaded_bytes;
-                            state.elapsed = file_progress.elapsed;
-                            state.retry_count = file_progress.retry_count;
-                        }
+        let file_report = download_file(
+            &client,
+            target,
+            &destination,
+            &download_probe,
+            |file_progress| {
+                {
+                    let mut states = file_states.borrow_mut();
+                    if let Some(state) = states.get_mut(index) {
+                        state.downloaded_bytes = file_progress.downloaded_bytes;
+                        state.total_bytes = file_progress.total_bytes;
+                        state.network_downloaded_bytes = file_progress.network_downloaded_bytes;
+                        state.elapsed = file_progress.elapsed;
+                        state.retry_count = file_progress.retry_count;
                     }
-
-                    let metrics = aggregate_progress_metrics(
-                        download_started_at.elapsed(),
-                        &progress_states,
-                        index,
-                        false,
-                        false,
-                    );
-                    emit_progress_from_states(
-                        &target_label,
-                        total_bytes,
-                        metrics,
-                        Some(index),
-                        &progress_states,
-                        &progress_callback,
-                    );
-                },
-                is_cancelled,
-            )
-            .await
-            .map_err(|err| match err {
-                Error::Cancelled => Error::Cancelled,
-                err => Error::Target {
-                    label: target.label.clone(),
-                    source: Box::new(err),
-                },
-            })?;
-
-            {
-                let mut states = progress_states.borrow_mut();
-                if let Some(state) = states.get_mut(index) {
-                    state.downloaded_bytes = file_report.final_size;
-                    state.total_bytes = expected_file_total.or(Some(file_report.final_size));
-                    state.network_downloaded_bytes = file_report.network_downloaded_bytes;
-                    state.elapsed = file_report.elapsed;
-                    state.retry_count = file_report.retry_count;
                 }
+
+                let metrics = aggregate_progress_metrics(
+                    download_started_at.elapsed(),
+                    &file_states,
+                    index,
+                    false,
+                    false,
+                );
+                emit_progress_from_states(
+                    &target_label,
+                    total_bytes,
+                    metrics,
+                    Some(index),
+                    &file_states,
+                    &on_progress,
+                );
+            },
+            &is_cancelled,
+        )
+        .await
+        .map_err(|err| match err {
+            Error::Cancelled => Error::Cancelled,
+            err => Error::Target {
+                label: target.label.clone(),
+                source: Box::new(err),
+            },
+        })?;
+
+        {
+            let mut states = file_states.borrow_mut();
+            if let Some(state) = states.get_mut(index) {
+                state.downloaded_bytes = file_report.final_size;
+                state.total_bytes = expected_file_total.or(Some(file_report.final_size));
+                state.network_downloaded_bytes = file_report.network_downloaded_bytes;
+                state.elapsed = file_report.elapsed;
+                state.retry_count = file_report.retry_count;
             }
+        }
 
-            let metrics = aggregate_progress_metrics(
-                download_started_at.elapsed(),
-                &progress_states,
-                index,
-                true,
-                false,
-            );
-            emit_progress_from_states(
-                &target_label,
-                total_bytes,
-                metrics,
-                Some(index),
-                &progress_states,
-                &progress_callback,
-            );
-
-            Ok(file_report)
-        });
+        let metrics = aggregate_progress_metrics(
+            download_started_at.elapsed(),
+            &file_states,
+            index,
+            true,
+            false,
+        );
+        emit_progress_from_states(
+            &target_label,
+            total_bytes,
+            metrics,
+            Some(index),
+            &file_states,
+            &on_progress,
+        );
     }
-
-    let _reports = try_join_all(downloads).await?;
     let complete_metrics = aggregate_complete_metrics(download_started_at.elapsed(), &file_states);
 
     emit_progress_from_states(
@@ -422,7 +407,9 @@ async fn download_file(
             .await
             {
                 Ok(report) => return Ok(report),
-                Err(err @ (Error::Cancelled | Error::Validation(_))) => return Err(err),
+                Err(err @ (Error::Cancelled | Error::Validation(_) | Error::StorageFull)) => {
+                    return Err(err);
+                }
                 Err(err) => {
                     range_error = Some(err);
                     cleanup_range_download(destination);
@@ -1909,6 +1896,43 @@ mod tests {
             *bytes
         );
         assert_eq!(get_count.load(Ordering::SeqCst), 1);
+
+        let _ = fs::remove_dir_all(test_dir);
+    }
+
+    #[test]
+    fn downloads_files_sequentially() {
+        let bytes = Arc::new(sample_bytes(512));
+        let active = Arc::new(AtomicUsize::new(0));
+        let max_active = Arc::new(AtomicUsize::new(0));
+
+        let server = {
+            let bytes = Arc::clone(&bytes);
+            let active = Arc::clone(&active);
+            let max_active = Arc::clone(&max_active);
+            TestServer::spawn(move |stream| {
+                let current = active.fetch_add(1, Ordering::SeqCst) + 1;
+                max_active.fetch_max(current, Ordering::SeqCst);
+                thread::sleep(Duration::from_millis(50));
+                handle_no_range_test_request(
+                    stream,
+                    Arc::clone(&bytes),
+                    Arc::new(AtomicUsize::new(0)),
+                );
+                active.fetch_sub(1, Ordering::SeqCst);
+            })
+        };
+
+        let test_dir = scratch_dir("sequential-downloads");
+        let targets = ["model", "projector"].map(|label| Target {
+            label: label.to_string(),
+            url: server.url(&format!("/{label}.bin")),
+            destination_path: test_dir.join(format!("{label}.bin")).display().to_string(),
+            sha256: sha_hex(&bytes),
+        });
+
+        fetch(targets.into(), |_| {}, || false).expect("downloads succeed");
+        assert_eq!(max_active.load(Ordering::SeqCst), 1);
 
         let _ = fs::remove_dir_all(test_dir);
     }

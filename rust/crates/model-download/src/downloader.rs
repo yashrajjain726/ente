@@ -13,14 +13,14 @@ use crate::gguf;
 
 #[derive(Debug, Clone)]
 pub enum ModelDownloadTarget {
+    Files {
+        id: String,
+        files: Vec<ModelFile>,
+    },
     TarGz {
         id: String,
         url: String,
         sha256: String,
-    },
-    Files {
-        id: String,
-        files: Vec<ModelFile>,
     },
 }
 
@@ -190,12 +190,14 @@ impl ModelDownloader {
             log_line: Some(format!("Extracting model archive id={id}")),
         });
         let archive_path = self.staging_dir().join(format!("{id}.tar.gz"));
-        let result = archive::extract_tar_gz(
-            &archive_path,
-            &self.staging_dir().join(id),
-            &self.model_path(target),
-        );
-        let _ = fs::remove_file(&archive_path);
+        let extraction_dir = self.staging_dir().join(id);
+        let result =
+            archive::extract_tar_gz(&archive_path, &extraction_dir, &self.model_path(target));
+        if result.is_err() {
+            let _ = fs::remove_dir_all(extraction_dir);
+        } else {
+            let _ = fs::remove_file(&archive_path);
+        }
         result
     }
 
@@ -235,7 +237,7 @@ impl ModelDownloader {
 
 fn storage_key(target: &ModelDownloadTarget) -> &str {
     match target {
-        ModelDownloadTarget::TarGz { id, .. } | ModelDownloadTarget::Files { id, .. } => id,
+        ModelDownloadTarget::Files { id, .. } | ModelDownloadTarget::TarGz { id, .. } => id,
     }
 }
 
@@ -780,6 +782,22 @@ mod tests {
 
         assert!(downloader.remove_downloaded(&target));
         assert!(!downloader.is_downloaded(&target));
+
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn failed_archive_extraction_cleans_staging() {
+        let dir = scratch_dir("variant-extract-failure");
+        let downloader = ModelDownloader::new(&dir);
+        let target = tar_gz_target("parakeet-v3-int8");
+        let staging_dir = dir.join(".staging");
+        fs::create_dir_all(&staging_dir).unwrap();
+        fs::write(staging_dir.join("parakeet-v3-int8.tar.gz"), b"invalid").unwrap();
+
+        assert!(downloader.extract_if_archive(&target, &mut |_| {}).is_err());
+        assert!(!staging_dir.join("parakeet-v3-int8").exists());
+        assert!(staging_dir.join("parakeet-v3-int8.tar.gz").exists());
 
         let _ = fs::remove_dir_all(dir);
     }
