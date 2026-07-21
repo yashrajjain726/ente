@@ -22,32 +22,43 @@ struct SettingsView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: EnsuSpacing.lg) {
-                    if let aboutItem = filteredAboutItem {
-                        Button(action: aboutItem.action) {
-                            settingsCard(title: aboutItem.title, iconName: aboutItem.iconName, showsChevron: true)
-                        }
-                        .buttonStyle(.plain)
-                    }
-
                     ForEach(filteredItems) { item in
                         NavigationLink {
                             item.destination
                         } label: {
-                            settingsCard(title: item.title, iconName: item.iconName, showsChevron: true)
+                            SettingsCard(title: item.title, iconName: item.iconName, showsChevron: true)
+                        }
+                        .buttonStyle(.plain)
+                    }
+
+                    if let aboutItem = filteredAboutItem {
+                        Button(action: aboutItem.action) {
+                            SettingsCard(title: aboutItem.title, iconName: aboutItem.iconName, showsChevron: true)
+                        }
+                        .buttonStyle(.plain)
+                    }
+
+                    ForEach(filteredUtilityItems) { item in
+                        NavigationLink {
+                            item.destination
+                        } label: {
+                            SettingsCard(title: item.title, iconName: item.iconName, showsChevron: true)
                         }
                         .buttonStyle(.plain)
                     }
 
                     if shouldShowSignInRow {
                         Button(action: onSignIn) {
-                            settingsCard(title: signInTitle, iconName: "Upload01Icon", showsChevron: true)
+                            SettingsCard(title: signInTitle, iconName: "Upload01Icon", showsChevron: true)
                         }
                         .buttonStyle(.plain)
                     }
 
-                    ForEach(filteredLegalLinkItems) { item in
-                        Button(action: item.action) {
-                            settingsCard(title: item.title, iconName: item.iconName, showsChevron: true)
+                    ForEach(filteredTermsItems) { item in
+                        NavigationLink {
+                            item.destination
+                        } label: {
+                            SettingsCard(title: item.title, iconName: item.iconName, showsChevron: true)
                         }
                         .buttonStyle(.plain)
                     }
@@ -62,7 +73,7 @@ struct SettingsView: View {
                             NavigationLink {
                                 item.destination
                             } label: {
-                                settingsCard(title: item.title, iconName: item.iconName, showsChevron: true)
+                                SettingsCard(title: item.title, iconName: item.iconName, showsChevron: true)
                             }
                             .buttonStyle(.plain)
                         }
@@ -104,57 +115,34 @@ struct SettingsView: View {
     }
 
     private var filteredItems: [SettingsItem] {
-        guard !trimmedQuery.isEmpty else { return allItems }
-        let q = trimmedQuery.lowercased()
-        return allItems.filter { item in
-            item.title.lowercased().contains(q)
-        }
+        filtered(allItems)
+    }
+
+    private var filteredUtilityItems: [SettingsItem] {
+        filtered(utilityItems)
+    }
+
+    private var filteredTermsItems: [SettingsItem] {
+        filtered(termsItems)
     }
 
     private var filteredAdvancedItems: [SettingsItem] {
         guard isAdvancedUnlocked else { return [] }
-        guard !trimmedQuery.isEmpty else { return advancedItems }
-        let q = trimmedQuery.lowercased()
-        return advancedItems.filter { item in
-            item.title.lowercased().contains(q)
-        }
+        return filtered(advancedItems)
     }
 
     private var aboutItem: SettingsActionItem {
         SettingsActionItem(
-            title: "About",
+            title: "About Ensu",
             iconName: "InformationCircleIcon",
             action: { openExternalLink("https://ente.com/blog/ensu/") }
         )
-    }
-
-    private var legalLinkItems: [SettingsActionItem] {
-        [
-            SettingsActionItem(
-                title: "Privacy Policy",
-                iconName: "ViewIcon",
-                action: { openExternalLink("https://ente.com/privacy") }
-            ),
-            SettingsActionItem(
-                title: "Terms of Service",
-                iconName: "DescriptionIcon",
-                action: { openExternalLink("https://ente.com/terms") }
-            )
-        ]
     }
 
     private var filteredAboutItem: SettingsActionItem? {
         guard !trimmedQuery.isEmpty else { return aboutItem }
         let q = trimmedQuery.lowercased()
         return aboutItem.title.lowercased().contains(q) ? aboutItem : nil
-    }
-
-    private var filteredLegalLinkItems: [SettingsActionItem] {
-        guard !trimmedQuery.isEmpty else { return legalLinkItems }
-        let q = trimmedQuery.lowercased()
-        return legalLinkItems.filter { item in
-            item.title.lowercased().contains(q)
-        }
     }
 
     private var shouldShowSignInRow: Bool {
@@ -168,8 +156,8 @@ struct SettingsView: View {
     private var allItems: [SettingsItem] {
         [
             SettingsItem(
-                title: "Knowledge",
-                iconName: "Search01Icon",
+                title: "Ensu Packs",
+                iconName: "PackageIcon",
                 destination: AnyView(
                     KnowledgeSettingsView(
                         state: knowledgeState,
@@ -178,13 +166,39 @@ struct SettingsView: View {
                         onSetEnabled: onSetKnowledgePackEnabled
                     )
                 )
-            ),
+            )
+        ]
+    }
+
+    private var utilityItems: [SettingsItem] {
+        [
             SettingsItem(
                 title: "Logs",
                 iconName: "Bug01Icon",
                 destination: AnyView(LogsView(embeddedInNavigation: true))
             )
         ]
+    }
+
+    private var termsItems: [SettingsItem] {
+        [
+            SettingsItem(
+                title: "Terms and Conditions",
+                iconName: "DescriptionIcon",
+                destination: AnyView(TermsAndConditionsView()),
+                searchTerms: [
+                    "Privacy Policy",
+                    "Ente Terms and Conditions",
+                    "Terms of Service"
+                ]
+            )
+        ]
+    }
+
+    private func filtered(_ items: [SettingsItem]) -> [SettingsItem] {
+        guard !trimmedQuery.isEmpty else { return items }
+        let q = trimmedQuery.lowercased()
+        return items.filter { $0.matches(q) }
     }
 
     private var advancedItems: [SettingsItem] {
@@ -239,8 +253,14 @@ struct SettingsView: View {
         guard let url = URL(string: urlString) else { return }
         openURL(url)
     }
+}
 
-    private func settingsCard(title: String, iconName: String, showsChevron: Bool) -> some View {
+struct SettingsCard: View {
+    let title: String
+    let iconName: String
+    let showsChevron: Bool
+
+    var body: some View {
         HStack(spacing: EnsuSpacing.md) {
             Image(iconName)
                 .resizable()
@@ -402,6 +422,24 @@ private struct SettingsItem: Identifiable {
     let title: String
     let iconName: String
     let destination: AnyView
+    let searchTerms: [String]
+
+    init(
+        title: String,
+        iconName: String,
+        destination: AnyView,
+        searchTerms: [String] = []
+    ) {
+        self.title = title
+        self.iconName = iconName
+        self.destination = destination
+        self.searchTerms = searchTerms
+    }
+
+    func matches(_ query: String) -> Bool {
+        title.lowercased().contains(query) ||
+            searchTerms.contains { $0.lowercased().contains(query) }
+    }
 }
 
 private struct SettingsActionItem: Identifiable {

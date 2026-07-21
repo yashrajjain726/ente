@@ -5,29 +5,23 @@ struct KnowledgeSettingsView: View {
     let onDownloadOrUpdate: (String) -> Void
     let onCancel: (String) -> Void
     let onSetEnabled: (String, Bool) -> Void
+    @State private var attributionPack: KnowledgePackState?
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: EnsuSpacing.md) {
-                Text("Download public knowledge packs for private, on-device answers. Queries never leave this device.")
-                    .font(EnsuTypography.body)
-                    .foregroundStyle(EnsuColor.textMuted)
-
                 ForEach(state.packs) { pack in
                     packCard(pack)
                 }
-
-                Text("Wikimedia and Ensu are not affiliated. Wikimedia project names identify the source material only.")
-                    .font(EnsuTypography.small)
-                    .foregroundStyle(EnsuColor.textMuted)
-                    .padding(.vertical, EnsuSpacing.md)
-
             }
             .padding(EnsuSpacing.lg)
         }
         .background(EnsuColor.backgroundBase)
-        .navigationTitle("Knowledge")
+        .navigationTitle("Ensu Packs")
         .navigationBarTitleDisplayMode(.inline)
+        .sheet(item: $attributionPack) { pack in
+            PackAttributionSheet(config: pack.config)
+        }
     }
 
     @ViewBuilder
@@ -39,13 +33,26 @@ struct KnowledgeSettingsView: View {
                     Text(pack.config.label)
                         .font(EnsuTypography.large)
                         .foregroundStyle(EnsuColor.textPrimary)
-                    Text(pack.status.label)
-                        .font(EnsuTypography.small)
-                        .foregroundStyle(EnsuColor.textMuted)
-                    if let activeIdentity = pack.activeIdentity {
-                        Text("Installed revision: \(activeIdentity)")
-                            .font(EnsuTypography.small)
+                    HStack(spacing: EnsuSpacing.xs) {
+                        Text(pack.config.downloadSizeBytes.formattedFileSize)
+                            .font(EnsuTypography.mini)
                             .foregroundStyle(EnsuColor.textMuted)
+                        Text("·")
+                            .font(EnsuTypography.mini)
+                            .foregroundStyle(EnsuColor.textMuted)
+                        Button {
+                            attributionPack = pack
+                        } label: {
+                            HStack(spacing: EnsuSpacing.xs) {
+                                Text(attribution.licenseLabel)
+                                    .font(EnsuTypography.mini)
+                                Image(systemName: "info.circle")
+                                    .font(.system(size: 12, weight: .medium))
+                            }
+                            .foregroundStyle(EnsuColor.accent)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("View attribution for \(pack.config.label)")
                     }
                 }
                 Spacer()
@@ -58,6 +65,17 @@ struct KnowledgeSettingsView: View {
                         )
                     )
                     .labelsHidden()
+                } else if state.downloadsAllowed && pack.status == .download && !pack.isMutating {
+                    Button {
+                        onDownloadOrUpdate(pack.id)
+                    } label: {
+                        Text("Download")
+                            .font(EnsuTypography.small)
+                            .padding(.horizontal, EnsuSpacing.xs)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
+                    .tint(EnsuColor.accent)
                 }
             }
 
@@ -70,12 +88,16 @@ struct KnowledgeSettingsView: View {
                 Button("Cancel") {
                     onCancel(pack.id)
                 }
-            } else if state.downloadsAllowed &&
-                (pack.status == .download || pack.status == .updateAvailable) {
-                Button(pack.status == .download ? "Download" : "Update") {
+            } else if state.downloadsAllowed && pack.status == .updateAvailable {
+                Button {
                     onDownloadOrUpdate(pack.id)
+                } label: {
+                    Text("Update")
+                        .font(EnsuTypography.small)
+                        .padding(.horizontal, EnsuSpacing.xs)
                 }
                 .buttonStyle(.borderedProminent)
+                .controlSize(.small)
                 .tint(EnsuColor.accent)
             }
 
@@ -84,33 +106,10 @@ struct KnowledgeSettingsView: View {
                     .font(EnsuTypography.small)
                     .foregroundStyle(.red)
             }
-
-            Divider()
-            Text(attribution.credit)
-                .font(EnsuTypography.small)
-            Text(attribution.buildProvenance)
-                .font(EnsuTypography.small)
-                .foregroundStyle(EnsuColor.textMuted)
-            Text(attribution.modificationNotice)
-                .font(EnsuTypography.small)
-                .foregroundStyle(EnsuColor.textMuted)
-            Link(attribution.licenseLabel, destination: URL(string: attribution.licenseUrl)!)
-            Link("Public pack", destination: URL(string: attribution.publicPackUrl)!)
         }
         .padding(EnsuSpacing.lg)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(EnsuColor.fillFaint)
         .clipShape(RoundedRectangle(cornerRadius: EnsuCornerRadius.card, style: .continuous))
-    }
-}
-
-private extension KnowledgePackStatus {
-    var label: String {
-        switch self {
-        case .checking: "Checking..."
-        case .download: "Not downloaded"
-        case .ready: "Ready"
-        case .updateAvailable: "Ready · update available"
-        }
     }
 }

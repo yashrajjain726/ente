@@ -16,7 +16,7 @@ const MAX_HITS: u32 = 3;
 const MAX_CONTEXT_UTF8_BYTES: u32 = 6_000;
 pub(crate) const KNOWLEDGE_LICENSE_LABEL: &str = "CC BY-SA 4.0";
 pub(crate) const KNOWLEDGE_LICENSE_URL: &str = "https://creativecommons.org/licenses/by-sa/4.0/";
-const MODIFICATION_NOTICE: &str = "Selected, cleaned, excerpted, chunked, and embedded by Ente";
+const MODIFICATION_NOTICE: &str = "Adapted by Ente";
 const MAX_DATASETS: usize = 32;
 const MAX_PATH_COMPONENT_BYTES: usize = 96;
 const MAX_DISPLAY_BYTES: usize = 256;
@@ -58,6 +58,7 @@ pub struct KnowledgeDatasetConfig {
     pub label: String,
     pub current_download_identity: String,
     pub artifact_base_url: String,
+    pub download_size_bytes: i64,
     pub max_chars: u32,
     pub source_url_template: String,
     pub relevance_threshold: f32,
@@ -128,6 +129,7 @@ pub(super) fn knowledge_datasets() -> Vec<KnowledgeDatasetConfig> {
             label: "Simple English Wikipedia".to_owned(),
             current_download_identity: "simplewiki-2026-07-02".to_owned(),
             artifact_base_url: "https://huggingface.co/datasets/ente-ai/ensu-knowledge-packs/resolve/a13b90e443dcdc1561ac777ea17ee6ed4703e35f/simplewiki/data/".to_owned(),
+            download_size_bytes: 167_849_446,
             max_chars: 600,
             source_url_template: "https://simple.wikipedia.org/wiki/{title}".to_owned(),
             relevance_threshold: 0.46,
@@ -145,6 +147,7 @@ pub(super) fn knowledge_datasets() -> Vec<KnowledgeDatasetConfig> {
             label: "Wikibooks".to_owned(),
             current_download_identity: "enwikibooks-2026-07-02".to_owned(),
             artifact_base_url: "https://huggingface.co/datasets/ente-ai/ensu-knowledge-packs/resolve/a13b90e443dcdc1561ac777ea17ee6ed4703e35f/wikibooks/data/".to_owned(),
+            download_size_bytes: 202_595_475,
             max_chars: 1_400,
             source_url_template: "https://en.wikibooks.org/wiki/{title}".to_owned(),
             relevance_threshold: 0.50,
@@ -205,6 +208,12 @@ pub fn validate_knowledge_datasets(
             &dataset.artifact_base_url,
             &format!("{prefix}.artifact_base_url"),
         )?;
+        if dataset.download_size_bytes <= 0 {
+            return Err(KnowledgeConfigError::invalid(
+                &format!("{prefix}.download_size_bytes"),
+                "must be greater than zero",
+            ));
+        }
         validate_source_url_template(
             &dataset.source_url_template,
             &format!("{prefix}.source_url_template"),
@@ -465,6 +474,13 @@ mod tests {
 
         assert_eq!(datasets[0].stable_id, "simplewiki");
         assert_eq!(datasets[1].stable_id, "wikibooks");
+        assert!(
+            datasets
+                .iter()
+                .all(|dataset| dataset.attribution.modification_notice == "Adapted by Ente")
+        );
+        assert_eq!(datasets[0].download_size_bytes, 167_849_446);
+        assert_eq!(datasets[1].download_size_bytes, 202_595_475);
         assert_eq!(knowledge_index_contract().source_dim, 768);
         assert_eq!(knowledge_index_contract().dim, 512);
     }
@@ -544,6 +560,12 @@ mod tests {
         datasets[0].max_chars = 0;
         assert!(validate_knowledge_datasets(&datasets).is_err());
         datasets[0].max_chars = 4_097;
+        assert!(validate_knowledge_datasets(&datasets).is_err());
+
+        let mut datasets = valid_datasets();
+        datasets[0].download_size_bytes = 0;
+        assert!(validate_knowledge_datasets(&datasets).is_err());
+        datasets[0].download_size_bytes = -1;
         assert!(validate_knowledge_datasets(&datasets).is_err());
 
         let mut datasets = valid_datasets();

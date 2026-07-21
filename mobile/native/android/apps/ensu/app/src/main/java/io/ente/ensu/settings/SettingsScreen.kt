@@ -49,6 +49,7 @@ fun SettingsScreen(
     isAdvancedUnlocked: Boolean,
     onOpenLogs: () -> Unit,
     onOpenKnowledge: () -> Unit,
+    onOpenTerms: () -> Unit,
     onOpenModelSettings: () -> Unit,
     onOpenSystemPromptSettings: () -> Unit,
     onUnlockAdvanced: () -> Unit,
@@ -59,19 +60,19 @@ fun SettingsScreen(
     var lastBuildVersionTapAt by remember { mutableStateOf<Long?>(null) }
     val context = LocalContext.current
 
-    val allItems = remember(context, onOpenLogs, onOpenKnowledge, onSignIn) {
+    val allItems = remember(context, onOpenLogs, onOpenKnowledge, onOpenTerms, onSignIn) {
         buildList {
             add(
                 SettingsItem(
-                    title = "Knowledge",
-                    iconRes = HugeIcons.Search01Icon,
+                    title = "Ensu Packs",
+                    iconRes = HugeIcons.PackageIcon,
                     onClick = onOpenKnowledge
                 )
             )
 
             add(
                 SettingsItem(
-                    title = "About",
+                    title = "About Ensu",
                     iconVector = Icons.Outlined.Info,
                     onClick = { context.openExternalLink("https://ente.com/blog/ensu/") }
                 )
@@ -95,16 +96,14 @@ fun SettingsScreen(
 
             add(
                 SettingsItem(
-                    title = "Privacy Policy",
-                    iconRes = HugeIcons.ViewIcon,
-                    onClick = { context.openExternalLink("https://ente.com/privacy") }
-                )
-            )
-            add(
-                SettingsItem(
-                    title = "Terms of Service",
+                    title = "Terms and Conditions",
                     iconVector = Icons.Outlined.Description,
-                    onClick = { context.openExternalLink("https://ente.com/terms") }
+                    searchTerms = listOf(
+                        "Privacy Policy",
+                        "Ente Terms and Conditions",
+                        "Terms of Service"
+                    ),
+                    onClick = onOpenTerms
                 )
             )
         }
@@ -114,7 +113,8 @@ fun SettingsScreen(
         val q = query.trim().lowercase()
         if (q.isEmpty()) return@remember allItems
         allItems.filter { item ->
-            item.title.lowercase().contains(q)
+            item.title.lowercase().contains(q) ||
+                item.searchTerms.any { it.lowercase().contains(q) }
         }
     }
 
@@ -206,16 +206,17 @@ fun SettingsScreen(
     }
 }
 
-private data class SettingsItem(
+internal data class SettingsItem(
     val title: String,
     val iconRes: Int? = null,
     val iconVector: ImageVector? = null,
+    val searchTerms: List<String> = emptyList(),
     val onClick: () -> Unit,
     val isDestructive: Boolean = false
 )
 
 @Composable
-private fun SettingsRow(item: SettingsItem) {
+internal fun SettingsRow(item: SettingsItem) {
     val iconAndTextColor = if (item.isDestructive) EnsuColor.error else EnsuColor.textPrimary()
 
     Row(

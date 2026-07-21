@@ -331,24 +331,55 @@ private struct KnowledgeSourcesSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: EnsuSpacing.lg) {
-                    ForEach(Array(citations.enumerated()), id: \.offset) { _, citation in
-                        VStack(alignment: .leading, spacing: EnsuSpacing.xs) {
-                            Text(citationTitle(citation))
+                    Text(sourceCountLabel)
+                        .font(EnsuTypography.small)
+                        .foregroundStyle(EnsuColor.textMuted)
+
+                    ForEach(Array(citations.enumerated()), id: \.offset) { index, citation in
+                        VStack(alignment: .leading, spacing: EnsuSpacing.sm) {
+                            Text("SOURCE \(index + 1) · \(citation.datasetLabel.uppercased())")
+                                .font(EnsuTypography.mini)
+                                .foregroundStyle(EnsuColor.textMuted)
+
+                            Text(citation.title)
                                 .font(EnsuTypography.large)
                                 .foregroundStyle(EnsuColor.textPrimary)
+
+                            if let section = citationSection(citation) {
+                                Text(section)
+                                    .font(EnsuTypography.small)
+                                    .foregroundStyle(EnsuColor.textMuted)
+                            }
+
+                            Divider()
+
+                            Text("Attribution")
+                                .font(EnsuTypography.mini)
+                                .foregroundStyle(EnsuColor.textMuted)
+
                             Text(citation.credit)
                                 .font(EnsuTypography.small)
-                                .foregroundStyle(EnsuColor.textMuted)
-                            Link(
-                                citation.licenseLabel,
-                                destination: URL(string: citation.licenseUrl)!
-                            )
-                            Link(
-                                "View source",
-                                destination: URL(string: citation.sourceUrl)!
-                            )
+                                .foregroundStyle(EnsuColor.textPrimary)
+
+                            HStack(spacing: EnsuSpacing.lg) {
+                                Link(destination: URL(string: citation.sourceUrl)!) {
+                                    Label("Open source", systemImage: "arrow.up.right.square")
+                                }
+                                Link(destination: URL(string: citation.licenseUrl)!) {
+                                    Label(citation.licenseLabel, systemImage: "doc.text")
+                                }
+                            }
+                            .font(EnsuTypography.small)
                         }
+                        .padding(EnsuSpacing.md)
                         .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(EnsuColor.fillFaint)
+                        .clipShape(
+                            RoundedRectangle(
+                                cornerRadius: EnsuCornerRadius.card,
+                                style: .continuous
+                            )
+                        )
                     }
                 }
                 .padding(EnsuSpacing.lg)
@@ -362,14 +393,24 @@ private struct KnowledgeSourcesSheet: View {
                 }
             }
         }
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
     }
 
-    private func citationTitle(_ citation: SourceCitation) -> String {
-        guard let section = citation.section?.trimmingCharacters(in: .whitespacesAndNewlines),
-              !section.isEmpty else {
-            return citation.title
-        }
-        return "\(citation.title) — \(section)"
+    private var sourceCountLabel: String {
+        citations.count == 1
+            ? "1 source used in this response"
+            : "\(citations.count) sources used in this response"
+    }
+
+    private func citationSection(_ citation: SourceCitation) -> String? {
+        citation.section?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+    }
+}
+
+private extension String {
+    var nilIfEmpty: String? {
+        isEmpty ? nil : self
     }
 }
 

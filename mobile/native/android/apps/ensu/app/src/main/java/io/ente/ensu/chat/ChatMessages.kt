@@ -10,6 +10,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -37,6 +39,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Surface
@@ -410,88 +413,92 @@ private fun DownloadOnboarding(
     val downloadAccent = EnsuColor.accentDark
     val downloadButtonTextColor = Color.Black
     val sizeText = modelDownloadSizeBytes?.let { "Approx. ${formatBytes(it)}" } ?: "Approx. size varies by model"
-    Box(
-        modifier = modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(
-                text = "Download models to begin using Chat",
-                style = EnsuTypography.large,
-                color = EnsuColor.textPrimary(),
-                textAlign = TextAlign.Center
-            )
-            Spacer(modifier = Modifier.height(EnsuSpacing.md.dp))
-            if (isDownloading) {
-                val isLoadingModel = downloadPhase == DownloadPhase.Loading
-                val showProgress = downloadPercent != null || isLoadingModel
-                val statusText = when {
-                    isLoadingModel -> downloadStatus
-                    modelDownloadSizeBytes != null && downloadPercent != null && downloadPercent >= 0 -> {
-                        val downloadedBytes = (modelDownloadSizeBytes * (downloadPercent / 100f)).roundToLong()
-                        "Downloading... ${formatBytes(downloadedBytes)} / ${formatBytes(modelDownloadSizeBytes)}"
-                    }
-                    !downloadStatus.isNullOrBlank() -> downloadStatus
-                    else -> "Downloading..."
-                }
+    Column(modifier = modifier.fillMaxSize()) {
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth(),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
-                    text = statusText ?: "Downloading...",
-                    style = EnsuTypography.body.copy(fontFeatureSettings = "tnum"),
-                    color = EnsuColor.textMuted(),
+                    text = "Download models to begin using Chat",
+                    style = EnsuTypography.large,
+                    color = EnsuColor.textPrimary(),
                     textAlign = TextAlign.Center
                 )
-                if (showProgress) {
-                    Spacer(modifier = Modifier.height(EnsuSpacing.sm.dp))
-                    val clamped = downloadPercent?.coerceIn(0, 100)
-                    if (clamped != null) {
-                        LinearProgressIndicator(
-                            progress = { clamped / 100f },
-                            color = downloadAccent,
-                            trackColor = EnsuColor.border(),
-                            modifier = Modifier
-                                .fillMaxWidth(0.6f)
-                                .height(6.dp)
-                        )
-                    } else {
-                        LinearProgressIndicator(
-                            color = downloadAccent,
-                            trackColor = EnsuColor.border(),
-                            modifier = Modifier
-                                .fillMaxWidth(0.6f)
-                                .height(6.dp)
-                        )
+                Spacer(modifier = Modifier.height(EnsuSpacing.md.dp))
+                if (isDownloading) {
+                    val isLoadingModel = downloadPhase == DownloadPhase.Loading
+                    val showProgress = downloadPercent != null || isLoadingModel
+                    val statusText = when {
+                        isLoadingModel -> downloadStatus
+                        modelDownloadSizeBytes != null && downloadPercent != null && downloadPercent >= 0 -> {
+                            val downloadedBytes = (modelDownloadSizeBytes * (downloadPercent / 100f)).roundToLong()
+                            "Downloading... ${formatBytes(downloadedBytes)} / ${formatBytes(modelDownloadSizeBytes)}"
+                        }
+                        !downloadStatus.isNullOrBlank() -> downloadStatus
+                        else -> "Downloading..."
                     }
-                }
-            } else {
-                if (!downloadStatus.isNullOrBlank()) {
                     Text(
-                        text = downloadStatus,
-                        style = EnsuTypography.body,
-                        color = if (downloadPhase == DownloadPhase.Failed) {
-                            EnsuColor.error
-                        } else {
-                            EnsuColor.textMuted()
-                        },
+                        text = statusText ?: "Downloading...",
+                        style = EnsuTypography.body.copy(fontFeatureSettings = "tnum"),
+                        color = EnsuColor.textMuted(),
                         textAlign = TextAlign.Center
                     )
+                    if (showProgress) {
+                        Spacer(modifier = Modifier.height(EnsuSpacing.sm.dp))
+                        val clamped = downloadPercent?.coerceIn(0, 100)
+                        if (clamped != null) {
+                            LinearProgressIndicator(
+                                progress = { clamped / 100f },
+                                color = downloadAccent,
+                                trackColor = EnsuColor.border(),
+                                modifier = Modifier
+                                    .fillMaxWidth(0.6f)
+                                    .height(6.dp)
+                            )
+                        } else {
+                            LinearProgressIndicator(
+                                color = downloadAccent,
+                                trackColor = EnsuColor.border(),
+                                modifier = Modifier
+                                    .fillMaxWidth(0.6f)
+                                    .height(6.dp)
+                            )
+                        }
+                    }
+                } else {
+                    if (!downloadStatus.isNullOrBlank()) {
+                        Text(
+                            text = downloadStatus,
+                            style = EnsuTypography.body,
+                            color = if (downloadPhase == DownloadPhase.Failed) {
+                                EnsuColor.error
+                            } else {
+                                EnsuColor.textMuted()
+                            },
+                            textAlign = TextAlign.Center
+                        )
+                        Spacer(modifier = Modifier.height(EnsuSpacing.sm.dp))
+                    }
+                    Button(
+                        onClick = {
+                            haptic.perform(HapticFeedbackType.TextHandleMove)
+                            onDownload()
+                        },
+                        shape = RoundedCornerShape(EnsuCornerRadius.button.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = downloadAccent)
+                    ) {
+                        Text(text = "Download", style = EnsuTypography.body, color = downloadButtonTextColor)
+                    }
                     Spacer(modifier = Modifier.height(EnsuSpacing.sm.dp))
+                    Text(
+                        text = sizeText,
+                        style = EnsuTypography.small,
+                        color = EnsuColor.textMuted()
+                    )
                 }
-                Button(
-                    onClick = {
-                        haptic.perform(HapticFeedbackType.TextHandleMove)
-                        onDownload()
-                    },
-                    shape = RoundedCornerShape(EnsuCornerRadius.button.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = downloadAccent)
-                ) {
-                    Text(text = "Download models", style = EnsuTypography.body, color = downloadButtonTextColor)
-                }
-                Spacer(modifier = Modifier.height(EnsuSpacing.sm.dp))
-                Text(
-                    text = sizeText,
-                    style = EnsuTypography.small,
-                    color = EnsuColor.textMuted()
-                )
             }
         }
     }
@@ -762,40 +769,67 @@ private fun KnowledgeSourcesDialog(
         onDismissRequest = onDismiss,
         title = { Text("Sources", style = EnsuTypography.h3) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(EnsuSpacing.lg.dp)) {
-                citations.forEach { citation ->
-                    Column {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(EnsuSpacing.lg.dp)
+            ) {
+                Text(
+                    text = if (citations.size == 1) {
+                        "1 source used in this response"
+                    } else {
+                        "${citations.size} sources used in this response"
+                    },
+                    style = EnsuTypography.small,
+                    color = EnsuColor.textMuted()
+                )
+
+                citations.forEachIndexed { index, citation ->
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(
+                                EnsuColor.fillFaint(),
+                                RoundedCornerShape(EnsuCornerRadius.card.dp)
+                            )
+                            .padding(EnsuSpacing.md.dp),
+                        verticalArrangement = Arrangement.spacedBy(EnsuSpacing.sm.dp)
+                    ) {
                         Text(
-                            text = buildString {
-                                append(citation.title)
-                                citation.section?.takeIf { it.isNotBlank() }?.let {
-                                    append(" — ").append(it)
-                                }
-                            },
+                            text = "SOURCE ${index + 1} · ${citation.datasetLabel.uppercase()}",
+                            style = EnsuTypography.mini,
+                            color = EnsuColor.textMuted()
+                        )
+                        Text(
+                            text = citation.title,
                             style = EnsuTypography.large,
                             color = EnsuColor.textPrimary()
+                        )
+                        citation.section?.trim()?.takeIf { it.isNotEmpty() }?.let { section ->
+                            Text(
+                                text = section,
+                                style = EnsuTypography.small,
+                                color = EnsuColor.textMuted()
+                            )
+                        }
+                        HorizontalDivider(color = EnsuColor.border())
+                        Text(
+                            text = "Attribution",
+                            style = EnsuTypography.mini,
+                            color = EnsuColor.textMuted()
                         )
                         Text(
                             citation.credit,
                             style = EnsuTypography.small,
-                            color = EnsuColor.textMuted()
+                            color = EnsuColor.textPrimary()
                         )
-                        Text(
-                            citation.licenseLabel,
-                            style = EnsuTypography.small,
-                            color = EnsuColor.accent(),
-                            modifier = Modifier.clickable {
+                        Row(horizontalArrangement = Arrangement.spacedBy(EnsuSpacing.lg.dp)) {
+                            SourceAttributionLink("Open source ↗") {
+                                uriHandler.openUri(citation.sourceUrl)
+                            }
+                            SourceAttributionLink("${citation.licenseLabel} ↗") {
                                 uriHandler.openUri(citation.licenseUrl)
                             }
-                        )
-                        Text(
-                            "View source",
-                            style = EnsuTypography.body,
-                            color = EnsuColor.accent(),
-                            modifier = Modifier
-                                .clickable { uriHandler.openUri(citation.sourceUrl) }
-                                .padding(top = EnsuSpacing.xs.dp)
-                        )
+                        }
                     }
                 }
             }
@@ -804,6 +838,18 @@ private fun KnowledgeSourcesDialog(
             TextButton(onClick = onDismiss) { Text("Done") }
         },
         containerColor = EnsuColor.backgroundBase()
+    )
+}
+
+@Composable
+private fun SourceAttributionLink(label: String, onClick: () -> Unit) {
+    Text(
+        text = label,
+        style = EnsuTypography.small,
+        color = EnsuColor.accent(),
+        modifier = Modifier
+            .clickable(onClick = onClick)
+            .padding(vertical = EnsuSpacing.xs.dp)
     )
 }
 
