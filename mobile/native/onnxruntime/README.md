@@ -13,11 +13,21 @@ binaries; there are no custom download scripts.
   (`io.ente.onnxruntime:onnxruntime-webgpu-android`) from an Ivy repository
   that points directly at the GitHub release. Its SHA-256 is pinned via
   Gradle dependency verification. Used by the photos app and ensu.
-- **iOS**: the release ZIP is downloaded by CocoaPods as the local
+- **iOS (photos)**: the release ZIP is downloaded by CocoaPods as the local
   `EnteOnnxRuntime` pod (`EnteOnnxRuntime.podspec` in this directory), which
   pins its SHA-256. The `ente_photos_rust` pod's build phase exports
   `ORT_LIB_PATH` pointing at the pre-thinned static archive for the active
   platform slice, which the Rust `ort` crate links statically.
+- **iOS (ensu)**: the Ensu Xcode project links the static XCFramework from
+  the same ZIP through Swift Package Manager
+  (`mobile/native/apple/packages/EnteOnnxRuntime/Package.swift`, a binary
+  target with a pinned checksum). The Rust side builds `ort-sys` with
+  `disable-linking` on iOS (see `rust/crates/ensu/Cargo.toml`), so cargo
+  neither downloads nor bundles any other ONNX Runtime; symbols resolve
+  against the SPM framework at app link time. Note: because of this, build
+  `ente-ensu-uniffi` for iOS with `--crate-type staticlib` (as the app's
+  `build-rust.sh` does); the cdylib crate type cannot link on iOS since
+  nothing provides ONNX Runtime at cargo link time.
 
 Desktop ONNX Runtime packaging is intentionally unchanged.
 
@@ -36,6 +46,9 @@ Update the release tag, version, and SHA-256 digests (published as the
    version.
 5. `mobile/native/android/apps/ensu/gradle/verification-metadata.xml`: same
    as 3.
+6. `mobile/native/apple/packages/EnteOnnxRuntime/Package.swift`: the binary
+   target URL and checksum (the checksum is the plain SHA-256 of the iOS
+   ZIP, identical to the one used in 1).
 
 ## WebGPU rollout status
 

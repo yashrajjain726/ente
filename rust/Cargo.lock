@@ -2389,6 +2389,7 @@ dependencies = [
  "futures-util",
  "llama-cpp-2",
  "ort",
+ "ort-sys",
  "parking_lot",
  "regex",
  "reqwest 0.12.28",

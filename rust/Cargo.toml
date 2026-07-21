@@ -30,6 +30,7 @@ ente-photos = { path = "crates/photos" }
 ente-rs = { path = "apps/cli" }
 ente-test-support = { path = "crates/test-support" }
 ort = { git = "https://github.com/pykeio/ort.git", rev = "31c8f1443bb579bfddb82705288347697e468fb3", default-features = false }
+ort-sys = { git = "https://github.com/pykeio/ort.git", rev = "31c8f1443bb579bfddb82705288347697e468fb3", default-features = false }
 serde = { version = "1.0.228", features = ["derive"] }
 thiserror = "2.0.18"
 uniffi = { version = "0.31.0" }
