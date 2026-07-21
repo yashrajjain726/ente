@@ -38,17 +38,17 @@
   "models": {
     "face_detection": {
       "file_name": "yolov5s_face_640_640_static_b1.onnx",
-      "url": "https://entedevassets.priem.dev/yolov5s_face_640_640_static_b1.onnx",
+      "url": "https://models.ente.com/yolov5s_face_640_640_static_b1.onnx",
       "sha256": "e047647409403d52696035ecd445792173e50d7fbdcccac97b958a585db9aa3d"
     },
     "face_embedding": {
       "file_name": "mobilefacenet_portable_static_b1.onnx",
-      "url": "https://entedevassets.priem.dev/mobilefacenet_portable_static_b1.onnx",
+      "url": "https://models.ente.com/mobilefacenet_portable_static_b1.onnx",
       "sha256": "0763fc33f54e138476194da95987e133b3e976075a6b1d3e1b2caedb251b1a36"
     },
     "clip_image": {
       "file_name": "mobileclip_s2_image_gelu_opset20.onnx",
-      "url": "https://entedevassets.priem.dev/mobileclip_s2_image_gelu_opset20.onnx",
+      "url": "https://models.ente.com/mobileclip_s2_image_gelu_opset20.onnx",
       "sha256": "205a430af825e501c5138e5bb9abea942482a7a4fd4a680e98e47cf0830dce7e"
     }
   },

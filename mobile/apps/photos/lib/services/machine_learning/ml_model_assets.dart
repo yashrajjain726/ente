@@ -1,7 +1,5 @@
 import "package:photos/services/machine_learning/ml_model.dart";
 
-const _optimizedModelBucketEndpoint = "https://entedevassets.priem.dev/";
-
 class FaceDetectionModel extends MlModelAsset {
   static const remoteFileName = "yolov5s_face_640_640_static_b1.onnx";
   static const _sha256 =
@@ -11,7 +9,7 @@ class FaceDetectionModel extends MlModelAsset {
   static final instance = FaceDetectionModel._();
 
   @override
-  String get modelRemotePath => _optimizedModelBucketEndpoint + remoteFileName;
+  String get modelRemotePath => kModelBucketEndpoint + remoteFileName;
 
   @override
   String get modelSha256 => _sha256;
@@ -26,7 +24,7 @@ class FaceEmbeddingModel extends MlModelAsset {
   static final instance = FaceEmbeddingModel._();
 
   @override
-  String get modelRemotePath => _optimizedModelBucketEndpoint + remoteFileName;
+  String get modelRemotePath => kModelBucketEndpoint + remoteFileName;
 
   @override
   String get modelSha256 => _sha256;
@@ -41,7 +39,7 @@ class ClipImageModel extends MlModelAsset {
   static final instance = ClipImageModel._();
 
   @override
-  String get modelRemotePath => _optimizedModelBucketEndpoint + remoteFileName;
+  String get modelRemotePath => kModelBucketEndpoint + remoteFileName;
 
   @override
   String get modelSha256 => _sha256;
