@@ -108,7 +108,9 @@ const imageBitmapOptions = (
     dimensions: ImageDimensions,
 ): ImageBitmapOptions => {
     const { height, width } = imageOutputDimensions(dimensions);
-    return { resizeHeight: height, resizeQuality: "high", resizeWidth: width };
+    return dimensions.width >= dimensions.height
+        ? { resizeQuality: "high", resizeWidth: width }
+        : { resizeHeight: height, resizeQuality: "high" };
 };
 
 const byteAt = (bytes: Uint8Array, offset: number) => bytes[offset] ?? 0;
