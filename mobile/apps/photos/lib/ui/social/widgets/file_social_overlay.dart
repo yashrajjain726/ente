@@ -1,5 +1,4 @@
 import "dart:async";
-import "dart:math" as math;
 
 import "package:collection/collection.dart";
 import "package:ente_components/theme/text_styles.dart" as component;
@@ -401,7 +400,7 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
                 child: _LatestCommentPill(
                   comment: latestComment,
                   author: latestCommentAuthor,
-                  maxWidth: math.min(constraints.maxWidth * 0.5, 200),
+                  maxWidth: constraints.maxWidth * 0.6,
                   currentUserID: widget.currentUserID!,
                   onTap: () => _openComments(comment: latestComment),
                 ),
