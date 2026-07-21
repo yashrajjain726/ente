@@ -143,7 +143,7 @@ LosslessEditTransform? getLosslessTransform(ProImageEditorState editorState) {
 }
 
 bool _isSameDouble(double a, double b) {
-  return (a - b).abs() < 0.01;
+  return (a - b).abs() < 0.001;
 }
 
 bool _isSameOffset(Offset a, Offset b) {
