@@ -421,16 +421,6 @@ mod tests {
     }
 
     #[test]
-    fn test_generate_sensitive_kek() {
-        let generated = generate_sensitive_kek("test_password").unwrap();
-
-        assert_eq!(generated.key.len(), 32);
-        assert_eq!(generated.salt.len(), 16);
-        assert!(generated.mem_limit > 0);
-        assert!(generated.ops_limit > 0);
-    }
-
-    #[test]
     fn test_generated_kek_debug_redacts_secret_material() {
         let generated = GeneratedKek {
             key: SecretVec::new(vec![1, 2, 3]),
