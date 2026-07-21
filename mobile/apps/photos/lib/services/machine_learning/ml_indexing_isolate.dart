@@ -5,6 +5,7 @@ import "package:photos/services/machine_learning/ml_model_assets.dart";
 import "package:photos/services/machine_learning/ml_model_download_service.dart";
 import "package:photos/services/machine_learning/ml_models_overview.dart";
 import "package:photos/services/machine_learning/ml_result.dart";
+import "package:photos/services/machine_learning/ml_runtime_events.dart";
 import "package:photos/services/machine_learning/webgpu_execution_policy.dart";
 import "package:photos/services/remote_assets_service.dart";
 import "package:photos/utils/isolate/isolate_operations.dart";
@@ -51,15 +52,20 @@ class MLIndexingIsolate extends SuperIsolate {
       final enableWebGpu = await webGpuExecutionPolicy.isEligible();
       _logger.info("Analyzing image ${instruction.fileKey} with Rust ML");
 
-      final isolateResult = await runInIsolate(IsolateOperation.analyzeImage, {
-        "enteFileID": instruction.fileKey,
-        "filePath": filePath,
-        "runFaces": instruction.shouldRunFaces,
-        "runClip": instruction.shouldRunClip,
-        "runPets": instruction.shouldRunPets,
-        ...rustRuntimeArgs,
-        "enableWebGpu": enableWebGpu,
-      });
+      final dynamic isolateResult;
+      try {
+        isolateResult = await runInIsolate(IsolateOperation.analyzeImage, {
+          "enteFileID": instruction.fileKey,
+          "filePath": filePath,
+          "runFaces": instruction.shouldRunFaces,
+          "runClip": instruction.shouldRunClip,
+          "runPets": instruction.shouldRunPets,
+          ...rustRuntimeArgs,
+          "enableWebGpu": enableWebGpu,
+        });
+      } finally {
+        await logRustMlRuntimeEvents();
+      }
       if (isolateResult is RustCorruptModelCacheDeletedException) {
         _logger.warning(
           "Deleted corrupt Rust ONNX model cache at ${isolateResult.modelPath}; "

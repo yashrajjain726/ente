@@ -42,6 +42,9 @@ enum IsolateOperation {
   /// [MLIndexingIsolate]
   releaseRustMlRuntime,
 
+  /// [MLIndexingIsolate] and [MLComputer]
+  takeMlRuntimeEvents,
+
   /// [MLComputer]
   generateFaceThumbnails,
 
@@ -134,6 +137,16 @@ Future<dynamic> isolateFunction(
     case IsolateOperation.releaseRustMlRuntime:
       await _releaseRustRuntime();
       return true;
+
+    /// MLIndexingIsolate and MLComputer
+    case IsolateOperation.takeMlRuntimeEvents:
+      await _ensureRustLoaded();
+      final events = await rust_ml.takeMlRuntimeEvents();
+      return events
+          .map(
+            (event) => {"severity": event.severity, "message": event.message},
+          )
+          .toList();
 
     /// Cases for MLIndexingIsolate stop here
 

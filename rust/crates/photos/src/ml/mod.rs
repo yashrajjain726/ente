@@ -1,6 +1,10 @@
 mod clip;
 pub mod error;
+pub mod events;
 pub mod face;
+pub mod golden;
+mod golden_data;
+pub mod golden_tooling;
 pub mod indexing;
 mod onnx;
 mod pet;

@@ -24,10 +24,11 @@ use ort::ep::{
 use std::num::NonZeroUsize;
 
 use crate::ml::error::{MlError, MlResult};
+use crate::ml::golden;
 #[cfg(target_os = "android")]
 use crate::ml::webgpu;
-#[cfg(target_os = "android")]
-use ort::session::SessionInputValue;
+#[cfg(any(target_os = "android", target_os = "ios"))]
+use crate::ml::{events, runtime::rt_log};
 
 #[cfg(any(target_os = "ios", test))]
 const COREML_CACHE_SCHEMA: &str = "ort-1_27-mlprogram-all-default-v1";
@@ -151,7 +152,7 @@ pub(crate) fn build_session(
         }
 
         let coreml_cache_dir = attempt.coreml_cache_dir.clone();
-        match build_session_with_providers(model_path, attempt) {
+        match build_and_validate_session(model_path, attempt) {
             Ok(session) => {
                 if let Some(cache_dir) = coreml_cache_dir
                     && let Err(error) = mark_coreml_cache_complete(&cache_dir)
@@ -187,12 +188,45 @@ pub(crate) fn build_session(
     )))
 }
 
+/// Builds a session for one provider attempt and, for CoreML attempts, runs
+/// the golden self-test before the session is trusted. A self-test failure is
+/// reported as a session-construction failure, so the caller invalidates the
+/// CoreML cache (a corrupt compiled model would otherwise persist) and falls
+/// through to the next attempt. WebGPU attempts do not take this path; they
+/// are validated inside the crash-canary window.
+fn build_and_validate_session(model_path: &str, attempt: ProviderAttempt) -> MlResult<Session> {
+    #[cfg(any(target_os = "android", target_os = "ios"))]
+    let execution_provider = attempt.execution_provider;
+
+    #[cfg_attr(not(target_os = "ios"), allow(unused_mut))]
+    let mut session = match build_session_with_providers(model_path, attempt) {
+        Ok(session) => session,
+        Err(error) => {
+            #[cfg(any(target_os = "android", target_os = "ios"))]
+            record_provider_attempt_failure(
+                execution_provider,
+                model_path,
+                "session construction",
+                &error,
+            );
+            return Err(error);
+        }
+    };
+
+    #[cfg(target_os = "ios")]
+    if execution_provider == ExecutionProvider::CoreMl {
+        run_session_self_test(model_path, &mut session, "CoreML")?;
+    }
+
+    Ok(session)
+}
+
 /// Builds the WebGPU session under the durable crash canary. The canary is
 /// armed before session construction and only disarmed after the session has
-/// survived one warm-up inference, so a driver crash anywhere in between is
-/// recorded on disk. Soft failures return an error with the canary left armed
-/// (the drop keeps the counted attempt), and the caller falls through to the
-/// next execution provider.
+/// passed the golden self-test, so a driver crash anywhere in between is
+/// recorded on disk. Soft failures (including self-test failures) return an
+/// error with the canary left armed (the drop keeps the counted attempt), and
+/// the caller falls through to the next execution provider.
 #[cfg(target_os = "android")]
 fn build_webgpu_session_with_canary(
     model_path: &str,
@@ -201,8 +235,19 @@ fn build_webgpu_session_with_canary(
 ) -> MlResult<Session> {
     // Fail closed: without a durable failure record, a crash during the
     // attempt would go unnoticed and the crash loop protection would be lost.
-    let canary = webgpu::arm_canary(model_path, model_namespace)
-        .map_err(|error| MlError::Ort(format!("failed to arm WebGPU crash canary: {error}")))?;
+    let canary = match webgpu::arm_canary(model_path, model_namespace) {
+        Ok(canary) => canary,
+        Err(error) => {
+            let error = MlError::Ort(format!("failed to arm WebGPU crash canary: {error}"));
+            record_provider_attempt_failure(
+                ExecutionProvider::WebGpu,
+                model_path,
+                "crash-canary setup",
+                &error,
+            );
+            return Err(error);
+        }
+    };
     // The adapter probe touches the Vulkan driver, so it runs inside the
     // armed canary window: a probe crash is recorded like any other WebGPU
     // crash.
@@ -222,59 +267,185 @@ fn build_webgpu_session_with_canary(
             // a driver whose probe keeps failing quarantines like one that
             // keeps crashing, and cannot reset the consecutive-failure
             // counter of genuine crashes.
-            return Err(MlError::Ort(
-                "WebGPU skipped: Vulkan adapter probe failed".to_string(),
-            ));
+            let error = MlError::Ort("WebGPU skipped: Vulkan adapter probe failed".to_string());
+            record_provider_attempt_failure(
+                ExecutionProvider::WebGpu,
+                model_path,
+                "adapter probe",
+                &error,
+            );
+            return Err(error);
         }
     }
-    let mut session = build_session_with_providers(model_path, attempt)?;
-    warmup_session(&mut session)?;
+    let mut session = match build_session_with_providers(model_path, attempt) {
+        Ok(session) => session,
+        Err(error) => {
+            record_provider_attempt_failure(
+                ExecutionProvider::WebGpu,
+                model_path,
+                "session construction",
+                &error,
+            );
+            return Err(error);
+        }
+    };
+    run_session_self_test(model_path, &mut session, "WebGPU")?;
     canary.disarm();
     Ok(session)
 }
 
-/// Runs one zeroed inference so that lazy provider work (pipeline creation,
-/// first dispatch) happens inside the crash-canary window, and so that the
-/// first real inference is not paying the warm-up cost. Output values are
-/// irrelevant; only whether the run crashes or errors matters.
-#[cfg(target_os = "android")]
-fn warmup_session(session: &mut Session) -> MlResult<()> {
-    let mut input_specs = Vec::new();
-    for input in session.inputs() {
-        let ValueType::Tensor { ty, shape, .. } = input.dtype() else {
-            // Unsupported input kind: skip the warm-up; the canary then only
-            // covers session construction for this model.
-            return Ok(());
-        };
-        // Our models have static shapes; substitute 1 for any dynamic
-        // dimension defensively.
-        let dims: Vec<i64> = shape.iter().map(|&dim| dim.max(1)).collect();
-        input_specs.push((input.name().to_string(), *ty, dims));
+#[cfg(any(target_os = "android", target_os = "ios"))]
+fn record_provider_attempt_failure(
+    provider: ExecutionProvider,
+    model_path: &str,
+    stage: &str,
+    error: &MlError,
+) {
+    if let Some(message) = provider_attempt_failure_message(provider, model_path, stage, error) {
+        events::record(events::Severity::Warning, message);
     }
+}
 
-    let mut inputs: Vec<(String, SessionInputValue<'_>)> = Vec::new();
-    for (name, ty, dims) in input_specs {
-        let element_count = dims.iter().product::<i64>() as usize;
-        let value: SessionInputValue<'_> = match ty {
-            TensorElementType::Float32 => {
-                Tensor::<f32>::from_array((dims, vec![0.0f32; element_count]))?.into()
+#[cfg(any(target_os = "android", target_os = "ios", test))]
+fn provider_attempt_failure_message(
+    provider: ExecutionProvider,
+    model_path: &str,
+    stage: &str,
+    error: &MlError,
+) -> Option<String> {
+    let provider_label = match provider {
+        ExecutionProvider::CoreMl => "CoreML",
+        ExecutionProvider::WebGpu => "WebGPU",
+        ExecutionProvider::Xnnpack => "XNNPACK",
+        ExecutionProvider::Cpu => return None,
+    };
+    Some(format!(
+        "{provider_label} {stage} failed for '{}': {error}; falling back to the next execution provider",
+        model_file_label(model_path)
+    ))
+}
+
+/// Number of golden inferences a freshly built accelerated session must pass.
+/// Two, because known driver defects (for example on newer Adreno GPUs)
+/// produce a correct first inference and corrupt output from the second
+/// dispatch onwards. The runs double as session warm-up: pipeline creation
+/// and first dispatch happen here (on Android inside the crash-canary
+/// window), not during the first real inference.
+#[cfg(any(target_os = "android", target_os = "ios"))]
+const GOLDEN_SELF_TEST_RUNS: usize = 2;
+
+/// Validates a freshly built accelerated session against the model's
+/// committed golden output. An error means the session must not be used; the
+/// caller falls through to the next execution provider attempt.
+#[cfg(any(target_os = "android", target_os = "ios"))]
+fn run_session_self_test(
+    model_path: &str,
+    session: &mut Session,
+    provider_label: &str,
+) -> MlResult<()> {
+    let model_file = model_file_label(model_path);
+    let Some(entry) = golden::lookup(model_path) else {
+        // Attempts are only constructed for models with a golden entry, so
+        // this is a defensive fail-closed path.
+        return Err(MlError::Ort(format!(
+            "golden self-test entry missing for '{model_file}'"
+        )));
+    };
+    let input = golden::prepare_input(entry).map_err(|reason| {
+        MlError::Ort(format!(
+            "golden self-test input invalid for '{model_file}': {reason}"
+        ))
+    })?;
+
+    for run_index in 1..=GOLDEN_SELF_TEST_RUNS {
+        let output = match run_golden_tensor(session, entry.input_shape, &input) {
+            Ok(output) => output,
+            Err(error) => {
+                // Surface inference failures too: without this, a provider
+                // that cannot even execute the golden input would fall back
+                // invisibly (the session-build error is swallowed once the
+                // next attempt succeeds).
+                events::record(
+                    events::Severity::Warning,
+                    format!(
+                        "{provider_label} golden self-test inference failed for '{model_file}' \
+                         on run {run_index}: {error}; falling back to the next execution provider"
+                    ),
+                );
+                return Err(error);
             }
-            TensorElementType::Float16 => {
-                Tensor::<half::f16>::from_array((dims, vec![half::f16::ZERO; element_count]))?
-                    .into()
-            }
-            TensorElementType::Int32 => {
-                Tensor::<i32>::from_array((dims, vec![0i32; element_count]))?.into()
-            }
-            TensorElementType::Int64 => {
-                Tensor::<i64>::from_array((dims, vec![0i64; element_count]))?.into()
-            }
-            _ => return Ok(()),
         };
-        inputs.push((name, value));
+        match golden::compare_output(entry, &output) {
+            Ok(distance) => rt_log(&format!(
+                "{provider_label} golden self-test run {run_index} for '{model_file}' passed \
+                 ({} {distance:.2e})",
+                entry.metric.label()
+            )),
+            Err(reason) => {
+                events::record(
+                    events::Severity::Severe,
+                    format!(
+                        "{provider_label} golden self-test failed for '{model_file}' on run \
+                         {run_index}: {reason}; falling back to the next execution provider"
+                    ),
+                );
+                return Err(MlError::Ort(format!(
+                    "golden self-test failed for '{model_file}' on run {run_index}: {reason}"
+                )));
+            }
+        }
     }
-    session.run(inputs)?;
     Ok(())
+}
+
+#[cfg(any(target_os = "android", target_os = "ios", test))]
+fn model_file_label(model_path: &str) -> &str {
+    Path::new(model_path)
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or(model_path)
+}
+
+/// Runs one golden input through the session and extracts the first output as
+/// f32. Shared with the golden generator so device and generator inference
+/// are identical by construction.
+pub(crate) fn run_golden_tensor(
+    session: &mut Session,
+    input_shape: &[i64],
+    input: &golden::PreparedGoldenInput,
+) -> MlResult<Vec<f32>> {
+    let shape = input_shape.to_vec();
+    let outputs = match input {
+        golden::PreparedGoldenInput::F32(data) => {
+            if session_expects_f16(session) {
+                let input_tensor = Tensor::<half::f16>::from_array((
+                    shape,
+                    Vec::<half::f16>::from_f32_slice(data),
+                ))?;
+                session.run(ort::inputs![input_tensor])?
+            } else {
+                let input_tensor = Tensor::<f32>::from_array((shape, data.clone()))?;
+                session.run(ort::inputs![input_tensor])?
+            }
+        }
+        golden::PreparedGoldenInput::I32(data) => {
+            let input_tensor = Tensor::<i32>::from_array((shape, data.clone()))?;
+            session.run(ort::inputs![input_tensor])?
+        }
+    };
+
+    if outputs.len() == 0 {
+        return Err(MlError::Ort("missing first output tensor".to_string()));
+    }
+    let output = &outputs[0];
+    if let Ok((_, tensor_data)) = output.try_extract_tensor::<f32>() {
+        Ok(tensor_data.to_vec())
+    } else {
+        let (_, tensor_data) = output.try_extract_tensor::<half::f16>()?;
+        let mut data = vec![0.0; tensor_data.len()];
+        tensor_data.convert_to_f32_slice(&mut data);
+        Ok(data)
+    }
 }
 
 fn has_protobuf_parse_failure(errors: &[String]) -> bool {
@@ -325,9 +496,11 @@ fn platform_default_attempts(
     model_path: &str,
     coreml_cache_namespace: &str,
 ) -> Vec<ProviderAttempt> {
-    let (coreml_provider, coreml_cache_dir) = coreml_provider(model_path, coreml_cache_namespace);
-    vec![
-        ProviderAttempt {
+    let mut attempts = Vec::new();
+    if golden_entry_required(model_path, "CoreML") {
+        let (coreml_provider, coreml_cache_dir) =
+            coreml_provider(model_path, coreml_cache_namespace);
+        attempts.push(ProviderAttempt {
             providers: vec![
                 coreml_provider,
                 CPU::default().with_arena_allocator(true).build(),
@@ -336,9 +509,10 @@ fn platform_default_attempts(
             coreml_cache_dir,
             uses_webgpu: false,
             execution_provider: ExecutionProvider::CoreMl,
-        },
-        ProviderAttempt::cpu_only(),
-    ]
+        });
+    }
+    attempts.push(ProviderAttempt::cpu_only());
+    attempts
 }
 
 #[cfg(target_os = "ios")]
@@ -373,7 +547,7 @@ fn platform_default_attempts(
     _coreml_cache_namespace: &str,
 ) -> Vec<ProviderAttempt> {
     let mut attempts = Vec::new();
-    if webgpu::attempt_permitted(model_path) {
+    if webgpu::attempt_permitted(model_path) && golden_entry_required(model_path, "WebGPU") {
         attempts.push(ProviderAttempt {
             // EP priority follows registration order. Unsupported WebGPU nodes
             // fall through to XNNPACK and then CPU in the same session.
@@ -393,6 +567,24 @@ fn platform_default_attempts(
     attempts.push(xnnpack_attempt());
     attempts.push(ProviderAttempt::cpu_only());
     attempts
+}
+
+/// Accelerated execution providers are only allowed for models with a
+/// committed golden self-test entry (fail closed). A miss for a production
+/// model means a model update shipped without regenerating `golden_data.rs`.
+#[cfg(any(target_os = "android", target_os = "ios"))]
+fn golden_entry_required(model_path: &str, provider_label: &str) -> bool {
+    if golden::lookup(model_path).is_some() {
+        return true;
+    }
+    events::record(
+        events::Severity::Severe,
+        format!(
+            "no golden self-test entry for '{}'; {provider_label} disabled for this model",
+            model_file_label(model_path)
+        ),
+    );
+    false
 }
 
 #[cfg(target_os = "android")]
@@ -695,10 +887,10 @@ mod tests {
     use std::{io::Write, path::Path};
 
     use super::{
-        coreml_cache_root, coreml_model_cache_key, ensure_finite_f16, ensure_finite_f32,
-        has_protobuf_parse_failure, invalidate_coreml_cache, mark_coreml_cache_complete,
-        prepare_coreml_cache_entry, prune_superseded_coreml_cache_directories,
-        sanitize_cache_component,
+        ExecutionProvider, coreml_cache_root, coreml_model_cache_key, ensure_finite_f16,
+        ensure_finite_f32, has_protobuf_parse_failure, invalidate_coreml_cache,
+        mark_coreml_cache_complete, prepare_coreml_cache_entry, provider_attempt_failure_message,
+        prune_superseded_coreml_cache_directories, sanitize_cache_component,
     };
 
     #[test]
@@ -729,6 +921,38 @@ mod tests {
         assert!(!has_protobuf_parse_failure(&[String::from(
             "Load model failed: missing initializer",
         )]));
+    }
+
+    #[test]
+    fn reports_accelerated_provider_attempt_failures_with_model_context() {
+        let error = super::MlError::Ort("provider registration failed".to_string());
+        let message = provider_attempt_failure_message(
+            ExecutionProvider::CoreMl,
+            "/models/face.onnx",
+            "session construction",
+            &error,
+        )
+        .unwrap();
+
+        assert!(message.contains("CoreML session construction failed"));
+        assert!(message.contains("'face.onnx'"));
+        assert!(message.contains("provider registration failed"));
+        assert!(message.contains("falling back"));
+    }
+
+    #[test]
+    fn does_not_report_final_cpu_construction_failure_as_a_fallback() {
+        let error = super::MlError::Ort("session construction failed".to_string());
+
+        assert!(
+            provider_attempt_failure_message(
+                ExecutionProvider::Cpu,
+                "/models/face.onnx",
+                "session construction",
+                &error,
+            )
+            .is_none()
+        );
     }
 
     #[test]

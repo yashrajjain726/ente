@@ -531,9 +531,13 @@ where
                     return Err(error);
                 }
 
-                rt_log(&format!(
-                    "execution provider failed, retrying with the next provider fallback: {error}"
-                ));
+                crate::ml::events::record(
+                    crate::ml::events::Severity::Warning,
+                    format!(
+                        "execution provider failed, retrying with the next provider fallback: \
+                         {error}"
+                    ),
+                );
                 // Drop provider attributions from the failed attempt; only the
                 // retry that produces the returned value should count.
                 runtime_view.reset_used_providers();

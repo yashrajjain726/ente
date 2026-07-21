@@ -73,3 +73,8 @@ tempfile = "3.12"
 name = "ml_indexing"
 path = "tests/ml_indexing.rs"
 required-features = ["ml-assets"]
+
+[[test]]
+name = "ml_goldens"
+path = "tests/ml_goldens.rs"
+required-features = ["ml-assets"]

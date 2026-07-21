@@ -362,6 +362,69 @@ impl MlIndexingTestContext {
     }
 }
 
+/// A downloaded production model together with its content hash as pinned in
+/// the asset lock, for embedding into generated golden entries.
+#[allow(dead_code)]
+pub(crate) struct GoldenModelAsset {
+    pub(crate) path: PathBuf,
+    pub(crate) sha256: String,
+}
+
+/// Downloaded production model assets for the golden self-test tooling, with
+/// ONNX Runtime already initialized. Used by the ml_goldens test binary only.
+#[allow(dead_code)]
+pub(crate) struct GoldenTestAssets {
+    pub(crate) face_detection: GoldenModelAsset,
+    pub(crate) face_embedding: GoldenModelAsset,
+    pub(crate) clip_image: GoldenModelAsset,
+    pub(crate) clip_text: GoldenModelAsset,
+    pub(crate) clip_text_vocab: PathBuf,
+}
+
+#[allow(dead_code)]
+impl GoldenTestAssets {
+    pub(crate) fn load() -> Result<Self> {
+        let repo_root = repo_root()?;
+        let asset_lock = load_asset_lock(&repo_root)?;
+        let cache_dir = cache_dir(&repo_root);
+        let client = Client::builder()
+            .user_agent("ente-rust-ml-goldens-test")
+            .build()
+            .context("build HTTP client")?;
+
+        let onnx_runtime_library =
+            resolve_onnx_runtime_library(&client, &cache_dir, &asset_lock.onnx_runtime)?;
+        let _ = ort::init_from(&onnx_runtime_library)
+            .context("load ONNX Runtime dynamic library")?
+            .commit();
+
+        let golden_model = |label: &str, model: &ModelAsset| -> Result<GoldenModelAsset> {
+            Ok(GoldenModelAsset {
+                path: resolve_model_asset(&client, &cache_dir, label, model)?,
+                sha256: model.sha256.clone(),
+            })
+        };
+
+        let models = &asset_lock.models;
+        Ok(Self {
+            face_detection: golden_model("face-detection", &models.face_detection)?,
+            face_embedding: golden_model("face-embedding", &models.face_embedding)?,
+            clip_image: golden_model("clip-image", &models.clip_image)?,
+            clip_text: golden_model("clip-text", &models.clip_text)?,
+            clip_text_vocab: resolve_model_asset(
+                &client,
+                &cache_dir,
+                "clip-text-vocab",
+                &models.clip_text_vocab,
+            )?,
+        })
+    }
+
+    pub(crate) fn golden_data_path() -> Result<PathBuf> {
+        Ok(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("src/ml/golden_data.rs"))
+    }
+}
+
 pub(crate) struct PreparedMlRuntime {
     model_paths: ModelPaths,
 }
@@ -414,6 +477,11 @@ struct ModelAssets {
     face_detection: ModelAsset,
     face_embedding: ModelAsset,
     clip_image: ModelAsset,
+    // Used by the ml_goldens test binary only.
+    #[allow(dead_code)]
+    clip_text: ModelAsset,
+    #[allow(dead_code)]
+    clip_text_vocab: ModelAsset,
 }
 
 #[derive(Debug, Deserialize)]

@@ -50,6 +50,16 @@
       "file_name": "mobileclip_s2_image_gelu_opset20.onnx",
       "url": "https://models.ente.com/mobileclip_s2_image_gelu_opset20.onnx",
       "sha256": "205a430af825e501c5138e5bb9abea942482a7a4fd4a680e98e47cf0830dce7e"
+    },
+    "clip_text": {
+      "file_name": "mobileclip_s2_text_opset18_quant.onnx",
+      "url": "https://models.ente.com/mobileclip_s2_text_opset18_quant.onnx",
+      "sha256": "d92f33dfcff83077fc2e0d3414250710efbb51795dfd89767bdbefb5fdc47322"
+    },
+    "clip_text_vocab": {
+      "file_name": "bpe_simple_vocab_16e6.txt",
+      "url": "https://models.ente.com/bpe_simple_vocab_16e6.txt",
+      "sha256": "67603cfda2e032ad77b5f8808af37789d590db664b26df8705d2bf8b3c553fc8"
     }
   },
   "expected_unsupported_decode_file_ids": ["IMG_8905.CR2"],

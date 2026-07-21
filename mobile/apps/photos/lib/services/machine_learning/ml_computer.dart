@@ -9,6 +9,7 @@ import "package:photos/models/ml/vector.dart";
 import "package:photos/services/machine_learning/ml_constants.dart";
 import "package:photos/services/machine_learning/ml_model_assets.dart";
 import "package:photos/services/machine_learning/ml_model_download_service.dart";
+import "package:photos/services/machine_learning/ml_runtime_events.dart";
 import "package:photos/services/machine_learning/semantic_search/query_result.dart";
 import "package:photos/services/machine_learning/webgpu_execution_policy.dart";
 import "package:photos/services/remote_assets_service.dart";
@@ -84,12 +85,17 @@ class MLComputer extends SuperIsolate {
         );
       }
       final enableWebGpu = await webGpuExecutionPolicy.isEligible();
-      final isolateResult = await runInIsolate(IsolateOperation.runClipText, {
-        "text": query,
-        "clipTextModelPath": modelPath,
-        "clipTextVocabPath": vocabPath,
-        "enableWebGpu": enableWebGpu,
-      });
+      final dynamic isolateResult;
+      try {
+        isolateResult = await runInIsolate(IsolateOperation.runClipText, {
+          "text": query,
+          "clipTextModelPath": modelPath,
+          "clipTextVocabPath": vocabPath,
+          "enableWebGpu": enableWebGpu,
+        });
+      } finally {
+        await logRustMlRuntimeEvents();
+      }
       if (isolateResult is RustCorruptModelCacheDeletedException) {
         _clipTextModelPath = null;
         MLModelDownloadService.instance.invalidateModelDownloadCache(
