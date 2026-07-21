@@ -95,25 +95,22 @@ fn decrypt_password_protected_paste(
     payload: &PastePayload,
     password: PastePasswordAttempt,
 ) -> Result<String> {
-    decrypt_password_protected_paste_with_prompt(
-        paste_key,
-        payload,
-        password,
-        prompt_raw_paste_password,
-    )
+    decrypt_password_protected_paste_with_prompt(password, prompt_raw_paste_password, |password| {
+        ente_paste::decrypt(payload, paste_key, Some(password))
+    })
 }
 
-fn decrypt_password_protected_paste_with_prompt<F>(
-    paste_key: &PasteKey,
-    payload: &PastePayload,
+fn decrypt_password_protected_paste_with_prompt<F, D>(
     mut password: PastePasswordAttempt,
     mut prompt_password: F,
+    mut decrypt: D,
 ) -> Result<String>
 where
     F: FnMut() -> Result<String>,
+    D: FnMut(&str) -> ente_paste::Result<String>,
 {
     loop {
-        match ente_paste::decrypt(payload, paste_key, Some(password.value())) {
+        match decrypt(password.value()) {
             Err(ente_paste::Error::IncorrectPassword) if password.can_retry() => {
                 eprintln!("Incorrect paste password. Try again.");
                 password = PastePasswordAttempt::Prompted(prompt_valid_paste_password(
@@ -288,6 +285,13 @@ impl PastePasswordAttempt {
 mod tests {
     use super::*;
 
+    fn test_decrypt_password_protected_paste(password: &str) -> ente_paste::Result<String> {
+        match password {
+            "correct horse" => Ok("protected paste".to_string()),
+            _ => Err(ente_paste::Error::IncorrectPassword),
+        }
+    }
+
     #[test]
     fn default_tty_output_escapes_controls() {
         let text = "ok\n\x1b]52;c;AAAA\x07\rhidden\tend\u{85}";
@@ -312,14 +316,11 @@ mod tests {
 
     #[test]
     fn prompted_password_retry_can_recover() {
-        let (paste_key, payload) =
-            ente_paste::encrypt("protected paste", Some("correct horse")).unwrap();
         let mut retry_passwords = ["correct horse"].into_iter();
         let text = decrypt_password_protected_paste_with_prompt(
-            &paste_key,
-            &payload,
             PastePasswordAttempt::Prompted("wrong horse".to_string()),
             || Ok::<_, Error>(retry_passwords.next().expect("retry password").to_string()),
+            test_decrypt_password_protected_paste,
         )
         .unwrap();
 
@@ -329,14 +330,11 @@ mod tests {
 
     #[test]
     fn prompted_password_retry_ignores_empty_password() {
-        let (paste_key, payload) =
-            ente_paste::encrypt("protected paste", Some("correct horse")).unwrap();
         let mut retry_passwords = ["", "correct horse"].into_iter();
         let text = decrypt_password_protected_paste_with_prompt(
-            &paste_key,
-            &payload,
             PastePasswordAttempt::Prompted("wrong horse".to_string()),
             || Ok::<_, Error>(retry_passwords.next().expect("retry password").to_string()),
+            test_decrypt_password_protected_paste,
         )
         .unwrap();
 
@@ -346,12 +344,10 @@ mod tests {
 
     #[test]
     fn wrong_env_password_fails_without_retry() {
-        let (paste_key, payload) =
-            ente_paste::encrypt("protected paste", Some("correct horse")).unwrap();
-        let error = decrypt_password_protected_paste(
-            &paste_key,
-            &payload,
+        let error = decrypt_password_protected_paste_with_prompt(
             PastePasswordAttempt::Env("wrong horse".to_string()),
+            || panic!("environment passwords must not be retried"),
+            test_decrypt_password_protected_paste,
         )
         .unwrap_err();
 

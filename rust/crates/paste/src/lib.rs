@@ -395,11 +395,9 @@ mod tests {
     }
 
     #[test]
-    fn encrypt_then_decrypt_password_protected_paste_payload() {
+    fn encrypt_password_protected_paste_payload_uses_moderate_kdf() {
         let (paste_key, payload) = encrypt("protected paste", Some("correct horse")).unwrap();
-        let text = decrypt(&payload, &paste_key, Some("correct horse")).unwrap();
 
-        assert_eq!(text, "protected paste");
         assert!(paste_key.password_required);
         assert!(
             paste_key
@@ -411,8 +409,18 @@ mod tests {
     }
 
     #[test]
+    fn decrypt_password_protected_paste_payload() {
+        let paste_key = PasteKey::parse("p-AbCd1234EfGh").unwrap();
+        let payload = test_payload("protected paste", &paste_key, Some("correct horse"));
+        let text = decrypt(&payload, &paste_key, Some("correct horse")).unwrap();
+
+        assert_eq!(text, "protected paste");
+    }
+
+    #[test]
     fn reject_wrong_paste_password() {
-        let (paste_key, payload) = encrypt("protected paste", Some("correct horse")).unwrap();
+        let paste_key = PasteKey::parse("p-AbCd1234EfGh").unwrap();
+        let payload = test_payload("protected paste", &paste_key, Some("correct horse"));
         let error = decrypt(&payload, &paste_key, Some("wrong horse")).unwrap_err();
 
         assert!(matches!(error, Error::IncorrectPassword));
@@ -420,7 +428,8 @@ mod tests {
 
     #[test]
     fn structural_payload_errors_are_not_incorrect_password() {
-        let (paste_key, mut payload) = encrypt("protected paste", Some("correct horse")).unwrap();
+        let paste_key = PasteKey::parse("p-AbCd1234EfGh").unwrap();
+        let mut payload = test_payload("protected paste", &paste_key, Some("correct horse"));
         payload.kdf_nonce = "not base64".to_string();
         let error = decrypt(&payload, &paste_key, Some("correct horse")).unwrap_err();
 
@@ -432,7 +441,8 @@ mod tests {
 
     #[test]
     fn wrapped_key_payload_errors_are_not_incorrect_password() {
-        let (paste_key, mut payload) = encrypt("protected paste", Some("correct horse")).unwrap();
+        let paste_key = PasteKey::parse("p-AbCd1234EfGh").unwrap();
+        let mut payload = test_payload("protected paste", &paste_key, Some("correct horse"));
         payload.encrypted_paste_key = "not base64".to_string();
         let error = decrypt(&payload, &paste_key, Some("correct horse")).unwrap_err();
 
