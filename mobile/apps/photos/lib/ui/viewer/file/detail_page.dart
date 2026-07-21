@@ -290,7 +290,11 @@ class _BodyState extends State<_Body> {
               ValueListenableBuilder(
                 valueListenable: _selectedIndexNotifier,
                 builder: (BuildContext context, int selectedIndex, _) {
-                  return _buildSocialOverlay(_files![selectedIndex]);
+                  return _GallerySocialOverlay(
+                    file: _files![selectedIndex],
+                    mode: widget.config.mode,
+                    isGuestView: isGuestView,
+                  );
                 },
               ),
               ValueListenableBuilder(
@@ -401,40 +405,6 @@ class _BodyState extends State<_Body> {
           ),
         )
         .ignore();
-  }
-
-  Widget _buildSocialOverlay(EnteFile file) {
-    if (widget.config.mode == DetailPageMode.minimalistic ||
-        isGuestView ||
-        file is TrashFile) {
-      return const SizedBox.shrink();
-    }
-
-    final padding = MediaQuery.paddingOf(context);
-    final fullScreenNotifier = InheritedDetailPageState.of(
-      context,
-    ).enableFullScreenNotifier;
-    return Positioned(
-      right: padding.right + _socialRightInset,
-      bottom: padding.bottom + _socialBottomBarClearance,
-      child: ValueListenableBuilder<bool>(
-        valueListenable: fullScreenNotifier,
-        builder: (context, isFullScreen, child) => IgnorePointer(
-          ignoring: isFullScreen,
-          child: AnimatedOpacity(
-            opacity: isFullScreen ? 0 : 1,
-            duration: const Duration(milliseconds: 250),
-            curve: Curves.easeInOut,
-            child: child,
-          ),
-        ),
-        child: FileSocialOverlay(
-          file: file,
-          currentUserID: Configuration.instance.getUserID(),
-          openingCollectionID: file.collectionID,
-        ),
-      ),
-    );
   }
 
   Widget _buildPageView() {
@@ -668,5 +638,53 @@ class _BodyState extends State<_Body> {
       return null;
     }
     return files[index];
+  }
+}
+
+/// Must remain under a [Stack] because this widget builds a [Positioned].
+class _GallerySocialOverlay extends StatelessWidget {
+  final EnteFile file;
+  final DetailPageMode mode;
+  final bool isGuestView;
+
+  const _GallerySocialOverlay({
+    required this.file,
+    required this.mode,
+    required this.isGuestView,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (mode == DetailPageMode.minimalistic ||
+        isGuestView ||
+        file is TrashFile) {
+      return const SizedBox.shrink();
+    }
+
+    final padding = MediaQuery.paddingOf(context);
+    final fullScreenNotifier = InheritedDetailPageState.of(
+      context,
+    ).enableFullScreenNotifier;
+    return Positioned(
+      right: padding.right + _socialRightInset,
+      bottom: padding.bottom + _socialBottomBarClearance,
+      child: ValueListenableBuilder<bool>(
+        valueListenable: fullScreenNotifier,
+        builder: (context, isFullScreen, child) => IgnorePointer(
+          ignoring: isFullScreen,
+          child: AnimatedOpacity(
+            opacity: isFullScreen ? 0 : 1,
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.easeInOut,
+            child: child,
+          ),
+        ),
+        child: FileSocialOverlay(
+          file: file,
+          currentUserID: Configuration.instance.getUserID(),
+          openingCollectionID: file.collectionID,
+        ),
+      ),
+    );
   }
 }

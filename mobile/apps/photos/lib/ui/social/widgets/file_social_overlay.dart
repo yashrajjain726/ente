@@ -389,69 +389,90 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
     }
 
     return LayoutBuilder(
-      builder: (context, constraints) => Row(
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          if (_latestComment != null && _latestCommentAuthor != null)
-            Padding(
-              padding: const EdgeInsets.only(right: 4, bottom: 4),
-              child: _buildLatestCommentPill(
-                _latestComment!,
-                _latestCommentAuthor!,
-                math.min(constraints.maxWidth * 0.5, 200),
+      builder: (context, constraints) {
+        final latestComment = _latestComment;
+        final latestCommentAuthor = _latestCommentAuthor;
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            if (latestComment != null && latestCommentAuthor != null)
+              Padding(
+                padding: const EdgeInsets.only(right: 4, bottom: 4),
+                child: _LatestCommentPill(
+                  comment: latestComment,
+                  author: latestCommentAuthor,
+                  maxWidth: math.min(constraints.maxWidth * 0.5, 200),
+                  currentUserID: widget.currentUserID!,
+                  onTap: () => _openComments(comment: latestComment),
+                ),
               ),
-            ),
-          Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Tooltip(
-                message: AppLocalizations.of(context).like,
-                child: GestureDetector(
-                  onLongPress: _showLikes,
-                  child: SizedBox.square(
-                    dimension: _socialControlsSize,
-                    child: IconButton(
-                      padding: _socialIconPadding,
-                      style: IconButton.styleFrom(
-                        overlayColor: WidgetStateColor.transparent,
-                      ),
-                      onPressed: _toggleReaction,
-                      icon: Icon(
-                        _hasLiked ? EnteIcons.likeFilled : EnteIcons.likeStroke,
-                        color: _hasLiked ? _likedColor : Colors.white,
-                        size: _socialIconSize,
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Tooltip(
+                  message: AppLocalizations.of(context).like,
+                  child: GestureDetector(
+                    onLongPress: _showLikes,
+                    child: SizedBox.square(
+                      dimension: _socialControlsSize,
+                      child: IconButton(
+                        padding: _socialIconPadding,
+                        style: IconButton.styleFrom(
+                          overlayColor: WidgetStateColor.transparent,
+                        ),
+                        onPressed: _toggleReaction,
+                        icon: Icon(
+                          _hasLiked
+                              ? EnteIcons.likeFilled
+                              : EnteIcons.likeStroke,
+                          color: _hasLiked ? _likedColor : Colors.white,
+                          size: _socialIconSize,
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 8),
-              Tooltip(
-                message: AppLocalizations.of(context).comments,
-                child: SizedBox.square(
-                  dimension: _socialControlsSize,
-                  child: IconButton(
-                    padding: _socialIconPadding,
-                    onPressed: _openComments,
-                    icon: _buildCommentIcon(),
+                const SizedBox(height: 8),
+                Tooltip(
+                  message: AppLocalizations.of(context).comments,
+                  child: SizedBox.square(
+                    dimension: _socialControlsSize,
+                    child: IconButton(
+                      padding: _socialIconPadding,
+                      onPressed: _openComments,
+                      icon: _CommentBadgeIcon(count: _commentCount),
+                    ),
                   ),
                 ),
-              ),
-            ],
-          ),
-        ],
-      ),
+              ],
+            ),
+          ],
+        );
+      },
     );
   }
+}
 
-  Widget _buildLatestCommentPill(
-    Comment comment,
-    User author,
-    double maxWidth,
-  ) {
+class _LatestCommentPill extends StatelessWidget {
+  final Comment comment;
+  final User author;
+  final double maxWidth;
+  final int currentUserID;
+  final VoidCallback onTap;
+
+  const _LatestCommentPill({
+    required this.comment,
+    required this.author,
+    required this.maxWidth,
+    required this.currentUserID,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTap: () => _openComments(comment: comment),
+      onTap: onTap,
       child: ConstrainedBox(
         constraints: BoxConstraints(maxWidth: maxWidth),
         child: Stack(
@@ -496,7 +517,7 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
                 child: UserAvatarWidget(
                   author,
                   type: AvatarType.small,
-                  currentUserID: widget.currentUserID!,
+                  currentUserID: currentUserID,
                 ),
               ),
             ),
@@ -505,8 +526,15 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
       ),
     );
   }
+}
 
-  Widget _buildCommentIcon() {
+class _CommentBadgeIcon extends StatelessWidget {
+  final int count;
+
+  const _CommentBadgeIcon({required this.count});
+
+  @override
+  Widget build(BuildContext context) {
     return Stack(
       clipBehavior: Clip.none,
       children: [
@@ -515,7 +543,7 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
           color: Colors.white,
           size: _socialIconSize,
         ),
-        if (_commentCount > 0)
+        if (count > 0)
           Positioned(
             right: -5,
             top: -5,
@@ -528,7 +556,7 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
               ),
               child: Center(
                 child: Text(
-                  _commentCount > 99 ? "99+" : _commentCount.toString(),
+                  count > 99 ? "99+" : count.toString(),
                   style: const TextStyle(
                     color: Colors.black,
                     fontSize: 10,
