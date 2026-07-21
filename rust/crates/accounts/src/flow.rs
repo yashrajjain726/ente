@@ -10,7 +10,7 @@ use base64::{
 use ente_core::{
     auth::{
         self, DecryptedSecrets, GeneratedSrpSetup, KeyAttributes as CoreKeyAttributes,
-        KeyDerivationStrength, derive_kek, generate_keys_with_strength, generate_srp_setup,
+        KeyDerivationStrength, derive_kek, generate_keys_with_strength,
         generate_srp_setup_with_login_key, get_recovery_key,
     },
     crypto::{self, SecretVec, secretbox},
@@ -433,14 +433,13 @@ where
 
         let srp_user_id = Uuid::new_v4();
         let srp_setup = generate_srp_setup_with_login_key(&login_key, &srp_user_id.to_string())?;
-        let update = self
-            .complete_srp_update(
-                &srp_user_id,
-                &srp_setup,
-                &updated_key_attr,
-                params.log_out_other_devices,
-            )
-            .await?;
+        self.complete_srp_update(
+            &srp_user_id,
+            &srp_setup,
+            &updated_key_attr,
+            params.log_out_other_devices,
+        )
+        .await?;
 
         let srp_attributes = self.client.get_srp_attributes(&params.email).await?;
 
@@ -467,8 +466,6 @@ where
                 mismatches.join(", ")
             )));
         }
-
-        let _ = update;
 
         Ok(ChangePasswordResult {
             key_attributes: updated_key_attributes,
@@ -701,7 +698,7 @@ where
         let key_gen_result = generate_keys_with_strength(&password, key_derivation_strength)?;
         let srp_user_id = Uuid::new_v4();
         let srp_setup =
-            generate_srp_setup(&key_gen_result.key_encryption_key, &srp_user_id.to_string())?;
+            generate_srp_setup_with_login_key(&key_gen_result.login_key, &srp_user_id.to_string())?;
         let key_attributes = to_api_key_attributes(&key_gen_result.key_attributes);
 
         self.client

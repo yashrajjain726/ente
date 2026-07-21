@@ -171,24 +171,23 @@ pub fn generate_sensitive_kek(password: &str) -> Result<GeneratedKek> {
         _ => AuthError::InsufficientMemory,
     })?;
 
-    Ok(GeneratedKek {
-        key: SecretVec::new(derived.key.as_bytes().to_vec()),
-        salt: derived.salt.as_bytes().to_vec(),
-        mem_limit: derived.params.mem_limit,
-        ops_limit: derived.params.ops_limit,
-    })
+    Ok(generated_kek(derived))
 }
 
 /// Generate a KEK using the current interactive web policy.
 pub fn generate_interactive_kek(password: &str) -> Result<GeneratedKek> {
     let derived = argon::derive_interactive_key(password)?;
 
-    Ok(GeneratedKek {
+    Ok(generated_kek(derived))
+}
+
+fn generated_kek(derived: argon::DerivedKey) -> GeneratedKek {
+    GeneratedKek {
         key: SecretVec::new(derived.key.as_bytes().to_vec()),
         salt: derived.salt.as_bytes().to_vec(),
         mem_limit: derived.params.mem_limit,
         ops_limit: derived.params.ops_limit,
-    })
+    }
 }
 
 /// Generate the SRP setup payload for a given KEK and SRP user ID.
