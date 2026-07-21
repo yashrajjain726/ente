@@ -3,6 +3,8 @@ use std::fs::{self, File, OpenOptions};
 use std::io::{ErrorKind, Write};
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 
 use futures_util::future::try_join_all;
@@ -66,15 +68,15 @@ impl From<std::io::Error> for Error {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct Target {
     pub label: String,
     pub url: String,
-    pub destination_path: String,
     pub sha256: String,
+    pub destination: PathBuf,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct Progress {
     pub label: String,
     pub downloaded_bytes: u64,
@@ -92,25 +94,23 @@ pub struct Progress {
     pub complete: bool,
 }
 
-#[derive(Debug, Clone, Copy, Default)]
-struct DownloadProgressMetrics {
-    elapsed_ms: u64,
-    bytes_per_second: f64,
-    file_elapsed_ms: u64,
-    file_bytes_per_second: f64,
-    retry_count: u32,
-    file_retry_count: u32,
-    file_complete: bool,
-    complete: bool,
+#[derive(Clone, Default)]
+pub struct CancellationToken {
+    cancelled: Arc<AtomicBool>,
 }
 
-#[derive(Debug, Clone, Copy)]
-struct FileDownloadProgress {
-    downloaded_bytes: u64,
-    total_bytes: Option<u64>,
-    network_downloaded_bytes: u64,
-    elapsed: Duration,
-    retry_count: u32,
+impl CancellationToken {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn cancel(&self) {
+        self.cancelled.store(true, Ordering::SeqCst);
+    }
+
+    pub fn is_cancelled(&self) -> bool {
+        self.cancelled.load(Ordering::SeqCst)
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -142,7 +142,7 @@ struct DownloadProbe {
 }
 
 #[derive(Debug, Clone, Copy)]
-struct FileDownloadState {
+struct FileProgress {
     downloaded_bytes: u64,
     total_bytes: Option<u64>,
     network_downloaded_bytes: u64,
@@ -180,7 +180,44 @@ struct ContentRange {
     total: Option<u64>,
 }
 
-pub fn fetch(
+#[derive(Clone)]
+pub struct Downloader {
+    client: Client,
+}
+
+impl Downloader {
+    pub fn new() -> Result<Self, Error> {
+        Ok(Self {
+            client: build_client()?,
+        })
+    }
+
+    pub(crate) fn client(&self) -> &Client {
+        &self.client
+    }
+
+    pub async fn download(
+        &self,
+        targets: Vec<Target>,
+        on_progress: impl FnMut(Progress) + Send,
+        cancellation: CancellationToken,
+    ) -> Result<(), Error> {
+        fetch_async(&self.client, targets, on_progress, move || {
+            cancellation.is_cancelled()
+        })
+        .await
+    }
+}
+
+fn build_client() -> Result<Client, Error> {
+    Client::builder()
+        .connect_timeout(CONNECT_TIMEOUT)
+        .build()
+        .map_err(|err| Error::Network(err.to_string()))
+}
+
+pub(crate) fn fetch(
+    downloader: &Downloader,
     targets: Vec<Target>,
     on_progress: impl FnMut(Progress),
     is_cancelled: impl Fn() -> bool,
@@ -189,10 +226,16 @@ pub fn fetch(
         .enable_io()
         .enable_time()
         .build()?;
-    runtime.block_on(fetch_async(targets, on_progress, is_cancelled))
+    runtime.block_on(fetch_async(
+        &downloader.client,
+        targets,
+        on_progress,
+        is_cancelled,
+    ))
 }
 
 async fn fetch_async(
+    client: &Client,
     targets: Vec<Target>,
     on_progress: impl FnMut(Progress),
     is_cancelled: impl Fn() -> bool,
@@ -210,16 +253,16 @@ async fn fetch_async(
         }
     }
 
-    let client = Client::builder()
-        .connect_timeout(CONNECT_TIMEOUT)
-        .build()
-        .map_err(|err| Error::Network(err.to_string()))?;
+    if is_cancelled() {
+        return Err(Error::Cancelled);
+    }
+
     let download_started_at = Instant::now();
     let mut download_probes = Vec::with_capacity(targets.len());
     let mut cached = Vec::with_capacity(targets.len());
 
     for target in &targets {
-        let destination = Path::new(&target.destination_path);
+        let destination = &target.destination;
         let is_cached = prepare_cached_download(target, destination);
         cached.push(is_cached);
         if is_cached {
@@ -229,7 +272,7 @@ async fn fetch_async(
                 response_metadata: None,
             });
         } else {
-            download_probes.push(fetch_download_probe(&client, &target.url).await);
+            download_probes.push(fetch_download_probe(client, &target.url).await);
         }
     }
 
@@ -251,13 +294,8 @@ async fn fetch_async(
         .zip(&download_probes)
         .zip(&cached)
         .map(|((target, probe), cached)| {
-            let existing = existing_download_bytes(
-                target,
-                Path::new(&target.destination_path),
-                probe,
-                *cached,
-            );
-            FileDownloadState {
+            let existing = existing_download_bytes(target, &target.destination, probe, *cached);
+            FileProgress {
                 downloaded_bytes: probe
                     .content_length
                     .map_or(existing, |value| existing.min(value)),
@@ -271,11 +309,10 @@ async fn fetch_async(
     let file_states = Rc::new(RefCell::new(file_states));
     let on_progress = Rc::new(RefCell::new(on_progress));
 
-    emit_progress_from_states(
-        "Preparing downloads",
+    emit_progress(
+        ProgressPhase::Preparing,
+        Duration::ZERO,
         total_bytes,
-        DownloadProgressMetrics::default(),
-        None,
         &file_states,
         &on_progress,
     );
@@ -287,7 +324,7 @@ async fn fetch_async(
         if is_cancelled() {
             return Err(Error::Cancelled);
         }
-        let destination = PathBuf::from(&target.destination_path);
+        let destination = target.destination.clone();
         let download_probe = download_probes
             .get(index)
             .cloned()
@@ -295,7 +332,7 @@ async fn fetch_async(
         let expected_file_total = download_probe.content_length;
         let target_label = target.label.clone();
         let file_report = download_file(
-            &client,
+            client,
             target,
             &destination,
             &download_probe,
@@ -303,26 +340,17 @@ async fn fetch_async(
                 {
                     let mut states = file_states.borrow_mut();
                     if let Some(state) = states.get_mut(index) {
-                        state.downloaded_bytes = file_progress.downloaded_bytes;
-                        state.total_bytes = file_progress.total_bytes;
-                        state.network_downloaded_bytes = file_progress.network_downloaded_bytes;
-                        state.elapsed = file_progress.elapsed;
-                        state.retry_count = file_progress.retry_count;
+                        *state = file_progress;
                     }
                 }
-
-                let metrics = aggregate_progress_metrics(
+                emit_progress(
+                    ProgressPhase::File {
+                        label: &target_label,
+                        index,
+                        complete: false,
+                    },
                     download_started_at.elapsed(),
-                    &file_states,
-                    index,
-                    false,
-                    false,
-                );
-                emit_progress_from_states(
-                    &target_label,
                     total_bytes,
-                    metrics,
-                    Some(index),
                     &file_states,
                     &on_progress,
                 );
@@ -349,29 +377,22 @@ async fn fetch_async(
             }
         }
 
-        let metrics = aggregate_progress_metrics(
+        emit_progress(
+            ProgressPhase::File {
+                label: &target_label,
+                index,
+                complete: true,
+            },
             download_started_at.elapsed(),
-            &file_states,
-            index,
-            true,
-            false,
-        );
-        emit_progress_from_states(
-            &target_label,
             total_bytes,
-            metrics,
-            Some(index),
             &file_states,
             &on_progress,
         );
     }
-    let complete_metrics = aggregate_complete_metrics(download_started_at.elapsed(), &file_states);
-
-    emit_progress_from_states(
-        "Complete",
-        total_bytes.or_else(|| Some(downloaded_bytes_from_states(&file_states))),
-        complete_metrics,
-        None,
+    emit_progress(
+        ProgressPhase::Complete,
+        download_started_at.elapsed(),
+        total_bytes,
         &file_states,
         &on_progress,
     );
@@ -384,7 +405,7 @@ async fn download_file(
     target: &Target,
     destination: &Path,
     download_probe: &DownloadProbe,
-    mut on_progress: impl FnMut(FileDownloadProgress),
+    mut on_progress: impl FnMut(FileProgress),
     is_cancelled: &impl Fn() -> bool,
 ) -> Result<FileDownloadReport, Error> {
     let parent = destination
@@ -447,7 +468,7 @@ async fn download_file_single(
     target: &Target,
     destination: &Path,
     expected_file_total: Option<u64>,
-    on_progress: &mut dyn FnMut(FileDownloadProgress),
+    on_progress: &mut dyn FnMut(FileProgress),
     is_cancelled: &impl Fn() -> bool,
 ) -> Result<FileDownloadReport, Error> {
     let tmp_path = tmp_path_for(destination);
@@ -544,7 +565,7 @@ async fn download_file_single(
         let mut last_progress = Instant::now();
         let mut retry_attempt = false;
 
-        on_progress(FileDownloadProgress {
+        on_progress(FileProgress {
             downloaded_bytes: downloaded,
             total_bytes: file_total,
             network_downloaded_bytes,
@@ -591,7 +612,7 @@ async fn download_file_single(
             network_downloaded_bytes = network_downloaded_bytes.saturating_add(chunk.len() as u64);
 
             if last_progress.elapsed() >= PROGRESS_INTERVAL {
-                on_progress(FileDownloadProgress {
+                on_progress(FileProgress {
                     downloaded_bytes: downloaded,
                     total_bytes: file_total,
                     network_downloaded_bytes,
@@ -610,7 +631,7 @@ async fn download_file_single(
         file.flush()?;
         drop(file);
 
-        on_progress(FileDownloadProgress {
+        on_progress(FileProgress {
             downloaded_bytes: downloaded,
             total_bytes: file_total,
             network_downloaded_bytes,
@@ -674,7 +695,7 @@ async fn download_file_ranged(
     destination: &Path,
     total: u64,
     response_metadata: Option<ResponseMetadata>,
-    on_progress: &mut dyn FnMut(FileDownloadProgress),
+    on_progress: &mut dyn FnMut(FileProgress),
     is_cancelled: &impl Fn() -> bool,
 ) -> Result<FileDownloadReport, Error> {
     let tmp_path = tmp_path_for(destination);
@@ -806,7 +827,7 @@ async fn download_range_part(
     range_metadata: Rc<RefCell<RangeDownloadMetadata>>,
     range_metadata_path: PathBuf,
     file_started_at: Instant,
-    on_progress: Rc<RefCell<&mut dyn FnMut(FileDownloadProgress)>>,
+    on_progress: Rc<RefCell<&mut dyn FnMut(FileProgress)>>,
     is_cancelled: &impl Fn() -> bool,
 ) -> Result<(), Error> {
     let range_len = range_download_len(range);
@@ -1151,7 +1172,7 @@ fn emit_range_file_progress(
     total_bytes: u64,
     file_started_at: Instant,
     range_states: &Rc<RefCell<Vec<RangePartState>>>,
-    on_progress: &Rc<RefCell<&mut dyn FnMut(FileDownloadProgress)>>,
+    on_progress: &Rc<RefCell<&mut dyn FnMut(FileProgress)>>,
 ) {
     let states = range_states.borrow();
     let downloaded_bytes = states
@@ -1170,7 +1191,7 @@ fn emit_range_file_progress(
     drop(states);
 
     let mut callback = on_progress.borrow_mut();
-    (**callback)(FileDownloadProgress {
+    (**callback)(FileProgress {
         downloaded_bytes,
         total_bytes: Some(total_bytes),
         network_downloaded_bytes,
@@ -1295,12 +1316,21 @@ fn parse_content_range(value: &str) -> Option<ContentRange> {
     Some(ContentRange { start, end, total })
 }
 
-fn emit_progress_from_states<F: FnMut(Progress)>(
-    label: &str,
+enum ProgressPhase<'a> {
+    Preparing,
+    File {
+        label: &'a str,
+        index: usize,
+        complete: bool,
+    },
+    Complete,
+}
+
+fn emit_progress<F: FnMut(Progress)>(
+    phase: ProgressPhase,
+    elapsed: Duration,
     total_bytes: Option<u64>,
-    metrics: DownloadProgressMetrics,
-    file_index: Option<usize>,
-    file_states: &Rc<RefCell<Vec<FileDownloadState>>>,
+    file_states: &Rc<RefCell<Vec<FileProgress>>>,
     on_progress: &Rc<RefCell<F>>,
 ) {
     let states = file_states.borrow();
@@ -1308,32 +1338,6 @@ fn emit_progress_from_states<F: FnMut(Progress)>(
         .iter()
         .map(|state| state.downloaded_bytes)
         .sum::<u64>();
-    let resolved_total_bytes = total_bytes.or_else(|| partial_total_from_states(&states));
-    let (file_downloaded_bytes, file_total_bytes) = file_index
-        .and_then(|index| states.get(index))
-        .map(|state| (state.downloaded_bytes, state.total_bytes))
-        .unwrap_or((0, None));
-    drop(states);
-
-    emit_combined_progress(
-        label,
-        downloaded_bytes,
-        resolved_total_bytes,
-        file_downloaded_bytes,
-        file_total_bytes,
-        metrics,
-        &mut *on_progress.borrow_mut(),
-    );
-}
-
-fn aggregate_progress_metrics(
-    elapsed: Duration,
-    file_states: &Rc<RefCell<Vec<FileDownloadState>>>,
-    file_index: usize,
-    file_complete: bool,
-    complete: bool,
-) -> DownloadProgressMetrics {
-    let states = file_states.borrow();
     let network_downloaded_bytes = states
         .iter()
         .map(|state| state.network_downloaded_bytes)
@@ -1342,128 +1346,57 @@ fn aggregate_progress_metrics(
         .iter()
         .map(|state| state.retry_count)
         .fold(0u32, u32::saturating_add);
-    let file_state = states
-        .get(file_index)
-        .copied()
-        .unwrap_or(FileDownloadState {
-            downloaded_bytes: 0,
-            total_bytes: None,
-            network_downloaded_bytes: 0,
-            elapsed: Duration::ZERO,
-            retry_count: 0,
-        });
+    let file_state = match &phase {
+        ProgressPhase::File { index, .. } => states.get(*index).copied(),
+        _ => None,
+    };
+    let total_bytes = match phase {
+        ProgressPhase::Complete => total_bytes.or(Some(downloaded_bytes)),
+        _ => total_bytes.or_else(|| {
+            let total = states
+                .iter()
+                .filter_map(|state| state.total_bytes)
+                .sum::<u64>();
+            (total > 0).then_some(total)
+        }),
+    };
     drop(states);
 
-    progress_metrics(
-        elapsed,
-        network_downloaded_bytes,
-        file_state,
-        retry_count,
-        file_complete,
-        complete,
-    )
-}
-
-fn aggregate_complete_metrics(
-    elapsed: Duration,
-    file_states: &Rc<RefCell<Vec<FileDownloadState>>>,
-) -> DownloadProgressMetrics {
-    let states = file_states.borrow();
-    let network_downloaded_bytes = states
-        .iter()
-        .map(|state| state.network_downloaded_bytes)
-        .sum::<u64>();
-    let retry_count = states
-        .iter()
-        .map(|state| state.retry_count)
-        .fold(0u32, u32::saturating_add);
-    drop(states);
-
-    progress_metrics(
-        elapsed,
-        network_downloaded_bytes,
-        FileDownloadState {
-            downloaded_bytes: 0,
-            total_bytes: None,
-            network_downloaded_bytes: 0,
-            elapsed: Duration::ZERO,
-            retry_count: 0,
-        },
-        retry_count,
-        false,
-        true,
-    )
-}
-
-fn downloaded_bytes_from_states(file_states: &Rc<RefCell<Vec<FileDownloadState>>>) -> u64 {
-    file_states
-        .borrow()
-        .iter()
-        .map(|state| state.downloaded_bytes)
-        .sum()
-}
-
-fn partial_total_from_states(states: &[FileDownloadState]) -> Option<u64> {
-    let total = states
-        .iter()
-        .filter_map(|state| state.total_bytes)
-        .sum::<u64>();
-    (total > 0).then_some(total)
-}
-
-fn emit_combined_progress(
-    label: &str,
-    downloaded_bytes: u64,
-    total_bytes: Option<u64>,
-    file_downloaded_bytes: u64,
-    file_total_bytes: Option<u64>,
-    metrics: DownloadProgressMetrics,
-    on_progress: &mut impl FnMut(Progress),
-) {
+    let (label, file_complete, complete) = match phase {
+        ProgressPhase::Preparing => ("Preparing downloads", false, false),
+        ProgressPhase::File {
+            label, complete, ..
+        } => (label, complete, false),
+        ProgressPhase::Complete => ("Complete", false, true),
+    };
     let percentage = total_bytes
         .filter(|value| *value > 0)
         .map(|total| ((downloaded_bytes as f64 / total as f64) * 100.0).clamp(0.0, 100.0))
         .unwrap_or(0.0);
+    let (file_downloaded_bytes, file_total_bytes) = file_state
+        .map(|state| (state.downloaded_bytes, state.total_bytes))
+        .unwrap_or((0, None));
 
-    on_progress(Progress {
+    on_progress.borrow_mut()(Progress {
         label: label.to_string(),
         downloaded_bytes,
         total_bytes,
         file_downloaded_bytes,
         file_total_bytes,
         percentage,
-        elapsed_ms: metrics.elapsed_ms,
-        bytes_per_second: metrics.bytes_per_second,
-        file_elapsed_ms: metrics.file_elapsed_ms,
-        file_bytes_per_second: metrics.file_bytes_per_second,
-        retry_count: metrics.retry_count,
-        file_retry_count: metrics.file_retry_count,
-        file_complete: metrics.file_complete,
-        complete: metrics.complete,
-    });
-}
-
-fn progress_metrics(
-    elapsed: Duration,
-    downloaded_bytes: u64,
-    file_state: FileDownloadState,
-    retry_count: u32,
-    file_complete: bool,
-    complete: bool,
-) -> DownloadProgressMetrics {
-    DownloadProgressMetrics {
         elapsed_ms: duration_ms(elapsed),
-        bytes_per_second: bytes_per_second(downloaded_bytes, elapsed),
-        file_elapsed_ms: duration_ms(file_state.elapsed),
-        file_bytes_per_second: bytes_per_second(
-            file_state.network_downloaded_bytes,
-            file_state.elapsed,
-        ),
+        bytes_per_second: bytes_per_second(network_downloaded_bytes, elapsed),
+        file_elapsed_ms: file_state
+            .map(|state| duration_ms(state.elapsed))
+            .unwrap_or(0),
+        file_bytes_per_second: file_state
+            .map(|state| bytes_per_second(state.network_downloaded_bytes, state.elapsed))
+            .unwrap_or(0.0),
         retry_count,
-        file_retry_count: file_state.retry_count,
+        file_retry_count: file_state.map(|state| state.retry_count).unwrap_or(0),
         file_complete,
         complete,
-    }
+    });
 }
 
 fn duration_ms(duration: Duration) -> u64 {
@@ -1831,10 +1764,11 @@ mod tests {
         assert!(probe.supports_ranges);
 
         let result = fetch(
+            &Downloader::new().unwrap(),
             vec![Target {
                 label: "Model".to_string(),
                 url,
-                destination_path: destination.display().to_string(),
+                destination: destination.clone(),
                 sha256: sha_hex(&bytes),
             }],
             |_| {},
@@ -1880,10 +1814,11 @@ mod tests {
         let destination = test_dir.join("model.bin");
 
         let result = fetch(
+            &Downloader::new().unwrap(),
             vec![Target {
                 label: "Model".to_string(),
                 url: server.url("/model.bin"),
-                destination_path: destination.display().to_string(),
+                destination: destination.clone(),
                 sha256: sha_hex(&bytes),
             }],
             |_| {},
@@ -1927,11 +1862,17 @@ mod tests {
         let targets = ["model", "projector"].map(|label| Target {
             label: label.to_string(),
             url: server.url(&format!("/{label}.bin")),
-            destination_path: test_dir.join(format!("{label}.bin")).display().to_string(),
+            destination: test_dir.join(format!("{label}.bin")),
             sha256: sha_hex(&bytes),
         });
 
-        fetch(targets.into(), |_| {}, || false).expect("downloads succeed");
+        fetch(
+            &Downloader::new().unwrap(),
+            targets.into(),
+            |_| {},
+            || false,
+        )
+        .expect("downloads succeed");
         assert_eq!(max_active.load(Ordering::SeqCst), 1);
 
         let _ = fs::remove_dir_all(test_dir);
@@ -1965,16 +1906,23 @@ mod tests {
         let target = Target {
             label: "Model".to_string(),
             url: server.url("/model.bin"),
-            destination_path: destination.display().to_string(),
+            destination: destination.clone(),
             sha256: sha_hex(&bytes),
         };
 
-        fetch(vec![target.clone()], |_| {}, || false).expect("first download succeeds");
+        fetch(
+            &Downloader::new().unwrap(),
+            vec![target.clone()],
+            |_| {},
+            || false,
+        )
+        .expect("first download succeeds");
         let requests_after_first =
             head_count.load(Ordering::SeqCst) + range_get_count.load(Ordering::SeqCst);
         assert!(requests_after_first > 0);
 
-        fetch(vec![target], |_| {}, || false).expect("second download succeeds");
+        fetch(&Downloader::new().unwrap(), vec![target], |_| {}, || false)
+            .expect("second download succeeds");
         assert_eq!(
             head_count.load(Ordering::SeqCst) + range_get_count.load(Ordering::SeqCst),
             requests_after_first,
@@ -2003,18 +1951,25 @@ mod tests {
         let target = Target {
             label: "Model".to_string(),
             url: server.url("/model.bin"),
-            destination_path: destination.display().to_string(),
+            destination: destination.clone(),
             sha256: sha_hex(&bytes),
         };
 
-        fetch(vec![target.clone()], |_| {}, || false).expect("first download succeeds");
+        fetch(
+            &Downloader::new().unwrap(),
+            vec![target.clone()],
+            |_| {},
+            || false,
+        )
+        .expect("first download succeeds");
         assert_eq!(get_count.load(Ordering::SeqCst), 1);
 
         let mut data = fs::read(&destination).expect("read cached file");
         data[0] = data[0].wrapping_add(1);
         fs::write(&destination, &data).expect("corrupt cached file");
 
-        fetch(vec![target], |_| {}, || false).expect("second download re-heals the corrupt cache");
+        fetch(&Downloader::new().unwrap(), vec![target], |_| {}, || false)
+            .expect("second download re-heals the corrupt cache");
         assert_eq!(
             get_count.load(Ordering::SeqCst),
             2,
@@ -2045,11 +2000,12 @@ mod tests {
         let target = Target {
             label: "Model".to_string(),
             url: server.url("/model.bin"),
-            destination_path: destination.display().to_string(),
+            destination: destination.clone(),
             sha256: sha_hex(&bytes),
         };
 
-        fetch(vec![target], |_| {}, || false).expect("fetch adopts existing file");
+        fetch(&Downloader::new().unwrap(), vec![target], |_| {}, || false)
+            .expect("fetch adopts existing file");
 
         assert_eq!(
             get_count.load(Ordering::SeqCst),
@@ -2089,7 +2045,7 @@ mod tests {
         let target = Target {
             label: "Model".to_string(),
             url: server.url("/model.bin"),
-            destination_path: destination.display().to_string(),
+            destination: destination.clone(),
             sha256: sha_hex(&bytes),
         };
         fs::write(tmp_path_for(&destination), &bytes[..256]).expect("place partial tmp");
@@ -2103,7 +2059,8 @@ mod tests {
         )
         .expect("write partial sidecar");
 
-        fetch(vec![target], |_| {}, || false).expect("resume succeeds");
+        fetch(&Downloader::new().unwrap(), vec![target], |_| {}, || false)
+            .expect("resume succeeds");
 
         assert_eq!(
             fs::read(&destination).expect("read downloaded file"),
@@ -2149,7 +2106,7 @@ mod tests {
         let target = Target {
             label: "Model".to_string(),
             url: server.url("/model.bin"),
-            destination_path: destination.display().to_string(),
+            destination: destination.clone(),
             sha256: sha_hex(&bytes),
         };
         fs::write(tmp_path_for(&destination), vec![0xAAu8; 256]).expect("place stale tmp");
@@ -2163,7 +2120,8 @@ mod tests {
         )
         .expect("write stale partial sidecar");
 
-        fetch(vec![target], |_| {}, || false).expect("restart succeeds");
+        fetch(&Downloader::new().unwrap(), vec![target], |_| {}, || false)
+            .expect("restart succeeds");
 
         assert_eq!(
             fs::read(&destination).expect("read downloaded file"),
@@ -2199,11 +2157,12 @@ mod tests {
         let target = Target {
             label: "Model".to_string(),
             url: server.url("/model.bin"),
-            destination_path: destination.display().to_string(),
+            destination: destination.clone(),
             sha256: sha_hex(&bytes),
         };
 
-        fetch(vec![target], |_| {}, || false).expect("fresh download succeeds");
+        fetch(&Downloader::new().unwrap(), vec![target], |_| {}, || false)
+            .expect("fresh download succeeds");
 
         assert_eq!(
             fs::read(&destination).expect("read downloaded file"),
@@ -2243,7 +2202,7 @@ mod tests {
         let target = Target {
             label: "Model".to_string(),
             url: server.url("/model.bin"),
-            destination_path: destination.display().to_string(),
+            destination: destination.clone(),
             sha256: sha_hex(&bytes),
         };
         fs::write(tmp_path_for(&destination), &bytes[..256]).expect("place partial tmp");
@@ -2257,7 +2216,8 @@ mod tests {
         )
         .expect("write partial sidecar");
 
-        fetch(vec![target], |_| {}, || false).expect("restart after bad 206 succeeds");
+        fetch(&Downloader::new().unwrap(), vec![target], |_| {}, || false)
+            .expect("restart after bad 206 succeeds");
 
         assert_eq!(
             fs::read(&destination).expect("read downloaded file"),
@@ -2333,10 +2293,11 @@ mod tests {
         let destination = test_dir.join("model.bin");
 
         let result = fetch(
+            &Downloader::new().unwrap(),
             vec![Target {
                 label: "Model".to_string(),
                 url: "http://127.0.0.1:1/model.bin".to_string(),
-                destination_path: destination.display().to_string(),
+                destination: destination.clone(),
                 sha256: "0".repeat(64),
             }],
             |_| {},
@@ -2358,10 +2319,11 @@ mod tests {
         fs::write(partial_metadata_path_for(&destination), "{}").expect("write partial sidecar");
 
         let result = fetch(
+            &Downloader::new().unwrap(),
             vec![Target {
                 label: "Model".to_string(),
                 url: "http://127.0.0.1:1/model.bin".to_string(),
-                destination_path: destination.display().to_string(),
+                destination: destination.clone(),
                 sha256: sha_hex(b"complete-model"),
             }],
             |_| {},
@@ -2397,10 +2359,11 @@ mod tests {
         }
 
         fetch(
+            &Downloader::new().unwrap(),
             vec![Target {
                 label: "Model".to_string(),
                 url: server.url("/model.bin"),
-                destination_path: destination.display().to_string(),
+                destination: destination.clone(),
                 sha256: expected,
             }],
             |_| {},
@@ -2431,10 +2394,11 @@ mod tests {
         let destination = test_dir.join("model.bin");
 
         let result = fetch(
+            &Downloader::new().unwrap(),
             vec![Target {
                 label: "Model".to_string(),
                 url: server.url("/model.bin"),
-                destination_path: destination.display().to_string(),
+                destination: destination.clone(),
                 sha256: "0".repeat(64),
             }],
             |_| {},
@@ -2474,10 +2438,11 @@ mod tests {
         let destination = test_dir.join("model.bin");
 
         let result = fetch(
+            &Downloader::new().unwrap(),
             vec![Target {
                 label: "Model".to_string(),
                 url: server.url("/model.bin"),
-                destination_path: destination.display().to_string(),
+                destination: destination.clone(),
                 sha256: "0".repeat(64),
             }],
             |_| {},
@@ -2505,11 +2470,12 @@ mod tests {
         let old_target = Target {
             label: "Model".to_string(),
             url: "http://cache.example.org/old-location".to_string(),
-            destination_path: destination.display().to_string(),
+            destination: destination.clone(),
             sha256: sha.clone(),
         };
 
         fetch(
+            &Downloader::new().unwrap(),
             vec![Target {
                 url: "http://127.0.0.1:9/new-location".to_string(),
                 ..old_target.clone()
@@ -2521,6 +2487,7 @@ mod tests {
 
         fs::write(&destination, b"corrupted").expect("corrupt cached file");
         let result = fetch(
+            &Downloader::new().unwrap(),
             vec![Target {
                 url: "http://127.0.0.1:9/new-location".to_string(),
                 ..old_target

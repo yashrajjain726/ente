@@ -1,24 +1,18 @@
 package io.ente.ensu.llm
 
-import io.ente.ensu.bindings.ModelDownloadTarget
+import io.ente.ensu.bindings.ConfigModelPreset
+import io.ente.ensu.bindings.ModelTarget
+import io.ente.ensu.bindings.mobileLlmTarget
 
-data class LlmModelTarget(
-    val id: String,
-    val url: String,
-    val sha256: String,
-    val mmprojUrl: String? = null,
-    val mmprojSha256: String? = null,
+data class LlmModelSelection(
+    val preset: ConfigModelPreset,
     val contextLength: Int? = null,
     val maxTokens: Int? = null
 ) {
-    val downloadTarget: ModelDownloadTarget
-        get() = ModelDownloadTarget.Gguf(
-            id = id,
-            url = url,
-            sha256 = sha256,
-            mmprojUrl = mmprojUrl,
-            mmprojSha256 = mmprojSha256
-        )
+    val id: String get() = preset.id
+
+    val modelTarget: ModelTarget
+        get() = mobileLlmTarget(preset.id)
 }
 
 data class DownloadProgress(

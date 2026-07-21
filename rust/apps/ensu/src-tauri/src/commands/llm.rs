@@ -5,8 +5,8 @@ use std::time::{Duration, Instant};
 
 use ente_ensu::llm;
 use ente_model_download::download;
-use ente_model_download::{ModelDownloadTarget, ModelDownloader, migrate_flat_models_dir};
-use serde::{Deserialize, Serialize};
+use ente_model_download::{ModelDownloader, ModelTarget};
+use serde::Serialize;
 use tauri::async_runtime;
 use tauri::{AppHandle, Emitter, Manager, State as TauriState, WebviewWindow};
 
@@ -25,33 +25,11 @@ pub struct ModelDownloadState {
 }
 
 impl ModelDownloadState {
-    pub fn new(models_dir: PathBuf) -> Self {
-        Self {
-            downloader: Arc::new(ModelDownloader::new(&models_dir)),
+    pub fn new(models_dir: PathBuf) -> Result<Self, download::Error> {
+        Ok(Self {
+            downloader: Arc::new(ModelDownloader::new(&models_dir)?),
             models_dir,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ModelTarget {
-    id: String,
-    url: String,
-    sha256: String,
-    mmproj_url: Option<String>,
-    mmproj_sha256: Option<String>,
-}
-
-impl From<ModelTarget> for ModelDownloadTarget {
-    fn from(value: ModelTarget) -> Self {
-        Self::gguf(
-            value.id,
-            value.url,
-            value.sha256,
-            value.mmproj_url,
-            value.mmproj_sha256,
-        )
+        })
     }
 }
 
@@ -112,6 +90,11 @@ fn llm_thread_error() -> ApiError {
 
 fn fs_thread_error() -> ApiError {
     ApiError::new("io_thread", "FS task failed")
+}
+
+fn desktop_target(model_id: &str) -> Result<ModelTarget, ApiError> {
+    ente_ensu::model::desktop_llm_target(model_id)
+        .map_err(|err| ApiError::new("invalid_target", err.to_string()))
 }
 
 pub(crate) fn replace_state(
@@ -258,17 +241,17 @@ impl llm::EventSink for EventSink {
 #[tauri::command]
 pub fn llm_model_status(
     state: TauriState<'_, ModelDownloadState>,
-    target: ModelTarget,
-) -> ModelStatus {
-    let target = ModelDownloadTarget::from(target);
-    ModelStatus {
-        model_path: state.downloader.model_path(&target).display().to_string(),
-        mmproj_path: state
-            .downloader
-            .file_path(&target, "mmproj.gguf")
+    model_id: String,
+) -> Result<ModelStatus, ApiError> {
+    let target = desktop_target(&model_id)?;
+    Ok(ModelStatus {
+        model_path: ente_ensu::model::llm_model_path(&state.downloader, &target)
+            .map(|path| path.display().to_string())
+            .unwrap_or_default(),
+        mmproj_path: ente_ensu::model::llm_mmproj_path(&state.downloader, &target)
             .map(|path| path.display().to_string()),
         downloaded: state.downloader.is_downloaded(&target),
-    }
+    })
 }
 
 #[tauri::command]
@@ -278,67 +261,41 @@ pub async fn llm_migrate_models(
     legacy_mmproj_url: Option<String>,
 ) -> Result<Option<String>, ApiError> {
     let models_dir = state.models_dir.clone();
-    let defaults = ente_ensu::config::defaults();
-    let selected = legacy_model_url.as_deref().and_then(|model_url| {
-        ente_ensu::config::legacy_selected_preset_id(
-            defaults
-                .mobile_model_presets
-                .iter()
-                .chain(defaults.desktop_model_presets.iter()),
-            model_url,
+    async_runtime::spawn_blocking(move || {
+        ente_ensu::model::migrations::migrate_desktop_models(
+            &models_dir,
+            legacy_model_url.as_deref(),
             legacy_mmproj_url.as_deref(),
         )
-    });
-    let targets: Vec<ModelDownloadTarget> = std::iter::once(defaults.mobile_default_model)
-        .chain(defaults.mobile_model_presets)
-        .chain(std::iter::once(defaults.desktop_default_model))
-        .chain(defaults.desktop_model_presets)
-        .map(|preset| {
-            ModelDownloadTarget::gguf(
-                preset.id,
-                preset.url,
-                preset.sha256,
-                preset.mmproj_url,
-                preset.mmproj_sha256,
-            )
-        })
-        .collect();
-
-    async_runtime::spawn_blocking(move || migrate_flat_models_dir(&models_dir, &targets))
-        .await
-        .map_err(|_| fs_thread_error())?;
-    Ok(selected)
+    })
+    .await
+    .map_err(|_| fs_thread_error())
 }
 
 #[tauri::command]
 pub async fn llm_download_model(
     window: WebviewWindow,
     state: TauriState<'_, ModelDownloadState>,
-    target: ModelTarget,
+    model_id: String,
 ) -> Result<(), ApiError> {
     let downloader = Arc::clone(&state.downloader);
-    let target = ModelDownloadTarget::from(target);
+    let target = desktop_target(&model_id)?;
     async_runtime::spawn_blocking(move || {
         downloader
-            .download(
-                std::slice::from_ref(&target),
-                |progress| {
-                    if let Some(line) = &progress.log_line {
-                        logging::log("LLMDownload", line.clone());
-                    }
-                    let _ = window.emit(
-                        "llm-download-progress",
-                        DownloadProgress {
-                            percent: progress.percent,
-                            status: progress.status,
-                            bytes_downloaded: progress.downloaded_bytes,
-                            total_bytes: progress.total_bytes,
-                        },
-                    );
-                },
-                || false,
-            )
-            .map(|_| ())
+            .download(std::slice::from_ref(&target), |progress| {
+                if let Some(line) = &progress.log_line {
+                    logging::log("LLMDownload", line.clone());
+                }
+                let _ = window.emit(
+                    "llm-download-progress",
+                    DownloadProgress {
+                        percent: progress.percent,
+                        status: progress.status,
+                        bytes_downloaded: progress.downloaded_bytes,
+                        total_bytes: progress.total_bytes,
+                    },
+                );
+            })
             .map_err(|err| ApiError::new(download_code(&err), err.to_string()))
     })
     .await

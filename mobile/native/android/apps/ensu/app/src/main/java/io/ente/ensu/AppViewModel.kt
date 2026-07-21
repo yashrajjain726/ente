@@ -11,7 +11,6 @@ import io.ente.ensu.device.AndroidDeviceCapabilityProvider
 import io.ente.ensu.settings.SessionPreferencesDataStore
 import io.ente.ensu.chat.ChatRepository
 import io.ente.ensu.config.loadConfigDefaults
-import io.ente.ensu.bindings.ModelDownloadTarget
 import io.ente.ensu.llm.LlmProvider
 import io.ente.ensu.llm.ModelDownloader
 import io.ente.ensu.llm.ModelSettingsState
@@ -66,7 +65,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             runCatching {
                 advancedSettingsDataStore.migrateLegacyModelSelection { url, mmproj ->
                     withContext(Dispatchers.IO) {
-                        modelDownloader.migrate(migrationTargets(), url, mmproj)
+                        modelDownloader.migrate(url, mmproj)
                     }
                 }
             }
@@ -89,13 +88,6 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     modelSettings = settings.modelSettings
                 )
             }
-        }
-    }
-
-    private fun migrationTargets(): List<ModelDownloadTarget> {
-        val presets = listOf(configDefaults.mobileDefaultModel) + configDefaults.mobileModelPresets
-        return presets.map {
-            ModelDownloadTarget.Gguf(it.id, it.url, it.sha256, it.mmprojUrl, it.mmprojSha256)
         }
     }
 

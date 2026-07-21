@@ -27,21 +27,6 @@ const MOBILE_SYSTEM_PROMPT_BODY: &str = "You are Ensu, an AI assistant built by 
 const DESKTOP_SYSTEM_PROMPT_BODY: &str = MOBILE_SYSTEM_PROMPT_BODY;
 const SESSION_SUMMARY_SYSTEM_PROMPT: &str = "You create concise chat titles. Given the provided message, summarize the user's goal in 5-7 words. Use plain words. Don't use markdown characters in the title. No quotes, no emojis, no trailing punctuation, and output only the title.";
 
-pub fn legacy_selected_preset_id<'a>(
-    presets: impl IntoIterator<Item = &'a ModelPreset>,
-    model_url: &str,
-    mmproj_url: Option<&str>,
-) -> Option<String> {
-    fn trim(url: Option<&str>) -> Option<&str> {
-        url.map(str::trim).filter(|url| !url.is_empty())
-    }
-    let mmproj_url = trim(mmproj_url);
-    presets
-        .into_iter()
-        .find(|preset| preset.url == model_url && trim(preset.mmproj_url.as_deref()) == mmproj_url)
-        .map(|preset| preset.id.clone())
-}
-
 fn lfm_vl_1_6b() -> ModelPreset {
     ModelPreset {
         id: "lfm-vl-1.6b".to_string(),

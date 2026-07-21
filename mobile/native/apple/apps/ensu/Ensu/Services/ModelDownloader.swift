@@ -6,44 +6,35 @@ private let logger = EnsuLogging.shared.logger("ModelDownloader")
 final class ModelDownloader {
     private let core: ModelDownloadCore
     private let activeLock = NSLock()
-    private var downloadActive = false
-    let transcriptionModelTarget: ModelDownloadTarget
-    let voiceActivityModelTarget: ModelDownloadTarget
+    private var activeToken: CancellationToken?
+    let transcriptionTarget: ModelTarget
+    let voiceActivityTarget: ModelTarget
 
     @MainActor
     init() {
         let baseDir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
             ?? FileManager.default.temporaryDirectory
-        let modelsDir = baseDir.appendingPathComponent("models", isDirectory: true)
+        var modelsDir = baseDir.appendingPathComponent("models", isDirectory: true)
+        try? FileManager.default.createDirectory(at: modelsDir, withIntermediateDirectories: true)
+        var values = URLResourceValues()
+        values.isExcludedFromBackup = true
+        try? modelsDir.setResourceValues(values)
         core = ModelDownloadCore(modelsDir: modelsDir.path)
-        let defaults = ConfigDefaults.shared
-        transcriptionModelTarget = .tarGz(
-            id: defaults.transcriptionModel.id,
-            url: defaults.transcriptionModel.url,
-            sha256: defaults.transcriptionModel.sha256
-        )
-        voiceActivityModelTarget = .file(
-            id: defaults.voiceActivityModel.id,
-            name: "model.onnx",
-            url: defaults.voiceActivityModel.url,
-            sha256: defaults.voiceActivityModel.sha256
-        )
+        transcriptionTarget = transcriptionModelTarget()
+        voiceActivityTarget = voiceActivityModelTarget()
         let settings = UserDefaults.standard
         let pendingSelection = settings.object(forKey: "ensu.model.id") == nil
         let legacyModelUrl = pendingSelection && settings.bool(forKey: "ensu.model.use_custom")
             ? settings.string(forKey: "ensu.model.url")
             : nil
-        let presetId = migrateEnsuLegacyModels(
+        let presetId = migrateMobileModels(
             modelsDir: modelsDir.path,
-            legacy: EnsuLegacyModels(
+            legacy: LegacyModels(
                 llmDir: baseDir.appendingPathComponent("llm", isDirectory: true).path,
                 transcriptionDir: baseDir.appendingPathComponent("transcription", isDirectory: true).path,
                 modelUrl: legacyModelUrl,
                 mmprojUrl: settings.string(forKey: "ensu.model.mmproj")
-            ),
-            llmTargets: Self.migrationTargets(),
-            transcriptionModel: transcriptionModelTarget,
-            voiceActivityModel: voiceActivityModelTarget
+            )
         )
         if pendingSelection {
             settings.set(presetId ?? "", forKey: "ensu.model.id")
@@ -51,10 +42,6 @@ final class ModelDownloader {
         settings.removeObject(forKey: "ensu.model.use_custom")
         settings.removeObject(forKey: "ensu.model.url")
         settings.removeObject(forKey: "ensu.model.mmproj")
-        var excludedDir = modelsDir
-        var values = URLResourceValues()
-        values.isExcludedFromBackup = true
-        try? excludedDir.setResourceValues(values)
     }
 
     static func registerBackgroundTask() {
@@ -63,68 +50,62 @@ final class ModelDownloader {
         }
     }
 
-    @MainActor
-    private static func migrationTargets() -> [ModelDownloadTarget] {
-        let config = ConfigDefaults.shared
-        return ([config.mobileDefaultModel] + config.mobileModelPresets).map {
-            ModelDownloadTarget.gguf(
-                id: $0.id,
-                url: $0.url,
-                sha256: $0.sha256,
-                mmprojUrl: $0.mmprojUrl,
-                mmprojSha256: $0.mmprojSha256
-            )
-        }
+    func modelDir(_ target: ModelTarget) -> URL {
+        URL(fileURLWithPath: core.modelDir(target))
     }
 
-    func modelPath(target: ModelDownloadTarget) -> URL {
-        URL(fileURLWithPath: core.modelPath(target: target))
+    func llmModelPath(_ target: ModelTarget) -> URL? {
+        core.llmModelPath(target).map { URL(fileURLWithPath: $0) }
     }
 
-    func mmprojPath(target: ModelDownloadTarget) -> String? {
-        core.mmprojPath(target: target)
+    func llmMmprojPath(_ target: ModelTarget) -> URL? {
+        core.llmMmprojPath(target).map { URL(fileURLWithPath: $0) }
     }
 
-    func isDownloaded(target: ModelDownloadTarget) -> Bool {
-        core.isDownloaded(target: target)
+    func voiceActivityModelPath() -> URL {
+        URL(fileURLWithPath: core.voiceActivityModelPath())
     }
 
-    func removeDownloaded(target: ModelDownloadTarget) -> Bool {
-        core.removeDownloaded(target: target)
+    func isDownloaded(_ target: ModelTarget) -> Bool {
+        core.isDownloaded(target)
+    }
+
+    func removeDownloaded(_ target: ModelTarget) -> Bool {
+        core.removeDownloaded(target)
     }
 
     func cancel() {
-        core.cancel()
+        activeLock.withLock { activeToken }?.cancel()
     }
 
-    func estimateDownloadSize(target: ModelDownloadTarget) async -> Int64? {
+    func estimateDownloadSize(_ target: ModelTarget) async -> Int64? {
         await Task.detached(priority: .utility) { [core] in
             core.estimatedDownloadSize(target: target)
         }.value
     }
 
-    @discardableResult
     func download(
-        targets: [ModelDownloadTarget],
+        targets: [ModelTarget],
         onProgress: @escaping (DownloadProgress) -> Void
-    ) async throws -> Bool {
+    ) async throws {
+        let token = CancellationToken()
         let started = activeLock.withLock { () -> Bool in
-            if downloadActive { return false }
-            downloadActive = true
+            if activeToken != nil { return false }
+            activeToken = token
             return true
         }
         guard started else { throw DownloadAlreadyActiveError() }
-        defer { activeLock.withLock { downloadActive = false } }
+        defer { activeLock.withLock { activeToken = nil } }
 
-        if targets.allSatisfy({ self.core.isDownloaded(target: $0) }) {
-            return false
+        if targets.allSatisfy({ self.core.isDownloaded($0) }) {
+            return
         }
 
         onProgress(DownloadProgress(percent: 0, status: "Starting download..."))
 
         if #available(iOS 26.0, *) {
-            ModelDownloadBackgroundTask.begin { [core] in
-                core.cancel()
+            ModelDownloadBackgroundTask.begin {
+                token.cancel()
             }
         }
         var succeeded = false
@@ -136,32 +117,29 @@ final class ModelDownloader {
 
         let core = core
         let downloadTask = Task.detached(priority: .utility) {
-            let callback = ModelDownloadCallbackSink(
-                onProgress: { progress in
-                    if let line = progress.logLine {
-                        logger.info(line)
-                    }
-                    if #available(iOS 26.0, *) {
-                        ModelDownloadBackgroundTask.update(
-                            downloadedBytes: progress.downloadedBytes,
-                            totalBytes: progress.totalBytes
-                        )
-                    }
-                    onProgress(DownloadProgress(percent: Int(progress.percent), status: progress.status))
-                },
-                isCancelled: { Task.isCancelled }
-            )
-            _ = try core.download(targets: targets, callback: callback)
+            try Task.checkCancellation()
+            let callback = ModelDownloadCallbackSink { progress in
+                if let line = progress.logLine {
+                    logger.info(line)
+                }
+                if #available(iOS 26.0, *) {
+                    ModelDownloadBackgroundTask.update(
+                        downloadedBytes: progress.downloadedBytes,
+                        totalBytes: progress.totalBytes
+                    )
+                }
+                onProgress(DownloadProgress(percent: Int(progress.percent), status: progress.status))
+            }
+            try core.download(targets: targets, callback: callback, cancellation: token)
         }
 
         try await withTaskCancellationHandler {
             try await downloadTask.value
         } onCancel: {
-            core.cancel()
             downloadTask.cancel()
+            token.cancel()
         }
         succeeded = true
-        return true
     }
 }
 
@@ -169,22 +147,13 @@ private struct DownloadAlreadyActiveError: Error {}
 
 private final class ModelDownloadCallbackSink: ModelDownloadCallback, @unchecked Sendable {
     private let onProgressHandler: (ModelDownloadProgress) -> Void
-    private let isCancelledHandler: () -> Bool
 
-    init(
-        onProgress: @escaping (ModelDownloadProgress) -> Void,
-        isCancelled: @escaping () -> Bool
-    ) {
+    init(onProgress: @escaping (ModelDownloadProgress) -> Void) {
         self.onProgressHandler = onProgress
-        self.isCancelledHandler = isCancelled
     }
 
     func onProgress(progress: ModelDownloadProgress) {
         onProgressHandler(progress)
-    }
-
-    func isCancelled() -> Bool {
-        isCancelledHandler()
     }
 }
 

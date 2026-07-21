@@ -93,17 +93,13 @@ final class ModelSettingsStore: ObservableObject {
         temperature = ""
     }
 
-    func currentTarget() -> LlmModelTarget {
+    func currentSelection() -> LlmModelSelection {
         let defaults = ConfigDefaults.shared
         let defaultModel = Self.platformDefaultModel
         let presets = [defaultModel] + defaults.mobileModelPresets
         let preset = presets.first(where: { $0.id == modelId }) ?? defaultModel
-        return LlmModelTarget(
-            id: preset.id,
-            url: preset.url,
-            sha256: preset.sha256,
-            mmprojUrl: preset.mmprojUrl,
-            mmprojSha256: preset.mmprojSha256,
+        return LlmModelSelection(
+            preset: preset,
             contextLength: Int(contextLength),
             maxTokens: Int(maxTokens).flatMap { $0 > 0 ? $0 : nil }
         )
