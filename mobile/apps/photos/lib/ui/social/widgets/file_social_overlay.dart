@@ -25,8 +25,9 @@ import "package:photos/ui/social/likes_bottom_sheet.dart";
 final _logger = Logger("FileSocialOverlay");
 
 const _likedColor = Color(0xFF08C225);
-const _socialControlsSize = 40.0;
+const _socialControlsSize = 48.0;
 const _socialIconSize = 32.0;
+const _socialIconPadding = EdgeInsets.fromLTRB(12, 12, 4, 4);
 
 /// Social content for a file. The host owns placement and visibility effects.
 class FileSocialOverlay extends StatefulWidget {
@@ -393,7 +394,7 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
         children: [
           if (_latestComment != null && _latestCommentAuthor != null)
             Padding(
-              padding: const EdgeInsets.only(right: 12, bottom: 4),
+              padding: const EdgeInsets.only(right: 4, bottom: 4),
               child: _buildLatestCommentPill(
                 _latestComment!,
                 _latestCommentAuthor!,
@@ -410,11 +411,8 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
                   child: SizedBox.square(
                     dimension: _socialControlsSize,
                     child: IconButton(
-                      padding: const EdgeInsets.all(4),
+                      padding: _socialIconPadding,
                       style: IconButton.styleFrom(
-                        minimumSize: const Size.square(_socialControlsSize),
-                        maximumSize: const Size.square(_socialControlsSize),
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                         overlayColor: WidgetStateColor.transparent,
                       ),
                       onPressed: _toggleReaction,
@@ -427,18 +425,13 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
                   ),
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 8),
               Tooltip(
                 message: AppLocalizations.of(context).comments,
                 child: SizedBox.square(
                   dimension: _socialControlsSize,
                   child: IconButton(
-                    padding: const EdgeInsets.all(4),
-                    style: IconButton.styleFrom(
-                      minimumSize: const Size.square(_socialControlsSize),
-                      maximumSize: const Size.square(_socialControlsSize),
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    ),
+                    padding: _socialIconPadding,
                     onPressed: _openComments,
                     icon: _buildCommentIcon(),
                   ),
