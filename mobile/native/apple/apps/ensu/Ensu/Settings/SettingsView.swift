@@ -2,10 +2,7 @@ import SwiftUI
 import Foundation
 
 struct SettingsView: View {
-    @ObservedObject var knowledgeState: KnowledgeState
-    let onDownloadOrUpdateKnowledgePack: (String) -> Void
-    let onCancelKnowledgePackDownload: (String) -> Void
-    let onSetKnowledgePackEnabled: (String, Bool) -> Void
+    @ObservedObject var knowledgeStore: KnowledgeStore
     let onSignIn: () -> Void
 
     @Environment(\.dismiss) private var dismiss
@@ -160,10 +157,7 @@ struct SettingsView: View {
                 iconName: "PackageIcon",
                 destination: AnyView(
                     KnowledgeSettingsView(
-                        state: knowledgeState,
-                        onDownloadOrUpdate: onDownloadOrUpdateKnowledgePack,
-                        onCancel: onCancelKnowledgePackDownload,
-                        onSetEnabled: onSetKnowledgePackEnabled
+                        store: knowledgeStore
                     )
                 )
             )
@@ -186,11 +180,7 @@ struct SettingsView: View {
                 title: "Terms and Conditions",
                 iconName: "DescriptionIcon",
                 destination: AnyView(TermsAndConditionsView()),
-                searchTerms: [
-                    "Privacy Policy",
-                    "Ente Terms and Conditions",
-                    "Terms of Service"
-                ]
+                searchTerms: EnsuLegalDocuments.searchTerms
             )
         ]
     }

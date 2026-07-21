@@ -63,6 +63,33 @@ impl From<core::RetrievalHit> for RetrievalHit {
     }
 }
 
+impl From<RetrievalHit> for core::RetrievalHit {
+    fn from(value: RetrievalHit) -> Self {
+        Self {
+            score: value.score,
+            text: value.text,
+            title: value.title,
+            section: value.section,
+            source_url: value.source_url,
+        }
+    }
+}
+
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct KnowledgePromptHit {
+    pub dataset_id: String,
+    pub hit: RetrievalHit,
+}
+
+impl From<KnowledgePromptHit> for core::KnowledgePromptHit {
+    fn from(value: KnowledgePromptHit) -> Self {
+        Self {
+            dataset_id: value.dataset_id,
+            hit: value.hit.into(),
+        }
+    }
+}
+
 #[derive(uniffi::Object)]
 pub struct RetrievalIndex {
     inner: core::RetrievalIndex,
@@ -193,6 +220,32 @@ impl From<core::SourceCitation> for SourceCitation {
 }
 
 #[derive(Debug, Clone, uniffi::Record)]
+pub struct KnowledgePromptContext {
+    pub text: String,
+    pub citations: Vec<SourceCitation>,
+}
+
+impl From<core::KnowledgePromptContext> for KnowledgePromptContext {
+    fn from(value: core::KnowledgePromptContext) -> Self {
+        Self {
+            text: value.text,
+            citations: value.citations.into_iter().map(Into::into).collect(),
+        }
+    }
+}
+
+#[uniffi::export]
+pub fn build_knowledge_prompt_context(
+    hits: Vec<KnowledgePromptHit>,
+    max_utf8_bytes: u32,
+) -> Result<Option<KnowledgePromptContext>, KnowledgeRetrievalError> {
+    let hits = hits.into_iter().map(Into::into).collect::<Vec<_>>();
+    core::build_knowledge_prompt_context(&hits, max_utf8_bytes as usize)
+        .map(|context| context.map(Into::into))
+        .map_err(Into::into)
+}
+
+#[derive(Debug, Clone, uniffi::Record)]
 pub struct ParsedAssistantText {
     pub text: String,
     pub citations: Vec<SourceCitation>,
@@ -268,4 +321,36 @@ pub fn download_knowledge_pack(
     .map_err(|error| KnowledgeDownloadError::Download {
         error: error.into(),
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn builds_a_prompt_context_through_the_binding_types() {
+        let context = build_knowledge_prompt_context(
+            vec![KnowledgePromptHit {
+                dataset_id: "simplewiki".to_string(),
+                hit: RetrievalHit {
+                    score: 0.9,
+                    text: "A useful passage".to_string(),
+                    title: "Example".to_string(),
+                    section: None,
+                    source_url: "https://simple.wikipedia.org/wiki/Example".to_string(),
+                },
+            }],
+            6_000,
+        )
+        .unwrap()
+        .unwrap();
+
+        assert!(
+            context
+                .text
+                .contains("# Example (Simple English Wikipedia)")
+        );
+        assert_eq!(context.citations.len(), 1);
+        assert_eq!(context.citations[0].dataset_id, "simplewiki");
+    }
 }

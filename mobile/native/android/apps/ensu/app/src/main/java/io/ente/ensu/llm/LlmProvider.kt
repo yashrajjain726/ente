@@ -21,7 +21,6 @@ import io.ente.ensu.device.requireChatSupported
 import java.io.File
 import kotlin.math.max
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -90,7 +89,6 @@ class LlmProvider(
                     if (embeddingFile.exists()) {
                         downloader.removeDownloaded(embeddingDownloadTarget)
                     }
-                    downloader.cleanupIncompleteTargets(listOf(embeddingDownloadTarget))
                 }
 
                 buildList {
@@ -103,6 +101,7 @@ class LlmProvider(
             }
             modelLoadMutex.withLock {
                 if (!isEmbeddingModelReady()) {
+                    downloader.removeDownloaded(embeddingDownloadTarget)
                     throw IllegalStateException("Embedding model failed exact readiness validation")
                 }
                 if (!isChatModelReady(target)) {
@@ -116,31 +115,6 @@ class LlmProvider(
                 )
             }
         }
-    }
-
-    suspend fun cleanupRequiredModelArtifacts(target: LlmModelTarget) {
-        withContext(NonCancellable + ioDispatcher) {
-            modelLoadMutex.withLock {
-                cleanupRequiredModelArtifactsLocked(target)
-            }
-        }
-    }
-
-    suspend fun cleanupRequiredModelArtifactsIfIdle(target: LlmModelTarget) {
-        withContext(NonCancellable + ioDispatcher) {
-            modelLoadMutex.withLock {
-                if (!downloader.isDownloadActive) {
-                    cleanupRequiredModelArtifactsLocked(target)
-                }
-            }
-        }
-    }
-
-    private fun cleanupRequiredModelArtifactsLocked(target: LlmModelTarget) {
-        if (!isEmbeddingModelReady() && downloader.modelPath(embeddingDownloadTarget).exists()) {
-            downloader.removeDownloaded(embeddingDownloadTarget)
-        }
-        downloader.cleanupIncompleteTargets(listOf(target.downloadTarget, embeddingDownloadTarget))
     }
 
     suspend fun generateChat(

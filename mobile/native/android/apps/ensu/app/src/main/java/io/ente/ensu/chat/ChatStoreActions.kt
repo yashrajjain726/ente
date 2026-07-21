@@ -17,17 +17,18 @@ import io.ente.ensu.chat.ChatSession
 import io.ente.ensu.bindings.DbException
 import io.ente.ensu.bindings.LlmException
 import io.ente.ensu.bindings.ConfigDefaults
+import io.ente.ensu.bindings.KnowledgePromptHit
 import io.ente.ensu.logging.LogLevel
 import io.ente.ensu.chat.MessageAuthor
 import io.ente.ensu.chat.sessionTitleFromText
 import io.ente.ensu.settings.SessionPreferencesDataStore
 import io.ente.ensu.AppState
 import io.ente.ensu.bindings.SourceCitation
+import io.ente.ensu.bindings.buildKnowledgePromptContext
 import io.ente.ensu.bindings.cleanAssistantText
 import io.ente.ensu.bindings.finalizeAssistantText
 import io.ente.ensu.knowledge.KnowledgeProvider
 import io.ente.ensu.knowledge.KnowledgeSearchHit
-import io.ente.ensu.knowledge.buildKnowledgePromptContext
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -524,7 +525,6 @@ internal class ChatStoreActions(
                                 downloadPercent = resolvedProgress.percent,
                                 downloadStatus = resolvedProgress.status,
                                 downloadPhase = resolvedProgress.phase,
-                                isModelDownloaded = if (resolvedProgress.isFinished) true else appState.chat.isModelDownloaded,
                                 modelDownloadSizeBytes = if (resolvedProgress.isFinished) null else appState.chat.modelDownloadSizeBytes
                             )
                         )
@@ -562,10 +562,6 @@ internal class ChatStoreActions(
             }
 
             if (!isActive()) return@launch
-
-            state.update { appState ->
-                appState.copy(chat = appState.chat.copy(isModelDownloaded = true))
-            }
 
             val generationLimits = resolveGenerationLimits(target)
             val normalSystemPrompt = buildSystemPrompt()
@@ -609,13 +605,20 @@ internal class ChatStoreActions(
                 (normalHistorySelection.inputBudget - normalHistorySelection.inputTokens)
                     .coerceAtLeast(0) * 4 - 2
                 ).coerceAtLeast(0)
-            val knowledgeContext = buildKnowledgePromptContext(
-                knowledgeHits,
-                min(
-                    configDefaults.knowledgeEmbedding.maxContextUtf8Bytes.toInt(),
-                    remainingKnowledgeBytes
+            val knowledgeContext = runCatching {
+                buildKnowledgePromptContext(
+                    hits = knowledgeHits.map { item ->
+                        KnowledgePromptHit(
+                            datasetId = item.dataset.stableId,
+                            hit = item.hit
+                        )
+                    },
+                    maxUtf8Bytes = min(
+                        configDefaults.knowledgeEmbedding.maxContextUtf8Bytes.toInt(),
+                        remainingKnowledgeBytes
+                    ).toUInt()
                 )
-            )
+            }.getOrNull()
             val candidateSystemPrompt = knowledgeContext?.let {
                 "$normalSystemPrompt\n\n${it.text}"
             }

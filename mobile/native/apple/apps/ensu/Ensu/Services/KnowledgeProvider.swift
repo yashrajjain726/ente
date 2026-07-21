@@ -20,11 +20,10 @@ actor KnowledgeProvider {
             dataset: KnowledgeDatasetConfig,
             onProgress: @escaping @Sendable (KnowledgeDownloadProgress) -> Void
         ) {
-            let cancellation = CancellationState()
             task = Task.detached(priority: .utility) {
                 let callback = KnowledgeDownloadCallbackSink(
                     onProgress: onProgress,
-                    isCancelled: { cancellation.isCancelled }
+                    isCancelled: { Task.isCancelled }
                 )
                 try downloadKnowledgePack(
                     packRoot: packRoot.path,
@@ -32,27 +31,9 @@ actor KnowledgeProvider {
                     callback: callback
                 )
             }
-            self.cancellationState = cancellation
         }
 
-        private let cancellationState: CancellationState
-
-        func cancel() {
-            cancellationState.cancel()
-        }
-    }
-
-    private final class CancellationState: @unchecked Sendable {
-        private let lock = NSLock()
-        private var value = false
-
-        var isCancelled: Bool {
-            lock.withLock { value }
-        }
-
-        func cancel() {
-            lock.withLock { value = true }
-        }
+        func cancel() { task.cancel() }
     }
 
     private struct OpenIndex {
@@ -63,8 +44,7 @@ actor KnowledgeProvider {
     private let root: URL
     private var mutations: [String: Mutation] = [:]
     private var indexes: [String: OpenIndex] = [:]
-    private var indexGateLocked = false
-    private var indexGateWaiters: [CheckedContinuation<Void, Never>] = []
+    private let indexGate = AsyncSerialGate()
 
     init(root: URL) {
         self.root = root
@@ -246,28 +226,7 @@ actor KnowledgeProvider {
     }
 
     private func withIndexGate<T>(_ operation: () async throws -> T) async throws -> T {
-        await acquireIndexGate()
-        defer { releaseIndexGate() }
-        try Task.checkCancellation()
-        return try await operation()
-    }
-
-    private func acquireIndexGate() async {
-        if !indexGateLocked {
-            indexGateLocked = true
-            return
-        }
-        await withCheckedContinuation { continuation in
-            indexGateWaiters.append(continuation)
-        }
-    }
-
-    private func releaseIndexGate() {
-        guard !indexGateWaiters.isEmpty else {
-            indexGateLocked = false
-            return
-        }
-        indexGateWaiters.removeFirst().resume()
+        try await indexGate.withLock(operation)
     }
 
     private func packRoot(_ dataset: KnowledgeDatasetConfig) -> URL {
@@ -294,23 +253,4 @@ private final class KnowledgeDownloadCallbackSink: KnowledgeDownloadCallback, @u
     func isCancelled() -> Bool {
         isCancelledHandler()
     }
-}
-
-enum KnowledgePackStatus: Equatable, Sendable {
-    case checking
-    case download
-    case ready
-    case updateAvailable
-}
-
-struct KnowledgePackState: Identifiable, Sendable {
-    var id: String { config.stableId }
-    let config: KnowledgeDatasetConfig
-    var status: KnowledgePackStatus = .checking
-    var activeIdentity: String?
-    var enabled = false
-    var isMutating = false
-    var progressPercent: Int?
-    var progressLabel: String?
-    var errorMessage: String?
 }

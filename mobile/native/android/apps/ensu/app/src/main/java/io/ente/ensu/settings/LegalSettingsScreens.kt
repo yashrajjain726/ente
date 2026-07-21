@@ -13,6 +13,13 @@ import androidx.compose.ui.unit.dp
 import io.ente.ensu.designsystem.EnsuSpacing
 import io.ente.ensu.designsystem.HugeIcons
 
+object EnsuLegalDocuments {
+    const val PRIVACY_TITLE = "Privacy Policy"
+    const val PRIVACY_URL = "https://ente.com/privacy/"
+    const val ENTE_TERMS_TITLE = "Ente Terms and Conditions"
+    const val ENTE_TERMS_URL = "https://ente.com/terms/"
+}
+
 @Composable
 fun TermsAndConditionsScreen() {
     val uriHandler = LocalUriHandler.current
@@ -25,18 +32,18 @@ fun TermsAndConditionsScreen() {
         item(key = "privacy") {
             SettingsRow(
                 SettingsItem(
-                    title = "Privacy Policy",
+                    title = EnsuLegalDocuments.PRIVACY_TITLE,
                     iconRes = HugeIcons.ViewIcon,
-                    onClick = { uriHandler.openUri("https://ente.com/privacy/") }
+                    onClick = { uriHandler.openUri(EnsuLegalDocuments.PRIVACY_URL) }
                 )
             )
         }
         item(key = "ente-terms") {
             SettingsRow(
                 SettingsItem(
-                    title = "Ente Terms and Conditions",
+                    title = EnsuLegalDocuments.ENTE_TERMS_TITLE,
                     iconVector = Icons.Outlined.Description,
-                    onClick = { uriHandler.openUri("https://ente.com/terms/") }
+                    onClick = { uriHandler.openUri(EnsuLegalDocuments.ENTE_TERMS_URL) }
                 )
             )
         }

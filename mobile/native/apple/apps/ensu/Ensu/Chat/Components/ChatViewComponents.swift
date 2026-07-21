@@ -58,7 +58,6 @@ struct DownloadOnboardingView: View {
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(.horizontal, EnsuSpacing.pageHorizontal)

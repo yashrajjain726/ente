@@ -220,7 +220,6 @@ fun ChatView(
                         streamingResponse = chatState.streamingResponse,
                         streamingParentId = chatState.streamingParentId,
                         isGenerating = chatState.isGenerating,
-                        isModelDownloaded = chatState.isModelDownloaded,
                         requiredModelsReady = chatState.requiredModelsReady,
                         isModelStateKnown = chatState.isModelStateKnown,
                         isChatUnsupported = isChatUnsupported,

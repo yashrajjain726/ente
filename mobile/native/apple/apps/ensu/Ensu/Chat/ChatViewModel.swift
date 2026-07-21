@@ -2,16 +2,6 @@ import Foundation
 import SwiftUI
 
 @MainActor
-final class KnowledgeState: ObservableObject {
-    @Published fileprivate(set) var packs: [KnowledgePackState]
-    @Published fileprivate(set) var downloadsAllowed = false
-
-    init(packs: [KnowledgePackState]) {
-        self.packs = packs
-    }
-}
-
-@MainActor
 final class ChatViewModel: ObservableObject {
     private struct ModelReadyKey: Equatable {
         let id: String
@@ -76,7 +66,6 @@ final class ChatViewModel: ObservableObject {
 
     @Published var editingMessageId: UUID?
     @Published var downloadToast: DownloadToastState?
-    @Published var isModelDownloaded: Bool = false
     @Published var requiredModelsReady: Bool = false
     @Published var modelDownloadSizeBytes: Int64?
     @Published var hasRequestedModelDownload: Bool = false
@@ -85,11 +74,10 @@ final class ChatViewModel: ObservableObject {
     @Published var generationErrorMessage: String?
     @Published var voiceInputState: VoiceInputState = .idle
     @Published var draftCursorMoveToken = UUID()
-    let knowledgeState: KnowledgeState
+    let knowledgeStore: KnowledgeStore
 
     private let provider: LlmProvider
     private let downloader: ModelDownloader
-    private let knowledgePreferences: KnowledgePreferences
     private let knowledgeEmbedding: KnowledgeEmbeddingConfig
     private let knowledgeProvider: KnowledgeProvider
     private let voiceTranscriber: VoiceTranscriptionService
@@ -98,10 +86,6 @@ final class ChatViewModel: ObservableObject {
     private let chatDbPath: String
     private let chatDbKey: Data
     private let modelSettings = ModelSettingsStore.shared
-
-    private var knowledgePacks: [KnowledgePackState] {
-        knowledgeState.packs
-    }
 
     private var messageStore: [UUID: [MessageNode]] = [:]
     private var branchSelections: [UUID: [String: UUID]] = [:]
@@ -112,7 +96,6 @@ final class ChatViewModel: ObservableObject {
     private let rootId = UUID(uuidString: "00000000-0000-0000-0000-000000000000")!
     private var generationTask: Task<Void, Never>?
     private var modelDownloadTask: Task<Void, Never>?
-    private var knowledgeMutationTasks: [String: Task<Void, Never>] = [:]
     private var voiceTransientErrorTask: Task<Void, Never>?
     private var sharedModelReadyTask: Task<Void, Error>?
     private var sharedModelReadyTaskId: UUID?
@@ -135,10 +118,6 @@ final class ChatViewModel: ObservableObject {
 
         let config = ConfigDefaults.shared
         let downloader = ModelDownloader()
-        let knowledgePreferences = KnowledgePreferences()
-        let knowledgeState = KnowledgeState(
-            packs: config.knowledgeDatasets.map { KnowledgePackState(config: $0) }
-        )
         let transcriber = Transcriber(
             modelDir: downloader.modelPath(target: downloader.transcriptionModelTarget).path,
             vadModelPath: downloader.modelPath(target: downloader.voiceActivityModelTarget).path
@@ -151,6 +130,10 @@ final class ChatViewModel: ObservableObject {
         let voiceTranscriber = VoiceTranscriptionService(transcriber: transcriber, downloader: downloader)
         let knowledgeProvider = KnowledgeProvider(
             root: baseDir.appendingPathComponent("knowledge", isDirectory: true)
+        )
+        let knowledgeStore = KnowledgeStore(
+            datasets: config.knowledgeDatasets,
+            provider: knowledgeProvider
         )
 
         // Chat DB + attachments.
@@ -191,10 +174,9 @@ final class ChatViewModel: ObservableObject {
         // Stored properties.
         self.provider = provider
         self.downloader = downloader
-        self.knowledgePreferences = knowledgePreferences
         self.knowledgeEmbedding = config.knowledgeEmbedding
         self.knowledgeProvider = knowledgeProvider
-        self.knowledgeState = knowledgeState
+        self.knowledgeStore = knowledgeStore
         self.voiceTranscriber = voiceTranscriber
         self.chatDb = chatDb
         self.attachmentsDir = attachmentsDir
@@ -216,15 +198,8 @@ final class ChatViewModel: ObservableObject {
 
         refreshDeviceCapability()
         refreshModelDownloadInfo()
-        Task { [weak self] in
-            guard let self else { return }
-            let target = modelSettings.currentTarget()
-            await provider.cleanupRequiredModelArtifactsIfIdle(target: target)
-            guard target == modelSettings.currentTarget() else { return }
-            refreshModelDownloadInfo()
-        }
-        Task { [weak self] in
-            await self?.bootstrapKnowledgePacks()
+        Task {
+            await knowledgeStore.bootstrap()
         }
     }
 
@@ -239,7 +214,7 @@ final class ChatViewModel: ObservableObject {
     func refreshDeviceCapability() {
         let capability = currentChatDeviceCapability()
         deviceCapability = capability
-        knowledgeState.downloadsAllowed = capability.isChatSupported
+        knowledgeStore.downloadsAllowed = capability.isChatSupported
         logger.info("Chat device capability evaluated", details: "\(capability)")
         guard !capability.isChatSupported else { return }
         showUnsupportedDeviceDialog = true
@@ -611,12 +586,10 @@ final class ChatViewModel: ObservableObject {
 
             do {
                 try await self.ensureChatModelReady(target: target)
-                self.isModelDownloaded = true
             } catch {
                 if self.isCancellation(error) {
                     return
                 }
-                self.isModelDownloaded = false
                 self.isDownloading = false
                 self.downloadToast = DownloadToastState(
                     phase: .errorDownload,
@@ -729,7 +702,6 @@ final class ChatViewModel: ObservableObject {
             return
         }
         let target = modelSettings.currentTarget()
-        isModelDownloaded = downloader.isDownloaded(target: target.downloadTarget)
         requiredModelsReady = provider.requiredModelsReady(target: target)
         if requiredModelsReady {
             clearDownloadProgressMemory()
@@ -753,160 +725,6 @@ final class ChatViewModel: ObservableObject {
                 self.modelDownloadSizeBytes = size ?? self.modelDownloadSizeBytes
             }
         }
-    }
-
-    var enabledReadyKnowledgeDatasets: [KnowledgeDatasetConfig] {
-        knowledgePacks.compactMap { pack in
-            guard pack.enabled,
-                  pack.status == .ready || pack.status == .updateAvailable else {
-                return nil
-            }
-            return pack.config
-        }
-    }
-
-    func downloadOrUpdateKnowledgePack(stableId: String) {
-        guard !isChatUnsupported,
-              knowledgeMutationTasks[stableId] == nil,
-              let index = knowledgePacks.firstIndex(where: { $0.id == stableId }) else {
-            return
-        }
-        let dataset = knowledgePacks[index].config
-        let wasInstalled = knowledgePacks[index].activeIdentity != nil
-        updateKnowledgePack(stableId) { pack in
-            pack.isMutating = true
-            pack.progressPercent = 0
-            pack.progressLabel = "Starting download..."
-            pack.errorMessage = nil
-        }
-
-        knowledgeMutationTasks[stableId] = Task { [weak self] in
-            guard let self else { return }
-            do {
-                let result = try await knowledgeProvider.download(dataset: dataset) { progress in
-                    Task { @MainActor [weak self] in
-                        self?.updateKnowledgePack(stableId) { pack in
-                            pack.progressPercent = min(100, max(0, Int(progress.percentage)))
-                            pack.progressLabel = progress.label
-                        }
-                    }
-                }
-                let shouldEnable = !wasInstalled && result.status == .ready
-                if shouldEnable {
-                    knowledgePreferences.setDatasetEnabled(id: stableId, enabled: true)
-                }
-                let preservedEnablement = knowledgePacks
-                    .first(where: { $0.id == stableId })?.enabled == true
-                applyKnowledgeReconciliation(
-                    result,
-                    stableId: stableId,
-                    enabled: wasInstalled ? preservedEnablement : shouldEnable
-                )
-            } catch {
-                if let result = try? await knowledgeProvider.reconcile(dataset: dataset) {
-                    let enabled = knowledgePacks
-                        .first(where: { $0.id == stableId })?.enabled == true
-                    applyKnowledgeReconciliation(
-                        result,
-                        stableId: stableId,
-                        enabled: enabled
-                    )
-                }
-                updateKnowledgePack(stableId) { pack in
-                    pack.errorMessage =
-                        error.localizedDescription.isEmpty ? "Knowledge pack download failed" : error.localizedDescription
-                }
-            }
-            updateKnowledgePack(stableId) { pack in
-                pack.isMutating = false
-                pack.progressPercent = nil
-                pack.progressLabel = nil
-            }
-            knowledgeMutationTasks.removeValue(forKey: stableId)
-        }
-    }
-
-    func cancelKnowledgePackDownload(stableId: String) {
-        guard let dataset = knowledgePacks.first(where: { $0.id == stableId })?.config else {
-            return
-        }
-        let ownerTask = knowledgeMutationTasks[stableId]
-        Task { [weak self] in
-            guard let self else { return }
-            let result = await knowledgeProvider.cancel(dataset: dataset)
-            await ownerTask?.value
-            if let result {
-                let enabled = knowledgePacks
-                    .first(where: { $0.id == stableId })?.enabled == true
-                applyKnowledgeReconciliation(result, stableId: stableId, enabled: enabled)
-            }
-            updateKnowledgePack(stableId) { pack in
-                pack.isMutating = false
-                pack.progressPercent = nil
-                pack.progressLabel = nil
-            }
-        }
-    }
-
-    func setKnowledgePackEnabled(stableId: String, enabled: Bool) {
-        guard let index = knowledgePacks.firstIndex(where: { $0.id == stableId }),
-              knowledgePacks[index].activeIdentity != nil,
-              !knowledgePacks[index].isMutating else {
-            return
-        }
-        updateKnowledgePack(stableId) { pack in
-            pack.enabled = enabled
-        }
-        knowledgePreferences.setDatasetEnabled(id: stableId, enabled: enabled)
-    }
-
-    private func bootstrapKnowledgePacks() async {
-        let requestedEnabled = knowledgePreferences.enabledDatasetIds
-        for dataset in knowledgePacks.map(\.config) {
-            do {
-                let result = try await knowledgeProvider.reconcile(dataset: dataset)
-                applyKnowledgeReconciliation(
-                    result,
-                    stableId: dataset.stableId,
-                    enabled: requestedEnabled.contains(dataset.stableId)
-                )
-            } catch {
-                updateKnowledgePack(dataset.stableId) { pack in
-                    pack.status = .download
-                    pack.enabled = false
-                    pack.errorMessage = error.localizedDescription
-                }
-            }
-        }
-    }
-
-    private func applyKnowledgeReconciliation(
-        _ result: KnowledgeReconciliation,
-        stableId: String,
-        enabled: Bool
-    ) {
-        updateKnowledgePack(stableId) { pack in
-            pack.status = switch result.status {
-            case .download: .download
-            case .ready: .ready
-            case .updateAvailable: .updateAvailable
-            }
-            pack.activeIdentity = result.activeIdentity
-            pack.enabled = enabled && result.activeIdentity != nil
-            pack.errorMessage = nil
-        }
-    }
-
-    private func updateKnowledgePack(
-        _ stableId: String,
-        update: (inout KnowledgePackState) -> Void
-    ) {
-        guard let index = knowledgePacks.firstIndex(where: { $0.id == stableId }) else {
-            return
-        }
-        var packs = knowledgePacks
-        update(&packs[index])
-        knowledgeState.packs = packs
     }
 
     private func clearSharedModelReadyTask() {
@@ -1014,7 +832,6 @@ final class ChatViewModel: ObservableObject {
 
         let target = modelSettings.currentTarget()
         if provider.requiredModelsReady(target: target) {
-            isModelDownloaded = true
             requiredModelsReady = true
             modelDownloadSizeBytes = nil
             return
@@ -1036,7 +853,6 @@ final class ChatViewModel: ObservableObject {
                 if isCancellation(error) {
                     return
                 }
-                await self.provider.cleanupRequiredModelArtifacts(target: target)
                 if self.modelDownloadLoggedStart {
                     self.logger.error("Model download failed", error)
                     self.modelDownloadLoggedStart = false
@@ -1051,7 +867,6 @@ final class ChatViewModel: ObservableObject {
                         offerRetryDownload: true
                     )
                     self.isDownloading = false
-                    self.isModelDownloaded = false
                     self.requiredModelsReady = false
                 }
             }
@@ -1066,7 +881,6 @@ final class ChatViewModel: ObservableObject {
             return
         }
         let target = modelSettings.currentTarget()
-        isModelDownloaded = downloader.isDownloaded(target: target.downloadTarget)
         requiredModelsReady = provider.requiredModelsReady(target: target)
         if !requiredModelsReady {
             return
@@ -1089,7 +903,6 @@ final class ChatViewModel: ObservableObject {
                         offerRetryDownload: true
                     )
                     self.isDownloading = false
-                    self.isModelDownloaded = false
                     self.requiredModelsReady = false
                 }
             }
@@ -1097,20 +910,12 @@ final class ChatViewModel: ObservableObject {
     }
 
     func cancelDownload() {
-        let target = modelSettings.currentTarget()
-        let activeReadyTask = sharedModelReadyTask
         resetGenerationState(stopRequested: true)
         modelDownloadTask?.cancel()
         modelDownloadTask = nil
         sharedModelReadyTask?.cancel()
         clearSharedModelReadyTask()
         downloader.cancel()
-        Task {
-            if let activeReadyTask {
-                _ = try? await activeReadyTask.value
-            }
-            await provider.cleanupRequiredModelArtifacts(target: target)
-        }
         if modelDownloadLoggedStart {
             logger.info("Model download cancelled")
             modelDownloadLoggedStart = false
@@ -1230,7 +1035,7 @@ final class ChatViewModel: ObservableObject {
             guard !Task.isCancelled, activeGenerationId == generationId else { return }
             var embeddingAssetInvalid = false
             var knowledgeHits: [KnowledgeSearchHit] = []
-            let enabledDatasets = enabledReadyKnowledgeDatasets
+            let enabledDatasets = knowledgeStore.enabledReadyDatasets
             if !userNode.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
                !enabledDatasets.isEmpty {
                 do {
@@ -1276,7 +1081,6 @@ final class ChatViewModel: ObservableObject {
                 if self.activeGenerationId == generationId {
                     isGenerating = false
                     isDownloading = false
-                    isModelDownloaded = false
                     streamingParentId = nil
                     downloadToast = DownloadToastState(
                         phase: .errorDownload,
@@ -1332,12 +1136,14 @@ final class ChatViewModel: ObservableObject {
                 0,
                 (normalHistorySelection.inputBudget - normalHistorySelection.inputTokens) * 4 - 2
             )
-            let knowledgeContext = buildKnowledgePromptContext(
-                hits: knowledgeHits,
-                maxUTF8Bytes: min(
+            let knowledgeContext = try? buildKnowledgePromptContext(
+                hits: knowledgeHits.map {
+                    KnowledgePromptHit(datasetId: $0.dataset.stableId, hit: $0.hit)
+                },
+                maxUtf8Bytes: UInt32(min(
                     Int(knowledgeEmbedding.maxContextUtf8Bytes),
                     remainingKnowledgeBytes
-                )
+                ))
             )
             let candidateSystemPrompt = knowledgeContext.map {
                 "\(normalSystemPrompt)\n\n\($0.text)"
@@ -1359,15 +1165,14 @@ final class ChatViewModel: ObservableObject {
             var activeCitations = useKnowledge ? (knowledgeContext?.citations ?? []) : []
             let effectiveSystemPrompt = useKnowledge ?
                 (candidateSystemPrompt ?? normalSystemPrompt) : normalSystemPrompt
+            let userMessage = LlmMessage(
+                text: prompt.text,
+                role: .user,
+                hasAttachments: !userNode.attachments.isEmpty
+            )
             var messages = [
                 LlmMessage(text: effectiveSystemPrompt, role: .system, hasAttachments: false)
-            ] + historySelection.messages + [
-                LlmMessage(
-                    text: prompt.text,
-                    role: .user,
-                    hasAttachments: !userNode.attachments.isEmpty
-                )
-            ]
+            ] + historySelection.messages + [userMessage]
 
             let bufferLock = NSLock()
             var buffer = ""
@@ -1454,13 +1259,7 @@ final class ChatViewModel: ObservableObject {
                                 role: .system,
                                 hasAttachments: false
                             )
-                        ] + normalHistorySelection.messages + [
-                            LlmMessage(
-                                text: prompt.text,
-                                role: .user,
-                                hasAttachments: !userNode.attachments.isEmpty
-                            )
-                        ]
+                        ] + normalHistorySelection.messages + [userMessage]
                         summary = try await runGeneration()
                     } else {
                         throw error
@@ -1644,7 +1443,6 @@ final class ChatViewModel: ObservableObject {
             }
             downloadToast = DownloadToastState(phase: .ready, percent: 100, status: progress.status, offerRetryDownload: false)
             isDownloading = false
-            isModelDownloaded = true
             requiredModelsReady = provider.requiredModelsReady(
                 target: modelSettings.currentTarget()
             )

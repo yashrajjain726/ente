@@ -1,16 +1,13 @@
 import SwiftUI
 
 struct KnowledgeSettingsView: View {
-    @ObservedObject var state: KnowledgeState
-    let onDownloadOrUpdate: (String) -> Void
-    let onCancel: (String) -> Void
-    let onSetEnabled: (String, Bool) -> Void
+    @ObservedObject var store: KnowledgeStore
     @State private var attributionPack: KnowledgePackState?
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: EnsuSpacing.md) {
-                ForEach(state.packs) { pack in
+                ForEach(store.packs) { pack in
                     packCard(pack)
                 }
             }
@@ -61,13 +58,13 @@ struct KnowledgeSettingsView: View {
                         "",
                         isOn: Binding(
                             get: { pack.enabled },
-                            set: { onSetEnabled(pack.id, $0) }
+                            set: { store.setEnabled(stableId: pack.id, enabled: $0) }
                         )
                     )
                     .labelsHidden()
-                } else if state.downloadsAllowed && pack.status == .download && !pack.isMutating {
+                } else if store.downloadsAllowed && pack.status == .download && !pack.isMutating {
                     Button {
-                        onDownloadOrUpdate(pack.id)
+                        store.downloadOrUpdate(stableId: pack.id)
                     } label: {
                         Text("Download")
                             .font(EnsuTypography.small)
@@ -86,11 +83,11 @@ struct KnowledgeSettingsView: View {
                     .font(EnsuTypography.small)
                     .foregroundStyle(EnsuColor.textMuted)
                 Button("Cancel") {
-                    onCancel(pack.id)
+                    store.cancel(stableId: pack.id)
                 }
-            } else if state.downloadsAllowed && pack.status == .updateAvailable {
+            } else if store.downloadsAllowed && pack.status == .updateAvailable {
                 Button {
-                    onDownloadOrUpdate(pack.id)
+                    store.downloadOrUpdate(stableId: pack.id)
                 } label: {
                     Text("Update")
                         .font(EnsuTypography.small)
@@ -111,5 +108,72 @@ struct KnowledgeSettingsView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(EnsuColor.fillFaint)
         .clipShape(RoundedRectangle(cornerRadius: EnsuCornerRadius.card, style: .continuous))
+    }
+}
+
+private struct PackAttributionSheet: View {
+    let config: KnowledgeDatasetConfig
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        let attribution = config.attribution
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: EnsuSpacing.sm) {
+                    Text(config.label)
+                        .font(EnsuTypography.large)
+                        .foregroundStyle(EnsuColor.textPrimary)
+
+                    Divider()
+
+                    Text("From \(attribution.credit)")
+                        .font(EnsuTypography.body)
+                        .foregroundStyle(EnsuColor.textPrimary)
+
+                    Text(attribution.modificationNotice)
+                        .font(EnsuTypography.body)
+                        .foregroundStyle(EnsuColor.textPrimary)
+
+                    HStack(spacing: EnsuSpacing.md) {
+                        Link(destination: URL(string: attribution.publicPackUrl)!) {
+                            Label("Source", systemImage: "arrow.up.right.square")
+                        }
+                        Link(destination: URL(string: attribution.licenseUrl)!) {
+                            Label("License", systemImage: "doc.text")
+                        }
+                    }
+                    .font(EnsuTypography.mini)
+                    .lineLimit(1)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                    Divider()
+
+                    Text("Wikimedia and Ensu are not affiliated. Wikimedia project names identify the source material only.")
+                        .font(EnsuTypography.small)
+                        .foregroundStyle(EnsuColor.textMuted)
+                }
+                .padding(EnsuSpacing.md)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(EnsuColor.fillFaint)
+                .clipShape(
+                    RoundedRectangle(
+                        cornerRadius: EnsuCornerRadius.card,
+                        style: .continuous
+                    )
+                )
+                .padding(EnsuSpacing.lg)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .background(EnsuColor.backgroundBase)
+            .navigationTitle("Attribution")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .primaryAction) {
+                    Button("Done") { dismiss() }
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
     }
 }

@@ -39,8 +39,9 @@ import io.ente.ensu.designsystem.EnsuCornerRadius
 import io.ente.ensu.designsystem.EnsuSpacing
 import io.ente.ensu.designsystem.EnsuTypography
 import io.ente.ensu.format.formatBytes
+import io.ente.ensu.bindings.KnowledgeDatasetConfig
+import io.ente.ensu.bindings.KnowledgeReconciliationStatus
 import io.ente.ensu.knowledge.KnowledgePackState
-import io.ente.ensu.knowledge.KnowledgePackStatus
 import io.ente.ensu.knowledge.KnowledgeState
 
 @Composable
@@ -51,7 +52,7 @@ fun KnowledgeSettingsScreen(
     onCancel: (String) -> Unit,
     onSetEnabled: (String, Boolean) -> Unit
 ) {
-    var attributionPack by remember { mutableStateOf<KnowledgePackState?>(null) }
+    var attributionConfig by remember { mutableStateOf<KnowledgeDatasetConfig?>(null) }
 
     LazyColumn(
         modifier = Modifier.padding(horizontal = EnsuSpacing.pageHorizontal.dp),
@@ -64,15 +65,15 @@ fun KnowledgeSettingsScreen(
                 onDownloadOrUpdate = { onDownloadOrUpdate(pack.config.stableId) },
                 onCancel = { onCancel(pack.config.stableId) },
                 onSetEnabled = { enabled -> onSetEnabled(pack.config.stableId, enabled) },
-                onOpenAttribution = { attributionPack = pack }
+                onOpenAttribution = { attributionConfig = pack.config }
             )
         }
     }
 
-    attributionPack?.let { pack ->
+    attributionConfig?.let { config ->
         PackAttributionDialog(
-            pack = pack,
-            onDismiss = { attributionPack = null }
+            config = config,
+            onDismiss = { attributionConfig = null }
         )
     }
 }
@@ -107,7 +108,7 @@ private fun KnowledgePackCard(
                 Switch(checked = pack.enabled, onCheckedChange = onSetEnabled)
             } else if (
                 packDownloadsAllowed &&
-                pack.status == KnowledgePackStatus.Download &&
+                pack.status == KnowledgeReconciliationStatus.DOWNLOAD &&
                 !pack.isMutating
             ) {
                 CompactPackButton(label = "Download", onClick = onDownloadOrUpdate)
@@ -117,18 +118,21 @@ private fun KnowledgePackCard(
         if (pack.isMutating) {
             Spacer(Modifier.height(EnsuSpacing.md.dp))
             LinearProgressIndicator(
-                progress = { (pack.progressPercent ?: 0).coerceIn(0, 100) / 100f },
+                progress = { (pack.mutationProgress?.percent ?: 0).coerceIn(0, 100) / 100f },
                 modifier = Modifier.fillMaxWidth(),
                 color = EnsuColor.accent(),
                 trackColor = EnsuColor.border()
             )
             Text(
-                pack.progressLabel ?: "Downloading...",
+                pack.mutationProgress?.label ?: "Downloading...",
                 style = EnsuTypography.small,
                 color = EnsuColor.textMuted()
             )
             TextButton(onClick = onCancel) { Text("Cancel") }
-        } else if (packDownloadsAllowed && pack.status == KnowledgePackStatus.UpdateAvailable) {
+        } else if (
+            packDownloadsAllowed &&
+            pack.status == KnowledgeReconciliationStatus.UPDATE_AVAILABLE
+        ) {
             Spacer(Modifier.height(EnsuSpacing.md.dp))
             CompactPackButton(label = "Update", onClick = onDownloadOrUpdate)
         }
@@ -191,10 +195,10 @@ private fun CompactPackButton(label: String, onClick: () -> Unit) {
 
 @Composable
 private fun PackAttributionDialog(
-    pack: KnowledgePackState,
+    config: KnowledgeDatasetConfig,
     onDismiss: () -> Unit
 ) {
-    val attribution = pack.config.attribution
+    val attribution = config.attribution
     val uriHandler = LocalUriHandler.current
 
     AlertDialog(
@@ -212,7 +216,7 @@ private fun PackAttributionDialog(
                 verticalArrangement = Arrangement.spacedBy(EnsuSpacing.sm.dp)
             ) {
                 Text(
-                    text = pack.config.label,
+                    text = config.label,
                     style = EnsuTypography.large,
                     color = EnsuColor.textPrimary()
                 )

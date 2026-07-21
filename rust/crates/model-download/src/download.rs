@@ -1604,49 +1604,6 @@ pub fn metadata_path_for(path: &Path) -> PathBuf {
     PathBuf::from(format!("{}.metadata.json", path.display()))
 }
 
-pub(crate) fn cleanup_incomplete_target(
-    target: &Target,
-    validate: impl Fn(&Target, &Path) -> Result<(), Error>,
-) -> Result<bool, Error> {
-    let destination = Path::new(&target.destination_path);
-    let regular_file = match fs::symlink_metadata(destination) {
-        Ok(metadata) => metadata.file_type().is_file(),
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => false,
-        Err(error) => return Err(error.into()),
-    };
-    let valid_final = regular_file && validate(target, destination).is_ok();
-    let valid_metadata = valid_final && download_metadata_matches(destination, &target.url);
-    let mut removed = false;
-
-    if !valid_final {
-        removed |= remove_file_if_present(destination)?;
-    }
-    if !valid_metadata {
-        removed |= remove_file_if_present(&metadata_path_for(destination))?;
-    }
-
-    for artifact in [
-        tmp_path_for(destination),
-        partial_metadata_path_for(destination),
-        range_metadata_path_for(destination),
-        tmp_path_for(&metadata_path_for(destination)),
-    ] {
-        removed |= remove_file_if_present(&artifact)?;
-    }
-    Ok(removed)
-}
-
-fn remove_file_if_present(path: &Path) -> Result<bool, Error> {
-    match fs::symlink_metadata(path) {
-        Ok(_) => {
-            fs::remove_file(path)?;
-            Ok(true)
-        }
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(false),
-        Err(error) => Err(error.into()),
-    }
-}
-
 fn range_metadata_path_for(path: &Path) -> PathBuf {
     PathBuf::from(format!("{}.tmp.ranges.json", path.display()))
 }
@@ -2325,6 +2282,78 @@ mod tests {
     }
 
     #[test]
+    fn cancelled_single_stream_download_resumes_from_persisted_bytes() {
+        let bytes = Arc::new(sample_bytes(768));
+        let release_first_response = Arc::new(AtomicBool::new(false));
+        let first_full_get = Arc::new(AtomicBool::new(true));
+        let full_get_count = Arc::new(AtomicUsize::new(0));
+        let range_get_count = Arc::new(AtomicUsize::new(0));
+
+        let server = {
+            let bytes = Arc::clone(&bytes);
+            let release_first_response = Arc::clone(&release_first_response);
+            let first_full_get = Arc::clone(&first_full_get);
+            let full_get_count = Arc::clone(&full_get_count);
+            let range_get_count = Arc::clone(&range_get_count);
+            TestServer::spawn(move |stream| {
+                handle_cancellable_resume_request(
+                    stream,
+                    Arc::clone(&bytes),
+                    Arc::clone(&release_first_response),
+                    Arc::clone(&first_full_get),
+                    Arc::clone(&full_get_count),
+                    Arc::clone(&range_get_count),
+                );
+            })
+        };
+
+        let test_dir = scratch_dir("cancel-resume-download");
+        let destination = test_dir.join("model.bin");
+        let target = Target {
+            label: "Model".to_string(),
+            url: server.url("/model.bin"),
+            destination_path: destination.display().to_string(),
+        };
+        let cancel_requested = Arc::new(AtomicBool::new(false));
+
+        let result = fetch(
+            vec![target.clone()],
+            |_, _| Ok(()),
+            {
+                let cancel_requested = Arc::clone(&cancel_requested);
+                move |progress| {
+                    if progress.file_downloaded_bytes > 0 && !progress.file_complete {
+                        cancel_requested.store(true, Ordering::SeqCst);
+                    }
+                }
+            },
+            {
+                let cancel_requested = Arc::clone(&cancel_requested);
+                move || cancel_requested.load(Ordering::SeqCst)
+            },
+        );
+
+        assert!(matches!(result, Err(Error::Cancelled)));
+        release_first_response.store(true, Ordering::SeqCst);
+        let persisted_bytes = file_size(&tmp_path_for(&destination)).expect("partial download");
+        assert!(persisted_bytes > 0 && persisted_bytes < bytes.len() as u64);
+        assert!(partial_metadata_path_for(&destination).exists());
+
+        fetch(vec![target], |_, _| Ok(()), |_| {}, || false).expect("resume succeeds");
+
+        assert_eq!(
+            fs::read(&destination).expect("read downloaded file"),
+            *bytes
+        );
+        assert_eq!(full_get_count.load(Ordering::SeqCst), 1);
+        assert_eq!(range_get_count.load(Ordering::SeqCst), 1);
+        assert!(!tmp_path_for(&destination).exists());
+        assert!(!partial_metadata_path_for(&destination).exists());
+
+        let _ = fs::remove_dir_all(test_dir);
+    }
+
+    #[test]
     fn single_stream_download_restarts_when_resume_validator_is_stale() {
         let bytes = Arc::new(sample_bytes(512));
         let head_count = Arc::new(AtomicUsize::new(0));
@@ -2741,6 +2770,86 @@ mod tests {
             let _ = stream.write_all(response.as_bytes());
             let _ = stream.write_all(bytes.as_slice());
         }
+    }
+
+    fn handle_cancellable_resume_request(
+        mut stream: TcpStream,
+        bytes: Arc<Vec<u8>>,
+        release_first_response: Arc<AtomicBool>,
+        first_full_get: Arc<AtomicBool>,
+        full_get_count: Arc<AtomicUsize>,
+        range_get_count: Arc<AtomicUsize>,
+    ) {
+        let mut reader = BufReader::new(stream.try_clone().expect("clone test stream"));
+        let mut request_line = String::new();
+        if reader.read_line(&mut request_line).is_err() {
+            return;
+        }
+
+        let mut range_header = None;
+        let mut if_range_header = None;
+        loop {
+            let mut line = String::new();
+            if reader.read_line(&mut line).is_err() || line == "\r\n" || line.is_empty() {
+                break;
+            }
+            if let Some((name, value)) = line.split_once(':') {
+                if name.eq_ignore_ascii_case("range") {
+                    range_header = Some(value.trim().to_string());
+                } else if name.eq_ignore_ascii_case("if-range") {
+                    if_range_header = Some(value.trim().to_string());
+                }
+            }
+        }
+
+        if request_line.starts_with("HEAD ") {
+            let response = format!(
+                "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nETag: \"test-etag\"\r\nConnection: close\r\n\r\n",
+                bytes.len()
+            );
+            let _ = stream.write_all(response.as_bytes());
+            return;
+        }
+
+        if if_range_header.as_deref() == Some("\"test-etag\"")
+            && let Some(range_header) = range_header
+            && let Some((start, end)) = parse_test_range_header(&range_header, bytes.len() as u64)
+        {
+            range_get_count.fetch_add(1, Ordering::SeqCst);
+            let body = &bytes[start as usize..=end as usize];
+            let response = format!(
+                "HTTP/1.1 206 Partial Content\r\nContent-Length: {}\r\nContent-Range: bytes {}-{}/{}\r\nETag: \"test-etag\"\r\nConnection: close\r\n\r\n",
+                body.len(),
+                start,
+                end,
+                bytes.len()
+            );
+            let _ = stream.write_all(response.as_bytes());
+            let _ = stream.write_all(body);
+            return;
+        }
+
+        full_get_count.fetch_add(1, Ordering::SeqCst);
+        let response = format!(
+            "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nETag: \"test-etag\"\r\nConnection: close\r\n\r\n",
+            bytes.len()
+        );
+        let _ = stream.write_all(response.as_bytes());
+        if !first_full_get.swap(false, Ordering::SeqCst) {
+            let _ = stream.write_all(bytes.as_slice());
+            return;
+        }
+
+        let _ = stream.write_all(&bytes[..256]);
+        let _ = stream.flush();
+        thread::sleep(PROGRESS_INTERVAL + Duration::from_millis(50));
+        let _ = stream.write_all(&bytes[256..512]);
+        let _ = stream.flush();
+        let release_deadline = Instant::now() + Duration::from_secs(5);
+        while !release_first_response.load(Ordering::SeqCst) && Instant::now() < release_deadline {
+            thread::sleep(Duration::from_millis(5));
+        }
+        let _ = stream.write_all(&bytes[512..]);
     }
 
     fn parse_test_range_header(value: &str, total: u64) -> Option<(u64, u64)> {

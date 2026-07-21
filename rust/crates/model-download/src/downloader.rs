@@ -109,33 +109,6 @@ impl ModelDownloader {
         removed
     }
 
-    pub fn cleanup_incomplete_targets(
-        &self,
-        targets: &[ModelDownloadTarget],
-    ) -> Result<bool, download::Error> {
-        let _guard = self
-            .download_lock
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner);
-        let mut removed = false;
-        let mut target_directories = HashSet::new();
-        for target in targets {
-            for entry in self.fetch_targets(target) {
-                let destination = Path::new(&entry.destination_path);
-                if let Some(parent) = destination.parent() {
-                    target_directories.insert(parent.to_path_buf());
-                }
-                removed |= download::cleanup_incomplete_target(&entry, validate_target)?;
-            }
-        }
-        for directory in target_directories {
-            if fs::remove_dir(&directory).is_ok() {
-                removed = true;
-            }
-        }
-        Ok(removed)
-    }
-
     /// Returns whether a network download ran; false when everything was
     /// already present.
     pub fn download(
@@ -608,29 +581,6 @@ mod tests {
         fs::write(path, content).unwrap();
     }
 
-    fn write_valid_gguf(path: &Path) {
-        let mut bytes = vec![0_u8; 1024 * 1024];
-        bytes[..4].copy_from_slice(b"GGUF");
-        write_gguf(path, &bytes);
-    }
-
-    fn write_matching_metadata(path: &Path, url: &str, label: &str) {
-        let size = fs::metadata(path).unwrap().len();
-        fs::write(
-            download::metadata_path_for(path),
-            serde_json::to_vec(&serde_json::json!({
-                "url": url,
-                "label": label,
-                "size_bytes": size,
-                "etag": null,
-                "last_modified": null,
-                "downloaded_at_ms": 0,
-            }))
-            .unwrap(),
-        )
-        .unwrap();
-    }
-
     #[test]
     fn paths_are_keyed_by_preset_id_or_custom_pair_hash() {
         let dir = scratch_dir("paths");
@@ -689,81 +639,6 @@ mod tests {
 
         write_gguf(&mmproj, b"GGUFdata");
         assert!(downloader.is_downloaded(&target));
-
-        let _ = fs::remove_dir_all(dir);
-    }
-
-    #[test]
-    fn cleanup_preserves_each_valid_gguf_and_matching_metadata() {
-        let dir = scratch_dir("cleanup-valid");
-        let downloader = ModelDownloader::new(&dir);
-        let target = target("qwen-2b-q8");
-        let entries = downloader.fetch_targets(&target);
-        for entry in &entries {
-            let path = Path::new(&entry.destination_path);
-            write_valid_gguf(path);
-            write_matching_metadata(path, &entry.url, &entry.label);
-            fs::write(format!("{}.tmp", path.display()), b"partial").unwrap();
-            fs::write(format!("{}.tmp.partial.json", path.display()), b"{}").unwrap();
-            fs::write(format!("{}.tmp.ranges.json", path.display()), b"{}").unwrap();
-            fs::write(format!("{}.metadata.json.tmp", path.display()), b"partial").unwrap();
-        }
-        write_gguf(&dir.join("unrelated/model.gguf"), b"GGUFkeep");
-
-        assert!(
-            downloader
-                .cleanup_incomplete_targets(std::slice::from_ref(&target))
-                .unwrap()
-        );
-        for entry in &entries {
-            let path = Path::new(&entry.destination_path);
-            assert!(path.exists());
-            assert!(download::metadata_path_for(path).exists());
-            assert!(!PathBuf::from(format!("{}.tmp", path.display())).exists());
-            assert!(!PathBuf::from(format!("{}.tmp.partial.json", path.display())).exists());
-            assert!(!PathBuf::from(format!("{}.tmp.ranges.json", path.display())).exists());
-            assert!(!PathBuf::from(format!("{}.metadata.json.tmp", path.display())).exists());
-        }
-        assert!(dir.join("unrelated/model.gguf").exists());
-
-        let _ = fs::remove_dir_all(dir);
-    }
-
-    #[test]
-    fn cleanup_removes_only_invalid_components_and_stale_metadata() {
-        let dir = scratch_dir("cleanup-invalid");
-        let downloader = ModelDownloader::new(&dir);
-        let target = target("qwen-2b-q8");
-        let entries = downloader.fetch_targets(&target);
-        let model = Path::new(&entries[0].destination_path);
-        let mmproj = Path::new(&entries[1].destination_path);
-        write_valid_gguf(model);
-        write_matching_metadata(model, &entries[0].url, &entries[0].label);
-        write_gguf(mmproj, b"not-gguf");
-        write_matching_metadata(mmproj, &entries[1].url, &entries[1].label);
-
-        assert!(
-            downloader
-                .cleanup_incomplete_targets(std::slice::from_ref(&target))
-                .unwrap()
-        );
-        assert!(model.exists());
-        assert!(download::metadata_path_for(model).exists());
-        assert!(!mmproj.exists());
-        assert!(!download::metadata_path_for(mmproj).exists());
-
-        fs::write(
-            download::metadata_path_for(model),
-            br#"{"url":"https://example.org/stale"}"#,
-        )
-        .unwrap();
-        assert!(
-            downloader
-                .cleanup_incomplete_targets(std::slice::from_ref(&target))
-                .unwrap()
-        );
-        assert!(model.exists());
-        assert!(!download::metadata_path_for(model).exists());
 
         let _ = fs::remove_dir_all(dir);
     }

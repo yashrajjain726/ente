@@ -89,7 +89,6 @@ internal class ModelSettingsActions(
         state.update { appState ->
             appState.copy(
                 chat = appState.chat.copy(
-                    isModelDownloaded = chatReady,
                     requiredModelsReady = requiredModelsReady,
                     isDownloading = if (requiredModelsReady) false else appState.chat.isDownloading,
                     downloadPercent = if (requiredModelsReady) null else appState.chat.downloadPercent,
@@ -136,25 +135,6 @@ internal class ModelSettingsActions(
         }
     }
 
-    fun cleanupRequiredModelArtifactsOnBootstrap() {
-        val scope = scope ?: return
-        val target = resolveTarget(state.value.modelSettings)
-        scope.launch {
-            runCatching {
-                llmProvider.cleanupRequiredModelArtifactsIfIdle(target)
-            }.onFailure { error ->
-                logRepository.log(
-                    LogLevel.Warning,
-                    "Required model bootstrap cleanup failed",
-                    details = error.message,
-                    tag = "Model",
-                    throwable = error
-                )
-            }
-            refreshModelDownloadInfo()
-        }
-    }
-
     fun startModelDownload(userInitiated: Boolean = true) {
         val scope = scope ?: return
         val currentState = state.value
@@ -171,7 +151,6 @@ internal class ModelSettingsActions(
             state.update { appState ->
                 appState.copy(
                     chat = appState.chat.copy(
-                        isModelDownloaded = true,
                         requiredModelsReady = true,
                         modelDownloadSizeBytes = null,
                         hasRequestedModelDownload = if (userInitiated) true else appState.chat.hasRequestedModelDownload
@@ -232,7 +211,6 @@ internal class ModelSettingsActions(
                                         downloadPercent = resolvedProgress.percent,
                                         downloadStatus = resolvedProgress.status,
                                         downloadPhase = resolvedProgress.phase,
-                                        isModelDownloaded = if (resolvedProgress.isFinished) true else appState.chat.isModelDownloaded,
                                         requiredModelsReady = if (resolvedProgress.isFinished) true else appState.chat.requiredModelsReady,
                                         modelDownloadSizeBytes = if (resolvedProgress.isFinished) null else appState.chat.modelDownloadSizeBytes
                                     )
@@ -250,16 +228,6 @@ internal class ModelSettingsActions(
                     }
                 }
             } catch (err: Throwable) {
-                runCatching { llmProvider.cleanupRequiredModelArtifacts(target) }
-                    .onFailure { cleanupError ->
-                        logRepository.log(
-                            LogLevel.Warning,
-                            "Required model cleanup failed",
-                            details = cleanupError.message,
-                            tag = "Model",
-                            throwable = cleanupError
-                        )
-                    }
                 val cancelled = err is kotlinx.coroutines.CancellationException ||
                     err is LlmException.Cancelled
                 val failureMessage = if (cancelled) {

@@ -1,4 +1,6 @@
 package io.ente.ensu
+
+import android.content.Context
 import io.ente.ensu.llm.ModelSettingsActions
 import io.ente.ensu.chat.AttachmentStoreActions
 import io.ente.ensu.chat.ChatStoreActions
@@ -16,12 +18,11 @@ import io.ente.ensu.chat.ChatMessage
 import io.ente.ensu.bindings.ConfigDefaults
 import io.ente.ensu.logging.LogLevel
 import io.ente.ensu.settings.SessionPreferencesDataStore
-import io.ente.ensu.settings.KnowledgePreferencesDataStore
 import io.ente.ensu.AppState
 import io.ente.ensu.settings.DeveloperSettingsState
 import io.ente.ensu.llm.ModelSettingsState
-import io.ente.ensu.knowledge.KnowledgeActions
 import io.ente.ensu.knowledge.KnowledgeProvider
+import io.ente.ensu.knowledge.KnowledgeStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -29,8 +30,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 class AppStore(
+    context: Context,
     private val sessionPreferences: SessionPreferencesDataStore,
-    private val knowledgePreferences: KnowledgePreferencesDataStore,
     private val chatRepository: ChatRepository,
     private val llmProvider: LlmProvider,
     private val knowledgeProvider: KnowledgeProvider,
@@ -46,6 +47,13 @@ class AppStore(
 
     private val messageStore = mutableMapOf<String, MutableList<ChatMessage>>()
     private val attachmentActions = AttachmentStoreActions(_state, messageStore)
+    private val knowledgeStore = KnowledgeStore(
+        context = context,
+        state = _state,
+        provider = knowledgeProvider,
+        datasets = configDefaults.knowledgeDatasets,
+        logRepository = logRepository
+    )
     private val modelSettingsActions =
         ModelSettingsActions(
             _state,
@@ -55,13 +63,6 @@ class AppStore(
             logRepository,
             configDefaults
         )
-    private val knowledgeActions = KnowledgeActions(
-        state = _state,
-        preferences = knowledgePreferences,
-        provider = knowledgeProvider,
-        datasets = configDefaults.knowledgeDatasets,
-        logRepository = logRepository
-    )
     private val chatActions = ChatStoreActions(
         state = _state,
         sessionPreferences = sessionPreferences,
@@ -82,8 +83,7 @@ class AppStore(
         refreshDeviceCapability(scope)
         chatActions.bootstrap(scope)
         modelSettingsActions.refreshModelDownloadInfo()
-        modelSettingsActions.cleanupRequiredModelArtifactsOnBootstrap()
-        knowledgeActions.bootstrap(scope)
+        knowledgeStore.bootstrap(scope)
         _state.value = _state.value.copy(
             chat = _state.value.chat.copy(isModelStateKnown = true)
         )
@@ -177,12 +177,12 @@ class AppStore(
     fun refreshModelDownloadInfo() = modelSettingsActions.refreshModelDownloadInfo()
 
     fun downloadOrUpdateKnowledgePack(stableId: String) =
-        knowledgeActions.downloadOrUpdate(stableId)
+        knowledgeStore.downloadOrUpdate(stableId)
 
-    fun cancelKnowledgePackDownload(stableId: String) = knowledgeActions.cancel(stableId)
+    fun cancelKnowledgePackDownload(stableId: String) = knowledgeStore.cancel(stableId)
 
     fun setKnowledgePackEnabled(stableId: String, enabled: Boolean) =
-        knowledgeActions.setEnabled(stableId, enabled)
+        knowledgeStore.setEnabled(stableId, enabled)
 
     fun cancelDownload() {
         chatActions.cancelGenerationForDownload()

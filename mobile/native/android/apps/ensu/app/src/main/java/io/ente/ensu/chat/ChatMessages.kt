@@ -101,7 +101,6 @@ internal fun MessageList(
     streamingResponse: String,
     streamingParentId: String?,
     isGenerating: Boolean,
-    isModelDownloaded: Boolean,
     requiredModelsReady: Boolean,
     isModelStateKnown: Boolean,
     isChatUnsupported: Boolean,
@@ -133,13 +132,11 @@ internal fun MessageList(
         if (!isModelStateKnown) {
             return
         }
-        if (isModelDownloaded || isChatUnsupported) {
-            EmptyState(
-                modifier = modifier,
-                title = "Welcome",
-                subtitle = "Type a message to start chatting"
-            )
-        }
+        EmptyState(
+            modifier = modifier,
+            title = "Welcome",
+            subtitle = "Type a message to start chatting"
+        )
         return
     }
 

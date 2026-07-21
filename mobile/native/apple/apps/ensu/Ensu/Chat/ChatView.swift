@@ -144,10 +144,7 @@ struct ChatView: View {
         }
         .sheet(isPresented: $viewState.showSettings) {
             SettingsView(
-                knowledgeState: viewModel.knowledgeState,
-                onDownloadOrUpdateKnowledgePack: viewModel.downloadOrUpdateKnowledgePack,
-                onCancelKnowledgePackDownload: viewModel.cancelKnowledgePackDownload,
-                onSetKnowledgePackEnabled: viewModel.setKnowledgePackEnabled,
+                knowledgeStore: viewModel.knowledgeStore,
                 onSignIn: {
                     viewState.pendingSignInRequest = true
                     viewState.showSettings = false
@@ -272,7 +269,10 @@ struct ChatView: View {
                         viewModel.beginEditing(message: message)
                     },
                     onCopy: { message in
-                        copyToPasteboard(message.text)
+                        let text = message.role == .assistant
+                            ? cleanAssistantText(storedText: message.text)
+                            : message.text
+                        copyToPasteboard(text)
                         showToast("Copied to clipboard", duration: 1)
                     },
                     onRetry: { message in

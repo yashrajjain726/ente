@@ -81,7 +81,7 @@ struct EmbeddingAssetInvalidError: LocalizedError {
     var errorDescription: String? { "Embedding model asset is invalid" }
 }
 
-private actor AsyncSerialGate {
+actor AsyncSerialGate {
     private var isLocked = false
     private var waiters: [CheckedContinuation<Void, Never>] = []
 
@@ -150,7 +150,7 @@ final class LlmProvider {
     }
 
     func isEmbeddingModelReady() -> Bool {
-        isExactEmbeddingModelReady(target: embeddingDownloadTarget)
+        isExactEmbeddingModelReady()
     }
 
     func requiredModelsReady(target: LlmModelTarget) -> Bool {
@@ -183,18 +183,16 @@ final class LlmProvider {
             throw UnsupportedDeviceMemoryError(capability: capability)
         }
 
-        let embeddingTarget = embeddingDownloadTarget
         let missingTargets: [ModelDownloadTarget] = try await modelLoadGate.withLock {
             let chatReady = downloader.isDownloaded(target: target.downloadTarget)
-            let embeddingReady = isExactEmbeddingModelReady(target: embeddingTarget)
+            let embeddingReady = isExactEmbeddingModelReady()
             if !embeddingReady {
-                _ = downloader.removeDownloaded(target: embeddingTarget)
-                _ = try downloader.cleanupIncompleteTargets([embeddingTarget])
+                _ = downloader.removeDownloaded(target: embeddingDownloadTarget)
             }
 
             return [
                 chatReady ? nil : target.downloadTarget,
-                embeddingReady ? nil : embeddingTarget,
+                embeddingReady ? nil : embeddingDownloadTarget,
             ].compactMap { $0 }
         }
 
@@ -203,7 +201,8 @@ final class LlmProvider {
         }
 
         try await modelLoadGate.withLock {
-            guard isExactEmbeddingModelReady(target: embeddingTarget) else {
+            guard isExactEmbeddingModelReady() else {
+                _ = downloader.removeDownloaded(target: embeddingDownloadTarget)
                 throw RequiredModelValidationError(targetId: knowledgeEmbedding.targetId)
             }
             try await ensureModelReadyLocked(
@@ -216,30 +215,6 @@ final class LlmProvider {
                 throw RequiredModelValidationError(targetId: target.id)
             }
         }
-    }
-
-    func cleanupRequiredModelArtifacts(target: LlmModelTarget) async {
-        try? await modelLoadGate.withLock {
-            try cleanupRequiredModelArtifactsLocked(target: target)
-        }
-    }
-
-    func cleanupRequiredModelArtifactsIfIdle(target: LlmModelTarget) async {
-        try? await modelLoadGate.withLock {
-            guard !downloader.isDownloadActive else { return }
-            try cleanupRequiredModelArtifactsLocked(target: target)
-        }
-    }
-
-    private func cleanupRequiredModelArtifactsLocked(target: LlmModelTarget) throws {
-        let embeddingTarget = embeddingDownloadTarget
-        if !isExactEmbeddingModelReady(target: embeddingTarget) {
-            _ = downloader.removeDownloaded(target: embeddingTarget)
-        }
-        _ = try downloader.cleanupIncompleteTargets([
-            target.downloadTarget,
-            embeddingTarget,
-        ])
     }
 
     func ensureModelReady(
@@ -515,7 +490,8 @@ final class LlmProvider {
         transcriber.unloadModel()
     }
 
-    private func isExactEmbeddingModelReady(target: ModelDownloadTarget) -> Bool {
+    private func isExactEmbeddingModelReady() -> Bool {
+        let target = embeddingDownloadTarget
         guard downloader.isDownloaded(target: target) else { return false }
         let url = downloader.modelPath(target: target)
         do {

@@ -6,39 +6,22 @@ use std::path::Path;
 
 use memmap2::{Mmap, MmapOptions};
 use serde::Deserialize;
-use thiserror::Error;
 use url::Url;
 
 use crate::config::{
+    KNOWLEDGE_MANIFEST_FILE, KNOWLEDGE_META_FILE, KNOWLEDGE_OFFSETS_FILE, KNOWLEDGE_VECTORS_FILE,
     KnowledgeDatasetConfig, is_path_safe_component, knowledge_index_contract,
     validate_knowledge_datasets,
 };
 
-use super::normalize_single_line;
+use super::{BEGIN_CONTEXT_SENTINEL, END_CONTEXT_SENTINEL, RetrievalError, normalize_single_line};
 
-const MANIFEST_FILE: &str = "manifest.json";
-const VECTORS_FILE: &str = "vectors.i8";
-const META_FILE: &str = "meta.zst";
-const OFFSETS_FILE: &str = "meta.offsets";
+const MANIFEST_FILE: &str = KNOWLEDGE_MANIFEST_FILE;
+const VECTORS_FILE: &str = KNOWLEDGE_VECTORS_FILE;
+const META_FILE: &str = KNOWLEDGE_META_FILE;
+const OFFSETS_FILE: &str = KNOWLEDGE_OFFSETS_FILE;
 const MAX_MANIFEST_BYTES: u64 = 1_048_576;
 const MAX_METADATA_FRAME_BYTES: u64 = 1_048_576;
-const BEGIN_CONTEXT_SENTINEL: &str = "----- BEGIN KNOWLEDGE CONTEXT -----";
-const END_CONTEXT_SENTINEL: &str = "----- END KNOWLEDGE CONTEXT -----";
-
-#[derive(Debug, Error)]
-pub enum RetrievalError {
-    #[error("invalid retrieval input: {0}")]
-    InvalidInput(String),
-    #[error("invalid knowledge pack: {0}")]
-    InvalidPack(String),
-    #[error("knowledge pack I/O failed: {0}")]
-    Io(#[from] std::io::Error),
-    #[error("knowledge pack JSON failed: {0}")]
-    Json(#[from] serde_json::Error),
-    #[error("knowledge pack metadata decompression failed: {0}")]
-    Zstd(String),
-}
-
 #[derive(Debug, Clone, PartialEq)]
 pub struct RetrievalHit {
     pub score: f32,
@@ -161,13 +144,7 @@ impl RetrievalIndex {
             ));
         }
 
-        let block_count = count
-            .checked_sub(1)
-            .and_then(|last| last.checked_div(rows_per_block))
-            .and_then(|last_block| last_block.checked_add(1))
-            .ok_or_else(|| {
-                RetrievalError::InvalidPack("metadata block count overflow".to_string())
-            })?;
+        let block_count = count.div_ceil(rows_per_block);
         let offset_count = block_count.checked_add(1).ok_or_else(|| {
             RetrievalError::InvalidPack("metadata offset count overflow".to_string())
         })?;

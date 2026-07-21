@@ -1,5 +1,9 @@
 package io.ente.ensu.knowledge
 
+import android.content.Context
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.stringSetPreferencesKey
+import androidx.datastore.preferences.preferencesDataStore
 import io.ente.ensu.AppState
 import io.ente.ensu.bindings.KnowledgeDatasetConfig
 import io.ente.ensu.bindings.KnowledgeReconciliation
@@ -7,21 +11,51 @@ import io.ente.ensu.bindings.KnowledgeReconciliationStatus
 import io.ente.ensu.device.isChatSupported
 import io.ente.ensu.logging.FileLogRepository
 import io.ente.ensu.logging.LogLevel
-import io.ente.ensu.settings.KnowledgePreferencesDataStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-class KnowledgeActions(
+private val Context.knowledgePreferences by preferencesDataStore("ensu_knowledge_preferences")
+
+data class KnowledgeMutationProgress(val percent: Int, val label: String)
+
+data class KnowledgePackState(
+    val config: KnowledgeDatasetConfig,
+    val status: KnowledgeReconciliationStatus? = null,
+    val activeIdentity: String? = null,
+    val enabled: Boolean = false,
+    val mutationProgress: KnowledgeMutationProgress? = null,
+    val errorMessage: String? = null
+) {
+    val isMutating: Boolean get() = mutationProgress != null
+}
+
+data class KnowledgeState(
+    val packs: Map<String, KnowledgePackState> = emptyMap()
+) {
+    val enabledReadyDatasets: List<KnowledgeDatasetConfig>
+        get() = packs.values
+            .filter { pack ->
+                pack.enabled &&
+                    (pack.status == KnowledgeReconciliationStatus.READY ||
+                        pack.status == KnowledgeReconciliationStatus.UPDATE_AVAILABLE)
+            }
+            .map { it.config }
+}
+
+class KnowledgeStore(
+    context: Context,
     private val state: MutableStateFlow<AppState>,
-    private val preferences: KnowledgePreferencesDataStore,
     private val provider: KnowledgeProvider,
     datasets: List<KnowledgeDatasetConfig>,
     private val logRepository: FileLogRepository
 ) {
+    private val preferences = KnowledgePreferences(context)
     private val catalog = datasets.associateBy { it.stableId }
     private val jobs = mutableMapOf<String, Job>()
     private var scope: CoroutineScope? = null
@@ -51,7 +85,7 @@ class KnowledgeActions(
                         },
                         onFailure = { error ->
                             current.copy(
-                                status = KnowledgePackStatus.Download,
+                                status = KnowledgeReconciliationStatus.DOWNLOAD,
                                 enabled = false,
                                 errorMessage = error.message
                             )
@@ -70,9 +104,7 @@ class KnowledgeActions(
         val wasInstalled = state.value.knowledge.packs[stableId]?.activeIdentity != null
         updatePack(stableId) {
             it.copy(
-                isMutating = true,
-                progressPercent = 0,
-                progressLabel = "Starting download...",
+                mutationProgress = KnowledgeMutationProgress(0, "Starting download..."),
                 errorMessage = null
             )
         }
@@ -81,8 +113,10 @@ class KnowledgeActions(
                 val reconciliation = provider.download(dataset) { progress ->
                     updatePack(stableId) { current ->
                         current.copy(
-                            progressPercent = progress.percentage.toInt().coerceIn(0, 100),
-                            progressLabel = progress.label,
+                            mutationProgress = KnowledgeMutationProgress(
+                                progress.percentage.toInt().coerceIn(0, 100),
+                                progress.label
+                            )
                         )
                     }
                 }
@@ -98,9 +132,7 @@ class KnowledgeActions(
                 }
                 updatePack(stableId) {
                     it.fromReconciliation(reconciliation, enabled).copy(
-                        isMutating = false,
-                        progressPercent = null,
-                        progressLabel = null
+                        mutationProgress = null
                     )
                 }
             } catch (error: Throwable) {
@@ -109,9 +141,7 @@ class KnowledgeActions(
                     (reconciled?.let {
                         current.fromReconciliation(it, current.enabled)
                     } ?: current).copy(
-                        isMutating = false,
-                        progressPercent = null,
-                        progressLabel = null,
+                        mutationProgress = null,
                         errorMessage = error.message ?: "Knowledge pack setup failed"
                     )
                 }
@@ -136,9 +166,7 @@ class KnowledgeActions(
             ownerJob?.join()
             updatePack(stableId) { current ->
                 (result?.let { current.fromReconciliation(it, current.enabled) } ?: current).copy(
-                    isMutating = false,
-                    progressPercent = null,
-                    progressLabel = null
+                    mutationProgress = null
                 )
             }
         }
@@ -172,13 +200,28 @@ class KnowledgeActions(
         result: KnowledgeReconciliation,
         enabled: Boolean
     ): KnowledgePackState = copy(
-        status = when (result.status) {
-            KnowledgeReconciliationStatus.DOWNLOAD -> KnowledgePackStatus.Download
-            KnowledgeReconciliationStatus.READY -> KnowledgePackStatus.Ready
-            KnowledgeReconciliationStatus.UPDATE_AVAILABLE -> KnowledgePackStatus.UpdateAvailable
-        },
+        status = result.status,
         activeIdentity = result.activeIdentity,
         enabled = enabled && result.activeIdentity != null,
         errorMessage = null
     )
+}
+
+private class KnowledgePreferences(context: Context) {
+    private val preferences = context.applicationContext.knowledgePreferences
+
+    val enabledDatasetIds: Flow<Set<String>> = preferences.data.map { values ->
+        values[Keys.enabledDatasetIds].orEmpty()
+    }
+
+    suspend fun setDatasetEnabled(stableId: String, enabled: Boolean) {
+        preferences.edit { values ->
+            val ids = values[Keys.enabledDatasetIds].orEmpty()
+            values[Keys.enabledDatasetIds] = if (enabled) ids + stableId else ids - stableId
+        }
+    }
+
+    private object Keys {
+        val enabledDatasetIds = stringSetPreferencesKey("enabled_dataset_ids")
+    }
 }

@@ -21,7 +21,7 @@ pub struct ContextParams {
     pub n_batch: Option<i32>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug)]
 pub struct EmbeddingContextParams {
     pub context_size: u32,
     pub n_threads: Option<i32>,

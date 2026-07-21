@@ -5,12 +5,9 @@ use super::{Context, Error};
 
 impl Context {
     pub fn embed(&self, text: &str) -> Result<Vec<f32>, Error> {
-        let params = self
-            .embedding_params()
-            .ok_or(Error::Unsupported(
-                "Context is not configured for embeddings",
-            ))?
-            .clone();
+        let params = self.embedding_params().ok_or(Error::Unsupported(
+            "Context is not configured for embeddings",
+        ))?;
         if text.trim().is_empty() {
             return Err(Error::InvalidInput(
                 "embedding query must not be empty".to_string(),
@@ -18,6 +15,7 @@ impl Context {
         }
 
         let prompt = params.query_prompt.replacen("{query}", text, 1);
+        let (batch_size, source_dim, dim) = (params.batch_size, params.source_dim, params.dim);
         self.with_context_mut(|context| {
             let tokens = context
                 .model
@@ -34,7 +32,7 @@ impl Context {
             let token_count = u32::try_from(tokens.len()).map_err(|_| {
                 Error::InvalidInput("embedding prompt has too many tokens".to_string())
             })?;
-            if token_count > context.n_ctx() || token_count > params.batch_size {
+            if token_count > context.n_ctx() || token_count > batch_size {
                 return Err(Error::PromptTooLong {
                     tokens: tokens.len(),
                     context_size: context.n_ctx(),
@@ -62,7 +60,7 @@ impl Context {
                 op: "Failed to read pooled embedding",
                 message: err.to_string(),
             })?;
-            normalize_matryoshka(native, params.source_dim, params.dim)
+            normalize_matryoshka(native, source_dim, dim)
         })
     }
 }

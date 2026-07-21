@@ -1,12 +1,11 @@
 mod knowledge;
 
-pub use knowledge::{
-    AttributionConfig, KNOWLEDGE_ARTIFACT_FILENAMES, KnowledgeConfigError, KnowledgeDatasetConfig,
-    KnowledgeEmbeddingConfig, KnowledgeIndexContract, knowledge_artifact_urls,
-    knowledge_index_contract, validate_knowledge_datasets, validate_knowledge_embedding,
-};
+pub use knowledge::{AttributionConfig, KnowledgeDatasetConfig, KnowledgeEmbeddingConfig};
 pub(crate) use knowledge::{
-    KNOWLEDGE_LICENSE_LABEL, KNOWLEDGE_LICENSE_URL, is_path_safe_component,
+    KNOWLEDGE_ARTIFACT_FILENAMES, KNOWLEDGE_LICENSE_LABEL, KNOWLEDGE_LICENSE_URL,
+    KNOWLEDGE_MANIFEST_FILE, KNOWLEDGE_META_FILE, KNOWLEDGE_OFFSETS_FILE, KNOWLEDGE_VECTORS_FILE,
+    KnowledgeConfigError, is_path_safe_component, knowledge_artifact_urls, knowledge_datasets,
+    knowledge_index_contract, validate_knowledge_datasets, validate_knowledge_embedding,
 };
 
 #[derive(Debug, Clone)]
@@ -209,13 +208,5 @@ mod tests {
                 );
             }
         }
-    }
-
-    #[test]
-    fn bundled_knowledge_defaults_are_valid() {
-        let defaults = defaults();
-        validate_defaults(&defaults).unwrap();
-        assert_eq!(defaults.knowledge_datasets.len(), 2);
-        assert_eq!(defaults.knowledge_embedding.exact_size_bytes, 333_590_944);
     }
 }

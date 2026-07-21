@@ -25,7 +25,6 @@ data class ChatState(
     val isProcessingAttachments: Boolean = false,
     val transientAssistantError: String? = null,
     val transientAssistantParentId: String? = null,
-    val isModelDownloaded: Boolean = false,
     val requiredModelsReady: Boolean = false,
     val isModelStateKnown: Boolean = false,
     val modelDownloadSizeBytes: Long? = null,

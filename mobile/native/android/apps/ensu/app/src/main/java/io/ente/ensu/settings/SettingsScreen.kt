@@ -99,8 +99,8 @@ fun SettingsScreen(
                     title = "Terms and Conditions",
                     iconVector = Icons.Outlined.Description,
                     searchTerms = listOf(
-                        "Privacy Policy",
-                        "Ente Terms and Conditions",
+                        EnsuLegalDocuments.PRIVACY_TITLE,
+                        EnsuLegalDocuments.ENTE_TERMS_TITLE,
                         "Terms of Service"
                     ),
                     onClick = onOpenTerms

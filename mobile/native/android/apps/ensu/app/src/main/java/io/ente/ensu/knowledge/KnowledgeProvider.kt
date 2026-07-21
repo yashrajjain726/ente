@@ -47,10 +47,6 @@ class KnowledgeProvider(
     private val indexGate = Mutex()
     private val indexes = mutableMapOf<String, OpenIndex>()
 
-    init {
-        knowledgeRoot.mkdirs()
-    }
-
     suspend fun reconcile(dataset: KnowledgeDatasetConfig): KnowledgeReconciliation =
         lifecycleGate(dataset.stableId).withLock {
             val activeMutation = mutationGate.withLock { mutations[dataset.stableId] }
