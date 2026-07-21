@@ -28,6 +28,12 @@ const _socialControlsSize = 48.0;
 const _socialIconSize = 32.0;
 const _socialIconPadding = EdgeInsets.fromLTRB(12, 12, 4, 4);
 
+Duration _motionDuration(BuildContext context, int milliseconds) {
+  return MediaQuery.disableAnimationsOf(context)
+      ? Duration.zero
+      : Duration(milliseconds: milliseconds);
+}
+
 /// Social content for a file. The host owns placement and visibility effects.
 class FileSocialOverlay extends StatefulWidget {
   final EnteFile file;
@@ -394,23 +400,50 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
 
     final latestComment = _latestComment;
     final latestCommentAuthor = _latestCommentAuthor;
+    final latestCommentPill =
+        latestComment != null && latestCommentAuthor != null
+        ? Padding(
+            key: ValueKey(latestComment.id),
+            padding: const EdgeInsets.only(right: 4, bottom: 4),
+            child: _LatestCommentPill(
+              comment: latestComment,
+              author: latestCommentAuthor,
+              maxWidth: MediaQuery.sizeOf(context).width * 0.6,
+              currentUserID: widget.currentUserID!,
+              onTap: () => _openComments(comment: latestComment),
+            ),
+          )
+        : const SizedBox.shrink();
     return IgnorePointer(
       ignoring: _loadedFileID != widget.file.uploadedFileID,
       child: Row(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          if (latestComment != null && latestCommentAuthor != null)
-            Padding(
-              padding: const EdgeInsets.only(right: 4, bottom: 4),
-              child: _LatestCommentPill(
-                comment: latestComment,
-                author: latestCommentAuthor,
-                maxWidth: MediaQuery.sizeOf(context).width * 0.6,
-                currentUserID: widget.currentUserID!,
-                onTap: () => _openComments(comment: latestComment),
+          AnimatedSwitcher(
+            duration: _motionDuration(context, 220),
+            reverseDuration: _motionDuration(context, 160),
+            switchInCurve: Curves.easeOutCubic,
+            switchOutCurve: Curves.easeIn,
+            transitionBuilder: (child, animation) => FadeTransition(
+              opacity: animation,
+              child: ScaleTransition(
+                scale: Tween<double>(begin: 0.94, end: 1).animate(animation),
+                alignment: Alignment.bottomRight,
+                child: child,
               ),
             ),
+            layoutBuilder: (currentChild, previousChildren) => Stack(
+              // Right alignment keeps width changes from moving visible UI.
+              alignment: Alignment.bottomRight,
+              children: [
+                for (final child in previousChildren)
+                  IgnorePointer(child: child),
+                ?currentChild,
+              ],
+            ),
+            child: latestCommentPill,
+          ),
           Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -537,6 +570,7 @@ class _CommentBadgeIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final displayCount = count > 99 ? "99+" : count.toString();
     return Stack(
       clipBehavior: Clip.none,
       children: [
@@ -545,31 +579,55 @@ class _CommentBadgeIcon extends StatelessWidget {
           color: Colors.white,
           size: _socialIconSize,
         ),
-        if (count > 0)
-          Positioned(
-            right: -5,
-            top: -5,
-            child: Container(
-              constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
-              padding: const EdgeInsets.symmetric(horizontal: 6),
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.all(Radius.circular(19)),
-              ),
-              child: Center(
-                child: Text(
-                  count > 99 ? "99+" : count.toString(),
-                  style: const TextStyle(
-                    color: Colors.black,
-                    fontSize: 10,
-                    height: 1.2,
-                    fontWeight: FontWeight.w700,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
+        Positioned(
+          right: -5,
+          top: -5,
+          child: AnimatedSwitcher(
+            duration: _motionDuration(context, 160),
+            reverseDuration: _motionDuration(context, 120),
+            switchInCurve: Curves.easeOutCubic,
+            switchOutCurve: Curves.easeIn,
+            transitionBuilder: (child, animation) => FadeTransition(
+              opacity: animation,
+              child: ScaleTransition(
+                scale: Tween<double>(begin: 0.9, end: 1).animate(animation),
+                child: child,
               ),
             ),
+            child: count > 0
+                ? Container(
+                    key: const ValueKey(true),
+                    constraints: const BoxConstraints(
+                      minWidth: 18,
+                      minHeight: 18,
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 6),
+                    decoration: const BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.all(Radius.circular(19)),
+                    ),
+                    child: Center(
+                      child: AnimatedSwitcher(
+                        duration: _motionDuration(context, 120),
+                        switchInCurve: Curves.easeOut,
+                        switchOutCurve: Curves.easeIn,
+                        child: Text(
+                          displayCount,
+                          key: ValueKey(displayCount),
+                          style: const TextStyle(
+                            color: Colors.black,
+                            fontSize: 10,
+                            height: 1.2,
+                            fontWeight: FontWeight.w700,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
+                  )
+                : const SizedBox.shrink(key: ValueKey(false)),
           ),
+        ),
       ],
     );
   }
