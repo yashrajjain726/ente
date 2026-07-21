@@ -403,7 +403,7 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
     final latestCommentPill =
         latestComment != null && latestCommentAuthor != null
         ? Padding(
-            key: ValueKey(latestComment.id),
+            key: const ValueKey("latest-comment"),
             padding: const EdgeInsets.only(right: 4, bottom: 4),
             child: _LatestCommentPill(
               comment: latestComment,
@@ -505,12 +505,26 @@ class _LatestCommentPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final textStyle = component.TextStyles.mini.copyWith(color: Colors.black);
+    final textPainter = TextPainter(
+      text: TextSpan(text: comment.data, style: textStyle),
+      textDirection: Directionality.of(context),
+      textScaler: MediaQuery.textScalerOf(context),
+      maxLines: 1,
+      ellipsis: "…",
+    )..layout(maxWidth: maxWidth - 32);
+    final targetWidth = textPainter.width + 32;
+    textPainter.dispose();
+
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: onTap,
-      child: ConstrainedBox(
-        constraints: BoxConstraints(maxWidth: maxWidth),
+      child: AnimatedContainer(
+        duration: _motionDuration(context, 220),
+        curve: Curves.easeOutCubic,
+        width: targetWidth,
         child: Stack(
+          fit: StackFit.passthrough,
           clipBehavior: Clip.none,
           children: [
             DecoratedBox(
@@ -532,9 +546,7 @@ class _LatestCommentPill extends StatelessWidget {
                   comment.data,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: component.TextStyles.mini.copyWith(
-                    color: Colors.black,
-                  ),
+                  style: textStyle,
                 ),
               ),
             ),
