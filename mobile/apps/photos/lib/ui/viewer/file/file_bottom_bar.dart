@@ -168,9 +168,7 @@ class FileBottomBarState extends State<FileBottomBar> {
         ),
       );
 
-      // Add to album button for uploaded, non-hidden files
-      // Hide when in shared collection (moved to app bar popup menu)
-      if (widget.file.isUploaded && !isFileHidden && !isInSharedCollection) {
+      if (widget.file.isUploaded && !isFileHidden) {
         children.add(
           Tooltip(
             message: AppLocalizations.of(context).addToAlbum,

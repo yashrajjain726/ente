@@ -1,0 +1,1 @@
+- Show Add to album directly in the gallery viewer for shared photos.
