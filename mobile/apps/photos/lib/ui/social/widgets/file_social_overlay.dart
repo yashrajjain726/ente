@@ -61,6 +61,7 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
   int _commentCount = 0;
   Comment? _latestComment;
   User? _latestCommentAuthor;
+  int? _loadedFileID;
   int _latestRefreshID = 0;
   final _fileIDsWithReactionUpdateInProgress = <int>{};
 
@@ -74,12 +75,12 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
   void didUpdateWidget(covariant FileSocialOverlay oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.file.uploadedFileID != widget.file.uploadedFileID) {
-      _clearSocialState();
       unawaited(_refreshSocialState());
     }
   }
 
   void _clearSocialState() {
+    _loadedFileID = null;
     _hasEligibleSharedCollections = false;
     _hasLiked = false;
     _commentCount = 0;
@@ -171,15 +172,19 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
         _commentCount = commentCount;
         _latestComment = latestComment;
         _latestCommentAuthor = latestCommentAuthor;
+        _loadedFileID = fileID;
       });
       widget.onVisibilityChanged?.call(true);
     } catch (error, stackTrace) {
-      // Preserve last-good state; page changes clear state and visibility.
       _logger.warning(
         "Failed to refresh social overlay for file $fileID",
         error,
         stackTrace,
       );
+      if (_isCurrentSocialRefresh(refreshID) && _loadedFileID != fileID) {
+        setState(_clearSocialState);
+        widget.onVisibilityChanged?.call(false);
+      }
     }
   }
 
@@ -389,60 +394,63 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
 
     final latestComment = _latestComment;
     final latestCommentAuthor = _latestCommentAuthor;
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.end,
-      children: [
-        if (latestComment != null && latestCommentAuthor != null)
-          Padding(
-            padding: const EdgeInsets.only(right: 4, bottom: 4),
-            child: _LatestCommentPill(
-              comment: latestComment,
-              author: latestCommentAuthor,
-              maxWidth: MediaQuery.sizeOf(context).width * 0.6,
-              currentUserID: widget.currentUserID!,
-              onTap: () => _openComments(comment: latestComment),
+    return IgnorePointer(
+      ignoring: _loadedFileID != widget.file.uploadedFileID,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          if (latestComment != null && latestCommentAuthor != null)
+            Padding(
+              padding: const EdgeInsets.only(right: 4, bottom: 4),
+              child: _LatestCommentPill(
+                comment: latestComment,
+                author: latestCommentAuthor,
+                maxWidth: MediaQuery.sizeOf(context).width * 0.6,
+                currentUserID: widget.currentUserID!,
+                onTap: () => _openComments(comment: latestComment),
+              ),
             ),
-          ),
-        Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Tooltip(
-              message: AppLocalizations.of(context).like,
-              child: GestureDetector(
-                onLongPress: _showLikes,
-                child: SizedBox.square(
-                  dimension: _socialControlsSize,
-                  child: IconButton(
-                    padding: _socialIconPadding,
-                    style: IconButton.styleFrom(
-                      overlayColor: WidgetStateColor.transparent,
-                    ),
-                    onPressed: _toggleReaction,
-                    icon: Icon(
-                      _hasLiked ? EnteIcons.likeFilled : EnteIcons.likeStroke,
-                      color: _hasLiked ? _likedColor : Colors.white,
-                      size: _socialIconSize,
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Tooltip(
+                message: AppLocalizations.of(context).like,
+                child: GestureDetector(
+                  onLongPress: _showLikes,
+                  child: SizedBox.square(
+                    dimension: _socialControlsSize,
+                    child: IconButton(
+                      padding: _socialIconPadding,
+                      style: IconButton.styleFrom(
+                        overlayColor: WidgetStateColor.transparent,
+                      ),
+                      onPressed: _toggleReaction,
+                      icon: Icon(
+                        _hasLiked ? EnteIcons.likeFilled : EnteIcons.likeStroke,
+                        color: _hasLiked ? _likedColor : Colors.white,
+                        size: _socialIconSize,
+                      ),
                     ),
                   ),
                 ),
               ),
-            ),
-            const SizedBox(height: 8),
-            Tooltip(
-              message: AppLocalizations.of(context).comments,
-              child: SizedBox.square(
-                dimension: _socialControlsSize,
-                child: IconButton(
-                  padding: _socialIconPadding,
-                  onPressed: _openComments,
-                  icon: _CommentBadgeIcon(count: _commentCount),
+              const SizedBox(height: 8),
+              Tooltip(
+                message: AppLocalizations.of(context).comments,
+                child: SizedBox.square(
+                  dimension: _socialControlsSize,
+                  child: IconButton(
+                    padding: _socialIconPadding,
+                    onPressed: _openComments,
+                    icon: _CommentBadgeIcon(count: _commentCount),
+                  ),
                 ),
               ),
-            ),
-          ],
-        ),
-      ],
+            ],
+          ),
+        ],
+      ),
     );
   }
 }

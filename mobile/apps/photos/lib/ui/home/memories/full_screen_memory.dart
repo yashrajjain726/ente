@@ -579,7 +579,6 @@ class _FullScreenMemoryState extends State<FullScreenMemory> {
   void _onPageChange(FullScreenMemoryData inheritedData, int index) {
     if (!_isValidMemoryIndex(index, inheritedData.memories.length)) return;
     _isMediaZoomed = false;
-    _setSocialControlsVisible(false);
     isAtFirstOrLastFile = false;
     unawaited(
       memoriesCacheService.markMemoryAsSeen(
