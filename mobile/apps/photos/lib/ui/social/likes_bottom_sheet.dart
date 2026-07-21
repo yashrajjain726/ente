@@ -79,15 +79,17 @@ class _LikesBottomSheetState extends State<LikesBottomSheet> {
     _loadSharedCollections();
   }
 
+  bool _isOpenedFromHiddenCollection() => CollectionsService.instance
+      .getHiddenCollectionIds()
+      .contains(widget.initialCollectionID);
+
   Future<void> _loadSharedCollections() async {
     try {
       final sharedCollectionsList =
           widget.sharedCollections ??
           await CollectionsService.instance.getSharedCollectionsForFile(
             widget.fileID,
-            includeHidden: CollectionsService.instance
-                .getHiddenCollectionIds()
-                .contains(widget.initialCollectionID),
+            includeHidden: _isOpenedFromHiddenCollection(),
           );
 
       // Fetch like counts and thumbnails in parallel

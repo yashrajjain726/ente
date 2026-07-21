@@ -92,7 +92,7 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
     return mounted && refreshID == _latestRefreshID;
   }
 
-  bool get _includeHiddenCollections {
+  bool _isOpenedFromHiddenCollection() {
     final openingCollectionID = widget.openingCollectionID;
     return openingCollectionID != null &&
         CollectionsService.instance.getHiddenCollectionIds().contains(
@@ -116,7 +116,7 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
       final collectionIDs = await CollectionsService.instance
           .getSharedCollectionIDsForFile(
             fileID,
-            includeHidden: _includeHiddenCollections,
+            includeHidden: _isOpenedFromHiddenCollection(),
           );
       if (!_isCurrentSocialRefresh(refreshID)) {
         return;
@@ -204,7 +204,7 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
       final sharedCollections = await CollectionsService.instance
           .getSharedCollectionsForFile(
             fileID,
-            includeHidden: _includeHiddenCollections,
+            includeHidden: _isOpenedFromHiddenCollection(),
           );
       if (!mounted ||
           widget.file.uploadedFileID != fileID ||
@@ -307,7 +307,7 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
       final sharedCollections = await CollectionsService.instance
           .getSharedCollectionsForFile(
             fileID,
-            includeHidden: _includeHiddenCollections,
+            includeHidden: _isOpenedFromHiddenCollection(),
           );
       if (!mounted ||
           widget.file.uploadedFileID != fileID ||
@@ -334,7 +334,7 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
       final sharedCollections = await CollectionsService.instance
           .getSharedCollectionsForFile(
             fileID,
-            includeHidden: _includeHiddenCollections,
+            includeHidden: _isOpenedFromHiddenCollection(),
           );
       if (!mounted ||
           widget.file.uploadedFileID != fileID ||

@@ -211,14 +211,16 @@ class _FileCommentsBottomSheetState extends State<FileCommentsBottomSheet> {
     super.dispose();
   }
 
+  bool _isOpenedFromHiddenCollection() => CollectionsService.instance
+      .getHiddenCollectionIds()
+      .contains(widget.collectionID);
+
   Future<void> _loadSharedCollections() async {
     final sharedCollectionsList =
         widget.sharedCollections ??
         await CollectionsService.instance.getSharedCollectionsForFile(
           widget.fileID,
-          includeHidden: CollectionsService.instance
-              .getHiddenCollectionIds()
-              .contains(widget.collectionID),
+          includeHidden: _isOpenedFromHiddenCollection(),
         );
 
     // Fetch data in parallel
