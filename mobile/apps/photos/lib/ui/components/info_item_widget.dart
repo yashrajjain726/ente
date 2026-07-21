@@ -1,3 +1,5 @@
+import "dart:async";
+
 import "package:ente_components/ente_components.dart";
 import "package:flutter/material.dart";
 import "package:hugeicons/hugeicons.dart";
@@ -12,7 +14,7 @@ class InfoItemWidget extends StatelessWidget {
   final VoidCallback? editOnTap;
   final String? title;
   final Widget? endSection;
-  final Future<List<Widget>> subtitleSection;
+  final FutureOr<List<Widget>> subtitleSection;
   final bool hasChipButtons;
   final bool biggerSpinner;
   final VoidCallback? onTap;
@@ -52,34 +54,31 @@ class InfoItemWidget extends StatelessWidget {
 
     children.addAll([
       Flexible(
-        child: FutureBuilder(
-          future: subtitleSection,
-          builder: (context, snapshot) {
-            Widget child;
-            if (snapshot.hasData) {
-              final subtitle = snapshot.data as List<Widget>;
-              if (subtitle.isNotEmpty) {
-                child = Wrap(runSpacing: 8, spacing: 8, children: subtitle);
-              } else {
-                child = const SizedBox.shrink();
-              }
+        child: _buildSubtitleSection(context, (context, snapshot) {
+          Widget child;
+          if (snapshot.hasData) {
+            final subtitle = snapshot.data as List<Widget>;
+            if (subtitle.isNotEmpty) {
+              child = Wrap(runSpacing: 8, spacing: 8, children: subtitle);
             } else {
-              child = EnteLoadingWidget(
-                padding: biggerSpinner ? 6 : 3,
-                size: biggerSpinner ? 20 : 11,
-                color: getEnteColorScheme(context).strokeMuted,
-                alignment: biggerSpinner
-                    ? Alignment.center
-                    : Alignment.centerLeft,
-              );
+              child = const SizedBox.shrink();
             }
-            return AnimatedSwitcher(
-              duration: const Duration(milliseconds: 200),
-              switchInCurve: Curves.easeInOutExpo,
-              child: child,
+          } else {
+            child = EnteLoadingWidget(
+              padding: biggerSpinner ? 6 : 3,
+              size: biggerSpinner ? 20 : 11,
+              color: getEnteColorScheme(context).strokeMuted,
+              alignment: biggerSpinner
+                  ? Alignment.center
+                  : Alignment.centerLeft,
             );
-          },
-        ),
+          }
+          return AnimatedSwitcher(
+            duration: const Duration(milliseconds: 200),
+            switchInCurve: Curves.easeInOutExpo,
+            child: child,
+          );
+        }),
       ),
     ]);
 
@@ -183,38 +182,35 @@ class InfoItemWidget extends StatelessWidget {
                             ),
                             const SizedBox(height: Spacing.xs),
                           ],
-                          FutureBuilder<List<Widget>>(
-                            future: subtitleSection,
-                            builder: (context, snapshot) {
-                              final Widget child;
-                              if (snapshot.hasData) {
-                                final subtitle = snapshot.data!;
-                                child = subtitle.isEmpty
-                                    ? const SizedBox.shrink()
-                                    : Wrap(
-                                        runSpacing: Spacing.sm,
-                                        spacing: hasChipButtons
-                                            ? Spacing.sm
-                                            : Spacing.md,
-                                        children: subtitle,
-                                      );
-                              } else {
-                                child = EnteLoadingWidget(
-                                  padding: biggerSpinner ? 6 : 3,
-                                  size: biggerSpinner ? 20 : 11,
-                                  color: colors.strokeFaint,
-                                  alignment: biggerSpinner
-                                      ? Alignment.center
-                                      : Alignment.centerLeft,
-                                );
-                              }
-                              return AnimatedSwitcher(
-                                duration: const Duration(milliseconds: 200),
-                                switchInCurve: Curves.easeInOutExpo,
-                                child: child,
+                          _buildSubtitleSection(context, (context, snapshot) {
+                            final Widget child;
+                            if (snapshot.hasData) {
+                              final subtitle = snapshot.data!;
+                              child = subtitle.isEmpty
+                                  ? const SizedBox.shrink()
+                                  : Wrap(
+                                      runSpacing: Spacing.sm,
+                                      spacing: hasChipButtons
+                                          ? Spacing.sm
+                                          : Spacing.md,
+                                      children: subtitle,
+                                    );
+                            } else {
+                              child = EnteLoadingWidget(
+                                padding: biggerSpinner ? 6 : 3,
+                                size: biggerSpinner ? 20 : 11,
+                                color: colors.strokeFaint,
+                                alignment: biggerSpinner
+                                    ? Alignment.center
+                                    : Alignment.centerLeft,
                               );
-                            },
-                          ),
+                            }
+                            return AnimatedSwitcher(
+                              duration: const Duration(milliseconds: 200),
+                              switchInCurve: Curves.easeInOutExpo,
+                              child: child,
+                            );
+                          }),
                         ],
                       ),
                     ),
@@ -249,5 +245,20 @@ class InfoItemWidget extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  Widget _buildSubtitleSection(
+    BuildContext context,
+    AsyncWidgetBuilder<List<Widget>> builder,
+  ) {
+    final section = subtitleSection;
+    if (section is List<Widget>) {
+      return builder(
+        context,
+        AsyncSnapshot.withData(ConnectionState.done, section),
+      );
+    }
+
+    return FutureBuilder<List<Widget>>(future: section, builder: builder);
   }
 }

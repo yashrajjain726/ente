@@ -41,46 +41,22 @@ class BasicExifItemWidget extends StatelessWidget {
   }
 }
 
-class AllExifItemWidget extends StatefulWidget {
+class AllExifItemWidget extends StatelessWidget {
   final EnteFile file;
   final Map<String, IfdTag>? exif;
   const AllExifItemWidget(this.file, this.exif, {super.key});
 
   @override
-  State<AllExifItemWidget> createState() => _AllExifItemWidgetState();
-}
-
-class _AllExifItemWidgetState extends State<AllExifItemWidget> {
-  VoidCallback? _onTap;
-
-  @override
-  void initState() {
-    super.initState();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    return InfoItemWidget(
-      leadingIconWidget: const HugeIcon(icon: HugeIcons.strokeRoundedLicense),
-      title: AppLocalizations.of(context).exif,
-      subtitleSection: _exifButton(context, widget.file, widget.exif),
-      onTap: _onTap,
-      useMenuStyle: true,
-    );
-  }
-
-  Future<List<Widget>> _exifButton(
-    BuildContext context,
-    EnteFile file,
-    Map<String, IfdTag>? exif,
-  ) async {
+    final l10n = AppLocalizations.of(context);
+    final currentExif = exif;
     late final String label;
     late final VoidCallback? onTap;
-    if (exif == null) {
-      label = AppLocalizations.of(context).loadingExifData;
+    if (currentExif == null) {
+      label = l10n.loadingExifData;
       onTap = null;
-    } else if (exif.isNotEmpty) {
-      label = AppLocalizations.of(context).viewAllExifData;
+    } else if (currentExif.isNotEmpty) {
+      label = l10n.viewAllExifData;
       onTap = () => showDialog(
         useRootNavigator: false,
         context: context,
@@ -90,17 +66,18 @@ class _AllExifItemWidgetState extends State<AllExifItemWidget> {
         barrierColor: backdropFaintDark,
       );
     } else {
-      label = AppLocalizations.of(context).noExifData;
-      onTap = () => showShortToast(
-        context,
-        AppLocalizations.of(context).thisImageHasNoExifData,
-      );
+      label = l10n.noExifData;
+      onTap = () => showShortToast(context, l10n.thisImageHasNoExifData);
     }
-    setState(() {
-      _onTap = onTap;
-    });
-    return Future.value([
-      Text(label, style: getEnteTextTheme(context).miniBoldMuted),
-    ]);
+
+    return InfoItemWidget(
+      leadingIconWidget: const HugeIcon(icon: HugeIcons.strokeRoundedLicense),
+      title: l10n.exif,
+      subtitleSection: [
+        Text(label, style: getEnteTextTheme(context).miniBoldMuted),
+      ],
+      onTap: onTap,
+      useMenuStyle: true,
+    );
   }
 }
