@@ -1,3 +1,4 @@
+import "package:ente_components/ente_components.dart";
 import "package:ente_crypto/ente_crypto.dart";
 import "package:flutter/material.dart";
 import "package:hugeicons/hugeicons.dart";
@@ -14,6 +15,7 @@ import "package:photos/ui/components/settings/settings_grouped_card.dart";
 import "package:photos/ui/components/toggle_switch_widget.dart";
 import "package:photos/ui/home/christmas/christmas_utils.dart";
 import "package:photos/ui/notification/toast.dart";
+import "package:photos/ui/notification/update/change_log_page.dart";
 import "package:photos/ui/settings/debug/social_debug_screen.dart";
 
 class DebugSettingsPage extends StatefulWidget {
@@ -225,6 +227,21 @@ class _DebugSettingsPageState extends State<DebugSettingsPage> {
                               await updateService.resetChangeLog();
                               if (!context.mounted) return;
                               _showKeyAttributesDialog(context);
+                            },
+                          ),
+                          MenuItemWidgetNew(
+                            title: "Show change log",
+                            leadingIconWidget: _buildIconWidget(
+                              context,
+                              HugeIcons.strokeRoundedInformationCircle,
+                            ),
+                            trailingIcon: Icons.chevron_right_outlined,
+                            trailingIconIsMuted: true,
+                            onTap: () async {
+                              await showBottomSheetComponent<void>(
+                                context: context,
+                                builder: (context) => const ChangeLogPage(),
+                              );
                             },
                           ),
                           MenuItemWidgetNew(
