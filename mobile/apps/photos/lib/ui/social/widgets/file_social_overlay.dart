@@ -27,9 +27,9 @@ const _likedColor = Color(0xFF08C225);
 const _socialControlsSize = 48.0;
 const _socialIconSize = 24.0;
 const _socialIconPadding = EdgeInsets.all(12);
-const _socialIconShadows = [Shadow(color: Color(0x33000000), blurRadius: 16)];
+const _socialIconShadows = [Shadow(color: Color(0x26000000), blurRadius: 12)];
 const _countBadgeShadows = [
-  BoxShadow(color: Color(0x33000000), blurRadius: 16),
+  BoxShadow(color: Color(0x1F000000), blurRadius: 4),
 ];
 const _latestCommentShadows = [
   BoxShadow(color: Color(0x14000000), blurRadius: 4),
@@ -635,8 +635,8 @@ class _CommentBadgeIcon extends StatelessWidget {
           shadows: _socialIconShadows,
         ),
         Positioned(
-          right: -5,
-          top: -5,
+          right: -7,
+          top: -7,
           child: AnimatedSwitcher(
             duration: _motionDuration(context, 160),
             reverseDuration: _motionDuration(context, 120),
