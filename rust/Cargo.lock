@@ -2424,7 +2424,6 @@ dependencies = [
 name = "ente-photos"
 version = "0.0.0"
 dependencies = [
- "android_system_properties",
  "anyhow",
  "ente-image",
  "fast_image_resize",

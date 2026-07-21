@@ -9,3 +9,4 @@ mod preprocess;
 pub mod runtime;
 pub mod types;
 pub mod vector_db;
+mod webgpu;

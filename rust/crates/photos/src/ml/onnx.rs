@@ -22,43 +22,12 @@ use ort::ep::{
 };
 #[cfg(target_os = "android")]
 use std::num::NonZeroUsize;
-#[cfg(target_os = "android")]
-use std::sync::{
-    OnceLock,
-    atomic::{AtomicBool, Ordering},
-};
 
 use crate::ml::error::{MlError, MlResult};
-
-/// WebGPU is opt-in while the custom Android ONNX Runtime build is being
-/// validated: the app currently enables it for internal users only.
 #[cfg(target_os = "android")]
-static WEBGPU_ENABLED: AtomicBool = AtomicBool::new(false);
-
-pub(crate) fn set_webgpu_enabled(enabled: bool) {
-    #[cfg(target_os = "android")]
-    WEBGPU_ENABLED.store(enabled, Ordering::Relaxed);
-    #[cfg(not(target_os = "android"))]
-    let _ = enabled;
-}
-
+use crate::ml::webgpu;
 #[cfg(target_os = "android")]
-fn webgpu_allowed() -> bool {
-    WEBGPU_ENABLED.load(Ordering::Relaxed) && android_supports_webgpu()
-}
-
-/// Dawn's Vulkan backend is only trusted on Android 12+ (SDK 31). This fails
-/// closed: if the SDK level cannot be read, WebGPU stays disabled.
-#[cfg(target_os = "android")]
-fn android_supports_webgpu() -> bool {
-    static SDK_AT_LEAST_31: OnceLock<bool> = OnceLock::new();
-    *SDK_AT_LEAST_31.get_or_init(|| {
-        android_system_properties::AndroidSystemProperties::new()
-            .get("ro.build.version.sdk")
-            .and_then(|value| value.trim().parse::<u32>().ok())
-            .is_some_and(|sdk| sdk >= 31)
-    })
-}
+use ort::session::SessionInputValue;
 
 #[cfg(any(target_os = "ios", test))]
 const COREML_CACHE_SCHEMA: &str = "ort-1_27-mlprogram-all-default-v1";
@@ -151,6 +120,20 @@ pub(crate) fn build_session(
 
     let mut errors = Vec::new();
     for attempt in attempts {
+        if attempt.uses_webgpu {
+            #[cfg(target_os = "android")]
+            {
+                match build_webgpu_session_with_canary(model_path, coreml_cache_namespace, attempt)
+                {
+                    Ok(session) => return Ok(session),
+                    Err(error) => errors.push(format!("{error}")),
+                }
+                continue;
+            }
+            #[cfg(not(target_os = "android"))]
+            unreachable!("WebGPU provider attempts are only constructed on Android");
+        }
+
         let coreml_cache_dir = attempt.coreml_cache_dir.clone();
         match build_session_with_providers(model_path, attempt) {
             Ok(session) => {
@@ -188,6 +171,72 @@ pub(crate) fn build_session(
     )))
 }
 
+/// Builds the WebGPU session under the durable crash canary. The canary is
+/// armed before session construction and only disarmed after the session has
+/// survived one warm-up inference, so a driver crash anywhere in between is
+/// recorded on disk. Soft failures return an error with the canary left armed
+/// (the drop keeps the counted attempt), and the caller falls through to the
+/// next execution provider.
+#[cfg(target_os = "android")]
+fn build_webgpu_session_with_canary(
+    model_path: &str,
+    model_namespace: &str,
+    attempt: ProviderAttempt,
+) -> MlResult<Session> {
+    // Fail closed: without a durable failure record, a crash during the
+    // attempt would go unnoticed and the crash loop protection would be lost.
+    let canary = webgpu::arm_canary(model_path, model_namespace)
+        .map_err(|error| MlError::Ort(format!("failed to arm WebGPU crash canary: {error}")))?;
+    let mut session = build_session_with_providers(model_path, attempt)?;
+    warmup_session(&mut session)?;
+    canary.disarm();
+    Ok(session)
+}
+
+/// Runs one zeroed inference so that lazy provider work (pipeline creation,
+/// first dispatch) happens inside the crash-canary window, and so that the
+/// first real inference is not paying the warm-up cost. Output values are
+/// irrelevant; only whether the run crashes or errors matters.
+#[cfg(target_os = "android")]
+fn warmup_session(session: &mut Session) -> MlResult<()> {
+    let mut input_specs = Vec::new();
+    for input in session.inputs() {
+        let ValueType::Tensor { ty, shape, .. } = input.dtype() else {
+            // Unsupported input kind: skip the warm-up; the canary then only
+            // covers session construction for this model.
+            return Ok(());
+        };
+        // Our models have static shapes; substitute 1 for any dynamic
+        // dimension defensively.
+        let dims: Vec<i64> = shape.iter().map(|&dim| dim.max(1)).collect();
+        input_specs.push((input.name().to_string(), *ty, dims));
+    }
+
+    let mut inputs: Vec<(String, SessionInputValue<'_>)> = Vec::new();
+    for (name, ty, dims) in input_specs {
+        let element_count = dims.iter().product::<i64>() as usize;
+        let value: SessionInputValue<'_> = match ty {
+            TensorElementType::Float32 => {
+                Tensor::<f32>::from_array((dims, vec![0.0f32; element_count]))?.into()
+            }
+            TensorElementType::Float16 => {
+                Tensor::<half::f16>::from_array((dims, vec![half::f16::ZERO; element_count]))?
+                    .into()
+            }
+            TensorElementType::Int32 => {
+                Tensor::<i32>::from_array((dims, vec![0i32; element_count]))?.into()
+            }
+            TensorElementType::Int64 => {
+                Tensor::<i64>::from_array((dims, vec![0i64; element_count]))?.into()
+            }
+            _ => return Ok(()),
+        };
+        inputs.push((name, value));
+    }
+    session.run(inputs)?;
+    Ok(())
+}
+
 fn has_protobuf_parse_failure(errors: &[String]) -> bool {
     errors.iter().any(|error| {
         error
@@ -200,6 +249,7 @@ struct ProviderAttempt {
     providers: Vec<ExecutionProviderDispatch>,
     disable_intra_op_spinning: bool,
     coreml_cache_dir: Option<PathBuf>,
+    uses_webgpu: bool,
 }
 
 impl ProviderAttempt {
@@ -208,6 +258,7 @@ impl ProviderAttempt {
             providers: vec![CPU::default().with_arena_allocator(true).build()],
             disable_intra_op_spinning: false,
             coreml_cache_dir: None,
+            uses_webgpu: false,
         }
     }
 }
@@ -241,6 +292,7 @@ fn platform_default_attempts(
             ],
             disable_intra_op_spinning: false,
             coreml_cache_dir,
+            uses_webgpu: false,
         },
         ProviderAttempt::cpu_only(),
     ]
@@ -274,11 +326,11 @@ fn coreml_provider(
 
 #[cfg(target_os = "android")]
 fn platform_default_attempts(
-    _model_path: &str,
+    model_path: &str,
     _coreml_cache_namespace: &str,
 ) -> Vec<ProviderAttempt> {
     let mut attempts = Vec::new();
-    if webgpu_allowed() {
+    if webgpu::attempt_permitted(model_path) {
         attempts.push(ProviderAttempt {
             // EP priority follows registration order. Unsupported WebGPU nodes
             // fall through to XNNPACK and then CPU in the same session.
@@ -289,6 +341,7 @@ fn platform_default_attempts(
             ],
             disable_intra_op_spinning: true,
             coreml_cache_dir: None,
+            uses_webgpu: true,
         });
     }
     // Clean-session fallbacks for provider or driver failures that prevent
@@ -452,6 +505,7 @@ fn xnnpack_attempt() -> ProviderAttempt {
         ],
         disable_intra_op_spinning: true,
         coreml_cache_dir: None,
+        uses_webgpu: false,
     }
 }
 

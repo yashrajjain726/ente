@@ -5,6 +5,7 @@ import "package:photos/services/machine_learning/ml_model_assets.dart";
 import "package:photos/services/machine_learning/ml_model_download_service.dart";
 import "package:photos/services/machine_learning/ml_models_overview.dart";
 import "package:photos/services/machine_learning/ml_result.dart";
+import "package:photos/services/machine_learning/webgpu_execution_policy.dart";
 import "package:photos/services/remote_assets_service.dart";
 import "package:photos/utils/isolate/isolate_operations.dart";
 import "package:photos/utils/isolate/super_isolate.dart";
@@ -47,6 +48,7 @@ class MLIndexingIsolate extends SuperIsolate {
   ) async {
     try {
       final rustRuntimeArgs = await _getCachedRustRuntimeArgs();
+      final enableWebGpu = await webGpuExecutionPolicy.isEligible();
       _logger.info("Analyzing image ${instruction.fileKey} with Rust ML");
 
       final isolateResult = await runInIsolate(IsolateOperation.analyzeImage, {
@@ -56,6 +58,7 @@ class MLIndexingIsolate extends SuperIsolate {
         "runClip": instruction.shouldRunClip,
         "runPets": instruction.shouldRunPets,
         ...rustRuntimeArgs,
+        "enableWebGpu": enableWebGpu,
       });
       if (isolateResult is RustCorruptModelCacheDeletedException) {
         _logger.warning(
@@ -176,9 +179,9 @@ class MLIndexingIsolate extends SuperIsolate {
     }
 
     return {
-      // WebGPU is only enabled for internal users while the custom Android
-      // ONNX Runtime build is being validated. Ignored on other platforms.
-      "enableWebGpu": flagService.webGPUEnabled,
+      // Sessions are lazy, so the inference call re-evaluates this app-side
+      // policy before Rust applies its own durable crash canary.
+      "enableWebGpu": await webGpuExecutionPolicy.isEligible(),
       "faceDetectionModelPath": faceDetectionPath,
       "faceEmbeddingModelPath": faceEmbeddingPath,
       "clipImageModelPath": clipImagePath,

@@ -12,7 +12,7 @@ use crate::ml::{
 };
 
 /// Log to Android logcat or stderr.
-fn rt_log(msg: &str) {
+pub(crate) fn rt_log(msg: &str) {
     #[cfg(target_os = "android")]
     {
         unsafe extern "C" {

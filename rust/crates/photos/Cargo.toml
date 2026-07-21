@@ -39,8 +39,6 @@ ort = { workspace = true, features = [
 ] }
 
 [target.'cfg(target_os = "android")'.dependencies]
-# Used to gate the WebGPU execution provider to Android 12+ (SDK 31).
-android_system_properties = "0.1.5"
 ort = { workspace = true, features = [
     "ndarray",
     "half",

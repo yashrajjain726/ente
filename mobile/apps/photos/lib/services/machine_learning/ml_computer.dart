@@ -6,11 +6,11 @@ import "package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart"
 import "package:logging/logging.dart";
 import "package:photos/core/errors.dart";
 import "package:photos/models/ml/vector.dart";
-import "package:photos/service_locator.dart" show flagService;
 import "package:photos/services/machine_learning/ml_constants.dart";
 import "package:photos/services/machine_learning/ml_model_assets.dart";
 import "package:photos/services/machine_learning/ml_model_download_service.dart";
 import "package:photos/services/machine_learning/semantic_search/query_result.dart";
+import "package:photos/services/machine_learning/webgpu_execution_policy.dart";
 import "package:photos/services/remote_assets_service.dart";
 import "package:photos/utils/isolate/isolate_operations.dart";
 import "package:photos/utils/isolate/super_isolate.dart";
@@ -83,14 +83,12 @@ class MLComputer extends SuperIsolate {
           "RustMLMissingModelPath: Missing required model path: clipTextVocabPath",
         );
       }
+      final enableWebGpu = await webGpuExecutionPolicy.isEligible();
       final isolateResult = await runInIsolate(IsolateOperation.runClipText, {
         "text": query,
         "clipTextModelPath": modelPath,
         "clipTextVocabPath": vocabPath,
-        // Keep in sync with MLIndexingIsolate: WebGPU is only enabled for
-        // internal users while the custom Android ONNX Runtime build is
-        // being validated. Ignored on other platforms.
-        "enableWebGpu": flagService.webGPUEnabled,
+        "enableWebGpu": enableWebGpu,
       });
       if (isolateResult is RustCorruptModelCacheDeletedException) {
         _clipTextModelPath = null;
