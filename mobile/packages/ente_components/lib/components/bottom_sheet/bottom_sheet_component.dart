@@ -118,7 +118,6 @@ class BottomSheetComponent extends StatelessWidget {
     this.actionsTopSpacing,
     this.backgroundColor,
     this.borderSide,
-    this.useSafeArea = true,
     this.isKeyboardAware = false,
     this.isScrollable = false,
     this.initialChildSize = 0.5,
@@ -150,12 +149,6 @@ class BottomSheetComponent extends StatelessWidget {
   /// Optional outline for sheet designs that specify a bordered surface.
   /// Source: https://www.figma.com/design/BuBNPPytxlVnqfmCUW0mgz/Ente-Visual-Design?node-id=4809-8027&m=dev
   final BorderSide? borderSide;
-
-  /// Whether to add the device's bottom safe-area inset inside the sheet.
-  /// Fixed-format sheets can opt out when their designed bottom padding keeps
-  /// actions clear of the home indicator.
-  /// Source: https://www.figma.com/design/BuBNPPytxlVnqfmCUW0mgz/Ente-Visual-Design?node-id=18629-312441&m=dev
-  final bool useSafeArea;
 
   final bool isKeyboardAware;
   final bool isScrollable;
@@ -251,9 +244,7 @@ class BottomSheetComponent extends StatelessWidget {
             ),
           );
 
-    final safeAreaBody = useSafeArea
-        ? SafeArea(top: false, child: sheetBody)
-        : sheetBody;
+    final safeAreaBody = SafeArea(top: false, child: sheetBody);
     final outlinedBody = borderSide == null
         ? safeAreaBody
         : DecoratedBox(

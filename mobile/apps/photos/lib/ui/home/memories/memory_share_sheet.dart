@@ -108,7 +108,6 @@ class _MemoryShareSelectionSheetState
             child: _buildHeader(context, l10n),
           ),
           showCloseButton: false,
-          useSafeArea: false,
           padding: const EdgeInsets.symmetric(vertical: Spacing.xl),
           borderSide: BorderSide(color: colors.strokeDark),
           content: Expanded(
