@@ -411,11 +411,21 @@ where
         &self,
         params: ChangePasswordParams,
     ) -> Result<ChangePasswordResult> {
+        self.change_password_with_strength(params, KeyDerivationStrength::Sensitive)
+            .await
+    }
+
+    async fn change_password_with_strength(
+        &self,
+        params: ChangePasswordParams,
+        key_derivation_strength: KeyDerivationStrength,
+    ) -> Result<ChangePasswordResult> {
         let (updated_key_attributes_core, login_key) =
-            auth::generate_key_attributes_for_new_password(
+            auth::generate_key_attributes_for_new_password_with_strength(
                 &params.master_key,
                 &to_core_key_attributes(&params.key_attributes),
                 &params.password,
+                key_derivation_strength,
             )?;
 
         let updated_key_attributes = to_api_key_attributes(&updated_key_attributes_core);
@@ -2159,13 +2169,16 @@ mod tests {
         let flow = AuthFlow::new(&client, &mut ui);
 
         let result = flow
-            .change_password(ChangePasswordParams {
-                email: "user@example.org".into(),
-                password: Zeroizing::new("new-password".into()),
-                master_key: SecretVec::new(master_key),
-                key_attributes,
-                log_out_other_devices: true,
-            })
+            .change_password_with_strength(
+                ChangePasswordParams {
+                    email: "user@example.org".into(),
+                    password: Zeroizing::new("new-password".into()),
+                    master_key: SecretVec::new(master_key),
+                    key_attributes,
+                    log_out_other_devices: true,
+                },
+                KeyDerivationStrength::Interactive,
+            )
             .await
             .unwrap();
 
