@@ -39,7 +39,7 @@ import 'package:photos/ui/viewer/gallery/gallery.dart';
 import 'package:photos/utils/dialog_util.dart';
 
 const _socialRightInset = 24.0;
-const _socialBottomBarClearance = 74.0;
+const _socialBottomBarClearance = 154.0;
 
 enum DetailPageMode { minimalistic, full }
 
