@@ -403,17 +403,20 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
         latestComment != null && latestCommentAuthor != null
         ? Padding(
             key: const ValueKey("latest-comment"),
-            padding: const EdgeInsets.only(right: 4, bottom: 4),
-            child: _LatestCommentPill(
-              comment: latestComment,
-              author: latestCommentAuthor,
-              width: _latestCommentPillWidth(
-                context,
-                latestComment.data,
-                MediaQuery.sizeOf(context).width * 0.6,
+            padding: const EdgeInsets.only(right: 4),
+            child: Transform.translate(
+              offset: const Offset(0, 8),
+              child: _LatestCommentPill(
+                comment: latestComment,
+                author: latestCommentAuthor,
+                width: _latestCommentPillWidth(
+                  context,
+                  latestComment.data,
+                  MediaQuery.sizeOf(context).width * 0.6,
+                ),
+                currentUserID: widget.currentUserID!,
+                onTap: () => _openComments(comment: latestComment),
               ),
-              currentUserID: widget.currentUserID!,
-              onTap: () => _openComments(comment: latestComment),
             ),
           )
         : const SizedBox.shrink();
@@ -427,23 +430,13 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
             duration: _motionDuration(context, 220),
             reverseDuration: Duration.zero,
             switchInCurve: Curves.easeOutCubic,
-            switchOutCurve: Curves.easeIn,
             transitionBuilder: (child, animation) => FadeTransition(
               opacity: animation,
               child: ScaleTransition(
                 scale: Tween<double>(begin: 0.94, end: 1).animate(animation),
-                alignment: Alignment.bottomRight,
+                alignment: Alignment.topRight,
                 child: child,
               ),
-            ),
-            layoutBuilder: (currentChild, previousChildren) => Stack(
-              // Right alignment keeps width changes from moving visible UI.
-              alignment: Alignment.bottomRight,
-              children: [
-                for (final child in previousChildren)
-                  IgnorePointer(child: child),
-                ?currentChild,
-              ],
             ),
             child: latestCommentPill,
           ),
