@@ -407,7 +407,11 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
             child: _LatestCommentPill(
               comment: latestComment,
               author: latestCommentAuthor,
-              maxWidth: MediaQuery.sizeOf(context).width * 0.6,
+              width: _latestCommentPillWidth(
+                context,
+                latestComment.data,
+                MediaQuery.sizeOf(context).width * 0.6,
+              ),
               currentUserID: widget.currentUserID!,
               onTap: () => _openComments(comment: latestComment),
             ),
@@ -487,88 +491,128 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
   }
 }
 
-class _LatestCommentPill extends StatelessWidget {
+double _latestCommentPillWidth(
+  BuildContext context,
+  String comment,
+  double maxWidth,
+) {
+  final textPainter = TextPainter(
+    text: TextSpan(
+      text: comment,
+      style: component.TextStyles.mini.copyWith(color: Colors.black),
+    ),
+    textDirection: Directionality.of(context),
+    textScaler: MediaQuery.textScalerOf(context),
+    maxLines: 1,
+    ellipsis: "…",
+  )..layout(maxWidth: maxWidth - 32);
+  final width = textPainter.width + 32;
+  textPainter.dispose();
+  return width;
+}
+
+class _LatestCommentPill extends StatefulWidget {
   final Comment comment;
   final User author;
-  final double maxWidth;
+  final double width;
   final int currentUserID;
   final VoidCallback onTap;
 
   const _LatestCommentPill({
     required this.comment,
     required this.author,
-    required this.maxWidth,
+    required this.width,
     required this.currentUserID,
     required this.onTap,
   });
 
   @override
+  State<_LatestCommentPill> createState() => _LatestCommentPillState();
+}
+
+class _LatestCommentPillState extends State<_LatestCommentPill> {
+  bool _showText = true;
+
+  @override
+  void didUpdateWidget(_LatestCommentPill oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.comment.id != widget.comment.id ||
+        oldWidget.comment.data != widget.comment.data) {
+      _showText = oldWidget.width == widget.width;
+    }
+  }
+
+  void _showTextAfterResize() {
+    if (!_showText) {
+      setState(() => _showText = true);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final textStyle = component.TextStyles.mini.copyWith(color: Colors.black);
-    final textPainter = TextPainter(
-      text: TextSpan(text: comment.data, style: textStyle),
-      textDirection: Directionality.of(context),
-      textScaler: MediaQuery.textScalerOf(context),
-      maxLines: 1,
-      ellipsis: "…",
-    )..layout(maxWidth: maxWidth - 32);
-    final targetWidth = textPainter.width + 32;
-    textPainter.dispose();
 
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: _motionDuration(context, 220),
-        curve: Curves.easeOutCubic,
-        width: targetWidth,
-        child: Stack(
-          fit: StackFit.passthrough,
-          clipBehavior: Clip.none,
-          children: [
-            DecoratedBox(
+      onTap: widget.onTap,
+      child: Stack(
+        fit: StackFit.passthrough,
+        clipBehavior: Clip.none,
+        children: [
+          DecoratedBox(
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.only(
+                topLeft: Radius.circular(20),
+                topRight: Radius.circular(6),
+                bottomLeft: Radius.circular(20),
+                bottomRight: Radius.circular(20),
+              ),
+            ),
+            child: AnimatedSize(
+              duration: _motionDuration(context, 220),
+              curve: Curves.easeOutExpo,
+              alignment: Alignment.bottomRight,
+              onEnd: _showTextAfterResize,
+              child: SizedBox(
+                width: widget.width,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
+                  child: Opacity(
+                    opacity: _showText ? 1 : 0,
+                    child: Text(
+                      widget.comment.data,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: textStyle,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            left: -3,
+            top: -6,
+            child: Container(
+              width: 22,
+              height: 22,
+              padding: const EdgeInsets.all(1),
               decoration: const BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.only(
-                  topLeft: Radius.circular(20),
-                  topRight: Radius.circular(6),
-                  bottomLeft: Radius.circular(20),
-                  bottomRight: Radius.circular(20),
-                ),
+                shape: BoxShape.circle,
               ),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 12,
-                ),
-                child: Text(
-                  comment.data,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: textStyle,
-                ),
+              child: UserAvatarWidget(
+                widget.author,
+                type: AvatarType.small,
+                currentUserID: widget.currentUserID,
               ),
             ),
-            Positioned(
-              left: -3,
-              top: -6,
-              child: Container(
-                width: 22,
-                height: 22,
-                padding: const EdgeInsets.all(1),
-                decoration: const BoxDecoration(
-                  color: Colors.white,
-                  shape: BoxShape.circle,
-                ),
-                child: UserAvatarWidget(
-                  author,
-                  type: AvatarType.small,
-                  currentUserID: currentUserID,
-                ),
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
