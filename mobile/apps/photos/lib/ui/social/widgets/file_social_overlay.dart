@@ -376,7 +376,6 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
         context,
         collectionID: initialCollection.id,
         fileID: fileID,
-        highlightCommentID: commentCollection == null ? null : comment?.id,
         sharedCollections: sharedCollections,
       );
     });
