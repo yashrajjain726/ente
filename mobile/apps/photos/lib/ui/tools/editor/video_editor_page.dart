@@ -579,8 +579,8 @@ class _VideoEditorPageState extends State<VideoEditorPage> {
           if (assetEntity != null) {
             final latLong = await assetEntity.latlngAsync();
             newFile.location = Location(
-              latitude: latLong.latitude,
-              longitude: latLong.longitude,
+              latitude: latLong?.latitude,
+              longitude: latLong?.longitude,
             );
           }
         }

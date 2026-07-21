@@ -152,8 +152,8 @@ class OfflineImportMetadataService {
       if (asset != null) {
         final latLong = await asset.latlngAsync();
         file.location = Location(
-          latitude: latLong.latitude,
-          longitude: latLong.longitude,
+          latitude: latLong?.latitude,
+          longitude: latLong?.longitude,
         );
       }
     }

@@ -275,8 +275,8 @@ Future<void> _decorateEnteFileData(
       (file.location!.latitude == 0 && file.location!.longitude == 0)) {
     final latLong = await asset.latlngAsync();
     file.location = Location(
-      latitude: latLong.latitude,
-      longitude: latLong.longitude,
+      latitude: latLong?.latitude,
+      longitude: latLong?.longitude,
     );
   }
   await updateLocationFromEmbeddedMetadata(file, sourceFile, exifData);
