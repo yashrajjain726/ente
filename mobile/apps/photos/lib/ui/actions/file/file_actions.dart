@@ -162,7 +162,8 @@ class _DraggableDetailsSheetState extends State<_DraggableDetailsSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final disableSnap = _isExpanded;
+    final isKeyboardOpen = MediaQuery.of(context).viewInsets.bottom > 60;
+    final disableSnap = isKeyboardOpen || _isExpanded;
     return DraggableScrollableSheet(
       controller: _sheetController,
       initialChildSize: disableSnap ? 0.95 : 0.75,
