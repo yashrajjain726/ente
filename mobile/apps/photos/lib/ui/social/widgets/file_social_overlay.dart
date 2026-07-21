@@ -25,8 +25,8 @@ final _logger = Logger("FileSocialOverlay");
 
 const _likedColor = Color(0xFF08C225);
 const _socialControlsSize = 48.0;
-const _socialIconSize = 32.0;
-const _socialIconPadding = EdgeInsets.fromLTRB(12, 12, 4, 4);
+const _socialIconSize = 24.0;
+const _socialIconPadding = EdgeInsets.all(12);
 const _socialIconShadows = [Shadow(color: Color(0x33000000), blurRadius: 16)];
 const _countBadgeShadows = [
   BoxShadow(color: Color(0x33000000), blurRadius: 16),
@@ -408,22 +408,19 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
     final latestCommentAuthor = _latestCommentAuthor;
     final latestCommentPill =
         latestComment != null && latestCommentAuthor != null
-        ? Padding(
+        ? Transform.translate(
             key: const ValueKey("latest-comment"),
-            padding: const EdgeInsets.only(right: 4),
-            child: Transform.translate(
-              offset: const Offset(0, 8),
-              child: _LatestCommentPill(
-                comment: latestComment,
-                author: latestCommentAuthor,
-                width: _latestCommentPillWidth(
-                  context,
-                  latestComment.data,
-                  MediaQuery.sizeOf(context).width * 0.6,
-                ),
-                currentUserID: widget.currentUserID!,
-                onTap: () => _openComments(comment: latestComment),
+            offset: const Offset(0, 8),
+            child: _LatestCommentPill(
+              comment: latestComment,
+              author: latestCommentAuthor,
+              width: _latestCommentPillWidth(
+                context,
+                latestComment.data,
+                MediaQuery.sizeOf(context).width * 0.6,
               ),
+              currentUserID: widget.currentUserID!,
+              onTap: () => _openComments(comment: latestComment),
             ),
           )
         : const SizedBox.shrink();

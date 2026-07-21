@@ -1,0 +1,1 @@
+- Align social controls and comment badges with the memories viewer design.
