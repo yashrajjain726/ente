@@ -11,7 +11,7 @@ struct DownloadOnboardingView: View {
 
     var body: some View {
         VStack(spacing: EnsuSpacing.md) {
-            Text("Download to begin using the Chat")
+            Text("Download models to begin using Chat")
                 .font(EnsuTypography.large)
                 .foregroundStyle(EnsuColor.textPrimary)
                 .multilineTextAlignment(.center)
@@ -40,7 +40,7 @@ struct DownloadOnboardingView: View {
 
                 progressView
             } else {
-                Button("Download") {
+                Button("Download models") {
                     hapticMedium()
                     onDownload()
                 }
@@ -54,6 +54,7 @@ struct DownloadOnboardingView: View {
                 Text(sizeText)
                     .font(EnsuTypography.small)
                     .foregroundStyle(EnsuColor.textMuted)
+
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

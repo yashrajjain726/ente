@@ -105,6 +105,7 @@ fun ChatView(
     }
     val canStartVoiceInput = !chatState.isGenerating &&
         !chatState.isDownloading &&
+        chatState.requiredModelsReady &&
         !isChatUnsupported &&
         editingMessage == null
     val latestCanStartVoiceInput by rememberUpdatedState(canStartVoiceInput)
@@ -126,16 +127,14 @@ fun ChatView(
     }
 
     val showDownloadOnboarding by remember(
-        chatState.isModelDownloaded,
+        chatState.requiredModelsReady,
         chatState.isModelStateKnown,
-        chatState.messages,
         chatState.isGenerating,
         isChatUnsupported
     ) {
         derivedStateOf {
             chatState.isModelStateKnown &&
-                !chatState.isModelDownloaded &&
-                chatState.messages.isEmpty() &&
+                !chatState.requiredModelsReady &&
                 !chatState.isGenerating &&
                 !isChatUnsupported
         }
@@ -146,7 +145,7 @@ fun ChatView(
     var focusRequestId by remember { mutableStateOf(0) }
     var wasDrawerOpen by remember { mutableStateOf(false) }
 
-    val shouldAutoFocusInput = chatState.isModelDownloaded &&
+    val shouldAutoFocusInput = chatState.requiredModelsReady &&
         !showDownloadOnboarding &&
         !isChatUnsupported &&
         !chatState.isDownloading &&
@@ -169,7 +168,7 @@ fun ChatView(
         }
 
         if (wasDrawerOpen) {
-            val shouldRestoreFocus = chatState.isModelDownloaded &&
+            val shouldRestoreFocus = chatState.requiredModelsReady &&
                 !showDownloadOnboarding &&
                 !isChatUnsupported &&
                 !chatState.isDownloading &&
@@ -222,6 +221,7 @@ fun ChatView(
                         streamingParentId = chatState.streamingParentId,
                         isGenerating = chatState.isGenerating,
                         isModelDownloaded = chatState.isModelDownloaded,
+                        requiredModelsReady = chatState.requiredModelsReady,
                         isModelStateKnown = chatState.isModelStateKnown,
                         isChatUnsupported = isChatUnsupported,
                         isDownloading = chatState.isDownloading,

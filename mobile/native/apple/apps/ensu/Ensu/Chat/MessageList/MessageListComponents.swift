@@ -246,11 +246,32 @@ struct AssistantMessageBubbleView: View {
     let onOpenAttachment: (ChatAttachment) -> Void
     let showsMetadata: Bool
 
+    @State private var showSources = false
+
     var body: some View {
+        let parsed = parseAssistantText(storedText: message.text)
+        let sourceLabel = parsed.sourceLabel
         HStack(alignment: .bottom) {
             VStack(alignment: .leading, spacing: 0) {
                 VStack(alignment: .leading, spacing: EnsuSpacing.sm) {
-                    AssistantMessageRenderer(text: message.text, isStreaming: false, storageId: message.id.uuidString)
+                    AssistantMessageRenderer(
+                        text: parsed.text,
+                        isStreaming: false,
+                        storageId: message.id.uuidString
+                    )
+
+                    if let sourceLabel {
+                        Button(sourceLabel) {
+                            showSources = true
+                        }
+                        .font(EnsuTypography.small)
+                        .foregroundStyle(EnsuColor.textPrimary)
+                        .padding(.horizontal, EnsuSpacing.md)
+                        .padding(.vertical, EnsuSpacing.sm)
+                        .background(EnsuColor.fillFaint)
+                        .clipShape(RoundedRectangle(cornerRadius: EnsuCornerRadius.button))
+                        .buttonStyle(.plain)
+                    }
 
                     if message.isInterrupted {
                         Text("Interrupted")
@@ -296,6 +317,59 @@ struct AssistantMessageBubbleView: View {
             .animation(.easeInOut(duration: 0.22), value: showsMetadata)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .sheet(isPresented: $showSources) {
+            KnowledgeSourcesSheet(citations: parsed.citations)
+        }
+    }
+}
+
+private struct KnowledgeSourcesSheet: View {
+    let citations: [SourceCitation]
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: EnsuSpacing.lg) {
+                    ForEach(Array(citations.enumerated()), id: \.offset) { _, citation in
+                        VStack(alignment: .leading, spacing: EnsuSpacing.xs) {
+                            Text(citationTitle(citation))
+                                .font(EnsuTypography.large)
+                                .foregroundStyle(EnsuColor.textPrimary)
+                            Text(citation.credit)
+                                .font(EnsuTypography.small)
+                                .foregroundStyle(EnsuColor.textMuted)
+                            Link(
+                                citation.licenseLabel,
+                                destination: URL(string: citation.licenseUrl)!
+                            )
+                            Link(
+                                "View source",
+                                destination: URL(string: citation.sourceUrl)!
+                            )
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
+                .padding(EnsuSpacing.lg)
+            }
+            .background(EnsuColor.backgroundBase)
+            .navigationTitle("Sources")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .primaryAction) {
+                    Button("Done") { dismiss() }
+                }
+            }
+        }
+    }
+
+    private func citationTitle(_ citation: SourceCitation) -> String {
+        guard let section = citation.section?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !section.isEmpty else {
+            return citation.title
+        }
+        return "\(citation.title) — \(section)"
     }
 }
 

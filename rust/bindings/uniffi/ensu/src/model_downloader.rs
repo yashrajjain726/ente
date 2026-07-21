@@ -133,6 +133,19 @@ impl ModelDownloadCore {
         self.inner.remove_downloaded(&target.into())
     }
 
+    pub fn cleanup_incomplete_targets(
+        &self,
+        targets: Vec<ModelDownloadTarget>,
+    ) -> Result<bool, LlmError> {
+        let targets = targets.into_iter().map(Into::into).collect::<Vec<_>>();
+        self.inner
+            .cleanup_incomplete_targets(&targets)
+            .map_err(|error| match DownloadError::from(error) {
+                DownloadError::Cancelled => LlmError::Cancelled,
+                error => LlmError::Download { error },
+            })
+    }
+
     pub fn download(
         &self,
         targets: Vec<ModelDownloadTarget>,

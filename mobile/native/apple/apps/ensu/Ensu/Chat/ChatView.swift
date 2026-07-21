@@ -22,7 +22,7 @@ struct ChatView: View {
     }
 
     private var shouldAutoFocusInput: Bool {
-        viewModel.isModelDownloaded
+        viewModel.requiredModelsReady
             && !viewModel.isChatUnsupported
             && !viewModel.isDownloading
             && !viewModel.isGenerating
@@ -116,7 +116,7 @@ struct ChatView: View {
                     isInputFocused = false
                     viewState.wasDrawerOpen = true
                 } else if viewState.wasDrawerOpen {
-                    let shouldRestoreFocus = viewModel.isModelDownloaded
+                    let shouldRestoreFocus = viewModel.requiredModelsReady
                         && !viewModel.isChatUnsupported
                         && !viewModel.isDownloading
                         && !viewModel.isGenerating
@@ -144,6 +144,10 @@ struct ChatView: View {
         }
         .sheet(isPresented: $viewState.showSettings) {
             SettingsView(
+                knowledgeState: viewModel.knowledgeState,
+                onDownloadOrUpdateKnowledgePack: viewModel.downloadOrUpdateKnowledgePack,
+                onCancelKnowledgePackDownload: viewModel.cancelKnowledgePackDownload,
+                onSetKnowledgePackEnabled: viewModel.setKnowledgePackEnabled,
                 onSignIn: {
                     viewState.pendingSignInRequest = true
                     viewState.showSettings = false
@@ -252,7 +256,7 @@ struct ChatView: View {
             .animation(.easeInOut(duration: 0.32))
 
             ZStack(alignment: .bottom) {
-                let shouldShowDownloadOnboarding = !viewModel.isModelDownloaded && !viewModel.isChatUnsupported
+                let shouldShowDownloadOnboarding = !viewModel.requiredModelsReady && !viewModel.isChatUnsupported
 
                 MessageListView(
                     messages: viewModel.messages,
@@ -261,7 +265,7 @@ struct ChatView: View {
                     isGenerating: viewModel.isGenerating,
                     sessionId: viewModel.currentSessionId,
                     keyboardHeight: keyboard.height,
-                    inputBarHeight: (viewModel.isModelDownloaded || viewModel.isChatUnsupported) ? viewState.inputBarHeight : 0,
+                    inputBarHeight: (viewModel.requiredModelsReady || viewModel.isChatUnsupported) ? viewState.inputBarHeight : 0,
                     emptyStateTitle: "Welcome",
                     emptyStateSubtitle: "Start typing to begin a conversation",
                     onEdit: { message in
@@ -301,7 +305,7 @@ struct ChatView: View {
                         }
                         .padding(.bottom, keyboard.isVisible ? keyboard.height : 0)
                         .zIndex(1)
-                } else if viewModel.isModelDownloaded {
+                } else if viewModel.requiredModelsReady {
                     let shouldAutoFocus = shouldAutoFocusInput
 
                     MessageInputView(

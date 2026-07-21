@@ -6,6 +6,7 @@ edition = "2024"
 ente-core.workspace = true
 ente-image.workspace = true
 ente-model-download.workspace = true
+memmap2.workspace = true
 parking_lot = "0.12"
 regex = { version = "1", optional = true }
 rubato = { version = "0.16", optional = true }
@@ -16,8 +17,13 @@ serde_json.workspace = true
 thiserror.workspace = true
 tokio = { version = "1", features = ["rt", "time"] }
 transcribe-rs = { version = "0.3.11", default-features = false, features = ["onnx", "vad-silero"], optional = true }
+url.workspace = true
 uuid = { version = "1", features = ["v4", "rng-getrandom"] }
 zeroize = { version = "1.8", features = ["derive"] }
+zstd.workspace = true
+
+[dev-dependencies]
+tempfile = "3.27.0"
 
 # llama-cpp-2's default features are "openmp" and "android-shared-stdcxx".
 #

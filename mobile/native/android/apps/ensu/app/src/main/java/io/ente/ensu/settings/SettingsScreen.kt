@@ -48,6 +48,7 @@ fun SettingsScreen(
     buildVersion: String,
     isAdvancedUnlocked: Boolean,
     onOpenLogs: () -> Unit,
+    onOpenKnowledge: () -> Unit,
     onOpenModelSettings: () -> Unit,
     onOpenSystemPromptSettings: () -> Unit,
     onUnlockAdvanced: () -> Unit,
@@ -58,8 +59,16 @@ fun SettingsScreen(
     var lastBuildVersionTapAt by remember { mutableStateOf<Long?>(null) }
     val context = LocalContext.current
 
-    val allItems = remember(context, onOpenLogs, onSignIn) {
+    val allItems = remember(context, onOpenLogs, onOpenKnowledge, onSignIn) {
         buildList {
+            add(
+                SettingsItem(
+                    title = "Knowledge",
+                    iconRes = HugeIcons.Search01Icon,
+                    onClick = onOpenKnowledge
+                )
+            )
+
             add(
                 SettingsItem(
                     title = "About",

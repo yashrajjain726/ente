@@ -2,6 +2,10 @@ import SwiftUI
 import Foundation
 
 struct SettingsView: View {
+    @ObservedObject var knowledgeState: KnowledgeState
+    let onDownloadOrUpdateKnowledgePack: (String) -> Void
+    let onCancelKnowledgePackDownload: (String) -> Void
+    let onSetKnowledgePackEnabled: (String, Bool) -> Void
     let onSignIn: () -> Void
 
     @Environment(\.dismiss) private var dismiss
@@ -163,6 +167,18 @@ struct SettingsView: View {
 
     private var allItems: [SettingsItem] {
         [
+            SettingsItem(
+                title: "Knowledge",
+                iconName: "Search01Icon",
+                destination: AnyView(
+                    KnowledgeSettingsView(
+                        state: knowledgeState,
+                        onDownloadOrUpdate: onDownloadOrUpdateKnowledgePack,
+                        onCancel: onCancelKnowledgePackDownload,
+                        onSetEnabled: onSetKnowledgePackEnabled
+                    )
+                )
+            ),
             SettingsItem(
                 title: "Logs",
                 iconName: "Bug01Icon",

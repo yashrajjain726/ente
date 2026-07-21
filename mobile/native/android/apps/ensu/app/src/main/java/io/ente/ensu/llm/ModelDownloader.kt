@@ -69,6 +69,9 @@ class ModelDownloader(context: Context) {
 
     fun removeDownloaded(target: ModelDownloadTarget): Boolean = core.removeDownloaded(target)
 
+    fun cleanupIncompleteTargets(targets: List<ModelDownloadTarget>): Boolean =
+        core.cleanupIncompleteTargets(targets)
+
     fun cancel() = core.cancel()
 
     suspend fun estimateDownloadSize(target: ModelDownloadTarget): Long? = withContext(Dispatchers.IO) {

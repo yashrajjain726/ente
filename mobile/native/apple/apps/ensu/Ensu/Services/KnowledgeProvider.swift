@@ -1,0 +1,316 @@
+import Foundation
+
+struct KnowledgeSearchHit: Sendable {
+    let dataset: KnowledgeDatasetConfig
+    let hit: RetrievalHit
+}
+
+private struct KnowledgePackValidationError: LocalizedError {
+    var errorDescription: String? {
+        "Downloaded knowledge pack failed current revision validation"
+    }
+}
+
+actor KnowledgeProvider {
+    private final class Mutation: @unchecked Sendable {
+        let task: Task<Void, Error>
+
+        init(
+            packRoot: URL,
+            dataset: KnowledgeDatasetConfig,
+            onProgress: @escaping @Sendable (KnowledgeDownloadProgress) -> Void
+        ) {
+            let cancellation = CancellationState()
+            task = Task.detached(priority: .utility) {
+                let callback = KnowledgeDownloadCallbackSink(
+                    onProgress: onProgress,
+                    isCancelled: { cancellation.isCancelled }
+                )
+                try downloadKnowledgePack(
+                    packRoot: packRoot.path,
+                    expectedDataset: dataset,
+                    callback: callback
+                )
+            }
+            self.cancellationState = cancellation
+        }
+
+        private let cancellationState: CancellationState
+
+        func cancel() {
+            cancellationState.cancel()
+        }
+    }
+
+    private final class CancellationState: @unchecked Sendable {
+        private let lock = NSLock()
+        private var value = false
+
+        var isCancelled: Bool {
+            lock.withLock { value }
+        }
+
+        func cancel() {
+            lock.withLock { value = true }
+        }
+    }
+
+    private struct OpenIndex {
+        let directory: String
+        let index: RetrievalIndex
+    }
+
+    private let root: URL
+    private var mutations: [String: Mutation] = [:]
+    private var indexes: [String: OpenIndex] = [:]
+    private var indexGateLocked = false
+    private var indexGateWaiters: [CheckedContinuation<Void, Never>] = []
+
+    init(root: URL) {
+        self.root = root
+        try? FileManager.default.createDirectory(
+            at: root,
+            withIntermediateDirectories: true
+        )
+        var excludedRoot = root
+        var values = URLResourceValues()
+        values.isExcludedFromBackup = true
+        try? excludedRoot.setResourceValues(values)
+    }
+
+    func reconcile(dataset: KnowledgeDatasetConfig) async throws -> KnowledgeReconciliation {
+        try await withIndexGate {
+            try await reconcileAndActivateLocked(dataset: dataset)
+        }
+    }
+
+    func download(
+        dataset: KnowledgeDatasetConfig,
+        onProgress: @escaping @Sendable (KnowledgeDownloadProgress) -> Void
+    ) async throws -> KnowledgeReconciliation {
+        let mutation: Mutation
+        if let current = mutations[dataset.stableId] {
+            mutation = current
+        } else {
+            let created = Mutation(
+                packRoot: packRoot(dataset),
+                dataset: dataset,
+                onProgress: onProgress
+            )
+            mutations[dataset.stableId] = created
+            mutation = created
+        }
+
+        do {
+            try await mutation.task.value
+        } catch {
+            if mutations[dataset.stableId] === mutation {
+                mutations.removeValue(forKey: dataset.stableId)
+            }
+            _ = try? await withIndexGate {
+                try await reconcileAndActivateLocked(dataset: dataset, removeIncoming: true)
+            }
+            throw error
+        }
+
+        do {
+            let result = try await reconcile(dataset: dataset)
+            guard result.activeIdentity == dataset.currentDownloadIdentity else {
+                throw KnowledgePackValidationError()
+            }
+            if mutations[dataset.stableId] === mutation {
+                mutations.removeValue(forKey: dataset.stableId)
+            }
+            return result
+        } catch {
+            if mutations[dataset.stableId] === mutation {
+                mutations.removeValue(forKey: dataset.stableId)
+            }
+            throw error
+        }
+    }
+
+    func cancel(dataset: KnowledgeDatasetConfig) async -> KnowledgeReconciliation? {
+        let mutation = mutations[dataset.stableId]
+        mutation?.cancel()
+        let transferFailed: Bool
+        do {
+            try await mutation?.task.value
+            transferFailed = false
+        } catch {
+            transferFailed = true
+        }
+        if let mutation, mutations[dataset.stableId] === mutation {
+            mutations.removeValue(forKey: dataset.stableId)
+        }
+        return try? await withIndexGate {
+            try await reconcileAndActivateLocked(
+                dataset: dataset,
+                removeIncoming: transferFailed
+            )
+        }
+    }
+
+    func search(
+        datasets: [KnowledgeDatasetConfig],
+        query: [Float],
+        maxHits: UInt32
+    ) async -> [KnowledgeSearchHit] {
+        do {
+            return try await withIndexGate {
+                let selected = datasets.compactMap { dataset -> (KnowledgeDatasetConfig, RetrievalIndex)? in
+                    guard let index = indexes[dataset.stableId]?.index else { return nil }
+                    return (dataset, index)
+                }
+                let searchTask = Task.detached(priority: .utility) { () -> [KnowledgeSearchHit] in
+                    var merged: [KnowledgeSearchHit] = []
+                    for (dataset, index) in selected {
+                        if Task.isCancelled { return [] }
+                        let hits: [RetrievalHit]
+                        do {
+                            hits = try index.search(
+                                query: query,
+                                maxHits: maxHits,
+                                threshold: dataset.relevanceThreshold
+                            )
+                        } catch {
+                            continue
+                        }
+                        if Task.isCancelled { return [] }
+                        merged.append(contentsOf: hits.map {
+                            KnowledgeSearchHit(dataset: dataset, hit: $0)
+                        })
+                    }
+                    return merged
+                        .sorted { $0.hit.score > $1.hit.score }
+                        .prefix(Int(maxHits))
+                        .map { $0 }
+                }
+                return await withTaskCancellationHandler {
+                    await searchTask.value
+                } onCancel: {
+                    searchTask.cancel()
+                }
+            }
+        } catch {
+            return []
+        }
+    }
+
+    private func reconcileAndActivateLocked(
+        dataset: KnowledgeDatasetConfig,
+        removeIncoming: Bool = false
+    ) async throws -> KnowledgeReconciliation {
+        let packRoot = packRoot(dataset)
+        let result = try await Task.detached(priority: .utility) {
+            if removeIncoming {
+                try? FileManager.default.removeItem(
+                    at: packRoot.appendingPathComponent(
+                        dataset.currentDownloadIdentity,
+                        isDirectory: true
+                    )
+                )
+            }
+            return try reconcileKnowledgePack(
+                packRoot: packRoot.path,
+                expectedDataset: dataset
+            )
+        }.value
+        try activate(result: result, dataset: dataset)
+        if let activeIdentity = result.activeIdentity {
+            _ = try? await Task.detached(priority: .utility) {
+                try cleanupObsoleteKnowledgePackRevisions(
+                    packRoot: packRoot.path,
+                    expectedDataset: dataset,
+                    activeIdentity: activeIdentity
+                )
+            }.value
+        }
+        return result
+    }
+
+    private func activate(
+        result: KnowledgeReconciliation,
+        dataset: KnowledgeDatasetConfig
+    ) throws {
+        guard let directory = result.activeDirectory else {
+            indexes.removeValue(forKey: dataset.stableId)
+            return
+        }
+        guard indexes[dataset.stableId]?.directory != directory else { return }
+        let replacement = try RetrievalIndex.open(
+            directory: directory,
+            expectedDataset: dataset
+        )
+        indexes[dataset.stableId] = OpenIndex(directory: directory, index: replacement)
+    }
+
+    private func withIndexGate<T>(_ operation: () async throws -> T) async throws -> T {
+        await acquireIndexGate()
+        defer { releaseIndexGate() }
+        try Task.checkCancellation()
+        return try await operation()
+    }
+
+    private func acquireIndexGate() async {
+        if !indexGateLocked {
+            indexGateLocked = true
+            return
+        }
+        await withCheckedContinuation { continuation in
+            indexGateWaiters.append(continuation)
+        }
+    }
+
+    private func releaseIndexGate() {
+        guard !indexGateWaiters.isEmpty else {
+            indexGateLocked = false
+            return
+        }
+        indexGateWaiters.removeFirst().resume()
+    }
+
+    private func packRoot(_ dataset: KnowledgeDatasetConfig) -> URL {
+        root.appendingPathComponent(dataset.stableId, isDirectory: true)
+    }
+}
+
+private final class KnowledgeDownloadCallbackSink: KnowledgeDownloadCallback, @unchecked Sendable {
+    private let onProgressHandler: @Sendable (KnowledgeDownloadProgress) -> Void
+    private let isCancelledHandler: @Sendable () -> Bool
+
+    init(
+        onProgress: @escaping @Sendable (KnowledgeDownloadProgress) -> Void,
+        isCancelled: @escaping @Sendable () -> Bool
+    ) {
+        onProgressHandler = onProgress
+        isCancelledHandler = isCancelled
+    }
+
+    func onProgress(progress: KnowledgeDownloadProgress) {
+        onProgressHandler(progress)
+    }
+
+    func isCancelled() -> Bool {
+        isCancelledHandler()
+    }
+}
+
+enum KnowledgePackStatus: Equatable, Sendable {
+    case checking
+    case download
+    case ready
+    case updateAvailable
+}
+
+struct KnowledgePackState: Identifiable, Sendable {
+    var id: String { config.stableId }
+    let config: KnowledgeDatasetConfig
+    var status: KnowledgePackStatus = .checking
+    var activeIdentity: String?
+    var enabled = false
+    var isMutating = false
+    var progressPercent: Int?
+    var progressLabel: String?
+    var errorMessage: String?
+}

@@ -1,3 +1,14 @@
+mod knowledge;
+
+pub use knowledge::{
+    AttributionConfig, KNOWLEDGE_ARTIFACT_FILENAMES, KnowledgeConfigError, KnowledgeDatasetConfig,
+    KnowledgeEmbeddingConfig, KnowledgeIndexContract, knowledge_artifact_urls,
+    knowledge_index_contract, validate_knowledge_datasets, validate_knowledge_embedding,
+};
+pub(crate) use knowledge::{
+    KNOWLEDGE_LICENSE_LABEL, KNOWLEDGE_LICENSE_URL, is_path_safe_component,
+};
+
 #[derive(Debug, Clone)]
 pub struct ModelPreset {
     pub id: String,
@@ -18,6 +29,8 @@ pub struct Defaults {
     pub desktop_model_presets: Vec<ModelPreset>,
     pub transcription_model: ModelPreset,
     pub voice_activity_model: ModelPreset,
+    pub knowledge_embedding: KnowledgeEmbeddingConfig,
+    pub knowledge_datasets: Vec<KnowledgeDatasetConfig>,
 }
 
 const SYSTEM_PROMPT_DATE_PLACEHOLDER: &str = "$date";
@@ -128,7 +141,7 @@ pub fn defaults() -> Defaults {
     let mobile_default_model = lfm_vl_1_6b();
     let desktop_default_model = gemma_4_e4b_q4km();
 
-    Defaults {
+    let defaults = Defaults {
         mobile_system_prompt_body: MOBILE_SYSTEM_PROMPT_BODY.to_string(),
         desktop_system_prompt_body: DESKTOP_SYSTEM_PROMPT_BODY.to_string(),
         system_prompt_date_placeholder: SYSTEM_PROMPT_DATE_PLACEHOLDER.to_string(),
@@ -145,7 +158,28 @@ pub fn defaults() -> Defaults {
         ],
         transcription_model: parakeet_v3_int8(),
         voice_activity_model: silero_vad_v4(),
-    }
+        knowledge_embedding: knowledge::knowledge_embedding_config(),
+        knowledge_datasets: knowledge::knowledge_datasets(),
+    };
+
+    validate_defaults(&defaults).expect("bundled Ensu defaults must be valid");
+    defaults
+}
+
+fn validate_defaults(defaults: &Defaults) -> Result<(), KnowledgeConfigError> {
+    validate_knowledge_datasets(&defaults.knowledge_datasets)?;
+
+    let reserved_model_ids = std::iter::once(&defaults.mobile_default_model)
+        .chain(defaults.mobile_model_presets.iter())
+        .chain(std::iter::once(&defaults.desktop_default_model))
+        .chain(defaults.desktop_model_presets.iter())
+        .chain([
+            &defaults.transcription_model,
+            &defaults.voice_activity_model,
+        ])
+        .map(|preset| preset.id.clone())
+        .collect::<Vec<_>>();
+    validate_knowledge_embedding(&defaults.knowledge_embedding, &reserved_model_ids)
 }
 
 #[cfg(test)]
@@ -175,5 +209,13 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn bundled_knowledge_defaults_are_valid() {
+        let defaults = defaults();
+        validate_defaults(&defaults).unwrap();
+        assert_eq!(defaults.knowledge_datasets.len(), 2);
+        assert_eq!(defaults.knowledge_embedding.exact_size_bytes, 333_590_944);
     }
 }

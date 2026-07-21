@@ -78,8 +78,17 @@ final class ModelDownloader {
         core.removeDownloaded(target: target)
     }
 
+    @discardableResult
+    func cleanupIncompleteTargets(_ targets: [ModelDownloadTarget]) throws -> Bool {
+        try core.cleanupIncompleteTargets(targets: targets)
+    }
+
     func cancel() {
         core.cancel()
+    }
+
+    var isDownloadActive: Bool {
+        activeLock.withLock { downloadActive }
     }
 
     func estimateDownloadSize(target: ModelDownloadTarget) async -> Int64? {

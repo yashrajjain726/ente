@@ -29,16 +29,19 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentSize
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -54,6 +57,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntOffset
@@ -84,6 +88,8 @@ import java.util.Locale
 import kotlin.math.roundToInt
 import kotlin.math.roundToLong
 import io.ente.ensu.llm.DownloadPhase
+import io.ente.ensu.bindings.SourceCitation
+import io.ente.ensu.bindings.parseAssistantText
 
 @Composable
 internal fun MessageList(
@@ -93,6 +99,7 @@ internal fun MessageList(
     streamingParentId: String?,
     isGenerating: Boolean,
     isModelDownloaded: Boolean,
+    requiredModelsReady: Boolean,
     isModelStateKnown: Boolean,
     isChatUnsupported: Boolean,
     isDownloading: Boolean,
@@ -107,21 +114,23 @@ internal fun MessageList(
     onOpenAttachment: (Attachment) -> Unit,
     onStartDownload: (Boolean) -> Unit
 ) {
+    if (isModelStateKnown && !requiredModelsReady && !isChatUnsupported) {
+        DownloadOnboarding(
+            modifier = modifier,
+            isDownloading = isDownloading,
+            downloadPercent = downloadPercent,
+            downloadStatus = downloadStatus,
+            downloadPhase = downloadPhase,
+            modelDownloadSizeBytes = modelDownloadSizeBytes,
+            onDownload = { onStartDownload(true) }
+        )
+        return
+    }
     if (messages.isEmpty() && !isGenerating) {
         if (!isModelStateKnown) {
             return
         }
-        if (!isModelDownloaded && !isChatUnsupported) {
-            DownloadOnboarding(
-                modifier = modifier,
-                isDownloading = isDownloading,
-                downloadPercent = downloadPercent,
-                downloadStatus = downloadStatus,
-                downloadPhase = downloadPhase,
-                modelDownloadSizeBytes = modelDownloadSizeBytes,
-                onDownload = { onStartDownload(true) }
-            )
-        } else {
+        if (isModelDownloaded || isChatUnsupported) {
             EmptyState(
                 modifier = modifier,
                 title = "Welcome",
@@ -407,7 +416,7 @@ private fun DownloadOnboarding(
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
-                text = "Download to begin using the Chat",
+                text = "Download models to begin using Chat",
                 style = EnsuTypography.large,
                 color = EnsuColor.textPrimary(),
                 textAlign = TextAlign.Center
@@ -475,7 +484,7 @@ private fun DownloadOnboarding(
                     shape = RoundedCornerShape(EnsuCornerRadius.button.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = downloadAccent)
                 ) {
-                    Text(text = "Download", style = EnsuTypography.body, color = downloadButtonTextColor)
+                    Text(text = "Download models", style = EnsuTypography.body, color = downloadButtonTextColor)
                 }
                 Spacer(modifier = Modifier.height(EnsuSpacing.sm.dp))
                 Text(
@@ -623,8 +632,12 @@ private fun AssistantMessageBubble(
     showsMetadata: Boolean
 ) {
     val clipboard = LocalClipboardManager.current
+    val parsed = remember(message.text) { parseAssistantText(message.text) }
+    val cleanMessageText = parsed.text
+    val sourceLabel = parsed.sourceLabel
     val haptic = rememberHaptics()
     var showMenu by remember { mutableStateOf(false) }
+    var showSources by remember { mutableStateOf(false) }
     var pressOffset by remember { mutableStateOf(Offset.Zero) }
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -662,9 +675,28 @@ private fun AssistantMessageBubble(
                     .padding(horizontal = EnsuSpacing.sm.dp, vertical = EnsuSpacing.md.dp)
             ) {
                 MarkdownView(
-                    markdown = stripHiddenMessageParts(message.text),
+                    markdown = stripHiddenMessageParts(cleanMessageText),
                     enableSelection = false
                 )
+
+                sourceLabel?.let { label ->
+                    Spacer(modifier = Modifier.height(EnsuSpacing.sm.dp))
+                    Surface(
+                        color = EnsuColor.fillFaint(),
+                        shape = RoundedCornerShape(EnsuCornerRadius.button.dp),
+                        modifier = Modifier.clickable { showSources = true }
+                    ) {
+                        Text(
+                            text = label,
+                            style = EnsuTypography.small,
+                            color = EnsuColor.textPrimary(),
+                            modifier = Modifier.padding(
+                                horizontal = EnsuSpacing.md.dp,
+                                vertical = EnsuSpacing.sm.dp
+                            )
+                        )
+                    }
+                }
 
                 if (message.isInterrupted) {
                     Spacer(modifier = Modifier.height(EnsuSpacing.xs.dp))
@@ -710,7 +742,69 @@ private fun AssistantMessageBubble(
                 }
             }
         }
+
+        if (showSources) {
+            KnowledgeSourcesDialog(
+                citations = parsed.citations,
+                onDismiss = { showSources = false }
+            )
+        }
     }
+}
+
+@Composable
+private fun KnowledgeSourcesDialog(
+    citations: List<SourceCitation>,
+    onDismiss: () -> Unit
+) {
+    val uriHandler = LocalUriHandler.current
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Sources", style = EnsuTypography.h3) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(EnsuSpacing.lg.dp)) {
+                citations.forEach { citation ->
+                    Column {
+                        Text(
+                            text = buildString {
+                                append(citation.title)
+                                citation.section?.takeIf { it.isNotBlank() }?.let {
+                                    append(" — ").append(it)
+                                }
+                            },
+                            style = EnsuTypography.large,
+                            color = EnsuColor.textPrimary()
+                        )
+                        Text(
+                            citation.credit,
+                            style = EnsuTypography.small,
+                            color = EnsuColor.textMuted()
+                        )
+                        Text(
+                            citation.licenseLabel,
+                            style = EnsuTypography.small,
+                            color = EnsuColor.accent(),
+                            modifier = Modifier.clickable {
+                                uriHandler.openUri(citation.licenseUrl)
+                            }
+                        )
+                        Text(
+                            "View source",
+                            style = EnsuTypography.body,
+                            color = EnsuColor.accent(),
+                            modifier = Modifier
+                                .clickable { uriHandler.openUri(citation.sourceUrl) }
+                                .padding(top = EnsuSpacing.xs.dp)
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("Done") }
+        },
+        containerColor = EnsuColor.backgroundBase()
+    )
 }
 
 private data class MessageAction(

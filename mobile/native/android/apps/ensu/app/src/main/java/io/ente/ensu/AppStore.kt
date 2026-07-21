@@ -16,9 +16,12 @@ import io.ente.ensu.chat.ChatMessage
 import io.ente.ensu.bindings.ConfigDefaults
 import io.ente.ensu.logging.LogLevel
 import io.ente.ensu.settings.SessionPreferencesDataStore
+import io.ente.ensu.settings.KnowledgePreferencesDataStore
 import io.ente.ensu.AppState
 import io.ente.ensu.settings.DeveloperSettingsState
 import io.ente.ensu.llm.ModelSettingsState
+import io.ente.ensu.knowledge.KnowledgeActions
+import io.ente.ensu.knowledge.KnowledgeProvider
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -27,8 +30,10 @@ import kotlinx.coroutines.launch
 
 class AppStore(
     private val sessionPreferences: SessionPreferencesDataStore,
+    private val knowledgePreferences: KnowledgePreferencesDataStore,
     private val chatRepository: ChatRepository,
     private val llmProvider: LlmProvider,
+    private val knowledgeProvider: KnowledgeProvider,
     val modelDownloader: ModelDownloader,
     val transcriber: Transcriber,
     private val deviceCapabilityProvider: AndroidDeviceCapabilityProvider,
@@ -42,12 +47,27 @@ class AppStore(
     private val messageStore = mutableMapOf<String, MutableList<ChatMessage>>()
     private val attachmentActions = AttachmentStoreActions(_state, messageStore)
     private val modelSettingsActions =
-        ModelSettingsActions(_state, sessionPreferences, llmProvider, modelDownloader, logRepository, configDefaults)
+        ModelSettingsActions(
+            _state,
+            sessionPreferences,
+            llmProvider,
+            modelDownloader,
+            logRepository,
+            configDefaults
+        )
+    private val knowledgeActions = KnowledgeActions(
+        state = _state,
+        preferences = knowledgePreferences,
+        provider = knowledgeProvider,
+        datasets = configDefaults.knowledgeDatasets,
+        logRepository = logRepository
+    )
     private val chatActions = ChatStoreActions(
         state = _state,
         sessionPreferences = sessionPreferences,
         chatRepository = chatRepository,
         llmProvider = llmProvider,
+        knowledgeProvider = knowledgeProvider,
         modelDownloader = modelDownloader,
         clock = clock,
         logRepository = logRepository,
@@ -62,6 +82,8 @@ class AppStore(
         refreshDeviceCapability(scope)
         chatActions.bootstrap(scope)
         modelSettingsActions.refreshModelDownloadInfo()
+        modelSettingsActions.cleanupRequiredModelArtifactsOnBootstrap()
+        knowledgeActions.bootstrap(scope)
         _state.value = _state.value.copy(
             chat = _state.value.chat.copy(isModelStateKnown = true)
         )
@@ -153,6 +175,14 @@ class AppStore(
         modelSettingsActions.prewarmImageInferenceIfDownloaded()
 
     fun refreshModelDownloadInfo() = modelSettingsActions.refreshModelDownloadInfo()
+
+    fun downloadOrUpdateKnowledgePack(stableId: String) =
+        knowledgeActions.downloadOrUpdate(stableId)
+
+    fun cancelKnowledgePackDownload(stableId: String) = knowledgeActions.cancel(stableId)
+
+    fun setKnowledgePackEnabled(stableId: String, enabled: Boolean) =
+        knowledgeActions.setEnabled(stableId, enabled)
 
     fun cancelDownload() {
         chatActions.cancelGenerationForDownload()

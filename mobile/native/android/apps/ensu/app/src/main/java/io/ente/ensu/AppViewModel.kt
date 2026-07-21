@@ -9,6 +9,7 @@ import io.ente.ensu.settings.AdvancedSettingsDataStore
 import io.ente.ensu.settings.AdvancedSettingsSnapshot
 import io.ente.ensu.device.AndroidDeviceCapabilityProvider
 import io.ente.ensu.settings.SessionPreferencesDataStore
+import io.ente.ensu.settings.KnowledgePreferencesDataStore
 import io.ente.ensu.chat.ChatRepository
 import io.ente.ensu.config.loadConfigDefaults
 import io.ente.ensu.bindings.ModelDownloadTarget
@@ -35,23 +36,28 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     val appVersion = runCatching { getAppVersion(application) }.getOrDefault("unknown")
     private val deviceCapabilityProvider = AndroidDeviceCapabilityProvider(application)
     private val transcriber = (application as EnsuApplication).transcriber
+    val configDefaults = loadConfigDefaults()
 
     val logRepository = FileLogRepository(application)
     private val modelDownloader = (application as EnsuApplication).modelDownloader
     private val _isReady = MutableStateFlow(!modelDownloader.needsMigration())
     val isReady = _isReady.asStateFlow()
+    private val knowledgePreferences = KnowledgePreferencesDataStore(application)
     private val llmProvider = LlmProvider(
         downloader = modelDownloader,
         transcriber = transcriber,
-        deviceCapabilityProvider = deviceCapabilityProvider
+        deviceCapabilityProvider = deviceCapabilityProvider,
+        knowledgeEmbedding = configDefaults.knowledgeEmbedding
     )
     private val chatRepository = ChatRepository(application, credentialStore)
-    val configDefaults = loadConfigDefaults()
+    private val knowledgeProvider = (application as EnsuApplication).knowledgeProvider
 
     val store = AppStore(
         sessionPreferences = sessionPreferences,
+        knowledgePreferences = knowledgePreferences,
         chatRepository = chatRepository,
         llmProvider = llmProvider,
+        knowledgeProvider = knowledgeProvider,
         modelDownloader = modelDownloader,
         transcriber = transcriber,
         deviceCapabilityProvider = deviceCapabilityProvider,

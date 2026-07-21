@@ -5,11 +5,14 @@ import io.ente.ensu.bindings.LlmChatMessage as NativeChatMessage
 import io.ente.ensu.bindings.LlmChatRequest
 import io.ente.ensu.bindings.LlmContext
 import io.ente.ensu.bindings.LlmContextParams
+import io.ente.ensu.bindings.LlmEmbeddingContextParams
 import io.ente.ensu.bindings.LlmGenerationEvent
 import io.ente.ensu.bindings.LlmGenerationEventCallback
 import io.ente.ensu.bindings.LlmGenerationSummary as NativeSummary
 import io.ente.ensu.bindings.LlmModel
 import io.ente.ensu.bindings.LlmModelLoadParams
+import io.ente.ensu.bindings.KnowledgeEmbeddingConfig
+import io.ente.ensu.bindings.ModelDownloadTarget
 import io.ente.ensu.bindings.Transcriber
 import io.ente.ensu.bindings.llmCancel
 import io.ente.ensu.bindings.llmInitBackend
@@ -18,6 +21,7 @@ import io.ente.ensu.device.requireChatSupported
 import java.io.File
 import kotlin.math.max
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -26,6 +30,7 @@ class LlmProvider(
     private val downloader: ModelDownloader,
     private val transcriber: Transcriber,
     private val deviceCapabilityProvider: AndroidDeviceCapabilityProvider,
+    private val knowledgeEmbedding: KnowledgeEmbeddingConfig,
     private val ioDispatcher: kotlinx.coroutines.CoroutineDispatcher = Dispatchers.IO
 ) {
     private data class LoadedModelKey(
@@ -40,6 +45,26 @@ class LlmProvider(
     @Volatile private var currentJobId: Long? = null
     private var backendInitialized = false
     private val modelLoadMutex = Mutex()
+    private val embeddingDownloadTarget = ModelDownloadTarget.Gguf(
+        knowledgeEmbedding.targetId,
+        knowledgeEmbedding.modelUrl,
+        null
+    )
+
+    class EmbeddingAssetInvalid : Exception("Embedding model asset is invalid")
+
+    fun isChatModelReady(target: LlmModelTarget): Boolean =
+        downloader.isDownloaded(target.downloadTarget)
+
+    fun isEmbeddingModelReady(): Boolean {
+        val modelFile = downloader.modelPath(embeddingDownloadTarget)
+        return downloader.isDownloaded(embeddingDownloadTarget) &&
+            modelFile.isFile &&
+            modelFile.length().toULong() == knowledgeEmbedding.exactSizeBytes
+    }
+
+    val embeddingDownloadSizeBytes: Long
+        get() = knowledgeEmbedding.exactSizeBytes.toLong()
 
     suspend fun ensureModelReady(
         target: LlmModelTarget,
@@ -52,6 +77,72 @@ class LlmProvider(
         }
     }
 
+    suspend fun ensureRequiredModelsReady(
+        target: LlmModelTarget,
+        onProgress: (DownloadProgress) -> Unit
+    ) {
+        withContext(ioDispatcher) {
+            deviceCapabilityProvider.chatCapability().requireChatSupported()
+            val missingTargets = modelLoadMutex.withLock {
+                val embeddingReady = isEmbeddingModelReady()
+                if (!embeddingReady) {
+                    val embeddingFile = downloader.modelPath(embeddingDownloadTarget)
+                    if (embeddingFile.exists()) {
+                        downloader.removeDownloaded(embeddingDownloadTarget)
+                    }
+                    downloader.cleanupIncompleteTargets(listOf(embeddingDownloadTarget))
+                }
+
+                buildList {
+                    if (!isChatModelReady(target)) add(target.downloadTarget)
+                    if (!isEmbeddingModelReady()) add(embeddingDownloadTarget)
+                }
+            }
+            if (missingTargets.isNotEmpty()) {
+                downloader.download(missingTargets, onProgress)
+            }
+            modelLoadMutex.withLock {
+                if (!isEmbeddingModelReady()) {
+                    throw IllegalStateException("Embedding model failed exact readiness validation")
+                }
+                if (!isChatModelReady(target)) {
+                    throw IllegalStateException("Chat model failed readiness validation")
+                }
+                ensureModelReadyLocked(
+                    target,
+                    onProgress,
+                    allowRecovery = false,
+                    shouldDownload = false
+                )
+            }
+        }
+    }
+
+    suspend fun cleanupRequiredModelArtifacts(target: LlmModelTarget) {
+        withContext(NonCancellable + ioDispatcher) {
+            modelLoadMutex.withLock {
+                cleanupRequiredModelArtifactsLocked(target)
+            }
+        }
+    }
+
+    suspend fun cleanupRequiredModelArtifactsIfIdle(target: LlmModelTarget) {
+        withContext(NonCancellable + ioDispatcher) {
+            modelLoadMutex.withLock {
+                if (!downloader.isDownloadActive) {
+                    cleanupRequiredModelArtifactsLocked(target)
+                }
+            }
+        }
+    }
+
+    private fun cleanupRequiredModelArtifactsLocked(target: LlmModelTarget) {
+        if (!isEmbeddingModelReady() && downloader.modelPath(embeddingDownloadTarget).exists()) {
+            downloader.removeDownloaded(embeddingDownloadTarget)
+        }
+        downloader.cleanupIncompleteTargets(listOf(target.downloadTarget, embeddingDownloadTarget))
+    }
+
     suspend fun generateChat(
         target: LlmModelTarget,
         messages: List<LlmMessage>,
@@ -60,40 +151,85 @@ class LlmProvider(
         maxTokens: Int?,
         onToken: (String) -> Unit
     ): GenerationSummary = withContext(ioDispatcher) {
-        deviceCapabilityProvider.chatCapability().requireChatSupported()
-        val context = loadedContext ?: throw IllegalStateException("Model context not loaded")
-        currentJobId = null
-        val mmprojPath = if (imageFiles.isEmpty()) {
-            null
-        } else {
-            downloader.mmprojPath(target.downloadTarget)
+        modelLoadMutex.withLock {
+            deviceCapabilityProvider.chatCapability().requireChatSupported()
+            val context = loadedContext ?: throw IllegalStateException("Model context not loaded")
+            currentJobId = null
+            val mmprojPath = if (imageFiles.isEmpty()) {
+                null
+            } else {
+                downloader.mmprojPath(target.downloadTarget)
+            }
+            val clampedTemperature = temperature.coerceIn(0.35f, 0.7f)
+
+            val request = LlmChatRequest(
+                messages = messages.map { msg ->
+                    NativeChatMessage(msg.roleString(), msg.text)
+                },
+                templateOverride = null,
+                addAssistant = true,
+                imagePaths = imageFiles.map { it.absolutePath },
+                mmprojPath = mmprojPath,
+                mediaMarker = null,
+                maxTokens = maxTokens,
+                temperature = clampedTemperature,
+                topP = 0.9f,
+                topK = 50,
+                repeatPenalty = 1.18f,
+                frequencyPenalty = 0f,
+                presencePenalty = 0f,
+                seed = null,
+                stopSequences = null,
+                grammar = null
+            )
+
+            unloadTranscriptionModelIfLoaded()
+            val summary = generateStreamWithCallback(context, request, onToken)
+            GenerationSummary(summary.jobId, summary.generatedTokens ?: 0, summary.totalTimeMs)
         }
-        val clampedTemperature = temperature.coerceIn(0.35f, 0.7f)
+    }
 
-        val request = LlmChatRequest(
-            messages = messages.map { msg ->
-                NativeChatMessage(msg.roleString(), msg.text)
-            },
-            templateOverride = null,
-            addAssistant = true,
-            imagePaths = imageFiles.map { it.absolutePath },
-            mmprojPath = mmprojPath,
-            mediaMarker = null,
-            maxTokens = maxTokens,
-            temperature = clampedTemperature,
-            topP = 0.9f,
-            topK = 50,
-            repeatPenalty = 1.18f,
-            frequencyPenalty = 0f,
-            presencePenalty = 0f,
-            seed = null,
-            stopSequences = null,
-            grammar = null
-        )
+    suspend fun <T> withChatModelReleasedForRetrieval(
+        block: suspend (embed: (String) -> List<Float>) -> T
+    ): T = withContext(ioDispatcher) {
+        modelLoadMutex.withLock {
+            deviceCapabilityProvider.chatCapability().requireChatSupported()
+            if (!isEmbeddingModelReady()) throw EmbeddingAssetInvalid()
+            unloadTranscriptionModelIfLoaded()
+            unloadModel()
+            if (!backendInitialized) {
+                llmInitBackend()
+                backendInitialized = true
+            }
 
-        unloadTranscriptionModelIfLoaded()
-        val summary = generateStreamWithCallback(context, request, onToken)
-        GenerationSummary(summary.jobId, summary.generatedTokens ?: 0, summary.totalTimeMs)
+            val embeddingModel = LlmModel.load(
+                LlmModelLoadParams(
+                    modelPath = downloader.modelPath(embeddingDownloadTarget).absolutePath,
+                    nGpuLayers = 0,
+                    useMmap = true,
+                    useMlock = false
+                )
+            )
+            var embeddingContext: LlmContext? = null
+            try {
+                val threads = max(1, Runtime.getRuntime().availableProcessors() - 1)
+                embeddingContext = embeddingModel.newEmbeddingContext(
+                    LlmEmbeddingContextParams(
+                        contextSize = knowledgeEmbedding.contextSize,
+                        nThreads = threads,
+                        batchSize = knowledgeEmbedding.batchSize,
+                        microBatchSize = knowledgeEmbedding.microBatchSize,
+                        sourceDim = knowledgeEmbedding.sourceDim,
+                        dim = knowledgeEmbedding.dim,
+                        queryPrompt = knowledgeEmbedding.queryPrompt
+                    )
+                )
+                block { text -> embeddingContext.embed(text) }
+            } finally {
+                embeddingContext?.destroy()
+                embeddingModel.destroy()
+            }
+        }
     }
 
     suspend fun prewarmImageInference(target: LlmModelTarget) {
@@ -133,15 +269,19 @@ class LlmProvider(
         }
     }
 
-    fun resetContext() {
-        val model = loadedModel ?: return
-        val contextParams = LlmContextParams(
-            contextSize = currentContextLength,
-            nThreads = null,
-            nBatch = null
-        )
-        loadedContext?.destroy()
-        loadedContext = model.newContext(contextParams)
+    suspend fun resetContext() {
+        withContext(ioDispatcher) {
+            modelLoadMutex.withLock {
+                val model = loadedModel ?: return@withLock
+                val contextParams = LlmContextParams(
+                    contextSize = currentContextLength,
+                    nThreads = null,
+                    nBatch = null
+                )
+                loadedContext?.destroy()
+                loadedContext = model.newContext(contextParams)
+            }
+        }
     }
 
     private fun LlmMessage.roleString(): String {
@@ -172,7 +312,8 @@ class LlmProvider(
     private suspend fun ensureModelReadyLocked(
         target: LlmModelTarget,
         onProgress: (DownloadProgress) -> Unit,
-        allowRecovery: Boolean = true
+        allowRecovery: Boolean = true,
+        shouldDownload: Boolean = true
     ) {
         deviceCapabilityProvider.chatCapability().requireChatSupported()
         val modelKey = LoadedModelKey(target.id, target.contextLength)
@@ -187,7 +328,11 @@ class LlmProvider(
 
         unloadModel()
 
-        val downloaded = downloader.download(listOf(target.downloadTarget), onProgress)
+        val downloaded = if (shouldDownload) {
+            downloader.download(listOf(target.downloadTarget), onProgress)
+        } else {
+            false
+        }
 
         onProgress(DownloadProgress(100, "Loading model...", phase = DownloadPhase.Loading))
         try {

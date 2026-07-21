@@ -2,6 +2,16 @@ import Foundation
 import SwiftUI
 
 @MainActor
+final class KnowledgeState: ObservableObject {
+    @Published fileprivate(set) var packs: [KnowledgePackState]
+    @Published fileprivate(set) var downloadsAllowed = false
+
+    init(packs: [KnowledgePackState]) {
+        self.packs = packs
+    }
+}
+
+@MainActor
 final class ChatViewModel: ObservableObject {
     private struct ModelReadyKey: Equatable {
         let id: String
@@ -67,6 +77,7 @@ final class ChatViewModel: ObservableObject {
     @Published var editingMessageId: UUID?
     @Published var downloadToast: DownloadToastState?
     @Published var isModelDownloaded: Bool = false
+    @Published var requiredModelsReady: Bool = false
     @Published var modelDownloadSizeBytes: Int64?
     @Published var hasRequestedModelDownload: Bool = false
     @Published var deviceCapability: ChatDeviceCapability = .unknown
@@ -74,15 +85,23 @@ final class ChatViewModel: ObservableObject {
     @Published var generationErrorMessage: String?
     @Published var voiceInputState: VoiceInputState = .idle
     @Published var draftCursorMoveToken = UUID()
+    let knowledgeState: KnowledgeState
 
     private let provider: LlmProvider
     private let downloader: ModelDownloader
+    private let knowledgePreferences: KnowledgePreferences
+    private let knowledgeEmbedding: KnowledgeEmbeddingConfig
+    private let knowledgeProvider: KnowledgeProvider
     private let voiceTranscriber: VoiceTranscriptionService
     private var chatDb: EnsuDb
     private let attachmentsDir: URL
     private let chatDbPath: String
     private let chatDbKey: Data
     private let modelSettings = ModelSettingsStore.shared
+
+    private var knowledgePacks: [KnowledgePackState] {
+        knowledgeState.packs
+    }
 
     private var messageStore: [UUID: [MessageNode]] = [:]
     private var branchSelections: [UUID: [String: UUID]] = [:]
@@ -93,6 +112,7 @@ final class ChatViewModel: ObservableObject {
     private let rootId = UUID(uuidString: "00000000-0000-0000-0000-000000000000")!
     private var generationTask: Task<Void, Never>?
     private var modelDownloadTask: Task<Void, Never>?
+    private var knowledgeMutationTasks: [String: Task<Void, Never>] = [:]
     private var voiceTransientErrorTask: Task<Void, Never>?
     private var sharedModelReadyTask: Task<Void, Error>?
     private var sharedModelReadyTaskId: UUID?
@@ -113,13 +133,25 @@ final class ChatViewModel: ObservableObject {
         let baseDir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
             ?? FileManager.default.temporaryDirectory
 
+        let config = ConfigDefaults.shared
         let downloader = ModelDownloader()
+        let knowledgePreferences = KnowledgePreferences()
+        let knowledgeState = KnowledgeState(
+            packs: config.knowledgeDatasets.map { KnowledgePackState(config: $0) }
+        )
         let transcriber = Transcriber(
             modelDir: downloader.modelPath(target: downloader.transcriptionModelTarget).path,
             vadModelPath: downloader.modelPath(target: downloader.voiceActivityModelTarget).path
         )
-        let provider = LlmProvider(downloader: downloader, transcriber: transcriber)
+        let provider = LlmProvider(
+            downloader: downloader,
+            transcriber: transcriber,
+            knowledgeEmbedding: config.knowledgeEmbedding
+        )
         let voiceTranscriber = VoiceTranscriptionService(transcriber: transcriber, downloader: downloader)
+        let knowledgeProvider = KnowledgeProvider(
+            root: baseDir.appendingPathComponent("knowledge", isDirectory: true)
+        )
 
         // Chat DB + attachments.
         let dbDir = baseDir.appendingPathComponent("llmchat", isDirectory: true)
@@ -159,6 +191,10 @@ final class ChatViewModel: ObservableObject {
         // Stored properties.
         self.provider = provider
         self.downloader = downloader
+        self.knowledgePreferences = knowledgePreferences
+        self.knowledgeEmbedding = config.knowledgeEmbedding
+        self.knowledgeProvider = knowledgeProvider
+        self.knowledgeState = knowledgeState
         self.voiceTranscriber = voiceTranscriber
         self.chatDb = chatDb
         self.attachmentsDir = attachmentsDir
@@ -169,7 +205,6 @@ final class ChatViewModel: ObservableObject {
         self.sessions = sessions
         self.currentSessionId = nil
         self.messages = []
-
         for session in sessions {
             self.messageStore[session.id] = []
             self.branchSelections[session.id] = [:]
@@ -181,6 +216,16 @@ final class ChatViewModel: ObservableObject {
 
         refreshDeviceCapability()
         refreshModelDownloadInfo()
+        Task { [weak self] in
+            guard let self else { return }
+            let target = modelSettings.currentTarget()
+            await provider.cleanupRequiredModelArtifactsIfIdle(target: target)
+            guard target == modelSettings.currentTarget() else { return }
+            refreshModelDownloadInfo()
+        }
+        Task { [weak self] in
+            await self?.bootstrapKnowledgePacks()
+        }
     }
 
     var isChatUnsupported: Bool {
@@ -194,6 +239,7 @@ final class ChatViewModel: ObservableObject {
     func refreshDeviceCapability() {
         let capability = currentChatDeviceCapability()
         deviceCapability = capability
+        knowledgeState.downloadsAllowed = capability.isChatSupported
         logger.info("Chat device capability evaluated", details: "\(capability)")
         guard !capability.isChatSupported else { return }
         showUnsupportedDeviceDialog = true
@@ -564,7 +610,7 @@ final class ChatViewModel: ObservableObject {
             self.hasRequestedModelDownload = true
 
             do {
-                try await self.ensureModelReadyShared(target: target)
+                try await self.ensureChatModelReady(target: target)
                 self.isModelDownloaded = true
             } catch {
                 if self.isCancellation(error) {
@@ -578,6 +624,7 @@ final class ChatViewModel: ObservableObject {
                     status: self.userFacingModelReadyError(error, wasDownloaded: false),
                     offerRetryDownload: true
                 )
+                self.refreshModelDownloadInfo()
                 self.logger.error("Model readiness check failed before send", error)
                 return
             }
@@ -678,11 +725,13 @@ final class ChatViewModel: ObservableObject {
             downloadToast = nil
             modelDownloadSizeBytes = nil
             hasRequestedModelDownload = false
+            requiredModelsReady = false
             return
         }
         let target = modelSettings.currentTarget()
         isModelDownloaded = downloader.isDownloaded(target: target.downloadTarget)
-        if isModelDownloaded {
+        requiredModelsReady = provider.requiredModelsReady(target: target)
+        if requiredModelsReady {
             clearDownloadProgressMemory()
             modelDownloadSizeBytes = nil
             return
@@ -690,7 +739,7 @@ final class ChatViewModel: ObservableObject {
 
         Task { [weak self] in
             guard let self else { return }
-            let size = await downloader.estimateDownloadSize(target: target.downloadTarget)
+            let size = await provider.missingRequiredDownloadSize(target: target)
             await MainActor.run {
                 guard self.modelReadyKey(for: self.modelSettings.currentTarget()) == self.modelReadyKey(for: target) else {
                     return
@@ -706,6 +755,160 @@ final class ChatViewModel: ObservableObject {
         }
     }
 
+    var enabledReadyKnowledgeDatasets: [KnowledgeDatasetConfig] {
+        knowledgePacks.compactMap { pack in
+            guard pack.enabled,
+                  pack.status == .ready || pack.status == .updateAvailable else {
+                return nil
+            }
+            return pack.config
+        }
+    }
+
+    func downloadOrUpdateKnowledgePack(stableId: String) {
+        guard !isChatUnsupported,
+              knowledgeMutationTasks[stableId] == nil,
+              let index = knowledgePacks.firstIndex(where: { $0.id == stableId }) else {
+            return
+        }
+        let dataset = knowledgePacks[index].config
+        let wasInstalled = knowledgePacks[index].activeIdentity != nil
+        updateKnowledgePack(stableId) { pack in
+            pack.isMutating = true
+            pack.progressPercent = 0
+            pack.progressLabel = "Starting download..."
+            pack.errorMessage = nil
+        }
+
+        knowledgeMutationTasks[stableId] = Task { [weak self] in
+            guard let self else { return }
+            do {
+                let result = try await knowledgeProvider.download(dataset: dataset) { progress in
+                    Task { @MainActor [weak self] in
+                        self?.updateKnowledgePack(stableId) { pack in
+                            pack.progressPercent = min(100, max(0, Int(progress.percentage)))
+                            pack.progressLabel = progress.label
+                        }
+                    }
+                }
+                let shouldEnable = !wasInstalled && result.status == .ready
+                if shouldEnable {
+                    knowledgePreferences.setDatasetEnabled(id: stableId, enabled: true)
+                }
+                let preservedEnablement = knowledgePacks
+                    .first(where: { $0.id == stableId })?.enabled == true
+                applyKnowledgeReconciliation(
+                    result,
+                    stableId: stableId,
+                    enabled: wasInstalled ? preservedEnablement : shouldEnable
+                )
+            } catch {
+                if let result = try? await knowledgeProvider.reconcile(dataset: dataset) {
+                    let enabled = knowledgePacks
+                        .first(where: { $0.id == stableId })?.enabled == true
+                    applyKnowledgeReconciliation(
+                        result,
+                        stableId: stableId,
+                        enabled: enabled
+                    )
+                }
+                updateKnowledgePack(stableId) { pack in
+                    pack.errorMessage =
+                        error.localizedDescription.isEmpty ? "Knowledge pack download failed" : error.localizedDescription
+                }
+            }
+            updateKnowledgePack(stableId) { pack in
+                pack.isMutating = false
+                pack.progressPercent = nil
+                pack.progressLabel = nil
+            }
+            knowledgeMutationTasks.removeValue(forKey: stableId)
+        }
+    }
+
+    func cancelKnowledgePackDownload(stableId: String) {
+        guard let dataset = knowledgePacks.first(where: { $0.id == stableId })?.config else {
+            return
+        }
+        let ownerTask = knowledgeMutationTasks[stableId]
+        Task { [weak self] in
+            guard let self else { return }
+            let result = await knowledgeProvider.cancel(dataset: dataset)
+            await ownerTask?.value
+            if let result {
+                let enabled = knowledgePacks
+                    .first(where: { $0.id == stableId })?.enabled == true
+                applyKnowledgeReconciliation(result, stableId: stableId, enabled: enabled)
+            }
+            updateKnowledgePack(stableId) { pack in
+                pack.isMutating = false
+                pack.progressPercent = nil
+                pack.progressLabel = nil
+            }
+        }
+    }
+
+    func setKnowledgePackEnabled(stableId: String, enabled: Bool) {
+        guard let index = knowledgePacks.firstIndex(where: { $0.id == stableId }),
+              knowledgePacks[index].activeIdentity != nil,
+              !knowledgePacks[index].isMutating else {
+            return
+        }
+        updateKnowledgePack(stableId) { pack in
+            pack.enabled = enabled
+        }
+        knowledgePreferences.setDatasetEnabled(id: stableId, enabled: enabled)
+    }
+
+    private func bootstrapKnowledgePacks() async {
+        let requestedEnabled = knowledgePreferences.enabledDatasetIds
+        for dataset in knowledgePacks.map(\.config) {
+            do {
+                let result = try await knowledgeProvider.reconcile(dataset: dataset)
+                applyKnowledgeReconciliation(
+                    result,
+                    stableId: dataset.stableId,
+                    enabled: requestedEnabled.contains(dataset.stableId)
+                )
+            } catch {
+                updateKnowledgePack(dataset.stableId) { pack in
+                    pack.status = .download
+                    pack.enabled = false
+                    pack.errorMessage = error.localizedDescription
+                }
+            }
+        }
+    }
+
+    private func applyKnowledgeReconciliation(
+        _ result: KnowledgeReconciliation,
+        stableId: String,
+        enabled: Bool
+    ) {
+        updateKnowledgePack(stableId) { pack in
+            pack.status = switch result.status {
+            case .download: .download
+            case .ready: .ready
+            case .updateAvailable: .updateAvailable
+            }
+            pack.activeIdentity = result.activeIdentity
+            pack.enabled = enabled && result.activeIdentity != nil
+            pack.errorMessage = nil
+        }
+    }
+
+    private func updateKnowledgePack(
+        _ stableId: String,
+        update: (inout KnowledgePackState) -> Void
+    ) {
+        guard let index = knowledgePacks.firstIndex(where: { $0.id == stableId }) else {
+            return
+        }
+        var packs = knowledgePacks
+        update(&packs[index])
+        knowledgeState.packs = packs
+    }
+
     private func clearSharedModelReadyTask() {
         sharedModelReadyTask = nil
         sharedModelReadyTaskId = nil
@@ -716,7 +919,30 @@ final class ChatViewModel: ObservableObject {
         ModelReadyKey(id: target.id, requestedContextLength: target.contextLength)
     }
 
-    private func ensureModelReadyShared(target: LlmModelTarget) async throws {
+    private func ensureChatModelReady(target: LlmModelTarget) async throws {
+        if isChatUnsupported {
+            throw UnsupportedDeviceMemoryError(capability: deviceCapability)
+        }
+        var retryCount = 0
+        while true {
+            do {
+                try await provider.ensureModelReady(target: target) { progress in
+                    Task { @MainActor in
+                        self.handleProgress(progress)
+                    }
+                }
+                return
+            } catch {
+                if isCancellation(error) || !shouldRetryModelDownload(error, retryCount: retryCount) {
+                    throw error
+                }
+                retryCount += 1
+                try await Task.sleep(nanoseconds: retryDelayNanoseconds(for: retryCount))
+            }
+        }
+    }
+
+    private func ensureRequiredModelsReadyShared(target: LlmModelTarget) async throws {
         if isChatUnsupported {
             throw UnsupportedDeviceMemoryError(capability: deviceCapability)
         }
@@ -737,7 +963,9 @@ final class ChatViewModel: ObservableObject {
             var retryCount = 0
             while true {
                 do {
-                    try await provider.ensureModelReady(target: target) { progress in
+                    try await provider.ensureRequiredModelsReady(
+                        target: target
+                    ) { progress in
                         Task { @MainActor in
                             self.handleProgress(progress)
                         }
@@ -785,9 +1013,9 @@ final class ChatViewModel: ObservableObject {
         }
 
         let target = modelSettings.currentTarget()
-        let isDownloaded = downloader.isDownloaded(target: target.downloadTarget)
-        if isDownloaded {
+        if provider.requiredModelsReady(target: target) {
             isModelDownloaded = true
+            requiredModelsReady = true
             modelDownloadSizeBytes = nil
             return
         }
@@ -800,11 +1028,15 @@ final class ChatViewModel: ObservableObject {
         modelDownloadTask?.cancel()
         modelDownloadTask = Task {
             do {
-                try await self.ensureModelReadyShared(target: target)
+                try await self.ensureRequiredModelsReadyShared(target: target)
+                self.handleProgress(
+                    DownloadProgress(percent: 100, status: "Ready", phase: .ready)
+                )
             } catch {
                 if isCancellation(error) {
                     return
                 }
+                await self.provider.cleanupRequiredModelArtifacts(target: target)
                 if self.modelDownloadLoggedStart {
                     self.logger.error("Model download failed", error)
                     self.modelDownloadLoggedStart = false
@@ -820,6 +1052,7 @@ final class ChatViewModel: ObservableObject {
                     )
                     self.isDownloading = false
                     self.isModelDownloaded = false
+                    self.requiredModelsReady = false
                 }
             }
         }
@@ -833,9 +1066,9 @@ final class ChatViewModel: ObservableObject {
             return
         }
         let target = modelSettings.currentTarget()
-        let isDownloaded = downloader.isDownloaded(target: target.downloadTarget)
-        isModelDownloaded = isDownloaded
-        if !isDownloaded {
+        isModelDownloaded = downloader.isDownloaded(target: target.downloadTarget)
+        requiredModelsReady = provider.requiredModelsReady(target: target)
+        if !requiredModelsReady {
             return
         }
         modelDownloadSizeBytes = nil
@@ -843,7 +1076,7 @@ final class ChatViewModel: ObservableObject {
         modelDownloadTask = Task { [weak self] in
             guard let self else { return }
             do {
-                try await self.ensureModelReadyShared(target: target)
+                try await self.ensureRequiredModelsReadyShared(target: target)
             } catch {
                 if self.isCancellation(error) {
                     return
@@ -857,18 +1090,27 @@ final class ChatViewModel: ObservableObject {
                     )
                     self.isDownloading = false
                     self.isModelDownloaded = false
+                    self.requiredModelsReady = false
                 }
             }
         }
     }
 
     func cancelDownload() {
+        let target = modelSettings.currentTarget()
+        let activeReadyTask = sharedModelReadyTask
         resetGenerationState(stopRequested: true)
         modelDownloadTask?.cancel()
         modelDownloadTask = nil
         sharedModelReadyTask?.cancel()
         clearSharedModelReadyTask()
         downloader.cancel()
+        Task {
+            if let activeReadyTask {
+                _ = try? await activeReadyTask.value
+            }
+            await provider.cleanupRequiredModelArtifacts(target: target)
+        }
         if modelDownloadLoggedStart {
             logger.info("Model download cancelled")
             modelDownloadLoggedStart = false
@@ -883,6 +1125,8 @@ final class ChatViewModel: ObservableObject {
     }
 
     func retryAssistantResponse(_ message: RenderedChatMessage) {
+        let priorGeneration = generationTask
+        let priorSummary = sessionSummaryTask
         guard message.role == .assistant else { return }
         if isGenerating {
             stopGenerating()
@@ -905,8 +1149,16 @@ final class ChatViewModel: ObservableObject {
             userNode = messageStore[sessionId]?.first(where: { $0.id == parentId })
         }
         guard let userNode else { return }
-        provider.resetContext()
-        startGeneration(for: userNode)
+        priorGeneration?.cancel()
+        priorSummary?.cancel()
+        provider.stopGeneration()
+        Task { [weak self] in
+            _ = await priorGeneration?.result
+            _ = await priorSummary?.result
+            guard let self else { return }
+            await provider.resetContext()
+            startGeneration(for: userNode)
+        }
     }
 
     func changeBranch(for message: RenderedChatMessage, delta: Int) {
@@ -947,8 +1199,11 @@ final class ChatViewModel: ObservableObject {
             showUnsupportedDeviceDialog = true
             return
         }
-        generationTask?.cancel()
-        sessionSummaryTask?.cancel()
+        let priorGeneration = generationTask
+        let priorSummary = sessionSummaryTask
+        priorGeneration?.cancel()
+        priorSummary?.cancel()
+        provider.stopGeneration()
         stopRequested = false
 
         let target = modelSettings.currentTarget()
@@ -967,8 +1222,42 @@ final class ChatViewModel: ObservableObject {
         rebuildMessages(for: userNode.sessionId)
 
         generationTask = Task {
+            defer {
+                settleGenerationIfActive(generationId: generationId, sessionId: userNode.sessionId)
+            }
+            _ = await priorGeneration?.result
+            _ = await priorSummary?.result
+            guard !Task.isCancelled, activeGenerationId == generationId else { return }
+            var embeddingAssetInvalid = false
+            var knowledgeHits: [KnowledgeSearchHit] = []
+            let enabledDatasets = enabledReadyKnowledgeDatasets
+            if !userNode.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+               !enabledDatasets.isEmpty {
+                do {
+                    let hits = try await provider.withChatModelReleasedForRetrieval { embed in
+                        try Task.checkCancellation()
+                        let query = try embed(
+                            userNode.text.trimmingCharacters(in: .whitespacesAndNewlines)
+                        )
+                        try Task.checkCancellation()
+                        return await knowledgeProvider.search(
+                            datasets: enabledDatasets,
+                            query: query,
+                            maxHits: knowledgeEmbedding.maxHits
+                        )
+                    }
+                    try Task.checkCancellation()
+                    knowledgeHits = hits
+                } catch {
+                    if isCancellation(error) {
+                        return
+                    }
+                    embeddingAssetInvalid = error is EmbeddingAssetInvalidError
+                }
+            }
+
             do {
-                try await self.ensureModelReadyShared(target: target)
+                try await self.ensureChatModelReady(target: target)
             } catch {
                 if isCancellation(error) {
                     self.sharedModelReadyTask?.cancel()
@@ -998,19 +1287,22 @@ final class ChatViewModel: ObservableObject {
                     activeGenerationId = nil
                     activeGenerationSessionId = nil
                 }
+                refreshModelDownloadInfo()
                 return
             }
 
             let generationLimits = resolveGenerationLimits(target: target)
-            let historySelection = buildHistorySelection(
+            let normalSystemPrompt = systemPrompt()
+            let normalHistorySelection = buildHistorySelection(
                 sessionId: userNode.sessionId,
                 promptText: prompt.text,
                 promptImageCount: prompt.imageFiles.count,
                 currentMessageId: userNode.id,
-                limits: generationLimits
+                limits: generationLimits,
+                systemPrompt: normalSystemPrompt
             )
 
-            if historySelection.wasTrimmed && overflowBypassMessageId != userNode.id {
+            if normalHistorySelection.wasTrimmed && overflowBypassMessageId != userNode.id {
                 overflowBypassMessageId = nil
                 pendingOverflow = PendingOverflow(sessionId: userNode.sessionId, messageId: userNode.id)
                 activeGenerationId = nil
@@ -1020,12 +1312,15 @@ final class ChatViewModel: ObservableObject {
                 streamingResponse = ""
                 streamingParentId = nil
                 overflowAlert = OverflowAlertState(
-                    inputTokens: historySelection.inputTokens,
-                    inputBudget: historySelection.inputBudget,
+                    inputTokens: normalHistorySelection.inputTokens,
+                    inputBudget: normalHistorySelection.inputBudget,
                     contextLength: generationLimits.contextLength,
                     maxOutput: generationLimits.maxOutput
                 )
                 rebuildMessages(for: userNode.sessionId)
+                if embeddingAssetInvalid {
+                    refreshModelDownloadInfo()
+                }
                 return
             }
 
@@ -1033,9 +1328,46 @@ final class ChatViewModel: ObservableObject {
             pendingOverflow = nil
             overflowAlert = nil
 
-            let history = historySelection.messages
-            let systemMessage = LlmMessage(text: systemPrompt(), role: .system, hasAttachments: false)
-            let messages = [systemMessage] + history + [LlmMessage(text: prompt.text, role: .user, hasAttachments: !userNode.attachments.isEmpty)]
+            let remainingKnowledgeBytes = max(
+                0,
+                (normalHistorySelection.inputBudget - normalHistorySelection.inputTokens) * 4 - 2
+            )
+            let knowledgeContext = buildKnowledgePromptContext(
+                hits: knowledgeHits,
+                maxUTF8Bytes: min(
+                    Int(knowledgeEmbedding.maxContextUtf8Bytes),
+                    remainingKnowledgeBytes
+                )
+            )
+            let candidateSystemPrompt = knowledgeContext.map {
+                "\(normalSystemPrompt)\n\n\($0.text)"
+            }
+            let knowledgeHistorySelection = candidateSystemPrompt.map { candidate in
+                buildHistorySelection(
+                    sessionId: userNode.sessionId,
+                    promptText: prompt.text,
+                    promptImageCount: prompt.imageFiles.count,
+                    currentMessageId: userNode.id,
+                    limits: generationLimits,
+                    systemPrompt: candidate
+                )
+            }
+            let useKnowledge = knowledgeContext != nil &&
+                knowledgeHistorySelection?.wasTrimmed == false
+            let historySelection = useKnowledge ?
+                (knowledgeHistorySelection ?? normalHistorySelection) : normalHistorySelection
+            var activeCitations = useKnowledge ? (knowledgeContext?.citations ?? []) : []
+            let effectiveSystemPrompt = useKnowledge ?
+                (candidateSystemPrompt ?? normalSystemPrompt) : normalSystemPrompt
+            var messages = [
+                LlmMessage(text: effectiveSystemPrompt, role: .system, hasAttachments: false)
+            ] + historySelection.messages + [
+                LlmMessage(
+                    text: prompt.text,
+                    role: .user,
+                    hasAttachments: !userNode.attachments.isEmpty
+                )
+            ]
 
             let bufferLock = NSLock()
             var buffer = ""
@@ -1071,13 +1403,14 @@ final class ChatViewModel: ObservableObject {
             }
 
             do {
-                let summary = try await provider.generateChat(
-                    target: target,
-                    messages: messages,
-                    imageFiles: prompt.imageFiles,
-                    temperature: resolveTemperature(),
-                    maxTokens: generationLimits.maxOutput,
-                    onToken: { token in
+                let runGeneration: () async throws -> GenerationSummary = {
+                    try await self.provider.generateChat(
+                        target: target,
+                        messages: messages,
+                        imageFiles: prompt.imageFiles,
+                        temperature: self.resolveTemperature(),
+                        maxTokens: generationLimits.maxOutput,
+                        onToken: { token in
                         let tokenEstimate = max(1, token.count / 4)
                         var snapshot = ""
                         var shouldUpdateNow = false
@@ -1105,10 +1438,44 @@ final class ChatViewModel: ObservableObject {
                         } else {
                             scheduleStreamingUpdate()
                         }
+                    })
+                }
+                let summary: GenerationSummary
+                do {
+                    summary = try await runGeneration()
+                } catch {
+                    if case LlmError.PromptTooLong = error,
+                       buffer.isEmpty,
+                       !activeCitations.isEmpty {
+                        activeCitations = []
+                        messages = [
+                            LlmMessage(
+                                text: normalSystemPrompt,
+                                role: .system,
+                                hasAttachments: false
+                            )
+                        ] + normalHistorySelection.messages + [
+                            LlmMessage(
+                                text: prompt.text,
+                                role: .user,
+                                hasAttachments: !userNode.attachments.isEmpty
+                            )
+                        ]
+                        summary = try await runGeneration()
+                    } else {
+                        throw error
                     }
-                )
+                }
 
-                finishGeneration(parent: userNode, response: buffer, tokenCount: tokenCount, totalTimeMs: summary.totalTimeMs, interrupted: false, generationId: generationId)
+                finishGeneration(
+                    parent: userNode,
+                    response: buffer,
+                    tokenCount: tokenCount,
+                    totalTimeMs: summary.totalTimeMs,
+                    interrupted: false,
+                    generationId: generationId,
+                    citations: activeCitations
+                )
             } catch {
                 let wasCancelled = stopRequested || isCancellation(error)
                 if activeGenerationId == generationId && !wasCancelled {
@@ -1116,13 +1483,49 @@ final class ChatViewModel: ObservableObject {
                     logger.error("Generation failed", error, details: details)
                     generationErrorMessage = "Response failed. Try again."
                 }
-                finishGeneration(parent: userNode, response: buffer, tokenCount: tokenCount, totalTimeMs: nil, interrupted: true, generationId: generationId)
+                finishGeneration(
+                    parent: userNode,
+                    response: buffer,
+                    tokenCount: tokenCount,
+                    totalTimeMs: nil,
+                    interrupted: true,
+                    generationId: generationId,
+                    citations: activeCitations
+                )
+            }
+            if embeddingAssetInvalid {
+                refreshModelDownloadInfo()
             }
         }
     }
 
-    private func finishGeneration(parent: MessageNode, response: String, tokenCount: Int, totalTimeMs: Int64?, interrupted: Bool, generationId: UUID) {
-        let trimmed = response.trimmingCharacters(in: .whitespacesAndNewlines)
+    private func finishGeneration(
+        parent: MessageNode,
+        response: String,
+        tokenCount: Int,
+        totalTimeMs: Int64?,
+        interrupted: Bool,
+        generationId: UUID,
+        citations: [SourceCitation] = []
+    ) {
+        let rawText = response.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmed: String
+        if rawText.isEmpty {
+            trimmed = rawText
+        } else {
+            do {
+                trimmed = try finalizeAssistantText(
+                    rawAssistantText: rawText,
+                    citations: citations
+                )
+            } catch {
+                logger.error("Assistant source finalization failed", error)
+                trimmed = (try? finalizeAssistantText(
+                    rawAssistantText: rawText,
+                    citations: []
+                )) ?? ""
+            }
+        }
         let isActiveGeneration = activeGenerationId == generationId
         if trimmed.isEmpty {
             if isActiveGeneration && !interrupted && generationErrorMessage == nil {
@@ -1165,7 +1568,11 @@ final class ChatViewModel: ObservableObject {
                         messageStore[parent.sessionId, default: []].append(assistant)
                         invalidateChildrenCache(for: parent.sessionId)
                         updateSelection(for: parent.sessionId, parentId: parent.id, childId: assistant.id)
-                        updateSessionPreview(sessionId: parent.sessionId, preview: trimmed, date: assistant.timestamp)
+                        updateSessionPreview(
+                            sessionId: parent.sessionId,
+                            preview: cleanAssistantText(storedText: trimmed),
+                            date: assistant.timestamp
+                        )
                     } else {
                         logger.warning(
                             "Skipping assistant message persistence",
@@ -1199,7 +1606,21 @@ final class ChatViewModel: ObservableObject {
         if currentSessionId == parent.sessionId {
             rebuildMessages(for: parent.sessionId)
         }
-        scheduleSessionSummary(for: parent.sessionId)
+        if isActiveGeneration {
+            scheduleSessionSummary(for: parent.sessionId)
+        }
+    }
+
+    private func settleGenerationIfActive(generationId: UUID, sessionId: UUID) {
+        guard activeGenerationId == generationId, isGenerating else { return }
+        isGenerating = false
+        isDownloading = false
+        streamingResponse = ""
+        streamingParentId = nil
+        downloadToast = nil
+        activeGenerationId = nil
+        activeGenerationSessionId = nil
+        rebuildMessages(for: sessionId)
     }
 
     private func handleProgress(_ progress: DownloadProgress) {
@@ -1224,6 +1645,9 @@ final class ChatViewModel: ObservableObject {
             downloadToast = DownloadToastState(phase: .ready, percent: 100, status: progress.status, offerRetryDownload: false)
             isDownloading = false
             isModelDownloaded = true
+            requiredModelsReady = provider.requiredModelsReady(
+                target: modelSettings.currentTarget()
+            )
             modelDownloadSizeBytes = nil
             clearDownloadProgressMemory()
             Task { @MainActor in
@@ -1255,7 +1679,10 @@ final class ChatViewModel: ObservableObject {
             let sortedMessages = messages.sorted { $0.createdAtUs < $1.createdAtUs }
             let firstUserMessage = sortedMessages.first(where: { $0.sender == .selfUser })?.text ?? ""
             let lastMessageNode = sortedMessages.last
-            let lastMessage = lastMessageNode?.text ?? ""
+            let lastMessage = lastMessageNode.map { message in
+                message.sender == .other ?
+                    cleanAssistantText(storedText: message.text) : message.text
+            } ?? ""
             let summary = summaries[session.uuid.lowercased()]
             let isPlaceholderTitle = session.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
                 session.title.caseInsensitiveCompare("New chat") == .orderedSame
@@ -1716,6 +2143,9 @@ final class ChatViewModel: ObservableObject {
         if retryCount >= 5 { return false }
         if isCancellation(error) { return false }
         if isOutOfStorageError(error) { return false }
+        if error is RequiredModelValidationError {
+            return false
+        }
 
         if case let LlmError.Download(inner) = error {
             switch inner {
@@ -1834,14 +2264,15 @@ final class ChatViewModel: ObservableObject {
         promptText: String,
         promptImageCount: Int,
         currentMessageId: UUID,
-        limits: GenerationLimits
+        limits: GenerationLimits,
+        systemPrompt: String
     ) -> HistorySelection {
         let childrenMap = childrenByParent(sessionId: sessionId)
         let path = buildSelectedPath(for: sessionId, childrenMap: childrenMap)
         let historyMessages = path.prefix { $0.id != currentMessageId }
 
         let inputBudget = max(0, limits.contextLength - limits.maxOutput - Self.overflowSafetyTokens)
-        let systemTokens = estimateTokens(systemPrompt())
+        let systemTokens = estimateTokens(systemPrompt)
         let promptTokens = estimatePromptTokens(promptText: promptText, imageCount: promptImageCount)
         let historyTokens = historyMessages.reduce(0) { total, node in
             total + estimateTokens(historyText(node))
@@ -1892,6 +2323,7 @@ final class ChatViewModel: ObservableObject {
     private func historyText(_ node: MessageNode) -> String {
         var text = node.text
         if node.role == .assistant {
+            text = cleanAssistantText(storedText: text)
             if let regex = ChatMessageTagRegex.think {
                 let range = NSRange(text.startIndex..., in: text)
                 text = regex.stringByReplacingMatches(in: text, options: [], range: range, withTemplate: "")

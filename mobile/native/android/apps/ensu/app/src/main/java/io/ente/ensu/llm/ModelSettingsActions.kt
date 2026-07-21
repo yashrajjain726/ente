@@ -80,25 +80,28 @@ internal class ModelSettingsActions(
             return
         }
         val target = resolveTarget(state.value.modelSettings)
-        val isDownloaded = modelDownloader.isDownloaded(target.downloadTarget)
-        if (isDownloaded) {
+        val chatReady = llmProvider.isChatModelReady(target)
+        val embeddingReady = llmProvider.isEmbeddingModelReady()
+        val requiredModelsReady = chatReady && embeddingReady
+        if (requiredModelsReady) {
             persistModelDownloadRequested(false)
         }
         state.update { appState ->
             appState.copy(
                 chat = appState.chat.copy(
-                    isModelDownloaded = isDownloaded,
-                    isDownloading = if (isDownloaded) false else appState.chat.isDownloading,
-                    downloadPercent = if (isDownloaded) null else appState.chat.downloadPercent,
-                    downloadStatus = if (isDownloaded) null else appState.chat.downloadStatus,
-                    downloadPhase = if (isDownloaded) null else appState.chat.downloadPhase,
-                    modelDownloadSizeBytes = if (isDownloaded) null else appState.chat.modelDownloadSizeBytes,
-                    hasRequestedModelDownload = appState.chat.hasRequestedModelDownload || isDownloaded
+                    isModelDownloaded = chatReady,
+                    requiredModelsReady = requiredModelsReady,
+                    isDownloading = if (requiredModelsReady) false else appState.chat.isDownloading,
+                    downloadPercent = if (requiredModelsReady) null else appState.chat.downloadPercent,
+                    downloadStatus = if (requiredModelsReady) null else appState.chat.downloadStatus,
+                    downloadPhase = if (requiredModelsReady) null else appState.chat.downloadPhase,
+                    modelDownloadSizeBytes = if (requiredModelsReady) null else appState.chat.modelDownloadSizeBytes,
+                    hasRequestedModelDownload = appState.chat.hasRequestedModelDownload || requiredModelsReady
                 )
             )
         }
 
-        if (isDownloaded) return
+        if (requiredModelsReady) return
 
         val scope = scope ?: return
         scope.launch {
@@ -117,7 +120,12 @@ internal class ModelSettingsActions(
                 }
             }
 
-            val size = modelDownloader.estimateDownloadSize(target.downloadTarget)
+            val chatSize = if (chatReady) 0L else modelDownloader.estimateDownloadSize(target.downloadTarget)
+            val size = if (!chatReady && chatSize == null) {
+                null
+            } else {
+                (chatSize ?: 0L) + if (embeddingReady) 0L else llmProvider.embeddingDownloadSizeBytes
+            }
             state.update { appState ->
                 appState.copy(
                     chat = appState.chat.copy(
@@ -125,6 +133,25 @@ internal class ModelSettingsActions(
                     )
                 )
             }
+        }
+    }
+
+    fun cleanupRequiredModelArtifactsOnBootstrap() {
+        val scope = scope ?: return
+        val target = resolveTarget(state.value.modelSettings)
+        scope.launch {
+            runCatching {
+                llmProvider.cleanupRequiredModelArtifactsIfIdle(target)
+            }.onFailure { error ->
+                logRepository.log(
+                    LogLevel.Warning,
+                    "Required model bootstrap cleanup failed",
+                    details = error.message,
+                    tag = "Model",
+                    throwable = error
+                )
+            }
+            refreshModelDownloadInfo()
         }
     }
 
@@ -137,12 +164,15 @@ internal class ModelSettingsActions(
         if (!userInitiated && !currentState.chat.hasRequestedModelDownload) return
 
         val target = resolveTarget(currentState.modelSettings)
-        val isDownloaded = modelDownloader.isDownloaded(target.downloadTarget)
-        if (isDownloaded) {
+        val wasChatReady = llmProvider.isChatModelReady(target)
+        val wasEmbeddingReady = llmProvider.isEmbeddingModelReady()
+        val requiredModelsReady = wasChatReady && wasEmbeddingReady
+        if (requiredModelsReady) {
             state.update { appState ->
                 appState.copy(
                     chat = appState.chat.copy(
                         isModelDownloaded = true,
+                        requiredModelsReady = true,
                         modelDownloadSizeBytes = null,
                         hasRequestedModelDownload = if (userInitiated) true else appState.chat.hasRequestedModelDownload
                     )
@@ -151,7 +181,7 @@ internal class ModelSettingsActions(
         }
 
         modelDownloadJob?.cancel()
-        if (!isDownloaded) {
+        if (!requiredModelsReady) {
             persistModelDownloadRequested(true)
             logRepository.log(
                 LogLevel.Info,
@@ -175,16 +205,18 @@ internal class ModelSettingsActions(
         modelDownloadJob = scope.launch {
             var loggedComplete = false
             val progressTracker = DownloadProgressTracker(
-                initialPercent = if (isDownloaded) null else 0,
-                initialStatus = if (isDownloaded) null else "Starting download..."
+                initialPercent = if (requiredModelsReady) null else 0,
+                initialStatus = if (requiredModelsReady) null else "Starting download..."
             )
             try {
                 var retryCount = 0
                 while (true) {
                     try {
-                        llmProvider.ensureModelReady(target) { progress ->
+                        llmProvider.ensureRequiredModelsReady(
+                            target
+                        ) { progress ->
                             val resolvedProgress = progressTracker.resolve(progress)
-                            if (!isDownloaded && resolvedProgress.isFinished && !loggedComplete) {
+                            if (!requiredModelsReady && resolvedProgress.isFinished && !loggedComplete) {
                                 loggedComplete = true
                                 logRepository.log(
                                     LogLevel.Info,
@@ -201,6 +233,7 @@ internal class ModelSettingsActions(
                                         downloadStatus = resolvedProgress.status,
                                         downloadPhase = resolvedProgress.phase,
                                         isModelDownloaded = if (resolvedProgress.isFinished) true else appState.chat.isModelDownloaded,
+                                        requiredModelsReady = if (resolvedProgress.isFinished) true else appState.chat.requiredModelsReady,
                                         modelDownloadSizeBytes = if (resolvedProgress.isFinished) null else appState.chat.modelDownloadSizeBytes
                                     )
                                 )
@@ -217,12 +250,22 @@ internal class ModelSettingsActions(
                     }
                 }
             } catch (err: Throwable) {
+                runCatching { llmProvider.cleanupRequiredModelArtifacts(target) }
+                    .onFailure { cleanupError ->
+                        logRepository.log(
+                            LogLevel.Warning,
+                            "Required model cleanup failed",
+                            details = cleanupError.message,
+                            tag = "Model",
+                            throwable = cleanupError
+                        )
+                    }
                 val cancelled = err is kotlinx.coroutines.CancellationException ||
                     err is LlmException.Cancelled
                 val failureMessage = if (cancelled) {
                     "Download cancelled"
                 } else {
-                    userFacingDownloadError(err, isDownloaded)
+                    userFacingDownloadError(err, requiredModelsReady)
                 }
                 state.update { appState ->
                     appState.copy(
@@ -237,13 +280,13 @@ internal class ModelSettingsActions(
                 }
                 persistModelDownloadRequested(false)
                 if (cancelled) {
-                    if (!isDownloaded) {
+                    if (!requiredModelsReady) {
                         logRepository.log(LogLevel.Info, "Model download cancelled", tag = "Model")
                     }
                 } else {
                     logRepository.log(
                         LogLevel.Error,
-                        if (isDownloaded) "Model load failed" else "Model download failed",
+                        if (requiredModelsReady) "Model load failed" else "Model download failed",
                         details = err.message,
                         tag = "Model",
                         throwable = err
@@ -281,7 +324,6 @@ internal class ModelSettingsActions(
 
     fun cancelModelDownload() {
         modelDownloadJob?.cancel()
-        modelDownloadJob = null
         modelDownloader.cancel()
         persistModelDownloadRequested(false)
         state.update { appState ->

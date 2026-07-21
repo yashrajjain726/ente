@@ -1604,6 +1604,49 @@ pub fn metadata_path_for(path: &Path) -> PathBuf {
     PathBuf::from(format!("{}.metadata.json", path.display()))
 }
 
+pub(crate) fn cleanup_incomplete_target(
+    target: &Target,
+    validate: impl Fn(&Target, &Path) -> Result<(), Error>,
+) -> Result<bool, Error> {
+    let destination = Path::new(&target.destination_path);
+    let regular_file = match fs::symlink_metadata(destination) {
+        Ok(metadata) => metadata.file_type().is_file(),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => false,
+        Err(error) => return Err(error.into()),
+    };
+    let valid_final = regular_file && validate(target, destination).is_ok();
+    let valid_metadata = valid_final && download_metadata_matches(destination, &target.url);
+    let mut removed = false;
+
+    if !valid_final {
+        removed |= remove_file_if_present(destination)?;
+    }
+    if !valid_metadata {
+        removed |= remove_file_if_present(&metadata_path_for(destination))?;
+    }
+
+    for artifact in [
+        tmp_path_for(destination),
+        partial_metadata_path_for(destination),
+        range_metadata_path_for(destination),
+        tmp_path_for(&metadata_path_for(destination)),
+    ] {
+        removed |= remove_file_if_present(&artifact)?;
+    }
+    Ok(removed)
+}
+
+fn remove_file_if_present(path: &Path) -> Result<bool, Error> {
+    match fs::symlink_metadata(path) {
+        Ok(_) => {
+            fs::remove_file(path)?;
+            Ok(true)
+        }
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(false),
+        Err(error) => Err(error.into()),
+    }
+}
+
 fn range_metadata_path_for(path: &Path) -> PathBuf {
     PathBuf::from(format!("{}.tmp.ranges.json", path.display()))
 }

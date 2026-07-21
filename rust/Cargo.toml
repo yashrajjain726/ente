@@ -37,11 +37,14 @@ ente-rs = { path = "apps/cli" }
 ente-space = { path = "space" }
 ente-test-support = { path = "crates/test-support" }
 ort = { git = "https://github.com/pykeio/ort.git", rev = "31c8f1443bb579bfddb82705288347697e468fb3", default-features = false }
+memmap2 = "0.9.9"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.149"
 thiserror = "2.0.18"
 uniffi = { version = "0.31.0" }
+url = "2.5.8"
 wasm-bindgen = "0.2.125"
+zstd = "0.13.3"
 
 # Keep transitive ORT users (notably transcribe-rs) on the same revision as direct ORT dependencies.
 [patch.crates-io]
