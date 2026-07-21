@@ -27,6 +27,13 @@ const _likedColor = Color(0xFF08C225);
 const _socialControlsSize = 48.0;
 const _socialIconSize = 32.0;
 const _socialIconPadding = EdgeInsets.fromLTRB(12, 12, 4, 4);
+const _socialIconShadows = [Shadow(color: Color(0x33000000), blurRadius: 16)];
+const _countBadgeShadows = [
+  BoxShadow(color: Color(0x33000000), blurRadius: 16),
+];
+const _latestCommentShadows = [
+  BoxShadow(color: Color(0x14000000), blurRadius: 4),
+];
 
 Duration _motionDuration(BuildContext context, int milliseconds) {
   return MediaQuery.disableAnimationsOf(context)
@@ -459,6 +466,7 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
                         _hasLiked ? EnteIcons.likeFilled : EnteIcons.likeStroke,
                         color: _hasLiked ? _likedColor : Colors.white,
                         size: _socialIconSize,
+                        shadows: _socialIconShadows,
                       ),
                     ),
                   ),
@@ -555,6 +563,7 @@ class _LatestCommentPillState extends State<_LatestCommentPill> {
           DecoratedBox(
             decoration: const BoxDecoration(
               color: Colors.white,
+              boxShadow: _latestCommentShadows,
               borderRadius: BorderRadius.only(
                 topLeft: Radius.circular(20),
                 topRight: Radius.circular(6),
@@ -626,6 +635,7 @@ class _CommentBadgeIcon extends StatelessWidget {
           EnteIcons.commentBubbleStroke,
           color: Colors.white,
           size: _socialIconSize,
+          shadows: _socialIconShadows,
         ),
         Positioned(
           right: -5,
@@ -652,6 +662,7 @@ class _CommentBadgeIcon extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(horizontal: 6),
                     decoration: const BoxDecoration(
                       color: Colors.white,
+                      boxShadow: _countBadgeShadows,
                       borderRadius: BorderRadius.all(Radius.circular(19)),
                     ),
                     child: Center(

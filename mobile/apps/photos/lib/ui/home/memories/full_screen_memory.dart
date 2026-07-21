@@ -1013,7 +1013,7 @@ class _MemoryTopOverlay extends StatelessWidget {
           final currentFile = inheritedData.memories[safeIndex].file;
           final showFavorite = currentFile.isOwner && !isLocalGalleryMode;
           return Padding(
-            padding: EdgeInsets.only(top: safePadding.top),
+            padding: EdgeInsets.only(top: max(safePadding.top, 40)),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
