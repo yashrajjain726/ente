@@ -1,11 +1,12 @@
 import "package:flutter/foundation.dart" show debugPrint, kDebugMode;
 import "package:logging/logging.dart";
+import "package:photos/models/ml/ml_versions.dart"
+    show mlIndexFlagCoreML, mlIndexFlagRuntimeRust, mlIndexFlagWebGPU;
 import "package:photos/service_locator.dart" show flagService, localSettings;
 import "package:photos/services/machine_learning/ml_model_assets.dart";
 import "package:photos/services/machine_learning/ml_model_download_service.dart";
 import "package:photos/services/machine_learning/ml_models_overview.dart";
 import "package:photos/services/machine_learning/ml_result.dart";
-import "package:photos/services/machine_learning/ml_runtime_events.dart";
 import "package:photos/services/machine_learning/webgpu_execution_policy.dart";
 import "package:photos/services/remote_assets_service.dart";
 import "package:photos/utils/isolate/isolate_operations.dart";
@@ -27,6 +28,7 @@ class MLIndexingIsolate extends SuperIsolate {
 
   final _rustRuntimeLock = Lock();
   Map<String, dynamic>? _cachedRustRuntimeArgs;
+  final Set<int> _runtimeFlagCombinations = {};
 
   @override
   Future<void> onDispose() => releaseRustRuntime();
@@ -52,20 +54,15 @@ class MLIndexingIsolate extends SuperIsolate {
       final enableWebGpu = await webGpuExecutionPolicy.isEligible();
       _logger.info("Analyzing image ${instruction.fileKey} with Rust ML");
 
-      final dynamic isolateResult;
-      try {
-        isolateResult = await runInIsolate(IsolateOperation.analyzeImage, {
-          "enteFileID": instruction.fileKey,
-          "filePath": filePath,
-          "runFaces": instruction.shouldRunFaces,
-          "runClip": instruction.shouldRunClip,
-          "runPets": instruction.shouldRunPets,
-          ...rustRuntimeArgs,
-          "enableWebGpu": enableWebGpu,
-        });
-      } finally {
-        await logRustMlRuntimeEvents();
-      }
+      final isolateResult = await runInIsolate(IsolateOperation.analyzeImage, {
+        "enteFileID": instruction.fileKey,
+        "filePath": filePath,
+        "runFaces": instruction.shouldRunFaces,
+        "runClip": instruction.shouldRunClip,
+        "runPets": instruction.shouldRunPets,
+        ...rustRuntimeArgs,
+        "enableWebGpu": enableWebGpu,
+      });
       if (isolateResult is RustCorruptModelCacheDeletedException) {
         _logger.warning(
           "Deleted corrupt Rust ONNX model cache at ${isolateResult.modelPath}; "
@@ -81,7 +78,9 @@ class MLIndexingIsolate extends SuperIsolate {
         }
         return null;
       }
-      return MLResult.fromJsonString(resultJsonString);
+      final result = MLResult.fromJsonString(resultJsonString);
+      _runtimeFlagCombinations.add(result.remoteFlags);
+      return result;
     } catch (e, s) {
       if (e is RustCorruptModelCacheDeletedException ||
           isExpectedMlSkipError(e)) {
@@ -103,6 +102,7 @@ class MLIndexingIsolate extends SuperIsolate {
 
   Future<void> prepareRustRuntime() {
     return _rustRuntimeLock.synchronized(() async {
+      _runtimeFlagCombinations.clear();
       final rustRuntimeArgs = await _buildRustRuntimeArgs();
       final frozenRuntimeArgs = Map<String, dynamic>.unmodifiable(
         rustRuntimeArgs,
@@ -116,29 +116,63 @@ class MLIndexingIsolate extends SuperIsolate {
   }
 
   Future<void> releaseRustRuntime() async {
-    final cachedRustRuntimeArgs = _cachedRustRuntimeArgs;
-    if (cachedRustRuntimeArgs == null) {
-      return;
-    }
-    if (!isIsolateSpawned) {
-      _cachedRustRuntimeArgs = null;
-      return;
-    }
-    return _rustRuntimeLock.synchronized(() async {
-      if (_cachedRustRuntimeArgs == null) {
+    try {
+      final cachedRustRuntimeArgs = _cachedRustRuntimeArgs;
+      if (cachedRustRuntimeArgs == null) {
         return;
       }
       if (!isIsolateSpawned) {
         _cachedRustRuntimeArgs = null;
         return;
       }
-      try {
-        await runInIsolate(IsolateOperation.releaseRustMlRuntime, {});
-        _cachedRustRuntimeArgs = null;
-      } catch (e, s) {
-        _logger.warning("Could not release Rust runtime in isolate", e, s);
-      }
-    });
+      await _rustRuntimeLock.synchronized(() async {
+        if (_cachedRustRuntimeArgs == null) {
+          return;
+        }
+        if (!isIsolateSpawned) {
+          _cachedRustRuntimeArgs = null;
+          return;
+        }
+        try {
+          await runInIsolate(IsolateOperation.releaseRustMlRuntime, {});
+          _cachedRustRuntimeArgs = null;
+        } catch (e, s) {
+          _logger.warning("Could not release Rust runtime in isolate", e, s);
+        }
+      });
+    } finally {
+      _logAndResetRuntimeSummary();
+    }
+  }
+
+  void _logAndResetRuntimeSummary() {
+    if (_runtimeFlagCombinations.isEmpty) {
+      return;
+    }
+    final summaries =
+        _runtimeFlagCombinations
+            .map(_formatRuntimeFlags)
+            .toList(growable: false)
+          ..sort();
+    _logger.info("Rust ML indexing runtime summary: ${summaries.join(', ')}");
+    _runtimeFlagCombinations.clear();
+  }
+
+  String _formatRuntimeFlags(int flags) {
+    if ((flags & mlIndexFlagRuntimeRust) == 0) {
+      return "unknown ($flags)";
+    }
+    final acceleratedProviders = <String>[];
+    if ((flags & mlIndexFlagCoreML) != 0) {
+      acceleratedProviders.add("CoreML");
+    }
+    if ((flags & mlIndexFlagWebGPU) != 0) {
+      acceleratedProviders.add("WebGPU");
+    }
+    if (acceleratedProviders.isEmpty) {
+      return "Rust (no CoreML/WebGPU flag)";
+    }
+    return "Rust+${acceleratedProviders.join('+')}";
   }
 
   Future<void> cleanupLocalIndexingModels({bool delete = false}) async {

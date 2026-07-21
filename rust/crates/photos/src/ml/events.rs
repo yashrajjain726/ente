@@ -45,6 +45,12 @@ pub(crate) fn record(severity: Severity, message: String) {
     let mut events = EVENTS
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
+    if events
+        .iter()
+        .any(|event| event.severity == severity && event.message == message)
+    {
+        return;
+    }
     if events.len() >= MAX_BUFFERED_EVENTS {
         events.remove(0);
     }
@@ -77,6 +83,12 @@ mod tests {
         assert_eq!(events[0].message, "first");
         assert_eq!(events[1].severity, Severity::Severe);
         assert!(take_events().is_empty());
+
+        record(Severity::Warning, "duplicate".to_string());
+        record(Severity::Warning, "duplicate".to_string());
+        let events = take_events();
+        assert_eq!(events.len(), 1);
+        assert_eq!(events[0].message, "duplicate");
 
         for index in 0..(MAX_BUFFERED_EVENTS + 3) {
             record(Severity::Info, format!("event {index}"));
