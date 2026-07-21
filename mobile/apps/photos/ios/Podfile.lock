@@ -474,7 +474,7 @@ SPEC CHECKSUMS:
   ente_qr: 86beaf5d2644705db9b565b32dd8b82c05fb36af
   ente_rust: d0197ebd5460e8f67576579452b073d698404abe
   ente_screen_cover: 6792566774f1c83939f9c1d03ed0a1f1ded45ae4
-  EnteOnnxRuntime: e8d3561a618fd03bf46e2e6c9219967b52487bef
+  EnteOnnxRuntime: 2b0a46f3b247216f991233074d030ab53c257a3f
   ffmpeg_kit_custom: 682b4f2f1ff1f8abae5a92f6c3540f2441d5be99
   ffmpeg_kit_flutter: 915b345acc97d4142e8a9a8549d177ff10f043f5
   file_saver: 6cdbcddd690cb02b0c1a0c225b37cd805c2bf8b6

@@ -11,7 +11,7 @@ Pod::Spec.new do |s|
   s.summary  = "Ente's custom prebuilt ONNX Runtime static libraries for iOS."
   s.homepage = 'https://github.com/laurens-pilot/ort-packaging'
   s.authors  = { 'Ente' => 'engineering@ente.io' }
-  s.license  = { :type => 'MIT', :file => 'ThirdPartyNotices.txt' }
+  s.license  = { :type => 'MIT', :file => 'ONNXRUNTIME-LICENSE' }
   s.source   = {
     :http   => 'https://github.com/laurens-pilot/ort-packaging/releases/download/ort-1.27.0-r2/onnxruntime-coreml-ios-1.27.0-r2.zip',
     :sha256 => '87f27a8d899ff9dbea29a0eac99e08d58a854b0d58542cc131de16f029bb8d5f',
@@ -21,5 +21,8 @@ Pod::Spec.new do |s|
 
   # Keep only the pre-thinned per-slice static archives; the XCFramework in
   # the ZIP is not used (the Rust build consumes the .a files directly).
-  s.preserve_paths = 'static-lib/**/*', 'ThirdPartyNotices.txt'
+  s.preserve_paths = \
+    'static-lib/**/*',
+    'ONNXRUNTIME-LICENSE',
+    'ThirdPartyNotices.txt'
 end
