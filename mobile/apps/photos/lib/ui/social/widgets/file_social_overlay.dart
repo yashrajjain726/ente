@@ -357,8 +357,8 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
       }
       final initialCollection =
           commentCollection ??
-          openingCollection ??
           latestCommentCollection ??
+          openingCollection ??
           sharedCollections.first;
 
       await showFileCommentsBottomSheet(
