@@ -542,11 +542,21 @@ class _LatestCommentPill extends StatelessWidget {
                   horizontal: 16,
                   vertical: 12,
                 ),
-                child: Text(
-                  comment.data,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: textStyle,
+                child: AnimatedSwitcher(
+                  duration: _motionDuration(context, 180),
+                  switchInCurve: const Interval(0.25, 1, curve: Curves.easeOut),
+                  switchOutCurve: const Interval(0.6, 1, curve: Curves.easeIn),
+                  layoutBuilder: (currentChild, previousChildren) => Stack(
+                    alignment: AlignmentDirectional.centerStart,
+                    children: [...previousChildren, ?currentChild],
+                  ),
+                  child: Text(
+                    comment.data,
+                    key: ValueKey(comment.id),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: textStyle,
+                  ),
                 ),
               ),
             ),
