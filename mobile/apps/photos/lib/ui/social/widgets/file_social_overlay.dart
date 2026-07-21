@@ -464,7 +464,7 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
                   ),
                 ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 10),
               Tooltip(
                 message: AppLocalizations.of(context).comments,
                 child: SizedBox.square(

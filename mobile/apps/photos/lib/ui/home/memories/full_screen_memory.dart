@@ -45,7 +45,7 @@ import "package:photos/utils/dialog_util.dart";
 import "package:photos/utils/share_util.dart";
 
 const _socialRightInset = 24.0;
-const _socialToActionBarGap = 14.0;
+const _socialToActionBarGap = 38.0;
 
 //There are two states of variables that FullScreenMemory depends on:
 //1. The list of memories
