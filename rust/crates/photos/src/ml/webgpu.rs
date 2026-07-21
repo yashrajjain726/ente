@@ -1,8 +1,11 @@
-//! Durable crash canary for the Android WebGPU execution provider.
+//! Device-side guards for the Android WebGPU execution provider: a durable
+//! crash canary and a GPU adapter allowlist.
 //!
-//! The only goal of this module is to prevent an infinite crash loop on the
-//! rare device where Dawn/Vulkan hard-crashes the process while a WebGPU
-//! session is built or first dispatched. It intentionally does nothing more.
+//! The canary prevents an infinite crash loop on the rare device where
+//! Dawn/Vulkan hard-crashes the process while a WebGPU session is built or
+//! first dispatched. The allowlist only permits WebGPU on GPU vendors that
+//! Chromium ships WebGPU to on Android, so Ente never runs Dawn on driver
+//! stacks that Google's far larger fleet has not validated.
 //!
 //! Mechanics: immediately before a WebGPU session is built, a per-model
 //! counter file next to the model is incremented and fsynced ("armed"). After
@@ -22,7 +25,10 @@
 //! already serialized and no in-memory state is needed beyond the enable flag.
 
 #[cfg(target_os = "android")]
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{
+    OnceLock,
+    atomic::{AtomicBool, Ordering},
+};
 #[cfg(any(target_os = "android", test))]
 use std::{
     fs::{self, File, OpenOptions},
@@ -55,19 +61,115 @@ pub(crate) fn set_enabled(enabled: bool) {
 /// Whether a WebGPU session may be attempted for this model. False when the
 /// app has not opted in, or when any model in the same directory has tripped
 /// the crash canary. Fails closed on IO errors.
+///
+/// The GPU adapter allowlist is deliberately not checked here: probing the
+/// adapter touches the Vulkan driver, so it must run inside the armed canary
+/// window (see `onnx::build_webgpu_session_with_canary`), where a probe crash
+/// is recorded like any other WebGPU crash.
 #[cfg(target_os = "android")]
 pub(crate) fn attempt_permitted(model_path: &str) -> bool {
     WEBGPU_ENABLED.load(Ordering::Relaxed)
-        && chromium_compatible_adapter_available()
         && model_dir(model_path).is_some_and(|dir| !quarantined(&dir))
 }
 
-/// Chromium-compatible Vulkan adapter filtering will be implemented here via
-/// `ash`. Keeping this inside the Rust eligibility path ensures an unsupported
-/// adapter cannot be bypassed by any Dart inference entry point.
+/// Vulkan vendor IDs of GPUs for which Chromium ships WebGPU on Android 12+,
+/// mirroring `gpu/config/webgpu_blocklist_impl.cc` (Chromium main, 2026-07).
+/// Notably absent, matching Chromium: Imagination/PowerVR (allowed there only
+/// on Android 16+), Samsung Xclipse (still work-in-progress), and everything
+/// else. Revisit whenever the pinned ONNX Runtime/Dawn build is bumped.
+#[cfg(any(target_os = "android", test))]
+const ALLOWLISTED_VULKAN_VENDOR_IDS: [u32; 3] = [
+    0x13B5, // ARM (Mali, Immortalis)
+    0x5143, // Qualcomm (Adreno)
+    0x8086, // Intel
+];
+
+/// WebGPU requires every enumerated adapter to be allowlisted: Dawn selects
+/// its adapter independently of this probe, so a mixed set could otherwise
+/// let Dawn pick a denied adapter. Android's Vulkan loader exposes a single
+/// vendor driver in practice, so on real devices this is a single-adapter
+/// check. An empty list fails closed.
+#[cfg(any(target_os = "android", test))]
+fn vendors_allowlisted(vendor_ids: &[u32]) -> bool {
+    !vendor_ids.is_empty()
+        && vendor_ids
+            .iter()
+            .all(|vendor_id| ALLOWLISTED_VULKAN_VENDOR_IDS.contains(vendor_id))
+}
+
+/// Outcome of the Vulkan adapter allowlist check. `Denied` means the probe
+/// completed and the adapter is not allowlisted — a clean policy decision.
+/// `Failed` means the probe itself did not complete, which callers must treat
+/// as a failed WebGPU attempt (counted by the crash canary) rather than a
+/// policy decision: a driver that cannot even create a Vulkan instance must
+/// eventually quarantine instead of being re-probed on every launch.
 #[cfg(target_os = "android")]
-fn chromium_compatible_adapter_available() -> bool {
-    true
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub(crate) enum AdapterCheck {
+    Allowed,
+    Denied,
+    Failed,
+}
+
+/// Checks the device's Vulkan adapters against the Chromium Android WebGPU
+/// allowlist. Probes once per process. Keeping this inside the Rust
+/// eligibility path ensures an unsupported adapter cannot be bypassed by any
+/// Dart inference entry point.
+///
+/// Must only be called inside an armed canary window: the probe is the first
+/// code in the process to touch the Vulkan driver.
+#[cfg(target_os = "android")]
+pub(crate) fn check_adapter() -> AdapterCheck {
+    static VERDICT: OnceLock<AdapterCheck> = OnceLock::new();
+    *VERDICT.get_or_init(|| match probe_vulkan_vendor_ids() {
+        Ok(vendor_ids) => {
+            let allowed = vendors_allowlisted(&vendor_ids);
+            crate::ml::runtime::rt_log(&format!(
+                "Vulkan adapter vendor IDs {vendor_ids:#06x?}; WebGPU allowlisted: {allowed}"
+            ));
+            if allowed {
+                AdapterCheck::Allowed
+            } else {
+                AdapterCheck::Denied
+            }
+        }
+        Err(error) => {
+            crate::ml::runtime::rt_log(&format!("Vulkan adapter probe failed: {error}"));
+            AdapterCheck::Failed
+        }
+    })
+}
+
+/// Enumerates the vendor IDs of all Vulkan physical devices via the system
+/// Vulkan loader. Any failure (no loader, no driver, no devices) is an error
+/// so that the caller fails closed.
+#[cfg(target_os = "android")]
+fn probe_vulkan_vendor_ids() -> Result<Vec<u32>, String> {
+    use ash::vk;
+
+    // SAFETY: loads the system Vulkan loader (`libvulkan.so`, present on all
+    // Android 7+ devices); `entry` keeps the library loaded until it drops at
+    // the end of this function, after the instance has been destroyed.
+    let entry = unsafe { ash::Entry::load() }
+        .map_err(|error| format!("loading Vulkan loader failed: {error}"))?;
+    // SAFETY: a default `InstanceCreateInfo` (Vulkan 1.0, no layers or
+    // extensions) is a valid instance description.
+    let instance = unsafe { entry.create_instance(&vk::InstanceCreateInfo::default(), None) }
+        .map_err(|error| format!("creating Vulkan instance failed: {error}"))?;
+    // SAFETY: `instance` is a live instance; it is destroyed below on every
+    // path and not used afterwards.
+    let vendor_ids = unsafe { instance.enumerate_physical_devices() }
+        .map(|devices| {
+            devices
+                .iter()
+                // SAFETY: each handle was just enumerated from `instance`.
+                .map(|&device| unsafe { instance.get_physical_device_properties(device) }.vendor_id)
+                .collect::<Vec<u32>>()
+        })
+        .map_err(|error| format!("enumerating Vulkan devices failed: {error}"));
+    // SAFETY: created above, no child objects outlive it.
+    unsafe { instance.destroy_instance(None) };
+    vendor_ids
 }
 
 /// A durable record of an in-flight WebGPU attempt for one model. Dropping it
@@ -198,7 +300,42 @@ fn sync_parent(path: &Path) -> io::Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use super::{MAX_CONSECUTIVE_FAILURES, arm_canary, quarantined};
+    use super::{MAX_CONSECUTIVE_FAILURES, arm_canary, quarantined, vendors_allowlisted};
+
+    #[test]
+    fn allowlists_the_vendors_chromium_ships_webgpu_to_on_android_12() {
+        assert!(vendors_allowlisted(&[0x13B5]), "ARM");
+        assert!(vendors_allowlisted(&[0x5143]), "Qualcomm");
+        assert!(vendors_allowlisted(&[0x8086]), "Intel");
+    }
+
+    #[test]
+    fn denies_vendors_chromium_does_not_ship_webgpu_to_on_android_12() {
+        assert!(!vendors_allowlisted(&[0x1010]), "Imagination/PowerVR");
+        assert!(!vendors_allowlisted(&[0x144D]), "Samsung Xclipse");
+        assert!(!vendors_allowlisted(&[0x10DE]), "NVIDIA");
+        assert!(!vendors_allowlisted(&[0x1AE0]), "Google SwiftShader");
+        assert!(!vendors_allowlisted(&[0x10005]), "Mesa llvmpipe");
+        assert!(!vendors_allowlisted(&[0]));
+    }
+
+    #[test]
+    fn denies_when_any_adapter_is_not_allowlisted() {
+        // Dawn selects its adapter independently of the probe, so a mixed
+        // set must fail closed.
+        assert!(!vendors_allowlisted(&[0x5143, 0x1AE0]));
+        assert!(!vendors_allowlisted(&[0x1010, 0x13B5]));
+    }
+
+    #[test]
+    fn allows_when_every_adapter_is_allowlisted() {
+        assert!(vendors_allowlisted(&[0x13B5, 0x8086]));
+    }
+
+    #[test]
+    fn denies_when_no_adapters_are_enumerated() {
+        assert!(!vendors_allowlisted(&[]));
+    }
 
     fn model_path(dir: &std::path::Path) -> String {
         dir.join("model.onnx").to_string_lossy().into_owned()

@@ -187,6 +187,30 @@ fn build_webgpu_session_with_canary(
     // attempt would go unnoticed and the crash loop protection would be lost.
     let canary = webgpu::arm_canary(model_path, model_namespace)
         .map_err(|error| MlError::Ort(format!("failed to arm WebGPU crash canary: {error}")))?;
+    // The adapter probe touches the Vulkan driver, so it runs inside the
+    // armed canary window: a probe crash is recorded like any other WebGPU
+    // crash.
+    match webgpu::check_adapter() {
+        webgpu::AdapterCheck::Allowed => {}
+        webgpu::AdapterCheck::Denied => {
+            // A completed probe that denies the adapter is a clean policy
+            // decision rather than a failed attempt, so the canary is
+            // disarmed.
+            canary.disarm();
+            return Err(MlError::Ort(
+                "WebGPU skipped: GPU adapter is not on the allowlist".to_string(),
+            ));
+        }
+        webgpu::AdapterCheck::Failed => {
+            // The canary stays armed so the drop records a failed attempt:
+            // a driver whose probe keeps failing quarantines like one that
+            // keeps crashing, and cannot reset the consecutive-failure
+            // counter of genuine crashes.
+            return Err(MlError::Ort(
+                "WebGPU skipped: Vulkan adapter probe failed".to_string(),
+            ));
+        }
+    }
     let mut session = build_session_with_providers(model_path, attempt)?;
     warmup_session(&mut session)?;
     canary.disarm();
