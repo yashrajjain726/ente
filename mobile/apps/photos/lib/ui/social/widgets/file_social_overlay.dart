@@ -25,8 +25,12 @@ final _logger = Logger("FileSocialOverlay");
 
 const _likedColor = Color(0xFF08C225);
 const _socialControlsSize = 48.0;
-const _socialIconSize = 24.0;
-const _socialIconPadding = EdgeInsets.all(12);
+// TODO: Restore both icons to 24px after updating their ente_icons assets to
+// follow HugeIcons sizing guidelines.
+const _likeIconSize = 25.0;
+const _commentIconSize = 26.0;
+const _likeIconPadding = EdgeInsets.all(11.5);
+const _commentIconPadding = EdgeInsets.all(11);
 const _socialIconShadows = [Shadow(color: Color(0x26000000), blurRadius: 12)];
 const _countBadgeShadows = [
   BoxShadow(color: Color(0x1F000000), blurRadius: 4),
@@ -454,7 +458,7 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
                   child: SizedBox.square(
                     dimension: _socialControlsSize,
                     child: IconButton(
-                      padding: _socialIconPadding,
+                      padding: _likeIconPadding,
                       style: IconButton.styleFrom(
                         overlayColor: WidgetStateColor.transparent,
                       ),
@@ -462,7 +466,7 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
                       icon: Icon(
                         _hasLiked ? EnteIcons.likeFilled : EnteIcons.likeStroke,
                         color: _hasLiked ? _likedColor : Colors.white,
-                        size: _socialIconSize,
+                        size: _likeIconSize,
                         shadows: _socialIconShadows,
                       ),
                     ),
@@ -475,7 +479,7 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
                 child: SizedBox.square(
                   dimension: _socialControlsSize,
                   child: IconButton(
-                    padding: _socialIconPadding,
+                    padding: _commentIconPadding,
                     onPressed: _openComments,
                     icon: _CommentBadgeIcon(count: _commentCount),
                   ),
@@ -631,7 +635,7 @@ class _CommentBadgeIcon extends StatelessWidget {
         const Icon(
           EnteIcons.commentBubbleStroke,
           color: Colors.white,
-          size: _socialIconSize,
+          size: _commentIconSize,
           shadows: _socialIconShadows,
         ),
         Positioned(
