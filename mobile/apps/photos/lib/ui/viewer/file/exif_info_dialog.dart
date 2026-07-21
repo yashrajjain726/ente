@@ -48,7 +48,7 @@ class ExifInfoDialog extends StatelessWidget {
               .map((entry) => "${entry.key}: ${entry.value}")
               .join("\n");
           if (data.isEmpty) {
-            data = "no exif data found";
+            data = AppLocalizations.of(context).noExifData;
           }
           return Container(
             padding: const EdgeInsets.all(2),
