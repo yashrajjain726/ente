@@ -31,6 +31,10 @@ pub struct AnalyzeImageResult {
     pub clip: Option<ClipResult>,
     pub pet_faces: Option<Vec<PetFaceResult>>,
     pub pet_bodies: Option<Vec<PetBodyResult>>,
+    /// True when any model that contributed to this result ran on the
+    /// respective accelerated execution provider.
+    pub used_coreml: bool,
+    pub used_webgpu: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -145,6 +149,7 @@ pub fn analyze_image(req: AnalyzeImageRequest) -> MlResult<AnalyzeImageResult> {
             (None, None)
         };
 
+        let used_providers = runtime.used_providers();
         Ok(AnalyzeImageResult {
             file_id,
             decoded_image_size: dims,
@@ -152,6 +157,8 @@ pub fn analyze_image(req: AnalyzeImageRequest) -> MlResult<AnalyzeImageResult> {
             clip,
             pet_faces,
             pet_bodies,
+            used_coreml: used_providers.coreml,
+            used_webgpu: used_providers.webgpu,
         })
     })
 }

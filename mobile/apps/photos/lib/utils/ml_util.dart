@@ -914,7 +914,13 @@ Future<MLResult> analyzeImageRust(Map args) async {
       }
     }
 
-    final result = MLResult.fromEnteFileID(enteFileID);
+    final result = MLResult.fromEnteFileID(
+      enteFileID,
+      remoteFlags:
+          mlIndexFlagRuntimeRust |
+          (rustResult.usedCoreml ? mlIndexFlagCoreML : 0) |
+          (rustResult.usedWebgpu ? mlIndexFlagWebGPU : 0),
+    );
     result.decodedImageSize = Dimensions(
       width: rustResult.decodedImageSize.width,
       height: rustResult.decodedImageSize.height,

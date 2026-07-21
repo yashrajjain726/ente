@@ -97,6 +97,21 @@ pub(crate) enum ExecutionMode {
     CpuOnly,
 }
 
+/// The preferred execution provider of the session attempt that succeeded.
+///
+/// Each accelerated session also registers the policy's fallback providers,
+/// but this identifies the provider whose attempt produced the session. The
+/// runtime aggregates it across the sessions used for a result so remotely
+/// stored embeddings can be attributed to the providers that computed them.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[allow(dead_code)] // Accelerated variants are constructed only on their target OS.
+pub(crate) enum ExecutionProvider {
+    CoreMl,
+    WebGpu,
+    Xnnpack,
+    Cpu,
+}
+
 impl ExecutionMode {
     pub(crate) fn fallback(self) -> Option<Self> {
         match self {
@@ -115,17 +130,18 @@ pub(crate) fn build_session(
     model_path: &str,
     mode: ExecutionMode,
     coreml_cache_namespace: &str,
-) -> MlResult<Session> {
+) -> MlResult<(Session, ExecutionProvider)> {
     let attempts = provider_attempts(mode, model_path, coreml_cache_namespace);
 
     let mut errors = Vec::new();
     for attempt in attempts {
+        let execution_provider = attempt.execution_provider;
         if attempt.uses_webgpu {
             #[cfg(target_os = "android")]
             {
                 match build_webgpu_session_with_canary(model_path, coreml_cache_namespace, attempt)
                 {
-                    Ok(session) => return Ok(session),
+                    Ok(session) => return Ok((session, execution_provider)),
                     Err(error) => errors.push(format!("{error}")),
                 }
                 continue;
@@ -145,7 +161,7 @@ pub(crate) fn build_session(
                         cache_dir.display()
                     );
                 }
-                return Ok(session);
+                return Ok((session, execution_provider));
             }
             Err(error) => {
                 if let Some(cache_dir) = coreml_cache_dir
@@ -274,6 +290,7 @@ struct ProviderAttempt {
     disable_intra_op_spinning: bool,
     coreml_cache_dir: Option<PathBuf>,
     uses_webgpu: bool,
+    execution_provider: ExecutionProvider,
 }
 
 impl ProviderAttempt {
@@ -283,6 +300,7 @@ impl ProviderAttempt {
             disable_intra_op_spinning: false,
             coreml_cache_dir: None,
             uses_webgpu: false,
+            execution_provider: ExecutionProvider::Cpu,
         }
     }
 }
@@ -317,6 +335,7 @@ fn platform_default_attempts(
             disable_intra_op_spinning: false,
             coreml_cache_dir,
             uses_webgpu: false,
+            execution_provider: ExecutionProvider::CoreMl,
         },
         ProviderAttempt::cpu_only(),
     ]
@@ -366,6 +385,7 @@ fn platform_default_attempts(
             disable_intra_op_spinning: true,
             coreml_cache_dir: None,
             uses_webgpu: true,
+            execution_provider: ExecutionProvider::WebGpu,
         });
     }
     // Clean-session fallbacks for provider or driver failures that prevent
@@ -530,6 +550,7 @@ fn xnnpack_attempt() -> ProviderAttempt {
         disable_intra_op_spinning: true,
         coreml_cache_dir: None,
         uses_webgpu: false,
+        execution_provider: ExecutionProvider::Xnnpack,
     }
 }
 

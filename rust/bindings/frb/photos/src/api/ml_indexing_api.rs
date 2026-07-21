@@ -116,6 +116,10 @@ pub struct AnalyzeImageResult {
     pub clip: Option<RustClipResult>,
     pub pet_faces: Option<Vec<RustPetFaceResult>>,
     pub pet_bodies: Option<Vec<RustPetBodyResult>>,
+    /// True when any model that contributed to this result ran on the
+    /// respective accelerated execution provider.
+    pub used_coreml: bool,
+    pub used_webgpu: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -231,6 +235,8 @@ fn to_api_analyze_image_result(result: shared_indexing::AnalyzeImageResult) -> A
         pet_bodies: result
             .pet_bodies
             .map(|bodies| bodies.into_iter().map(to_api_pet_body_result).collect()),
+        used_coreml: result.used_coreml,
+        used_webgpu: result.used_webgpu,
     }
 }
 

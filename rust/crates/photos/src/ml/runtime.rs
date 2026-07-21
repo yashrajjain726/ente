@@ -1,4 +1,5 @@
 use std::{
+    cell::Cell,
     ops::{Deref, DerefMut},
     sync::{Mutex, MutexGuard},
 };
@@ -53,6 +54,7 @@ pub struct ModelPaths {
 struct ModelSlotState {
     path: String,
     fallback_execution_mode: Option<onnx::ExecutionMode>,
+    execution_provider: Option<onnx::ExecutionProvider>,
     pin_count: usize,
     session: Option<Session>,
 }
@@ -68,9 +70,30 @@ pub(crate) struct ModelSessionGuard<'a> {
     state: MutexGuard<'a, ModelSlotState>,
 }
 
+/// Which accelerated execution providers were behind the sessions used through
+/// a [`MlRuntimeView`]. ORed over every session guard the view hands out, so a
+/// result produced through the view can be attributed to the providers that
+/// actually computed (any part of) it.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(crate) struct UsedProviders {
+    pub(crate) coreml: bool,
+    pub(crate) webgpu: bool,
+}
+
+impl UsedProviders {
+    fn record(&mut self, provider: onnx::ExecutionProvider) {
+        match provider {
+            onnx::ExecutionProvider::CoreMl => self.coreml = true,
+            onnx::ExecutionProvider::WebGpu => self.webgpu = true,
+            onnx::ExecutionProvider::Xnnpack | onnx::ExecutionProvider::Cpu => {}
+        }
+    }
+}
+
 pub(crate) struct MlRuntimeView<'a> {
     runtime: &'a MlRuntime,
     model_paths: &'a ModelPaths,
+    used_providers: Cell<UsedProviders>,
 }
 
 impl Deref for ModelSessionGuard<'_> {
@@ -104,6 +127,7 @@ impl ModelSlot {
             state: Mutex::new(ModelSlotState {
                 path: String::new(),
                 fallback_execution_mode: None,
+                execution_provider: None,
                 pin_count: 0,
                 session: None,
             }),
@@ -163,6 +187,7 @@ impl ModelSlot {
         };
 
         state.fallback_execution_mode = Some(fallback_mode);
+        state.execution_provider = None;
         state.session = None;
         true
     }
@@ -184,11 +209,13 @@ impl ModelSlot {
         }
         state.path = path.to_string();
         state.fallback_execution_mode = None;
+        state.execution_provider = None;
         state.session = None;
     }
 
     fn clear_transient_runtime_state_locked(state: &mut ModelSlotState) {
         state.fallback_execution_mode = None;
+        state.execution_provider = None;
         state.session = None;
     }
 
@@ -218,11 +245,20 @@ impl ModelSlot {
             "loading {model_name} with {execution_mode:?} execution"
         ));
         let t = std::time::Instant::now();
-        let session =
+        let (session, execution_provider) =
             onnx::build_session(&state.path, execution_mode, self.coreml_cache_namespace)?;
         rt_log(&format!("loaded {model_name} in {:?}", t.elapsed()));
+        state.execution_provider = Some(execution_provider);
         state.session = Some(session);
         Ok(())
+    }
+}
+
+impl ModelSessionGuard<'_> {
+    fn execution_provider(&self) -> onnx::ExecutionProvider {
+        self.state
+            .execution_provider
+            .expect("a loaded session must record its execution provider")
     }
 }
 
@@ -359,76 +395,110 @@ impl MlRuntime {
         MlRuntimeView {
             runtime: self,
             model_paths,
+            used_providers: Cell::new(UsedProviders::default()),
         }
     }
 }
 
-impl MlRuntimeView<'_> {
+impl<'a> MlRuntimeView<'a> {
+    /// The accelerated providers behind every session used through this view
+    /// so far (since creation or the last [`Self::reset_used_providers`]).
+    pub(crate) fn used_providers(&self) -> UsedProviders {
+        self.used_providers.get()
+    }
+
+    fn reset_used_providers(&self) {
+        self.used_providers.set(UsedProviders::default());
+    }
+
+    fn tracked_session(
+        &self,
+        slot: &'a ModelSlot,
+        path: &str,
+        error_msg: &str,
+    ) -> MlResult<ModelSessionGuard<'a>> {
+        let guard = slot.session_guard_for(path, error_msg)?;
+        let mut used = self.used_providers.get();
+        used.record(guard.execution_provider());
+        self.used_providers.set(used);
+        Ok(guard)
+    }
+
     pub(crate) fn face_detection_session(&self) -> MlResult<ModelSessionGuard<'_>> {
-        self.runtime.face_detection.session_guard_for(
+        self.tracked_session(
+            &self.runtime.face_detection,
             &self.model_paths.face_detection,
             "missing model path: faceDetectionModelPath is required when runFaces is true",
         )
     }
 
     pub(crate) fn face_embedding_session(&self) -> MlResult<ModelSessionGuard<'_>> {
-        self.runtime.face_embedding.session_guard_for(
+        self.tracked_session(
+            &self.runtime.face_embedding,
             &self.model_paths.face_embedding,
             "missing model path: faceEmbeddingModelPath is required when runFaces is true",
         )
     }
 
     pub(crate) fn clip_image_session(&self) -> MlResult<ModelSessionGuard<'_>> {
-        self.runtime.clip_image.session_guard_for(
+        self.tracked_session(
+            &self.runtime.clip_image,
             &self.model_paths.clip_image,
             "missing model path: clipImageModelPath is required when runClip is true",
         )
     }
 
     pub(crate) fn clip_text_session(&self) -> MlResult<ModelSessionGuard<'_>> {
-        self.runtime.clip_text.session_guard_for(
+        self.tracked_session(
+            &self.runtime.clip_text,
             &self.model_paths.clip_text,
             "missing model path: clipTextModelPath is required when running clip text",
         )
     }
 
     pub(crate) fn pet_face_detection_session(&self) -> MlResult<ModelSessionGuard<'_>> {
-        self.runtime.pet_face_detection.session_guard_for(
+        self.tracked_session(
+            &self.runtime.pet_face_detection,
             &self.model_paths.pet_face_detection,
             "missing model path: petFaceDetectionModelPath is required when runPets is true",
         )
     }
 
     pub(crate) fn pet_face_embedding_dog_session(&self) -> MlResult<ModelSessionGuard<'_>> {
-        self.runtime.pet_face_embedding_dog.session_guard_for(
+        self.tracked_session(
+            &self.runtime.pet_face_embedding_dog,
             &self.model_paths.pet_face_embedding_dog,
             "missing model path: petFaceEmbeddingDogModelPath is required",
         )
     }
 
     pub(crate) fn pet_face_embedding_cat_session(&self) -> MlResult<ModelSessionGuard<'_>> {
-        self.runtime.pet_face_embedding_cat.session_guard_for(
+        self.tracked_session(
+            &self.runtime.pet_face_embedding_cat,
             &self.model_paths.pet_face_embedding_cat,
             "missing model path: petFaceEmbeddingCatModelPath is required",
         )
     }
 
     pub(crate) fn pet_body_detection_session(&self) -> MlResult<ModelSessionGuard<'_>> {
-        self.runtime.pet_body_detection.session_guard_for(
+        self.tracked_session(
+            &self.runtime.pet_body_detection,
             &self.model_paths.pet_body_detection,
             "missing model path: petBodyDetectionModelPath is required when runPets is true",
         )
     }
 
     pub(crate) fn pet_body_embedding_dog_session(&self) -> MlResult<ModelSessionGuard<'_>> {
-        self.runtime.pet_body_embedding_dog.session_guard_for(
+        self.tracked_session(
+            &self.runtime.pet_body_embedding_dog,
             &self.model_paths.pet_body_embedding_dog,
             "missing model path: petBodyEmbeddingDogModelPath is required",
         )
     }
 
     pub(crate) fn pet_body_embedding_cat_session(&self) -> MlResult<ModelSessionGuard<'_>> {
-        self.runtime.pet_body_embedding_cat.session_guard_for(
+        self.tracked_session(
+            &self.runtime.pet_body_embedding_cat,
             &self.model_paths.pet_body_embedding_cat,
             "missing model path: petBodyEmbeddingCatModelPath is required",
         )
@@ -464,6 +534,9 @@ where
                 rt_log(&format!(
                     "execution provider failed, retrying with the next provider fallback: {error}"
                 ));
+                // Drop provider attributions from the failed attempt; only the
+                // retry that produces the returned value should count.
+                runtime_view.reset_used_providers();
                 result = func(&runtime_view);
             }
         }
