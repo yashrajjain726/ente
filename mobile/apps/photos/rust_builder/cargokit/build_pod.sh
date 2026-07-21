@@ -35,19 +35,6 @@ export CARGOKIT_TOOL_TEMP_DIR=$TARGET_TEMP_DIR/build_tool
 # Directory inside root project. Not necessarily the top level directory of root project.
 export CARGOKIT_ROOT_PROJECT_DIR=$SRCROOT
 
-case "$PLATFORM_NAME" in
-  iphoneos|iphonesimulator)
-    ONNXRUNTIME_CACHE_DIR=${ENTE_ORT_CACHE_DIR:-$HOME/Library/Caches/io.ente/onnxruntime}
-    ORT_LIB_PATH=$(
-      sh "$BASEDIR/../../../../native/onnxruntime/prepare-ios.sh" \
-        "$ONNXRUNTIME_CACHE_DIR" \
-        "$PLATFORM_NAME"
-    )
-    export ORT_LIB_PATH
-    unset ORT_IOS_XCFWK_PATH ORT_IOS_XCFWK_LOCATION
-    ;;
-esac
-
 FLUTTER_EXPORT_BUILD_ENVIRONMENT=(
   "$PODS_ROOT/../Flutter/ephemeral/flutter_export_environment.sh" # macOS
   "$PODS_ROOT/../Flutter/flutter_export_environment.sh" # iOS

@@ -1,5 +1,4 @@
 import java.io.ByteArrayOutputStream
-import java.util.Properties
 
 plugins {
     id("com.android.library")
@@ -10,25 +9,6 @@ val knownAbis = listOf("arm64-v8a", "armeabi-v7a", "x86_64")
 
 val debugJniLibsDir = layout.buildDirectory.dir("generated/jniLibs/debug")
 val releaseJniLibsDir = layout.buildDirectory.dir("generated/jniLibs/release")
-// The pinned custom ONNX Runtime release is defined once in
-// mobile/native/onnxruntime/version.properties.
-val onnxRuntimeVersionFile = file("../../../../onnxruntime/version.properties")
-val onnxRuntimeVersions = Properties().apply {
-    onnxRuntimeVersionFile.inputStream().use { load(it) }
-}
-val onnxRuntimeAar = gradle.gradleUserHomeDir.resolve(
-    "caches/io.ente/onnxruntime/${onnxRuntimeVersions.getProperty("ortRelease")}/" +
-        onnxRuntimeVersions.getProperty("ortAndroidAsset"),
-)
-val prepareOnnxRuntimeAndroid = tasks.register<Exec>("prepareOnnxRuntimeAndroid") {
-    val prepareScript = file("../../../../onnxruntime/prepare-android.sh")
-    inputs.file(prepareScript)
-    inputs.file(onnxRuntimeVersionFile)
-    outputs.file(onnxRuntimeAar)
-    outputs.upToDateWhen { false }
-    commandLine("sh", prepareScript, onnxRuntimeAar)
-}
-val onnxRuntimeFiles = files(onnxRuntimeAar).builtBy(prepareOnnxRuntimeAndroid)
 
 fun capture(vararg cmd: String): String? = runCatching {
     val out = ByteArrayOutputStream()
@@ -152,6 +132,7 @@ dependencies {
     api("net.java.dev.jna:jna:5.18.1@aar")
     api("androidx.annotation:annotation:1.7.1")
     // Custom WebGPU/XNNPACK build; the Rust runtime dynamically loads its
-    // libonnxruntime.so.
-    api(onnxRuntimeFiles)
+    // libonnxruntime.so. Resolved from the Ivy repository declared in
+    // settings.gradle.kts and SHA-256 pinned in gradle/verification-metadata.xml.
+    api("io.ente.onnxruntime:onnxruntime-webgpu-android:1.27.0-r2@aar")
 }

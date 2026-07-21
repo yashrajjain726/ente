@@ -1,20 +1,41 @@
 # Custom ONNX Runtime binaries
 
-The mobile apps use Ente's pinned custom ONNX Runtime 1.27.0 packaging build:
+The mobile apps use Ente's pinned custom ONNX Runtime 1.27.0 packaging build
+(`ort-1.27.0-r2` from the ort-packaging repository):
 
 - Android: WebGPU, XNNPACK, and CPU; ARM64, ARMv7, and x86_64
 - iOS: CoreML and CPU; iOS 15.1+ device and ARM64 Simulator
 
-The release tag, asset names, and SHA-256 digests are defined once in
-`version.properties`; the prepare scripts and the Android Gradle builds all
-read from it. To bump the release, update only that file.
+Each platform's own package manager downloads and checksum-verifies the
+binaries; there are no custom download scripts.
 
-Android's AAR is downloaded by `prepare-android.sh` into the Gradle user cache.
-iOS's XCFramework ZIP is downloaded by `prepare-ios.sh`; the selected static
-archive slice is then bundled by the Rust build. Both downloads are verified
-against the SHA-256 digests published with the release.
+- **Android**: the AAR is resolved as a regular Gradle dependency
+  (`io.ente.onnxruntime:onnxruntime-webgpu-android`) from an Ivy repository
+  that points directly at the GitHub release. Its SHA-256 is pinned via
+  Gradle dependency verification. Used by the photos app and ensu.
+- **iOS**: the release ZIP is downloaded by CocoaPods as the local
+  `EnteOnnxRuntime` pod (`EnteOnnxRuntime.podspec` in this directory), which
+  pins its SHA-256. The `ente_photos_rust` pod's build phase exports
+  `ORT_LIB_PATH` pointing at the pre-thinned static archive for the active
+  platform slice, which the Rust `ort` crate links statically.
 
 Desktop ONNX Runtime packaging is intentionally unchanged.
+
+## Bumping the pinned release
+
+Update the release tag, version, and SHA-256 digests (published as the
+`SHA256SUMS` release asset) in each of:
+
+1. `EnteOnnxRuntime.podspec` (this directory): `s.version`, `:http` URL, and
+   `:sha256`; then run `pod install` in `mobile/apps/photos/ios`.
+2. `mobile/apps/photos/android/app/build.gradle`: the
+   `io.ente.onnxruntime:onnxruntime-webgpu-android` dependency version.
+3. `mobile/apps/photos/android/gradle/verification-metadata.xml`: the
+   component version, artifact file name, and SHA-256.
+4. `mobile/native/android/apps/ensu/rust/build.gradle.kts`: the dependency
+   version.
+5. `mobile/native/android/apps/ensu/gradle/verification-metadata.xml`: same
+   as 3.
 
 ## WebGPU rollout status
 
@@ -25,17 +46,18 @@ Android 12+ (SDK 31). All other devices use the XNNPACK/CPU chain.
 
 ## Building the Rust photos crate for iOS outside Xcode
 
-The iOS `ort` dependency no longer downloads prebuilt binaries; the Cargokit
-build exports `ORT_LIB_PATH` pointing at the custom static archive. For direct
-`cargo` invocations against an iOS target (for example `cargo check`), export
-it manually:
+The iOS `ort` dependency does not download prebuilt binaries; the
+`ente_photos_rust` build phase exports `ORT_LIB_PATH` pointing at the custom
+static archive inside the `EnteOnnxRuntime` pod. For direct `cargo`
+invocations against an iOS target (for example `cargo check`), run
+`pod install` in `mobile/apps/photos/ios` once, then export it manually:
 
 ```sh
-ORT_LIB_PATH="$(sh mobile/native/onnxruntime/prepare-ios.sh \
-  "$HOME/Library/Caches/io.ente/onnxruntime" iphoneos)" \
+ORT_LIB_PATH="$PWD/mobile/apps/photos/ios/Pods/EnteOnnxRuntime/static-lib/ios-arm64" \
 IPHONEOS_DEPLOYMENT_TARGET=15.1 \
 cargo check -p ente-photos --target aarch64-apple-ios
 ```
 
-Use `iphonesimulator` and `--target aarch64-apple-ios-sim` for the Simulator.
-The deployment target must be at least 15.1 to match the archive.
+Use the `ios-arm64-simulator` slice and `--target aarch64-apple-ios-sim` for
+the Simulator. The deployment target must be at least 15.1 to match the
+archive.

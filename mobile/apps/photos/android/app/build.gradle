@@ -29,26 +29,24 @@ if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
 }
 
-// The pinned custom ONNX Runtime release is defined once in
-// mobile/native/onnxruntime/version.properties.
-def onnxRuntimeVersionFile = file('../../../../native/onnxruntime/version.properties')
-def onnxRuntimeVersions = new Properties()
-onnxRuntimeVersionFile.withInputStream { onnxRuntimeVersions.load(it) }
-def onnxRuntimeAar = new File(
-    gradle.gradleUserHomeDir,
-    "caches/io.ente/onnxruntime/${onnxRuntimeVersions.getProperty('ortRelease')}/" +
-        onnxRuntimeVersions.getProperty('ortAndroidAsset'),
-)
-def prepareOnnxRuntimeAndroid = tasks.register('prepareOnnxRuntimeAndroid', Exec) {
-    def prepareScript = file('../../../../native/onnxruntime/prepare-android.sh')
-    inputs.file(prepareScript)
-    inputs.file(onnxRuntimeVersionFile)
-    outputs.file(onnxRuntimeAar)
-    outputs.upToDateWhen { false }
-    commandLine 'sh', prepareScript, onnxRuntimeAar
+// Ente's custom prebuilt ONNX Runtime AAR is resolved straight from its
+// GitHub release through an Ivy repository; its SHA-256 is pinned in
+// gradle/verification-metadata.xml. See mobile/native/onnxruntime/README.md.
+repositories {
+    exclusiveContent {
+        forRepository {
+            ivy {
+                name = 'enteOnnxRuntimePackaging'
+                url = 'https://github.com/laurens-pilot/ort-packaging/releases/download'
+                patternLayout {
+                    artifact 'ort-[revision]/[artifact]-[revision].[ext]'
+                }
+                metadataSources { artifact() }
+            }
+        }
+        filter { includeGroup 'io.ente.onnxruntime' }
+    }
 }
-def onnxRuntimeFiles = files(onnxRuntimeAar)
-onnxRuntimeFiles.builtBy(prepareOnnxRuntimeAndroid)
 
 configurations.configureEach {
     // mobile_ocr also declares Microsoft's stock AAR. The custom AAR exposes
@@ -202,7 +200,7 @@ dependencies {
     implementation 'com.google.guava:listenablefuture:9999.0-empty-to-avoid-conflict-with-guava'
     // Custom WebGPU/XNNPACK build required by Rust ML, which dynamically
     // loads libonnxruntime.so.
-    implementation(onnxRuntimeFiles)
+    implementation 'io.ente.onnxruntime:onnxruntime-webgpu-android:1.27.0-r2@aar'
     testImplementation 'junit:junit:4.12'
     androidTestImplementation 'androidx.test:runner:1.1.1'
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.1.1'
