@@ -387,67 +387,62 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
       return const SizedBox.shrink();
     }
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final latestComment = _latestComment;
-        final latestCommentAuthor = _latestCommentAuthor;
-        return Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
+    final latestComment = _latestComment;
+    final latestCommentAuthor = _latestCommentAuthor;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        if (latestComment != null && latestCommentAuthor != null)
+          Padding(
+            padding: const EdgeInsets.only(right: 4, bottom: 4),
+            child: _LatestCommentPill(
+              comment: latestComment,
+              author: latestCommentAuthor,
+              maxWidth: MediaQuery.sizeOf(context).width * 0.6,
+              currentUserID: widget.currentUserID!,
+              onTap: () => _openComments(comment: latestComment),
+            ),
+          ),
+        Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            if (latestComment != null && latestCommentAuthor != null)
-              Padding(
-                padding: const EdgeInsets.only(right: 4, bottom: 4),
-                child: _LatestCommentPill(
-                  comment: latestComment,
-                  author: latestCommentAuthor,
-                  maxWidth: constraints.maxWidth * 0.6,
-                  currentUserID: widget.currentUserID!,
-                  onTap: () => _openComments(comment: latestComment),
+            Tooltip(
+              message: AppLocalizations.of(context).like,
+              child: GestureDetector(
+                onLongPress: _showLikes,
+                child: SizedBox.square(
+                  dimension: _socialControlsSize,
+                  child: IconButton(
+                    padding: _socialIconPadding,
+                    style: IconButton.styleFrom(
+                      overlayColor: WidgetStateColor.transparent,
+                    ),
+                    onPressed: _toggleReaction,
+                    icon: Icon(
+                      _hasLiked ? EnteIcons.likeFilled : EnteIcons.likeStroke,
+                      color: _hasLiked ? _likedColor : Colors.white,
+                      size: _socialIconSize,
+                    ),
+                  ),
                 ),
               ),
-            Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Tooltip(
-                  message: AppLocalizations.of(context).like,
-                  child: GestureDetector(
-                    onLongPress: _showLikes,
-                    child: SizedBox.square(
-                      dimension: _socialControlsSize,
-                      child: IconButton(
-                        padding: _socialIconPadding,
-                        style: IconButton.styleFrom(
-                          overlayColor: WidgetStateColor.transparent,
-                        ),
-                        onPressed: _toggleReaction,
-                        icon: Icon(
-                          _hasLiked
-                              ? EnteIcons.likeFilled
-                              : EnteIcons.likeStroke,
-                          color: _hasLiked ? _likedColor : Colors.white,
-                          size: _socialIconSize,
-                        ),
-                      ),
-                    ),
-                  ),
+            ),
+            const SizedBox(height: 8),
+            Tooltip(
+              message: AppLocalizations.of(context).comments,
+              child: SizedBox.square(
+                dimension: _socialControlsSize,
+                child: IconButton(
+                  padding: _socialIconPadding,
+                  onPressed: _openComments,
+                  icon: _CommentBadgeIcon(count: _commentCount),
                 ),
-                const SizedBox(height: 8),
-                Tooltip(
-                  message: AppLocalizations.of(context).comments,
-                  child: SizedBox.square(
-                    dimension: _socialControlsSize,
-                    child: IconButton(
-                      padding: _socialIconPadding,
-                      onPressed: _openComments,
-                      icon: _CommentBadgeIcon(count: _commentCount),
-                    ),
-                  ),
-                ),
-              ],
+              ),
             ),
           ],
-        );
-      },
+        ),
+      ],
     );
   }
 }
