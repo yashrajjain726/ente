@@ -437,22 +437,22 @@ pub(crate) fn run_golden_tensor(
     input_shape: &[i64],
     input: &golden::PreparedGoldenInput,
 ) -> MlResult<Vec<f32>> {
-    let shape = input_shape.to_vec();
     let outputs = match input {
         golden::PreparedGoldenInput::F32(data) => {
             if session_expects_f16(session) {
                 let input_tensor = Tensor::<half::f16>::from_array((
-                    shape,
+                    input_shape,
                     Vec::<half::f16>::from_f32_slice(data),
                 ))?;
                 session.run(ort::inputs![input_tensor])?
             } else {
-                let input_tensor = Tensor::<f32>::from_array((shape, data.clone()))?;
+                let input_tensor =
+                    TensorRef::<f32>::from_array_view((input_shape, data.as_slice()))?;
                 session.run(ort::inputs![input_tensor])?
             }
         }
         golden::PreparedGoldenInput::I32(data) => {
-            let input_tensor = Tensor::<i32>::from_array((shape, data.clone()))?;
+            let input_tensor = TensorRef::<i32>::from_array_view((input_shape, data.as_slice()))?;
             session.run(ort::inputs![input_tensor])?
         }
     };
