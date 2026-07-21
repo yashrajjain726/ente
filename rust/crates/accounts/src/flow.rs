@@ -11,7 +11,7 @@ use ente_core::{
     auth::{
         self, DecryptedSecrets, GeneratedSrpSetup, KeyAttributes as CoreKeyAttributes,
         KeyDerivationStrength, derive_kek, generate_keys_with_strength, generate_srp_setup,
-        get_recovery_key,
+        generate_srp_setup_with_login_key, get_recovery_key,
     },
     crypto::{self, SecretVec, secretbox},
 };
@@ -411,24 +411,18 @@ where
         &self,
         params: ChangePasswordParams,
     ) -> Result<ChangePasswordResult> {
-        let (updated_key_attributes_core, _) = auth::generate_key_attributes_for_new_password(
-            &params.master_key,
-            &to_core_key_attributes(&params.key_attributes),
-            &params.password,
-        )?;
+        let (updated_key_attributes_core, login_key) =
+            auth::generate_key_attributes_for_new_password(
+                &params.master_key,
+                &to_core_key_attributes(&params.key_attributes),
+                &params.password,
+            )?;
 
         let updated_key_attributes = to_api_key_attributes(&updated_key_attributes_core);
         let updated_key_attr = UpdatedKeyAttr::from(&updated_key_attributes);
 
-        let kek = derive_kek(
-            &params.password,
-            &updated_key_attributes.kek_salt,
-            updated_key_attributes.mem_limit as u32,
-            updated_key_attributes.ops_limit as u32,
-        )?;
-
         let srp_user_id = Uuid::new_v4();
-        let srp_setup = generate_srp_setup(&kek, &srp_user_id.to_string())?;
+        let srp_setup = generate_srp_setup_with_login_key(&login_key, &srp_user_id.to_string())?;
         let update = self
             .complete_srp_update(
                 &srp_user_id,

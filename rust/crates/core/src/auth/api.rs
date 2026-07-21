@@ -464,8 +464,7 @@ mod tests {
     #[cfg(feature = "srp")]
     #[test]
     fn test_generate_srp_setup() {
-        let generated = generate_sensitive_kek("test_password").unwrap();
-        let srp_setup = generate_srp_setup(&generated.key, "test-user-id").unwrap();
+        let srp_setup = generate_srp_setup(&[1; 32], "test-user-id").unwrap();
 
         assert_eq!(srp_setup.srp_salt.len(), 16);
         assert_eq!(srp_setup.login_sub_key.len(), 16);
