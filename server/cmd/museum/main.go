@@ -1116,7 +1116,7 @@ func setAppDefaults() {
 	viper.SetDefault("apps.family", "https://family.ente.io")
 	viper.SetDefault("apps.space", "https://ente.space")
 	viper.SetDefault("apps.legacy", "https://legacy.ente.com")
-	viper.SetDefault("apps.extra-origins", []string{"https://ente.com", "https://embed.ente.io", "https://cast.ente.io", "https://staff.ente.sh"})
+	viper.SetDefault("apps.extra-origins", []string{"https://ente.com", "https://ente.io", "https://web.ente.io", "https://auth.ente.io", "https://locker.ente.io", "https://share.ente.io", "https://payments.ente.io", "https://embed.ente.io", "https://cast.ente.io", "https://staff.ente.sh"})
 	viper.SetDefault("apps.custom-domain.cname", "my.ente.com")
 }
 
@@ -1441,19 +1441,21 @@ func corsForOrigins(origins []string, enforce bool) gin.HandlerFunc {
 			knownOrigins[origin] = true
 		}
 	}
-	isKnownOrigin := func(c *gin.Context, origin string) bool {
+	isAllowed := func(c *gin.Context, origin string) bool {
+		path := c.Request.URL.Path
+		if path == "/files/count" || path == "/billing/plans/v2" {
+			return true
+		}
 		if origin == "" || knownOrigins[normalizeOrigin(origin)] || network.IsLoopbackOrigin(origin) {
 			return true
 		}
 		// CollectionLinkMiddleware validates custom album domains.
-		path := c.Request.URL.Path
 		return path == "/public-collection" || strings.HasPrefix(path, "/public-collection/")
 	}
 
 	return func(c *gin.Context) {
 		origin := c.GetHeader("Origin")
-		knownOrigin := isKnownOrigin(c, origin)
-		if !knownOrigin {
+		if !isAllowed(c, origin) {
 			if c.Request.Method != http.MethodOptions || enforce {
 				message := "unknown CORS origin"
 				if enforce {
