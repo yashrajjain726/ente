@@ -17,7 +17,8 @@ mod support;
 
 use anyhow::{Context, bail};
 use ente_photos::ml::golden_tooling::{
-    GoldenMetric, GoldenModelSpec, GoldenSpecInput, render_golden_data,
+    GoldenMetric, GoldenModelSpec, GoldenSpecInput, measure_zero_golden_separation,
+    render_golden_data,
 };
 use support::ml_indexing::{GoldenTestAssets, run_with_large_stack};
 
@@ -85,6 +86,47 @@ fn generate_goldens() {
             bail!("rustfmt failed on {}", path.display());
         }
         println!("wrote {}", path.display());
+        Ok(())
+    });
+}
+
+#[test]
+#[ignore = "downloads and runs the production models"]
+fn zero_inputs_are_separated_from_committed_goldens() {
+    run_with_large_stack("zero_golden_separation", || {
+        let assets = GoldenTestAssets::load()?;
+        let model_paths = [
+            &assets.face_detection.path,
+            &assets.face_embedding.path,
+            &assets.clip_image.path,
+            &assets.clip_text.path,
+        ];
+
+        for model_path in model_paths {
+            let separation = measure_zero_golden_separation(&model_path.to_string_lossy())
+                .map_err(|error| anyhow::anyhow!(error))?;
+            let threshold_margin = separation.zero_distance / separation.threshold;
+            println!(
+                "{}: metric={}, golden_distance={:.9}, zero_distance={:.9}, threshold={:.9}, \
+                 threshold_margin={:.1}x",
+                separation.model_file,
+                separation.metric_label,
+                separation.golden_distance,
+                separation.zero_distance,
+                separation.threshold,
+                threshold_margin,
+            );
+            if separation.zero_distance <= separation.threshold {
+                bail!(
+                    "{}: zero-input output is not separated from the golden ({} {:.9} <= \
+                     threshold {:.9})",
+                    separation.model_file,
+                    separation.metric_label,
+                    separation.zero_distance,
+                    separation.threshold,
+                );
+            }
+        }
         Ok(())
     });
 }

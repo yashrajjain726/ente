@@ -72,6 +72,14 @@ impl GoldenMetric {
             Self::DetectorRelativeL2 { .. } => "detector channel relative L2 error",
         }
     }
+
+    /// Maximum accepted distance from the committed CPU golden.
+    pub fn threshold(self) -> f64 {
+        match self {
+            Self::CosineDistance => COSINE_DISTANCE_THRESHOLD,
+            Self::DetectorRelativeL2 { .. } => RELATIVE_L2_THRESHOLD,
+        }
+    }
 }
 
 /// A committed golden record for one model file.
@@ -145,6 +153,16 @@ pub enum PreparedGoldenInput {
     I32(Vec<i32>),
 }
 
+impl PreparedGoldenInput {
+    /// A zero-filled input with the same element type and length.
+    pub fn zeroed(&self) -> Self {
+        match self {
+            Self::F32(data) => Self::F32(vec![0.0; data.len()]),
+            Self::I32(data) => Self::I32(vec![0; data.len()]),
+        }
+    }
+}
+
 /// Materializes the entry's fixed input tensor data.
 pub fn prepare_input(entry: &GoldenEntry) -> Result<PreparedGoldenInput, String> {
     let element_count: i64 = entry.input_shape.iter().product();
@@ -199,6 +217,49 @@ fn sample_stride(output_len: usize) -> usize {
 /// entry's metric. Returns the measured distance, or a description of why the
 /// output is rejected.
 pub fn compare_output(entry: &GoldenEntry, output: &[f32]) -> Result<f64, String> {
+    let distances = measure_output(entry, output)?;
+    match distances {
+        OutputDistances::Cosine(distance) => ensure_within_threshold(
+            "output cosine distance",
+            distance,
+            COSINE_DISTANCE_THRESHOLD,
+        ),
+        OutputDistances::Detector {
+            confidence,
+            remaining,
+        } => {
+            ensure_within_threshold(
+                "detector confidence relative L2 error",
+                confidence,
+                RELATIVE_L2_THRESHOLD,
+            )?;
+            ensure_within_threshold(
+                "detector remaining-output relative L2 error",
+                remaining,
+                RELATIVE_L2_THRESHOLD,
+            )?;
+            Ok(confidence.max(remaining))
+        }
+    }
+}
+
+/// Measures an output's distance from the committed golden without applying
+/// the acceptance threshold. Useful for checking that a warm-up input's
+/// output is well separated from the golden output.
+pub fn output_distance(entry: &GoldenEntry, output: &[f32]) -> Result<f64, String> {
+    Ok(match measure_output(entry, output)? {
+        OutputDistances::Cosine(distance) => distance,
+        OutputDistances::Detector {
+            confidence,
+            remaining,
+        } => confidence.max(remaining),
+    })
+}
+
+/// Validates the properties required of the zero-input warm-up output. The
+/// warm-up has no numeric golden, but it must still produce a complete finite
+/// tensor before the session can proceed to the golden comparison.
+pub fn validate_output(entry: &GoldenEntry, output: &[f32]) -> Result<(), String> {
     if output.len() != entry.output_len {
         return Err(format!(
             "output length {} does not match golden length {}",
@@ -206,6 +267,20 @@ pub fn compare_output(entry: &GoldenEntry, output: &[f32]) -> Result<f64, String
             entry.output_len
         ));
     }
+
+    if let Some(bad) = output.iter().find(|value| !value.is_finite()) {
+        return Err(format!("output contains non-finite values ({bad})"));
+    }
+    Ok(())
+}
+
+enum OutputDistances {
+    Cosine(f64),
+    Detector { confidence: f64, remaining: f64 },
+}
+
+fn measure_output(entry: &GoldenEntry, output: &[f32]) -> Result<OutputDistances, String> {
+    validate_output(entry, output)?;
 
     let sample = sample_output(output);
     if sample.len() != entry.expected_sample.len() {
@@ -215,16 +290,12 @@ pub fn compare_output(entry: &GoldenEntry, output: &[f32]) -> Result<f64, String
             entry.expected_sample.len()
         ));
     }
-    if let Some(bad) = sample.iter().find(|value| !value.is_finite()) {
-        return Err(format!("output contains non-finite values ({bad})"));
-    }
 
-    let distance = match entry.metric {
-        GoldenMetric::CosineDistance => ensure_within_threshold(
-            "output cosine distance",
-            cosine_distance(&sample, entry.expected_sample)?,
-            COSINE_DISTANCE_THRESHOLD,
-        )?,
+    match entry.metric {
+        GoldenMetric::CosineDistance => Ok(OutputDistances::Cosine(cosine_distance(
+            &sample,
+            entry.expected_sample,
+        )?)),
         GoldenMetric::DetectorRelativeL2 {
             row_len,
             confidence_offset,
@@ -236,20 +307,12 @@ pub fn compare_output(entry: &GoldenEntry, output: &[f32]) -> Result<f64, String
                 row_len,
                 confidence_offset,
             )?;
-            ensure_within_threshold(
-                "detector confidence relative L2 error",
-                confidence_distance,
-                RELATIVE_L2_THRESHOLD,
-            )?;
-            ensure_within_threshold(
-                "detector remaining-output relative L2 error",
-                remaining_distance,
-                RELATIVE_L2_THRESHOLD,
-            )?;
-            confidence_distance.max(remaining_distance)
+            Ok(OutputDistances::Detector {
+                confidence: confidence_distance,
+                remaining: remaining_distance,
+            })
         }
-    };
-    Ok(distance)
+    }
 }
 
 fn ensure_within_threshold(label: &str, distance: f64, threshold: f64) -> Result<f64, String> {
@@ -349,7 +412,7 @@ fn relative_l2_error(actual_sample: &[f32], expected_sample: &[f32]) -> Result<f
 mod tests {
     use super::{
         COSINE_DISTANCE_THRESHOLD, GOLDEN_ENTRIES, GoldenEntry, GoldenInput, GoldenMetric,
-        compare_output, matches_model_file, seeded_noise,
+        PreparedGoldenInput, compare_output, matches_model_file, seeded_noise, validate_output,
     };
 
     fn entry_with_metric(
@@ -429,6 +492,21 @@ mod tests {
     }
 
     #[test]
+    fn zeroed_input_preserves_type_and_length() {
+        let f32_input = PreparedGoldenInput::F32(vec![1.0, 2.0, 3.0]);
+        let i32_input = PreparedGoldenInput::I32(vec![1, 2]);
+
+        let PreparedGoldenInput::F32(f32_zeroes) = f32_input.zeroed() else {
+            panic!("f32 input changed type");
+        };
+        let PreparedGoldenInput::I32(i32_zeroes) = i32_input.zeroed() else {
+            panic!("i32 input changed type");
+        };
+        assert_eq!(f32_zeroes, vec![0.0; 3]);
+        assert_eq!(i32_zeroes, vec![0; 2]);
+    }
+
+    #[test]
     fn accepts_output_close_to_golden() {
         static EXPECTED: [f32; 4] = [0.5, -1.0, 2.0, 0.25];
         let entry = entry_for(&EXPECTED, 4);
@@ -463,6 +541,19 @@ mod tests {
         let entry = entry_for(&EXPECTED, 4);
 
         let error = compare_output(&entry, &[0.5, f32::NAN, 2.0, 0.25]).unwrap_err();
+        assert!(error.contains("non-finite"), "{error}");
+    }
+
+    #[test]
+    fn warm_up_validation_checks_the_full_output_not_only_the_golden_sample() {
+        static EXPECTED: [f32; 1] = [1.0];
+        let entry = entry_for(&EXPECTED, 10_000);
+        let mut output = vec![1.0; 10_000];
+        // The committed golden would sample every third value for this output
+        // length, so this index demonstrates that validation is full-tensor.
+        output[9_998] = f32::INFINITY;
+
+        let error = validate_output(&entry, &output).unwrap_err();
         assert!(error.contains("non-finite"), "{error}");
     }
 

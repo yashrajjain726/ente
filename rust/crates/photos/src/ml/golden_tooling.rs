@@ -55,6 +55,16 @@ pub enum GoldenSpecInput {
     ClipText { phrase: String, vocab_path: String },
 }
 
+/// Measured separation between a zero-input warm-up and the committed golden
+/// when both are run consecutively on one CPU session.
+pub struct ZeroGoldenSeparation {
+    pub model_file: String,
+    pub metric_label: &'static str,
+    pub golden_distance: f64,
+    pub zero_distance: f64,
+    pub threshold: f64,
+}
+
 /// Renders the complete contents of `golden_data.rs` for the given models.
 pub fn render_golden_data(models: &[GoldenModelSpec]) -> Result<String, String> {
     let mut source = String::from(GENERATED_FILE_HEADER);
@@ -63,6 +73,38 @@ pub fn render_golden_data(models: &[GoldenModelSpec]) -> Result<String, String> 
     }
     source.push_str("];\n");
     Ok(source)
+}
+
+/// Runs the production self-test sequence on CPU and measures whether a
+/// stale zero-input result would be rejected by the committed golden.
+pub fn measure_zero_golden_separation(model_path: &str) -> Result<ZeroGoldenSeparation, String> {
+    let model_file = model_file_name(model_path)?;
+    let entry = golden::lookup(model_path)
+        .ok_or_else(|| format!("{model_file}: no committed golden entry"))?;
+    let mut session = build_cpu_session(model_path)?;
+    let golden_input = golden::prepare_input(entry)
+        .map_err(|error| format!("{model_file}: preparing golden input: {error}"))?;
+    let zero_input = golden_input.zeroed();
+
+    let zero_output = onnx::run_golden_tensor(&mut session, entry.input_shape, &zero_input)
+        .map_err(|error| format!("{model_file}: zero-input CPU inference failed: {error}"))?;
+    golden::validate_output(entry, &zero_output)
+        .map_err(|error| format!("{model_file}: invalid zero-input output: {error}"))?;
+
+    let golden_output = onnx::run_golden_tensor(&mut session, entry.input_shape, &golden_input)
+        .map_err(|error| format!("{model_file}: golden CPU inference failed: {error}"))?;
+    let golden_distance = golden::compare_output(entry, &golden_output)
+        .map_err(|error| format!("{model_file}: golden output rejected: {error}"))?;
+    let zero_distance = golden::output_distance(entry, &zero_output)
+        .map_err(|error| format!("{model_file}: measuring zero-input output: {error}"))?;
+
+    Ok(ZeroGoldenSeparation {
+        model_file: model_file.to_string(),
+        metric_label: entry.metric.label(),
+        golden_distance,
+        zero_distance,
+        threshold: entry.metric.threshold(),
+    })
 }
 
 /// A production model as pinned in the asset lock

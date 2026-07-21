@@ -325,15 +325,6 @@ fn provider_attempt_failure_message(
     ))
 }
 
-/// Number of golden inferences a freshly built accelerated session must pass.
-/// Two, because known driver defects (for example on newer Adreno GPUs)
-/// produce a correct first inference and corrupt output from the second
-/// dispatch onwards. The runs double as session warm-up: pipeline creation
-/// and first dispatch happen here (on Android inside the crash-canary
-/// window), not during the first real inference.
-#[cfg(any(target_os = "android", target_os = "ios"))]
-const GOLDEN_SELF_TEST_RUNS: usize = 2;
-
 /// Validates a freshly built accelerated session against the model's
 /// committed golden output. An error means the session must not be used; the
 /// caller falls through to the next execution provider attempt.
@@ -351,51 +342,83 @@ fn run_session_self_test(
             "golden self-test entry missing for '{model_file}'"
         )));
     };
-    let input = golden::prepare_input(entry).map_err(|reason| {
+    let golden_input = golden::prepare_input(entry).map_err(|reason| {
         MlError::Ort(format!(
             "golden self-test input invalid for '{model_file}': {reason}"
         ))
     })?;
+    let zero_input = golden_input.zeroed();
 
-    for run_index in 1..=GOLDEN_SELF_TEST_RUNS {
-        let output = match run_golden_tensor(session, entry.input_shape, &input) {
-            Ok(output) => output,
-            Err(error) => {
-                // Surface inference failures too: without this, a provider
-                // that cannot even execute the golden input would fall back
-                // invisibly (the session-build error is swallowed once the
-                // next attempt succeeds).
-                events::record(
-                    events::Severity::Warning,
-                    format!(
-                        "{provider_label} golden self-test inference failed for '{model_file}' \
-                         on run {run_index}: {error}; falling back to the next execution provider"
-                    ),
-                );
-                return Err(error);
-            }
-        };
-        match golden::compare_output(entry, &output) {
-            Ok(distance) => rt_log(&format!(
-                "{provider_label} golden self-test run {run_index} for '{model_file}' passed \
+    // Warm up pipeline creation and the first dispatch with an input that is
+    // deliberately different from the golden. If a later dispatch reuses
+    // this result, the golden comparison below rejects the session.
+    let zero_output = match run_golden_tensor(session, entry.input_shape, &zero_input) {
+        Ok(output) => output,
+        Err(error) => {
+            events::record(
+                events::Severity::Warning,
+                format!(
+                    "{provider_label} zero-input warm-up inference failed for '{model_file}': \
+                     {error}; falling back to the next execution provider"
+                ),
+            );
+            return Err(error);
+        }
+    };
+    if let Err(reason) = golden::validate_output(entry, &zero_output) {
+        events::record(
+            events::Severity::Severe,
+            format!(
+                "{provider_label} zero-input warm-up failed for '{model_file}': {reason}; \
+                 falling back to the next execution provider"
+            ),
+        );
+        return Err(MlError::Ort(format!(
+            "zero-input warm-up failed for '{model_file}': {reason}"
+        )));
+    }
+    rt_log(&format!(
+        "{provider_label} zero-input warm-up for '{model_file}' passed"
+    ));
+
+    let golden_output = match run_golden_tensor(session, entry.input_shape, &golden_input) {
+        Ok(output) => output,
+        Err(error) => {
+            // Surface inference failures too: without this, a provider that
+            // cannot execute the golden input would fall back invisibly (the
+            // session-build error is swallowed once the next attempt succeeds).
+            events::record(
+                events::Severity::Warning,
+                format!(
+                    "{provider_label} golden self-test inference failed for '{model_file}': \
+                     {error}; falling back to the next execution provider"
+                ),
+            );
+            return Err(error);
+        }
+    };
+    match golden::compare_output(entry, &golden_output) {
+        Ok(distance) => {
+            rt_log(&format!(
+                "{provider_label} golden self-test for '{model_file}' passed \
                  ({} {distance:.2e})",
                 entry.metric.label()
-            )),
-            Err(reason) => {
-                events::record(
-                    events::Severity::Severe,
-                    format!(
-                        "{provider_label} golden self-test failed for '{model_file}' on run \
-                         {run_index}: {reason}; falling back to the next execution provider"
-                    ),
-                );
-                return Err(MlError::Ort(format!(
-                    "golden self-test failed for '{model_file}' on run {run_index}: {reason}"
-                )));
-            }
+            ));
+            Ok(())
+        }
+        Err(reason) => {
+            events::record(
+                events::Severity::Severe,
+                format!(
+                    "{provider_label} golden self-test failed for '{model_file}': {reason}; \
+                     falling back to the next execution provider"
+                ),
+            );
+            Err(MlError::Ort(format!(
+                "golden self-test failed for '{model_file}': {reason}"
+            )))
         }
     }
-    Ok(())
 }
 
 #[cfg(any(target_os = "android", target_os = "ios", test))]
