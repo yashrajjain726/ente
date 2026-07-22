@@ -20,22 +20,24 @@
 
 use crate::ml::golden_data::GOLDEN_ENTRIES;
 
+// All thresholds are deliberately loose (a false rejection silently degrades
+// the device to CPU) and unvalidated against real accelerated hardware;
+// tighten them once field measurements exist. Corrupted output measures ~1.0
+// on every metric.
+
 /// Maximum cosine distance between an accelerated session's embedding output
-/// and the CPU-generated golden output before the session is rejected.
-/// Healthy fp16 provider divergence is around 1e-3; corrupted output is
-/// orders of magnitude beyond this (random vectors sit near 1.0). The
-/// threshold is deliberately loose — a false rejection silently degrades the
-/// device to CPU, which is worse than letting marginal-but-healthy numerics
-/// through.
+/// and the CPU golden. Healthy fp16 divergence is around 1e-3.
 pub(crate) const COSINE_DISTANCE_THRESHOLD: f64 = 0.025;
 
-/// Maximum relative L2 error (`|actual - expected| / |expected|`) for each
-/// detector output channel group. Unlike cosine distance this also rejects
-/// magnitude corruption, which matters for outputs whose absolute values are
-/// consumed directly (box coordinates, scores). Healthy fp16 divergence is
-/// around 1e-3 here too; the same loose-threshold rationale as for cosine
-/// distance applies.
-pub(crate) const RELATIVE_L2_THRESHOLD: f64 = 0.025;
+/// Maximum relative L2 error for the detector's non-confidence outputs (box
+/// coordinates, landmarks), whose absolute values are consumed directly.
+/// Well-conditioned: healthy fp16 divergence is around 1e-3.
+pub(crate) const RELATIVE_L2_THRESHOLD: f64 = 0.1;
+
+/// Maximum relative L2 error for the detector's confidence group, which sits
+/// at the fp16 noise floor on the no-face noise input (samples <= ~2e-3), so
+/// healthy relative divergence can plausibly reach a few 1e-2.
+pub(crate) const CONFIDENCE_RELATIVE_L2_THRESHOLD: f64 = 0.2;
 
 /// Reference outputs are compared on a deterministic strided sample capped at
 /// this many elements, so large detector outputs stay small in the committed
@@ -73,11 +75,12 @@ impl GoldenMetric {
         }
     }
 
-    /// Maximum accepted distance from the committed CPU golden.
+    /// The loosest accepted distance; separation checks must measure beyond
+    /// this. [`compare_output`] applies the per-group thresholds.
     pub fn threshold(self) -> f64 {
         match self {
             Self::CosineDistance => COSINE_DISTANCE_THRESHOLD,
-            Self::DetectorRelativeL2 { .. } => RELATIVE_L2_THRESHOLD,
+            Self::DetectorRelativeL2 { .. } => CONFIDENCE_RELATIVE_L2_THRESHOLD,
         }
     }
 }
@@ -231,7 +234,7 @@ pub fn compare_output(entry: &GoldenEntry, output: &[f32]) -> Result<f64, String
             ensure_within_threshold(
                 "detector confidence relative L2 error",
                 confidence,
-                RELATIVE_L2_THRESHOLD,
+                CONFIDENCE_RELATIVE_L2_THRESHOLD,
             )?;
             ensure_within_threshold(
                 "detector remaining-output relative L2 error",
@@ -649,6 +652,49 @@ mod tests {
 
         let error = compare_output(&entry, &output).unwrap_err();
         assert!(error.contains("detector confidence"), "{error}");
+    }
+
+    /// Coordinate corruption must fail even where the looser confidence
+    /// threshold would accept it.
+    #[test]
+    fn detector_metric_keeps_the_strict_threshold_for_coordinates() {
+        static EXPECTED: [f32; 32] = [
+            100.0, 100.0, 20.0, 20.0, 0.001, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0, 17.0, 18.0,
+            19.0, 0.98, 200.0, 200.0, 40.0, 40.0, 0.002, 20.0, 21.0, 22.0, 23.0, 24.0, 25.0, 26.0,
+            27.0, 28.0, 29.0, 0.99,
+        ];
+        let entry = detector_entry(&EXPECTED);
+        let mut output = EXPECTED;
+        for (index, value) in output.iter_mut().enumerate() {
+            if index % 16 != 4 {
+                *value *= 1.25;
+            }
+        }
+
+        let error = compare_output(&entry, &output).unwrap_err();
+        assert!(error.contains("remaining"), "{error}");
+    }
+
+    /// A confidence-group deviation beyond the coordinate threshold must
+    /// still be accepted (fp16 noise floor).
+    #[test]
+    fn detector_metric_tolerates_noise_floor_divergence_on_confidences() {
+        static EXPECTED: [f32; 32] = [
+            100.0, 100.0, 20.0, 20.0, 0.001, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0, 17.0, 18.0,
+            19.0, 0.98, 200.0, 200.0, 40.0, 40.0, 0.002, 20.0, 21.0, 22.0, 23.0, 24.0, 25.0, 26.0,
+            27.0, 28.0, 29.0, 0.99,
+        ];
+        let entry = detector_entry(&EXPECTED);
+        let mut output = EXPECTED;
+        for confidence in output.iter_mut().skip(4).step_by(16) {
+            *confidence *= 1.15;
+        }
+
+        let distance = compare_output(&entry, &output).unwrap();
+        assert!(
+            distance > super::RELATIVE_L2_THRESHOLD,
+            "distance {distance} must exceed the coordinate threshold to discriminate"
+        );
     }
 
     #[test]

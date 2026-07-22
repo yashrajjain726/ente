@@ -1,7 +1,7 @@
 use std::{
     ffi::OsStr,
     fs::File,
-    io::{BufRead, BufReader, Cursor, Seek},
+    io::{BufRead, BufReader, Cursor, Read, Seek},
     path::Path,
     sync::Once,
 };
@@ -362,6 +362,9 @@ fn orient_decoded_image(
     if path_extension_is_heif(path) {
         return apply_heif_exif_orientation_hint(image, path);
     }
+    if file_looks_like_jxl(path) {
+        return image;
+    }
 
     match decoder_orientation {
         Some(orientation) => apply_exif_orientation_dynamic(image, orientation.to_exif()),
@@ -376,6 +379,9 @@ fn orient_decoded_image_from_bytes(
 ) -> DynamicImage {
     if bytes_look_like_heif(image_bytes) {
         return apply_heif_exif_orientation_hint_from_bytes(image, image_bytes);
+    }
+    if bytes_look_like_jxl(image_bytes) {
+        return image;
     }
 
     match decoder_orientation {
@@ -453,6 +459,30 @@ fn read_exif_orientation_from_bytes(image_bytes: &[u8]) -> Option<u8> {
         .and_then(|field| field.value.get_uint(0))
         .and_then(|value| u8::try_from(value).ok())
         .filter(|value| (1..=8).contains(value))
+}
+
+/// JPEG XL must never have an EXIF-derived orientation applied: jxl-oxide
+/// already applies the authoritative codestream orientation (ISO/IEC
+/// 18181-2), and encoders keep a redundant EXIF tag in the container.
+fn bytes_look_like_jxl(image_bytes: &[u8]) -> bool {
+    const BARE_CODESTREAM_SIGNATURE: [u8; 2] = [0xFF, 0x0A];
+    const CONTAINER_SIGNATURE: [u8; 12] = [
+        0x00, 0x00, 0x00, 0x0C, b'J', b'X', b'L', b' ', 0x0D, 0x0A, 0x87, 0x0A,
+    ];
+
+    image_bytes.starts_with(&BARE_CODESTREAM_SIGNATURE)
+        || image_bytes.starts_with(&CONTAINER_SIGNATURE)
+}
+
+fn file_looks_like_jxl(path: &Path) -> bool {
+    let Ok(file) = File::open(path) else {
+        return false;
+    };
+    let mut signature = Vec::with_capacity(12);
+    if file.take(12).read_to_end(&mut signature).is_err() {
+        return false;
+    }
+    bytes_look_like_jxl(&signature)
 }
 
 fn bytes_look_like_heif(image_bytes: &[u8]) -> bool {
@@ -554,6 +584,15 @@ mod tests {
         let decoded = decode_image_from_bytes(&png).unwrap();
 
         assert_eq!(decoded.rgb, vec![128, 64, 32]);
+    }
+
+    #[test]
+    fn detects_jxl_signatures() {
+        assert!(super::bytes_look_like_jxl(&[0xFF, 0x0A, 0x00]));
+        assert!(super::bytes_look_like_jxl(&[
+            0x00, 0x00, 0x00, 0x0C, b'J', b'X', b'L', b' ', 0x0D, 0x0A, 0x87, 0x0A, 0x00
+        ]));
+        assert!(!super::bytes_look_like_jxl(b"not an image"));
     }
 
     #[test]

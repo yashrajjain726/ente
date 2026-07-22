@@ -149,9 +149,22 @@ impl TransformSubpixel for u8 {
         encoded_profile: &[u8],
         layout: Layout,
     ) -> Result<Option<Vec<Self>>, String> {
-        let transform = cached_u8_transform(encoded_profile, source_profile, layout)?;
-        transform.transform(pixels).map_err(|err| err.to_string())?;
-        Ok(None)
+        // A2B LUTs take ICC precedence over matrix/TRC, and the in-place
+        // executor only implements matrix math, so LUT-carrying profiles go
+        // out-of-place; the matrix path is the fallback when the LUT does
+        // not cover the default intent (moxcms has no cross-intent fallback).
+        if profile_has_device_to_pcs_lut(source_profile)
+            && let Ok(transformed) = transform_u8_out_of_place(pixels, source_profile, layout)
+        {
+            return Ok(Some(transformed));
+        }
+
+        if let Ok(transform) = cached_u8_transform(encoded_profile, source_profile, layout) {
+            transform.transform(pixels).map_err(|err| err.to_string())?;
+            return Ok(None);
+        }
+
+        transform_u8_out_of_place(pixels, source_profile, layout).map(Some)
     }
 }
 
@@ -285,6 +298,29 @@ fn cache_u8_transform(encoded: &[u8], layout: Layout, transform: U8Transform) ->
     }
     entry.u8_transforms.push((layout, Arc::clone(&transform)));
     transform
+}
+
+fn transform_u8_out_of_place(
+    pixels: &[u8],
+    source_profile: &ColorProfile,
+    layout: Layout,
+) -> Result<Vec<u8>, String> {
+    let target_profile = target_profile_for_layout(layout);
+    let transform = source_profile
+        .create_transform_8bit(layout, target_profile, layout, transform_options())
+        .map_err(|err| err.to_string())?;
+    let mut transformed = vec![0; pixels.len()];
+    transform
+        .transform(pixels, &mut transformed)
+        .map_err(|err| err.to_string())?;
+    Ok(transformed)
+}
+
+/// Mirrors moxcms's crate-private `ColorProfile::has_device_to_pcs_lut`.
+fn profile_has_device_to_pcs_lut(profile: &ColorProfile) -> bool {
+    profile.lut_a_to_b_perceptual.is_some()
+        || profile.lut_a_to_b_colorimetric.is_some()
+        || profile.lut_a_to_b_saturation.is_some()
 }
 
 fn profile_is_cacheable(encoded: &[u8]) -> bool {
@@ -450,9 +486,38 @@ fn tone_curve_matches_reference(
 #[cfg(test)]
 mod tests {
     use image::{DynamicImage, ImageBuffer};
-    use moxcms::{ColorProfile, Layout, TransformOptions};
+    use moxcms::{
+        ColorProfile, Layout, LutMultidimensionalType, LutWarehouse, Matrix3d, ToneReprCurve,
+        TransformOptions, Vector3d,
+    };
 
     use super::{apply_icc_profile_to_srgb, profile_is_effectively_srgb};
+
+    fn identity_a_to_b_lut() -> LutWarehouse {
+        let identity_curve = || ToneReprCurve::Lut(vec![0, u16::MAX]);
+        LutWarehouse::Multidimensional(LutMultidimensionalType {
+            num_input_channels: 3,
+            num_output_channels: 3,
+            grid_points: [0; 16],
+            clut: None,
+            a_curves: Vec::new(),
+            b_curves: vec![identity_curve(), identity_curve(), identity_curve()],
+            m_curves: Vec::new(),
+            matrix: Matrix3d::IDENTITY,
+            bias: Vector3d::default(),
+        })
+    }
+
+    /// An RGB profile that converts only through an A2B LUT (no TRC tags),
+    /// like calibrated display/scanner profiles.
+    fn lut_based_rgb_profile() -> ColorProfile {
+        let mut profile = ColorProfile::new_display_p3();
+        profile.red_trc = None;
+        profile.green_trc = None;
+        profile.blue_trc = None;
+        profile.lut_a_to_b_perceptual = Some(identity_a_to_b_lut());
+        profile
+    }
 
     #[test]
     fn detects_generated_srgb_profile() {
@@ -595,6 +660,133 @@ mod tests {
             DynamicImage::ImageRgb8(ImageBuffer::from_raw(4, 1, pixels).expect("valid RGB image"));
 
         let actual = apply_icc_profile_to_srgb(image, Some(&display_p3_icc))
+            .into_rgb8()
+            .into_raw();
+
+        assert_eq!(actual, expected);
+    }
+
+    /// A profile with matrix/TRC AND A2B LUT tags must be converted via the
+    /// LUT (ICC precedence), even though the in-place constructor accepts it.
+    #[test]
+    fn profile_with_matrix_and_lut_tags_is_transformed_via_the_lut() {
+        let mut profile = ColorProfile::new_display_p3();
+        profile.lut_a_to_b_perceptual = Some(identity_a_to_b_lut());
+        let icc = profile.encode().unwrap();
+        let parsed = ColorProfile::new_from_slice(&icc).unwrap();
+        let pixels = vec![0, 32, 64, 96, 128, 160, 192, 224, 255, 17, 91, 203];
+
+        let in_place = parsed
+            .create_in_place_transform_8bit(
+                Layout::Rgb,
+                &ColorProfile::new_srgb(),
+                TransformOptions::default(),
+            )
+            .expect("the in-place constructor accepts matrix-shaper profiles with LUT tags");
+        let mut matrix_result = pixels.clone();
+        in_place.transform(&mut matrix_result).unwrap();
+
+        let mut expected = vec![0; pixels.len()];
+        parsed
+            .create_transform_8bit(
+                Layout::Rgb,
+                &ColorProfile::new_srgb(),
+                Layout::Rgb,
+                TransformOptions::default(),
+            )
+            .unwrap()
+            .transform(&pixels, &mut expected)
+            .unwrap();
+        assert_ne!(
+            expected, matrix_result,
+            "the LUT and matrix paths must disagree for this test to discriminate"
+        );
+
+        let image =
+            DynamicImage::ImageRgb8(ImageBuffer::from_raw(4, 1, pixels).expect("valid RGB image"));
+
+        let actual = apply_icc_profile_to_srgb(image, Some(&icc))
+            .into_rgb8()
+            .into_raw();
+
+        assert_eq!(actual, expected);
+    }
+
+    /// A colorimetric-only A2B LUT (no A2B0) is unusable under moxcms's
+    /// default Perceptual intent; the matrix path must still convert.
+    #[test]
+    fn profile_with_unusable_lut_intent_falls_back_to_the_matrix_transform() {
+        let mut profile = ColorProfile::new_display_p3();
+        profile.lut_a_to_b_colorimetric = Some(identity_a_to_b_lut());
+        let icc = profile.encode().unwrap();
+        let parsed = ColorProfile::new_from_slice(&icc).unwrap();
+        let pixels = vec![0, 32, 64, 96, 128, 160, 192, 224, 255, 17, 91, 203];
+        assert!(
+            parsed
+                .create_transform_8bit(
+                    Layout::Rgb,
+                    &ColorProfile::new_srgb(),
+                    Layout::Rgb,
+                    TransformOptions::default(),
+                )
+                .is_err(),
+            "the out-of-place transform must fail for this test to cover the fallback"
+        );
+        let mut expected = pixels.clone();
+        parsed
+            .create_in_place_transform_8bit(
+                Layout::Rgb,
+                &ColorProfile::new_srgb(),
+                TransformOptions::default(),
+            )
+            .unwrap()
+            .transform(&mut expected)
+            .unwrap();
+        assert_ne!(expected, pixels);
+        let image =
+            DynamicImage::ImageRgb8(ImageBuffer::from_raw(4, 1, pixels).expect("valid RGB image"));
+
+        let actual = apply_icc_profile_to_srgb(image, Some(&icc))
+            .into_rgb8()
+            .into_raw();
+
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn lut_profile_rgb8_falls_back_to_out_of_place_transform() {
+        let lut_icc = lut_based_rgb_profile().encode().unwrap();
+        let parsed = ColorProfile::new_from_slice(&lut_icc).unwrap();
+        assert!(
+            parsed
+                .create_in_place_transform_8bit(
+                    Layout::Rgb,
+                    &ColorProfile::new_srgb(),
+                    TransformOptions::default(),
+                )
+                .is_err(),
+            "profile must be rejected by the in-place executor for this test to cover the fallback"
+        );
+        let pixels = vec![0, 32, 64, 96, 128, 160, 192, 224, 255, 17, 91, 203];
+        let mut expected = vec![0; pixels.len()];
+        parsed
+            .create_transform_8bit(
+                Layout::Rgb,
+                &ColorProfile::new_srgb(),
+                Layout::Rgb,
+                TransformOptions::default(),
+            )
+            .unwrap()
+            .transform(&pixels, &mut expected)
+            .unwrap();
+        assert_ne!(
+            expected, pixels,
+            "the LUT transform must actually change pixel values"
+        );
+        let image =
+            DynamicImage::ImageRgb8(ImageBuffer::from_raw(4, 1, pixels).expect("valid RGB image"));
+
+        let actual = apply_icc_profile_to_srgb(image, Some(&lut_icc))
             .into_rgb8()
             .into_raw();
 

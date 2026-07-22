@@ -348,8 +348,7 @@ mod tests {
             for x in 0..CLIP_IMAGE_INPUT_SIZE {
                 let source = ((start_y + y) * scaled_width as usize + start_x + x) * 3;
                 let destination = y * CLIP_IMAGE_INPUT_SIZE + x;
-                output[destination] =
-                    resized.buffer()[source] as f32 * super::NORMALIZATION_SCALE;
+                output[destination] = resized.buffer()[source] as f32 * super::NORMALIZATION_SCALE;
                 output[pixel_count + destination] =
                     resized.buffer()[source + 1] as f32 * super::NORMALIZATION_SCALE;
                 output[2 * pixel_count + destination] =
