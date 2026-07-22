@@ -115,7 +115,7 @@ fn parakeet_v3_int8() -> ModelPreset {
     ModelPreset {
         id: "parakeet-v3-int8".to_string(),
         title: "Transcription model".to_string(),
-        url: "https://models.ente.io/parakeet-v3-int8.tar.gz".to_string(),
+        url: "https://models.ente.com/parakeet-v3-int8.tar.gz".to_string(),
         sha256: "43d37191602727524a7d8c6da0eef11c4ba24320f5b4730f1a2497befc2efa77".to_string(),
         mmproj_url: None,
         mmproj_sha256: None,
@@ -126,7 +126,7 @@ fn silero_vad_v4() -> ModelPreset {
     ModelPreset {
         id: "silero-vad-v4".to_string(),
         title: "Voice activity model".to_string(),
-        url: "https://models.ente.io/silero_vad_v4.onnx".to_string(),
+        url: "https://models.ente.com/silero_vad_v4.onnx".to_string(),
         sha256: "a35ebf52fd3ce5f1469b2a36158dba761bc47b973ea3382b3186ca15b1f5af28".to_string(),
         mmproj_url: None,
         mmproj_sha256: None,
