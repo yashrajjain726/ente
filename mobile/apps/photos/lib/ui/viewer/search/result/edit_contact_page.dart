@@ -224,6 +224,8 @@ class _EditContactPageState extends State<EditContactPage> {
   Widget _buildAvatar(BuildContext context, {required double size}) {
     final colorScheme = getEnteColorScheme(context);
     final textTheme = getEnteTextTheme(context);
+    final cachedPixelWidth = (size * MediaQuery.devicePixelRatioOf(context))
+        .round();
     final trimmedName = _nameController.text.trim();
     final identity = AvatarIdentity.account(
       label: trimmedName.isNotEmpty ? trimmedName : widget.email,
@@ -243,7 +245,11 @@ class _EditContactPageState extends State<EditContactPage> {
     if (_draftPhotoBytes != null) {
       return _ContactThumbnailShell(
         size: size,
-        child: Image.memory(_draftPhotoBytes!, fit: BoxFit.cover),
+        child: Image.memory(
+          _draftPhotoBytes!,
+          fit: BoxFit.cover,
+          cacheWidth: cachedPixelWidth,
+        ),
       );
     }
 
