@@ -479,7 +479,10 @@ class _FamilyPlanPageState extends State<FamilyPlanPage> {
     }
   }
 
-  Future<void> _showMemberActions(FamilyMember member) async {
+  Future<void> _showMemberActions(
+    FamilyMember member,
+    String fallbackDisplayName,
+  ) async {
     final isCurrentUser =
         member.email.trim().toLowerCase() ==
         _userDetails.email.trim().toLowerCase();
@@ -497,14 +500,15 @@ class _FamilyPlanPageState extends State<FamilyPlanPage> {
       return;
     }
 
-    final displayName = savedContact?.data?.name.trim();
+    final savedContactName = savedContact?.data?.name.trim();
+    final displayName = savedContactName == null || savedContactName.isEmpty
+        ? fallbackDisplayName
+        : savedContactName;
     final l10n = AppLocalizations.of(context);
     await showBottomSheetComponent<void>(
       context: context,
       builder: (sheetContext) => BottomSheetComponent(
-        title: displayName == null || displayName.isEmpty
-            ? member.email
-            : displayName,
+        title: displayName,
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -512,6 +516,7 @@ class _FamilyPlanPageState extends State<FamilyPlanPage> {
               _buildMemberActionItem(
                 sheetContext,
                 member: member,
+                displayName: displayName,
                 action: actions[index],
                 l10n: l10n,
               ),
@@ -527,6 +532,7 @@ class _FamilyPlanPageState extends State<FamilyPlanPage> {
   Widget _buildMemberActionItem(
     BuildContext sheetContext, {
     required FamilyMember member,
+    required String displayName,
     required FamilyMemberAction action,
     required AppLocalizations l10n,
   }) {
@@ -575,6 +581,7 @@ class _FamilyPlanPageState extends State<FamilyPlanPage> {
               context,
               EditStorageLimitPage(
                 member: member,
+                displayName: displayName,
                 totalStorageInBytes: _userDetails.getTotalStorage(),
                 avatarColor: avatarComponentColorValue(
                   context,

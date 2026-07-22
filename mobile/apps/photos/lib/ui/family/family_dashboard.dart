@@ -82,7 +82,7 @@ class FamilyDashboard extends StatelessWidget {
   final Map<int, Uint8List?> profilePictureBytesByUserId;
   final Map<int, String> linkedPersonIdsByUserId;
   final Map<int, String> linkedPersonNamesByUserId;
-  final ValueChanged<FamilyMember> onMemberTap;
+  final void Function(FamilyMember member, String displayName) onMemberTap;
   final VoidCallback onAddMember;
   final int remainingSlots;
 
@@ -118,7 +118,7 @@ class FamilyDashboard extends StatelessWidget {
             linkedPersonId: linkedPersonIdsByUserId[member.userID],
             hasSavedContact: contactsByUserId[member.userID] != null,
             avatarColor: _avatarColorFor(member),
-            onTap: () => onMemberTap(member),
+            onTap: () => onMemberTap(member, _displayNameFor(member)),
           ),
           if (index < visibleMembers.length - 1)
             const SizedBox(height: Spacing.sm),
