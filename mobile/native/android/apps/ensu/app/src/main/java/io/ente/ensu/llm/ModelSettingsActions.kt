@@ -120,10 +120,11 @@ internal class ModelSettingsActions(
             }
 
             val chatSize = if (chatReady) 0L else modelDownloader.estimateDownloadSize(target.downloadTarget)
-            val size = if (!chatReady && chatSize == null) {
+            val embeddingSize = if (embeddingReady) 0L else llmProvider.estimateEmbeddingDownloadSize()
+            val size = if (chatSize == null || embeddingSize == null) {
                 null
             } else {
-                (chatSize ?: 0L) + if (embeddingReady) 0L else llmProvider.embeddingDownloadSizeBytes
+                chatSize + embeddingSize
             }
             state.update { appState ->
                 appState.copy(

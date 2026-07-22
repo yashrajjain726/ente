@@ -12,7 +12,6 @@ pub struct ConfigModelPreset {
 pub struct KnowledgeEmbeddingConfig {
     pub model_url: String,
     pub target_id: String,
-    pub exact_size_bytes: u64,
     pub source_dim: u32,
     pub dim: u32,
     pub query_prompt: String,
@@ -78,7 +77,6 @@ impl From<config::KnowledgeEmbeddingConfig> for KnowledgeEmbeddingConfig {
         Self {
             model_url: value.model_url,
             target_id: value.target_id,
-            exact_size_bytes: value.exact_size_bytes,
             source_dim: value.source_dim,
             dim: value.dim,
             query_prompt: value.query_prompt,

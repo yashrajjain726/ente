@@ -55,15 +55,11 @@ class LlmProvider(
     fun isChatModelReady(target: LlmModelTarget): Boolean =
         downloader.isDownloaded(target.downloadTarget)
 
-    fun isEmbeddingModelReady(): Boolean {
-        val modelFile = downloader.modelPath(embeddingDownloadTarget)
-        return downloader.isDownloaded(embeddingDownloadTarget) &&
-            modelFile.isFile &&
-            modelFile.length().toULong() == knowledgeEmbedding.exactSizeBytes
-    }
+    fun isEmbeddingModelReady(): Boolean =
+        downloader.isDownloaded(embeddingDownloadTarget)
 
-    val embeddingDownloadSizeBytes: Long
-        get() = knowledgeEmbedding.exactSizeBytes.toLong()
+    suspend fun estimateEmbeddingDownloadSize(): Long? =
+        downloader.estimateDownloadSize(embeddingDownloadTarget)
 
     suspend fun ensureModelReady(
         target: LlmModelTarget,

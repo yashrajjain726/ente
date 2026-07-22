@@ -150,7 +150,7 @@ final class LlmProvider {
     }
 
     func isEmbeddingModelReady() -> Bool {
-        isExactEmbeddingModelReady()
+        downloader.isDownloaded(target: embeddingDownloadTarget)
     }
 
     func requiredModelsReady(target: LlmModelTarget) -> Bool {
@@ -169,7 +169,12 @@ final class LlmProvider {
             total += chatSize
         }
         if !isEmbeddingModelReady() {
-            total += Int64(clamping: knowledgeEmbedding.exactSizeBytes)
+            guard let embeddingSize = await downloader.estimateDownloadSize(
+                target: embeddingDownloadTarget
+            ) else {
+                return nil
+            }
+            total += embeddingSize
         }
         return total > 0 ? total : nil
     }
@@ -185,7 +190,7 @@ final class LlmProvider {
 
         let missingTargets: [ModelDownloadTarget] = try await modelLoadGate.withLock {
             let chatReady = downloader.isDownloaded(target: target.downloadTarget)
-            let embeddingReady = isExactEmbeddingModelReady()
+            let embeddingReady = isEmbeddingModelReady()
             if !embeddingReady {
                 _ = downloader.removeDownloaded(target: embeddingDownloadTarget)
             }
@@ -201,7 +206,7 @@ final class LlmProvider {
         }
 
         try await modelLoadGate.withLock {
-            guard isExactEmbeddingModelReady() else {
+            guard isEmbeddingModelReady() else {
                 _ = downloader.removeDownloaded(target: embeddingDownloadTarget)
                 throw RequiredModelValidationError(targetId: knowledgeEmbedding.targetId)
             }
@@ -488,24 +493,6 @@ final class LlmProvider {
 
     private func unloadTranscriptionModelIfLoaded() {
         transcriber.unloadModel()
-    }
-
-    private func isExactEmbeddingModelReady() -> Bool {
-        let target = embeddingDownloadTarget
-        guard downloader.isDownloaded(target: target) else { return false }
-        let url = downloader.modelPath(target: target)
-        do {
-            let values = try url.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey])
-            guard values.isRegularFile == true,
-                  let fileSize = values.fileSize,
-                  fileSize >= 0,
-                  UInt64(fileSize) == knowledgeEmbedding.exactSizeBytes else {
-                return false
-            }
-            return true
-        } catch {
-            return false
-        }
     }
 
     private func loadModel(target: LlmModelTarget, modelPath: URL) throws {

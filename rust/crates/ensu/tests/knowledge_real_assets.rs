@@ -1,5 +1,4 @@
 use std::env;
-use std::fs;
 use std::path::Path;
 
 use ente_ensu::config::defaults;
@@ -21,8 +20,6 @@ fn pinned_embedding_and_pack_match_builder_top_hit() {
     };
     let defaults = defaults();
     let embedding = defaults.knowledge_embedding;
-    let model_metadata = fs::metadata(&model_path).expect("read embedding GGUF metadata");
-    assert_eq!(model_metadata.len(), embedding.exact_size_bytes);
     let pack_identity = Path::new(&pack_directory)
         .file_name()
         .and_then(|name| name.to_str())

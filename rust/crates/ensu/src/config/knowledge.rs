@@ -36,7 +36,6 @@ const MODIFICATION_NOTICE: &str = "Adapted by Ente";
 pub struct KnowledgeEmbeddingConfig {
     pub model_url: String,
     pub target_id: String,
-    pub exact_size_bytes: u64,
     pub source_dim: u32,
     pub dim: u32,
     pub matryoshka: bool,
@@ -115,7 +114,6 @@ pub(crate) fn knowledge_embedding_config() -> KnowledgeEmbeddingConfig {
     KnowledgeEmbeddingConfig {
         model_url: EMBEDDING_MODEL_URL.to_owned(),
         target_id: EMBEDDING_TARGET_ID.to_owned(),
-        exact_size_bytes: 333_590_944,
         source_dim: contract.source_dim,
         dim: contract.dim,
         matryoshka: contract.matryoshka,
@@ -210,7 +208,6 @@ mod tests {
         );
         assert_eq!(datasets[0].download_size_bytes, 167_849_446);
         assert_eq!(datasets[1].download_size_bytes, 202_595_475);
-        assert_eq!(embedding.exact_size_bytes, 333_590_944);
         assert_eq!(knowledge_index_contract().source_dim, 768);
         assert_eq!(knowledge_index_contract().dim, 512);
     }

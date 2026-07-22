@@ -130,13 +130,6 @@ pub fn validate_knowledge_embedding(
         ));
     }
     validate_embedding_model_url(&config.model_url, "knowledge_embedding.model_url")?;
-    if config.exact_size_bytes == 0 {
-        return Err(KnowledgeConfigError::invalid(
-            "knowledge_embedding.exact_size_bytes",
-            "must be positive",
-        ));
-    }
-
     let contract = knowledge_index_contract();
     let exact_fields_match = config.source_dim == contract.source_dim
         && config.dim == contract.dim
@@ -304,9 +297,7 @@ fn is_commit_hash(value: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::super::{
-        EMBEDDING_TARGET_ID, RETRIEVAL_DIM, knowledge_datasets, knowledge_embedding_config,
-    };
+    use super::super::{EMBEDDING_TARGET_ID, knowledge_datasets, knowledge_embedding_config};
     use super::*;
 
     fn valid_datasets() -> Vec<KnowledgeDatasetConfig> {
@@ -417,9 +408,6 @@ mod tests {
 
         let mut config = knowledge_embedding_config();
         config.dim = 768;
-        assert!(validate_knowledge_embedding(&config, &[]).is_err());
-        config.dim = RETRIEVAL_DIM;
-        config.exact_size_bytes = 0;
         assert!(validate_knowledge_embedding(&config, &[]).is_err());
     }
 }
