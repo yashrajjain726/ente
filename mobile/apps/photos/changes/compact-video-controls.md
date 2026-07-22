@@ -1,1 +1,0 @@
-- Made video captions and playback controls more compact in the photo viewer.

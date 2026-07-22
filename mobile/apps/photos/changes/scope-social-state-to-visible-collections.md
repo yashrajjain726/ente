@@ -1,1 +1,0 @@
-- Keep like and comment indicators consistent with the shared albums visible from the current viewer.

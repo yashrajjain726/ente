@@ -1,1 +1,0 @@
-- Redesigned the memories viewer with edge-to-edge media, clearer controls, and add-to-album support.

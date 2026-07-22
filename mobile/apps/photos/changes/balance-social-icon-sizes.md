@@ -1,1 +1,0 @@
-- Improve the visual balance of the like and comment controls.

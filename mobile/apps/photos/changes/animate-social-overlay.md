@@ -1,1 +1,0 @@
-- Added polished animations when comments and comment counts change in the photo viewer.
