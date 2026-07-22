@@ -32,9 +32,7 @@ const _commentIconSize = 26.0;
 const _likeIconPadding = EdgeInsets.all(11.5);
 const _commentIconPadding = EdgeInsets.all(11);
 const _socialIconShadows = [Shadow(color: Color(0x26000000), blurRadius: 12)];
-const _countBadgeShadows = [
-  BoxShadow(color: Color(0x1F000000), blurRadius: 4),
-];
+const _countBadgeShadows = [BoxShadow(color: Color(0x1F000000), blurRadius: 4)];
 const _latestCommentShadows = [
   BoxShadow(color: Color(0x14000000), blurRadius: 4),
 ];
