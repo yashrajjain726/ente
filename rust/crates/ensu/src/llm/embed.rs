@@ -16,7 +16,7 @@ impl Context {
 
         let prompt = params.query_prompt.replacen("{query}", text, 1);
         let (batch_size, source_dim, dim) = (params.batch_size, params.source_dim, params.dim);
-        self.with_context_mut(|context| {
+        self.with_context_and_cache_mut(|context, cached_tokens| {
             let tokens = context
                 .model
                 .str_to_token(&prompt, AddBos::Always)
@@ -40,6 +40,7 @@ impl Context {
             }
 
             context.clear_kv_cache();
+            cached_tokens.clear();
             let mut batch = LlamaBatch::new(tokens.len(), 1);
             for (index, token) in tokens.into_iter().enumerate() {
                 let position = i32::try_from(index).map_err(|_| {
