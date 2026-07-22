@@ -5,7 +5,9 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import io.ente.ensu.AppState
+import io.ente.ensu.bindings.DownloadError
 import io.ente.ensu.bindings.KnowledgeDatasetConfig
+import io.ente.ensu.bindings.KnowledgeDownloadException
 import io.ente.ensu.bindings.KnowledgeReconciliation
 import io.ente.ensu.bindings.KnowledgeReconciliationStatus
 import io.ente.ensu.device.isChatSupported
@@ -87,7 +89,7 @@ class KnowledgeStore(
                             current.copy(
                                 status = KnowledgeReconciliationStatus.DOWNLOAD,
                                 enabled = false,
-                                errorMessage = error.message
+                                errorMessage = userFacingKnowledgeError(error)
                             )
                         }
                     )
@@ -142,7 +144,7 @@ class KnowledgeStore(
                         current.fromReconciliation(it, current.enabled)
                     } ?: current).copy(
                         mutationProgress = null,
-                        errorMessage = error.message ?: "Knowledge pack setup failed"
+                        errorMessage = userFacingKnowledgeError(error)
                     )
                 }
                 logRepository.log(
@@ -205,6 +207,27 @@ class KnowledgeStore(
         enabled = enabled && result.activeIdentity != null,
         errorMessage = null
     )
+
+    private fun userFacingKnowledgeError(error: Throwable): String {
+        val downloadError = (error as? KnowledgeDownloadException.Download)?.error
+        return when (downloadError) {
+            DownloadError.Cancelled -> "Download cancelled"
+            DownloadError.StorageFull ->
+                "Not enough storage space to download this knowledge pack."
+            is DownloadError.Network ->
+                "Couldn't download the knowledge pack. Check your connection and try again."
+            is DownloadError.Http ->
+                "The knowledge pack is currently unavailable. Please try again later."
+            is DownloadError.Validation,
+            is DownloadError.SizeMismatch,
+            is DownloadError.Protocol,
+            is DownloadError.InvalidTarget ->
+                "The knowledge pack couldn't be verified. Please try again."
+            is DownloadError.Io ->
+                "Couldn't save the knowledge pack. Please try again."
+            null -> "Knowledge pack setup failed. Please try again."
+        }
+    }
 }
 
 private class KnowledgePreferences(context: Context) {

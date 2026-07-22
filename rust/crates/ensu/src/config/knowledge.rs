@@ -136,7 +136,7 @@ pub(crate) fn knowledge_datasets() -> Vec<KnowledgeDatasetConfig> {
             download_size_bytes: 167_849_446,
             max_chars: 600,
             source_url_template: "https://simple.wikipedia.org/wiki/{title}".to_owned(),
-            relevance_threshold: 0.46,
+            relevance_threshold: 0.55,
             attribution: AttributionConfig {
                 credit: "Simple English Wikipedia contributors".to_owned(),
                 license_label: KNOWLEDGE_LICENSE_LABEL.to_owned(),
@@ -154,7 +154,7 @@ pub(crate) fn knowledge_datasets() -> Vec<KnowledgeDatasetConfig> {
             download_size_bytes: 202_595_475,
             max_chars: 1_400,
             source_url_template: "https://en.wikibooks.org/wiki/{title}".to_owned(),
-            relevance_threshold: 0.50,
+            relevance_threshold: 0.55,
             attribution: AttributionConfig {
                 credit: "Wikibooks contributors".to_owned(),
                 license_label: KNOWLEDGE_LICENSE_LABEL.to_owned(),

@@ -7,8 +7,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import io.ente.ensu.designsystem.EnsuSpacing
 import io.ente.ensu.designsystem.HugeIcons

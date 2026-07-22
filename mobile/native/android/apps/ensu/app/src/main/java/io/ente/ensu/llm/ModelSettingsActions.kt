@@ -111,8 +111,6 @@ internal class ModelSettingsActions(
                         chat = appState.chat.copy(
                             isDownloading = false,
                             downloadPercent = null,
-                            downloadStatus = null,
-                            downloadPhase = null,
                             hasRequestedModelDownload = false
                         )
                     )

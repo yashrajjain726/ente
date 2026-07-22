@@ -44,7 +44,7 @@ final class KnowledgeStore: ObservableObject {
                 updatePack(dataset.stableId) { pack in
                     pack.status = .download
                     pack.enabled = false
-                    pack.errorMessage = error.localizedDescription
+                    pack.errorMessage = userFacingKnowledgeError(error)
                 }
             }
         }
@@ -98,8 +98,7 @@ final class KnowledgeStore: ObservableObject {
                     )
                 }
                 updatePack(stableId) { pack in
-                    pack.errorMessage =
-                        error.localizedDescription.isEmpty ? "Knowledge pack download failed" : error.localizedDescription
+                    pack.errorMessage = userFacingKnowledgeError(error)
                 }
             }
             updatePack(stableId) { pack in
@@ -168,6 +167,26 @@ final class KnowledgeStore: ObservableObject {
         var updated = packs
         update(&updated[index])
         packs = updated
+    }
+
+    private func userFacingKnowledgeError(_ error: Error) -> String {
+        guard case let KnowledgeDownloadError.Download(downloadError) = error else {
+            return "Knowledge pack setup failed. Please try again."
+        }
+        switch downloadError {
+        case .cancelled:
+            return "Download cancelled"
+        case .storageFull:
+            return "Not enough storage space to download this knowledge pack."
+        case .network:
+            return "Couldn't download the knowledge pack. Check your connection and try again."
+        case .http:
+            return "The knowledge pack is currently unavailable. Please try again later."
+        case .validation, .sizeMismatch, .`protocol`, .invalidTarget:
+            return "The knowledge pack couldn't be verified. Please try again."
+        case .io:
+            return "Couldn't save the knowledge pack. Please try again."
+        }
     }
 }
 

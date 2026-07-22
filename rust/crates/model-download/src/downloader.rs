@@ -195,8 +195,8 @@ impl ModelDownloader {
             let mut any = false;
             for entry in self.fetch_targets(target) {
                 let path = Path::new(&entry.destination_path);
-                let size = if path.exists() {
-                    fs::metadata(path).ok().map(|m| m.len()).filter(|s| *s > 0)
+                let size = if let Some(size) = valid_local_size(&entry, path) {
+                    Some(size)
                 } else {
                     download::probe_content_length(&client, &entry.url).await
                 };
@@ -232,6 +232,15 @@ impl ModelDownloader {
             }],
         }
     }
+}
+
+fn valid_local_size(target: &Target, path: &Path) -> Option<u64> {
+    validate_target(target, path).ok()?;
+    fs::metadata(path)
+        .ok()
+        .filter(|metadata| metadata.is_file())
+        .map(|metadata| metadata.len())
+        .filter(|size| *size > 0)
 }
 
 fn model_path(models_dir: &Path, target: &ModelDownloadTarget) -> PathBuf {
@@ -639,6 +648,29 @@ mod tests {
 
         write_gguf(&mmproj, b"GGUFdata");
         assert!(downloader.is_downloaded(&target));
+
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn local_size_ignores_invalid_final_gguf() {
+        let dir = scratch_dir("local-size-validation");
+        let downloader = ModelDownloader::new(&dir);
+        let target = target("qwen-2b-q8");
+        let entry = downloader
+            .fetch_targets(&target)
+            .into_iter()
+            .next()
+            .unwrap();
+        let path = Path::new(&entry.destination_path);
+
+        write_gguf(path, b"x");
+        assert_eq!(valid_local_size(&entry, path), None);
+
+        let mut valid_gguf = vec![0; 1024 * 1024];
+        valid_gguf[..4].copy_from_slice(b"GGUF");
+        write_gguf(path, &valid_gguf);
+        assert_eq!(valid_local_size(&entry, path), Some(1024 * 1024));
 
         let _ = fs::remove_dir_all(dir);
     }
