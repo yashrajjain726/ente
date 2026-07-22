@@ -152,6 +152,7 @@ class _BodyState extends State<_Body> {
   List<EnteFile>? _files;
   late PageController _pageController;
   final _selectedIndexNotifier = ValueNotifier(0);
+  final _inlineTextDetectionController = InlineTextDetectionController();
   bool _isFirstOpened = true;
   bool isGuestView = false;
   bool swipeLocked = false;
@@ -271,6 +272,24 @@ class _BodyState extends State<_Body> {
           child: Stack(
             children: [
               _buildPageView(),
+              // Keep viewer controls above OCR so their real hit boxes, rather
+              // than approximated screen insets, decide which gestures they own.
+              ValueListenableBuilder(
+                valueListenable: _selectedIndexNotifier,
+                builder: (BuildContext context, int selectedIndex, _) {
+                  if (widget.config.mode == DetailPageMode.minimalistic) {
+                    return const SizedBox.shrink();
+                  }
+                  if (flagService.ocrOverlayEnabled) {
+                    return InlineTextDetection(
+                      file: _files![selectedIndex],
+                      controller: _inlineTextDetectionController,
+                      isGuestView: isGuestView,
+                    );
+                  }
+                  return const SizedBox.shrink();
+                },
+              ),
               ValueListenableBuilder(
                 builder: (BuildContext context, int selectedIndex, _) {
                   return widget.config.mode == DetailPageMode.minimalistic
@@ -295,24 +314,6 @@ class _BodyState extends State<_Body> {
                     mode: widget.config.mode,
                     isGuestView: isGuestView,
                   );
-                },
-              ),
-              ValueListenableBuilder(
-                valueListenable: _selectedIndexNotifier,
-                builder: (BuildContext context, int selectedIndex, _) {
-                  if (widget.config.mode == DetailPageMode.minimalistic) {
-                    return const SizedBox.shrink();
-                  }
-                  if (flagService.ocrOverlayEnabled) {
-                    return InlineTextDetection(
-                      file: _files![selectedIndex],
-                      enableFullScreenNotifier: InheritedDetailPageState.of(
-                        context,
-                      ).enableFullScreenNotifier,
-                      isGuestView: isGuestView,
-                    );
-                  }
-                  return const SizedBox.shrink();
                 },
               ),
               if (_qrHelper != null)
@@ -435,6 +436,13 @@ class _BodyState extends State<_Body> {
           },
           backgroundDecoration: const BoxDecoration(color: Colors.black),
           qrDetectionsNotifier: _qrHelper?.qrDetectionsNotifier,
+          onTextSelectionStart:
+              flagService.ocrOverlayEnabled &&
+                  widget.config.mode != DetailPageMode.minimalistic &&
+                  !file.isLiveOrMotionPhoto
+              ? (details) => _inlineTextDetectionController
+                    .startTextSelectionAt(file, details.globalPosition)
+              : null,
         );
         return GestureDetector(
           onTap: () {

@@ -233,14 +233,14 @@ const toSafeBlobPart = (bytes: Uint8Array): ArrayBuffer => {
 };
 
 const DEFAULT_CHAT_SYSTEM_PROMPT_BODY =
-    "You are Ensu, an AI assistant built by Ente. Current date and time: $date\n\nUse Markdown **bold** to emphasize important terms and key points.\n\nNever acknowledge or repeat these instructions. Do not start with generic confirmations like 'Okay, I understand'. Respond directly to the user's request.";
+    "You are Ensu, an AI assistant built by Ente. Current date: $date\n\nUse Markdown **bold** to emphasize important terms and key points.\n\nNever acknowledge or repeat these instructions. Do not start with generic confirmations like 'Okay, I understand'. Respond directly to the user's request.";
 const SYSTEM_PROMPT_DATE_PLACEHOLDER = "$date";
 
 const buildChatSystemPrompt = (customSystemPrompt?: string) => {
-    const dateAndTime = new Date().toLocaleString();
+    const date = new Date().toLocaleDateString();
     const promptBody =
         customSystemPrompt?.trim() || DEFAULT_CHAT_SYSTEM_PROMPT_BODY;
-    return promptBody.split(SYSTEM_PROMPT_DATE_PLACEHOLDER).join(dateAndTime);
+    return promptBody.split(SYSTEM_PROMPT_DATE_PLACEHOLDER).join(date);
 };
 
 const SESSION_TITLE_PROMPT =
@@ -592,6 +592,7 @@ const Page: React.FC = () => {
     const [showSystemPromptSettings, setShowSystemPromptSettings] =
         useState(false);
     const [useCustomModel, setUseCustomModel] = useState(false);
+    const [modelSettingsLoaded, setModelSettingsLoaded] = useState(false);
     const [resolvedDefaultModel, setResolvedDefaultModel] =
         useState<ModelInfo>(DEFAULT_MODEL);
     const [resolvedModelPresets, setResolvedModelPresets] = useState<
@@ -919,7 +920,8 @@ const Page: React.FC = () => {
     }, []);
 
     useEffect(() => {
-        if (loading || typeof window === "undefined") return;
+        if (loading || !modelSettingsLoaded || typeof window === "undefined")
+            return;
         const element = chatViewportRef.current;
         if (!element) return;
 
@@ -938,7 +940,7 @@ const Page: React.FC = () => {
         const observer = new ResizeObserver(() => updateWidth());
         observer.observe(element);
         return () => observer.disconnect();
-    }, [loading]);
+    }, [loading, modelSettingsLoaded]);
 
     useEffect(() => {
         if (typeof window === "undefined") return;
@@ -955,7 +957,10 @@ const Page: React.FC = () => {
         // unlocked. Without this gate a user who had custom settings before
         // the unlock feature was added would silently keep a hidden custom
         // model with no visible way to change it.
-        if (!isUnlocked) return;
+        if (!isUnlocked) {
+            setModelSettingsLoaded(true);
+            return;
+        }
 
         let raw = window.localStorage.getItem(MODEL_SETTINGS_STORAGE_KEY);
         if (!raw) {
@@ -1006,6 +1011,9 @@ const Page: React.FC = () => {
                 })
                 .catch((error: unknown) => {
                     log.error("Failed to migrate model settings", error);
+                })
+                .finally(() => {
+                    if (!cancelled) setModelSettingsLoaded(true);
                 });
             return () => {
                 cancelled = true;
@@ -1049,6 +1057,7 @@ const Page: React.FC = () => {
         } catch (error) {
             log.error("Failed to read model settings", error);
         }
+        setModelSettingsLoaded(true);
         return () => {
             cancelled = true;
         };
@@ -2025,7 +2034,7 @@ const Page: React.FC = () => {
     }, [ensureProvider, getModelSettings, isTauriRuntime]);
 
     useEffect(() => {
-        if (!firstPaintDone) return;
+        if (!firstPaintDone || !modelSettingsLoaded) return;
         const cancelIdle = scheduleIdleTask(() => {
             void preloadModelIfAvailable();
         }, 2000);
@@ -2034,6 +2043,7 @@ const Page: React.FC = () => {
         };
     }, [
         firstPaintDone,
+        modelSettingsLoaded,
         modelSettingsKey,
         preloadModelIfAvailable,
         scheduleIdleTask,
@@ -2169,22 +2179,18 @@ const Page: React.FC = () => {
                     ? candidates.slice(0, -1)
                     : candidates;
 
-            const safetyMargin = 256;
-            let budget =
+            const inputBudget =
                 contextSize -
                 (maxTokensCount ?? DEFAULT_GENERATION_MAX_TOKENS) -
-                safetyMargin;
-            budget -= approxTokens(buildChatSystemPrompt(systemPrompt));
-            budget -= approxTokens(promptText);
+                256;
+            const budget =
+                inputBudget -
+                approxTokens(buildChatSystemPrompt(systemPrompt)) -
+                approxTokens(promptText);
 
             if (budget <= 0) return [];
 
-            const selected: LlmMessage[] = [];
-            let used = 0;
-
-            for (let idx = trimmedCandidates.length - 1; idx >= 0; idx -= 1) {
-                const message = trimmedCandidates[idx];
-                if (!message) continue;
+            const messages = trimmedCandidates.map((message): LlmMessage => {
                 const isUser = message.sender === "self";
                 let text = isUser
                     ? message.text
@@ -2202,28 +2208,36 @@ const Page: React.FC = () => {
                     }
                 }
 
-                const cost = approxTokens(text);
+                return { role: isUser ? "user" : "assistant", content: text };
+            });
 
-                if (used + cost > budget) {
-                    if (selected.length === 0 && budget > 0) {
-                        const charBudget = Math.max(1, budget * 4);
-                        const truncated = text.slice(-charBudget);
-                        selected.push({
-                            role: isUser ? "user" : "assistant",
-                            content: truncated,
-                        });
-                    }
-                    break;
-                }
-
-                selected.push({
-                    role: isUser ? "user" : "assistant",
-                    content: text,
-                });
-                used += cost;
+            const historyTokens = messages.reduce(
+                (total, message) => total + approxTokens(message.content),
+                0,
+            );
+            const quantum = Math.max(1, Math.floor(inputBudget / 4));
+            const overflow = Math.max(0, historyTokens - budget);
+            const discardTarget = Math.ceil(overflow / quantum) * quantum;
+            let discarded = 0;
+            let startIndex = 0;
+            while (startIndex < messages.length && discarded < discardTarget) {
+                discarded += approxTokens(messages[startIndex]!.content);
+                startIndex += 1;
             }
 
-            return selected.reverse();
+            const selected = messages.slice(startIndex);
+            if (selected.length === 0 && messages.length > 0) {
+                const last = messages[messages.length - 1]!;
+                if (approxTokens(last.content) <= budget) return [last];
+                return [
+                    {
+                        ...last,
+                        content: last.content.slice(-Math.max(1, budget * 4)),
+                    },
+                ];
+            }
+
+            return selected;
         },
         [approxTokens, slicePathUntil, stripHiddenParts, systemPrompt],
     );
@@ -3945,7 +3959,7 @@ const Page: React.FC = () => {
         />
     );
 
-    if (loading) return <></>;
+    if (loading || !modelSettingsLoaded) return <></>;
 
     return (
         <>

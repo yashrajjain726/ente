@@ -9,6 +9,7 @@ import io.ente.ensu.llm.DownloadPhase
 import io.ente.ensu.llm.LlmMessage
 import io.ente.ensu.llm.LlmMessageRole
 import io.ente.ensu.llm.LlmModelTarget
+import io.ente.ensu.llm.ModelDownloader
 import io.ente.ensu.llm.LlmProvider
 import io.ente.ensu.chat.Attachment
 import io.ente.ensu.chat.ChatMessage
@@ -43,6 +44,7 @@ internal class ChatStoreActions(
     private val sessionPreferences: SessionPreferencesDataStore,
     private val chatRepository: ChatRepository,
     private val llmProvider: LlmProvider,
+    private val modelDownloader: ModelDownloader,
     private val clock: () -> Long,
     private val logRepository: FileLogRepository,
     private val messageStore: MutableMap<String, MutableList<ChatMessage>>,
@@ -777,7 +779,7 @@ internal class ChatStoreActions(
         if (!state.value.chat.deviceCapability.isChatSupported()) {
             return sessionTitleFromText(fallback, fallback = fallback)
         }
-        if (!llmProvider.isModelDownloaded(target)) {
+        if (!modelDownloader.isDownloaded(target.downloadTarget)) {
             return sessionTitleFromText(fallback, fallback = fallback)
         }
         val cleanedInput = sanitizeTitleText(input)
@@ -1097,31 +1099,37 @@ internal class ChatStoreActions(
         val promptTokens = estimatePromptTokens(promptText, promptImageCount)
         val historyTokens = historyMessages.sumOf { estimateTokens(historyText(it)) }
         val inputTokens = systemTokens + promptTokens + historyTokens
-        var remaining = inputBudget - systemTokens - promptTokens
+        val remaining = inputBudget - systemTokens - promptTokens
 
         if (remaining <= 0 || historyMessages.isEmpty()) {
             return HistorySelection(emptyList(), inputTokens, inputBudget, inputTokens > inputBudget)
         }
 
-        val selected = mutableListOf<LlmMessage>()
-        for (message in historyMessages.asReversed()) {
-            val text = historyText(message)
-            val cost = estimateTokens(text)
-            if (cost <= remaining) {
-                selected.add(
-                    LlmMessage(
-                        text = text,
-                        role = if (message.author == MessageAuthor.User) LlmMessageRole.User else LlmMessageRole.Assistant,
-                        hasAttachments = message.attachments.isNotEmpty()
-                    )
-                )
-                remaining -= cost
-            } else {
-                break
-            }
+        val quantum = max(1, inputBudget / 4)
+        val overflow = max(0, historyTokens - remaining)
+        val quantaToDiscard = (overflow + quantum - 1) / quantum
+        val discardTarget = quantaToDiscard * quantum
+        var discarded = 0
+        var startIndex = 0
+        while (startIndex < historyMessages.size && discarded < discardTarget) {
+            discarded += estimateTokens(historyText(historyMessages[startIndex]))
+            startIndex++
         }
 
-        return HistorySelection(selected.reversed(), inputTokens, inputBudget, inputTokens > inputBudget)
+        val retained = historyMessages.drop(startIndex).ifEmpty {
+            historyMessages.takeLast(1).filter { estimateTokens(historyText(it)) <= remaining }
+        }
+
+        val selected = retained.map { message ->
+            val text = historyText(message)
+            LlmMessage(
+                text = text,
+                role = if (message.author == MessageAuthor.User) LlmMessageRole.User else LlmMessageRole.Assistant,
+                hasAttachments = message.attachments.isNotEmpty()
+            )
+        }
+
+        return HistorySelection(selected, inputTokens, inputBudget, inputTokens > inputBudget)
     }
 
     private fun resolveGenerationLimits(target: LlmModelTarget): GenerationLimits {
@@ -1232,11 +1240,11 @@ internal class ChatStoreActions(
     )
 
     private fun buildSystemPrompt(nowMillis: Long = clock()): String {
-        val dateAndTime = SimpleDateFormat("yyyy-MM-dd HH:mm:ss z", Locale.getDefault())
+        val date = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
             .format(Date(nowMillis))
         val promptBody = state.value.developerSettings.systemPrompt.trim()
             .ifEmpty { configDefaults.mobileSystemPromptBody }
-        return promptBody.replace(configDefaults.systemPromptDatePlaceholder, dateAndTime)
+        return promptBody.replace(configDefaults.systemPromptDatePlaceholder, date)
     }
 
     companion object {

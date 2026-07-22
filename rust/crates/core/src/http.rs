@@ -32,6 +32,7 @@ const ACCESS_TOKEN: HeaderName = HeaderName::from_static("x-auth-access-token");
 const ACCESS_TOKEN_JWT: HeaderName = HeaderName::from_static("x-auth-access-token-jwt");
 const LINK_DEVICE_TOKEN: HeaderName = HeaderName::from_static("x-auth-link-device-token");
 const CAST_ACCESS_TOKEN: HeaderName = HeaderName::from_static("x-cast-access-token");
+const SPACE_SESSION_TOKEN: HeaderName = HeaderName::from_static("x-space-session-token");
 
 /// An error from an HTTP request.
 #[derive(Error, Debug)]
@@ -195,6 +196,8 @@ pub enum Auth {
     },
     /// A cast session, sent as the `X-Cast-Access-Token` header.
     Cast(String),
+    /// A Space browser session, sent as the `X-Space-Session-Token` header.
+    SpaceSession(String),
 }
 
 impl Auth {
@@ -216,6 +219,7 @@ impl Auth {
                 builder
             }
             Auth::Cast(token) => sensitive_header(builder, CAST_ACCESS_TOKEN, token),
+            Auth::SpaceSession(token) => sensitive_header(builder, SPACE_SESSION_TOKEN, token),
         }
     }
 }
@@ -626,6 +630,28 @@ mod tests {
         mock.assert_async().await;
         assert_eq!(response.message, "pong");
         assert_eq!(response.id, "abc");
+    }
+
+    #[tokio::test]
+    async fn api_sends_space_session_token_header() {
+        let mut server = Server::new_async().await;
+        let mock = server
+            .mock("GET", "/ping")
+            .match_header("x-space-session-token", "space-session-token")
+            .with_body(r#"{"message":"pong","id":"abc"}"#)
+            .create_async()
+            .await;
+
+        let response = api(
+            &server,
+            Some(Auth::SpaceSession("space-session-token".into())),
+        )
+        .ping()
+        .await
+        .unwrap();
+
+        mock.assert_async().await;
+        assert_eq!(response.message, "pong");
     }
 
     #[tokio::test]

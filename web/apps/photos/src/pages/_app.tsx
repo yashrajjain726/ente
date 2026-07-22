@@ -1,7 +1,8 @@
+import { AppLockSetupError } from "@/components/app-lock/LockScreenContents";
 import { useDesktopAppLockRoute } from "@/components/utils/use-app-lock-route";
 import { photosLogout } from "@/services/logout";
 import "@fontsource-variable/inter";
-import "@fontsource/outfit/700.css";
+import "@fontsource-variable/outfit";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import { CssBaseline, Typography } from "@mui/material";
 import { styled, ThemeProvider } from "@mui/material/styles";
@@ -220,7 +221,8 @@ const DesktopMainContent: React.FC<MainContentProps> = ({
     pageProps,
     isChangingRoute,
 }) => {
-    const isAppLockReady = useSetupAppLock();
+    const { isAppLockReady, appLockSetupFailed, retryAppLockSetup } =
+        useSetupAppLock();
     const appLock = useAppLockSnapshot();
     const { shouldBlockAppLockRouteTransition } = useDesktopAppLockRoute(
         isAppLockReady,
@@ -234,6 +236,9 @@ const DesktopMainContent: React.FC<MainContentProps> = ({
         appLock.autoLockTimeMs,
     );
 
+    if (appLockSetupFailed) {
+        return <AppLockSetupError onRetry={retryAppLockSetup} />;
+    }
     if (!isAppLockReady) return <LoadingIndicator />;
     if (shouldBlockAppLockRouteTransition) return <LoadingIndicator />;
 
