@@ -196,7 +196,7 @@ void main() {
                     1: 'Person current user',
                     42: 'Person saved member',
                   },
-                  onMemberTap: (member) => selectedMember = member,
+                  onMemberTap: (member, _) => selectedMember = member,
                   onAddMember: () {},
                   remainingSlots: 2,
                 ),
@@ -268,12 +268,9 @@ void main() {
   testWidgets('uses a linked Person name and face without a saved contact', (
     tester,
   ) async {
-    final member = _member(
-      email: 'admin@example.com',
-      userID: 42,
-      status: FamilyMemberStatus.self,
-    );
+    final member = _member(email: 'member@example.com', userID: 42);
     final members = [member];
+    String? selectedDisplayName;
 
     await tester.pumpWidget(
       MaterialApp(
@@ -289,7 +286,9 @@ void main() {
             profilePictureBytesByUserId: const {},
             linkedPersonIdsByUserId: const {42: 'person-42'},
             linkedPersonNamesByUserId: const {42: 'Current person'},
-            onMemberTap: (_) {},
+            onMemberTap: (_, displayName) {
+              selectedDisplayName = displayName;
+            },
             onAddMember: () {},
             remainingSlots: 0,
           ),
@@ -303,6 +302,9 @@ void main() {
       find.byType(PersonFaceWidget),
     );
     expect(personAvatar.personId, 'person-42');
+
+    await tester.tap(find.byType(MenuComponent));
+    expect(selectedDisplayName, 'Current person');
   });
 
   testWidgets('sorts other members by their displayed name or email', (
@@ -337,7 +339,7 @@ void main() {
               profilePictureBytesByUserId: const {},
               linkedPersonIdsByUserId: const {},
               linkedPersonNamesByUserId: const {4: 'Aaron'},
-              onMemberTap: (_) {},
+              onMemberTap: (_, _) {},
               onAddMember: () {},
               remainingSlots: 0,
             ),
