@@ -1,7 +1,8 @@
 import "dart:io" show Platform;
 
 import "package:device_info_plus/device_info_plus.dart";
-import "package:photos/service_locator.dart" show flagService;
+import "package:photos/service_locator.dart"
+    show flagService, isLocalGalleryMode;
 import "package:photos/utils/ram_check_util.dart";
 
 final webGpuExecutionPolicy = WebGpuExecutionPolicy();
@@ -14,7 +15,7 @@ class WebGpuExecutionPolicy {
 
   Future<bool> isEligible() async {
     if (!Platform.isAndroid ||
-        !flagService.webGPUEnabled ||
+        (!isLocalGalleryMode && !flagService.webGPUEnabled) ||
         !enoughRamForLocalIndexing) {
       return false;
     }
