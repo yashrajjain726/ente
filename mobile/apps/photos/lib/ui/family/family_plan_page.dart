@@ -481,7 +481,7 @@ class _FamilyPlanPageState extends State<FamilyPlanPage> {
 
   Future<void> _showMemberActions(
     FamilyMember member,
-    String displayName,
+    String fallbackDisplayName,
   ) async {
     final isCurrentUser =
         member.email.trim().toLowerCase() ==
@@ -500,6 +500,10 @@ class _FamilyPlanPageState extends State<FamilyPlanPage> {
       return;
     }
 
+    final savedContactName = savedContact?.data?.name.trim();
+    final displayName = savedContactName == null || savedContactName.isEmpty
+        ? fallbackDisplayName
+        : savedContactName;
     final l10n = AppLocalizations.of(context);
     await showBottomSheetComponent<void>(
       context: context,
