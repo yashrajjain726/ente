@@ -33,6 +33,8 @@ use crate::ml::{events, runtime::rt_log};
 #[cfg(any(target_os = "ios", test))]
 const COREML_CACHE_SCHEMA: &str = "ort-1_27-mlprogram-all-default-v1";
 const COREML_CACHE_COMPLETE_MARKER: &str = ".ente-cache-complete";
+#[cfg(target_os = "ios")]
+const ENABLE_PERSISTENT_COREML_CACHE: bool = false;
 
 /// An f32 model input that can be borrowed by multiple sessions.
 ///
@@ -549,15 +551,17 @@ fn coreml_provider(
         .with_specialization_strategy(SpecializationStrategy::Default);
 
     let mut prepared_cache_dir = None;
-    match prepare_coreml_cache_directory(model_path, cache_namespace) {
-        Ok(cache_dir) => {
-            provider = provider.with_model_cache_dir(cache_dir.to_string_lossy());
-            prepared_cache_dir = Some(cache_dir);
-        }
-        Err(error) => {
-            eprintln!(
-                "[ml][rt] failed to prepare persistent CoreML cache for '{model_path}'; continuing without it: {error}"
-            );
+    if ENABLE_PERSISTENT_COREML_CACHE {
+        match prepare_coreml_cache_directory(model_path, cache_namespace) {
+            Ok(cache_dir) => {
+                provider = provider.with_model_cache_dir(cache_dir.to_string_lossy());
+                prepared_cache_dir = Some(cache_dir);
+            }
+            Err(error) => {
+                eprintln!(
+                    "[ml][rt] failed to prepare persistent CoreML cache for '{model_path}'; continuing without it: {error}"
+                );
+            }
         }
     }
 
