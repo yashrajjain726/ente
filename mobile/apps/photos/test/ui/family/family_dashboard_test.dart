@@ -127,22 +127,21 @@ void main() {
   });
 
   group('familyMemberAvatarComponentColor', () {
-    test('uses black for the current user and hashes other members', () {
+    test('hashes every member including the current user', () {
       final currentUser = _member(email: 'admin@example.com', userID: 1);
       final otherMember = _member(email: 'saved@example.com', userID: 42);
 
       expect(
-        familyMemberAvatarComponentColor(
-          currentUser,
-          currentUserEmail: 'ADMIN@example.com',
+        familyMemberAvatarComponentColor(currentUser),
+        avatarComponentColorForIdentity(
+          avatarIdentityKey(
+            email: currentUser.email,
+            userID: currentUser.userID,
+          ),
         ),
-        AvatarComponentColor.black,
       );
       expect(
-        familyMemberAvatarComponentColor(
-          otherMember,
-          currentUserEmail: currentUser.email,
-        ),
+        familyMemberAvatarComponentColor(otherMember),
         avatarComponentColorForIdentity(
           avatarIdentityKey(
             email: otherMember.email,
@@ -165,16 +164,13 @@ void main() {
         email: 'pending@example.com',
         status: FamilyMemberStatus.invited,
       );
-      final members = [
-        _member(
-          email: 'admin@example.com',
-          userID: 1,
-          isAdmin: true,
-          status: FamilyMemberStatus.self,
-        ),
-        savedMember,
-        pendingMember,
-      ];
+      final currentUser = _member(
+        email: 'admin@example.com',
+        userID: 1,
+        isAdmin: true,
+        status: FamilyMemberStatus.self,
+      );
+      final members = [currentUser, savedMember, pendingMember];
       FamilyMember? selectedMember;
 
       await tester.pumpWidget(
@@ -191,6 +187,7 @@ void main() {
                   members: members,
                   isAdmin: true,
                   contactsByUserId: {
+                    1: _contact(currentUser, name: 'Current user'),
                     42: _contact(savedMember, name: 'Saved member'),
                   },
                   profilePictureBytesByUserId: const {},
@@ -206,8 +203,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('admin@example.com'), findsOneWidget);
-      expect(find.text('admin'), findsOneWidget);
+      expect(find.text('Current user'), findsWidgets);
       expect(find.text('Saved member'), findsNWidgets(2));
       expect(find.text('pending@example.com'), findsOneWidget);
       expect(
@@ -236,9 +232,9 @@ void main() {
       );
       expect(avatars.map((avatar) => avatar.seed), everyElement(isNull));
       final currentUserAvatar = avatars.singleWhere(
-        (avatar) => avatar.semanticLabel == 'admin@example.com',
+        (avatar) => avatar.semanticLabel == 'Current user',
       );
-      expect(currentUserAvatar.color, AvatarComponentColor.black);
+      expect(currentUserAvatar.color, isIn(avatarComponentIdentityPalette));
       final savedMemberAvatar = avatars.singleWhere(
         (avatar) => avatar.semanticLabel == 'Saved member',
       );

@@ -19,17 +19,9 @@ enum FamilyMemberAction {
   revokeInvite,
 }
 
-AvatarComponentColor familyMemberAvatarComponentColor(
-  FamilyMember member, {
-  required String currentUserEmail,
-}) {
-  return avatarComponentColorForAvatarIdentity(
-    AvatarIdentity.account(
-      label: member.email,
-      email: member.email,
-      userID: member.userID,
-      currentUserEmail: currentUserEmail,
-    ),
+AvatarComponentColor familyMemberAvatarComponentColor(FamilyMember member) {
+  return avatarComponentColorForIdentity(
+    avatarIdentityKey(email: member.email, userID: member.userID),
   );
 }
 
@@ -177,10 +169,7 @@ class FamilyDashboard extends StatelessWidget {
   }
 
   AvatarComponentColor _avatarColorFor(FamilyMember member) =>
-      familyMemberAvatarComponentColor(
-        member,
-        currentUserEmail: userDetails.email,
-      );
+      familyMemberAvatarComponentColor(member);
 }
 
 class _FamilyStorageCard extends StatelessWidget {

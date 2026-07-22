@@ -568,10 +568,7 @@ class _FamilyPlanPageState extends State<FamilyPlanPage> {
                 totalStorageInBytes: _userDetails.getTotalStorage(),
                 avatarColor: avatarComponentColorValue(
                   context,
-                  familyMemberAvatarComponentColor(
-                    member,
-                    currentUserEmail: _userDetails.email,
-                  ),
+                  familyMemberAvatarComponentColor(member),
                 ),
               ),
             );
