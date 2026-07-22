@@ -1023,6 +1023,8 @@ final class ChatViewModel: ObservableObject {
             _ = await priorGeneration?.result
             _ = await priorSummary?.result
             guard !Task.isCancelled, activeGenerationId == generationId else { return }
+            await knowledgeStore.bootstrap()
+            guard !Task.isCancelled, activeGenerationId == generationId else { return }
             var embeddingAssetInvalid = false
             var knowledgeHits: [KnowledgeSearchHit] = []
             let enabledDatasets = knowledgeStore.enabledReadyDatasets
@@ -1148,8 +1150,7 @@ final class ChatViewModel: ObservableObject {
                     systemPrompt: candidate
                 )
             }
-            let useKnowledge = knowledgeContext != nil &&
-                knowledgeHistorySelection?.wasTrimmed == false
+            let useKnowledge = knowledgeHistorySelection?.wasTrimmed == false
             let historySelection = useKnowledge ?
                 (knowledgeHistorySelection ?? normalHistorySelection) : normalHistorySelection
             var activeCitations = useKnowledge ? (knowledgeContext?.citations ?? []) : []

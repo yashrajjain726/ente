@@ -5,7 +5,6 @@ import io.ente.ensu.bindings.LlmChatMessage as NativeChatMessage
 import io.ente.ensu.bindings.LlmChatRequest
 import io.ente.ensu.bindings.LlmContext
 import io.ente.ensu.bindings.LlmContextParams
-import io.ente.ensu.bindings.LlmEmbeddingContextParams
 import io.ente.ensu.bindings.LlmGenerationEvent
 import io.ente.ensu.bindings.LlmGenerationEventCallback
 import io.ente.ensu.bindings.LlmGenerationSummary as NativeSummary
@@ -24,6 +23,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+
+class RequiredModelValidationError(
+    val targetId: String
+) : Exception("Downloaded model failed validation: $targetId")
 
 class LlmProvider(
     private val downloader: ModelDownloader,
@@ -94,10 +97,10 @@ class LlmProvider(
             modelLoadMutex.withLock {
                 if (!isEmbeddingModelReady()) {
                     downloader.removeDownloaded(embeddingDownloadTarget)
-                    throw IllegalStateException("Embedding model failed exact readiness validation")
+                    throw RequiredModelValidationError(knowledgeEmbedding.targetId)
                 }
                 if (!isChatModelReady(selection)) {
-                    throw IllegalStateException("Chat model failed readiness validation")
+                    throw RequiredModelValidationError(selection.id)
                 }
                 ensureModelReadyLocked(
                     selection,
@@ -179,17 +182,7 @@ class LlmProvider(
             var embeddingContext: LlmContext? = null
             try {
                 val threads = max(1, Runtime.getRuntime().availableProcessors() - 1)
-                embeddingContext = embeddingModel.newEmbeddingContext(
-                    LlmEmbeddingContextParams(
-                        contextSize = knowledgeEmbedding.contextSize,
-                        nThreads = threads,
-                        batchSize = knowledgeEmbedding.batchSize,
-                        microBatchSize = knowledgeEmbedding.microBatchSize,
-                        sourceDim = knowledgeEmbedding.sourceDim,
-                        dim = knowledgeEmbedding.dim,
-                        queryPrompt = knowledgeEmbedding.queryPrompt
-                    )
-                )
+                embeddingContext = embeddingModel.newEmbeddingContext(threads)
                 block { text -> embeddingContext.embed(text) }
             } finally {
                 embeddingContext?.destroy()

@@ -49,7 +49,6 @@ fun SettingsScreen(
     isAdvancedUnlocked: Boolean,
     onOpenLogs: () -> Unit,
     onOpenKnowledge: () -> Unit,
-    onOpenTerms: () -> Unit,
     onOpenModelSettings: () -> Unit,
     onOpenSystemPromptSettings: () -> Unit,
     onUnlockAdvanced: () -> Unit,
@@ -60,7 +59,7 @@ fun SettingsScreen(
     var lastBuildVersionTapAt by remember { mutableStateOf<Long?>(null) }
     val context = LocalContext.current
 
-    val allItems = remember(context, onOpenLogs, onOpenKnowledge, onOpenTerms, onSignIn) {
+    val allItems = remember(context, onOpenLogs, onOpenKnowledge, onSignIn) {
         buildList {
             add(
                 SettingsItem(
@@ -96,14 +95,16 @@ fun SettingsScreen(
 
             add(
                 SettingsItem(
-                    title = "Terms and Conditions",
+                    title = "Privacy Policy",
+                    iconRes = HugeIcons.ViewIcon,
+                    onClick = { context.openExternalLink("https://ente.com/privacy") }
+                )
+            )
+            add(
+                SettingsItem(
+                    title = "Terms of Service",
                     iconVector = Icons.Outlined.Description,
-                    searchTerms = listOf(
-                        EnsuLegalDocuments.PRIVACY_TITLE,
-                        EnsuLegalDocuments.ENTE_TERMS_TITLE,
-                        "Terms of Service"
-                    ),
-                    onClick = onOpenTerms
+                    onClick = { context.openExternalLink("https://ente.com/terms") }
                 )
             )
         }
@@ -113,8 +114,7 @@ fun SettingsScreen(
         val q = query.trim().lowercase()
         if (q.isEmpty()) return@remember allItems
         allItems.filter { item ->
-            item.title.lowercase().contains(q) ||
-                item.searchTerms.any { it.lowercase().contains(q) }
+            item.title.lowercase().contains(q)
         }
     }
 
@@ -206,17 +206,16 @@ fun SettingsScreen(
     }
 }
 
-internal data class SettingsItem(
+private data class SettingsItem(
     val title: String,
     val iconRes: Int? = null,
     val iconVector: ImageVector? = null,
-    val searchTerms: List<String> = emptyList(),
     val onClick: () -> Unit,
     val isDestructive: Boolean = false
 )
 
 @Composable
-internal fun SettingsRow(item: SettingsItem) {
+private fun SettingsRow(item: SettingsItem) {
     val iconAndTextColor = if (item.isDestructive) EnsuColor.error else EnsuColor.textPrimary()
 
     Row(

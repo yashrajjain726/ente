@@ -146,8 +146,7 @@ final class LlmProvider {
 
     func missingModelDownloadSize(_ selection: LlmModelSelection) async -> Int64? {
         var total: Int64 = 0
-        let chatMissing = !downloader.isDownloaded(selection.modelTarget)
-        if chatMissing {
+        if !downloader.isDownloaded(selection.modelTarget) {
             guard let chatSize = await downloader.estimateDownloadSize(selection.modelTarget) else {
                 return nil
             }
@@ -172,14 +171,13 @@ final class LlmProvider {
         }
 
         let missingTargets: [ModelTarget] = try await modelLoadGate.withLock {
-            let chatReady = downloader.isDownloaded(selection.modelTarget)
             let embeddingReady = isEmbeddingModelReady()
             if !embeddingReady {
                 _ = downloader.removeDownloaded(embeddingDownloadTarget)
             }
 
             return [
-                chatReady ? nil : selection.modelTarget,
+                downloader.isDownloaded(selection.modelTarget) ? nil : selection.modelTarget,
                 embeddingReady ? nil : embeddingDownloadTarget,
             ].compactMap { $0 }
         }
@@ -393,15 +391,7 @@ final class LlmProvider {
             }
             let threadCount = max(1, ProcessInfo.processInfo.activeProcessorCount - 1)
             embeddingContext = try model.newEmbeddingContext(
-                params: LlmEmbeddingContextParams(
-                    contextSize: knowledgeEmbedding.contextSize,
-                    nThreads: Int32(threadCount),
-                    batchSize: knowledgeEmbedding.batchSize,
-                    microBatchSize: knowledgeEmbedding.microBatchSize,
-                    sourceDim: knowledgeEmbedding.sourceDim,
-                    dim: knowledgeEmbedding.dim,
-                    queryPrompt: knowledgeEmbedding.queryPrompt
-                )
+                nThreads: Int32(threadCount)
             )
             guard let context = embeddingContext else {
                 throw EmbeddingAssetInvalidError()

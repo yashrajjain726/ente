@@ -795,13 +795,6 @@ private fun KnowledgeSourcesDialog(
                             style = EnsuTypography.large,
                             color = EnsuColor.textPrimary()
                         )
-                        citation.section?.trim()?.takeIf { it.isNotEmpty() }?.let { section ->
-                            Text(
-                                text = section,
-                                style = EnsuTypography.small,
-                                color = EnsuColor.textMuted()
-                            )
-                        }
                         HorizontalDivider(color = EnsuColor.border())
                         Text(
                             text = "Attribution",

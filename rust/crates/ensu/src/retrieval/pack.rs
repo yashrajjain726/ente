@@ -5,7 +5,7 @@ use ente_model_download::download::{self, Downloader, Progress, Target};
 
 use crate::config::{
     KNOWLEDGE_ARTIFACT_FILENAMES, KnowledgeDatasetConfig, is_path_safe_component,
-    knowledge_artifact_urls, validate_knowledge_datasets,
+    knowledge_artifact_urls,
 };
 
 use super::{RetrievalError, index::RetrievalIndex};
@@ -13,20 +13,22 @@ use super::{RetrievalError, index::RetrievalIndex};
 pub fn download_knowledge_pack(
     pack_root: impl AsRef<Path>,
     expected_pack: &KnowledgeDatasetConfig,
-    on_progress: impl FnMut(Progress),
-    is_cancelled: impl Fn() -> bool,
+    on_progress: impl FnMut(Progress) + Send,
+    cancellation: download::CancellationToken,
 ) -> Result<(), download::Error> {
     let pack_root = pack_root.as_ref();
     let targets = knowledge_download_targets(pack_root, expected_pack)?;
-    Downloader::new()?.download_blocking(targets, on_progress, is_cancelled)
+    tokio::runtime::Builder::new_current_thread()
+        .enable_io()
+        .enable_time()
+        .build()?
+        .block_on(Downloader::new()?.download(targets, on_progress, cancellation))
 }
 
 fn knowledge_download_targets(
     pack_root: &Path,
     expected_pack: &KnowledgeDatasetConfig,
 ) -> Result<Vec<Target>, download::Error> {
-    validate_knowledge_datasets(std::slice::from_ref(expected_pack))
-        .map_err(|error| download::Error::InvalidTarget(error.to_string()))?;
     let root_identity = pack_root
         .file_name()
         .and_then(|name| name.to_str())
@@ -57,8 +59,7 @@ fn knowledge_download_targets(
         ));
     }
 
-    let urls = knowledge_artifact_urls(expected_pack)
-        .map_err(|error| download::Error::InvalidTarget(error.to_string()))?;
+    let urls = knowledge_artifact_urls(expected_pack);
     Ok(KNOWLEDGE_ARTIFACT_FILENAMES
         .into_iter()
         .zip(urls)
@@ -120,7 +121,7 @@ pub fn reconcile_knowledge_pack(
     let active = if let Some(position) = current_position {
         Some(valid.swap_remove(position))
     } else {
-        valid.sort_by(|left, right| left.0.cmp(&right.0));
+        valid.sort_by(|left, right| right.0.cmp(&left.0));
         (!valid.is_empty()).then(|| valid.remove(0))
     };
 
@@ -184,8 +185,6 @@ fn validate_pack_root(
     expected_pack: &KnowledgeDatasetConfig,
     create: bool,
 ) -> Result<(), RetrievalError> {
-    validate_knowledge_datasets(std::slice::from_ref(expected_pack))
-        .map_err(|error| RetrievalError::InvalidInput(error.to_string()))?;
     let root_identity = pack_root
         .file_name()
         .and_then(|name| name.to_str())

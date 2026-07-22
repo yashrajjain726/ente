@@ -207,15 +207,6 @@ impl Downloader {
         })
         .await
     }
-
-    pub fn download_blocking(
-        &self,
-        targets: Vec<Target>,
-        on_progress: impl FnMut(Progress),
-        is_cancelled: impl Fn() -> bool,
-    ) -> Result<(), Error> {
-        fetch(self, targets, on_progress, is_cancelled)
-    }
 }
 
 fn build_client() -> Result<Client, Error> {

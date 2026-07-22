@@ -144,9 +144,7 @@ internal class ModelSettingsActions(
         if (!userInitiated && !currentState.chat.hasRequestedModelDownload) return
 
         val selection = resolveSelection(currentState.modelSettings)
-        val wasChatReady = llmProvider.isChatModelReady(selection)
-        val wasEmbeddingReady = llmProvider.isEmbeddingModelReady()
-        val isDownloaded = wasChatReady && wasEmbeddingReady
+        val isDownloaded = llmProvider.isChatModelReady(selection) && llmProvider.isEmbeddingModelReady()
         if (isDownloaded) {
             state.update { appState ->
                 appState.copy(
@@ -363,6 +361,7 @@ internal class ModelSettingsActions(
         if (err is kotlinx.coroutines.CancellationException) return false
         if (err is LlmException.Cancelled) return false
         if (isOutOfStorageError(err)) return false
+        if (err is RequiredModelValidationError) return false
         if (err is LlmException.Download) {
             when (val error = err.error) {
                 is DownloadError.Validation -> return false

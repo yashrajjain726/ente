@@ -1,11 +1,12 @@
 mod knowledge;
 
+pub use knowledge::knowledge_dataset;
 pub use knowledge::{AttributionConfig, KnowledgeDatasetConfig, KnowledgeEmbeddingConfig};
 pub(crate) use knowledge::{
     KNOWLEDGE_ARTIFACT_FILENAMES, KNOWLEDGE_LICENSE_LABEL, KNOWLEDGE_LICENSE_URL,
     KNOWLEDGE_MANIFEST_FILE, KNOWLEDGE_META_FILE, KNOWLEDGE_OFFSETS_FILE, KNOWLEDGE_VECTORS_FILE,
-    KnowledgeConfigError, is_path_safe_component, knowledge_artifact_urls, knowledge_datasets,
-    knowledge_index_contract, validate_knowledge_datasets, validate_knowledge_embedding,
+    is_path_safe_component, knowledge_artifact_urls, knowledge_datasets,
+    knowledge_embedding_config, knowledge_index_contract,
 };
 
 #[derive(Debug, Clone)]
@@ -165,7 +166,7 @@ pub fn defaults() -> Defaults {
             .expect("preset id is in the catalog")
             .clone()
     };
-    let defaults = Defaults {
+    Defaults {
         mobile_system_prompt_body: MOBILE_SYSTEM_PROMPT_BODY.to_string(),
         desktop_system_prompt_body: DESKTOP_SYSTEM_PROMPT_BODY.to_string(),
         system_prompt_date_placeholder: SYSTEM_PROMPT_DATE_PLACEHOLDER.to_string(),
@@ -187,26 +188,7 @@ pub fn defaults() -> Defaults {
         voice_activity_model: silero_vad_v4(),
         knowledge_embedding: knowledge::knowledge_embedding_config(),
         knowledge_datasets: knowledge::knowledge_datasets(),
-    };
-
-    validate_defaults(&defaults).expect("bundled Ensu defaults must be valid");
-    defaults
-}
-
-fn validate_defaults(defaults: &Defaults) -> Result<(), KnowledgeConfigError> {
-    validate_knowledge_datasets(&defaults.knowledge_datasets)?;
-
-    let reserved_model_ids = std::iter::once(&defaults.mobile_default_model)
-        .chain(defaults.mobile_model_presets.iter())
-        .chain(std::iter::once(&defaults.desktop_default_model))
-        .chain(defaults.desktop_model_presets.iter())
-        .chain([
-            &defaults.transcription_model,
-            &defaults.voice_activity_model,
-        ])
-        .map(|preset| preset.id.clone())
-        .collect::<Vec<_>>();
-    validate_knowledge_embedding(&defaults.knowledge_embedding, &reserved_model_ids)
+    }
 }
 
 #[cfg(test)]

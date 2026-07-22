@@ -340,13 +340,6 @@ private struct KnowledgeSourcesSheet: View {
                                 .font(EnsuTypography.large)
                                 .foregroundStyle(EnsuColor.textPrimary)
 
-                            if let section = citation.section?.trimmingCharacters(in: .whitespacesAndNewlines),
-                               !section.isEmpty {
-                                Text(section)
-                                    .font(EnsuTypography.small)
-                                    .foregroundStyle(EnsuColor.textMuted)
-                            }
-
                             Divider()
 
                             Text("Attribution")

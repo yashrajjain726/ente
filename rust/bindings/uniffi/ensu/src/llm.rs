@@ -68,17 +68,6 @@ pub struct LlmContextParams {
 }
 
 #[derive(Debug, Clone, uniffi::Record)]
-pub struct LlmEmbeddingContextParams {
-    pub context_size: u32,
-    pub n_threads: Option<i32>,
-    pub batch_size: u32,
-    pub micro_batch_size: u32,
-    pub source_dim: u32,
-    pub dim: u32,
-    pub query_prompt: String,
-}
-
-#[derive(Debug, Clone, uniffi::Record)]
 pub struct LlmChatMessage {
     pub role: String,
     pub content: String,
@@ -144,10 +133,10 @@ impl LlmModel {
 
     pub fn new_embedding_context(
         &self,
-        params: LlmEmbeddingContextParams,
+        n_threads: Option<i32>,
     ) -> Result<Arc<LlmContext>, LlmError> {
-        let handle =
-            llm::Context::new_embedding(&self.handle, params.into()).map_err(LlmError::from)?;
+        let handle = llm::Context::new_knowledge_embedding(&self.handle, n_threads)
+            .map_err(LlmError::from)?;
         Ok(Arc::new(LlmContext { handle }))
     }
 }
@@ -208,20 +197,6 @@ impl From<LlmContextParams> for llm::ContextParams {
             context_size: value.context_size,
             n_threads: value.n_threads,
             n_batch: value.n_batch,
-        }
-    }
-}
-
-impl From<LlmEmbeddingContextParams> for llm::EmbeddingContextParams {
-    fn from(value: LlmEmbeddingContextParams) -> Self {
-        Self {
-            context_size: value.context_size,
-            n_threads: value.n_threads,
-            batch_size: value.batch_size,
-            micro_batch_size: value.micro_batch_size,
-            source_dim: value.source_dim,
-            dim: value.dim,
-            query_prompt: value.query_prompt,
         }
     }
 }

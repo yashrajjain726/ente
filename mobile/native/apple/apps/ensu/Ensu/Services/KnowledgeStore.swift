@@ -8,6 +8,7 @@ final class KnowledgeStore: ObservableObject {
 
     private let provider: KnowledgeProvider
     private let preferences: KnowledgePreferences
+    private var bootstrapTask: Task<Void, Never>?
     private var mutationTasks: [String: Task<Void, Never>] = [:]
 
     init(
@@ -31,21 +32,50 @@ final class KnowledgeStore: ObservableObject {
     }
 
     func bootstrap() async {
+        if let bootstrapTask {
+            await bootstrapTask.value
+            return
+        }
+
+        let task = Task { @MainActor [weak self] in
+            guard let self else { return }
+            await bootstrapEnabledDatasets()
+        }
+        bootstrapTask = task
+        await task.value
+    }
+
+    private func bootstrapEnabledDatasets() async {
         let requestedEnabled = preferences.enabledDatasetIds
-        for dataset in packs.map(\.config) {
-            do {
-                let result = try await provider.reconcile(dataset: dataset)
-                applyReconciliation(
-                    result,
-                    stableId: dataset.stableId,
-                    enabled: requestedEnabled.contains(dataset.stableId)
-                )
-            } catch {
-                updatePack(dataset.stableId) { pack in
-                    pack.status = .download
-                    pack.enabled = false
-                    pack.errorMessage = userFacingKnowledgeError(error)
-                }
+        let datasets = packs.map(\.config)
+        for dataset in datasets where requestedEnabled.contains(dataset.stableId) {
+            await reconcileForBootstrap(dataset, enabled: true)
+        }
+
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            for dataset in datasets where !requestedEnabled.contains(dataset.stableId) {
+                await reconcileForBootstrap(dataset, enabled: false)
+            }
+        }
+    }
+
+    private func reconcileForBootstrap(
+        _ dataset: KnowledgeDatasetConfig,
+        enabled: Bool
+    ) async {
+        do {
+            let result = try await provider.reconcile(dataset: dataset)
+            applyReconciliation(
+                result,
+                stableId: dataset.stableId,
+                enabled: enabled
+            )
+        } catch {
+            updatePack(dataset.stableId) { pack in
+                pack.status = .download
+                pack.enabled = false
+                pack.errorMessage = userFacingKnowledgeError(error)
             }
         }
     }

@@ -118,7 +118,7 @@ private fun KnowledgePackCard(
         if (pack.isMutating) {
             Spacer(Modifier.height(EnsuSpacing.md.dp))
             LinearProgressIndicator(
-                progress = { (pack.mutationProgress?.percent ?: 0).coerceIn(0, 100) / 100f },
+                progress = { (pack.mutationProgress?.percentage ?: 0.0).coerceIn(0.0, 100.0).toFloat() / 100f },
                 modifier = Modifier.fillMaxWidth(),
                 color = EnsuColor.accent(),
                 trackColor = EnsuColor.border()

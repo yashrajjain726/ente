@@ -8,11 +8,13 @@ import io.ente.ensu.AppState
 import io.ente.ensu.bindings.DownloadError
 import io.ente.ensu.bindings.KnowledgeDatasetConfig
 import io.ente.ensu.bindings.KnowledgeDownloadException
+import io.ente.ensu.bindings.KnowledgeDownloadProgress
 import io.ente.ensu.bindings.KnowledgeReconciliation
 import io.ente.ensu.bindings.KnowledgeReconciliationStatus
 import io.ente.ensu.device.isChatSupported
 import io.ente.ensu.logging.FileLogRepository
 import io.ente.ensu.logging.LogLevel
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
@@ -24,14 +26,12 @@ import kotlinx.coroutines.launch
 
 private val Context.knowledgePreferences by preferencesDataStore("ensu_knowledge_preferences")
 
-data class KnowledgeMutationProgress(val percent: Int, val label: String)
-
 data class KnowledgePackState(
     val config: KnowledgeDatasetConfig,
     val status: KnowledgeReconciliationStatus? = null,
     val activeIdentity: String? = null,
     val enabled: Boolean = false,
-    val mutationProgress: KnowledgeMutationProgress? = null,
+    val mutationProgress: KnowledgeDownloadProgress? = null,
     val errorMessage: String? = null
 ) {
     val isMutating: Boolean get() = mutationProgress != null
@@ -61,9 +61,12 @@ class KnowledgeStore(
     private val catalog = datasets.associateBy { it.stableId }
     private val jobs = mutableMapOf<String, Job>()
     private var scope: CoroutineScope? = null
+    private var bootstrapJob: Job? = null
+    private val enabledPacksReady = CompletableDeferred<Unit>()
 
     fun bootstrap(scope: CoroutineScope) {
         this.scope = scope
+        if (bootstrapJob != null) return
         state.update { appState ->
             appState.copy(
                 knowledge = KnowledgeState(
@@ -71,31 +74,28 @@ class KnowledgeStore(
                 )
             )
         }
-        scope.launch {
+        bootstrapJob = scope.launch {
             val requestedEnabled = runCatching {
                 preferences.enabledDatasetIds.first()
             }.getOrDefault(emptySet())
-            catalog.values.forEach { dataset ->
-                val result = runCatching { provider.reconcile(dataset) }
-                updatePack(dataset.stableId) { current ->
-                    result.fold(
-                        onSuccess = { reconciliation ->
-                            current.fromReconciliation(
-                                reconciliation,
-                                enabled = dataset.stableId in requestedEnabled
-                            )
-                        },
-                        onFailure = { error ->
-                            current.copy(
-                                status = KnowledgeReconciliationStatus.DOWNLOAD,
-                                enabled = false,
-                                errorMessage = userFacingKnowledgeError(error)
-                            )
-                        }
-                    )
+            val (enabled, disabled) = catalog.values.partition {
+                it.stableId in requestedEnabled
+            }
+            try {
+                enabled.forEach { dataset ->
+                    reconcileAndUpdate(dataset, enabled = true)
                 }
+            } finally {
+                enabledPacksReady.complete(Unit)
+            }
+            disabled.forEach { dataset ->
+                reconcileAndUpdate(dataset, enabled = false)
             }
         }
+    }
+
+    suspend fun awaitEnabledPacksReady() {
+        enabledPacksReady.await()
     }
 
     fun downloadOrUpdate(stableId: String) {
@@ -106,7 +106,7 @@ class KnowledgeStore(
         val wasInstalled = state.value.knowledge.packs[stableId]?.activeIdentity != null
         updatePack(stableId) {
             it.copy(
-                mutationProgress = KnowledgeMutationProgress(0, "Starting download..."),
+                mutationProgress = KnowledgeDownloadProgress("Starting download...", 0.0),
                 errorMessage = null
             )
         }
@@ -114,12 +114,7 @@ class KnowledgeStore(
             try {
                 val reconciliation = provider.download(dataset) { progress ->
                     updatePack(stableId) { current ->
-                        current.copy(
-                            mutationProgress = KnowledgeMutationProgress(
-                                progress.percentage.toInt().coerceIn(0, 100),
-                                progress.label
-                            )
-                        )
+                        current.copy(mutationProgress = progress)
                     }
                 }
                 val shouldEnable = !wasInstalled &&
@@ -194,6 +189,27 @@ class KnowledgeStore(
                 knowledge = appState.knowledge.copy(
                     packs = appState.knowledge.packs + (stableId to transform(current))
                 )
+            )
+        }
+    }
+
+    private suspend fun reconcileAndUpdate(
+        dataset: KnowledgeDatasetConfig,
+        enabled: Boolean
+    ) {
+        val result = runCatching { provider.reconcile(dataset) }
+        updatePack(dataset.stableId) { current ->
+            result.fold(
+                onSuccess = { reconciliation ->
+                    current.fromReconciliation(reconciliation, enabled)
+                },
+                onFailure = { error ->
+                    current.copy(
+                        status = KnowledgeReconciliationStatus.DOWNLOAD,
+                        enabled = false,
+                        errorMessage = userFacingKnowledgeError(error)
+                    )
+                }
             )
         }
     }

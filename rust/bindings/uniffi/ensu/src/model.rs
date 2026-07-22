@@ -211,7 +211,7 @@ impl ModelDownloadCore {
 
 #[derive(Default, uniffi::Object)]
 pub struct CancellationToken {
-    inner: ente_model_download::download::CancellationToken,
+    pub(crate) inner: ente_model_download::download::CancellationToken,
 }
 
 #[uniffi::export]

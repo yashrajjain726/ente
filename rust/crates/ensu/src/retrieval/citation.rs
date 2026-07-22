@@ -20,7 +20,6 @@ pub struct SourceCitation {
     pub dataset_label: String,
     pub credit: String,
     pub title: String,
-    pub section: Option<String>,
     pub source_url: String,
     pub license_label: String,
     pub license_url: String,
@@ -85,16 +84,7 @@ fn normalize_and_deduplicate(
         }
         let dataset_label = normalize_required(&citation.dataset_label, "dataset label")?;
         let credit = normalize_required(&citation.credit, "credit")?;
-        let mut title = normalize_required(&citation.title, "title")?;
-        if let Some(section) = citation
-            .section
-            .as_deref()
-            .map(normalize_single_line)
-            .filter(|section| !section.is_empty())
-        {
-            title.push_str(" — ");
-            title.push_str(&section);
-        }
+        let title = normalize_required(&citation.title, "title")?;
         let license_label = normalize_required(&citation.license_label, "license label")?;
         if license_label != LICENSE_LABEL || citation.license_url != LICENSE_URL {
             return Err(RetrievalError::InvalidInput(
@@ -112,7 +102,6 @@ fn normalize_and_deduplicate(
             dataset_label,
             credit,
             title,
-            section: None,
             source_url: citation.source_url.clone(),
             license_label,
             license_url: citation.license_url.clone(),
@@ -206,7 +195,6 @@ fn parse_footer(footer: &str) -> Option<Vec<SourceCitation>> {
             dataset_label: dataset_label.to_owned(),
             credit: credit.to_owned(),
             title: title.to_owned(),
-            section: None,
             source_url: source_url.to_owned(),
             license_label: license_label.to_owned(),
             license_url: license_url.to_owned(),
@@ -288,7 +276,6 @@ mod tests {
             dataset_label: dataset_label.to_owned(),
             credit: format!("{dataset_label} contributors"),
             title: "Example title".to_owned(),
-            section: None,
             source_url: url.to_owned(),
             license_label: LICENSE_LABEL.to_owned(),
             license_url: LICENSE_URL.to_owned(),
@@ -302,19 +289,18 @@ mod tests {
             "Simple English Wikipedia",
             "https://simple.wikipedia.org/wiki/Example",
         );
-        let mut second = citation(
+        let second = citation(
             "wikibooks",
             "Wikibooks",
             "https://en.wikibooks.org/wiki/Tea",
         );
-        second.section = Some("Brewing".to_owned());
         let finalized = finalize_assistant_text("An answer", &[first, second]).unwrap();
         assert!(!finalized.ends_with('\n'));
 
         let parsed = parse_assistant_text(&finalized);
         assert_eq!(parsed.text, "An answer");
         assert_eq!(parsed.citations.len(), 2);
-        assert_eq!(parsed.citations[1].title, "Example title — Brewing");
+        assert_eq!(parsed.citations[1].title, "Example title");
         assert_eq!(
             knowledge_source_chip_label(&parsed.citations).as_deref(),
             Some("Simple English Wikipedia +1")

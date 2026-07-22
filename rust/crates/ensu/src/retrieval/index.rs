@@ -11,7 +11,6 @@ use url::Url;
 use crate::config::{
     KNOWLEDGE_MANIFEST_FILE, KNOWLEDGE_META_FILE, KNOWLEDGE_OFFSETS_FILE, KNOWLEDGE_VECTORS_FILE,
     KnowledgeDatasetConfig, is_path_safe_component, knowledge_index_contract,
-    validate_knowledge_datasets,
 };
 
 use super::{BEGIN_CONTEXT_SENTINEL, END_CONTEXT_SENTINEL, RetrievalError, normalize_single_line};
@@ -30,7 +29,6 @@ pub struct RetrievalHit {
 #[derive(Debug, Deserialize)]
 struct Manifest {
     dataset: String,
-    granularity: String,
     max_chars: u32,
     model: String,
     source_dim: u32,
@@ -48,7 +46,6 @@ struct Manifest {
 
 #[derive(Debug, Deserialize)]
 struct MetadataRow {
-    id: serde_json::Value,
     title: String,
     text: String,
     #[serde(default)]
@@ -73,8 +70,6 @@ impl RetrievalIndex {
         directory: impl AsRef<Path>,
         expected_pack: &KnowledgeDatasetConfig,
     ) -> Result<Self, RetrievalError> {
-        validate_knowledge_datasets(std::slice::from_ref(expected_pack))
-            .map_err(|error| RetrievalError::InvalidInput(error.to_string()))?;
         let directory = directory.as_ref();
         let directory_metadata = fs::symlink_metadata(directory)?;
         if !directory_metadata.file_type().is_dir() {
@@ -270,11 +265,6 @@ impl RetrievalIndex {
                     ))
                 })?;
                 let row: MetadataRow = serde_json::from_str(line)?;
-                if row.id.is_null() {
-                    return Err(RetrievalError::InvalidPack(
-                        "metadata row id must not be null".to_string(),
-                    ));
-                }
                 if row.title.trim().is_empty() {
                     return Err(RetrievalError::InvalidPack(
                         "metadata title must not be empty".to_string(),
@@ -404,14 +394,6 @@ fn validate_manifest(
     if !is_path_safe_component(&manifest.dataset) || manifest.dataset != directory_identity {
         return Err(RetrievalError::InvalidPack(
             "manifest dataset must equal its path-safe revision directory".to_string(),
-        ));
-    }
-    if manifest.granularity.trim().is_empty()
-        || manifest.granularity.len() > 256
-        || manifest.granularity.chars().any(char::is_control)
-    {
-        return Err(RetrievalError::InvalidPack(
-            "manifest granularity is invalid".to_string(),
         ));
     }
     if manifest.count == 0 || manifest.dim == 0 || manifest.meta_rows_per_block == 0 {

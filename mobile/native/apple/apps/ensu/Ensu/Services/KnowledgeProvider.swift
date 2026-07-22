@@ -13,6 +13,7 @@ private struct KnowledgePackValidationError: LocalizedError {
 
 actor KnowledgeProvider {
     private final class Mutation: @unchecked Sendable {
+        let cancellation: CancellationToken
         let task: Task<Void, Error>
 
         init(
@@ -20,20 +21,23 @@ actor KnowledgeProvider {
             dataset: KnowledgeDatasetConfig,
             onProgress: @escaping @Sendable (KnowledgeDownloadProgress) -> Void
         ) {
+            let cancellation = CancellationToken()
+            self.cancellation = cancellation
             task = Task.detached(priority: .utility) {
-                let callback = KnowledgeDownloadCallbackSink(
-                    onProgress: onProgress,
-                    isCancelled: { Task.isCancelled }
-                )
+                let callback = KnowledgeDownloadCallbackSink(onProgress: onProgress)
                 try downloadKnowledgePack(
                     packRoot: packRoot.path,
-                    expectedDataset: dataset,
-                    callback: callback
+                    stableId: dataset.stableId,
+                    callback: callback,
+                    cancellation: cancellation
                 )
             }
         }
 
-        func cancel() { task.cancel() }
+        func cancel() {
+            cancellation.cancel()
+            task.cancel()
+        }
     }
 
     private struct OpenIndex {
@@ -43,6 +47,7 @@ actor KnowledgeProvider {
 
     private let root: URL
     private var mutations: [String: Mutation] = [:]
+    private var lifecycleGates: [String: AsyncSerialGate] = [:]
     private var indexes: [String: OpenIndex] = [:]
     private let indexGate = AsyncSerialGate()
 
@@ -59,8 +64,14 @@ actor KnowledgeProvider {
     }
 
     func reconcile(dataset: KnowledgeDatasetConfig) async throws -> KnowledgeReconciliation {
-        try await withIndexGate {
-            try await reconcileAndActivateLocked(dataset: dataset)
+        let gate = lifecycleGate(dataset.stableId)
+        return try await gate.withLock {
+            if let mutation = mutations[dataset.stableId] {
+                _ = try? await mutation.task.value
+            }
+            return try await withIndexGate {
+                try await reconcileAndActivateLocked(dataset: dataset)
+            }
         }
     }
 
@@ -68,17 +79,18 @@ actor KnowledgeProvider {
         dataset: KnowledgeDatasetConfig,
         onProgress: @escaping @Sendable (KnowledgeDownloadProgress) -> Void
     ) async throws -> KnowledgeReconciliation {
-        let mutation: Mutation
-        if let current = mutations[dataset.stableId] {
-            mutation = current
-        } else {
+        let gate = lifecycleGate(dataset.stableId)
+        let mutation = try await gate.withLock {
+            if let current = mutations[dataset.stableId] {
+                return current
+            }
             let created = Mutation(
                 packRoot: packRoot(dataset),
                 dataset: dataset,
                 onProgress: onProgress
             )
             mutations[dataset.stableId] = created
-            mutation = created
+            return created
         }
 
         do {
@@ -193,7 +205,7 @@ actor KnowledgeProvider {
             }
             return try reconcileKnowledgePack(
                 packRoot: packRoot.path,
-                expectedDataset: dataset
+                stableId: dataset.stableId
             )
         }.value
         try activate(result: result, dataset: dataset)
@@ -201,7 +213,7 @@ actor KnowledgeProvider {
             _ = try? await Task.detached(priority: .utility) {
                 try cleanupObsoleteKnowledgePackRevisions(
                     packRoot: packRoot.path,
-                    expectedDataset: dataset,
+                    stableId: dataset.stableId,
                     activeIdentity: activeIdentity
                 )
             }.value
@@ -220,13 +232,22 @@ actor KnowledgeProvider {
         guard indexes[dataset.stableId]?.directory != directory else { return }
         let replacement = try RetrievalIndex.open(
             directory: directory,
-            expectedDataset: dataset
+            stableId: dataset.stableId
         )
         indexes[dataset.stableId] = OpenIndex(directory: directory, index: replacement)
     }
 
     private func withIndexGate<T>(_ operation: () async throws -> T) async throws -> T {
         try await indexGate.withLock(operation)
+    }
+
+    private func lifecycleGate(_ stableId: String) -> AsyncSerialGate {
+        if let gate = lifecycleGates[stableId] {
+            return gate
+        }
+        let gate = AsyncSerialGate()
+        lifecycleGates[stableId] = gate
+        return gate
     }
 
     private func packRoot(_ dataset: KnowledgeDatasetConfig) -> URL {
@@ -236,21 +257,12 @@ actor KnowledgeProvider {
 
 private final class KnowledgeDownloadCallbackSink: KnowledgeDownloadCallback, @unchecked Sendable {
     private let onProgressHandler: @Sendable (KnowledgeDownloadProgress) -> Void
-    private let isCancelledHandler: @Sendable () -> Bool
 
-    init(
-        onProgress: @escaping @Sendable (KnowledgeDownloadProgress) -> Void,
-        isCancelled: @escaping @Sendable () -> Bool
-    ) {
+    init(onProgress: @escaping @Sendable (KnowledgeDownloadProgress) -> Void) {
         onProgressHandler = onProgress
-        isCancelledHandler = isCancelled
     }
 
     func onProgress(progress: KnowledgeDownloadProgress) {
         onProgressHandler(progress)
-    }
-
-    func isCancelled() -> Bool {
-        isCancelledHandler()
     }
 }

@@ -1,5 +1,3 @@
-use unicode_segmentation::UnicodeSegmentation;
-
 use crate::config::knowledge_datasets;
 
 use super::{
@@ -69,7 +67,7 @@ pub fn build_knowledge_prompt_context(
             break;
         }
 
-        let passage = truncate_utf8_graphemes(&item.hit.text, available).trim();
+        let passage = truncate_utf8(&item.hit.text, available).trim();
         if passage.is_empty() {
             break;
         }
@@ -80,8 +78,7 @@ pub fn build_knowledge_prompt_context(
             dataset_id: dataset.stable_id.clone(),
             dataset_label: dataset.label.clone(),
             credit: dataset.attribution.credit.clone(),
-            title: item.hit.title.clone(),
-            section: item.hit.section.clone(),
+            title: display_title,
             source_url: item.hit.source_url.clone(),
             license_label: dataset.attribution.license_label.clone(),
             license_url: dataset.attribution.license_url.clone(),
@@ -96,18 +93,14 @@ pub fn build_knowledge_prompt_context(
     Ok(Some(KnowledgePromptContext { text, citations }))
 }
 
-fn truncate_utf8_graphemes(value: &str, max_bytes: usize) -> &str {
+fn truncate_utf8(value: &str, max_bytes: usize) -> &str {
     if value.len() <= max_bytes {
         return value;
     }
 
-    let mut end = 0;
-    for (start, grapheme) in value.grapheme_indices(true) {
-        let next = start + grapheme.len();
-        if next > max_bytes {
-            break;
-        }
-        end = next;
+    let mut end = max_bytes;
+    while !value.is_char_boundary(end) {
+        end -= 1;
     }
     &value[..end]
 }
@@ -170,8 +163,7 @@ A useful passage\n\
             context.citations[0].credit,
             "Simple English Wikipedia contributors"
         );
-        assert_eq!(context.citations[0].title, "Example title");
-        assert_eq!(context.citations[0].section.as_deref(), Some("Details"));
+        assert_eq!(context.citations[0].title, "Example title — Details");
         assert_eq!(
             context.citations[0].source_url,
             "https://example.com/source"
@@ -200,41 +192,13 @@ A useful passage\n\
     }
 
     #[test]
-    fn truncates_only_at_extended_grapheme_boundaries() {
-        let item = hit("simplewiki", "A👨‍👩‍👧‍👦B");
-        let budget_inside_family_emoji = fixed_bytes(&item) + 1 + "👨".len();
-        let context = build_knowledge_prompt_context(&[item], budget_inside_family_emoji)
-            .unwrap()
-            .unwrap();
-
-        assert!(
-            context
-                .text
-                .contains("\nA\n----- END KNOWLEDGE CONTEXT -----")
-        );
-        assert!(!context.text.contains('👨'));
-
-        let item = hit("simplewiki", "Ae\u{301}B");
-        let budget_inside_combining_grapheme = fixed_bytes(&item) + 2;
-        let context = build_knowledge_prompt_context(&[item], budget_inside_combining_grapheme)
-            .unwrap()
-            .unwrap();
-        assert!(
-            context
-                .text
-                .contains("\nA\n----- END KNOWLEDGE CONTEXT -----")
-        );
-        assert!(!context.text.contains("e\u{301}"));
-    }
-
-    #[test]
     fn respects_two_three_and_four_byte_scalar_boundaries() {
-        assert_eq!(truncate_utf8_graphemes("é", 1), "");
-        assert_eq!(truncate_utf8_graphemes("é", 2), "é");
-        assert_eq!(truncate_utf8_graphemes("€", 2), "");
-        assert_eq!(truncate_utf8_graphemes("€", 3), "€");
-        assert_eq!(truncate_utf8_graphemes("🙂", 3), "");
-        assert_eq!(truncate_utf8_graphemes("🙂", 4), "🙂");
+        assert_eq!(truncate_utf8("é", 1), "");
+        assert_eq!(truncate_utf8("é", 2), "é");
+        assert_eq!(truncate_utf8("€", 2), "");
+        assert_eq!(truncate_utf8("€", 3), "€");
+        assert_eq!(truncate_utf8("🙂", 3), "");
+        assert_eq!(truncate_utf8("🙂", 4), "🙂");
     }
 
     #[test]
@@ -249,7 +213,7 @@ A useful passage\n\
                 .text
                 .contains("# Example title (Simple English Wikipedia)\npassage")
         );
-        assert_eq!(context.citations[0].section.as_deref(), Some(" \n "));
+        assert_eq!(context.citations[0].title, "Example title");
 
         let blank = hit("simplewiki", " \n\t ");
         assert!(

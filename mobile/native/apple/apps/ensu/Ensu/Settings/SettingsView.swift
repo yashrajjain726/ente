@@ -21,7 +21,7 @@ struct SettingsView: View {
                 VStack(alignment: .leading, spacing: EnsuSpacing.lg) {
                     if let aboutItem = filteredAboutItem {
                         Button(action: aboutItem.action) {
-                            SettingsCard(title: aboutItem.title, iconName: aboutItem.iconName, showsChevron: true)
+                            settingsCard(title: aboutItem.title, iconName: aboutItem.iconName, showsChevron: true)
                         }
                         .buttonStyle(.plain)
                     }
@@ -30,23 +30,21 @@ struct SettingsView: View {
                         NavigationLink {
                             item.destination
                         } label: {
-                            SettingsCard(title: item.title, iconName: item.iconName, showsChevron: true)
+                            settingsCard(title: item.title, iconName: item.iconName, showsChevron: true)
                         }
                         .buttonStyle(.plain)
                     }
 
                     if shouldShowSignInRow {
                         Button(action: onSignIn) {
-                            SettingsCard(title: signInTitle, iconName: "Upload01Icon", showsChevron: true)
+                            settingsCard(title: signInTitle, iconName: "Upload01Icon", showsChevron: true)
                         }
                         .buttonStyle(.plain)
                     }
 
-                    ForEach(filteredTermsItems) { item in
-                        NavigationLink {
-                            item.destination
-                        } label: {
-                            SettingsCard(title: item.title, iconName: item.iconName, showsChevron: true)
+                    ForEach(filteredLegalLinkItems) { item in
+                        Button(action: item.action) {
+                            settingsCard(title: item.title, iconName: item.iconName, showsChevron: true)
                         }
                         .buttonStyle(.plain)
                     }
@@ -61,7 +59,7 @@ struct SettingsView: View {
                             NavigationLink {
                                 item.destination
                             } label: {
-                                SettingsCard(title: item.title, iconName: item.iconName, showsChevron: true)
+                                settingsCard(title: item.title, iconName: item.iconName, showsChevron: true)
                             }
                             .buttonStyle(.plain)
                         }
@@ -110,15 +108,6 @@ struct SettingsView: View {
         }
     }
 
-    private var filteredTermsItems: [SettingsItem] {
-        guard !trimmedQuery.isEmpty else { return termsItems }
-        let q = trimmedQuery.lowercased()
-        return termsItems.filter { item in
-            item.title.lowercased().contains(q) ||
-                item.searchTerms.contains { $0.lowercased().contains(q) }
-        }
-    }
-
     private var filteredAdvancedItems: [SettingsItem] {
         guard isAdvancedUnlocked else { return [] }
         guard !trimmedQuery.isEmpty else { return advancedItems }
@@ -136,10 +125,33 @@ struct SettingsView: View {
         )
     }
 
+    private var legalLinkItems: [SettingsActionItem] {
+        [
+            SettingsActionItem(
+                title: "Privacy Policy",
+                iconName: "ViewIcon",
+                action: { openExternalLink("https://ente.com/privacy") }
+            ),
+            SettingsActionItem(
+                title: "Terms of Service",
+                iconName: "DescriptionIcon",
+                action: { openExternalLink("https://ente.com/terms") }
+            )
+        ]
+    }
+
     private var filteredAboutItem: SettingsActionItem? {
         guard !trimmedQuery.isEmpty else { return aboutItem }
         let q = trimmedQuery.lowercased()
         return aboutItem.title.lowercased().contains(q) ? aboutItem : nil
+    }
+
+    private var filteredLegalLinkItems: [SettingsActionItem] {
+        guard !trimmedQuery.isEmpty else { return legalLinkItems }
+        let q = trimmedQuery.lowercased()
+        return legalLinkItems.filter { item in
+            item.title.lowercased().contains(q)
+        }
     }
 
     private var shouldShowSignInRow: Bool {
@@ -161,17 +173,6 @@ struct SettingsView: View {
                 title: "Logs",
                 iconName: "Bug01Icon",
                 destination: AnyView(LogsView(embeddedInNavigation: true))
-            )
-        ]
-    }
-
-    private var termsItems: [SettingsItem] {
-        [
-            SettingsItem(
-                title: "Terms and Conditions",
-                iconName: "DescriptionIcon",
-                destination: AnyView(TermsAndConditionsView()),
-                searchTerms: EnsuLegalDocuments.searchTerms
             )
         ]
     }
@@ -228,14 +229,8 @@ struct SettingsView: View {
         guard let url = URL(string: urlString) else { return }
         openURL(url)
     }
-}
 
-struct SettingsCard: View {
-    let title: String
-    let iconName: String
-    let showsChevron: Bool
-
-    var body: some View {
+    private func settingsCard(title: String, iconName: String, showsChevron: Bool) -> some View {
         HStack(spacing: EnsuSpacing.md) {
             Image(iconName)
                 .resizable()
@@ -397,14 +392,6 @@ private struct SettingsItem: Identifiable {
     let title: String
     let iconName: String
     let destination: AnyView
-    let searchTerms: [String]
-
-    init(title: String, iconName: String, destination: AnyView, searchTerms: [String] = []) {
-        self.title = title
-        self.iconName = iconName
-        self.destination = destination
-        self.searchTerms = searchTerms
-    }
 }
 
 private struct SettingsActionItem: Identifiable {

@@ -82,7 +82,7 @@ pub fn voice_activity_target() -> ModelTarget {
 }
 
 pub fn knowledge_embedding_target() -> ModelTarget {
-    let embedding = config::defaults().knowledge_embedding;
+    let embedding = config::knowledge_embedding_config();
     ModelTarget::Files {
         id: embedding.target_id,
         files: vec![ModelFile {

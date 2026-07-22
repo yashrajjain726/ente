@@ -101,7 +101,7 @@ struct KnowledgeSettingsView: View {
             if let error = pack.errorMessage {
                 Text(error)
                     .font(EnsuTypography.small)
-                    .foregroundStyle(.red)
+                    .foregroundStyle(EnsuColor.error)
             }
         }
         .padding(EnsuSpacing.lg)

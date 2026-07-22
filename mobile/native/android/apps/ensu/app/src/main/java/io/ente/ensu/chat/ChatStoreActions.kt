@@ -17,7 +17,6 @@ import io.ente.ensu.chat.ChatSession
 import io.ente.ensu.bindings.DbException
 import io.ente.ensu.bindings.LlmException
 import io.ente.ensu.bindings.ConfigDefaults
-import io.ente.ensu.bindings.KnowledgePromptHit
 import io.ente.ensu.logging.LogLevel
 import io.ente.ensu.chat.MessageAuthor
 import io.ente.ensu.chat.sessionTitleFromText
@@ -28,7 +27,6 @@ import io.ente.ensu.bindings.buildKnowledgePromptContext
 import io.ente.ensu.bindings.cleanAssistantText
 import io.ente.ensu.bindings.finalizeAssistantText
 import io.ente.ensu.knowledge.KnowledgeProvider
-import io.ente.ensu.knowledge.KnowledgeSearchHit
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -58,7 +56,8 @@ internal class ChatStoreActions(
     private val messageStore: MutableMap<String, MutableList<ChatMessage>>,
     private val attachmentActions: AttachmentStoreActions,
     private val modelSettingsActions: ModelSettingsActions,
-    private val configDefaults: ConfigDefaults
+    private val configDefaults: ConfigDefaults,
+    private val awaitKnowledgeReady: suspend () -> Unit
 ) {
     private val branchSelections = mutableMapOf<String, MutableMap<String, String>>()
     private val sessionSummaries = mutableMapOf<String, String>()
@@ -485,10 +484,12 @@ internal class ChatStoreActions(
             priorSummary?.join()
             val isActive = { isGenerationActive(generationToken, sessionId) }
             if (!isActive()) return@launch
+            awaitKnowledgeReady()
+            if (!isActive()) return@launch
             val progressTracker = DownloadProgressTracker()
             var embeddingAssetInvalid = false
             val enabledDatasets = state.value.knowledge.enabledReadyDatasets
-            val knowledgeHits: List<KnowledgeSearchHit> = if (
+            val knowledgeHits = if (
                 userMessage.text.isNotBlank() && enabledDatasets.isNotEmpty()
             ) {
                 try {
@@ -607,12 +608,7 @@ internal class ChatStoreActions(
                 ).coerceAtLeast(0)
             val knowledgeContext = runCatching {
                 buildKnowledgePromptContext(
-                    hits = knowledgeHits.map { item ->
-                        KnowledgePromptHit(
-                            datasetId = item.dataset.stableId,
-                            hit = item.hit
-                        )
-                    },
+                    hits = knowledgeHits,
                     maxUtf8Bytes = min(
                         configDefaults.knowledgeEmbedding.maxContextUtf8Bytes.toInt(),
                         remainingKnowledgeBytes
@@ -632,9 +628,7 @@ internal class ChatStoreActions(
                     systemPrompt = it
                 )
             }
-            val useKnowledge = knowledgeContext != null &&
-                knowledgeHistorySelection != null &&
-                !knowledgeHistorySelection.wasTrimmed
+            val useKnowledge = knowledgeHistorySelection?.wasTrimmed == false
             val historySelection = if (useKnowledge) {
                 knowledgeHistorySelection ?: normalHistorySelection
             } else {

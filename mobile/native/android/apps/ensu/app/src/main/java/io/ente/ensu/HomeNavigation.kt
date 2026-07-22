@@ -38,7 +38,6 @@ import io.ente.ensu.logging.LogViewerScreen
 import io.ente.ensu.settings.SettingsScreen
 import io.ente.ensu.settings.SystemPromptSettingsScreen
 import io.ente.ensu.settings.KnowledgeSettingsScreen
-import io.ente.ensu.settings.TermsAndConditionsScreen
 import io.ente.ensu.device.isChatSupported
 
 @Composable
@@ -95,9 +94,6 @@ internal fun HomeNavigation(
                 }
                 HomeRoute.Knowledge -> {
                     SimpleTopBar(title = "Ensu Packs") { navController.popBackStack() }
-                }
-                HomeRoute.Terms -> {
-                    SimpleTopBar(title = "Terms and Conditions") { navController.popBackStack() }
                 }
                 else -> Unit
             }
@@ -156,7 +152,6 @@ internal fun HomeNavigation(
                         isAdvancedUnlocked = appState.developerSettings.isAdvancedUnlocked,
                         onOpenLogs = { navController.navigate(HomeRoute.Logs) },
                         onOpenKnowledge = { navController.navigate(HomeRoute.Knowledge) },
-                        onOpenTerms = { navController.navigate(HomeRoute.Terms) },
                         onOpenModelSettings = { navController.navigate(HomeRoute.ModelSettings) },
                         onOpenSystemPromptSettings = { navController.navigate(HomeRoute.SystemPromptSettings) },
                         onUnlockAdvanced = {
@@ -180,15 +175,6 @@ internal fun HomeNavigation(
                         onCancel = store::cancelKnowledgePackDownload,
                         onSetEnabled = store::setKnowledgePackEnabled
                     )
-                }
-                composable(
-                    route = HomeRoute.Terms,
-                    enterTransition = { forwardEnter() },
-                    exitTransition = { forwardExit() },
-                    popEnterTransition = { backEnter() },
-                    popExitTransition = { backExit() }
-                ) {
-                    TermsAndConditionsScreen()
                 }
                 composable(
                     route = HomeRoute.Logs,
@@ -258,7 +244,6 @@ internal object HomeRoute {
     const val ModelSettings = "model-settings"
     const val SystemPromptSettings = "system-prompt-settings"
     const val Knowledge = "knowledge"
-    const val Terms = "terms"
 }
 
 internal fun AnimatedContentTransitionScope<NavBackStackEntry>.forwardEnter() =

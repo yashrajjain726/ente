@@ -1,10 +1,3 @@
-mod validation;
-
-use thiserror::Error;
-
-pub(crate) use validation::is_path_safe_component;
-pub(crate) use validation::{validate_knowledge_datasets, validate_knowledge_embedding};
-
 pub(crate) const KNOWLEDGE_LICENSE_LABEL: &str = "CC BY-SA 4.0";
 pub(crate) const KNOWLEDGE_LICENSE_URL: &str = "https://creativecommons.org/licenses/by-sa/4.0/";
 
@@ -41,7 +34,6 @@ pub struct KnowledgeEmbeddingConfig {
     pub target_id: String,
     pub source_dim: u32,
     pub dim: u32,
-    pub matryoshka: bool,
     pub query_prompt: String,
     pub context_size: u32,
     pub batch_size: u32,
@@ -56,7 +48,6 @@ pub struct AttributionConfig {
     pub license_label: String,
     pub license_url: String,
     pub public_pack_url: String,
-    pub build_provenance: String,
     pub modification_notice: String,
 }
 
@@ -88,16 +79,6 @@ pub struct KnowledgeIndexContract {
     pub meta_rows_per_block: u32,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Error)]
-#[error("{0}")]
-pub struct KnowledgeConfigError(String);
-
-impl KnowledgeConfigError {
-    fn invalid(field: &str, reason: impl AsRef<str>) -> Self {
-        Self(format!("invalid {field}: {}", reason.as_ref()))
-    }
-}
-
 pub(crate) fn knowledge_index_contract() -> KnowledgeIndexContract {
     KnowledgeIndexContract {
         model: EMBEDDING_MODEL_IDENTITY.to_owned(),
@@ -114,15 +95,13 @@ pub(crate) fn knowledge_index_contract() -> KnowledgeIndexContract {
 }
 
 pub(crate) fn knowledge_embedding_config() -> KnowledgeEmbeddingConfig {
-    let contract = knowledge_index_contract();
     KnowledgeEmbeddingConfig {
         model_url: EMBEDDING_MODEL_URL.to_owned(),
         model_sha256: EMBEDDING_MODEL_SHA256.to_owned(),
         target_id: EMBEDDING_TARGET_ID.to_owned(),
-        source_dim: contract.source_dim,
-        dim: contract.dim,
-        matryoshka: contract.matryoshka,
-        query_prompt: contract.query_prompt,
+        source_dim: SOURCE_DIM,
+        dim: RETRIEVAL_DIM,
+        query_prompt: QUERY_PROMPT.to_owned(),
         context_size: EMBEDDING_CONTEXT_SIZE,
         batch_size: EMBEDDING_CONTEXT_SIZE,
         micro_batch_size: EMBEDDING_CONTEXT_SIZE,
@@ -153,7 +132,6 @@ pub(crate) fn knowledge_datasets() -> Vec<KnowledgeDatasetConfig> {
                 license_label: KNOWLEDGE_LICENSE_LABEL.to_owned(),
                 license_url: KNOWLEDGE_LICENSE_URL.to_owned(),
                 public_pack_url: "https://huggingface.co/datasets/ente-ai/ensu-knowledge-packs/tree/a13b90e443dcdc1561ac777ea17ee6ed4703e35f/simplewiki".to_owned(),
-                build_provenance: "Simple English Wikipedia dump dated 2026-07-02".to_owned(),
                 modification_notice: MODIFICATION_NOTICE.to_owned(),
             },
         },
@@ -177,18 +155,30 @@ pub(crate) fn knowledge_datasets() -> Vec<KnowledgeDatasetConfig> {
                 license_label: KNOWLEDGE_LICENSE_LABEL.to_owned(),
                 license_url: KNOWLEDGE_LICENSE_URL.to_owned(),
                 public_pack_url: "https://huggingface.co/datasets/ente-ai/ensu-knowledge-packs/tree/a13b90e443dcdc1561ac777ea17ee6ed4703e35f/wikibooks".to_owned(),
-                build_provenance: "English Wikibooks dump dated 2026-07-02".to_owned(),
                 modification_notice: MODIFICATION_NOTICE.to_owned(),
             },
         },
     ]
 }
 
-pub(crate) fn knowledge_artifact_urls(
-    dataset: &KnowledgeDatasetConfig,
-) -> Result<[String; 4], KnowledgeConfigError> {
-    validation::validate_artifact_base_url(&dataset.artifact_base_url, "artifact_base_url")?;
-    Ok(KNOWLEDGE_ARTIFACT_FILENAMES.map(|name| format!("{}{name}", dataset.artifact_base_url)))
+pub fn knowledge_dataset(stable_id: &str) -> Option<KnowledgeDatasetConfig> {
+    knowledge_datasets()
+        .into_iter()
+        .find(|dataset| dataset.stable_id == stable_id)
+}
+
+pub(crate) fn knowledge_artifact_urls(dataset: &KnowledgeDatasetConfig) -> [String; 4] {
+    KNOWLEDGE_ARTIFACT_FILENAMES.map(|name| format!("{}{name}", dataset.artifact_base_url))
+}
+
+pub(crate) fn is_path_safe_component(value: &str) -> bool {
+    !value.is_empty()
+        && value.len() <= 255
+        && value != "."
+        && value != ".."
+        && !value.chars().any(|character| {
+            character.is_control() || character == '/' || character == '\\' || character == ':'
+        })
 }
 
 #[cfg(test)]
@@ -197,7 +187,7 @@ mod tests {
 
     #[test]
     fn artifact_urls_append_only_fixed_names() {
-        let urls = knowledge_artifact_urls(&knowledge_datasets()[0]).unwrap();
+        let urls = knowledge_artifact_urls(&knowledge_datasets()[0]);
         assert_eq!(
             urls.each_ref()
                 .map(|url| url.rsplit('/').next().unwrap().to_owned()),
@@ -211,9 +201,7 @@ mod tests {
     #[test]
     fn pinned_catalog_and_embedding_are_valid() {
         let datasets = knowledge_datasets();
-        validate_knowledge_datasets(&datasets).unwrap();
         let embedding = knowledge_embedding_config();
-        validate_knowledge_embedding(&embedding, &[]).unwrap();
 
         assert_eq!(datasets.len(), 2);
         assert_eq!(datasets[0].stable_id, "simplewiki");
@@ -235,5 +223,10 @@ mod tests {
         assert_eq!(embedding.model_sha256.len(), 64);
         assert_eq!(knowledge_index_contract().source_dim, 768);
         assert_eq!(knowledge_index_contract().dim, 512);
+        assert!(datasets.iter().all(|dataset| {
+            is_path_safe_component(&dataset.stable_id)
+                && is_path_safe_component(&dataset.current_download_identity)
+        }));
+        assert!(knowledge_dataset("missing").is_none());
     }
 }

@@ -272,6 +272,25 @@ impl Context {
         Ok(Arc::new(context))
     }
 
+    pub fn new_knowledge_embedding(
+        model: &ModelRef,
+        n_threads: Option<i32>,
+    ) -> Result<ContextRef, Error> {
+        let config = crate::config::knowledge_embedding_config();
+        Self::new_embedding(
+            model,
+            EmbeddingContextParams {
+                context_size: config.context_size,
+                n_threads,
+                batch_size: config.batch_size,
+                micro_batch_size: config.micro_batch_size,
+                source_dim: config.source_dim,
+                dim: config.dim,
+                query_prompt: config.query_prompt,
+            },
+        )
+    }
+
     pub fn prewarm_multimodal(
         &self,
         mmproj_path: String,

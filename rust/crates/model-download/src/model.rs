@@ -189,8 +189,8 @@ impl ModelDownloader {
             let mut any = false;
             for entry in download_targets(&self.models_dir, target).ok()? {
                 let path = &entry.destination;
-                let size = if let Some(size) = valid_local_size(&entry, path) {
-                    Some(size)
+                let size = if path.exists() {
+                    fs::metadata(path).ok().map(|m| m.len()).filter(|s| *s > 0)
                 } else {
                     download::probe_content_length(downloader.client(), &entry.url).await
                 };
@@ -202,18 +202,6 @@ impl ModelDownloader {
             any.then_some(total)
         })
     }
-}
-
-fn valid_local_size(target: &Target, path: &Path) -> Option<u64> {
-    let actual = download::sha256_file(path).ok()?;
-    if actual != target.sha256.trim().to_ascii_lowercase() {
-        return None;
-    }
-    fs::metadata(path)
-        .ok()
-        .filter(|metadata| metadata.is_file())
-        .map(|metadata| metadata.len())
-        .filter(|size| *size > 0)
 }
 
 fn storage_key(target: &ModelTarget) -> &str {
@@ -437,25 +425,6 @@ mod tests {
 
         write_gguf(&mmproj, b"GGUFdata");
         assert!(downloader.is_downloaded(&target));
-
-        let _ = fs::remove_dir_all(dir);
-    }
-
-    #[test]
-    fn local_size_ignores_files_that_fail_checksum_validation() {
-        let dir = scratch_dir("local-size-validation");
-        let path = dir.join("model.gguf");
-        write_gguf(&path, b"GGUFdata");
-        let mut target = Target {
-            label: "Model".to_string(),
-            url: "https://example.org/model.gguf".to_string(),
-            sha256: test_sha(),
-            destination: path.clone(),
-        };
-
-        assert_eq!(valid_local_size(&target, &path), None);
-        target.sha256 = download::sha256_file(&path).unwrap();
-        assert_eq!(valid_local_size(&target, &path), Some(8));
 
         let _ = fs::remove_dir_all(dir);
     }

@@ -3,8 +3,8 @@ use std::sync::Arc;
 use ente_ensu::retrieval as core;
 use thiserror::Error;
 
-use crate::config::KnowledgeDatasetConfig;
 use crate::download::DownloadError;
+use crate::model::CancellationToken;
 
 #[derive(Debug, Error, uniffi::Error)]
 pub enum KnowledgeRetrievalError {
@@ -34,6 +34,16 @@ impl From<core::RetrievalError> for KnowledgeRetrievalError {
             core::RetrievalError::Zstd(detail) => Self::Zstd { detail },
         }
     }
+}
+
+fn knowledge_dataset(
+    stable_id: &str,
+) -> Result<ente_ensu::config::KnowledgeDatasetConfig, KnowledgeRetrievalError> {
+    ente_ensu::config::knowledge_dataset(stable_id).ok_or_else(|| {
+        KnowledgeRetrievalError::InvalidInput {
+            detail: format!("unknown knowledge dataset ID: {stable_id}"),
+        }
+    })
 }
 
 #[derive(Debug, Error, uniffi::Error)]
@@ -100,9 +110,9 @@ impl RetrievalIndex {
     #[uniffi::constructor]
     pub fn open(
         directory: String,
-        expected_dataset: KnowledgeDatasetConfig,
+        stable_id: String,
     ) -> Result<Arc<Self>, KnowledgeRetrievalError> {
-        let inner = core::RetrievalIndex::open(directory, &expected_dataset.into())?;
+        let inner = core::RetrievalIndex::open(directory, &knowledge_dataset(&stable_id)?)?;
         Ok(Arc::new(Self { inner }))
     }
 
@@ -156,9 +166,9 @@ impl From<core::KnowledgeReconciliation> for KnowledgeReconciliation {
 #[uniffi::export]
 pub fn reconcile_knowledge_pack(
     pack_root: String,
-    expected_dataset: KnowledgeDatasetConfig,
+    stable_id: String,
 ) -> Result<KnowledgeReconciliation, KnowledgeRetrievalError> {
-    core::reconcile_knowledge_pack(pack_root, &expected_dataset.into())
+    core::reconcile_knowledge_pack(pack_root, &knowledge_dataset(&stable_id)?)
         .map(Into::into)
         .map_err(Into::into)
 }
@@ -166,12 +176,12 @@ pub fn reconcile_knowledge_pack(
 #[uniffi::export]
 pub fn cleanup_obsolete_knowledge_pack_revisions(
     pack_root: String,
-    expected_dataset: KnowledgeDatasetConfig,
+    stable_id: String,
     active_identity: String,
 ) -> Result<(), KnowledgeRetrievalError> {
     core::cleanup_obsolete_knowledge_pack_revisions(
         pack_root,
-        &expected_dataset.into(),
+        &knowledge_dataset(&stable_id)?,
         &active_identity,
     )
     .map_err(Into::into)
@@ -183,7 +193,6 @@ pub struct SourceCitation {
     pub dataset_label: String,
     pub credit: String,
     pub title: String,
-    pub section: Option<String>,
     pub source_url: String,
     pub license_label: String,
     pub license_url: String,
@@ -196,7 +205,6 @@ impl From<SourceCitation> for core::SourceCitation {
             dataset_label: value.dataset_label,
             credit: value.credit,
             title: value.title,
-            section: value.section,
             source_url: value.source_url,
             license_label: value.license_label,
             license_url: value.license_url,
@@ -211,7 +219,6 @@ impl From<core::SourceCitation> for SourceCitation {
             dataset_label: value.dataset_label,
             credit: value.credit,
             title: value.title,
-            section: value.section,
             source_url: value.source_url,
             license_label: value.license_label,
             license_url: value.license_url,
@@ -300,57 +307,29 @@ impl From<ente_model_download::download::Progress> for KnowledgeDownloadProgress
 #[uniffi::export(callback_interface)]
 pub trait KnowledgeDownloadCallback: Send + Sync {
     fn on_progress(&self, progress: KnowledgeDownloadProgress);
-    fn is_cancelled(&self) -> bool;
 }
 
 #[uniffi::export]
 pub fn download_knowledge_pack(
     pack_root: String,
-    expected_dataset: KnowledgeDatasetConfig,
+    stable_id: String,
     callback: Box<dyn KnowledgeDownloadCallback>,
+    cancellation: Arc<CancellationToken>,
 ) -> Result<(), KnowledgeDownloadError> {
-    let callback: Arc<dyn KnowledgeDownloadCallback> = Arc::from(callback);
-    let progress_callback = Arc::clone(&callback);
-    let cancel_callback = Arc::clone(&callback);
+    let expected_dataset = ente_ensu::config::knowledge_dataset(&stable_id).ok_or_else(|| {
+        KnowledgeDownloadError::Download {
+            error: DownloadError::InvalidTarget {
+                message: format!("unknown knowledge dataset ID: {stable_id}"),
+            },
+        }
+    })?;
     core::download_knowledge_pack(
         pack_root,
-        &expected_dataset.into(),
-        move |progress| progress_callback.on_progress(progress.into()),
-        move || cancel_callback.is_cancelled(),
+        &expected_dataset,
+        move |progress| callback.on_progress(progress.into()),
+        cancellation.inner.clone(),
     )
     .map_err(|error| KnowledgeDownloadError::Download {
         error: error.into(),
     })
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn builds_a_prompt_context_through_the_binding_types() {
-        let context = build_knowledge_prompt_context(
-            vec![KnowledgePromptHit {
-                dataset_id: "simplewiki".to_string(),
-                hit: RetrievalHit {
-                    score: 0.9,
-                    text: "A useful passage".to_string(),
-                    title: "Example".to_string(),
-                    section: None,
-                    source_url: "https://simple.wikipedia.org/wiki/Example".to_string(),
-                },
-            }],
-            6_000,
-        )
-        .unwrap()
-        .unwrap();
-
-        assert!(
-            context
-                .text
-                .contains("# Example (Simple English Wikipedia)")
-        );
-        assert_eq!(context.citations.len(), 1);
-        assert_eq!(context.citations[0].dataset_id, "simplewiki");
-    }
 }

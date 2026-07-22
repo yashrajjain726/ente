@@ -68,7 +68,8 @@ class AppStore(
         messageStore = messageStore,
         attachmentActions = attachmentActions,
         modelSettingsActions = modelSettingsActions,
-        configDefaults = configDefaults
+        configDefaults = configDefaults,
+        awaitKnowledgeReady = knowledgeStore::awaitEnabledPacksReady
     )
     fun bootstrap(scope: CoroutineScope) {
         chatActions.setScope(scope)
