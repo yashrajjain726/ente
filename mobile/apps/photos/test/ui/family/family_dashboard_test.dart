@@ -192,6 +192,10 @@ void main() {
                   },
                   profilePictureBytesByUserId: const {},
                   linkedPersonIdsByUserId: const {},
+                  linkedPersonNamesByUserId: const {
+                    1: 'Person current user',
+                    42: 'Person saved member',
+                  },
                   onMemberTap: (member) => selectedMember = member,
                   onAddMember: () {},
                   remainingSlots: 2,
@@ -261,10 +265,14 @@ void main() {
     },
   );
 
-  testWidgets('uses a linked Person face when no contact photo is saved', (
+  testWidgets('uses a linked Person name and face without a saved contact', (
     tester,
   ) async {
-    final member = _member(email: 'me@example.com', userID: 42);
+    final member = _member(
+      email: 'admin@example.com',
+      userID: 42,
+      status: FamilyMemberStatus.self,
+    );
     final members = [member];
 
     await tester.pumpWidget(
@@ -280,6 +288,7 @@ void main() {
             contactsByUserId: const {},
             profilePictureBytesByUserId: const {},
             linkedPersonIdsByUserId: const {42: 'person-42'},
+            linkedPersonNamesByUserId: const {42: 'Current person'},
             onMemberTap: (_) {},
             onAddMember: () {},
             remainingSlots: 0,
@@ -288,6 +297,7 @@ void main() {
       ),
     );
 
+    expect(find.text('Current person'), findsWidgets);
     expect(find.byType(PersonFaceWidget), findsOneWidget);
     final personAvatar = tester.widget<PersonFaceWidget>(
       find.byType(PersonFaceWidget),
@@ -326,6 +336,7 @@ void main() {
               },
               profilePictureBytesByUserId: const {},
               linkedPersonIdsByUserId: const {},
+              linkedPersonNamesByUserId: const {4: 'Aaron'},
               onMemberTap: (_) {},
               onAddMember: () {},
               remainingSlots: 0,
@@ -339,7 +350,7 @@ void main() {
       tester
           .widgetList<MenuComponent>(find.byType(MenuComponent))
           .map((item) => item.title),
-      ['admin@example.com', 'Amy', 'bob@example.com', 'Zoe'],
+      ['admin@example.com', 'Aaron', 'Amy', 'Zoe'],
     );
   });
 }
