@@ -19,15 +19,6 @@ struct SettingsView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: EnsuSpacing.lg) {
-                    ForEach(filteredItems) { item in
-                        NavigationLink {
-                            item.destination
-                        } label: {
-                            SettingsCard(title: item.title, iconName: item.iconName, showsChevron: true)
-                        }
-                        .buttonStyle(.plain)
-                    }
-
                     if let aboutItem = filteredAboutItem {
                         Button(action: aboutItem.action) {
                             SettingsCard(title: aboutItem.title, iconName: aboutItem.iconName, showsChevron: true)
@@ -35,7 +26,7 @@ struct SettingsView: View {
                         .buttonStyle(.plain)
                     }
 
-                    ForEach(filteredUtilityItems) { item in
+                    ForEach(filteredItems) { item in
                         NavigationLink {
                             item.destination
                         } label: {
@@ -112,25 +103,34 @@ struct SettingsView: View {
     }
 
     private var filteredItems: [SettingsItem] {
-        filtered(allItems)
-    }
-
-    private var filteredUtilityItems: [SettingsItem] {
-        filtered(utilityItems)
+        guard !trimmedQuery.isEmpty else { return allItems }
+        let q = trimmedQuery.lowercased()
+        return allItems.filter { item in
+            item.title.lowercased().contains(q)
+        }
     }
 
     private var filteredTermsItems: [SettingsItem] {
-        filtered(termsItems)
+        guard !trimmedQuery.isEmpty else { return termsItems }
+        let q = trimmedQuery.lowercased()
+        return termsItems.filter { item in
+            item.title.lowercased().contains(q) ||
+                item.searchTerms.contains { $0.lowercased().contains(q) }
+        }
     }
 
     private var filteredAdvancedItems: [SettingsItem] {
         guard isAdvancedUnlocked else { return [] }
-        return filtered(advancedItems)
+        guard !trimmedQuery.isEmpty else { return advancedItems }
+        let q = trimmedQuery.lowercased()
+        return advancedItems.filter { item in
+            item.title.lowercased().contains(q)
+        }
     }
 
     private var aboutItem: SettingsActionItem {
         SettingsActionItem(
-            title: "About Ensu",
+            title: "About",
             iconName: "InformationCircleIcon",
             action: { openExternalLink("https://ente.com/blog/ensu/") }
         )
@@ -155,17 +155,8 @@ struct SettingsView: View {
             SettingsItem(
                 title: "Ensu Packs",
                 iconName: "PackageIcon",
-                destination: AnyView(
-                    KnowledgeSettingsView(
-                        store: knowledgeStore
-                    )
-                )
-            )
-        ]
-    }
-
-    private var utilityItems: [SettingsItem] {
-        [
+                destination: AnyView(KnowledgeSettingsView(store: knowledgeStore))
+            ),
             SettingsItem(
                 title: "Logs",
                 iconName: "Bug01Icon",
@@ -183,12 +174,6 @@ struct SettingsView: View {
                 searchTerms: EnsuLegalDocuments.searchTerms
             )
         ]
-    }
-
-    private func filtered(_ items: [SettingsItem]) -> [SettingsItem] {
-        guard !trimmedQuery.isEmpty else { return items }
-        let q = trimmedQuery.lowercased()
-        return items.filter { $0.matches(q) }
     }
 
     private var advancedItems: [SettingsItem] {
@@ -414,21 +399,11 @@ private struct SettingsItem: Identifiable {
     let destination: AnyView
     let searchTerms: [String]
 
-    init(
-        title: String,
-        iconName: String,
-        destination: AnyView,
-        searchTerms: [String] = []
-    ) {
+    init(title: String, iconName: String, destination: AnyView, searchTerms: [String] = []) {
         self.title = title
         self.iconName = iconName
         self.destination = destination
         self.searchTerms = searchTerms
-    }
-
-    func matches(_ query: String) -> Bool {
-        title.lowercased().contains(query) ||
-            searchTerms.contains { $0.lowercased().contains(query) }
     }
 }
 

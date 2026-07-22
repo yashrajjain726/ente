@@ -64,17 +64,17 @@ fun SettingsScreen(
         buildList {
             add(
                 SettingsItem(
-                    title = "Ensu Packs",
-                    iconRes = HugeIcons.PackageIcon,
-                    onClick = onOpenKnowledge
+                    title = "About",
+                    iconVector = Icons.Outlined.Info,
+                    onClick = { context.openExternalLink("https://ente.com/blog/ensu/") }
                 )
             )
 
             add(
                 SettingsItem(
-                    title = "About Ensu",
-                    iconVector = Icons.Outlined.Info,
-                    onClick = { context.openExternalLink("https://ente.com/blog/ensu/") }
+                    title = "Ensu Packs",
+                    iconRes = HugeIcons.PackageIcon,
+                    onClick = onOpenKnowledge
                 )
             )
 

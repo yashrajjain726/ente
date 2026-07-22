@@ -7,9 +7,7 @@ import io.ente.ensu.llm.ModelDownloader
 
 class EnsuApplication : Application() {
     val modelDownloader by lazy { ModelDownloader(this) }
-    val knowledgeProvider by lazy {
-        KnowledgeProvider(noBackupFilesDir.resolve("knowledge"))
-    }
+    val knowledgeProvider by lazy { KnowledgeProvider(noBackupFilesDir.resolve("knowledge")) }
     val transcriber by lazy {
         Transcriber(
             modelDownloader.modelDir(modelDownloader.transcriptionTarget).absolutePath,

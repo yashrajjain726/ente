@@ -8,7 +8,6 @@ use crate::config::{self, ModelPreset};
 
 const LLM_MODEL_FILE: &str = "model.gguf";
 const LLM_MMPROJ_FILE: &str = "mmproj.gguf";
-const EMBEDDING_MODEL_FILE: &str = "model.gguf";
 const VOICE_ACTIVITY_MODEL_FILE: &str = "model.onnx";
 
 #[derive(Debug, thiserror::Error)]
@@ -87,7 +86,7 @@ pub fn knowledge_embedding_target() -> ModelTarget {
     ModelTarget::Files {
         id: embedding.target_id,
         files: vec![ModelFile {
-            name: EMBEDDING_MODEL_FILE.to_string(),
+            name: LLM_MODEL_FILE.to_string(),
             url: embedding.model_url,
             sha256: embedding.model_sha256,
         }],

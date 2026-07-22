@@ -636,7 +636,7 @@ internal class ChatStoreActions(
                 knowledgeHistorySelection != null &&
                 !knowledgeHistorySelection.wasTrimmed
             val historySelection = if (useKnowledge) {
-                knowledgeHistorySelection!!
+                knowledgeHistorySelection ?: normalHistorySelection
             } else {
                 normalHistorySelection
             }

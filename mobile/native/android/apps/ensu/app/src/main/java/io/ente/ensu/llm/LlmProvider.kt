@@ -170,9 +170,7 @@ class LlmProvider(
 
             val embeddingModel = LlmModel.load(
                 LlmModelLoadParams(
-                    modelPath = requireNotNull(
-                        downloader.llmModelPath(embeddingDownloadTarget)
-                    ).absolutePath,
+                    modelPath = requireNotNull(downloader.llmModelPath(embeddingDownloadTarget)).absolutePath,
                     nGpuLayers = 0,
                     useMmap = true,
                     useMlock = false

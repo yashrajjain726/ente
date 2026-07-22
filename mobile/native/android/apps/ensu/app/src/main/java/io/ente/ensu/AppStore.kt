@@ -34,7 +34,7 @@ class AppStore(
     private val sessionPreferences: SessionPreferencesDataStore,
     private val chatRepository: ChatRepository,
     private val llmProvider: LlmProvider,
-    private val knowledgeProvider: KnowledgeProvider,
+    knowledgeProvider: KnowledgeProvider,
     val modelDownloader: ModelDownloader,
     val transcriber: Transcriber,
     private val deviceCapabilityProvider: AndroidDeviceCapabilityProvider,
@@ -55,14 +55,7 @@ class AppStore(
         logRepository = logRepository
     )
     private val modelSettingsActions =
-        ModelSettingsActions(
-            _state,
-            sessionPreferences,
-            llmProvider,
-            modelDownloader,
-            logRepository,
-            configDefaults
-        )
+        ModelSettingsActions(_state, sessionPreferences, llmProvider, modelDownloader, logRepository, configDefaults)
     private val chatActions = ChatStoreActions(
         state = _state,
         sessionPreferences = sessionPreferences,
@@ -176,13 +169,11 @@ class AppStore(
 
     fun refreshModelDownloadInfo() = modelSettingsActions.refreshModelDownloadInfo()
 
-    fun downloadOrUpdateKnowledgePack(stableId: String) =
-        knowledgeStore.downloadOrUpdate(stableId)
+    fun downloadOrUpdateKnowledgePack(stableId: String) = knowledgeStore.downloadOrUpdate(stableId)
 
     fun cancelKnowledgePackDownload(stableId: String) = knowledgeStore.cancel(stableId)
 
-    fun setKnowledgePackEnabled(stableId: String, enabled: Boolean) =
-        knowledgeStore.setEnabled(stableId, enabled)
+    fun setKnowledgePackEnabled(stableId: String, enabled: Boolean) = knowledgeStore.setEnabled(stableId, enabled)
 
     fun cancelDownload() {
         chatActions.cancelGenerationForDownload()

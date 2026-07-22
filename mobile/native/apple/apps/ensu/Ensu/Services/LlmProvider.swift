@@ -126,11 +126,7 @@ final class LlmProvider {
     private var currentJobId: Int64?
     private let modelLoadGate = AsyncSerialGate()
 
-    init(
-        downloader: ModelDownloader,
-        transcriber: Transcriber,
-        knowledgeEmbedding: KnowledgeEmbeddingConfig
-    ) {
+    init(downloader: ModelDownloader, transcriber: Transcriber, knowledgeEmbedding: KnowledgeEmbeddingConfig) {
         self.downloader = downloader
         self.transcriber = transcriber
         self.knowledgeEmbedding = knowledgeEmbedding
@@ -144,25 +140,21 @@ final class LlmProvider {
         downloader.isDownloaded(embeddingDownloadTarget)
     }
 
-    func requiredModelsReady(_ selection: LlmModelSelection) -> Bool {
+    func isModelDownloaded(_ selection: LlmModelSelection) -> Bool {
         downloader.isDownloaded(selection.modelTarget) && isEmbeddingModelReady()
     }
 
-    func missingRequiredDownloadSize(_ selection: LlmModelSelection) async -> Int64? {
+    func missingModelDownloadSize(_ selection: LlmModelSelection) async -> Int64? {
         var total: Int64 = 0
         let chatMissing = !downloader.isDownloaded(selection.modelTarget)
         if chatMissing {
-            guard let chatSize = await downloader.estimateDownloadSize(
-                selection.modelTarget
-            ) else {
+            guard let chatSize = await downloader.estimateDownloadSize(selection.modelTarget) else {
                 return nil
             }
             total += chatSize
         }
         if !isEmbeddingModelReady() {
-            guard let embeddingSize = await downloader.estimateDownloadSize(
-                embeddingDownloadTarget
-            ) else {
+            guard let embeddingSize = await downloader.estimateDownloadSize(embeddingDownloadTarget) else {
                 return nil
             }
             total += embeddingSize
@@ -380,9 +372,12 @@ final class LlmProvider {
                 backendInitialized = true
             }
 
+            guard let embeddingModelPath = downloader.llmModelPath(embeddingDownloadTarget) else {
+                throw EmbeddingAssetInvalidError()
+            }
             var embeddingModel: LlmModel? = try LlmModel.load(
                 params: LlmModelLoadParams(
-                    modelPath: downloader.llmModelPath(embeddingDownloadTarget)!.path,
+                    modelPath: embeddingModelPath.path,
                     nGpuLayers: 0,
                     useMmap: true,
                     useMlock: false
@@ -458,11 +453,7 @@ final class LlmProvider {
     func resetContext() async {
         try? await modelLoadGate.withLock {
             guard let model = loadedModel else { return }
-            let contextParams = LlmContextParams(
-                contextSize: currentContextLength.map(Int32.init),
-                nThreads: nil,
-                nBatch: nil
-            )
+            let contextParams = LlmContextParams(contextSize: currentContextLength.map(Int32.init), nThreads: nil, nBatch: nil)
             loadedContext = nil
             loadedContext = try? model.newContext(params: contextParams)
         }

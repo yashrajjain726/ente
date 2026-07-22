@@ -22,7 +22,7 @@ struct ChatView: View {
     }
 
     private var shouldAutoFocusInput: Bool {
-        viewModel.requiredModelsReady
+        viewModel.isModelDownloaded
             && !viewModel.isChatUnsupported
             && !viewModel.isDownloading
             && !viewModel.isGenerating
@@ -116,7 +116,7 @@ struct ChatView: View {
                     isInputFocused = false
                     viewState.wasDrawerOpen = true
                 } else if viewState.wasDrawerOpen {
-                    let shouldRestoreFocus = viewModel.requiredModelsReady
+                    let shouldRestoreFocus = viewModel.isModelDownloaded
                         && !viewModel.isChatUnsupported
                         && !viewModel.isDownloading
                         && !viewModel.isGenerating
@@ -253,7 +253,7 @@ struct ChatView: View {
             .animation(.easeInOut(duration: 0.32))
 
             ZStack(alignment: .bottom) {
-                let shouldShowDownloadOnboarding = !viewModel.requiredModelsReady && !viewModel.isChatUnsupported
+                let shouldShowDownloadOnboarding = !viewModel.isModelDownloaded && !viewModel.isChatUnsupported
 
                 MessageListView(
                     messages: viewModel.messages,
@@ -262,17 +262,14 @@ struct ChatView: View {
                     isGenerating: viewModel.isGenerating,
                     sessionId: viewModel.currentSessionId,
                     keyboardHeight: keyboard.height,
-                    inputBarHeight: (viewModel.requiredModelsReady || viewModel.isChatUnsupported) ? viewState.inputBarHeight : 0,
+                    inputBarHeight: (viewModel.isModelDownloaded || viewModel.isChatUnsupported) ? viewState.inputBarHeight : 0,
                     emptyStateTitle: "Welcome",
                     emptyStateSubtitle: "Start typing to begin a conversation",
                     onEdit: { message in
                         viewModel.beginEditing(message: message)
                     },
                     onCopy: { message in
-                        let text = message.role == .assistant
-                            ? cleanAssistantText(storedText: message.text)
-                            : message.text
-                        copyToPasteboard(text)
+                        copyToPasteboard(message.role == .assistant ? cleanAssistantText(storedText: message.text) : message.text)
                         showToast("Copied to clipboard", duration: 1)
                     },
                     onRetry: { message in
@@ -305,7 +302,7 @@ struct ChatView: View {
                         }
                         .padding(.bottom, keyboard.isVisible ? keyboard.height : 0)
                         .zIndex(1)
-                } else if viewModel.requiredModelsReady {
+                } else if viewModel.isModelDownloaded {
                     let shouldAutoFocus = shouldAutoFocusInput
 
                     MessageInputView(

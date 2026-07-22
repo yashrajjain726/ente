@@ -250,17 +250,12 @@ struct AssistantMessageBubbleView: View {
 
     var body: some View {
         let parsed = parseAssistantText(storedText: message.text)
-        let sourceLabel = parsed.sourceLabel
         HStack(alignment: .bottom) {
             VStack(alignment: .leading, spacing: 0) {
                 VStack(alignment: .leading, spacing: EnsuSpacing.sm) {
-                    AssistantMessageRenderer(
-                        text: parsed.text,
-                        isStreaming: false,
-                        storageId: message.id.uuidString
-                    )
+                    AssistantMessageRenderer(text: parsed.text, isStreaming: false, storageId: message.id.uuidString)
 
-                    if let sourceLabel {
+                    if let sourceLabel = parsed.sourceLabel {
                         Button(sourceLabel) {
                             showSources = true
                         }
@@ -345,7 +340,8 @@ private struct KnowledgeSourcesSheet: View {
                                 .font(EnsuTypography.large)
                                 .foregroundStyle(EnsuColor.textPrimary)
 
-                            if let section = citationSection(citation) {
+                            if let section = citation.section?.trimmingCharacters(in: .whitespacesAndNewlines),
+                               !section.isEmpty {
                                 Text(section)
                                     .font(EnsuTypography.small)
                                     .foregroundStyle(EnsuColor.textMuted)
@@ -401,16 +397,6 @@ private struct KnowledgeSourcesSheet: View {
         citations.count == 1
             ? "1 source used in this response"
             : "\(citations.count) sources used in this response"
-    }
-
-    private func citationSection(_ citation: SourceCitation) -> String? {
-        citation.section?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
-    }
-}
-
-private extension String {
-    var nilIfEmpty: String? {
-        isEmpty ? nil : self
     }
 }
 

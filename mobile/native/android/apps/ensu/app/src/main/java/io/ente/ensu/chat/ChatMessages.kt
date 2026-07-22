@@ -7,6 +7,7 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -31,13 +32,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentSize
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -101,7 +101,7 @@ internal fun MessageList(
     streamingResponse: String,
     streamingParentId: String?,
     isGenerating: Boolean,
-    requiredModelsReady: Boolean,
+    isModelDownloaded: Boolean,
     isModelStateKnown: Boolean,
     isChatUnsupported: Boolean,
     isDownloading: Boolean,
@@ -116,7 +116,7 @@ internal fun MessageList(
     onOpenAttachment: (Attachment) -> Unit,
     onStartDownload: (Boolean) -> Unit
 ) {
-    if (isModelStateKnown && !requiredModelsReady && !isChatUnsupported) {
+    if (isModelStateKnown && !isModelDownloaded && !isChatUnsupported) {
         DownloadOnboarding(
             modifier = modifier,
             isDownloading = isDownloading,
@@ -633,8 +633,6 @@ private fun AssistantMessageBubble(
 ) {
     val clipboard = LocalClipboardManager.current
     val parsed = remember(message.text) { parseAssistantText(message.text) }
-    val cleanMessageText = parsed.text
-    val sourceLabel = parsed.sourceLabel
     val haptic = rememberHaptics()
     var showMenu by remember { mutableStateOf(false) }
     var showSources by remember { mutableStateOf(false) }
@@ -647,7 +645,7 @@ private fun AssistantMessageBubble(
             if (!message.isSynthetic) {
                 add(MessageAction("Copy", HugeIcons.Copy01Icon) {
                     haptic.perform(HapticFeedbackType.TextHandleMove)
-                    clipboard.setText(AnnotatedString(stripHiddenMessageParts(cleanMessageText)))
+                    clipboard.setText(AnnotatedString(stripHiddenMessageParts(parsed.text)))
                 })
             }
             if (!message.isSynthetic || isLastMessage) {
@@ -675,11 +673,11 @@ private fun AssistantMessageBubble(
                     .padding(horizontal = EnsuSpacing.sm.dp, vertical = EnsuSpacing.md.dp)
             ) {
                 MarkdownView(
-                    markdown = stripHiddenMessageParts(cleanMessageText),
+                    markdown = stripHiddenMessageParts(parsed.text),
                     enableSelection = false
                 )
 
-                sourceLabel?.let { label ->
+                parsed.sourceLabel?.let { label ->
                     Spacer(modifier = Modifier.height(EnsuSpacing.sm.dp))
                     Surface(
                         color = EnsuColor.fillFaint(),

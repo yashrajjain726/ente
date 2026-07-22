@@ -16,10 +16,6 @@ use crate::config::{
 
 use super::{BEGIN_CONTEXT_SENTINEL, END_CONTEXT_SENTINEL, RetrievalError, normalize_single_line};
 
-const MANIFEST_FILE: &str = KNOWLEDGE_MANIFEST_FILE;
-const VECTORS_FILE: &str = KNOWLEDGE_VECTORS_FILE;
-const META_FILE: &str = KNOWLEDGE_META_FILE;
-const OFFSETS_FILE: &str = KNOWLEDGE_OFFSETS_FILE;
 const MAX_MANIFEST_BYTES: u64 = 1_048_576;
 const MAX_METADATA_FRAME_BYTES: u64 = 1_048_576;
 #[derive(Debug, Clone, PartialEq)]
@@ -100,7 +96,7 @@ impl RetrievalIndex {
             ));
         }
 
-        let manifest_path = directory.join(MANIFEST_FILE);
+        let manifest_path = directory.join(KNOWLEDGE_MANIFEST_FILE);
         let manifest_metadata = regular_file_metadata(&manifest_path)?;
         if manifest_metadata.len() == 0 || manifest_metadata.len() > MAX_MANIFEST_BYTES {
             return Err(RetrievalError::InvalidPack(
@@ -124,7 +120,7 @@ impl RetrievalIndex {
         let expected_vector_bytes = count.checked_mul(dim).ok_or_else(|| {
             RetrievalError::InvalidPack("vector byte length overflow".to_string())
         })?;
-        let vector_path = directory.join(VECTORS_FILE);
+        let vector_path = directory.join(KNOWLEDGE_VECTORS_FILE);
         let vector_file = open_regular_file(&vector_path)?;
         let vector_length = usize::try_from(vector_file.metadata()?.len()).map_err(|_| {
             RetrievalError::InvalidPack("vector file is too large for this platform".to_string())
@@ -135,7 +131,7 @@ impl RetrievalIndex {
             )));
         }
 
-        let metadata_path = directory.join(META_FILE);
+        let metadata_path = directory.join(KNOWLEDGE_META_FILE);
         let metadata_file = open_regular_file(&metadata_path)?;
         let metadata_len = metadata_file.metadata()?.len();
         if metadata_len == 0 {
@@ -151,7 +147,7 @@ impl RetrievalIndex {
         let expected_offset_bytes = offset_count.checked_mul(8).ok_or_else(|| {
             RetrievalError::InvalidPack("metadata offset byte length overflow".to_string())
         })?;
-        let offsets_path = directory.join(OFFSETS_FILE);
+        let offsets_path = directory.join(KNOWLEDGE_OFFSETS_FILE);
         let offset_metadata = regular_file_metadata(&offsets_path)?;
         let offset_bytes = usize::try_from(offset_metadata.len()).map_err(|_| {
             RetrievalError::InvalidPack("metadata offsets are too large".to_string())
@@ -582,9 +578,9 @@ pub(super) mod tests {
             .collect::<Vec<_>>()
             .join("\n");
         let compressed = zstd::stream::encode_all(metadata_lines.as_bytes(), 1).unwrap();
-        fs::write(revision.join(META_FILE), &compressed).unwrap();
+        fs::write(revision.join(KNOWLEDGE_META_FILE), &compressed).unwrap();
         fs::write(
-            revision.join(OFFSETS_FILE),
+            revision.join(KNOWLEDGE_OFFSETS_FILE),
             [0_u64, compressed.len() as u64]
                 .into_iter()
                 .flat_map(u64::to_le_bytes)
@@ -596,9 +592,9 @@ pub(super) mod tests {
         vectors[0] = 127_i8 as u8;
         vectors[contract.dim as usize] = 100_i8 as u8;
         vectors[contract.dim as usize * 2] = 50_i8 as u8;
-        fs::write(revision.join(VECTORS_FILE), vectors).unwrap();
+        fs::write(revision.join(KNOWLEDGE_VECTORS_FILE), vectors).unwrap();
         fs::write(
-            revision.join(MANIFEST_FILE),
+            revision.join(KNOWLEDGE_MANIFEST_FILE),
             serde_json::to_vec_pretty(&json!({
                 "dataset": identity,
                 "granularity": "test",
@@ -653,11 +649,15 @@ pub(super) mod tests {
     #[test]
     fn rejects_vector_and_offset_contract_mismatches() {
         let pack = synthetic_pack("simplewiki-test");
-        fs::write(pack.revision.join(VECTORS_FILE), [0_u8]).unwrap();
+        fs::write(pack.revision.join(KNOWLEDGE_VECTORS_FILE), [0_u8]).unwrap();
         assert!(RetrievalIndex::open(&pack.revision, &pack.expected).is_err());
 
         let pack = synthetic_pack("simplewiki-test");
-        fs::write(pack.revision.join(OFFSETS_FILE), 1_u64.to_le_bytes()).unwrap();
+        fs::write(
+            pack.revision.join(KNOWLEDGE_OFFSETS_FILE),
+            1_u64.to_le_bytes(),
+        )
+        .unwrap();
         assert!(RetrievalIndex::open(&pack.revision, &pack.expected).is_err());
     }
 
