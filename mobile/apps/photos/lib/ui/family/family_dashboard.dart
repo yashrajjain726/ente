@@ -416,9 +416,16 @@ class _MemberAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cachedPixelWidth =
+        (AvatarComponentSize.large.dimension *
+                MediaQuery.devicePixelRatioOf(context))
+            .round();
     final avatar = profilePictureBytes != null
         ? AvatarComponent.image(
-            image: MemoryImage(profilePictureBytes!),
+            image: ResizeImage(
+              MemoryImage(profilePictureBytes!),
+              width: cachedPixelWidth,
+            ),
             size: AvatarComponentSize.large,
             semanticLabel: displayName,
           )
@@ -431,10 +438,7 @@ class _MemberAvatar extends StatelessWidget {
               child: ClipOval(
                 child: PersonFaceWidget(
                   personId: linkedPersonId,
-                  cachedPixelWidth:
-                      (AvatarComponentSize.large.dimension *
-                              MediaQuery.devicePixelRatioOf(context))
-                          .round(),
+                  cachedPixelWidth: cachedPixelWidth,
                 ),
               ),
             ),

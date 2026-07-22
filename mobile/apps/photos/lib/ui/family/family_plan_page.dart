@@ -504,6 +504,12 @@ class _FamilyPlanPageState extends State<FamilyPlanPage> {
     final displayName = savedContactName == null || savedContactName.isEmpty
         ? fallbackDisplayName
         : savedContactName;
+    final linkedPersonId = member.userID == null || !PersonService.isInitialized
+        ? null
+        : PersonService.instance.getCachedPartialPersonData(
+            userID: member.userID,
+            email: member.email,
+          )?[PersonService.kPersonIDKey];
     final l10n = AppLocalizations.of(context);
     await showBottomSheetComponent<void>(
       context: context,
@@ -517,6 +523,7 @@ class _FamilyPlanPageState extends State<FamilyPlanPage> {
                 sheetContext,
                 member: member,
                 displayName: displayName,
+                linkedPersonId: linkedPersonId,
                 action: actions[index],
                 l10n: l10n,
               ),
@@ -533,6 +540,7 @@ class _FamilyPlanPageState extends State<FamilyPlanPage> {
     BuildContext sheetContext, {
     required FamilyMember member,
     required String displayName,
+    required String? linkedPersonId,
     required FamilyMemberAction action,
     required AppLocalizations l10n,
   }) {
@@ -582,11 +590,8 @@ class _FamilyPlanPageState extends State<FamilyPlanPage> {
               EditStorageLimitPage(
                 member: member,
                 displayName: displayName,
+                linkedPersonId: linkedPersonId,
                 totalStorageInBytes: _userDetails.getTotalStorage(),
-                avatarColor: avatarComponentColorValue(
-                  context,
-                  familyMemberAvatarComponentColor(member),
-                ),
               ),
             );
             if (!mounted) {
