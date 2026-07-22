@@ -45,23 +45,19 @@ pub(crate) fn llm_target(preset: &ModelPreset) -> Result<ModelTarget, InvalidPre
 }
 
 pub fn mobile_llm_target(model_id: &str) -> Result<ModelTarget, InvalidPreset> {
-    let defaults = config::defaults();
-    let preset = defaults
-        .mobile_model_presets
-        .iter()
+    let preset = config::llm_catalog()
+        .into_iter()
         .find(|preset| preset.id == model_id)
-        .unwrap_or(&defaults.mobile_default_model);
-    llm_target(preset)
+        .unwrap_or_else(|| config::defaults().mobile_default_model);
+    llm_target(&preset)
 }
 
 pub fn desktop_llm_target(model_id: &str) -> Result<ModelTarget, InvalidPreset> {
-    let defaults = config::defaults();
-    let preset = std::iter::once(&defaults.mobile_default_model)
-        .chain(&defaults.mobile_model_presets)
-        .chain(&defaults.desktop_model_presets)
+    let preset = config::llm_catalog()
+        .into_iter()
         .find(|preset| preset.id == model_id)
-        .unwrap_or(&defaults.desktop_default_model);
-    llm_target(preset)
+        .unwrap_or_else(|| config::defaults().desktop_default_model);
+    llm_target(&preset)
 }
 
 pub fn transcription_target() -> ModelTarget {
@@ -152,50 +148,37 @@ mod tests {
     }
 
     #[test]
-    fn mobile_llm_target_resolves_or_falls_back_to_default() {
+    fn llm_targets_resolve_catalog_ids_or_fall_back_to_defaults() {
         let defaults = crate::config::defaults();
-        for preset in &defaults.mobile_model_presets {
+        for preset in crate::config::llm_catalog() {
             assert_eq!(
                 mobile_llm_target(&preset.id).unwrap(),
-                llm_target(preset).unwrap(),
+                llm_target(&preset).unwrap(),
                 "{}",
                 preset.id
             );
-        }
-        let default = llm_target(&defaults.mobile_default_model).unwrap();
-        assert_eq!(mobile_llm_target("").unwrap(), default);
-        assert_eq!(mobile_llm_target("no-such-model").unwrap(), default);
-    }
-
-    #[test]
-    fn desktop_llm_target_resolves_union_or_falls_back_to_default() {
-        let defaults = crate::config::defaults();
-        for preset in std::iter::once(&defaults.mobile_default_model)
-            .chain(&defaults.mobile_model_presets)
-            .chain(std::iter::once(&defaults.desktop_default_model))
-            .chain(&defaults.desktop_model_presets)
-        {
             assert_eq!(
                 desktop_llm_target(&preset.id).unwrap(),
-                llm_target(preset).unwrap(),
+                llm_target(&preset).unwrap(),
                 "{}",
                 preset.id
             );
         }
-        let default = llm_target(&defaults.desktop_default_model).unwrap();
-        assert_eq!(desktop_llm_target("").unwrap(), default);
-        assert_eq!(desktop_llm_target("no-such-model").unwrap(), default);
+        let mobile_default = llm_target(&defaults.mobile_default_model).unwrap();
+        assert_eq!(mobile_llm_target("").unwrap(), mobile_default);
+        assert_eq!(mobile_llm_target("no-such-model").unwrap(), mobile_default);
+        let desktop_default = llm_target(&defaults.desktop_default_model).unwrap();
+        assert_eq!(desktop_llm_target("").unwrap(), desktop_default);
+        assert_eq!(
+            desktop_llm_target("no-such-model").unwrap(),
+            desktop_default
+        );
     }
 
     #[test]
-    fn all_config_presets_produce_valid_targets() {
-        let defaults = crate::config::defaults();
-        for preset in std::iter::once(&defaults.mobile_default_model)
-            .chain(&defaults.mobile_model_presets)
-            .chain(std::iter::once(&defaults.desktop_default_model))
-            .chain(&defaults.desktop_model_presets)
-        {
-            llm_target(preset).expect("config preset");
+    fn all_catalog_presets_produce_valid_targets() {
+        for preset in crate::config::llm_catalog() {
+            llm_target(&preset).expect("catalog preset");
         }
     }
 }

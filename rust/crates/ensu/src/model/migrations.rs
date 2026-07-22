@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use ente_model_download::{ModelDownloader, ModelTarget};
 use sha2::{Digest, Sha256};
 
-use crate::config::{self, ModelPreset};
+use crate::config;
 use crate::model::{self, InvalidPreset, trimmed};
 
 pub struct LegacyModels {
@@ -17,12 +17,9 @@ pub struct LegacyModels {
 }
 
 pub fn migrate_mobile_models(models_dir: &Path, legacy: LegacyModels) -> Option<String> {
-    let defaults = config::defaults();
     let store = ModelDownloader::new(models_dir);
     if let Some(llm_dir) = &legacy.llm_dir
-        && let Ok(targets) = llm_targets(
-            std::iter::once(&defaults.mobile_default_model).chain(&defaults.mobile_model_presets),
-        )
+        && let Ok(targets) = llm_targets()
     {
         migrate_legacy_dir(&store, llm_dir, &targets);
     }
@@ -32,11 +29,7 @@ pub fn migrate_mobile_models(models_dir: &Path, legacy: LegacyModels) -> Option<
         &model::transcription_target(),
         &model::voice_activity_target(),
     );
-    legacy_selected_preset_id(
-        &defaults.mobile_model_presets,
-        legacy.model_url.as_deref()?,
-        legacy.mmproj_url.as_deref(),
-    )
+    legacy_selected_preset_id(legacy.model_url.as_deref()?, legacy.mmproj_url.as_deref())
 }
 
 pub fn migrate_desktop_models(
@@ -44,46 +37,28 @@ pub fn migrate_desktop_models(
     model_url: Option<&str>,
     mmproj_url: Option<&str>,
 ) -> Option<String> {
-    let defaults = config::defaults();
-    let selected = model_url.and_then(|model_url| {
-        legacy_selected_preset_id(
-            std::iter::once(&defaults.mobile_default_model)
-                .chain(&defaults.mobile_model_presets)
-                .chain(std::iter::once(&defaults.desktop_default_model))
-                .chain(&defaults.desktop_model_presets),
-            model_url,
-            mmproj_url,
-        )
-    });
-    if let Ok(targets) = llm_targets(
-        std::iter::once(&defaults.mobile_default_model)
-            .chain(&defaults.mobile_model_presets)
-            .chain(std::iter::once(&defaults.desktop_default_model))
-            .chain(&defaults.desktop_model_presets),
-    ) {
+    let selected = model_url.and_then(|model_url| legacy_selected_preset_id(model_url, mmproj_url));
+    if let Ok(targets) = llm_targets() {
         migrate_flat_models_dir(models_dir, &targets);
     }
     selected
 }
 
-fn llm_targets<'a>(
-    presets: impl Iterator<Item = &'a ModelPreset>,
-) -> Result<Vec<ModelTarget>, InvalidPreset> {
-    presets.map(model::llm_target).collect()
+fn llm_targets() -> Result<Vec<ModelTarget>, InvalidPreset> {
+    config::llm_catalog()
+        .iter()
+        .map(model::llm_target)
+        .collect()
 }
 
-fn legacy_selected_preset_id<'a>(
-    presets: impl IntoIterator<Item = &'a ModelPreset>,
-    model_url: &str,
-    mmproj_url: Option<&str>,
-) -> Option<String> {
+fn legacy_selected_preset_id(model_url: &str, mmproj_url: Option<&str>) -> Option<String> {
     let mmproj_url = trimmed(mmproj_url);
-    presets
+    config::llm_catalog()
         .into_iter()
         .find(|preset| {
             preset.url == model_url && trimmed(preset.mmproj_url.as_deref()) == mmproj_url
         })
-        .map(|preset| preset.id.clone())
+        .map(|preset| preset.id)
 }
 
 fn migrate_legacy_dir(store: &ModelDownloader, legacy_dir: &Path, targets: &[ModelTarget]) {
@@ -309,6 +284,7 @@ mod tests {
     use ente_model_download::ModelFile;
 
     use super::*;
+    use crate::config::ModelPreset;
     use crate::model;
 
     fn scratch_dir(name: &str) -> PathBuf {

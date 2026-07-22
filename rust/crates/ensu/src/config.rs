@@ -133,19 +133,44 @@ fn silero_vad_v4() -> ModelPreset {
     }
 }
 
-pub fn defaults() -> Defaults {
-    let mobile_default_model = lfm_vl_1_6b();
-    let desktop_default_model = gemma_4_e4b_q4km();
+pub(crate) fn llm_catalog() -> Vec<ModelPreset> {
+    vec![
+        lfm_vl_1_6b(),
+        qwen_0_8b(),
+        qwen_2b_q8(),
+        qwen_4b_q4km(),
+        gemma_4_e4b_q4km(),
+        gemma_4_e2b_q4km(),
+    ]
+}
 
+pub fn defaults() -> Defaults {
+    let catalog = llm_catalog();
+    let preset = |id: &str| -> ModelPreset {
+        catalog
+            .iter()
+            .find(|preset| preset.id == id)
+            .expect("preset id is in the catalog")
+            .clone()
+    };
     Defaults {
         mobile_system_prompt_body: MOBILE_SYSTEM_PROMPT_BODY.to_string(),
         desktop_system_prompt_body: DESKTOP_SYSTEM_PROMPT_BODY.to_string(),
         system_prompt_date_placeholder: SYSTEM_PROMPT_DATE_PLACEHOLDER.to_string(),
         session_summary_system_prompt: SESSION_SUMMARY_SYSTEM_PROMPT.to_string(),
-        mobile_default_model,
-        mobile_model_presets: vec![qwen_0_8b(), qwen_2b_q8(), gemma_4_e2b_q4km()],
-        desktop_default_model,
-        desktop_model_presets: vec![qwen_4b_q4km(), lfm_vl_1_6b(), qwen_0_8b(), qwen_2b_q8()],
+        mobile_default_model: preset("lfm-vl-1.6b"),
+        mobile_model_presets: vec![
+            preset("qwen-0.8b"),
+            preset("qwen-2b-q8"),
+            preset("gemma-4-e2b-q4km"),
+        ],
+        desktop_default_model: preset("gemma-4-e4b-q4km"),
+        desktop_model_presets: vec![
+            preset("qwen-4b-q4km"),
+            preset("lfm-vl-1.6b"),
+            preset("qwen-0.8b"),
+            preset("qwen-2b-q8"),
+        ],
         transcription_model: parakeet_v3_int8(),
         voice_activity_model: silero_vad_v4(),
     }
@@ -154,40 +179,26 @@ pub fn defaults() -> Defaults {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::collections::HashMap;
+    use std::collections::{HashMap, HashSet};
 
     #[test]
-    fn preset_ids_key_unique_artifacts() {
-        let defaults = defaults();
-        let all = std::iter::once(&defaults.mobile_default_model)
-            .chain(defaults.mobile_model_presets.iter())
-            .chain(std::iter::once(&defaults.desktop_default_model))
-            .chain(defaults.desktop_model_presets.iter())
-            .chain([
-                &defaults.transcription_model,
-                &defaults.voice_activity_model,
-            ]);
-        let mut seen: HashMap<&str, (&str, Option<&str>)> = HashMap::new();
-        for preset in all {
-            let artifact = (preset.url.as_str(), preset.mmproj_url.as_deref());
-            if let Some(existing) = seen.insert(preset.id.as_str(), artifact) {
-                assert_eq!(
-                    existing, artifact,
-                    "preset id {} aliases different artifacts",
-                    preset.id
-                );
-            }
+    fn model_ids_are_unique() {
+        let mut seen = HashSet::new();
+        for preset in llm_catalog()
+            .into_iter()
+            .chain([parakeet_v3_int8(), silero_vad_v4()])
+        {
+            assert!(
+                seen.insert(preset.id.clone()),
+                "duplicate model id {}",
+                preset.id
+            );
         }
     }
 
     #[test]
-    fn presets_pair_mmproj_url_with_checksum() {
-        let defaults = defaults();
-        let all = std::iter::once(&defaults.mobile_default_model)
-            .chain(defaults.mobile_model_presets.iter())
-            .chain(std::iter::once(&defaults.desktop_default_model))
-            .chain(defaults.desktop_model_presets.iter());
-        for preset in all {
+    fn catalog_presets_pair_mmproj_url_with_checksum() {
+        for preset in llm_catalog() {
             let has_url = preset
                 .mmproj_url
                 .as_deref()
@@ -205,14 +216,10 @@ mod tests {
     }
 
     #[test]
-    fn preset_artifacts_resolve_unambiguously() {
-        let defaults = defaults();
+    fn catalog_artifacts_resolve_unambiguously() {
+        let catalog = llm_catalog();
         let mut seen: HashMap<(&str, Option<&str>), &str> = HashMap::new();
-        for preset in defaults
-            .mobile_model_presets
-            .iter()
-            .chain(defaults.desktop_model_presets.iter())
-        {
+        for preset in &catalog {
             let artifact = (preset.url.as_str(), preset.mmproj_url.as_deref());
             if let Some(existing) = seen.insert(artifact, preset.id.as_str()) {
                 assert_eq!(
@@ -222,5 +229,10 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn defaults_views_select_from_the_catalog() {
+        defaults();
     }
 }
