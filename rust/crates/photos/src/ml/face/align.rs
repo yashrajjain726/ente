@@ -11,6 +11,7 @@ use super::FACE_INPUT_SIZE;
 
 const LAPLACIAN_HARD_THRESHOLD: f32 = 10.0;
 const REMOVE_SIDE_COLUMNS: usize = 56;
+const MOBILEFACENET_NORMALIZATION_SCALE: f32 = 1.0 / 127.5;
 
 const MOBILEFACENET_IDEAL_5_LANDMARKS: [[f32; 2]; 5] = [
     [38.2946 / 112.0, 51.6963 / 112.0],
@@ -253,9 +254,9 @@ fn normalize_face_rgb_for_mobilefacenet(face_image: &RgbImage) -> Vec<f32> {
     for y in 0..FACE_INPUT_SIZE {
         for x in 0..FACE_INPUT_SIZE {
             let px = face_image.get_pixel(x, y).0;
-            output.push(px[0] as f32 / 127.5 - 1.0);
-            output.push(px[1] as f32 / 127.5 - 1.0);
-            output.push(px[2] as f32 / 127.5 - 1.0);
+            output.push(px[0] as f32 * MOBILEFACENET_NORMALIZATION_SCALE - 1.0);
+            output.push(px[1] as f32 * MOBILEFACENET_NORMALIZATION_SCALE - 1.0);
+            output.push(px[2] as f32 * MOBILEFACENET_NORMALIZATION_SCALE - 1.0);
         }
     }
     output
