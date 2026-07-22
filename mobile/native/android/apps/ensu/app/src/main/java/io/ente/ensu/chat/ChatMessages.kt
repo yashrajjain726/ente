@@ -651,7 +651,7 @@ private fun AssistantMessageBubble(
             if (!message.isSynthetic) {
                 add(MessageAction("Copy", HugeIcons.Copy01Icon) {
                     haptic.perform(HapticFeedbackType.TextHandleMove)
-                    clipboard.setText(AnnotatedString(stripHiddenMessageParts(message.text)))
+                    clipboard.setText(AnnotatedString(stripHiddenMessageParts(cleanMessageText)))
                 })
             }
             if (!message.isSynthetic || isLastMessage) {
