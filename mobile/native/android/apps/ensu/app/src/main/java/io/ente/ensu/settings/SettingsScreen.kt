@@ -43,6 +43,8 @@ import io.ente.ensu.designsystem.EnsuSpacing
 import io.ente.ensu.designsystem.EnsuTypography
 import io.ente.ensu.designsystem.HugeIcons
 
+private const val IS_ENSU_PACKS_ENABLED = false
+
 @Composable
 fun SettingsScreen(
     buildVersion: String,
@@ -69,13 +71,15 @@ fun SettingsScreen(
                 )
             )
 
-            add(
-                SettingsItem(
-                    title = "Ensu Packs",
-                    iconRes = HugeIcons.PackageIcon,
-                    onClick = onOpenKnowledge
+            if (IS_ENSU_PACKS_ENABLED) {
+                add(
+                    SettingsItem(
+                        title = "Ensu Packs",
+                        iconRes = HugeIcons.PackageIcon,
+                        onClick = onOpenKnowledge
+                    )
                 )
-            )
+            }
 
             add(
                 SettingsItem(
