@@ -36,8 +36,11 @@ class SocialDataProvider {
     );
   }
 
-  Future<int> getCommentCountForFile(int fileID) {
-    return _db.getCommentCountForFile(fileID);
+  Future<int> getCommentCountForFileInCollections(
+    int fileID,
+    List<int> collectionIDs,
+  ) {
+    return _db.getCommentCountForFileInCollections(fileID, collectionIDs);
   }
 
   Future<int> getCommentCountForFileInCollection(int fileID, int collectionID) {
@@ -48,8 +51,12 @@ class SocialDataProvider {
     return _db.getReactionsForFile(fileID);
   }
 
-  Future<bool> hasUserReactedToFile(int fileID, int userID) {
-    return _db.hasUserReactedToFile(fileID, userID);
+  Future<bool> hasUserReactedToFileInCollections(
+    int fileID,
+    int userID,
+    List<int> collectionIDs,
+  ) {
+    return _db.hasUserReactedToFileInCollections(fileID, userID, collectionIDs);
   }
 
   Future<List<Reaction>> getReactionsForFileInCollection(

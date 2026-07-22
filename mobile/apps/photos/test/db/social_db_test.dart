@@ -29,7 +29,7 @@ void main() {
     await tempDir.delete(recursive: true);
   });
 
-  test("heart state is file-wide across collections", () async {
+  test("heart state stays inside the requested collection scope", () async {
     await SocialDB.instance.upsertReactions([
       _reaction(id: "visible", collectionID: 10, userID: 1),
       _reaction(id: "hidden", collectionID: 20, userID: 2),
@@ -42,10 +42,43 @@ void main() {
       ),
     ]);
 
-    expect(await SocialDB.instance.hasUserReactedToFile(100, 1), isTrue);
-    expect(await SocialDB.instance.hasUserReactedToFile(100, 2), isTrue);
-    expect(await SocialDB.instance.hasUserReactedToFile(100, 3), isFalse);
-    expect(await SocialDB.instance.hasUserReactedToFile(100, 4), isFalse);
+    expect(
+      await SocialDB.instance.hasUserReactedToFileInCollections(100, 1, [10]),
+      isTrue,
+    );
+    expect(
+      await SocialDB.instance.hasUserReactedToFileInCollections(100, 2, [10]),
+      isFalse,
+    );
+    expect(
+      await SocialDB.instance.hasUserReactedToFileInCollections(100, 2, [20]),
+      isTrue,
+    );
+    expect(
+      await SocialDB.instance.hasUserReactedToFileInCollections(100, 2, [
+        10,
+        20,
+      ]),
+      isTrue,
+    );
+    expect(
+      await SocialDB.instance.hasUserReactedToFileInCollections(100, 3, [
+        10,
+        20,
+      ]),
+      isFalse,
+    );
+    expect(
+      await SocialDB.instance.hasUserReactedToFileInCollections(100, 4, [
+        10,
+        20,
+      ]),
+      isFalse,
+    );
+    expect(
+      await SocialDB.instance.hasUserReactedToFileInCollections(100, 1, []),
+      isFalse,
+    );
   });
 
   test("latest comment stays inside the eligible collection scope", () async {
@@ -74,14 +107,32 @@ void main() {
     );
   });
 
-  test("comment count is aggregated across collections", () async {
+  test("comment count stays inside the requested collection scope", () async {
     await SocialDB.instance.upsertComments([
       _comment(id: "visible", collectionID: 10, createdAt: 10),
       _comment(id: "hidden", collectionID: 20, createdAt: 20),
       _comment(id: "deleted", collectionID: 20, createdAt: 30, isDeleted: true),
     ]);
 
-    expect(await SocialDB.instance.getCommentCountForFile(100), 2);
+    expect(
+      await SocialDB.instance.getCommentCountForFileInCollections(100, [10]),
+      1,
+    );
+    expect(
+      await SocialDB.instance.getCommentCountForFileInCollections(100, [20]),
+      1,
+    );
+    expect(
+      await SocialDB.instance.getCommentCountForFileInCollections(100, [
+        10,
+        20,
+      ]),
+      2,
+    );
+    expect(
+      await SocialDB.instance.getCommentCountForFileInCollections(100, []),
+      0,
+    );
   });
 }
 

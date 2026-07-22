@@ -147,8 +147,12 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
 
       final provider = SocialDataProvider.instance;
       final results = await Future.wait<Object?>([
-        provider.hasUserReactedToFile(fileID, currentUserID),
-        provider.getCommentCountForFile(fileID),
+        provider.hasUserReactedToFileInCollections(
+          fileID,
+          currentUserID,
+          collectionIDs,
+        ),
+        provider.getCommentCountForFileInCollections(fileID, collectionIDs),
         provider.getLatestCommentForFile(
           fileID,
           candidateCollectionIDs: collectionIDs,
