@@ -12,6 +12,7 @@ use crate::ml::{
 
 pub(crate) const YOLO_INPUT_SIZE: usize = 640;
 const PAD_VALUE: f32 = 114.0;
+const NORMALIZATION_SCALE: f32 = 1.0 / 255.0;
 
 pub(crate) struct YoloInput {
     pub(crate) tensor: PreparedF32Input,
@@ -103,7 +104,7 @@ pub(crate) fn preprocess_yolo(decoded: &DecodedImage) -> MlResult<YoloInput> {
     let pad_left = (YOLO_INPUT_SIZE.saturating_sub(scaled_width_usize)) / 2;
     let pad_top = (YOLO_INPUT_SIZE.saturating_sub(scaled_height_usize)) / 2;
 
-    let pad_norm = PAD_VALUE / 255.0;
+    let pad_norm = PAD_VALUE * NORMALIZATION_SCALE;
     let mut output = vec![pad_norm; 3 * YOLO_INPUT_SIZE * YOLO_INPUT_SIZE];
     let green_offset = YOLO_INPUT_SIZE * YOLO_INPUT_SIZE;
     let blue_offset = 2 * YOLO_INPUT_SIZE * YOLO_INPUT_SIZE;
@@ -116,9 +117,9 @@ pub(crate) fn preprocess_yolo(decoded: &DecodedImage) -> MlResult<YoloInput> {
             let dst_y = y + pad_top;
             let dst_idx = dst_y * YOLO_INPUT_SIZE + dst_x;
 
-            output[dst_idx] = resized[src_idx] as f32 / 255.0;
-            output[dst_idx + green_offset] = resized[src_idx + 1] as f32 / 255.0;
-            output[dst_idx + blue_offset] = resized[src_idx + 2] as f32 / 255.0;
+            output[dst_idx] = resized[src_idx] as f32 * NORMALIZATION_SCALE;
+            output[dst_idx + green_offset] = resized[src_idx + 1] as f32 * NORMALIZATION_SCALE;
+            output[dst_idx + blue_offset] = resized[src_idx + 2] as f32 * NORMALIZATION_SCALE;
         }
     }
 
@@ -184,9 +185,9 @@ pub(crate) fn preprocess_clip(decoded: &DecodedImage) -> MlResult<Vec<f32>> {
         for x in 0..CLIP_IMAGE_INPUT_SIZE {
             let src_idx = (y * CLIP_IMAGE_INPUT_SIZE + x) * 3;
             let dst_idx = y * CLIP_IMAGE_INPUT_SIZE + x;
-            output[dst_idx] = resized[src_idx] as f32 / 255.0;
-            output[dst_idx + green_offset] = resized[src_idx + 1] as f32 / 255.0;
-            output[dst_idx + blue_offset] = resized[src_idx + 2] as f32 / 255.0;
+            output[dst_idx] = resized[src_idx] as f32 * NORMALIZATION_SCALE;
+            output[dst_idx + green_offset] = resized[src_idx + 1] as f32 * NORMALIZATION_SCALE;
+            output[dst_idx + blue_offset] = resized[src_idx + 2] as f32 * NORMALIZATION_SCALE;
         }
     }
 
@@ -347,9 +348,12 @@ mod tests {
             for x in 0..CLIP_IMAGE_INPUT_SIZE {
                 let source = ((start_y + y) * scaled_width as usize + start_x + x) * 3;
                 let destination = y * CLIP_IMAGE_INPUT_SIZE + x;
-                output[destination] = resized.buffer()[source] as f32 / 255.0;
-                output[pixel_count + destination] = resized.buffer()[source + 1] as f32 / 255.0;
-                output[2 * pixel_count + destination] = resized.buffer()[source + 2] as f32 / 255.0;
+                output[destination] =
+                    resized.buffer()[source] as f32 * super::NORMALIZATION_SCALE;
+                output[pixel_count + destination] =
+                    resized.buffer()[source + 1] as f32 * super::NORMALIZATION_SCALE;
+                output[2 * pixel_count + destination] =
+                    resized.buffer()[source + 2] as f32 * super::NORMALIZATION_SCALE;
             }
         }
         Ok(output)
