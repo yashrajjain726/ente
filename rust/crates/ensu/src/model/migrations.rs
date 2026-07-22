@@ -47,7 +47,10 @@ pub fn migrate_desktop_models(
     let defaults = config::defaults();
     let selected = model_url.and_then(|model_url| {
         legacy_selected_preset_id(
-            std::iter::once(&defaults.desktop_default_model).chain(&defaults.desktop_model_presets),
+            std::iter::once(&defaults.mobile_default_model)
+                .chain(&defaults.mobile_model_presets)
+                .chain(std::iter::once(&defaults.desktop_default_model))
+                .chain(&defaults.desktop_model_presets),
             model_url,
             mmproj_url,
         )

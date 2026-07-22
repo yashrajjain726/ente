@@ -73,14 +73,6 @@ interface TauriLlmModelDownloadProgress {
     totalBytes?: number;
 }
 
-interface ModelTarget {
-    id: string;
-    url: string;
-    sha256: string;
-    mmprojUrl?: string | null;
-    mmprojSha256?: string | null;
-}
-
 interface TauriModelStatus {
     modelPath: string;
     mmprojPath?: string | null;
@@ -259,7 +251,7 @@ export class LlmProvider {
             };
         }
 
-        const status = await this.modelStatus(this.resolveTarget(model));
+        const status = await this.modelStatus(model.id);
         return {
             model,
             modelPath: status.modelPath,
@@ -279,11 +271,8 @@ export class LlmProvider {
         const { model, contextSize } = this.resolveRuntimeSettings(settings);
         const contextKey = JSON.stringify({ contextSize });
 
-        const target =
-            this.backend.kind === "tauri"
-                ? this.resolveTarget(model)
-                : undefined;
-        const status = target ? await this.modelStatus(target) : undefined;
+        const modelId = this.backend.kind === "tauri" ? model.id : undefined;
+        const status = modelId ? await this.modelStatus(modelId) : undefined;
         const modelPath = status?.modelPath ?? model.url;
         const mmprojPath = status?.mmprojPath ?? undefined;
 
@@ -350,8 +339,8 @@ export class LlmProvider {
             this.currentMmprojPath = undefined;
             this.currentContextKey = undefined;
 
-            if (target && !(await this.modelStatus(target)).downloaded) {
-                await this.downloadModelNative(target);
+            if (modelId && !(await this.modelStatus(modelId)).downloaded) {
+                await this.downloadModelNative(modelId);
             }
 
             if (emitProgress) {
@@ -573,28 +562,18 @@ export class LlmProvider {
         ].find((preset) => preset.id == modelId);
     }
 
-    private resolveTarget(model: ModelInfo): ModelTarget {
-        return {
-            id: model.id,
-            url: model.url,
-            sha256: model.sha256,
-            mmprojUrl: model.mmprojUrl ?? null,
-            mmprojSha256: model.mmprojSha256 ?? null,
-        };
-    }
-
-    private async modelStatus(target: ModelTarget): Promise<TauriModelStatus> {
+    private async modelStatus(modelId: string): Promise<TauriModelStatus> {
         const { invoke } = await import("@tauri-apps/api/core");
-        return invoke<TauriModelStatus>("llm_model_status", { target });
+        return invoke<TauriModelStatus>("llm_model_status", { modelId });
     }
 
-    private async downloadModelNative(target: ModelTarget) {
+    private async downloadModelNative(modelId: string) {
         const [{ invoke }, { listen }] = await Promise.all([
             import("@tauri-apps/api/core"),
             import("@tauri-apps/api/event"),
         ]);
 
-        log.info("LLM native download start", { target });
+        log.info("LLM native download start", { modelId });
         this.emitProgress({
             percent: 0,
             status: "Starting download...",
@@ -616,8 +595,8 @@ export class LlmProvider {
         );
 
         try {
-            await invoke("llm_download_model", { target });
-            log.info("LLM native download complete", { target });
+            await invoke("llm_download_model", { modelId });
+            log.info("LLM native download complete", { modelId });
         } finally {
             this.downloadActive = false;
             unlisten();

@@ -56,9 +56,9 @@ pub fn mobile_llm_target(model_id: &str) -> Result<ModelTarget, InvalidPreset> {
 
 pub fn desktop_llm_target(model_id: &str) -> Result<ModelTarget, InvalidPreset> {
     let defaults = config::defaults();
-    let preset = defaults
-        .desktop_model_presets
-        .iter()
+    let preset = std::iter::once(&defaults.mobile_default_model)
+        .chain(&defaults.mobile_model_presets)
+        .chain(&defaults.desktop_model_presets)
         .find(|preset| preset.id == model_id)
         .unwrap_or(&defaults.desktop_default_model);
     llm_target(preset)
@@ -168,9 +168,13 @@ mod tests {
     }
 
     #[test]
-    fn desktop_llm_target_resolves_or_falls_back_to_default() {
+    fn desktop_llm_target_resolves_union_or_falls_back_to_default() {
         let defaults = crate::config::defaults();
-        for preset in &defaults.desktop_model_presets {
+        for preset in std::iter::once(&defaults.mobile_default_model)
+            .chain(&defaults.mobile_model_presets)
+            .chain(std::iter::once(&defaults.desktop_default_model))
+            .chain(&defaults.desktop_model_presets)
+        {
             assert_eq!(
                 desktop_llm_target(&preset.id).unwrap(),
                 llm_target(preset).unwrap(),
@@ -179,10 +183,6 @@ mod tests {
             );
         }
         let default = llm_target(&defaults.desktop_default_model).unwrap();
-        assert_eq!(
-            desktop_llm_target(&defaults.desktop_default_model.id).unwrap(),
-            default
-        );
         assert_eq!(desktop_llm_target("").unwrap(), default);
         assert_eq!(desktop_llm_target("no-such-model").unwrap(), default);
     }

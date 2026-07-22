@@ -1,15 +1,10 @@
 import Foundation
 
 struct LlmModelSelection: Equatable {
-    let preset: ConfigModelPreset
+    let id: String
+    let modelTarget: ModelTarget
     let contextLength: Int?
     let maxTokens: Int?
-
-    var id: String { preset.id }
-
-    var modelTarget: ModelTarget {
-        try! mobileLlmTarget(modelId: preset.id)
-    }
 }
 
 struct DownloadProgress: Equatable {

@@ -169,27 +169,64 @@ pub(crate) struct MlIndexingTestContext {
     runtime_config: MlRuntimeConfig,
 }
 
+struct AssetFetcher {
+    runtime: tokio::runtime::Runtime,
+    downloader: download::Downloader,
+}
+
+impl AssetFetcher {
+    fn new() -> Result<Self> {
+        Ok(Self {
+            runtime: tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .context("build download runtime")?,
+            downloader: download::Downloader::new().context("build downloader")?,
+        })
+    }
+
+    fn fetch(&self, targets: Vec<download::Target>) -> Result<()> {
+        self.runtime.block_on(self.downloader.download(
+            targets,
+            |_| {},
+            download::CancellationToken::default(),
+        ))?;
+        Ok(())
+    }
+}
+
 impl MlIndexingTestContext {
     pub(crate) fn load() -> Result<Self> {
         let repo_root = repo_root()?;
         let asset_lock = load_asset_lock(&repo_root)?;
         let cache_dir = cache_dir(&repo_root);
+        let fetcher = AssetFetcher::new()?;
 
-        let manifest_path = resolve_document_asset(&cache_dir, "manifest", &asset_lock.manifest)?;
-        let golden_path =
-            resolve_document_asset(&cache_dir, "python-golden", &asset_lock.python_golden)?;
+        let manifest_path =
+            resolve_document_asset(&fetcher, &cache_dir, "manifest", &asset_lock.manifest)?;
+        let golden_path = resolve_document_asset(
+            &fetcher,
+            &cache_dir,
+            "python-golden",
+            &asset_lock.python_golden,
+        )?;
         let manifest = load_manifest(&manifest_path)?;
         let golden_results = load_golden_results(&golden_path)?;
-        fetch_fixtures(&cache_dir, &asset_lock.fixture_base_url, &manifest)?;
+        fetch_fixtures(
+            &fetcher,
+            &cache_dir,
+            &asset_lock.fixture_base_url,
+            &manifest,
+        )?;
 
         let onnx_runtime_library =
-            resolve_onnx_runtime_library(&cache_dir, &asset_lock.onnx_runtime)?;
+            resolve_onnx_runtime_library(&fetcher, &cache_dir, &asset_lock.onnx_runtime)?;
         let _ = ort::init_from(&onnx_runtime_library)
             .context("load ONNX Runtime dynamic library")?
             .commit();
 
         let runtime_config = MlRuntimeConfig {
-            model_paths: resolve_model_paths(&cache_dir, &asset_lock.models)?,
+            model_paths: resolve_model_paths(&fetcher, &cache_dir, &asset_lock.models)?,
             provider_policy: ExecutionProviderPolicy {
                 prefer_coreml: false,
                 prefer_nnapi: false,
@@ -520,9 +557,14 @@ fn file_id_for_manifest_path(path: &str) -> Result<String> {
         .with_context(|| format!("derive file_id from manifest path '{path}'"))
 }
 
-fn resolve_document_asset(cache_dir: &Path, label: &str, asset: &DocumentAsset) -> Result<PathBuf> {
+fn resolve_document_asset(
+    fetcher: &AssetFetcher,
+    cache_dir: &Path,
+    label: &str,
+    asset: &DocumentAsset,
+) -> Result<PathBuf> {
     let target = cache_path_for(cache_dir, "documents", &asset.path, &asset.sha256)?;
-    ensure_remote_asset(&asset.url, &asset.sha256, &target, label)
+    ensure_remote_asset(fetcher, &asset.url, &asset.sha256, &target, label)
 }
 
 fn fixture_url(fixture_base_url: &str, path: &str) -> Result<String> {
@@ -534,6 +576,7 @@ fn fixture_url(fixture_base_url: &str, path: &str) -> Result<String> {
 }
 
 fn fetch_fixtures(
+    fetcher: &AssetFetcher,
     cache_dir: &Path,
     fixture_base_url: &str,
     manifest: &FixtureManifest,
@@ -545,22 +588,19 @@ fn fetch_fixtures(
             Ok(download::Target {
                 label: file_id_for_manifest_path(&fixture.path)?,
                 url: fixture_url(fixture_base_url, &fixture.path)?,
-                destination_path: cache_path_for(
-                    cache_dir,
-                    "fixtures",
-                    &fixture.path,
-                    &fixture.sha256,
-                )?
-                .display()
-                .to_string(),
                 sha256: normalize_sha256(&fixture.sha256),
+                destination: cache_path_for(cache_dir, "fixtures", &fixture.path, &fixture.sha256)?,
             })
         })
         .collect::<Result<Vec<_>>>()?;
-    download::fetch(targets, |_| {}, || false).context("fetch fixtures")
+    fetcher.fetch(targets).context("fetch fixtures")
 }
 
-fn resolve_onnx_runtime_library(cache_dir: &Path, assets: &OnnxRuntimeAssets) -> Result<PathBuf> {
+fn resolve_onnx_runtime_library(
+    fetcher: &AssetFetcher,
+    cache_dir: &Path,
+    assets: &OnnxRuntimeAssets,
+) -> Result<PathBuf> {
     let target_key = onnx_runtime_target_key()?;
     let archive = assets.archives.get(&target_key).with_context(|| {
         let supported = assets
@@ -582,6 +622,7 @@ fn resolve_onnx_runtime_library(cache_dir: &Path, assets: &OnnxRuntimeAssets) ->
         &archive.sha256,
     )?;
     let archive_path = ensure_remote_asset(
+        fetcher,
         &archive.url,
         &archive.sha256,
         &archive_path,
@@ -672,10 +713,16 @@ fn extract_tgz_member(archive_path: &Path, member_path: &str, target: &Path) -> 
     );
 }
 
-fn resolve_model_paths(cache_dir: &Path, models: &ModelAssets) -> Result<ModelPaths> {
-    let face_detection = resolve_model_asset(cache_dir, "face-detection", &models.face_detection)?;
-    let face_embedding = resolve_model_asset(cache_dir, "face-embedding", &models.face_embedding)?;
-    let clip_image = resolve_model_asset(cache_dir, "clip-image", &models.clip_image)?;
+fn resolve_model_paths(
+    fetcher: &AssetFetcher,
+    cache_dir: &Path,
+    models: &ModelAssets,
+) -> Result<ModelPaths> {
+    let face_detection =
+        resolve_model_asset(fetcher, cache_dir, "face-detection", &models.face_detection)?;
+    let face_embedding =
+        resolve_model_asset(fetcher, cache_dir, "face-embedding", &models.face_embedding)?;
+    let clip_image = resolve_model_asset(fetcher, cache_dir, "clip-image", &models.clip_image)?;
 
     Ok(ModelPaths {
         face_detection: face_detection.to_string_lossy().into_owned(),
@@ -691,28 +738,31 @@ fn resolve_model_paths(cache_dir: &Path, models: &ModelAssets) -> Result<ModelPa
     })
 }
 
-fn resolve_model_asset(cache_dir: &Path, label: &str, asset: &ModelAsset) -> Result<PathBuf> {
+fn resolve_model_asset(
+    fetcher: &AssetFetcher,
+    cache_dir: &Path,
+    label: &str,
+    asset: &ModelAsset,
+) -> Result<PathBuf> {
     let target = cache_path_for(cache_dir, "models", &asset.file_name, &asset.sha256)?;
-    ensure_remote_asset(&asset.url, &asset.sha256, &target, label)
+    ensure_remote_asset(fetcher, &asset.url, &asset.sha256, &target, label)
 }
 
 fn ensure_remote_asset(
+    fetcher: &AssetFetcher,
     url: &str,
     expected_sha256: &str,
     target: &Path,
     label: &str,
 ) -> Result<PathBuf> {
-    download::fetch(
-        vec![download::Target {
+    fetcher
+        .fetch(vec![download::Target {
             label: label.to_string(),
             url: url.to_string(),
-            destination_path: target.display().to_string(),
             sha256: normalize_sha256(expected_sha256),
-        }],
-        |_| {},
-        || false,
-    )
-    .with_context(|| format!("download {label} from {url}"))?;
+            destination: target.to_path_buf(),
+        }])
+        .with_context(|| format!("download {label} from {url}"))?;
     Ok(target.to_path_buf())
 }
 

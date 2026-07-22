@@ -6,6 +6,7 @@ import io.ente.ensu.AppState
 import io.ente.ensu.bindings.ConfigDefaults
 import io.ente.ensu.bindings.DownloadError
 import io.ente.ensu.bindings.LlmException
+import io.ente.ensu.bindings.mobileLlmTarget
 import io.ente.ensu.device.isChatSupported
 import io.ente.ensu.logging.FileLogRepository
 import io.ente.ensu.logging.LogLevel
@@ -319,7 +320,8 @@ internal class ModelSettingsActions(
         val maxTokens = settings.maxTokens.toIntOrNull()?.takeIf { it > 0 }
 
         return LlmModelSelection(
-            preset = preset,
+            id = preset.id,
+            modelTarget = mobileLlmTarget(preset.id),
             contextLength = contextLength,
             maxTokens = maxTokens
         )

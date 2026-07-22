@@ -1574,7 +1574,7 @@ final class ChatViewModel: ObservableObject {
                 fallback: summaryInput.fallback,
                 existingSummary: existingSummary,
                 provider: provider,
-                selection
+                selection: selection
             )
             guard let summary else { return }
 

@@ -51,15 +51,15 @@ final class ModelDownloader {
     }
 
     func modelDir(_ target: ModelTarget) -> URL {
-        URL(fileURLWithPath: core.modelDir(target))
+        URL(fileURLWithPath: core.modelDir(target: target))
     }
 
     func llmModelPath(_ target: ModelTarget) -> URL? {
-        core.llmModelPath(target).map { URL(fileURLWithPath: $0) }
+        core.llmModelPath(target: target).map { URL(fileURLWithPath: $0) }
     }
 
     func llmMmprojPath(_ target: ModelTarget) -> URL? {
-        core.llmMmprojPath(target).map { URL(fileURLWithPath: $0) }
+        core.llmMmprojPath(target: target).map { URL(fileURLWithPath: $0) }
     }
 
     func voiceActivityModelPath() -> URL {
@@ -67,11 +67,11 @@ final class ModelDownloader {
     }
 
     func isDownloaded(_ target: ModelTarget) -> Bool {
-        core.isDownloaded(target)
+        core.isDownloaded(target: target)
     }
 
     func removeDownloaded(_ target: ModelTarget) -> Bool {
-        core.removeDownloaded(target)
+        core.removeDownloaded(target: target)
     }
 
     func cancel() {
@@ -97,7 +97,7 @@ final class ModelDownloader {
         guard started else { throw DownloadAlreadyActiveError() }
         defer { activeLock.withLock { activeToken = nil } }
 
-        if targets.allSatisfy({ self.core.isDownloaded($0) }) {
+        if targets.allSatisfy({ self.core.isDownloaded(target: $0) }) {
             return
         }
 

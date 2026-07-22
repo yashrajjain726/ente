@@ -1,6 +1,6 @@
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, PoisonError};
 use std::time::{Duration, Instant};
 
 use ente_ensu::llm;
@@ -22,14 +22,16 @@ pub struct State {
 pub struct ModelDownloadState {
     downloader: Arc<ModelDownloader>,
     models_dir: PathBuf,
+    active_token: Mutex<Option<download::CancellationToken>>,
 }
 
 impl ModelDownloadState {
-    pub fn new(models_dir: PathBuf) -> Result<Self, download::Error> {
-        Ok(Self {
-            downloader: Arc::new(ModelDownloader::new(&models_dir)?),
+    pub fn new(models_dir: PathBuf) -> Self {
+        Self {
+            downloader: Arc::new(ModelDownloader::new(&models_dir)),
             models_dir,
-        })
+            active_token: Mutex::new(None),
+        }
     }
 }
 
@@ -280,31 +282,62 @@ pub async fn llm_download_model(
 ) -> Result<(), ApiError> {
     let downloader = Arc::clone(&state.downloader);
     let target = desktop_target(&model_id)?;
-    async_runtime::spawn_blocking(move || {
+    let token = {
+        let mut slot = state
+            .active_token
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
+        if slot.is_some() {
+            return Err(ApiError::new(
+                "download_active",
+                "A model download is already in progress",
+            ));
+        }
+        let token = download::CancellationToken::new();
+        *slot = Some(token.clone());
+        token
+    };
+    let result = async_runtime::spawn_blocking(move || {
         downloader
-            .download(std::slice::from_ref(&target), |progress| {
-                if let Some(line) = &progress.log_line {
-                    logging::log("LLMDownload", line.clone());
-                }
-                let _ = window.emit(
-                    "llm-download-progress",
-                    DownloadProgress {
-                        percent: progress.percent,
-                        status: progress.status,
-                        bytes_downloaded: progress.downloaded_bytes,
-                        total_bytes: progress.total_bytes,
-                    },
-                );
-            })
+            .download(
+                std::slice::from_ref(&target),
+                |progress| {
+                    if let Some(line) = &progress.log_line {
+                        logging::log("LLMDownload", line.clone());
+                    }
+                    let _ = window.emit(
+                        "llm-download-progress",
+                        DownloadProgress {
+                            percent: progress.percent,
+                            status: progress.status,
+                            bytes_downloaded: progress.downloaded_bytes,
+                            total_bytes: progress.total_bytes,
+                        },
+                    );
+                },
+                &token,
+            )
             .map_err(|err| ApiError::new(download_code(&err), err.to_string()))
     })
     .await
-    .map_err(|_| fs_thread_error())?
+    .map_err(|_| fs_thread_error());
+    *state
+        .active_token
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner) = None;
+    result?
 }
 
 #[tauri::command]
 pub fn llm_cancel_model_download(state: TauriState<'_, ModelDownloadState>) {
-    state.downloader.cancel();
+    if let Some(token) = state
+        .active_token
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner)
+        .as_ref()
+    {
+        token.cancel();
+    }
 }
 
 #[tauri::command]
