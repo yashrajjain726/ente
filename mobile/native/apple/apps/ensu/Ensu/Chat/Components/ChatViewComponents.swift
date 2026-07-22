@@ -10,54 +10,51 @@ struct DownloadOnboardingView: View {
     let onDownload: () -> Void
 
     var body: some View {
-        VStack(spacing: 0) {
-            VStack(spacing: EnsuSpacing.md) {
-                Text("Download models to begin using Chat")
-                    .font(EnsuTypography.large)
-                    .foregroundStyle(EnsuColor.textPrimary)
-                    .multilineTextAlignment(.center)
+        VStack(spacing: EnsuSpacing.md) {
+            Text("Download to begin using the Chat")
+                .font(EnsuTypography.large)
+                .foregroundStyle(EnsuColor.textPrimary)
+                .multilineTextAlignment(.center)
 
-                if isDownloading {
-                    let statusLine: String = {
-                        if let statusText, isLoadingModel {
-                            return statusText
-                        }
-                        if let totalBytes, let percent = downloadPercent {
-                            let clamped = min(max(percent, 0), 100)
-                            let downloaded = Int64(Double(totalBytes) * Double(clamped) / 100.0)
-                            return "Downloading... \(downloaded.formattedFileSize) / \(totalBytes.formattedFileSize)"
-                        }
-                        if let statusText, !statusText.isEmpty {
-                            return statusText
-                        }
-                        return "Downloading..."
-                    }()
-
-                    StableDownloadStatusText(
-                        text: statusLine,
-                        font: EnsuTypography.body,
-                        color: EnsuColor.textMuted
-                    )
-
-                    progressView
-                } else {
-                    Button("Download") {
-                        hapticMedium()
-                        onDownload()
+            if isDownloading {
+                let statusLine: String = {
+                    if let statusText, isLoadingModel {
+                        return statusText
                     }
-                    .font(EnsuTypography.body)
-                    .foregroundStyle(Color.black)
-                    .frame(maxWidth: 200)
-                    .padding(.vertical, EnsuSpacing.md)
-                    .background(EnsuColor.accent)
-                    .clipShape(RoundedRectangle(cornerRadius: EnsuCornerRadius.button))
+                    if let totalBytes, let percent = downloadPercent {
+                        let clamped = min(max(percent, 0), 100)
+                        let downloaded = Int64(Double(totalBytes) * Double(clamped) / 100.0)
+                        return "Downloading... \(downloaded.formattedFileSize) / \(totalBytes.formattedFileSize)"
+                    }
+                    if let statusText, !statusText.isEmpty {
+                        return statusText
+                    }
+                    return "Downloading..."
+                }()
 
-                    Text(sizeText)
-                        .font(EnsuTypography.small)
-                        .foregroundStyle(EnsuColor.textMuted)
+                StableDownloadStatusText(
+                    text: statusLine,
+                    font: EnsuTypography.body,
+                    color: EnsuColor.textMuted
+                )
+
+                progressView
+            } else {
+                Button("Download") {
+                    hapticMedium()
+                    onDownload()
                 }
+                .font(EnsuTypography.body)
+                .foregroundStyle(Color.black)
+                .frame(maxWidth: 200)
+                .padding(.vertical, EnsuSpacing.md)
+                .background(EnsuColor.accent)
+                .clipShape(RoundedRectangle(cornerRadius: EnsuCornerRadius.button))
+
+                Text(sizeText)
+                    .font(EnsuTypography.small)
+                    .foregroundStyle(EnsuColor.textMuted)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(.horizontal, EnsuSpacing.pageHorizontal)

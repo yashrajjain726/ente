@@ -410,92 +410,88 @@ private fun DownloadOnboarding(
     val downloadAccent = EnsuColor.accentDark
     val downloadButtonTextColor = Color.Black
     val sizeText = modelDownloadSizeBytes?.let { "Approx. ${formatBytes(it)}" } ?: "Approx. size varies by model"
-    Column(modifier = modifier.fillMaxSize()) {
-        Box(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth(),
-            contentAlignment = Alignment.Center
-        ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+    Box(
+        modifier = modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                text = "Download to begin using the Chat",
+                style = EnsuTypography.large,
+                color = EnsuColor.textPrimary(),
+                textAlign = TextAlign.Center
+            )
+            Spacer(modifier = Modifier.height(EnsuSpacing.md.dp))
+            if (isDownloading) {
+                val isLoadingModel = downloadPhase == DownloadPhase.Loading
+                val showProgress = downloadPercent != null || isLoadingModel
+                val statusText = when {
+                    isLoadingModel -> downloadStatus
+                    modelDownloadSizeBytes != null && downloadPercent != null && downloadPercent >= 0 -> {
+                        val downloadedBytes = (modelDownloadSizeBytes * (downloadPercent / 100f)).roundToLong()
+                        "Downloading... ${formatBytes(downloadedBytes)} / ${formatBytes(modelDownloadSizeBytes)}"
+                    }
+                    !downloadStatus.isNullOrBlank() -> downloadStatus
+                    else -> "Downloading..."
+                }
                 Text(
-                    text = "Download models to begin using Chat",
-                    style = EnsuTypography.large,
-                    color = EnsuColor.textPrimary(),
+                    text = statusText ?: "Downloading...",
+                    style = EnsuTypography.body.copy(fontFeatureSettings = "tnum"),
+                    color = EnsuColor.textMuted(),
                     textAlign = TextAlign.Center
                 )
-                Spacer(modifier = Modifier.height(EnsuSpacing.md.dp))
-                if (isDownloading) {
-                    val isLoadingModel = downloadPhase == DownloadPhase.Loading
-                    val showProgress = downloadPercent != null || isLoadingModel
-                    val statusText = when {
-                        isLoadingModel -> downloadStatus
-                        modelDownloadSizeBytes != null && downloadPercent != null && downloadPercent >= 0 -> {
-                            val downloadedBytes = (modelDownloadSizeBytes * (downloadPercent / 100f)).roundToLong()
-                            "Downloading... ${formatBytes(downloadedBytes)} / ${formatBytes(modelDownloadSizeBytes)}"
-                        }
-                        !downloadStatus.isNullOrBlank() -> downloadStatus
-                        else -> "Downloading..."
+                if (showProgress) {
+                    Spacer(modifier = Modifier.height(EnsuSpacing.sm.dp))
+                    val clamped = downloadPercent?.coerceIn(0, 100)
+                    if (clamped != null) {
+                        LinearProgressIndicator(
+                            progress = { clamped / 100f },
+                            color = downloadAccent,
+                            trackColor = EnsuColor.border(),
+                            modifier = Modifier
+                                .fillMaxWidth(0.6f)
+                                .height(6.dp)
+                        )
+                    } else {
+                        LinearProgressIndicator(
+                            color = downloadAccent,
+                            trackColor = EnsuColor.border(),
+                            modifier = Modifier
+                                .fillMaxWidth(0.6f)
+                                .height(6.dp)
+                        )
                     }
+                }
+            } else {
+                if (!downloadStatus.isNullOrBlank()) {
                     Text(
-                        text = statusText ?: "Downloading...",
-                        style = EnsuTypography.body.copy(fontFeatureSettings = "tnum"),
-                        color = EnsuColor.textMuted(),
+                        text = downloadStatus,
+                        style = EnsuTypography.body,
+                        color = if (downloadPhase == DownloadPhase.Failed) {
+                            EnsuColor.error
+                        } else {
+                            EnsuColor.textMuted()
+                        },
                         textAlign = TextAlign.Center
                     )
-                    if (showProgress) {
-                        Spacer(modifier = Modifier.height(EnsuSpacing.sm.dp))
-                        val clamped = downloadPercent?.coerceIn(0, 100)
-                        if (clamped != null) {
-                            LinearProgressIndicator(
-                                progress = { clamped / 100f },
-                                color = downloadAccent,
-                                trackColor = EnsuColor.border(),
-                                modifier = Modifier
-                                    .fillMaxWidth(0.6f)
-                                    .height(6.dp)
-                            )
-                        } else {
-                            LinearProgressIndicator(
-                                color = downloadAccent,
-                                trackColor = EnsuColor.border(),
-                                modifier = Modifier
-                                    .fillMaxWidth(0.6f)
-                                    .height(6.dp)
-                            )
-                        }
-                    }
-                } else {
-                    if (!downloadStatus.isNullOrBlank()) {
-                        Text(
-                            text = downloadStatus,
-                            style = EnsuTypography.body,
-                            color = if (downloadPhase == DownloadPhase.Failed) {
-                                EnsuColor.error
-                            } else {
-                                EnsuColor.textMuted()
-                            },
-                            textAlign = TextAlign.Center
-                        )
-                        Spacer(modifier = Modifier.height(EnsuSpacing.sm.dp))
-                    }
-                    Button(
-                        onClick = {
-                            haptic.perform(HapticFeedbackType.TextHandleMove)
-                            onDownload()
-                        },
-                        shape = RoundedCornerShape(EnsuCornerRadius.button.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = downloadAccent)
-                    ) {
-                        Text(text = "Download", style = EnsuTypography.body, color = downloadButtonTextColor)
-                    }
                     Spacer(modifier = Modifier.height(EnsuSpacing.sm.dp))
-                    Text(
-                        text = sizeText,
-                        style = EnsuTypography.small,
-                        color = EnsuColor.textMuted()
-                    )
                 }
+                Button(
+                    onClick = {
+                        haptic.perform(HapticFeedbackType.TextHandleMove)
+                        onDownload()
+                    },
+                    shape = RoundedCornerShape(EnsuCornerRadius.button.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = downloadAccent)
+                ) {
+                    Text(text = "Download", style = EnsuTypography.body, color = downloadButtonTextColor)
+                }
+                Spacer(modifier = Modifier.height(EnsuSpacing.sm.dp))
+                Text(
+                    text = sizeText,
+                    style = EnsuTypography.small,
+                    color = EnsuColor.textMuted()
+                )
             }
         }
     }
