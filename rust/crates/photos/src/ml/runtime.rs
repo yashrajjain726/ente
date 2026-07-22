@@ -287,7 +287,10 @@ impl MlRuntime {
             face_detection: ModelSlot::new(platform_default, "face-detection"),
             face_embedding: ModelSlot::new(platform_default, "face-embedding"),
             clip_image: ModelSlot::new(platform_default, "clip-image"),
-            clip_text: ModelSlot::new(platform_default, "clip-text"),
+            // The quantized CLIP text graph is heavily partitioned by both
+            // CoreML and WebGPU, making their mixed CPU/GPU execution slower
+            // than running the complete model on CPU.
+            clip_text: ModelSlot::new(cpu_only, "clip-text"),
             // Pet models previously had device-specific FP16 driver failures.
             // Keep them CPU-only until they have been validated on the GPU
             // execution providers of supported iOS and Android devices.
@@ -747,7 +750,7 @@ mod tests {
         );
         assert_eq!(
             runtime.clip_text.default_execution_mode,
-            onnx::ExecutionMode::PlatformDefault
+            onnx::ExecutionMode::CpuOnly
         );
         assert_eq!(
             runtime.pet_face_detection.default_execution_mode,
