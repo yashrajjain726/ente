@@ -8,7 +8,7 @@ import io.ente.ensu.logging.FileLogRepository
 import io.ente.ensu.llm.DownloadPhase
 import io.ente.ensu.llm.LlmMessage
 import io.ente.ensu.llm.LlmMessageRole
-import io.ente.ensu.llm.LlmModelTarget
+import io.ente.ensu.llm.LlmModelSelection
 import io.ente.ensu.llm.ModelDownloader
 import io.ente.ensu.llm.LlmProvider
 import io.ente.ensu.chat.Attachment
@@ -459,7 +459,7 @@ internal class ChatStoreActions(
         stopRequested = false
 
         val settings = state.value.modelSettings
-        val target = modelSettingsActions.resolveTarget(settings)
+        val selection = modelSettingsActions.resolveSelection(settings)
         val prompt = buildPrompt(userMessage.text, userMessage.attachments)
 
         val generationToken = nextGenerationToken()
@@ -515,7 +515,7 @@ internal class ChatStoreActions(
 
             if (!isActive()) return@launch
             try {
-                llmProvider.ensureModelReady(target) { progress ->
+                llmProvider.ensureModelReady(selection) { progress ->
                     if (!isActive()) return@ensureModelReady
                     val resolvedProgress = progressTracker.resolve(progress)
                     state.update { appState ->
@@ -563,7 +563,7 @@ internal class ChatStoreActions(
 
             if (!isActive()) return@launch
 
-            val generationLimits = resolveGenerationLimits(target)
+            val generationLimits = resolveGenerationLimits(selection)
             val normalSystemPrompt = buildSystemPrompt()
             val normalHistorySelection = buildHistorySelection(
                 sessionId = sessionId,
@@ -658,7 +658,7 @@ internal class ChatStoreActions(
             try {
                 val generate: suspend () -> io.ente.ensu.llm.GenerationSummary = {
                     llmProvider.generateChat(
-                        target = target,
+                        selection = selection,
                         messages = llmMessages,
                         imageFiles = prompt.imageFiles,
                         temperature = modelSettingsActions.resolveTemperature(settings),
@@ -879,13 +879,13 @@ internal class ChatStoreActions(
         sessionSummaryJob?.cancel()
         if (sessionSummaries.containsKey(sessionKey(sessionId))) return
         val summaryInput = buildSessionSummaryInput(sessionId) ?: return
-        val target = modelSettingsActions.resolveTarget(state.value.modelSettings)
+        val selection = modelSettingsActions.resolveSelection(state.value.modelSettings)
 
         sessionSummaryJob = scope.launch(Dispatchers.Default) {
             val summary = generateSessionSummary(
                 input = summaryInput.text,
                 fallback = summaryInput.fallback,
-                target = target
+                selection = selection
             ) ?: return@launch
             if (!isActive) return@launch
             withContext(Dispatchers.Main) {
@@ -916,12 +916,12 @@ internal class ChatStoreActions(
     private suspend fun generateSessionSummary(
         input: String,
         fallback: String,
-        target: LlmModelTarget
+        selection: LlmModelSelection
     ): String? {
         if (!state.value.chat.deviceCapability.isChatSupported()) {
             return sessionTitleFromText(fallback, fallback = fallback)
         }
-        if (!modelDownloader.isDownloaded(target.downloadTarget)) {
+        if (!modelDownloader.isDownloaded(selection.modelTarget)) {
             return sessionTitleFromText(fallback, fallback = fallback)
         }
         val cleanedInput = sanitizeTitleText(input)
@@ -935,7 +935,7 @@ internal class ChatStoreActions(
         val buffer = StringBuilder()
         try {
             llmProvider.generateChat(
-                target = target,
+                selection = selection,
                 messages = messages,
                 imageFiles = emptyList(),
                 temperature = 0.2f,
@@ -1274,11 +1274,11 @@ internal class ChatStoreActions(
         return HistorySelection(selected, inputTokens, inputBudget, inputTokens > inputBudget)
     }
 
-    private fun resolveGenerationLimits(target: LlmModelTarget): GenerationLimits {
-        val contextLength = llmProvider.loadedContextLength(target)
-            ?: target.contextLength
+    private fun resolveGenerationLimits(selection: LlmModelSelection): GenerationLimits {
+        val contextLength = llmProvider.loadedContextLength(selection)
+            ?: selection.contextLength
             ?: DEFAULT_CONTEXT_LENGTH
-        val maxOutput = resolveMaxOutputTokens(target.maxTokens, contextLength)
+        val maxOutput = resolveMaxOutputTokens(selection.maxTokens, contextLength)
         return GenerationLimits(contextLength = contextLength, maxOutput = maxOutput)
     }
 

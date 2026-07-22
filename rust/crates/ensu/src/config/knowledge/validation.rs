@@ -3,9 +3,9 @@ use std::collections::HashSet;
 use url::Url;
 
 use super::{
-    EMBEDDING_CONTEXT_SIZE, KNOWLEDGE_LICENSE_LABEL, KNOWLEDGE_LICENSE_URL, KnowledgeConfigError,
-    KnowledgeDatasetConfig, KnowledgeEmbeddingConfig, MAX_CONTEXT_UTF8_BYTES, MAX_HITS,
-    knowledge_index_contract,
+    EMBEDDING_CONTEXT_SIZE, KNOWLEDGE_ARTIFACT_FILENAMES, KNOWLEDGE_LICENSE_LABEL,
+    KNOWLEDGE_LICENSE_URL, KnowledgeConfigError, KnowledgeDatasetConfig, KnowledgeEmbeddingConfig,
+    MAX_CONTEXT_UTF8_BYTES, MAX_HITS, knowledge_index_contract,
 };
 
 const MAX_DATASETS: usize = 32;
@@ -52,6 +52,16 @@ pub fn validate_knowledge_datasets(
             &dataset.artifact_base_url,
             &format!("{prefix}.artifact_base_url"),
         )?;
+        if dataset.artifact_sha256.len() != KNOWLEDGE_ARTIFACT_FILENAMES.len()
+            || dataset.artifact_sha256.iter().any(|sha256| {
+                sha256.len() != 64 || !sha256.chars().all(|ch| ch.is_ascii_hexdigit())
+            })
+        {
+            return Err(KnowledgeConfigError::invalid(
+                &format!("{prefix}.artifact_sha256"),
+                "must provide one SHA-256 digest per knowledge artifact",
+            ));
+        }
         if dataset.download_size_bytes <= 0 {
             return Err(KnowledgeConfigError::invalid(
                 &format!("{prefix}.download_size_bytes"),
@@ -130,6 +140,14 @@ pub fn validate_knowledge_embedding(
         ));
     }
     validate_embedding_model_url(&config.model_url, "knowledge_embedding.model_url")?;
+    if config.model_sha256.len() != 64
+        || !config.model_sha256.chars().all(|ch| ch.is_ascii_hexdigit())
+    {
+        return Err(KnowledgeConfigError::invalid(
+            "knowledge_embedding.model_sha256",
+            "must be a SHA-256 digest",
+        ));
+    }
     let contract = knowledge_index_contract();
     let exact_fields_match = config.source_dim == contract.source_dim
         && config.dim == contract.dim
@@ -375,6 +393,14 @@ mod tests {
         assert!(validate_knowledge_datasets(&datasets).is_err());
 
         let mut datasets = valid_datasets();
+        datasets[0].artifact_sha256.pop();
+        assert!(validate_knowledge_datasets(&datasets).is_err());
+        datasets[0]
+            .artifact_sha256
+            .push("not-a-checksum".to_owned());
+        assert!(validate_knowledge_datasets(&datasets).is_err());
+
+        let mut datasets = valid_datasets();
         datasets[0].relevance_threshold = f32::NAN;
         assert!(validate_knowledge_datasets(&datasets).is_err());
         datasets[0].relevance_threshold = 1.01;
@@ -404,6 +430,10 @@ mod tests {
         config.model_url = config
             .model_url
             .replace("957b55764bd672f51240ac026e3a23ac9459ee3c", "main");
+        assert!(validate_knowledge_embedding(&config, &[]).is_err());
+
+        let mut config = knowledge_embedding_config();
+        config.model_sha256 = "not-a-checksum".to_owned();
         assert!(validate_knowledge_embedding(&config, &[]).is_err());
 
         let mut config = knowledge_embedding_config();

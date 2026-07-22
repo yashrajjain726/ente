@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use ente_model_download::download::{self, Progress, Target};
+use ente_model_download::download::{self, Downloader, Progress, Target};
 
 use crate::config::{
     KNOWLEDGE_ARTIFACT_FILENAMES, KnowledgeDatasetConfig, is_path_safe_component,
@@ -18,7 +18,7 @@ pub fn download_knowledge_pack(
 ) -> Result<(), download::Error> {
     let pack_root = pack_root.as_ref();
     let targets = knowledge_download_targets(pack_root, expected_pack)?;
-    download::fetch(targets, validate_staged_file, on_progress, is_cancelled)
+    Downloader::new()?.download_blocking(targets, on_progress, is_cancelled)
 }
 
 fn knowledge_download_targets(
@@ -62,24 +62,14 @@ fn knowledge_download_targets(
     Ok(KNOWLEDGE_ARTIFACT_FILENAMES
         .into_iter()
         .zip(urls)
-        .map(|(filename, url)| Target {
+        .zip(expected_pack.artifact_sha256.iter().cloned())
+        .map(|((filename, url), sha256)| Target {
             label: filename.to_owned(),
             url,
-            destination_path: revision_directory.join(filename).display().to_string(),
+            sha256,
+            destination: revision_directory.join(filename),
         })
         .collect())
-}
-
-fn validate_staged_file(_target: &Target, path: &Path) -> Result<(), download::Error> {
-    let metadata = fs::symlink_metadata(path)?;
-    if metadata.file_type().is_file() && metadata.len() > 0 {
-        Ok(())
-    } else {
-        Err(download::Error::Validation(format!(
-            "{} must be a nonempty regular file",
-            path.display()
-        )))
-    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -260,12 +250,14 @@ mod tests {
         assert_eq!(targets.len(), 4);
         for (target, filename) in targets.iter().zip(KNOWLEDGE_ARTIFACT_FILENAMES) {
             assert!(target.url.ends_with(filename));
-            assert!(target.destination_path.ends_with(filename));
+            assert!(target.destination.ends_with(filename));
             assert!(
                 target
-                    .destination_path
+                    .destination
+                    .to_string_lossy()
                     .contains(&expected.current_download_identity)
             );
+            assert_eq!(target.sha256.len(), 64);
         }
     }
 

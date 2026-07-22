@@ -12,8 +12,8 @@ import io.ente.ensu.bindings.LlmGenerationSummary as NativeSummary
 import io.ente.ensu.bindings.LlmModel
 import io.ente.ensu.bindings.LlmModelLoadParams
 import io.ente.ensu.bindings.KnowledgeEmbeddingConfig
-import io.ente.ensu.bindings.ModelDownloadTarget
 import io.ente.ensu.bindings.Transcriber
+import io.ente.ensu.bindings.knowledgeEmbeddingModelTarget
 import io.ente.ensu.bindings.llmCancel
 import io.ente.ensu.bindings.llmInitBackend
 import io.ente.ensu.device.AndroidDeviceCapabilityProvider
@@ -44,16 +44,12 @@ class LlmProvider(
     @Volatile private var currentJobId: Long? = null
     private var backendInitialized = false
     private val modelLoadMutex = Mutex()
-    private val embeddingDownloadTarget = ModelDownloadTarget.Gguf(
-        knowledgeEmbedding.targetId,
-        knowledgeEmbedding.modelUrl,
-        null
-    )
+    private val embeddingDownloadTarget = knowledgeEmbeddingModelTarget()
 
     class EmbeddingAssetInvalid : Exception("Embedding model asset is invalid")
 
-    fun isChatModelReady(target: LlmModelTarget): Boolean =
-        downloader.isDownloaded(target.downloadTarget)
+    fun isChatModelReady(selection: LlmModelSelection): Boolean =
+        downloader.isDownloaded(selection.modelTarget)
 
     fun isEmbeddingModelReady(): Boolean =
         downloader.isDownloaded(embeddingDownloadTarget)
@@ -62,18 +58,18 @@ class LlmProvider(
         downloader.estimateDownloadSize(embeddingDownloadTarget)
 
     suspend fun ensureModelReady(
-        target: LlmModelTarget,
+        selection: LlmModelSelection,
         onProgress: (DownloadProgress) -> Unit
     ) {
         withContext(ioDispatcher) {
             modelLoadMutex.withLock {
-                ensureModelReadyLocked(target, onProgress)
+                ensureModelReadyLocked(selection, onProgress)
             }
         }
     }
 
     suspend fun ensureRequiredModelsReady(
-        target: LlmModelTarget,
+        selection: LlmModelSelection,
         onProgress: (DownloadProgress) -> Unit
     ) {
         withContext(ioDispatcher) {
@@ -81,14 +77,14 @@ class LlmProvider(
             val missingTargets = modelLoadMutex.withLock {
                 val embeddingReady = isEmbeddingModelReady()
                 if (!embeddingReady) {
-                    val embeddingFile = downloader.modelPath(embeddingDownloadTarget)
-                    if (embeddingFile.exists()) {
+                    val embeddingFile = downloader.llmModelPath(embeddingDownloadTarget)
+                    if (embeddingFile?.exists() == true) {
                         downloader.removeDownloaded(embeddingDownloadTarget)
                     }
                 }
 
                 buildList {
-                    if (!isChatModelReady(target)) add(target.downloadTarget)
+                    if (!isChatModelReady(selection)) add(selection.modelTarget)
                     if (!isEmbeddingModelReady()) add(embeddingDownloadTarget)
                 }
             }
@@ -100,11 +96,11 @@ class LlmProvider(
                     downloader.removeDownloaded(embeddingDownloadTarget)
                     throw IllegalStateException("Embedding model failed exact readiness validation")
                 }
-                if (!isChatModelReady(target)) {
+                if (!isChatModelReady(selection)) {
                     throw IllegalStateException("Chat model failed readiness validation")
                 }
                 ensureModelReadyLocked(
-                    target,
+                    selection,
                     onProgress,
                     allowRecovery = false,
                     shouldDownload = false
@@ -114,7 +110,7 @@ class LlmProvider(
     }
 
     suspend fun generateChat(
-        target: LlmModelTarget,
+        selection: LlmModelSelection,
         messages: List<LlmMessage>,
         imageFiles: List<File>,
         temperature: Float,
@@ -128,7 +124,7 @@ class LlmProvider(
             val mmprojPath = if (imageFiles.isEmpty()) {
                 null
             } else {
-                downloader.mmprojPath(target.downloadTarget)
+                downloader.llmMmprojPath(selection.modelTarget)?.absolutePath
             }
             val clampedTemperature = temperature.coerceIn(0.35f, 0.7f)
 
@@ -174,7 +170,9 @@ class LlmProvider(
 
             val embeddingModel = LlmModel.load(
                 LlmModelLoadParams(
-                    modelPath = downloader.modelPath(embeddingDownloadTarget).absolutePath,
+                    modelPath = requireNotNull(
+                        downloader.llmModelPath(embeddingDownloadTarget)
+                    ).absolutePath,
                     nGpuLayers = 0,
                     useMmap = true,
                     useMlock = false
@@ -202,15 +200,16 @@ class LlmProvider(
         }
     }
 
-    suspend fun prewarmImageInference(target: LlmModelTarget) {
+    suspend fun prewarmImageInference(selection: LlmModelSelection) {
         withContext(ioDispatcher) {
             runCatching {
                 modelLoadMutex.withLock {
-                    if (!downloader.isDownloaded(target.downloadTarget)) return@withLock
-                    val mmprojPath = downloader.mmprojPath(target.downloadTarget)
+                    if (!downloader.isDownloaded(selection.modelTarget)) return@withLock
+                    val mmprojPath =
+                        downloader.llmMmprojPath(selection.modelTarget)?.absolutePath
                         ?.takeIf { File(it).exists() }
                         ?: return@withLock
-                    ensureModelReadyLocked(target, onProgress = {})
+                    ensureModelReadyLocked(selection, onProgress = {})
                     val context = loadedContext ?: return@withLock
                     unloadTranscriptionModelIfLoaded()
                     context.prewarmMultimodal(mmprojPath, null)
@@ -221,8 +220,8 @@ class LlmProvider(
         }
     }
 
-    fun loadedContextLength(target: LlmModelTarget): Int? {
-        val modelKey = LoadedModelKey(target.id, target.contextLength)
+    fun loadedContextLength(selection: LlmModelSelection): Int? {
+        val modelKey = LoadedModelKey(selection.id, selection.contextLength)
         return if (currentModelKey == modelKey && loadedContext != null && loadedModel != null) {
             currentContextLength
         } else {
@@ -280,13 +279,13 @@ class LlmProvider(
     }
 
     private suspend fun ensureModelReadyLocked(
-        target: LlmModelTarget,
+        selection: LlmModelSelection,
         onProgress: (DownloadProgress) -> Unit,
         allowRecovery: Boolean = true,
         shouldDownload: Boolean = true
     ) {
         deviceCapabilityProvider.chatCapability().requireChatSupported()
-        val modelKey = LoadedModelKey(target.id, target.contextLength)
+        val modelKey = LoadedModelKey(selection.id, selection.contextLength)
         if (!backendInitialized) {
             llmInitBackend()
             backendInitialized = true
@@ -298,19 +297,21 @@ class LlmProvider(
 
         unloadModel()
 
-        val downloaded = if (shouldDownload) {
-            downloader.download(listOf(target.downloadTarget), onProgress)
-        } else {
-            false
+        val wasAlreadyDownloaded = downloader.isDownloaded(selection.modelTarget)
+        if (shouldDownload) {
+            downloader.download(listOf(selection.modelTarget), onProgress)
         }
 
         onProgress(DownloadProgress(100, "Loading model...", phase = DownloadPhase.Loading))
         try {
-            loadWithFallbacks(target, downloader.modelPath(target.downloadTarget))
+            loadWithFallbacks(
+                selection,
+                requireNotNull(downloader.llmModelPath(selection.modelTarget))
+            )
         } catch (error: Throwable) {
-            if (allowRecovery && !downloaded && downloader.removeDownloaded(target.downloadTarget)) {
+            if (allowRecovery && wasAlreadyDownloaded && downloader.removeDownloaded(selection.modelTarget)) {
                 onProgress(DownloadProgress(0, "Starting download...", phase = DownloadPhase.Downloading))
-                ensureModelReadyLocked(target, onProgress, allowRecovery = false)
+                ensureModelReadyLocked(selection, onProgress, allowRecovery = false)
                 return
             }
             throw error
@@ -318,8 +319,8 @@ class LlmProvider(
         onProgress(DownloadProgress(100, "Ready", phase = DownloadPhase.Ready))
     }
 
-    private fun loadWithFallbacks(target: LlmModelTarget, modelFile: File) {
-        val desiredCtx = target.contextLength ?: 12000
+    private fun loadWithFallbacks(selection: LlmModelSelection, modelFile: File) {
+        val desiredCtx = selection.contextLength ?: 12000
         val contexts = listOf(desiredCtx, 12000, 8192, 4096, 2048, 1024).distinct().filter { it > 0 }
         val threads = max(1, Runtime.getRuntime().availableProcessors() - 1)
         val batch = 512
@@ -343,7 +344,7 @@ class LlmProvider(
                     nBatch = batch
                 )
                 loadedContext = model.newContext(contextParams)
-                currentModelKey = LoadedModelKey(target.id, target.contextLength)
+                currentModelKey = LoadedModelKey(selection.id, selection.contextLength)
                 currentContextLength = ctx
                 return
             } catch (err: Throwable) {

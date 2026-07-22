@@ -19,17 +19,9 @@ enum FamilyMemberAction {
   revokeInvite,
 }
 
-AvatarComponentColor familyMemberAvatarComponentColor(
-  FamilyMember member, {
-  required String currentUserEmail,
-}) {
-  return avatarComponentColorForAvatarIdentity(
-    AvatarIdentity.account(
-      label: member.email,
-      email: member.email,
-      userID: member.userID,
-      currentUserEmail: currentUserEmail,
-    ),
+AvatarComponentColor familyMemberAvatarComponentColor(FamilyMember member) {
+  return avatarComponentColorForIdentity(
+    avatarIdentityKey(email: member.email, userID: member.userID),
   );
 }
 
@@ -76,6 +68,7 @@ class FamilyDashboard extends StatelessWidget {
     required this.contactsByUserId,
     required this.profilePictureBytesByUserId,
     required this.linkedPersonIdsByUserId,
+    required this.linkedPersonNamesByUserId,
     required this.onMemberTap,
     required this.onAddMember,
     required this.remainingSlots,
@@ -88,6 +81,7 @@ class FamilyDashboard extends StatelessWidget {
   final Map<int, contacts.ContactRecord?> contactsByUserId;
   final Map<int, Uint8List?> profilePictureBytesByUserId;
   final Map<int, String> linkedPersonIdsByUserId;
+  final Map<int, String> linkedPersonNamesByUserId;
   final ValueChanged<FamilyMember> onMemberTap;
   final VoidCallback onAddMember;
   final int remainingSlots;
@@ -166,21 +160,25 @@ class FamilyDashboard extends StatelessWidget {
   }
 
   String _displayNameFor(FamilyMember member) =>
-      _savedNameFor(member) ?? member.email;
+      _savedNameFor(member) ?? _linkedPersonNameFor(member) ?? member.email;
 
   String _storageLabelFor(FamilyMember member) =>
-      _savedNameFor(member) ?? member.email.split('@').first;
+      _savedNameFor(member) ??
+      _linkedPersonNameFor(member) ??
+      member.email.split('@').first;
 
   String? _savedNameFor(FamilyMember member) {
     final savedName = contactsByUserId[member.userID]?.data?.name.trim();
     return savedName == null || savedName.isEmpty ? null : savedName;
   }
 
+  String? _linkedPersonNameFor(FamilyMember member) {
+    final personName = linkedPersonNamesByUserId[member.userID]?.trim();
+    return personName == null || personName.isEmpty ? null : personName;
+  }
+
   AvatarComponentColor _avatarColorFor(FamilyMember member) =>
-      familyMemberAvatarComponentColor(
-        member,
-        currentUserEmail: userDetails.email,
-      );
+      familyMemberAvatarComponentColor(member);
 }
 
 class _FamilyStorageCard extends StatelessWidget {

@@ -348,38 +348,48 @@ class _FamilyPlanPageState extends State<FamilyPlanPage> {
 
   Widget _buildDashboard(BuildContext context, {required bool isAdminView}) {
     final members = _userDetails.familyData?.members ?? const <FamilyMember>[];
+    final linkedPersons = _linkedPersonsFor(members);
     return FamilyDashboard(
       userDetails: _userDetails,
       members: members,
       isAdmin: isAdminView,
       contactsByUserId: _contactsByUserId,
       profilePictureBytesByUserId: _profilePictureBytesByUserId,
-      linkedPersonIdsByUserId: _linkedPersonIdsFor(members),
+      linkedPersonIdsByUserId: linkedPersons.idsByUserId,
+      linkedPersonNamesByUserId: linkedPersons.namesByUserId,
       onMemberTap: _showMemberActions,
       onAddMember: () => unawaited(_openInvitePage()),
       remainingSlots: _remainingSlots,
     );
   }
 
-  Map<int, String> _linkedPersonIdsFor(List<FamilyMember> members) {
+  ({Map<int, String> idsByUserId, Map<int, String> namesByUserId})
+  _linkedPersonsFor(List<FamilyMember> members) {
     if (!PersonService.isInitialized) {
-      return const {};
+      return (idsByUserId: const {}, namesByUserId: const {});
     }
-    final result = <int, String>{};
+    final idsByUserId = <int, String>{};
+    final namesByUserId = <int, String>{};
     for (final member in members) {
       final userID = member.userID;
       if (userID == null) {
         continue;
       }
-      final personID = PersonService.instance.getCachedPartialPersonData(
+      final personData = PersonService.instance.getCachedPartialPersonData(
         userID: userID,
         email: member.email,
-      )?[PersonService.kPersonIDKey];
-      if (personID != null) {
-        result[userID] = personID;
+      );
+      final personID = personData?[PersonService.kPersonIDKey];
+      if (personID == null) {
+        continue;
+      }
+      idsByUserId[userID] = personID;
+      final personName = personData?[PersonService.kNameKey]?.trim();
+      if (personName != null && personName.isNotEmpty) {
+        namesByUserId[userID] = personName;
       }
     }
-    return result;
+    return (idsByUserId: idsByUserId, namesByUserId: namesByUserId);
   }
 
   Widget _buildDashboardOverflow(BuildContext context) {
@@ -568,10 +578,7 @@ class _FamilyPlanPageState extends State<FamilyPlanPage> {
                 totalStorageInBytes: _userDetails.getTotalStorage(),
                 avatarColor: avatarComponentColorValue(
                   context,
-                  familyMemberAvatarComponentColor(
-                    member,
-                    currentUserEmail: _userDetails.email,
-                  ),
+                  familyMemberAvatarComponentColor(member),
                 ),
               ),
             );

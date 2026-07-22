@@ -5,12 +5,15 @@ pub struct ConfigModelPreset {
     pub id: String,
     pub title: String,
     pub url: String,
+    pub sha256: String,
     pub mmproj_url: Option<String>,
+    pub mmproj_sha256: Option<String>,
 }
 
 #[derive(Debug, Clone, uniffi::Record)]
 pub struct KnowledgeEmbeddingConfig {
     pub model_url: String,
+    pub model_sha256: String,
     pub target_id: String,
     pub source_dim: u32,
     pub dim: u32,
@@ -38,6 +41,7 @@ pub struct KnowledgeDatasetConfig {
     pub label: String,
     pub current_download_identity: String,
     pub artifact_base_url: String,
+    pub artifact_sha256: Vec<String>,
     pub download_size_bytes: i64,
     pub max_chars: u32,
     pub source_url_template: String,
@@ -67,7 +71,9 @@ impl From<config::ModelPreset> for ConfigModelPreset {
             id: value.id,
             title: value.title,
             url: value.url,
+            sha256: value.sha256,
             mmproj_url: value.mmproj_url,
+            mmproj_sha256: value.mmproj_sha256,
         }
     }
 }
@@ -76,6 +82,7 @@ impl From<config::KnowledgeEmbeddingConfig> for KnowledgeEmbeddingConfig {
     fn from(value: config::KnowledgeEmbeddingConfig) -> Self {
         Self {
             model_url: value.model_url,
+            model_sha256: value.model_sha256,
             target_id: value.target_id,
             source_dim: value.source_dim,
             dim: value.dim,
@@ -122,6 +129,7 @@ impl From<config::KnowledgeDatasetConfig> for KnowledgeDatasetConfig {
             label: value.label,
             current_download_identity: value.current_download_identity,
             artifact_base_url: value.artifact_base_url,
+            artifact_sha256: value.artifact_sha256,
             download_size_bytes: value.download_size_bytes,
             max_chars: value.max_chars,
             source_url_template: value.source_url_template,
@@ -138,6 +146,7 @@ impl From<KnowledgeDatasetConfig> for config::KnowledgeDatasetConfig {
             label: value.label,
             current_download_identity: value.current_download_identity,
             artifact_base_url: value.artifact_base_url,
+            artifact_sha256: value.artifact_sha256,
             download_size_bytes: value.download_size_bytes,
             max_chars: value.max_chars,
             source_url_template: value.source_url_template,
