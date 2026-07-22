@@ -80,10 +80,9 @@ async fn load_album_metadata(
 
         // Check if the actual file exists
         for filename in &disk_metadata.info.file_names {
-            let file_path = export_path
-                .join(album_name)
-                .join(sanitize_filename(filename));
-            if file_path.exists() {
+            let filename = validate_stored_file_name(filename)?;
+            let file_path = export_path.join(album_name).join(filename);
+            if file_path.try_exists()? {
                 existing_files.insert(
                     disk_metadata.info.id,
                     ExistingFile {
@@ -1039,6 +1038,17 @@ fn safe_path_component(name: String) -> String {
     }
 }
 
+fn validate_stored_file_name(name: &str) -> Result<&str> {
+    let path = Path::new(name);
+    if path.file_name() == Some(path.as_os_str()) {
+        Ok(name)
+    } else {
+        Err(crate::Error::Generic(format!(
+            "Unsafe filename in export metadata: {name:?}"
+        )))
+    }
+}
+
 /// Sanitize a filename for the filesystem
 fn sanitize_filename(name: &str) -> String {
     let sanitized = name
@@ -1209,4 +1219,25 @@ async fn write_file_metadata(
     fs::write(&meta_path, json).await?;
 
     Ok(meta_path)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::validate_stored_file_name;
+
+    #[test]
+    fn validates_stored_file_names_without_rewriting() {
+        assert_eq!(validate_stored_file_name("a*b.jpg").unwrap(), "a*b.jpg");
+
+        for name in [
+            "",
+            ".",
+            "..",
+            "../photo.jpg",
+            "album/photo.jpg",
+            "/photo.jpg",
+        ] {
+            assert!(validate_stored_file_name(name).is_err());
+        }
+    }
 }
