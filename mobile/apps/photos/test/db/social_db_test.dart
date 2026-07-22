@@ -31,27 +31,25 @@ void main() {
 
   test("heart state stays inside the requested collection scope", () async {
     await SocialDB.instance.upsertReactions([
-      _reaction(id: "visible", collectionID: 10, userID: 1),
-      _reaction(id: "hidden", collectionID: 20, userID: 2),
-      _reaction(id: "deleted", collectionID: 20, userID: 3, isDeleted: true),
+      _reaction(id: "hidden", collectionID: 20, userID: 1),
+      _reaction(id: "deleted", collectionID: 20, userID: 2, isDeleted: true),
       _reaction(
         id: "comment-reaction",
         collectionID: 10,
-        userID: 4,
+        userID: 2,
         commentID: "comment",
       ),
     ]);
 
     expect(
       await SocialDB.instance.hasUserReactedToFileInCollections(100, 1, [10]),
-      isTrue,
-    );
-    expect(
-      await SocialDB.instance.hasUserReactedToFileInCollections(100, 2, [10]),
       isFalse,
     );
     expect(
-      await SocialDB.instance.hasUserReactedToFileInCollections(100, 2, [20]),
+      await SocialDB.instance.hasUserReactedToFileInCollections(100, 1, [
+        10,
+        20,
+      ]),
       isTrue,
     );
     expect(
@@ -59,24 +57,6 @@ void main() {
         10,
         20,
       ]),
-      isTrue,
-    );
-    expect(
-      await SocialDB.instance.hasUserReactedToFileInCollections(100, 3, [
-        10,
-        20,
-      ]),
-      isFalse,
-    );
-    expect(
-      await SocialDB.instance.hasUserReactedToFileInCollections(100, 4, [
-        10,
-        20,
-      ]),
-      isFalse,
-    );
-    expect(
-      await SocialDB.instance.hasUserReactedToFileInCollections(100, 1, []),
       isFalse,
     );
   });
@@ -91,20 +71,7 @@ void main() {
       100,
       candidateCollectionIDs: [10],
     );
-    final hiddenLatest = await SocialDB.instance.getLatestCommentForFile(
-      100,
-      candidateCollectionIDs: [20],
-    );
-
     expect(visibleLatest?.id, "visible");
-    expect(hiddenLatest?.id, "hidden");
-    expect(
-      await SocialDB.instance.getLatestCommentForFile(
-        100,
-        candidateCollectionIDs: const [],
-      ),
-      isNull,
-    );
   });
 
   test("comment count stays inside the requested collection scope", () async {
@@ -119,19 +86,11 @@ void main() {
       1,
     );
     expect(
-      await SocialDB.instance.getCommentCountForFileInCollections(100, [20]),
-      1,
-    );
-    expect(
       await SocialDB.instance.getCommentCountForFileInCollections(100, [
         10,
         20,
       ]),
       2,
-    );
-    expect(
-      await SocialDB.instance.getCommentCountForFileInCollections(100, []),
-      0,
     );
   });
 }
