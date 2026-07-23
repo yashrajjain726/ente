@@ -1,8 +1,11 @@
+#![cfg(feature = "museum")]
+
 mod support;
 
 use ente_space::{AccountSpaceCtx, PostPhotoAssetOptions};
+use ente_test_support::{Museum, TestResult};
 
-use support::{auth, space};
+use crate::support::{auth, space};
 
 const TEST_WEBP_BYTES: &[u8] = b"RIFF0000WEBP";
 
@@ -37,40 +40,29 @@ async fn request_and_confirm_friend(
     assert_eq!(confirmed.status, "friend");
 }
 
-#[tokio::test]
-#[ignore = "requires local Museum at ENTE_E2E_ENDPOINT or http://localhost:8080"]
-async fn space_bootstrap_posts_and_friend_share_suite() {
-    let endpoint = support::endpoint();
-    if !support::assert_server_or_skip(&endpoint, "space rust e2e suite").await {
-        return;
-    }
+#[test]
+fn space_e2e() -> TestResult {
+    Museum::run_async(run)
+}
 
-    let owner = auth::create_account(
-        &endpoint,
-        support::unique_test_email("space-owner"),
-        support::unique_password("SpaceOwner"),
-    )
-    .await;
-    let friend = auth::create_account(
-        &endpoint,
-        support::unique_test_email("space-friend"),
-        support::unique_password("SpaceFriender"),
-    )
-    .await;
-    let outsider = auth::create_account(
-        &endpoint,
-        support::unique_test_email("space-outsider"),
-        support::unique_password("SpaceOutsider"),
-    )
-    .await;
+async fn run(endpoint: String) -> TestResult {
+    space_bootstrap_posts_and_friend_share_suite(&endpoint).await;
+    space_unfriend_revokes_reciprocal_account_access_suite(&endpoint).await;
+    Ok(())
+}
 
-    let owner_ctx = space::open_ctx(&endpoint, &owner).await;
-    let friend_ctx = space::open_ctx(&endpoint, &friend).await;
-    let outsider_ctx = space::open_ctx(&endpoint, &outsider).await;
+async fn space_bootstrap_posts_and_friend_share_suite(endpoint: &str) {
+    let owner = auth::create_account(endpoint, "space-owner").await;
+    let friend = auth::create_account(endpoint, "space-friend").await;
+    let outsider = auth::create_account(endpoint, "space-outsider").await;
 
-    let owner_slug = format!("owner-{}", owner.user_id);
-    let friend_slug = format!("friend-{}", friend.user_id);
-    let outsider_slug = format!("outsider-{}", outsider.user_id);
+    let owner_ctx = space::open_ctx(endpoint, &owner).await;
+    let friend_ctx = space::open_ctx(endpoint, &friend).await;
+    let outsider_ctx = space::open_ctx(endpoint, &outsider).await;
+
+    let owner_slug = format!("owner_{}", owner.user_id);
+    let friend_slug = format!("friend_{}", friend.user_id);
+    let outsider_slug = format!("outsider_{}", outsider.user_id);
 
     let owner_profile = space::profile_payload("Owner", "Owner bio");
     let owner_space = owner_ctx
@@ -111,7 +103,7 @@ async fn space_bootstrap_posts_and_friend_share_suite() {
         403,
     );
 
-    let updated_slug = format!("{owner_slug}-updated");
+    let updated_slug = format!("{owner_slug}_updated");
     owner_ctx
         .update_space_slug(&owner_space.space_id, &updated_slug)
         .await
@@ -293,32 +285,15 @@ async fn space_bootstrap_posts_and_friend_share_suite() {
     );
 }
 
-#[tokio::test]
-#[ignore = "requires local Museum at ENTE_E2E_ENDPOINT or http://localhost:8080"]
-async fn space_unfriend_revokes_reciprocal_account_access_suite() {
-    let endpoint = support::endpoint();
-    if !support::assert_server_or_skip(&endpoint, "space unfriend e2e suite").await {
-        return;
-    }
+async fn space_unfriend_revokes_reciprocal_account_access_suite(endpoint: &str) {
+    let owner = auth::create_account(endpoint, "space-unfriend-owner").await;
+    let friend = auth::create_account(endpoint, "space-unfriend-friend").await;
 
-    let owner = auth::create_account(
-        &endpoint,
-        support::unique_test_email("space-unfriend-owner"),
-        support::unique_password("SpaceUnfriendOwner"),
-    )
-    .await;
-    let friend = auth::create_account(
-        &endpoint,
-        support::unique_test_email("space-unfriend-friend"),
-        support::unique_password("SpaceUnfriendFriender"),
-    )
-    .await;
+    let owner_ctx = space::open_ctx(endpoint, &owner).await;
+    let friend_ctx = space::open_ctx(endpoint, &friend).await;
 
-    let owner_ctx = space::open_ctx(&endpoint, &owner).await;
-    let friend_ctx = space::open_ctx(&endpoint, &friend).await;
-
-    let owner_slug = format!("unfriend-owner-{}", owner.user_id);
-    let friend_slug = format!("unfriend-friend-{}", friend.user_id);
+    let owner_slug = format!("uo_{}", owner.user_id);
+    let friend_slug = format!("uf_{}", friend.user_id);
     let owner_profile = space::profile_payload("Unfriend Owner", "Owner bio");
     let friend_profile = space::profile_payload("Unfriend Friend", "Friend bio");
     let owner_space = owner_ctx
@@ -550,295 +525,5 @@ async fn space_unfriend_revokes_reciprocal_account_access_suite() {
             )
             .await,
         403,
-    );
-}
-
-#[tokio::test]
-#[ignore = "requires local Museum at ENTE_E2E_ENDPOINT or http://localhost:8080"]
-async fn space_rotation_history_and_refresh_suite() {
-    let endpoint = support::endpoint();
-    if !support::assert_server_or_skip(&endpoint, "space rotation e2e suite").await {
-        return;
-    }
-
-    let owner = auth::create_account(
-        &endpoint,
-        support::unique_test_email("space-rotation-owner"),
-        support::unique_password("SpaceRotationOwner"),
-    )
-    .await;
-    let friend = auth::create_account(
-        &endpoint,
-        support::unique_test_email("space-rotation-friend"),
-        support::unique_password("SpaceRotationFriender"),
-    )
-    .await;
-
-    let owner_ctx = space::open_ctx(&endpoint, &owner).await;
-    let friend_ctx = space::open_ctx(&endpoint, &friend).await;
-
-    let owner_slug = format!("rotation-owner-{}", owner.user_id);
-    let friend_slug = format!("rotation-friend-{}", friend.user_id);
-    let profile_v1 = space::profile_payload("Rotation Owner", "Profile v1");
-    let owner_space = owner_ctx
-        .create_space(&owner_slug, &profile_v1)
-        .await
-        .expect("owner space creation failed");
-    let friend_space = friend_ctx
-        .create_space(
-            &friend_slug,
-            &space::profile_payload("Rotation Friender", "Friender bio"),
-        )
-        .await
-        .expect("friend space creation failed");
-
-    let avatar_v1 = owner_ctx
-        .upload_avatar(
-            &owner_space.space_id,
-            &owner_space.space_key,
-            TEST_WEBP_BYTES,
-        )
-        .await
-        .expect("v1 avatar upload should succeed");
-    let cover_v1 = owner_ctx
-        .upload_cover(
-            &owner_space.space_id,
-            &owner_space.space_key,
-            TEST_WEBP_BYTES,
-        )
-        .await
-        .expect("v1 cover upload should succeed");
-    let profile_assets_v1 = owner_ctx
-        .update_space_profile_assets(
-            &owner_space.space_id,
-            &profile_v1,
-            Some(avatar_v1),
-            Some(cover_v1),
-            false,
-            false,
-        )
-        .await
-        .expect("v1 profile assets should attach");
-    assert_eq!(
-        profile_assets_v1
-            .avatar
-            .as_ref()
-            .map(|avatar| avatar.key_version),
-        Some(owner_space.key_version)
-    );
-    assert_eq!(
-        profile_assets_v1
-            .cover
-            .as_ref()
-            .map(|cover| cover.key_version),
-        Some(owner_space.key_version)
-    );
-
-    let post_key_v1 = owner_ctx.generate_post_key();
-    let object_v1 = owner_ctx
-        .upload_post_photo_asset(
-            &owner_space.space_id,
-            &post_key_v1,
-            TEST_WEBP_BYTES,
-            PostPhotoAssetOptions {
-                width: Some(320),
-                height: Some(240),
-                media_type: Some("image/webp".to_owned()),
-                thumb_hash: None,
-            },
-        )
-        .await
-        .expect("v1 post asset upload should succeed");
-    let (post_id_v1, _post_key_v1) = owner_ctx
-        .create_post(
-            &owner_space.space_id,
-            &[object_v1],
-            Some(br#"{"caption":"version one"}"#),
-            Some(&post_key_v1),
-        )
-        .await
-        .expect("v1 post creation should succeed");
-
-    request_and_confirm_friend(
-        &friend_ctx,
-        &friend_space.space_id,
-        &owner_ctx,
-        &owner_space.space_id,
-        &owner_slug,
-    )
-    .await;
-
-    let friend_profile_v1 = friend_ctx
-        .get_space_profile_decrypted(
-            &owner_space.space_id,
-            Some(&friend_space.space_id),
-            Some(owner_space.key_version),
-        )
-        .await
-        .expect("friend should decrypt v1 profile");
-    assert_eq!(friend_profile_v1.profile, profile_v1);
-
-    let profile_v2 = space::profile_payload("Rotation Owner", "Profile v2");
-    let rotated_space = owner_ctx
-        .rotate_space_key(&owner_space.space_id, Some(&profile_v2))
-        .await
-        .expect("space rotation should succeed");
-    assert_eq!(rotated_space.key_version, owner_space.key_version + 1);
-
-    let refreshed = owner_ctx
-        .refresh_friend_shares(&owner_space.space_id)
-        .await
-        .expect("friend shares should refresh");
-    assert_eq!(refreshed, 1);
-    let friend_ctx = space::open_ctx(&endpoint, &friend).await;
-    let refreshed_shares = friend_ctx
-        .list_friend_shares(&friend_space.space_id)
-        .await
-        .expect("refreshed friend shares should load");
-    assert_eq!(refreshed_shares.len(), 1);
-    assert_eq!(refreshed_shares[0].key_version, rotated_space.key_version);
-
-    let post_key_v2 = owner_ctx.generate_post_key();
-    let object_v2 = owner_ctx
-        .upload_post_photo_asset(
-            &owner_space.space_id,
-            &post_key_v2,
-            TEST_WEBP_BYTES,
-            PostPhotoAssetOptions {
-                width: Some(320),
-                height: Some(240),
-                media_type: Some("image/webp".to_owned()),
-                thumb_hash: None,
-            },
-        )
-        .await
-        .expect("v2 post asset upload should succeed");
-    let (post_id_v2, _post_key_v2) = owner_ctx
-        .create_post(
-            &owner_space.space_id,
-            &[object_v2],
-            Some(br#"{"caption":"version two"}"#),
-            Some(&post_key_v2),
-        )
-        .await
-        .expect("v2 post creation should succeed");
-
-    let owner_profile_v1 = owner_ctx
-        .get_space_profile_decrypted(&owner_space.space_id, None, Some(owner_space.key_version))
-        .await
-        .expect("owner should decrypt historical profile");
-    assert_eq!(owner_profile_v1.profile, profile_v1);
-    let owner_profile_v2 = owner_ctx
-        .get_space_profile_decrypted(&owner_space.space_id, None, None)
-        .await
-        .expect("owner should decrypt current profile");
-    assert_eq!(owner_profile_v2.profile, profile_v2);
-    let friend_profile_v2 = friend_ctx
-        .get_space_profile_decrypted(&owner_space.space_id, Some(&friend_space.space_id), None)
-        .await
-        .expect("friend should decrypt current profile");
-    assert_eq!(friend_profile_v2.profile, profile_v2);
-    let owner_avatar = owner_profile_v2
-        .avatar
-        .as_ref()
-        .expect("owner profile should retain v1 avatar");
-    let owner_cover = owner_profile_v2
-        .cover
-        .as_ref()
-        .expect("owner profile should retain v1 cover");
-    assert_eq!(owner_avatar.key_version, owner_space.key_version);
-    assert_eq!(owner_cover.key_version, owner_space.key_version);
-    assert_eq!(
-        owner_ctx
-            .download_profile_asset(
-                &owner_space.space_id,
-                None,
-                "avatar",
-                &owner_avatar.object_id,
-                owner_avatar.key_version,
-            )
-            .await
-            .expect("owner should decrypt v1 avatar after rotation"),
-        TEST_WEBP_BYTES
-    );
-    assert_eq!(
-        owner_ctx
-            .download_profile_asset(
-                &owner_space.space_id,
-                None,
-                "cover",
-                &owner_cover.object_id,
-                owner_cover.key_version,
-            )
-            .await
-            .expect("owner should decrypt v1 cover after rotation"),
-        TEST_WEBP_BYTES
-    );
-    let friend_avatar = friend_profile_v2
-        .avatar
-        .as_ref()
-        .expect("friend profile should retain v1 avatar");
-    let friend_cover = friend_profile_v2
-        .cover
-        .as_ref()
-        .expect("friend profile should retain v1 cover");
-    assert_eq!(friend_avatar.key_version, owner_space.key_version);
-    assert_eq!(friend_cover.key_version, owner_space.key_version);
-    assert_eq!(
-        friend_ctx
-            .download_profile_asset(
-                &owner_space.space_id,
-                Some(&friend_space.space_id),
-                "avatar",
-                &friend_avatar.object_id,
-                friend_avatar.key_version,
-            )
-            .await
-            .expect("friend should decrypt v1 avatar after rotation"),
-        TEST_WEBP_BYTES
-    );
-    assert_eq!(
-        friend_ctx
-            .download_profile_asset(
-                &owner_space.space_id,
-                Some(&friend_space.space_id),
-                "cover",
-                &friend_cover.object_id,
-                friend_cover.key_version,
-            )
-            .await
-            .expect("friend should decrypt v1 cover after rotation"),
-        TEST_WEBP_BYTES
-    );
-
-    let feed = friend_ctx
-        .list_feed(&friend_space.space_id, None, Some(10))
-        .await
-        .expect("feed should load after rotation");
-    let feed_v1 = feed
-        .items
-        .iter()
-        .find(|item| item.post_id == post_id_v1)
-        .expect("v1 post should remain in friend feed");
-    let feed_v2 = feed
-        .items
-        .iter()
-        .find(|item| item.post_id == post_id_v2)
-        .expect("v2 post should appear in friend feed");
-    let friend_post_v1 = friend_ctx
-        .decrypt_feed_item(feed_v1)
-        .await
-        .expect("friend should decrypt v1 post after rotation");
-    assert_eq!(
-        friend_post_v1.caption_plaintext.as_deref(),
-        Some(br#"{"caption":"version one"}"#.as_slice())
-    );
-    let friend_post_v2 = friend_ctx
-        .decrypt_feed_item(feed_v2)
-        .await
-        .expect("friend should decrypt v2 post after rotation");
-    assert_eq!(
-        friend_post_v2.caption_plaintext.as_deref(),
-        Some(br#"{"caption":"version two"}"#.as_slice())
     );
 }

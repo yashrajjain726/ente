@@ -1,3 +1,5 @@
+#![cfg(feature = "ml-assets")]
+
 mod support;
 
 use anyhow::Result;

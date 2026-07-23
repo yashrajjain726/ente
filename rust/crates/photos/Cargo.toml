@@ -69,8 +69,3 @@ tar = "0.4"
 tempfile = "3.12"
 tokio = { version = "1", features = ["rt"] }
 url = "2.5.8"
-
-[[test]]
-name = "ml_indexing"
-path = "tests/ml_indexing.rs"
-required-features = ["ml-assets"]

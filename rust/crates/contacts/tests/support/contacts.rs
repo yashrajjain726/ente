@@ -4,8 +4,8 @@ use ente_contacts::{
     legacy_models::{LegacyContactRecord, LegacyInfo, LegacyRecoverySession},
 };
 use ente_core::auth::KeyAttributes as CoreKeyAttributes;
-use ente_rs::models::account::App;
 
+use crate::CLIENT_PACKAGE;
 use crate::support::auth::TestAccount;
 
 pub async fn open_ctx(endpoint: &str, account: &TestAccount) -> ContactsCtx {
@@ -15,8 +15,8 @@ pub async fn open_ctx(endpoint: &str, account: &TestAccount) -> ContactsCtx {
         user_id: account.user_id,
         master_key: account.master_key.clone(),
         cached_wrapped_root_contact_key: None,
-        user_agent: Some("ente-e2e-test".to_string()),
-        client_package: Some(App::Photos.client_package().to_string()),
+        user_agent: Some("ente-contacts-e2e".to_string()),
+        client_package: Some(CLIENT_PACKAGE.to_string()),
         client_version: Some("0.0.1".to_string()),
     })
     .await
