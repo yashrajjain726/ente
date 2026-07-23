@@ -20,7 +20,6 @@ members = [
     "crates/model-download",
     "crates/photos",
     "crates/test-support",
-    "e2e",
     "space",
 ]
 

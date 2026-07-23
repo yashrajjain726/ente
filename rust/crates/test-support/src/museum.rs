@@ -1,5 +1,6 @@
 use std::{
     fs,
+    future::Future,
     path::{Path, PathBuf},
 };
 
@@ -45,6 +46,15 @@ impl Museum {
                 std::panic::resume_unwind(panic);
             }
         }
+    }
+
+    /// Boot a Museum and run an asynchronous test on a Tokio runtime.
+    pub fn run_async<F, Fut>(test: F) -> TestResult
+    where
+        F: FnOnce(String) -> Fut,
+        Fut: Future<Output = TestResult>,
+    {
+        Self::run(|museum| tokio::runtime::Runtime::new()?.block_on(test(museum.endpoint.clone())))
     }
 
     fn start() -> TestResult<Self> {

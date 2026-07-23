@@ -11,7 +11,7 @@ pub struct LegacyKitOwner {
 }
 
 pub async fn create_owner(endpoint: &str) -> LegacyKitOwner {
-    let owner = auth::create_account_strict(endpoint, "legacy-kit-owner", "LegacyKitOwner").await;
+    let owner = auth::create_fixture_account(endpoint, "legacy-kit-owner").await;
     let owner_ctx = contacts::open_ctx(endpoint, &owner).await;
     LegacyKitOwner { owner, owner_ctx }
 }

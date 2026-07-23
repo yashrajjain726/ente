@@ -1,3 +1,5 @@
+#![cfg(feature = "museum")]
+
 mod support;
 
 use ente_accounts::Error as CliError;
@@ -7,7 +9,6 @@ use ente_contacts::{
     legacy_models::{LegacyContactState, LegacyRecoveryStatus},
 };
 use ente_core::http;
-use ente_rs::models::account::App;
 use ente_test_support::{Museum, TestResult};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -15,9 +16,7 @@ use uuid::Uuid;
 
 use support::{auth, contacts, legacy, legacy_kit};
 
-const STAGE_AUTH_CONTACTS: &str = "auth_contacts_e2e";
-const STAGE_LEGACY_CONTACT_RECOVERY: &str = "legacy_contact_recovery_e2e";
-const STAGE_LEGACY_KIT_RECOVERY: &str = "legacy_kit_recovery_e2e";
+const CLIENT_PACKAGE: &str = "io.ente.photos";
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -55,65 +54,28 @@ struct CreateLegacyKitRequest {
 }
 
 #[test]
-fn full_e2e() -> TestResult {
-    Museum::run(|museum| run_stages(museum.endpoint()))
+fn contacts() -> TestResult {
+    Museum::run_async(run)
 }
 
-fn run_stages(endpoint: &str) -> TestResult {
-    tokio::runtime::Runtime::new()?.block_on(async {
-        let auth_contacts = support::stage_enabled(STAGE_AUTH_CONTACTS);
-        let legacy_recovery = support::stage_enabled(STAGE_LEGACY_CONTACT_RECOVERY);
+async fn run(endpoint: String) -> TestResult {
+    let endpoint = &endpoint;
+    let pair_state = legacy::create_accepted_pair_state(endpoint, 14).await;
+    let pair = legacy::open_pair(endpoint, &pair_state).await;
+    run_contacts_stage(&pair).await;
 
-        let pair_state = if auth_contacts || legacy_recovery {
-            Some(legacy::create_accepted_pair_state(endpoint, 14).await)
-        } else {
-            None
-        };
+    let mut pair = legacy::open_pair(endpoint, &pair_state).await;
+    ensure_totp_enabled(endpoint, &pair.owner).await;
+    run_legacy_reject_stage(&pair).await;
+    run_legacy_stop_stage(&pair).await;
+    run_legacy_reinvite_stage(&pair).await;
+    run_legacy_reset_stage(endpoint, &mut pair).await;
 
-        if auth_contacts {
-            let pair = legacy::open_pair(endpoint, pair_state.as_ref().unwrap()).await;
-            run_auth_stage(endpoint, &pair.owner).await;
-            run_contacts_stage(&pair).await;
-        }
+    let mut owner = legacy_kit::create_owner(endpoint).await;
+    ensure_totp_enabled(endpoint, &owner.owner).await;
+    run_legacy_kit_stage(endpoint, &mut owner).await;
 
-        if legacy_recovery {
-            let mut pair = legacy::open_pair(endpoint, pair_state.as_ref().unwrap()).await;
-            ensure_totp_enabled(endpoint, &pair.owner).await;
-            run_legacy_reject_stage(&pair).await;
-            run_legacy_stop_stage(&pair).await;
-            run_legacy_reinvite_stage(&pair).await;
-            run_legacy_reset_stage(endpoint, &mut pair).await;
-        }
-
-        if support::stage_enabled(STAGE_LEGACY_KIT_RECOVERY) {
-            let mut owner = legacy_kit::create_owner(endpoint).await;
-            ensure_totp_enabled(endpoint, &owner.owner).await;
-            run_legacy_kit_stage(endpoint, &mut owner).await;
-        }
-
-        Ok(())
-    })
-}
-
-async fn run_auth_stage(endpoint: &str, owner: &auth::TestAccount) {
-    let first_login = auth::login_without_totp(endpoint, &owner.email, &owner.password)
-        .await
-        .expect("initial login failed");
-    assert_eq!(first_login.user_id, owner.user_id);
-    assert_eq!(first_login.secrets.master_key, owner.master_key);
-
-    let totp_secret = auth::enable_totp(endpoint, owner).await;
-
-    let second_login = auth::login_with_totp(endpoint, &owner.email, &owner.password, &totp_secret)
-        .await
-        .expect("two-factor login failed");
-    assert_eq!(second_login.user_id, owner.user_id);
-    assert_eq!(second_login.secrets.master_key, owner.master_key);
-    assert!(
-        auth::fetch_two_factor_status(endpoint, owner)
-            .await
-            .expect("two-factor status fetch failed")
-    );
+    Ok(())
 }
 
 async fn ensure_totp_enabled(endpoint: &str, owner: &auth::TestAccount) {
@@ -373,7 +335,7 @@ async fn run_legacy_kit_stage(endpoint: &str, owner: &mut legacy_kit::LegacyKitO
     let missing_notice_period = public_client
         .post(format!("{endpoint}/legacy-kits"))
         .header("X-Auth-Token", owner.owner.auth_token.clone())
-        .header("X-Client-Package", App::Photos.client_package())
+        .header("X-Client-Package", CLIENT_PACKAGE)
         .json(&json!({
             "id": Uuid::new_v4().to_string(),
             "variant": 1,
@@ -392,7 +354,7 @@ async fn run_legacy_kit_stage(endpoint: &str, owner: &mut legacy_kit::LegacyKitO
     let invalid_create = public_client
         .post(format!("{endpoint}/legacy-kits"))
         .header("X-Auth-Token", owner.owner.auth_token.clone())
-        .header("X-Client-Package", App::Photos.client_package())
+        .header("X-Client-Package", CLIENT_PACKAGE)
         .json(&CreateLegacyKitRequest {
             id: Uuid::new_v4().to_string(),
             variant: 1,

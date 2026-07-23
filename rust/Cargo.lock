@@ -2292,9 +2292,12 @@ version = "0.0.0"
 dependencies = [
  "base64 0.22.1",
  "ente-core",
+ "ente-test-support",
+ "hmac 0.13.0",
  "mockito",
  "serde",
  "serde_json",
+ "sha1 0.11.0",
  "sha2 0.11.0",
  "srp",
  "thiserror 2.0.18",
@@ -2317,15 +2320,22 @@ dependencies = [
 name = "ente-contacts"
 version = "0.0.0"
 dependencies = [
+ "base64 0.22.1",
+ "ente-accounts",
  "ente-core",
+ "ente-test-support",
+ "hmac 0.13.0",
  "md-5 0.11.0",
  "mockito",
+ "reqwest 0.12.28",
  "serde",
  "serde_json",
+ "sha1 0.11.0",
  "sha2 0.11.0",
  "thiserror 2.0.18",
  "tokio",
  "uuid",
+ "zeroize",
 ]
 
 [[package]]
@@ -2357,26 +2367,6 @@ dependencies = [
  "tokio",
  "x25519-dalek",
  "xsalsa20poly1305",
- "zeroize",
-]
-
-[[package]]
-name = "ente-e2e"
-version = "0.0.0"
-dependencies = [
- "base64 0.22.1",
- "ente-accounts",
- "ente-contacts",
- "ente-core",
- "ente-rs",
- "ente-test-support",
- "hmac 0.13.0",
- "reqwest 0.12.28",
- "serde",
- "serde_json",
- "sha1 0.11.0",
- "tokio",
- "uuid",
  "zeroize",
 ]
 
@@ -2563,6 +2553,7 @@ version = "0.0.0"
 dependencies = [
  "dirs 5.0.1",
  "postgresql_embedded",
+ "tokio",
  "uuid",
 ]
 

@@ -6,10 +6,6 @@ edition = "2024"
 [features]
 museum = ["ente-core/srp"]
 
-[[test]]
-name = "space"
-required-features = ["museum"]
-
 [dependencies]
 ente-core.workspace = true
 md-5 = "0.11"

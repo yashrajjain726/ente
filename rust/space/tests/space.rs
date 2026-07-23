@@ -1,3 +1,5 @@
+#![cfg(feature = "museum")]
+
 mod support;
 
 use ente_space::{AccountSpaceCtx, PostPhotoAssetOptions};
@@ -40,15 +42,13 @@ async fn request_and_confirm_friend(
 
 #[test]
 fn space_e2e() -> TestResult {
-    Museum::run(|museum| {
-        tokio::runtime::Runtime::new()?.block_on(run(museum.endpoint()));
-        Ok(())
-    })
+    Museum::run_async(run)
 }
 
-async fn run(endpoint: &str) {
-    space_bootstrap_posts_and_friend_share_suite(endpoint).await;
-    space_unfriend_revokes_reciprocal_account_access_suite(endpoint).await;
+async fn run(endpoint: String) -> TestResult {
+    space_bootstrap_posts_and_friend_share_suite(&endpoint).await;
+    space_unfriend_revokes_reciprocal_account_access_suite(&endpoint).await;
+    Ok(())
 }
 
 async fn space_bootstrap_posts_and_friend_share_suite(endpoint: &str) {

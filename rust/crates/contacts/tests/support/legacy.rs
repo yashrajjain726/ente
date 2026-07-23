@@ -21,7 +21,7 @@ pub async fn create_accepted_pair_state(
     recovery_notice_in_days: i32,
 ) -> LegacyPairState {
     let owner = auth::create_account_strict(endpoint, "legacy-owner", "LegacyOwner").await;
-    let trusted = auth::create_account_strict(endpoint, "legacy-trusted", "LegacyTrusted").await;
+    let trusted = auth::create_fixture_account(endpoint, "legacy-trusted").await;
 
     let (owner_ctx, trusted_ctx) = tokio::join!(
         contacts::open_ctx(endpoint, &owner),
