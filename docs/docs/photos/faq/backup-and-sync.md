@@ -20,6 +20,10 @@ Once you select which albums to backup in your mobile app settings, Ente automat
 
 Learn more in the [Backup feature guide](/photos/features/backup-and-sync/).
 
+### Will Ente recognize my existing backup if I switch phones? {#switch-phone-recognizes-backup}
+
+Yes. Your photos live in your Ente account, not on any single device. Install Ente on your new phone and sign in with the same account - your library downloads and syncs normally. New photos on your new phone are compared by content hash against what's already in your account, so anything already backed up won't be re-uploaded.
+
 ### How do I select which albums to back up? {#select-albums}
 
 **On mobile:**
@@ -804,7 +808,7 @@ Deduplication is based on the file's content hash, not on its thumbnail. Thumbna
 
 The differing thumbnails don't affect deduplication. Ente still recognizes the files as exact duplicates and keeps a single underlying copy.
 
-### Which copy does Ente keep when it finds the same photo in multiple albums? {#dedup-which-copy-kept}
+### Which copy does Ente keep during deduplication? {#dedup-which-copy-kept}
 
 When Ente finds the same photo across, say, three albums, it keeps just one underlying copy of the file and replaces the others with symlinks (references) pointing back to that copy. All three albums still show the photo, and you can scroll through any of them and see it there. The only thing that changes is that your storage quota goes down, since Ente is no longer storing three full copies of the same file.
 

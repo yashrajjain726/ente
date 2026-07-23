@@ -245,12 +245,6 @@ Now simply drag and drop the downloaded folders into [our desktop app](https://e
 
 > Note: In case your uploads get interrupted, just drag and drop the folders into the same albums again, and we will ignore already backed up files and upload just the rest.
 
-## Switching Devices
-
-### Will Ente recognize my existing backup if I switch phones? {#switch-phone-recognizes-backup}
-
-Yes. Your photos live in your Ente account, not on any single device. Install Ente on your new phone and sign in with the same account - your library downloads and syncs normally. New photos on your new phone are compared by content hash against what's already in your account, so anything already backed up won't be re-uploaded.
-
 ## Importing from other cloud services
 
 ### I have photos on my phone and also photos autosynced from my phone to a cloud storage. How do I upload all these photos to Ente without duplicates? {#prevent-duplicates-cloud-sync}

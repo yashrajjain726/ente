@@ -141,10 +141,6 @@ Disable the option to download original quality photos. Recipients can still vie
 >
 > This doesn't prevent screenshots or screen recording, but does make it harder for recipients to get high-quality copies.
 
-> [!NOTE]
->
-> When downloads are disabled, the link cannot be opened on mobile browsers, since a mobile browser would otherwise let someone screenshot or save the photos anyway. It continues to work on desktop and laptop browsers.
-
 ### Allow joining album
 
 Let people who open the link in their Ente app add the shared album to their account. This is handy when you want other Ente users to keep the album in their Shared tab without sending them individual invites.
