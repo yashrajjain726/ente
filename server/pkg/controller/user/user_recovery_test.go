@@ -170,6 +170,15 @@ func TestSelfAccountRecoveryStatusAndRecovery(t *testing.T) {
 	if response.Status != ente.AccountRecoveryReady {
 		t.Fatalf("validation status = %q, want %q", response.Status, ente.AccountRecoveryReady)
 	}
+	if _, err := db.Exec(`UPDATE data_cleanup SET stage = $1 WHERE user_id = $2`, cleanupentity.Collection, userID); err != nil {
+		t.Fatalf("failed to advance cleanup: %v", err)
+	}
+	if _, err := controller.ValidateSelfAccountRecovery(token); !errors.Is(err, ErrAccountRecoveryUnavailable) {
+		t.Fatalf("validation after cleanup advanced error = %v, want ErrAccountRecoveryUnavailable", err)
+	}
+	if _, err := db.Exec(`UPDATE data_cleanup SET stage = $1 WHERE user_id = $2`, cleanupentity.Scheduled, userID); err != nil {
+		t.Fatalf("failed to restore scheduled cleanup fixture: %v", err)
+	}
 
 	gin.SetMode(gin.TestMode)
 	ctx, _ := gin.CreateTestContext(httptest.NewRecorder())

@@ -1,6 +1,7 @@
 package user
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -135,6 +136,13 @@ func (c *UserController) accountRecoveryStatus(req ente.RecoverAccountRequest, a
 			return "", stacktrace.Propagate(ErrAccountRecoveryUnavailable, "key attributes have been deleted")
 		}
 		return "", stacktrace.Propagate(err, "failed to get key attributes")
+	}
+	scheduled, err := c.DataCleanupRepo.HasScheduledDelete(context.Background(), req.UserID)
+	if err != nil {
+		return "", stacktrace.Propagate(err, "failed to check scheduled deletion")
+	}
+	if !scheduled {
+		return "", stacktrace.Propagate(ErrAccountRecoveryUnavailable, "scheduled deletion is no longer recoverable")
 	}
 
 	recoveryEmail := email.NormalizeEmail(req.EmailID)

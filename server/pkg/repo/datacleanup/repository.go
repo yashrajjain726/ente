@@ -19,6 +19,14 @@ func (r *Repository) Insert(ctx context.Context, userID int64) error {
 	return stacktrace.Propagate(err, "failed to insert")
 }
 
+func (r *Repository) HasScheduledDelete(ctx context.Context, userID int64) (bool, error) {
+	var exists bool
+	err := r.DB.QueryRowContext(ctx, `SELECT EXISTS(
+		SELECT 1 FROM data_cleanup WHERE user_id = $1 AND stage = $2
+	)`, userID, entity.Scheduled).Scan(&exists)
+	return exists, stacktrace.Propagate(err, "failed to check scheduled delete")
+}
+
 func (r *Repository) LockScheduledDelete(ctx context.Context, tx *sql.Tx, userID int64) error {
 	var lockedUserID int64
 	return tx.QueryRowContext(ctx, `SELECT user_id FROM data_cleanup
