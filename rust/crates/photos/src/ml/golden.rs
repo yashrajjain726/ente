@@ -23,7 +23,8 @@ use crate::ml::golden_data::GOLDEN_ENTRIES;
 // All thresholds are deliberately loose (a false rejection silently degrades
 // the device to CPU) and unvalidated against real accelerated hardware;
 // tighten them once field measurements exist. Corrupted output measures ~1.0
-// on every metric.
+// on the cosine and coordinate metrics, and orders of magnitude higher on
+// the confidence group (its expected norm is tiny).
 
 /// Maximum cosine distance between an accelerated session's embedding output
 /// and the CPU golden. Healthy fp16 divergence is around 1e-3.
@@ -34,10 +35,14 @@ pub(crate) const COSINE_DISTANCE_THRESHOLD: f64 = 0.025;
 /// Well-conditioned: healthy fp16 divergence is around 1e-3.
 pub(crate) const RELATIVE_L2_THRESHOLD: f64 = 0.1;
 
-/// Maximum relative L2 error for the detector's confidence group, which sits
-/// at the fp16 noise floor on the no-face noise input (samples <= ~2e-3), so
-/// healthy relative divergence can plausibly reach a few 1e-2.
-pub(crate) const CONFIDENCE_RELATIVE_L2_THRESHOLD: f64 = 0.2;
+/// Maximum relative L2 error for the detector's confidence group. All its
+/// values are tiny background sigmoid outputs (samples <= ~2e-3), whose
+/// relative error is roughly the absolute drift of the underlying logit, so
+/// healthy fp16 pipelines can plausibly measure O(0.1..1) here (a full
+/// flush-to-zero is exactly 1.0 and functionally harmless), while defects
+/// that inflate confidences measure >= ~45 against the tiny expected norm.
+/// Deliberately loose within that gap, pending real-hardware measurements.
+pub(crate) const CONFIDENCE_RELATIVE_L2_THRESHOLD: f64 = 2.0;
 
 /// Reference outputs are compared on a deterministic strided sample capped at
 /// this many elements, so large detector outputs stay small in the committed
@@ -620,8 +625,13 @@ mod tests {
         )
     }
 
+    /// Background confidences flushed to zero measure exactly 1.0, below the
+    /// deliberately loose confidence threshold: some fp16 pipelines flush
+    /// subnormals, and a zeroed background score is functionally identical to
+    /// a tiny one. An all-zero *output* is still rejected via the coordinate
+    /// group.
     #[test]
-    fn detector_metric_rejects_all_zero_confidences() {
+    fn detector_metric_tolerates_fully_flushed_confidences() {
         static EXPECTED: [f32; 32] = [
             100.0, 100.0, 20.0, 20.0, 0.001, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0, 17.0, 18.0,
             19.0, 0.98, 200.0, 200.0, 40.0, 40.0, 0.002, 20.0, 21.0, 22.0, 23.0, 24.0, 25.0, 26.0,
@@ -633,8 +643,11 @@ mod tests {
             *confidence = 0.0;
         }
 
-        let error = compare_output(&entry, &output).unwrap_err();
-        assert!(error.contains("detector confidence"), "{error}");
+        let distance = compare_output(&entry, &output).unwrap();
+        assert!(
+            (distance - 1.0).abs() < 1e-9,
+            "flushed confidences must measure exactly 1.0, got {distance}"
+        );
     }
 
     #[test]
