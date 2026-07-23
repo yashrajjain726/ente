@@ -854,7 +854,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
                         <Box
                             aria-hidden
                             sx={{
-                                bgcolor: "rgba(255, 255, 255, 0.35)",
+                                bgcolor: "rgba(255, 255, 255, 0.2)",
                                 borderRadius: "50%",
                                 inset: 0,
                                 position: "absolute",
@@ -870,7 +870,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
                                         to: { opacity: 1 },
                                     },
                                     animation:
-                                        "spaceFeedAvatarFade 180ms ease-out both",
+                                        "spaceFeedAvatarFade 320ms cubic-bezier(0.22, 1, 0.36, 1) both",
                                     borderRadius: "50%",
                                     height: feedAvatarSize,
                                     overflow: "hidden",
