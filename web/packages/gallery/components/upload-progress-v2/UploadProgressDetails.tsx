@@ -200,10 +200,10 @@ export function UploadProgressDetails({ closeOnly }: { closeOnly: boolean }) {
             {isDone && (closeOnly || failedCount > 0) && (
                 <Button
                     fullWidth
-                    onClick={closeOnly ? onClose : retryFailed}
+                    onClick={failedCount > 0 ? retryFailed : onClose}
                     sx={retryButtonSx}
                 >
-                    {t(closeOnly ? "close" : "retry_failed_uploads")}
+                    {t(failedCount > 0 ? "retry_failed_uploads" : "close")}
                 </Button>
             )}
         </Stack>
