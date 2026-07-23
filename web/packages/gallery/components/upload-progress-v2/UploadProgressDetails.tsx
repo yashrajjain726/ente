@@ -26,7 +26,7 @@ import {
     type ListedFile,
 } from "./UploadFileList";
 
-export function UploadProgressDetails({ closeOnly }: { closeOnly: boolean }) {
+export function UploadProgressDetails() {
     const {
         finishedUploads,
         hasLivePhotos,
@@ -197,7 +197,7 @@ export function UploadProgressDetails({ closeOnly }: { closeOnly: boolean }) {
                     </Typography>
                 )}
             </Box>
-            {isDone && (closeOnly || failedCount > 0) && (
+            {isDone && (
                 <Button
                     fullWidth
                     onClick={failedCount > 0 ? retryFailed : onClose}
