@@ -4,16 +4,11 @@ use ente_core::{
     auth::{SrpSession, generate_srp_setup_with_login_key},
     crypto::{Key, SecretKey, decode_b64, encode_b64, kdf, secretbox},
 };
-use ente_test_support::{HARDCODED_OTT, HARDCODED_OTT_EMAIL_SUFFIX};
+use ente_test_support::{HARDCODED_OTT, HARDCODED_OTT_EMAIL_SUFFIX, account_fixture};
 use uuid::Uuid;
 
 use super::{CLIENT_PACKAGE, USER_AGENT};
 
-// Argon2id("space-e2e-fixture-password", 16 × 0x42, 256 MiB, 16 ops).
-const FIXTURE_KEK: &str = "HuSa1eJkbjlGQ/Th/Qwf7/ezjTSMrPcc1ZHdAfVup4c=";
-const FIXTURE_KEK_SALT: &str = "QkJCQkJCQkJCQkJCQkJCQg==";
-const FIXTURE_MEM_LIMIT: i32 = 268_435_456;
-const FIXTURE_OPS_LIMIT: i32 = 16;
 const SRP_A_LEN: usize = 512;
 
 pub struct TestAccount {
@@ -41,7 +36,7 @@ pub async fn create_account(endpoint: &str, email_prefix: &str) -> TestAccount {
     let auth_token = verification.token.expect("signup should return a token");
     client.set_auth_token(Some(auth_token.clone()));
 
-    let kek = Key::try_from_slice(&decode_b64(FIXTURE_KEK).unwrap()).unwrap();
+    let kek = Key::try_from_slice(&decode_b64(account_fixture::KEK).unwrap()).unwrap();
     let master_key = Key::generate();
     let recovery_key = Key::generate();
     let secret_key = SecretKey::generate();
@@ -51,15 +46,15 @@ pub async fn create_account(endpoint: &str, email_prefix: &str) -> TestAccount {
     let encrypted_master_with_recovery = secretbox::encrypt(master_key.as_bytes(), &recovery_key);
     let encrypted_recovery_with_master = secretbox::encrypt(recovery_key.as_bytes(), &master_key);
     let key_attributes = KeyAttributes {
-        kek_salt: FIXTURE_KEK_SALT.into(),
+        kek_salt: account_fixture::KEK_SALT.into(),
         kek_hash: None,
         encrypted_key: encode_b64(&encrypted_master_key.encrypted_data),
         key_decryption_nonce: encode_b64(encrypted_master_key.nonce.as_bytes()),
         public_key: encode_b64(public_key.as_bytes()),
         encrypted_secret_key: encode_b64(&encrypted_secret_key.encrypted_data),
         secret_key_decryption_nonce: encode_b64(encrypted_secret_key.nonce.as_bytes()),
-        mem_limit: FIXTURE_MEM_LIMIT,
-        ops_limit: FIXTURE_OPS_LIMIT,
+        mem_limit: account_fixture::MEM_LIMIT,
+        ops_limit: account_fixture::OPS_LIMIT,
         master_key_encrypted_with_recovery_key: Some(encode_b64(
             &encrypted_master_with_recovery.encrypted_data,
         )),
