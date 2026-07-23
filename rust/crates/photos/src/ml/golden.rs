@@ -7,7 +7,7 @@
 //! session (WebGPU on Android, CoreML on iOS) is trusted, it must reproduce a
 //! committed golden output for a fixed input within a cosine-distance
 //! threshold. The golden outputs are generated on the CPU execution provider
-//! by `cargo test -p ente-photos --features ml-assets --test ml_goldens`
+//! by `cargo run -p ente-photos --example ml_goldens -- generate`
 //! and committed in `golden_data.rs`. A cheap unit test in `golden_tooling`
 //! keeps the committed entries pinned (by file name and content hash) to the
 //! production models in `infra/ml/test/ml_indexing/assets.json`, so a model

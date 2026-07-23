@@ -389,7 +389,7 @@ pub(crate) struct GoldenModelAsset {
 }
 
 /// Downloaded production model assets for the golden self-test tooling, with
-/// ONNX Runtime already initialized. Used by the ml_goldens test binary only.
+/// ONNX Runtime already initialized. Used by the ml_goldens developer tool only.
 #[allow(dead_code)]
 pub(crate) struct GoldenTestAssets {
     pub(crate) face_detection: GoldenModelAsset,
@@ -492,7 +492,7 @@ struct ModelAssets {
     face_detection: ModelAsset,
     face_embedding: ModelAsset,
     clip_image: ModelAsset,
-    // Used by the ml_goldens test binary only.
+    // Used by the ml_goldens developer tool only.
     #[allow(dead_code)]
     clip_text: ModelAsset,
     #[allow(dead_code)]

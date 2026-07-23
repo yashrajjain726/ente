@@ -1,8 +1,8 @@
 //! Generation and verification of the committed golden self-test data.
 //!
 //! Regeneration (`render_golden_data`) runs the production models on the CPU
-//! execution provider and is invoked manually via the `generate_goldens`
-//! test in the `ml_goldens` test binary (requires the `ml-assets` feature).
+//! execution provider and is invoked manually via the `ml_goldens` developer
+//! tool's `generate` command.
 //! Verification (`verify_goldens_against_pins`) is metadata-only and runs as
 //! a plain unit test in every CI pass.
 
@@ -24,7 +24,7 @@ const GENERATED_FILE_HEADER: &str = "\
 //! GENERATED FILE — do not edit by hand.
 //!
 //! Regenerate with:
-//!   cargo test -p ente-photos --features ml-assets --test ml_goldens -- --ignored generate_goldens
+//!   cargo run -p ente-photos --example ml_goldens -- generate
 //!
 //! TODO: the pet models are CPU-only and therefore have no golden entries
 //! yet; they must get entries here before they are moved off CPU-only
@@ -288,8 +288,8 @@ mod tests {
 
     /// The CI guard against stale goldens: a model update (new file name) or
     /// a content change under an unchanged name in the asset lock fails this
-    /// test until `golden_data.rs` is regenerated (see the `generate_goldens`
-    /// test in the ml_goldens test binary).
+    /// test until `golden_data.rs` is regenerated with the `ml_goldens`
+    /// developer tool.
     #[test]
     fn committed_goldens_are_pinned_to_the_production_models() {
         let pins = pinned_production_models();

@@ -1,7 +1,7 @@
 //! GENERATED FILE — do not edit by hand.
 //!
 //! Regenerate with:
-//!   cargo test -p ente-photos --features ml-assets --test ml_goldens -- --ignored generate_goldens
+//!   cargo run -p ente-photos --example ml_goldens -- generate
 //!
 //! TODO: the pet models are CPU-only and therefore have no golden entries
 //! yet; they must get entries here before they are moved off CPU-only
