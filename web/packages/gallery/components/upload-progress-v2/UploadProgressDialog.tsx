@@ -91,13 +91,17 @@ function UploadProgressV2Summary() {
     const context = useUploadProgressContext();
     const { uploadPhase, percentComplete } = context;
     const progress = normalizePercent(percentComplete);
+    const headline =
+        uploadPhase == "readingMetadata"
+            ? uploadStatusText(uploadPhase)
+            : `${progress.toLocaleString()}% uploaded`;
 
     return (
         <Box sx={summaryLayoutSx}>
             <Stack sx={{ gap: 2, minWidth: 0 }}>
                 <Stack sx={{ minWidth: 0, gap: "4px" }}>
                     <Typography component="p" sx={titleTextSx}>
-                        {progress.toLocaleString()}% uploaded
+                        {headline}
                     </Typography>
                     <Typography sx={mutedBodySx}>
                         {uploadCountsText(context)}
