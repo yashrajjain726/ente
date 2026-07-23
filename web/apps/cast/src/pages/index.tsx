@@ -1,5 +1,9 @@
 import { PairingCode } from "@/components/PairingCode";
-import { readCastData, storeCastData } from "@/services/cast-data";
+import {
+    clearCastData,
+    readCastData,
+    storeCastData,
+} from "@/services/cast-data";
 import { getCastPayload, register } from "@/services/pair";
 import { Box, Stack, styled, Typography } from "@mui/material";
 import { EnteLogo } from "ente-base/components/EnteLogo";
@@ -15,6 +19,8 @@ const Page: React.FC = () => {
     const [pairingCode, setPairingCode] = useState<string | undefined>();
 
     const router = useRouter();
+
+    useEffect(() => clearCastData(), []);
 
     useEffect(() => {
         if (!pairingCode) {
@@ -83,6 +89,8 @@ const Page: React.FC = () => {
 export default Page;
 
 const Container = styled(Stack)`
+    /* Chrome 92 does not support svh. */
+    height: 100vh;
     height: 100svh;
     justify-content: center;
     align-items: center;
