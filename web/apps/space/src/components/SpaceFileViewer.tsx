@@ -57,6 +57,7 @@ const viewerSwipeMinDeltaPx = 72;
 const viewerSwipeAxisRatio = 1.5;
 const viewerHeaderAvatarSize = 28;
 const viewerHeaderButtonVisualSize = 28;
+const draftPostExitDurationMs = 320;
 
 interface ViewerViewportSize {
     x: number;
@@ -150,6 +151,7 @@ interface SpaceFileViewerProps {
     isDraftPostPreviewPending?: boolean;
     onClose: () => void;
     onDeletePost?: () => Promise<void> | void;
+    onDraftPostExitStart?: () => void;
     onDraftPostPublished?: () => void;
     onOpenProfile?: () => void;
     onPublishDraftPost?: (
@@ -233,18 +235,23 @@ const viewerActionButtonSx = {
     "&:hover": { bgcolor: controlBackgroundHover },
 };
 
-export const SpaceViewerFeedBackdrop: React.FC = () => (
+export const SpaceViewerFeedBackdrop: React.FC<{ exiting?: boolean }> = ({
+    exiting = false,
+}) => (
     <Box
         aria-hidden
         sx={{
             bgcolor: viewerBackground,
             bottom: "-100vh",
             left: 0,
+            opacity: exiting ? 0 : 1,
             pointerEvents: "none",
             position: "absolute",
             right: 0,
             top: "-100vh",
+            transition: `opacity ${draftPostExitDurationMs}ms cubic-bezier(0.22, 1, 0.36, 1)`,
             zIndex: 1299,
+            "@media (prefers-reduced-motion: reduce)": { transition: "none" },
         }}
     />
 );
@@ -298,6 +305,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
     isDraftPostPreviewPending = false,
     onClose,
     onDeletePost,
+    onDraftPostExitStart,
     onDraftPostPublished,
     onOpenProfile,
     onPublishDraftPost,
@@ -381,6 +389,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
         React.useState<SpaceActionPhase | null>(null);
     const [draftPostActionPhase, setDraftPostActionPhase] =
         React.useState<SpaceActionPhase | null>(null);
+    const [isDraftPostExit, setIsDraftPostExit] = React.useState(false);
     const [isDesktopViewer, setIsDesktopViewer] = React.useState(
         () =>
             typeof window != "undefined" &&
@@ -448,6 +457,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
         isActionsOpen ||
         (canDeletePost && deleteSheetOpen) ||
         isDeleteExit ||
+        isDraftPostExit ||
         isCaptionEditing ||
         isDraftPost ||
         isDraftPostPreviewPending;
@@ -578,7 +588,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
 
     const publishDraftPostWithCaption = React.useCallback(
         (captionToPublish: string, editToPublish: SpaceViewerDraftPostEdit) => {
-            if (!onPublishDraftPost || isDeleteExit) return;
+            if (!onPublishDraftPost || isDeleteExit || isDraftPostExit) return;
 
             setDraftPostActionPhase("busy");
             let publishPromise: Promise<void>;
@@ -593,13 +603,18 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
             }
 
             setQueuedDraftPost(undefined);
-            onClose();
-            onDraftPostPublished?.();
+            setIsDraftPostExit(true);
+            onDraftPostExitStart?.();
             void publishPromise.catch((error: unknown) => {
                 console.error("Failed to publish space post", error);
             });
         },
-        [isDeleteExit, onClose, onDraftPostPublished, onPublishDraftPost],
+        [
+            isDeleteExit,
+            isDraftPostExit,
+            onDraftPostExitStart,
+            onPublishDraftPost,
+        ],
     );
 
     const publishDraftPost = () => {
@@ -608,7 +623,8 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
             isDraftPostActionRunning ||
             isDraftPostPreviewPending ||
             hasDraftPostPreparationError ||
-            isDeleteExit
+            isDeleteExit ||
+            isDraftPostExit
         )
             return;
 
@@ -810,6 +826,17 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
 
         onClose();
     }, [isDeleteExit, onClose]);
+
+    const finishDraftPostExit = React.useCallback(() => {
+        onClose();
+        onDraftPostPublished?.();
+    }, [onClose, onDraftPostPublished]);
+
+    React.useEffect(() => {
+        if (!isDraftPostExit) return;
+        if (window.matchMedia("(prefers-reduced-motion: reduce)").matches)
+            finishDraftPostExit();
+    }, [finishDraftPostExit, isDraftPostExit]);
 
     React.useEffect(() => {
         const root = viewerRootRef.current;
@@ -1025,7 +1052,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
 
     React.useEffect(() => {
         const closeOnEscape = (event: KeyboardEvent) => {
-            if (deleteSheetOpen) return;
+            if (deleteSheetOpen || isDraftPostExit) return;
             if (event.key != "Escape") return;
 
             if (isCaptionEditing && !isCaptionUpdateActionRunning) {
@@ -1040,6 +1067,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
     }, [
         cancelCaptionEdit,
         deleteSheetOpen,
+        isDraftPostExit,
         isCaptionEditing,
         isCaptionUpdateActionRunning,
     ]);
@@ -1050,6 +1078,16 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
             role="dialog"
             aria-label={`${displayName} photo viewer`}
             aria-modal="true"
+            onTransitionEnd={(event) => {
+                if (
+                    !isDraftPostExit ||
+                    event.currentTarget != event.target ||
+                    event.propertyName != "opacity"
+                )
+                    return;
+
+                finishDraftPostExit();
+            }}
             sx={{
                 bgcolor: viewerBackground,
                 boxSizing: "border-box",
@@ -1060,11 +1098,17 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                 isolation: "isolate",
                 maxWidth: "100vw",
                 minHeight: "100svh",
+                opacity: isDraftPostExit ? 0 : 1,
                 overflow: "hidden",
                 overflowX: "hidden",
+                pointerEvents: isDraftPostExit ? "none" : "auto",
                 position: "fixed",
+                transition: `opacity ${draftPostExitDurationMs}ms cubic-bezier(0.22, 1, 0.36, 1)`,
                 width: "100%",
                 zIndex: 1300,
+                "@media (prefers-reduced-motion: reduce)": {
+                    transition: "none",
+                },
             }}
         >
             <Box

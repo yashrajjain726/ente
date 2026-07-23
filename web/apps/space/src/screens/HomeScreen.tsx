@@ -6,6 +6,7 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Box, Skeleton } from "@mui/material";
+import { SpaceActionToast } from "components/SpaceActionToast";
 import { SpaceAvatarImage } from "components/SpaceAvatarImage";
 import {
     SpaceFileViewer,
@@ -115,6 +116,7 @@ interface HomeScreenProps {
     isFriendsLoading?: boolean;
     localFeedPosts?: LocalSpaceFeedPost[];
     showInstallPrompt?: boolean;
+    showInviteFriendsToast?: boolean;
     onCreatePost?: (
         image: DraftSpacePostImage,
         caption: string,
@@ -124,6 +126,7 @@ interface HomeScreenProps {
     onLoadPostAvatar?: SpacePostAvatarURLLoader;
     onLoadPostImage?: SpacePostAssetURLLoader;
     onFriendRequestSentToastClose?: () => void;
+    onInviteFriendsToastClose?: () => void;
     onOpenFriend?: (friendID: string) => void;
     onOpenMessages?: () => void;
     onOpenProfile?: () => void;
@@ -201,6 +204,13 @@ interface FeedItemProps {
 interface AddedFriendToastProps {
     message: string;
     onClose?: () => void;
+}
+
+interface InviteFriendsToastProps {
+    profileLink?: string;
+    sharing: boolean;
+    onClose?: () => void;
+    onSharingChange: (sharing: boolean) => void;
 }
 
 const dimensionsFromAspectRatio = (
@@ -1209,6 +1219,68 @@ const AddedFriendToast: React.FC<AddedFriendToastProps> = ({
     </Box>
 );
 
+const InviteFriendsToast: React.FC<InviteFriendsToastProps> = ({
+    profileLink,
+    sharing,
+    onClose,
+    onSharingChange,
+}) => (
+    <SpaceActionToast
+        action={
+            <SpaceShareInviteButton
+                label="Invite"
+                profileLink={profileLink}
+                sharing={sharing}
+                showIcon={false}
+                onShareComplete={onClose}
+                onShareError={(error) =>
+                    console.error("Failed to share space invite", error)
+                }
+                onSharingChange={onSharingChange}
+                sx={{
+                    alignItems: "center",
+                    bgcolor: green,
+                    border: 0,
+                    borderRadius: "14px",
+                    color: "#FFFFFF",
+                    cursor: profileLink && !sharing ? "pointer" : "default",
+                    display: "flex",
+                    flexShrink: 0,
+                    fontFamily: '"Inter Variable", Inter, sans-serif',
+                    fontSize: 13,
+                    fontWeight: 700,
+                    height: 34,
+                    justifyContent: "center",
+                    lineHeight: "18px",
+                    minWidth: 48,
+                    px: "17px",
+                    transition: "filter 120ms ease",
+                    "&:active":
+                        profileLink && !sharing
+                            ? { filter: "brightness(0.96)" }
+                            : undefined,
+                    "&:disabled": { opacity: 0.45 },
+                    "&:focus-visible": {
+                        outline: "2px solid rgba(0 0 0 / 0.72)",
+                        outlineOffset: 2,
+                    },
+                    "&:hover":
+                        profileLink && !sharing
+                            ? { filter: "brightness(0.98)" }
+                            : undefined,
+                }}
+            />
+        }
+        animateEntrance
+        closeLabel="Close invite prompt"
+        icon={
+            <HugeiconsIcon icon={UserAdd02Icon} size={24} strokeWidth={1.9} />
+        }
+        message="Invite friends to your Space"
+        onClose={onClose}
+    />
+);
+
 export const HomeScreen: React.FC<HomeScreenProps> = ({
     feedItems,
     friendRequestSentToastName,
@@ -1221,12 +1293,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     isFriendsLoading = false,
     localFeedPosts = [],
     showInstallPrompt = false,
+    showInviteFriendsToast = false,
     onCreatePost,
     onDeletePost,
     onLoadMoreFeedItems,
     onLoadPostAvatar,
     onLoadPostImage,
     onFriendRequestSentToastClose,
+    onInviteFriendsToastClose,
     onOpenFriend,
     onOpenMessages,
     onOpenProfile,
@@ -1238,6 +1312,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 }) => {
     const [selectedViewer, setSelectedViewer] =
         useState<SelectedHomeViewer | null>(null);
+    const [isDraftPostExiting, setIsDraftPostExiting] = useState(false);
     const [isInviteSharing, setIsInviteSharing] = useState(false);
     const [isPostPhotoOpening, setIsPostPhotoOpening] = useState(false);
     const [loadedFeedAvatarURLsByKey, setLoadedFeedAvatarURLsByKey] = useState<
@@ -1279,7 +1354,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     const isEmptyFeedLoading = !hasFeedItems && isFeedLoading;
     const showFeedCards = hasFeedItems;
     const isInstallPromptEnabled =
-        showInstallPrompt && !friendRequestSentToastName && !selectedViewer;
+        showInstallPrompt &&
+        !friendRequestSentToastName &&
+        !showInviteFriendsToast &&
+        !selectedViewer;
     const showUnreadIndicator = hasUnreadMessages === true;
     const hasLoadedNoFriends = !isFriendsLoading && friendsCount == 0;
     const emptyFeedMessage = hasLoadedNoFriends
@@ -1316,6 +1394,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     };
     const closeSelectedPhoto = () => {
         activeLocalPostObjectUrlRef.current = null;
+        setIsDraftPostExiting(false);
         setSelectedViewer(null);
         revokeLocalPostObjectUrls();
     };
@@ -1672,7 +1751,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 position: "relative",
             }}
         >
-            {selectedViewer && <SpaceViewerFeedBackdrop />}
+            {selectedViewer && (
+                <SpaceViewerFeedBackdrop exiting={isDraftPostExiting} />
+            )}
             <Box
                 sx={{
                     bgcolor: homeBackground,
@@ -2153,9 +2234,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                                   }
                                 : undefined
                         }
-                        onDraftPostPublished={() =>
-                            setFeedScrollRequest((request) => request + 1)
-                        }
+                        onDraftPostExitStart={() => {
+                            setIsDraftPostExiting(true);
+                            setFeedScrollRequest((request) => request + 1);
+                        }}
                         onSetPostLiked={onSetPostLiked}
                         onUpdatePostCaption={
                             selectedPhotoIsOwn ? onUpdatePostCaption : undefined
@@ -2166,6 +2248,13 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                     <AddedFriendToast
                         message={`Friend request sent to @${friendRequestSentToastName}`}
                         onClose={onFriendRequestSentToastClose}
+                    />
+                ) : showInviteFriendsToast ? (
+                    <InviteFriendsToast
+                        profileLink={profileLink}
+                        sharing={isInviteSharing}
+                        onClose={onInviteFriendsToastClose}
+                        onSharingChange={setIsInviteSharing}
                     />
                 ) : (
                     <SpacePWAInstallPrompt enabled={isInstallPromptEnabled} />

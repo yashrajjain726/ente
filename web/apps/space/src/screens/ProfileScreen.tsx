@@ -586,6 +586,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
 }) => {
     const [selectedPost, setSelectedPost] =
         useState<SelectedProfilePost | null>(null);
+    const [isDraftPostExiting, setIsDraftPostExiting] = useState(false);
     const [isPostPhotoOpening, setIsPostPhotoOpening] = useState(false);
     const [deletedPostIDs, setDeletedPostIDs] = useState<Set<string>>(
         () => new Set(),
@@ -778,6 +779,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     };
     const closeSelectedPost = () => {
         activeLocalPostObjectUrlRef.current = null;
+        setIsDraftPostExiting(false);
         setSelectedPost(null);
         revokeLocalPostObjectUrls();
     };
@@ -1135,7 +1137,9 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                 position: "relative",
             }}
         >
-            {selectedPost && <SpaceViewerFeedBackdrop />}
+            {selectedPost && (
+                <SpaceViewerFeedBackdrop exiting={isDraftPostExiting} />
+            )}
             <Box
                 sx={{
                     bgcolor: profileBackground,
@@ -2034,6 +2038,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                 : handleSelectedPostIndexChange
                         }
                         onClose={closeSelectedPost}
+                        onDraftPostExitStart={() => setIsDraftPostExiting(true)}
                         onDeletePost={
                             isOwnerProfile ? deleteSelectedPost : undefined
                         }
