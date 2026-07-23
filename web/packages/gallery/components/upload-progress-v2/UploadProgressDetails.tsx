@@ -50,10 +50,17 @@ export function UploadProgressDetails({ closeOnly }: { closeOnly: boolean }) {
         finishedUploads,
         preUploadSkippedFiles,
     });
+    const skippedCount = statCounts.skipped;
     const failedCount = statCounts.failed;
     const activeStat =
         selectedStat ??
-        (isDone ? (failedCount > 0 ? "failed" : "completed") : "inProgress");
+        (isDone
+            ? failedCount > 0
+                ? "failed"
+                : skippedCount > 0
+                  ? "skipped"
+                  : "completed"
+            : "inProgress");
 
     const handleSelectStat = (kind: UploadStatKind) => {
         setSelectedStat(kind);
