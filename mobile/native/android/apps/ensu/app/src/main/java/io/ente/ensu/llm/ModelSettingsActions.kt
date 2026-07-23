@@ -10,6 +10,7 @@ import io.ente.ensu.bindings.mobileLlmTarget
 import io.ente.ensu.device.isChatSupported
 import io.ente.ensu.logging.FileLogRepository
 import io.ente.ensu.logging.LogLevel
+import io.ente.ensu.settings.IS_ENSU_PACKS_ENABLED
 import io.ente.ensu.settings.SessionPreferencesDataStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -79,7 +80,9 @@ internal class ModelSettingsActions(
             return
         }
         val selection = resolveSelection(state.value.modelSettings)
-        val isDownloaded = modelDownloader.isDownloaded(selection.modelTarget)
+        val chatReady = llmProvider.isChatModelReady(selection)
+        val embeddingReady = llmProvider.isEmbeddingModelReady()
+        val isDownloaded = chatReady && (!IS_ENSU_PACKS_ENABLED || embeddingReady)
         if (isDownloaded) {
             persistModelDownloadRequested(false)
         }
@@ -116,7 +119,17 @@ internal class ModelSettingsActions(
                 }
             }
 
-            val size = modelDownloader.estimateDownloadSize(selection.modelTarget)
+            val chatSize = if (chatReady) 0L else modelDownloader.estimateDownloadSize(selection.modelTarget)
+            val embeddingSize = if (!IS_ENSU_PACKS_ENABLED || embeddingReady) {
+                0L
+            } else {
+                llmProvider.estimateEmbeddingDownloadSize()
+            }
+            val size = if (chatSize == null || embeddingSize == null) {
+                null
+            } else {
+                chatSize + embeddingSize
+            }
             state.update { appState ->
                 appState.copy(
                     chat = appState.chat.copy(
@@ -136,7 +149,8 @@ internal class ModelSettingsActions(
         if (!userInitiated && !currentState.chat.hasRequestedModelDownload) return
 
         val selection = resolveSelection(currentState.modelSettings)
-        val isDownloaded = modelDownloader.isDownloaded(selection.modelTarget)
+        val isDownloaded = llmProvider.isChatModelReady(selection) &&
+            (!IS_ENSU_PACKS_ENABLED || llmProvider.isEmbeddingModelReady())
         if (isDownloaded) {
             state.update { appState ->
                 appState.copy(
@@ -181,7 +195,7 @@ internal class ModelSettingsActions(
                 var retryCount = 0
                 while (true) {
                     try {
-                        llmProvider.ensureModelReady(selection) { progress ->
+                        llmProvider.ensureRequiredModelsReady(selection) { progress ->
                             val resolvedProgress = progressTracker.resolve(progress)
                             if (!isDownloaded && resolvedProgress.isFinished && !loggedComplete) {
                                 loggedComplete = true
@@ -353,6 +367,7 @@ internal class ModelSettingsActions(
         if (err is kotlinx.coroutines.CancellationException) return false
         if (err is LlmException.Cancelled) return false
         if (isOutOfStorageError(err)) return false
+        if (err is RequiredModelValidationError) return false
         if (err is LlmException.Download) {
             when (val error = err.error) {
                 is DownloadError.Validation -> return false

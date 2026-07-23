@@ -1,5 +1,5 @@
 use llama_cpp_2::context::LlamaContext;
-use llama_cpp_2::context::params::LlamaContextParams;
+use llama_cpp_2::context::params::{LlamaContextParams, LlamaPoolingType};
 use llama_cpp_2::model::LlamaModel;
 use llama_cpp_2::mtmd::{MtmdContext, MtmdContextParams, mtmd_default_marker};
 use llama_cpp_2::token::LlamaToken;
@@ -19,6 +19,17 @@ pub struct ContextParams {
     pub context_size: Option<i32>,
     pub n_threads: Option<i32>,
     pub n_batch: Option<i32>,
+}
+
+#[derive(Debug)]
+pub struct EmbeddingContextParams {
+    pub context_size: u32,
+    pub n_threads: Option<i32>,
+    pub batch_size: u32,
+    pub micro_batch_size: u32,
+    pub source_dim: u32,
+    pub dim: u32,
+    pub query_prompt: String,
 }
 
 self_cell!(
@@ -52,6 +63,7 @@ struct ContextState {
 pub struct Context {
     state: Mutex<ContextState>,
     mtmd_context: Mutex<Option<CachedMtmdContext>>,
+    embedding_params: Option<EmbeddingContextParams>,
 }
 
 pub type ContextRef = Arc<Context>;
@@ -62,6 +74,7 @@ unsafe impl Sync for Context {}
 impl Context {
     fn try_new(
         owner: ModelRef,
+        embedding_params: Option<EmbeddingContextParams>,
         builder: impl for<'a> FnOnce(&'a ModelRef) -> Result<LlamaContext<'a>, Error>,
     ) -> Result<Self, Error> {
         ContextCell::try_new(owner, builder).map(|cell| Context {
@@ -70,6 +83,7 @@ impl Context {
                 cached_tokens: Vec::new(),
             }),
             mtmd_context: Mutex::new(None),
+            embedding_params,
         })
     }
 
@@ -83,6 +97,10 @@ impl Context {
             cached_tokens,
         } = &mut *state;
         cell.with_dependent_mut(|_owner, context| func(context, cached_tokens))
+    }
+
+    pub(super) fn embedding_params(&self) -> Option<&EmbeddingContextParams> {
+        self.embedding_params.as_ref()
     }
 
     pub(super) fn cached_mtmd_context(
@@ -186,7 +204,7 @@ impl Context {
             context_params = context_params.with_n_batch(n_batch);
         }
 
-        let context = Context::try_new(Arc::clone(model), |model| {
+        let context = Context::try_new(Arc::clone(model), None, |model| {
             let backend = backend()?;
             model
                 .model()
@@ -198,6 +216,79 @@ impl Context {
         })?;
 
         Ok(Arc::new(context))
+    }
+
+    pub fn new_embedding(
+        model: &ModelRef,
+        params: EmbeddingContextParams,
+    ) -> Result<ContextRef, Error> {
+        let context_size = NonZeroU32::new(params.context_size)
+            .ok_or_else(|| Error::InvalidInput("context_size must be > 0".to_string()))?;
+        if params.batch_size == 0 {
+            return Err(Error::InvalidInput("batch_size must be > 0".to_string()));
+        }
+        if params.micro_batch_size == 0 {
+            return Err(Error::InvalidInput(
+                "micro_batch_size must be > 0".to_string(),
+            ));
+        }
+        if params.source_dim == 0 || params.dim == 0 || params.dim > params.source_dim {
+            return Err(Error::InvalidInput(
+                "embedding dimensions must satisfy 0 < dim <= source_dim".to_string(),
+            ));
+        }
+        if params.query_prompt.match_indices("{query}").count() != 1 {
+            return Err(Error::InvalidInput(
+                "query_prompt must contain exactly one {query} placeholder".to_string(),
+            ));
+        }
+
+        let mut context_params = LlamaContextParams::default()
+            .with_embeddings(true)
+            .with_pooling_type(LlamaPoolingType::Mean)
+            .with_n_ctx(Some(context_size))
+            .with_n_batch(params.batch_size)
+            .with_n_ubatch(params.micro_batch_size);
+        if let Some(n_threads) = params.n_threads {
+            if n_threads <= 0 {
+                return Err(Error::InvalidInput("n_threads must be > 0".to_string()));
+            }
+            context_params = context_params
+                .with_n_threads(n_threads)
+                .with_n_threads_batch(n_threads);
+        }
+
+        let context = Context::try_new(Arc::clone(model), Some(params), |model| {
+            let backend = backend()?;
+            model
+                .model()
+                .new_context(backend, context_params)
+                .map_err(|err| Error::Llama {
+                    op: "Failed to create embedding context",
+                    message: err.to_string(),
+                })
+        })?;
+
+        Ok(Arc::new(context))
+    }
+
+    pub fn new_knowledge_embedding(
+        model: &ModelRef,
+        n_threads: Option<i32>,
+    ) -> Result<ContextRef, Error> {
+        let config = crate::config::knowledge_embedding_config();
+        Self::new_embedding(
+            model,
+            EmbeddingContextParams {
+                context_size: config.context_size,
+                n_threads,
+                batch_size: config.batch_size,
+                micro_batch_size: config.micro_batch_size,
+                source_dim: config.source_dim,
+                dim: config.dim,
+                query_prompt: config.query_prompt,
+            },
+        )
     }
 
     pub fn prewarm_multimodal(

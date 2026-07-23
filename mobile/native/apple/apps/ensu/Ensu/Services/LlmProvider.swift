@@ -64,7 +64,19 @@ struct GenerationSummary {
     let totalTimeMs: Int64?
 }
 
-private actor AsyncSerialGate {
+struct RequiredModelValidationError: LocalizedError {
+    let targetId: String
+
+    var errorDescription: String? {
+        "Downloaded model failed validation: \(targetId)"
+    }
+}
+
+struct EmbeddingAssetInvalidError: LocalizedError {
+    var errorDescription: String? { "Embedding model asset is invalid" }
+}
+
+actor AsyncSerialGate {
     private var isLocked = false
     private var waiters: [CheckedContinuation<Void, Never>] = []
 
@@ -105,6 +117,7 @@ final class LlmProvider {
 
     private let downloader: ModelDownloader
     private let transcriber: Transcriber
+    private let knowledgeEmbedding: KnowledgeEmbeddingConfig
     private var loadedModel: LlmModel?
     private var loadedContext: LlmContext?
     private var currentModelKey: LoadedModelKey?
@@ -113,9 +126,82 @@ final class LlmProvider {
     private var currentJobId: Int64?
     private let modelLoadGate = AsyncSerialGate()
 
-    init(downloader: ModelDownloader, transcriber: Transcriber) {
+    init(downloader: ModelDownloader, transcriber: Transcriber, knowledgeEmbedding: KnowledgeEmbeddingConfig) {
         self.downloader = downloader
         self.transcriber = transcriber
+        self.knowledgeEmbedding = knowledgeEmbedding
+    }
+
+    private var embeddingDownloadTarget: ModelTarget {
+        knowledgeEmbeddingModelTarget()
+    }
+
+    func isEmbeddingModelReady() -> Bool {
+        downloader.isDownloaded(embeddingDownloadTarget)
+    }
+
+    func isModelDownloaded(_ selection: LlmModelSelection) -> Bool {
+        downloader.isDownloaded(selection.modelTarget) &&
+            (!isEnsuPacksEnabled || isEmbeddingModelReady())
+    }
+
+    func missingModelDownloadSize(_ selection: LlmModelSelection) async -> Int64? {
+        var total: Int64 = 0
+        if !downloader.isDownloaded(selection.modelTarget) {
+            guard let chatSize = await downloader.estimateDownloadSize(selection.modelTarget) else {
+                return nil
+            }
+            total += chatSize
+        }
+        if isEnsuPacksEnabled && !isEmbeddingModelReady() {
+            guard let embeddingSize = await downloader.estimateDownloadSize(embeddingDownloadTarget) else {
+                return nil
+            }
+            total += embeddingSize
+        }
+        return total > 0 ? total : nil
+    }
+
+    func ensureRequiredModelsReady(
+        _ selection: LlmModelSelection,
+        onProgress: @escaping (DownloadProgress) -> Void
+    ) async throws {
+        let capability = currentChatDeviceCapability()
+        if !capability.isChatSupported {
+            throw UnsupportedDeviceMemoryError(capability: capability)
+        }
+
+        let missingTargets: [ModelTarget] = try await modelLoadGate.withLock {
+            let embeddingReady = isEmbeddingModelReady()
+            if isEnsuPacksEnabled && !embeddingReady {
+                _ = downloader.removeDownloaded(embeddingDownloadTarget)
+            }
+
+            return [
+                downloader.isDownloaded(selection.modelTarget) ? nil : selection.modelTarget,
+                (!isEnsuPacksEnabled || embeddingReady) ? nil : embeddingDownloadTarget,
+            ].compactMap { $0 }
+        }
+
+        if !missingTargets.isEmpty {
+            try await downloader.download(targets: missingTargets, onProgress: onProgress)
+        }
+
+        try await modelLoadGate.withLock {
+            guard !isEnsuPacksEnabled || isEmbeddingModelReady() else {
+                _ = downloader.removeDownloaded(embeddingDownloadTarget)
+                throw RequiredModelValidationError(targetId: knowledgeEmbedding.targetId)
+            }
+            try await ensureModelReadyLocked(
+                selection,
+                onProgress: onProgress,
+                allowRecovery: false,
+                shouldDownload: false
+            )
+            guard downloader.isDownloaded(selection.modelTarget) else {
+                throw RequiredModelValidationError(targetId: selection.id)
+            }
+        }
     }
 
     func ensureModelReady(
@@ -130,7 +216,8 @@ final class LlmProvider {
     private func ensureModelReadyLocked(
         _ selection: LlmModelSelection,
         onProgress: @escaping (DownloadProgress) -> Void,
-        allowRecovery: Bool
+        allowRecovery: Bool,
+        shouldDownload: Bool = true
     ) async throws {
         let capability = currentChatDeviceCapability()
         if !capability.isChatSupported {
@@ -149,7 +236,9 @@ final class LlmProvider {
         }
 
         let wasAlreadyDownloaded = downloader.isDownloaded(selection.modelTarget)
-        try await downloader.download(targets: [selection.modelTarget], onProgress: onProgress)
+        if shouldDownload {
+            try await downloader.download(targets: [selection.modelTarget], onProgress: onProgress)
+        }
 
         onProgress(DownloadProgress(percent: 100, status: "Loading model...", phase: .loading))
         do {
@@ -169,6 +258,26 @@ final class LlmProvider {
     }
 
     func generateChat(
+        _ selection: LlmModelSelection,
+        messages: [LlmMessage],
+        imageFiles: [URL],
+        temperature: Float,
+        maxTokens: Int?,
+        onToken: @escaping (String) -> Void
+    ) async throws -> GenerationSummary {
+        try await modelLoadGate.withLock {
+            try await generateChatLocked(
+                selection,
+                messages: messages,
+                imageFiles: imageFiles,
+                temperature: temperature,
+                maxTokens: maxTokens,
+                onToken: onToken
+            )
+        }
+    }
+
+    private func generateChatLocked(
         _ selection: LlmModelSelection,
         messages: [LlmMessage],
         imageFiles: [URL],
@@ -243,6 +352,57 @@ final class LlmProvider {
         )
     }
 
+    func withChatModelReleasedForRetrieval<T>(
+        _ operation: (_ embed: (String) throws -> [Float]) async throws -> T
+    ) async throws -> T {
+        try await modelLoadGate.withLock {
+            let capability = currentChatDeviceCapability()
+            if !capability.isChatSupported {
+                throw UnsupportedDeviceMemoryError(capability: capability)
+            }
+            guard isEmbeddingModelReady() else {
+                throw EmbeddingAssetInvalidError()
+            }
+
+            unloadTranscriptionModelIfLoaded()
+            unloadModel()
+            if !backendInitialized {
+                try llmInitBackend()
+                backendInitialized = true
+            }
+
+            guard let embeddingModelPath = downloader.llmModelPath(embeddingDownloadTarget) else {
+                throw EmbeddingAssetInvalidError()
+            }
+            var embeddingModel: LlmModel? = try LlmModel.load(
+                params: LlmModelLoadParams(
+                    modelPath: embeddingModelPath.path,
+                    nGpuLayers: 0,
+                    useMmap: true,
+                    useMlock: false
+                )
+            )
+            var embeddingContext: LlmContext?
+            defer {
+                embeddingContext = nil
+                embeddingModel = nil
+            }
+            guard let model = embeddingModel else {
+                throw EmbeddingAssetInvalidError()
+            }
+            let threadCount = max(1, ProcessInfo.processInfo.activeProcessorCount - 1)
+            embeddingContext = try model.newEmbeddingContext(
+                nThreads: Int32(threadCount)
+            )
+            guard let context = embeddingContext else {
+                throw EmbeddingAssetInvalidError()
+            }
+            return try await operation { text in
+                try context.embed(text: text)
+            }
+        }
+    }
+
     func stopGeneration() {
         if let jobId = currentJobId {
             llmCancel(jobId: jobId)
@@ -281,11 +441,13 @@ final class LlmProvider {
         }
     }
 
-    func resetContext() {
-        guard let model = loadedModel else { return }
-        let contextParams = LlmContextParams(contextSize: currentContextLength.map(Int32.init), nThreads: nil, nBatch: nil)
-        loadedContext = nil
-        loadedContext = try? model.newContext(params: contextParams)
+    func resetContext() async {
+        try? await modelLoadGate.withLock {
+            guard let model = loadedModel else { return }
+            let contextParams = LlmContextParams(contextSize: currentContextLength.map(Int32.init), nThreads: nil, nBatch: nil)
+            loadedContext = nil
+            loadedContext = try? model.newContext(params: contextParams)
+        }
     }
 
     func loadedContextLength(_ selection: LlmModelSelection) -> Int? {

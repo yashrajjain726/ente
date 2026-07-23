@@ -1,4 +1,5 @@
 mod context;
+mod embed;
 mod event;
 mod generate;
 mod model;

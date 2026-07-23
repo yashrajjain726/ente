@@ -81,6 +81,18 @@ pub fn voice_activity_target() -> ModelTarget {
     }
 }
 
+pub fn knowledge_embedding_target() -> ModelTarget {
+    let embedding = config::knowledge_embedding_config();
+    ModelTarget::Files {
+        id: embedding.target_id,
+        files: vec![ModelFile {
+            name: LLM_MODEL_FILE.to_string(),
+            url: embedding.model_url,
+            sha256: embedding.model_sha256,
+        }],
+    }
+}
+
 pub fn llm_model_path(downloader: &ModelDownloader, target: &ModelTarget) -> Option<PathBuf> {
     downloader.file_path(target, LLM_MODEL_FILE)
 }
@@ -180,5 +192,17 @@ mod tests {
         for preset in crate::config::llm_catalog() {
             llm_target(&preset).expect("catalog preset");
         }
+    }
+
+    #[test]
+    fn knowledge_embedding_target_is_checksum_backed() {
+        let target = knowledge_embedding_target();
+        let ModelTarget::Files { id, files } = target else {
+            panic!("embedding target must use files");
+        };
+        assert_eq!(id, "embeddinggemma-300m-q8-0");
+        assert_eq!(files.len(), 1);
+        assert_eq!(files[0].name, "model.gguf");
+        assert_eq!(files[0].sha256.len(), 64);
     }
 }

@@ -85,6 +85,11 @@ pub fn voice_activity_model_target() -> ModelTarget {
     ente_ensu::model::voice_activity_target().into()
 }
 
+#[uniffi::export]
+pub fn knowledge_embedding_model_target() -> ModelTarget {
+    ente_ensu::model::knowledge_embedding_target().into()
+}
+
 #[derive(Debug, Clone, uniffi::Record)]
 pub struct ModelDownloadProgress {
     pub downloaded_bytes: i64,
@@ -206,7 +211,7 @@ impl ModelDownloadCore {
 
 #[derive(Default, uniffi::Object)]
 pub struct CancellationToken {
-    inner: ente_model_download::download::CancellationToken,
+    pub(crate) inner: ente_model_download::download::CancellationToken,
 }
 
 #[uniffi::export]

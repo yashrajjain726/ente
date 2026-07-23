@@ -34,6 +34,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     val appVersion = runCatching { getAppVersion(application) }.getOrDefault("unknown")
     private val deviceCapabilityProvider = AndroidDeviceCapabilityProvider(application)
     private val transcriber = (application as EnsuApplication).transcriber
+    val configDefaults = loadConfigDefaults()
 
     val logRepository = FileLogRepository(application)
     private val modelDownloader = (application as EnsuApplication).modelDownloader
@@ -42,15 +43,18 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private val llmProvider = LlmProvider(
         downloader = modelDownloader,
         transcriber = transcriber,
-        deviceCapabilityProvider = deviceCapabilityProvider
+        deviceCapabilityProvider = deviceCapabilityProvider,
+        knowledgeEmbedding = configDefaults.knowledgeEmbedding
     )
     private val chatRepository = ChatRepository(application, credentialStore)
-    val configDefaults = loadConfigDefaults()
+    private val knowledgeProvider = (application as EnsuApplication).knowledgeProvider
 
     val store = AppStore(
+        context = application,
         sessionPreferences = sessionPreferences,
         chatRepository = chatRepository,
         llmProvider = llmProvider,
+        knowledgeProvider = knowledgeProvider,
         modelDownloader = modelDownloader,
         transcriber = transcriber,
         deviceCapabilityProvider = deviceCapabilityProvider,
