@@ -1299,7 +1299,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                             paper: {
                                 sx: {
                                     bgcolor: "#1E1E1E",
-                                    borderRadius: "16px",
+                                    borderRadius: "14px",
                                     boxShadow:
                                         "0 14px 40px rgba(0, 0, 0, 0.16)",
                                     mt: "6px",
@@ -1316,6 +1316,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                     >
                         {canUpdatePostCaption && (
                             <MenuItem
+                                dense
                                 disableRipple
                                 onClick={requestCaptionEdit}
                                 sx={{
@@ -1324,9 +1325,9 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                                     color: textBase,
                                     display: "flex",
                                     gap: "8px",
-                                    minHeight: 0,
-                                    px: "8px",
-                                    py: "7px",
+                                    minHeight: 36,
+                                    px: "9px",
+                                    py: "4px",
                                     whiteSpace: "nowrap",
                                     "&.Mui-focusVisible": {
                                         bgcolor: "rgba(255, 255, 255, 0.1)",
@@ -1360,6 +1361,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                         )}
                         {canDeletePost && (
                             <MenuItem
+                                dense
                                 disableRipple
                                 onClick={requestDeletePost}
                                 sx={{
@@ -1368,9 +1370,9 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                                     color: dangerColor,
                                     display: "flex",
                                     gap: "8px",
-                                    minHeight: 0,
-                                    px: "8px",
-                                    py: "7px",
+                                    minHeight: 36,
+                                    px: "9px",
+                                    py: "4px",
                                     whiteSpace: "nowrap",
                                     "&.Mui-focusVisible": {
                                         bgcolor: "rgba(246, 58, 58, 0.14)",

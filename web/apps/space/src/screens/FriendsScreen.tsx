@@ -268,7 +268,7 @@ const FriendRow: React.FC<FriendRowProps> = ({
                 slotProps={{
                     paper: {
                         sx: {
-                            borderRadius: "16px",
+                            borderRadius: "14px",
                             boxShadow: "0 14px 40px rgba(0, 0, 0, 0.16)",
                             mt: "6px",
                             minWidth: 0,
@@ -280,15 +280,16 @@ const FriendRow: React.FC<FriendRowProps> = ({
                 }}
             >
                 <MenuItem
+                    dense
                     disableRipple
                     onClick={unfriend}
                     sx={{
                         borderRadius: "10px",
                         color: dangerColor,
                         gap: "8px",
-                        minHeight: spaceTouchTargetSize,
+                        minHeight: 36,
                         px: "9px",
-                        py: "7px",
+                        py: "4px",
                         whiteSpace: "nowrap",
                         "&.Mui-focusVisible": {
                             bgcolor: "rgba(246, 58, 58, 0.06)",
