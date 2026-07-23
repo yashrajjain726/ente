@@ -133,6 +133,7 @@ interface HomeScreenProps {
         text: string,
     ) => Promise<void>;
     onSetPostLiked?: (postId: number, liked: boolean) => Promise<void>;
+    onUpdatePostCaption?: (postId: number, caption: string) => Promise<void>;
     profileLink?: string;
     profile: SetupProfile | null;
 }
@@ -1376,6 +1377,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     onOpenProfile,
     onReplyToPost,
     onSetPostLiked,
+    onUpdatePostCaption,
     profile,
     profileLink,
 }) => {
@@ -2300,6 +2302,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                             setFeedScrollRequest((request) => request + 1)
                         }
                         onSetPostLiked={onSetPostLiked}
+                        onUpdatePostCaption={
+                            selectedPhotoIsOwn ? onUpdatePostCaption : undefined
+                        }
                     />
                 )}
                 {friendRequestSentToastName ? (

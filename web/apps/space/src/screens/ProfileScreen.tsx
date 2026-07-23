@@ -540,6 +540,7 @@ interface ProfileScreenProps {
         text: string,
     ) => Promise<void>;
     onSetPostLiked?: (postId: number, liked: boolean) => Promise<void>;
+    onUpdatePostCaption?: (postId: number, caption: string) => Promise<void>;
     postGroups?: ProfilePostGroup[];
     profile: SetupProfile;
     profileLink?: string;
@@ -562,6 +563,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     onLoadPostImage,
     onReplyToPost,
     onSetPostLiked,
+    onUpdatePostCaption,
     postGroups = [],
     profile,
     profileLink,
@@ -1805,6 +1807,9 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                 : undefined
                         }
                         onSetPostLiked={onSetPostLiked}
+                        onUpdatePostCaption={
+                            isOwnerProfile ? onUpdatePostCaption : undefined
+                        }
                     />
                 )}
             </Box>

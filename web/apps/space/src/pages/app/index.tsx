@@ -13,6 +13,7 @@ import {
     loadCurrentUnreadStatus,
     replyToCurrentPost,
     setCurrentPostLiked,
+    updateCurrentPostCaption,
     type SpacePost,
 } from "services/space";
 import {
@@ -307,6 +308,35 @@ const Page: React.FC = () => {
                     );
                     setFeedItems((currentItems) =>
                         currentItems.filter((item) => item.postId != postId),
+                    );
+                }}
+                onUpdatePostCaption={async (postId, caption) => {
+                    const spaceId = profile?.spaceId;
+                    if (!spaceId) throw new Error("Missing space.");
+
+                    await updateCurrentPostCaption(spaceId, postId, caption);
+                    const normalizedCaption = caption.trim() || undefined;
+                    setLocalFeedPosts((currentPosts) =>
+                        currentPosts.map((item) =>
+                            (item.status == "posted" ||
+                                item.status == "ready") &&
+                            item.post.postId == postId
+                                ? {
+                                      ...item,
+                                      post: {
+                                          ...item.post,
+                                          caption: normalizedCaption,
+                                      },
+                                  }
+                                : item,
+                        ),
+                    );
+                    setFeedItems((currentItems) =>
+                        currentItems.map((item) =>
+                            item.postId == postId
+                                ? { ...item, caption: normalizedCaption }
+                                : item,
+                        ),
                     );
                 }}
                 onOpenFriend={(friendID) =>

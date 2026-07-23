@@ -1361,3 +1361,20 @@ export const deleteCurrentPost = async (spaceId: string, postId: number) => {
         releaseCurrentSpaceContext(ctx);
     }
 };
+
+export const updateCurrentPostCaption = async (
+    spaceId: string,
+    postId: number,
+    caption: string,
+) => {
+    const ctx = await ensureCurrentSpaceContext();
+    try {
+        await ctx.updatePostCaption(
+            spaceId,
+            BigInt(postId),
+            caption.trim() || null,
+        );
+    } finally {
+        releaseCurrentSpaceContext(ctx);
+    }
+};
