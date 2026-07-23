@@ -24,17 +24,25 @@ use ort::ep::{
 use std::num::NonZeroUsize;
 
 use crate::ml::error::{MlError, MlResult};
+use crate::ml::events;
 use crate::ml::golden;
+#[cfg(any(target_os = "android", target_os = "ios"))]
+use crate::ml::runtime::rt_log;
 #[cfg(target_os = "android")]
 use crate::ml::webgpu;
-#[cfg(any(target_os = "android", target_os = "ios"))]
-use crate::ml::{events, runtime::rt_log};
 
 #[cfg(any(target_os = "ios", test))]
 const COREML_CACHE_SCHEMA: &str = "ort-1_27-mlprogram-all-default-v1";
 const COREML_CACHE_COMPLETE_MARKER: &str = ".ente-cache-complete";
+/// The name ONNX Runtime's CoreML EP gives the compiled model it stores
+/// inside each generated MLProgram package directory in the cache
+/// (`model.mm` `CompileOrReadCachedModel`).
+const COREML_CACHE_COMPILED_MODEL: &str = "compiled_model.mlmodelc";
+/// The weight blob file name inside an ORT-generated `.mlpackage`
+/// (`model_builder.cc` writes `@model_path/weights/weight.bin`).
+const COREML_PACKAGE_WEIGHT_BLOB: &str = "weight.bin";
 #[cfg(target_os = "ios")]
-const ENABLE_PERSISTENT_COREML_CACHE: bool = false;
+const ENABLE_PERSISTENT_COREML_CACHE: bool = true;
 
 /// An f32 model input that can be borrowed by multiple sessions.
 ///
@@ -156,13 +164,8 @@ pub(crate) fn build_session(
         let coreml_cache_dir = attempt.coreml_cache_dir.clone();
         match build_and_validate_session(model_path, attempt) {
             Ok(session) => {
-                if let Some(cache_dir) = coreml_cache_dir
-                    && let Err(error) = mark_coreml_cache_complete(&cache_dir)
-                {
-                    eprintln!(
-                        "[ml][rt] failed to mark CoreML cache complete at '{}': {error}",
-                        cache_dir.display()
-                    );
+                if let Some(cache_dir) = coreml_cache_dir {
+                    finalize_coreml_cache(&cache_dir, model_path);
                 }
                 return Ok((session, execution_provider));
             }
@@ -170,9 +173,12 @@ pub(crate) fn build_session(
                 if let Some(cache_dir) = coreml_cache_dir
                     && let Err(cleanup_error) = invalidate_coreml_cache(&cache_dir)
                 {
-                    eprintln!(
-                        "[ml][rt] failed to invalidate CoreML cache at '{}' after session construction failed: {cleanup_error}",
-                        cache_dir.display()
+                    events::record(
+                        events::Severity::Warning,
+                        format!(
+                            "failed to invalidate CoreML cache for '{}' after session construction failed: {cleanup_error}",
+                            model_file_label(model_path)
+                        ),
                     );
                 }
                 errors.push(format!("{error}"));
@@ -423,7 +429,6 @@ fn run_session_self_test(
     }
 }
 
-#[cfg(any(target_os = "android", target_os = "ios", test))]
 fn model_file_label(model_path: &str) -> &str {
     Path::new(model_path)
         .file_name()
@@ -558,14 +563,44 @@ fn coreml_provider(
                 prepared_cache_dir = Some(cache_dir);
             }
             Err(error) => {
-                eprintln!(
-                    "[ml][rt] failed to prepare persistent CoreML cache for '{model_path}'; continuing without it: {error}"
+                events::record(
+                    events::Severity::Warning,
+                    format!(
+                        "failed to prepare persistent CoreML cache for '{}'; continuing without it: {error}",
+                        model_file_label(model_path)
+                    ),
                 );
             }
         }
+    } else {
+        remove_persistent_coreml_cache(model_path);
     }
 
     (provider.build().error_on_failure(), prepared_cache_dir)
+}
+
+/// Deletes the entire persistent cache tree while the feature is disabled, so
+/// flipping `ENABLE_PERSISTENT_COREML_CACHE` off in a release actually
+/// returns the disk space instead of stranding the caches forever.
+#[cfg(target_os = "ios")]
+fn remove_persistent_coreml_cache(model_path: &str) {
+    let Some(coreml_root) = coreml_cache_root(Path::new(model_path))
+        .parent()
+        .map(Path::to_path_buf)
+    else {
+        return;
+    };
+    match std::fs::remove_dir_all(&coreml_root) {
+        Ok(()) => events::record(
+            events::Severity::Info,
+            "removed persistent CoreML cache (feature disabled)".to_string(),
+        ),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+        Err(error) => events::record(
+            events::Severity::Warning,
+            format!("failed to remove disabled persistent CoreML cache: {error}"),
+        ),
+    }
 }
 
 #[cfg(target_os = "android")]
@@ -637,8 +672,27 @@ fn prepare_coreml_cache_directory(
     cache_namespace: &str,
 ) -> std::io::Result<PathBuf> {
     let model_path = Path::new(model_path);
-    let model_cache_root =
-        coreml_cache_root(model_path).join(sanitize_cache_component(cache_namespace));
+    let schema_root = coreml_cache_root(model_path);
+
+    // Best effort: a prune failure must not cost this load its cache.
+    if let Some(coreml_root) = schema_root.parent() {
+        match prune_stale_coreml_schema_directories(coreml_root, COREML_CACHE_SCHEMA) {
+            Ok(removed) => {
+                for schema in removed {
+                    events::record(
+                        events::Severity::Info,
+                        format!("removed stale CoreML cache schema '{schema}'"),
+                    );
+                }
+            }
+            Err(error) => events::record(
+                events::Severity::Warning,
+                format!("failed to prune stale CoreML cache schemas: {error}"),
+            ),
+        }
+    }
+
+    let model_cache_root = schema_root.join(sanitize_cache_component(cache_namespace));
     std::fs::create_dir_all(&model_cache_root)?;
 
     let cache_key = coreml_model_cache_key(model_path)?;
@@ -658,6 +712,105 @@ fn prepare_coreml_cache_entry(cache_dir: &Path) -> std::io::Result<()> {
         std::fs::remove_dir_all(cache_dir)?;
     }
     std::fs::create_dir_all(cache_dir)
+}
+
+/// Runs after a session was built successfully from `cache_dir`: trims the
+/// redundant generated-package weights, then marks the entry complete. Trim
+/// failures are reported but do not fail the load; an untrimmed cache is
+/// merely larger. Trimming before marking means a crash mid-trim leaves no
+/// completion marker, so the next load rebuilds the entry from scratch.
+fn finalize_coreml_cache(cache_dir: &Path, model_path: &str) {
+    match trim_coreml_cache_weights(cache_dir) {
+        Ok(0) => {}
+        Ok(reclaimed) => events::record(
+            events::Severity::Info,
+            format!(
+                "primed CoreML cache for '{}': trimmed {} MiB of generated package weights",
+                model_file_label(model_path),
+                reclaimed / (1024 * 1024)
+            ),
+        ),
+        Err(error) => events::record(
+            events::Severity::Warning,
+            format!(
+                "failed to trim CoreML cache weights for '{}': {error}",
+                model_file_label(model_path)
+            ),
+        ),
+    }
+
+    if let Err(error) = mark_coreml_cache_complete(cache_dir) {
+        events::record(
+            events::Severity::Warning,
+            format!(
+                "failed to mark CoreML cache complete for '{}': {error}",
+                model_file_label(model_path)
+            ),
+        );
+    }
+}
+
+/// Truncates the weight blobs inside every cached generated package that
+/// already contains a compiled model, returning the bytes reclaimed.
+///
+/// On a warm cache hit ONNX Runtime 1.27 only checks that the generated
+/// MLProgram package directory exists and then loads
+/// `compiled_model.mlmodelc` (`model_builder.cc` constructor, `model.mm`
+/// `CompileOrReadCachedModel`), so the package's own weight copy is dead
+/// bytes — roughly half the cache footprint. Packages without a compiled
+/// model are left intact because ONNX Runtime would recompile from them.
+/// Should a future runtime read the package weights again, session
+/// construction fails, the caller invalidates the entry, and the next load
+/// rebuilds it from the ONNX source.
+fn trim_coreml_cache_weights(cache_dir: &Path) -> std::io::Result<u64> {
+    let mut reclaimed = 0;
+    // Layout per ORT 1.27: <cache_dir>/<model_hash>/<partition>/model is the
+    // generated MLProgram package. `CompileOrReadCachedModel` strips the last
+    // path component only for the NeuralNetwork format, so for MLProgram the
+    // compiled model is stored INSIDE the package directory:
+    // <partition>/model/compiled_model.mlmodelc.
+    for model_hash_entry in std::fs::read_dir(cache_dir)? {
+        let model_hash_entry = model_hash_entry?;
+        if !model_hash_entry.file_type()?.is_dir() {
+            continue;
+        }
+        for partition_entry in std::fs::read_dir(model_hash_entry.path())? {
+            let partition_entry = partition_entry?;
+            if !partition_entry.file_type()?.is_dir() {
+                continue;
+            }
+            let package_dir = partition_entry.path().join("model");
+            if !package_dir.is_dir() || !package_dir.join(COREML_CACHE_COMPILED_MODEL).exists() {
+                continue;
+            }
+            reclaimed += truncate_weight_blobs(&package_dir)?;
+        }
+    }
+    Ok(reclaimed)
+}
+
+/// Truncates `weight.bin` files under `dir`, never descending into
+/// `.mlmodelc` bundles: the compiled model keeps its own `weights/weight.bin`
+/// copy, and that one is exactly what warm loads read, so it must survive.
+fn truncate_weight_blobs(dir: &Path) -> std::io::Result<u64> {
+    let mut reclaimed = 0;
+    for entry in std::fs::read_dir(dir)? {
+        let entry = entry?;
+        let file_type = entry.file_type()?;
+        if file_type.is_dir() {
+            if entry.path().extension() == Some(std::ffi::OsStr::new("mlmodelc")) {
+                continue;
+            }
+            reclaimed += truncate_weight_blobs(&entry.path())?;
+        } else if file_type.is_file() && entry.file_name() == COREML_PACKAGE_WEIGHT_BLOB {
+            let size = entry.metadata()?.len();
+            if size > 0 {
+                std::fs::write(entry.path(), [])?;
+                reclaimed += size;
+            }
+        }
+    }
+    Ok(reclaimed)
 }
 
 fn mark_coreml_cache_complete(cache_dir: &Path) -> std::io::Result<()> {
@@ -732,6 +885,32 @@ fn sanitize_cache_component(value: &str) -> String {
             }
         })
         .collect()
+}
+
+/// Removes cache trees written under superseded `COREML_CACHE_SCHEMA`
+/// versions, returning the names of the removed directories. Without this, a
+/// schema bump (ORT upgrade or CoreML policy change) would orphan the
+/// previous schema's caches — hundreds of MB — forever.
+#[cfg(any(target_os = "ios", test))]
+fn prune_stale_coreml_schema_directories(
+    coreml_root: &Path,
+    current_schema: &str,
+) -> std::io::Result<Vec<String>> {
+    let mut removed = Vec::new();
+    let entries = match std::fs::read_dir(coreml_root) {
+        Ok(entries) => entries,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(removed),
+        Err(error) => return Err(error),
+    };
+    for entry in entries {
+        let entry = entry?;
+        if entry.file_name() == current_schema || !entry.file_type()?.is_dir() {
+            continue;
+        }
+        std::fs::remove_dir_all(entry.path())?;
+        removed.push(entry.file_name().to_string_lossy().into_owned());
+    }
+    Ok(removed)
 }
 
 /// Retain exactly one generated cache for each logical model slot. The active
@@ -917,7 +1096,8 @@ mod tests {
         ExecutionProvider, coreml_cache_root, coreml_model_cache_key, ensure_finite_f16,
         ensure_finite_f32, has_protobuf_parse_failure, invalidate_coreml_cache,
         mark_coreml_cache_complete, prepare_coreml_cache_entry, provider_attempt_failure_message,
-        prune_superseded_coreml_cache_directories, sanitize_cache_component,
+        prune_stale_coreml_schema_directories, prune_superseded_coreml_cache_directories,
+        sanitize_cache_component, trim_coreml_cache_weights,
     };
 
     #[test]
@@ -1032,6 +1212,106 @@ mod tests {
         assert!(!old_cache.exists());
         assert!(current_cache.exists());
         assert!(root.path().join("marker").exists());
+    }
+
+    #[test]
+    fn prunes_stale_schema_directories_keeping_current_and_files() {
+        let coreml_root = tempfile::tempdir().unwrap();
+        let stale = coreml_root.path().join("ort-1_26-mlprogram-all-default-v1");
+        let current = coreml_root.path().join("ort-1_27-mlprogram-all-default-v1");
+        std::fs::create_dir(&stale).unwrap();
+        std::fs::write(stale.join("cached"), b"stale").unwrap();
+        std::fs::create_dir(&current).unwrap();
+        std::fs::write(coreml_root.path().join("stray-file"), b"keep").unwrap();
+
+        let removed = prune_stale_coreml_schema_directories(
+            coreml_root.path(),
+            "ort-1_27-mlprogram-all-default-v1",
+        )
+        .unwrap();
+
+        assert_eq!(removed, vec!["ort-1_26-mlprogram-all-default-v1"]);
+        assert!(!stale.exists());
+        assert!(current.exists());
+        assert!(coreml_root.path().join("stray-file").exists());
+    }
+
+    #[test]
+    fn schema_pruning_treats_a_missing_root_as_empty() {
+        let parent = tempfile::tempdir().unwrap();
+        let removed =
+            prune_stale_coreml_schema_directories(&parent.path().join("missing"), "current")
+                .unwrap();
+        assert!(removed.is_empty());
+    }
+
+    /// Mirrors the ORT 1.27 MLProgram cache layout: the generated package at
+    /// `<cache_dir>/<model_hash>/<partition>/model/` holds its weights under
+    /// `Data/com.microsoft.OnnxRuntime/weights/weight.bin`, and the compiled
+    /// model is stored INSIDE the package directory as
+    /// `model/compiled_model.mlmodelc` (which keeps its own
+    /// `weights/weight.bin` copy).
+    fn write_cache_partition(
+        cache_dir: &Path,
+        partition: &str,
+        compiled: bool,
+    ) -> std::path::PathBuf {
+        let package_dir = cache_dir.join("modelhash").join(partition).join("model");
+        let weights_dir = package_dir
+            .join("Data")
+            .join("com.microsoft.OnnxRuntime")
+            .join("weights");
+        std::fs::create_dir_all(&weights_dir).unwrap();
+        let weight_blob = weights_dir.join("weight.bin");
+        std::fs::write(&weight_blob, b"weights").unwrap();
+        std::fs::write(package_dir.join("Manifest.json"), b"manifest").unwrap();
+        if compiled {
+            let compiled_weights_dir = package_dir.join("compiled_model.mlmodelc").join("weights");
+            std::fs::create_dir_all(&compiled_weights_dir).unwrap();
+            std::fs::write(compiled_weights_dir.join("weight.bin"), b"compiled-weights").unwrap();
+        }
+        weight_blob
+    }
+
+    #[test]
+    fn trims_package_weights_only_where_a_compiled_model_exists() {
+        let cache_dir = tempfile::tempdir().unwrap();
+        let compiled_blob = write_cache_partition(cache_dir.path(), "0_static_mlprogram", true);
+        let uncompiled_blob = write_cache_partition(cache_dir.path(), "1_static_mlprogram", false);
+        mark_coreml_cache_complete(cache_dir.path()).unwrap();
+
+        let reclaimed = trim_coreml_cache_weights(cache_dir.path()).unwrap();
+
+        assert_eq!(reclaimed, b"weights".len() as u64);
+        assert!(compiled_blob.exists());
+        assert_eq!(std::fs::metadata(&compiled_blob).unwrap().len(), 0);
+        // The package directory itself must survive: ONNX Runtime checks its
+        // existence to decide the model is cached.
+        let package_dir = compiled_blob.ancestors().nth(4).unwrap();
+        assert!(package_dir.ends_with("model"));
+        assert!(package_dir.is_dir());
+        // The compiled model's own weight copy is what warm loads read; the
+        // trim walk must never descend into the `.mlmodelc` bundle.
+        assert_eq!(
+            std::fs::read(
+                package_dir
+                    .join("compiled_model.mlmodelc")
+                    .join("weights")
+                    .join("weight.bin")
+            )
+            .unwrap(),
+            b"compiled-weights".to_vec()
+        );
+        assert_eq!(std::fs::read(uncompiled_blob).unwrap(), b"weights".to_vec());
+    }
+
+    #[test]
+    fn trimming_an_already_trimmed_cache_reclaims_nothing() {
+        let cache_dir = tempfile::tempdir().unwrap();
+        write_cache_partition(cache_dir.path(), "0_static_mlprogram", true);
+
+        assert!(trim_coreml_cache_weights(cache_dir.path()).unwrap() > 0);
+        assert_eq!(trim_coreml_cache_weights(cache_dir.path()).unwrap(), 0);
     }
 
     #[test]
