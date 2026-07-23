@@ -11,7 +11,7 @@ use ente_photos::ml::{
     indexing::{
         AnalyzeImageRequest, AnalyzeImageResult, analyze_image, init_ml_runtime, release_ml_runtime,
     },
-    runtime::{ExecutionProviderPolicy, MlRuntimeConfig, ModelPaths},
+    runtime::ModelPaths,
     types::FaceResult as RustFaceResult,
 };
 use flate2::read::GzDecoder;
@@ -166,7 +166,7 @@ pub(crate) struct MlIndexingTestContext {
     cache_dir: PathBuf,
     golden_results: HashMap<String, ComparableResult>,
     manifest: FixtureManifest,
-    runtime_config: MlRuntimeConfig,
+    model_paths: ModelPaths,
 }
 
 struct AssetFetcher {
@@ -225,30 +225,22 @@ impl MlIndexingTestContext {
             .context("load ONNX Runtime dynamic library")?
             .commit();
 
-        let runtime_config = MlRuntimeConfig {
-            model_paths: resolve_model_paths(&fetcher, &cache_dir, &asset_lock.models)?,
-            provider_policy: ExecutionProviderPolicy {
-                prefer_coreml: false,
-                prefer_nnapi: false,
-                prefer_xnnpack: false,
-                allow_cpu_fallback: true,
-            },
-        };
+        let model_paths = resolve_model_paths(&fetcher, &cache_dir, &asset_lock.models)?;
 
         Ok(Self {
             asset_lock,
             cache_dir,
             golden_results,
             manifest,
-            runtime_config,
+            model_paths,
         })
     }
 
-    pub(crate) fn prepare_runtime(&self) -> Result<PreparedMlRuntime> {
-        init_ml_runtime(self.runtime_config.clone()).context("prepare ML runtime")?;
-        Ok(PreparedMlRuntime {
-            config: self.runtime_config.clone(),
-        })
+    pub(crate) fn prepare_runtime(&self) -> PreparedMlRuntime {
+        init_ml_runtime(self.model_paths.clone());
+        PreparedMlRuntime {
+            model_paths: self.model_paths.clone(),
+        }
     }
 
     pub(crate) fn validate_manifest_expectations(&self) -> Result<Vec<String>> {
@@ -287,7 +279,7 @@ impl MlIndexingTestContext {
                 run_faces: true,
                 run_clip: true,
                 run_pets: false,
-                runtime_config: runtime.config().clone(),
+                model_paths: runtime.model_paths().clone(),
             };
 
             if expected_unsupported.contains(&file_id) {
@@ -388,19 +380,79 @@ impl MlIndexingTestContext {
     }
 }
 
+/// A downloaded production model together with its content hash as pinned in
+/// the asset lock, for embedding into generated golden entries.
+#[allow(dead_code)]
+pub(crate) struct GoldenModelAsset {
+    pub(crate) path: PathBuf,
+    pub(crate) sha256: String,
+}
+
+/// Downloaded production model assets for the golden self-test tooling, with
+/// ONNX Runtime already initialized. Used by the ml_goldens developer tool only.
+#[allow(dead_code)]
+pub(crate) struct GoldenTestAssets {
+    pub(crate) face_detection: GoldenModelAsset,
+    pub(crate) face_embedding: GoldenModelAsset,
+    pub(crate) clip_image: GoldenModelAsset,
+    pub(crate) clip_text: GoldenModelAsset,
+    pub(crate) clip_text_vocab: PathBuf,
+}
+
+#[allow(dead_code)]
+impl GoldenTestAssets {
+    pub(crate) fn load() -> Result<Self> {
+        let repo_root = repo_root()?;
+        let asset_lock = load_asset_lock(&repo_root)?;
+        let cache_dir = cache_dir(&repo_root);
+        let fetcher = AssetFetcher::new()?;
+
+        let onnx_runtime_library =
+            resolve_onnx_runtime_library(&fetcher, &cache_dir, &asset_lock.onnx_runtime)?;
+        let _ = ort::init_from(&onnx_runtime_library)
+            .context("load ONNX Runtime dynamic library")?
+            .commit();
+
+        let golden_model = |label: &str, model: &ModelAsset| -> Result<GoldenModelAsset> {
+            Ok(GoldenModelAsset {
+                path: resolve_model_asset(&fetcher, &cache_dir, label, model)?,
+                sha256: model.sha256.clone(),
+            })
+        };
+
+        let models = &asset_lock.models;
+        Ok(Self {
+            face_detection: golden_model("face-detection", &models.face_detection)?,
+            face_embedding: golden_model("face-embedding", &models.face_embedding)?,
+            clip_image: golden_model("clip-image", &models.clip_image)?,
+            clip_text: golden_model("clip-text", &models.clip_text)?,
+            clip_text_vocab: resolve_model_asset(
+                &fetcher,
+                &cache_dir,
+                "clip-text-vocab",
+                &models.clip_text_vocab,
+            )?,
+        })
+    }
+
+    pub(crate) fn golden_data_path() -> Result<PathBuf> {
+        Ok(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("src/ml/golden_data.rs"))
+    }
+}
+
 pub(crate) struct PreparedMlRuntime {
-    config: MlRuntimeConfig,
+    model_paths: ModelPaths,
 }
 
 impl PreparedMlRuntime {
-    fn config(&self) -> &MlRuntimeConfig {
-        &self.config
+    fn model_paths(&self) -> &ModelPaths {
+        &self.model_paths
     }
 }
 
 impl Drop for PreparedMlRuntime {
     fn drop(&mut self) {
-        let _ = release_ml_runtime();
+        release_ml_runtime();
     }
 }
 
@@ -440,6 +492,11 @@ struct ModelAssets {
     face_detection: ModelAsset,
     face_embedding: ModelAsset,
     clip_image: ModelAsset,
+    // Used by the ml_goldens developer tool only.
+    #[allow(dead_code)]
+    clip_text: ModelAsset,
+    #[allow(dead_code)]
+    clip_text_vocab: ModelAsset,
 }
 
 #[derive(Debug, Deserialize)]
