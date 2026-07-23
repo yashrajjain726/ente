@@ -11,7 +11,6 @@ import 'package:photos/models/file/file.dart';
 import 'package:photos/module/metadata/panorama.dart';
 import "package:photos/service_locator.dart";
 import "package:photos/services/media_store_service.dart";
-import "package:photos/theme/ente_theme.dart";
 import "package:photos/ui/notification/toast.dart";
 import 'package:photos/ui/viewer/file/file_details_widget.dart';
 import "package:photos/utils/delete_file_util.dart";
@@ -174,9 +173,12 @@ class _DraggableDetailsSheetState extends State<_DraggableDetailsSheet> {
       snapSizes: disableSnap ? null : const [0.75],
       expand: false,
       builder: (context, scrollController) => Container(
+        clipBehavior: Clip.antiAlias,
         decoration: BoxDecoration(
-          color: getEnteColorScheme(context).backgroundElevated,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+          color: context.componentColors.backgroundBase,
+          borderRadius: const BorderRadius.vertical(
+            top: Radius.circular(Radii.bottomSheet),
+          ),
         ),
         child: FileDetailsWidget(
           widget.file,

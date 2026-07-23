@@ -1,11 +1,12 @@
+import "package:ente_components/ente_components.dart";
 import "package:ente_pure_utils/ente_pure_utils.dart";
 import "package:flutter/material.dart";
+import "package:hugeicons/hugeicons.dart";
 import "package:photos/generated/l10n.dart";
 import "package:photos/models/ffmpeg/ffprobe_props.dart";
 import 'package:photos/models/file/file.dart';
 import "package:photos/models/file/file_type.dart";
 import "package:photos/services/video_preview_service.dart";
-import "package:photos/theme/ente_theme.dart";
 import "package:photos/ui/components/info_item_widget.dart";
 
 class PreviewPropertiesItemWidget extends StatefulWidget {
@@ -42,7 +43,9 @@ class _PreviewPropertiesItemWidgetState
 
   Future<void> _getSection() async {
     if (!mounted) return;
-    final textStyle = getEnteTextTheme(context).miniMuted;
+    final textStyle = TextStyles.mini.copyWith(
+      color: context.componentColors.textLight,
+    );
     final subSectionWidgets = <Widget>[];
 
     final data = await VideoPreviewService.instance
@@ -81,9 +84,14 @@ class _PreviewPropertiesItemWidgetState
 
     child = InfoItemWidget(
       key: const ValueKey("Stream properties"),
-      leadingIcon: Icons.play_circle_outline,
+      leadingIconWidget: HugeIcon(
+        icon: HugeIcons.strokeRoundedPlay,
+        size: IconSizes.small,
+        color: context.componentColors.textLight,
+      ),
       title: AppLocalizations.of(context).streamDetails,
       subtitleSection: Future.value(subSectionWidgets),
+      useMenuStyle: true,
     );
     if (mounted) {
       setState(() {});

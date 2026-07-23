@@ -5,7 +5,9 @@ pub struct ConfigModelPreset {
     pub id: String,
     pub title: String,
     pub url: String,
+    pub sha256: String,
     pub mmproj_url: Option<String>,
+    pub mmproj_sha256: Option<String>,
 }
 
 #[derive(Debug, Clone, uniffi::Record)]
@@ -18,6 +20,8 @@ pub struct ConfigDefaults {
     pub mobile_model_presets: Vec<ConfigModelPreset>,
     pub desktop_default_model: ConfigModelPreset,
     pub desktop_model_presets: Vec<ConfigModelPreset>,
+    pub transcription_model: ConfigModelPreset,
+    pub voice_activity_model: ConfigModelPreset,
 }
 
 impl From<config::ModelPreset> for ConfigModelPreset {
@@ -26,7 +30,9 @@ impl From<config::ModelPreset> for ConfigModelPreset {
             id: value.id,
             title: value.title,
             url: value.url,
+            sha256: value.sha256,
             mmproj_url: value.mmproj_url,
+            mmproj_sha256: value.mmproj_sha256,
         }
     }
 }
@@ -50,6 +56,8 @@ impl From<config::Defaults> for ConfigDefaults {
                 .into_iter()
                 .map(Into::into)
                 .collect(),
+            transcription_model: value.transcription_model.into(),
+            voice_activity_model: value.voice_activity_model.into(),
         }
     }
 }

@@ -1,3 +1,4 @@
+import "package:ente_components/ente_components.dart";
 import "package:ente_pure_utils/ente_pure_utils.dart";
 import "package:flutter/material.dart";
 import "package:hugeicons/hugeicons.dart";
@@ -6,7 +7,6 @@ import "package:photos/models/file/extensions/file_props.dart";
 import 'package:photos/models/file/file.dart';
 import 'package:photos/models/file/file_type.dart';
 import "package:photos/module/download/file.dart";
-import "package:photos/theme/ente_theme.dart";
 import "package:photos/ui/components/info_item_widget.dart";
 import "package:photos/utils/image_util.dart";
 import "package:photos/utils/magic_util.dart";
@@ -31,12 +31,15 @@ class FilePropertiesItemWidget extends StatefulWidget {
 class _FilePropertiesItemWidgetState extends State<FilePropertiesItemWidget> {
   @override
   Widget build(BuildContext context) {
+    final colors = context.componentColors;
     return InfoItemWidget(
       key: const ValueKey("File properties"),
       leadingIconWidget: HugeIcon(
         icon: widget.isImage
             ? HugeIcons.strokeRoundedImage01
             : HugeIcons.strokeRoundedVideo02,
+        size: IconSizes.small,
+        color: colors.textLight,
       ),
       title:
           path.basenameWithoutExtension(widget.file.displayName) +
@@ -51,11 +54,14 @@ class _FilePropertiesItemWidgetState extends State<FilePropertiesItemWidget> {
               await editFilename(context, widget.file);
               setState(() {});
             },
+      useMenuStyle: true,
     );
   }
 
   Future<List<Widget>> _subTitleSection() async {
-    final textStyle = getEnteTextTheme(context).miniMuted;
+    final textStyle = TextStyles.mini.copyWith(
+      color: context.componentColors.textLight,
+    );
     final StringBuffer dimString = StringBuffer();
     int? width;
     int? height;
