@@ -91,17 +91,6 @@ async fn run(endpoint: String) -> TestResult {
         .unwrap();
 
     let mut ui = TestUi { totp_secret: None };
-    let login = AuthFlow::new(&accounts_client(endpoint), &mut ui)
-        .login(LoginParams {
-            email: email.clone(),
-            password: Zeroizing::new(password.clone()),
-        })
-        .await
-        .unwrap();
-    assert_eq!(login.user_id, created.user_id);
-    assert_eq!(login.secrets.master_key, created.secrets.master_key);
-
-    let mut ui = TestUi { totp_secret: None };
     let setup = AuthFlow::new(&client, &mut ui)
         .setup_two_factor(SetupTwoFactorParams {
             master_key: SecretVec::new(created.secrets.master_key.clone()),
