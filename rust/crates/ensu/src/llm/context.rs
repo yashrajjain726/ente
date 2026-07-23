@@ -3,16 +3,15 @@ use llama_cpp_2::context::params::{LlamaContextParams, LlamaPoolingType};
 use llama_cpp_2::model::LlamaModel;
 use llama_cpp_2::mtmd::{MtmdContext, MtmdContextParams, mtmd_default_marker};
 use llama_cpp_2::token::LlamaToken;
-use parking_lot::Mutex;
 use self_cell::self_cell;
 use serde::{Deserialize, Serialize};
 use std::ffi::CString;
 use std::num::NonZeroU32;
 use std::path::Path;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use super::model::ModelRef;
-use super::{Error, backend, format_error};
+use super::{Error, backend, format_error, lock};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ContextParams {
@@ -91,7 +90,7 @@ impl Context {
         &self,
         func: impl for<'a, 'b> FnOnce(&'b mut LlamaContext<'a>, &'b mut Vec<LlamaToken>) -> R,
     ) -> R {
-        let mut state = self.state.lock();
+        let mut state = lock(&self.state);
         let ContextState {
             cell,
             cached_tokens,
@@ -117,7 +116,7 @@ impl Context {
         }
 
         let (key, params) = mtmd_cache_key_and_params(mmproj_path, marker)?;
-        let mut guard = self.mtmd_context.lock();
+        let mut guard = lock(&self.mtmd_context);
 
         if let Some(cached) = guard.as_ref()
             && cached.key == key
@@ -146,7 +145,7 @@ impl Context {
     }
 
     pub(super) fn invalidate_cache(&self) {
-        self.state.lock().cached_tokens.clear();
+        lock(&self.state).cached_tokens.clear();
     }
 }
 

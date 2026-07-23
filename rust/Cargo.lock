@@ -2381,7 +2381,6 @@ dependencies = [
  "memmap2",
  "ort",
  "ort-sys",
- "parking_lot",
  "regex",
  "rubato",
  "rusqlite",
