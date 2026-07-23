@@ -11,15 +11,7 @@ There are multiple answers, none of which are better or worse, they just depend 
 
 We recommend that you ensure you store your recovery key in a safe place (writing it down on a paper is a good idea). This key can be used to bypass Ente 2FA in case you are locked out.
 
-Another option is to use a separate account for Ente Auth:
-
-1. Create a new Ente Auth account with a different email address.
-2. On your old account, export your codes: `Settings > Data > Export codes > Encrypted`.
-3. On the new account, import them: `Settings > Data > Import codes > Ente Encrypted Export`, then select the JSON file.
-4. Verify that all the codes match once imported into the new account.
-5. Once verified, log out of the old Auth account (you don't need to delete it - deleting it would also delete any Ente Photos or Ente Locker data tied to that account).
-
-Make sure to separately and clearly note down the password and 24-word recovery key for the new account.
+Another option is to use a separate account for Ente Auth.
 
 Also, exporting the encrypted backup is another good way to reduce the risk (you can easily import the encrypted backup without signing in).
 

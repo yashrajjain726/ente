@@ -29,12 +29,6 @@ The app still shows all the fields in the raw Exif data in the file info panel w
 
 In particular, for the description associated with a photo, the exact logic to determine the description from the Exif when uploading the image can be seen [in this part of the code](https://github.com/ente/ente/blob/0dcb185744da469848b41b668fe4b647226b6fe2/web/packages/gallery/services/exif.ts#L609-L620).
 
-### Which Lightroom fields does Ente read - Caption, Title, Keywords, Copyright, Rating? {#lightroom-fields-read}
-
-Of these, Ente only reads the **Caption/Description** field. It looks at the XMP `dc:description` tag first, then falls back to the Exif `ImageDescription` tag, and this works for WebP too since Lightroom stores it in the file's XMP. That caption becomes your photo's caption in Ente - shown, editable, and synced consistently across mobile, desktop, and web with end-to-end encryption.
-
-**Title**, **Keywords**, **Copyright**, and **Rating** aren't currently read or indexed. They stay safely embedded in your original file - Ente never strips them - but Ente won't display or search them for now. If you rely on the caption, make sure your Lightroom export includes all metadata so it's actually written into the file.
-
 ### Where does Ente import photo dates from? {#photo-date-sources}
 
 Ente will import the date for your photos from three places (in order of priority):

@@ -411,12 +411,6 @@ Open the album, create or manage the public link, and disable **Allow downloads*
 
 This lets people view the album through the link without showing them a download option.
 
-### Why can't my public link be opened on mobile when downloads are disabled? {#public-link-download-disabled-mobile}
-
-This is intentional. When a public link has **Allow downloads** turned off, it cannot be opened on mobile browsers, since a mobile browser would otherwise let someone screenshot or save the photos anyway. This restriction is by design to keep the "no download" setting meaningful.
-
-The link continues to work normally on desktop and laptop browsers.
-
 ### Can I set limits on public links? {#link-limits}
 
 Yes! Public links (including collect links) support several protective features:

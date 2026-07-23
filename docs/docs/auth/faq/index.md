@@ -5,22 +5,6 @@ description: Frequently asked questions about Ente Auth
 
 # Frequently Asked Questions
 
-### Is Ente Auth free, including for corporate/business use? {#auth-free-corporate-use}
-
-Yes, Ente Auth is completely free, with no special conditions or licensing fees for business or corporate use.
-
-### Does Ente Auth support German (or other languages) on desktop? {#auth-desktop-language}
-
-Yes. Open `Settings > General > Language` in the app to change the display language, including German.
-
-### Can Ente Auth run fully offline with no connection to any server? {#auth-fully-offline}
-
-Yes. Choose **Use without backups** to use Auth entirely offline, with no account and no connection to Ente's servers. Learn more in [Using offline mode safely](/auth/features/offline-mode).
-
-### What support options does Ente Auth offer, and how often are updates released? {#auth-support-update-cadence}
-
-We provide email support at [support@ente.com](mailto:support@ente.com). Ente Auth apps are typically updated once a month, and we ship hotfixes sooner whenever something serious or a security concern comes up.
-
 ### How do I add a code to Ente Auth? {#add-code}
 
 **If a service shows a QR code:**
@@ -122,6 +106,10 @@ If your codes were created offline and you've since lost access to that device, 
 
 No, Ente Auth does not require an account. You can choose to use the app without backups if you prefer.
 
+### Can Ente Auth run fully offline with no connection to any server? {#auth-fully-offline}
+
+Yes. Choose **Use without backups** to use Auth entirely offline, with no account and no connection to Ente's servers. Learn more in [Using offline mode safely](/auth/features/offline-mode).
+
 ### Will I lose my offline codes if I create an account later?
 
 No. When you sign in after using Ente Auth offline, the desktop app migrates any remaining offline codes into the newly created account so you keep them.
@@ -203,4 +191,4 @@ Most of these failures come from network-level filtering between your device and
 
 If you use any of these, allowlist Ente's domains or temporarily disable the blocker and try again. After clearing the interference, signing in and syncing should work normally.
 
-If you were in the middle of resetting your password using your recovery key and the app showed an error partway through (for example, after multiple network drops), your new password may have already been registered on our server even though the app didn't get the success confirmation. Before retrying the reset flow, try signing in with the new password directly - it's likely to work.
+If you were in the middle of resetting your password using your recovery key and the app showed an error partway through (for example, after multiple network drops), your new password may have already been registered on our server even though the app didn't get the success confirmation. Before retrying the reset flow, try signing in with the new password directly.

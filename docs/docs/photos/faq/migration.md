@@ -119,30 +119,11 @@ If photos already uploaded without the right album assignment, Ente can't recons
 2. Re-arrange the extracted Takeout contents into a single merged folder as shown above.
 3. Re-upload through the desktop app.
 
-### Will removing duplicates delete photos from my "Photos from 20XX" or original albums? {#dedup-yearly-albums-safe}
+### Why are "Photos from 20XX" yearly albums appearing on migration from Google photos? {#yearly-albums-recreated}
 
-No. Deduplication keeps one copy of each duplicated file and replaces the other copies with symlinks (references) in every album that contained it - including both a "Photos from 20XX" album and your original Google Photos album. Nothing disappears from any album; the album structure stays untouched. All that's freed up is the storage the extra copies were using.
-
-Photos that Google re-compressed, edited, or whose metadata differs won't be caught by deduplication, since they no longer share the same file hash. Also, if you later export your library, the file will be exported into every album folder it belonged to again, since symlinks become real file copies on export.
-
-### Do "Photos from 20XX" yearly albums get recreated as I use Ente? {#yearly-albums-recreated}
-
-No. These albums aren't created by Ente - they come from Google Takeout, which sorts any photos that weren't in a specific album into "Photos from 2020", "Photos from 2021", and so on. When you imported, Ente created one album per Takeout folder.
+These albums come from Google Takeout, which sorts any photos that weren't in a specific album into "Photos from 2020", "Photos from 2021", and so on. When you imported, Ente created one album per Takeout folder.
 
 New photos you back up afterwards (for example, from your phone's camera) go to their normal device-folder albums, not into yearly albums. Changing a photo's date also does not move it into a yearly album. These yearly albums are a one-time import artifact - they won't regenerate or grow on their own.
-
-### Can I delete the yearly albums without losing my photos, and will that clear up duplicate storage? {#delete-yearly-albums}
-
-Yes, you can delete them safely, but do it in the right order.
-
-When you delete an album, Ente asks how to handle the photos inside - choose **Delete album, but keep photos**. Photos that also live in another album stay right where they are, and photos that were only in that yearly album move to Uncategorized (not deleted, not Trash).
-
-However, deleting the yearly albums by itself is not a reliable way to reclaim duplicate storage. If a duplicate copy is a separate uploaded file, "keep photos" just relocates it to Uncategorized, where it still takes up space.
-
-Recommended order:
-
-1. Run **Remove duplicates** first (`Settings > Backup > Free up space > Remove duplicates` on mobile, or `Settings > Free up space > Deduplicate files` on desktop). This safely merges the copies and frees the storage while keeping every album intact.
-2. Then, if you simply don't want the "Photos from 20XX" albums cluttering your album list, delete them with **Delete album, but keep photos**. Since the photos already exist in your original albums, they'll remain there safely.
 
 ### Why is my storage usage in Ente higher than what Google Photos showed? {#ente-storage-higher-than-google}
 
@@ -264,30 +245,11 @@ Now simply drag and drop the downloaded folders into [our desktop app](https://e
 
 > Note: In case your uploads get interrupted, just drag and drop the folders into the same albums again, and we will ignore already backed up files and upload just the rest.
 
-### Why do Ente and Apple Photos show different item counts and storage usage for the same library? {#apple-photos-vs-ente-storage-mismatch}
-
-A gap between the two is expected, even right after a full import. It usually comes down to a few things:
-
-- **GB vs GiB**: Apple Photos calculates 1 GB as 1000 x 1000 x 1000 bytes, while Ente calculates 1 GB as 1024 x 1024 x 1024 bytes. The same library will always show as smaller in Ente. Learn more in [Why does Ente consume less storage than other providers?](/photos/faq/storage-and-plans#less-storage-usage)
-- **Items iOS excludes from third-party apps**: Some burst frames and certain shared or synced assets are excluded from third-party app queries by iOS itself, so Ente's on-device counts can be slightly lower than what Photos shows. See [Why is my Recents count lower in Ente than in the iOS Photos app?](/photos/faq/backup-and-sync#ios-recents-count-mismatch)
-- **The 10 GB file size limit**: Ente does not upload individual files larger than 10 GB.
-- **Skipped files**: Open `Albums > Device > Recents` (or whichever album is chosen for backup) and check for a "Skipped files" banner at the top, which lists any files that failed to back up and why.
-
 ## Switching Devices
 
 ### Will Ente recognize my existing backup if I switch phones? {#switch-phone-recognizes-backup}
 
 Yes. Your photos live in your Ente account, not on any single device. Install Ente on your new phone and sign in with the same account - your library downloads and syncs normally. New photos on your new phone are compared by content hash against what's already in your account, so anything already backed up won't be re-uploaded.
-
-### What affects how long a large migration takes? {#migration-speed-factors}
-
-A few factors determine migration speed for a large library:
-
-- **CPU and disk**: Every file is encrypted on your device and a thumbnail is generated before upload. On a fast connection, your device's CPU or disk can become the bottleneck instead of the network.
-- **File count vs size**: Lots of small photos carry more per-file overhead than a few large videos, so two libraries of the same total size can upload at very different speeds.
-- **Keep the device awake**: Disable sleep/hibernation (or auto-lock on mobile) so the upload doesn't stall overnight.
-
-For a typical home connection (20-50 Mbps upload speed), expect a large migration to take about a week.
 
 ## Importing from other cloud services
 

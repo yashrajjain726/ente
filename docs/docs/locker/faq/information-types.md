@@ -56,13 +56,7 @@ Individual file uploads have size limits. Large files may need to be compressed 
 
 **On iOS:**
 
-1. Open Ente Locker and tap the **+** button.
-2. Select **Document**.
-3. Choose **Photo Library** to pick an existing photo, or **Take Photo** to capture a new one.
-4. Add a descriptive title and select one or more collections.
-5. Tap **Save**.
-
-The image is added as a Document item, the same as a PDF or scan.
+Open Apple Photos, choose the photo, open the share sheet, and select Ente Locker to upload the image to Locker.
 
 ### How do I scan a physical document? {#locker-scan-document}
 

@@ -559,11 +559,7 @@ Disable your content blocker or add `photos.ente.com` to your allowlist. Wait 15
 
 This is an iOS-specific issue: for some videos, Apple Photos rejects the file and doesn't store it on your device, even though Ente backed it up successfully. Since the video isn't fully available locally, playback in the Ente app can stutter or freeze. The video itself is still safely stored in Ente - nothing is lost.
 
-Because this happens at the iOS level, there isn't much the app can do to prevent it directly. The workaround is to enable video streaming on desktop:
-
-1. Install Ente desktop from [ente.com/download/desktop](https://ente.com/download/desktop) and sign in with the same account.
-2. Open `Settings > Preferences` and enable **Streamable videos**.
-3. Leave the desktop app running - processing a large library can take time.
+Because this happens at the iOS level, there isn't much the app can do to prevent it directly. The workaround is to enable video streaming on desktop.
 
 As videos are processed, your iPhone automatically uses the streamable version for smooth playback, while your original file stays untouched.
 

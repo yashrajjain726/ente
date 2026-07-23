@@ -28,16 +28,6 @@ Open `Settings > Backup > Backed up folders` and select the albums you want to a
 
 Once configured, new photos added to these albums will automatically sync in the background.
 
-### I don't want everything to auto-upload. How do I control which photos back up? {#control-what-backs-up}
-
-Photos are automatically uploaded based on the folders selected for backup - Ente doesn't currently offer a way to back up only individual photos you pick one by one.
-
-To stop specific folders from backing up, open `Settings > Backup > Backed up folders` on mobile and unselect all, or just the ones you don't want backed up.
-
-You can also delete photos that are already backed up to Ente as well as on your device: long-press a photo (or select multiple), choose delete, and pick **Delete from Ente** to remove it from both places at once.
-
-After that, on the home gallery, photos that aren't backed up show a slashed cloud icon. See [What does the slashed cloud icon mean?](#slashed-cloud-icon) if you want to back one of them up later.
-
 ### What does the slashed cloud icon mean, and how do I back that photo up? {#slashed-cloud-icon}
 
 A slashed cloud icon on a photo means it isn't backed up to Ente - usually because it's in a folder you haven't selected for backup, or because you deleted it from Ente while keeping it on your device.
@@ -353,9 +343,7 @@ A few details to keep in mind:
 
 ### Can Ente be my Android cloud media provider (system gallery source for photo picker)? {#android-cloud-media-provider}
 
-Not currently. Android's cloud media provider program, which lets an app supply photos into the system Photo Picker as a cloud source, is only open to apps nominated by device manufacturers (OEMs). There's nothing Ente can do on our end to opt in outside of that program.
-
-See our [GitHub discussion](https://github.com/ente/ente/discussions/1266#discussioncomment-10396221) for more context.
+Not currently. Android's cloud media provider program, which lets an app supply photos into the system Photo Picker as a cloud source, is only open to apps nominated by device manufacturers (OEMs).
 
 ### Can Ente replace my default Photos or Camera gallery? {#ente-as-default-gallery}
 
