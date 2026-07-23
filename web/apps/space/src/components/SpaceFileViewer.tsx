@@ -881,6 +881,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                 ) {
                     return;
                 }
+                if (deltaX < 0 && pswp?.currSlide?.isPannable()) return;
 
                 const swipeAction =
                     deltaX < 0
