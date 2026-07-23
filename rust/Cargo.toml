@@ -43,6 +43,10 @@ thiserror = "2.0.18"
 uniffi = { version = "0.31.0" }
 wasm-bindgen = "0.2.125"
 
+# Unoptimized Argon2 makes production-strength derivations dominate test runtime.
+[profile.dev.package.argon2]
+opt-level = 3
+
 # Keep transitive ORT users (notably transcribe-rs) on the same revision as direct ORT dependencies.
 [patch.crates-io]
 ort = { git = "https://github.com/pykeio/ort.git", rev = "31c8f1443bb579bfddb82705288347697e468fb3" }
