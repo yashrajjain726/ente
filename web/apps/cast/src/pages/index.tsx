@@ -20,8 +20,6 @@ const Page: React.FC = () => {
 
     const router = useRouter();
 
-    useEffect(() => clearCastData(), []);
-
     useEffect(() => {
         if (!pairingCode) {
             void register().then((r) => {
@@ -30,6 +28,7 @@ const Page: React.FC = () => {
                 setPairingCode(r.pairingCode);
             });
         } else {
+            clearCastData();
             advertiseOnChromecast(
                 () => pairingCode,
                 () => readCastData()?.collectionID,
