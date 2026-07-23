@@ -334,7 +334,7 @@ class _EditContactPageState extends State<EditContactPage> {
         minClusterSize: kMinimumClusterSizeAllFaces,
       );
       candidates = buildContactPersonPickerCandidates(
-        faceResultParams: faceResults.map((result) => result.params),
+        faceResults: faceResults,
         persons: await PersonService.instance.getPersons(),
       );
     } catch (e, s) {
