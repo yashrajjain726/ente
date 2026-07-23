@@ -33,7 +33,6 @@ export function UploadProgressDetails() {
         inProgressUploads,
         retryFailed,
         preUploadSkippedFiles,
-        uploadCounter,
         uploadFileNames,
         uploadPhase,
         onClose,
@@ -45,7 +44,6 @@ export function UploadProgressDetails() {
 
     const statCounts = uploadProgressStatCounts({
         uploadPhase,
-        uploadCounter,
         inProgressUploads,
         finishedUploads,
         preUploadSkippedFiles,
