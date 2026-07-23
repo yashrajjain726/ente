@@ -4,7 +4,6 @@ pub mod auth;
 pub mod contacts;
 pub mod legacy;
 pub mod legacy_kit;
-pub mod space;
 
 use ente_test_support::HARDCODED_OTT_EMAIL_SUFFIX;
 use std::collections::HashSet;

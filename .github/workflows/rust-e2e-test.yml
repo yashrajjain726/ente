@@ -28,8 +28,9 @@ jobs:
                 include:
                     - name: CLI integration tests
                       package: ente-rs
-                    - name: E2E suite
+                    - name: E2E suites
                       package: ente-e2e
+                      space: true
         defaults:
             run:
                 working-directory: rust
@@ -55,5 +56,11 @@ jobs:
               run: cargo test -p ${{ matrix.package }} --features museum --locked
               # GITHUB_TOKEN lifts GitHub API rate limit when fetching
               # postgresql_embedded binaries.
+              env:
+                  GITHUB_TOKEN: ${{ github.token }}
+
+            - name: Run Space E2E suite
+              if: matrix.space
+              run: cargo test -p ente-space --features museum --locked
               env:
                   GITHUB_TOKEN: ${{ github.token }}

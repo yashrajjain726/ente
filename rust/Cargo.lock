@@ -2369,7 +2369,6 @@ dependencies = [
  "ente-contacts",
  "ente-core",
  "ente-rs",
- "ente-space",
  "ente-test-support",
  "hmac 0.13.0",
  "reqwest 0.12.28",
@@ -2530,14 +2529,19 @@ dependencies = [
 name = "ente-space"
 version = "0.0.1"
 dependencies = [
+ "base64 0.22.1",
+ "ente-accounts",
  "ente-core",
+ "ente-test-support",
  "md-5 0.11.0",
  "mockito",
+ "reqwest 0.12.28",
  "serde",
  "serde_json",
  "thiserror 2.0.18",
  "tokio",
  "urlencoding",
+ "uuid",
  "zeroize",
 ]
 

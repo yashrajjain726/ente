@@ -1,10 +1,9 @@
 use ente_core::crypto::{Key, Nonce, decode_b64, encode_b64, secretbox};
 use ente_core::http::Error as HttpError;
-use ente_rs::models::account::App;
 use ente_space::{AccountSpaceCtx, OpenAccountSpaceCtxInput, SpaceError};
 use serde::Deserialize;
 
-use crate::support::auth::TestAccount;
+use super::{CLIENT_PACKAGE, USER_AGENT, auth::TestAccount};
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -24,7 +23,7 @@ pub async fn open_ctx(endpoint: &str, account: &TestAccount) -> AccountSpaceCtx 
     let session = reqwest::Client::new()
         .post(format!("{endpoint}/account/space/sessions"))
         .header("X-Auth-Token", &account.auth_token)
-        .header("X-Client-Package", App::Photos.client_package())
+        .header("X-Client-Package", CLIENT_PACKAGE)
         .json(&serde_json::json!({ "sessionWrapKey": encode_b64(Key::generate().as_bytes()) }))
         .send()
         .await
@@ -43,9 +42,9 @@ pub async fn open_ctx(endpoint: &str, account: &TestAccount) -> AccountSpaceCtx 
         base_url: endpoint.to_string(),
         space_session_token: Some(session.session_token),
         space_root_key,
-        user_agent: Some("ente-e2e".to_string()),
-        client_package: Some(App::Photos.client_package().to_string()),
-        client_version: Some("ente-e2e".to_string()),
+        user_agent: Some(USER_AGENT.to_string()),
+        client_package: Some(CLIENT_PACKAGE.to_string()),
+        client_version: Some(USER_AGENT.to_string()),
     })
     .expect("space context should open")
 }
@@ -59,7 +58,7 @@ async fn ensure_space_root_key(endpoint: &str, account: &TestAccount) -> Vec<u8>
     let response = reqwest::Client::new()
         .post(format!("{endpoint}/user-entity/key/ensure"))
         .header("X-Auth-Token", &account.auth_token)
-        .header("X-Client-Package", App::Photos.client_package())
+        .header("X-Client-Package", CLIENT_PACKAGE)
         .json(&serde_json::json!({
             "type": "space",
             "encryptedKey": encode_b64(encrypted_key),
