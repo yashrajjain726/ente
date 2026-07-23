@@ -1,5 +1,6 @@
 import {
     ArrowLeft02Icon,
+    BubbleChatIcon,
     MoreVerticalIcon,
     UserAdd02Icon,
     UserRemove01Icon,
@@ -41,6 +42,7 @@ interface FriendsScreenProps {
     friends: FriendProfile[];
     onLoadFriendAvatar?: (friend: FriendProfile) => Promise<string | null>;
     onBack?: () => void;
+    onMessage?: (friendID: string) => void;
     onOpenFriend?: (friendID: string) => void;
     profileLink?: string;
     onUnfriend?: (friendID: string) => Promise<void> | void;
@@ -50,6 +52,7 @@ interface FriendRowProps {
     avatarUrl?: string | null;
     friend: FriendProfile;
     onLoadAvatar?: () => Promise<string | null | undefined>;
+    onMessage?: (friendID: string) => void;
     onOpenFriend?: (friendID: string) => void;
     onUnfriend?: (friendID: string) => void;
 }
@@ -58,6 +61,7 @@ const FriendRow: React.FC<FriendRowProps> = ({
     avatarUrl,
     friend,
     onLoadAvatar,
+    onMessage,
     onOpenFriend,
     onUnfriend,
 }) => {
@@ -74,6 +78,11 @@ const FriendRow: React.FC<FriendRowProps> = ({
     );
 
     const closeActions = () => setActionsAnchor(null);
+
+    const message = () => {
+        closeActions();
+        onMessage?.(friend.id);
+    };
 
     const unfriend = () => {
         closeActions();
@@ -279,6 +288,44 @@ const FriendRow: React.FC<FriendRowProps> = ({
                     list: { "aria-labelledby": actionsButtonID, sx: { p: 0 } },
                 }}
             >
+                {onMessage && (
+                    <MenuItem
+                        dense
+                        disableRipple
+                        onClick={message}
+                        sx={{
+                            borderRadius: "10px",
+                            color: textBase,
+                            gap: "8px",
+                            minHeight: 36,
+                            px: "9px",
+                            py: "4px",
+                            whiteSpace: "nowrap",
+                            "&.Mui-focusVisible": {
+                                bgcolor: "rgba(0, 0, 0, 0.04)",
+                            },
+                            "&:active": { bgcolor: "rgba(0, 0, 0, 0.04)" },
+                            "&:hover": { bgcolor: "rgba(0, 0, 0, 0.04)" },
+                        }}
+                    >
+                        <HugeiconsIcon
+                            icon={BubbleChatIcon}
+                            size={18}
+                            strokeWidth={1.8}
+                        />
+                        <Box
+                            sx={{
+                                fontFamily:
+                                    '"Inter Variable", Inter, sans-serif',
+                                fontSize: 13,
+                                fontWeight: 650,
+                                lineHeight: "18px",
+                            }}
+                        >
+                            Message
+                        </Box>
+                    </MenuItem>
+                )}
                 <MenuItem
                     dense
                     disableRipple
@@ -323,6 +370,7 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
     friends,
     onLoadFriendAvatar,
     onBack,
+    onMessage,
     onOpenFriend,
     profileLink,
     onUnfriend,
@@ -559,6 +607,7 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
                                 avatarUrl={loadedAvatarURLFor(friend)}
                                 friend={friend}
                                 onLoadAvatar={() => loadFriendAvatar(friend)}
+                                onMessage={onMessage}
                                 onOpenFriend={onOpenFriend}
                                 onUnfriend={() => {
                                     setUnfriendErrorMessage(null);

@@ -14,6 +14,7 @@ import {
     loadCurrentSpacePostAssetURL,
     loadCurrentSpaceProfile,
     loadCurrentSpaceProfilePostsPage,
+    removeCurrentSpaceFriend,
     replyToCurrentPost,
     setCurrentPostLiked,
     type SpaceProfilePost,
@@ -195,6 +196,24 @@ const Page: React.FC = () => {
         void router.push(spaceRoutes.friends);
     };
 
+    const unfriend = React.useCallback(async () => {
+        const actorSpaceId = profile?.spaceId;
+        if (!actorSpaceId || !selectedFriendSpaceId) return;
+
+        await removeCurrentSpaceFriend(actorSpaceId, selectedFriendSpaceId);
+    }, [profile?.spaceId, selectedFriendSpaceId]);
+
+    const finishUnfriend = React.useCallback(() => {
+        setFriends((currentFriends) =>
+            currentFriends.filter(
+                (friend) =>
+                    friend.spaceId != selectedFriendSpaceId &&
+                    friend.id != friendSpaceId,
+            ),
+        );
+        void router.replace(spaceRoutes.friends);
+    }, [friendSpaceId, router, selectedFriendSpaceId, setFriends]);
+
     if (
         !router.isReady ||
         profileLoadStatus != "ready" ||
@@ -264,6 +283,14 @@ const Page: React.FC = () => {
                 }}
                 onBack={goBack}
                 onLoadPostImage={loadCurrentSpacePostAssetURL}
+                onMessageFriend={
+                    selectedFriendSpaceId
+                        ? () =>
+                              void router.push(
+                                  spaceRoutes.message(selectedFriendSpaceId),
+                              )
+                        : undefined
+                }
                 onOpenProfileCover={() => setOpenProfileImage("cover")}
                 onOpenProfilePhoto={() => setOpenProfileImage("avatar")}
                 onReplyToPost={(postSpaceId, postId, text) =>
@@ -271,6 +298,10 @@ const Page: React.FC = () => {
                 }
                 onSetPostLiked={(postId, liked) =>
                     setCurrentPostLiked(actorSpaceId, postId, liked)
+                }
+                onUnfriend={selectedFriendSpaceId ? unfriend : undefined}
+                onUnfriendComplete={
+                    selectedFriendSpaceId ? finishUnfriend : undefined
                 }
                 showPostLoadingIndicator={false}
             />

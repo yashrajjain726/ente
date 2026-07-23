@@ -54,6 +54,14 @@ const Page: React.FC = () => {
                 friends={friends}
                 onLoadFriendAvatar={loadCurrentFriendAvatarURL}
                 onBack={() => void router.push(spaceRoutes.profile)}
+                onMessage={(friendID) => {
+                    const friend = friends.find(
+                        (candidate) => candidate.id == friendID,
+                    );
+                    if (friend?.spaceId) {
+                        void router.push(spaceRoutes.message(friend.spaceId));
+                    }
+                }}
                 onOpenFriend={(friendID) =>
                     void router.push(spaceRoutes.friend(friendID))
                 }
