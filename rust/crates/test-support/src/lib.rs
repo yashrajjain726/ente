@@ -1,12 +1,11 @@
 //! A live Museum for integration tests.
 //!
-//! [`Museum`] spins up a local Museum server backed by a temporary local
-//! Postgres ([postgresql_embedded]). See the crate README for requirements.
-//!
-//! [postgresql_embedded]: https://crates.io/crates/postgresql_embedded
+//! [`Museum`] spins up a local Museum server backed by temporary Postgres and
+//! object storage. See the crate README for requirements.
 
 mod museum;
 mod net;
+mod object_store;
 mod postgres;
 mod process;
 mod server;

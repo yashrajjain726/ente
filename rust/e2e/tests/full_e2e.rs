@@ -1,3 +1,4 @@
+mod space_e2e;
 mod support;
 
 use ente_accounts::Error as CliError;
@@ -18,6 +19,7 @@ use support::{auth, contacts, legacy, legacy_kit};
 const STAGE_AUTH_CONTACTS: &str = "auth_contacts_e2e";
 const STAGE_LEGACY_CONTACT_RECOVERY: &str = "legacy_contact_recovery_e2e";
 const STAGE_LEGACY_KIT_RECOVERY: &str = "legacy_kit_recovery_e2e";
+const STAGE_SPACE: &str = "space_e2e";
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -89,6 +91,10 @@ fn run_stages(endpoint: &str) -> TestResult {
             let mut owner = legacy_kit::create_owner(endpoint).await;
             ensure_totp_enabled(endpoint, &owner.owner).await;
             run_legacy_kit_stage(endpoint, &mut owner).await;
+        }
+
+        if support::stage_enabled(STAGE_SPACE) {
+            space_e2e::run(endpoint).await;
         }
 
         Ok(())

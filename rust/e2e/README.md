@@ -1,15 +1,13 @@
 # Rust E2E
 
-Rust end-to-end tests that require a live Museum instance belong here.
+Rust tests should live in the crate whose behavior they cover, whether they
+are unit, integration, or end-to-end tests. This crate houses existing
+cross-crate tests while they are moved to their owning crates incrementally.
 
-The single `full_e2e` test runs these stages in sequence:
-`auth_contacts_e2e`, `legacy_contact_recovery_e2e`, and
-`legacy_kit_recovery_e2e`.
-
-Like the CLI integration tests, the suite runs against a live Museum spun up by
-[ente-test-support](../crates/test-support) (see its README for setup). It is
-gated behind the `museum` Cargo feature, so a plain `cargo test -p ente-e2e`
-skips it. To run it:
+[ente-test-support](../crates/test-support) provides the shared Museum,
+Postgres, and object-storage harness; individual crates do not need to
+duplicate that infrastructure. Tests using the harness are gated behind the
+`museum` Cargo feature:
 
 ```sh
 cargo test -p ente-e2e --features museum
