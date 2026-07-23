@@ -137,6 +137,12 @@ interface SpaceFriendRequestResponse {
     createdAt: string;
 }
 
+interface SpaceSentFriendRequestResponse {
+    requestId: number;
+    target: SpaceActor;
+    createdAt: string;
+}
+
 interface SpaceConversationChatSummaryResponse {
     latestActivity: SpaceMessageConversationActivity;
     unreadActivities?: SpaceMessageConversationActivity[];
@@ -284,6 +290,12 @@ export interface SpaceMessageConversationList {
     items: SpaceMessageConversation[];
 }
 
+export interface SpaceFriendRequest {
+    direction: "received" | "sent";
+    friend: FriendProfile;
+    requestId: number;
+}
+
 export interface SpaceUnreadStatus {
     messagesUnread: boolean;
 }
@@ -298,6 +310,12 @@ interface SpaceFriendRequestContext {
         requestId: bigint,
     ) => Promise<unknown>;
     deleteFriendRequest: (spaceId: string, requestId: bigint) => Promise<void>;
+    listFriendRequests: (
+        spaceId: string,
+    ) => Promise<SpaceFriendRequestResponse[]>;
+    listSentFriendRequests: (
+        spaceId: string,
+    ) => Promise<SpaceSentFriendRequestResponse[]>;
     requestFriendByUsername: (
         spaceId: string,
         username: string,
@@ -851,6 +869,33 @@ export const loadCurrentSpaceFriendsCount = async (spaceId: string) => {
             spaceId,
         )) as SpaceProfileResponse;
         return spaceProfile.friends ?? 0;
+    } finally {
+        releaseCurrentSpaceContext(ctx);
+    }
+};
+
+export const loadCurrentFriendRequests = async (
+    spaceId: string,
+): Promise<SpaceFriendRequest[]> => {
+    const ctx = await ensureCurrentSpaceContext();
+    try {
+        const requestContext = ctx as SpaceFriendRequestContext;
+        const [receivedRequests, sentRequests] = await Promise.all([
+            requestContext.listFriendRequests(spaceId),
+            requestContext.listSentFriendRequests(spaceId),
+        ]);
+        return [
+            ...receivedRequests.map((request) => ({
+                direction: "received" as const,
+                friend: actorProfile(request.requester),
+                requestId: request.requestId,
+            })),
+            ...sentRequests.map((request) => ({
+                direction: "sent" as const,
+                friend: actorProfile(request.target),
+                requestId: request.requestId,
+            })),
+        ];
     } finally {
         releaseCurrentSpaceContext(ctx);
     }

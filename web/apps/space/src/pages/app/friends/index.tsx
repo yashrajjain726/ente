@@ -3,9 +3,13 @@ import { SpaceRouteFallback } from "components/SpaceRouteFallback";
 import React, { useEffect } from "react";
 import { FriendsScreen, friendsBackground } from "screens/FriendsScreen";
 import {
+    confirmCurrentFriendRequest,
+    deleteCurrentFriendRequest,
     loadCurrentFriendAvatarURL,
+    loadCurrentFriendRequests,
     loadCurrentSpaceFriends,
     removeCurrentSpaceFriend,
+    type SpaceFriendRequest,
 } from "services/space";
 import { spaceInviteURL } from "services/spaceInvite";
 import { useSpaceAppState } from "state/spaceAppState";
@@ -21,6 +25,10 @@ const Page: React.FC = () => {
         profileLoadStatus,
         setFriends,
     } = useSpaceAppState();
+    const [friendRequests, setFriendRequests] = React.useState<
+        SpaceFriendRequest[]
+    >([]);
+    const [isFriendsLoading, setIsFriendsLoading] = React.useState(true);
 
     useEffect(() => {
         if (profileLoadStatus == "ready" && !profile) {
@@ -31,11 +39,30 @@ const Page: React.FC = () => {
     useEffect(() => {
         if (!profile?.spaceId) return;
 
-        void loadCurrentSpaceFriends(profile.spaceId)
-            .then(setFriends)
-            .catch((error: unknown) =>
-                console.error("Failed to load space friends", error),
-            );
+        setIsFriendsLoading(true);
+        void Promise.allSettled([
+            loadCurrentFriendRequests(profile.spaceId),
+            loadCurrentSpaceFriends(profile.spaceId),
+        ])
+            .then(([requestsResult, friendsResult]) => {
+                if (requestsResult.status == "fulfilled") {
+                    setFriendRequests(requestsResult.value);
+                } else {
+                    console.error(
+                        "Failed to load space friend requests",
+                        requestsResult.reason,
+                    );
+                }
+                if (friendsResult.status == "fulfilled") {
+                    setFriends(friendsResult.value);
+                } else {
+                    console.error(
+                        "Failed to load space friends",
+                        friendsResult.reason,
+                    );
+                }
+            })
+            .finally(() => setIsFriendsLoading(false));
     }, [profile?.spaceId, setFriends]);
 
     if (profileLoadStatus != "ready" || !profile) {
@@ -51,7 +78,9 @@ const Page: React.FC = () => {
         <>
             <SpacePageMeta themeColor={friendsBackground} />
             <FriendsScreen
+                friendRequests={friendRequests}
                 friends={friends}
+                isLoading={isFriendsLoading}
                 onLoadFriendAvatar={loadCurrentFriendAvatarURL}
                 onBack={() => void router.push(spaceRoutes.profile)}
                 onMessage={(friendID) => {
@@ -68,6 +97,29 @@ const Page: React.FC = () => {
                 profileLink={spaceInviteURL({
                     spaceUsername: profile.username,
                 })}
+                onAcceptFriendRequest={async (requestID) => {
+                    const actorSpaceId = profile.spaceId;
+                    if (!actorSpaceId) return;
+
+                    await confirmCurrentFriendRequest(actorSpaceId, requestID);
+                    setFriendRequests((currentRequests) =>
+                        currentRequests.filter(
+                            (request) => request.requestId != requestID,
+                        ),
+                    );
+                    setFriends(await loadCurrentSpaceFriends(actorSpaceId));
+                }}
+                onDeleteFriendRequest={async (requestID) => {
+                    const actorSpaceId = profile.spaceId;
+                    if (!actorSpaceId) return;
+
+                    await deleteCurrentFriendRequest(actorSpaceId, requestID);
+                    setFriendRequests((currentRequests) =>
+                        currentRequests.filter(
+                            (request) => request.requestId != requestID,
+                        ),
+                    );
+                }}
                 onUnfriend={async (friendID) => {
                     const actorSpaceId = profile.spaceId;
                     if (!actorSpaceId) return;
