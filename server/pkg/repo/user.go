@@ -41,7 +41,7 @@ type UserInactivityCandidate struct {
 	LastActivity int64
 }
 
-type emailUpdateExecutor interface {
+type userMutationExecutor interface {
 	ExecContext(context.Context, string, ...any) (sql.Result, error)
 }
 
@@ -98,8 +98,20 @@ func (repo *UserRepository) IsLikelySelfHosted() bool {
 // Delete removes the email_hash and encrypted email information for the user. It replaces email_hash with placeholder value
 // based on DELETED_EMAIL_HASH_FORMAT
 func (repo *UserRepository) Delete(userID int64) error {
-	emailHash := fmt.Sprintf(DELETED_EMAIL_HASH_FORMAT, userID)
-	_, err := repo.DB.Exec(`UPDATE users SET encrypted_email = null, email_decryption_nonce = null, email_hash = $1 WHERE user_id = $2`, emailHash, userID)
+	return deleteUser(context.Background(), repo.DB, userID)
+}
+
+func (repo *UserRepository) DeleteTx(ctx context.Context, tx *sql.Tx, userID int64) (string, error) {
+	var emailHash string
+	if err := tx.QueryRowContext(ctx, `SELECT email_hash FROM users WHERE user_id = $1 FOR UPDATE`, userID).Scan(&emailHash); err != nil {
+		return "", stacktrace.Propagate(err, "failed to read email hash")
+	}
+	return emailHash, deleteUser(ctx, tx, userID)
+}
+
+func deleteUser(ctx context.Context, executor userMutationExecutor, userID int64) error {
+	deletedEmailHash := fmt.Sprintf(DELETED_EMAIL_HASH_FORMAT, userID)
+	_, err := executor.ExecContext(ctx, `UPDATE users SET encrypted_email = null, email_decryption_nonce = null, email_hash = $1 WHERE user_id = $2`, deletedEmailHash, userID)
 	return stacktrace.Propagate(err, "")
 }
 
@@ -335,7 +347,7 @@ func (repo *UserRepository) UpdateEmailTx(ctx context.Context, tx *sql.Tx, userI
 	return updateEmail(ctx, tx, userID, encryptedEmail, emailHash)
 }
 
-func updateEmail(ctx context.Context, executor emailUpdateExecutor, userID int64, encryptedEmail ente.EncryptionResult, emailHash string) error {
+func updateEmail(ctx context.Context, executor userMutationExecutor, userID int64, encryptedEmail ente.EncryptionResult, emailHash string) error {
 	_, err := executor.ExecContext(ctx, `UPDATE users SET encrypted_email = $1, email_decryption_nonce = $2, email_hash = $3 WHERE user_id = $4`, encryptedEmail.Cipher, encryptedEmail.Nonce, emailHash, userID)
 	return stacktrace.Propagate(err, "")
 }

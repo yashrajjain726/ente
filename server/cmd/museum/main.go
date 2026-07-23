@@ -966,6 +966,7 @@ func main() {
 	adminAPI.GET("/listmonk/missing-subscribers/count", adminHandler.GetListmonkMissingSubscribersCount)
 	adminAPI.GET("/users", adminHandler.GetUsers)
 	adminAPI.GET("/user", adminHandler.GetUser)
+	adminAPI.GET("/user/scheduled-deletions", adminHandler.GetScheduledDeletions)
 	adminAPI.POST("/user/disable-2fa", adminHandler.DisableTwoFactor)
 	adminAPI.POST("/user/update-referral", adminHandler.UpdateReferral)
 	adminAPI.POST("/user/disable-passkeys", adminHandler.RemovePasskeys)
