@@ -141,7 +141,8 @@ final class LlmProvider {
     }
 
     func isModelDownloaded(_ selection: LlmModelSelection) -> Bool {
-        downloader.isDownloaded(selection.modelTarget) && isEmbeddingModelReady()
+        downloader.isDownloaded(selection.modelTarget) &&
+            (!isEnsuPacksEnabled || isEmbeddingModelReady())
     }
 
     func missingModelDownloadSize(_ selection: LlmModelSelection) async -> Int64? {
@@ -152,7 +153,7 @@ final class LlmProvider {
             }
             total += chatSize
         }
-        if !isEmbeddingModelReady() {
+        if isEnsuPacksEnabled && !isEmbeddingModelReady() {
             guard let embeddingSize = await downloader.estimateDownloadSize(embeddingDownloadTarget) else {
                 return nil
             }
@@ -172,13 +173,13 @@ final class LlmProvider {
 
         let missingTargets: [ModelTarget] = try await modelLoadGate.withLock {
             let embeddingReady = isEmbeddingModelReady()
-            if !embeddingReady {
+            if isEnsuPacksEnabled && !embeddingReady {
                 _ = downloader.removeDownloaded(embeddingDownloadTarget)
             }
 
             return [
                 downloader.isDownloaded(selection.modelTarget) ? nil : selection.modelTarget,
-                embeddingReady ? nil : embeddingDownloadTarget,
+                (!isEnsuPacksEnabled || embeddingReady) ? nil : embeddingDownloadTarget,
             ].compactMap { $0 }
         }
 
@@ -187,7 +188,7 @@ final class LlmProvider {
         }
 
         try await modelLoadGate.withLock {
-            guard isEmbeddingModelReady() else {
+            guard !isEnsuPacksEnabled || isEmbeddingModelReady() else {
                 _ = downloader.removeDownloaded(embeddingDownloadTarget)
                 throw RequiredModelValidationError(targetId: knowledgeEmbedding.targetId)
             }

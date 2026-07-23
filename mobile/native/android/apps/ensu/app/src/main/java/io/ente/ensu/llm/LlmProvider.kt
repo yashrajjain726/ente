@@ -17,6 +17,7 @@ import io.ente.ensu.bindings.llmCancel
 import io.ente.ensu.bindings.llmInitBackend
 import io.ente.ensu.device.AndroidDeviceCapabilityProvider
 import io.ente.ensu.device.requireChatSupported
+import io.ente.ensu.settings.IS_ENSU_PACKS_ENABLED
 import java.io.File
 import kotlin.math.max
 import kotlinx.coroutines.Dispatchers
@@ -79,7 +80,7 @@ class LlmProvider(
             deviceCapabilityProvider.chatCapability().requireChatSupported()
             val missingTargets = modelLoadMutex.withLock {
                 val embeddingReady = isEmbeddingModelReady()
-                if (!embeddingReady) {
+                if (IS_ENSU_PACKS_ENABLED && !embeddingReady) {
                     val embeddingFile = downloader.llmModelPath(embeddingDownloadTarget)
                     if (embeddingFile?.exists() == true) {
                         downloader.removeDownloaded(embeddingDownloadTarget)
@@ -88,14 +89,14 @@ class LlmProvider(
 
                 buildList {
                     if (!isChatModelReady(selection)) add(selection.modelTarget)
-                    if (!isEmbeddingModelReady()) add(embeddingDownloadTarget)
+                    if (IS_ENSU_PACKS_ENABLED && !isEmbeddingModelReady()) add(embeddingDownloadTarget)
                 }
             }
             if (missingTargets.isNotEmpty()) {
                 downloader.download(missingTargets, onProgress)
             }
             modelLoadMutex.withLock {
-                if (!isEmbeddingModelReady()) {
+                if (IS_ENSU_PACKS_ENABLED && !isEmbeddingModelReady()) {
                     downloader.removeDownloaded(embeddingDownloadTarget)
                     throw RequiredModelValidationError(knowledgeEmbedding.targetId)
                 }

@@ -10,6 +10,7 @@ import io.ente.ensu.bindings.mobileLlmTarget
 import io.ente.ensu.device.isChatSupported
 import io.ente.ensu.logging.FileLogRepository
 import io.ente.ensu.logging.LogLevel
+import io.ente.ensu.settings.IS_ENSU_PACKS_ENABLED
 import io.ente.ensu.settings.SessionPreferencesDataStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -81,7 +82,7 @@ internal class ModelSettingsActions(
         val selection = resolveSelection(state.value.modelSettings)
         val chatReady = llmProvider.isChatModelReady(selection)
         val embeddingReady = llmProvider.isEmbeddingModelReady()
-        val isDownloaded = chatReady && embeddingReady
+        val isDownloaded = chatReady && (!IS_ENSU_PACKS_ENABLED || embeddingReady)
         if (isDownloaded) {
             persistModelDownloadRequested(false)
         }
@@ -119,7 +120,11 @@ internal class ModelSettingsActions(
             }
 
             val chatSize = if (chatReady) 0L else modelDownloader.estimateDownloadSize(selection.modelTarget)
-            val embeddingSize = if (embeddingReady) 0L else llmProvider.estimateEmbeddingDownloadSize()
+            val embeddingSize = if (!IS_ENSU_PACKS_ENABLED || embeddingReady) {
+                0L
+            } else {
+                llmProvider.estimateEmbeddingDownloadSize()
+            }
             val size = if (chatSize == null || embeddingSize == null) {
                 null
             } else {
@@ -144,7 +149,8 @@ internal class ModelSettingsActions(
         if (!userInitiated && !currentState.chat.hasRequestedModelDownload) return
 
         val selection = resolveSelection(currentState.modelSettings)
-        val isDownloaded = llmProvider.isChatModelReady(selection) && llmProvider.isEmbeddingModelReady()
+        val isDownloaded = llmProvider.isChatModelReady(selection) &&
+            (!IS_ENSU_PACKS_ENABLED || llmProvider.isEmbeddingModelReady())
         if (isDownloaded) {
             state.update { appState ->
                 appState.copy(
