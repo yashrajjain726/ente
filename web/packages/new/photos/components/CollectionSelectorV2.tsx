@@ -297,16 +297,13 @@ const CollectionSummaryButtonV2: React.FC<CollectionSummaryButtonV2Props> = ({
 };
 
 const CreateAlbumTile: React.FC<{ onClick: () => void }> = ({ onClick }) => (
-    <TileButtonV2 onClick={onClick} sx={{ borderRadius: "16px" }}>
+    <TileButtonV2
+        aria-label={t("new_album")}
+        onClick={onClick}
+        sx={{ borderRadius: "16px" }}
+    >
         <CreateTileInner>
-            <Typography
-                sx={{ fontSize: 14, lineHeight: "20px", fontWeight: 500 }}
-            >
-                {t("new_album")}
-            </Typography>
-            <Box sx={createTileIconSx}>
-                <AddIcon />
-            </Box>
+            <AddIcon />
         </CreateTileInner>
     </TileButtonV2>
 );
@@ -316,23 +313,17 @@ const CreateTileInner = styled("span")(({ theme }) => ({
     inset: 0,
     padding: 10,
     display: "flex",
-    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
     border: "1px dashed",
     borderColor: theme.vars.palette.stroke.muted,
     borderRadius: 16,
-    color: theme.vars.palette.text.base,
+    color: theme.vars.palette.text.muted,
     "&:hover": { borderColor: "rgba(0 0 0 / 0.45)" },
     ...theme.applyStyles("dark", {
         "&:hover": { borderColor: "rgba(255 255 255 / 0.45)" },
     }),
 }));
-const createTileIconSx = {
-    flex: 1,
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    color: "text.muted",
-};
 
 interface SearchFieldV2Props {
     value: string;

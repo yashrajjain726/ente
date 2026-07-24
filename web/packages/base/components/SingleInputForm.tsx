@@ -269,8 +269,8 @@ const greenAccentHover = "#07ad21";
 const errorColor = "#fa1336";
 
 const v2LabelSx = {
-    fontSize: 12,
-    lineHeight: "16px",
+    fontSize: 14,
+    lineHeight: "20px",
     fontWeight: 500,
     color: "text.muted",
 };
@@ -286,11 +286,14 @@ const v2InputSx: SxProps<Theme> = (theme) => ({
     fontSize: 14,
     fontWeight: 500,
     color: "text.base",
-    "&.Mui-focused": { borderColor: greenAccent },
-    "&.Mui-error": { borderColor: errorColor },
+    "&.Mui-focused": { borderColor: "rgba(0 0 0 / 0.08)" },
     "& input": { padding: 0, height: "auto" },
     "& input::placeholder": { color: "text.muted", opacity: 1 },
-    ...theme.applyStyles("dark", { backgroundColor: "#282828" }),
+    ...theme.applyStyles("dark", {
+        backgroundColor: "#282828",
+        "&.Mui-focused": { borderColor: "rgba(255 255 255 / 0.18)" },
+    }),
+    "&.Mui-error": { borderColor: errorColor },
 });
 const v2HelperSx = (isError: boolean) => (theme: Theme) => ({
     fontSize: 12,
