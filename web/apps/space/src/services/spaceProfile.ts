@@ -114,8 +114,15 @@ export const isSpaceSessionUnauthorized = (error: unknown) =>
 const defaultOwnedSpace = (spaces: OwnedSpace[]) => spaces[0];
 
 const currentSpaceContextConfig = async () => {
-    await restoreSpaceBrowserSessionIfNeeded();
-    const baseUrl = await apiOrigin();
+    const sessionRestore = restoreSpaceBrowserSessionIfNeeded();
+    const spaceWasm = savedSpaceSessionToken()
+        ? import("ente-space-wasm")
+        : undefined;
+    const [, baseUrl, prefetchedSpaceWasm] = await Promise.all([
+        sessionRestore,
+        apiOrigin(),
+        spaceWasm,
+    ]);
     const spaceRootKeyB64 = spaceRootKeyFromSpaceSession();
     const user = savedPartialLocalUser();
     const spaceSessionToken = savedSpaceSessionToken();
@@ -123,6 +130,8 @@ const currentSpaceContextConfig = async () => {
     if (!spaceRootKeyB64 || !user?.id || !spaceSessionToken) {
         return undefined;
     }
+    const { spaceOpenAccountCtx } =
+        prefetchedSpaceWasm ?? (await import("ente-space-wasm"));
 
     return {
         cacheKey: [user.id, baseUrl, spaceSessionToken].join(":"),
@@ -133,6 +142,7 @@ const currentSpaceContextConfig = async () => {
             spaceRootKeyB64,
             spaceSessionToken,
         },
+        spaceOpenAccountCtx,
     };
 };
 
@@ -157,8 +167,7 @@ export const openCurrentSpaceContext = async () => {
     const config = await currentSpaceContextConfig();
     if (!config) return undefined;
 
-    const { spaceOpenAccountCtx } = await import("ente-space-wasm");
-    return await spaceOpenAccountCtx(config.input);
+    return await config.spaceOpenAccountCtx(config.input);
 };
 
 export const clearCurrentSpaceContext = () => {
@@ -188,10 +197,8 @@ export const ensureCurrentSpaceContext = async () => {
     }
 
     const generation = currentSpaceContextGeneration;
-    const promise = (async () => {
-        const { spaceOpenAccountCtx } = await import("ente-space-wasm");
-        return await spaceOpenAccountCtx(config.input);
-    })()
+    const promise = config
+        .spaceOpenAccountCtx(config.input)
         .then((ctx) => {
             if (
                 currentSpaceContextGeneration != generation ||
