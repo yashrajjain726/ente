@@ -2316,13 +2316,14 @@ const Page: React.FC = () => {
             />
             <SingleInputDialog
                 {...albumNameInputVisibilityProps}
+                variant={isInternalUser ? "v2" : "default"}
                 title={t("new_album")}
                 label={t("album_name")}
                 submitButtonTitle={t("create")}
                 onClose={() => {
                     // If the user dismisses the album name dialog without
-                    // submitting, clear any pending single-file add so that it
-                    // doesn't leak into a future album creation.
+                    // submitting, clear any pending single-file add so that
+                    // it doesn't leak into a future album creation.
                     pendingSingleFileAdd.current = undefined;
                     albumNameInputVisibilityProps.onClose();
                 }}
