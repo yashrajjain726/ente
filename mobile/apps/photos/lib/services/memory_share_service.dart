@@ -33,6 +33,7 @@ class MemoryShareService {
 
   static const int _shortFragmentSecretLength = 12;
   static const int _maxMemoryShareFiles = 100;
+  static const int _maxMemoryShareMetadataBytes = 1024 * 1024; // 1 MiB
   static final RegExp _base62SecretPattern = RegExp(r'^[0-9A-Za-z]{12}$');
 
   static List<EnteFile> uniqueUploadedFiles(List<EnteFile> files) {
@@ -81,6 +82,7 @@ class MemoryShareService {
 
       final metadata = jsonEncode({'name': title});
       final metadataBytes = utf8.encode(metadata);
+      _validateMetadataSize(metadataBytes.length);
       final encryptedMetadata = CryptoUtil.encryptSync(
         Uint8List.fromList(metadataBytes),
         shareKey,
@@ -147,9 +149,11 @@ class MemoryShareService {
       final metadataBytes = Uint8List.fromList(
         utf8.encode(jsonEncode(metadata)),
       );
+      _validateMetadataSize(metadataBytes.length);
       final compressedMetadataBytes = Uint8List.fromList(
         GZipCodec().encode(metadataBytes),
       );
+      _validateMetadataSize(compressedMetadataBytes.length);
       final encryptedMetadata = CryptoUtil.encryptSync(
         compressedMetadataBytes,
         shareKey,
@@ -587,6 +591,12 @@ class MemoryShareService {
       return int.tryParse(value);
     }
     return null;
+  }
+
+  void _validateMetadataSize(int size) {
+    if (size > _maxMemoryShareMetadataBytes) {
+      throw StateError("Memory share metadata exceeds the allowed size");
+    }
   }
 
   Future<(String, int)> getOrCreateMemoryLink({
