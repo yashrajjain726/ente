@@ -11,6 +11,7 @@ import {
 import {
     ensureCurrentSpaceContext,
     loadExistingSpaceProfile,
+    persistCurrentOwnedSpaces,
     releaseCurrentSpaceContext,
 } from "services/spaceProfile";
 import {
@@ -953,16 +954,13 @@ export const loadCurrentFeedPage = async (
 ): Promise<SpacePostPage> => {
     const ctx = await ensureCurrentSpaceContext();
     try {
-        return await postPageFromAccountPage(
-            ctx,
-            (await ctx.listFeed(
-                spaceId,
-                cursor ?? null,
-                currentFeedPageSize,
-            )) as SpacePostPageResponse,
-            false,
+        const page = (await ctx.listFeed(
             spaceId,
-        );
+            cursor ?? null,
+            currentFeedPageSize,
+        )) as SpacePostPageResponse;
+        await persistCurrentOwnedSpaces(ctx);
+        return await postPageFromAccountPage(ctx, page, false, spaceId);
     } finally {
         releaseCurrentSpaceContext(ctx);
     }

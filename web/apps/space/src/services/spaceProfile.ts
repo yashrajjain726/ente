@@ -13,7 +13,10 @@ import {
 } from "services/spaceMediaCache";
 import {
     restoreSpaceBrowserSessionIfNeeded,
+    savedSpaceOwnedSpaces,
     savedSpaceSessionToken,
+    saveSpaceOwnedSpaces,
+    type OwnedSpace,
 } from "services/spacePersistentSession";
 import {
     parseSpaceProfilePayload,
@@ -33,11 +36,6 @@ interface SpaceAvatar {
 }
 
 type SpaceCover = SpaceAvatar;
-
-interface OwnedSpace {
-    spaceId: string;
-    spaceSlug: string;
-}
 
 interface CreatedSpace {
     spaceId: string;
@@ -139,6 +137,7 @@ const currentSpaceContextConfig = async () => {
             baseUrl,
             clientPackage: clientPackageName,
             clientVersion: isDesktop ? desktopAppVersion : undefined,
+            ownedSpaces: savedSpaceOwnedSpaces(),
             spaceRootKeyB64,
             spaceSessionToken,
         },
@@ -152,6 +151,10 @@ let currentSpaceContext:
 let pendingCurrentSpaceContext:
     | { cacheKey: string; promise: Promise<SpaceAccountCtxHandle> }
     | undefined;
+let currentOwnedSpace: { cacheKey: string; space: OwnedSpace } | undefined;
+let pendingCurrentOwnedSpace:
+    | { cacheKey: string; promise: Promise<OwnedSpace | undefined> }
+    | undefined;
 let currentSpaceProfile:
     | { cacheKey: string; profile: SetupProfile | null }
     | undefined;
@@ -162,6 +165,9 @@ let currentSpaceContextGeneration = 0;
 
 const cloneSetupProfile = (profile: SetupProfile | null) =>
     profile ? { ...profile } : null;
+
+const cloneOwnedSpace = (space: OwnedSpace | undefined) =>
+    space ? { ...space } : undefined;
 
 export const openCurrentSpaceContext = async () => {
     const config = await currentSpaceContextConfig();
@@ -175,6 +181,8 @@ export const clearCurrentSpaceContext = () => {
     currentSpaceContextGeneration += 1;
     currentSpaceContext = undefined;
     pendingCurrentSpaceContext = undefined;
+    currentOwnedSpace = undefined;
+    pendingCurrentOwnedSpace = undefined;
     currentSpaceProfile = undefined;
     pendingCurrentSpaceProfile = undefined;
     cached?.ctx.free();
@@ -225,6 +233,22 @@ export const ensureCurrentSpaceContext = async () => {
 export const releaseCurrentSpaceContext = (_ctx: SpaceAccountCtxHandle) => {
     void _ctx;
     // Shared context is freed by clearCurrentSpaceContext on logout/session change.
+};
+
+const loadAndPersistOwnedSpaces = async (
+    ctx: SpaceAccountCtxHandle,
+    sessionToken: string,
+) => {
+    const spaces = (await ctx.listOwnedSpaces()) as OwnedSpace[];
+    saveSpaceOwnedSpaces(sessionToken, spaces);
+    return spaces;
+};
+
+export const persistCurrentOwnedSpaces = async (ctx: SpaceAccountCtxHandle) => {
+    const sessionToken = savedSpaceSessionToken();
+    if (sessionToken) {
+        await loadAndPersistOwnedSpaces(ctx, sessionToken);
+    }
 };
 
 const avatarURLForRemoteAvatar = async (
@@ -298,6 +322,44 @@ const profileFromDecryptedSpaceProfile = (
     };
 };
 
+const loadExistingOwnedSpace = async () => {
+    const config = await currentSpaceContextConfig();
+    if (!config) return undefined;
+
+    if (pendingCurrentOwnedSpace?.cacheKey == config.cacheKey) {
+        return cloneOwnedSpace(await pendingCurrentOwnedSpace.promise);
+    }
+    if (currentOwnedSpace?.cacheKey == config.cacheKey) {
+        return cloneOwnedSpace(currentOwnedSpace.space);
+    }
+
+    const promise = (async () => {
+        const ctx = await ensureCurrentSpaceContext();
+        const spaces = await loadAndPersistOwnedSpaces(
+            ctx,
+            config.input.spaceSessionToken,
+        );
+        return defaultOwnedSpace(spaces);
+    })();
+    const pendingSpace = { cacheKey: config.cacheKey, promise };
+    pendingCurrentOwnedSpace = pendingSpace;
+
+    try {
+        const space = await promise;
+        if (space && pendingCurrentOwnedSpace == pendingSpace) {
+            currentOwnedSpace = { cacheKey: config.cacheKey, space };
+        }
+        return cloneOwnedSpace(space);
+    } finally {
+        if (pendingCurrentOwnedSpace == pendingSpace) {
+            pendingCurrentOwnedSpace = undefined;
+        }
+    }
+};
+
+export const loadExistingSpaceId = async () =>
+    (await loadExistingOwnedSpace())?.spaceId;
+
 export const loadExistingSpaceProfile = async (options?: {
     force?: boolean;
 }) => {
@@ -312,15 +374,17 @@ export const loadExistingSpaceProfile = async (options?: {
     }
 
     const promise = (async () => {
-        const ctx = await ensureCurrentSpaceContext();
-        const spaces = (await ctx.listOwnedSpaces()) as OwnedSpace[];
-        const space = defaultOwnedSpace(spaces);
+        const space = await loadExistingOwnedSpace();
         if (!space) return null;
 
+        // Give the home feed, which shares this lookup, the first request slot.
+        await new Promise<void>((resolve) => setTimeout(resolve, 0));
+        const ctx = await ensureCurrentSpaceContext();
         const spaceProfile = (await ctx.getSpaceProfile(
             space.spaceId,
             space.spaceId,
         )) as DecryptedSpaceProfile;
+        await persistCurrentOwnedSpaces(ctx);
         return profileFromDecryptedSpaceProfile(spaceProfile);
     })();
 
@@ -407,6 +471,8 @@ export const saveSpaceProfile = async (
     const ctx = await ensureCurrentSpaceContext();
     try {
         const spaces = (await ctx.listOwnedSpaces()) as OwnedSpace[];
+        const sessionToken = savedSpaceSessionToken();
+        if (sessionToken) saveSpaceOwnedSpaces(sessionToken, spaces);
         const existingSpace =
             (profile.spaceId &&
                 spaces.find((space) => space.spaceId == profile.spaceId)) ||
@@ -441,6 +507,10 @@ export const saveSpaceProfile = async (
             )) as CreatedSpace;
             spaceId = created.spaceId;
             spaceSlug = created.spaceSlug;
+            const createdSpaces = (await ctx.listOwnedSpaces()) as OwnedSpace[];
+            if (sessionToken) {
+                saveSpaceOwnedSpaces(sessionToken, createdSpaces);
+            }
         }
 
         let avatarUrl = profile.avatarUrl ?? null;

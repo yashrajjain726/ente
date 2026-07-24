@@ -776,6 +776,102 @@ async fn create_space_updates_loaded_owned_space_cache() {
 }
 
 #[tokio::test]
+async fn list_owned_spaces_uses_initial_cache() {
+    let server = Server::new_async().await;
+    let expected = SpaceKeyResponse {
+        space_id: "space_owner_main".to_owned(),
+        space_slug: "owner-main".to_owned(),
+        root_wrapped_space_key: "wrapped-key".to_owned(),
+        public_key: "public-key".to_owned(),
+        encrypted_secret_key: "encrypted-secret-key".to_owned(),
+        encrypted_profile: "encrypted-profile".to_owned(),
+        key_version: 3,
+    };
+    let ctx = AccountSpaceCtx::open(OpenAccountSpaceCtxInput {
+        base_url: server.url(),
+        space_session_token: Some("space-session-token".to_owned()),
+        space_root_key: generate_key(),
+        initial_owned_spaces: Some(vec![expected.clone()]),
+        user_agent: None,
+        client_package: None,
+        client_version: None,
+    })
+    .expect("account space ctx should open");
+
+    let spaces = ctx
+        .list_owned_spaces()
+        .await
+        .expect("seeded space list should load");
+
+    assert_eq!(spaces.len(), 1);
+    assert_eq!(spaces[0].space_id, expected.space_id);
+    assert_eq!(
+        spaces[0].root_wrapped_space_key,
+        expected.root_wrapped_space_key
+    );
+}
+
+#[tokio::test]
+async fn newer_key_version_refreshes_initial_owned_cache() {
+    let mut server = Server::new_async().await;
+    let space_root_key = generate_key();
+    let old_space_key = generate_key();
+    let current_space_key = generate_key();
+    let list_spaces = server
+        .mock("GET", "/account/space")
+        .match_header("x-space-session-token", "space-session-token")
+        .with_status(200)
+        .with_body(owned_space_response(
+            &space_root_key,
+            &current_space_key,
+            "space_owner_main",
+            "owner-main",
+            3,
+        ))
+        .expect(1)
+        .create_async()
+        .await;
+    let cached = SpaceKeyResponse {
+        space_id: "space_owner_main".to_owned(),
+        space_slug: "owner-main".to_owned(),
+        root_wrapped_space_key: encode_b64(
+            &encrypt_secretbox_payload(&space_root_key, &old_space_key)
+                .expect("old space key wrap"),
+        ),
+        public_key: String::new(),
+        encrypted_secret_key: String::new(),
+        encrypted_profile: String::new(),
+        key_version: 2,
+    };
+    let ctx = AccountSpaceCtx::open(OpenAccountSpaceCtxInput {
+        base_url: server.url(),
+        space_session_token: Some("space-session-token".to_owned()),
+        space_root_key,
+        initial_owned_spaces: Some(vec![cached]),
+        user_agent: None,
+        client_package: None,
+        client_version: None,
+    })
+    .expect("account space ctx should open");
+
+    let resolved = ctx
+        .resolve_space_key_for_version("space_owner_main", Some(3))
+        .await
+        .expect("current space key should resolve")
+        .expect("current space key should exist");
+
+    assert_eq!(resolved, current_space_key);
+    assert_eq!(
+        ctx.list_owned_spaces()
+            .await
+            .expect("refreshed owned spaces")[0]
+            .key_version,
+        3
+    );
+    list_spaces.assert_async().await;
+}
+
+#[tokio::test]
 async fn list_owned_spaces_reuses_loaded_cache() {
     let mut server = Server::new_async().await;
     let ctx = test_account_ctx(&server.url());
