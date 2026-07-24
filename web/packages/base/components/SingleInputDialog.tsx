@@ -14,7 +14,7 @@ import { t } from "i18next";
 import React, { useCallback } from "react";
 import { SingleInputForm, type SingleInputFormProps } from "./SingleInputForm";
 
-export type SingleInputDialogProps = ModalVisibilityProps &
+type SingleInputDialogProps = ModalVisibilityProps &
     Omit<SingleInputFormProps, "onCancel"> & {
         /** Title of the dialog. */
         title: string;

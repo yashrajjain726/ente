@@ -117,7 +117,7 @@ export const CollectionsSortOptions: React.FC<CollectionsSortOptionsProps> = ({
                 aria-controls={anchorEl ? ariaID : undefined}
                 aria-haspopup="true"
                 aria-expanded={anchorEl ? "true" : undefined}
-                aria-label={t("sort_by")}
+                aria-label={isV2 ? t("sort_by") : undefined}
                 sx={triggerButtonSxProps}
             >
                 <SortIcon sx={isV2 ? { fontSize: 20 } : undefined} />

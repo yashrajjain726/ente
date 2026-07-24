@@ -18,14 +18,21 @@ import {
 } from "@mui/material";
 import { CollectionsSortOptions } from "ente-new/photos/components/CollectionsSortOptions";
 import { BaseTileButton, ItemCard } from "ente-new/photos/components/Tiles";
-import type { CollectionSummary } from "ente-new/photos/services/collection-summary";
-import { t } from "i18next";
-import React from "react";
-import type { CollectionSelectorProps } from "./CollectionSelector";
 import {
-    collectionSelectorTitle,
-    useCollectionSelector,
-} from "./useCollectionSelector";
+    canAddToCollection,
+    canMoveToCollection,
+    collectionsSortBy,
+    sortCollectionSummaries,
+    type CollectionsSortBy,
+    type CollectionSummary,
+} from "ente-new/photos/services/collection-summary";
+import { includes } from "ente-utils/type-guards";
+import { t } from "i18next";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import type {
+    CollectionSelectorAction,
+    CollectionSelectorProps,
+} from "./CollectionSelector";
 
 /**
  * The internal-only ("v2") variant of {@link CollectionSelector}, restyled to
@@ -39,32 +46,124 @@ import {
 export const CollectionSelectorV2: React.FC<CollectionSelectorProps> = (
     props,
 ) => {
+    const {
+        open,
+        onClose,
+        onExited,
+        attributes,
+        collectionSummaries,
+        collectionForCollectionSummaryID,
+    } = props;
+
     // Make the dialog fullscreen if the screen is <= the dialog's max width.
     const isFullScreen = useMediaQuery("(max-width: 490px)");
-    const {
-        attributes,
-        searchTerm,
-        setSearchTerm,
-        sortBy,
-        setSortBy,
-        filteredCollections,
-        searchFilteredCollections,
-        showCreateButton,
-        handleExited,
-        handleCollectionSummaryClick,
-        handleClose,
-    } = useCollectionSelector({
-        ...props,
-        createCollectionLabel: t("new_album"),
-    });
+
+    const [searchTerm, setSearchTerm] = useState("");
+    const [sortBy, setSortBy] =
+        useCollectionSelectorSortByLocalState("name-asc");
+    const [filteredCollections, setFilteredCollections] = useState<
+        CollectionSummary[]
+    >([]);
+
+    const handleExited = useCallback(() => {
+        setSearchTerm("");
+        onExited?.();
+    }, [onExited]);
+
+    useEffect(() => {
+        if (!attributes || !open) return;
+
+        const activeCollectionID = attributes.activeCollectionID;
+        const selectableCollections = [...collectionSummaries.values()].filter(
+            (collectionSummary) => {
+                if (
+                    collectionSummary.id ===
+                    attributes.sourceCollectionSummaryID
+                ) {
+                    return false;
+                }
+
+                const isUserFavorites =
+                    collectionSummary.type === "userFavorites";
+                if (
+                    attributes.action === "add" ||
+                    attributes.action === "move"
+                ) {
+                    return (
+                        canAddToCollection(collectionSummary) &&
+                        !isUserFavorites
+                    );
+                }
+                if (attributes.action === "upload") {
+                    return (
+                        (canAddToCollection(collectionSummary) ||
+                            collectionSummary.type === "uncategorized") &&
+                        !isUserFavorites
+                    );
+                }
+                if (attributes.action === "restore") {
+                    return (
+                        (canMoveToCollection(collectionSummary) ||
+                            collectionSummary.type === "uncategorized") &&
+                        !isUserFavorites
+                    );
+                }
+                return (
+                    canMoveToCollection(collectionSummary) && !isUserFavorites
+                );
+            },
+        );
+
+        const collections = sortCollectionSummaries(
+            selectableCollections,
+            sortBy,
+        )
+            .sort((a, b) => b.sortPriority - a.sortPriority)
+            .sort((a, b) => {
+                if (a.id === activeCollectionID) return -1;
+                if (b.id === activeCollectionID) return 1;
+                return 0;
+            });
+
+        if (collections.length === 0) {
+            onClose();
+            attributes.onCreateCollection();
+            handleExited();
+        }
+
+        setFilteredCollections(collections);
+    }, [collectionSummaries, attributes, open, onClose, sortBy, handleExited]);
+
+    const searchFilteredCollections = useMemo(() => {
+        if (!searchTerm.trim()) return filteredCollections;
+        const searchLower = searchTerm.toLowerCase();
+        return filteredCollections.filter((collectionSummary) =>
+            collectionSummary.name.toLowerCase().includes(searchLower),
+        );
+    }, [filteredCollections, searchTerm]);
+
+    const showCreateButton =
+        !searchTerm.trim() ||
+        t("new_album").toLowerCase().includes(searchTerm.toLowerCase());
 
     if (!filteredCollections.length || !attributes) return null;
 
-    const { action, onCreateCollection } = attributes;
+    const { action, onCancel, onCreateCollection, onSelectCollection } =
+        attributes;
+
+    const handleCollectionSummaryClick = async (id: number) => {
+        onSelectCollection(await collectionForCollectionSummaryID(id));
+        onClose();
+    };
+
+    const handleClose = () => {
+        onCancel?.();
+        onClose();
+    };
 
     return (
         <Dialog
-            open={props.open}
+            open={open}
             onClose={handleClose}
             fullScreen={isFullScreen}
             maxWidth={false}
@@ -128,6 +227,42 @@ export const CollectionSelectorV2: React.FC<CollectionSelectorProps> = (
             )}
         </Dialog>
     );
+};
+
+const collectionSelectorTitle = (action: CollectionSelectorAction) => {
+    switch (action) {
+        case "upload":
+            return t("upload_to_album");
+        case "add":
+            return t("add_to_album");
+        case "move":
+            return t("move_to_album");
+        case "restore":
+            return t("restore_to_album");
+        case "unhide":
+            return t("unhide_to_album");
+    }
+};
+
+const useCollectionSelectorSortByLocalState = (
+    initialValue: CollectionsSortBy,
+) => {
+    const key = "collectionSelectorSortBy";
+    const [value, setValue] = useState(initialValue);
+
+    useEffect(() => {
+        const storedValue = localStorage.getItem(key);
+        if (storedValue && includes(collectionsSortBy, storedValue)) {
+            setValue(storedValue);
+        }
+    }, []);
+
+    const setter = (newValue: CollectionsSortBy) => {
+        localStorage.setItem(key, newValue);
+        setValue(newValue);
+    };
+
+    return [value, setter] as const;
 };
 
 const surfaceStroke = "#e0e0e0";

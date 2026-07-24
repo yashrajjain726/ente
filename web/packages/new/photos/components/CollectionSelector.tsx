@@ -27,17 +27,25 @@ import {
     LargeTileTextOverlay,
 } from "ente-new/photos/components/Tiles";
 import { useSettingsSnapshot } from "ente-new/photos/components/utils/use-snapshot";
-import type {
-    CollectionSummaries,
-    CollectionSummary,
-} from "ente-new/photos/services/collection-summary";
-import { t } from "i18next";
-import React, { useRef } from "react";
-import { CollectionSelectorV2 } from "./CollectionSelectorV2";
 import {
-    collectionSelectorTitle,
-    useCollectionSelector,
-} from "./useCollectionSelector";
+    canAddToCollection,
+    canMoveToCollection,
+    collectionsSortBy,
+    sortCollectionSummaries,
+    type CollectionsSortBy,
+    type CollectionSummaries,
+    type CollectionSummary,
+} from "ente-new/photos/services/collection-summary";
+import { includes } from "ente-utils/type-guards";
+import { t } from "i18next";
+import React, {
+    useCallback,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+} from "react";
+import { CollectionSelectorV2 } from "./CollectionSelectorV2";
 
 export type CollectionSelectorAction =
     | "upload"
@@ -148,35 +156,127 @@ export const CollectionSelector: React.FC<CollectionSelectorProps> = (
     );
 };
 
-const CollectionSelectorClassic: React.FC<CollectionSelectorProps> = (
-    props,
-) => {
+const CollectionSelectorClassic: React.FC<CollectionSelectorProps> = ({
+    open,
+    onClose,
+    onExited,
+    attributes,
+    collectionSummaries,
+    collectionForCollectionSummaryID,
+}) => {
     // Make the dialog fullscreen if the screen is <= the dialog's max width.
     const isFullScreen = useMediaQuery("(max-width: 490px)");
-    const {
-        attributes,
-        searchTerm,
-        setSearchTerm,
-        sortBy,
-        setSortBy,
-        filteredCollections,
-        searchFilteredCollections,
-        showCreateButton,
-        handleExited,
-        handleCollectionSummaryClick,
-        handleClose,
-    } = useCollectionSelector({
-        ...props,
-        createCollectionLabel: t("create_albums"),
-    });
 
-    if (!filteredCollections.length || !attributes) return null;
+    const [searchTerm, setSearchTerm] = useState("");
+    const [sortBy, setSortBy] =
+        useCollectionSelectorSortByLocalState("name-asc");
 
-    const { action, onCreateCollection } = attributes;
+    const [filteredCollections, setFilteredCollections] = useState<
+        CollectionSummary[]
+    >([]);
+
+    const handleExited = useCallback(() => {
+        setSearchTerm("");
+        onExited?.();
+    }, [onExited]);
+
+    useEffect(() => {
+        if (!attributes || !open) {
+            return;
+        }
+
+        const activeCollectionID = attributes.activeCollectionID;
+        const filteredCollections = [...collectionSummaries.values()].filter(
+            (cs) => {
+                if (cs.id === attributes.sourceCollectionSummaryID) {
+                    return false;
+                } else if (
+                    attributes.action == "add" ||
+                    attributes.action == "move"
+                ) {
+                    return canAddToCollection(cs) && cs.type != "userFavorites";
+                } else if (attributes.action == "upload") {
+                    return (
+                        (canAddToCollection(cs) ||
+                            cs.type == "uncategorized") &&
+                        cs.type != "userFavorites"
+                    );
+                } else if (attributes.action == "restore") {
+                    return (
+                        (canMoveToCollection(cs) ||
+                            cs.type == "uncategorized") &&
+                        cs.type != "userFavorites"
+                    );
+                } else {
+                    // "unhide"
+                    return (
+                        canMoveToCollection(cs) && cs.type != "userFavorites"
+                    );
+                }
+            },
+        );
+
+        const collections = sortCollectionSummaries(filteredCollections, sortBy)
+            .sort((a, b) => b.sortPriority - a.sortPriority)
+            .sort((a, b) => {
+                // Prioritize the active collection (if any) to appear first.
+                if (a.id === activeCollectionID) return -1;
+                if (b.id === activeCollectionID) return 1;
+                return 0;
+            });
+
+        if (collections.length === 0) {
+            onClose();
+            attributes.onCreateCollection();
+            handleExited();
+        }
+
+        setFilteredCollections(collections);
+    }, [collectionSummaries, attributes, open, onClose, sortBy, handleExited]);
+
+    const searchFilteredCollections = useMemo(() => {
+        if (!searchTerm.trim()) {
+            return filteredCollections;
+        }
+        const searchLower = searchTerm.toLowerCase();
+        return filteredCollections.filter((cs) =>
+            cs.name.toLowerCase().includes(searchLower),
+        );
+    }, [filteredCollections, searchTerm]);
+
+    const showCreateButton = useMemo(() => {
+        if (!searchTerm.trim()) {
+            return true;
+        }
+        const searchLower = searchTerm.toLowerCase();
+        const createText = t("create_albums").toLowerCase();
+        return createText.includes(searchLower);
+    }, [searchTerm]);
+
+    if (!filteredCollections.length) {
+        return <></>;
+    }
+
+    if (!attributes) {
+        return <></>;
+    }
+
+    const { action, onSelectCollection, onCancel, onCreateCollection } =
+        attributes;
+
+    const handleCollectionSummaryClick = async (id: number) => {
+        onSelectCollection(await collectionForCollectionSummaryID(id));
+        onClose();
+    };
+
+    const handleClose = () => {
+        onCancel?.();
+        onClose();
+    };
 
     return (
         <StyledDialog
-            open={props.open}
+            open={open}
             onClose={handleClose}
             fullWidth
             fullScreen={isFullScreen}
@@ -196,7 +296,7 @@ const CollectionSelectorClassic: React.FC<CollectionSelectorProps> = (
                         <Stack sx={{ flex: 1 }}>
                             <Box>
                                 <Typography variant="h5">
-                                    {collectionSelectorTitle(action)}
+                                    {titleForAction(action)}
                                 </Typography>
                                 <Typography
                                     variant="small"
@@ -274,6 +374,21 @@ const NoResultsContent = styled(DialogContent)`
     align-items: center;
     min-height: 154px;
 `;
+
+const titleForAction = (action: CollectionSelectorAction) => {
+    switch (action) {
+        case "upload":
+            return t("upload_to_album");
+        case "add":
+            return t("add_to_album");
+        case "move":
+            return t("move_to_album");
+        case "restore":
+            return t("restore_to_album");
+        case "unhide":
+            return t("unhide_to_album");
+    }
+};
 
 interface CollectionSummaryButtonProps {
     collectionSummary: CollectionSummary;
@@ -410,4 +525,28 @@ const SearchField: React.FC<SearchFieldProps> = ({ value, onChange }) => {
             }}
         />
     );
+};
+
+/**
+ * A hook that maintains the collection selector sort order both as in-memory
+ * and local storage state.
+ */
+const useCollectionSelectorSortByLocalState = (
+    initialValue: CollectionsSortBy,
+) => {
+    const key = "collectionSelectorSortBy";
+
+    const [value, setValue] = useState(initialValue);
+
+    useEffect(() => {
+        const value = localStorage.getItem(key);
+        if (value && includes(collectionsSortBy, value)) setValue(value);
+    }, []);
+
+    const setter = (value: CollectionsSortBy) => {
+        localStorage.setItem(key, value);
+        setValue(value);
+    };
+
+    return [value, setter] as const;
 };
