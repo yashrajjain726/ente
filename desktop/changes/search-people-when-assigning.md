@@ -1,0 +1,1 @@
+- Search for people when assigning photos.
