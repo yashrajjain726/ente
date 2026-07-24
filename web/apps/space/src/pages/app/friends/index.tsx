@@ -1,3 +1,4 @@
+import { SpaceFriendRequestCanceledToast } from "components/SpaceFriendRequestCanceledToast";
 import { SpacePageMeta } from "components/SpacePageMeta";
 import { SpaceRouteFallback } from "components/SpaceRouteFallback";
 import React, { useEffect } from "react";
@@ -5,6 +6,7 @@ import { FriendsScreen, friendsBackground } from "screens/FriendsScreen";
 import {
     confirmCurrentFriendRequest,
     deleteCurrentFriendRequest,
+    isFriendRequestCanceledError,
     loadCurrentFriendAvatarURL,
     loadCurrentFriendRequests,
     loadCurrentSpaceFriends,
@@ -29,6 +31,8 @@ const Page: React.FC = () => {
         SpaceFriendRequest[]
     >([]);
     const [isFriendsLoading, setIsFriendsLoading] = React.useState(true);
+    const [showFriendRequestCanceledToast, setShowFriendRequestCanceledToast] =
+        React.useState(false);
 
     useEffect(() => {
         if (profileLoadStatus == "ready" && !profile) {
@@ -101,7 +105,21 @@ const Page: React.FC = () => {
                     const actorSpaceId = profile.spaceId;
                     if (!actorSpaceId) return;
 
-                    await confirmCurrentFriendRequest(actorSpaceId, requestID);
+                    try {
+                        await confirmCurrentFriendRequest(
+                            actorSpaceId,
+                            requestID,
+                        );
+                    } catch (error: unknown) {
+                        if (!isFriendRequestCanceledError(error)) throw error;
+                        setFriendRequests((currentRequests) =>
+                            currentRequests.filter(
+                                (request) => request.requestId != requestID,
+                            ),
+                        );
+                        setShowFriendRequestCanceledToast(true);
+                        return;
+                    }
                     setFriendRequests((currentRequests) =>
                         currentRequests.filter(
                             (request) => request.requestId != requestID,
@@ -113,7 +131,21 @@ const Page: React.FC = () => {
                     const actorSpaceId = profile.spaceId;
                     if (!actorSpaceId) return;
 
-                    await deleteCurrentFriendRequest(actorSpaceId, requestID);
+                    try {
+                        await deleteCurrentFriendRequest(
+                            actorSpaceId,
+                            requestID,
+                        );
+                    } catch (error: unknown) {
+                        if (!isFriendRequestCanceledError(error)) throw error;
+                        setFriendRequests((currentRequests) =>
+                            currentRequests.filter(
+                                (request) => request.requestId != requestID,
+                            ),
+                        );
+                        setShowFriendRequestCanceledToast(true);
+                        return;
+                    }
                     setFriendRequests((currentRequests) =>
                         currentRequests.filter(
                             (request) => request.requestId != requestID,
@@ -140,6 +172,11 @@ const Page: React.FC = () => {
                     );
                 }}
             />
+            {showFriendRequestCanceledToast && (
+                <SpaceFriendRequestCanceledToast
+                    onClose={() => setShowFriendRequestCanceledToast(false)}
+                />
+            )}
         </>
     );
 };

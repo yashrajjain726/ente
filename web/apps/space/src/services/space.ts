@@ -1340,6 +1340,23 @@ export const confirmCurrentFriendRequest = async (
     }
 };
 
+export const isFriendRequestCanceledError = (error: unknown) => {
+    if (!error || typeof error != "object") return false;
+
+    const { code, message, status } = error as {
+        code?: unknown;
+        message?: unknown;
+        status?: unknown;
+    };
+    return (
+        status == 400 ||
+        status == 404 ||
+        (code == "invalid_input" &&
+            typeof message == "string" &&
+            message.includes("friend request is not available"))
+    );
+};
+
 export const deleteCurrentFriendRequest = async (
     spaceId: string,
     requestId: number,

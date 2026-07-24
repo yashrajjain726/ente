@@ -533,17 +533,18 @@ const FriendRequestRow: React.FC<FriendRequestRowProps> = ({
                                     : { bgcolor: "#F1F1F1" },
                             }}
                         >
-                            <SpaceActionFeedbackIcon
-                                idleIcon={
-                                    <HugeiconsIcon
-                                        icon={Cancel01Icon}
-                                        size={18}
-                                        strokeWidth={2}
-                                    />
-                                }
-                                phase={action == "delete" ? "busy" : null}
-                                size={18}
-                            />
+                            {action == "delete" ? (
+                                <SpaceActionFeedbackIcon
+                                    phase="busy"
+                                    size={18}
+                                />
+                            ) : (
+                                <HugeiconsIcon
+                                    icon={Cancel01Icon}
+                                    size={18}
+                                    strokeWidth={2}
+                                />
+                            )}
                         </Box>
                     </>
                 ) : (
