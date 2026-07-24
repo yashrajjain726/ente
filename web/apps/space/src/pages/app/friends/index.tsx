@@ -4,6 +4,7 @@ import { SpaceRouteFallback } from "components/SpaceRouteFallback";
 import React, { useEffect } from "react";
 import { FriendsScreen, friendsBackground } from "screens/FriendsScreen";
 import {
+    clearSpaceFriendsCache,
     confirmCurrentFriendRequest,
     deleteCurrentFriendRequest,
     isFriendRequestCanceledError,
@@ -120,16 +121,20 @@ const Page: React.FC = () => {
                         setShowFriendRequestCanceledToast(true);
                         return;
                     }
+                    const friends = await loadCurrentSpaceFriends(actorSpaceId);
                     setFriendRequests((currentRequests) =>
                         currentRequests.filter(
                             (request) => request.requestId != requestID,
                         ),
                     );
-                    setFriends(await loadCurrentSpaceFriends(actorSpaceId));
+                    setFriends(friends);
                 }}
                 onDeleteFriendRequest={async (requestID) => {
                     const actorSpaceId = profile.spaceId;
                     if (!actorSpaceId) return;
+                    const friendRequest = friendRequests.find(
+                        (request) => request.requestId == requestID,
+                    );
 
                     try {
                         await deleteCurrentFriendRequest(
@@ -138,12 +143,20 @@ const Page: React.FC = () => {
                         );
                     } catch (error: unknown) {
                         if (!isFriendRequestCanceledError(error)) throw error;
-                        setFriendRequests((currentRequests) =>
-                            currentRequests.filter(
-                                (request) => request.requestId != requestID,
-                            ),
+                        clearSpaceFriendsCache();
+                        const [requests, friends] = await Promise.all([
+                            loadCurrentFriendRequests(actorSpaceId),
+                            loadCurrentSpaceFriends(actorSpaceId),
+                        ]);
+                        setFriendRequests(requests);
+                        setFriends(friends);
+                        setShowFriendRequestCanceledToast(
+                            !friendRequest ||
+                                !friends.some(
+                                    (friend) =>
+                                        friend.id == friendRequest.friend.id,
+                                ),
                         );
-                        setShowFriendRequestCanceledToast(true);
                         return;
                     }
                     setFriendRequests((currentRequests) =>
