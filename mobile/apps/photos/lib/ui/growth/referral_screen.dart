@@ -1,3 +1,4 @@
+import "package:ente_components/ente_components.dart";
 import "package:ente_pure_utils/ente_pure_utils.dart";
 import "package:flutter/material.dart";
 import "package:hugeicons/hugeicons.dart";
@@ -6,14 +7,12 @@ import "package:photos/generated/l10n.dart";
 import "package:photos/models/user_details.dart";
 import "package:photos/service_locator.dart";
 import "package:photos/services/account/user_service.dart";
-import "package:photos/theme/ente_theme.dart";
-import "package:photos/theme/text_style.dart";
 import "package:photos/ui/common/loading_widget.dart";
 import "package:photos/ui/common/web_page.dart";
-import "package:photos/ui/components/menu_item_widget/menu_item_widget_new.dart";
 import "package:photos/ui/growth/apply_code_sheet.dart";
 import "package:photos/ui/growth/referral_code_widget.dart";
 import "package:photos/ui/growth/storage_details_screen.dart";
+import "package:photos/ui/settings/components/settings_page_scaffold.dart";
 import "package:photos/utils/share_util.dart";
 import "package:tuple/tuple.dart";
 
@@ -45,52 +44,61 @@ class _ReferralScreenState extends State<ReferralScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = getEnteColorScheme(context);
-
-    return Scaffold(
-      backgroundColor: colorScheme.backgroundColour,
-      body: SafeArea(
-        child: FutureBuilder<Tuple2<ReferralView, UserDetails>>(
-          future: _fetchData(),
-          builder: (context, snapshot) {
-            if (snapshot.hasData) {
-              return ReferralWidget(
-                referralView: snapshot.data!.item1,
+    final l10n = AppLocalizations.of(context);
+    return FutureBuilder<Tuple2<ReferralView, UserDetails>>(
+      future: _fetchData(),
+      builder: (context, snapshot) {
+        final referralView = snapshot.data?.item1;
+        return SettingsPageScaffold(
+          title: l10n.earnFreeStorage,
+          subtitle: l10n.shareCodeEarnStorage,
+          actions: [
+            if (referralView?.planInfo.isEnabled ?? false)
+              IconButtonComponent(
+                icon: HugeIcon(
+                  icon: HugeIcons.strokeRoundedShare08,
+                  color: context.componentColors.iconColor,
+                ),
+                tooltip: l10n.share,
+                shouldSurfaceExecutionStates: false,
+                onTap: () {
+                  shareText(
+                    l10n.shareTextReferralCode(
+                      referralCode: referralView!.code,
+                      referralStorageInGB: referralView.planInfo.storageInGB,
+                    ),
+                  );
+                },
+              ),
+          ],
+          children: [
+            if (snapshot.hasData)
+              ReferralWidget(
+                referralView: referralView!,
                 userDetails: snapshot.data!.item2,
                 notifyParent: _safeUIUpdate,
-              );
-            } else if (snapshot.hasError) {
-              return Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const SizedBox(height: 24),
-                    GestureDetector(
-                      onTap: () => Navigator.of(context).pop(),
-                      child: Icon(
-                        Icons.arrow_back,
-                        color: colorScheme.strokeBase,
-                        size: 24,
-                      ),
+              )
+            else if (snapshot.hasError)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 80),
+                child: Center(
+                  child: Text(
+                    l10n.failedToFetchReferralDetails,
+                    style: TextStyles.body.copyWith(
+                      color: context.componentColors.textLight,
                     ),
-                    Expanded(
-                      child: Center(
-                        child: Text(
-                          AppLocalizations.of(
-                            context,
-                          ).failedToFetchReferralDetails,
-                        ),
-                      ),
-                    ),
-                  ],
+                    textAlign: TextAlign.center,
+                  ),
                 ),
-              );
-            }
-            return const Center(child: EnteLoadingWidget());
-          },
-        ),
-      ),
+              )
+            else
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 80),
+                child: Center(child: EnteLoadingWidget()),
+              ),
+          ],
+        );
+      },
     );
   }
 }
@@ -109,153 +117,74 @@ class ReferralWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = getEnteColorScheme(context);
-    final textTheme = getEnteTextTheme(context);
-    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final colors = context.componentColors;
+    final l10n = AppLocalizations.of(context);
     final bool isReferralEnabled = referralView.planInfo.isEnabled;
 
-    final cardColor = isDarkMode
-        ? const Color(0xFF212121)
-        : const Color(0xFFFFFFFF);
-
-    return SingleChildScrollView(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: 24),
-            // Back arrow
-            GestureDetector(
-              onTap: () => Navigator.of(context).pop(),
-              child: Icon(
-                Icons.arrow_back,
-                color: colorScheme.strokeBase,
-                size: 24,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (isReferralEnabled) ...[
+          const SizedBox(height: Spacing.xxl),
+          Center(
+            child: ReferralCodeWidget(
+              referralView.code,
+              shouldShowEdit: true,
+              userDetails: userDetails,
+              notifyParent: notifyParent,
+            ),
+          ),
+          const SizedBox(height: Spacing.xl),
+          _buildInstructions(context),
+          const SizedBox(height: Spacing.xxl),
+        ] else ...[
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 48),
+            child: Center(
+              child: Column(
+                children: [
+                  Icon(Icons.error_outline, color: colors.textLight),
+                  const SizedBox(height: Spacing.md),
+                  Text(
+                    l10n.referralsAreCurrentlyPaused,
+                    style: TextStyles.body.copyWith(color: colors.textLight),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 24),
-            // Header section with title and share button
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        AppLocalizations.of(context).earnFreeStorage,
-                        style: textTheme.largeBold,
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        AppLocalizations.of(context).shareCodeEarnStorage,
-                        style: textTheme.miniMuted,
-                      ),
-                    ],
-                  ),
-                ),
-                if (isReferralEnabled)
-                  GestureDetector(
-                    onTap: () {
-                      shareText(
-                        AppLocalizations.of(context).shareTextReferralCode(
-                          referralCode: referralView.code,
-                          referralStorageInGB:
-                              referralView.planInfo.storageInGB,
-                        ),
-                      );
-                    },
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: cardColor,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      padding: const EdgeInsets.all(8),
-                      child: HugeIcon(
-                        icon: HugeIcons.strokeRoundedShare08,
-                        color: colorScheme.strokeBase,
-                        size: 20,
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 42),
-            // Referral code section
-            if (isReferralEnabled) ...[
-              Center(
-                child: ReferralCodeWidget(
-                  referralView.code,
-                  shouldShowEdit: true,
-                  userDetails: userDetails,
-                  notifyParent: notifyParent,
-                ),
-              ),
-              const SizedBox(height: 16),
-              // Instructions
-              _buildInstructions(context, textTheme),
-              const SizedBox(height: 16),
-            ] else ...[
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 48),
-                child: Center(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      Icon(Icons.error_outline, color: colorScheme.strokeMuted),
-                      const SizedBox(height: 12),
-                      Text(
-                        AppLocalizations.of(
-                          context,
-                        ).referralsAreCurrentlyPaused,
-                        style: textTheme.small.copyWith(
-                          color: colorScheme.textFaint,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-            // Menu items
-            if (referralView.enableApplyCode) ...[
-              MenuItemWidgetNew(
-                title: AppLocalizations.of(context).applyCodeTitle,
-                trailingIcon: Icons.chevron_right_outlined,
-                trailingIconIsMuted: true,
+          ),
+        ],
+        MenuGroupComponent(
+          items: [
+            if (referralView.enableApplyCode)
+              MenuComponent(
+                title: l10n.applyCodeTitle,
+                trailing: _chevron(colors),
                 onTap: () async {
                   final result = await showApplyCodeSheet(
                     context,
                     referralView: referralView,
                     userDetails: userDetails,
                   );
-                  if (result == true) {
-                    notifyParent();
-                  }
+                  if (result == true) notifyParent();
                 },
               ),
-              const SizedBox(height: 8),
-            ],
-            MenuItemWidgetNew(
-              title: AppLocalizations.of(context).faq,
-              trailingIcon: Icons.chevron_right_outlined,
-              trailingIconIsMuted: true,
+            MenuComponent(
+              title: l10n.faq,
+              trailing: _chevron(colors),
               onTap: () async {
                 await routeToPage(
                   context,
                   WebPage(
-                    AppLocalizations.of(context).faq,
+                    l10n.faq,
                     "https://ente.com/help/photos/features/account/referral-program/",
                   ),
                 );
               },
             ),
-            const SizedBox(height: 8),
-            MenuItemWidgetNew(
-              title: AppLocalizations.of(context).details,
-              trailingIcon: Icons.chevron_right_outlined,
-              trailingIconIsMuted: true,
+            MenuComponent(
+              title: l10n.details,
+              trailing: _chevron(colors),
               onTap: () async {
                 await routeToPage(
                   context,
@@ -263,17 +192,26 @@ class ReferralWidget extends StatelessWidget {
                 );
               },
             ),
-            const SizedBox(height: 60),
           ],
         ),
-      ),
+        const SizedBox(height: Spacing.xxl),
+      ],
     );
   }
 
-  Widget _buildInstructions(BuildContext context, EnteTextTheme textTheme) {
-    const greenColor = Color(0xFF08C225);
+  Widget _chevron(ColorTokens colors) => Icon(
+    Icons.chevron_right_outlined,
+    color: colors.textLight,
+    size: IconSizes.medium,
+  );
+
+  Widget _buildInstructions(BuildContext context) {
+    final colors = context.componentColors;
     final storageInGB = referralView.planInfo.storageInGB;
-    final mutedStyle = textTheme.miniMuted.copyWith(height: 2);
+    final mutedStyle = TextStyles.mini.copyWith(
+      color: colors.textLight,
+      height: 2,
+    );
     final step3Text = AppLocalizations.of(
       context,
     ).referralStep3(storageInGB: storageInGB);
@@ -289,7 +227,7 @@ class ReferralWidget extends StatelessWidget {
             children: _buildHighlightedSpans(
               step3Text,
               mutedStyle,
-              greenColor,
+              colors.primary,
               ["${storageInGB}GB free", "$storageInGB GB free"],
               ["${storageInGB}GB", "$storageInGB GB"],
             ),

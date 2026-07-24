@@ -1,0 +1,1 @@
+- Refreshes the referral screens.
