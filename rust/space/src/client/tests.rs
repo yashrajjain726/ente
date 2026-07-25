@@ -1558,6 +1558,13 @@ async fn refresh_friend_shares_accepts_empty_server_response() {
 async fn list_feed_uses_space_feed_endpoint() {
     let mut server = Server::new_async().await;
     let ctx = test_account_ctx(&server.url());
+    let shares = server
+        .mock("GET", "/spaces/space_owner_main/friends/shares")
+        .match_header("x-space-session-token", "space-session-token")
+        .with_status(200)
+        .with_body("[]")
+        .create_async()
+        .await;
     let feed = server
         .mock("GET", "/spaces/space_owner_main/feed")
         .match_header("x-space-session-token", "space-session-token")
@@ -1598,6 +1605,7 @@ async fn list_feed_uses_space_feed_endpoint() {
     assert_eq!(page.items.len(), 1);
     assert_eq!(page.items[0].post_id, 42);
     assert_eq!(page.next_cursor, "cursor-2");
+    shares.assert_async().await;
     feed.assert_async().await;
 }
 
