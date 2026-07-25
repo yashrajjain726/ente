@@ -205,22 +205,15 @@ const Page: React.FC = () => {
         if (!actorSpaceId || !selectedFriendSpaceId) return;
 
         await removeCurrentSpaceFriend(actorSpaceId, selectedFriendSpaceId);
-        void removeCachedSpaceFeedPostsBySpace(
+        await removeCachedSpaceFeedPostsBySpace(
             actorSpaceId,
             selectedFriendSpaceId,
         );
     }, [profile?.spaceId, selectedFriendSpaceId]);
 
     const finishUnfriend = React.useCallback(() => {
-        setFriends((currentFriends) =>
-            currentFriends.filter(
-                (friend) =>
-                    friend.spaceId != selectedFriendSpaceId &&
-                    friend.id != friendSpaceId,
-            ),
-        );
-        void router.replace(spaceRoutes.friends);
-    }, [friendSpaceId, router, selectedFriendSpaceId, setFriends]);
+        window.location.replace(spaceRoutes.friends);
+    }, []);
 
     if (
         !router.isReady ||

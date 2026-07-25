@@ -183,15 +183,11 @@ const Page: React.FC = () => {
                         actorSpaceId,
                         friend.spaceId,
                     );
-                    void removeCachedSpaceFeedPostsBySpace(
+                    await removeCachedSpaceFeedPostsBySpace(
                         actorSpaceId,
                         friend.spaceId,
                     );
-                    setFriends((currentFriends) =>
-                        currentFriends.filter(
-                            (candidate) => candidate.id != friendID,
-                        ),
-                    );
+                    window.location.reload();
                 }}
             />
             {showFriendRequestCanceledToast && (
