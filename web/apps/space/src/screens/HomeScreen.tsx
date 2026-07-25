@@ -241,6 +241,7 @@ class FeedMotionList extends React.Component<FeedMotionListProps> {
         this.animations.clear();
         this.rowElements.forEach((element) => {
             element.style.zIndex = "";
+            element.style.willChange = "";
         });
     };
 
@@ -308,15 +309,21 @@ class FeedMotionList extends React.Component<FeedMotionListProps> {
             let animation: Animation | undefined;
             if (snapshot.enteringKeys.has(key)) {
                 const delay = enteringIndex * feedRowEnterStaggerMs;
+                const height = element.getBoundingClientRect().height;
+                const paddingBottom =
+                    window.getComputedStyle(element).paddingBottom;
                 element.style.zIndex = String(3 - enteringIndex++);
+                element.style.willChange = "height, padding-bottom, transform";
                 animation = element.animate(
                     [
                         {
-                            clipPath: "inset(0 0 100% 0)",
-                            transform: "translate3d(0, -20px, 0)",
+                            height: "0px",
+                            paddingBottom: "0px",
+                            transform: `translate3d(0, -${height}px, 0)`,
                         },
                         {
-                            clipPath: "inset(0 0 0% 0)",
+                            height: `${height}px`,
+                            paddingBottom,
                             transform: "translate3d(0, 0, 0)",
                         },
                     ],
@@ -327,7 +334,7 @@ class FeedMotionList extends React.Component<FeedMotionListProps> {
                         fill: "both",
                     },
                 );
-            } else {
+            } else if (snapshot.enteringKeys.size == 0) {
                 const previousTop = snapshot.previousTops.get(key);
                 if (previousTop == undefined) continue;
                 const offsetY =
@@ -345,6 +352,7 @@ class FeedMotionList extends React.Component<FeedMotionListProps> {
                     },
                 );
             }
+            if (!animation) continue;
 
             this.animations.set(key, animation);
             void animation.finished.then(
@@ -353,6 +361,7 @@ class FeedMotionList extends React.Component<FeedMotionListProps> {
                     animation.cancel();
                     this.animations.delete(key);
                     element.style.zIndex = "";
+                    element.style.willChange = "";
                 },
                 () => undefined,
             );
@@ -371,6 +380,7 @@ class FeedMotionList extends React.Component<FeedMotionListProps> {
                     key={key}
                     ref={this.rowRefFor(key)}
                     sx={{
+                        boxSizing: "border-box",
                         minWidth: 0,
                         pb: "24px",
                         position: "relative",
