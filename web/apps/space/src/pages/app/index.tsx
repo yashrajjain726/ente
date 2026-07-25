@@ -17,6 +17,13 @@ import {
     type SpacePost,
 } from "services/space";
 import {
+    cacheCurrentSpaceFeedPage,
+    loadCachedSpaceFeed,
+    patchCachedSpaceFeedPost,
+    prependCachedSpaceFeedPost,
+    removeCachedSpaceFeedPost,
+} from "services/spaceFeedCache";
+import {
     consumeSentSpaceInviteFriend,
     spaceInviteURL,
 } from "services/spaceInvite";
@@ -112,20 +119,45 @@ const Page: React.FC = () => {
         setIsFeedLoadingMore(false);
         setIsFriendsLoading(true);
         void loadExistingSpaceId()
-            .then((nextSpaceId) => {
+            .then(async (nextSpaceId) => {
                 if (cancelled) return undefined;
 
                 loadedSpaceId = nextSpaceId;
                 setSpaceId(nextSpaceId);
-                return nextSpaceId
-                    ? loadCurrentFeedPage(nextSpaceId)
-                    : undefined;
+                if (!nextSpaceId) return undefined;
+
+                let freshFeedApplied = false;
+                const cachedFeedLoad = loadCachedSpaceFeed(nextSpaceId);
+                const freshFeedLoad = loadCurrentFeedPage(nextSpaceId);
+                void cachedFeedLoad.then((cachedFeed) => {
+                    if (cancelled || freshFeedApplied || !cachedFeed) return;
+
+                    setFeedItems(cachedFeed.items);
+                    setFeedNextCursor(
+                        cachedFeed.dirty ? undefined : cachedFeed.nextCursor,
+                    );
+                });
+
+                const feed = await freshFeedLoad;
+                freshFeedApplied = true;
+                return feed;
             })
             .then((feed) => {
-                if (cancelled || !feed) return;
+                if (cancelled || !loadedSpaceId || !feed) return;
 
                 setFeedItems(feed.items);
                 setFeedNextCursor(feed.nextCursor);
+                void cacheCurrentSpaceFeedPage(loadedSpaceId, feed);
+                const refreshedPostIDs = new Set(
+                    feed.items.map((item) => item.postId),
+                );
+                setLocalFeedPosts((currentPosts) =>
+                    currentPosts.filter(
+                        (item) =>
+                            item.status != "ready" ||
+                            !refreshedPostIDs.has(item.post.postId),
+                    ),
+                );
             })
             .catch((error: unknown) =>
                 console.error("Failed to load space feed", error),
@@ -168,7 +200,7 @@ const Page: React.FC = () => {
         return () => {
             cancelled = true;
         };
-    }, [setFriends, setSkipNextHomeFeedSkeleton]);
+    }, [setFriends, setLocalFeedPosts, setSkipNextHomeFeedSkeleton]);
 
     const loadMoreFeedItems = React.useCallback(async () => {
         if (!spaceId || !feedNextCursor || isFeedLoadingMore) return;
@@ -202,6 +234,9 @@ const Page: React.FC = () => {
             if (!spaceId) throw new Error("Missing space.");
 
             await setCurrentPostLiked(spaceId, postId, liked);
+            void patchCachedSpaceFeedPost(spaceId, postId, {
+                viewerLiked: liked,
+            });
             setFeedItems((currentItems) =>
                 currentItems.map((item) =>
                     item.postId == postId
@@ -240,6 +275,7 @@ const Page: React.FC = () => {
                 isFriendsLoading={isFriendsLoading}
                 localFeedPosts={localFeedPosts}
                 profile={profile}
+                viewerSpaceId={spaceId ?? profile?.spaceId}
                 showInstallPrompt={
                     profileLoadStatus == "ready" &&
                     Boolean(profile) &&
@@ -309,6 +345,10 @@ const Page: React.FC = () => {
                                       localPostId,
                                       post,
                                   );
+                                  void prependCachedSpaceFeedPost(
+                                      spaceId,
+                                      post,
+                                  );
                                   if (isFirstPost) {
                                       inviteFriendsToastTimerRef.current =
                                           window.setTimeout(() => {
@@ -334,6 +374,7 @@ const Page: React.FC = () => {
                     const spaceId = profile?.spaceId;
                     if (!spaceId) throw new Error("Missing space.");
                     await deleteCurrentPost(spaceId, postId);
+                    void removeCachedSpaceFeedPost(spaceId, postId);
                     setLocalFeedPosts((currentPosts) =>
                         currentPosts.filter(
                             (item) =>
@@ -352,6 +393,9 @@ const Page: React.FC = () => {
 
                     await updateCurrentPostCaption(spaceId, postId, caption);
                     const normalizedCaption = caption.trim() || undefined;
+                    void patchCachedSpaceFeedPost(spaceId, postId, {
+                        caption: normalizedCaption,
+                    });
                     setLocalFeedPosts((currentPosts) =>
                         currentPosts.map((item) =>
                             (item.status == "posted" ||

@@ -11,6 +11,7 @@ import {
     clearSpaceFriendsCache,
     clearSpaceMediaURLCache,
 } from "services/space";
+import { clearSpaceFeedMemoryCache } from "services/spaceFeedCache";
 import type { PendingSpacePasskeyVerification } from "services/spacePasskeyVerification";
 import { logoutRevokedSpaceSession } from "services/spacePersistentSession";
 import {
@@ -222,6 +223,7 @@ export const SpaceAppStateProvider: React.FC<React.PropsWithChildren> = ({
         profileLoadGenerationRef.current += 1;
         clearCurrentSpaceContext();
         clearSpaceFriendsCache();
+        clearSpaceFeedMemoryCache();
         clearSpaceMediaURLCache();
         applyProfile(null);
         setProfileLoadError(undefined);

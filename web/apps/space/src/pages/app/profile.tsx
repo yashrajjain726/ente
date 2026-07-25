@@ -13,6 +13,11 @@ import {
     updateCurrentPostCaption,
     type SpaceProfilePost,
 } from "services/space";
+import {
+    patchCachedSpaceFeedPost,
+    prependCachedSpaceFeedPost,
+    removeCachedSpaceFeedPost,
+} from "services/spaceFeedCache";
 import { spaceInviteURL } from "services/spaceInvite";
 import { useSpaceAppState } from "state/spaceAppState";
 import {
@@ -175,6 +180,7 @@ const Page: React.FC = () => {
                             localPostId,
                             post,
                         );
+                        void prependCachedSpaceFeedPost(spaceId, post);
                     } catch (error) {
                         failLocalFeedPost(
                             setLocalFeedPosts,
@@ -191,6 +197,7 @@ const Page: React.FC = () => {
                     const spaceId = profile.spaceId;
                     if (!spaceId) throw new Error("Missing space.");
                     await deleteCurrentPost(spaceId, postId);
+                    void removeCachedSpaceFeedPost(spaceId, postId);
                     setLocalFeedPosts((currentPosts) =>
                         currentPosts.filter(
                             (item) =>
@@ -209,6 +216,9 @@ const Page: React.FC = () => {
 
                     await updateCurrentPostCaption(spaceId, postId, caption);
                     const normalizedCaption = caption.trim() || undefined;
+                    void patchCachedSpaceFeedPost(spaceId, postId, {
+                        caption: normalizedCaption,
+                    });
                     setLocalFeedPosts((currentPosts) =>
                         currentPosts.map((item) =>
                             (item.status == "posted" ||
@@ -241,9 +251,12 @@ const Page: React.FC = () => {
                 }
                 onOpenSettings={() => void router.push(spaceRoutes.settings)}
                 onLoadPostImage={loadCurrentSpacePostAssetURL}
-                onSetPostLiked={(postId, liked) =>
-                    setCurrentPostLiked(actorSpaceId, postId, liked)
-                }
+                onSetPostLiked={async (postId, liked) => {
+                    await setCurrentPostLiked(actorSpaceId, postId, liked);
+                    void patchCachedSpaceFeedPost(actorSpaceId, postId, {
+                        viewerLiked: liked,
+                    });
+                }}
                 profileLink={spaceInviteURL({
                     spaceUsername: profile.username,
                 })}
