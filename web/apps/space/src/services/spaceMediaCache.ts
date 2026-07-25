@@ -1,5 +1,5 @@
 import { savedPartialLocalUser } from "ente-accounts-rs/services/accounts-db";
-import { blobCache } from "ente-base/blob-cache";
+import { blobCache, clearBlobCache } from "ente-base/blob-cache";
 import { apiOrigin } from "ente-base/origins";
 import { blobPartForBytes } from "services/spaceProfilePayload";
 
@@ -154,4 +154,13 @@ export const clearSpaceMediaURLCache = () => {
         );
     }
     spaceMediaURLCache.clear();
+};
+
+export const clearSpaceMediaCache = async () => {
+    clearSpaceMediaURLCache();
+    try {
+        await clearBlobCache("space-media");
+    } catch (error) {
+        console.warn("Failed to clear Space media cache", error);
+    }
 };

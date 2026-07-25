@@ -4,6 +4,7 @@ import type { SpaceAccountCtxHandle } from "ente-space-wasm";
 import type { PendingSpaceInvite } from "services/spaceInvite";
 import {
     cachedSpaceMediaBlobURL,
+    clearSpaceMediaCache,
     rememberCachedSpaceMediaBlobURL,
     spacePostMediaCacheKey,
     spaceProfileMediaCacheKey,
@@ -942,6 +943,7 @@ export const removeCurrentSpaceFriend = async (
     const ctx = await ensureCurrentSpaceContext();
     try {
         await ctx.removeFriendBySpace(actorSpaceId, spaceId);
+        await clearSpaceMediaCache();
         clearSpaceFriendsCache();
     } finally {
         releaseCurrentSpaceContext(ctx);
