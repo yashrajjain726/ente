@@ -8,14 +8,17 @@ import type {
 } from "screens/SetupProfileScreen";
 import {
     cachedSpaceMediaBlobURL,
+    cachedSpaceMediaBlobURLIfPresent,
     rememberCachedSpaceMediaBlobURL,
     spaceProfileMediaCacheKey,
 } from "services/spaceMediaCache";
 import {
     restoreSpaceBrowserSessionIfNeeded,
     savedSpaceOwnedSpaces,
+    savedSpaceProfileAvatar,
     savedSpaceSessionToken,
     saveSpaceOwnedSpaces,
+    saveSpaceProfileAvatar,
     type OwnedSpace,
 } from "services/spacePersistentSession";
 import {
@@ -322,6 +325,22 @@ const profileFromDecryptedSpaceProfile = (
     };
 };
 
+const persistSpaceProfileAvatar = (profile: SetupProfile) => {
+    const sessionToken = savedSpaceSessionToken();
+    if (!sessionToken) return;
+    const { avatarKeyVersion, avatarObjectID, spaceId } = profile;
+    saveSpaceProfileAvatar(
+        sessionToken,
+        avatarKeyVersion && avatarObjectID && spaceId
+            ? {
+                  keyVersion: avatarKeyVersion,
+                  objectID: avatarObjectID,
+                  spaceId,
+              }
+            : undefined,
+    );
+};
+
 const loadExistingOwnedSpace = async () => {
     const config = await currentSpaceContextConfig();
     if (!config) return undefined;
@@ -385,7 +404,9 @@ export const loadExistingSpaceProfile = async (options?: {
             space.spaceId,
         )) as DecryptedSpaceProfile;
         await persistCurrentOwnedSpaces(ctx);
-        return profileFromDecryptedSpaceProfile(spaceProfile);
+        const profile = profileFromDecryptedSpaceProfile(spaceProfile);
+        persistSpaceProfileAvatar(profile);
+        return profile;
     })();
 
     const pendingProfile = { cacheKey: config.cacheKey, promise };
@@ -401,6 +422,21 @@ export const loadExistingSpaceProfile = async (options?: {
             pendingCurrentSpaceProfile = undefined;
         }
     }
+};
+
+export const loadCachedCurrentSpaceAvatar = async () => {
+    const avatar = savedSpaceProfileAvatar();
+    if (!avatar) return undefined;
+    await restoreSpaceBrowserSessionIfNeeded();
+    const avatarUrl = await cachedSpaceMediaBlobURLIfPresent(
+        spaceProfileMediaCacheKey(
+            avatar.spaceId,
+            "avatar",
+            avatar.objectID,
+            avatar.keyVersion,
+        ),
+    );
+    return avatarUrl ? { ...avatar, avatarUrl } : undefined;
 };
 
 export const loadExistingSpaceAvatar = async (
@@ -582,6 +618,7 @@ export const saveSpaceProfile = async (
             spaceId,
             spaceSlug,
         };
+        persistSpaceProfileAvatar(savedProfile);
         currentSpaceProfile = undefined;
         pendingCurrentSpaceProfile = undefined;
         return savedProfile;

@@ -41,11 +41,19 @@ const OwnedSpace = z.object({
 const OwnedSpaces = OwnedSpace.array();
 export type OwnedSpace = z.infer<typeof OwnedSpace>;
 
+const SpaceProfileAvatar = z.object({
+    keyVersion: z.number(),
+    objectID: z.string(),
+    spaceId: z.string(),
+});
+export type SpaceProfileAvatar = z.infer<typeof SpaceProfileAvatar>;
+
 const PersistedSpaceBrowserSession = z.object({
     encryptedSpaceRootKey: z.string(),
     email: z.string(),
     nonce: z.string(),
     ownedSpaces: OwnedSpaces.optional(),
+    profileAvatar: SpaceProfileAvatar.optional(),
     sessionToken: z.string(),
     userId: z.number(),
 });
@@ -145,6 +153,9 @@ export const savedSpaceSessionToken = () =>
 
 export const savedSpaceOwnedSpaces = () => savedPersistedSession()?.ownedSpaces;
 
+export const savedSpaceProfileAvatar = () =>
+    savedPersistedSession()?.profileAvatar;
+
 export const saveSpaceOwnedSpaces = (
     sessionToken: string,
     ownedSpaces: OwnedSpace[],
@@ -157,6 +168,18 @@ export const saveSpaceOwnedSpaces = (
             ...persisted,
             ownedSpaces: ownedSpaces.length ? ownedSpaces : undefined,
         }),
+    );
+};
+
+export const saveSpaceProfileAvatar = (
+    sessionToken: string,
+    profileAvatar: SpaceProfileAvatar | undefined,
+) => {
+    const persisted = savedPersistedSession();
+    if (persisted?.sessionToken != sessionToken) return;
+    localStorage.setItem(
+        spaceBrowserSessionStorageKey,
+        JSON.stringify({ ...persisted, profileAvatar }),
     );
 };
 

@@ -111,6 +111,26 @@ export const cachedSpaceMediaBlobURL = async (
     return promise;
 };
 
+export const cachedSpaceMediaBlobURLIfPresent = async (cacheKey: string) => {
+    const storageKey = await spaceMediaStorageKey(cacheKey);
+    const cached = spaceMediaURLCache.get(storageKey);
+    if (cached) {
+        spaceMediaURLCache.delete(storageKey);
+        spaceMediaURLCache.set(storageKey, cached);
+        return await cached;
+    }
+
+    const blob = await cachedSpaceMediaBlob(storageKey);
+    const loadedWhileReading = spaceMediaURLCache.get(storageKey);
+    if (loadedWhileReading) return await loadedWhileReading;
+    if (!blob) return undefined;
+
+    const url = URL.createObjectURL(blob);
+    spaceMediaURLCache.set(storageKey, Promise.resolve(url));
+    trimSpaceMediaURLCache();
+    return url;
+};
+
 export const rememberCachedSpaceMediaBlobURL = async (
     cacheKey: string,
     blob: Blob,

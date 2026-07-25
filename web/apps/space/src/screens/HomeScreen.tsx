@@ -72,6 +72,11 @@ const feedHorizontalPadding = "16px";
 const minimumFeedPhotoFrameAspectRatio = 3 / 4;
 const feedMediaLoadRootMargin = "640px 0px";
 const feedLoadMoreRootMargin = "0px 0px 160px 0px";
+const avatarFadeSx = {
+    "@keyframes spaceAvatarFade": { from: { opacity: 0 }, to: { opacity: 1 } },
+    animation: "spaceAvatarFade 320ms cubic-bezier(0.22, 1, 0.36, 1) both",
+    "@media (prefers-reduced-motion: reduce)": { animation: "none" },
+} as const;
 const feedCaptionTextSx = {
     color: textBase,
     fontFamily: '"Inter Variable", Inter, sans-serif',
@@ -875,21 +880,13 @@ const FeedItem: React.FC<FeedItemProps> = ({
                             <Box
                                 key={displayAvatarUrl ?? "default-avatar"}
                                 sx={{
-                                    "@keyframes spaceFeedAvatarFade": {
-                                        from: { opacity: 0 },
-                                        to: { opacity: 1 },
-                                    },
-                                    animation:
-                                        "spaceFeedAvatarFade 320ms cubic-bezier(0.22, 1, 0.36, 1) both",
+                                    ...avatarFadeSx,
                                     borderRadius: "50%",
                                     height: feedAvatarSize,
                                     overflow: "hidden",
                                     position: "relative",
                                     width: feedAvatarSize,
                                     zIndex: 1,
-                                    "@media (prefers-reduced-motion: reduce)": {
-                                        animation: "none",
-                                    },
                                 }}
                             >
                                 <SpaceAvatarImage
@@ -1859,10 +1856,19 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                         >
                             {profile &&
                             (profile.avatarUrl || !profile.avatarObjectID) ? (
-                                <SpaceAvatarImage
-                                    src={profile.avatarUrl}
-                                    borderRadius="50%"
-                                />
+                                <Box
+                                    key={profile.avatarUrl ?? "default-avatar"}
+                                    sx={{
+                                        ...avatarFadeSx,
+                                        height: "100%",
+                                        width: "100%",
+                                    }}
+                                >
+                                    <SpaceAvatarImage
+                                        src={profile.avatarUrl}
+                                        borderRadius="50%"
+                                    />
+                                </Box>
                             ) : (
                                 <Skeleton
                                     variant="circular"

@@ -16,6 +16,7 @@ import { logoutRevokedSpaceSession } from "services/spacePersistentSession";
 import {
     clearCurrentSpaceContext,
     isSpaceSessionUnauthorized,
+    loadCachedCurrentSpaceAvatar,
     loadExistingSpaceAvatar,
     loadExistingSpaceCover,
     loadExistingSpaceProfile,
@@ -176,14 +177,26 @@ export const SpaceAppStateProvider: React.FC<React.PropsWithChildren> = ({
             setProfileLoadStatus("loading");
 
             try {
-                const nextProfile = await loadExistingSpaceProfile({
-                    force: true,
-                });
+                const [nextProfile, cachedAvatar] = await Promise.all([
+                    loadExistingSpaceProfile({ force: true }),
+                    loadCachedCurrentSpaceAvatar(),
+                ]);
                 if (profileLoadGenerationRef.current == generation) {
+                    const hydratedProfile =
+                        nextProfile &&
+                        cachedAvatar &&
+                        cachedAvatar.spaceId == nextProfile.spaceId &&
+                        cachedAvatar.objectID == nextProfile.avatarObjectID &&
+                        cachedAvatar.keyVersion == nextProfile.avatarKeyVersion
+                            ? {
+                                  ...nextProfile,
+                                  avatarUrl: cachedAvatar.avatarUrl,
+                              }
+                            : nextProfile;
                     setProfileLoadError(undefined);
-                    applyProfile(nextProfile);
-                    void loadProfileAvatar(nextProfile, generation);
-                    void loadProfileCover(nextProfile, generation);
+                    applyProfile(hydratedProfile);
+                    void loadProfileAvatar(hydratedProfile, generation);
+                    void loadProfileCover(hydratedProfile, generation);
                     setProfileLoadStatus("ready");
                 }
                 return nextProfile;
