@@ -72,6 +72,7 @@ class _ApplyCodeScreenState extends State<ApplyCodeScreen> {
         const SizedBox(height: Spacing.xl),
         ButtonComponent(
           label: l10n.apply,
+          variant: ButtonComponentVariant.primary,
           isDisabled: _isApplying || code.trim().length < 4,
           shouldShowSuccessState: false,
           onTap: _applyCode,

@@ -55,6 +55,7 @@ class _ReferralScreenState extends State<ReferralScreen> {
           actions: [
             if (referralView?.planInfo.isEnabled ?? false)
               IconButtonComponent(
+                variant: IconButtonComponentVariant.primary,
                 icon: HugeIcon(
                   icon: HugeIcons.strokeRoundedShare08,
                   color: context.componentColors.iconColor,
@@ -154,45 +155,44 @@ class ReferralWidget extends StatelessWidget {
             ),
           ),
         ],
-        MenuGroupComponent(
-          items: [
-            if (referralView.enableApplyCode)
-              MenuComponent(
-                title: l10n.applyCodeTitle,
-                trailing: _chevron(colors),
-                onTap: () async {
-                  final result = await showApplyCodeSheet(
-                    context,
-                    referralView: referralView,
-                    userDetails: userDetails,
-                  );
-                  if (result == true) notifyParent();
-                },
+        if (referralView.enableApplyCode) ...[
+          MenuComponent(
+            title: l10n.applyCodeTitle,
+            trailing: _chevron(colors),
+            onTap: () async {
+              final result = await showApplyCodeSheet(
+                context,
+                referralView: referralView,
+                userDetails: userDetails,
+              );
+              if (result == true) notifyParent();
+            },
+          ),
+          const SizedBox(height: Spacing.sm),
+        ],
+        MenuComponent(
+          title: l10n.faq,
+          trailing: _chevron(colors),
+          onTap: () async {
+            await routeToPage(
+              context,
+              WebPage(
+                l10n.faq,
+                "https://ente.com/help/photos/features/account/referral-program/",
               ),
-            MenuComponent(
-              title: l10n.faq,
-              trailing: _chevron(colors),
-              onTap: () async {
-                await routeToPage(
-                  context,
-                  WebPage(
-                    l10n.faq,
-                    "https://ente.com/help/photos/features/account/referral-program/",
-                  ),
-                );
-              },
-            ),
-            MenuComponent(
-              title: l10n.details,
-              trailing: _chevron(colors),
-              onTap: () async {
-                await routeToPage(
-                  context,
-                  StorageDetailsScreen(referralView, userDetails),
-                );
-              },
-            ),
-          ],
+            );
+          },
+        ),
+        const SizedBox(height: Spacing.sm),
+        MenuComponent(
+          title: l10n.details,
+          trailing: _chevron(colors),
+          onTap: () async {
+            await routeToPage(
+              context,
+              StorageDetailsScreen(referralView, userDetails),
+            );
+          },
         ),
         const SizedBox(height: Spacing.xxl),
       ],
