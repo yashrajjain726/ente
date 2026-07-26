@@ -1,6 +1,5 @@
 /app    /app    200
 /app/friends    /app/friends    200
-/app/friends/*    /app/friends/[spaceId]    200
 /app/messages    /app/messages    200
 /app/messages/*    /app/messages/[spaceId]    200
 /app/posts/*    /app/posts/[spaceId]/[postId]    200

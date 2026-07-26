@@ -419,9 +419,20 @@ const Page: React.FC = () => {
                         ),
                     );
                 }}
-                onOpenFriend={(friendID) =>
-                    void router.push(spaceRoutes.friend(friendID))
-                }
+                onOpenFriend={(friendID, username) => {
+                    const friend = friends.find(
+                        (candidate) =>
+                            candidate.id == friendID ||
+                            candidate.spaceId == friendID,
+                    );
+                    const friendUsername = username || friend?.username;
+                    if (friendUsername) {
+                        void router.push(
+                            spaceRoutes.friendPage,
+                            spaceRoutes.friend(friendUsername),
+                        );
+                    }
+                }}
                 onLoadMoreFeedItems={loadMoreFeedItems}
                 onLoadPostAvatar={loadCurrentSpacePostAvatarURL}
                 onLoadPostImage={loadCurrentSpacePostAssetURL}

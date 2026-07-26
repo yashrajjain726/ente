@@ -25,6 +25,7 @@ import {
 } from "components/SpacePostLikeAnimation";
 import type PhotoSwipe from "photoswipe";
 import React from "react";
+import type { SpaceInviteIntent } from "services/spaceInvite";
 import { spaceTouchTargetSize } from "styles/touchTargets";
 import { firstNameFrom, formatSpaceDate } from "utils/spaceDisplay";
 import { clampSpaceMessageText } from "utils/spaceMessageLimits";
@@ -136,6 +137,7 @@ export interface SpaceViewerPhoto {
     postId?: number;
     spaceId?: string;
     timestampMs: number;
+    username?: string;
     viewerLiked?: boolean;
     width?: number;
 }
@@ -153,6 +155,7 @@ interface SpaceFileViewerProps {
     onDeletePost?: () => Promise<void> | void;
     onDraftPostExitStart?: () => void;
     onDraftPostPublished?: () => void;
+    onAddFriendForPostAction?: (intent: SpaceInviteIntent) => void;
     onOpenProfile?: () => void;
     onPublishDraftPost?: (
         caption: string,
@@ -307,6 +310,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
     onDeletePost,
     onDraftPostExitStart,
     onDraftPostPublished,
+    onAddFriendForPostAction,
     onOpenProfile,
     onPublishDraftPost,
     onReplyToPost,
@@ -387,6 +391,9 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
         React.useState(focusReplyOnOpen);
     const [replyActionPhase, setReplyActionPhase] =
         React.useState<SpaceActionPhase | null>(null);
+    const [addFriendSheetOpen, setAddFriendSheetOpen] = React.useState(false);
+    const [addFriendIntent, setAddFriendIntent] =
+        React.useState<SpaceInviteIntent>("like");
     const [draftPostActionPhase, setDraftPostActionPhase] =
         React.useState<SpaceActionPhase | null>(null);
     const [isDraftPostExit, setIsDraftPostExit] = React.useState(false);
@@ -435,11 +442,13 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
         hasDraftPostPreparationError ||
         (!onPublishDraftPost && !canQueueDraftPostPublish);
     const isReplyActionRunning = replyActionPhase != null;
+    const canAddFriendForPostAction = Boolean(
+        !isDraftPost && onAddFriendForPostAction,
+    );
     const canReplyToPost = Boolean(
         !isDraftPost &&
-        activePhoto.spaceId &&
-        activePhoto.postId &&
-        onReplyToPost,
+        (canAddFriendForPostAction ||
+            (activePhoto.spaceId && activePhoto.postId && onReplyToPost)),
     );
     const isReplyMode =
         canReplyToPost &&
@@ -448,13 +457,16 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
         !isReplyMode && isPhotoLiked && photoLikePopID > 0;
     const usePhotoSwipeViewer = !isDraftPost || isDesktopViewer;
     const canSendReply =
-        canReplyToPost && !isReplyActionRunning && replyText.trim().length > 0;
+        canReplyToPost &&
+        !isReplyActionRunning &&
+        (canAddFriendForPostAction || replyText.trim().length > 0);
     const swipeGestureRef = React.useRef<ViewerSwipeGesture | null>(null);
     const swipeActionsRef = React.useRef({ onSwipeLeft, onSwipeRight });
     swipeActionsRef.current = { onSwipeLeft, onSwipeRight };
     const isSwipeBlockedRef = React.useRef(false);
     isSwipeBlockedRef.current =
         isActionsOpen ||
+        addFriendSheetOpen ||
         (canDeletePost && deleteSheetOpen) ||
         isDeleteExit ||
         isDraftPostExit ||
@@ -478,7 +490,18 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
         return nextSize;
     }, []);
 
+    const requestAddFriendForPostAction = (intent: SpaceInviteIntent) => {
+        if (!onAddFriendForPostAction) return;
+        setAddFriendIntent(intent);
+        setAddFriendSheetOpen(true);
+    };
+
     const handlePhotoLikeClick = () => {
+        if (canAddFriendForPostAction) {
+            requestAddFriendForPostAction("like");
+            return;
+        }
+
         const nextLiked = !isPhotoLiked;
         if (!activePhoto.postId || !onSetPostLiked) {
             setIsPhotoLiked(nextLiked);
@@ -641,6 +664,11 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
     };
 
     const sendReply = () => {
+        if (canAddFriendForPostAction) {
+            requestAddFriendForPostAction("reply");
+            return;
+        }
+
         const text = replyText.trim();
         if (
             !canSendReply ||
@@ -669,6 +697,15 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
     };
 
     const handleReplyKeyDown = (event: React.KeyboardEvent) => {
+        if (
+            canAddFriendForPostAction &&
+            (event.key == "Enter" || event.key == " ")
+        ) {
+            event.preventDefault();
+            requestAddFriendForPostAction("reply");
+            return;
+        }
+
         if (event.key != "Enter" || event.shiftKey) return;
 
         event.preventDefault();
@@ -677,6 +714,17 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
 
     const handleReplyActionPointerDown = (event: React.PointerEvent) => {
         event.preventDefault();
+    };
+
+    const handleReplyInputPointerDown = (event: React.PointerEvent) => {
+        if (!canAddFriendForPostAction) return;
+        event.preventDefault();
+        requestAddFriendForPostAction("reply");
+    };
+
+    const confirmAddFriendForPostAction = () => {
+        setAddFriendSheetOpen(false);
+        onAddFriendForPostAction?.(addFriendIntent);
     };
 
     React.useLayoutEffect(() => {
@@ -1052,7 +1100,8 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
 
     React.useEffect(() => {
         const closeOnEscape = (event: KeyboardEvent) => {
-            if (deleteSheetOpen || isDraftPostExit) return;
+            if (addFriendSheetOpen || deleteSheetOpen || isDraftPostExit)
+                return;
             if (event.key != "Escape") return;
 
             if (isCaptionEditing && !isCaptionUpdateActionRunning) {
@@ -1066,6 +1115,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
         return () => window.removeEventListener("keydown", closeOnEscape);
     }, [
         cancelCaptionEdit,
+        addFriendSheetOpen,
         deleteSheetOpen,
         isDraftPostExit,
         isCaptionEditing,
@@ -1965,7 +2015,9 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                                 }}
                                 onFocus={() => setIsReplyFocused(true)}
                                 onKeyDown={handleReplyKeyDown}
+                                onPointerDown={handleReplyInputPointerDown}
                                 placeholder={`Reply privately to ${displayName}...`}
+                                readOnly={canAddFriendForPostAction}
                                 rows={1}
                                 value={replyText}
                                 sx={{
@@ -2147,6 +2199,21 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                     onCancel={closeDeleteSheet}
                     onConfirm={confirmDeletePost}
                     onExited={handleDeleteSheetExited}
+                />
+            )}
+            {canAddFriendForPostAction && (
+                <ConfirmationActionSheet
+                    appearance="dark"
+                    open={addFriendSheetOpen}
+                    title={
+                        addFriendIntent == "like"
+                            ? `Add ${displayName} as a friend to like this post?`
+                            : `Add ${displayName} as a friend to reply privately?`
+                    }
+                    confirmLabel="Add friend"
+                    confirmBackgroundColor={green}
+                    onCancel={() => setAddFriendSheetOpen(false)}
+                    onConfirm={confirmAddFriendForPostAction}
                 />
             )}
         </Box>

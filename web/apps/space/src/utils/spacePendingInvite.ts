@@ -2,6 +2,7 @@ import { joinSpaceInvite } from "services/space";
 import {
     clearPendingSpaceInvite,
     clearPendingSpaceInviteFriend,
+    clearPendingSpaceInviteIntent,
     saveSentSpaceInviteFriend,
     savedPendingSpaceInvite,
     savedPendingSpaceInviteFriend,
@@ -18,6 +19,7 @@ export const acceptPendingSpaceInvite = async () => {
     const status = await joinSpaceInvite(pendingInvite);
     clearPendingSpaceInvite();
     clearPendingSpaceInviteFriend();
+    clearPendingSpaceInviteIntent();
     if (status == "requested") saveSentSpaceInviteFriend(pendingFriend);
     return true;
 };

@@ -267,10 +267,14 @@ func (c *SpacesController) RotateKey(ctx context.Context, current *repo.SpaceRec
 	if err != nil {
 		return nil, err
 	}
+	linkEncryptedSpaceKey, err := decodeOptionalEncodedSpaceField("linkEncryptedSpaceKey", req.LinkEncryptedSpaceKey, maxSpaceEncryptedKeyEncodedBytes, maxSpaceEncryptedKeyDecodedBytes)
+	if err != nil {
+		return nil, err
+	}
 	if req.KeyVersion != current.CurrentVersion {
 		return nil, ente.NewBadRequestWithMessage("keyVersion does not match current space version")
 	}
-	space, err := c.SpacesRepo.RotateKey(ctx, current.SpaceID, req.KeyVersion, rootWrappedSpaceKey, wrappedPrevKey, encryptedProfile)
+	space, err := c.SpacesRepo.RotateKey(ctx, current.SpaceID, req.KeyVersion, rootWrappedSpaceKey, wrappedPrevKey, encryptedProfile, linkEncryptedSpaceKey)
 	if err != nil {
 		if errors.Is(stacktrace.RootCause(err), sql.ErrNoRows) {
 			return nil, ente.NewBadRequestWithMessage("keyVersion does not match current space version")

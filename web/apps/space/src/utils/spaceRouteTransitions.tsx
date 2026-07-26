@@ -27,7 +27,6 @@ const routePath = (route: SpaceRouteURL | SpaceRouteAs): string => {
 };
 
 const parentRoutePaths = (path: string) => {
-    if (/^\/app\/friends\/[^/]+$/.test(path)) return ["/app/friends"];
     if (/^\/app\/messages\/[^/]+$/.test(path)) return ["/app/messages"];
     if (/^\/app\/posts\/[^/]+\/[^/]+$/.test(path)) {
         return ["/app"];
@@ -60,6 +59,8 @@ const parentRoutePaths = (path: string) => {
 
 const previousStackRoute = () =>
     routeStack.length > 1 ? routeStack[routeStack.length - 2] : undefined;
+
+export const hasPreviousSpaceRoute = () => Boolean(previousStackRoute());
 
 const ensureRouteStack = (currentPath: string) => {
     if (routeStack.length == 0 && currentPath) routeStack = [currentPath];

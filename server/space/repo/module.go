@@ -15,6 +15,7 @@ type Module struct {
 	Read     *ReadMarkersRepository
 	Sessions *SessionsRepository
 	Drips    *DripsRepository
+	Links    *LinksRepository
 }
 
 type SpacesRepository struct {
@@ -47,6 +48,10 @@ type SessionsRepository struct {
 }
 
 type DripsRepository struct {
+	DB *sql.DB
+}
+
+type LinksRepository struct {
 	DB *sql.DB
 }
 
@@ -225,6 +230,22 @@ type SpaceBrowserSessionRecord struct {
 	LastUsedAt     int64
 }
 
+type SpaceLinkRecord struct {
+	LinkID             int64
+	SpaceID            string
+	SpaceSlug          string
+	AuthKeyHash        []byte
+	KDFSalt            []byte
+	KDFMemLimit        int64
+	KDFOpsLimit        int64
+	KeyVersion         int
+	EncryptedSpaceKey  []byte
+	EncryptedAccessKey []byte
+	Active             bool
+	CreatedAt          int64
+	UpdatedAt          int64
+}
+
 func NewModule(db *sql.DB, s3Config *s3config.S3Config) *Module {
 	return &Module{
 		Spaces:   &SpacesRepository{DB: db},
@@ -235,5 +256,6 @@ func NewModule(db *sql.DB, s3Config *s3config.S3Config) *Module {
 		Read:     &ReadMarkersRepository{DB: db},
 		Sessions: &SessionsRepository{DB: db},
 		Drips:    &DripsRepository{DB: db},
+		Links:    &LinksRepository{DB: db},
 	}
 }

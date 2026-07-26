@@ -587,9 +587,14 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
                 onCloseThread={closeConversation}
                 onConfirmFriendRequest={confirmFriendRequest}
                 onDeleteFriendRequest={deleteFriendRequest}
-                onOpenSelectedFriendProfile={(friend) =>
-                    void router.push(spaceRoutes.friend(friendSpaceId(friend)))
-                }
+                onOpenSelectedFriendProfile={(friend) => {
+                    const username = friend.username || friend.spaceSlug;
+                    if (username)
+                        void router.push(
+                            spaceRoutes.friendPage,
+                            spaceRoutes.friend(username),
+                        );
+                }}
                 onOpenQuotePost={(quote) =>
                     void router.push(
                         spaceRoutes.post(quote.spaceId, quote.postId),

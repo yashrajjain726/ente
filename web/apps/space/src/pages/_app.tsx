@@ -3,6 +3,7 @@ import "@fontsource/nunito/800.css";
 import { CssBaseline } from "@mui/material";
 import { ThemeProvider } from "@mui/material/styles";
 import { SpaceRouteTransitionBoundary } from "components/SpaceRouteTransitionBoundary";
+import { SpaceShareLinkDialogHost } from "components/SpaceShareLinkDialog";
 import "configureZod";
 import { CustomHead } from "ente-base/components/Head";
 import { useSetupLogs } from "ente-base/components/utils/hooks-app";
@@ -46,6 +47,7 @@ const App: React.FC<AppProps> = ({ Component, pageProps }) => {
             <SpaceRouteTransitionBoundary>
                 <SpaceAppStateProvider>
                     <Component {...pageProps} />
+                    <SpaceShareLinkDialogHost />
                 </SpaceAppStateProvider>
             </SpaceRouteTransitionBoundary>
         </ThemeProvider>

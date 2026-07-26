@@ -100,9 +100,18 @@ const Page: React.FC = () => {
                         void router.push(spaceRoutes.message(friend.spaceId));
                     }
                 }}
-                onOpenFriend={(friendID) =>
-                    void router.push(spaceRoutes.friend(friendID))
-                }
+                onOpenFriend={(friendID) => {
+                    const friend = friends.find(
+                        (candidate) =>
+                            candidate.id == friendID ||
+                            candidate.spaceId == friendID,
+                    );
+                    if (friend)
+                        void router.push(
+                            spaceRoutes.friendPage,
+                            spaceRoutes.friend(friend.username),
+                        );
+                }}
                 profileLink={spaceInviteURL({
                     spaceUsername: profile.username,
                 })}

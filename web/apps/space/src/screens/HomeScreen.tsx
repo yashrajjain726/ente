@@ -135,7 +135,7 @@ interface HomeScreenProps {
     onLoadPostImage?: SpacePostAssetURLLoader;
     onFriendRequestSentToastClose?: () => void;
     onInviteFriendsToastClose?: () => void;
-    onOpenFriend?: (friendID: string) => void;
+    onOpenFriend?: (friendID: string, username?: string) => void;
     onOpenMessages?: () => void;
     onOpenProfile?: () => void;
     onReplyToPost?: (
@@ -407,7 +407,7 @@ interface FeedItemProps {
     name: string;
     onLoadAvatar?: () => Promise<string | null | undefined>;
     onLoadImage?: () => Promise<string | undefined>;
-    onOpenFriend?: (friendID: string) => void;
+    onOpenFriend?: (friendID: string, username?: string) => void;
     onOpenPhoto?: (photo: SpaceViewerPhoto, focusReplyOnOpen?: boolean) => void;
     onOpenProfile?: () => void;
     onSetPostLiked?: (postId: number, liked: boolean) => Promise<void>;
@@ -416,6 +416,7 @@ interface FeedItemProps {
     thumbHash?: string;
     timestampStatus?: FeedTimestampStatus;
     timestampMs: number;
+    username?: string;
     viewerLiked: boolean;
 }
 
@@ -710,6 +711,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
     thumbHash,
     timestampStatus,
     timestampMs,
+    username,
     viewerLiked,
 }) => {
     const [isLiked, setIsLiked] = useState(viewerLiked);
@@ -738,7 +740,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
             onOpenProfile?.();
             return;
         }
-        onOpenFriend?.(friendID);
+        onOpenFriend?.(friendID, username);
     };
     const [loadedPhotoDimensions, setLoadedPhotoDimensions] =
         useState<LoadedFeedPhotoDimensions | null>(null);
@@ -799,6 +801,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
                 postId,
                 spaceId,
                 timestampMs,
+                username,
                 viewerLiked: isLiked,
                 width: photoDimensions.width,
             },
@@ -1768,6 +1771,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 thumbHash={item.thumbHash}
                 timestampStatus={timestampStatus}
                 timestampMs={item.timestampMs}
+                username={item.username}
                 viewerLiked={item.viewerLiked}
             />
         );
@@ -2460,7 +2464,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                                             "back",
                                         ).finally(() => {
                                             closeSelectedPhoto();
-                                            onOpenFriend(selectedPhotoFriendID);
+                                            onOpenFriend(
+                                                selectedPhotoFriendID,
+                                                selectedViewer.photo.username,
+                                            );
                                         });
                                     }
                                   : undefined

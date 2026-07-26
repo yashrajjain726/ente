@@ -1,6 +1,10 @@
 import type { FriendProfile } from "data/friends";
+import { clientPackageName, desktopAppVersion, isDesktop } from "ente-base/app";
 import { apiOrigin } from "ente-base/origins";
-import type { SpaceAccountCtxHandle } from "ente-space-wasm";
+import type {
+    SpaceAccountCtxHandle,
+    SpaceLinkCtxHandle,
+} from "ente-space-wasm";
 import type { PendingSpaceInvite } from "services/spaceInvite";
 import {
     cachedSpaceMediaBlobURL,
@@ -38,6 +42,7 @@ interface SpaceProfileResponse {
     avatar?: SpaceAvatar;
     cover?: SpaceCover;
     friends?: number;
+    posts?: number;
     profile: string;
     updatedAt?: string;
     version?: number;
@@ -173,6 +178,7 @@ interface SpacePostBase {
     postId: number;
     timestampMs: number;
     thumbHash?: string;
+    username?: string;
     viewerLiked: boolean;
     spaceId: string;
     width?: number;
@@ -205,6 +211,24 @@ export interface SpaceProfilePost extends SpacePostBase {
 export interface SpaceProfilePostPage {
     items: SpaceProfilePost[];
     nextCursor?: string;
+}
+
+export interface PublicSpaceLinkSession {
+    close: () => void;
+    loadPostImage: SpacePostAssetURLLoader;
+    loadProfileMedia: () => Promise<{
+        avatarUrl: string | null;
+        coverUrl: string | null;
+    }>;
+    loadPosts: () => Promise<SpaceProfilePost[]>;
+    profile: FriendProfile & { avatarUrl: string | null };
+    postsCount: number;
+}
+
+export interface CurrentSpaceLink {
+    accessKey: string;
+    spaceId: string;
+    spaceSlug: string;
 }
 
 export type SpacePostAssetURLLoader = (
@@ -576,6 +600,7 @@ const postFromAccountPost = async (
         postId: post.postId,
         timestampMs: timestampMsFromSpaceDate(post.createdAt),
         thumbHash: object.thumbHash,
+        username: author.username,
         viewerLiked: post.viewerLiked,
         spaceId: post.spaceId,
         width: object.width,
@@ -603,6 +628,7 @@ const profilePostFromPost = (
         postId: post.postId,
         timestampMs: timestampMsFromSpaceDate(post.createdAt),
         thumbHash: object.thumbHash,
+        username: author.username,
         viewerLiked: post.viewerLiked,
         spaceId: post.spaceId,
         width: object.width,
@@ -633,6 +659,118 @@ const profilePostPageFromPage = (
         .filter((post): post is SpaceProfilePost => Boolean(post)),
     nextCursor: page.nextCursor || undefined,
 });
+
+const publicLinkProfileMediaURL = async (
+    ctx: SpaceLinkCtxHandle,
+    spaceId: string,
+    assetType: "avatar" | "cover",
+    asset?: SpaceAvatar,
+) => {
+    if (!asset?.objectID) return null;
+    try {
+        return await cachedSpaceMediaBlobURL(
+            spaceProfileMediaCacheKey(
+                spaceId,
+                assetType,
+                asset.objectID,
+                asset.keyVersion,
+            ),
+            () =>
+                assetType == "avatar"
+                    ? ctx.downloadAvatar(asset.objectID, asset.keyVersion)
+                    : ctx.downloadCover(asset.objectID, asset.keyVersion),
+        );
+    } catch (error) {
+        console.warn(`Failed to load public Space ${assetType}`, error);
+        return null;
+    }
+};
+
+export const openPublicSpaceLink = async (
+    spaceUsername: string,
+    accessKey: string,
+): Promise<PublicSpaceLinkSession> => {
+    const [{ spaceOpenLinkCtx }, baseUrl] = await Promise.all([
+        import("ente-space-wasm"),
+        apiOrigin(),
+    ]);
+    const ctx = await spaceOpenLinkCtx({
+        accessKey,
+        baseUrl,
+        clientPackage: clientPackageName,
+        clientVersion: isDesktop ? desktopAppVersion : undefined,
+        spaceUsername,
+    });
+    try {
+        const response = ctx.getProfile() as SpaceProfileResponse;
+        const profile = profileFromSpaceProfile(response);
+        return {
+            close: () => ctx.free(),
+            loadPostImage: (asset) =>
+                cachedSpaceMediaBlobURL(
+                    postAssetCacheKey(asset),
+                    () =>
+                        ctx.downloadPostAsset(
+                            asset.encryptedPostKey,
+                            asset.keyVersion,
+                            asset.objectKey,
+                        ),
+                    asset.mediaType,
+                ),
+            loadProfileMedia: async () => {
+                const [avatarUrl, coverUrl] = await Promise.all([
+                    publicLinkProfileMediaURL(
+                        ctx,
+                        response.spaceId,
+                        "avatar",
+                        response.avatar,
+                    ),
+                    publicLinkProfileMediaURL(
+                        ctx,
+                        response.spaceId,
+                        "cover",
+                        response.cover,
+                    ),
+                ]);
+                return { avatarUrl, coverUrl };
+            },
+            loadPosts: async () =>
+                profilePostPageFromPage(
+                    (await ctx.listPosts()) as SpacePostPageResponse,
+                ).items,
+            profile: { ...profile, avatarUrl: profile.avatarUrl ?? null },
+            postsCount: response.posts ?? 0,
+        };
+    } catch (error) {
+        ctx.free();
+        throw error;
+    }
+};
+
+const withCurrentSpaceContext = async <T>(
+    run: (ctx: SpaceAccountCtxHandle, spaceId: string) => Promise<T>,
+) => {
+    const profile = await loadExistingSpaceProfile();
+    if (!profile?.spaceId) throw new Error("Space profile is unavailable.");
+    const ctx = await ensureCurrentSpaceContext();
+    try {
+        return await run(ctx, profile.spaceId);
+    } finally {
+        releaseCurrentSpaceContext(ctx);
+    }
+};
+
+export const getOrCreateCurrentSpaceLink = () =>
+    withCurrentSpaceContext(
+        async (ctx, spaceId) =>
+            (await ctx.getOrCreateSpaceLink(spaceId)) as CurrentSpaceLink,
+    );
+
+export const rotateCurrentSpaceLink = () =>
+    withCurrentSpaceContext(
+        async (ctx, spaceId) =>
+            (await ctx.rotateSpaceLink(spaceId)) as CurrentSpaceLink,
+    );
 
 const messageQuoteFromPostResponse = async (
     ctx: SpaceAccountCtxHandle,
@@ -824,6 +962,19 @@ export const joinSpaceInvite = async ({
         releaseCurrentSpaceContext(ctx);
     }
 };
+
+export const loadCurrentSpaceRelationship = (targetSpaceId: string) =>
+    withCurrentSpaceContext(async (ctx, spaceId) => {
+        const response = (await ctx.getRelationship(
+            spaceId,
+            targetSpaceId,
+        )) as { relationship?: string };
+        return response.relationship == "self"
+            ? "self"
+            : response.relationship == "friend"
+              ? "friend"
+              : null;
+    });
 
 export const loadPublicSpaceIdentity = async (
     username: string,

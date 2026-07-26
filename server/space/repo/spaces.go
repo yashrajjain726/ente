@@ -227,7 +227,7 @@ func (r *SpacesRepository) UpdateSlug(ctx context.Context, spaceID, spaceSlug st
 	return rec, nil
 }
 
-func (r *SpacesRepository) RotateKey(ctx context.Context, spaceID string, keyVersion int, rootWrappedSpaceKey, wrappedPrevKey, encryptedProfile []byte) (*SpaceRecord, error) {
+func (r *SpacesRepository) RotateKey(ctx context.Context, spaceID string, keyVersion int, rootWrappedSpaceKey, wrappedPrevKey, encryptedProfile, linkEncryptedSpaceKey []byte) (*SpaceRecord, error) {
 	tx, err := r.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, stacktrace.Propagate(err, "")
@@ -262,6 +262,23 @@ func (r *SpacesRepository) RotateKey(ctx context.Context, spaceID string, keyVer
 		WHERE space_id = $4
 	`, rootWrappedSpaceKey, encryptedProfile, newVersion, spaceID); err != nil {
 		return nil, stacktrace.Propagate(err, "")
+	}
+	if len(linkEncryptedSpaceKey) > 0 {
+		if _, err := tx.ExecContext(ctx, `
+			UPDATE space_links
+			SET key_version = $2, encrypted_space_key = $3
+			WHERE space_id = $1 AND active = TRUE
+		`, spaceID, newVersion, linkEncryptedSpaceKey); err != nil {
+			return nil, stacktrace.Propagate(err, "")
+		}
+	} else {
+		if _, err := tx.ExecContext(ctx, `
+			UPDATE space_links
+			SET active = FALSE
+			WHERE space_id = $1 AND active = TRUE
+		`, spaceID); err != nil {
+			return nil, stacktrace.Propagate(err, "")
+		}
 	}
 	rec, err := scanSpaceRecord(tx.QueryRowContext(ctx, `
 		SELECT `+spaceRecordSelectColumns+`

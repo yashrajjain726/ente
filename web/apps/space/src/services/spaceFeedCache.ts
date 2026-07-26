@@ -30,6 +30,7 @@ const CachedSpacePost = z.object({
     spaceId: z.string(),
     thumbHash: z.string().optional(),
     timestampMs: z.number(),
+    username: z.string().optional(),
     viewerLiked: z.boolean(),
     width: z.number().optional(),
 });
