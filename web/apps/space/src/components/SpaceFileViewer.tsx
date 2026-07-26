@@ -2207,8 +2207,8 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                     open={addFriendSheetOpen}
                     title={
                         addFriendIntent == "like"
-                            ? `Add ${displayName} as a friend to like this post?`
-                            : `Add ${displayName} as a friend to reply privately?`
+                            ? `Add ${displayName} as a friend to like?`
+                            : `Add ${displayName} as a friend to reply?`
                     }
                     confirmLabel="Add friend"
                     confirmBackgroundColor={green}
