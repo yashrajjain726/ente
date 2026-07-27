@@ -1,3 +1,5 @@
+import "dart:math";
+
 import "package:ente_pure_utils/ente_pure_utils.dart";
 import "package:logging/logging.dart";
 import "package:path/path.dart";
@@ -13,6 +15,15 @@ const _minDateTimeSecondsSinceEpoch = -_maxDateTimeSecondsSinceEpoch;
 
 typedef AssetDateTimes = ({int creationTime, int modificationTime});
 
+/// Compares at the whole-second precision provided by photo_manager.
+bool isAssetAtOrAfterSyncCutoff(AssetDateTimes dateTimes, int cutoffTime) {
+  final latestAssetTimeSecond =
+      max(dateTimes.creationTime, dateTimes.modificationTime) ~/
+      Duration.microsecondsPerSecond;
+  final cutoffTimeSecond = cutoffTime ~/ Duration.microsecondsPerSecond;
+  return latestAssetTimeSecond >= cutoffTimeSecond;
+}
+
 AssetDateTimes resolveAssetDateTimes(AssetEntity asset) {
   final uploadTime = DateTime.now().toUtc().microsecondsSinceEpoch;
   final creationTime = _validMicrosecondsSinceEpoch(asset.createDateSecond);
@@ -27,9 +38,17 @@ AssetDateTimes resolveAssetDateTimes(AssetEntity asset) {
     return (creationTime: uploadTime, modificationTime: uploadTime);
   }
   if (creationTime == null) {
-    _logger.info("Asset creation time is invalid; using modification time");
+    _logger.info(
+      "Asset creation time is invalid; resolving from modification time",
+    );
+    final resolvedCreationTime = _resolveCreationTime(
+      asset,
+      modificationTime!,
+      modificationTime,
+      uploadTime,
+    );
     return (
-      creationTime: modificationTime!,
+      creationTime: resolvedCreationTime,
       modificationTime: modificationTime,
     );
   }

@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'dart:math';
 
 import 'package:computer/computer.dart';
 import 'package:logging/logging.dart';
@@ -210,15 +209,17 @@ Tuple2<Set<String>, List<EnteFile>> _getLocalIDsAndFilesFromAssets(
 ) {
   final pathEntity = args["pathEntity"] as AssetPathEntity;
   final assetList = args["assetList"];
-  final fromTime = args["fromTime"];
+  final fromTime = args["fromTime"] as int;
   final alreadySeenLocalIDs = args["alreadySeenLocalIDs"] as Set<String>;
   final List<EnteFile> files = [];
   final Set<String> localIDs = {};
   for (AssetEntity entity in assetList) {
     localIDs.add(entity.id);
     final dateTimes = resolveAssetDateTimes(entity);
-    final bool assetCreatedOrUpdatedAfterGivenTime =
-        max(dateTimes.creationTime, dateTimes.modificationTime) >= fromTime;
+    final bool assetCreatedOrUpdatedAfterGivenTime = isAssetAtOrAfterSyncCutoff(
+      dateTimes,
+      fromTime,
+    );
     if (!alreadySeenLocalIDs.contains(entity.id) &&
         assetCreatedOrUpdatedAfterGivenTime) {
       final file = fileFromAsset(pathEntity.name, entity, dateTimes: dateTimes);
