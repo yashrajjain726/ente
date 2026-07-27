@@ -24,7 +24,7 @@ tokio = { version = "1.41", features = ["full"] }
 futures = "0.3"
 
 # Cryptography - using ente-core pure Rust implementation
-zeroize = { version = "1.8", features = ["derive"] }
+zeroize.workspace = true
 
 # Storage
 rusqlite = { version = "0.38", features = ["bundled", "serde_json"] }
@@ -36,7 +36,7 @@ env_logger = "0.11"
 dirs = "5.0"
 chrono = "0.4"
 uuid = { version = "1.11", features = ["serde", "v4"] }
-urlencoding = "2.1"
+urlencoding.workspace = true
 indicatif = "0.18"
 dialoguer = "0.11"
 open = "5.0"
@@ -46,7 +46,7 @@ zip = "2.2"
 
 [dev-dependencies]
 ente-test-support.workspace = true
-mockito = "1.6"
-url = "2.5.8"
-sha2 = "0.11"
+mockito.workspace = true
+url.workspace = true
+sha2.workspace = true
 srp = { version = "0.7.0-rc.3", default-features = false }
