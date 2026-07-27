@@ -265,14 +265,12 @@ const Page: React.FC = () => {
             <SpacePageMeta themeColor={homeBackground} />
             <HomeScreen
                 feedItems={feedItems}
-                friendsCount={friends.length}
                 friendRequestSentToastName={friendRequestSentToastName}
                 hasFeedLoadMoreError={hasFeedLoadMoreError}
                 hasUnreadMessages={hasUnreadMessages}
                 hasMoreFeedItems={Boolean(feedNextCursor)}
                 isFeedLoading={isHomeFeedLoading}
                 isFeedLoadingMore={isFeedLoadingMore}
-                isFriendsLoading={isFriendsLoading}
                 localFeedPosts={localFeedPosts}
                 profile={profile}
                 viewerSpaceId={spaceId ?? profile?.spaceId}

@@ -1861,7 +1861,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                 }}
                             >
                                 {isOwnerProfile
-                                    ? "What are you up to?"
+                                    ? "Share an everyday moment."
                                     : `${firstName} hasn't posted anything yet.`}
                             </Box>
                             {isOwnerProfile && (
@@ -1920,7 +1920,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                         </Box>
                     )}
                 </Box>
-                {isOwnerProfile && (
+                {isOwnerProfile && hasProfilePosts && (
                     <SpacePostFloatingActionButton
                         disabled={isPostPhotoOpening}
                         onClick={openPostPhotoPicker}

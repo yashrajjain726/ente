@@ -15,6 +15,7 @@ import {
     type SpaceViewerPhoto,
     type SpaceViewerPostActionMode,
 } from "components/SpaceFileViewer";
+import { SpaceInlinePostButton } from "components/SpaceInlinePostButton";
 import { SpacePostFloatingActionButton } from "components/SpacePostFloatingActionButton";
 import {
     spacePostLikeButtonPop,
@@ -115,13 +116,11 @@ const FeedReplyIcon: React.FC = () => (
 interface HomeScreenProps {
     feedItems: SpacePost[];
     friendRequestSentToastName?: string;
-    friendsCount: number;
     hasFeedLoadMoreError?: boolean;
     hasMoreFeedItems?: boolean;
     hasUnreadMessages?: boolean;
     isFeedLoading?: boolean;
     isFeedLoadingMore?: boolean;
-    isFriendsLoading?: boolean;
     localFeedPosts?: LocalSpaceFeedPost[];
     showInstallPrompt?: boolean;
     showInviteFriendsToast?: boolean;
@@ -1497,13 +1496,11 @@ const InviteFriendsToast: React.FC<InviteFriendsToastProps> = ({
 export const HomeScreen: React.FC<HomeScreenProps> = ({
     feedItems,
     friendRequestSentToastName,
-    friendsCount,
     hasFeedLoadMoreError = false,
     hasMoreFeedItems = false,
     hasUnreadMessages,
     isFeedLoading = false,
     isFeedLoadingMore = false,
-    isFriendsLoading = false,
     localFeedPosts = [],
     showInstallPrompt = false,
     showInviteFriendsToast = false,
@@ -1595,10 +1592,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         !showInviteFriendsToast &&
         !selectedViewer;
     const showUnreadIndicator = hasUnreadMessages === true;
-    const hasLoadedNoFriends = !isFriendsLoading && friendsCount == 0;
-    const emptyFeedMessage = hasLoadedNoFriends
-        ? "When you add friends, their posts will appear here."
-        : "When your friends share posts, they'll appear here.";
     const profileDisplayName =
         profile?.fullName.trim() || profile?.username.trim() || "";
     const revokeLocalPostObjectUrls = React.useCallback(() => {
@@ -2360,7 +2353,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                             <Box
                                 component="img"
                                 alt=""
-                                src="/images/ducky-space.svg"
+                                src="/images/ducky-camera.svg"
                                 sx={{
                                     display: "block",
                                     height: "auto",
@@ -2382,15 +2375,22 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                                     maxWidth: 220,
                                 }}
                             >
-                                {emptyFeedMessage}
+                                Share an everyday moment. Posts from friends and
+                                family will show up here too.
                             </Box>
+                            <SpaceInlinePostButton
+                                disabled={isPostPhotoButtonDisabled}
+                                onClick={openPostPhotoPicker}
+                            />
                         </Box>
                     )}
                 </Box>
-                <SpacePostFloatingActionButton
-                    disabled={isPostPhotoButtonDisabled}
-                    onClick={openPostPhotoPicker}
-                />
+                {hasFeedItems && (
+                    <SpacePostFloatingActionButton
+                        disabled={isPostPhotoButtonDisabled}
+                        onClick={openPostPhotoPicker}
+                    />
+                )}
                 {selectedViewer && (
                     <SpaceFileViewer
                         focusReplyOnOpen={selectedViewer.focusReplyOnOpen}
