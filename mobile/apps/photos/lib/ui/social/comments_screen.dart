@@ -265,7 +265,7 @@ class _FileCommentsBottomSheetState extends State<FileCommentsBottomSheet> {
       final savedSelectedCollectionID =
           _lastSelectedDraftCollectionIDs[_draftFileKey];
       final nextSelectedCollectionID =
-          _canRestoreDraftCollection &&
+          _shouldPreferDraftCollection &&
               savedSelectedCollectionID != null &&
               sharedCollections.any(
                 (info) => info.collection.id == savedSelectedCollectionID,
@@ -688,7 +688,7 @@ class _FileCommentsBottomSheetState extends State<FileCommentsBottomSheet> {
   _CommentDraftFileKey get _draftFileKey =>
       (userID: _currentUserID, fileID: widget.fileID);
 
-  bool get _canRestoreDraftCollection =>
+  bool get _shouldPreferDraftCollection =>
       widget.preferDraftCollection && widget.highlightCommentID == null;
 
   _CommentDraftKey get _draftKey => (
