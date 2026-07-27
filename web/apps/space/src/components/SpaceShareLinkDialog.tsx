@@ -1,4 +1,4 @@
-import { Box, Dialog, Skeleton, useMediaQuery } from "@mui/material";
+import { Box, Dialog, useMediaQuery } from "@mui/material";
 import { ConfirmationActionSheet } from "components/ConfirmationActionSheet";
 import { SpaceBottomSheetTransition } from "components/SpaceBottomSheetTransition";
 import React from "react";
@@ -21,6 +21,7 @@ export const SpaceShareLinkDialogHost: React.FC = () => {
     const [loading, setLoading] = React.useState(false);
     const [error, setError] = React.useState<string>();
     const [copied, setCopied] = React.useState(false);
+    const [linkChanged, setLinkChanged] = React.useState(false);
     const [isChangeConfirmationOpen, setIsChangeConfirmationOpen] =
         React.useState(false);
     const [confirming, setConfirming] = React.useState(false);
@@ -32,6 +33,7 @@ export const SpaceShareLinkDialogHost: React.FC = () => {
         setLoading(true);
         setError(undefined);
         setCopied(false);
+        setLinkChanged(false);
         void getOrCreateCurrentSpaceLink()
             .then((nextLink) => {
                 if (linkRequestID.current == requestID) setLink(nextLink);
@@ -102,6 +104,7 @@ export const SpaceShareLinkDialogHost: React.FC = () => {
                 setIsChangeConfirmationOpen(false);
                 setLink(nextLink);
                 setCopied(false);
+                setLinkChanged(true);
             })
             .catch((error: unknown) => {
                 console.error("Failed to change Space link", error);
@@ -143,116 +146,105 @@ export const SpaceShareLinkDialogHost: React.FC = () => {
                                 borderRadius: "20px",
                                 bottom: "auto",
                                 left: "50%",
-                                maxWidth: 420,
+                                maxWidth: 363,
                                 top: "50%",
                                 transform: "translate(-50%, -50%)",
-                                width: 420,
+                                width: 363,
                             },
                         },
                     },
                 }}
             >
                 <Box
-                    component="h2"
                     sx={{
-                        fontFamily: '"Inter Variable", Inter, sans-serif',
-                        fontSize: 17,
-                        fontWeight: 700,
-                        lineHeight: "24px",
-                        m: 0,
-                        textAlign: "center",
+                        maxWidth: 320,
+                        mx: "auto",
+                        width: "100%",
+                        "@media (min-width: 600px)": { maxWidth: "none" },
                     }}
                 >
-                    Share
-                </Box>
-                <Box
-                    sx={{
-                        color: "#666",
-                        fontFamily: '"Inter Variable", Inter, sans-serif',
-                        fontSize: 13,
-                        lineHeight: "18px",
-                        mt: "6px",
-                    }}
-                >
-                    This link allows anyone who receives it to view your profile
-                    and all current and future posts. You can remove their
-                    access at any time by changing the link.
-                </Box>
-                {loading ? (
-                    <Skeleton
-                        variant="rounded"
-                        sx={{ borderRadius: "14px", height: 52, mt: "22px" }}
-                    />
-                ) : (
                     <Box
+                        component="h2"
                         sx={{
-                            alignItems: "center",
-                            bgcolor: "#FFF",
-                            border: "1px solid #E7E7E7",
-                            borderRadius: "14px",
-                            display: "flex",
-                            gap: "10px",
-                            mt: "22px",
-                            p: "6px 6px 6px 14px",
-                        }}
-                    >
-                        <Box
-                            sx={{
-                                flex: 1,
-                                fontFamily:
-                                    '"Inter Variable", Inter, sans-serif',
-                                fontSize: 13,
-                                overflow: "hidden",
-                                textOverflow: "ellipsis",
-                                whiteSpace: "nowrap",
-                            }}
-                        >
-                            {url}
-                        </Box>
-                        <ActionButton
-                            label={copied ? "Copied" : "Copy"}
-                            onClick={copy}
-                        />
-                    </Box>
-                )}
-                {error && (
-                    <Box
-                        role="alert"
-                        sx={{
-                            color: dangerColor,
-                            fontSize: 13,
-                            mt: "10px",
+                            fontFamily: '"Inter Variable", Inter, sans-serif',
+                            fontSize: 15,
+                            fontWeight: 600,
+                            lineHeight: "20px",
+                            m: 0,
+                            px: "20px",
                             textAlign: "center",
                         }}
                     >
-                        {error}
+                        {linkChanged ? "New link ready" : "Share your profile"}
                     </Box>
-                )}
-                <Box
-                    sx={{
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: "10px",
-                        mt: "18px",
-                    }}
-                >
-                    <ActionButton
-                        disabled={!link || loading}
-                        label="Share link"
-                        primary
-                        onClick={share}
-                    />
-                    <ActionButton
-                        disabled={!link || loading}
-                        label="Change link"
-                        onClick={() => setIsChangeConfirmationOpen(true)}
-                    />
+                    <Box
+                        sx={{
+                            color: "#666",
+                            fontFamily: '"Inter Variable", Inter, sans-serif',
+                            fontSize: 13,
+                            lineHeight: "18px",
+                            mt: "8px",
+                            mx: "-10px",
+                            px: 0,
+                            textAlign: "center",
+                        }}
+                    >
+                        {linkChanged
+                            ? "Share it with friends and family. Only you and people with this link can see your posts."
+                            : "Let friends and family see what you share on Space. Only you and people with this link can see your posts."}
+                    </Box>
+                    <Box
+                        sx={{
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: "12px",
+                            mt: "20px",
+                        }}
+                    >
+                        <ActionButton
+                            disabled={!link || loading}
+                            label={
+                                copied
+                                    ? "Link copied"
+                                    : loading
+                                      ? "Getting link…"
+                                      : linkChanged
+                                        ? "Share new link"
+                                        : "Share profile"
+                            }
+                            onClick={share}
+                            variant="primary"
+                        />
+                        <ActionButton
+                            disabled={!link || loading}
+                            label="Change link"
+                            onClick={() => setIsChangeConfirmationOpen(true)}
+                            variant="text"
+                        />
+                        {error && (
+                            <Box
+                                role="alert"
+                                sx={{
+                                    color: dangerColor,
+                                    fontFamily:
+                                        '"Inter Variable", Inter, sans-serif',
+                                    fontSize: 13,
+                                    fontWeight: 600,
+                                    lineHeight: "18px",
+                                    px: "12px",
+                                    textAlign: "center",
+                                }}
+                            >
+                                {error}
+                            </Box>
+                        )}
+                    </Box>
                 </Box>
             </Dialog>
             <ConfirmationActionSheet
                 open={isChangeConfirmationOpen}
-                title="Change this link?"
-                description="A new link will replace this one. People with the current link will no longer be able to load your Space. Anything already downloaded stays with them."
+                title="Change profile link?"
+                description="You'll get a new link to share. The current one will stop working."
                 confirmLabel="Change link"
                 confirmBackgroundColor={green}
                 confirmDisabled={confirming}
@@ -271,14 +263,14 @@ interface ActionButtonProps {
     disabled?: boolean;
     label: string;
     onClick: () => void | Promise<void>;
-    primary?: boolean;
+    variant: "primary" | "text";
 }
 
 const ActionButton: React.FC<ActionButtonProps> = ({
     disabled,
     label,
     onClick,
-    primary,
+    variant,
 }) => (
     <Box
         component="button"
@@ -286,17 +278,31 @@ const ActionButton: React.FC<ActionButtonProps> = ({
         disabled={disabled}
         onClick={() => void onClick()}
         sx={{
-            bgcolor: primary ? "#000" : "#F0F0F0",
+            alignItems: "center",
+            bgcolor: variant == "primary" ? green : "transparent",
             border: 0,
-            borderRadius: "14px",
-            color: primary ? "#FFF" : "#111",
+            borderRadius: "20px",
+            color: variant == "primary" ? "#FFF" : "#8A8A8A",
             cursor: disabled ? "default" : "pointer",
+            display: "flex",
             fontFamily: '"Inter Variable", Inter, sans-serif',
             fontSize: 14,
-            fontWeight: 650,
-            minHeight: 46,
+            fontWeight: 600,
+            height: variant == "primary" ? 48 : 32,
+            justifyContent: "center",
+            lineHeight: "20px",
             opacity: disabled ? 0.5 : 1,
-            px: "18px",
+            px: variant == "primary" ? "24px" : 0,
+            textDecoration: variant == "text" ? "underline" : "none",
+            textUnderlineOffset: "3px",
+            transition: "filter 120ms ease, opacity 120ms ease",
+            width: "100%",
+            "&:active": disabled ? undefined : { filter: "brightness(0.96)" },
+            "&:focus-visible": {
+                outline: `2px solid ${green}`,
+                outlineOffset: 2,
+            },
+            "&:hover": disabled ? undefined : { filter: "brightness(0.98)" },
         }}
     >
         {label}
