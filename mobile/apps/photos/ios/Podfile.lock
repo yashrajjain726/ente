@@ -181,7 +181,7 @@ PODS:
     - Flutter
   - permission_handler_apple (9.4.8):
     - Flutter
-  - photo_manager (3.10.0):
+  - photo_manager (3.11.0):
     - Flutter
     - FlutterMacOS
   - PromisesObjC (2.4.0)
@@ -526,7 +526,7 @@ SPEC CHECKSUMS:
   OrderedSet: e539b66b644ff081c73a262d24ad552a69be3a94
   package_info_plus: af8e2ca6888548050f16fa2f1938db7b5a5df499
   permission_handler_apple: 92d754bbaa7361d436db2d6c3c1c2a0fdcec462e
-  photo_manager: 93cc83778e33d5fd49dfd7e34b73f8f5a4f10aaf
+  photo_manager: 6ab48c2ce7ec21aa06d59e6cc049f0b6d9ba7f94
   PromisesObjC: f5707f49cb48b9636751c5b2e7d227e43fba9f47
   receive_sharing_intent: 222384f00ffe7e952bbfabaa9e3967cb87e5fe00
   rive_native: a57df296c558867395bfe82fafe857ec67640f58
