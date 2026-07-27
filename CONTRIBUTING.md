@@ -51,9 +51,9 @@ For anything that changes UX, however small, please talk to us (on [GitHub](http
 
 Please don't open PRs with big product changes. These will not get merged. If you wish for a new feature or a behaviour change, start a discussion, or add your perspective to the (likely) existing thread about it.
 
-On agents: LLM-generated code is not a problem in itself, but writing code was never the bottleneck; verifying it is. What makes your contribution valuable is the testing and judgement that you add.
+On agents: LLM-generated code is not a problem in itself, but writing code is not the bottleneck; verifying it is. What makes your contribution valuable is the testing and judgement that you add.
 
-In your PR, include before / after screenshots, and clearly indicate the tests that you performed.
+**Ensure that you test everything that you touch.** In your PR, include before / after screenshots, and clearly indicate the tests that you performed.
 
 ## Leave a review or star
 
