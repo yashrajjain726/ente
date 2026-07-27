@@ -11,8 +11,6 @@ import "package:photos/services/home_widget_service.dart";
 import "package:photos/services/people_home_widget_service.dart";
 import "package:photos/settings/local_settings.dart";
 import "package:photos/theme/ente_theme.dart";
-import "package:photos/ui/components/buttons/button_widget.dart";
-import "package:photos/ui/components/models/button_type.dart";
 import "package:photos/ui/viewer/search/result/people_section_all_page.dart";
 
 class PeopleWidgetSettings extends StatefulWidget {
@@ -73,10 +71,8 @@ class _PeopleWidgetSettingsState extends State<PeopleWidgetSettings> {
                         )
                       : _selectedPeople.personIds.isNotEmpty;
 
-                  return ButtonWidget(
-                    buttonType: ButtonType.primary,
-                    buttonSize: ButtonSize.large,
-                    labelText: AppLocalizations.of(context).save,
+                  return ButtonComponent(
+                    label: AppLocalizations.of(context).save,
                     shouldSurfaceExecutionStates: false,
                     isDisabled: !areIdsChanged,
                     onTap: areIdsChanged

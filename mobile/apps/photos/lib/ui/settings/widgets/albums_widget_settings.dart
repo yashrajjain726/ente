@@ -14,8 +14,6 @@ import "package:photos/settings/local_settings.dart";
 import "package:photos/theme/ente_theme.dart";
 import "package:photos/ui/collections/flex_grid_view.dart";
 import "package:photos/ui/common/loading_widget.dart";
-import "package:photos/ui/components/buttons/button_widget.dart";
-import "package:photos/ui/components/models/button_type.dart";
 
 class AlbumsWidgetSettings extends StatefulWidget {
   const AlbumsWidgetSettings({super.key});
@@ -98,10 +96,8 @@ class _AlbumsWidgetSettingsState extends State<AlbumsWidgetSettings> {
               child: ListenableBuilder(
                 listenable: _selectedAlbums,
                 builder: (context, _) {
-                  return ButtonWidget(
-                    buttonType: ButtonType.primary,
-                    buttonSize: ButtonSize.large,
-                    labelText: AppLocalizations.of(context).save,
+                  return ButtonComponent(
+                    label: AppLocalizations.of(context).save,
                     shouldSurfaceExecutionStates: false,
                     onTap: _selectedAlbums.albums.isNotEmpty
                         ? () async {
