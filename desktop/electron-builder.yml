@@ -35,6 +35,7 @@ linux:
     category: Photography
     icon: ./build/icon.icns
 mac:
+    minimumSystemVersion: "13.3"
     target:
         target: default
         arch: [universal]
