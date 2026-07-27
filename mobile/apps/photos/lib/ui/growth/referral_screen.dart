@@ -48,56 +48,75 @@ class _ReferralScreenState extends State<ReferralScreen> {
     return FutureBuilder<Tuple2<ReferralView, UserDetails>>(
       future: _fetchData(),
       builder: (context, snapshot) {
-        final referralView = snapshot.data?.item1;
-        return SettingsPageScaffold(
-          title: l10n.earnFreeStorage,
-          subtitle: l10n.shareCodeEarnStorage,
-          actions: [
-            if (referralView?.planInfo.isEnabled ?? false)
-              IconButtonComponent(
-                variant: IconButtonComponentVariant.primary,
-                icon: HugeIcon(
-                  icon: HugeIcons.strokeRoundedShare08,
-                  color: context.componentColors.iconColor,
+        if (snapshot.hasData) {
+          final referralView = snapshot.data!.item1;
+          return SettingsPageScaffold(
+            title: l10n.earnFreeStorage,
+            subtitle: l10n.shareCodeEarnStorage,
+            actions: [
+              if (referralView.planInfo.isEnabled)
+                IconButtonComponent(
+                  variant: IconButtonComponentVariant.primary,
+                  icon: HugeIcon(
+                    icon: HugeIcons.strokeRoundedShare08,
+                    color: context.componentColors.iconColor,
+                  ),
+                  tooltip: l10n.share,
+                  shouldSurfaceExecutionStates: false,
+                  onTap: () {
+                    shareText(
+                      l10n.shareTextReferralCode(
+                        referralCode: referralView.code,
+                        referralStorageInGB: referralView.planInfo.storageInGB,
+                      ),
+                    );
+                  },
                 ),
-                tooltip: l10n.share,
-                shouldSurfaceExecutionStates: false,
-                onTap: () {
-                  shareText(
-                    l10n.shareTextReferralCode(
-                      referralCode: referralView!.code,
-                      referralStorageInGB: referralView.planInfo.storageInGB,
-                    ),
-                  );
-                },
-              ),
-          ],
-          children: [
-            if (snapshot.hasData)
+            ],
+            children: [
               ReferralWidget(
-                referralView: referralView!,
+                referralView: referralView,
                 userDetails: snapshot.data!.item2,
                 notifyParent: _safeUIUpdate,
-              )
-            else if (snapshot.hasError)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 80),
-                child: Center(
-                  child: Text(
-                    l10n.failedToFetchReferralDetails,
-                    style: TextStyles.body.copyWith(
-                      color: context.componentColors.textLight,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ),
-              )
-            else
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 80),
-                child: Center(child: EnteLoadingWidget()),
               ),
-          ],
+            ],
+          );
+        } else if (snapshot.hasError) {
+          return Scaffold(
+            body: SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 24),
+                    GestureDetector(
+                      onTap: () => Navigator.of(context).pop(),
+                      child: Icon(
+                        Icons.arrow_back,
+                        color: context.componentColors.iconColor,
+                        size: 24,
+                      ),
+                    ),
+                    Expanded(
+                      child: Center(
+                        child: Text(
+                          l10n.failedToFetchReferralDetails,
+                          style: TextStyles.body.copyWith(
+                            color: context.componentColors.textLight,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }
+        return const Scaffold(
+          body: SafeArea(child: Center(child: EnteLoadingWidget())),
         );
       },
     );

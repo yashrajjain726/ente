@@ -25,7 +25,6 @@ class _ApplyCodeScreenState extends State<ApplyCodeScreen> {
 
   late FocusNode textFieldFocusNode;
   String code = "";
-  bool _isApplying = false;
 
   @override
   void initState() {
@@ -59,21 +58,20 @@ class _ApplyCodeScreenState extends State<ApplyCodeScreen> {
           focusNode: textFieldFocusNode,
           autofocus: true,
           inputFormatters: [UpperCaseTextFormatter()],
-          textCapitalization: TextCapitalization.characters,
+          textCapitalization: TextCapitalization.sentences,
           hintText: l10n.enterReferralCode,
           autocorrect: false,
-          keyboardType: TextInputType.text,
-          textInputAction: TextInputAction.done,
+          keyboardType: TextInputType.emailAddress,
+          textInputAction: TextInputAction.next,
           onChanged: (value) {
             setState(() => code = value.trim());
           },
-          onSubmit: (_) => _applyCode(),
         ),
         const SizedBox(height: Spacing.xl),
         ButtonComponent(
           label: l10n.apply,
           variant: ButtonComponentVariant.primary,
-          isDisabled: _isApplying || code.trim().length < 4,
+          isDisabled: code.trim().length < 4,
           shouldShowSuccessState: false,
           onTap: _applyCode,
         ),
@@ -82,8 +80,6 @@ class _ApplyCodeScreenState extends State<ApplyCodeScreen> {
   }
 
   Future<void> _applyCode() async {
-    if (_isApplying || code.trim().length < 4) return;
-    setState(() => _isApplying = true);
     try {
       await storageBonusService.applyCode(code);
       if (!mounted) return;
@@ -101,8 +97,6 @@ class _ApplyCodeScreenState extends State<ApplyCodeScreen> {
         exception: e as Exception,
         apiErrorPrefix: AppLocalizations.of(context).failedToApplyCode,
       );
-    } finally {
-      if (mounted) setState(() => _isApplying = false);
     }
   }
 }
