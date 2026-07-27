@@ -4,10 +4,10 @@ import 'dart:math';
 import 'package:computer/computer.dart';
 import 'package:logging/logging.dart';
 import 'package:photo_manager/photo_manager.dart';
-import 'package:photos/core/errors.dart';
 import 'package:photos/core/event_bus.dart';
 import 'package:photos/events/local_import_progress.dart';
 import 'package:photos/models/file/file.dart';
+import "package:photos/module/metadata/asset_date_times.dart";
 import "package:photos/module/metadata/local_file.dart";
 import "package:photos/services/sync/import/model.dart";
 import 'package:tuple/tuple.dart';
@@ -202,25 +202,6 @@ Future<List<AssetEntity>> _getAllAssetLists(AssetPathEntity pathEntity) async {
   return result;
 }
 
-/// Safely extracts millisecondsSinceEpoch from DateTime, throwing InvalidDateTimeError if invalid
-int _safeGetMilliseconds(
-  DateTime dateTime,
-  String assetId,
-  String? assetTitle,
-  String label,
-) {
-  try {
-    return dateTime.millisecondsSinceEpoch;
-  } on RangeError catch (e) {
-    throw InvalidDateTimeError(
-      assetId: assetId,
-      assetTitle: assetTitle,
-      field: label,
-      originalError: e.message ?? e.toString(),
-    );
-  }
-}
-
 // Runs in a worker isolate because a device folder can contain thousands of
 // assets and this loop constructs metadata for the full folder. Re-benchmark
 // large imports before moving this work onto the UI isolate.
@@ -235,23 +216,12 @@ Tuple2<Set<String>, List<EnteFile>> _getLocalIDsAndFilesFromAssets(
   final Set<String> localIDs = {};
   for (AssetEntity entity in assetList) {
     localIDs.add(entity.id);
-    final createMs = _safeGetMilliseconds(
-      entity.createDateTime,
-      entity.id,
-      entity.title,
-      'createDateTime',
-    );
-    final modifiedMs = _safeGetMilliseconds(
-      entity.modifiedDateTime,
-      entity.id,
-      entity.title,
-      'modifiedDateTime',
-    );
+    final dateTimes = resolveAssetDateTimes(entity);
     final bool assetCreatedOrUpdatedAfterGivenTime =
-        max(createMs, modifiedMs) >= (fromTime ~/ 1000);
+        max(dateTimes.creationTime, dateTimes.modificationTime) >= fromTime;
     if (!alreadySeenLocalIDs.contains(entity.id) &&
         assetCreatedOrUpdatedAfterGivenTime) {
-      final file = fileFromAsset(pathEntity.name, entity);
+      final file = fileFromAsset(pathEntity.name, entity, dateTimes: dateTimes);
       files.add(file);
     }
   }
