@@ -19,6 +19,10 @@ import {
     setCurrentPostLiked,
     type SpaceProfilePost,
 } from "services/space";
+import {
+    patchCachedSpaceFeedPost,
+    removeCachedSpaceFeedPostsBySpace,
+} from "services/spaceFeedCache";
 import { useSpaceAppState } from "state/spaceAppState";
 import { profilePostGroupsFromPosts } from "utils/spacePostDisplay";
 import { spaceDefaultCoverImagePath } from "utils/spacePostImage";
@@ -201,18 +205,15 @@ const Page: React.FC = () => {
         if (!actorSpaceId || !selectedFriendSpaceId) return;
 
         await removeCurrentSpaceFriend(actorSpaceId, selectedFriendSpaceId);
+        await removeCachedSpaceFeedPostsBySpace(
+            actorSpaceId,
+            selectedFriendSpaceId,
+        );
     }, [profile?.spaceId, selectedFriendSpaceId]);
 
     const finishUnfriend = React.useCallback(() => {
-        setFriends((currentFriends) =>
-            currentFriends.filter(
-                (friend) =>
-                    friend.spaceId != selectedFriendSpaceId &&
-                    friend.id != friendSpaceId,
-            ),
-        );
-        void router.replace(spaceRoutes.friends);
-    }, [friendSpaceId, router, selectedFriendSpaceId, setFriends]);
+        window.location.replace(spaceRoutes.friends);
+    }, []);
 
     if (
         !router.isReady ||
@@ -296,9 +297,12 @@ const Page: React.FC = () => {
                 onReplyToPost={(postSpaceId, postId, text) =>
                     replyToCurrentPost(actorSpaceId, postSpaceId, postId, text)
                 }
-                onSetPostLiked={(postId, liked) =>
-                    setCurrentPostLiked(actorSpaceId, postId, liked)
-                }
+                onSetPostLiked={async (postId, liked) => {
+                    await setCurrentPostLiked(actorSpaceId, postId, liked);
+                    void patchCachedSpaceFeedPost(actorSpaceId, postId, {
+                        viewerLiked: liked,
+                    });
+                }}
                 onUnfriend={selectedFriendSpaceId ? unfriend : undefined}
                 onUnfriendComplete={
                     selectedFriendSpaceId ? finishUnfriend : undefined

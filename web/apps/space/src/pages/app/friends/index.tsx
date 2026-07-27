@@ -14,6 +14,10 @@ import {
     removeCurrentSpaceFriend,
     type SpaceFriendRequest,
 } from "services/space";
+import {
+    invalidateCachedSpaceFeed,
+    removeCachedSpaceFeedPostsBySpace,
+} from "services/spaceFeedCache";
 import { spaceInviteURL } from "services/spaceInvite";
 import { useSpaceAppState } from "state/spaceAppState";
 import { spaceRoutes } from "utils/spaceRoutes";
@@ -121,6 +125,7 @@ const Page: React.FC = () => {
                         setShowFriendRequestCanceledToast(true);
                         return;
                     }
+                    void invalidateCachedSpaceFeed(actorSpaceId);
                     const friends = await loadCurrentSpaceFriends(actorSpaceId);
                     setFriendRequests((currentRequests) =>
                         currentRequests.filter(
@@ -178,11 +183,11 @@ const Page: React.FC = () => {
                         actorSpaceId,
                         friend.spaceId,
                     );
-                    setFriends((currentFriends) =>
-                        currentFriends.filter(
-                            (candidate) => candidate.id != friendID,
-                        ),
+                    await removeCachedSpaceFeedPostsBySpace(
+                        actorSpaceId,
+                        friend.spaceId,
                     );
+                    window.location.reload();
                 }}
             />
             {showFriendRequestCanceledToast && (

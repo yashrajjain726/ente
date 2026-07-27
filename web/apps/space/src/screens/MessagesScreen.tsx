@@ -222,6 +222,7 @@ const conversationPreview = (conversation: SpaceMessageConversation) => {
 const ConversationPreviewLine: React.FC<{
     conversation: SpaceMessageConversation;
 }> = ({ conversation }) => {
+    const activity = conversation.latestActivity;
     const previewLineSx = {
         color: textSecondary,
         fontFamily: '"Inter Variable", Inter, sans-serif',
@@ -233,6 +234,29 @@ const ConversationPreviewLine: React.FC<{
         textOverflow: "ellipsis",
         whiteSpace: "nowrap",
     };
+
+    if (activity.type == "message_like" && activity.text) {
+        return (
+            <Box sx={{ ...previewLineSx, display: "flex" }}>
+                <Box component="span" sx={{ flexShrink: 0 }}>
+                    {activity.outgoing ? 'You liked "' : 'Liked "'}
+                </Box>
+                <Box
+                    component="span"
+                    sx={{
+                        minWidth: 0,
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                    }}
+                >
+                    {truncateMessageText(activity.text)}
+                </Box>
+                <Box component="span" sx={{ flexShrink: 0 }}>
+                    &quot;
+                </Box>
+            </Box>
+        );
+    }
 
     return <Box sx={previewLineSx}>{conversationPreview(conversation)}</Box>;
 };

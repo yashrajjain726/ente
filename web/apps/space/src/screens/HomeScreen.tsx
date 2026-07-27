@@ -72,6 +72,14 @@ const feedHorizontalPadding = "16px";
 const minimumFeedPhotoFrameAspectRatio = 3 / 4;
 const feedMediaLoadRootMargin = "640px 0px";
 const feedLoadMoreRootMargin = "0px 0px 160px 0px";
+const feedRowEnterDurationMs = 460;
+const feedRowEnterStaggerMs = 35;
+const feedRowEnterTiming = "cubic-bezier(0.2, 0.8, 0.2, 1)";
+const avatarFadeSx = {
+    "@keyframes spaceAvatarFade": { from: { opacity: 0 }, to: { opacity: 1 } },
+    animation: "spaceAvatarFade 320ms cubic-bezier(0.22, 1, 0.36, 1) both",
+    "@media (prefers-reduced-motion: reduce)": { animation: "none" },
+} as const;
 const feedCaptionTextSx = {
     color: textBase,
     fontFamily: '"Inter Variable", Inter, sans-serif',
@@ -139,6 +147,7 @@ interface HomeScreenProps {
     onUpdatePostCaption?: (postId: number, caption: string) => Promise<void>;
     profileLink?: string;
     profile: SetupProfile | null;
+    viewerSpaceId?: string;
 }
 
 interface FeedPhotoDimensions {
@@ -174,6 +183,215 @@ interface DraftSpacePostImage {
     previewUrl?: string;
     rotationDegrees?: number;
     width?: number;
+}
+
+type HomeFeedEntry =
+    | {
+          identity: string;
+          item: LocalSpaceFeedPost;
+          kind: "local";
+          renderKey: string;
+      }
+    | { identity: string; item: SpacePost; kind: "remote"; renderKey: string };
+
+interface FeedLayoutSnapshot {
+    enteringKeys: Set<string>;
+    previousTops: Map<string, number>;
+}
+
+interface FeedMotionListProps {
+    entries: HomeFeedEntry[];
+    renderEntry: (entry: HomeFeedEntry) => React.ReactNode;
+}
+
+class FeedMotionList extends React.Component<FeedMotionListProps> {
+    private animations = new Map<string, Animation>();
+    private identityKeys = new Map<string, string>();
+    private rowElements = new Map<string, HTMLDivElement>();
+    private rowRefs = new Map<
+        string,
+        (element: HTMLDivElement | null) => void
+    >();
+    private sourceKeys = new Map<string, string>();
+
+    private stableKeyFor = (entry: HomeFeedEntry) => {
+        const stableKey =
+            this.identityKeys.get(entry.identity) ??
+            this.sourceKeys.get(entry.renderKey) ??
+            entry.renderKey;
+        this.identityKeys.set(entry.identity, stableKey);
+        this.sourceKeys.set(entry.renderKey, stableKey);
+        return stableKey;
+    };
+
+    private rowRefFor = (key: string) => {
+        let rowRef = this.rowRefs.get(key);
+        if (!rowRef) {
+            rowRef = (element) => {
+                if (element) this.rowElements.set(key, element);
+                else this.rowElements.delete(key);
+            };
+            this.rowRefs.set(key, rowRef);
+        }
+        return rowRef;
+    };
+
+    private cancelAnimations = () => {
+        this.animations.forEach((animation) => animation.cancel());
+        this.animations.clear();
+        this.rowElements.forEach((element) => {
+            element.style.zIndex = "";
+            element.style.willChange = "";
+        });
+    };
+
+    getSnapshotBeforeUpdate(
+        previousProps: FeedMotionListProps,
+    ): FeedLayoutSnapshot | null {
+        const previousIdentityOrder = previousProps.entries.map(
+            (entry) => entry.identity,
+        );
+        const identityOrder = this.props.entries.map((entry) => entry.identity);
+        if (
+            previousIdentityOrder.length == identityOrder.length &&
+            previousIdentityOrder.every(
+                (identity, index) => identity == identityOrder[index],
+            )
+        )
+            return null;
+
+        const previousIdentities = new Set(previousIdentityOrder);
+        const addedEntries = this.props.entries.filter(
+            (entry) => !previousIdentities.has(entry.identity),
+        );
+        if (
+            previousProps.entries.length == 0 ||
+            addedEntries.some((entry) => entry.kind == "local")
+        )
+            return null;
+
+        const firstRetainedIndex = this.props.entries.findIndex((entry) =>
+            previousIdentities.has(entry.identity),
+        );
+        const enteringKeys = new Set(
+            firstRetainedIndex > 0
+                ? this.props.entries
+                      .slice(0, firstRetainedIndex)
+                      .filter((entry) => entry.kind == "remote")
+                      .map(this.stableKeyFor)
+                : [],
+        );
+        const previousTops = new Map<string, number>();
+        this.rowElements.forEach((element, key) => {
+            previousTops.set(key, element.getBoundingClientRect().top);
+        });
+        return { enteringKeys, previousTops };
+    }
+
+    componentDidUpdate(
+        _previousProps: FeedMotionListProps,
+        _previousState: unknown,
+        snapshot: FeedLayoutSnapshot | null,
+    ) {
+        if (
+            !snapshot ||
+            window.matchMedia("(prefers-reduced-motion: reduce)").matches
+        )
+            return;
+
+        this.cancelAnimations();
+        let enteringIndex = 0;
+        for (const entry of this.props.entries) {
+            const key = this.stableKeyFor(entry);
+            const element = this.rowElements.get(key);
+            if (!element) continue;
+
+            let animation: Animation | undefined;
+            if (snapshot.enteringKeys.has(key)) {
+                const delay = enteringIndex * feedRowEnterStaggerMs;
+                const height = element.getBoundingClientRect().height;
+                const paddingBottom =
+                    window.getComputedStyle(element).paddingBottom;
+                element.style.zIndex = String(3 - enteringIndex++);
+                element.style.willChange = "height, padding-bottom, transform";
+                animation = element.animate(
+                    [
+                        {
+                            height: "0px",
+                            paddingBottom: "0px",
+                            transform: `translate3d(0, -${height}px, 0)`,
+                        },
+                        {
+                            height: `${height}px`,
+                            paddingBottom,
+                            transform: "translate3d(0, 0, 0)",
+                        },
+                    ],
+                    {
+                        delay,
+                        duration: feedRowEnterDurationMs,
+                        easing: feedRowEnterTiming,
+                        fill: "both",
+                    },
+                );
+            } else if (snapshot.enteringKeys.size == 0) {
+                const previousTop = snapshot.previousTops.get(key);
+                if (previousTop == undefined) continue;
+                const offsetY =
+                    previousTop - element.getBoundingClientRect().top;
+                if (!offsetY) continue;
+                animation = element.animate(
+                    [
+                        { transform: `translate3d(0, ${offsetY}px, 0)` },
+                        { transform: "translate3d(0, 0, 0)" },
+                    ],
+                    {
+                        duration: feedRowEnterDurationMs,
+                        easing: feedRowEnterTiming,
+                        fill: "both",
+                    },
+                );
+            }
+            if (!animation) continue;
+
+            this.animations.set(key, animation);
+            void animation.finished.then(
+                () => {
+                    if (this.animations.get(key) != animation) return;
+                    animation.cancel();
+                    this.animations.delete(key);
+                    element.style.zIndex = "";
+                    element.style.willChange = "";
+                },
+                () => undefined,
+            );
+        }
+    }
+
+    componentWillUnmount() {
+        this.cancelAnimations();
+    }
+
+    render() {
+        return this.props.entries.map((entry) => {
+            const key = this.stableKeyFor(entry);
+            return (
+                <Box
+                    key={key}
+                    ref={this.rowRefFor(key)}
+                    sx={{
+                        boxSizing: "border-box",
+                        minWidth: 0,
+                        pb: "24px",
+                        position: "relative",
+                        width: "100%",
+                    }}
+                >
+                    {this.props.renderEntry(entry)}
+                </Box>
+            );
+        });
+    }
 }
 
 type FeedTimestampStatus = "failed" | "post-limit" | "posted" | "posting";
@@ -875,21 +1093,13 @@ const FeedItem: React.FC<FeedItemProps> = ({
                             <Box
                                 key={displayAvatarUrl ?? "default-avatar"}
                                 sx={{
-                                    "@keyframes spaceFeedAvatarFade": {
-                                        from: { opacity: 0 },
-                                        to: { opacity: 1 },
-                                    },
-                                    animation:
-                                        "spaceFeedAvatarFade 320ms cubic-bezier(0.22, 1, 0.36, 1) both",
+                                    ...avatarFadeSx,
                                     borderRadius: "50%",
                                     height: feedAvatarSize,
                                     overflow: "hidden",
                                     position: "relative",
                                     width: feedAvatarSize,
                                     zIndex: 1,
-                                    "@media (prefers-reduced-motion: reduce)": {
-                                        animation: "none",
-                                    },
                                 }}
                             >
                                 <SpaceAvatarImage
@@ -1309,6 +1519,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     onUpdatePostCaption,
     profile,
     profileLink,
+    viewerSpaceId,
 }) => {
     const [selectedViewer, setSelectedViewer] =
         useState<SelectedHomeViewer | null>(null);
@@ -1335,22 +1546,44 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     const feedImageLoadsInFlightRef = React.useRef<
         Map<string, Promise<string | undefined>>
     >(new Map());
-    const profileSpaceId = profile?.spaceId;
     const isPostPhotoButtonDisabled =
-        isPostPhotoOpening || !profileSpaceId || !onCreatePost;
+        isPostPhotoOpening || !viewerSpaceId || !onCreatePost;
     const selectedPhotoFriendID = selectedViewer?.photo.friendID;
     const selectedPhotoIsOwn =
-        Boolean(profileSpaceId) && selectedPhotoFriendID == profileSpaceId;
-    const localResolvedPostIds = new Set(
-        localFeedPosts
-            .filter((item) => item.status == "posted" || item.status == "ready")
-            .map((item) => item.post.postId),
-    );
-    const remoteFeedItems = feedItems.filter(
-        (item) => !localResolvedPostIds.has(item.postId),
-    );
-    const hasFeedItems =
-        localFeedPosts.length > 0 || remoteFeedItems.length > 0;
+        Boolean(viewerSpaceId) && selectedPhotoFriendID == viewerSpaceId;
+    const desiredFeedEntries = React.useMemo<HomeFeedEntry[]>(() => {
+        const localResolvedPostIds = new Set(
+            localFeedPosts
+                .filter(
+                    (item) => item.status == "posted" || item.status == "ready",
+                )
+                .map((item) => item.post.postId),
+        );
+        return [
+            ...localFeedPosts.map(
+                (item): HomeFeedEntry => ({
+                    identity:
+                        item.status == "posted" || item.status == "ready"
+                            ? `post:${item.post.postId}`
+                            : `local:${item.id}`,
+                    item,
+                    kind: "local",
+                    renderKey: `local:${item.id}`,
+                }),
+            ),
+            ...feedItems
+                .filter((item) => !localResolvedPostIds.has(item.postId))
+                .map(
+                    (item): HomeFeedEntry => ({
+                        identity: `post:${item.postId}`,
+                        item,
+                        kind: "remote",
+                        renderKey: `post:${item.postId}`,
+                    }),
+                ),
+        ];
+    }, [feedItems, localFeedPosts]);
+    const hasFeedItems = desiredFeedEntries.length > 0;
     const isEmptyFeedLoading = !hasFeedItems && isFeedLoading;
     const showFeedCards = hasFeedItems;
     const isInstallPromptEnabled =
@@ -1385,7 +1618,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         focusReplyOnOpen = false,
     ) => {
         const isOwnPost =
-            Boolean(profileSpaceId) && photo.friendID == profileSpaceId;
+            Boolean(viewerSpaceId) && photo.friendID == viewerSpaceId;
         setSelectedViewer({
             focusReplyOnOpen: isOwnPost ? false : focusReplyOnOpen,
             photo,
@@ -1517,7 +1750,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 imageUrl={imageUrl}
                 isAvatarPending={isAvatarPending}
                 isOwnPost={
-                    Boolean(profileSpaceId) && item.spaceId == profileSpaceId
+                    Boolean(viewerSpaceId) && item.spaceId == viewerSpaceId
                 }
                 name={item.name}
                 onLoadAvatar={
@@ -1782,7 +2015,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                     }}
                     sx={{
                         alignItems: "center",
-                        bgcolor: homeBackground,
+                        background: "transparent",
                         boxSizing: "border-box",
                         display: "grid",
                         gap: "12px",
@@ -1801,6 +2034,24 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                         transition: "transform 180ms ease",
                         width: "100%",
                         zIndex: 4,
+                        "&::before": {
+                            WebkitBackdropFilter: "blur(4px)",
+                            WebkitMaskImage:
+                                "linear-gradient(to bottom, #000 0%, transparent 100%)",
+                            backdropFilter: "blur(4px)",
+                            background:
+                                "linear-gradient(to bottom, rgba(245, 245, 247, 0.8), transparent)",
+                            content: '""',
+                            height: "calc(100% + 28px)",
+                            left: 0,
+                            maskImage:
+                                "linear-gradient(to bottom, #000 0%, transparent 100%)",
+                            pointerEvents: "none",
+                            position: "absolute",
+                            right: 0,
+                            top: 0,
+                            zIndex: -1,
+                        },
                         "@media (min-width: 600px)": { maxWidth: 390 },
                         "@media (prefers-reduced-motion: reduce)": {
                             transition: "none",
@@ -1859,10 +2110,19 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                         >
                             {profile &&
                             (profile.avatarUrl || !profile.avatarObjectID) ? (
-                                <SpaceAvatarImage
-                                    src={profile.avatarUrl}
-                                    borderRadius="50%"
-                                />
+                                <Box
+                                    key={profile.avatarUrl ?? "default-avatar"}
+                                    sx={{
+                                        ...avatarFadeSx,
+                                        height: "100%",
+                                        width: "100%",
+                                    }}
+                                >
+                                    <SpaceAvatarImage
+                                        src={profile.avatarUrl}
+                                        borderRadius="50%"
+                                    />
+                                </Box>
                             ) : (
                                 <Skeleton
                                     variant="circular"
@@ -1985,7 +2245,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                         boxSizing: "border-box",
                         display: "flex",
                         flexDirection: "column",
-                        gap: showFeedCards ? "24px" : 0,
+                        gap: 0,
                         justifyContent: showFeedCards ? "flex-start" : "center",
                         minHeight: "calc(100svh - 64px)",
                         minWidth: 0,
@@ -1999,10 +2259,17 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 >
                     {hasFeedItems ? (
                         <>
-                            {localFeedPosts.map(localFeedItemFor)}
-                            {remoteFeedItems.map((item) =>
-                                feedItemFor(item, item.postId),
-                            )}
+                            <FeedMotionList
+                                entries={desiredFeedEntries}
+                                renderEntry={(entry) =>
+                                    entry.kind == "local"
+                                        ? localFeedItemFor(entry.item)
+                                        : feedItemFor(
+                                              entry.item,
+                                              entry.item.postId,
+                                          )
+                                }
+                            />
                             {hasMoreFeedItems && onLoadMoreFeedItems && (
                                 <Box
                                     ref={feedLoadMoreRef}
@@ -2201,7 +2468,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                         onSwipeLeft={closeSelectedPhoto}
                         onReplyToPost={
                             !selectedPhotoIsOwn &&
-                            selectedViewer.photo.friendID != profileSpaceId
+                            selectedViewer.photo.friendID != viewerSpaceId
                                 ? onReplyToPost
                                 : undefined
                         }

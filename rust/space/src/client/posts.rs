@@ -111,15 +111,22 @@ impl AccountSpaceCtx {
             query.push(("limit", value.to_string()));
         }
         let path = format!("/spaces/{space_id}/feed");
-        Ok(self
-            .api()
-            .get(&path)
-            .query(&query)
-            .send()
-            .await?
-            .error_for_status()?
-            .json()
-            .await?)
+        let fetch_feed = async {
+            Ok(self
+                .api()
+                .get(&path)
+                .query(&query)
+                .send()
+                .await?
+                .error_for_status()?
+                .json()
+                .await?)
+        };
+        let (page, _) = futures_util::try_join!(
+            fetch_feed,
+            self.list_decrypted_friend_shares_cached(space_id)
+        )?;
+        Ok(page)
     }
 
     pub async fn unread_status(&self, space_id: &str) -> Result<SpaceUnreadStatusResponse> {

@@ -20,6 +20,7 @@ import 'package:photos/db/files_db.dart';
 import 'package:photos/db/social_db.dart';
 import 'package:photos/db/trash_db.dart';
 import 'package:photos/events/collection_updated_event.dart';
+import 'package:photos/events/contact_relationships_invalidated_event.dart';
 import 'package:photos/events/files_updated_event.dart';
 import 'package:photos/events/force_reload_home_gallery_event.dart';
 import 'package:photos/events/local_photos_updated_event.dart';
@@ -206,6 +207,7 @@ class CollectionsService {
     watch.log("${fetchedCollections.length} collection cached refreshed ");
 
     if (fetchedCollections.isNotEmpty) {
+      Bus.instance.fire(ContactRelationshipsInvalidatedEvent());
       Bus.instance.fire(
         CollectionUpdatedEvent(
           null,
@@ -905,6 +907,7 @@ class CollectionsService {
       );
       _collectionIDToCollections[collectionID] =
           _collectionIDToCollections[collectionID]!.copyWith(sharees: sharees);
+      Bus.instance.fire(ContactRelationshipsInvalidatedEvent());
       unawaited(_db.insert([_collectionIDToCollections[collectionID]!]));
       RemoteSyncService.instance.sync(silently: true).ignore();
       return sharees;
@@ -924,6 +927,7 @@ class CollectionsService {
       );
       _collectionIDToCollections[collectionID] =
           _collectionIDToCollections[collectionID]!.copyWith(sharees: sharees);
+      Bus.instance.fire(ContactRelationshipsInvalidatedEvent());
       unawaited(_db.insert([_collectionIDToCollections[collectionID]!]));
       RemoteSyncService.instance.sync(silently: true).ignore();
       return sharees;
