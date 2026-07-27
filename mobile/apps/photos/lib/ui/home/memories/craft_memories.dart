@@ -94,50 +94,50 @@ class _CraftMemoriesState extends State<CraftMemories> {
                       ),
                     ),
                     const SizedBox(height: 6),
-                    _buildButton(),
+                    GestureDetector(
+                      onTap: () async {
+                        if (await NotificationService.instance
+                                .requestPermissions(context) &&
+                            mounted) {
+                          widget.onNotificationsPermissionGranted?.call();
+                        }
+                      },
+                      onTapDown: (_) => setState(() => _isButtonPressed = true),
+                      onTapUp: (_) => setState(() => _isButtonPressed = false),
+                      onTapCancel: () =>
+                          setState(() => _isButtonPressed = false),
+                      child: AnimatedScale(
+                        scale: _isButtonPressed ? 0.98 : 1,
+                        duration: const Duration(milliseconds: 120),
+                        curve: Curves.easeOutCubic,
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: Colors.white.withAlpha(128),
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 8,
+                            ),
+                            child: Text(
+                              l10n.notifyMe,
+                              style: const TextStyle(
+                                fontFamily: TextStyles.outfitFontFamily,
+                                package: TextStyles.fontPackage,
+                                color: Colors.white,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),
             ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildButton() {
-    final l10n = AppLocalizations.of(context);
-    return GestureDetector(
-      onTap: () async {
-        if (await NotificationService.instance.requestPermissions(context) &&
-            mounted) {
-          widget.onNotificationsPermissionGranted?.call();
-        }
-      },
-      onTapDown: (_) => setState(() => _isButtonPressed = true),
-      onTapUp: (_) => setState(() => _isButtonPressed = false),
-      onTapCancel: () => setState(() => _isButtonPressed = false),
-      child: AnimatedScale(
-        scale: _isButtonPressed ? 0.98 : 1,
-        duration: const Duration(milliseconds: 120),
-        curve: Curves.easeOutCubic,
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: Colors.white.withAlpha(128),
-            borderRadius: BorderRadius.circular(14),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-            child: Text(
-              l10n.notifyMe,
-              style: const TextStyle(
-                fontFamily: TextStyles.outfitFontFamily,
-                package: TextStyles.fontPackage,
-                color: Colors.white,
-                fontSize: 11,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
           ),
         ),
       ),
