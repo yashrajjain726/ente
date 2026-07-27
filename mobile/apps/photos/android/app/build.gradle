@@ -31,7 +31,7 @@ if (keystorePropertiesFile.exists()) {
 
 // Ente's custom prebuilt ONNX Runtime AAR is resolved straight from its
 // GitHub release through an Ivy repository; its SHA-256 is pinned in
-// gradle/verification-metadata.xml. See mobile/native/onnxruntime.md.
+// gradle/verification-metadata.xml.
 repositories {
     exclusiveContent {
         forRepository {
