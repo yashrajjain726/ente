@@ -9,7 +9,7 @@
 // "disable-linking" so that it neither downloads nor bundles any other ONNX
 // Runtime; the symbols resolve against this static library at app link time.
 //
-// See mobile/native/onnxruntime/README.md for the release bump checklist.
+// See mobile/native/onnxruntime.md for the release bump checklist.
 import PackageDescription
 
 let package = Package(

@@ -266,7 +266,7 @@ DEPENDENCIES:
   - ente_qr (from `.symlinks/plugins/ente_qr/ios`)
   - ente_rust (from `.symlinks/plugins/ente_rust/ios`)
   - ente_screen_cover (from `.symlinks/plugins/ente_screen_cover/ios`)
-  - EnteOnnxRuntime (from `../../../native/onnxruntime/EnteOnnxRuntime.podspec`)
+  - EnteOnnxRuntime (from `../../../native/apple/packages/EnteOnnxRuntime/EnteOnnxRuntime.podspec`)
   - ffmpeg_kit_flutter (from `.symlinks/plugins/ffmpeg_kit_flutter/ios`)
   - file_saver (from `.symlinks/plugins/file_saver/ios`)
   - firebase_core (from `.symlinks/plugins/firebase_core/ios`)
@@ -366,7 +366,7 @@ EXTERNAL SOURCES:
   ente_screen_cover:
     :path: ".symlinks/plugins/ente_screen_cover/ios"
   EnteOnnxRuntime:
-    :podspec: "../../../native/onnxruntime/EnteOnnxRuntime.podspec"
+    :podspec: "../../../native/apple/packages/EnteOnnxRuntime/EnteOnnxRuntime.podspec"
   ffmpeg_kit_flutter:
     :path: ".symlinks/plugins/ffmpeg_kit_flutter/ios"
   file_saver:
@@ -548,6 +548,6 @@ SPEC CHECKSUMS:
   wakelock_plus: e29112ab3ef0b318e58cfa5c32326458be66b556
   workmanager_apple: 904529ae31e97fc5be632cf628507652294a0778
 
-PODFILE CHECKSUM: 7af4c0a38ff14aa9b6ef0b1309156a8d783a20c6
+PODFILE CHECKSUM: c2a274bcfa5cc0e68e6b4387a846407ac479bae9
 
 COCOAPODS: 1.17.0

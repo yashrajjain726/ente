@@ -4,7 +4,7 @@
 # the ente_photos_rust pod's build phase points the Rust `ort` crate at the
 # XCFramework's static archive for the active platform via ORT_LIB_PATH.
 #
-# See README.md next to this file for the release bump checklist.
+# See mobile/native/onnxruntime.md for the release bump checklist.
 Pod::Spec.new do |s|
   s.name     = 'EnteOnnxRuntime'
   s.version  = '1.27.0-r3'

@@ -7,7 +7,7 @@
   metadata), so their SHA-256 digests are pinned here. The digests come from
   the SHA256SUMS asset published with the ort-packaging release.
 
-  See mobile/native/onnxruntime/README.md for the release bump checklist.
+  See mobile/native/onnxruntime.md for the release bump checklist.
 -->
 <verification-metadata xmlns="https://schema.gradle.org/dependency-verification"
                        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
