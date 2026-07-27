@@ -416,11 +416,12 @@ class _MemberAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final hasPhoto = profilePictureBytes != null || linkedPersonId != null;
     final cachedPixelWidth =
         (AvatarComponentSize.large.dimension *
                 MediaQuery.devicePixelRatioOf(context))
             .round();
-    final avatar = profilePictureBytes != null
+    Widget avatar = profilePictureBytes != null
         ? AvatarComponent.image(
             image: ResizeImage(
               MemoryImage(profilePictureBytes!),
@@ -444,11 +445,25 @@ class _MemberAvatar extends StatelessWidget {
             ),
           )
         : AvatarComponent(
-            initials: _initials(displayName),
+            initials: avatarInitials(displayName),
             color: avatarColor,
             size: AvatarComponentSize.large,
             semanticLabel: displayName,
           );
+
+    if (hasPhoto) {
+      avatar = DecoratedBox(
+        position: DecorationPosition.foreground,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: avatarComponentColorValue(context, avatarColor),
+            width: 2,
+          ),
+        ),
+        child: avatar,
+      );
+    }
 
     if (!member.isAdmin) {
       return avatar;
@@ -475,19 +490,4 @@ class _MemberAvatar extends StatelessWidget {
       ],
     );
   }
-}
-
-String _initials(String value) {
-  final words = value
-      .trim()
-      .split(RegExp(r'\s+'))
-      .where((word) => word.isNotEmpty)
-      .toList();
-  if (words.isEmpty) {
-    return '?';
-  }
-  if (words.length == 1) {
-    return words.first.substring(0, 1);
-  }
-  return '${words.first.substring(0, 1)}${words.last.substring(0, 1)}';
 }

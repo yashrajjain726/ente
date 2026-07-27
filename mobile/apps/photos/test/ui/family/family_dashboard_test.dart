@@ -242,6 +242,7 @@ void main() {
       final savedMemberAvatar = avatars.singleWhere(
         (avatar) => avatar.semanticLabel == 'Saved member',
       );
+      expect(savedMemberAvatar.initials, 'SM');
       expect(
         savedMemberAvatar.color,
         avatarComponentColorForIdentity(
@@ -302,6 +303,26 @@ void main() {
       find.byType(PersonFaceWidget),
     );
     expect(personAvatar.personId, 'person-42');
+    final ringFinder = find.ancestor(
+      of: find.byType(PersonFaceWidget),
+      matching: find.byWidgetPredicate(
+        (widget) =>
+            widget is DecoratedBox &&
+            widget.position == DecorationPosition.foreground &&
+            widget.decoration is BoxDecoration &&
+            (widget.decoration as BoxDecoration).shape == BoxShape.circle,
+      ),
+    );
+    expect(ringFinder, findsOneWidget);
+    final ring = tester.widget<DecoratedBox>(ringFinder);
+    final border = (ring.decoration as BoxDecoration).border! as Border;
+    expect(
+      border.top.color,
+      avatarComponentColorValue(
+        tester.element(find.byType(PersonFaceWidget)),
+        familyMemberAvatarComponentColor(member),
+      ),
+    );
 
     await tester.tap(find.byType(MenuComponent));
     expect(selectedDisplayName, 'Current person');
