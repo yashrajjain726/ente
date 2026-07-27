@@ -6,19 +6,19 @@ edition = "2024"
 museum = []
 
 [dependencies]
-ente-core.workspace = true
-serde.workspace = true
-serde_json.workspace = true
-thiserror.workspace = true
 bip39 = { version = "2", default-features = false, features = ["std"] }
+ente-core.workspace = true
 getrandom = { version = "0.2", features = ["js"] }
 hex = "0.4"
+serde.workspace = true
+serde_json.workspace = true
 sha2.workspace = true
 srp = { version = "0.7.0-rc.3", default-features = false }
 subtle = "2"
+thiserror.workspace = true
+urlencoding.workspace = true
 uuid = { version = "1.11", features = ["js", "serde", "v4"] }
 zeroize.workspace = true
-urlencoding.workspace = true
 
 [dev-dependencies]
 ente-test-support.workspace = true
