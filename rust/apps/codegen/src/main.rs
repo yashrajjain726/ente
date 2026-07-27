@@ -66,12 +66,18 @@ fn run() -> Result<(), DynError> {
             }
             generate_frb(target)
         }
+        Some("napi") => {
+            if args.next().is_some() {
+                return Err(usage_error());
+            }
+            generate_napi()
+        }
         _ => Err(usage_error()),
     }
 }
 
 fn usage_error() -> DynError {
-    "usage: cargo codegen <native [ensu|cast]|frb [shared|photos]>".into()
+    "usage: cargo codegen <native [ensu|cast]|frb [shared|photos]|napi>".into()
 }
 
 fn generate_native(target: NativeTarget) -> Result<(), DynError> {
@@ -199,6 +205,40 @@ fn generate_frb_package(package_dir: &Path) -> Result<(), DynError> {
     result?;
 
     Ok(())
+}
+
+/// Builds the desktop Node addon and regenerates its JS type declarations
+/// into the gitignored `desktop/rust-bindings/` directory, via `@napi-rs/cli`
+/// (a devDependency of `desktop/`).
+fn generate_napi() -> Result<(), DynError> {
+    let rust_root = rust_root()?;
+    let desktop_dir = repo_root()?.join("desktop");
+    let out_dir = desktop_dir.join("rust-bindings");
+    write_generated_gitignore(&out_dir)?;
+
+    // On Windows npm is a .cmd shim, which CreateProcess doesn't resolve.
+    let npm = if cfg!(windows) { "npm.cmd" } else { "npm" };
+    run_command(
+        Command::new(npm)
+            .arg("exec")
+            .arg("--")
+            .arg("napi")
+            .arg("build")
+            .arg("--manifest-path")
+            .arg(rust_root.join("bindings/napi/photos/Cargo.toml"))
+            .arg("--target-dir")
+            .arg(target_dir()?)
+            .arg("--release")
+            .arg("--strip")
+            .arg("--platform")
+            .arg("--no-js")
+            .arg("--dts")
+            .arg("index.d.ts")
+            .arg("--output-dir")
+            .arg(&out_dir)
+            .current_dir(&desktop_dir),
+        "failed to build the desktop Node addon (run npm install in desktop/ first)".to_owned(),
+    )
 }
 
 fn format_frb_bindings(target: FrbTarget) -> Result<(), DynError> {

@@ -153,10 +153,11 @@ pub fn release_ml_runtime() {
 pub fn analyze_image_rust(req: AnalyzeImageRequest) -> Result<AnalyzeImageResult, RustMlError> {
     let shared_req = shared_indexing::AnalyzeImageRequest {
         file_id: req.file_id,
-        image_path: req.image_path,
+        source: shared_indexing::ImageSource::Path(req.image_path),
         run_faces: req.run_faces,
         run_clip: req.run_clip,
         run_pets: req.run_pets,
+        generate_face_crops: false,
         model_paths: to_model_paths(&req.model_paths),
     };
 

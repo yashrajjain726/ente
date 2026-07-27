@@ -1,6 +1,6 @@
 # ML Indexing Parity Test Suite
 
-This directory contains the ML indexing parity framework for Android, iOS, desktop, and Python ground truth.
+This directory contains the ML indexing parity framework for Android, iOS, and Python ground truth. (Desktop ships the same shared Rust pipeline that the `ente-photos` crate's `ml_indexing` integration test validates against the Python goldens, so it has no separate parity runner.)
 
 ## Layout
 
@@ -13,7 +13,6 @@ This directory contains the ML indexing parity framework for Android, iOS, deskt
 ## Prerequisites
 
 - Python + `uv`
-- Node/npm (desktop parity)
 - Flutter SDK (Android/iOS parity)
 - Android emulator/device and iOS simulator/device when running mobile parity
 
@@ -25,7 +24,7 @@ bash infra/ml/test/run_ml_parity_tests.sh
 
 Common flags:
 
-- `--platforms all|desktop|android|ios`
+- `--platforms all|android|ios`
 - `--output-dir <path>`
 - `--verbose` (stream full runner/comparator logs to terminal)
 - `--render-detection-overlays` (generate annotated detection images under `out/parity/detections/<platform>/`; includes selected platforms plus `python` ground truth)

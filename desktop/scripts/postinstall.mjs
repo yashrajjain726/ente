@@ -37,10 +37,13 @@ const run = (cmd) => {
     execSync(cmd, { stdio: "inherit" });
 };
 
-run(
-    "npm rebuild --ignore-scripts=false ffmpeg-static onnxruntime-node electron-winstaller",
-);
+run("npm rebuild --ignore-scripts=false ffmpeg-static electron-winstaller");
 run("npm exec -- electron-builder install-app-deps");
 run("node scripts/vips.js");
+run("node scripts/ort.js");
+// Build the Rust ML addon from source (requires a Rust toolchain). See
+// [Note: ML with Rust].
+console.log("> cargo codegen napi");
+execSync("cargo codegen napi", { cwd: "../rust", stdio: "inherit" });
 
 writeFileSync(stamp, treeHash());

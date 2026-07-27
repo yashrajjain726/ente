@@ -29,7 +29,7 @@ usage() {
 Usage: infra/ml/test/run_ml_parity_tests.sh [flags]
 
 Flags:
-  --platforms all|desktop|android|ios   (default: all)
+  --platforms all|android|ios           (default: all)
   --output-dir <path>                   (default: infra/ml/test/out/parity)
   --verbose                             (default: disabled)
   --render-detection-overlays           (default: disabled; render annotated face detection images to out/parity/detections/<platform>/)
@@ -283,9 +283,9 @@ print_kv "mobile_ml_route:" "rust"
 declare -a selected_platforms=()
 case "$PLATFORMS" in
   all)
-    selected_platforms=(desktop android ios)
+    selected_platforms=(android ios)
     ;;
-  desktop|android|ios)
+  android|ios)
     selected_platforms=("$PLATFORMS")
     ;;
   *)
@@ -565,9 +565,6 @@ ensure_selected_mobile_devices_running() {
 }
 
 run_preflight_checks() {
-  local desktop_dir="$ROOT_DIR/desktop"
-  local web_dir="$ROOT_DIR/web"
-  local runner_path="$desktop_dir/scripts/ml_parity_runner.ts"
   local mobile_dir="$ROOT_DIR/mobile/apps/photos"
   local driver_path="$mobile_dir/test_driver/ml_parity_driver.dart"
   local -a preflight_errors=()
@@ -575,23 +572,6 @@ run_preflight_checks() {
 
   for platform in "${selected_platforms[@]}"; do
     case "$platform" in
-      desktop)
-        if [[ ! -f "$runner_path" ]]; then
-          preflight_errors+=("desktop parity runner not found at $runner_path")
-        fi
-        if [[ ! -d "$desktop_dir/node_modules" ]]; then
-          preflight_errors+=("desktop dependencies missing: $desktop_dir/node_modules")
-        fi
-        if [[ ! -d "$web_dir/node_modules" ]]; then
-          preflight_errors+=("web dependencies missing: $web_dir/node_modules")
-        fi
-        if ! command -v npx >/dev/null 2>&1; then
-          preflight_errors+=("npx is required for desktop parity")
-        fi
-        if ! command -v npm >/dev/null 2>&1; then
-          preflight_errors+=("npm is required for desktop parity compilation")
-        fi
-        ;;
       android|ios)
         if ! command -v flutter >/dev/null 2>&1; then
           preflight_errors+=("flutter is required for $platform parity")
@@ -799,32 +779,6 @@ for platform in "${selected_platforms[@]}"; do
   mkdir -p "$platform_dir"
 done
 
-run_desktop_runner() {
-  local desktop_dir="$ROOT_DIR/desktop"
-  local web_dir="$ROOT_DIR/web"
-  local runner_path="$desktop_dir/scripts/ml_parity_runner.ts"
-  local platform_output_dir="$OUTPUT_DIR/desktop"
-
-  echo "Compiling desktop TypeScript sources"
-  if ! (cd "$desktop_dir" && npm exec -- tsc); then
-    echo "Desktop TypeScript compilation failed; desktop parity output not generated."
-    return 1
-  fi
-
-  echo "Running desktop parity runner"
-  if ! (
-    cd "$web_dir"
-    isDesktop=1 appName=photos desktopAppVersion=parity npx --yes tsx "$runner_path" \
-      --manifest "$MANIFEST_PATH" \
-      --output-dir "$platform_output_dir"
-  ); then
-    echo "Desktop parity runner failed; desktop parity output not generated."
-    return 1
-  fi
-
-  return 0
-}
-
 run_mobile_runner() {
   local platform="$1"
   local target="$2"
@@ -1013,9 +967,6 @@ run_ios_runner() {
 run_platform_runner() {
   local platform="$1"
   case "$platform" in
-    desktop)
-      run_desktop_runner
-      ;;
     android)
       run_android_runner
       ;;

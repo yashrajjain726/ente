@@ -5,6 +5,7 @@ on:
         paths:
             - ".github/workflows/desktop-lint.yml"
             - "desktop/**"
+            - "rust/bindings/napi/**"
 
 permissions:
     contents: read
@@ -27,5 +28,18 @@ jobs:
                   cache-dependency-path: "desktop/package-lock.json"
 
             - run: npm ci
+
+            # Restore-only; primed on main by warm-caches.yml.
+            - name: Restore Rust cache
+              uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+              with:
+                  workspaces: rust
+                  shared-key: rust-workspace
+                  save-if: false
+
+            # tsc typechecks against the generated rust-bindings/index.d.ts.
+            - name: Generate ML addon bindings
+              working-directory: rust
+              run: cargo codegen napi
 
             - run: npm run lint

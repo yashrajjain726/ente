@@ -12,8 +12,79 @@ import type { EnteFile } from "ente-media/file";
 import { fileFileName } from "ente-media/file-metadata";
 import { FileType } from "ente-media/file-type";
 import { decodeLivePhoto } from "ente-media/live-photo";
-export { createImageBitmapAndData } from "./decode";
-export type { ImageBitmapAndData } from "./decode";
+
+/**
+ * The image that should be indexed for a given file, either as a path on the
+ * user's file system or as its (encoded, undecoded) contents.
+ *
+ * The native side decodes all the formats we care about itself, so unlike
+ * {@link fetchRenderableBlob} there is no JPEG conversion involved.
+ */
+export type IndexableImageSource =
+    | { path: string; bytes?: undefined }
+    | { path?: undefined; bytes: Uint8Array };
+
+/**
+ * Return the original image contents (or its path on disk) for the native ML
+ * pipeline to index.
+ *
+ * - For images this is the original image itself: the local file when we're
+ *   called during an upload from this client, otherwise the downloaded (and
+ *   decrypted) original.
+ * - For videos it is their (JPEG) thumbnail.
+ * - For live photos it is the image component of the live photo.
+ *
+ * @param file The {@link EnteFile} to index.
+ *
+ * @param puItem If we're called during the upload process, then this will be
+ * set to the {@link ProcessableUploadItem} that was uploaded so that we can
+ * directly use the on-disk file instead of needing to download the original.
+ *
+ * @param electron The {@link ElectronMLWorker} instance that we can use to
+ * IPC with the Node.js layer.
+ */
+export const fetchIndexableImageSource = async (
+    file: EnteFile,
+    puItem: ProcessableUploadItem | undefined,
+    electron: ElectronMLWorker,
+): Promise<IndexableImageSource> => {
+    if (file.metadata.fileType == FileType.video) {
+        const thumbnailData = await downloadManager.thumbnailData(file);
+        return { bytes: thumbnailData! };
+    }
+
+    if (puItem) {
+        if (puItem instanceof File) {
+            return { bytes: new Uint8Array(await puItem.arrayBuffer()) };
+        }
+        const uploadItem = await fileSystemUploadItemIfUnchanged(
+            puItem,
+            electron.fsStatMtime,
+        );
+        if (uploadItem) {
+            // The native side can directly read (and decode) local files, so
+            // pass paths as paths; only zip entries need to be read by us.
+            if (typeof uploadItem == "string") return { path: uploadItem };
+            const blob = await readNonVideoUploadItem(uploadItem, electron);
+            return { bytes: new Uint8Array(await blob.arrayBuffer()) };
+        }
+        // The file on disk has changed. Fetch it from remote instead.
+    }
+
+    const originalFileBlob = await downloadManager.fileBlob(file, {
+        background: true,
+    });
+
+    if (file.metadata.fileType == FileType.livePhoto) {
+        const { imageData } = await decodeLivePhoto(
+            fileFileName(file),
+            originalFileBlob,
+        );
+        return { bytes: imageData };
+    } else {
+        return { bytes: new Uint8Array(await originalFileBlob.arrayBuffer()) };
+    }
+};
 
 /**
  * Return a renderable blob (converting to JPEG if needed) for the given data.

@@ -555,7 +555,11 @@ pub(crate) fn release_runtime() {
 }
 
 fn should_retry_execution_provider_runtime(error: &MlError) -> bool {
-    cfg!(any(target_os = "ios", target_os = "android")) && is_execution_provider_failure(error)
+    cfg!(any(
+        target_os = "ios",
+        target_os = "android",
+        target_os = "macos"
+    )) && is_execution_provider_failure(error)
 }
 
 fn is_execution_provider_failure(error: &MlError) -> bool {

@@ -74,9 +74,9 @@ On macOS, we use the `sips` CLI tool for these tasks, but that is already availa
 
 ### ML
 
-[onnxruntime-node](https://github.com/Microsoft/onnxruntime) is used as the ML runtime. It powers both natural language searches (using CLIP) and face detection (using YOLO).
+The ML pipeline (natural language search using CLIP, and face detection and recognition) is implemented by the Rust crate shared with the mobile apps (`rust/crates/photos`), exposed to us as a Node native addon built from source by `cargo codegen napi` (see "[Note: ML with Rust]").
 
-[clip-bpe-js](https://github.com/simonwarchol/clip-bpe-js) is used for tokening the user's search phrase before computing its CLIP (text) embedding.
+The addon loads [ONNX Runtime](https://onnxruntime.ai) dynamically at runtime, using Ente's pinned custom builds (CoreML-enabled on macOS) that `scripts/ort.js` downloads into the extra resources (`build`) folder. See "[Note: ONNX Runtime binaries]".
 
 ### ZIP
 

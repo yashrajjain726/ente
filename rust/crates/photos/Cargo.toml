@@ -50,7 +50,19 @@ ort = { workspace = true, features = [
     "xnnpack",
 ] }
 
-[target.'cfg(not(any(target_os = "ios", target_os = "android")))'.dependencies]
+# macOS desktop loads the custom CoreML-enabled dylib at runtime; CoreML is
+# the preferred execution provider like on iOS.
+[target.'cfg(target_os = "macos")'.dependencies]
+ort = { workspace = true, features = [
+    "ndarray",
+    "half",
+    "coreml",
+    "api-27",
+    "load-dynamic",
+    "copy-dylibs",
+] }
+
+[target.'cfg(not(any(target_os = "ios", target_os = "android", target_os = "macos")))'.dependencies]
 ort = { workspace = true, features = [
     "ndarray",
     "half",

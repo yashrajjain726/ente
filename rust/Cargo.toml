@@ -6,6 +6,7 @@ members = [
     "apps/ensu/src-tauri",
     "bindings/frb/ente-rust",
     "bindings/frb/photos",
+    "bindings/napi/photos",
     "bindings/uniffi/cast",
     "bindings/uniffi/ensu",
     "bindings/wasm/ente-wasm",
