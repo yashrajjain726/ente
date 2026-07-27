@@ -1,0 +1,1 @@
+- Fixed opening the wrong album when tapping the latest comment on a photo.

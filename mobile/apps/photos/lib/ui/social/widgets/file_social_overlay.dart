@@ -123,7 +123,18 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
 
     if (fileID == null || currentUserID == null) {
       _clearSocialState();
-      widget.onVisibilityChanged?.call(false);
+      // This path can run synchronously from didUpdateWidget. Defer notifying
+      // the host so a future uploaded-to-local transition cannot mark a
+      // sibling widget dirty while Flutter is still building this overlay.
+      scheduleMicrotask(() {
+        if (!mounted ||
+            refreshID != _latestRefreshID ||
+            widget.file.uploadedFileID != fileID ||
+            widget.currentUserID != currentUserID) {
+          return;
+        }
+        widget.onVisibilityChanged?.call(false);
+      });
       return;
     }
 
@@ -389,6 +400,7 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
         context,
         collectionID: initialCollection.id,
         fileID: fileID,
+        preferDraftCollection: comment == null,
         sharedCollections: sharedCollections,
       );
     });
