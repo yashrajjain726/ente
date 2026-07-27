@@ -16,10 +16,15 @@ const _minDateTimeSecondsSinceEpoch = -_maxDateTimeSecondsSinceEpoch;
 typedef AssetDateTimes = ({int creationTime, int modificationTime});
 
 /// Compares at the whole-second precision provided by photo_manager.
-bool isAssetAtOrAfterSyncCutoff(AssetDateTimes dateTimes, int cutoffTime) {
-  final latestAssetTimeSecond =
-      max(dateTimes.creationTime, dateTimes.modificationTime) ~/
-      Duration.microsecondsPerSecond;
+///
+/// Uses the raw asset timestamps, counting invalid ones as epoch, so that
+/// assets with broken dates are picked up during first import (cutoff 0) but
+/// not re-flagged as updated on every incremental sync.
+bool isAssetAtOrAfterSyncCutoff(AssetEntity asset, int cutoffTime) {
+  final latestAssetTimeSecond = max(
+    _validSecondsSinceEpoch(asset.createDateSecond) ?? 0,
+    _validSecondsSinceEpoch(asset.modifiedDateSecond) ?? 0,
+  );
   final cutoffTimeSecond = cutoffTime ~/ Duration.microsecondsPerSecond;
   return latestAssetTimeSecond >= cutoffTimeSecond;
 }
@@ -31,49 +36,25 @@ AssetDateTimes resolveAssetDateTimes(AssetEntity asset) {
     asset.modifiedDateSecond,
   );
 
-  if (creationTime == null && modificationTime == null) {
+  if (creationTime == null || modificationTime == null) {
     _logger.warning(
-      "Asset creation and modification times are invalid; using upload time",
-    );
-    return (creationTime: uploadTime, modificationTime: uploadTime);
-  }
-  if (creationTime == null) {
-    _logger.info(
-      "Asset creation time is invalid; resolving from modification time",
-    );
-    final resolvedCreationTime = _resolveCreationTime(
-      asset,
-      modificationTime!,
-      modificationTime,
-      uploadTime,
-    );
-    return (
-      creationTime: resolvedCreationTime,
-      modificationTime: modificationTime,
-    );
-  }
-  if (modificationTime == null) {
-    _logger.info("Asset modification time is invalid; using creation time");
-    final resolvedCreationTime = _resolveCreationTime(
-      asset,
-      creationTime,
-      creationTime,
-      uploadTime,
-    );
-    return (
-      creationTime: resolvedCreationTime,
-      modificationTime: resolvedCreationTime,
+      "LocalID: ${asset.id} has invalid raw date(s) "
+      "(createDateSecond: ${asset.createDateSecond}, "
+      "modifiedDateSecond: ${asset.modifiedDateSecond}); using fallbacks",
     );
   }
 
+  // A missing creation time is treated as pre-1981 so the filename and
+  // modification-time fallbacks in _resolveCreationTime apply to it.
+  final resolvedCreationTime = _resolveCreationTime(
+    asset,
+    creationTime ?? 0,
+    modificationTime ?? 0,
+    uploadTime,
+  );
   return (
-    creationTime: _resolveCreationTime(
-      asset,
-      creationTime,
-      modificationTime,
-      uploadTime,
-    ),
-    modificationTime: modificationTime,
+    creationTime: resolvedCreationTime,
+    modificationTime: modificationTime ?? resolvedCreationTime,
   );
 }
 
@@ -89,7 +70,7 @@ int _resolveCreationTime(
     // filesystem creation time. Embedded metadata may replace this on upload.
     if (modificationTime >= jan011981Time && modificationTime < creationTime) {
       _logger.info(
-        "Asset modification time is less than creation time. "
+        "LocalID: ${asset.id} modification time is less than creation time. "
         "Using modification time as creation time",
       );
       resolvedCreationTime = modificationTime;
@@ -110,11 +91,19 @@ int _resolveCreationTime(
   }
 }
 
-int? _validMicrosecondsSinceEpoch(int? secondsSinceEpoch) {
+int? _validSecondsSinceEpoch(int? secondsSinceEpoch) {
   if (secondsSinceEpoch == null ||
       secondsSinceEpoch < _minDateTimeSecondsSinceEpoch ||
       secondsSinceEpoch > _maxDateTimeSecondsSinceEpoch) {
     return null;
   }
-  return secondsSinceEpoch * Duration.microsecondsPerSecond;
+  return secondsSinceEpoch;
+}
+
+int? _validMicrosecondsSinceEpoch(int? secondsSinceEpoch) {
+  final validSeconds = _validSecondsSinceEpoch(secondsSinceEpoch);
+  if (validSeconds == null) {
+    return null;
+  }
+  return validSeconds * Duration.microsecondsPerSecond;
 }

@@ -215,14 +215,13 @@ Tuple2<Set<String>, List<EnteFile>> _getLocalIDsAndFilesFromAssets(
   final Set<String> localIDs = {};
   for (AssetEntity entity in assetList) {
     localIDs.add(entity.id);
-    final dateTimes = resolveAssetDateTimes(entity);
     final bool assetCreatedOrUpdatedAfterGivenTime = isAssetAtOrAfterSyncCutoff(
-      dateTimes,
+      entity,
       fromTime,
     );
     if (!alreadySeenLocalIDs.contains(entity.id) &&
         assetCreatedOrUpdatedAfterGivenTime) {
-      final file = fileFromAsset(pathEntity.name, entity, dateTimes: dateTimes);
+      final file = fileFromAsset(pathEntity.name, entity);
       files.add(file);
     }
   }

@@ -8,12 +8,8 @@ import "package:photos/models/location/location.dart";
 import "package:photos/module/metadata/asset_date_times.dart";
 import "package:photos/module/metadata/exif.dart";
 
-EnteFile fileFromAsset(
-  String deviceFolder,
-  AssetEntity asset, {
-  AssetDateTimes? dateTimes,
-}) {
-  final resolvedDateTimes = dateTimes ?? resolveAssetDateTimes(asset);
+EnteFile fileFromAsset(String deviceFolder, AssetEntity asset) {
+  final resolvedDateTimes = resolveAssetDateTimes(asset);
   return EnteFile()
     ..localID = asset.id
     ..title = asset.title
