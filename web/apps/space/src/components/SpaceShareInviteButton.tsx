@@ -37,14 +37,14 @@ export const SpaceShareInviteButton: React.FC<SpaceShareInviteButtonProps> = ({
 }) => {
     const isSharing = sharing ?? false;
     const isDisabled = isSharing || !profileLink;
-    const buttonLabel = label ?? "Share invite";
+    const buttonLabel = label ?? "Share profile";
 
     const shareInvite = () => {
         if (isDisabled || !profileLink) return;
         onShareStart?.();
         try {
             onSharingChange?.(true);
-            openSpaceShareLinkDialog();
+            openSpaceShareLinkDialog("invite");
             onShareComplete?.();
         } catch (error) {
             onShareError?.(error);

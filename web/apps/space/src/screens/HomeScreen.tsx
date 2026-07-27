@@ -2384,51 +2384,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                             >
                                 {emptyFeedMessage}
                             </Box>
-                            {hasLoadedNoFriends && (
-                                <SpaceShareInviteButton
-                                    profileLink={profileLink}
-                                    sharing={isInviteSharing}
-                                    onShareError={(error) =>
-                                        console.error(
-                                            "Failed to share space invite",
-                                            error,
-                                        )
-                                    }
-                                    onSharingChange={setIsInviteSharing}
-                                    sx={{
-                                        alignItems: "center",
-                                        bgcolor: "#E8E8E8",
-                                        border: 0,
-                                        borderRadius: "18px",
-                                        color: textBase,
-                                        cursor:
-                                            profileLink && !isInviteSharing
-                                                ? "pointer"
-                                                : "default",
-                                        display: "inline-flex",
-                                        fontFamily:
-                                            '"Inter Variable", Inter, sans-serif',
-                                        fontSize: 13,
-                                        fontWeight: 600,
-                                        gap: "6px",
-                                        height: spaceTouchTargetSize,
-                                        justifyContent: "center",
-                                        lineHeight: "18px",
-                                        mt: emptyFeedItemGap,
-                                        px: "14px",
-                                        whiteSpace: "nowrap",
-                                        "&:disabled": { opacity: 0.45 },
-                                        "&:focus-visible": {
-                                            outline: `2px solid ${green}`,
-                                            outlineOffset: 2,
-                                        },
-                                        "&:hover":
-                                            profileLink && !isInviteSharing
-                                                ? { bgcolor: "#DEDEDE" }
-                                                : undefined,
-                                    }}
-                                />
-                            )}
                         </Box>
                     )}
                 </Box>

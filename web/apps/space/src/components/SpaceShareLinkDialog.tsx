@@ -8,7 +8,10 @@ import {
     type CurrentSpaceLink,
 } from "services/space";
 import { spaceInviteURL } from "services/spaceInvite";
-import { onOpenSpaceShareLinkDialog } from "services/spaceShareLink";
+import {
+    onOpenSpaceShareLinkDialog,
+    type SpaceShareLinkDialogMode,
+} from "services/spaceShareLink";
 
 const green = "#08C225";
 const dangerColor = "#F63A3A";
@@ -22,13 +25,15 @@ export const SpaceShareLinkDialogHost: React.FC = () => {
     const [error, setError] = React.useState<string>();
     const [copied, setCopied] = React.useState(false);
     const [linkChanged, setLinkChanged] = React.useState(false);
+    const [mode, setMode] = React.useState<SpaceShareLinkDialogMode>("profile");
     const [isChangeConfirmationOpen, setIsChangeConfirmationOpen] =
         React.useState(false);
     const [confirming, setConfirming] = React.useState(false);
 
-    const loadLink = React.useCallback(() => {
+    const loadLink = React.useCallback((nextMode: SpaceShareLinkDialogMode) => {
         const requestID = ++linkRequestID.current;
         setOpen(true);
+        setMode(nextMode);
         setLink(undefined);
         setLoading(true);
         setError(undefined);
@@ -175,7 +180,11 @@ export const SpaceShareLinkDialogHost: React.FC = () => {
                             textAlign: "center",
                         }}
                     >
-                        {linkChanged ? "New link ready" : "Share your profile"}
+                        {linkChanged
+                            ? "New link ready"
+                            : mode == "invite"
+                              ? "Invite friends"
+                              : "Share your profile"}
                     </Box>
                     <Box
                         sx={{
