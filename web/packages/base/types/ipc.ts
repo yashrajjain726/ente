@@ -859,7 +859,7 @@ export interface MLWorkerFaceResult {
     };
     blurValue: number;
     /** The face embedding (192 floating point values). */
-    embedding: number[];
+    embedding: Float32Array<ArrayBuffer>;
 }
 
 /**
@@ -883,7 +883,7 @@ export interface MLWorkerAnalyzeImageResult {
     /** Present when the request had {@link runClip} set. */
     clip?: {
         /** The (normalized) CLIP image embedding (512 floating point values). */
-        embedding: number[];
+        embedding: Float32Array<ArrayBuffer>;
     };
     /** Pet recognition results (feature in development, ignored for now). */
     petFaces?: unknown;

@@ -72,6 +72,11 @@ export type RemoteCLIPIndex = CLIPIndex & {
     version: number;
     /** The UA for the client which generated this embedding. */
     client: string;
+    /**
+     * Bitmask describing the runtime that generated this index. An absent
+     * value on legacy remote data is parsed as zero.
+     */
+    flags: number;
 };
 
 export type LocalCLIPIndex = CLIPIndex & {

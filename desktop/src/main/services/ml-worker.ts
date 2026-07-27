@@ -114,6 +114,9 @@ const loadMLNative = (paths: MLNativePaths) => {
         // eslint-disable-next-line @typescript-eslint/no-require-imports
         const native = require(paths.addon) as MLNative;
         native.initOrt(paths.onnxRuntimeLibrary);
+        // Enables the guarded WebGPU path on Linux and Windows. This is a
+        // no-op on macOS, where CoreML remains the preferred provider.
+        native.setMlExecutionConfig(true);
         _native = native;
         log.debugString(`Loaded ML addon at ${paths.addon}`);
     } catch (e) {
@@ -575,7 +578,7 @@ export const computeCLIPTextEmbeddingIfAvailable = async (text: string) => {
         log.debugString(
             `Rust ML CLIP text embedding took ${Date.now() - t} ms`,
         );
-        return Float32Array.from(embedding);
+        return embedding;
     } finally {
         logMLRuntimeEvents(native);
     }

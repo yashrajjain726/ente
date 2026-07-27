@@ -23,9 +23,8 @@ pub fn init_ort(dylib_path: String) -> Result<()> {
     Ok(())
 }
 
-/// Configures process-wide ML execution behavior. `enable_webgpu` only has an
-/// effect on Android; it is a no-op on desktop and exists for surface parity
-/// with the mobile bindings.
+/// Configures process-wide ML execution behavior. `enable_webgpu` enables the
+/// guarded WebGPU path on Linux and Windows; it is a no-op on macOS.
 #[napi]
 pub fn set_ml_execution_config(enable_webgpu: bool) {
     shared_indexing::set_ml_execution_config(enable_webgpu);
@@ -94,12 +93,12 @@ pub struct FaceResult {
     pub face_id: String,
     pub detection: FaceDetection,
     pub blur_value: f64,
-    pub embedding: Vec<f64>,
+    pub embedding: Float32Array,
 }
 
 #[napi(object)]
 pub struct ClipResult {
-    pub embedding: Vec<f64>,
+    pub embedding: Float32Array,
 }
 
 #[napi(object)]
@@ -111,7 +110,7 @@ pub struct PetFaceResult {
     pub keypoints: Vec<Vec<f64>>,
     /// 0 = dog, 1 = cat.
     pub species: u32,
-    pub face_embedding: Vec<f64>,
+    pub face_embedding: Float32Array,
 }
 
 #[napi(object)]
@@ -121,7 +120,7 @@ pub struct PetBodyResult {
     pub box_xyxy: Vec<f64>,
     /// COCO class: 15 = cat, 16 = dog.
     pub coco_class: u32,
-    pub body_embedding: Vec<f64>,
+    pub body_embedding: Float32Array,
 }
 
 #[napi(object)]
@@ -199,7 +198,7 @@ pub struct RunClipTextRequest {
 
 #[napi(object)]
 pub struct RunClipTextResult {
-    pub embedding: Vec<f64>,
+    pub embedding: Float32Array,
 }
 
 pub struct RunClipTextTask {
@@ -220,11 +219,7 @@ impl Task for RunClipTextTask {
 
     fn resolve(&mut self, _env: Env, output: Self::Output) -> Result<Self::JsValue> {
         Ok(RunClipTextResult {
-            embedding: output
-                .embedding
-                .into_iter()
-                .map(|value| value as f64)
-                .collect(),
+            embedding: output.embedding.into(),
         })
     }
 }
@@ -325,7 +320,7 @@ fn to_napi_analyze_image_result(result: shared_indexing::AnalyzeImageResult) -> 
             .face_crops
             .map(|crops| crops.into_iter().map(Buffer::from).collect()),
         clip: result.clip.map(|clip| ClipResult {
-            embedding: to_f64_vec(clip.embedding),
+            embedding: clip.embedding.into(),
         }),
         pet_faces: result
             .pet_faces
@@ -357,7 +352,7 @@ fn to_napi_face_result(result: shared_types::FaceResult) -> FaceResult {
                 .collect(),
         },
         blur_value: f64::from(result.blur_value),
-        embedding: to_f64_vec(result.embedding),
+        embedding: result.embedding.into(),
     }
 }
 
@@ -378,7 +373,7 @@ fn to_napi_pet_face_result(result: shared_types::PetFaceResult) -> PetFaceResult
             .map(|point| point.into_iter().map(f64::from).collect())
             .collect(),
         species: u32::from(result.species),
-        face_embedding: to_f64_vec(result.face_embedding),
+        face_embedding: result.face_embedding.into(),
     }
 }
 
@@ -393,10 +388,6 @@ fn to_napi_pet_body_result(result: shared_types::PetBodyResult) -> PetBodyResult
             .map(f64::from)
             .collect(),
         coco_class: u32::from(result.detection.coco_class),
-        body_embedding: to_f64_vec(result.body_embedding),
+        body_embedding: result.body_embedding.into(),
     }
-}
-
-fn to_f64_vec(values: Vec<f32>) -> Vec<f64> {
-    values.into_iter().map(f64::from).collect()
 }

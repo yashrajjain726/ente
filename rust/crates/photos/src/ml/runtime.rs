@@ -293,7 +293,7 @@ impl MlRuntime {
             clip_text: ModelSlot::new(cpu_only, "clip-text"),
             // Pet models previously had device-specific FP16 driver failures.
             // Keep them CPU-only until they have been validated on the GPU
-            // execution providers of supported iOS and Android devices.
+            // execution providers of all supported platforms.
             pet_face_detection: ModelSlot::new(cpu_only, "pet-face-detection"),
             pet_face_embedding_dog: ModelSlot::new(cpu_only, "pet-face-embedding-dog"),
             pet_face_embedding_cat: ModelSlot::new(cpu_only, "pet-face-embedding-cat"),
@@ -558,7 +558,9 @@ fn should_retry_execution_provider_runtime(error: &MlError) -> bool {
     cfg!(any(
         target_os = "ios",
         target_os = "android",
-        target_os = "macos"
+        target_os = "linux",
+        target_os = "macos",
+        target_os = "windows"
     )) && is_execution_provider_failure(error)
 }
 

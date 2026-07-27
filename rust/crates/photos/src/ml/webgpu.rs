@@ -1,11 +1,11 @@
-//! Device-side guards for the Android WebGPU execution provider: a durable
-//! crash canary and a GPU adapter allowlist.
+//! Platform guards for the WebGPU execution provider: a durable crash canary
+//! on Android, Linux and Windows, plus an Android GPU adapter allowlist.
 //!
-//! The canary prevents an infinite crash loop on the rare device where
-//! Dawn/Vulkan hard-crashes the process while a WebGPU session is built or
-//! first dispatched. The allowlist only permits WebGPU on GPU vendors that
-//! Chromium ships WebGPU to on Android, so Ente never runs Dawn on driver
-//! stacks that Google's far larger fleet has not validated.
+//! The canary prevents an infinite crash loop on machines where Dawn's native
+//! backend hard-crashes the process while a WebGPU session is built or first
+//! dispatched. On Android, the allowlist additionally permits WebGPU only on
+//! GPU vendors that Chromium ships WebGPU to, so Ente never runs Dawn on
+//! mobile driver stacks that Google's far larger fleet has not validated.
 //!
 //! Mechanics: immediately before a WebGPU session is built, a per-model
 //! counter file next to the model is incremented and fsynced ("armed"). After
@@ -15,46 +15,65 @@
 //! [`MAX_CONSECUTIVE_FAILURES`], WebGPU is no longer attempted for models in
 //! that directory — durably, across process restarts.
 //!
-//! A single interrupted attempt (e.g. Android killing the app mid-indexing)
-//! is therefore tolerated: only consecutive failures with no intervening
-//! success trip the breaker, which a genuine crash loop does deterministically
-//! within a few launches.
+//! A single interrupted attempt (e.g. the OS killing the app mid-indexing) is
+//! therefore tolerated: only consecutive failures with no intervening success
+//! trip the breaker, which a genuine crash loop does deterministically within
+//! a few launches.
 //!
 //! Everything here is called from `onnx::build_session` while the caller
 //! holds the per-model slot lock, so accesses to one model's counter file are
 //! already serialized and no in-memory state is needed beyond the enable flag.
 
+#[cfg(all(
+    not(target_os = "windows"),
+    any(target_os = "android", target_os = "linux", test)
+))]
+use std::fs::File;
 #[cfg(target_os = "android")]
-use std::sync::{
-    OnceLock,
-    atomic::{AtomicBool, Ordering},
-};
-#[cfg(any(target_os = "android", test))]
+use std::sync::OnceLock;
+#[cfg(any(target_os = "android", target_os = "linux", target_os = "windows"))]
+use std::sync::atomic::{AtomicBool, Ordering};
+#[cfg(any(
+    target_os = "android",
+    target_os = "linux",
+    target_os = "windows",
+    test
+))]
 use std::{
-    fs::{self, File, OpenOptions},
+    fs::{self, OpenOptions},
     io::{self, Write},
     path::{Path, PathBuf},
 };
 
 /// Bump the version to discard all previous canary state, e.g. after a major
 /// ONNX Runtime or Dawn upgrade that warrants re-trialing quarantined devices.
-#[cfg(any(target_os = "android", test))]
+#[cfg(any(
+    target_os = "android",
+    target_os = "linux",
+    target_os = "windows",
+    test
+))]
 const CANARY_FILE_PREFIX: &str = ".ente-webgpu-canary-v1.";
 
 /// Number of consecutive failed or interrupted WebGPU attempts for one model
 /// after which WebGPU is durably disabled.
-#[cfg(any(target_os = "android", test))]
+#[cfg(any(
+    target_os = "android",
+    target_os = "linux",
+    target_os = "windows",
+    test
+))]
 const MAX_CONSECUTIVE_FAILURES: u32 = 3;
 
-/// WebGPU is opt-in while the custom Android ONNX Runtime build is being
-/// validated; the app-side policy also gates on device eligibility.
-#[cfg(target_os = "android")]
+/// WebGPU is opt-in at the app boundary. Android additionally gates this on
+/// device eligibility; desktop enables it when its native addon is loaded.
+#[cfg(any(target_os = "android", target_os = "linux", target_os = "windows"))]
 static WEBGPU_ENABLED: AtomicBool = AtomicBool::new(false);
 
 pub(crate) fn set_enabled(enabled: bool) {
-    #[cfg(target_os = "android")]
+    #[cfg(any(target_os = "android", target_os = "linux", target_os = "windows"))]
     WEBGPU_ENABLED.store(enabled, Ordering::Relaxed);
-    #[cfg(not(target_os = "android"))]
+    #[cfg(not(any(target_os = "android", target_os = "linux", target_os = "windows")))]
     let _ = enabled;
 }
 
@@ -66,7 +85,7 @@ pub(crate) fn set_enabled(enabled: bool) {
 /// adapter touches the Vulkan driver, so it must run inside the armed canary
 /// window (see `onnx::build_webgpu_session_with_canary`), where a probe crash
 /// is recorded like any other WebGPU crash.
-#[cfg(target_os = "android")]
+#[cfg(any(target_os = "android", target_os = "linux", target_os = "windows"))]
 pub(crate) fn attempt_permitted(model_path: &str) -> bool {
     WEBGPU_ENABLED.load(Ordering::Relaxed)
         && model_dir(model_path).is_some_and(|dir| !quarantined(&dir))
@@ -175,7 +194,12 @@ fn probe_vulkan_vendor_ids() -> Result<Vec<u32>, String> {
 /// A durable record of an in-flight WebGPU attempt for one model. Dropping it
 /// without calling [`ArmedCanary::disarm`] leaves the attempt recorded as
 /// failed, which is exactly what a crash does implicitly.
-#[cfg(any(target_os = "android", test))]
+#[cfg(any(
+    target_os = "android",
+    target_os = "linux",
+    target_os = "windows",
+    test
+))]
 pub(crate) struct ArmedCanary {
     path: PathBuf,
 }
@@ -183,7 +207,12 @@ pub(crate) struct ArmedCanary {
 /// Increments and fsyncs the model's consecutive-failure counter before a
 /// WebGPU attempt. On error the caller must skip WebGPU (fail closed): without
 /// a durable record, a crash during the attempt would go unnoticed.
-#[cfg(any(target_os = "android", test))]
+#[cfg(any(
+    target_os = "android",
+    target_os = "linux",
+    target_os = "windows",
+    test
+))]
 pub(crate) fn arm_canary(model_path: &str, model_namespace: &str) -> io::Result<ArmedCanary> {
     let dir = model_dir(model_path).ok_or_else(|| {
         io::Error::new(
@@ -197,7 +226,12 @@ pub(crate) fn arm_canary(model_path: &str, model_namespace: &str) -> io::Result<
     Ok(ArmedCanary { path })
 }
 
-#[cfg(any(target_os = "android", test))]
+#[cfg(any(
+    target_os = "android",
+    target_os = "linux",
+    target_os = "windows",
+    test
+))]
 impl ArmedCanary {
     /// Marks the attempt as successful by removing the counter file, resetting
     /// the model's consecutive-failure count to zero.
@@ -211,7 +245,12 @@ impl ArmedCanary {
     }
 }
 
-#[cfg(any(target_os = "android", test))]
+#[cfg(any(
+    target_os = "android",
+    target_os = "linux",
+    target_os = "windows",
+    test
+))]
 fn model_dir(model_path: &str) -> Option<PathBuf> {
     if model_path.trim().is_empty() {
         return None;
@@ -224,7 +263,12 @@ fn model_dir(model_path: &str) -> Option<PathBuf> {
 
 /// True if any model's canary in this directory records too many consecutive
 /// failures. Unreadable state fails closed.
-#[cfg(any(target_os = "android", test))]
+#[cfg(any(
+    target_os = "android",
+    target_os = "linux",
+    target_os = "windows",
+    test
+))]
 fn quarantined(dir: &Path) -> bool {
     let entries = match fs::read_dir(dir) {
         Ok(entries) => entries,
@@ -251,7 +295,12 @@ fn quarantined(dir: &Path) -> bool {
 
 /// A missing file means zero consecutive failures. Unparseable contents are an
 /// error so that callers fail closed.
-#[cfg(any(target_os = "android", test))]
+#[cfg(any(
+    target_os = "android",
+    target_os = "linux",
+    target_os = "windows",
+    test
+))]
 fn read_failure_count(path: &Path) -> io::Result<u32> {
     let contents = match fs::read_to_string(path) {
         Ok(contents) => contents,
@@ -266,7 +315,12 @@ fn read_failure_count(path: &Path) -> io::Result<u32> {
     })
 }
 
-#[cfg(any(target_os = "android", test))]
+#[cfg(any(
+    target_os = "android",
+    target_os = "linux",
+    target_os = "windows",
+    test
+))]
 fn persist_failure_count(path: &Path, failures: u32) -> io::Result<()> {
     let mut file = OpenOptions::new()
         .create(true)
@@ -278,7 +332,12 @@ fn persist_failure_count(path: &Path, failures: u32) -> io::Result<()> {
     sync_parent(path)
 }
 
-#[cfg(any(target_os = "android", test))]
+#[cfg(any(
+    target_os = "android",
+    target_os = "linux",
+    target_os = "windows",
+    test
+))]
 fn remove_file_durably(path: &Path) -> io::Result<()> {
     match fs::remove_file(path) {
         Ok(()) => sync_parent(path),
@@ -287,7 +346,12 @@ fn remove_file_durably(path: &Path) -> io::Result<()> {
     }
 }
 
-#[cfg(any(target_os = "android", test))]
+#[cfg(any(
+    target_os = "android",
+    target_os = "linux",
+    target_os = "windows",
+    test
+))]
 fn sync_parent(path: &Path) -> io::Result<()> {
     let parent = path.parent().ok_or_else(|| {
         io::Error::new(
@@ -295,7 +359,16 @@ fn sync_parent(path: &Path) -> io::Result<()> {
             "WebGPU canary path has no parent directory",
         )
     })?;
-    File::open(parent)?.sync_all()
+    // Rust's standard library can open and fsync directories on Unix. Windows
+    // does not expose an equivalent portable operation; the counter file
+    // itself is still flushed above, which preserves the breaker semantics.
+    #[cfg(not(target_os = "windows"))]
+    return File::open(parent)?.sync_all();
+    #[cfg(target_os = "windows")]
+    {
+        let _ = parent;
+        Ok(())
+    }
 }
 
 #[cfg(test)]

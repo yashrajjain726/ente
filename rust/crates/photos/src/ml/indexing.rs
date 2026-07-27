@@ -67,9 +67,10 @@ pub struct RunClipTextResult {
 /// Configures process-wide ML execution behavior. Must be called before the
 /// first session is created to take effect for that session.
 ///
-/// `enable_webgpu` is the app-side eligibility decision for Android. Rust
-/// additionally applies its durable crash canary before attempting the WebGPU
-/// execution provider. It has no effect on other platforms.
+/// `enable_webgpu` is the app-side eligibility decision for Android, Linux and
+/// Windows. Rust additionally applies its durable crash canary before
+/// attempting the WebGPU execution provider. It has no effect on Apple
+/// platforms.
 pub fn set_ml_execution_config(enable_webgpu: bool) {
     webgpu::set_enabled(enable_webgpu);
 }

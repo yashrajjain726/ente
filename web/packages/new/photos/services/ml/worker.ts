@@ -46,6 +46,7 @@ import {
     updateAssumingLocalFiles,
 } from "./db";
 import { faceIndexingVersion, type FaceIndex } from "./face";
+import { mlIndexFlagsForRustResult } from "./index-flags";
 import {
     fetchMLData,
     putMLData,
@@ -665,27 +666,40 @@ const index = async (
 
     const faceIndex = existingFaceIndex ?? faceIndexFromAnalysisResult(result);
     const clipIndex = existingCLIPIndex ?? clipIndexFromAnalysisResult(result);
+    const indexFlags = mlIndexFlagsForRustResult(result);
 
     log.debug(() => {
         const ms = Date.now() - startTime;
         const msg = [];
         if (runFaces) msg.push(`${faceIndex.faces.length} faces`);
         if (runClip) msg.push("clip");
-        const ep = result.usedCoreml ? " [coreml]" : "";
+        const ep = result.usedCoreml
+            ? " [coreml]"
+            : result.usedWebgpu
+              ? " [webgpu]"
+              : " [cpu]";
         return `Indexed ${msg.join(" and ")} in ${f} (${ms} ms)${ep}`;
     });
 
-    const remoteFaceIndex = existingRemoteFaceIndex ?? {
-        version: faceIndexingVersion,
-        client: clientIdentifier,
-        ...faceIndex,
-    };
+    const remoteFaceIndex =
+        existingFaceIndex && existingRemoteFaceIndex
+            ? existingRemoteFaceIndex
+            : {
+                  version: faceIndexingVersion,
+                  client: clientIdentifier,
+                  flags: indexFlags,
+                  ...faceIndex,
+              };
 
-    const remoteCLIPIndex = existingRemoteCLIPIndex ?? {
-        version: clipIndexingVersion,
-        client: clientIdentifier,
-        ...clipIndex,
-    };
+    const remoteCLIPIndex =
+        existingCLIPIndex && existingRemoteCLIPIndex
+            ? existingRemoteCLIPIndex
+            : {
+                  version: clipIndexingVersion,
+                  client: clientIdentifier,
+                  flags: indexFlags,
+                  ...clipIndex,
+              };
 
     // Perform an "upsert" by using the existing raw data we got from the
     // remote as the base, and inserting or overwriting only the parts we
@@ -895,7 +909,11 @@ const faceIndexFromAnalysisResult = (
             },
             score: face.detection.score,
             blur: face.blurValue,
-            embedding: face.embedding,
+            // Keep persisted and remote indexes as ordinary arrays. The
+            // native/IPC boundary uses Float32Array to avoid widening and an
+            // extra allocation, but JSON does not serialize typed arrays as
+            // arrays.
+            embedding: Array.from(face.embedding),
         })),
     };
 };
@@ -911,5 +929,5 @@ const clipIndexFromAnalysisResult = (
     const embedding = result.clip?.embedding;
     if (!embedding)
         throw new Error("Analysis result is missing the CLIP embedding");
-    return { embedding };
+    return { embedding: Array.from(embedding) };
 };
