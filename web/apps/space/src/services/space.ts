@@ -8,6 +8,7 @@ import type {
 import type { PendingSpaceInvite } from "services/spaceInvite";
 import {
     cachedSpaceMediaBlobURL,
+    cachedSpaceMediaBlobURLIfPresent,
     clearSpaceMediaCache,
     rememberCachedSpaceMediaBlobURL,
     spacePostMediaCacheKey,
@@ -506,6 +507,23 @@ const accountAvatarURL = async (
     }
 };
 
+const cachedAccountAvatarURLIfPresent = async (
+    spaceId: string | undefined,
+    avatar: SpaceAvatar | undefined,
+) => {
+    if (!spaceId || !avatar?.objectID) return null;
+    return (
+        (await cachedSpaceMediaBlobURLIfPresent(
+            spaceProfileMediaCacheKey(
+                spaceId,
+                "avatar",
+                avatar.objectID,
+                avatar.keyVersion,
+            ),
+        )) ?? null
+    );
+};
+
 const postAssetFrom = (
     post: SpacePostResponse,
     object: SpacePostObject,
@@ -896,13 +914,28 @@ export const loadCurrentMessageActivityPostPreview = async (
     viewerSpaceId?: string,
 ): Promise<SpaceMessageActivityPost | undefined> => {
     if (post.isDeleted) return post;
-    const loadedPost = await loadCurrentSpacePost(
-        post.spaceId,
-        post.postId,
-        viewerSpaceId,
-    );
-    if (!loadedPost) return post;
-    return { ...post, imageUrl: loadedPost.imageUrl };
+    const ctx = await ensureCurrentSpaceContext();
+    try {
+        const response = (await ctx.getPost(
+            post.spaceId,
+            BigInt(post.postId),
+            viewerSpaceId ?? null,
+        )) as SpacePostResponse | null;
+        if (!response) return post;
+        const quote = await messageQuoteFromPostResponse(
+            ctx,
+            response,
+            true,
+            viewerSpaceId,
+        );
+        return {
+            ...post,
+            imageUrl: quote.imageUrl,
+            isDeleted: quote.isUnavailable,
+        };
+    } finally {
+        releaseCurrentSpaceContext(ctx);
+    }
 };
 
 const messageActivityFromSpaceActivity = (
@@ -1416,11 +1449,9 @@ export const loadCurrentMessageConversations = async (
             (response.friends ?? []).map(async (conversation) => {
                 const friend = actorProfile(conversation.friend);
                 const friendSpaceID = friendSpaceId(friend);
-                friend.avatarUrl = await accountAvatarURL(
-                    ctx,
+                friend.avatarUrl = await cachedAccountAvatarURLIfPresent(
                     friendSpaceID,
                     conversation.friend.avatar,
-                    spaceId,
                 );
                 const summary = conversationSummaryForFriend(
                     summaries,
@@ -1470,6 +1501,36 @@ export const loadCurrentMessageConversations = async (
             }),
         );
         return { items: [...requestItems, ...friendItems] };
+    } finally {
+        releaseCurrentSpaceContext(ctx);
+    }
+};
+
+export const loadCurrentMessageConversationAvatar = async (
+    viewerSpaceId: string,
+    friend: FriendProfile,
+) => {
+    if (
+        friend.avatarUrl ||
+        !friend.avatarObjectID ||
+        !friend.avatarKeyVersion
+    ) {
+        return friend.avatarUrl ?? null;
+    }
+
+    const ctx = await ensureCurrentSpaceContext();
+    try {
+        return await accountAvatarURL(
+            ctx,
+            friendSpaceId(friend),
+            {
+                keyVersion: friend.avatarKeyVersion,
+                objectID: friend.avatarObjectID,
+                size: friend.avatarSize,
+                updatedAt: friend.avatarUpdatedAt,
+            },
+            viewerSpaceId,
+        );
     } finally {
         releaseCurrentSpaceContext(ctx);
     }
@@ -1540,10 +1601,13 @@ export const loadCurrentMessageThread = async (
         const items = (
             await Promise.all(
                 (page.items ?? []).map((message) =>
-                    messageFromSpaceMessage(ctx, message, true, viewerSpaceId, {
-                        friend,
-                        viewer,
-                    }),
+                    messageFromSpaceMessage(
+                        ctx,
+                        message,
+                        false,
+                        viewerSpaceId,
+                        { friend, viewer },
+                    ),
                 ),
             )
         ).reverse();
