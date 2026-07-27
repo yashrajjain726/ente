@@ -34,6 +34,7 @@ class NotificationService {
 
   void init(SharedPreferences preferences) {
     _preferences = preferences;
+    unawaited(preferences.remove("notification_permission_granted"));
   }
 
   bool timezoneInitialized = false;
