@@ -132,9 +132,6 @@ export const SpaceShareLinkDialogHost: React.FC = () => {
                         : undefined
                 }
                 slotProps={{
-                    backdrop: {
-                        sx: { backgroundColor: "rgba(0, 0, 0, 0.48)" },
-                    },
                     paper: {
                         sx: {
                             bgcolor: "#FAFAFA",

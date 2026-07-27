@@ -66,20 +66,11 @@ export const ConfirmationActionSheet: React.FC<
                 isDark
                     ? {
                           zIndex: 1500,
-                          "& .MuiBackdrop-root": {
-                              backgroundColor: "rgba(0, 0, 0, 0.86) !important",
-                          },
+                          "--space-dialog-backdrop": "rgba(0 0 0 / 0.86)",
                       }
                     : undefined
             }
             slotProps={{
-                backdrop: {
-                    sx: {
-                        backgroundColor: isDark
-                            ? "rgba(0, 0, 0, 0.86)"
-                            : "rgba(0, 0, 0, 0.48)",
-                    },
-                },
                 paper: {
                     sx: {
                         bgcolor: isDark ? "#1E1E1E" : "#FAFAFA",

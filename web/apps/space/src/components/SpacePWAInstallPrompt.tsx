@@ -212,13 +212,13 @@ const SpacePWAInstallInstructions: React.FC<
             onClose={onClose}
             maxWidth={false}
             aria-labelledby={titleID}
+            sx={{ "--space-dialog-backdrop": "rgba(0 0 0 / 0.56)" }}
             slots={
                 isBottomSheet
                     ? { transition: SpaceBottomSheetTransition }
                     : undefined
             }
             slotProps={{
-                backdrop: { sx: { backgroundColor: "rgba(0, 0, 0, 0.56)" } },
                 paper: {
                     sx: {
                         bgcolor: "#FFFFFF",
