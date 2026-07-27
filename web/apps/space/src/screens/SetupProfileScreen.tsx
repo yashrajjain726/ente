@@ -297,7 +297,7 @@ export const SetupProfileScreen: React.FC<SetupProfileScreenProps> = ({
                             whiteSpace: "nowrap",
                         }}
                     >
-                        Create your profile
+                        Setup profile
                     </Box>
                     <Box />
                 </Box>
