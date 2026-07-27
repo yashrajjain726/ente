@@ -1265,7 +1265,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
                                 display: "block",
                                 p: 0,
                                 textAlign: "left",
-                                width: "100%",
+                                width: isOwnPost ? "calc(100% - 1ch)" : "100%",
                                 "&:disabled": { color: textBase },
                                 "&:focus-visible": {
                                     borderRadius: "4px",
