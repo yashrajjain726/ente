@@ -1,6 +1,7 @@
 import { SpaceFriendRequestCanceledToast } from "components/SpaceFriendRequestCanceledToast";
 import { SpacePageMeta } from "components/SpacePageMeta";
 import { SpaceRouteFallback } from "components/SpaceRouteFallback";
+import log from "ente-base/log";
 import React from "react";
 import { MessagesScreen, messagesBackground } from "screens/MessagesScreen";
 import type { SetupProfile } from "screens/SetupProfileScreen";
@@ -231,10 +232,7 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
             });
             void markCurrentMessagesRead(actorSpaceId, spaceId).catch(
                 (error: unknown) =>
-                    console.warn(
-                        "Failed to mark message conversation read",
-                        error,
-                    ),
+                    log.warn("Failed to mark message conversation read", error),
             );
         },
         [profile?.spaceId],
@@ -333,7 +331,7 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
                         );
                     })
                     .catch((error: unknown) =>
-                        console.warn(
+                        log.warn(
                             "Failed to load message conversation avatar",
                             error,
                         ),
@@ -345,7 +343,7 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
                         markCurrentMessagesRead(actorSpaceId, spaceId),
                     ),
                 ).catch((error: unknown) =>
-                    console.warn(
+                    log.warn(
                         "Failed to mark passive message activity read",
                         error,
                     ),
@@ -353,7 +351,7 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
             }
             return true;
         } catch (error: unknown) {
-            console.error("Failed to load message conversations", error);
+            log.error("Failed to load message conversations", error);
             return false;
         } finally {
             if (conversationsLoadGenerationRef.current == generation) {
@@ -543,7 +541,7 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
                 if (!cancelled) setSelectedFriendProfile(friend);
             })
             .catch((error: unknown) => {
-                console.error("Failed to load selected space profile", error);
+                log.error("Failed to load selected space profile", error);
                 if (!cancelled) {
                     setSelectedFriendProfileLoadFailedSpaceId(selectedSpaceId);
                 }
@@ -616,7 +614,7 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
                 }
             })
             .catch((error: unknown) =>
-                console.error("Failed to load message thread", error),
+                log.error("Failed to load message thread", error),
             )
             .finally(() => {
                 if (!cancelled) setIsThreadLoading(false);

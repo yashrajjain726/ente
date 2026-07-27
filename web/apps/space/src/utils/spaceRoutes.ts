@@ -15,7 +15,6 @@ export const spaceRoutes = {
     friendPage: "/profile-link",
     friends: "/app/friends",
     home: "/app",
-    invite: "/invite",
     login: "/login",
     message: (spaceId: string) =>
         `/app/messages/${encodeURIComponent(spaceId)}`,

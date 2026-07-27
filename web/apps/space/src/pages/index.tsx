@@ -4,6 +4,7 @@ import { SpaceButtonSpinner } from "components/SpaceButtonSpinner";
 import { SpaceMobileBestToast } from "components/SpaceMobileBestToast";
 import { SpacePageMeta } from "components/SpacePageMeta";
 import { SpaceRouteFallback } from "components/SpaceRouteFallback";
+import log from "ente-base/log";
 import React, { useEffect, useMemo, useState } from "react";
 import {
     OnboardingScreen,
@@ -12,10 +13,10 @@ import {
 } from "screens/OnboardingScreen";
 import { ProfileScreen, profileBackground } from "screens/ProfileScreen";
 import {
-    joinSpaceInvite,
     loadCurrentSpaceRelationship,
     loadPublicSpaceIdentity,
     openPublicSpaceLink,
+    requestFriendByUsername,
     type PublicSpaceIdentity,
     type PublicSpaceLinkSession,
     type SpaceProfilePost,
@@ -411,10 +412,7 @@ export const Page: React.FC<PageProps> = ({ invitePreview }) => {
                         if (!isAborted()) setPublicPosts(posts);
                     })
                     .catch((error: unknown) =>
-                        console.error(
-                            "Failed to load public Space posts",
-                            error,
-                        ),
+                        log.error("Failed to load public Space posts", error),
                     )
                     .finally(() => {
                         if (!isAborted()) setArePublicPostsLoading(false);
@@ -433,7 +431,7 @@ export const Page: React.FC<PageProps> = ({ invitePreview }) => {
                         );
                     })
                     .catch((error: unknown) =>
-                        console.error(
+                        log.error(
                             "Failed to load public Space profile media",
                             error,
                         ),
@@ -487,7 +485,7 @@ export const Page: React.FC<PageProps> = ({ invitePreview }) => {
                         publicIdentity.spaceId,
                     );
                 } catch (error) {
-                    console.error("Failed to load Space relationship", error);
+                    log.error("Failed to load Space relationship", error);
                 }
             }
             if (abortController.signal.aborted) return;
@@ -606,7 +604,7 @@ export const Page: React.FC<PageProps> = ({ invitePreview }) => {
                     return;
                 }
 
-                const status = await joinSpaceInvite(invite);
+                const status = await requestFriendByUsername(invite);
                 clearPendingSpaceInvite();
                 clearPendingSpaceInviteFriend();
                 clearPendingSpaceInviteIntent();
@@ -616,7 +614,7 @@ export const Page: React.FC<PageProps> = ({ invitePreview }) => {
                 void router.push(spaceRoutes.home);
             } catch (error) {
                 setIsAddingFriend(false);
-                console.error("Failed to send friend request", error);
+                log.error("Failed to send friend request", error);
             }
         };
 

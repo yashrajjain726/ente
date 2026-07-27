@@ -1,5 +1,6 @@
 import { SpacePageMeta } from "components/SpacePageMeta";
 import { SpaceRouteFallback } from "components/SpaceRouteFallback";
+import log from "ente-base/log";
 import React, { useEffect, useState } from "react";
 import { HomeScreen, homeBackground } from "screens/HomeScreen";
 import {
@@ -160,7 +161,7 @@ const Page: React.FC = () => {
                 );
             })
             .catch((error: unknown) =>
-                console.error("Failed to load space feed", error),
+                log.error("Failed to load space feed", error),
             )
             .finally(() => {
                 if (cancelled) return;
@@ -180,17 +181,14 @@ const Page: React.FC = () => {
                         }
                     })
                     .catch((error: unknown) =>
-                        console.error(
-                            "Failed to load space unread status",
-                            error,
-                        ),
+                        log.error("Failed to load space unread status", error),
                     );
                 void loadCurrentSpaceFriends(loadedSpaceId)
                     .then((nextFriends) => {
                         if (!cancelled) setFriends(nextFriends);
                     })
                     .catch((error: unknown) =>
-                        console.error("Failed to load space friends", error),
+                        log.error("Failed to load space friends", error),
                     )
                     .finally(() => {
                         if (!cancelled) setIsFriendsLoading(false);
@@ -223,7 +221,7 @@ const Page: React.FC = () => {
             setFeedNextCursor(feed.nextCursor);
         } catch (error) {
             setHasFeedLoadMoreError(true);
-            console.error("Failed to load more space feed", error);
+            log.error("Failed to load more space feed", error);
         } finally {
             setIsFeedLoadingMore(false);
         }

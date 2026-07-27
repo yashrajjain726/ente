@@ -52,6 +52,6 @@ export const SpaceInlinePostButton: React.FC<SpaceInlinePostButtonProps> = ({
         }}
     >
         <HugeiconsIcon icon={AddSquareIcon} size={20} strokeWidth={1.8} />
-        Post
+        Share a moment
     </Box>
 );

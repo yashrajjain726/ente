@@ -1,6 +1,7 @@
 import { spaceDefaultProfilePicPath } from "components/SpaceAvatarImage";
 import { SpacePageMeta } from "components/SpacePageMeta";
 import { SpaceRouteFallback } from "components/SpaceRouteFallback";
+import log from "ente-base/log";
 import { useBrowserBackClose } from "hooks/useBrowserBackClose";
 import React from "react";
 import { friendsBackground } from "screens/FriendsScreen";
@@ -107,7 +108,7 @@ export const AuthenticatedFriendProfile: React.FC<
                 if (!cancelled) setFriendProfile(nextProfile);
             })
             .catch((error: unknown) =>
-                console.error("Failed to load friend profile", error),
+                log.error("Failed to load friend profile", error),
             )
             .finally(() => {
                 if (!cancelled) setIsProfileLoading(false);
@@ -117,7 +118,7 @@ export const AuthenticatedFriendProfile: React.FC<
                 if (!cancelled) setPosts(page.items);
             })
             .catch((error: unknown) =>
-                console.error("Failed to load friend posts", error),
+                log.error("Failed to load friend posts", error),
             )
             .finally(() => {
                 if (!cancelled) setIsPostsLoading(false);

@@ -26,6 +26,7 @@ import {
 import { SpacePWAInstallPrompt } from "components/SpacePWAInstallPrompt";
 import { SpaceLoadingSpinner } from "components/SpaceRouteFallback";
 import { SpaceShareInviteButton } from "components/SpaceShareInviteButton";
+import log from "ente-base/log";
 import { useBrowserBackClose } from "hooks/useBrowserBackClose";
 import React, { useState } from "react";
 import type { SetupProfile } from "screens/SetupProfileScreen";
@@ -814,7 +815,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
         setIsLiked(nextLiked);
         if (nextLiked) setLikePopID((id) => id + 1);
         void onSetPostLiked?.(postId, nextLiked).catch((error: unknown) => {
-            console.error("Failed to update post like", error);
+            log.error("Failed to update post like", error);
             setIsLiked(!nextLiked);
         });
     };
@@ -1446,7 +1447,7 @@ const InviteFriendsToast: React.FC<InviteFriendsToastProps> = ({
                 showIcon={false}
                 onShareComplete={onClose}
                 onShareError={(error) =>
-                    console.error("Failed to share space invite", error)
+                    log.error("Failed to share space invite", error)
                 }
                 onSharingChange={onSharingChange}
                 sx={{
@@ -1594,6 +1595,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     const showUnreadIndicator = hasUnreadMessages === true;
     const profileDisplayName =
         profile?.fullName.trim() || profile?.username.trim() || "";
+    const profileFirstName = profile?.fullName.trim().split(/\s+/)[0];
     const revokeLocalPostObjectUrls = React.useCallback(() => {
         localPostObjectUrlsRef.current.forEach((objectUrl) =>
             URL.revokeObjectURL(objectUrl),
@@ -1675,7 +1677,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                     return imageUrl;
                 })
                 .catch((error: unknown) => {
-                    console.warn("Failed to load feed post image", error);
+                    log.warn("Failed to load feed post image", error);
                     return undefined;
                 })
                 .finally(() => {
@@ -1710,7 +1712,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                     return avatarUrl;
                 })
                 .catch((error: unknown) => {
-                    console.warn("Failed to load feed avatar", error);
+                    log.warn("Failed to load feed avatar", error);
                     setLoadedFeedAvatarURLsByKey((currentURLs) =>
                         currentURLs[cacheKey] === null
                             ? currentURLs
@@ -1832,7 +1834,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             didRequestLoad = true;
             void Promise.resolve(onLoadMoreFeedItems()).catch(
                 (error: unknown) => {
-                    console.error("Failed to load more space feed", error);
+                    log.error("Failed to load more space feed", error);
                 },
             );
         };
@@ -1912,7 +1914,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                         });
                     })
                     .catch((error: unknown) => {
-                        console.error("Failed to prepare post preview", error);
+                        log.error("Failed to prepare post preview", error);
                         const message = spacePostImageErrorMessage(error);
                         setSelectedViewer((currentViewer) => {
                             if (currentViewer?.localObjectUrl != draftKey)
@@ -1953,7 +1955,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         setIsPostPhotoOpening(true);
         void prepareSelectedPostPhoto(file)
             .catch((error: unknown) => {
-                console.error("Failed to open post photo draft", error);
+                log.error("Failed to open post photo draft", error);
             })
             .finally(() => {
                 setIsPostPhotoOpening(false);
@@ -2372,11 +2374,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                                     lineHeight: "20px",
                                     m: 0,
                                     mt: emptyFeedItemGap,
-                                    maxWidth: 220,
+                                    maxWidth: 280,
                                 }}
                             >
-                                Share an everyday moment. Posts from friends and
-                                family will show up here too.
+                                Welcome to your space, {profileFirstName}.
+                                <br />
+                                Share a little moment from your day.
                             </Box>
                             <SpaceInlinePostButton
                                 disabled={isPostPhotoButtonDisabled}

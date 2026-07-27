@@ -18,6 +18,7 @@ import { SpaceAvatarImage } from "components/SpaceAvatarImage";
 import { SpaceLoadingSpinner } from "components/SpaceRouteFallback";
 import { SpaceShareInviteButton } from "components/SpaceShareInviteButton";
 import type { FriendProfile } from "data/friends";
+import log from "ente-base/log";
 import React, { useState } from "react";
 import type { SpaceFriendRequest } from "services/space";
 import { openSpaceShareLinkDialog } from "services/spaceShareLink";
@@ -111,7 +112,7 @@ const FriendIdentity: React.FC<FriendIdentityProps> = ({
     React.useEffect(() => {
         if (!shouldLoadAvatar || avatarUrl || !friend.avatarObjectID) return;
         void onLoadAvatar?.().catch((error: unknown) => {
-            console.warn("Failed to load friend avatar", error);
+            log.warn("Failed to load friend avatar", error);
         });
     }, [avatarUrl, friend.avatarObjectID, onLoadAvatar, shouldLoadAvatar]);
 
@@ -428,7 +429,7 @@ const FriendRequestRow: React.FC<FriendRequestRowProps> = ({
         if (isBusy) return;
         setAction(nextAction);
         void handler(request.requestId).catch((error: unknown) => {
-            console.error("Failed to update friend request", error);
+            log.error("Failed to update friend request", error);
             setAction(null);
         });
     };
@@ -651,7 +652,7 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
                     return avatarUrl;
                 })
                 .catch((error: unknown) => {
-                    console.warn("Failed to load friend avatar", error);
+                    log.warn("Failed to load friend avatar", error);
                     return undefined;
                 })
                 .finally(() => {
@@ -678,7 +679,7 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
                 await Promise.resolve(onUnfriend?.(friendToUnfriend.id));
                 setUnfriendActionPhase("done");
             } catch (error) {
-                console.error("Failed to unfriend space friend", error);
+                log.error("Failed to unfriend space friend", error);
                 setUnfriendActionPhase(null);
                 setUnfriendErrorMessage("Couldn't unfriend. Please try again.");
             }
@@ -885,10 +886,7 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
                             profileLink={profileLink}
                             sharing={isInviteSharing}
                             onShareError={(error) =>
-                                console.error(
-                                    "Failed to share space invite",
-                                    error,
-                                )
+                                log.error("Failed to share space invite", error)
                             }
                             onSharingChange={setIsInviteSharing}
                             sx={{

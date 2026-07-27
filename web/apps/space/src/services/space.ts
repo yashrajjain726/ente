@@ -1,5 +1,6 @@
 import type { FriendProfile } from "data/friends";
 import { clientPackageName, desktopAppVersion, isDesktop } from "ente-base/app";
+import log from "ente-base/log";
 import { apiOrigin } from "ente-base/origins";
 import type {
     SpaceAccountCtxHandle,
@@ -473,7 +474,7 @@ const accountCoverURL = async (
                 ),
         );
     } catch (error) {
-        console.warn("Failed to load space cover", error);
+        log.warn("Failed to load space cover", error);
         return null;
     }
 };
@@ -502,7 +503,7 @@ const accountAvatarURL = async (
                 ),
         );
     } catch (error) {
-        console.warn("Failed to load space avatar", error);
+        log.warn("Failed to load space avatar", error);
         return null;
     }
 };
@@ -699,7 +700,7 @@ const publicLinkProfileMediaURL = async (
                     : ctx.downloadCover(asset.objectID, asset.keyVersion),
         );
     } catch (error) {
-        console.warn(`Failed to load public Space ${assetType}`, error);
+        log.warn(`Failed to load public Space ${assetType}`, error);
         return null;
     }
 };
@@ -816,7 +817,7 @@ const messageQuoteFromPostResponse = async (
         }
         quote.imageUrl = imageUrl;
     } catch (error) {
-        console.warn("Failed to load quoted post image", error);
+        log.warn("Failed to load quoted post image", error);
         quote.isUnavailable = true;
     }
     return quote;
@@ -851,7 +852,7 @@ const messageQuoteFromReplyPost = async (
             viewerSpaceId,
         );
     } catch (error) {
-        console.warn("Failed to load quoted post", error);
+        log.warn("Failed to load quoted post", error);
         return { ...fallbackQuote, isUnavailable: true };
     }
 };
@@ -977,7 +978,7 @@ export const shouldAutoReadMessageActivities = (
     activities.every(isPassiveAutoReadMessageActivity) &&
     messageConversationUnreadCount(activities) == 0;
 
-export const joinSpaceInvite = async ({
+export const requestFriendByUsername = async ({
     spaceUsername,
 }: PendingSpaceInvite): Promise<"friend" | "requested"> => {
     const profile = await loadExistingSpaceProfile();

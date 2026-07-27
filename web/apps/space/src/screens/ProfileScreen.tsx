@@ -25,6 +25,7 @@ import {
 import { SpacePostFloatingActionButton } from "components/SpacePostFloatingActionButton";
 import { SpaceLoadingSpinner } from "components/SpaceRouteFallback";
 import { SpaceShareIcon } from "components/SpaceShareInviteButton";
+import log from "ente-base/log";
 import { useBrowserBackClose } from "hooks/useBrowserBackClose";
 import React, { useState } from "react";
 import type { SetupProfile } from "screens/SetupProfileScreen";
@@ -351,7 +352,7 @@ const ProfilePostTile: React.FC<ProfilePostTileProps> = ({
     React.useEffect(() => {
         if (!shouldLoad || imageUrl) return;
         void onLoadImage().catch((error: unknown) => {
-            console.warn("Failed to load profile post image", error);
+            log.warn("Failed to load profile post image", error);
         });
     }, [imageUrl, onLoadImage, shouldLoad]);
 
@@ -621,7 +622,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                 await Promise.resolve(onUnfriend());
                 setUnfriendActionPhase("done");
             } catch (error) {
-                console.error("Failed to unfriend space friend", error);
+                log.error("Failed to unfriend space friend", error);
                 setUnfriendActionPhase(null);
                 setUnfriendErrorMessage("Couldn't unfriend. Please try again.");
             }
@@ -721,7 +722,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                     return imageUrl;
                 })
                 .catch((error: unknown) => {
-                    console.warn("Failed to load profile post image", error);
+                    log.warn("Failed to load profile post image", error);
                     return undefined;
                 })
                 .finally(() => {
@@ -909,7 +910,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                         });
                     })
                     .catch((error: unknown) => {
-                        console.error("Failed to prepare post preview", error);
+                        log.error("Failed to prepare post preview", error);
                         const message = spacePostImageErrorMessage(error);
                         setSelectedPost((currentPost) => {
                             if (currentPost?.localObjectUrl != draftKey)
@@ -948,7 +949,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         setIsPostPhotoOpening(true);
         void prepareSelectedPostPhoto(file)
             .catch((error: unknown) => {
-                console.error("Failed to open post photo draft", error);
+                log.error("Failed to open post photo draft", error);
             })
             .finally(() => {
                 setIsPostPhotoOpening(false);
@@ -1847,23 +1848,23 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                 width: "100%",
                             }}
                         >
-                            <Box
-                                component="p"
-                                sx={{
-                                    color: textSoft,
-                                    fontFamily:
-                                        '"Inter Variable", Inter, sans-serif',
-                                    fontSize: 14,
-                                    fontWeight: 500,
-                                    lineHeight: "20px",
-                                    m: 0,
-                                    maxWidth: isOwnerProfile ? 230 : 250,
-                                }}
-                            >
-                                {isOwnerProfile
-                                    ? "Share an everyday moment."
-                                    : `${firstName} hasn't posted anything yet.`}
-                            </Box>
+                            {!isOwnerProfile && (
+                                <Box
+                                    component="p"
+                                    sx={{
+                                        color: textSoft,
+                                        fontFamily:
+                                            '"Inter Variable", Inter, sans-serif',
+                                        fontSize: 14,
+                                        fontWeight: 500,
+                                        lineHeight: "20px",
+                                        m: 0,
+                                        maxWidth: 250,
+                                    }}
+                                >
+                                    {firstName} hasn&apos;t posted anything yet.
+                                </Box>
+                            )}
                             {isOwnerProfile && (
                                 <Box
                                     className="green-bg"
@@ -1891,7 +1892,6 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                         height: spaceTouchTargetSize,
                                         justifyContent: "center",
                                         lineHeight: "20px",
-                                        mt: "24px",
                                         px: "16px",
                                         py: 0,
                                         pointerEvents: "auto",
@@ -1914,7 +1914,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                         size={20}
                                         strokeWidth={1.8}
                                     />
-                                    Post
+                                    Share a moment
                                 </Box>
                             )}
                         </Box>

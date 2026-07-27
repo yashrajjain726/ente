@@ -18,6 +18,7 @@ import { SpaceAvatarImage } from "components/SpaceAvatarImage";
 import { SpaceLoadingSpinner } from "components/SpaceRouteFallback";
 import { SpaceShareInviteButton } from "components/SpaceShareInviteButton";
 import { formatTimeAgo } from "ente-base/date";
+import log from "ente-base/log";
 import React from "react";
 import { flushSync } from "react-dom";
 import type { SetupProfile } from "screens/SetupProfileScreen";
@@ -451,12 +452,12 @@ const ConversationListItem: React.FC<{
     ]);
     const confirmFriendRequest = () => {
         void onConfirmFriendRequest(conversation).catch((error: unknown) =>
-            console.error("Failed to confirm friend request", error),
+            log.error("Failed to confirm friend request", error),
         );
     };
     const deleteFriendRequest = () => {
         void onDeleteFriendRequest(conversation).catch((error: unknown) =>
-            console.error("Failed to delete friend request", error),
+            log.error("Failed to delete friend request", error),
         );
     };
 
@@ -1648,7 +1649,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                     );
                 })
                 .catch((error: unknown) => {
-                    console.warn("Failed to load message activity post", error);
+                    log.warn("Failed to load message activity post", error);
                     setActivityPostsByKey((currentPosts) =>
                         currentPosts[key]
                             ? currentPosts
@@ -1699,7 +1700,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
             })
             .catch((error: unknown) => {
                 smoothNextMessageScrollRef.current = false;
-                console.error("Failed to send message", error);
+                log.error("Failed to send message", error);
                 setMessageText((currentText) => currentText || text);
                 setReplyingTo(
                     (currentReplyingTo) => currentReplyingTo ?? repliedMessage,
@@ -1768,7 +1769,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                 closeMessageActions();
                 void copyTextToClipboard(targetMessage.text).catch(
                     (error: unknown) =>
-                        console.error("Failed to copy message", error),
+                        log.error("Failed to copy message", error),
                 );
                 break;
             case "like":
@@ -1778,7 +1779,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                     targetMessage.id,
                     !targetMessage.viewerLiked,
                 ).catch((error: unknown) =>
-                    console.error("Failed to update message like", error),
+                    log.error("Failed to update message like", error),
                 );
                 break;
             case "reply":
@@ -1791,7 +1792,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
             case "delete":
                 closeMessageActions();
                 void onDeleteMessage(targetMessage.id).catch((error: unknown) =>
-                    console.error("Failed to delete message", error),
+                    log.error("Failed to delete message", error),
                 );
                 if (replyingTo?.id == targetMessage.id) {
                     setReplyingTo(null);
@@ -2683,7 +2684,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                             profileLink={profileLink}
                                             sharing={isInviteSharing}
                                             onShareError={(error) =>
-                                                console.error(
+                                                log.error(
                                                     "Failed to share space invite",
                                                     error,
                                                 )

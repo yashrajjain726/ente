@@ -1,6 +1,7 @@
 import { Box, Dialog, useMediaQuery } from "@mui/material";
 import { ConfirmationActionSheet } from "components/ConfirmationActionSheet";
 import { SpaceBottomSheetTransition } from "components/SpaceBottomSheetTransition";
+import log from "ente-base/log";
 import React from "react";
 import {
     getOrCreateCurrentSpaceLink,
@@ -45,7 +46,7 @@ export const SpaceShareLinkDialogHost: React.FC = () => {
             })
             .catch((error: unknown) => {
                 if (linkRequestID.current != requestID) return;
-                console.error("Failed to create Space link", error);
+                log.error("Failed to create Space link", error);
                 setError("Couldn't create the link. Please try again.");
             })
             .finally(() => {
@@ -77,7 +78,7 @@ export const SpaceShareLinkDialogHost: React.FC = () => {
             await navigator.clipboard.writeText(url);
             setCopied(true);
         } catch (error) {
-            console.error("Failed to copy Space link", error);
+            log.error("Failed to copy Space link", error);
             setError("Couldn't copy the link.");
         }
     };
@@ -94,7 +95,7 @@ export const SpaceShareLinkDialogHost: React.FC = () => {
             if (
                 !(error instanceof DOMException && error.name == "AbortError")
             ) {
-                console.error("Failed to share Space link", error);
+                log.error("Failed to share Space link", error);
                 setError("Couldn't share the link.");
             }
         }
@@ -112,7 +113,7 @@ export const SpaceShareLinkDialogHost: React.FC = () => {
                 setLinkChanged(true);
             })
             .catch((error: unknown) => {
-                console.error("Failed to change Space link", error);
+                log.error("Failed to change Space link", error);
                 setIsChangeConfirmationOpen(false);
                 setError("Couldn't change the link.");
             })

@@ -23,6 +23,7 @@ import {
     spacePostLikePopDurationMs,
     spacePostLikePopTiming,
 } from "components/SpacePostLikeAnimation";
+import log from "ente-base/log";
 import type PhotoSwipe from "photoswipe";
 import React from "react";
 import type { SpaceInviteIntent } from "services/spaceInvite";
@@ -513,7 +514,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
         if (nextLiked) setPhotoLikePopID((id) => id + 1);
         void onSetPostLiked(activePhoto.postId, nextLiked).catch(
             (error: unknown) => {
-                console.error("Failed to update post like", error);
+                log.error("Failed to update post like", error);
                 setIsPhotoLiked(!nextLiked);
             },
         );
@@ -559,7 +560,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                 setCaptionUpdateActionPhase("done");
             })
             .catch((error: unknown) => {
-                console.error("Failed to update post caption", error);
+                log.error("Failed to update post caption", error);
                 setCaptionUpdateActionPhase(null);
                 setHasCaptionUpdateError(true);
             });
@@ -594,7 +595,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                 await Promise.resolve(onDeletePost());
                 setDeleteActionPhase("done");
             } catch (error) {
-                console.error("Failed to delete space post", error);
+                log.error("Failed to delete space post", error);
                 deleteSnapshotRef.current = null;
                 setDeleteActionPhase(null);
             }
@@ -620,7 +621,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                     onPublishDraftPost(captionToPublish, editToPublish),
                 );
             } catch (error) {
-                console.error("Failed to publish space post", error);
+                log.error("Failed to publish space post", error);
                 setDraftPostActionPhase(null);
                 return;
             }
@@ -629,7 +630,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
             setIsDraftPostExit(true);
             onDraftPostExitStart?.();
             void publishPromise.catch((error: unknown) => {
-                console.error("Failed to publish space post", error);
+                log.error("Failed to publish space post", error);
             });
         },
         [
@@ -690,7 +691,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                 setReplyText("");
                 setReplyActionPhase("done");
             } catch (error) {
-                console.error("Failed to send post reply", error);
+                log.error("Failed to send post reply", error);
                 setReplyActionPhase(null);
             }
         })();

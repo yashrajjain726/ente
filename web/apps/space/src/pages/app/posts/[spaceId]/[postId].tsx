@@ -1,6 +1,7 @@
 import { SpaceFileViewer } from "components/SpaceFileViewer";
 import { SpacePageMeta } from "components/SpacePageMeta";
 import { SpaceRouteFallback } from "components/SpaceRouteFallback";
+import log from "ente-base/log";
 import React from "react";
 import {
     loadCurrentSpacePost,
@@ -103,7 +104,7 @@ const Page: React.FC = () => {
                 setPost(nextPost);
             })
             .catch((error: unknown) => {
-                console.error("Failed to load space post", error);
+                log.error("Failed to load space post", error);
                 if (!cancelled) setPostLoadError("Post unavailable.");
             })
             .finally(() => {
