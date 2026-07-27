@@ -123,7 +123,7 @@ impl AccountSpaceCtx {
             api,
             space_root_key,
             space_identity_cache: Mutex::new(BTreeMap::new()),
-            owned_spaces_cache: Mutex::new(None),
+            owned_spaces_cache: Mutex::new(input.initial_owned_spaces),
             friend_shares_cache: Mutex::new(BTreeMap::new()),
         })
     }
@@ -148,6 +148,10 @@ impl AccountSpaceCtx {
         if let Some(value) = cache_lock(&self.owned_spaces_cache, "owned spaces")?.clone() {
             return Ok(value);
         }
+        self.refresh_owned_spaces().await
+    }
+
+    async fn refresh_owned_spaces(&self) -> Result<Vec<SpaceKeyResponse>> {
         let spaces: Vec<SpaceKeyResponse> = self
             .api
             .get("/account/space")
@@ -483,11 +487,14 @@ impl AccountSpaceCtx {
         space_id: &str,
         version: Option<i32>,
     ) -> Result<Option<Vec<u8>>> {
-        let access = match self.resolve_space_access(space_id).await? {
+        let mut access = match self.resolve_space_access(space_id).await? {
             Some(value) => value,
             None => return Ok(None),
         };
         let target_version = version.unwrap_or(access.key_version);
+        access = self
+            .refresh_owned_access_for_version(space_id, target_version, access)
+            .await?;
         if target_version == access.key_version {
             return Ok(Some(access.space_key));
         }
@@ -508,11 +515,14 @@ impl AccountSpaceCtx {
             }
             None => self.resolve_space_access(space_id).await?,
         };
-        let access = match access {
+        let mut access = match access {
             Some(value) => value,
             None => return Ok(None),
         };
         let target_version = version.unwrap_or(access.key_version);
+        access = self
+            .refresh_owned_access_for_version(space_id, target_version, access)
+            .await?;
         if target_version == access.key_version {
             return Ok(Some(access.space_key));
         }
@@ -520,6 +530,29 @@ impl AccountSpaceCtx {
             .build_space_key_history_for_space_for_viewer(space_id, viewer_space_id)
             .await?;
         Ok(history.get(&target_version).cloned())
+    }
+
+    async fn refresh_owned_access_for_version(
+        &self,
+        space_id: &str,
+        target_version: i32,
+        access: ResolvedSpaceAccess,
+    ) -> Result<ResolvedSpaceAccess> {
+        if target_version <= access.key_version {
+            return Ok(access);
+        }
+        let is_owned = cache_lock(&self.owned_spaces_cache, "owned spaces")?
+            .as_ref()
+            .is_some_and(|spaces| spaces.iter().any(|space| space.space_id == space_id));
+        if !is_owned {
+            return Ok(access);
+        }
+        self.refresh_owned_spaces().await?;
+        self.resolve_owned_space_access(space_id)
+            .await?
+            .ok_or_else(|| {
+                SpaceError::InvalidInput(format!("space {space_id} is not owned by the account"))
+            })
     }
 
     pub(crate) async fn list_owned_spaces_cached(&self) -> Result<Vec<SpaceKeyResponse>> {

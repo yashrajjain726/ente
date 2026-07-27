@@ -34,6 +34,7 @@ pub(crate) fn test_account_ctx_with_space_root_key(
         base_url: base_url.to_owned(),
         space_session_token: Some("space-session-token".to_owned()),
         space_root_key,
+        initial_owned_spaces: None,
         user_agent: None,
         client_package: None,
         client_version: None,

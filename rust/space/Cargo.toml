@@ -8,6 +8,7 @@ museum = []
 
 [dependencies]
 ente-core.workspace = true
+futures-util = "0.3.32"
 md-5.workspace = true
 serde.workspace = true
 serde_json.workspace = true

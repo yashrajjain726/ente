@@ -1,5 +1,5 @@
 import { savedPartialLocalUser } from "ente-accounts-rs/services/accounts-db";
-import { blobCache } from "ente-base/blob-cache";
+import { blobCache, clearBlobCache } from "ente-base/blob-cache";
 import { apiOrigin } from "ente-base/origins";
 import { blobPartForBytes } from "services/spaceProfilePayload";
 
@@ -111,6 +111,26 @@ export const cachedSpaceMediaBlobURL = async (
     return promise;
 };
 
+export const cachedSpaceMediaBlobURLIfPresent = async (cacheKey: string) => {
+    const storageKey = await spaceMediaStorageKey(cacheKey);
+    const cached = spaceMediaURLCache.get(storageKey);
+    if (cached) {
+        spaceMediaURLCache.delete(storageKey);
+        spaceMediaURLCache.set(storageKey, cached);
+        return await cached;
+    }
+
+    const blob = await cachedSpaceMediaBlob(storageKey);
+    const loadedWhileReading = spaceMediaURLCache.get(storageKey);
+    if (loadedWhileReading) return await loadedWhileReading;
+    if (!blob) return undefined;
+
+    const url = URL.createObjectURL(blob);
+    spaceMediaURLCache.set(storageKey, Promise.resolve(url));
+    trimSpaceMediaURLCache();
+    return url;
+};
+
 export const rememberCachedSpaceMediaBlobURL = async (
     cacheKey: string,
     blob: Blob,
@@ -134,4 +154,13 @@ export const clearSpaceMediaURLCache = () => {
         );
     }
     spaceMediaURLCache.clear();
+};
+
+export const clearSpaceMediaCache = async () => {
+    clearSpaceMediaURLCache();
+    try {
+        await clearBlobCache("space-media");
+    } catch (error) {
+        console.warn("Failed to clear Space media cache", error);
+    }
 };

@@ -7,6 +7,7 @@ use ente_space::{
     AccountSpaceCtx, CreatedSpace, DecryptedMessage, DecryptedPost, DecryptedSpaceProfile,
     MessageConversationActivity, MessageResponse, OpenAccountSpaceCtxInput, PostPhotoAssetOptions,
     PostResponse, ProfileAvatarResponse, ProfileCoverResponse, SpaceActorResponse,
+    SpaceKeyResponse,
 };
 use serde::{Deserialize, Serialize};
 use serde_wasm_bindgen as swb;
@@ -85,6 +86,8 @@ struct OpenAccountSpaceCtxJsInput {
     base_url: String,
     space_session_token: Option<String>,
     space_root_key_b64: String,
+    #[serde(default)]
+    owned_spaces: Option<Vec<SpaceKeyResponse>>,
     user_agent: Option<String>,
     client_package: Option<String>,
     client_version: Option<String>,
@@ -504,6 +507,7 @@ pub async fn space_open_account_ctx(
         base_url: input.base_url.clone(),
         space_session_token: input.space_session_token,
         space_root_key,
+        initial_owned_spaces: input.owned_spaces,
         user_agent: input.user_agent.clone(),
         client_package: input.client_package.clone(),
         client_version: input.client_version.clone(),

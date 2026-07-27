@@ -8,6 +8,7 @@ import {
     setCurrentPostLiked,
     type SpacePost,
 } from "services/space";
+import { patchCachedSpaceFeedPost } from "services/spaceFeedCache";
 import { useSpaceAppState } from "state/spaceAppState";
 import { spaceRoutes } from "utils/spaceRoutes";
 import { useSpaceRouter } from "utils/spaceRouteTransitions";
@@ -174,9 +175,12 @@ const Page: React.FC = () => {
                                   text,
                               )
                 }
-                onSetPostLiked={(nextPostId, liked) =>
-                    setCurrentPostLiked(actorSpaceId, nextPostId, liked)
-                }
+                onSetPostLiked={async (nextPostId, liked) => {
+                    await setCurrentPostLiked(actorSpaceId, nextPostId, liked);
+                    void patchCachedSpaceFeedPost(actorSpaceId, nextPostId, {
+                        viewerLiked: liked,
+                    });
+                }}
             />
         </>
     );

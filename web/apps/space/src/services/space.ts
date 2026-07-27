@@ -4,6 +4,7 @@ import type { SpaceAccountCtxHandle } from "ente-space-wasm";
 import type { PendingSpaceInvite } from "services/spaceInvite";
 import {
     cachedSpaceMediaBlobURL,
+    clearSpaceMediaCache,
     rememberCachedSpaceMediaBlobURL,
     spacePostMediaCacheKey,
     spaceProfileMediaCacheKey,
@@ -11,6 +12,7 @@ import {
 import {
     ensureCurrentSpaceContext,
     loadExistingSpaceProfile,
+    persistCurrentOwnedSpaces,
     releaseCurrentSpaceContext,
 } from "services/spaceProfile";
 import {
@@ -941,6 +943,7 @@ export const removeCurrentSpaceFriend = async (
     const ctx = await ensureCurrentSpaceContext();
     try {
         await ctx.removeFriendBySpace(actorSpaceId, spaceId);
+        await clearSpaceMediaCache();
         clearSpaceFriendsCache();
     } finally {
         releaseCurrentSpaceContext(ctx);
@@ -953,16 +956,13 @@ export const loadCurrentFeedPage = async (
 ): Promise<SpacePostPage> => {
     const ctx = await ensureCurrentSpaceContext();
     try {
-        return await postPageFromAccountPage(
-            ctx,
-            (await ctx.listFeed(
-                spaceId,
-                cursor ?? null,
-                currentFeedPageSize,
-            )) as SpacePostPageResponse,
-            false,
+        const page = (await ctx.listFeed(
             spaceId,
-        );
+            cursor ?? null,
+            currentFeedPageSize,
+        )) as SpacePostPageResponse;
+        await persistCurrentOwnedSpaces(ctx);
+        return await postPageFromAccountPage(ctx, page, false, spaceId);
     } finally {
         releaseCurrentSpaceContext(ctx);
     }

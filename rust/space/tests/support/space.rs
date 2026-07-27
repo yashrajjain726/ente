@@ -43,6 +43,7 @@ pub async fn open_ctx(endpoint: &str, account: &TestAccount) -> AccountSpaceCtx 
         base_url: endpoint.to_string(),
         space_session_token: Some(session.session_token),
         space_root_key,
+        initial_owned_spaces: None,
         user_agent: Some(USER_AGENT.to_string()),
         client_package: Some(CLIENT_PACKAGE.to_string()),
         client_version: Some(USER_AGENT.to_string()),

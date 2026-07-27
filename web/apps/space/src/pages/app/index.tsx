@@ -17,9 +17,17 @@ import {
     type SpacePost,
 } from "services/space";
 import {
+    cacheCurrentSpaceFeedPage,
+    loadCachedSpaceFeed,
+    patchCachedSpaceFeedPost,
+    prependCachedSpaceFeedPost,
+    removeCachedSpaceFeedPost,
+} from "services/spaceFeedCache";
+import {
     consumeSentSpaceInviteFriend,
     spaceInviteURL,
 } from "services/spaceInvite";
+import { loadExistingSpaceId } from "services/spaceProfile";
 import { useSpaceAppState } from "state/spaceAppState";
 import {
     confirmLocalFeedPost,
@@ -54,13 +62,13 @@ const Page: React.FC = () => {
     const [isFeedLoading, setIsFeedLoading] = useState(true);
     const [isFeedLoadingMore, setIsFeedLoadingMore] = useState(false);
     const [isFriendsLoading, setIsFriendsLoading] = useState(true);
+    const [spaceId, setSpaceId] = useState<string>();
     const [showInviteFriendsToast, setShowInviteFriendsToast] = useState(false);
     const inviteFriendsToastTimerRef = React.useRef<number | undefined>(
         undefined,
     );
     const isInitialFeedLoading =
-        profileLoadStatus == "ready" &&
-        Boolean(profile?.spaceId) &&
+        Boolean(spaceId || profile?.spaceId) &&
         isFeedLoading &&
         feedItems.length == 0 &&
         localFeedPosts.length == 0;
@@ -100,22 +108,9 @@ const Page: React.FC = () => {
     }, [router.isReady]);
 
     useEffect(() => {
-        if (profileLoadStatus != "ready") return;
-
-        const spaceId = profile?.spaceId;
-        if (!spaceId) {
-            setFeedItems([]);
-            setHasFeedLoadMoreError(false);
-            setFeedNextCursor(undefined);
-            setHasUnreadMessages(false);
-            setIsFeedLoading(false);
-            setIsFeedLoadingMore(false);
-            setIsFriendsLoading(false);
-            setSkipNextHomeFeedSkeleton(false);
-            return;
-        }
-
         let cancelled = false;
+        let loadedSpaceId: string | undefined;
+        setSpaceId(undefined);
         setFeedItems([]);
         setHasFeedLoadMoreError(false);
         setFeedNextCursor(undefined);
@@ -123,56 +118,91 @@ const Page: React.FC = () => {
         setIsFeedLoading(true);
         setIsFeedLoadingMore(false);
         setIsFriendsLoading(true);
-        void loadCurrentFeedPage(spaceId)
+        void loadExistingSpaceId()
+            .then(async (nextSpaceId) => {
+                if (cancelled) return undefined;
+
+                loadedSpaceId = nextSpaceId;
+                setSpaceId(nextSpaceId);
+                if (!nextSpaceId) return undefined;
+
+                let freshFeedApplied = false;
+                const cachedFeedLoad = loadCachedSpaceFeed(nextSpaceId);
+                const freshFeedLoad = loadCurrentFeedPage(nextSpaceId);
+                void cachedFeedLoad.then((cachedFeed) => {
+                    if (cancelled || freshFeedApplied || !cachedFeed) return;
+
+                    setFeedItems(cachedFeed.items);
+                    setFeedNextCursor(
+                        cachedFeed.dirty ? undefined : cachedFeed.nextCursor,
+                    );
+                });
+
+                const feed = await freshFeedLoad;
+                freshFeedApplied = true;
+                return feed;
+            })
             .then((feed) => {
-                if (cancelled) return;
+                if (cancelled || !loadedSpaceId || !feed) return;
 
                 setFeedItems(feed.items);
                 setFeedNextCursor(feed.nextCursor);
+                void cacheCurrentSpaceFeedPage(loadedSpaceId, feed);
+                const refreshedPostIDs = new Set(
+                    feed.items.map((item) => item.postId),
+                );
+                setLocalFeedPosts((currentPosts) =>
+                    currentPosts.filter(
+                        (item) =>
+                            item.status != "ready" ||
+                            !refreshedPostIDs.has(item.post.postId),
+                    ),
+                );
             })
             .catch((error: unknown) =>
                 console.error("Failed to load space feed", error),
             )
             .finally(() => {
-                if (!cancelled) {
-                    setIsFeedLoading(false);
-                    setSkipNextHomeFeedSkeleton(false);
-                }
-            });
+                if (cancelled) return;
 
-        void loadCurrentUnreadStatus(spaceId)
-            .then((unreadStatus) => {
-                if (!cancelled) {
-                    setHasUnreadMessages(unreadStatus.messagesUnread);
+                setIsFeedLoading(false);
+                setSkipNextHomeFeedSkeleton(false);
+                if (!loadedSpaceId) {
+                    setHasUnreadMessages(false);
+                    setIsFriendsLoading(false);
+                    return;
                 }
-            })
-            .catch((error: unknown) =>
-                console.error("Failed to load space unread status", error),
-            );
 
-        void loadCurrentSpaceFriends(spaceId)
-            .then((nextFriends) => {
-                if (!cancelled) setFriends(nextFriends);
-            })
-            .catch((error: unknown) =>
-                console.error("Failed to load space friends", error),
-            )
-            .finally(() => {
-                if (!cancelled) setIsFriendsLoading(false);
+                void loadCurrentUnreadStatus(loadedSpaceId)
+                    .then((unreadStatus) => {
+                        if (!cancelled) {
+                            setHasUnreadMessages(unreadStatus.messagesUnread);
+                        }
+                    })
+                    .catch((error: unknown) =>
+                        console.error(
+                            "Failed to load space unread status",
+                            error,
+                        ),
+                    );
+                void loadCurrentSpaceFriends(loadedSpaceId)
+                    .then((nextFriends) => {
+                        if (!cancelled) setFriends(nextFriends);
+                    })
+                    .catch((error: unknown) =>
+                        console.error("Failed to load space friends", error),
+                    )
+                    .finally(() => {
+                        if (!cancelled) setIsFriendsLoading(false);
+                    });
             });
 
         return () => {
             cancelled = true;
         };
-    }, [
-        profile?.spaceId,
-        profileLoadStatus,
-        setFriends,
-        setSkipNextHomeFeedSkeleton,
-    ]);
+    }, [setFriends, setLocalFeedPosts, setSkipNextHomeFeedSkeleton]);
 
     const loadMoreFeedItems = React.useCallback(async () => {
-        const spaceId = profile?.spaceId;
         if (!spaceId || !feedNextCursor || isFeedLoadingMore) return;
 
         setHasFeedLoadMoreError(false);
@@ -197,14 +227,16 @@ const Page: React.FC = () => {
         } finally {
             setIsFeedLoadingMore(false);
         }
-    }, [feedNextCursor, isFeedLoadingMore, profile?.spaceId]);
+    }, [feedNextCursor, isFeedLoadingMore, spaceId]);
 
     const setFeedPostLiked = React.useCallback(
         async (postId: number, liked: boolean) => {
-            const spaceId = profile?.spaceId;
             if (!spaceId) throw new Error("Missing space.");
 
             await setCurrentPostLiked(spaceId, postId, liked);
+            void patchCachedSpaceFeedPost(spaceId, postId, {
+                viewerLiked: liked,
+            });
             setFeedItems((currentItems) =>
                 currentItems.map((item) =>
                     item.postId == postId
@@ -213,7 +245,7 @@ const Page: React.FC = () => {
                 ),
             );
         },
-        [profile?.spaceId],
+        [spaceId],
     );
 
     if (
@@ -243,6 +275,7 @@ const Page: React.FC = () => {
                 isFriendsLoading={isFriendsLoading}
                 localFeedPosts={localFeedPosts}
                 profile={profile}
+                viewerSpaceId={spaceId ?? profile?.spaceId}
                 showInstallPrompt={
                     profileLoadStatus == "ready" &&
                     Boolean(profile) &&
@@ -312,6 +345,10 @@ const Page: React.FC = () => {
                                       localPostId,
                                       post,
                                   );
+                                  void prependCachedSpaceFeedPost(
+                                      spaceId,
+                                      post,
+                                  );
                                   if (isFirstPost) {
                                       inviteFriendsToastTimerRef.current =
                                           window.setTimeout(() => {
@@ -337,6 +374,7 @@ const Page: React.FC = () => {
                     const spaceId = profile?.spaceId;
                     if (!spaceId) throw new Error("Missing space.");
                     await deleteCurrentPost(spaceId, postId);
+                    void removeCachedSpaceFeedPost(spaceId, postId);
                     setLocalFeedPosts((currentPosts) =>
                         currentPosts.filter(
                             (item) =>
@@ -355,6 +393,9 @@ const Page: React.FC = () => {
 
                     await updateCurrentPostCaption(spaceId, postId, caption);
                     const normalizedCaption = caption.trim() || undefined;
+                    void patchCachedSpaceFeedPost(spaceId, postId, {
+                        caption: normalizedCaption,
+                    });
                     setLocalFeedPosts((currentPosts) =>
                         currentPosts.map((item) =>
                             (item.status == "posted" ||
