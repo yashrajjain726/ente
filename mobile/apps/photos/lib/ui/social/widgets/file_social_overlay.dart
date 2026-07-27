@@ -361,7 +361,7 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
     });
   }
 
-  Future<void> _openComments({Comment? comment}) async {
+  Future<void> _openComments({int? targetCollectionID}) async {
     final fileID = widget.file.uploadedFileID;
     if (fileID == null) return;
     await _runSheetAndRefresh(() async {
@@ -376,12 +376,12 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
         return;
       }
 
-      Collection? commentCollection;
+      Collection? targetCollection;
       Collection? openingCollection;
       Collection? latestCommentCollection;
       for (final collection in sharedCollections) {
-        if (collection.id == comment?.collectionID) {
-          commentCollection = collection;
+        if (collection.id == targetCollectionID) {
+          targetCollection = collection;
         }
         if (collection.id == widget.openingCollectionID) {
           openingCollection = collection;
@@ -391,7 +391,7 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
         }
       }
       final initialCollection =
-          commentCollection ??
+          targetCollection ??
           latestCommentCollection ??
           openingCollection ??
           sharedCollections.first;
@@ -400,7 +400,7 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
         context,
         collectionID: initialCollection.id,
         fileID: fileID,
-        preferDraftCollection: comment == null,
+        preferDraftCollection: targetCollectionID == null,
         sharedCollections: sharedCollections,
       );
     });
@@ -438,7 +438,8 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
                 MediaQuery.sizeOf(context).width * 0.6,
               ),
               currentUserID: widget.currentUserID!,
-              onTap: () => _openComments(comment: latestComment),
+              onTap: () =>
+                  _openComments(targetCollectionID: latestComment.collectionID),
             ),
           )
         : const SizedBox.shrink();
