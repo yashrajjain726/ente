@@ -1,3 +1,3 @@
-- Made notification permissions request open settings app on android and iOS with toast notification with instructions.
-- Notifications are requested on user action, as opposed to all the time.
-- Fixed issue with notifications settings page toggle buttons not working if notification permissions are denied.
+- New "Crafting memories" memory card that asks for notification permission when tapped.
+- Made notification permission requests open the settings app on Android and iOS, with a toast explaining what to do if the OS refuses to show the permission dialog.
+- Fixed the no-op when a user tries to enable notifications from Settings → Notifications after denying permission.
