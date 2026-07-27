@@ -1,5 +1,6 @@
 {
   "@@locale ": "en",
+  "onboardingDesc": "Salva le tue foto e video. Ogni memoria, in un unico posto.",
   "enterYourEmailAddress": "Inserisci il tuo indirizzo email",
   "enterYourNewEmailAddress": "Inserisci il tuo nuovo indirizzo email",
   "accountWelcomeBack": "Bentornato!",
@@ -319,7 +320,6 @@
   "theyAlsoGetXGb": "Anche loro riceveranno {storageAmountInGB} GB",
   "referralStorageForBoth": "{storageAmountInGB} GB per loro + {storageAmountInGB} GB per te quando si abbonano.",
   "freeStorageOnReferralSuccess": "{storageAmountInGB} GB ogni volta che qualcuno si iscrive a un piano a pagamento e applica il tuo codice",
-  "shareTextReferralCode": "Ente Photos è un luogo privato e sicuro per le tue foto\n* Scarica Ente Photos da https://ente.com/app\n* Crea un account\n* Applica il codice invito {referralCode} in Impostazioni -> Inviti\n* Ottieni {referralStorageInGB} GB gratis quando ti abboni a un piano a pagamento",
   "claimFreeStorage": "Richiedi spazio gratuito",
   "inviteYourFriends": "Invita i tuoi amici",
   "earnFreeStorage": "Ottieni spazio gratis",

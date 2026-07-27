@@ -340,7 +340,6 @@
   "theyAlsoGetXGb": "Emellett {storageAmountInGB} GB-ot kapnak",
   "referralStorageForBoth": "{storageAmountInGB} GB nekik + {storageAmountInGB} GB neked, amikor előfizetnek.",
   "freeStorageOnReferralSuccess": "{storageAmountInGB} GB minden alkalommal, amikor valaki fizetős csomagra fizet elő és felhasználja a kódodat",
-  "shareTextReferralCode": "Az Ente Photos egy privát és biztonságos hely a fotóid számára\n*Töltsd le az Ente Photos alkalmazást: https://ente.com/app\n*Hozz létre egy fiókot\n*Add meg az {referralCode} ajánlókódot a Beállítások → Ajánlókód menüpontban\n*Fizetős csomagra váltáskor {referralStorageInGB} GB ingyen tárhelyet kapsz",
   "claimFreeStorage": "Igényeljen ingyenes tárhelyet",
   "inviteYourFriends": "Hívd meg a barátaidat",
   "earnFreeStorage": "Szerezz ingyen tárhelyet",
