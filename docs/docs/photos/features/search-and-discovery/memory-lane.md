@@ -44,10 +44,11 @@ You can share a Memory Lane as a public link so others can view that person's ti
 
 1. Open a person's **Memory lane**.
 2. Tap the share action.
-3. Create or copy the link.
-4. Share the link with anyone you want.
+3. Select the photos and videos you want to include. You can use **Select all**, or tap the selected count to clear the selection.
+4. Tap **Share memory** to create the link. To send the selected original files instead, tap **Share items**.
+5. Share the link with anyone you want.
 
-Recipients can open the link without an Ente account.
+Recipients can open the link without an Ente account. The link contains only the items you selected.
 
 ## What recipients see
 
@@ -55,7 +56,7 @@ A shared Memory Lane opens as a public, browser-based viewer with the same timel
 
 Recipients can:
 
-- view the timeline in order
+- view the selected items in order
 - play through the lane presentation
 - open the shared link without signing in
 
