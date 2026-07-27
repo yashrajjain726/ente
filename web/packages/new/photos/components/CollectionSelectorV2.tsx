@@ -35,9 +35,9 @@ import type {
 } from "./CollectionSelector";
 
 /**
- * The internal-only ("v2") variant of {@link CollectionSelector}, restyled to
- * match the upload design system (paper surfaces, hairline borders, radius 20
- * dialog, 16px tiles, paper-filled 38px icon buttons).
+ * The V2 variant of {@link CollectionSelector}, restyled to match the upload
+ * design system (paper surfaces, hairline borders, radius 20 dialog, 16px
+ * tiles, paper-filled 38px icon buttons).
  *
  * It preserves the exact same behaviour and props as the classic selector; only
  * the presentation differs. See {@link CollectionSelector} for a description of
@@ -144,7 +144,7 @@ export const CollectionSelectorV2: React.FC<CollectionSelectorProps> = (
 
     const showCreateButton =
         !searchTerm.trim() ||
-        t("new_album").toLowerCase().includes(searchTerm.toLowerCase());
+        t("create_albums").toLowerCase().includes(searchTerm.toLowerCase());
 
     if (!filteredCollections.length || !attributes) return null;
 
@@ -338,6 +338,7 @@ const gridSx = {
     p: "16px 20px 20px",
     display: "grid",
     gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+    gridAutoRows: "max-content",
     gap: "8px",
     alignContent: "start",
     overflowY: "auto",

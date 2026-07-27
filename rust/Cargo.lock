@@ -2268,9 +2268,9 @@ checksum = "66b7e2430c6dff6a955451e2cfc438f09cea1965a9d6f87f7e3b90decc014099"
 name = "ensu-desktop"
 version = "0.1.18-beta"
 dependencies = [
+ "ente-assets",
  "ente-core",
  "ente-ensu",
- "ente-model-download",
  "keyring",
  "libc",
  "serde",
@@ -2290,7 +2290,6 @@ dependencies = [
 name = "ente-accounts"
 version = "0.0.0"
 dependencies = [
- "base64 0.22.1",
  "bip39",
  "ente-core",
  "ente-test-support",
@@ -2313,6 +2312,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "ente-assets"
+version = "0.0.0"
+dependencies = [
+ "flate2",
+ "futures-util",
+ "reqwest 0.12.28",
+ "serde",
+ "serde_json",
+ "sha2 0.11.0",
+ "tar",
+ "thiserror 2.0.18",
+ "tokio",
+]
+
+[[package]]
 name = "ente-cast-uniffi"
 version = "0.0.0"
 dependencies = [
@@ -2325,7 +2339,6 @@ dependencies = [
 name = "ente-contacts"
 version = "0.0.0"
 dependencies = [
- "base64 0.22.1",
  "ente-accounts",
  "ente-core",
  "ente-test-support",
@@ -2375,9 +2388,9 @@ dependencies = [
 name = "ente-ensu"
 version = "0.0.0"
 dependencies = [
+ "ente-assets",
  "ente-core",
  "ente-image",
- "ente-model-download",
  "llama-cpp-2",
  "memmap2",
  "ort",
@@ -2388,7 +2401,6 @@ dependencies = [
  "self_cell",
  "serde",
  "serde_json",
- "sha2 0.11.0",
  "tempfile",
  "thiserror 2.0.18",
  "tokio",
@@ -2403,9 +2415,10 @@ dependencies = [
 name = "ente-ensu-uniffi"
 version = "0.0.0"
 dependencies = [
+ "ente-assets",
  "ente-ensu",
- "ente-model-download",
  "thiserror 2.0.18",
+ "tokio",
  "uniffi",
  "uuid",
 ]
@@ -2422,21 +2435,6 @@ dependencies = [
  "moxcms",
  "thiserror 2.0.18",
  "tiff 0.10.3",
-]
-
-[[package]]
-name = "ente-model-download"
-version = "0.0.0"
-dependencies = [
- "flate2",
- "futures-util",
- "reqwest 0.12.28",
- "serde",
- "serde_json",
- "sha2 0.11.0",
- "tar",
- "thiserror 2.0.18",
- "tokio",
 ]
 
 [[package]]
@@ -2458,8 +2456,8 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "ash",
+ "ente-assets",
  "ente-image",
- "ente-model-download",
  "fast_image_resize",
  "flate2",
  "half",
@@ -2486,7 +2484,6 @@ dependencies = [
 name = "ente-rs"
 version = "0.0.1"
 dependencies = [
- "base64 0.22.1",
  "chrono",
  "clap",
  "dialoguer",
@@ -2519,7 +2516,6 @@ dependencies = [
 name = "ente-space"
 version = "0.0.1"
 dependencies = [
- "base64 0.22.1",
  "ente-accounts",
  "ente-core",
  "ente-test-support",
