@@ -26,7 +26,7 @@ PODS:
     - Flutter
   - ente_screen_cover (0.0.1):
     - Flutter
-  - EnteOnnxRuntime (1.27.0-r2)
+  - EnteOnnxRuntime (1.27.0-r3)
   - ffmpeg_kit_custom (6.0.3)
   - ffmpeg_kit_flutter (6.0.3):
     - ffmpeg_kit_custom
@@ -476,11 +476,11 @@ SPEC CHECKSUMS:
   cupertino_http: 94ac07f5ff090b8effa6c5e2c47871d48ab7c86c
   device_info_plus: 21fcca2080fbcd348be798aa36c3e5ed849eefbe
   ente_cast: a25feb3127397e5fc6aff03a12120916707757d4
-  ente_photos_rust: 380a324fc22445a1281e206726ccddd86582ad28
+  ente_photos_rust: 2db1f31cbe3f13ef0f52909a52b1f885b880a6ec
   ente_qr: 86beaf5d2644705db9b565b32dd8b82c05fb36af
   ente_rust: d0197ebd5460e8f67576579452b073d698404abe
   ente_screen_cover: 6792566774f1c83939f9c1d03ed0a1f1ded45ae4
-  EnteOnnxRuntime: 2b0a46f3b247216f991233074d030ab53c257a3f
+  EnteOnnxRuntime: 6621104c53b3bfced7e51f27e1ef5650678523aa
   ffmpeg_kit_custom: 682b4f2f1ff1f8abae5a92f6c3540f2441d5be99
   ffmpeg_kit_flutter: 915b345acc97d4142e8a9a8549d177ff10f043f5
   file_saver: 6cdbcddd690cb02b0c1a0c225b37cd805c2bf8b6

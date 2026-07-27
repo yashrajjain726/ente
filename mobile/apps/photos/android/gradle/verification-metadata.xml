@@ -20,8 +20,8 @@
       </trusted-artifacts>
    </configuration>
    <components>
-      <component group="io.ente.onnxruntime" name="onnxruntime-webgpu-android" version="1.27.0-r2">
-         <artifact name="onnxruntime-webgpu-android-1.27.0-r2.aar">
+      <component group="io.ente.onnxruntime" name="onnxruntime-webgpu-android" version="1.27.0-r3">
+         <artifact name="onnxruntime-webgpu-android-1.27.0-r3.aar">
             <sha256 value="0752f9b026df55780602cf482d9acddbe662d21383a2530d6e8c3d34a1ca8090"/>
          </artifact>
       </component>
