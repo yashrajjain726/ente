@@ -51,6 +51,7 @@ export const SpacePWAInstallPrompt: React.FC<SpacePWAInstallPromptProps> = ({
             <SpaceActionToast
                 action={
                     <Box
+                        className="green-bg"
                         component="button"
                         type="button"
                         onClick={openInstructions}

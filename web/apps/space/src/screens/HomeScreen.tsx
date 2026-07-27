@@ -1441,6 +1441,7 @@ const InviteFriendsToast: React.FC<InviteFriendsToastProps> = ({
     <SpaceActionToast
         action={
             <SpaceShareInviteButton
+                className="green-bg"
                 label="Invite"
                 profileLink={profileLink}
                 sharing={sharing}

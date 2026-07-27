@@ -283,6 +283,7 @@ const ActionButton: React.FC<ActionButtonProps> = ({
     variant,
 }) => (
     <Box
+        className={variant == "primary" ? "green-bg" : undefined}
         component="button"
         type="button"
         disabled={disabled}
