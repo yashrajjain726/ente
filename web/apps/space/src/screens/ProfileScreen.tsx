@@ -1862,7 +1862,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                         maxWidth: 250,
                                     }}
                                 >
-                                    {firstName} hasn&apos;t posted anything yet.
+                                    {`${firstName} hasn't posted anything yet.`}
                                 </Box>
                             )}
                             {isOwnerProfile && (
