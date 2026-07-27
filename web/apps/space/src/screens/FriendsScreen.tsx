@@ -467,6 +467,7 @@ const FriendRequestRow: React.FC<FriendRequestRowProps> = ({
                 {isReceived ? (
                     <>
                         <Box
+                            className="green-bg"
                             component="button"
                             type="button"
                             disabled={isBusy}

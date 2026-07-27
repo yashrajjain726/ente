@@ -2213,6 +2213,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                     }
                     confirmLabel="Add friend"
                     confirmBackgroundColor={green}
+                    confirmClassName="green-bg"
                     onCancel={() => setAddFriendSheetOpen(false)}
                     onConfirm={confirmAddFriendForPostAction}
                 />

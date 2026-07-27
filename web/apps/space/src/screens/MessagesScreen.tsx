@@ -701,6 +701,7 @@ const ConversationListItem: React.FC<{
                 {isFriendRequest && (
                     <Box sx={{ display: "flex", flexShrink: 0, gap: "6px" }}>
                         <Box
+                            className="green-bg"
                             component="button"
                             type="button"
                             onClick={confirmFriendRequest}
@@ -2681,6 +2682,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                     </Box>
                                     {showInviteEmptyState && (
                                         <SpaceShareInviteButton
+                                            label="Invite friends"
                                             profileLink={profileLink}
                                             sharing={isInviteSharing}
                                             onShareError={(error) =>

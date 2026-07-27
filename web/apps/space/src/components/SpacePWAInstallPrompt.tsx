@@ -281,6 +281,7 @@ const SpacePWAInstallInstructions: React.FC<
                     ))}
                 </Box>
                 <Box
+                    className="green-bg"
                     component="button"
                     type="button"
                     onClick={onDismiss}
