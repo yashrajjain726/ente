@@ -55,7 +55,7 @@ class _GalleryLayoutSettingsState extends State<GalleryLayoutSettings> {
             onTap: () => _applyLayout(GroupType.day, 3),
           ),
           MenuComponent(
-            title: context.l10n.month,
+            title: context.l10n.month.capitalizeFirst(),
             leading: const Icon(Icons.grid_on_rounded),
             trailing: isMonthLayout
                 ? Icon(Icons.check, color: colors.primary)
