@@ -78,6 +78,27 @@ const parseInitData = (data: unknown) => {
 
 type MLNative = typeof MLNativeModule;
 
+type MLWorkerAnalyzeImageErrorKind = "init" | "ort" | "image" | "misc";
+
+interface MLWorkerAnalyzeImageError {
+    kind: MLWorkerAnalyzeImageErrorKind;
+    message: string;
+}
+
+type MLWorkerAnalyzeImageResponse =
+    | { ok: true; result: MLNativeModule.AnalyzeImageResult }
+    | { ok: false; error: MLWorkerAnalyzeImageError };
+
+class CategorizedMLWorkerError extends Error {
+    constructor(
+        public readonly kind: MLWorkerAnalyzeImageErrorKind,
+        message: string,
+    ) {
+        super(message);
+        this.name = "CategorizedMLWorkerError";
+    }
+}
+
 let _native: MLNative | undefined;
 let _nativeLoadError: string | undefined;
 
@@ -107,7 +128,10 @@ const loadMLNative = (paths: MLNativePaths) => {
  */
 const mlNative = () => {
     if (_native) return _native;
-    throw new Error(`ML is unavailable: ${_nativeLoadError ?? "not loaded"}`);
+    throw new CategorizedMLWorkerError(
+        "init",
+        `ML is unavailable: ${_nativeLoadError ?? "not loaded"}`,
+    );
 };
 
 /**
@@ -189,6 +213,9 @@ const modelSavePath = (modelName: string) =>
  */
 const _verifiedModelPaths = new Map<string, Promise<string>>();
 
+/** The single cleanup attempt shared by all model loads in this process. */
+let _oldModelsCleanup: Promise<void> | undefined;
+
 const modelPath = (spec: ModelSpec) => {
     let promise = _verifiedModelPaths.get(spec.name);
     if (!promise) {
@@ -258,12 +285,18 @@ const computeFileSHA256 = (filePath: string) =>
 /**
  * Cleanup old models.
  *
- * This code runs whenever we need to download a new model, which usually
- * happens when we update a model, so this is a great time to go through the
- * list of previously existent but now unused models, and delete them if they
- * exist to clean up the user's disk space.
+ * This code runs at most once in each utility process, before its first model
+ * is resolved. This is a good time to delete previously existent but now
+ * unused models and reclaim their disk space.
  */
-const cleanupOldModelsIfNeeded = async () => {
+const cleanupOldModelsIfNeeded = () =>
+    (_oldModelsCleanup ??= cleanupOldModels().catch((e: unknown) => {
+        // Removing obsolete cache files is best effort and must not prevent the
+        // current models from loading. Retry on the next process start.
+        log.warn("Failed to clean up old ML models", e);
+    }));
+
+const cleanupOldModels = async () => {
     const oldModelNames = [
         "clip-image-vit-32-float32.onnx",
         "clip-text-vit-32-uint8.onnx",
@@ -281,7 +314,7 @@ const cleanupOldModelsIfNeeded = async () => {
         const modelPath = modelSavePath(modelName);
         if (existsSync(modelPath)) {
             log.info(`Removing unused ML model at ${modelPath}`);
-            await fs.rm(modelPath);
+            await fs.rm(modelPath, { force: true });
         }
     }
 };
@@ -409,7 +442,15 @@ export interface MLWorkerAnalyzeImageRequest {
  */
 export const analyzeImage = async (
     req: MLWorkerAnalyzeImageRequest,
-): Promise<MLNativeModule.AnalyzeImageResult> => {
+): Promise<MLWorkerAnalyzeImageResponse> => {
+    try {
+        return { ok: true, result: await analyzeImageOrThrow(req) };
+    } catch (e) {
+        return { ok: false, error: categorizeAnalyzeImageError(e) };
+    }
+};
+
+const analyzeImageOrThrow = async (req: MLWorkerAnalyzeImageRequest) => {
     const native = mlNative();
     try {
         return await analyzeImageOnce(native, req);
@@ -425,6 +466,23 @@ export const analyzeImage = async (
     } finally {
         logMLRuntimeEvents(native);
     }
+};
+
+const categorizeAnalyzeImageError = (e: unknown): MLWorkerAnalyzeImageError => {
+    if (e instanceof CategorizedMLWorkerError) {
+        return { kind: e.kind, message: e.message };
+    }
+
+    const message = e instanceof Error ? e.message : String(e);
+    const kind: MLWorkerAnalyzeImageErrorKind =
+        message.startsWith("Decode: ") || message.startsWith("Image: ")
+            ? "image"
+            : message.startsWith("Ort: ") ||
+                message.startsWith("CorruptModel: ") ||
+                message.startsWith("Runtime: ")
+              ? "ort"
+              : "misc";
+    return { kind, message };
 };
 
 const analyzeImageOnce = async (

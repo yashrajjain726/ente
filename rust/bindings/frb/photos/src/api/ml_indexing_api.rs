@@ -31,6 +31,7 @@ pub struct AnalyzeImageRequest {
 pub enum RustMlError {
     InvalidRequest(String),
     Decode(String),
+    Image(String),
     Preprocess(String),
     Ort(String),
     CorruptModel(String),
@@ -229,6 +230,7 @@ impl From<SharedMlError> for RustMlError {
         match value {
             SharedMlError::InvalidRequest(message) => RustMlError::InvalidRequest(message),
             SharedMlError::Decode(message) => RustMlError::Decode(message),
+            SharedMlError::Image(message) => RustMlError::Image(message),
             SharedMlError::Preprocess(message) => RustMlError::Preprocess(message),
             SharedMlError::Ort(message) => RustMlError::Ort(message),
             SharedMlError::CorruptModel(message) => RustMlError::CorruptModel(message),

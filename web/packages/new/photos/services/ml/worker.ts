@@ -7,6 +7,7 @@ import log from "ente-base/log";
 import { logUnhandledErrorsAndRejectionsInWorker } from "ente-base/log-web";
 import type {
     ElectronMLWorker,
+    MLWorkerAnalyzeImageErrorKind,
     MLWorkerAnalyzeImageRequest,
     MLWorkerAnalyzeImageResult,
 } from "ente-base/types/ipc";
@@ -186,6 +187,8 @@ export class MLWorker {
      * closes while we're indexing.
      */
     index() {
+        if (_blockingMLInitError) return Promise.resolve(0);
+
         const nextIdle = new Promise<number>((resolve, reject) =>
             this.onNextIdles.push({ resolve, reject }),
         );
@@ -217,6 +220,8 @@ export class MLWorker {
      * us and won't need to download the file from remote.
      */
     onUpload(file: EnteFile, processableUploadItem: ProcessableUploadItem) {
+        if (_blockingMLInitError) return;
+
         // Add the recently uploaded file to the live indexing queue.
         this.liveQ.push({
             file,
@@ -265,16 +270,20 @@ export class MLWorker {
                   return [];
               });
 
-        this.countSinceLastIdle += items.length;
-
         // If there is items remaining,
         if (items.length > 0) {
             // Index them.
-            const indexedCount = await indexNextBatch(
+            const { indexedCount, blockingInitError } = await indexNextBatch(
                 items,
                 this.electron!,
                 this.delegate,
             );
+            if (blockingInitError) {
+                this.suspendForMLInitError(blockingInitError);
+                return;
+            }
+
+            this.countSinceLastIdle += items.length;
             if (indexedCount > 0) {
                 // We made some progress, so there are no complete blockers
                 // (e.g. network being offline). Reset the idle duration and
@@ -308,7 +317,24 @@ export class MLWorker {
             log.warn("Failed to release the native ML runtime", e);
         });
 
-        // Resolve any awaiting promises returned from `index`.
+        this.resolvePendingIndexRequests();
+    }
+
+    /** Stop indexing until this web worker (and its utility process) is replaced. */
+    private suspendForMLInitError(error: MLAnalyzeError) {
+        log.error(
+            "Suspending ML indexing because the native runtime failed to initialize",
+            error,
+        );
+        this.liveQ = [];
+        this.state = "idle";
+        this.idleTimeout = undefined;
+        this.delegate?.workerDidUpdateStatus();
+        this.resolvePendingIndexRequests();
+    }
+
+    /** Resolve callers waiting for the worker to next become idle. */
+    private resolvePendingIndexRequests() {
         const onNextIdles = this.onNextIdles;
         const countSinceLastIdle = this.countSinceLastIdle;
         this.onNextIdles = [];
@@ -395,7 +421,7 @@ logUnhandledErrorsAndRejectionsInWorker();
 /**
  * Index the given batch of items.
  *
- * @returns the count of items which were indexed.
+ * @returns the number of indexed items and any process-blocking init error.
  */
 const indexNextBatch = async (
     items: IndexableItem[],
@@ -407,7 +433,7 @@ const indexNextBatch = async (
     // were able to upload just a bit ago but don't have network now.
     if (!self.navigator.onLine) {
         log.info("Skipping ML indexing since we are not online");
-        return 0;
+        return { indexedCount: 0 };
     }
 
     // Keep track if any of the items failed.
@@ -417,7 +443,7 @@ const indexNextBatch = async (
     const tasks = new Array<Promise<void> | undefined>(4).fill(undefined);
 
     let i = 0;
-    while (i < items.length) {
+    while (i < items.length && !_blockingMLInitError) {
         for (let j = 0; j < tasks.length; j++) {
             if (i < items.length && !tasks[j]) {
                 // Use an IIFE to capture the value of j at the time of
@@ -430,6 +456,9 @@ const indexNextBatch = async (
                         .catch((e: unknown) => {
                             const f = fileLogID(item.file);
                             log.error(`Failed to index ${f}`, e);
+                            if (isMLInitError(e)) {
+                                _blockingMLInitError ??= e;
+                            }
                             failureCount++;
                             tasks[j] = undefined;
                         }))(items[i++]!, j);
@@ -454,16 +483,16 @@ const indexNextBatch = async (
     // Clear any cached CLIP indexes, since now we might have new ones.
     clearCachedCLIPIndexes();
 
-    const indexedCount = items.length - failureCount;
+    const attemptedCount = i;
+    const indexedCount = attemptedCount - failureCount;
 
     log.info(
         failureCount > 0
             ? `Indexed ${indexedCount} files (${failureCount} failed)`
-            : `Indexed ${items.length} files`,
+            : `Indexed ${attemptedCount} files`,
     );
 
-    // Return the count of indexed files.
-    return indexedCount;
+    return { indexedCount, blockingInitError: _blockingMLInitError };
 };
 
 /**
@@ -626,8 +655,11 @@ const index = async (
             electron,
         );
     } catch (e) {
+        // Only failures inherent to the image (including the JPEG conversion
+        // fallback below) are permanent. Runtime and infrastructure failures
+        // should be retried after the underlying issue is resolved.
         // See: [Note: Transient and permanent indexing failures]
-        await markIndexingFailed(fileID);
+        if (isMLImageError(e)) await markIndexingFailed(fileID);
         throw e;
     }
 
@@ -747,19 +779,52 @@ const analyzeImageWithConversionFallback = async (
             `Native decode of ${fileLogID(file)} failed, retrying with a JPEG conversion`,
             e,
         );
-        const blob = await fetchRenderableBlob(
-            file,
-            processableUploadItem,
-            electron,
-        );
-        const bytes = new Uint8Array(await blob.arrayBuffer());
+        let bytes: Uint8Array;
+        try {
+            const blob = await fetchRenderableBlob(
+                file,
+                processableUploadItem,
+                electron,
+            );
+            bytes = new Uint8Array(await blob.arrayBuffer());
+        } catch (conversionError) {
+            // Fetching the source for conversion can still fail transiently.
+            // Do not turn such a download error into a permanent image error.
+            if (isNetworkDownloadError(conversionError)) throw conversionError;
+
+            const message =
+                conversionError instanceof Error
+                    ? conversionError.message
+                    : String(conversionError);
+            throw new MLAnalyzeError(
+                "image",
+                `JPEG conversion fallback failed: ${message}`,
+            );
+        }
         return await enqueueAnalyzeImage(electron, { ...request, bytes });
     }
 };
 
-/** `true` if the error looks like the native side failing to decode an image. */
+/** `true` for a permanent failure inherent to the image being analyzed. */
+const isMLImageError = (e: unknown): e is MLAnalyzeError =>
+    e instanceof MLAnalyzeError && e.kind == "image";
+
+/** `true` specifically for the Rust image decoder failure that permits fallback. */
 const isMLDecodeError = (e: unknown) =>
-    e instanceof Error && e.message.startsWith("Decode: ");
+    isMLImageError(e) && e.message.startsWith("Decode: ");
+
+const isMLInitError = (e: unknown): e is MLAnalyzeError =>
+    e instanceof MLAnalyzeError && e.kind == "init";
+
+class MLAnalyzeError extends Error {
+    constructor(
+        public readonly kind: MLWorkerAnalyzeImageErrorKind,
+        message: string,
+    ) {
+        super(message);
+        this.name = "MLAnalyzeError";
+    }
+}
 
 /**
  * A promise queue serializing calls to {@link ElectronMLWorker.analyzeImage}.
@@ -772,13 +837,23 @@ const isMLDecodeError = (e: unknown) =>
  */
 let _analyzeImageQueue: Promise<unknown> = Promise.resolve();
 
+/** The native addon is loaded only once, so this error cannot recover here. */
+let _blockingMLInitError: MLAnalyzeError | undefined;
+
 const enqueueAnalyzeImage = (
     electron: ElectronMLWorker,
     request: MLWorkerAnalyzeImageRequest,
 ): Promise<MLWorkerAnalyzeImageResult> => {
-    const result = _analyzeImageQueue.then(() =>
-        electron.analyzeImage(request),
-    );
+    const result = _analyzeImageQueue.then(async () => {
+        const response = await electron.analyzeImage(request);
+        if (!response.ok) {
+            throw new MLAnalyzeError(
+                response.error.kind,
+                response.error.message,
+            );
+        }
+        return response.result;
+    });
     _analyzeImageQueue = result.catch(() => undefined);
     return result;
 };

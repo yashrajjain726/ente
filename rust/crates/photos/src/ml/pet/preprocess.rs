@@ -130,7 +130,7 @@ fn relative_crop(decoded: &DecodedImage, box_xyxy: &[f32; 4]) -> MlResult<PixelC
     let height = y2.saturating_sub(y1);
 
     if width == 0 || height == 0 {
-        return Err(MlError::Preprocess("crop region has zero area".to_string()));
+        return Err(MlError::Image("crop region has zero area".to_string()));
     }
 
     Ok(PixelCrop {
@@ -166,25 +166,23 @@ impl RgbCropResizer {
         crop: PixelCrop,
     ) -> MlResult<&[u8]> {
         if crop.width == 0 || crop.height == 0 {
-            return Err(MlError::Preprocess(
-                "crop dimensions cannot be zero".to_string(),
-            ));
+            return Err(MlError::Image("crop dimensions cannot be zero".to_string()));
         }
         if crop.x > source_width.saturating_sub(crop.width)
             || crop.y > source_height.saturating_sub(crop.height)
         {
-            return Err(MlError::Preprocess(
+            return Err(MlError::Image(
                 "crop region extends beyond source image".to_string(),
             ));
         }
 
         let source = FirImageRef::new(source_width, source_height, rgb, PixelType::U8x3)
-            .map_err(|e| MlError::Preprocess(format!("failed to create FIR source image: {e}")))?;
+            .map_err(|e| MlError::Image(format!("failed to create FIR source image: {e}")))?;
         let source = CroppedImage::new(&source, crop.x, crop.y, crop.width, crop.height)
-            .map_err(|e| MlError::Preprocess(format!("failed to create FIR crop view: {e}")))?;
+            .map_err(|e| MlError::Image(format!("failed to create FIR crop view: {e}")))?;
         self.resizer
             .resize(&source, &mut self.resized, Some(&self.options))
-            .map_err(|e| MlError::Preprocess(format!("failed to resize RGB crop: {e}")))?;
+            .map_err(|e| MlError::Image(format!("failed to resize RGB crop: {e}")))?;
 
         Ok(self.resized.buffer())
     }

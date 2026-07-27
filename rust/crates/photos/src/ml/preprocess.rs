@@ -73,7 +73,7 @@ impl YoloInput {
 
 pub(crate) fn preprocess_yolo(decoded: &DecodedImage) -> MlResult<YoloInput> {
     if decoded.dimensions.width == 0 || decoded.dimensions.height == 0 {
-        return Err(MlError::Preprocess(
+        return Err(MlError::Image(
             "image dimensions cannot be zero".to_string(),
         ));
     }
@@ -90,14 +90,14 @@ pub(crate) fn preprocess_yolo(decoded: &DecodedImage) -> MlResult<YoloInput> {
         decoded.rgb.as_slice(),
         PixelType::U8x3,
     )
-    .map_err(|e| MlError::Preprocess(format!("failed to create FIR source image: {e}")))?;
+    .map_err(|e| MlError::Image(format!("failed to create FIR source image: {e}")))?;
 
     let mut resized_image = FirImage::new(scaled_width, scaled_height, PixelType::U8x3);
     let mut resizer = Resizer::new();
     let options = ResizeOptions::new().resize_alg(ResizeAlg::Interpolation(FilterType::Bilinear));
     resizer
         .resize(&src_image, &mut resized_image, Some(&options))
-        .map_err(|e| MlError::Preprocess(format!("failed to resize YOLO image input: {e}")))?;
+        .map_err(|e| MlError::Image(format!("failed to resize YOLO image input: {e}")))?;
 
     let scaled_width_usize = scaled_width as usize;
     let scaled_height_usize = scaled_height as usize;
@@ -134,7 +134,7 @@ pub(crate) fn preprocess_yolo(decoded: &DecodedImage) -> MlResult<YoloInput> {
 
 pub(crate) fn preprocess_clip(decoded: &DecodedImage) -> MlResult<Vec<f32>> {
     if decoded.dimensions.width == 0 || decoded.dimensions.height == 0 {
-        return Err(MlError::Preprocess(
+        return Err(MlError::Image(
             "image dimensions cannot be zero".to_string(),
         ));
     }
@@ -151,7 +151,7 @@ pub(crate) fn preprocess_clip(decoded: &DecodedImage) -> MlResult<Vec<f32>> {
         decoded.rgb.as_slice(),
         PixelType::U8x3,
     )
-    .map_err(|e| MlError::Preprocess(format!("failed to create FIR source image: {e}")))?;
+    .map_err(|e| MlError::Image(format!("failed to create FIR source image: {e}")))?;
 
     let start_x = (scaled_width.saturating_sub(CLIP_IMAGE_INPUT_SIZE as u32) / 2) as f64;
     let start_y = (scaled_height.saturating_sub(CLIP_IMAGE_INPUT_SIZE as u32) / 2) as f64;
@@ -173,7 +173,7 @@ pub(crate) fn preprocess_clip(decoded: &DecodedImage) -> MlResult<Vec<f32>> {
         .crop(crop_left, crop_top, crop_width, crop_height);
     resizer
         .resize(&src_image, &mut resized_image, Some(&options))
-        .map_err(|e| MlError::Preprocess(format!("failed to resize CLIP image input: {e}")))?;
+        .map_err(|e| MlError::Image(format!("failed to resize CLIP image input: {e}")))?;
 
     let resized = resized_image.buffer();
 
@@ -201,13 +201,21 @@ mod tests {
         images::{Image as FirImage, ImageRef as FirImageRef},
     };
 
-    use super::{YOLO_INPUT_SIZE, YoloInput, preprocess_clip};
+    use super::{YOLO_INPUT_SIZE, YoloInput, preprocess_clip, preprocess_yolo};
     use crate::ml::{
         clip::CLIP_IMAGE_INPUT_SIZE,
         error::{MlError, MlResult},
         onnx::PreparedF32Input,
         types::{DecodedImage, Dimensions},
     };
+
+    #[test]
+    fn zero_sized_images_are_classified_as_image_errors() {
+        let decoded = test_image(0, 0);
+
+        assert!(matches!(preprocess_yolo(&decoded), Err(MlError::Image(_))));
+        assert!(matches!(preprocess_clip(&decoded), Err(MlError::Image(_))));
+    }
 
     #[test]
     fn yolo_geometry_matches_the_previous_letterbox_correction() {

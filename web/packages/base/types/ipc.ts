@@ -743,7 +743,7 @@ export interface ElectronMLWorker {
      */
     analyzeImage: (
         request: MLWorkerAnalyzeImageRequest,
-    ) => Promise<MLWorkerAnalyzeImageResult>;
+    ) => Promise<MLWorkerAnalyzeImageResponse>;
 
     /**
      * Release the (pinned) native ML sessions.
@@ -808,6 +808,32 @@ export interface MLWorkerAnalyzeImageRequest {
      */
     generateFaceCrops: boolean;
 }
+
+/**
+ * Broad category for an error encountered while analyzing an image.
+ *
+ * Only `image` indicates a permanent problem inherent to the image. `init`
+ * blocks indexing for the lifetime of the utility process, while `ort` and
+ * `misc` remain retryable. None of those other kinds should permanently mark
+ * the file as unindexable.
+ */
+export type MLWorkerAnalyzeImageErrorKind = "init" | "ort" | "image" | "misc";
+
+/** An error returned by the Electron ML utility process. */
+export interface MLWorkerAnalyzeImageError {
+    kind: MLWorkerAnalyzeImageErrorKind;
+    message: string;
+}
+
+/**
+ * Result envelope for an image analysis request.
+ *
+ * This explicit envelope is used instead of throwing a custom `Error` because
+ * Comlink only preserves an error's name, message and stack.
+ */
+export type MLWorkerAnalyzeImageResponse =
+    | { ok: true; result: MLWorkerAnalyzeImageResult }
+    | { ok: false; error: MLWorkerAnalyzeImageError };
 
 /**
  * A face detected by {@link ElectronMLWorker.analyzeImage}.

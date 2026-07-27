@@ -276,6 +276,7 @@ fn ml_error_to_napi(error: MlError) -> Error {
     let kind = match &error {
         MlError::InvalidRequest(_) => "InvalidRequest",
         MlError::Decode(_) => "Decode",
+        MlError::Image(_) => "Image",
         MlError::Preprocess(_) => "Preprocess",
         MlError::Ort(_) => "Ort",
         MlError::CorruptModel(_) => "CorruptModel",
@@ -285,6 +286,7 @@ fn ml_error_to_napi(error: MlError) -> Error {
     let detail = match error {
         MlError::InvalidRequest(message)
         | MlError::Decode(message)
+        | MlError::Image(message)
         | MlError::Preprocess(message)
         | MlError::Ort(message)
         | MlError::CorruptModel(message)

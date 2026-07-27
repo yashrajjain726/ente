@@ -8,6 +8,11 @@ pub enum MlError {
     InvalidRequest(String),
     #[error("decode error: {0}")]
     Decode(String),
+    /// A deterministic failure caused by this image's decoded contents or by
+    /// image-derived geometry. Unlike generic preprocessing/postprocessing
+    /// failures, callers may safely stop retrying this particular image.
+    #[error("image processing error: {0}")]
+    Image(String),
     #[error("preprocess error: {0}")]
     Preprocess(String),
     #[error("onnx runtime error: {0}")]
@@ -36,7 +41,7 @@ impl From<ente_image::ImageError> for MlError {
     fn from(value: ente_image::ImageError) -> Self {
         match value {
             ente_image::ImageError::Decode(message) => MlError::Decode(message),
-            ente_image::ImageError::Postprocess(message) => MlError::Postprocess(message),
+            ente_image::ImageError::Postprocess(message) => MlError::Image(message),
         }
     }
 }
