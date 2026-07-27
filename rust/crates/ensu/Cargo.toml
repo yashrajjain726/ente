@@ -57,7 +57,7 @@ llama-cpp-2 = { version = "=0.1.144", features = ["mtmd"] }
 ort = { workspace = true, features = ["load-dynamic"], optional = true }
 
 # The iOS app links Ente's custom ONNX Runtime XCFramework via SPM, so ort-sys
-# must not download/link pyke's binaries. See mobile/native/onnxruntime/README.md.
+# must not download/link pyke's binaries.
 [target.'cfg(target_os = "ios")'.dependencies]
 ort-sys = { workspace = true, features = ["disable-linking"], optional = true }
 

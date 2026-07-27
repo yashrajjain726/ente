@@ -8,8 +8,6 @@
 // The Rust side (ente-ensu's iOS `ort-sys` dependency) is built with
 // "disable-linking" so that it neither downloads nor bundles any other ONNX
 // Runtime; the symbols resolve against this static library at app link time.
-//
-// See mobile/native/onnxruntime/README.md for the release bump checklist.
 import PackageDescription
 
 let package = Package(

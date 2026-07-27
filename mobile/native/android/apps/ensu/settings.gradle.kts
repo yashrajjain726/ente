@@ -14,7 +14,7 @@ dependencyResolutionManagement {
         maven { url = uri("https://jitpack.io") }
         // Ente's custom prebuilt ONNX Runtime AAR is resolved straight from
         // its GitHub release; its SHA-256 is pinned in
-        // gradle/verification-metadata.xml. See mobile/native/onnxruntime/README.md.
+        // gradle/verification-metadata.xml.
         exclusiveContent {
             forRepository {
                 ivy {
