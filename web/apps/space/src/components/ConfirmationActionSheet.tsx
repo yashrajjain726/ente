@@ -17,6 +17,7 @@ interface ConfirmationActionSheetProps {
     description?: React.ReactNode;
     confirmLabel: string;
     confirmBackgroundColor?: string;
+    confirmClassName?: string;
     confirmActionPhase?: SpaceActionPhase | null;
     confirmDisabled?: boolean;
     errorMessage?: string | null;
@@ -36,6 +37,7 @@ export const ConfirmationActionSheet: React.FC<
     description,
     confirmLabel,
     confirmBackgroundColor = dangerColor,
+    confirmClassName,
     confirmActionPhase = null,
     confirmDisabled = false,
     errorMessage = null,
@@ -155,6 +157,7 @@ export const ConfirmationActionSheet: React.FC<
                     <SheetButton
                         label={confirmLabel}
                         backgroundColor={confirmBackgroundColor}
+                        className={confirmClassName}
                         color="#FFFFFF"
                         disabled={confirmDisabled}
                         actionPhase={confirmActionPhase}
@@ -192,6 +195,7 @@ export const ConfirmationActionSheet: React.FC<
 
 interface SheetButtonProps {
     backgroundColor: string;
+    className?: string;
     color: string;
     actionPhase?: SpaceActionPhase | null;
     disabled?: boolean;
@@ -201,6 +205,7 @@ interface SheetButtonProps {
 
 const SheetButton: React.FC<SheetButtonProps> = ({
     backgroundColor,
+    className,
     color,
     actionPhase = null,
     disabled = false,
@@ -208,6 +213,7 @@ const SheetButton: React.FC<SheetButtonProps> = ({
     onClick,
 }) => (
     <Box
+        className={className}
         component="button"
         type="button"
         aria-label={label}

@@ -182,7 +182,7 @@ export const SpaceShareLinkDialogHost: React.FC = () => {
                         }}
                     >
                         {linkChanged
-                            ? "New link ready"
+                            ? "New link is ready"
                             : mode == "invite"
                               ? "Invite friends"
                               : "Share your profile"}
@@ -254,9 +254,10 @@ export const SpaceShareLinkDialogHost: React.FC = () => {
             <ConfirmationActionSheet
                 open={isChangeConfirmationOpen}
                 title="Change profile link?"
-                description="You'll get a new link to share. The current one will stop working."
+                description="You'll get a new link to share. The current one will stop working for anyone with the link."
                 confirmLabel="Change link"
                 confirmBackgroundColor={green}
+                confirmClassName="green-bg"
                 confirmDisabled={confirming}
                 confirmActionPhase={confirming ? "busy" : null}
                 cancelDisabled={confirming}
