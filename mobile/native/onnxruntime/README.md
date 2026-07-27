@@ -1,10 +1,10 @@
 # Custom ONNX Runtime binaries
 
-The mobile apps use Ente's pinned custom ONNX Runtime 1.27.0 packaging builds
-from the ort-packaging repository:
+The mobile apps use Ente's pinned custom ONNX Runtime 1.27.0 packaging build
+(`ort-1.27.0-r3` from the ort-packaging repository):
 
-- Android (`ort-1.27.0-r2`): WebGPU, XNNPACK, and CPU; ARM64, ARMv7, and x86_64
-- iOS (`ort-1.27.0-r3`): CoreML and CPU; iOS 15.1+ device and ARM64 Simulator
+- Android: WebGPU, XNNPACK, and CPU; ARM64, ARMv7, and x86_64
+- iOS: CoreML and CPU; iOS 15.1+ device and ARM64 Simulator
 
 Each platform's own package manager downloads and checksum-verifies the
 binaries; there are no custom download scripts.
