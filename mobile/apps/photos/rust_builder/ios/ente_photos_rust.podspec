@@ -41,7 +41,7 @@ A new Flutter FFI plugin project.
         iphonesimulator) ort_slice=ios-arm64-simulator ;;
         *) echo "error: unsupported platform for ONNX Runtime: $PLATFORM_NAME" >&2; exit 1 ;;
       esac
-      export ORT_LIB_PATH="$PODS_ROOT/EnteOnnxRuntime/static-lib/$ort_slice"
+      export ORT_LIB_PATH="$PODS_ROOT/EnteOnnxRuntime/onnxruntime.xcframework/$ort_slice"
       if [ ! -f "$ORT_LIB_PATH/libonnxruntime.a" ]; then
         echo "error: $ORT_LIB_PATH/libonnxruntime.a is missing; run 'pod install'" >&2
         exit 1
