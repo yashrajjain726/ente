@@ -1,10 +1,14 @@
 const fsp = require("fs/promises");
+const { stageMLAddons } = require("./ml-native");
+const { ensureONNXRuntime } = require("./ort");
 
 /**
  * This hook is invoked during the initial build (e.g. when triggered by
  * "npm run build"), and importantly, on each rebuild for a different
- * architecture during the build. We use it to ensure the vips binary matches
- * the current architecture. See "[Note: vips]" for more details.
+ * architecture during the build. We use it to ensure the vips binary, the
+ * ONNX Runtime library, and the Rust ML addon match the current architecture.
+ * See "[Note: vips]", "[Note: ONNX Runtime binaries]" and "[Note: Packaging
+ * the ML addon]" for more details.
  *
  * The documentation for this hook is at:
  * https://www.electron.build/app-builder-lib.interface.configuration#beforebuild
@@ -29,6 +33,13 @@ const fsp = require("fs/promises");
  */
 module.exports = async (context) => {
     const { appDir, platform, arch } = context;
+
+    // Match the ONNX Runtime library and the staged Rust ML addon to the
+    // architecture being packaged. Unlike the vips handling below, this also
+    // has work to do when the build arch is the host arch: the addon must be
+    // staged from `rust-bindings/` into `build/` in all cases.
+    await ensureONNXRuntime(platform.nodeName, arch, appDir);
+    await stageMLAddons(appDir, platform.nodeName, arch);
 
     // The arch used by Electron Builder is not the same as the arch used by
     // Node's process, but for the two cases that we care about, "x64" and

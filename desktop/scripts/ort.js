@@ -85,14 +85,31 @@ const downloadONNXRuntimeIfNeeded = async (platform, arch, appDir) => {
     await fsp.writeFile(stampPath, asset);
 };
 
-const main = async () => {
-    const arches =
-        process.platform == "darwin" ? ["arm64", "x64"] : [process.arch];
-    for (const arch of arches)
-        await downloadONNXRuntimeIfNeeded(process.platform, arch, ".");
+/**
+ * Ensure `<appDir>/build/onnxruntime` contains exactly the ONNX Runtime
+ * libraries needed for the given OS/arch combination.
+ *
+ * On macOS the packaged app is universal, so both architectures are kept. On
+ * Linux and Windows only the given arch is kept: unlike vips (a single file
+ * that gets overwritten in place per arch), the libraries live in per-arch
+ * directories, so directories left over from earlier passes for other
+ * architectures need to be removed lest they also get copied into the
+ * package.
+ */
+const ensureONNXRuntime = async (platform, arch, appDir) => {
+    const arches = platform == "darwin" ? ["arm64", "x64"] : [arch];
+    for (const a of arches)
+        await downloadONNXRuntimeIfNeeded(platform, a, appDir);
+
+    const outDir = path.join(appDir, "build", "onnxruntime");
+    for (const entry of await fsp.readdir(outDir))
+        if (!arches.includes(entry))
+            await fsp.rm(path.join(outDir, entry), { recursive: true });
 };
 
-module.exports = { downloadONNXRuntimeIfNeeded };
+const main = () => ensureONNXRuntime(process.platform, process.arch, ".");
+
+module.exports = { ensureONNXRuntime };
 
 if (require.main === module)
     main().catch((e) => {
