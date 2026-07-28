@@ -186,11 +186,11 @@ impl AssetStore {
     }
 
     pub fn remove(&self, asset: &Asset) -> Result<(), AssetStoreError> {
-        let lock = self.asset_lock(asset)?;
-        let _guard = lock.try_lock().map_err(|_| AssetStoreError::Busy)?;
-        remove_path(&self.asset_dir(asset))?;
-        remove_path(&self.staging_dir(asset))?;
-        Ok(())
+        self.remove_key(&asset.components)
+    }
+
+    pub fn remove_keys(&self, keys: &[Vec<String>]) -> Result<(), AssetStoreError> {
+        keys.iter().try_for_each(|key| self.remove_key(key))
     }
 
     async fn download_asset<F>(
@@ -237,23 +237,33 @@ impl AssetStore {
     }
 
     fn asset_lock(&self, asset: &Asset) -> Result<Arc<Mutex<()>>, Error> {
+        self.key_lock(&asset.components)
+    }
+
+    fn key_lock(&self, components: &[String]) -> Result<Arc<Mutex<()>>, Error> {
         let mut locks = self.asset_locks.lock().expect("asset lock registry");
-        if let Some((key, lock)) = locks
-            .iter()
-            .find(|(key, _)| keys_overlap(key, &asset.components))
-        {
-            if *key == asset.components {
+        if let Some((key, lock)) = locks.iter().find(|(key, _)| keys_overlap(key, components)) {
+            if key == components {
                 return Ok(Arc::clone(lock));
             }
             return Err(Error::InvalidTarget(format!(
                 "asset keys {} and {} overlap",
                 key.join("/"),
-                asset.components.join("/")
+                components.join("/")
             )));
         }
         let lock = Arc::new(Mutex::new(()));
-        locks.insert(asset.components.clone(), Arc::clone(&lock));
+        locks.insert(components.to_vec(), Arc::clone(&lock));
         Ok(lock)
+    }
+
+    fn remove_key(&self, key: &[String]) -> Result<(), AssetStoreError> {
+        validate_components(key)?;
+        let lock = self.key_lock(key)?;
+        let _guard = lock.try_lock().map_err(|_| AssetStoreError::Busy)?;
+        remove_path(&join_components(&self.root, key))?;
+        remove_path(&join_components(&self.root.join(STAGING_DIR), key))?;
+        Ok(())
     }
 
     fn downloader(&self) -> Result<&Downloader, Error> {
@@ -810,7 +820,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn remove_deletes_published_and_staged_data() {
+    async fn remove_keys_deletes_published_and_staged_data() {
         let root = scratch_dir("remove");
         let store = AssetStore::new(&root);
         let asset =
@@ -822,10 +832,15 @@ mod tests {
         fs::create_dir_all(&staging).unwrap();
         fs::write(staging.join("model.onnx.tmp"), b"partial").unwrap();
 
-        store.remove(&asset).unwrap();
+        let keys = vec![key(&["models", "clip"])];
+        store.remove_keys(&keys).unwrap();
         assert!(!final_dir.exists());
         assert!(!staging.exists());
-        store.remove(&asset).unwrap();
+        store.remove_keys(&keys).unwrap();
+        assert!(matches!(
+            store.remove_keys(&[key(&[".."])]),
+            Err(AssetStoreError::Download(Error::InvalidTarget(_)))
+        ));
         let _ = fs::remove_dir_all(root);
     }
 
