@@ -1936,7 +1936,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                         fontSize: 14,
                         fontWeight: 650,
                         left: "50%",
-                        lineHeight: "23px",
+                        lineHeight: "21px",
                         m: 0,
                         maxWidth: "90vw",
                         minWidth: 0,
