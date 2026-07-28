@@ -4,15 +4,19 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"time"
 
 	"github.com/ente/stacktrace"
 	"github.com/lib/pq"
 )
 
 var (
-	ErrSpaceLinkSecretReused = errors.New("space link secret reused")
-	ErrSpaceLinkStateChanged = errors.New("space link state changed")
+	ErrSpaceLinkSecretReused         = errors.New("space link secret reused")
+	ErrSpaceLinkStateChanged         = errors.New("space link state changed")
+	ErrSpaceLinkRotationLimitReached = errors.New("space link rotation limit reached")
 )
+
+const maxSpaceLinkRotationsPerDay = 5
 
 func isSpaceLinkUniqueViolation(err error, constraint string) bool {
 	var pgErr *pq.Error
@@ -187,6 +191,20 @@ func (r *LinksRepository) Rotate(
 	}
 	if currentVersion != keyVersion {
 		return nil, sql.ErrNoRows
+	}
+	// Link deactivation updates updated_at, recording when each rotation succeeded.
+	var recentRotations int
+	if err := tx.QueryRowContext(ctx, `
+		SELECT COUNT(*)
+		FROM space_links
+		WHERE space_id = $1
+		  AND active = FALSE
+		  AND updated_at >= now_utc_micro_seconds() - $2
+	`, spaceID, (24 * time.Hour).Microseconds()).Scan(&recentRotations); err != nil {
+		return nil, stacktrace.Propagate(err, "")
+	}
+	if recentRotations >= maxSpaceLinkRotationsPerDay {
+		return nil, ErrSpaceLinkRotationLimitReached
 	}
 	if _, err := tx.ExecContext(ctx, `
 		UPDATE space_links

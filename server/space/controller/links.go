@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"database/sql"
 	"errors"
+	"net/http"
 	"strings"
 
 	"github.com/ente/museum/ente"
@@ -149,6 +150,13 @@ func (c *LinksController) Rotate(ctx context.Context, space *repo.SpaceRecord, r
 		}
 		if errors.Is(err, repo.ErrSpaceLinkSecretReused) {
 			return nil, ente.NewBadRequestWithMessage("space link secret has already been used")
+		}
+		if errors.Is(err, repo.ErrSpaceLinkRotationLimitReached) {
+			return nil, &ente.ApiError{
+				Code:           ente.ErrorCode("SPACE_LINK_ROTATION_LIMIT_REACHED"),
+				Message:        "space link can only be rotated five times per day",
+				HttpStatusCode: http.StatusTooManyRequests,
+			}
 		}
 		return nil, err
 	}
