@@ -343,6 +343,8 @@ pub struct RotateSpaceKeyRequest {
     pub wrapped_prev_key: String,
     pub encrypted_profile: String,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub expected_link_id: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub link_encrypted_space_key: Option<String>,
 }
 
@@ -370,6 +372,8 @@ pub struct SpaceLinkWriteRequest {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SpaceLinkStatusResponse {
+    #[serde(default)]
+    pub link_id: i64,
     pub space_id: String,
     pub space_slug: String,
     pub active: bool,

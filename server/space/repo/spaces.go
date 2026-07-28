@@ -227,7 +227,7 @@ func (r *SpacesRepository) UpdateSlug(ctx context.Context, spaceID, spaceSlug st
 	return rec, nil
 }
 
-func (r *SpacesRepository) RotateKey(ctx context.Context, spaceID string, keyVersion int, rootWrappedSpaceKey, wrappedPrevKey, encryptedProfile, linkEncryptedSpaceKey []byte) (*SpaceRecord, error) {
+func (r *SpacesRepository) RotateKey(ctx context.Context, spaceID string, keyVersion int, rootWrappedSpaceKey, wrappedPrevKey, encryptedProfile []byte, expectedLinkID *int64, linkEncryptedSpaceKey []byte) (*SpaceRecord, error) {
 	tx, err := r.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, stacktrace.Propagate(err, "")
@@ -263,13 +263,35 @@ func (r *SpacesRepository) RotateKey(ctx context.Context, spaceID string, keyVer
 	`, rootWrappedSpaceKey, encryptedProfile, newVersion, spaceID); err != nil {
 		return nil, stacktrace.Propagate(err, "")
 	}
-	if len(linkEncryptedSpaceKey) > 0 {
-		if _, err := tx.ExecContext(ctx, `
+	if expectedLinkID != nil && *expectedLinkID > 0 {
+		result, err := tx.ExecContext(ctx, `
 			UPDATE space_links
 			SET key_version = $2, encrypted_space_key = $3
-			WHERE space_id = $1 AND active = TRUE
-		`, spaceID, newVersion, linkEncryptedSpaceKey); err != nil {
+			WHERE space_id = $1 AND link_id = $4 AND active = TRUE
+		`, spaceID, newVersion, linkEncryptedSpaceKey, *expectedLinkID)
+		if err != nil {
 			return nil, stacktrace.Propagate(err, "")
+		}
+		updated, err := result.RowsAffected()
+		if err != nil {
+			return nil, stacktrace.Propagate(err, "")
+		}
+		if updated != 1 {
+			return nil, ErrSpaceLinkStateChanged
+		}
+	} else if expectedLinkID != nil {
+		var active bool
+		if err := tx.QueryRowContext(ctx, `
+			SELECT EXISTS (
+				SELECT 1
+				FROM space_links
+				WHERE space_id = $1 AND active = TRUE
+			)
+		`, spaceID).Scan(&active); err != nil {
+			return nil, stacktrace.Propagate(err, "")
+		}
+		if active {
+			return nil, ErrSpaceLinkStateChanged
 		}
 	} else {
 		if _, err := tx.ExecContext(ctx, `
@@ -330,9 +352,8 @@ func (r *SpacesRepository) GetVersion(ctx context.Context, spaceID string, versi
 	return &rec, nil
 }
 
-func scanSpaceRecord(scanner interface{ Scan(dest ...any) error }) (*SpaceRecord, error) {
-	var rec SpaceRecord
-	if err := scanner.Scan(
+func spaceRecordScanDest(rec *SpaceRecord) []any {
+	return []any{
 		&rec.SpaceID,
 		&rec.OwnerID,
 		&rec.SpaceSlug,
@@ -350,7 +371,12 @@ func scanSpaceRecord(scanner interface{ Scan(dest ...any) error }) (*SpaceRecord
 		&rec.CoverSize,
 		&rec.CreatedAt,
 		&rec.UpdatedAt,
-	); err != nil {
+	}
+}
+
+func scanSpaceRecord(scanner interface{ Scan(dest ...any) error }) (*SpaceRecord, error) {
+	var rec SpaceRecord
+	if err := scanner.Scan(spaceRecordScanDest(&rec)...); err != nil {
 		return nil, stacktrace.Propagate(err, "")
 	}
 	return &rec, nil

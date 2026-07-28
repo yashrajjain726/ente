@@ -81,7 +81,7 @@ func TestSpaceKeyRotationRewrapsOrDisablesActiveLink(t *testing.T) {
 	require.NoError(t, err)
 
 	auth := sha256.Sum256([]byte("rotation-auth-key"))
-	_, err = module.Links.Create(
+	link, err := module.Links.Create(
 		ctx,
 		space.SpaceID,
 		auth[:],
@@ -93,6 +93,7 @@ func TestSpaceKeyRotationRewrapsOrDisablesActiveLink(t *testing.T) {
 		[]byte("encrypted-access-key"),
 	)
 	require.NoError(t, err)
+	expectedLinkID := link.LinkID
 
 	rotated, err := module.Spaces.RotateKey(
 		ctx,
@@ -101,10 +102,11 @@ func TestSpaceKeyRotationRewrapsOrDisablesActiveLink(t *testing.T) {
 		[]byte("root-v2"),
 		[]byte("wrapped-v1"),
 		[]byte("profile-v2"),
+		&expectedLinkID,
 		[]byte("encrypted-space-key-v2"),
 	)
 	require.NoError(t, err)
-	link, err := module.Links.GetActive(ctx, space.SpaceID)
+	link, err = module.Links.GetActive(ctx, space.SpaceID)
 	require.NoError(t, err)
 	require.Equal(t, rotated.CurrentVersion, link.KeyVersion)
 	require.Equal(t, []byte("encrypted-space-key-v2"), link.EncryptedSpaceKey)
@@ -116,6 +118,7 @@ func TestSpaceKeyRotationRewrapsOrDisablesActiveLink(t *testing.T) {
 		[]byte("root-v3"),
 		[]byte("wrapped-v2"),
 		[]byte("profile-v3"),
+		nil,
 		nil,
 	)
 	require.NoError(t, err)

@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"database/sql"
 	"errors"
+	"net/http"
 	"strings"
 
 	"github.com/ente/museum/ente"
@@ -33,6 +34,7 @@ type LinksController struct {
 
 func spaceLinkStatus(link *repo.SpaceLinkRecord) *models.SpaceLinkStatusResponse {
 	return &models.SpaceLinkStatusResponse{
+		LinkID:             link.LinkID,
 		SpaceID:            link.SpaceID,
 		SpaceSlug:          link.SpaceSlug,
 		Active:             link.Active,
@@ -149,6 +151,13 @@ func (c *LinksController) Rotate(ctx context.Context, space *repo.SpaceRecord, r
 		if errors.Is(err, repo.ErrSpaceLinkSecretReused) {
 			return nil, ente.NewBadRequestWithMessage("space link secret has already been used")
 		}
+		if errors.Is(err, repo.ErrSpaceLinkRotationLimitReached) {
+			return nil, &ente.ApiError{
+				Code:           ente.ErrorCode("SPACE_LINK_ROTATION_LIMIT_REACHED"),
+				Message:        "space link can only be rotated five times per day",
+				HttpStatusCode: http.StatusTooManyRequests,
+			}
+		}
 		return nil, err
 	}
 	return spaceLinkStatus(link), nil
@@ -176,15 +185,11 @@ func (c *LinksController) authorize(ctx *gin.Context, slug string) (*repo.SpaceL
 		return nil, nil, ente.ErrNotFound
 	}
 	sum := sha256.Sum256(authKey)
-	link, err := c.LinksRepo.GetActiveBySlugAndAuthHash(ctx, strings.TrimSpace(slug), sum[:])
+	link, space, err := c.LinksRepo.GetActiveSpaceBySlugAndAuthHash(ctx, strings.TrimSpace(slug), sum[:])
 	if err != nil {
 		if errors.Is(stacktrace.RootCause(err), sql.ErrNoRows) {
 			return nil, nil, ente.ErrNotFound
 		}
-		return nil, nil, err
-	}
-	space, err := c.SpacesRepo.GetSpaceByID(ctx, link.SpaceID)
-	if err != nil {
 		return nil, nil, err
 	}
 	return link, space, nil
