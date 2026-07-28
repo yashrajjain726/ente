@@ -479,23 +479,27 @@ export function MemoryViewer({
     const effectiveMediaAspectRatio = finishedPlayback
         ? MEMORY_END_CARD_ASPECT_RATIO
         : resolvedMediaAspectRatio;
+    const useMobileVideoSizing = isVideo && !finishedPlayback;
 
     const mobileFrameSize = useMemo(() => {
         const availableWidth = Math.max(
             220,
-            viewport.width - (isVideo ? 32 : MOBILE_MEDIA_HORIZONTAL_INSET_PX),
+            viewport.width -
+                (useMobileVideoSizing ? 32 : MOBILE_MEDIA_HORIZONTAL_INSET_PX),
         );
-        const maxWidth = isVideo
+        const maxWidth = useMobileVideoSizing
             ? Math.min(MOBILE_VIDEO_MAX_WIDTH_PX, availableWidth)
             : availableWidth;
         const maxHeight = Math.max(
             180,
             viewport.height -
-                (isVideo
+                (useMobileVideoSizing
                     ? MOBILE_VIDEO_MEDIA_RESERVED_VERTICAL_SPACE_PX
                     : MOBILE_MEDIA_RESERVED_VERTICAL_SPACE_PX),
         );
-        const ratio = effectiveMediaAspectRatio ?? (isVideo ? 16 / 9 : 4 / 3);
+        const ratio =
+            effectiveMediaAspectRatio ??
+            (useMobileVideoSizing ? 16 / 9 : 4 / 3);
 
         let width = maxWidth;
         let height = width / ratio;
@@ -506,7 +510,12 @@ export function MemoryViewer({
         }
 
         return { width: Math.round(width), height: Math.round(height) };
-    }, [effectiveMediaAspectRatio, isVideo, viewport.height, viewport.width]);
+    }, [
+        effectiveMediaAspectRatio,
+        useMobileVideoSizing,
+        viewport.height,
+        viewport.width,
+    ]);
 
     const desktopFrameSize = useMemo(() => {
         const availableWidth = Math.max(
@@ -537,7 +546,7 @@ export function MemoryViewer({
     const mediaFrameStyle = isMobileLayout
         ? {
               width: `${mobileFrameSize.width}px`,
-              aspectRatio: `${effectiveMediaAspectRatio ?? (isVideo ? 16 / 9 : 4 / 3)}`,
+              aspectRatio: `${effectiveMediaAspectRatio ?? (useMobileVideoSizing ? 16 / 9 : 4 / 3)}`,
           }
         : {
               width: `${desktopFrameSize.width}px`,
