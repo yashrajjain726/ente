@@ -456,7 +456,7 @@
   "gettingStarted": "Inizia",
   "gettingStartedDesc": "Installa Locker, crea un account e salva il tuo primo oggetto",
   "informationTypes": "Tipi d'informazioni",
-  "informationTypesDesc": "Documenti, note, carte, password e altri tipi di elementi",
+  "informationTypesDesc": "Documenti, note, carte, password e altri tipi di ",
   "organization": "Organizzazione",
   "organizationDesc": "Collezioni, preferiti, ricerca e modi per mantenere gli oggetti organizzati",
   "legacyDesc": "Contatti affidabili, Kit Legacy e pianificazione del recupero account",
@@ -917,7 +917,7 @@
       }
     }
   },
-  "deleteMultipleFilesDialogBody": "{count, plural, one{{count} elemento sarà eliminato definitivamente.} other{{count} elementi saranno eliminati definitivamente.}}",
+  "deleteMultipleFilesDialogBody": "{count, plural, one {{count} raccolta} other {{count} raccolte}} sarà eliminata definitivamente.",
   "@deleteMultipleFilesDialogBody": {
     "description": "Confirmation message body for deleting multiple items",
     "placeholders": {
@@ -931,7 +931,7 @@
   "@deleteCollectionFromEverywhere": {
     "description": "Checkbox label asking whether to delete collection items everywhere"
   },
-  "yesDeleteCollections": "Sì, elimina {count, plural, one{raccolta} other{raccolte}}",
+  "yesDeleteCollections": "Sì, elimina {count, plural, one {collection} other {collections}}",
   "@yesDeleteCollections": {
     "description": "Button label for confirming deletion of one or more collections",
     "placeholders": {
@@ -941,7 +941,7 @@
       }
     }
   },
-  "yesDeleteFiles": "Sì, elimina {count, plural, one{elemento} other{elementi}}",
+  "yesDeleteFiles": "Sì, elimina {count, plural, one{{item}} other{{items}}}",
   "@yesDeleteFiles": {
     "description": "Button label for confirming deletion of one or more items",
     "placeholders": {
@@ -1058,7 +1058,7 @@
   "collectionUpdated": "Collezione aggiornata",
   "actionNotSupportedOnFavouritesAlbum": "Questa azione non è supportata nei Album preferiti",
   "leaveCollectionSuccessfully": "Hai lasciato la raccolta con successo",
-  "leftCollectionsSuccessfully": "{count, plural, one{Hai lasciato {count} raccolta con successo} other{Hai lasciato {count} raccolte con successo}}",
+  "leftCollectionsSuccessfully": "{count, plural, one{Rimasta {count} raccolta con successo} other{Rimasto {count} collezioni con successo}}",
   "@leftCollectionsSuccessfully": {
     "description": "Success message when leaving collections",
     "placeholders": {
