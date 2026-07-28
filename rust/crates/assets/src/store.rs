@@ -443,8 +443,14 @@ fn validate_component(component: &str) -> Result<(), Error> {
     if !component.is_empty()
         && component != "."
         && component != ".."
-        && !component.contains('/')
-        && !component.contains('\\')
+        && !component.ends_with([' ', '.'])
+        && !component.chars().any(|character| {
+            character.is_ascii_control()
+                || matches!(
+                    character,
+                    '<' | '>' | ':' | '"' | '/' | '\\' | '|' | '?' | '*'
+                )
+        })
     {
         return Ok(());
     }
@@ -521,6 +527,23 @@ mod tests {
         assert!(Asset::files(Vec::new(), vec![file("model", b"model")]).is_err());
         assert!(Asset::files(key(&[".staging", "model"]), vec![file("model", b"model")]).is_err());
         assert!(Asset::files(key(&["models", ".."]), vec![file("model", b"model")]).is_err());
+        for component in [
+            "less<than",
+            "greater>than",
+            "colon:name",
+            "quoted\"name",
+            "pipe|name",
+            "question?",
+            "star*name",
+            "nested/name",
+            "nested\\name",
+            "control\u{1f}",
+            "trailing.",
+            "trailing ",
+        ] {
+            assert!(Asset::file(key(&["models", component]), file("model", b"model")).is_err());
+            assert!(Asset::file(key(&["models", "model"]), file(component, b"model")).is_err());
+        }
         assert!(Asset::files(key(&["models", "model"]), Vec::new()).is_err());
         assert!(
             Asset::files(
