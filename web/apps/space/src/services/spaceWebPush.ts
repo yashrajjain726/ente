@@ -54,6 +54,22 @@ export const isSpaceWebPushSupported = () =>
     "PushManager" in window &&
     "indexedDB" in window;
 
+interface BraveNavigator extends Navigator {
+    brave?: { isBrave: () => Promise<boolean> };
+}
+
+export const isBravePushServiceError = async (error: unknown) => {
+    if (
+        !(error instanceof DOMException) ||
+        error.name != "AbortError" ||
+        !error.message.includes("push service error")
+    ) {
+        return false;
+    }
+    const brave = (navigator as BraveNavigator).brave;
+    return brave ? brave.isBrave() : false;
+};
+
 export const registerSpaceServiceWorker = async () => {
     if (typeof navigator == "undefined" || !("serviceWorker" in navigator)) {
         return undefined;

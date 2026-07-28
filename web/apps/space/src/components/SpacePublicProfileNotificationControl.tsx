@@ -17,6 +17,7 @@ import {
 import React from "react";
 import type { PublicSpaceLinkSession } from "services/space";
 import {
+    isBravePushServiceError,
     isSpaceWebPushSupported,
     reconcilePublicSpaceWebPush,
     subscribeToPublicSpaceWebPush,
@@ -45,6 +46,8 @@ export const SpacePublicProfileNotificationControl: React.FC<
     const [installInstructionsOpen, setInstallInstructionsOpen] =
         React.useState(false);
     const [permissionInstructionsOpen, setPermissionInstructionsOpen] =
+        React.useState(false);
+    const [needsBravePushMessaging, setNeedsBravePushMessaging] =
         React.useState(false);
     const route =
         typeof window == "undefined"
@@ -105,14 +108,19 @@ export const SpacePublicProfileNotificationControl: React.FC<
 
     const canShowNotifications =
         !requiresIOSInstall && isSpaceWebPushSupported();
-    const showNotificationAction =
+    const hasNotificationAction =
         canShowNotifications &&
         (updating.current ||
             (!busy && state != "subscribed" && state != "unavailable"));
-    const showInstallPrompt = requiresIOSInstall && installPrompt.shouldShow;
+    const hasInstallPrompt = requiresIOSInstall && installPrompt.shouldShow;
+    const instructionsOpen =
+        installInstructionsOpen || permissionInstructionsOpen;
+    const showNotificationAction = hasNotificationAction && !instructionsOpen;
+    const showInstallPrompt = hasInstallPrompt && !instructionsOpen;
 
     const enable = async () => {
         if (Notification.permission == "denied") {
+            setNeedsBravePushMessaging(false);
             setPermissionInstructionsOpen(true);
             return;
         }
@@ -121,6 +129,7 @@ export const SpacePublicProfileNotificationControl: React.FC<
             successTimer.current = undefined;
         }
         setSuccessState("hidden");
+        setNeedsBravePushMessaging(false);
         updating.current = true;
         setBusy(true);
         try {
@@ -143,7 +152,15 @@ export const SpacePublicProfileNotificationControl: React.FC<
                 setPermissionInstructionsOpen(true);
             }
         } catch (error) {
-            console.warn("Failed to update public Space notifications", error);
+            if (await isBravePushServiceError(error)) {
+                setNeedsBravePushMessaging(true);
+                setPermissionInstructionsOpen(true);
+            } else {
+                console.warn(
+                    "Failed to update public Space notifications",
+                    error,
+                );
+            }
             setState("recovery");
         } finally {
             updating.current = false;
@@ -191,8 +208,12 @@ export const SpacePublicProfileNotificationControl: React.FC<
                 }}
             />
             <SpaceNotificationPermissionInstructions
+                mode={needsBravePushMessaging ? "brave-push" : "permission"}
                 open={permissionInstructionsOpen}
-                onClose={() => setPermissionInstructionsOpen(false)}
+                onClose={() => {
+                    setPermissionInstructionsOpen(false);
+                    setNeedsBravePushMessaging(false);
+                }}
             />
         </>
     );

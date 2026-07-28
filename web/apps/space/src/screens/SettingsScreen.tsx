@@ -392,6 +392,12 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
         }
     };
 
+    React.useEffect(() => {
+        if (webPushPrompt.needsBravePushMessaging) {
+            setNotificationInstructionsOpen(true);
+        }
+    }, [webPushPrompt.needsBravePushMessaging]);
+
     return (
         <Box
             component="main"
@@ -587,8 +593,16 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                 onDismiss={() => setInstallInstructionsOpen(false)}
             />
             <SpaceNotificationPermissionInstructions
+                mode={
+                    webPushPrompt.needsBravePushMessaging
+                        ? "brave-push"
+                        : "permission"
+                }
                 open={notificationInstructionsOpen}
-                onClose={() => setNotificationInstructionsOpen(false)}
+                onClose={() => {
+                    setNotificationInstructionsOpen(false);
+                    webPushPrompt.clearBravePushMessagingError();
+                }}
             />
         </Box>
     );

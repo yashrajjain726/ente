@@ -11,6 +11,7 @@ import {
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Box, Dialog, useMediaQuery } from "@mui/material";
 import { SpaceBottomSheetTransition } from "components/SpaceBottomSheetTransition";
+import { SpaceNotificationPermissionInstructions } from "components/SpaceNotificationPermissionInstructions";
 import { useSpacePWAInstallPrompt } from "hooks/useSpacePWAInstallPrompt";
 import { useSpaceWebPushPrompt } from "hooks/useSpaceWebPushPrompt";
 import React from "react";
@@ -87,16 +88,28 @@ export const SpacePWAInstallPrompt: React.FC<SpacePWAInstallPromptProps> = ({
         webPushPrompt.shouldShow,
     ]);
 
-    const showWebPushPrompt =
+    const hasWebPushPrompt =
         enabled && claimedPrompt == "webPush" && webPushPrompt.shouldShow;
-    const showInstallPrompt =
+    const hasInstallPrompt =
         enabled && claimedPrompt == "install" && installPrompt.shouldShow;
+    const notificationInstructionsOpen = webPushPrompt.needsBravePushMessaging;
+    const showWebPushPrompt =
+        hasWebPushPrompt && !instructionsOpen && !notificationInstructionsOpen;
+    const showInstallPrompt =
+        hasInstallPrompt && !instructionsOpen && !notificationInstructionsOpen;
 
     React.useEffect(() => {
-        if (!showInstallPrompt) setInstructionsOpen(false);
-    }, [showInstallPrompt]);
+        if (!hasInstallPrompt) setInstructionsOpen(false);
+    }, [hasInstallPrompt]);
 
-    if (!showWebPushPrompt && !showInstallPrompt) return null;
+    if (
+        !showWebPushPrompt &&
+        !showInstallPrompt &&
+        !instructionsOpen &&
+        !notificationInstructionsOpen
+    ) {
+        return null;
+    }
 
     const addToHomeScreen = () => {
         if (installPrompt.mode == "native") {
@@ -129,7 +142,7 @@ export const SpacePWAInstallPrompt: React.FC<SpacePWAInstallPromptProps> = ({
                     onAction={() => void webPushPrompt.enable()}
                     onDismiss={webPushPrompt.dismiss}
                 />
-            ) : (
+            ) : showInstallPrompt ? (
                 <SpacePWAPromptBanner
                     actionLabel="Add"
                     dismissLabel="Close install prompt"
@@ -138,12 +151,17 @@ export const SpacePWAInstallPrompt: React.FC<SpacePWAInstallPromptProps> = ({
                     onAction={addToHomeScreen}
                     onDismiss={installPrompt.dismiss}
                 />
-            )}
+            ) : null}
             <SpacePWAInstallInstructions
                 mode={installPrompt.mode}
                 open={instructionsOpen}
                 onClose={closeInstructions}
                 onDismiss={dismissInstructions}
+            />
+            <SpaceNotificationPermissionInstructions
+                mode="brave-push"
+                open={notificationInstructionsOpen}
+                onClose={webPushPrompt.clearBravePushMessagingError}
             />
         </>
     );

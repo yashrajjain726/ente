@@ -1,6 +1,7 @@
 import { isSpaceIOS, isSpaceStandalone } from "hooks/useSpacePWAInstallPrompt";
 import React from "react";
 import {
+    isBravePushServiceError,
     isSpaceWebPushSupported,
     reconcileSpaceWebPush,
     subscribeToSpaceWebPush,
@@ -52,6 +53,8 @@ export const useSpaceWebPushPrompt = () => {
         null,
     );
     const [needsRecovery, setNeedsRecovery] = React.useState(false);
+    const [needsBravePushMessaging, setNeedsBravePushMessaging] =
+        React.useState(false);
     const [permissionDenied, setPermissionDenied] = React.useState(false);
     const [status, setStatus] = React.useState<PromptStatus>("loading");
 
@@ -118,6 +121,7 @@ export const useSpaceWebPushPrompt = () => {
 
     const enable = React.useCallback(async () => {
         updating.current = true;
+        setNeedsBravePushMessaging(false);
         setStatus("enabling");
         try {
             const permission = await subscribeToSpaceWebPush();
@@ -134,7 +138,11 @@ export const useSpaceWebPushPrompt = () => {
                 setStatus("hidden");
             }
         } catch (error) {
-            console.warn("Failed to enable Space notifications", error);
+            if (await isBravePushServiceError(error)) {
+                setNeedsBravePushMessaging(true);
+            } else {
+                console.warn("Failed to enable Space notifications", error);
+            }
             setStatus("error");
         } finally {
             updating.current = false;
@@ -158,12 +166,14 @@ export const useSpaceWebPushPrompt = () => {
     }, [dismiss]);
 
     return {
+        clearBravePushMessagingError: () => setNeedsBravePushMessaging(false),
         dismiss,
         enable,
         isAvailable,
         isEnabling: status == "enabling",
         isResolved: status != "loading",
         isSubscribed,
+        needsBravePushMessaging,
         needsRecovery,
         permissionDenied,
         shouldShow: status == "ready" || status == "error",
