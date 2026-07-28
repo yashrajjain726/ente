@@ -458,12 +458,7 @@ const analyzeImageOrThrow = async (req: MLWorkerAnalyzeImageRequest) => {
     try {
         return await analyzeImageOnce(native, req);
     } catch (e) {
-        const corruptModelPath = corruptModelPathFromError(e);
-        if (!corruptModelPath) throw e;
-        log.error(
-            `Rust ML reported a corrupt model at ${corruptModelPath}, redownloading and retrying`,
-        );
-        await evictModel(corruptModelPath);
+        if (!(await evictModelIfReportedCorrupt(e))) throw e;
         _preparedRuntimeKey = undefined;
         return await analyzeImageOnce(native, req);
     } finally {
@@ -534,6 +529,20 @@ const corruptModelPathFromError = (e: unknown) => {
     return corruptPath.startsWith(modelsDir) ? corruptPath : undefined;
 };
 
+/**
+ * If {@link e} is the addon's tagged "CorruptModel" error, evict the model it
+ * names so that its next use downloads a fresh copy, and return `true`.
+ */
+const evictModelIfReportedCorrupt = async (e: unknown) => {
+    const corruptModelPath = corruptModelPathFromError(e);
+    if (!corruptModelPath) return false;
+    log.error(
+        `Rust ML reported a corrupt model at ${corruptModelPath}, evicting it so that it gets redownloaded`,
+    );
+    await evictModel(corruptModelPath);
+    return true;
+};
+
 // Zero-copy view over the transferred bytes.
 const uint8ArrayToBuffer = (bytes: Uint8Array) =>
     Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength);
@@ -579,6 +588,11 @@ export const computeCLIPTextEmbeddingIfAvailable = async (text: string) => {
             `Rust ML CLIP text embedding took ${Date.now() - t} ms`,
         );
         return embedding;
+    } catch (e) {
+        // Don't block this query on the redownload; a subsequent query will
+        // pick up the fresh copy.
+        if (!(await evictModelIfReportedCorrupt(e))) throw e;
+        return undefined;
     } finally {
         logMLRuntimeEvents(native);
     }
