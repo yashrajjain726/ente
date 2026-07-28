@@ -51,20 +51,22 @@ extension SuperLogRecord on LogRecord {
         final e = error as DioException;
         final String? id = e.requestOptions.headers['x-request-id'] as String?;
         if (id != null) {
-          msg += "\n⤷ id: $id";
+          msg += "\n⤷ id: $id ";
         }
-        msg += "\n⤷ type: ${e.type}";
-        final statusCode = e.response?.statusCode;
-        if (statusCode != null) {
-          msg += "\n⤷ status: $statusCode";
-        } else if (e.response == null) {
-          final message = e.message;
-          if (message != null && message.isNotEmpty) {
-            msg += "\n⤷ message: $message";
+        final responseData = e.response?.data;
+        if (responseData != null) {
+          // Skip logging response data if it exceeds 100KB
+          final contentLength = int.tryParse(
+            e.response?.headers.value('content-length') ?? '',
+          );
+          if (contentLength != null && contentLength > 102400) {
+            msg +=
+                "\n⤷ type: ${e.type}\n⤷ error: [response too large: $contentLength bytes]";
+          } else {
+            msg += "\n⤷ type: ${e.type}\n⤷ error: $responseData";
           }
-          if (e.error != null) {
-            msg += "\n⤷ error: ${e.error}";
-          }
+        } else {
+          msg += "\n⤷ type: ${e.type}\n⤷ error: $error";
         }
       } else {
         msg += "\n⤷ type: ${error.runtimeType}\n⤷ error: $error";
