@@ -222,6 +222,7 @@
 /* Begin PBXShellScriptBuildPhase section */
 		CC142736A470612F436ECF8E /* Build Rust (ensu) */ = {
 			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
 			buildActionMask = 2147483647;
 			files = (
 			);

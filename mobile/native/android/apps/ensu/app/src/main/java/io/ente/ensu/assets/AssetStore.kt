@@ -17,10 +17,6 @@ import io.ente.ensu.bindings.reconcileKnowledgePack
 import io.ente.ensu.bindings.uniffiEnsureInitialized
 import java.io.File
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.withContext
 
 class AssetStore(context: Context) {
     private val appContext = context.applicationContext
@@ -73,44 +69,35 @@ class AssetStore(context: Context) {
     internal fun cleanupKnowledgeRevisions(stableId: String, activeIdentity: String) =
         cleanupObsoleteKnowledgePackRevisions(core, stableId, activeIdentity)
 
-    suspend fun estimateDownloadSize(asset: Asset): Long? = withContext(Dispatchers.IO) {
-        core.estimatedDownloadSize(asset)
-    }
+    suspend fun estimateDownloadSize(asset: Asset): Long? = core.estimatedDownloadSize(asset)
 
     suspend fun download(
         assets: List<Asset>,
         onProgress: (AssetDownloadProgress) -> Unit
-    ): Unit = withContext(Dispatchers.IO) {
-        if (assets.all { core.isDownloaded(it) }) return@withContext
+    ) {
+        if (assets.all { core.isDownloaded(it) }) return
 
         val token = CancellationToken()
         val lease = AssetDownloadJobService.begin { token.cancel() }
         try {
-            coroutineScope {
-                val download = async {
-                    core.download(
-                        assets,
-                        object : AssetDownloadCallback {
-                            override fun onProgress(progress: AssetDownloadProgress) {
-                                progress.logLine?.let { Log.i("AssetStore", it) }
-                                AssetDownloadJobService.update(
-                                    lease,
-                                    progress.percentage.toInt(),
-                                    progress.totalBytes == null
-                                )
-                                onProgress(progress)
-                            }
-                        },
-                        token
-                    )
-                }
-                try {
-                    download.await()
-                } catch (e: CancellationException) {
-                    token.cancel()
-                    throw e
-                }
-            }
+            core.download(
+                assets,
+                object : AssetDownloadCallback {
+                    override fun onProgress(progress: AssetDownloadProgress) {
+                        progress.logLine?.let { Log.i("AssetStore", it) }
+                        AssetDownloadJobService.update(
+                            lease,
+                            progress.percentage.toInt(),
+                            progress.totalBytes == null
+                        )
+                        onProgress(progress)
+                    }
+                },
+                token
+            )
+        } catch (e: CancellationException) {
+            token.cancel()
+            throw e
         } finally {
             AssetDownloadJobService.end(lease)
         }

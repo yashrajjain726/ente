@@ -81,9 +81,7 @@ final class AssetStore: @unchecked Sendable {
     }
 
     func estimateDownloadSize(_ asset: Asset) async -> Int64? {
-        await Task.detached(priority: .utility) { [core] in
-            core.estimatedDownloadSize(asset: asset)
-        }.value
+        await core.estimatedDownloadSize(asset: asset)
     }
 
     func download(
@@ -110,29 +108,23 @@ final class AssetStore: @unchecked Sendable {
             }
         }
 
-        let core = core
-        let downloadTask = Task.detached(priority: .utility) {
-            try Task.checkCancellation()
-            let callback = AssetDownloadCallbackSink { progress in
-                if let line = progress.logLine {
-                    logger.info(line)
-                }
-                if #available(iOS 26.0, *), let leaseId {
-                    AssetDownloadBackgroundTask.update(
-                        id: leaseId,
-                        downloadedBytes: progress.downloadedBytes,
-                        totalBytes: progress.totalBytes
-                    )
-                }
-                onProgress(progress)
+        let callback = AssetDownloadCallbackSink { progress in
+            if let line = progress.logLine {
+                logger.info(line)
             }
-            try core.download(assets: assets, callback: callback, cancellation: token)
+            if #available(iOS 26.0, *), let leaseId {
+                AssetDownloadBackgroundTask.update(
+                    id: leaseId,
+                    downloadedBytes: progress.downloadedBytes,
+                    totalBytes: progress.totalBytes
+                )
+            }
+            onProgress(progress)
         }
 
         try await withTaskCancellationHandler {
-            try await downloadTask.value
+            try await core.download(assets: assets, callback: callback, cancellation: token)
         } onCancel: {
-            downloadTask.cancel()
             token.cancel()
         }
         succeeded = true

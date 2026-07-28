@@ -1,5 +1,5 @@
 use std::path::PathBuf;
-use std::sync::{Arc, OnceLock};
+use std::sync::Arc;
 
 use ente_assets::download;
 use thiserror::Error;
@@ -97,11 +97,11 @@ impl From<ente_assets::AssetDownloadProgress> for AssetDownloadProgress {
         let display = ente_ensu::model::display_progress(&value);
         Self {
             label: value.asset_progress.label,
-            downloaded_bytes: i64::try_from(value.downloaded_bytes).unwrap_or(i64::MAX),
+            downloaded_bytes: i64::try_from(value.batch_downloaded_bytes).unwrap_or(i64::MAX),
             total_bytes: value
-                .total_bytes
+                .batch_total_bytes
                 .map(|total| i64::try_from(total).unwrap_or(i64::MAX)),
-            percentage: value.percentage,
+            percentage: value.batch_percentage,
             status: display.status,
             log_line: display.log_line,
         }
@@ -149,7 +149,6 @@ pub fn migrate_ensu_assets(assets_dir: String, legacy: LegacyAssets) -> Option<S
 #[derive(uniffi::Object)]
 pub struct AssetStoreCore {
     inner: ente_assets::AssetStore,
-    runtime: OnceLock<tokio::runtime::Runtime>,
 }
 
 #[uniffi::export]
@@ -158,7 +157,6 @@ impl AssetStoreCore {
     pub fn new(assets_dir: String) -> Arc<Self> {
         Arc::new(Self {
             inner: ente_assets::AssetStore::new(assets_dir),
-            runtime: OnceLock::new(),
         })
     }
 
@@ -186,25 +184,22 @@ impl AssetStoreCore {
         self.inner.is_downloaded(&asset.inner)
     }
 
-    pub fn estimated_download_size(&self, asset: Arc<Asset>) -> Option<i64> {
-        self.runtime()
-            .ok()?
-            .block_on(
-                self.inner
-                    .estimated_download_size(std::slice::from_ref(&asset.inner)),
-            )
+    #[uniffi::method(async_runtime = "tokio")]
+    pub async fn estimated_download_size(&self, asset: Arc<Asset>) -> Option<i64> {
+        self.inner
+            .estimated_download_size(std::slice::from_ref(&asset.inner))
+            .await
             .map(|size| i64::try_from(size).unwrap_or(i64::MAX))
     }
 
     pub fn remove_downloaded(&self, asset: Arc<Asset>) -> bool {
         let existed = self.inner.is_downloaded(&asset.inner);
-        let removed = self
-            .runtime()
-            .is_ok_and(|runtime| runtime.block_on(self.inner.remove(&asset.inner)).is_ok());
+        let removed = self.inner.remove(&asset.inner).is_ok();
         existed && removed
     }
 
-    pub fn download(
+    #[uniffi::method(async_runtime = "tokio")]
+    pub async fn download(
         &self,
         assets: Vec<Arc<Asset>>,
         callback: Box<dyn AssetDownloadCallback>,
@@ -214,32 +209,20 @@ impl AssetStoreCore {
             .into_iter()
             .map(|asset| asset.inner.clone())
             .collect::<Vec<_>>();
-        match self.runtime() {
-            Ok(runtime) => runtime
-                .block_on(self.inner.download(
-                    &assets,
-                    |progress| callback.on_progress(progress.into()),
-                    cancellation.inner.clone(),
-                ))
-                .map_err(AssetDownloadError::from),
-            Err(error) => Err(AssetDownloadError::from(error)),
-        }
+        self.inner
+            .download(
+                &assets,
+                |progress| callback.on_progress(progress.into()),
+                cancellation.inner.clone(),
+            )
+            .await
+            .map_err(AssetDownloadError::from)
     }
 }
 
 impl AssetStoreCore {
     pub(crate) fn store(&self) -> &ente_assets::AssetStore {
         &self.inner
-    }
-
-    pub(crate) fn runtime(&self) -> Result<&tokio::runtime::Runtime, ente_assets::download::Error> {
-        if let Some(runtime) = self.runtime.get() {
-            return Ok(runtime);
-        }
-        let runtime = tokio::runtime::Builder::new_multi_thread()
-            .enable_all()
-            .build()?;
-        Ok(self.runtime.get_or_init(|| runtime))
     }
 }
 

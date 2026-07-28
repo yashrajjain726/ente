@@ -78,16 +78,10 @@ pub struct Progress {
     pub downloaded_bytes: u64,
     pub total_bytes: Option<u64>,
     pub file_downloaded_bytes: u64,
-    pub file_total_bytes: Option<u64>,
-    pub percentage: f64,
-    pub elapsed_ms: u64,
-    pub bytes_per_second: f64,
     pub file_elapsed_ms: u64,
     pub file_bytes_per_second: f64,
-    pub retry_count: u32,
     pub file_retry_count: u32,
     pub file_complete: bool,
-    pub complete: bool,
 }
 
 #[derive(Default)]
@@ -265,13 +259,12 @@ async fn fetch_async(
         return Err(Error::Cancelled);
     }
 
-    let download_started_at = Instant::now();
     let mut download_probes = Vec::with_capacity(targets.len());
     let mut cached = Vec::with_capacity(targets.len());
 
     for target in &targets {
         let destination = &target.destination;
-        let is_cached = prepare_cached_download(target, destination);
+        let is_cached = prepare_cached_download(target, destination).await;
         cached.push(is_cached);
         if is_cached {
             download_probes.push(DownloadProbe {
@@ -316,7 +309,6 @@ async fn fetch_async(
         .collect::<Vec<_>>();
     emit_progress(
         ProgressPhase::Preparing,
-        Duration::ZERO,
         total_bytes,
         &file_states,
         &mut on_progress,
@@ -351,7 +343,6 @@ async fn fetch_async(
                         index,
                         complete: false,
                     },
-                    download_started_at.elapsed(),
                     total_bytes,
                     &file_states,
                     &mut on_progress,
@@ -382,7 +373,6 @@ async fn fetch_async(
                 index,
                 complete: true,
             },
-            download_started_at.elapsed(),
             total_bytes,
             &file_states,
             &mut on_progress,
@@ -390,7 +380,6 @@ async fn fetch_async(
     }
     emit_progress(
         ProgressPhase::Complete,
-        download_started_at.elapsed(),
         total_bytes,
         &file_states,
         &mut on_progress,
@@ -656,7 +645,7 @@ async fn download_file_single(
             continue;
         }
 
-        if let Err(err) = check_sha256(&tmp_path, &target.sha256, &target.label) {
+        if let Err(err) = check_sha256(&tmp_path, &target.sha256, &target.label).await {
             let _ = fs::remove_file(&tmp_path);
             let _ = fs::remove_file(&partial_metadata_path);
             return Err(err);
@@ -773,7 +762,7 @@ async fn download_file_ranged(
 
     emit_range_file_progress(total, file_started_at, &range_states, &on_progress);
 
-    if let Err(err) = check_sha256(&tmp_path, &target.sha256, &target.label) {
+    if let Err(err) = check_sha256(&tmp_path, &target.sha256, &target.label).await {
         let _ = fs::remove_file(&tmp_path);
         let _ = fs::remove_file(&range_metadata_path);
         return Err(err);
@@ -1301,7 +1290,6 @@ enum ProgressPhase<'a> {
 
 fn emit_progress<F: FnMut(Progress)>(
     phase: ProgressPhase,
-    elapsed: Duration,
     total_bytes: Option<u64>,
     file_states: &[FileProgress],
     on_progress: &mut F,
@@ -1310,14 +1298,6 @@ fn emit_progress<F: FnMut(Progress)>(
         .iter()
         .map(|state| state.downloaded_bytes)
         .sum::<u64>();
-    let network_downloaded_bytes = file_states
-        .iter()
-        .map(|state| state.network_downloaded_bytes)
-        .sum::<u64>();
-    let retry_count = file_states
-        .iter()
-        .map(|state| state.retry_count)
-        .fold(0u32, u32::saturating_add);
     let file_state = match &phase {
         ProgressPhase::File { index, .. } => file_states.get(*index).copied(),
         _ => None,
@@ -1333,40 +1313,27 @@ fn emit_progress<F: FnMut(Progress)>(
         }),
     };
 
-    let (label, file_complete, complete) = match phase {
-        ProgressPhase::Preparing => ("Preparing downloads", false, false),
+    let (label, file_complete) = match phase {
+        ProgressPhase::Preparing => ("Preparing downloads", false),
         ProgressPhase::File {
             label, complete, ..
-        } => (label, complete, false),
-        ProgressPhase::Complete => ("Complete", false, true),
+        } => (label, complete),
+        ProgressPhase::Complete => ("Complete", false),
     };
-    let percentage = total_bytes
-        .filter(|value| *value > 0)
-        .map(|total| ((downloaded_bytes as f64 / total as f64) * 100.0).clamp(0.0, 100.0))
-        .unwrap_or(0.0);
-    let (file_downloaded_bytes, file_total_bytes) = file_state
-        .map(|state| (state.downloaded_bytes, state.total_bytes))
-        .unwrap_or((0, None));
 
     on_progress(Progress {
         label: label.to_string(),
         downloaded_bytes,
         total_bytes,
-        file_downloaded_bytes,
-        file_total_bytes,
-        percentage,
-        elapsed_ms: duration_ms(elapsed),
-        bytes_per_second: bytes_per_second(network_downloaded_bytes, elapsed),
+        file_downloaded_bytes: file_state.map(|state| state.downloaded_bytes).unwrap_or(0),
         file_elapsed_ms: file_state
             .map(|state| duration_ms(state.elapsed))
             .unwrap_or(0),
         file_bytes_per_second: file_state
             .map(|state| bytes_per_second(state.network_downloaded_bytes, state.elapsed))
             .unwrap_or(0.0),
-        retry_count,
         file_retry_count: file_state.map(|state| state.retry_count).unwrap_or(0),
         file_complete,
-        complete,
     });
 }
 
@@ -1383,8 +1350,12 @@ fn bytes_per_second(bytes: u64, elapsed: Duration) -> f64 {
     }
 }
 
-fn prepare_cached_download(target: &DownloadTarget, destination: &Path) -> bool {
-    if !destination.exists() || check_sha256(destination, &target.sha256, &target.label).is_err() {
+async fn prepare_cached_download(target: &DownloadTarget, destination: &Path) -> bool {
+    if !destination.exists()
+        || check_sha256(destination, &target.sha256, &target.label)
+            .await
+            .is_err()
+    {
         return false;
     }
     cleanup_range_download(destination);
@@ -1439,7 +1410,16 @@ pub fn sha256_file(path: &Path) -> Result<String, Error> {
     Ok(hex)
 }
 
-fn check_sha256(path: &Path, expected: &str, label: &str) -> Result<(), Error> {
+async fn check_sha256(path: &Path, expected: &str, label: &str) -> Result<(), Error> {
+    let path = path.to_owned();
+    let expected = expected.to_owned();
+    let label = label.to_owned();
+    tokio::task::spawn_blocking(move || check_sha256_blocking(&path, &expected, &label))
+        .await
+        .map_err(|error| Error::Io(std::io::Error::other(error)))?
+}
+
+fn check_sha256_blocking(path: &Path, expected: &str, label: &str) -> Result<(), Error> {
     let actual = sha256_file(path)?;
     if actual != expected.trim().to_ascii_lowercase() {
         return Err(Error::Validation(format!(
@@ -2283,6 +2263,44 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn dropping_download_preserves_partial_without_installing() {
+        let bytes = Arc::new(sample_bytes(512));
+        let release = Arc::new(AtomicBool::new(false));
+        let server = {
+            let bytes = Arc::clone(&bytes);
+            let release = Arc::clone(&release);
+            TestServer::spawn(move |stream| {
+                handle_stalled_test_request(stream, Arc::clone(&bytes), Arc::clone(&release));
+            })
+        };
+        let test_dir = scratch_dir("drop-download");
+        let destination = test_dir.join("model.bin");
+        let tmp = tmp_path_for(&destination);
+        let target = DownloadTarget {
+            label: "Model".to_string(),
+            url: server.url("/model.bin"),
+            destination: destination.clone(),
+            sha256: sha_hex(&bytes),
+        };
+
+        let task = tokio::spawn(download(vec![target], |_| {}, false));
+        for _ in 0..10_000 {
+            if file_size(&tmp).unwrap_or(0) > 0 {
+                break;
+            }
+            tokio::task::yield_now().await;
+        }
+        task.abort();
+        release.store(true, Ordering::SeqCst);
+
+        assert!(task.await.unwrap_err().is_cancelled());
+        assert!(file_size(&tmp).unwrap_or(0) > 0);
+        assert!(!destination.exists());
+        assert!(partial_metadata_path_for(&destination).is_file());
+        let _ = fs::remove_dir_all(test_dir);
+    }
+
+    #[tokio::test]
     async fn cached_download_adoption_removes_stale_partials() {
         let test_dir = scratch_dir("cached-adoption");
         let destination = test_dir.join("model.bin");
@@ -2551,28 +2569,45 @@ mod tests {
         bytes: Arc<Vec<u8>>,
         get_count: Arc<AtomicUsize>,
     ) {
-        let mut reader = BufReader::new(stream.try_clone().expect("clone test stream"));
-        let mut request_line = String::new();
-        if reader.read_line(&mut request_line).is_err() {
+        let Some(request) = read_test_request(&stream) else {
             return;
-        }
-        loop {
-            let mut line = String::new();
-            if reader.read_line(&mut line).is_err() || line == "\r\n" || line.is_empty() {
-                break;
-            }
-        }
+        };
 
         let response = format!(
             "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
             bytes.len()
         );
         let _ = stream.write_all(response.as_bytes());
-        if request_line.starts_with("HEAD ") {
+        if request.line.starts_with("HEAD ") {
             return;
         }
         get_count.fetch_add(1, Ordering::SeqCst);
         let _ = stream.write_all(bytes.as_slice());
+    }
+
+    fn handle_stalled_test_request(
+        mut stream: TcpStream,
+        bytes: Arc<Vec<u8>>,
+        release: Arc<AtomicBool>,
+    ) {
+        let Some(request) = read_test_request(&stream) else {
+            return;
+        };
+        let response = format!(
+            "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nETag: \"test-etag\"\r\nConnection: close\r\n\r\n",
+            bytes.len()
+        );
+        let _ = stream.write_all(response.as_bytes());
+        if request.line.starts_with("HEAD ") {
+            return;
+        }
+        let midpoint = bytes.len() / 2;
+        let _ = stream.write_all(&bytes[..midpoint]);
+        let _ = stream.flush();
+        while !release.load(Ordering::SeqCst) {
+            thread::sleep(Duration::from_millis(1));
+        }
+        let _ = stream.write_all(&bytes[midpoint..]);
     }
 
     fn handle_range_test_request(
@@ -2582,29 +2617,11 @@ mod tests {
         range_get_count: Arc<AtomicUsize>,
         full_get_count: Arc<AtomicUsize>,
     ) {
-        let mut reader = BufReader::new(stream.try_clone().expect("clone test stream"));
-        let mut request_line = String::new();
-        if reader.read_line(&mut request_line).is_err() {
+        let Some(request) = read_test_request(&stream) else {
             return;
-        }
+        };
 
-        let mut range_header = None;
-        let mut if_range_header = None;
-        loop {
-            let mut line = String::new();
-            if reader.read_line(&mut line).is_err() || line == "\r\n" || line.is_empty() {
-                break;
-            }
-            if let Some((name, value)) = line.split_once(':') {
-                if name.eq_ignore_ascii_case("range") {
-                    range_header = Some(value.trim().to_string());
-                } else if name.eq_ignore_ascii_case("if-range") {
-                    if_range_header = Some(value.trim().to_string());
-                }
-            }
-        }
-
-        if request_line.starts_with("HEAD ") {
+        if request.line.starts_with("HEAD ") {
             head_count.fetch_add(1, Ordering::SeqCst);
             let response = format!(
                 "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nAccept-Ranges: bytes\r\nETag: \"test-etag\"\r\nConnection: close\r\n\r\n",
@@ -2614,10 +2631,11 @@ mod tests {
             return;
         }
 
-        let resume_allowed = if_range_header
+        let resume_allowed = request
+            .if_range
             .as_deref()
             .is_none_or(|value| value == "\"test-etag\"");
-        if let Some(range_header) = range_header.filter(|_| resume_allowed) {
+        if let Some(range_header) = request.range.filter(|_| resume_allowed) {
             let Some((start, end)) = parse_test_range_header(&range_header, bytes.len() as u64)
             else {
                 let _ = stream
@@ -2644,6 +2662,36 @@ mod tests {
             let _ = stream.write_all(response.as_bytes());
             let _ = stream.write_all(bytes.as_slice());
         }
+    }
+
+    struct TestRequest {
+        line: String,
+        range: Option<String>,
+        if_range: Option<String>,
+    }
+
+    fn read_test_request(stream: &TcpStream) -> Option<TestRequest> {
+        let mut reader = BufReader::new(stream.try_clone().ok()?);
+        let mut request = TestRequest {
+            line: String::new(),
+            range: None,
+            if_range: None,
+        };
+        reader.read_line(&mut request.line).ok()?;
+        loop {
+            let mut line = String::new();
+            if reader.read_line(&mut line).ok()? == 0 || line == "\r\n" {
+                break;
+            }
+            if let Some((name, value)) = line.split_once(':') {
+                if name.eq_ignore_ascii_case("range") {
+                    request.range = Some(value.trim().to_string());
+                } else if name.eq_ignore_ascii_case("if-range") {
+                    request.if_range = Some(value.trim().to_string());
+                }
+            }
+        }
+        Some(request)
     }
 
     fn parse_test_range_header(value: &str, total: u64) -> Option<(u64, u64)> {

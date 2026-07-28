@@ -309,17 +309,17 @@ pub async fn llm_download_model(
         .download(
             std::slice::from_ref(&asset),
             |progress| {
-                let progress = ente_ensu::model::display_progress(&progress);
-                if let Some(line) = &progress.log_line {
+                let display = ente_ensu::model::display_progress(&progress);
+                if let Some(line) = &display.log_line {
                     logging::log("LLMDownload", line.clone());
                 }
                 let _ = window.emit(
                     "llm-download-progress",
                     DownloadProgress {
-                        percent: progress.percent,
-                        status: progress.status,
-                        bytes_downloaded: progress.downloaded_bytes,
-                        total_bytes: progress.total_bytes,
+                        percent: (progress.batch_percentage as i32).clamp(0, 99),
+                        status: display.status,
+                        bytes_downloaded: progress.batch_downloaded_bytes,
+                        total_bytes: progress.batch_total_bytes,
                     },
                 );
             },

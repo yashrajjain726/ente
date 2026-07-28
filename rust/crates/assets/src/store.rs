@@ -35,10 +35,11 @@ pub struct AssetFile {
 
 #[derive(Debug, Clone)]
 pub struct AssetDownloadProgress {
+    pub asset_index: usize,
     pub asset_progress: Progress,
-    pub downloaded_bytes: u64,
-    pub total_bytes: Option<u64>,
-    pub percentage: f64,
+    pub batch_downloaded_bytes: u64,
+    pub batch_total_bytes: Option<u64>,
+    pub batch_percentage: f64,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -184,12 +185,12 @@ impl AssetStore {
         Ok(())
     }
 
-    pub async fn remove(&self, asset: &Asset) -> Result<(), AssetStoreError> {
-        let lock = self.asset_lock(asset)?;
-        let _guard = lock.try_lock().map_err(|_| AssetStoreError::Busy)?;
-        remove_path(&self.asset_dir(asset))?;
-        remove_path(&self.staging_dir(asset))?;
-        Ok(())
+    pub fn remove(&self, asset: &Asset) -> Result<(), AssetStoreError> {
+        self.remove_key(&asset.components)
+    }
+
+    pub fn remove_keys(&self, keys: &[Vec<String>]) -> Result<(), AssetStoreError> {
+        keys.iter().try_for_each(|key| self.remove_key(key))
     }
 
     async fn download_asset<F>(
@@ -219,8 +220,7 @@ impl AssetStore {
         self.downloader()?
             .download(
                 self.download_targets(asset),
-                |mut update| {
-                    update.complete = false;
+                |update| {
                     progress
                         .lock()
                         .expect("progress lock")
@@ -237,23 +237,33 @@ impl AssetStore {
     }
 
     fn asset_lock(&self, asset: &Asset) -> Result<Arc<Mutex<()>>, Error> {
+        self.key_lock(&asset.components)
+    }
+
+    fn key_lock(&self, components: &[String]) -> Result<Arc<Mutex<()>>, Error> {
         let mut locks = self.asset_locks.lock().expect("asset lock registry");
-        if let Some((key, lock)) = locks
-            .iter()
-            .find(|(key, _)| keys_overlap(key, &asset.components))
-        {
-            if *key == asset.components {
+        if let Some((key, lock)) = locks.iter().find(|(key, _)| keys_overlap(key, components)) {
+            if key == components {
                 return Ok(Arc::clone(lock));
             }
             return Err(Error::InvalidTarget(format!(
                 "asset keys {} and {} overlap",
                 key.join("/"),
-                asset.components.join("/")
+                components.join("/")
             )));
         }
         let lock = Arc::new(Mutex::new(()));
-        locks.insert(asset.components.clone(), Arc::clone(&lock));
+        locks.insert(components.to_vec(), Arc::clone(&lock));
         Ok(lock)
+    }
+
+    fn remove_key(&self, key: &[String]) -> Result<(), AssetStoreError> {
+        validate_components(key)?;
+        let lock = self.key_lock(key)?;
+        let _guard = lock.try_lock().map_err(|_| AssetStoreError::Busy)?;
+        remove_path(&join_components(&self.root, key))?;
+        remove_path(&join_components(&self.root.join(STAGING_DIR), key))?;
+        Ok(())
     }
 
     fn downloader(&self) -> Result<&Downloader, Error> {
@@ -388,17 +398,17 @@ where
     fn update(&mut self, asset_index: usize, asset_progress: Progress) {
         self.pending[asset_index] = false;
         self.assets[asset_index] = Some(asset_progress.clone());
-        self.emit(asset_progress);
+        self.emit(asset_index, asset_progress);
     }
 
-    fn emit(&mut self, asset_progress: Progress) {
-        let downloaded_bytes = self
+    fn emit(&mut self, asset_index: usize, asset_progress: Progress) {
+        let batch_downloaded_bytes = self
             .assets
             .iter()
             .flatten()
             .map(|progress| progress.downloaded_bytes)
             .sum();
-        let total_bytes = (!self.pending.iter().any(|pending| *pending))
+        let batch_total_bytes = (!self.pending.iter().any(|pending| *pending))
             .then(|| {
                 self.assets
                     .iter()
@@ -407,15 +417,16 @@ where
                     .try_fold(0u64, |total, value| total.checked_add(value?))
             })
             .flatten();
-        let percentage = total_bytes
+        let batch_percentage = batch_total_bytes
             .filter(|total| *total > 0)
-            .map(|total| ((downloaded_bytes as f64 / total as f64) * 100.0).clamp(0.0, 100.0))
+            .map(|total| ((batch_downloaded_bytes as f64 / total as f64) * 100.0).clamp(0.0, 100.0))
             .unwrap_or(0.0);
         (self.callback)(AssetDownloadProgress {
+            asset_index,
             asset_progress,
-            downloaded_bytes,
-            total_bytes,
-            percentage,
+            batch_downloaded_bytes,
+            batch_total_bytes,
+            batch_percentage,
         });
     }
 }
@@ -443,8 +454,14 @@ fn validate_component(component: &str) -> Result<(), Error> {
     if !component.is_empty()
         && component != "."
         && component != ".."
-        && !component.contains('/')
-        && !component.contains('\\')
+        && !component.ends_with([' ', '.'])
+        && !component.chars().any(|character| {
+            character.is_ascii_control()
+                || matches!(
+                    character,
+                    '<' | '>' | ':' | '"' | '/' | '\\' | '|' | '?' | '*'
+                )
+        })
     {
         return Ok(());
     }
@@ -514,7 +531,6 @@ mod tests {
             CancellationToken::default(),
         ));
         assert_send(store.estimated_download_size(std::slice::from_ref(&asset)));
-        assert_send(store.remove(&asset));
     }
 
     #[test]
@@ -522,6 +538,23 @@ mod tests {
         assert!(Asset::files(Vec::new(), vec![file("model", b"model")]).is_err());
         assert!(Asset::files(key(&[".staging", "model"]), vec![file("model", b"model")]).is_err());
         assert!(Asset::files(key(&["models", ".."]), vec![file("model", b"model")]).is_err());
+        for component in [
+            "less<than",
+            "greater>than",
+            "colon:name",
+            "quoted\"name",
+            "pipe|name",
+            "question?",
+            "star*name",
+            "nested/name",
+            "nested\\name",
+            "control\u{1f}",
+            "trailing.",
+            "trailing ",
+        ] {
+            assert!(Asset::file(key(&["models", component]), file("model", b"model")).is_err());
+            assert!(Asset::file(key(&["models", "model"]), file(component, b"model")).is_err());
+        }
         assert!(Asset::files(key(&["models", "model"]), Vec::new()).is_err());
         assert!(
             Asset::files(
@@ -577,15 +610,17 @@ mod tests {
         stage_files(&store, &first, &[("model", b"first")]);
         stage_files(&store, &second, &[("model", b"second")]);
         let mut latest_progress = None;
+        let mut asset_progress = [0, 0];
 
         store
             .download(
                 &[first.clone(), second.clone()],
                 |progress| {
+                    asset_progress[progress.asset_index] = progress.asset_progress.downloaded_bytes;
                     latest_progress = Some((
-                        progress.downloaded_bytes,
-                        progress.total_bytes,
-                        progress.percentage,
+                        progress.batch_downloaded_bytes,
+                        progress.batch_total_bytes,
+                        progress.batch_percentage,
                     ));
                 },
                 CancellationToken::default(),
@@ -595,6 +630,7 @@ mod tests {
 
         assert!(store.is_downloaded(&first));
         assert!(store.is_downloaded(&second));
+        assert_eq!(asset_progress, [5, 6]);
         assert_eq!(latest_progress, Some((11, Some(11), 100.0)));
         let _ = fs::remove_dir_all(root);
     }
@@ -640,10 +676,7 @@ mod tests {
         ));
         let lock = store.asset_lock(&asset).unwrap();
         let guard = lock.lock().await;
-        assert!(matches!(
-            store.remove(&asset).await,
-            Err(AssetStoreError::Busy)
-        ));
+        assert!(matches!(store.remove(&asset), Err(AssetStoreError::Busy)));
 
         let token = CancellationToken::new();
         let cancellation = token.clone();
@@ -787,7 +820,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn remove_deletes_published_and_staged_data() {
+    async fn remove_keys_deletes_published_and_staged_data() {
         let root = scratch_dir("remove");
         let store = AssetStore::new(&root);
         let asset =
@@ -799,10 +832,15 @@ mod tests {
         fs::create_dir_all(&staging).unwrap();
         fs::write(staging.join("model.onnx.tmp"), b"partial").unwrap();
 
-        store.remove(&asset).await.unwrap();
+        let keys = vec![key(&["models", "clip"])];
+        store.remove_keys(&keys).unwrap();
         assert!(!final_dir.exists());
         assert!(!staging.exists());
-        store.remove(&asset).await.unwrap();
+        store.remove_keys(&keys).unwrap();
+        assert!(matches!(
+            store.remove_keys(&[key(&[".."])]),
+            Err(AssetStoreError::Download(Error::InvalidTarget(_)))
+        ));
         let _ = fs::remove_dir_all(root);
     }
 
