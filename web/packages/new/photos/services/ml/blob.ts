@@ -1,4 +1,5 @@
 import { basename } from "ente-base/file-name";
+import log from "ente-base/log";
 import type { ElectronMLWorker } from "ente-base/types/ipc";
 import { renderableImageBlob } from "ente-gallery/services/convert";
 import { downloadManager } from "ente-gallery/services/download";
@@ -14,19 +15,18 @@ import { FileType } from "ente-media/file-type";
 import { decodeLivePhoto } from "ente-media/live-photo";
 
 /**
- * The image that should be indexed for a given file, either as a path on the
- * user's file system or as its (encoded, undecoded) contents.
+ * The encoded, undecoded image contents that should be indexed for a given
+ * file.
  *
  * The native side decodes all the formats we care about itself, so unlike
  * {@link fetchRenderableBlob} there is no JPEG conversion involved.
  */
-export type IndexableImageSource =
-    | { path: string; bytes?: undefined }
-    | { path?: undefined; bytes: Uint8Array };
+export interface IndexableImageSource {
+    bytes: Uint8Array;
+}
 
 /**
- * Return the original image contents (or its path on disk) for the native ML
- * pipeline to index.
+ * Return the original image contents for the native ML pipeline to index.
  *
  * - For images this is the original image itself: the local file when we're
  *   called during an upload from this client, otherwise the downloaded (and
@@ -62,11 +62,29 @@ export const fetchIndexableImageSource = async (
             electron.fsStatMtime,
         );
         if (uploadItem) {
-            // The native side can directly read (and decode) local files, so
-            // pass paths as paths; only zip entries need to be read by us.
-            if (typeof uploadItem == "string") return { path: uploadItem };
-            const blob = await readNonVideoUploadItem(uploadItem, electron);
-            return { bytes: new Uint8Array(await blob.arrayBuffer()) };
+            try {
+                const blob = await readNonVideoUploadItem(uploadItem, electron);
+                const bytes = new Uint8Array(await blob.arrayBuffer());
+
+                // Revalidate after stabilizing the bytes. Multiple files are
+                // fetched ahead of the serialized native analysis queue, so a
+                // path must not remain as a deferred reference to mutable file
+                // system contents. If it changed while we were reading it,
+                // fall through and use the uploaded remote original instead.
+                if (
+                    await fileSystemUploadItemIfUnchanged(
+                        puItem,
+                        electron.fsStatMtime,
+                    )
+                ) {
+                    return { bytes };
+                }
+            } catch (e) {
+                log.warn(
+                    "Could not read upload item for ML indexing; fetching the remote original",
+                    e,
+                );
+            }
         }
         // The file on disk has changed. Fetch it from remote instead.
     }
