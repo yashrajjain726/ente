@@ -1,6 +1,6 @@
 import type { ElectronMLWorker } from "ente-base/types/ipc";
 import { savedCLIPIndexes } from "./db";
-import { dotProduct, norm } from "./math";
+import { dotProduct } from "./math";
 import type { CLIPMatches } from "./worker-types";
 
 /**
@@ -84,11 +84,6 @@ export type LocalCLIPIndex = CLIPIndex & {
     fileID: number;
 };
 
-const normalized = (embedding: Float32Array) => {
-    const n = norm(embedding);
-    return embedding.map((v) => v / n);
-};
-
 /**
  * Find the files whose CLIP embedding "matches" the given {@link searchPhrase}.
  *
@@ -99,10 +94,10 @@ export const _clipMatches = async (
     searchPhrase: string,
     electron: ElectronMLWorker,
 ): Promise<CLIPMatches | undefined> => {
-    const t = await electron.computeCLIPTextEmbeddingIfAvailable(searchPhrase);
-    if (!t) return undefined;
-
-    const textEmbedding = normalized(t);
+    // The native pipeline returns the embedding already normalized.
+    const textEmbedding =
+        await electron.computeCLIPTextEmbeddingIfAvailable(searchPhrase);
+    if (!textEmbedding) return undefined;
     const items = (await cachedOrReadCLIPIndexes()).map(
         ({ fileID, embedding }) =>
             // The dot product gives us cosine similarity here since both the
