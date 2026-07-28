@@ -18,10 +18,7 @@ pub struct InvalidPreset {
     reason: String,
 }
 
-pub struct ModelDownloadProgress {
-    pub downloaded_bytes: u64,
-    pub total_bytes: Option<u64>,
-    pub percent: i32,
+pub struct ModelDownloadDisplay {
     pub status: String,
     pub log_line: Option<String>,
 }
@@ -123,19 +120,19 @@ pub(crate) fn trimmed(value: Option<&str>) -> Option<&str> {
     value.map(str::trim).filter(|value| !value.is_empty())
 }
 
-pub fn display_progress(progress: &AssetDownloadProgress) -> ModelDownloadProgress {
-    let total = progress.total_bytes.filter(|total| *total > 0);
-    let percent = total
-        .map(|total| ((progress.downloaded_bytes * 100 / total) as i32).clamp(0, 99))
-        .unwrap_or(0);
+pub fn display_progress(progress: &AssetDownloadProgress) -> ModelDownloadDisplay {
+    let total = progress.batch_total_bytes.filter(|total| *total > 0);
     let status = if let Some(total) = total {
         format!(
             "Downloading... {} / {}",
-            format_bytes(progress.downloaded_bytes),
+            format_bytes(progress.batch_downloaded_bytes),
             format_bytes(total)
         )
-    } else if progress.downloaded_bytes > 0 {
-        format!("Downloading... {}", format_bytes(progress.downloaded_bytes))
+    } else if progress.batch_downloaded_bytes > 0 {
+        format!(
+            "Downloading... {}",
+            format_bytes(progress.batch_downloaded_bytes)
+        )
     } else {
         "Downloading...".to_string()
     };
@@ -153,13 +150,7 @@ pub fn display_progress(progress: &AssetDownloadProgress) -> ModelDownloadProgre
         None
     };
 
-    ModelDownloadProgress {
-        downloaded_bytes: progress.downloaded_bytes,
-        total_bytes: progress.total_bytes,
-        percent,
-        status,
-        log_line,
-    }
+    ModelDownloadDisplay { status, log_line }
 }
 
 fn invalid_preset(preset: &ModelPreset, reason: impl Into<String>) -> InvalidPreset {

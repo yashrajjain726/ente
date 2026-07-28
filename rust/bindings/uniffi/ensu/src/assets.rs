@@ -97,11 +97,11 @@ impl From<ente_assets::AssetDownloadProgress> for AssetDownloadProgress {
         let display = ente_ensu::model::display_progress(&value);
         Self {
             label: value.asset_progress.label,
-            downloaded_bytes: i64::try_from(value.downloaded_bytes).unwrap_or(i64::MAX),
+            downloaded_bytes: i64::try_from(value.batch_downloaded_bytes).unwrap_or(i64::MAX),
             total_bytes: value
-                .total_bytes
+                .batch_total_bytes
                 .map(|total| i64::try_from(total).unwrap_or(i64::MAX)),
-            percentage: value.percentage,
+            percentage: value.batch_percentage,
             status: display.status,
             log_line: display.log_line,
         }

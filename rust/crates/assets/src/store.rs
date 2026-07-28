@@ -35,10 +35,11 @@ pub struct AssetFile {
 
 #[derive(Debug, Clone)]
 pub struct AssetDownloadProgress {
+    pub asset_index: usize,
     pub asset_progress: Progress,
-    pub downloaded_bytes: u64,
-    pub total_bytes: Option<u64>,
-    pub percentage: f64,
+    pub batch_downloaded_bytes: u64,
+    pub batch_total_bytes: Option<u64>,
+    pub batch_percentage: f64,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -219,8 +220,7 @@ impl AssetStore {
         self.downloader()?
             .download(
                 self.download_targets(asset),
-                |mut update| {
-                    update.complete = false;
+                |update| {
                     progress
                         .lock()
                         .expect("progress lock")
@@ -388,17 +388,17 @@ where
     fn update(&mut self, asset_index: usize, asset_progress: Progress) {
         self.pending[asset_index] = false;
         self.assets[asset_index] = Some(asset_progress.clone());
-        self.emit(asset_progress);
+        self.emit(asset_index, asset_progress);
     }
 
-    fn emit(&mut self, asset_progress: Progress) {
-        let downloaded_bytes = self
+    fn emit(&mut self, asset_index: usize, asset_progress: Progress) {
+        let batch_downloaded_bytes = self
             .assets
             .iter()
             .flatten()
             .map(|progress| progress.downloaded_bytes)
             .sum();
-        let total_bytes = (!self.pending.iter().any(|pending| *pending))
+        let batch_total_bytes = (!self.pending.iter().any(|pending| *pending))
             .then(|| {
                 self.assets
                     .iter()
@@ -407,15 +407,16 @@ where
                     .try_fold(0u64, |total, value| total.checked_add(value?))
             })
             .flatten();
-        let percentage = total_bytes
+        let batch_percentage = batch_total_bytes
             .filter(|total| *total > 0)
-            .map(|total| ((downloaded_bytes as f64 / total as f64) * 100.0).clamp(0.0, 100.0))
+            .map(|total| ((batch_downloaded_bytes as f64 / total as f64) * 100.0).clamp(0.0, 100.0))
             .unwrap_or(0.0);
         (self.callback)(AssetDownloadProgress {
+            asset_index,
             asset_progress,
-            downloaded_bytes,
-            total_bytes,
-            percentage,
+            batch_downloaded_bytes,
+            batch_total_bytes,
+            batch_percentage,
         });
     }
 }
@@ -599,15 +600,17 @@ mod tests {
         stage_files(&store, &first, &[("model", b"first")]);
         stage_files(&store, &second, &[("model", b"second")]);
         let mut latest_progress = None;
+        let mut asset_progress = [0, 0];
 
         store
             .download(
                 &[first.clone(), second.clone()],
                 |progress| {
+                    asset_progress[progress.asset_index] = progress.asset_progress.downloaded_bytes;
                     latest_progress = Some((
-                        progress.downloaded_bytes,
-                        progress.total_bytes,
-                        progress.percentage,
+                        progress.batch_downloaded_bytes,
+                        progress.batch_total_bytes,
+                        progress.batch_percentage,
                     ));
                 },
                 CancellationToken::default(),
@@ -617,6 +620,7 @@ mod tests {
 
         assert!(store.is_downloaded(&first));
         assert!(store.is_downloaded(&second));
+        assert_eq!(asset_progress, [5, 6]);
         assert_eq!(latest_progress, Some((11, Some(11), 100.0)));
         let _ = fs::remove_dir_all(root);
     }

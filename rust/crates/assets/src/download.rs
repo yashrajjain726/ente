@@ -78,16 +78,10 @@ pub struct Progress {
     pub downloaded_bytes: u64,
     pub total_bytes: Option<u64>,
     pub file_downloaded_bytes: u64,
-    pub file_total_bytes: Option<u64>,
-    pub percentage: f64,
-    pub elapsed_ms: u64,
-    pub bytes_per_second: f64,
     pub file_elapsed_ms: u64,
     pub file_bytes_per_second: f64,
-    pub retry_count: u32,
     pub file_retry_count: u32,
     pub file_complete: bool,
-    pub complete: bool,
 }
 
 #[derive(Default)]
@@ -265,7 +259,6 @@ async fn fetch_async(
         return Err(Error::Cancelled);
     }
 
-    let download_started_at = Instant::now();
     let mut download_probes = Vec::with_capacity(targets.len());
     let mut cached = Vec::with_capacity(targets.len());
 
@@ -316,7 +309,6 @@ async fn fetch_async(
         .collect::<Vec<_>>();
     emit_progress(
         ProgressPhase::Preparing,
-        Duration::ZERO,
         total_bytes,
         &file_states,
         &mut on_progress,
@@ -351,7 +343,6 @@ async fn fetch_async(
                         index,
                         complete: false,
                     },
-                    download_started_at.elapsed(),
                     total_bytes,
                     &file_states,
                     &mut on_progress,
@@ -382,7 +373,6 @@ async fn fetch_async(
                 index,
                 complete: true,
             },
-            download_started_at.elapsed(),
             total_bytes,
             &file_states,
             &mut on_progress,
@@ -390,7 +380,6 @@ async fn fetch_async(
     }
     emit_progress(
         ProgressPhase::Complete,
-        download_started_at.elapsed(),
         total_bytes,
         &file_states,
         &mut on_progress,
@@ -1301,7 +1290,6 @@ enum ProgressPhase<'a> {
 
 fn emit_progress<F: FnMut(Progress)>(
     phase: ProgressPhase,
-    elapsed: Duration,
     total_bytes: Option<u64>,
     file_states: &[FileProgress],
     on_progress: &mut F,
@@ -1310,14 +1298,6 @@ fn emit_progress<F: FnMut(Progress)>(
         .iter()
         .map(|state| state.downloaded_bytes)
         .sum::<u64>();
-    let network_downloaded_bytes = file_states
-        .iter()
-        .map(|state| state.network_downloaded_bytes)
-        .sum::<u64>();
-    let retry_count = file_states
-        .iter()
-        .map(|state| state.retry_count)
-        .fold(0u32, u32::saturating_add);
     let file_state = match &phase {
         ProgressPhase::File { index, .. } => file_states.get(*index).copied(),
         _ => None,
@@ -1333,40 +1313,27 @@ fn emit_progress<F: FnMut(Progress)>(
         }),
     };
 
-    let (label, file_complete, complete) = match phase {
-        ProgressPhase::Preparing => ("Preparing downloads", false, false),
+    let (label, file_complete) = match phase {
+        ProgressPhase::Preparing => ("Preparing downloads", false),
         ProgressPhase::File {
             label, complete, ..
-        } => (label, complete, false),
-        ProgressPhase::Complete => ("Complete", false, true),
+        } => (label, complete),
+        ProgressPhase::Complete => ("Complete", false),
     };
-    let percentage = total_bytes
-        .filter(|value| *value > 0)
-        .map(|total| ((downloaded_bytes as f64 / total as f64) * 100.0).clamp(0.0, 100.0))
-        .unwrap_or(0.0);
-    let (file_downloaded_bytes, file_total_bytes) = file_state
-        .map(|state| (state.downloaded_bytes, state.total_bytes))
-        .unwrap_or((0, None));
 
     on_progress(Progress {
         label: label.to_string(),
         downloaded_bytes,
         total_bytes,
-        file_downloaded_bytes,
-        file_total_bytes,
-        percentage,
-        elapsed_ms: duration_ms(elapsed),
-        bytes_per_second: bytes_per_second(network_downloaded_bytes, elapsed),
+        file_downloaded_bytes: file_state.map(|state| state.downloaded_bytes).unwrap_or(0),
         file_elapsed_ms: file_state
             .map(|state| duration_ms(state.elapsed))
             .unwrap_or(0),
         file_bytes_per_second: file_state
             .map(|state| bytes_per_second(state.network_downloaded_bytes, state.elapsed))
             .unwrap_or(0.0),
-        retry_count,
         file_retry_count: file_state.map(|state| state.retry_count).unwrap_or(0),
         file_complete,
-        complete,
     });
 }
 
