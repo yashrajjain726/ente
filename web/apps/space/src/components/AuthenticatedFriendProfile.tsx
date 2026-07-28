@@ -188,7 +188,9 @@ export const AuthenticatedFriendProfile: React.FC<
                     });
                 }}
                 onUnfriend={unfriend}
-                onUnfriendComplete={() => window.location.reload()}
+                onUnfriendComplete={() =>
+                    window.location.replace(spaceRoutes.friends)
+                }
                 postGroups={postGroups}
                 profile={displayedProfile}
                 showPostLoadingIndicator={false}
