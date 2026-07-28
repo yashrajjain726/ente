@@ -59,22 +59,20 @@ const rustTriple = (platform, arch) => {
 };
 
 /**
- * Build the addon for the given platform-arch into `rust-bindings/` if it is
- * not already there.
+ * Build the addon for the given platform-arch into `rust-bindings/`.
  *
- * For the host architecture this is equivalent to (and no-ops after) the
- * `cargo codegen napi` that postinstall runs.
+ * The build always runs so that edits to the Rust sources cannot be missed
+ * when packaging; cargo's incremental compilation makes this cheap when
+ * nothing has changed. For the host architecture we omit `--target` so that
+ * the build shares the cargo cache of the `cargo codegen napi` that
+ * postinstall runs (which also omits it).
  */
-const buildAddonIfNeeded = async (appDir, platform, arch) => {
+const buildAddon = async (appDir, platform, arch) => {
     const addonPath = path.join(
         appDir,
         "rust-bindings",
         `index.${napiTriple(platform, arch)}.node`,
     );
-    try {
-        await fsp.access(addonPath);
-        return addonPath;
-    } catch {}
 
     const cmd = [
         "npm exec -- napi build",
@@ -83,11 +81,14 @@ const buildAddonIfNeeded = async (appDir, platform, arch) => {
         "--release --strip --platform --no-js",
         "--dts index.d.ts",
         "--output-dir rust-bindings",
-        `--target ${rustTriple(platform, arch)}`,
-        // Cross-compiling for the other Linux architecture needs a gcc cross
-        // toolchain; let napi-cli download its prebuilt one.
-        ...(platform == "linux" && arch != process.arch
-            ? ["--use-napi-cross"]
+        ...(arch != process.arch
+            ? [
+                  `--target ${rustTriple(platform, arch)}`,
+                  // Cross-compiling for the other Linux architecture needs a
+                  // gcc cross toolchain; let napi-cli download its prebuilt
+                  // one.
+                  ...(platform == "linux" ? ["--use-napi-cross"] : []),
+              ]
             : []),
     ].join(" ");
     console.log(`> ${cmd}`);
@@ -111,7 +112,7 @@ const stageMLAddons = async (appDir, platform, arch) => {
 
     const wanted = [];
     for (const a of arches) {
-        const addonPath = await buildAddonIfNeeded(appDir, platform, a);
+        const addonPath = await buildAddon(appDir, platform, a);
         wanted.push(path.basename(addonPath));
         await fsp.copyFile(
             addonPath,
