@@ -184,7 +184,7 @@ impl AssetStore {
         Ok(())
     }
 
-    pub async fn remove(&self, asset: &Asset) -> Result<(), AssetStoreError> {
+    pub fn remove(&self, asset: &Asset) -> Result<(), AssetStoreError> {
         let lock = self.asset_lock(asset)?;
         let _guard = lock.try_lock().map_err(|_| AssetStoreError::Busy)?;
         remove_path(&self.asset_dir(asset))?;
@@ -514,7 +514,6 @@ mod tests {
             CancellationToken::default(),
         ));
         assert_send(store.estimated_download_size(std::slice::from_ref(&asset)));
-        assert_send(store.remove(&asset));
     }
 
     #[test]
@@ -640,10 +639,7 @@ mod tests {
         ));
         let lock = store.asset_lock(&asset).unwrap();
         let guard = lock.lock().await;
-        assert!(matches!(
-            store.remove(&asset).await,
-            Err(AssetStoreError::Busy)
-        ));
+        assert!(matches!(store.remove(&asset), Err(AssetStoreError::Busy)));
 
         let token = CancellationToken::new();
         let cancellation = token.clone();
@@ -799,10 +795,10 @@ mod tests {
         fs::create_dir_all(&staging).unwrap();
         fs::write(staging.join("model.onnx.tmp"), b"partial").unwrap();
 
-        store.remove(&asset).await.unwrap();
+        store.remove(&asset).unwrap();
         assert!(!final_dir.exists());
         assert!(!staging.exists());
-        store.remove(&asset).await.unwrap();
+        store.remove(&asset).unwrap();
         let _ = fs::remove_dir_all(root);
     }
 

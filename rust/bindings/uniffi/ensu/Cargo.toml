@@ -10,6 +10,5 @@ crate-type = ["staticlib", "cdylib"]
 ente-assets.workspace = true
 ente-ensu = { workspace = true, features = ["transcription"] }
 thiserror.workspace = true
-tokio = { version = "1", features = ["rt-multi-thread"] }
-uniffi.workspace = true
+uniffi = { workspace = true, features = ["tokio"] }
 uuid = { version = "1" }
