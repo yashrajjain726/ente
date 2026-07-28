@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, sync::Mutex};
 
 use ente_core::{
     b64,
@@ -6,7 +6,9 @@ use ente_core::{
     http::Api,
 };
 
-use super::{AccountSpaceCtx, build_api, build_space_key_history_map, decrypt_space_profile};
+use super::{
+    AccountSpaceCtx, build_api, build_space_key_history_map, cache_lock, decrypt_space_profile,
+};
 use crate::{
     crypto::{decrypt_asset_payload, decrypt_secretbox_payload, encrypt_secretbox_payload},
     error::{Result, SpaceError},
@@ -30,13 +32,25 @@ struct DerivedLinkKeys {
     wrap: Vec<u8>,
 }
 
+struct SpaceLinkSnapshot {
+    profile: DecryptedSpaceProfile,
+    posts: i64,
+    key_history: BTreeMap<i32, Vec<u8>>,
+}
+
+pub(crate) struct SpaceLinkKeyRotation {
+    pub(crate) expected_link_id: i64,
+    pub(crate) encrypted_space_key: Option<String>,
+}
+
 pub struct SpaceLinkCtx {
     api: Api,
     space_slug: String,
     auth_key: String,
+    wrap_key: Vec<u8>,
     profile: DecryptedSpaceProfile,
     posts: i64,
-    key_history: BTreeMap<i32, Vec<u8>>,
+    key_history: Mutex<BTreeMap<i32, Vec<u8>>>,
 }
 
 impl AccountSpaceCtx {
@@ -56,10 +70,18 @@ impl AccountSpaceCtx {
         &self,
         space_id: &str,
         next_space_key: &[u8],
-    ) -> Result<Option<String>> {
+    ) -> Result<SpaceLinkKeyRotation> {
         let status = self.get_space_link_status(space_id).await?;
         if !status.active {
-            return Ok(None);
+            return Ok(SpaceLinkKeyRotation {
+                expected_link_id: 0,
+                encrypted_space_key: None,
+            });
+        }
+        if status.link_id <= 0 {
+            return Err(SpaceError::InvalidInput(
+                "active space link is missing its ID".into(),
+            ));
         }
         let access_key = self.decrypt_link_access_key(&status)?;
         let keys = derive_link_keys(
@@ -68,10 +90,13 @@ impl AccountSpaceCtx {
             status.kdf_mem_limit,
             status.kdf_ops_limit,
         )?;
-        Ok(Some(b64::encode(&encrypt_secretbox_payload(
-            &keys.wrap,
-            next_space_key,
-        )?)))
+        Ok(SpaceLinkKeyRotation {
+            expected_link_id: status.link_id,
+            encrypted_space_key: Some(b64::encode(&encrypt_secretbox_payload(
+                &keys.wrap,
+                next_space_key,
+            )?)),
+        })
     }
 
     async fn get_space_link_status(&self, space_id: &str) -> Result<SpaceLinkStatusResponse> {
@@ -190,42 +215,15 @@ impl SpaceLinkCtx {
             bootstrap.kdf_ops_limit,
         )?;
         let auth_key = b64::encode(&keys.auth);
-        let fetch_profile = async {
-            Ok::<SpaceLinkProfileResponse, SpaceError>(
-                api.get(&format!("{prefix}/profile"))
-                    .header(AUTH_HEADER, &auth_key)
-                    .send()
-                    .await?
-                    .error_for_status()?
-                    .json()
-                    .await?,
-            )
-        };
-        let fetch_versions = async {
-            Ok::<Vec<SpaceKeyVersionResponse>, SpaceError>(
-                api.get(&format!("{prefix}/versions"))
-                    .header(AUTH_HEADER, &auth_key)
-                    .send()
-                    .await?
-                    .error_for_status()?
-                    .json()
-                    .await?,
-            )
-        };
-        let (profile_response, versions): (SpaceLinkProfileResponse, Vec<SpaceKeyVersionResponse>) =
-            futures_util::try_join!(fetch_profile, fetch_versions)?;
-        let encrypted_space_key = b64::decode(&profile_response.encrypted_space_key)?;
-        let space_key = decrypt_secretbox_payload(&keys.wrap, &encrypted_space_key)?;
-        let profile = decrypt_space_profile(&profile_response.profile, &space_key)?;
-        let key_history =
-            build_space_key_history_map(profile_response.key_version, &space_key, &versions)?;
+        let snapshot = fetch_link_snapshot(&api, &prefix, &auth_key, &keys.wrap).await?;
         Ok(Self {
             api,
             space_slug,
             auth_key,
-            profile,
-            posts: profile_response.posts,
-            key_history,
+            wrap_key: keys.wrap,
+            profile: snapshot.profile,
+            posts: snapshot.posts,
+            key_history: Mutex::new(snapshot.key_history),
         })
     }
 
@@ -238,7 +236,7 @@ impl SpaceLinkCtx {
     }
 
     pub async fn list_posts(&self) -> Result<PostPage> {
-        Ok(self
+        let page: PostPage = self
             .api
             .get(&format!("{}/posts", self.prefix()))
             .header(AUTH_HEADER, &self.auth_key)
@@ -246,16 +244,25 @@ impl SpaceLinkCtx {
             .await?
             .error_for_status()?
             .json()
-            .await?)
+            .await?;
+        if !self.has_keys_for_posts(&page)? {
+            let snapshot =
+                fetch_link_snapshot(&self.api, &self.prefix(), &self.auth_key, &self.wrap_key)
+                    .await?;
+            *cache_lock(&self.key_history, "space link key history")? = snapshot.key_history;
+        }
+        if !self.has_keys_for_posts(&page)? {
+            return Err(SpaceError::InvalidInput(
+                "space link changed while posts were being loaded".into(),
+            ));
+        }
+        Ok(page)
     }
 
     pub fn decrypt_post(&self, post: &PostResponse) -> Result<DecryptedPost> {
-        let space_key = self
-            .key_history
-            .get(&post.key_version)
-            .ok_or_else(|| SpaceError::InvalidInput("missing space key for post".into()))?;
+        let space_key = self.space_key(post.key_version, "post")?;
         let post_key =
-            decrypt_secretbox_payload(space_key, &b64::decode(&post.encrypted_post_key)?)?;
+            decrypt_secretbox_payload(&space_key, &b64::decode(&post.encrypted_post_key)?)?;
         let caption_plaintext = if post.caption_cipher.is_empty() {
             None
         } else {
@@ -276,11 +283,8 @@ impl SpaceLinkCtx {
         key_version: i32,
         object_key: &str,
     ) -> Result<Vec<u8>> {
-        let space_key = self
-            .key_history
-            .get(&key_version)
-            .ok_or_else(|| SpaceError::InvalidInput("missing space key for post".into()))?;
-        let post_key = decrypt_secretbox_payload(space_key, &b64::decode(encrypted_post_key)?)?;
+        let space_key = self.space_key(key_version, "post")?;
+        let post_key = decrypt_secretbox_payload(&space_key, &b64::decode(encrypted_post_key)?)?;
         self.download_asset(vec![("objectKey", object_key.to_owned())], &post_key)
             .await
     }
@@ -291,16 +295,13 @@ impl SpaceLinkCtx {
         object_id: &str,
         key_version: i32,
     ) -> Result<Vec<u8>> {
-        let space_key = self
-            .key_history
-            .get(&key_version)
-            .ok_or_else(|| SpaceError::InvalidInput("missing space key for profile".into()))?;
+        let space_key = self.space_key(key_version, "profile")?;
         self.download_asset(
             vec![
                 ("assetType", asset_type.to_owned()),
                 ("objectID", object_id.to_owned()),
             ],
-            space_key,
+            &space_key,
         )
         .await
     }
@@ -331,6 +332,72 @@ impl SpaceLinkCtx {
     fn prefix(&self) -> String {
         format!("/space/public/by-slug/{}/link", self.space_slug)
     }
+
+    fn has_keys_for_posts(&self, page: &PostPage) -> Result<bool> {
+        let key_history = cache_lock(&self.key_history, "space link key history")?;
+        Ok(page
+            .items
+            .iter()
+            .all(|post| key_history.contains_key(&post.key_version)))
+    }
+
+    fn space_key(&self, key_version: i32, subject: &str) -> Result<Vec<u8>> {
+        cache_lock(&self.key_history, "space link key history")?
+            .get(&key_version)
+            .cloned()
+            .ok_or_else(|| SpaceError::InvalidInput(format!("missing space key for {subject}")))
+    }
+}
+
+async fn fetch_link_snapshot(
+    api: &Api,
+    prefix: &str,
+    auth_key: &str,
+    wrap_key: &[u8],
+) -> Result<SpaceLinkSnapshot> {
+    for _ in 0..2 {
+        let fetch_profile = async {
+            Ok::<SpaceLinkProfileResponse, SpaceError>(
+                api.get(&format!("{prefix}/profile"))
+                    .header(AUTH_HEADER, auth_key)
+                    .send()
+                    .await?
+                    .error_for_status()?
+                    .json()
+                    .await?,
+            )
+        };
+        let fetch_versions = async {
+            Ok::<Vec<SpaceKeyVersionResponse>, SpaceError>(
+                api.get(&format!("{prefix}/versions"))
+                    .header(AUTH_HEADER, auth_key)
+                    .send()
+                    .await?
+                    .error_for_status()?
+                    .json()
+                    .await?,
+            )
+        };
+        let (profile_response, versions) = futures_util::try_join!(fetch_profile, fetch_versions)?;
+        let current_version = profile_response.key_version;
+        let versions_current =
+            versions.iter().map(|version| version.version).max() == Some(current_version);
+        if profile_response.profile.version != current_version || !versions_current {
+            continue;
+        }
+        let encrypted_space_key = b64::decode(&profile_response.encrypted_space_key)?;
+        let space_key = decrypt_secretbox_payload(wrap_key, &encrypted_space_key)?;
+        let profile = decrypt_space_profile(&profile_response.profile, &space_key)?;
+        let key_history = build_space_key_history_map(current_version, &space_key, &versions)?;
+        return Ok(SpaceLinkSnapshot {
+            profile,
+            posts: profile_response.posts,
+            key_history,
+        });
+    }
+    Err(SpaceError::InvalidInput(
+        "space link changed while it was being opened".into(),
+    ))
 }
 
 fn validate_access_key(access_key: &str) -> Result<()> {

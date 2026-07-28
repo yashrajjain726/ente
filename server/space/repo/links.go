@@ -11,6 +11,7 @@ import (
 
 var (
 	ErrSpaceLinkSecretReused = errors.New("space link secret reused")
+	ErrSpaceLinkStateChanged = errors.New("space link state changed")
 )
 
 func isSpaceLinkUniqueViolation(err error, constraint string) bool {
@@ -20,9 +21,8 @@ func isSpaceLinkUniqueViolation(err error, constraint string) bool {
 		pgErr.Constraint == constraint
 }
 
-func scanSpaceLink(scanner interface{ Scan(dest ...any) error }) (*SpaceLinkRecord, error) {
-	var rec SpaceLinkRecord
-	if err := scanner.Scan(
+func spaceLinkScanDest(rec *SpaceLinkRecord) []any {
+	return []any{
 		&rec.LinkID,
 		&rec.SpaceID,
 		&rec.SpaceSlug,
@@ -36,17 +36,26 @@ func scanSpaceLink(scanner interface{ Scan(dest ...any) error }) (*SpaceLinkReco
 		&rec.Active,
 		&rec.CreatedAt,
 		&rec.UpdatedAt,
-	); err != nil {
+	}
+}
+
+func scanSpaceLink(scanner interface{ Scan(dest ...any) error }) (*SpaceLinkRecord, error) {
+	var rec SpaceLinkRecord
+	if err := scanner.Scan(spaceLinkScanDest(&rec)...); err != nil {
 		return nil, stacktrace.Propagate(err, "")
 	}
 	return &rec, nil
 }
 
+const spaceLinkSelectColumns = `
+	l.link_id, l.space_id, s.space_slug, l.auth_key_hash,
+	l.kdf_salt, l.kdf_mem_limit, l.kdf_ops_limit, l.key_version,
+	l.encrypted_space_key, l.encrypted_access_key, l.active,
+	l.created_at, l.updated_at
+`
+
 const spaceLinkSelect = `
-	SELECT l.link_id, l.space_id, s.space_slug, l.auth_key_hash,
-	       l.kdf_salt, l.kdf_mem_limit, l.kdf_ops_limit, l.key_version,
-	       l.encrypted_space_key, l.encrypted_access_key, l.active,
-	       l.created_at, l.updated_at
+	SELECT ` + spaceLinkSelectColumns + `
 	FROM space_links l
 	JOIN spaces s ON s.space_id = l.space_id
 `
@@ -64,6 +73,26 @@ func (r *LinksRepository) GetActiveBySlugAndAuthHash(ctx context.Context, slug s
 		  AND l.auth_key_hash = $2
 		  AND l.active = TRUE
 	`, slug, authKeyHash))
+}
+
+func (r *LinksRepository) GetActiveSpaceBySlugAndAuthHash(ctx context.Context, slug string, authKeyHash []byte) (*SpaceLinkRecord, *SpaceRecord, error) {
+	row := r.DB.QueryRowContext(ctx, `
+		SELECT `+spaceLinkSelectColumns+`, `+spaceRecordSelectColumns+`
+		FROM space_links l
+		JOIN spaces s ON s.space_id = l.space_id
+		`+spaceRecordProfileAssetJoins+`
+		JOIN users u ON u.user_id = s.owner_id AND u.encrypted_email IS NOT NULL
+		WHERE s.space_slug = LOWER($1)
+		  AND l.auth_key_hash = $2
+		  AND l.active = TRUE
+	`, slug, authKeyHash)
+	var link SpaceLinkRecord
+	var space SpaceRecord
+	dest := append(spaceLinkScanDest(&link), spaceRecordScanDest(&space)...)
+	if err := row.Scan(dest...); err != nil {
+		return nil, nil, stacktrace.Propagate(err, "")
+	}
+	return &link, &space, nil
 }
 
 func (r *LinksRepository) GetActiveBootstrap(ctx context.Context, slug string) (*SpaceLinkRecord, error) {

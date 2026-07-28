@@ -92,6 +92,7 @@ type SpaceLinkWriteRequest struct {
 }
 
 type SpaceLinkStatusResponse struct {
+	LinkID             int64  `json:"linkId,omitempty"`
 	SpaceID            string `json:"spaceId"`
 	SpaceSlug          string `json:"spaceSlug"`
 	Active             bool   `json:"active"`
@@ -241,6 +242,7 @@ type RotateSpaceKeyRequest struct {
 	RootWrappedSpaceKey   string `json:"rootWrappedSpaceKey" binding:"required"`
 	WrappedPrevKey        string `json:"wrappedPrevKey" binding:"required"`
 	EncryptedProfile      string `json:"encryptedProfile" binding:"required"`
+	ExpectedLinkID        *int64 `json:"expectedLinkId,omitempty"`
 	LinkEncryptedSpaceKey string `json:"linkEncryptedSpaceKey,omitempty"`
 }
 
