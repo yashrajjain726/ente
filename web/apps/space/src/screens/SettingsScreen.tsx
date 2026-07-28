@@ -330,7 +330,7 @@ const SettingsEyebrow: React.FC<{ children: React.ReactNode }> = ({
             lineHeight: "16px",
             m: 0,
             px: "8px",
-            "&:not(:first-child)": { mt: "16px" },
+            "&:not(:first-of-type)": { mt: "16px" },
         }}
     >
         {children}
@@ -346,8 +346,8 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
 }) => {
     const installPrompt = useSpacePWAInstallPrompt();
     const webPushPrompt = useSpaceWebPushPrompt();
-    const [installInstructionsOpen, setInstallInstructionsOpen] =
-        React.useState(false);
+    const [installInstructionsPurpose, setInstallInstructionsPurpose] =
+        React.useState<"install" | "notifications" | null>(null);
     const [notificationInstructionsOpen, setNotificationInstructionsOpen] =
         React.useState(false);
     const [logoutSheetOpen, setLogoutSheetOpen] = React.useState(false);
@@ -378,13 +378,13 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
         if (installPrompt.mode == "native") {
             void installPrompt.install();
         } else {
-            setInstallInstructionsOpen(true);
+            setInstallInstructionsPurpose("install");
         }
     };
 
     const toggleNotifications = () => {
         if (requiresIOSInstall) {
-            setInstallInstructionsOpen(true);
+            setInstallInstructionsPurpose("notifications");
         } else if (webPushPrompt.permissionDenied) {
             setNotificationInstructionsOpen(true);
         } else {
@@ -510,10 +510,13 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                     <SettingsRow
                         icon={Notification02Icon}
                         label="Notifications"
+                        onClick={
+                            requiresIOSInstall ? toggleNotifications : undefined
+                        }
                         trailingOnClick={
                             webPushPrompt.isResolved &&
                             !webPushPrompt.isEnabling &&
-                            (requiresIOSInstall || webPushPrompt.isAvailable)
+                            webPushPrompt.isAvailable
                                 ? toggleNotifications
                                 : undefined
                         }
@@ -588,9 +591,10 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
             />
             <SpacePWAInstallInstructions
                 mode={installPrompt.mode}
-                open={installInstructionsOpen}
-                onClose={() => setInstallInstructionsOpen(false)}
-                onDismiss={() => setInstallInstructionsOpen(false)}
+                open={installInstructionsPurpose != null}
+                onClose={() => setInstallInstructionsPurpose(null)}
+                onDismiss={() => setInstallInstructionsPurpose(null)}
+                purpose={installInstructionsPurpose ?? "install"}
             />
             <SpaceNotificationPermissionInstructions
                 mode={

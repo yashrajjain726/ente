@@ -1,8 +1,4 @@
-import {
-    Notification02Icon,
-    ScreenAddToHomeIcon,
-    Tick02Icon,
-} from "@hugeicons/core-free-icons";
+import { Notification02Icon, Tick02Icon } from "@hugeicons/core-free-icons";
 import { SpaceNotificationPermissionInstructions } from "components/SpaceNotificationPermissionInstructions";
 import {
     SpacePWAInstallInstructions,
@@ -112,7 +108,7 @@ export const SpacePublicProfileNotificationControl: React.FC<
         canShowNotifications &&
         (updating.current ||
             (!busy && state != "subscribed" && state != "unavailable"));
-    const hasInstallPrompt = requiresIOSInstall && installPrompt.shouldShow;
+    const hasInstallPrompt = requiresIOSInstall && installPrompt.canInstall;
     const instructionsOpen =
         installInstructionsOpen || permissionInstructionsOpen;
     const showNotificationAction = hasNotificationAction && !instructionsOpen;
@@ -190,22 +186,21 @@ export const SpacePublicProfileNotificationControl: React.FC<
             ) : null}
             {showInstallPrompt && (
                 <SpacePWAPromptBanner
-                    actionLabel="Add"
+                    actionLabel="Enable"
                     hidden={isHiddenForScroll}
-                    icon={ScreenAddToHomeIcon}
-                    label="Add to home screen"
+                    icon={Notification02Icon}
+                    label="Get notified about new posts"
                     onAction={() => setInstallInstructionsOpen(true)}
                     placement="bottom"
                 />
             )}
             <SpacePWAInstallInstructions
                 mode={installPrompt.mode}
+                notificationEntryPoint="banner"
                 open={installInstructionsOpen}
                 onClose={() => setInstallInstructionsOpen(false)}
-                onDismiss={() => {
-                    setInstallInstructionsOpen(false);
-                    installPrompt.dismiss();
-                }}
+                onDismiss={() => setInstallInstructionsOpen(false)}
+                purpose="notifications"
             />
             <SpaceNotificationPermissionInstructions
                 mode={needsBravePushMessaging ? "brave-push" : "permission"}

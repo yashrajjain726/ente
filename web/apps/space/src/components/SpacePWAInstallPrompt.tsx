@@ -1,6 +1,7 @@
 import {
     AddSquareIcon,
     ArrowDown01Icon,
+    Home01Icon,
     MoreHorizontalIcon,
     MoreVerticalIcon,
     MultiplicationSignIcon,
@@ -332,12 +333,22 @@ interface SpacePWAInstallInstructionsProps {
     open: boolean;
     onClose: () => void;
     onDismiss: () => void;
+    notificationEntryPoint?: "banner" | "settings";
+    purpose?: "install" | "notifications";
 }
 
 export const SpacePWAInstallInstructions: React.FC<
     SpacePWAInstallInstructionsProps
-> = ({ mode, open, onClose, onDismiss }) => {
+> = ({
+    mode,
+    notificationEntryPoint = "settings",
+    open,
+    onClose,
+    onDismiss,
+    purpose = "install",
+}) => {
     const titleID = React.useId();
+    const descriptionID = React.useId();
     const isBottomSheet = useMediaQuery("(max-width: 599px)");
     const shareStep: InstallStep = {
         icon: <HugeiconsIcon icon={Upload01Icon} size={18} strokeWidth={2} />,
@@ -387,7 +398,7 @@ export const SpacePWAInstallInstructions: React.FC<
         shareStep,
         addHomeScreenStep,
     ];
-    const steps: InstallStep[] =
+    const installSteps: InstallStep[] =
         mode == "ios-chrome"
             ? iosChromeSteps
             : mode == "ios-fallback"
@@ -426,6 +437,35 @@ export const SpacePWAInstallInstructions: React.FC<
                           text: 'Tap "Add to Home screen"',
                       },
                   ];
+    const steps =
+        purpose == "notifications"
+            ? [
+                  ...installSteps,
+                  {
+                      icon: (
+                          <HugeiconsIcon
+                              icon={Home01Icon}
+                              size={18}
+                              strokeWidth={2}
+                          />
+                      ),
+                      text: "Open Space from your Home Screen",
+                  },
+                  {
+                      icon: (
+                          <HugeiconsIcon
+                              icon={Notification02Icon}
+                              size={18}
+                              strokeWidth={2}
+                          />
+                      ),
+                      text:
+                          notificationEntryPoint == "banner"
+                              ? 'Tap "Enable" to turn on notifications'
+                              : "Turn on notifications in Settings",
+                  },
+              ]
+            : installSteps;
 
     return (
         <Dialog
@@ -433,6 +473,9 @@ export const SpacePWAInstallInstructions: React.FC<
             onClose={onClose}
             maxWidth={false}
             aria-labelledby={titleID}
+            aria-describedby={
+                purpose == "notifications" ? descriptionID : undefined
+            }
             sx={{ "--space-dialog-backdrop": "rgba(0 0 0 / 0.56)" }}
             slots={
                 isBottomSheet
@@ -490,8 +533,28 @@ export const SpacePWAInstallInstructions: React.FC<
                         textAlign: "center",
                     }}
                 >
-                    Add Space to your home screen
+                    {purpose == "notifications"
+                        ? "Turn on notifications"
+                        : "Add Space to your home screen"}
                 </Box>
+                {purpose == "notifications" && (
+                    <Box
+                        component="p"
+                        id={descriptionID}
+                        sx={{
+                            color: textSoft,
+                            fontFamily: '"Inter Variable", Inter, sans-serif',
+                            fontSize: 13,
+                            lineHeight: "18px",
+                            m: "8px 0 0",
+                            px: "12px",
+                            textAlign: "center",
+                        }}
+                    >
+                        On iPhone, Space can send notifications only after
+                        it&apos;s added to your Home Screen.
+                    </Box>
+                )}
                 <Box sx={{ display: "grid", gap: "12px", mt: "22px" }}>
                     {steps.map((step, index) => (
                         <InstallInstructionStep

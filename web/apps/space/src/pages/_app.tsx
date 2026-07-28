@@ -36,7 +36,7 @@ const spaceTheme = createTheme(shareTheme, {
 const App: React.FC<AppProps> = ({ Component, pageProps }) => {
     useSetupLogs({ disableDiskLogs: true });
     const router = useRouter();
-    const publicProfileManifest = /^\/[^/?#]+#/.test(router.asPath);
+    const publicProfileManifest = router.pathname == "/profile-link";
 
     React.useEffect(captureSpacePWAInstallPrompt, []);
     React.useEffect(() => {
