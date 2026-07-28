@@ -76,7 +76,7 @@ class _VideoWidgetNativeState extends State<VideoWidgetNative>
   final _progressNotifier = ValueNotifier<double?>(null);
   late StreamSubscription<PauseVideoEvent> pauseVideoSubscription;
   late StreamSubscription<ResumeVideoEvent> resumeVideoSubscription;
-  late final StreamSubscription<VideoMuteChangedEvent> _muteSubscription;
+  StreamSubscription<VideoMuteChangedEvent>? _muteSubscription;
   bool _isGuestView = false;
   late final StreamSubscription<GuestViewEvent> _guestViewEventSubscription;
   NativeVideoPlayerController? _controller;
@@ -120,13 +120,15 @@ class _VideoWidgetNativeState extends State<VideoWidgetNative>
     ) {
       _controller?.play();
     });
-    _muteSubscription = Bus.instance.on<VideoMuteChangedEvent>().listen((
-      event,
-    ) async {
-      final controller = _controller;
-      if (controller == null) return;
-      await controller.setVolume(event.isMuted ? 0.0 : 1.0);
-    });
+    if (!widget.isFromMemories) {
+      _muteSubscription = Bus.instance.on<VideoMuteChangedEvent>().listen((
+        event,
+      ) async {
+        final controller = _controller;
+        if (controller == null) return;
+        await controller.setVolume(event.isMuted ? 0.0 : 1.0);
+      });
+    }
     _guestViewEventSubscription = Bus.instance.on<GuestViewEvent>().listen((
       event,
     ) {
@@ -181,7 +183,9 @@ class _VideoWidgetNativeState extends State<VideoWidgetNative>
       type: VideoSourceType.file,
     );
     await _controller?.loadVideo(videoSource);
-    await _controller?.setVolume(localSettings.isMuted() ? 0.0 : 1.0);
+    if (!widget.isFromMemories) {
+      await _controller?.setVolume(localSettings.isMuted() ? 0.0 : 1.0);
+    }
     await _controller?.play();
 
     Bus.instance.fire(SeekbarTriggeredEvent(position: 0));
@@ -271,7 +275,7 @@ class _VideoWidgetNativeState extends State<VideoWidgetNative>
     _guestViewEventSubscription.cancel();
     pauseVideoSubscription.cancel();
     resumeVideoSubscription.cancel();
-    _muteSubscription.cancel();
+    _muteSubscription?.cancel();
     removeDownloadCallback(widget.file);
     _progressNotifier.dispose();
     WidgetsBinding.instance.removeObserver(this);
@@ -611,7 +615,9 @@ class _VideoWidgetNativeState extends State<VideoWidgetNative>
 
   Future<void> _onPlaybackReady() async {
     if (_isPlaybackReady.value) return;
-    await _controller!.setVolume(localSettings.isMuted() ? 0.0 : 1.0);
+    if (!widget.isFromMemories) {
+      await _controller!.setVolume(localSettings.isMuted() ? 0.0 : 1.0);
+    }
     await _controller!.play();
     final durationInSeconds = durationToSeconds(duration) ?? 10;
     widget.onFinalFileLoad?.call(memoryDuration: durationInSeconds);

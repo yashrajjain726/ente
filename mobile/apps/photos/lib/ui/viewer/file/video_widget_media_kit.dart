@@ -68,7 +68,7 @@ class _VideoWidgetMediaKitState extends State<VideoWidgetMediaKit>
   bool _isAppInFG = true;
   late StreamSubscription<PauseVideoEvent> pauseVideoSubscription;
   late StreamSubscription<ResumeVideoEvent> resumeVideoSubscription;
-  late final StreamSubscription<VideoMuteChangedEvent> _muteSubscription;
+  StreamSubscription<VideoMuteChangedEvent>? _muteSubscription;
   bool isGuestView = false;
   late final StreamSubscription<GuestViewEvent> _guestViewEventSubscription;
   bool _isGuestView = false;
@@ -101,11 +101,13 @@ class _VideoWidgetMediaKitState extends State<VideoWidgetMediaKit>
     ) {
       player.play();
     });
-    _muteSubscription = Bus.instance.on<VideoMuteChangedEvent>().listen((
-      event,
-    ) {
-      player.setVolume(event.isMuted ? 0.0 : 100.0);
-    });
+    if (!widget.isFromMemories) {
+      _muteSubscription = Bus.instance.on<VideoMuteChangedEvent>().listen((
+        event,
+      ) {
+        player.setVolume(event.isMuted ? 0.0 : 100.0);
+      });
+    }
     _guestViewEventSubscription = Bus.instance.on<GuestViewEvent>().listen((
       event,
     ) {
@@ -200,7 +202,7 @@ class _VideoWidgetMediaKitState extends State<VideoWidgetMediaKit>
     _guestViewEventSubscription.cancel();
     pauseVideoSubscription.cancel();
     resumeVideoSubscription.cancel();
-    _muteSubscription.cancel();
+    _muteSubscription?.cancel();
     removeDownloadCallback(widget.file);
     _progressNotifier.dispose();
     WidgetsBinding.instance.removeObserver(this);
@@ -355,7 +357,9 @@ class _VideoWidgetMediaKitState extends State<VideoWidgetMediaKit>
           );
           controller = VideoController(player);
         }
-        player.setVolume(localSettings.isMuted() ? 0.0 : 100.0);
+        if (!widget.isFromMemories) {
+          player.setVolume(localSettings.isMuted() ? 0.0 : 100.0);
+        }
         player.open(Media(url), play: _isAppInFG);
       });
       int duration = controller!.player.state.duration.inSeconds;
