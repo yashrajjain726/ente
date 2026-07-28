@@ -125,7 +125,7 @@ func testUpdateProfile(ctx context.Context, module *Module, _ int64, spaceID str
 }
 
 func testRotateKey(ctx context.Context, module *Module, _ int64, spaceID string, keyVersion int, rootWrappedSpaceKey string, wrappedPrevKey string, encryptedProfile string) (*SpaceRecord, error) {
-	return module.Spaces.RotateKey(ctx, spaceID, keyVersion, testSpaceBytes(rootWrappedSpaceKey), testSpaceBytes(wrappedPrevKey), testSpaceBytes(encryptedProfile))
+	return module.Spaces.RotateKey(ctx, spaceID, keyVersion, testSpaceBytes(rootWrappedSpaceKey), testSpaceBytes(wrappedPrevKey), testSpaceBytes(encryptedProfile), nil, nil)
 }
 
 func testAddFriend(ctx context.Context, module *Module, requesterID int64, requesterSpaceID string, targetSpaceID string, targetFriendSealedSpaceKey string, targetKeyVersion int, requesterFriendSealedSpaceKey string, requesterKeyVersion int) error {

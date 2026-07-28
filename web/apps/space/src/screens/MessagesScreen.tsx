@@ -18,6 +18,7 @@ import { SpaceAvatarImage } from "components/SpaceAvatarImage";
 import { SpaceLoadingSpinner } from "components/SpaceRouteFallback";
 import { SpaceShareInviteButton } from "components/SpaceShareInviteButton";
 import { formatTimeAgo } from "ente-base/date";
+import log from "ente-base/log";
 import React from "react";
 import { flushSync } from "react-dom";
 import type { SetupProfile } from "screens/SetupProfileScreen";
@@ -432,19 +433,18 @@ const ConversationListItem: React.FC<{
         conversation.latestActivity.type == "friend_request";
     const post = conversation.latestActivity.post;
     const postThumbnailUrl = (activityPost ?? post)?.imageUrl;
+    const showPostThumbnailSlot = Boolean(post);
+    const isPostThumbnailUnavailable =
+        Boolean(post?.isDeleted) ||
+        Boolean(activityPost && !activityPost.imageUrl);
     const unreadCount = conversation.unreadCount;
     React.useEffect(() => {
-        if (
-            !post ||
-            post.isDeleted ||
-            post.imageUrl ||
-            activityPost?.imageUrl
-        ) {
+        if (!post || post.isDeleted || post.imageUrl || activityPost) {
             return;
         }
         onLoadActivityPost?.(post);
     }, [
-        activityPost?.imageUrl,
+        activityPost,
         onLoadActivityPost,
         post,
         post?.imageUrl,
@@ -452,12 +452,12 @@ const ConversationListItem: React.FC<{
     ]);
     const confirmFriendRequest = () => {
         void onConfirmFriendRequest(conversation).catch((error: unknown) =>
-            console.error("Failed to confirm friend request", error),
+            log.error("Failed to confirm friend request", error),
         );
     };
     const deleteFriendRequest = () => {
         void onDeleteFriendRequest(conversation).catch((error: unknown) =>
-            console.error("Failed to delete friend request", error),
+            log.error("Failed to delete friend request", error),
         );
     };
 
@@ -577,7 +577,7 @@ const ConversationListItem: React.FC<{
                         display: "grid",
                         gap: "10px",
                         gridColumn: isFriendRequest ? undefined : "2 / -1",
-                        gridTemplateColumns: postThumbnailUrl
+                        gridTemplateColumns: showPostThumbnailSlot
                             ? "minmax(0, 1fr) 44px"
                             : "minmax(0, 1fr)",
                         minWidth: 0,
@@ -654,25 +654,54 @@ const ConversationListItem: React.FC<{
                         </Box>
                         <ConversationPreviewLine conversation={conversation} />
                     </Box>
-                    {postThumbnailUrl && (
-                        <Box
-                            component="img"
-                            alt=""
-                            src={postThumbnailUrl}
-                            sx={{
-                                borderRadius: "6px",
-                                display: "block",
-                                height: 44,
-                                objectFit: "cover",
-                                objectPosition: "center",
-                                width: 44,
-                            }}
-                        />
-                    )}
+                    {showPostThumbnailSlot &&
+                        (postThumbnailUrl ? (
+                            <Box
+                                component="img"
+                                alt=""
+                                src={postThumbnailUrl}
+                                sx={{
+                                    borderRadius: "6px",
+                                    display: "block",
+                                    height: 44,
+                                    objectFit: "cover",
+                                    objectPosition: "center",
+                                    width: 44,
+                                }}
+                            />
+                        ) : (
+                            <Box
+                                aria-label={
+                                    isPostThumbnailUnavailable
+                                        ? "Post image unavailable"
+                                        : "Loading post image"
+                                }
+                                role="img"
+                                sx={{
+                                    alignItems: "center",
+                                    bgcolor: incomingQuoteBubble,
+                                    borderRadius: "6px",
+                                    color: incomingQuoteText,
+                                    display: "flex",
+                                    height: 44,
+                                    justifyContent: "center",
+                                    width: 44,
+                                }}
+                            >
+                                {isPostThumbnailUnavailable && (
+                                    <HugeiconsIcon
+                                        icon={ImageDelete02Icon}
+                                        size={18}
+                                        strokeWidth={1.5}
+                                    />
+                                )}
+                            </Box>
+                        ))}
                 </Box>
                 {isFriendRequest && (
                     <Box sx={{ display: "flex", flexShrink: 0, gap: "6px" }}>
                         <Box
+                            className="green-bg"
                             component="button"
                             type="button"
                             onClick={confirmFriendRequest}
@@ -1123,14 +1152,38 @@ const MessageReplyPreview: React.FC<{
 };
 
 const PostQuotePreview: React.FC<{
+    activityPost?: SpaceMessageActivityPost;
     isOwn: boolean;
     message: SpaceMessage;
     mb?: string;
+    onLoadActivityPost?: (post: SpaceMessageActivityPost) => void;
     onOpenQuotePost: (quote: SpaceMessageQuote) => void;
-}> = ({ isOwn, message, mb, onOpenQuotePost }) => {
+}> = ({
+    activityPost,
+    isOwn,
+    message,
+    mb,
+    onLoadActivityPost,
+    onOpenQuotePost,
+}) => {
     const quote = message.quote;
-    const isUnavailable = !quote || quote.isUnavailable || !quote.imageUrl;
-    const canOpen = Boolean(quote && !isUnavailable);
+    const imageUrl = quote?.imageUrl ?? activityPost?.imageUrl;
+    const isUnavailable =
+        !quote ||
+        quote.isUnavailable == true ||
+        (!imageUrl &&
+            (activityPost != undefined || onLoadActivityPost == undefined));
+    const loadedQuote =
+        quote && imageUrl && !isUnavailable
+            ? { ...quote, imageUrl }
+            : undefined;
+    const isLoading = quote != undefined && !imageUrl && !isUnavailable;
+    const canOpen = Boolean(loadedQuote);
+
+    React.useEffect(() => {
+        if (!quote || imageUrl || isUnavailable) return;
+        onLoadActivityPost?.(quote);
+    }, [imageUrl, isUnavailable, onLoadActivityPost, quote]);
 
     return (
         <QuoteFrame isOwn={isOwn} mb={mb}>
@@ -1139,9 +1192,9 @@ const PostQuotePreview: React.FC<{
                 type={canOpen ? "button" : undefined}
                 aria-label={canOpen ? "Open quoted post" : undefined}
                 onClick={(event: React.MouseEvent) => {
-                    if (!quote || !canOpen) return;
+                    if (!loadedQuote) return;
                     event.stopPropagation();
-                    onOpenQuotePost(quote);
+                    onOpenQuotePost(loadedQuote);
                 }}
                 sx={{
                     appearance: "none",
@@ -1159,10 +1212,28 @@ const PostQuotePreview: React.FC<{
                     },
                 }}
             >
-                {isUnavailable ? (
+                {imageUrl ? (
+                    <Box
+                        component="img"
+                        alt=""
+                        src={imageUrl}
+                        sx={{
+                            borderRadius: "8px",
+                            display: "block",
+                            height: postQuoteThumbnailSize,
+                            objectFit: "cover",
+                            objectPosition: "center",
+                            width: postQuoteThumbnailSize,
+                        }}
+                    />
+                ) : (
                     <Box
                         role="img"
-                        aria-label="Deleted post"
+                        aria-label={
+                            isLoading
+                                ? "Loading post image"
+                                : "Post unavailable"
+                        }
                         sx={{
                             alignItems: "center",
                             bgcolor: incomingQuoteBubble,
@@ -1180,26 +1251,14 @@ const PostQuotePreview: React.FC<{
                             px: "12px",
                         }}
                     >
-                        <HugeiconsIcon
-                            icon={ImageDelete02Icon}
-                            size={28}
-                            strokeWidth={1.5}
-                        />
+                        {isUnavailable && (
+                            <HugeiconsIcon
+                                icon={ImageDelete02Icon}
+                                size={28}
+                                strokeWidth={1.5}
+                            />
+                        )}
                     </Box>
-                ) : (
-                    <Box
-                        component="img"
-                        alt=""
-                        src={quote.imageUrl}
-                        sx={{
-                            borderRadius: "8px",
-                            display: "block",
-                            height: postQuoteThumbnailSize,
-                            objectFit: "cover",
-                            objectPosition: "center",
-                            width: postQuoteThumbnailSize,
-                        }}
-                    />
                 )}
             </Box>
         </QuoteFrame>
@@ -1210,6 +1269,7 @@ const isMessageLongPressIgnoredTarget = (target: EventTarget | null) =>
     target instanceof Element && Boolean(target.closest("button"));
 
 const MessageBubble: React.FC<{
+    activityPost?: SpaceMessageActivityPost;
     groupsWithNext: boolean;
     groupsWithPrevious: boolean;
     isHighlighted: boolean;
@@ -1219,16 +1279,19 @@ const MessageBubble: React.FC<{
         anchorEl: HTMLElement,
         source: MessageActionsOpenSource,
     ) => void;
+    onLoadActivityPost?: (post: SpaceMessageActivityPost) => void;
     onOpenQuotePost: (quote: SpaceMessageQuote) => void;
     ownSpaceID?: string;
     parentMessage?: SpaceMessage;
     profile: SetupProfile;
 }> = ({
+    activityPost,
     groupsWithNext,
     groupsWithPrevious,
     isHighlighted,
     message,
     onOpenActions,
+    onLoadActivityPost,
     onOpenQuotePost,
     ownSpaceID,
     parentMessage,
@@ -1394,9 +1457,11 @@ const MessageBubble: React.FC<{
                     )}
                     {(isPostReply || isSyntheticPostLike) && (
                         <PostQuotePreview
+                            activityPost={activityPost}
                             isOwn={isOwn}
                             mb={hasBodyBubble ? "8px" : "0"}
                             message={message}
+                            onLoadActivityPost={onLoadActivityPost}
                             onOpenQuotePost={onOpenQuotePost}
                         />
                     )}
@@ -1572,15 +1637,28 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
             activityPostLoadsInFlightRef.current.add(key);
             void onLoadActivityPost(post)
                 .then((loadedPost) => {
-                    if (!loadedPost) return;
                     setActivityPostsByKey((currentPosts) =>
                         currentPosts[key]
                             ? currentPosts
-                            : { ...currentPosts, [key]: loadedPost },
+                            : {
+                                  ...currentPosts,
+                                  [key]: loadedPost ?? {
+                                      ...post,
+                                      isDeleted: true,
+                                  },
+                              },
                     );
                 })
                 .catch((error: unknown) => {
-                    console.warn("Failed to load message activity post", error);
+                    log.warn("Failed to load message activity post", error);
+                    setActivityPostsByKey((currentPosts) =>
+                        currentPosts[key]
+                            ? currentPosts
+                            : {
+                                  ...currentPosts,
+                                  [key]: { ...post, isDeleted: true },
+                              },
+                    );
                 })
                 .finally(() => {
                     activityPostLoadsInFlightRef.current.delete(key);
@@ -1623,7 +1701,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
             })
             .catch((error: unknown) => {
                 smoothNextMessageScrollRef.current = false;
-                console.error("Failed to send message", error);
+                log.error("Failed to send message", error);
                 setMessageText((currentText) => currentText || text);
                 setReplyingTo(
                     (currentReplyingTo) => currentReplyingTo ?? repliedMessage,
@@ -1692,7 +1770,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                 closeMessageActions();
                 void copyTextToClipboard(targetMessage.text).catch(
                     (error: unknown) =>
-                        console.error("Failed to copy message", error),
+                        log.error("Failed to copy message", error),
                 );
                 break;
             case "like":
@@ -1702,7 +1780,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                     targetMessage.id,
                     !targetMessage.viewerLiked,
                 ).catch((error: unknown) =>
-                    console.error("Failed to update message like", error),
+                    log.error("Failed to update message like", error),
                 );
                 break;
             case "reply":
@@ -1715,7 +1793,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
             case "delete":
                 closeMessageActions();
                 void onDeleteMessage(targetMessage.id).catch((error: unknown) =>
-                    console.error("Failed to delete message", error),
+                    log.error("Failed to delete message", error),
                 );
                 if (replyingTo?.id == targetMessage.id) {
                     setReplyingTo(null);
@@ -2078,7 +2156,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                     py: "12px",
                                 }}
                             >
-                                {isThreadLoading || isThreadRecipientLoading ? (
+                                {isThreadLoading ? (
                                     <Box
                                         sx={{
                                             alignItems: "center",
@@ -2176,6 +2254,15 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                                                 />
                                                             )}
                                                             <MessageBubble
+                                                                activityPost={
+                                                                    message.quote
+                                                                        ? activityPostsByKey[
+                                                                              activityPostKey(
+                                                                                  message.quote,
+                                                                              )
+                                                                          ]
+                                                                        : undefined
+                                                                }
                                                                 groupsWithNext={
                                                                     groupsWithNext
                                                                 }
@@ -2193,6 +2280,9 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                                                 }
                                                                 onOpenActions={
                                                                     openMessageActions
+                                                                }
+                                                                onLoadActivityPost={
+                                                                    loadActivityPost
                                                                 }
                                                                 onOpenQuotePost={
                                                                     onOpenQuotePost
@@ -2592,10 +2682,11 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                     </Box>
                                     {showInviteEmptyState && (
                                         <SpaceShareInviteButton
+                                            label="Invite friends"
                                             profileLink={profileLink}
                                             sharing={isInviteSharing}
                                             onShareError={(error) =>
-                                                console.error(
+                                                log.error(
                                                     "Failed to share space invite",
                                                     error,
                                                 )

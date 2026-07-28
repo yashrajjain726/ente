@@ -1,6 +1,7 @@
 import { SpaceFriendRequestCanceledToast } from "components/SpaceFriendRequestCanceledToast";
 import { SpacePageMeta } from "components/SpacePageMeta";
 import { SpaceRouteFallback } from "components/SpaceRouteFallback";
+import log from "ente-base/log";
 import React, { useEffect } from "react";
 import { FriendsScreen, friendsBackground } from "screens/FriendsScreen";
 import {
@@ -57,7 +58,7 @@ const Page: React.FC = () => {
                 if (requestsResult.status == "fulfilled") {
                     setFriendRequests(requestsResult.value);
                 } else {
-                    console.error(
+                    log.error(
                         "Failed to load space friend requests",
                         requestsResult.reason,
                     );
@@ -65,7 +66,7 @@ const Page: React.FC = () => {
                 if (friendsResult.status == "fulfilled") {
                     setFriends(friendsResult.value);
                 } else {
-                    console.error(
+                    log.error(
                         "Failed to load space friends",
                         friendsResult.reason,
                     );
@@ -100,9 +101,18 @@ const Page: React.FC = () => {
                         void router.push(spaceRoutes.message(friend.spaceId));
                     }
                 }}
-                onOpenFriend={(friendID) =>
-                    void router.push(spaceRoutes.friend(friendID))
-                }
+                onOpenFriend={(friendID) => {
+                    const friend = friends.find(
+                        (candidate) =>
+                            candidate.id == friendID ||
+                            candidate.spaceId == friendID,
+                    );
+                    if (friend)
+                        void router.push(
+                            spaceRoutes.friendPage,
+                            spaceRoutes.friend(friend.username),
+                        );
+                }}
                 profileLink={spaceInviteURL({
                     spaceUsername: profile.username,
                 })}

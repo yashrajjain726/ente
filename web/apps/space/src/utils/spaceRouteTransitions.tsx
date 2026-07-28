@@ -1,3 +1,4 @@
+import log from "ente-base/log";
 import { useRouter, type NextRouter } from "next/router";
 import React from "react";
 
@@ -27,7 +28,6 @@ const routePath = (route: SpaceRouteURL | SpaceRouteAs): string => {
 };
 
 const parentRoutePaths = (path: string) => {
-    if (/^\/app\/friends\/[^/]+$/.test(path)) return ["/app/friends"];
     if (/^\/app\/messages\/[^/]+$/.test(path)) return ["/app/messages"];
     if (/^\/app\/posts\/[^/]+\/[^/]+$/.test(path)) {
         return ["/app"];
@@ -45,7 +45,6 @@ const parentRoutePaths = (path: string) => {
             "/app/settings": ["/app/profile"],
             "/app/settings/profile": ["/app/settings"],
             "/app/settings/profile/name": ["/app/settings/profile"],
-            "/invite": ["/add-profile-photo"],
             "/login": ["/"],
             "/passkeys/finish": ["/passkeys/verify"],
             "/passkeys/verify": ["/login", "/verify"],
@@ -60,6 +59,8 @@ const parentRoutePaths = (path: string) => {
 
 const previousStackRoute = () =>
     routeStack.length > 1 ? routeStack[routeStack.length - 2] : undefined;
+
+export const hasPreviousSpaceRoute = () => Boolean(previousStackRoute());
 
 const ensureRouteStack = (currentPath: string) => {
     if (routeStack.length == 0 && currentPath) routeStack = [currentPath];
@@ -136,7 +137,7 @@ const startSpaceRouteTransition = async <T,>(
 
     void transition.ready.catch((error: unknown) => {
         if (error instanceof DOMException && error.name == "AbortError") return;
-        console.error("Failed to start route transition", error);
+        log.error("Failed to start route transition", error);
     });
 
     void transition.finished
@@ -217,9 +218,7 @@ const backSpaceRoute = (router: NextRouter) => {
                 recordRoutePush(currentPath, targetPath, "back");
             }
         })
-        .catch((error: unknown) =>
-            console.error("Failed to navigate back", error),
-        );
+        .catch((error: unknown) => log.error("Failed to navigate back", error));
 };
 
 export const useSpaceRouter = (): NextRouter => {
@@ -280,7 +279,7 @@ export const useSpaceRouteTransitionPopState = () => {
                     }
                 })
                 .catch((error: unknown) =>
-                    console.error("Failed to handle browser back", error),
+                    log.error("Failed to handle browser back", error),
                 );
 
             return false;

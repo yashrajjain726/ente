@@ -51,6 +51,7 @@ export const SpacePWAInstallPrompt: React.FC<SpacePWAInstallPromptProps> = ({
             <SpaceActionToast
                 action={
                     <Box
+                        className="green-bg"
                         component="button"
                         type="button"
                         onClick={openInstructions}
@@ -211,13 +212,13 @@ const SpacePWAInstallInstructions: React.FC<
             onClose={onClose}
             maxWidth={false}
             aria-labelledby={titleID}
+            sx={{ "--space-dialog-backdrop": "rgba(0 0 0 / 0.56)" }}
             slots={
                 isBottomSheet
                     ? { transition: SpaceBottomSheetTransition }
                     : undefined
             }
             slotProps={{
-                backdrop: { sx: { backgroundColor: "rgba(0, 0, 0, 0.56)" } },
                 paper: {
                     sx: {
                         bgcolor: "#FFFFFF",
@@ -280,6 +281,7 @@ const SpacePWAInstallInstructions: React.FC<
                     ))}
                 </Box>
                 <Box
+                    className="green-bg"
                     component="button"
                     type="button"
                     onClick={onDismiss}

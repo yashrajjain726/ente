@@ -1,3 +1,4 @@
+import log from "ente-base/log";
 import React, {
     useCallback,
     useEffect,
@@ -120,7 +121,7 @@ export const SpaceAppStateProvider: React.FC<React.PropsWithChildren> = ({
 
                 applyProfile({ ...currentProfile, avatarUrl });
             } catch (error) {
-                console.warn("Failed to load space avatar", error);
+                log.warn("Failed to load space avatar", error);
             }
         },
         [applyProfile],
@@ -160,7 +161,7 @@ export const SpaceAppStateProvider: React.FC<React.PropsWithChildren> = ({
 
                 applyProfile({ ...currentProfile, coverUrl });
             } catch (error) {
-                console.warn("Failed to load space cover", error);
+                log.warn("Failed to load space cover", error);
             }
         },
         [applyProfile],
@@ -207,7 +208,7 @@ export const SpaceAppStateProvider: React.FC<React.PropsWithChildren> = ({
                     window.location.replace("/");
                     return null;
                 }
-                console.error("Failed to load space profile", error);
+                log.error("Failed to load space profile", error);
                 if (profileLoadGenerationRef.current == generation) {
                     setProfileLoadError(profileErrorMessage(error));
                     setProfileLoadStatus("error");

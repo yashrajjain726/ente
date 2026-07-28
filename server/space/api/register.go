@@ -38,6 +38,9 @@ func Register(privateAPI, publicAPI gin.IRouter, handlers *Handlers) {
 	spaceAPI.GET("/friends/relationship", selected(handlers.FriendRelationship))
 	spaceAPI.POST("/friends/shares/refresh", selected(handlers.RefreshFriendShares))
 	spaceAPI.GET("/friends/shares", selected(handlers.ListFriendShares))
+	spaceAPI.GET("/link", selected(handlers.GetSpaceLink))
+	spaceAPI.POST("/link", selected(handlers.CreateSpaceLink))
+	spaceAPI.POST("/link/rotate", selected(handlers.RotateSpaceLink))
 
 	publicAPI.GET("/spaces/:spaceID/profile", handlers.GetSpaceProfile)
 	publicAPI.GET("/spaces/:spaceID/assets/redirect", handlers.AssetRedirect)
@@ -46,6 +49,11 @@ func Register(privateAPI, publicAPI gin.IRouter, handlers *Handlers) {
 	publicAPI.GET("/spaces/:spaceID/versions", handlers.ListSpaceKeyVersions)
 	publicAPI.GET("/space/public/by-slug/:spaceSlug", handlers.LookupSpaceBySlug)
 	publicAPI.GET("/space/public/slug-availability/:spaceSlug", handlers.SpaceSlugAvailability)
+	publicAPI.GET("/space/public/by-slug/:spaceSlug/link/bootstrap", handlers.SpaceLinkBootstrap)
+	publicAPI.GET("/space/public/by-slug/:spaceSlug/link/profile", handlers.SpaceLinkProfile)
+	publicAPI.GET("/space/public/by-slug/:spaceSlug/link/posts", handlers.SpaceLinkPosts)
+	publicAPI.GET("/space/public/by-slug/:spaceSlug/link/versions", handlers.SpaceLinkVersions)
+	publicAPI.GET("/space/public/by-slug/:spaceSlug/link/assets/redirect", handlers.SpaceLinkAssetRedirect)
 	publicAPI.POST("/account/space/sessions/bootstrap", handlers.BootstrapBrowserSession)
 	publicAPI.DELETE("/account/space/sessions/current", handlers.DeleteBrowserSession)
 }

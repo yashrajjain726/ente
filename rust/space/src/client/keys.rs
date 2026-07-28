@@ -105,6 +105,7 @@ impl AccountSpaceCtx {
         };
         let next_space_key = generate_key();
         let space_root_key = self.get_or_create_space_root_key().await?;
+        let link_rotation = self.active_link_wrapper(space_id, &next_space_key).await?;
         let request = RotateSpaceKeyRequest {
             key_version: current.key_version,
             root_wrapped_space_key: b64::encode(&encrypt_secretbox_payload(
@@ -119,6 +120,8 @@ impl AccountSpaceCtx {
                 &next_space_key,
                 &next_profile,
             )?),
+            expected_link_id: Some(link_rotation.expected_link_id),
+            link_encrypted_space_key: link_rotation.encrypted_space_key,
         };
         let path = format!("/spaces/{space_id}/rotate");
         let response = self

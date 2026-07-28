@@ -15,6 +15,7 @@ type Module struct {
 	Read       *ReadMarkersController
 	Sessions   *SessionsController
 	Cleanup    *CleanupController
+	Links      *LinksController
 	UserTokens UserTokenTerminator
 	auth       authDeps
 }
@@ -34,15 +35,19 @@ func NewModule(repos *repo.Module, userAuthRepo *baserepo.UserAuthRepository, em
 		FriendsRepo:  repos.Friends,
 		SessionsRepo: repos.Sessions,
 	}
+	spaces := &SpacesController{SpacesRepo: repos.Spaces, AssetsRepo: repos.Assets, auth: authDeps}
+	posts := &PostsController{PostsRepo: repos.Posts, SpacesRepo: repos.Spaces, FriendsRepo: repos.Friends, AssetsRepo: repos.Assets, EmailNotifier: emailNotifier, auth: authDeps}
+	assets := &AssetsController{AssetsRepo: repos.Assets, SpacesRepo: repos.Spaces, auth: authDeps}
 	return &Module{
-		Spaces:   &SpacesController{SpacesRepo: repos.Spaces, AssetsRepo: repos.Assets, auth: authDeps},
-		Posts:    &PostsController{PostsRepo: repos.Posts, SpacesRepo: repos.Spaces, FriendsRepo: repos.Friends, AssetsRepo: repos.Assets, EmailNotifier: emailNotifier, auth: authDeps},
+		Spaces:   spaces,
+		Posts:    posts,
 		Friends:  &FriendsController{FriendsRepo: repos.Friends, SpacesRepo: repos.Spaces, EmailNotifier: emailNotifier},
 		Messages: &MessagesController{MessagesRepo: repos.Messages, PostsRepo: repos.Posts, SpacesRepo: repos.Spaces, FriendsRepo: repos.Friends, ReadMarkersRepo: repos.Read, EmailNotifier: emailNotifier, auth: authDeps},
-		Assets:   &AssetsController{AssetsRepo: repos.Assets, SpacesRepo: repos.Spaces, auth: authDeps},
+		Assets:   assets,
 		Read:     &ReadMarkersController{ReadMarkersRepo: repos.Read},
 		Sessions: &SessionsController{SessionsRepo: repos.Sessions},
 		Cleanup:  &CleanupController{AssetsRepo: repos.Assets},
+		Links:    &LinksController{LinksRepo: repos.Links, SpacesRepo: repos.Spaces, FriendsRepo: repos.Friends, Posts: posts, Assets: assets},
 		auth:     authDeps,
 	}
 }

@@ -1,5 +1,6 @@
 import { savedPartialLocalUser } from "ente-accounts-rs/services/accounts-db";
 import { blobCache, clearBlobCache } from "ente-base/blob-cache";
+import log from "ente-base/log";
 import { apiOrigin } from "ente-base/origins";
 import { blobPartForBytes } from "services/spaceProfilePayload";
 
@@ -51,7 +52,7 @@ const spaceMediaCache = async () => {
     try {
         return await blobCache("space-media");
     } catch (error) {
-        console.warn("Failed to open Space media cache", error);
+        log.warn("Failed to open Space media cache", error);
         return undefined;
     }
 };
@@ -60,7 +61,7 @@ const cachedSpaceMediaBlob = async (storageKey: string) => {
     try {
         return await (await spaceMediaCache())?.get(storageKey);
     } catch (error) {
-        console.warn("Failed to read Space media cache", error);
+        log.warn("Failed to read Space media cache", error);
         return undefined;
     }
 };
@@ -69,7 +70,7 @@ const putSpaceMediaBlob = async (storageKey: string, blob: Blob) => {
     try {
         await (await spaceMediaCache())?.put(storageKey, blob);
     } catch (error) {
-        console.warn("Failed to write Space media cache", error);
+        log.warn("Failed to write Space media cache", error);
     }
 };
 
@@ -161,6 +162,6 @@ export const clearSpaceMediaCache = async () => {
     try {
         await clearBlobCache("space-media");
     } catch (error) {
-        console.warn("Failed to clear Space media cache", error);
+        log.warn("Failed to clear Space media cache", error);
     }
 };

@@ -1,5 +1,6 @@
 import { SpacePageMeta } from "components/SpacePageMeta";
 import { SpaceRouteFallback } from "components/SpaceRouteFallback";
+import log from "ente-base/log";
 import React, { useEffect, useState } from "react";
 import { HomeScreen, homeBackground } from "screens/HomeScreen";
 import {
@@ -160,7 +161,7 @@ const Page: React.FC = () => {
                 );
             })
             .catch((error: unknown) =>
-                console.error("Failed to load space feed", error),
+                log.error("Failed to load space feed", error),
             )
             .finally(() => {
                 if (cancelled) return;
@@ -180,17 +181,14 @@ const Page: React.FC = () => {
                         }
                     })
                     .catch((error: unknown) =>
-                        console.error(
-                            "Failed to load space unread status",
-                            error,
-                        ),
+                        log.error("Failed to load space unread status", error),
                     );
                 void loadCurrentSpaceFriends(loadedSpaceId)
                     .then((nextFriends) => {
                         if (!cancelled) setFriends(nextFriends);
                     })
                     .catch((error: unknown) =>
-                        console.error("Failed to load space friends", error),
+                        log.error("Failed to load space friends", error),
                     )
                     .finally(() => {
                         if (!cancelled) setIsFriendsLoading(false);
@@ -223,7 +221,7 @@ const Page: React.FC = () => {
             setFeedNextCursor(feed.nextCursor);
         } catch (error) {
             setHasFeedLoadMoreError(true);
-            console.error("Failed to load more space feed", error);
+            log.error("Failed to load more space feed", error);
         } finally {
             setIsFeedLoadingMore(false);
         }
@@ -265,14 +263,12 @@ const Page: React.FC = () => {
             <SpacePageMeta themeColor={homeBackground} />
             <HomeScreen
                 feedItems={feedItems}
-                friendsCount={friends.length}
                 friendRequestSentToastName={friendRequestSentToastName}
                 hasFeedLoadMoreError={hasFeedLoadMoreError}
                 hasUnreadMessages={hasUnreadMessages}
                 hasMoreFeedItems={Boolean(feedNextCursor)}
                 isFeedLoading={isHomeFeedLoading}
                 isFeedLoadingMore={isFeedLoadingMore}
-                isFriendsLoading={isFriendsLoading}
                 localFeedPosts={localFeedPosts}
                 profile={profile}
                 viewerSpaceId={spaceId ?? profile?.spaceId}
@@ -419,9 +415,20 @@ const Page: React.FC = () => {
                         ),
                     );
                 }}
-                onOpenFriend={(friendID) =>
-                    void router.push(spaceRoutes.friend(friendID))
-                }
+                onOpenFriend={(friendID, username) => {
+                    const friend = friends.find(
+                        (candidate) =>
+                            candidate.id == friendID ||
+                            candidate.spaceId == friendID,
+                    );
+                    const friendUsername = username || friend?.username;
+                    if (friendUsername) {
+                        void router.push(
+                            spaceRoutes.friendPage,
+                            spaceRoutes.friend(friendUsername),
+                        );
+                    }
+                }}
                 onLoadMoreFeedItems={loadMoreFeedItems}
                 onLoadPostAvatar={loadCurrentSpacePostAvatarURL}
                 onLoadPostImage={loadCurrentSpacePostAssetURL}

@@ -1,5 +1,6 @@
 import { SpacePageMeta } from "components/SpacePageMeta";
 import { SpaceRouteFallback } from "components/SpaceRouteFallback";
+import log from "ente-base/log";
 import React, { useEffect, useState } from "react";
 import {
     ChangeNameSettingsScreen,
@@ -52,7 +53,7 @@ const Page: React.FC = () => {
                             void router.push(spaceRoutes.settingsProfile);
                         })
                         .catch((error: unknown) => {
-                            console.error("Space name update failed", error);
+                            log.error("Space name update failed", error);
                             setErrorMessage(spaceProfileErrorMessage(error));
                         })
                         .finally(() => setIsSaving(false));

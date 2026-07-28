@@ -15,12 +15,13 @@ import {
     type SpaceActionPhase,
 } from "components/SpaceActionFeedback";
 import { SpaceAvatarImage } from "components/SpaceAvatarImage";
-import { SpaceInviteFriendsDialog } from "components/SpaceInviteFriendsDialog";
 import { SpaceLoadingSpinner } from "components/SpaceRouteFallback";
 import { SpaceShareInviteButton } from "components/SpaceShareInviteButton";
 import type { FriendProfile } from "data/friends";
+import log from "ente-base/log";
 import React, { useState } from "react";
 import type { SpaceFriendRequest } from "services/space";
+import { openSpaceShareLinkDialog } from "services/spaceShareLink";
 import { spaceTouchTargetSize } from "styles/touchTargets";
 
 export const friendsBackground = "#FFFFFF";
@@ -111,7 +112,7 @@ const FriendIdentity: React.FC<FriendIdentityProps> = ({
     React.useEffect(() => {
         if (!shouldLoadAvatar || avatarUrl || !friend.avatarObjectID) return;
         void onLoadAvatar?.().catch((error: unknown) => {
-            console.warn("Failed to load friend avatar", error);
+            log.warn("Failed to load friend avatar", error);
         });
     }, [avatarUrl, friend.avatarObjectID, onLoadAvatar, shouldLoadAvatar]);
 
@@ -428,7 +429,7 @@ const FriendRequestRow: React.FC<FriendRequestRowProps> = ({
         if (isBusy) return;
         setAction(nextAction);
         void handler(request.requestId).catch((error: unknown) => {
-            console.error("Failed to update friend request", error);
+            log.error("Failed to update friend request", error);
             setAction(null);
         });
     };
@@ -466,6 +467,7 @@ const FriendRequestRow: React.FC<FriendRequestRowProps> = ({
                 {isReceived ? (
                     <>
                         <Box
+                            className="green-bg"
                             component="button"
                             type="button"
                             disabled={isBusy}
@@ -614,7 +616,6 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
     const [loadedAvatarURLsByKey, setLoadedAvatarURLsByKey] = React.useState<
         Record<string, string>
     >({});
-    const [isInviteDialogOpen, setIsInviteDialogOpen] = React.useState(false);
     const [isInviteSharing, setIsInviteSharing] = React.useState(false);
     const avatarLoadsInFlightRef = React.useRef<
         Map<string, Promise<string | null | undefined>>
@@ -652,7 +653,7 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
                     return avatarUrl;
                 })
                 .catch((error: unknown) => {
-                    console.warn("Failed to load friend avatar", error);
+                    log.warn("Failed to load friend avatar", error);
                     return undefined;
                 })
                 .finally(() => {
@@ -679,7 +680,7 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
                 await Promise.resolve(onUnfriend?.(friendToUnfriend.id));
                 setUnfriendActionPhase("done");
             } catch (error) {
-                console.error("Failed to unfriend space friend", error);
+                log.error("Failed to unfriend space friend", error);
                 setUnfriendActionPhase(null);
                 setUnfriendErrorMessage("Couldn't unfriend. Please try again.");
             }
@@ -700,10 +701,6 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
         setUnfriendActionPhase(null);
         setUnfriendErrorMessage(null);
     };
-
-    const openInviteDialog = () => setIsInviteDialogOpen(true);
-
-    const closeInviteDialog = () => setIsInviteDialogOpen(false);
 
     return (
         <Box
@@ -789,7 +786,7 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
                         type="button"
                         aria-label="Invite friends"
                         disabled={!profileLink}
-                        onClick={openInviteDialog}
+                        onClick={() => openSpaceShareLinkDialog("invite")}
                         sx={{
                             alignItems: "center",
                             bgcolor: "transparent",
@@ -886,13 +883,11 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
                     >
                         No friends yet
                         <SpaceShareInviteButton
+                            label="Invite friends"
                             profileLink={profileLink}
                             sharing={isInviteSharing}
                             onShareError={(error) =>
-                                console.error(
-                                    "Failed to share space invite",
-                                    error,
-                                )
+                                log.error("Failed to share space invite", error)
                             }
                             onSharingChange={setIsInviteSharing}
                             sx={{
@@ -943,13 +938,6 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
                 onCancel={cancelUnfriend}
                 onConfirm={confirmUnfriend}
                 onExited={handleUnfriendSheetExited}
-            />
-            <SpaceInviteFriendsDialog
-                open={isInviteDialogOpen}
-                profileLink={profileLink}
-                sharing={isInviteSharing}
-                onClose={closeInviteDialog}
-                onSharingChange={setIsInviteSharing}
             />
         </Box>
     );

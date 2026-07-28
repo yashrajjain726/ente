@@ -2,6 +2,7 @@ mod assets;
 mod entity_keys;
 mod friends;
 mod keys;
+mod links;
 mod media;
 mod messages;
 mod posts;
@@ -18,6 +19,7 @@ use std::{
     sync::{Mutex, MutexGuard},
 };
 
+pub use links::SpaceLinkCtx;
 use media::{ensure_supported_photo_bytes, ensure_supported_photo_media_type};
 
 use crate::crypto::{

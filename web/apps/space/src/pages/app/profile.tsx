@@ -1,5 +1,6 @@
 import { SpacePageMeta } from "components/SpacePageMeta";
 import { SpaceRouteFallback } from "components/SpaceRouteFallback";
+import log from "ente-base/log";
 import React, { useEffect, useMemo, useState } from "react";
 import { ProfileScreen, profileBackground } from "screens/ProfileScreen";
 import {
@@ -81,7 +82,7 @@ const Page: React.FC = () => {
                 setFriendsCount(nextFriendsCount);
             })
             .catch((error: unknown) =>
-                console.error("Failed to load space profile", error),
+                log.error("Failed to load space profile", error),
             )
             .finally(() => {
                 if (!cancelled) setIsPostsLoading(false);

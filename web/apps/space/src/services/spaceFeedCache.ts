@@ -1,5 +1,6 @@
 import { savedPartialLocalUser } from "ente-accounts-rs/services/accounts-db";
 import { getKV, removeKV, setKV } from "ente-base/kv";
+import log from "ente-base/log";
 import { apiOrigin } from "ente-base/origins";
 import type { SpacePost, SpacePostPage } from "services/space";
 import { z } from "zod";
@@ -30,6 +31,7 @@ const CachedSpacePost = z.object({
     spaceId: z.string(),
     thumbHash: z.string().optional(),
     timestampMs: z.number(),
+    username: z.string().optional(),
     viewerLiked: z.boolean(),
     width: z.number().optional(),
 });
@@ -68,7 +70,7 @@ const cacheKey = async (spaceId: string) => {
             spaceId,
         ].join(":");
     } catch (error) {
-        console.warn("Failed to resolve cached Space feed", error);
+        log.warn("Failed to resolve cached Space feed", error);
         return undefined;
     }
 };
@@ -110,7 +112,7 @@ const enqueueCacheOperation = async (
         .catch(() => undefined)
         .then(operation)
         .catch((error: unknown) => {
-            console.warn("Failed to update cached Space feed", error);
+            log.warn("Failed to update cached Space feed", error);
         });
     cacheOperations.set(key, next);
     await next;
@@ -144,7 +146,7 @@ export const loadCachedSpaceFeed = async (
         memoryCache.set(key, snapshot);
         return cloneSnapshot(snapshot);
     } catch (error) {
-        console.warn("Failed to load cached Space feed", error);
+        log.warn("Failed to load cached Space feed", error);
         return undefined;
     }
 };

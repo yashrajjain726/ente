@@ -18,6 +18,23 @@ pub struct OpenAccountSpaceCtxInput {
 }
 
 #[derive(Clone)]
+pub struct OpenSpaceLinkCtxInput {
+    pub base_url: String,
+    pub space_slug: String,
+    pub access_key: String,
+    pub user_agent: Option<String>,
+    pub client_package: Option<String>,
+    pub client_version: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CreatedSpaceLink {
+    pub space_id: String,
+    pub space_slug: String,
+    pub access_key: String,
+}
+
+#[derive(Clone)]
 pub struct CreatedSpace {
     pub space_id: String,
     pub space_slug: String,

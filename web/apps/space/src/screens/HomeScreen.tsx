@@ -15,6 +15,7 @@ import {
     type SpaceViewerPhoto,
     type SpaceViewerPostActionMode,
 } from "components/SpaceFileViewer";
+import { SpaceInlinePostButton } from "components/SpaceInlinePostButton";
 import { SpacePostFloatingActionButton } from "components/SpacePostFloatingActionButton";
 import {
     spacePostLikeButtonPop,
@@ -25,6 +26,7 @@ import {
 import { SpacePWAInstallPrompt } from "components/SpacePWAInstallPrompt";
 import { SpaceLoadingSpinner } from "components/SpaceRouteFallback";
 import { SpaceShareInviteButton } from "components/SpaceShareInviteButton";
+import log from "ente-base/log";
 import { useBrowserBackClose } from "hooks/useBrowserBackClose";
 import React, { useState } from "react";
 import type { SetupProfile } from "screens/SetupProfileScreen";
@@ -115,13 +117,11 @@ const FeedReplyIcon: React.FC = () => (
 interface HomeScreenProps {
     feedItems: SpacePost[];
     friendRequestSentToastName?: string;
-    friendsCount: number;
     hasFeedLoadMoreError?: boolean;
     hasMoreFeedItems?: boolean;
     hasUnreadMessages?: boolean;
     isFeedLoading?: boolean;
     isFeedLoadingMore?: boolean;
-    isFriendsLoading?: boolean;
     localFeedPosts?: LocalSpaceFeedPost[];
     showInstallPrompt?: boolean;
     showInviteFriendsToast?: boolean;
@@ -135,7 +135,7 @@ interface HomeScreenProps {
     onLoadPostImage?: SpacePostAssetURLLoader;
     onFriendRequestSentToastClose?: () => void;
     onInviteFriendsToastClose?: () => void;
-    onOpenFriend?: (friendID: string) => void;
+    onOpenFriend?: (friendID: string, username?: string) => void;
     onOpenMessages?: () => void;
     onOpenProfile?: () => void;
     onReplyToPost?: (
@@ -407,7 +407,7 @@ interface FeedItemProps {
     name: string;
     onLoadAvatar?: () => Promise<string | null | undefined>;
     onLoadImage?: () => Promise<string | undefined>;
-    onOpenFriend?: (friendID: string) => void;
+    onOpenFriend?: (friendID: string, username?: string) => void;
     onOpenPhoto?: (photo: SpaceViewerPhoto, focusReplyOnOpen?: boolean) => void;
     onOpenProfile?: () => void;
     onSetPostLiked?: (postId: number, liked: boolean) => Promise<void>;
@@ -416,6 +416,7 @@ interface FeedItemProps {
     thumbHash?: string;
     timestampStatus?: FeedTimestampStatus;
     timestampMs: number;
+    username?: string;
     viewerLiked: boolean;
 }
 
@@ -710,6 +711,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
     thumbHash,
     timestampStatus,
     timestampMs,
+    username,
     viewerLiked,
 }) => {
     const [isLiked, setIsLiked] = useState(viewerLiked);
@@ -738,7 +740,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
             onOpenProfile?.();
             return;
         }
-        onOpenFriend?.(friendID);
+        onOpenFriend?.(friendID, username);
     };
     const [loadedPhotoDimensions, setLoadedPhotoDimensions] =
         useState<LoadedFeedPhotoDimensions | null>(null);
@@ -799,6 +801,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
                 postId,
                 spaceId,
                 timestampMs,
+                username,
                 viewerLiked: isLiked,
                 width: photoDimensions.width,
             },
@@ -812,7 +815,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
         setIsLiked(nextLiked);
         if (nextLiked) setLikePopID((id) => id + 1);
         void onSetPostLiked?.(postId, nextLiked).catch((error: unknown) => {
-            console.error("Failed to update post like", error);
+            log.error("Failed to update post like", error);
             setIsLiked(!nextLiked);
         });
     };
@@ -1438,13 +1441,14 @@ const InviteFriendsToast: React.FC<InviteFriendsToastProps> = ({
     <SpaceActionToast
         action={
             <SpaceShareInviteButton
+                className="green-bg"
                 label="Invite"
                 profileLink={profileLink}
                 sharing={sharing}
                 showIcon={false}
                 onShareComplete={onClose}
                 onShareError={(error) =>
-                    console.error("Failed to share space invite", error)
+                    log.error("Failed to share space invite", error)
                 }
                 onSharingChange={onSharingChange}
                 sx={{
@@ -1494,13 +1498,11 @@ const InviteFriendsToast: React.FC<InviteFriendsToastProps> = ({
 export const HomeScreen: React.FC<HomeScreenProps> = ({
     feedItems,
     friendRequestSentToastName,
-    friendsCount,
     hasFeedLoadMoreError = false,
     hasMoreFeedItems = false,
     hasUnreadMessages,
     isFeedLoading = false,
     isFeedLoadingMore = false,
-    isFriendsLoading = false,
     localFeedPosts = [],
     showInstallPrompt = false,
     showInviteFriendsToast = false,
@@ -1592,12 +1594,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         !showInviteFriendsToast &&
         !selectedViewer;
     const showUnreadIndicator = hasUnreadMessages === true;
-    const hasLoadedNoFriends = !isFriendsLoading && friendsCount == 0;
-    const emptyFeedMessage = hasLoadedNoFriends
-        ? "When you add friends, their posts will appear here."
-        : "When your friends share posts, they'll appear here.";
     const profileDisplayName =
         profile?.fullName.trim() || profile?.username.trim() || "";
+    const profileFirstName = profile?.fullName.trim().split(/\s+/)[0];
     const revokeLocalPostObjectUrls = React.useCallback(() => {
         localPostObjectUrlsRef.current.forEach((objectUrl) =>
             URL.revokeObjectURL(objectUrl),
@@ -1679,7 +1678,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                     return imageUrl;
                 })
                 .catch((error: unknown) => {
-                    console.warn("Failed to load feed post image", error);
+                    log.warn("Failed to load feed post image", error);
                     return undefined;
                 })
                 .finally(() => {
@@ -1714,7 +1713,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                     return avatarUrl;
                 })
                 .catch((error: unknown) => {
-                    console.warn("Failed to load feed avatar", error);
+                    log.warn("Failed to load feed avatar", error);
                     setLoadedFeedAvatarURLsByKey((currentURLs) =>
                         currentURLs[cacheKey] === null
                             ? currentURLs
@@ -1768,6 +1767,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 thumbHash={item.thumbHash}
                 timestampStatus={timestampStatus}
                 timestampMs={item.timestampMs}
+                username={item.username}
                 viewerLiked={item.viewerLiked}
             />
         );
@@ -1835,7 +1835,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             didRequestLoad = true;
             void Promise.resolve(onLoadMoreFeedItems()).catch(
                 (error: unknown) => {
-                    console.error("Failed to load more space feed", error);
+                    log.error("Failed to load more space feed", error);
                 },
             );
         };
@@ -1915,7 +1915,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                         });
                     })
                     .catch((error: unknown) => {
-                        console.error("Failed to prepare post preview", error);
+                        log.error("Failed to prepare post preview", error);
                         const message = spacePostImageErrorMessage(error);
                         setSelectedViewer((currentViewer) => {
                             if (currentViewer?.localObjectUrl != draftKey)
@@ -1956,7 +1956,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         setIsPostPhotoOpening(true);
         void prepareSelectedPostPhoto(file)
             .catch((error: unknown) => {
-                console.error("Failed to open post photo draft", error);
+                log.error("Failed to open post photo draft", error);
             })
             .finally(() => {
                 setIsPostPhotoOpening(false);
@@ -2356,7 +2356,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                             <Box
                                 component="img"
                                 alt=""
-                                src="/images/ducky-space.svg"
+                                src="/images/ducky-camera.svg"
                                 sx={{
                                     display: "block",
                                     height: "auto",
@@ -2375,63 +2375,26 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                                     lineHeight: "20px",
                                     m: 0,
                                     mt: emptyFeedItemGap,
-                                    maxWidth: 220,
+                                    maxWidth: 280,
                                 }}
                             >
-                                {emptyFeedMessage}
+                                Welcome to your space, {profileFirstName}.
+                                <br />
+                                Share a little moment from your day.
                             </Box>
-                            {hasLoadedNoFriends && (
-                                <SpaceShareInviteButton
-                                    profileLink={profileLink}
-                                    sharing={isInviteSharing}
-                                    onShareError={(error) =>
-                                        console.error(
-                                            "Failed to share space invite",
-                                            error,
-                                        )
-                                    }
-                                    onSharingChange={setIsInviteSharing}
-                                    sx={{
-                                        alignItems: "center",
-                                        bgcolor: "#E8E8E8",
-                                        border: 0,
-                                        borderRadius: "18px",
-                                        color: textBase,
-                                        cursor:
-                                            profileLink && !isInviteSharing
-                                                ? "pointer"
-                                                : "default",
-                                        display: "inline-flex",
-                                        fontFamily:
-                                            '"Inter Variable", Inter, sans-serif',
-                                        fontSize: 13,
-                                        fontWeight: 600,
-                                        gap: "6px",
-                                        height: spaceTouchTargetSize,
-                                        justifyContent: "center",
-                                        lineHeight: "18px",
-                                        mt: emptyFeedItemGap,
-                                        px: "14px",
-                                        whiteSpace: "nowrap",
-                                        "&:disabled": { opacity: 0.45 },
-                                        "&:focus-visible": {
-                                            outline: `2px solid ${green}`,
-                                            outlineOffset: 2,
-                                        },
-                                        "&:hover":
-                                            profileLink && !isInviteSharing
-                                                ? { bgcolor: "#DEDEDE" }
-                                                : undefined,
-                                    }}
-                                />
-                            )}
+                            <SpaceInlinePostButton
+                                disabled={isPostPhotoButtonDisabled}
+                                onClick={openPostPhotoPicker}
+                            />
                         </Box>
                     )}
                 </Box>
-                <SpacePostFloatingActionButton
-                    disabled={isPostPhotoButtonDisabled}
-                    onClick={openPostPhotoPicker}
-                />
+                {hasFeedItems && (
+                    <SpacePostFloatingActionButton
+                        disabled={isPostPhotoButtonDisabled}
+                        onClick={openPostPhotoPicker}
+                    />
+                )}
                 {selectedViewer && (
                     <SpaceFileViewer
                         focusReplyOnOpen={selectedViewer.focusReplyOnOpen}
@@ -2460,7 +2423,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                                             "back",
                                         ).finally(() => {
                                             closeSelectedPhoto();
-                                            onOpenFriend(selectedPhotoFriendID);
+                                            onOpenFriend(
+                                                selectedPhotoFriendID,
+                                                selectedViewer.photo.username,
+                                            );
                                         });
                                     }
                                   : undefined

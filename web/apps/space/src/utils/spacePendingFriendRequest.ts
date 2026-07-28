@@ -1,13 +1,14 @@
-import { joinSpaceInvite } from "services/space";
+import { requestFriendByUsername } from "services/space";
 import {
     clearPendingSpaceInvite,
     clearPendingSpaceInviteFriend,
+    clearPendingSpaceInviteIntent,
     saveSentSpaceInviteFriend,
     savedPendingSpaceInvite,
     savedPendingSpaceInviteFriend,
 } from "services/spaceInvite";
 
-export const acceptPendingSpaceInvite = async () => {
+export const sendPendingSpaceFriendRequest = async () => {
     const pendingInvite = savedPendingSpaceInvite();
     if (!pendingInvite) return false;
 
@@ -15,9 +16,10 @@ export const acceptPendingSpaceInvite = async () => {
         fullName: "",
         username: pendingInvite.spaceUsername,
     };
-    const status = await joinSpaceInvite(pendingInvite);
+    const status = await requestFriendByUsername(pendingInvite);
     clearPendingSpaceInvite();
     clearPendingSpaceInviteFriend();
+    clearPendingSpaceInviteIntent();
     if (status == "requested") saveSentSpaceInviteFriend(pendingFriend);
     return true;
 };
