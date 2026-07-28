@@ -225,6 +225,12 @@ export interface PublicSpaceLinkSession {
     loadPosts: () => Promise<SpaceProfilePost[]>;
     profile: FriendProfile & { avatarUrl: string | null };
     postsCount: number;
+    subscribeWebPush: (
+        endpoint: string,
+        p256dh: string,
+        auth: string,
+    ) => Promise<string>;
+    unsubscribeWebPush: (endpoint: string) => Promise<void>;
 }
 
 export interface CurrentSpaceLink {
@@ -759,6 +765,9 @@ export const openPublicSpaceLink = async (
                 ).items,
             profile: { ...profile, avatarUrl: profile.avatarUrl ?? null },
             postsCount: response.posts ?? 0,
+            subscribeWebPush: (endpoint, p256dh, auth) =>
+                ctx.subscribeWebPush(endpoint, p256dh, auth),
+            unsubscribeWebPush: (endpoint) => ctx.unsubscribeWebPush(endpoint),
         };
     } catch (error) {
         ctx.free();

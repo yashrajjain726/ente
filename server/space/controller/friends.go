@@ -13,9 +13,9 @@ import (
 )
 
 type FriendsController struct {
-	FriendsRepo   *repo.FriendsRepository
-	SpacesRepo    *repo.SpacesRepository
-	EmailNotifier SpaceEmailNotifier
+	FriendsRepo      *repo.FriendsRepository
+	SpacesRepo       *repo.SpacesRepository
+	ActivityNotifier SpaceActivityNotifier
 }
 
 func (c *FriendsController) Add(ctx context.Context, requesterSpace *repo.SpaceRecord, req models.AddFriendPayload) (*models.FriendStatusResponse, error) {
@@ -62,13 +62,22 @@ func (c *FriendsController) Add(ctx context.Context, requesterSpace *repo.SpaceR
 		return nil, err
 	}
 	if becameFriends {
-		if c.EmailNotifier != nil {
-			go c.EmailNotifier.OnSpaceFriendAdded(requesterSpace.OwnerID, requesterSpace.SpaceSlug, request.RequesterID)
+		if c.ActivityNotifier != nil {
+			go c.ActivityNotifier.OnSpaceFriendAdded(
+				requesterSpace.OwnerID,
+				requesterSpace.SpaceID,
+				requesterSpace.SpaceSlug,
+				request.RequesterID,
+			)
 		}
 		return &models.FriendStatusResponse{Status: "friend"}, nil
 	}
-	if created && c.EmailNotifier != nil {
-		go c.EmailNotifier.OnSpaceFriendRequested(requesterSpace.OwnerID, requesterSpace.SpaceSlug, request.TargetID)
+	if created && c.ActivityNotifier != nil {
+		go c.ActivityNotifier.OnSpaceFriendRequested(
+			requesterSpace.OwnerID,
+			requesterSpace.SpaceSlug,
+			request.TargetID,
+		)
 	}
 	return &models.FriendStatusResponse{Status: "requested"}, nil
 }
@@ -126,8 +135,13 @@ func (c *FriendsController) ConfirmRequest(ctx context.Context, targetSpace *rep
 		}
 		return nil, err
 	}
-	if created && c.EmailNotifier != nil {
-		go c.EmailNotifier.OnSpaceFriendAdded(targetSpace.OwnerID, targetSpace.SpaceSlug, requesterID)
+	if created && c.ActivityNotifier != nil {
+		go c.ActivityNotifier.OnSpaceFriendAdded(
+			targetSpace.OwnerID,
+			targetSpace.SpaceID,
+			targetSpace.SpaceSlug,
+			requesterID,
+		)
 	}
 	return &models.FriendStatusResponse{Status: "friend"}, nil
 }

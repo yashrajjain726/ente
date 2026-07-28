@@ -3,19 +3,24 @@ import {
     ArrowDown01Icon,
     MoreHorizontalIcon,
     MoreVerticalIcon,
+    MultiplicationSignIcon,
+    Notification02Icon,
     ScreenAddToHomeIcon,
     Upload01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Box, Dialog, useMediaQuery } from "@mui/material";
-import { SpaceActionToast } from "components/SpaceActionToast";
 import { SpaceBottomSheetTransition } from "components/SpaceBottomSheetTransition";
 import { useSpacePWAInstallPrompt } from "hooks/useSpacePWAInstallPrompt";
+import { useSpaceWebPushPrompt } from "hooks/useSpaceWebPushPrompt";
 import React from "react";
+import { spaceTouchTargetSize } from "styles/touchTargets";
 
 const green = "#08C225";
 const textBase = "#000";
 const textSoft = "#777777";
+const authenticatedSessionSeenKey = "space.prompts.authenticatedSessionSeen";
+const automaticPromptClaimedKey = "space.prompts.automaticClaimed";
 
 interface SpacePWAInstallPromptProps {
     enabled: boolean;
@@ -29,75 +34,113 @@ interface InstallStep {
 export const SpacePWAInstallPrompt: React.FC<SpacePWAInstallPromptProps> = ({
     enabled,
 }) => {
-    const { dismiss, mode, shouldShow } = useSpacePWAInstallPrompt();
+    const installPrompt = useSpacePWAInstallPrompt();
+    const webPushPrompt = useSpaceWebPushPrompt();
     const [instructionsOpen, setInstructionsOpen] = React.useState(false);
-    const showPrompt = enabled && shouldShow;
+    const [automaticAllowed] = React.useState(() => {
+        try {
+            if (sessionStorage.getItem(automaticPromptClaimedKey)) return false;
+            const seen = localStorage.getItem(authenticatedSessionSeenKey);
+            localStorage.setItem(authenticatedSessionSeenKey, "1");
+            if (seen != "1") {
+                sessionStorage.setItem(automaticPromptClaimedKey, "1");
+            }
+            return seen == "1";
+        } catch {
+            return false;
+        }
+    });
+    const [claimedPrompt, setClaimedPrompt] = React.useState<
+        "install" | "webPush" | null
+    >(null);
+    const hasCandidate = webPushPrompt.shouldShow || installPrompt.shouldShow;
 
     React.useEffect(() => {
-        if (!showPrompt) setInstructionsOpen(false);
-    }, [showPrompt]);
+        if (
+            !enabled ||
+            !automaticAllowed ||
+            claimedPrompt ||
+            !webPushPrompt.isResolved ||
+            !hasCandidate
+        ) {
+            return;
+        }
+        try {
+            sessionStorage.setItem(automaticPromptClaimedKey, "1");
+        } catch {
+            return;
+        }
+        setClaimedPrompt(
+            webPushPrompt.shouldShow
+                ? "webPush"
+                : installPrompt.shouldShow
+                  ? "install"
+                  : null,
+        );
+    }, [
+        automaticAllowed,
+        claimedPrompt,
+        enabled,
+        hasCandidate,
+        installPrompt.shouldShow,
+        webPushPrompt.isResolved,
+        webPushPrompt.shouldShow,
+    ]);
 
-    if (!showPrompt) return null;
+    const showWebPushPrompt =
+        enabled && claimedPrompt == "webPush" && webPushPrompt.shouldShow;
+    const showInstallPrompt =
+        enabled && claimedPrompt == "install" && installPrompt.shouldShow;
 
-    const openInstructions = () => setInstructionsOpen(true);
+    React.useEffect(() => {
+        if (!showInstallPrompt) setInstructionsOpen(false);
+    }, [showInstallPrompt]);
+
+    if (!showWebPushPrompt && !showInstallPrompt) return null;
+
+    const addToHomeScreen = () => {
+        if (installPrompt.mode == "native") {
+            void installPrompt.install();
+        } else {
+            setInstructionsOpen(true);
+        }
+    };
     const closeInstructions = () => setInstructionsOpen(false);
     const dismissInstructions = () => {
         setInstructionsOpen(false);
-        dismiss();
+        installPrompt.dismiss();
     };
 
     return (
         <>
-            <SpaceActionToast
-                action={
-                    <Box
-                        className="green-bg"
-                        component="button"
-                        type="button"
-                        onClick={openInstructions}
-                        sx={{
-                            alignItems: "center",
-                            bgcolor: green,
-                            border: 0,
-                            borderRadius: "14px",
-                            color: "#FFFFFF",
-                            cursor: "pointer",
-                            display: "flex",
-                            flexShrink: 0,
-                            fontFamily: '"Inter Variable", Inter, sans-serif',
-                            fontSize: 13,
-                            fontWeight: 700,
-                            height: 34,
-                            justifyContent: "center",
-                            lineHeight: "18px",
-                            minWidth: 48,
-                            px: "17px",
-                            transition: "filter 120ms ease",
-                            "&:active": { filter: "brightness(0.96)" },
-                            "&:focus-visible": {
-                                outline: "2px solid rgba(0 0 0 / 0.72)",
-                                outlineOffset: 2,
-                            },
-                            "&:hover": { filter: "brightness(0.98)" },
-                        }}
-                    >
-                        Add
-                    </Box>
-                }
-                closeLabel="Close install prompt"
-                icon={
-                    <HugeiconsIcon
-                        icon={ScreenAddToHomeIcon}
-                        size={24}
-                        strokeWidth={1.9}
-                    />
-                }
-                message="Add to home screen"
-                onClose={dismiss}
-                zIndex={19}
-            />
+            {showWebPushPrompt ? (
+                <SpacePWAPromptBanner
+                    actionDisabled={webPushPrompt.isEnabling}
+                    actionLabel={
+                        webPushPrompt.isEnabling ? "Turning on…" : "Turn on"
+                    }
+                    dismissLabel="Close notification prompt"
+                    icon={Notification02Icon}
+                    label={
+                        webPushPrompt.needsRecovery
+                            ? "Turn notifications back on"
+                            : "Turn on notifications"
+                    }
+                    onAction={() => void webPushPrompt.enable()}
+                    onDismiss={webPushPrompt.dismiss}
+                />
+            ) : (
+                <SpacePWAPromptBanner
+                    actionLabel="Add"
+                    dismissLabel="Close install prompt"
+                    icon={ScreenAddToHomeIcon}
+                    label="Add to home screen"
+                    onAction={addToHomeScreen}
+                    onDismiss={installPrompt.dismiss}
+                />
+            )}
             <SpacePWAInstallInstructions
-                mode={mode}
+                mode={installPrompt.mode}
                 open={instructionsOpen}
                 onClose={closeInstructions}
                 onDismiss={dismissInstructions}
@@ -106,6 +149,143 @@ export const SpacePWAInstallPrompt: React.FC<SpacePWAInstallPromptProps> = ({
     );
 };
 
+interface SpacePWAPromptBannerProps {
+    actionDisabled?: boolean;
+    actionLabel: string;
+    dismissLabel: string;
+    icon: Parameters<typeof HugeiconsIcon>[0]["icon"];
+    label: string;
+    onAction: () => void;
+    onDismiss: () => void;
+}
+
+const SpacePWAPromptBanner: React.FC<SpacePWAPromptBannerProps> = ({
+    actionDisabled,
+    actionLabel,
+    dismissLabel,
+    icon,
+    label,
+    onAction,
+    onDismiss,
+}) => (
+    <Box
+        sx={{
+            boxSizing: "border-box",
+            left: "50%",
+            px: "16px",
+            pointerEvents: "none",
+            position: "fixed",
+            top: "calc(env(safe-area-inset-top) + 10px)",
+            transform: "translateX(-50%)",
+            width: "100%",
+            zIndex: 19,
+            "@media (min-width: 600px)": { maxWidth: 390 },
+        }}
+    >
+        <Box
+            role="status"
+            aria-live="polite"
+            sx={{
+                alignItems: "center",
+                bgcolor: "#FFFFFF",
+                borderRadius: "18px",
+                boxShadow: "0 12px 32px rgba(0, 0, 0, 0.18)",
+                color: textBase,
+                display: "flex",
+                fontFamily: '"Inter Variable", Inter, sans-serif',
+                fontSize: 14,
+                fontWeight: 650,
+                gap: "10px",
+                lineHeight: "20px",
+                minHeight: 50,
+                pointerEvents: "auto",
+                pl: "10px",
+                pr: "6px",
+                py: "3px",
+                width: "100%",
+            }}
+        >
+            <Box
+                component="span"
+                sx={{
+                    alignItems: "center",
+                    color: green,
+                    display: "flex",
+                    flexShrink: 0,
+                    height: 24,
+                    justifyContent: "center",
+                    width: 24,
+                }}
+            >
+                <HugeiconsIcon icon={icon} size={24} strokeWidth={1.9} />
+            </Box>
+            <Box
+                sx={{
+                    flex: "1 1 auto",
+                    minWidth: 0,
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                }}
+            >
+                {label}
+            </Box>
+            <Box sx={{ alignItems: "center", display: "flex", flexShrink: 0 }}>
+                <Box
+                    className="green-bg"
+                    component="button"
+                    type="button"
+                    disabled={actionDisabled}
+                    onClick={onAction}
+                    sx={{
+                        alignItems: "center",
+                        bgcolor: green,
+                        border: 0,
+                        borderRadius: "14px",
+                        color: "#FFFFFF",
+                        cursor: actionDisabled ? "default" : "pointer",
+                        display: "flex",
+                        fontFamily: '"Inter Variable", Inter, sans-serif',
+                        fontSize: 13,
+                        fontWeight: 700,
+                        height: 34,
+                        justifyContent: "center",
+                        minWidth: 48,
+                        opacity: actionDisabled ? 0.7 : 1,
+                        px: "17px",
+                    }}
+                >
+                    {actionLabel}
+                </Box>
+                <Box
+                    component="button"
+                    type="button"
+                    aria-label={dismissLabel}
+                    onClick={onDismiss}
+                    sx={{
+                        alignItems: "center",
+                        bgcolor: "transparent",
+                        border: 0,
+                        color: textBase,
+                        cursor: "pointer",
+                        display: "flex",
+                        height: spaceTouchTargetSize,
+                        justifyContent: "center",
+                        p: 0,
+                        width: 36,
+                    }}
+                >
+                    <HugeiconsIcon
+                        icon={MultiplicationSignIcon}
+                        size={16}
+                        strokeWidth={2}
+                    />
+                </Box>
+            </Box>
+        </Box>
+    </Box>
+);
+
 interface SpacePWAInstallInstructionsProps {
     mode: ReturnType<typeof useSpacePWAInstallPrompt>["mode"];
     open: boolean;
@@ -113,7 +293,7 @@ interface SpacePWAInstallInstructionsProps {
     onDismiss: () => void;
 }
 
-const SpacePWAInstallInstructions: React.FC<
+export const SpacePWAInstallInstructions: React.FC<
     SpacePWAInstallInstructionsProps
 > = ({ mode, open, onClose, onDismiss }) => {
     const titleID = React.useId();

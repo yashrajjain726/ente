@@ -14,6 +14,7 @@ type Module struct {
 	Assets     *AssetsController
 	Read       *ReadMarkersController
 	Sessions   *SessionsController
+	WebPush    *WebPushController
 	Cleanup    *CleanupController
 	Links      *LinksController
 	UserTokens UserTokenTerminator
@@ -24,10 +25,10 @@ type UserTokenTerminator interface {
 	TerminateSession(userID int64, token string) error
 }
 
-func NewModule(repos *repo.Module, userAuthRepo *baserepo.UserAuthRepository, emailNotifiers ...SpaceEmailNotifier) *Module {
-	var emailNotifier SpaceEmailNotifier
-	if len(emailNotifiers) > 0 {
-		emailNotifier = emailNotifiers[0]
+func NewModule(repos *repo.Module, userAuthRepo *baserepo.UserAuthRepository, activityNotifiers ...SpaceActivityNotifier) *Module {
+	var activityNotifier SpaceActivityNotifier
+	if len(activityNotifiers) > 0 {
+		activityNotifier = activityNotifiers[0]
 	}
 	authDeps := authDeps{
 		UserAuthRepo: userAuthRepo,
@@ -36,18 +37,20 @@ func NewModule(repos *repo.Module, userAuthRepo *baserepo.UserAuthRepository, em
 		SessionsRepo: repos.Sessions,
 	}
 	spaces := &SpacesController{SpacesRepo: repos.Spaces, AssetsRepo: repos.Assets, auth: authDeps}
-	posts := &PostsController{PostsRepo: repos.Posts, SpacesRepo: repos.Spaces, FriendsRepo: repos.Friends, AssetsRepo: repos.Assets, EmailNotifier: emailNotifier, auth: authDeps}
+	posts := &PostsController{PostsRepo: repos.Posts, SpacesRepo: repos.Spaces, FriendsRepo: repos.Friends, AssetsRepo: repos.Assets, ActivityNotifier: activityNotifier, auth: authDeps}
 	assets := &AssetsController{AssetsRepo: repos.Assets, SpacesRepo: repos.Spaces, auth: authDeps}
+	links := &LinksController{LinksRepo: repos.Links, SpacesRepo: repos.Spaces, FriendsRepo: repos.Friends, Posts: posts, Assets: assets}
 	return &Module{
 		Spaces:   spaces,
 		Posts:    posts,
-		Friends:  &FriendsController{FriendsRepo: repos.Friends, SpacesRepo: repos.Spaces, EmailNotifier: emailNotifier},
-		Messages: &MessagesController{MessagesRepo: repos.Messages, PostsRepo: repos.Posts, SpacesRepo: repos.Spaces, FriendsRepo: repos.Friends, ReadMarkersRepo: repos.Read, EmailNotifier: emailNotifier, auth: authDeps},
+		Friends:  &FriendsController{FriendsRepo: repos.Friends, SpacesRepo: repos.Spaces, ActivityNotifier: activityNotifier},
+		Messages: &MessagesController{MessagesRepo: repos.Messages, PostsRepo: repos.Posts, SpacesRepo: repos.Spaces, FriendsRepo: repos.Friends, ReadMarkersRepo: repos.Read, ActivityNotifier: activityNotifier, auth: authDeps},
 		Assets:   assets,
 		Read:     &ReadMarkersController{ReadMarkersRepo: repos.Read},
 		Sessions: &SessionsController{SessionsRepo: repos.Sessions},
+		WebPush:  &WebPushController{WebPushRepo: repos.WebPush, Links: links},
 		Cleanup:  &CleanupController{AssetsRepo: repos.Assets},
-		Links:    &LinksController{LinksRepo: repos.Links, SpacesRepo: repos.Spaces, FriendsRepo: repos.Friends, Posts: posts, Assets: assets},
+		Links:    links,
 		auth:     authDeps,
 	}
 }

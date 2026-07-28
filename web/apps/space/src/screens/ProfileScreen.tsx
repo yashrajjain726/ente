@@ -478,6 +478,7 @@ interface ProfileScreenProps {
     postsCount?: number;
     profile: SetupProfile;
     profileLink?: string;
+    publicNotificationControl?: React.ReactNode;
 }
 
 export const ProfileScreen: React.FC<ProfileScreenProps> = ({
@@ -509,6 +510,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     postsCount,
     profile,
     profileLink,
+    publicNotificationControl,
     showAddingFriendSpinner = isAddingFriend,
     showPostLoadingIndicator,
 }) => {
@@ -1674,6 +1676,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                 </Box>
                             </Box>
                         )}
+                        {isPublicProfile && publicNotificationControl}
                     </Box>
                 </Box>
                 <Box

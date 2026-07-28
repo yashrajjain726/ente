@@ -532,14 +532,22 @@ const pageScrollY = () =>
     );
 
 const scrollPageToTop = () => {
-    const scrollOptions: ScrollToOptions = { behavior: "auto", top: 0 };
-    document.scrollingElement?.scrollTo(scrollOptions);
-    window.scrollTo(scrollOptions);
+    const behavior = window.matchMedia("(prefers-reduced-motion: reduce)")
+        .matches
+        ? "auto"
+        : "smooth";
+    window.scrollTo({ behavior, top: 0 });
 };
 
 const scheduleScrollPageToTop = () => {
-    const timeoutID = window.setTimeout(scrollPageToTop, 0);
-    return () => window.clearTimeout(timeoutID);
+    let scrollFrame = 0;
+    const closeFrame = window.requestAnimationFrame(() => {
+        scrollFrame = window.requestAnimationFrame(scrollPageToTop);
+    });
+    return () => {
+        window.cancelAnimationFrame(closeFrame);
+        window.cancelAnimationFrame(scrollFrame);
+    };
 };
 
 const useHideHeaderOnScrollDirection = () => {
@@ -2469,6 +2477,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                         }
                         onDraftPostExitStart={() => {
                             setIsDraftPostExiting(true);
+                        }}
+                        onDraftPostPublished={() => {
                             setFeedScrollRequest((request) => request + 1);
                         }}
                         onSetPostLiked={onSetPostLiked}

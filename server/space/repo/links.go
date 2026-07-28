@@ -213,6 +213,16 @@ func (r *LinksRepository) Rotate(
 	`, spaceID); err != nil {
 		return nil, stacktrace.Propagate(err, "")
 	}
+	if _, err := tx.ExecContext(ctx, `
+		DELETE FROM space_web_push_subscriptions
+		WHERE link_id IN (
+			SELECT link_id
+			FROM space_links
+			WHERE space_id = $1 AND active = FALSE
+		)
+	`, spaceID); err != nil {
+		return nil, stacktrace.Propagate(err, "")
+	}
 	var linkID int64
 	err = tx.QueryRowContext(ctx, `
 		INSERT INTO space_links (

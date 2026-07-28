@@ -66,6 +66,12 @@ space:
         # Bucket ID used for Space post, avatar, and cover uploads.
         # If omitted, Space asset uploads return SPACE_ASSETS_UNAVAILABLE.
         primaryBucket: b2-eu-cen
+    webPush:
+        # Generate once with `go run tools/gen-vapid-keys/main.go` and keep the pair stable.
+        publicKey:
+        privateKey:
+        # Bare email address. webpush-go adds the mailto: prefix.
+        subscriber:
 
 # Key used for encrypting customer emails before storing them in DB
 #

@@ -3,6 +3,7 @@ import { AuthenticatedFriendProfile } from "components/AuthenticatedFriendProfil
 import { SpaceButtonSpinner } from "components/SpaceButtonSpinner";
 import { SpaceMobileBestToast } from "components/SpaceMobileBestToast";
 import { SpacePageMeta } from "components/SpacePageMeta";
+import { SpacePublicProfileNotificationControl } from "components/SpacePublicProfileNotificationControl";
 import { SpaceRouteFallback } from "components/SpaceRouteFallback";
 import log from "ente-base/log";
 import React, { useEffect, useMemo, useState } from "react";
@@ -643,6 +644,11 @@ export const Page: React.FC<PageProps> = ({ invitePreview }) => {
                             postGroups={publicPostGroups}
                             postsCount={publicLink.postsCount}
                             profile={publicLink.profile}
+                            publicNotificationControl={
+                                <SpacePublicProfileNotificationControl
+                                    session={publicLink}
+                                />
+                            }
                             showAddingFriendSpinner={
                                 isAddingFriend && Boolean(profile)
                             }

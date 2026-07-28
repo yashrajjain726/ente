@@ -989,7 +989,7 @@ func main() {
 	userEntityHandler := &api.UserEntityHandler{Controller: userEntityController}
 	spaceRepos := spacerepo.NewModule(db, s3Config)
 	userController.SpaceAccessResetter = spaceRepos
-	spaceModule := spacecontroller.NewModule(spaceRepos, userAuthRepo, spacecontroller.NewSpaceEmailSender(userRepo))
+	spaceModule := spacecontroller.NewModule(spaceRepos, userAuthRepo, spacecontroller.NewSpaceWebPushSender(spaceRepos.WebPush))
 	spaceModule.Posts.AbuseNotifier = discordController
 	spaceDripController := spacecontroller.NewSpaceDripController(spaceRepos, userRepo, notificationHistoryRepo, lockController)
 	spaceModule.UserTokens = userController

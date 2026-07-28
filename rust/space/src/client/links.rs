@@ -16,7 +16,8 @@ use crate::{
     transport::{
         AssetDownloadResponse, PostPage, PostResponse, SpaceKeyVersionResponse,
         SpaceLinkBootstrapResponse, SpaceLinkProfileResponse, SpaceLinkStatusResponse,
-        SpaceLinkWriteRequest,
+        SpaceLinkWriteRequest, WebPushSubscriptionKeys, WebPushSubscriptionRequest,
+        WebPushTargetResponse, WebPushUnsubscriptionRequest,
     },
 };
 
@@ -259,6 +260,44 @@ impl SpaceLinkCtx {
         Ok(page)
     }
 
+    pub async fn subscribe_web_push(
+        &self,
+        endpoint: &str,
+        p256dh: &str,
+        auth: &str,
+    ) -> Result<String> {
+        let response: WebPushTargetResponse = self
+            .api
+            .put(&format!("{}/push/subscription", self.prefix()))
+            .header(AUTH_HEADER, &self.auth_key)
+            .json(&WebPushSubscriptionRequest {
+                endpoint: endpoint.to_owned(),
+                keys: WebPushSubscriptionKeys {
+                    p256dh: p256dh.to_owned(),
+                    auth: auth.to_owned(),
+                },
+            })
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await?;
+        Ok(response.target_id)
+    }
+
+    pub async fn unsubscribe_web_push(&self, endpoint: &str) -> Result<()> {
+        self.api
+            .delete(&format!("{}/push/subscription", self.prefix()))
+            .header(AUTH_HEADER, &self.auth_key)
+            .json(&WebPushUnsubscriptionRequest {
+                endpoint: endpoint.to_owned(),
+            })
+            .send()
+            .await?
+            .error_for_status()?;
+        Ok(())
+    }
+
     pub fn decrypt_post(&self, post: &PostResponse) -> Result<DecryptedPost> {
         let space_key = self.space_key(post.key_version, "post")?;
         let post_key =
@@ -473,7 +512,7 @@ fn derive_link_keys_with_salt(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use mockito::Server;
+    use mockito::{Matcher, Server};
     use serde_json::json;
 
     #[test]
@@ -559,6 +598,29 @@ mod tests {
             )
             .create_async()
             .await;
+        let subscribe = server
+            .mock("PUT", format!("{prefix}/push/subscription").as_str())
+            .match_header("x-ente-space-link-auth", auth.as_str())
+            .match_body(Matcher::Json(json!({
+                "endpoint": "https://push.example/subscription",
+                "keys": {
+                    "p256dh": "p256dh",
+                    "auth": "auth"
+                }
+            })))
+            .with_status(200)
+            .with_body(json!({"targetId": "wpt_target"}).to_string())
+            .create_async()
+            .await;
+        let unsubscribe = server
+            .mock("DELETE", format!("{prefix}/push/subscription").as_str())
+            .match_header("x-ente-space-link-auth", auth.as_str())
+            .match_body(Matcher::Json(json!({
+                "endpoint": "https://push.example/subscription"
+            })))
+            .with_status(204)
+            .create_async()
+            .await;
 
         let ctx = SpaceLinkCtx::open(OpenSpaceLinkCtxInput {
             base_url: server.url(),
@@ -574,8 +636,19 @@ mod tests {
         assert_eq!(ctx.profile().profile, profile);
         assert_eq!(ctx.profile().friends, 2);
         assert_eq!(ctx.posts(), 3);
+        assert_eq!(
+            ctx.subscribe_web_push("https://push.example/subscription", "p256dh", "auth")
+                .await
+                .unwrap(),
+            "wpt_target"
+        );
+        ctx.unsubscribe_web_push("https://push.example/subscription")
+            .await
+            .unwrap();
         bootstrap.assert_async().await;
         profile_request.assert_async().await;
         versions.assert_async().await;
+        subscribe.assert_async().await;
+        unsubscribe.assert_async().await;
     }
 }

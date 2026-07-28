@@ -22,13 +22,13 @@ type SpaceAbuseNotifier interface {
 }
 
 type PostsController struct {
-	PostsRepo     *repo.PostsRepository
-	SpacesRepo    *repo.SpacesRepository
-	FriendsRepo   *repo.FriendsRepository
-	AssetsRepo    *repo.AssetsRepository
-	EmailNotifier SpaceEmailNotifier
-	AbuseNotifier SpaceAbuseNotifier
-	auth          authDeps
+	PostsRepo        *repo.PostsRepository
+	SpacesRepo       *repo.SpacesRepository
+	FriendsRepo      *repo.FriendsRepository
+	AssetsRepo       *repo.AssetsRepository
+	ActivityNotifier SpaceActivityNotifier
+	AbuseNotifier    SpaceAbuseNotifier
+	auth             authDeps
 }
 
 func (c *PostsController) Create(ctx context.Context, space *repo.SpaceRecord, req models.CreatePostRequest) (*models.CreatePostResponse, error) {
@@ -97,19 +97,16 @@ func (c *PostsController) Create(ctx context.Context, space *repo.SpaceRecord, r
 }
 
 func (c *PostsController) notifyFriendsOfNewPost(ownerID int64, spaceID, spaceSlug string) {
-	if c.EmailNotifier == nil || c.FriendsRepo == nil {
+	if c.ActivityNotifier == nil || c.FriendsRepo == nil {
 		return
 	}
 	go func() {
 		recipientUserIDs, err := c.FriendsRepo.ListFriendOwnerIDsForSpace(context.Background(), spaceID)
 		if err != nil {
-			log.WithField("space_id", spaceID).WithError(err).Error("Failed to list friends for space post email")
+			log.WithField("space_id", spaceID).WithError(err).Error("Failed to list friends for Space post notification")
 			return
 		}
-		if len(recipientUserIDs) == 0 {
-			return
-		}
-		c.EmailNotifier.OnSpacePostCreated(ownerID, spaceSlug, recipientUserIDs)
+		c.ActivityNotifier.OnSpacePostCreated(ownerID, spaceID, spaceSlug, recipientUserIDs)
 	}()
 }
 
@@ -242,8 +239,13 @@ func (c *PostsController) SetLike(ctx context.Context, actorSpace *repo.SpaceRec
 	if err != nil {
 		return nil, err
 	}
-	if like && created && c.EmailNotifier != nil {
-		go c.EmailNotifier.OnSpacePostLiked(actorSpace.OwnerID, actorSpace.SpaceSlug, post.OwnerID)
+	if like && created && c.ActivityNotifier != nil {
+		go c.ActivityNotifier.OnSpacePostLiked(
+			actorSpace.OwnerID,
+			actorSpace.SpaceID,
+			actorSpace.SpaceSlug,
+			post.OwnerID,
+		)
 	}
 	return &models.LikePostResponse{Liked: like}, nil
 }
