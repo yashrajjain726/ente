@@ -151,35 +151,53 @@ export const SpacePWAInstallPrompt: React.FC<SpacePWAInstallPromptProps> = ({
 
 interface SpacePWAPromptBannerProps {
     actionDisabled?: boolean;
-    actionLabel: string;
-    dismissLabel: string;
+    actionLabel?: string;
+    dismissLabel?: string;
     icon: Parameters<typeof HugeiconsIcon>[0]["icon"];
+    hidden?: boolean;
     label: string;
-    onAction: () => void;
-    onDismiss: () => void;
+    onAction?: () => void;
+    onDismiss?: () => void;
+    placement?: "bottom" | "top";
 }
 
-const SpacePWAPromptBanner: React.FC<SpacePWAPromptBannerProps> = ({
+export const SpacePWAPromptBanner: React.FC<SpacePWAPromptBannerProps> = ({
     actionDisabled,
     actionLabel,
     dismissLabel,
     icon,
+    hidden = false,
     label,
     onAction,
     onDismiss,
+    placement = "top",
 }) => (
     <Box
+        aria-hidden={hidden}
         sx={{
+            bottom:
+                placement == "bottom"
+                    ? "calc(env(safe-area-inset-bottom) + 16px)"
+                    : undefined,
             boxSizing: "border-box",
             left: "50%",
             px: "16px",
             pointerEvents: "none",
             position: "fixed",
-            top: "calc(env(safe-area-inset-top) + 10px)",
-            transform: "translateX(-50%)",
+            top:
+                placement == "top"
+                    ? "calc(env(safe-area-inset-top) + 10px)"
+                    : undefined,
+            transform: hidden
+                ? placement == "bottom"
+                    ? "translate(-50%, calc(100% + env(safe-area-inset-bottom) + 16px))"
+                    : "translate(-50%, calc(-100% - env(safe-area-inset-top) - 10px))"
+                : "translate(-50%, 0)",
+            transition: "transform 180ms ease",
             width: "100%",
             zIndex: 19,
             "@media (min-width: 600px)": { maxWidth: 390 },
+            "@media (prefers-reduced-motion: reduce)": { transition: "none" },
         }}
     >
         <Box
@@ -198,7 +216,7 @@ const SpacePWAPromptBanner: React.FC<SpacePWAPromptBannerProps> = ({
                 gap: "10px",
                 lineHeight: "20px",
                 minHeight: 50,
-                pointerEvents: "auto",
+                pointerEvents: hidden ? "none" : "auto",
                 pl: "10px",
                 pr: "6px",
                 py: "3px",
@@ -224,6 +242,7 @@ const SpacePWAPromptBanner: React.FC<SpacePWAPromptBannerProps> = ({
                     flex: "1 1 auto",
                     minWidth: 0,
                     overflow: "hidden",
+                    textAlign: "left",
                     textOverflow: "ellipsis",
                     whiteSpace: "nowrap",
                 }}
@@ -231,56 +250,60 @@ const SpacePWAPromptBanner: React.FC<SpacePWAPromptBannerProps> = ({
                 {label}
             </Box>
             <Box sx={{ alignItems: "center", display: "flex", flexShrink: 0 }}>
-                <Box
-                    className="green-bg"
-                    component="button"
-                    type="button"
-                    disabled={actionDisabled}
-                    onClick={onAction}
-                    sx={{
-                        alignItems: "center",
-                        bgcolor: green,
-                        border: 0,
-                        borderRadius: "14px",
-                        color: "#FFFFFF",
-                        cursor: actionDisabled ? "default" : "pointer",
-                        display: "flex",
-                        fontFamily: '"Inter Variable", Inter, sans-serif',
-                        fontSize: 13,
-                        fontWeight: 700,
-                        height: 34,
-                        justifyContent: "center",
-                        minWidth: 48,
-                        opacity: actionDisabled ? 0.7 : 1,
-                        px: "17px",
-                    }}
-                >
-                    {actionLabel}
-                </Box>
-                <Box
-                    component="button"
-                    type="button"
-                    aria-label={dismissLabel}
-                    onClick={onDismiss}
-                    sx={{
-                        alignItems: "center",
-                        bgcolor: "transparent",
-                        border: 0,
-                        color: textBase,
-                        cursor: "pointer",
-                        display: "flex",
-                        height: spaceTouchTargetSize,
-                        justifyContent: "center",
-                        p: 0,
-                        width: 36,
-                    }}
-                >
-                    <HugeiconsIcon
-                        icon={MultiplicationSignIcon}
-                        size={16}
-                        strokeWidth={2}
-                    />
-                </Box>
+                {onAction && (
+                    <Box
+                        className="green-bg"
+                        component="button"
+                        type="button"
+                        disabled={actionDisabled}
+                        onClick={onAction}
+                        sx={{
+                            alignItems: "center",
+                            bgcolor: green,
+                            border: 0,
+                            borderRadius: "14px",
+                            color: "#FFFFFF",
+                            cursor: actionDisabled ? "default" : "pointer",
+                            display: "flex",
+                            fontFamily: '"Inter Variable", Inter, sans-serif',
+                            fontSize: 13,
+                            fontWeight: 700,
+                            height: 34,
+                            justifyContent: "center",
+                            minWidth: 48,
+                            opacity: actionDisabled ? 0.7 : 1,
+                            px: "17px",
+                        }}
+                    >
+                        {actionLabel}
+                    </Box>
+                )}
+                {onDismiss && (
+                    <Box
+                        component="button"
+                        type="button"
+                        aria-label={dismissLabel}
+                        onClick={onDismiss}
+                        sx={{
+                            alignItems: "center",
+                            bgcolor: "transparent",
+                            border: 0,
+                            color: textBase,
+                            cursor: "pointer",
+                            display: "flex",
+                            height: spaceTouchTargetSize,
+                            justifyContent: "center",
+                            p: 0,
+                            width: 36,
+                        }}
+                    >
+                        <HugeiconsIcon
+                            icon={MultiplicationSignIcon}
+                            size={16}
+                            strokeWidth={2}
+                        />
+                    </Box>
+                )}
             </Box>
         </Box>
     </Box>

@@ -1676,7 +1676,15 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                 </Box>
                             </Box>
                         )}
-                        {isPublicProfile && publicNotificationControl}
+                        {isPublicProfile && publicNotificationControl && (
+                            <Box
+                                sx={{
+                                    display: selectedPost ? "none" : "contents",
+                                }}
+                            >
+                                {publicNotificationControl}
+                            </Box>
+                        )}
                     </Box>
                 </Box>
                 <Box

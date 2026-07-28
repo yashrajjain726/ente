@@ -1,11 +1,14 @@
 import {
     Notification02Icon,
     ScreenAddToHomeIcon,
+    Tick02Icon,
 } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
-import { Box } from "@mui/material";
 import { SpaceNotificationPermissionInstructions } from "components/SpaceNotificationPermissionInstructions";
-import { SpacePWAInstallInstructions } from "components/SpacePWAInstallPrompt";
+import {
+    SpacePWAInstallInstructions,
+    SpacePWAPromptBanner,
+} from "components/SpacePWAInstallPrompt";
+import { useHideOnScrollDirection } from "hooks/useHideOnScrollDirection";
 import {
     isSpaceIOS,
     isSpaceStandalone,
@@ -20,6 +23,11 @@ import {
     type SpaceWebPushState,
 } from "services/spaceWebPush";
 
+type SuccessState = "exiting" | "hidden" | "visible";
+
+const successDisplayDurationMs = 2400;
+const toastTransitionDurationMs = 180;
+
 interface SpacePublicProfileNotificationControlProps {
     session: PublicSpaceLinkSession;
 }
@@ -29,8 +37,11 @@ export const SpacePublicProfileNotificationControl: React.FC<
 > = ({ session }) => {
     const installPrompt = useSpacePWAInstallPrompt();
     const updating = React.useRef(false);
+    const successTimer = React.useRef<number | undefined>(undefined);
     const [state, setState] = React.useState<SpaceWebPushState>("unavailable");
     const [busy, setBusy] = React.useState(true);
+    const [successState, setSuccessState] =
+        React.useState<SuccessState>("hidden");
     const [installInstructionsOpen, setInstallInstructionsOpen] =
         React.useState(false);
     const [permissionInstructionsOpen, setPermissionInstructionsOpen] =
@@ -40,6 +51,16 @@ export const SpacePublicProfileNotificationControl: React.FC<
             ? ""
             : `${window.location.pathname}${window.location.search}${window.location.hash}`;
     const requiresIOSInstall = isSpaceIOS() && !isSpaceStandalone();
+    const isHiddenForScroll = useHideOnScrollDirection();
+
+    React.useEffect(
+        () => () => {
+            if (successTimer.current !== undefined) {
+                window.clearTimeout(successTimer.current);
+            }
+        },
+        [],
+    );
 
     const reconcile = React.useCallback(async () => {
         if (!route || !isSpaceWebPushSupported() || requiresIOSInstall) {
@@ -84,29 +105,22 @@ export const SpacePublicProfileNotificationControl: React.FC<
 
     const canShowNotifications =
         !requiresIOSInstall && isSpaceWebPushSupported();
-    const showNotificationButton =
+    const showNotificationAction =
         canShowNotifications &&
         (updating.current ||
             (!busy && state != "subscribed" && state != "unavailable"));
-    const showNotificationStatus =
-        canShowNotifications && !busy && state == "subscribed";
-    const showInstall = requiresIOSInstall && installPrompt.canInstall;
-    const reserveControlSpace =
-        busy && (canShowNotifications || requiresIOSInstall);
-    if (
-        !showNotificationButton &&
-        !showNotificationStatus &&
-        !showInstall &&
-        !reserveControlSpace
-    ) {
-        return null;
-    }
+    const showInstallPrompt = requiresIOSInstall && installPrompt.shouldShow;
 
     const enable = async () => {
         if (Notification.permission == "denied") {
             setPermissionInstructionsOpen(true);
             return;
         }
+        if (successTimer.current !== undefined) {
+            window.clearTimeout(successTimer.current);
+            successTimer.current = undefined;
+        }
+        setSuccessState("hidden");
         updating.current = true;
         setBusy(true);
         try {
@@ -116,6 +130,14 @@ export const SpacePublicProfileNotificationControl: React.FC<
             );
             if (permission == "granted") {
                 setState("subscribed");
+                setSuccessState("visible");
+                successTimer.current = window.setTimeout(() => {
+                    setSuccessState("exiting");
+                    successTimer.current = window.setTimeout(() => {
+                        successTimer.current = undefined;
+                        setSuccessState("hidden");
+                    }, toastTransitionDurationMs);
+                }, successDisplayDurationMs);
             } else if (permission == "denied") {
                 setState("denied");
                 setPermissionInstructionsOpen(true);
@@ -129,43 +151,44 @@ export const SpacePublicProfileNotificationControl: React.FC<
         }
     };
 
-    const label = busy ? "Enabling…" : "Get notified of new posts";
-
     return (
         <>
-            <Box
-                sx={{
-                    alignItems: "center",
-                    display: "flex",
-                    flexWrap: "wrap",
-                    gap: "8px",
-                    justifyContent: "center",
-                    minHeight: 40,
-                    mt: "14px",
-                }}
-            >
-                {showNotificationButton && (
-                    <PublicProfileControlButton
-                        busy={busy}
-                        icon={Notification02Icon}
-                        label={label}
-                        onClick={() => void enable()}
-                    />
-                )}
-                {showNotificationStatus && <PublicProfileNotificationStatus />}
-                {showInstall && (
-                    <PublicProfileControlButton
-                        icon={ScreenAddToHomeIcon}
-                        label="Add to home screen"
-                        onClick={() => setInstallInstructionsOpen(true)}
-                    />
-                )}
-            </Box>
+            {successState != "hidden" ? (
+                <SpacePWAPromptBanner
+                    hidden={isHiddenForScroll || successState == "exiting"}
+                    icon={Tick02Icon}
+                    label="You’ll be notified about new posts"
+                    placement="bottom"
+                />
+            ) : showNotificationAction ? (
+                <SpacePWAPromptBanner
+                    actionDisabled={busy}
+                    actionLabel={busy ? "Enabling…" : "Enable"}
+                    hidden={isHiddenForScroll}
+                    icon={Notification02Icon}
+                    label="Get notified about new posts"
+                    onAction={() => void enable()}
+                    placement="bottom"
+                />
+            ) : null}
+            {showInstallPrompt && (
+                <SpacePWAPromptBanner
+                    actionLabel="Add"
+                    hidden={isHiddenForScroll}
+                    icon={ScreenAddToHomeIcon}
+                    label="Add to home screen"
+                    onAction={() => setInstallInstructionsOpen(true)}
+                    placement="bottom"
+                />
+            )}
             <SpacePWAInstallInstructions
                 mode={installPrompt.mode}
                 open={installInstructionsOpen}
                 onClose={() => setInstallInstructionsOpen(false)}
-                onDismiss={() => setInstallInstructionsOpen(false)}
+                onDismiss={() => {
+                    setInstallInstructionsOpen(false);
+                    installPrompt.dismiss();
+                }}
             />
             <SpaceNotificationPermissionInstructions
                 open={permissionInstructionsOpen}
@@ -174,61 +197,3 @@ export const SpacePublicProfileNotificationControl: React.FC<
         </>
     );
 };
-
-const PublicProfileNotificationStatus: React.FC = () => (
-    <Box
-        role="status"
-        sx={{
-            alignItems: "center",
-            color: "#777777",
-            display: "inline-flex",
-            fontFamily: '"Inter Variable", Inter, sans-serif',
-            fontSize: 14,
-            fontWeight: 500,
-            gap: "8px",
-            minHeight: 40,
-        }}
-    >
-        <HugeiconsIcon icon={Notification02Icon} size={18} strokeWidth={1.9} />
-        You’ll be notified of new posts
-    </Box>
-);
-
-const PublicProfileControlButton: React.FC<{
-    busy?: boolean;
-    icon: IconSvgElement;
-    label: string;
-    onClick: () => void;
-}> = ({ busy, icon, label, onClick }) => (
-    <Box
-        component="button"
-        type="button"
-        disabled={busy}
-        onClick={onClick}
-        sx={{
-            alignItems: "center",
-            appearance: "none",
-            bgcolor: "#F2F2F2",
-            border: 0,
-            borderRadius: "14px",
-            color: "#1B1B1B",
-            cursor: busy ? "default" : "pointer",
-            display: "inline-flex",
-            fontFamily: '"Inter Variable", Inter, sans-serif',
-            fontSize: 14,
-            fontWeight: 600,
-            gap: "8px",
-            minHeight: 40,
-            opacity: busy ? 0.7 : 1,
-            px: "16px",
-            "&:hover": { bgcolor: busy ? "#F2F2F2" : "#E7E7E7" },
-            "&:focus-visible": {
-                outline: "2px solid #1B1B1B",
-                outlineOffset: 2,
-            },
-        }}
-    >
-        <HugeiconsIcon icon={icon} size={18} strokeWidth={1.9} />
-        {label}
-    </Box>
-);

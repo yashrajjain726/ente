@@ -28,6 +28,7 @@ import { SpaceLoadingSpinner } from "components/SpaceRouteFallback";
 import { SpaceShareInviteButton } from "components/SpaceShareInviteButton";
 import log from "ente-base/log";
 import { useBrowserBackClose } from "hooks/useBrowserBackClose";
+import { useHideOnScrollDirection } from "hooks/useHideOnScrollDirection";
 import React, { useState } from "react";
 import type { SetupProfile } from "screens/SetupProfileScreen";
 import type {
@@ -63,8 +64,6 @@ const headerAvatarSize = 28;
 const feedAvatarSize = 38;
 const headerHeight = 64;
 const headerIconSize = 30;
-const headerHideStartY = 96;
-const headerScrollDelta = 4;
 const headerSideWidth = 32;
 const feedLikeActionSize = spaceTouchTargetSize;
 const feedActionIconSize = 20;
@@ -521,16 +520,6 @@ const useDecodedImage = (
     return { ready: !src, src };
 };
 
-const pageScrollY = () =>
-    Math.max(
-        0,
-        window.scrollY ||
-            document.scrollingElement?.scrollTop ||
-            document.documentElement.scrollTop ||
-            document.body.scrollTop ||
-            0,
-    );
-
 const scrollPageToTop = () => {
     const behavior = window.matchMedia("(prefers-reduced-motion: reduce)")
         .matches
@@ -548,52 +537,6 @@ const scheduleScrollPageToTop = () => {
         window.cancelAnimationFrame(closeFrame);
         window.cancelAnimationFrame(scrollFrame);
     };
-};
-
-const useHideHeaderOnScrollDirection = () => {
-    const [isHidden, setIsHidden] = useState(false);
-    const lastScrollYRef = React.useRef(0);
-    const frameRef = React.useRef<number | null>(null);
-
-    React.useEffect(() => {
-        lastScrollYRef.current = pageScrollY();
-
-        const updateVisibility = () => {
-            frameRef.current = null;
-            const nextScrollY = pageScrollY();
-            const delta = nextScrollY - lastScrollYRef.current;
-            lastScrollYRef.current = nextScrollY;
-
-            if (nextScrollY <= headerHideStartY) {
-                setIsHidden(false);
-                return;
-            }
-
-            if (delta > headerScrollDelta) {
-                setIsHidden(true);
-                return;
-            }
-
-            if (delta < -1) setIsHidden(false);
-        };
-
-        const scheduleUpdate = () => {
-            if (frameRef.current != null) return;
-            frameRef.current = window.requestAnimationFrame(updateVisibility);
-        };
-
-        window.addEventListener("scroll", scheduleUpdate, { passive: true });
-        document.addEventListener("scroll", scheduleUpdate, { passive: true });
-        return () => {
-            window.removeEventListener("scroll", scheduleUpdate);
-            document.removeEventListener("scroll", scheduleUpdate);
-            if (frameRef.current != null) {
-                window.cancelAnimationFrame(frameRef.current);
-            }
-        };
-    }, []);
-
-    return isHidden;
 };
 
 const usePostingDotCount = (isPosting: boolean) => {
@@ -1543,7 +1486,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         Record<string, string>
     >({});
     const [feedScrollRequest, setFeedScrollRequest] = useState(0);
-    const isHeaderTriggered = useHideHeaderOnScrollDirection();
+    const isHeaderTriggered = useHideOnScrollDirection();
     const [isHeaderFocused, setIsHeaderFocused] = useState(false);
     const isHeaderHidden = isHeaderTriggered && !isHeaderFocused;
     const postInputRef = React.useRef<HTMLInputElement | null>(null);
