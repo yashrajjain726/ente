@@ -12,6 +12,7 @@ import io.ente.ensu.bindings.KnowledgeReconciliationStatus
 import io.ente.ensu.device.isChatSupported
 import io.ente.ensu.logging.FileLogRepository
 import io.ente.ensu.logging.LogLevel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -130,6 +131,8 @@ class KnowledgeStore(
                         mutationProgress = null
                     )
                 }
+            } catch (error: CancellationException) {
+                throw error
             } catch (error: Throwable) {
                 val reconciled = runCatching { provider.reconcile(dataset) }.getOrNull()
                 updatePack(stableId) { current ->
