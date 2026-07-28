@@ -1,6 +1,7 @@
 use crate::ml::{
     clip::{run_clip_image, run_clip_text_query, tokenize_clip_text as tokenize_clip_text_impl},
     error::{MlError, MlResult},
+    events,
     face::{
         run_face_alignment, run_face_detection, run_face_embedding,
         thumbnail::{FaceBox, generate_face_thumbnails},
@@ -41,8 +42,9 @@ pub struct AnalyzeImageResult {
     pub decoded_image_size: Dimensions,
     pub faces: Option<Vec<FaceResult>>,
     /// Index-aligned with `faces`; present only when requested via
-    /// `generate_face_crops`.
-    pub face_crops: Option<Vec<Vec<u8>>>,
+    /// `generate_face_crops`. Crop generation is best effort: a face whose
+    /// crop could not be generated has `None` in its slot.
+    pub face_crops: Option<Vec<Option<Vec<u8>>>>,
     pub clip: Option<ClipResult>,
     pub pet_faces: Option<Vec<PetFaceResult>>,
     pub pet_bodies: Option<Vec<PetBodyResult>>,
@@ -125,25 +127,37 @@ pub fn analyze_image(req: AnalyzeImageRequest) -> MlResult<AnalyzeImageResult> {
             None
         };
 
+        // Crops are a cosmetic side artifact of indexing, so their generation
+        // is best effort: a face whose crop fails is skipped (with a `None`
+        // slot to keep the index alignment) instead of failing the analysis.
         let face_crops = if generate_face_crops {
-            faces
-                .as_ref()
-                .map(|face_results| {
-                    let face_boxes = face_results
-                        .iter()
-                        .map(|face| {
-                            let [x_min, y_min, x_max, y_max] = face.detection.box_xyxy;
-                            FaceBox {
-                                x: x_min,
-                                y: y_min,
-                                width: x_max - x_min,
-                                height: y_max - y_min,
+            faces.as_ref().map(|face_results| {
+                face_results
+                    .iter()
+                    .map(|face| {
+                        let [x_min, y_min, x_max, y_max] = face.detection.box_xyxy;
+                        let face_box = FaceBox {
+                            x: x_min,
+                            y: y_min,
+                            width: x_max - x_min,
+                            height: y_max - y_min,
+                        };
+                        match generate_face_thumbnails(&decoded, std::slice::from_ref(&face_box)) {
+                            Ok(mut crops) => crops.pop(),
+                            Err(error) => {
+                                events::record(
+                                    events::Severity::Warning,
+                                    format!(
+                                        "skipping face crop for face {}: {error}",
+                                        face.face_id
+                                    ),
+                                );
+                                None
                             }
-                        })
-                        .collect::<Vec<_>>();
-                    generate_face_thumbnails(&decoded, &face_boxes)
-                })
-                .transpose()?
+                        }
+                    })
+                    .collect::<Vec<_>>()
+            })
         } else {
             None
         };

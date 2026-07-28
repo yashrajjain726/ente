@@ -877,9 +877,10 @@ export interface MLWorkerAnalyzeImageResult {
     /**
      * JPEG blobs of the crops of detected faces, index-aligned with
      * {@link faces}. Present when the request had {@link generateFaceCrops}
-     * set.
+     * set. Crop generation is best effort: a face whose crop could not be
+     * generated has a `null` in its slot.
      */
-    faceCrops?: Uint8Array<ArrayBuffer>[];
+    faceCrops?: (Uint8Array<ArrayBuffer> | null)[];
     /** Present when the request had {@link runClip} set. */
     clip?: {
         /** The (normalized) CLIP image embedding (512 floating point values). */

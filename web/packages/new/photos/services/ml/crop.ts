@@ -40,7 +40,8 @@ export const regenerateFaceCrops = async (
  * indexing an image.
  *
  * @param faceCrops JPEG blobs of the face crops, index-aligned with the faces
- * in {@link faceIndex}.
+ * in {@link faceIndex}. Faces whose crop the native side could not generate
+ * have a `null` in their slot, and are skipped.
  *
  * @param faceIndex The {@link FaceIndex} containing information about the
  * faces detected in the given image.
@@ -49,7 +50,7 @@ export const regenerateFaceCrops = async (
  * from the {@link BlobCache} named "face-crops".
  */
 export const saveFaceCropBlobs = async (
-    faceCrops: Uint8Array<ArrayBuffer>[],
+    faceCrops: (Uint8Array<ArrayBuffer> | null)[],
     faceIndex: FaceIndex,
 ) => {
     const cache = await blobCache("face-crops");

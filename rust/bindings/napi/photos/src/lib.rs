@@ -129,8 +129,9 @@ pub struct AnalyzeImageResult {
     pub decoded_image_size: Dimensions,
     pub faces: Option<Vec<FaceResult>>,
     /// JPEG bytes, index-aligned with `faces`; present only when requested
-    /// via `generate_face_crops`.
-    pub face_crops: Option<Vec<Buffer>>,
+    /// via `generate_face_crops`. Crop generation is best effort: a face
+    /// whose crop could not be generated has a null slot.
+    pub face_crops: Option<Vec<Option<Buffer>>>,
     pub clip: Option<ClipResult>,
     pub pet_faces: Option<Vec<PetFaceResult>>,
     pub pet_bodies: Option<Vec<PetBodyResult>>,
@@ -316,9 +317,12 @@ fn to_napi_analyze_image_result(result: shared_indexing::AnalyzeImageResult) -> 
         faces: result
             .faces
             .map(|faces| faces.into_iter().map(to_napi_face_result).collect()),
-        face_crops: result
-            .face_crops
-            .map(|crops| crops.into_iter().map(Buffer::from).collect()),
+        face_crops: result.face_crops.map(|crops| {
+            crops
+                .into_iter()
+                .map(|crop| crop.map(Buffer::from))
+                .collect()
+        }),
         clip: result.clip.map(|clip| ClipResult {
             embedding: clip.embedding.into(),
         }),
