@@ -690,6 +690,7 @@ class MemoryShareService {
     final files = await FilesDB.instance.getFilesFromIDs(uniqueFileIDs);
     final activeCollectionIDs = CollectionsService.instance
         .getActiveCollections()
+        .where((collection) => !collection.isHidden())
         .map((collection) => collection.id)
         .toSet();
     final filesByID = <int, EnteFile>{};
