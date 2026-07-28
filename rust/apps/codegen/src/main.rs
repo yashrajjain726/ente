@@ -218,6 +218,16 @@ fn generate_napi() -> Result<(), DynError> {
 
     // On Windows npm is a .cmd shim, which CreateProcess doesn't resolve.
     let npm = if cfg!(windows) { "npm.cmd" } else { "npm" };
+    let linux_cross_args = if cfg!(target_os = "linux") {
+        let target = match env::consts::ARCH {
+            "x86_64" => "x86_64-unknown-linux-gnu",
+            "aarch64" => "aarch64-unknown-linux-gnu",
+            arch => return Err(format!("unsupported Linux architecture for NAPI: {arch}").into()),
+        };
+        vec!["--target", target, "--use-napi-cross"]
+    } else {
+        Vec::new()
+    };
     run_command(
         Command::new(npm)
             .arg("exec")
@@ -236,6 +246,7 @@ fn generate_napi() -> Result<(), DynError> {
             .arg("index.d.ts")
             .arg("--output-dir")
             .arg(&out_dir)
+            .args(linux_cross_args)
             .current_dir(&desktop_dir),
         "failed to build the desktop Node addon (run npm install in desktop/ first)".to_owned(),
     )

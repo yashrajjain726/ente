@@ -63,9 +63,8 @@ const rustTriple = (platform, arch) => {
  *
  * The build always runs so that edits to the Rust sources cannot be missed
  * when packaging; cargo's incremental compilation makes this cheap when
- * nothing has changed. For the host architecture we omit `--target` so that
- * the build shares the cargo cache of the `cargo codegen napi` that
- * postinstall runs (which also omits it).
+ * nothing has changed. Linux always uses napi-cli's cross toolchain, including
+ * for the host architecture, to keep the addon's glibc requirement at 2.17.
  */
 const buildAddon = async (appDir, platform, arch) => {
     const addonPath = path.join(
@@ -81,12 +80,9 @@ const buildAddon = async (appDir, platform, arch) => {
         "--release --strip --platform --no-js",
         "--dts index.d.ts",
         "--output-dir rust-bindings",
-        ...(arch != process.arch
+        ...(platform == "linux" || arch != process.arch
             ? [
                   `--target ${rustTriple(platform, arch)}`,
-                  // Cross-compiling for the other Linux architecture needs a
-                  // gcc cross toolchain; let napi-cli download its prebuilt
-                  // one.
                   ...(platform == "linux" ? ["--use-napi-cross"] : []),
               ]
             : []),

@@ -6,6 +6,7 @@ edition = "2024"
 crate-type = ["cdylib"]
 
 [dependencies]
+# Keep usearch disabled: its C++17 code cannot use napi-cli's GCC 4.8 toolchain.
 ente-photos.workspace = true
 napi = { version = "3", default-features = false, features = ["napi8"] }
 napi-derive = "3"

@@ -8,7 +8,7 @@ crate-type = ["cdylib", "staticlib"]
 [dependencies]
 flutter_rust_bridge = "=2.12.0"
 ente-image.workspace = true
-ente-photos.workspace = true
+ente-photos = { workspace = true, features = ["usearch"] }
 
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(frb_expand)'] }
