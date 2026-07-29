@@ -24,7 +24,7 @@ const fsp = require("node:fs/promises");
 const path = require("node:path");
 const { execFileSync } = require("node:child_process");
 
-const version = "1.27.0-r2";
+const version = "1.27.0-r4";
 
 const releaseURL = `https://github.com/laurens-pilot/ort-packaging/releases/download/ort-${version}`;
 
@@ -37,17 +37,17 @@ const releaseURL = `https://github.com/laurens-pilot/ort-packaging/releases/down
  */
 const assetSHA256s = {
     "darwin-arm64":
-        "3249212d99a22b5c3a7fecf5d7269938475f6cc2dbb5ca98f43f1b5887d5b80f",
+        "dbb243c3b43963fda6c9475a978d0954b69490d386bc3ecb54a471b2a13ba043",
     "darwin-x64":
-        "11264a993b1dd9c25c9fc52c777052aa90cc1e2fe2e6145bba9d397ec86ae3cd",
+        "d655686380c1976a9067a48d82645a381e4bc4bdfcc44c88f300befc24c4ae8e",
     "linux-arm64":
-        "f83f463d37c9a7bce0482202cb5c75b519c0e41dd5c194ad629f9f2b920bfc18",
+        "0b0367bddd96fb0263781022f715ec531a9856e14d8ed91beea80da8d9bb6a2e",
     "linux-x64":
-        "bfd679770f0a5a2c186980e565cd7d1eaee1491ff1f038d079d73f382eb81b76",
+        "d417b8d92498f3e754e23fbeac0751f13375061c6c31cc83e869f33a37fca8ad",
     "win32-arm64":
-        "1fd74f7dadd9d9c58d0573cdeb789d6deaa7d744333c2dd5285f9c88e4f957b6",
+        "9e3179a985e08700b37f15af7049bca4fc007cb4d5a7e2ff1d81df10e330544e",
     "win32-x64":
-        "d20661b8af1cce1a6d5577e32da22edba940d547b8247ffc143f9735a8afe87b",
+        "0534f35981fe3174379c7e80f93977edd990ce67c40f6cbdde1e6890eb798911",
 };
 
 const assetName = (platform, arch) => {
