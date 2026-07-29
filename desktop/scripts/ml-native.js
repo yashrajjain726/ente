@@ -40,18 +40,18 @@ const fsp = require("node:fs/promises");
 const path = require("node:path");
 const { execFileSync, execSync } = require("node:child_process");
 
-const version = "1.27.0-r4";
+const ortVersion = "1.27.0-r4";
 
-const releaseURL = `https://github.com/laurens-pilot/ort-packaging/releases/download/ort-${version}`;
+const ortReleaseURL = `https://github.com/laurens-pilot/ort-packaging/releases/download/ort-${ortVersion}`;
 
 /**
  * SHA-256 checksums of the release assets, pinned here so that the library we
  * package cannot change without a corresponding (reviewed) change to this
- * file. When bumping {@link version}, update these with the values from the
+ * file. When bumping {@link ortVersion}, update these with the values from the
  * release's `.sha256` sidecar files after verifying them against the built
  * archives.
  */
-const assetSHA256s = {
+const ortAssetSHA256s = {
     "darwin-arm64":
         "dbb243c3b43963fda6c9475a978d0954b69490d386bc3ecb54a471b2a13ba043",
     "darwin-x64":
@@ -66,25 +66,28 @@ const assetSHA256s = {
         "0534f35981fe3174379c7e80f93977edd990ce67c40f6cbdde1e6890eb798911",
 };
 
-const assetName = (platform, arch) => {
+const ortAssetName = (platform, arch) => {
     switch (platform) {
         case "darwin":
-            return `onnxruntime-coreml-macos-${arch}-${version}.tar.gz`;
+            return `onnxruntime-coreml-macos-${arch}-${ortVersion}.tar.gz`;
         case "linux":
-            return `onnxruntime-webgpu-linux-${arch}-${version}.tar.gz`;
+            return `onnxruntime-webgpu-linux-${arch}-${ortVersion}.tar.gz`;
         case "win32":
-            return `onnxruntime-webgpu-windows-${arch}-${version}.zip`;
+            return `onnxruntime-webgpu-windows-${arch}-${ortVersion}.zip`;
         default:
             throw new Error(`Unsupported platform: ${platform}`);
     }
 };
+
+const archesForTarget = (platform, arch) =>
+    platform == "darwin" ? ["arm64", "x64"] : [arch];
 
 /**
  * Download and extract the ONNX Runtime library for the given OS/arch into
  * `<appDir>/build/onnxruntime/<arch>`, no-oping if it is already there.
  */
 const downloadONNXRuntimeIfNeeded = async (platform, arch, appDir) => {
-    const asset = assetName(platform, arch);
+    const asset = ortAssetName(platform, arch);
     const outDir = path.join(appDir, "build", "onnxruntime", arch);
     const stampPath = path.join(outDir, ".ente-ort-stamp");
 
@@ -92,11 +95,11 @@ const downloadONNXRuntimeIfNeeded = async (platform, arch, appDir) => {
         if ((await fsp.readFile(stampPath, "utf8")) == asset) return;
     } catch {}
 
-    const expected = assetSHA256s[`${platform}-${arch}`];
+    const expected = ortAssetSHA256s[`${platform}-${arch}`];
     if (!expected) throw new Error(`No pinned SHA-256 for ${platform}-${arch}`);
 
     console.log(`Downloading ${asset}`);
-    const res = await fetch(`${releaseURL}/${asset}`);
+    const res = await fetch(`${ortReleaseURL}/${asset}`);
     if (!res.ok)
         throw new Error(`Failed to download ${asset}: HTTP ${res.status}`);
     const archive = Buffer.from(await res.arrayBuffer());
@@ -130,7 +133,7 @@ const downloadONNXRuntimeIfNeeded = async (platform, arch, appDir) => {
  * package.
  */
 const ensureONNXRuntime = async (platform, arch, appDir) => {
-    const arches = platform == "darwin" ? ["arm64", "x64"] : [arch];
+    const arches = archesForTarget(platform, arch);
     for (const a of arches)
         await downloadONNXRuntimeIfNeeded(platform, a, appDir);
 
@@ -223,7 +226,7 @@ const buildAddon = async (appDir, platform, arch) => {
 const stageMLAddons = async (appDir, platform, arch) => {
     // On macOS the packaged app is universal, so both architectures must be
     // staged regardless of which arch this build pass is for.
-    const arches = platform == "darwin" ? ["arm64", "x64"] : [arch];
+    const arches = archesForTarget(platform, arch);
 
     const stageDir = path.join(appDir, "build", "ml-native");
     await fsp.mkdir(stageDir, { recursive: true });
@@ -246,8 +249,12 @@ const stageMLAddons = async (appDir, platform, arch) => {
 };
 
 const main = async () => {
-    await ensureONNXRuntime(process.platform, process.arch, ".");
-    execSync("cargo codegen napi", { cwd: "../rust", stdio: "inherit" });
+    const appDir = path.resolve(__dirname, "..");
+    await ensureONNXRuntime(process.platform, process.arch, appDir);
+    execSync("cargo codegen napi", {
+        cwd: path.resolve(appDir, "..", "rust"),
+        stdio: "inherit",
+    });
 };
 
 module.exports = { ensureONNXRuntime, napiTriple, stageMLAddons };
