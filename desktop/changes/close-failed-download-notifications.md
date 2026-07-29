@@ -1,1 +1,0 @@
-- Added Close button to the download notification toast.

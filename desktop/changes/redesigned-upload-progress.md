@@ -1,1 +1,0 @@
-- Redesigned upload progress with completed, skipped, and failed file tracking.

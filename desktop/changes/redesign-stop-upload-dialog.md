@@ -1,1 +1,0 @@
-- Redesigned stop-upload confirmation dialog.
