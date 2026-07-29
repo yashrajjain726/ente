@@ -237,9 +237,9 @@ func (n *SpaceWebPushSender) send(
 		}
 
 		waitGroup.Add(1)
+		n.sendSlots <- struct{}{}
 		go func(subscription repo.SpaceWebPushSubscriptionRecord, payload []byte) {
 			defer waitGroup.Done()
-			n.sendSlots <- struct{}{}
 			defer func() { <-n.sendSlots }()
 			n.sendSubscription(event, payload, subscription, options)
 		}(subscription, encoded)
