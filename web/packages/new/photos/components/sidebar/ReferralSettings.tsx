@@ -59,10 +59,6 @@ type Loadable<T> =
     | { status: "error" }
     | { status: "loaded"; value: T };
 
-const referralFAQURL =
-    "https://ente.com/help/photos/features/account/referral-program/";
-const isValidReferralCode = (code: string) => /^[A-Z0-9]{4,20}$/.test(code);
-
 export const ReferralSettings: React.FC<NestedSidebarDrawerVisibilityProps> = ({
     open,
     onClose,
@@ -262,6 +258,7 @@ export const ReferralSettings: React.FC<NestedSidebarDrawerVisibilityProps> = ({
         contents = (
             <MainContents
                 referralView={referralView.value}
+                familyAdminEmail={familyAdminEmail(userDetails)}
                 onShowDetails={showDetails}
                 onEditCode={handleEditCode}
                 onApplyCode={showApplyCodeDialog}
@@ -332,6 +329,7 @@ const LoadError: React.FC<LoadErrorProps> = ({ onRetry, message }) => (
 
 interface MainContentsProps {
     referralView: ReferralView;
+    familyAdminEmail?: string;
     onShowDetails: () => void;
     onEditCode: () => void;
     onApplyCode: () => void;
@@ -339,14 +337,18 @@ interface MainContentsProps {
 
 const MainContents: React.FC<MainContentsProps> = ({
     referralView,
+    familyAdminEmail,
     onShowDetails,
     onEditCode,
     onApplyCode,
 }) => {
     const { planInfo, code } = referralView;
-    const codeChangeHint =
-        referralView.remainingCodeChangeAttempts == undefined
-            ? t("referral_code_change_hint")
+    const codeChangeHint = referralView.isFamilyMember
+        ? t("referral_code_change_family_admin_only", { familyAdminEmail })
+        : referralView.remainingCodeChangeAttempts == undefined
+          ? t("referral_code_change_hint")
+          : referralView.remainingCodeChangeAttempts === 0
+            ? t("code_change_limit_reached")
             : t("referral_code_changes_remaining", {
                   count: referralView.remainingCodeChangeAttempts,
               });
@@ -366,7 +368,15 @@ const MainContents: React.FC<MainContentsProps> = ({
             {planInfo.isEnabled && (
                 <>
                     <Stack sx={{ gap: 1 }}>
-                        <ReferralCodeCard code={code} onEdit={onEditCode} />
+                        <ReferralCodeCard
+                            code={code}
+                            onEdit={
+                                referralView.isFamilyMember ||
+                                referralView.remainingCodeChangeAttempts === 0
+                                    ? undefined
+                                    : onEditCode
+                            }
+                        />
                         <Typography
                             variant="small"
                             sx={{ px: 1, color: "text.muted" }}
@@ -396,7 +406,11 @@ const MainContents: React.FC<MainContentsProps> = ({
                 <RowButton
                     variant="secondary"
                     label={t("faq")}
-                    onClick={() => openURL(referralFAQURL)}
+                    onClick={() =>
+                        openURL(
+                            "https://ente.com/help/photos/features/account/referral-program/",
+                        )
+                    }
                 />
                 <RowButtonDivider />
                 <RowButton
@@ -535,7 +549,7 @@ const EditCodeDialog: React.FC<EditCodeDialogProps> = ({
             return;
         }
 
-        if (!isValidReferralCode(normalized)) {
+        if (normalized.length < 4) {
             setFieldError(t("referral_code_invalid"));
             return;
         }
