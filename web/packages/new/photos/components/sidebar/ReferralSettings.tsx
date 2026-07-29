@@ -59,6 +59,8 @@ type Loadable<T> =
     | { status: "error" }
     | { status: "loaded"; value: T };
 
+const isValidReferralCode = (code: string) => /^[A-Z0-9]{4,20}$/.test(code);
+
 export const ReferralSettings: React.FC<NestedSidebarDrawerVisibilityProps> = ({
     open,
     onClose,
@@ -549,7 +551,7 @@ const EditCodeDialog: React.FC<EditCodeDialogProps> = ({
             return;
         }
 
-        if (normalized.length < 4) {
+        if (!isValidReferralCode(normalized)) {
             setFieldError(t("referral_code_invalid"));
             return;
         }
