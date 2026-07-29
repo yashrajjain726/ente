@@ -278,25 +278,15 @@ fn build_webgpu_session_with_canary(
     };
     #[cfg(target_os = "android")]
     {
-        // The Android adapter probe touches the Vulkan driver, so it runs
-        // inside the armed canary window: a probe crash is recorded like any
-        // other WebGPU crash.
         match webgpu::check_adapter() {
             webgpu::AdapterCheck::Allowed => {}
             webgpu::AdapterCheck::Denied => {
-                // A completed probe that denies the adapter is a clean policy
-                // decision rather than a failed attempt, so the canary is
-                // disarmed.
                 canary.disarm();
                 return Err(MlError::Ort(
                     "WebGPU skipped: GPU adapter is not on the allowlist".to_string(),
                 ));
             }
             webgpu::AdapterCheck::Failed => {
-                // The canary stays armed so the drop records a failed attempt:
-                // a driver whose probe keeps failing quarantines like one that
-                // keeps crashing, and cannot reset the consecutive-failure
-                // counter of genuine crashes.
                 let error = MlError::Ort("WebGPU skipped: Vulkan adapter probe failed".to_string());
                 record_provider_attempt_failure(
                     ExecutionProvider::WebGpu,
@@ -681,8 +671,6 @@ fn platform_default_attempts(
     let mut attempts = Vec::new();
     if webgpu::attempt_permitted(model_path) && golden_entry_required(model_path, "WebGPU") {
         attempts.push(ProviderAttempt {
-            // EP priority follows registration order. Unsupported WebGPU nodes
-            // fall through to CPU in the same session.
             providers: vec![
                 webgpu_provider(),
                 CPU::default().with_arena_allocator(true).build(),

@@ -291,9 +291,7 @@ impl MlRuntime {
             // CoreML and WebGPU, making their mixed CPU/GPU execution slower
             // than running the complete model on CPU.
             clip_text: ModelSlot::new(cpu_only, "clip-text"),
-            // Pet models previously had device-specific FP16 driver failures.
-            // Keep them CPU-only until they have been validated on the GPU
-            // execution providers of all supported platforms.
+            // Pet models stay CPU-only due to device-specific FP16 failures.
             pet_face_detection: ModelSlot::new(cpu_only, "pet-face-detection"),
             pet_face_embedding_dog: ModelSlot::new(cpu_only, "pet-face-embedding-dog"),
             pet_face_embedding_cat: ModelSlot::new(cpu_only, "pet-face-embedding-cat"),

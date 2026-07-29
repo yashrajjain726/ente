@@ -1,12 +1,3 @@
-//! Platform guards for the WebGPU execution provider: a durable crash canary
-//! on Android, Linux and Windows, plus an Android GPU adapter allowlist.
-//!
-//! The canary prevents an infinite crash loop on machines where Dawn's native
-//! backend hard-crashes the process while a WebGPU session is built or first
-//! dispatched. On Android, the allowlist additionally permits WebGPU only on
-//! GPU vendors that Chromium ships WebGPU to, so Ente never runs Dawn on
-//! mobile driver stacks that Google's far larger fleet has not validated.
-//!
 //! Mechanics: immediately before a WebGPU session is built, a per-model
 //! counter file next to the model is incremented and fsynced ("armed"). After
 //! the session has been built *and* has survived one warm-up inference, the
@@ -14,11 +5,6 @@
 //! leaves the incremented counter behind. Once any model's counter reaches
 //! [`MAX_CONSECUTIVE_FAILURES`], WebGPU is no longer attempted for models in
 //! that directory — durably, across process restarts.
-//!
-//! A single interrupted attempt (e.g. the OS killing the app mid-indexing) is
-//! therefore tolerated: only consecutive failures with no intervening success
-//! trip the breaker, which a genuine crash loop does deterministically within
-//! a few launches.
 //!
 //! Everything here is called from `onnx::build_session` while the caller
 //! holds the per-model slot lock, so accesses to one model's counter file are
@@ -65,8 +51,6 @@ const CANARY_FILE_PREFIX: &str = ".ente-webgpu-canary-v1.";
 ))]
 const MAX_CONSECUTIVE_FAILURES: u32 = 3;
 
-/// WebGPU is opt-in at the app boundary. Android additionally gates this on
-/// device eligibility; desktop enables it when its native addon is loaded.
 #[cfg(any(target_os = "android", target_os = "linux", target_os = "windows"))]
 static WEBGPU_ENABLED: AtomicBool = AtomicBool::new(false);
 
@@ -359,9 +343,7 @@ fn sync_parent(path: &Path) -> io::Result<()> {
             "WebGPU canary path has no parent directory",
         )
     })?;
-    // Rust's standard library can open and fsync directories on Unix. Windows
-    // does not expose an equivalent portable operation; the counter file
-    // itself is still flushed above, which preserves the breaker semantics.
+    // std cannot fsync directories on Windows.
     #[cfg(not(target_os = "windows"))]
     return File::open(parent)?.sync_all();
     #[cfg(target_os = "windows")]

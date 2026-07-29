@@ -207,16 +207,12 @@ fn generate_frb_package(package_dir: &Path) -> Result<(), DynError> {
     Ok(())
 }
 
-/// Builds the desktop Node addon and regenerates its JS type declarations
-/// into the gitignored `desktop/rust-bindings/` directory, via `@napi-rs/cli`
-/// (a devDependency of `desktop/`).
 fn generate_napi() -> Result<(), DynError> {
     let rust_root = rust_root()?;
     let desktop_dir = repo_root()?.join("desktop");
     let out_dir = desktop_dir.join("rust-bindings");
     write_generated_gitignore(&out_dir)?;
 
-    // On Windows npm is a .cmd shim, which CreateProcess doesn't resolve.
     let npm = if cfg!(windows) { "npm.cmd" } else { "npm" };
     let linux_cross_args = if cfg!(target_os = "linux") {
         let target = match env::consts::ARCH {

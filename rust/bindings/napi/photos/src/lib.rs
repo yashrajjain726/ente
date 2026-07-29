@@ -1,7 +1,3 @@
-//! Node addon exposing the shared photos ML pipeline to the desktop app's
-//! Electron utility process. A thin mirror of the FRB surface in
-//! `bindings/frb/photos/src/api/ml_indexing_api.rs`.
-
 use ente_photos::ml::{
     error::MlError, indexing as shared_indexing, runtime::ModelPaths as SharedModelPaths,
     types as shared_types,
@@ -9,8 +5,6 @@ use ente_photos::ml::{
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
 
-/// Loads the ONNX Runtime dynamic library from `dylib_path`. Must be called
-/// once, before any other ML function.
 #[napi]
 pub fn init_ort(dylib_path: String) -> Result<()> {
     ort::init_from(&dylib_path)
@@ -23,20 +17,16 @@ pub fn init_ort(dylib_path: String) -> Result<()> {
     Ok(())
 }
 
-/// Configures process-wide ML execution behavior. `enable_webgpu` enables the
-/// guarded WebGPU path on Linux and Windows; it is a no-op on macOS.
 #[napi]
 pub fn set_ml_execution_config(enable_webgpu: bool) {
     shared_indexing::set_ml_execution_config(enable_webgpu);
 }
 
-/// Pins the indexing model sessions resident for a batch of analyze calls.
 #[napi]
 pub fn init_ml_runtime(model_paths: ModelPaths) {
     shared_indexing::init_ml_runtime(to_shared_model_paths(&model_paths));
 }
 
-/// Releases the session residency taken by [`init_ml_runtime`].
 #[napi]
 pub fn release_ml_runtime() {
     shared_indexing::release_ml_runtime();
@@ -59,15 +49,11 @@ pub struct ModelPaths {
 #[napi(object)]
 pub struct AnalyzeImageRequest {
     pub file_id: i64,
-    /// Filesystem path of the image. Exactly one of `image_path` and
-    /// `image_bytes` must be set.
     pub image_path: Option<String>,
-    /// Encoded image bytes (any supported format; decoded in Rust).
     pub image_bytes: Option<Buffer>,
     pub run_faces: bool,
     pub run_clip: bool,
     pub run_pets: bool,
-    /// When set, the result carries a JPEG face crop per detected face.
     pub generate_face_crops: bool,
     pub model_paths: ModelPaths,
 }
@@ -81,10 +67,7 @@ pub struct Dimensions {
 #[napi(object)]
 pub struct FaceDetection {
     pub score: f64,
-    /// Relative [x_min, y_min, x_max, y_max].
     pub box_xyxy: Vec<f64>,
-    /// 5 relative [x, y] keypoints: leftEye, rightEye, nose, leftMouth,
-    /// rightMouth.
     pub keypoints: Vec<Vec<f64>>,
 }
 
@@ -106,9 +89,7 @@ pub struct PetFaceResult {
     pub pet_face_id: String,
     pub score: f64,
     pub box_xyxy: Vec<f64>,
-    /// 3 relative [x, y] keypoints: leftEye, rightEye, nose.
     pub keypoints: Vec<Vec<f64>>,
-    /// 0 = dog, 1 = cat.
     pub species: u32,
     pub face_embedding: Float32Array,
 }
@@ -118,7 +99,6 @@ pub struct PetBodyResult {
     pub pet_body_id: String,
     pub score: f64,
     pub box_xyxy: Vec<f64>,
-    /// COCO class: 15 = cat, 16 = dog.
     pub coco_class: u32,
     pub body_embedding: Float32Array,
 }
@@ -128,15 +108,10 @@ pub struct AnalyzeImageResult {
     pub file_id: i64,
     pub decoded_image_size: Dimensions,
     pub faces: Option<Vec<FaceResult>>,
-    /// JPEG bytes, index-aligned with `faces`; present only when requested
-    /// via `generate_face_crops`. Crop generation is best effort: a face
-    /// whose crop could not be generated has a null slot.
     pub face_crops: Option<Vec<Option<Buffer>>>,
     pub clip: Option<ClipResult>,
     pub pet_faces: Option<Vec<PetFaceResult>>,
     pub pet_bodies: Option<Vec<PetBodyResult>>,
-    /// True when any model that contributed to this result ran on the
-    /// respective accelerated execution provider.
     pub used_coreml: bool,
     pub used_webgpu: bool,
 }
@@ -162,9 +137,6 @@ impl Task for AnalyzeImageTask {
     }
 }
 
-/// Analyzes one image (decode + the requested face / CLIP / pet models). The
-/// work runs off the JS event loop; callers should keep at most one analyze
-/// in flight, since the underlying model sessions serialize anyway.
 #[napi(ts_return_type = "Promise<AnalyzeImageResult>")]
 pub fn analyze_image(req: AnalyzeImageRequest) -> Result<AsyncTask<AnalyzeImageTask>> {
     let source = match (req.image_path, req.image_bytes) {
@@ -225,7 +197,6 @@ impl Task for RunClipTextTask {
     }
 }
 
-/// Computes the (L2-normalized) CLIP embedding of a text query.
 #[napi(ts_return_type = "Promise<RunClipTextResult>")]
 pub fn run_clip_text(req: RunClipTextRequest) -> AsyncTask<RunClipTextTask> {
     AsyncTask::new(RunClipTextTask {
@@ -242,17 +213,12 @@ pub fn tokenize_clip_text(text: String, vocab_path: String) -> Result<Vec<i32>> 
     shared_indexing::tokenize_clip_text(&text, &vocab_path).map_err(ml_error_to_napi)
 }
 
-/// A notable ML runtime event (execution provider fallback, golden self-test
-/// failure) buffered by the Rust runtime for app-side logging. `severity` is
-/// one of "info", "warning", or "severe".
 #[napi(object)]
 pub struct MlRuntimeEvent {
     pub severity: String,
     pub message: String,
 }
 
-/// Drains buffered ML runtime events. The buffer is process-wide, so drain
-/// after ML operations and log each event at its severity.
 #[napi]
 pub fn take_ml_runtime_events() -> Vec<MlRuntimeEvent> {
     ente_photos::ml::events::take_events()
@@ -264,10 +230,7 @@ pub fn take_ml_runtime_events() -> Vec<MlRuntimeEvent> {
         .collect()
 }
 
-/// Maps an [`MlError`] onto a JS error whose message starts with a stable
-/// `Kind:` tag. comlink only carries the message across the MessagePort, so
-/// callers match on the tag (notably `CorruptModel:`, whose detail is the
-/// model path to delete and redownload).
+// Error kind prefixes survive Comlink's MessagePort serialization.
 fn ml_error_to_napi(error: MlError) -> Error {
     let kind = match &error {
         MlError::InvalidRequest(_) => "InvalidRequest",

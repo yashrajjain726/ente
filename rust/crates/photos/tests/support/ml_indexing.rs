@@ -258,8 +258,6 @@ impl MlIndexingTestContext {
             match analyze_image(req) {
                 Ok(result) => {
                     let face_count = result.faces.as_ref().map_or(0, Vec::len);
-                    // Count generated crops only; a `None` slot (best-effort
-                    // skip) must not happen for the test corpus.
                     let crop_count = result
                         .face_crops
                         .as_ref()

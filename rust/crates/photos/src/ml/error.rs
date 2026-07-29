@@ -8,9 +8,7 @@ pub enum MlError {
     InvalidRequest(String),
     #[error("decode error: {0}")]
     Decode(String),
-    /// A deterministic failure caused by this image's decoded contents or by
-    /// image-derived geometry. Unlike generic preprocessing/postprocessing
-    /// failures, callers may safely stop retrying this particular image.
+    /// A deterministic per-image failure that should not be retried.
     #[error("image processing error: {0}")]
     Image(String),
     #[error("preprocess error: {0}")]

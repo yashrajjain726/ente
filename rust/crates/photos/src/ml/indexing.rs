@@ -30,8 +30,6 @@ pub struct AnalyzeImageRequest {
     pub run_faces: bool,
     pub run_clip: bool,
     pub run_pets: bool,
-    /// When set, the result carries a JPEG face crop per detected face,
-    /// generated from the same decode used for indexing.
     pub generate_face_crops: bool,
     pub model_paths: ModelPaths,
 }
@@ -41,9 +39,6 @@ pub struct AnalyzeImageResult {
     pub file_id: i64,
     pub decoded_image_size: Dimensions,
     pub faces: Option<Vec<FaceResult>>,
-    /// Index-aligned with `faces`; present only when requested via
-    /// `generate_face_crops`. Crop generation is best effort: a face whose
-    /// crop could not be generated has `None` in its slot.
     pub face_crops: Option<Vec<Option<Vec<u8>>>>,
     pub clip: Option<ClipResult>,
     pub pet_faces: Option<Vec<PetFaceResult>>,
@@ -68,11 +63,6 @@ pub struct RunClipTextResult {
 
 /// Configures process-wide ML execution behavior. Must be called before the
 /// first session is created to take effect for that session.
-///
-/// `enable_webgpu` is the app-side eligibility decision for Android, Linux and
-/// Windows. Rust additionally applies its durable crash canary before
-/// attempting the WebGPU execution provider. It has no effect on Apple
-/// platforms.
 pub fn set_ml_execution_config(enable_webgpu: bool) {
     webgpu::set_enabled(enable_webgpu);
 }
@@ -127,9 +117,6 @@ pub fn analyze_image(req: AnalyzeImageRequest) -> MlResult<AnalyzeImageResult> {
             None
         };
 
-        // Crops are a cosmetic side artifact of indexing, so their generation
-        // is best effort: a face whose crop fails is skipped (with a `None`
-        // slot to keep the index alignment) instead of failing the analysis.
         let face_crops = if generate_face_crops {
             faces.as_ref().map(|face_results| {
                 face_results
