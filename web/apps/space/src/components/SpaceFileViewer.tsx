@@ -309,6 +309,7 @@ const viewerCaptionTextSx = {
     fontWeight: 650,
     lineHeight: "21px",
     textAlign: "center",
+    textWrap: "balance",
     whiteSpace: "pre-wrap",
 } as const;
 const viewerCaptionBubbleSx = {

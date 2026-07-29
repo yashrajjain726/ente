@@ -87,6 +87,7 @@ const feedPhotoCaptionTextSx = {
     fontWeight: 650,
     lineHeight: "19px",
     textAlign: "center",
+    textWrap: "balance",
 } as const;
 const feedPhotoCaptionBubbleSx = {
     bgcolor: "rgba(48, 48, 48, 0.86)",
@@ -637,7 +638,7 @@ const FeedPhotoCaption: React.FC<{ caption: string }> = ({ caption }) => {
         const measure = () => {
             const fits = (value: string) => {
                 text.textContent = value;
-                return text.getClientRects().length <= 3;
+                return text.getClientRects().length <= 2;
             };
             if (fits(caption)) {
                 setDisplayCaption(caption);
@@ -694,7 +695,7 @@ const FeedPhotoCaption: React.FC<{ caption: string }> = ({ caption }) => {
                 title={caption}
                 sx={{
                     ...feedPhotoCaptionTextSx,
-                    bottom: 28,
+                    bottom: 20,
                     display: "-webkit-box",
                     left: "50%",
                     maxWidth: "70%",
@@ -703,7 +704,7 @@ const FeedPhotoCaption: React.FC<{ caption: string }> = ({ caption }) => {
                     textShadow: "0 1px 10px rgba(0, 0, 0, 0.74)",
                     transform: "translateX(-50%)",
                     WebkitBoxOrient: "vertical",
-                    WebkitLineClamp: 3,
+                    WebkitLineClamp: 2,
                     width: "max-content",
                     zIndex: 2,
                 }}
