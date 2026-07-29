@@ -1,1 +1,0 @@
-- Choose whether to import Google Photos favorites into Ente Favorites.

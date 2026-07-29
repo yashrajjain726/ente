@@ -1,1 +1,0 @@
-- Import or skip partner-shared photos during Google Photos Takeout.

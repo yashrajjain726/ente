@@ -1,1 +1,0 @@
-- Review photo, video, and album counts before uploading.
