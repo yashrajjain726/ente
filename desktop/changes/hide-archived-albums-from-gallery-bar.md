@@ -1,0 +1,1 @@
+- Hide archived albums from the main Gallery album bar.
