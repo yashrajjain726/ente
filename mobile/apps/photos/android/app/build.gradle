@@ -31,7 +31,7 @@ if (keystorePropertiesFile.exists()) {
 
 // Ente's custom prebuilt ONNX Runtime AAR is resolved straight from its
 // GitHub release through an Ivy repository; its SHA-256 is pinned in
-// gradle/verification-metadata.xml. See mobile/native/onnxruntime/README.md.
+// gradle/verification-metadata.xml.
 repositories {
     exclusiveContent {
         forRepository {
@@ -200,7 +200,7 @@ dependencies {
     implementation 'com.google.guava:listenablefuture:9999.0-empty-to-avoid-conflict-with-guava'
     // Custom WebGPU/XNNPACK build required by Rust ML, which dynamically
     // loads libonnxruntime.so.
-    implementation 'io.ente.onnxruntime:onnxruntime-webgpu-android:1.27.0-r2@aar'
+    implementation 'io.ente.onnxruntime:onnxruntime-webgpu-android:1.27.0-r3@aar'
     testImplementation 'junit:junit:4.12'
     androidTestImplementation 'androidx.test:runner:1.1.1'
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.1.1'

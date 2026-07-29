@@ -370,6 +370,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "async-compat"
+version = "0.2.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a1ba85bc55464dcbf728b56d97e119d673f4cf9062be330a9a26f3acf504a590"
+dependencies = [
+ "futures-core",
+ "futures-io",
+ "once_cell",
+ "pin-project-lite",
+ "tokio",
+]
+
+[[package]]
 name = "async-executor"
 version = "1.13.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2283,9 +2296,9 @@ checksum = "66b7e2430c6dff6a955451e2cfc438f09cea1965a9d6f87f7e3b90decc014099"
 name = "ensu-desktop"
 version = "0.1.18-beta"
 dependencies = [
+ "ente-assets",
  "ente-core",
  "ente-ensu",
- "ente-model-download",
  "keyring",
  "libc",
  "serde",
@@ -2305,21 +2318,40 @@ dependencies = [
 name = "ente-accounts"
 version = "0.0.0"
 dependencies = [
- "base64 0.22.1",
+ "bip39",
  "ente-core",
  "ente-test-support",
+ "getrandom 0.2.17",
+ "hex",
  "hmac 0.13.0",
  "mockito",
+ "rand_core 0.6.4",
  "serde",
  "serde_json",
  "sha1 0.11.0",
  "sha2 0.11.0",
  "srp",
+ "subtle",
  "thiserror 2.0.18",
  "tokio",
  "urlencoding",
  "uuid",
  "zeroize",
+]
+
+[[package]]
+name = "ente-assets"
+version = "0.0.0"
+dependencies = [
+ "flate2",
+ "futures-util",
+ "reqwest 0.12.28",
+ "serde",
+ "serde_json",
+ "sha2 0.11.0",
+ "tar",
+ "thiserror 2.0.18",
+ "tokio",
 ]
 
 [[package]]
@@ -2335,7 +2367,6 @@ dependencies = [
 name = "ente-contacts"
 version = "0.0.0"
 dependencies = [
- "base64 0.22.1",
  "ente-accounts",
  "ente-core",
  "ente-test-support",
@@ -2359,14 +2390,12 @@ version = "0.0.0"
 dependencies = [
  "argon2",
  "base64 0.22.1",
- "bip39",
  "blake2b_simd",
  "bytes",
  "crypto_secretstream",
  "futures-core",
  "getrandom 0.2.17",
  "gloo-timers",
- "hex",
  "log",
  "md-5 0.11.0",
  "mockito",
@@ -2375,8 +2404,6 @@ dependencies = [
  "salsa20",
  "serde",
  "serde_json",
- "sha2 0.11.0",
- "srp",
  "subtle",
  "thiserror 2.0.18",
  "tokio",
@@ -2389,9 +2416,9 @@ dependencies = [
 name = "ente-ensu"
 version = "0.0.0"
 dependencies = [
+ "ente-assets",
  "ente-core",
  "ente-image",
- "ente-model-download",
  "llama-cpp-2",
  "memmap2",
  "ort",
@@ -2402,7 +2429,6 @@ dependencies = [
  "self_cell",
  "serde",
  "serde_json",
- "sha2 0.11.0",
  "tempfile",
  "thiserror 2.0.18",
  "tokio",
@@ -2417,8 +2443,8 @@ dependencies = [
 name = "ente-ensu-uniffi"
 version = "0.0.0"
 dependencies = [
+ "ente-assets",
  "ente-ensu",
- "ente-model-download",
  "thiserror 2.0.18",
  "uniffi",
  "uuid",
@@ -2436,21 +2462,6 @@ dependencies = [
  "moxcms",
  "thiserror 2.0.18",
  "tiff 0.10.3",
-]
-
-[[package]]
-name = "ente-model-download"
-version = "0.0.0"
-dependencies = [
- "flate2",
- "futures-util",
- "reqwest 0.12.28",
- "serde",
- "serde_json",
- "sha2 0.11.0",
- "tar",
- "thiserror 2.0.18",
- "tokio",
 ]
 
 [[package]]
@@ -2472,8 +2483,8 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "ash",
+ "ente-assets",
  "ente-image",
- "ente-model-download",
  "fast_image_resize",
  "flate2",
  "half",
@@ -2500,7 +2511,6 @@ dependencies = [
 name = "ente-rs"
 version = "0.0.1"
 dependencies = [
- "base64 0.22.1",
  "chrono",
  "clap",
  "dialoguer",
@@ -2533,10 +2543,10 @@ dependencies = [
 name = "ente-space"
 version = "0.0.1"
 dependencies = [
- "base64 0.22.1",
  "ente-accounts",
  "ente-core",
  "ente-test-support",
+ "futures-util",
  "md-5 0.11.0",
  "mockito",
  "reqwest 0.12.28",
@@ -2575,6 +2585,7 @@ dependencies = [
 name = "ente-wasm"
 version = "0.0.0"
 dependencies = [
+ "ente-accounts",
  "ente-contacts",
  "ente-core",
  "js-sys",
@@ -2617,6 +2628,7 @@ dependencies = [
 name = "ente_rust"
 version = "0.0.0"
 dependencies = [
+ "ente-accounts",
  "ente-contacts",
  "ente-core",
  "flutter_rust_bridge",
@@ -9775,6 +9787,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b0ef62e69762fbb9386dcb6c87cd3dd05d525fa8a3a579a290892e60ddbda47e"
 dependencies = [
  "anyhow",
+ "async-compat",
  "bytes",
  "once_cell",
  "static_assertions",

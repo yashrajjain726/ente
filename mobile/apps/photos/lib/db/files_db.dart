@@ -1552,11 +1552,9 @@ class FilesDB with SqlDbBase {
 
   Future<void> deleteCollection(int collectionID) async {
     final db = await instance.sqliteAsyncDB;
-    unawaited(
-      db.execute('DELETE FROM $filesTable WHERE $columnCollectionID = ?', [
-        collectionID,
-      ]),
-    );
+    await db.execute('DELETE FROM $filesTable WHERE $columnCollectionID = ?', [
+      collectionID,
+    ]);
   }
 
   Future<void> removeFromCollection(int collectionID, List<int> fileIDs) async {

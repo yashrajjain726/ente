@@ -13,6 +13,7 @@ import { Box } from "@mui/material";
 import { ConfirmationActionSheet } from "components/ConfirmationActionSheet";
 import type { SpaceActionPhase } from "components/SpaceActionFeedback";
 import { SpaceButtonSpinner } from "components/SpaceButtonSpinner";
+import log from "ente-base/log";
 import React from "react";
 import { spaceTouchTargetSize } from "styles/touchTargets";
 
@@ -233,7 +234,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
         setLogoutErrorMessage(null);
         setLogoutActionPhase("busy");
         void onLogout().catch((error: unknown) => {
-            console.error("Failed to log out Space sessions", error);
+            log.error("Failed to log out Space sessions", error);
             setLogoutActionPhase(null);
             setLogoutErrorMessage("Couldn't log out. Please try again.");
         });

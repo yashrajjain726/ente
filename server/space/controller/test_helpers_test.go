@@ -39,7 +39,7 @@ func testUpdateProfile(ctx context.Context, module *spacerepo.Module, _ int64, s
 }
 
 func testRotateKey(ctx context.Context, module *spacerepo.Module, _ int64, spaceID string, keyVersion int, rootWrappedSpaceKey string, wrappedPrevKey string, encryptedProfile string) (*spacerepo.SpaceRecord, error) {
-	return module.Spaces.RotateKey(ctx, spaceID, keyVersion, testSpaceBytes(rootWrappedSpaceKey), testSpaceBytes(wrappedPrevKey), testSpaceBytes(encryptedProfile))
+	return module.Spaces.RotateKey(ctx, spaceID, keyVersion, testSpaceBytes(rootWrappedSpaceKey), testSpaceBytes(wrappedPrevKey), testSpaceBytes(encryptedProfile), nil, nil)
 }
 
 func testAddFriend(ctx context.Context, module *spacerepo.Module, requesterID int64, requesterSpaceID string, targetSpaceID string, targetFriendSealedSpaceKey string, targetKeyVersion int, requesterFriendSealedSpaceKey string, requesterKeyVersion int) error {

@@ -125,7 +125,7 @@ func testUpdateProfile(ctx context.Context, module *Module, _ int64, spaceID str
 }
 
 func testRotateKey(ctx context.Context, module *Module, _ int64, spaceID string, keyVersion int, rootWrappedSpaceKey string, wrappedPrevKey string, encryptedProfile string) (*SpaceRecord, error) {
-	return module.Spaces.RotateKey(ctx, spaceID, keyVersion, testSpaceBytes(rootWrappedSpaceKey), testSpaceBytes(wrappedPrevKey), testSpaceBytes(encryptedProfile))
+	return module.Spaces.RotateKey(ctx, spaceID, keyVersion, testSpaceBytes(rootWrappedSpaceKey), testSpaceBytes(wrappedPrevKey), testSpaceBytes(encryptedProfile), nil, nil)
 }
 
 func testAddFriend(ctx context.Context, module *Module, requesterID int64, requesterSpaceID string, targetSpaceID string, targetFriendSealedSpaceKey string, targetKeyVersion int, requesterFriendSealedSpaceKey string, requesterKeyVersion int) error {
@@ -1138,6 +1138,45 @@ func TestDeleteFriendRequestClearsUnread(t *testing.T) {
 	require.NoError(t, err)
 	require.False(t, aliceUnread)
 	requests, err := module.Friends.ListFriendRequestsForSpace(ctx, aliceSpace.SpaceID)
+	require.NoError(t, err)
+	require.Empty(t, requests)
+}
+
+func TestListAndDeleteSentFriendRequests(t *testing.T) {
+	ctx := context.Background()
+	module := newSpaceTestModule(t)
+
+	aliceID := insertSpaceUser(t, module, "alice-sent-requests@example.com", "alice-sent-requests-public")
+	bobID := insertSpaceUser(t, module, "bob-sent-requests@example.com", "bob-sent-requests-public")
+	charlieID := insertSpaceUser(t, module, "charlie-sent-requests@example.com", "charlie-sent-requests-public")
+	aliceSpace, err := testCreateSpace(ctx, module, aliceID, "alice_sent_requests", "alice-space-key", "alice-sent-requests-public", "alice-secret", "alice-secret-nonce", "alice-profile")
+	require.NoError(t, err)
+	bobSpace, err := testCreateSpace(ctx, module, bobID, "bob_sent_requests", "bob-space-key", "bob-sent-requests-public", "bob-secret", "bob-secret-nonce", "bob-profile")
+	require.NoError(t, err)
+	charlieSpace, err := testCreateSpace(ctx, module, charlieID, "charlie_sent_requests", "charlie-space-key", "charlie-sent-requests-public", "charlie-secret", "charlie-secret-nonce", "charlie-profile")
+	require.NoError(t, err)
+
+	bobRequest, created, err := testCreateFriendRequest(ctx, module, aliceID, aliceSpace.SpaceID, bobSpace.SpaceID, "bob-share-key", aliceSpace.CurrentVersion)
+	require.NoError(t, err)
+	require.True(t, created)
+	charlieRequest, created, err := testCreateFriendRequest(ctx, module, aliceID, aliceSpace.SpaceID, charlieSpace.SpaceID, "charlie-share-key", aliceSpace.CurrentVersion)
+	require.NoError(t, err)
+	require.True(t, created)
+	setFriendRequestCreatedAt(t, module, 1000, bobRequest.RequestID)
+	setFriendRequestCreatedAt(t, module, 2000, charlieRequest.RequestID)
+
+	requests, err := module.Friends.ListSentFriendRequestsForSpace(ctx, aliceSpace.SpaceID)
+	require.NoError(t, err)
+	require.Len(t, requests, 2)
+	require.Equal(t, charlieSpace.SpaceID, requests[0].Target.SpaceID)
+	require.Equal(t, bobSpace.SpaceID, requests[1].Target.SpaceID)
+
+	err = module.Friends.DeleteFriendRequest(ctx, bobSpace.SpaceID, charlieRequest.RequestID)
+	require.ErrorIs(t, err, sql.ErrNoRows)
+	require.NoError(t, module.Friends.DeleteFriendRequest(ctx, aliceSpace.SpaceID, charlieRequest.RequestID))
+	require.NoError(t, module.Friends.DeleteFriendRequest(ctx, bobSpace.SpaceID, bobRequest.RequestID))
+
+	requests, err = module.Friends.ListSentFriendRequestsForSpace(ctx, aliceSpace.SpaceID)
 	require.NoError(t, err)
 	require.Empty(t, requests)
 }

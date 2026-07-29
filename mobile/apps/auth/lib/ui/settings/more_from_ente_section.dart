@@ -43,19 +43,13 @@ class MoreFromEnteSection extends StatelessWidget {
 Uri moreFromEnteUri({
   required ComponentApp sourceApp,
   required ComponentApp destinationApp,
-  required String sourcePlatform,
 }) {
   final path = switch (destinationApp) {
     ComponentApp.photos => '/',
     ComponentApp.locker => '/locker',
     ComponentApp.auth => '/auth',
   };
-  return Uri.https('ente.com', path, {
-    'utm_source': 'ente_${sourceApp.name}',
-    'utm_medium': '${sourcePlatform}_app',
-    'utm_campaign': 'more_from_ente',
-    'utm_content': destinationApp.name,
-  });
+  return Uri.https('ente.com', path, {'from': sourceApp.name});
 }
 
 class _MoreFromEnteBrand extends StatelessWidget {
@@ -126,7 +120,7 @@ class _EnteAppLink extends StatelessWidget {
               children: [
                 Material(
                   key: ValueKey('more-from-ente-${app.name}'),
-                  type: MaterialType.transparency,
+                  color: colors.fillLight,
                   borderRadius: BorderRadius.circular(_appRadius),
                   clipBehavior: Clip.antiAlias,
                   child: InkWell(

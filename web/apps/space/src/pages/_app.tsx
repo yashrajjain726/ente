@@ -1,8 +1,9 @@
 import "@fontsource-variable/inter";
 import "@fontsource/nunito/800.css";
 import { CssBaseline } from "@mui/material";
-import { ThemeProvider } from "@mui/material/styles";
+import { createTheme, ThemeProvider } from "@mui/material/styles";
 import { SpaceRouteTransitionBoundary } from "components/SpaceRouteTransitionBoundary";
+import { SpaceShareLinkDialogHost } from "components/SpaceShareLinkDialog";
 import "configureZod";
 import { CustomHead } from "ente-base/components/Head";
 import { useSetupLogs } from "ente-base/components/utils/hooks-app";
@@ -14,12 +15,27 @@ import "react-easy-crop/react-easy-crop.css";
 import { SpaceAppStateProvider } from "state/SpaceAppStateProvider";
 import "styles/globals.css";
 
+const spaceTheme = createTheme(shareTheme, {
+    components: {
+        MuiDialog: {
+            styleOverrides: {
+                root: {
+                    ".MuiBackdrop-root": {
+                        backgroundColor:
+                            "var(--space-dialog-backdrop, rgba(0 0 0 / 0.48))",
+                    },
+                },
+            },
+        },
+    },
+});
+
 const App: React.FC<AppProps> = ({ Component, pageProps }) => {
     useSetupLogs({ disableDiskLogs: true });
 
     return (
         <ThemeProvider
-            theme={shareTheme}
+            theme={spaceTheme}
             defaultMode="light"
             storageManager={null}
         >
@@ -46,6 +62,7 @@ const App: React.FC<AppProps> = ({ Component, pageProps }) => {
             <SpaceRouteTransitionBoundary>
                 <SpaceAppStateProvider>
                     <Component {...pageProps} />
+                    <SpaceShareLinkDialogHost />
                 </SpaceAppStateProvider>
             </SpaceRouteTransitionBoundary>
         </ThemeProvider>

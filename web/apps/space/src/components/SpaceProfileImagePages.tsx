@@ -1,5 +1,6 @@
 import { SpacePageMeta } from "components/SpacePageMeta";
 import { SpaceRouteFallback } from "components/SpaceRouteFallback";
+import log from "ente-base/log";
 import React, { useEffect } from "react";
 import {
     EditProfileCoverScreen,
@@ -151,7 +152,7 @@ export const SpaceProfileImageEditPage: React.FC<{
             await router.push(savedRoute);
             clearPendingFile();
         } catch (error) {
-            console.error(
+            log.error(
                 variant == "cover"
                     ? "Space cover update failed"
                     : "Space avatar update failed",

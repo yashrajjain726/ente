@@ -6,8 +6,6 @@
   binaries: those are fetched from a plain GitHub release (no repository
   metadata), so their SHA-256 digests are pinned here. The digests come from
   the SHA256SUMS asset published with the ort-packaging release.
-
-  See mobile/native/onnxruntime/README.md for the release bump checklist.
 -->
 <verification-metadata xmlns="https://schema.gradle.org/dependency-verification"
                        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -20,8 +18,8 @@
       </trusted-artifacts>
    </configuration>
    <components>
-      <component group="io.ente.onnxruntime" name="onnxruntime-webgpu-android" version="1.27.0-r2">
-         <artifact name="onnxruntime-webgpu-android-1.27.0-r2.aar">
+      <component group="io.ente.onnxruntime" name="onnxruntime-webgpu-android" version="1.27.0-r3">
+         <artifact name="onnxruntime-webgpu-android-1.27.0-r3.aar">
             <sha256 value="0752f9b026df55780602cf482d9acddbe662d21383a2530d6e8c3d34a1ca8090"/>
          </artifact>
       </component>
