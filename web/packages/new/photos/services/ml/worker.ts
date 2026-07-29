@@ -673,12 +673,7 @@ const index = async (
         const msg = [];
         if (runFaces) msg.push(`${faceIndex.faces.length} faces`);
         if (runClip) msg.push("clip");
-        const ep = result.usedCoreml
-            ? " [coreml]"
-            : result.usedWebgpu
-              ? " [webgpu]"
-              : " [cpu]";
-        return `Indexed ${msg.join(" and ")} in ${f} (${ms} ms)${ep}`;
+        return `Indexed ${msg.join(" and ")} in ${f} (${ms} ms)`;
     });
 
     const remoteFaceIndex =

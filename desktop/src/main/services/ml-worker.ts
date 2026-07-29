@@ -118,7 +118,6 @@ const loadMLNative = (paths: MLNativePaths) => {
         // no-op on macOS, where CoreML remains the preferred provider.
         native.setMlExecutionConfig(true);
         _native = native;
-        log.debugString(`Loaded ML addon at ${paths.addon}`);
     } catch (e) {
         _nativeLoadError = e instanceof Error ? e.message : String(e);
         log.error(`Failed to load ML addon at ${paths.addon}`, e);
@@ -502,8 +501,7 @@ const analyzeImageOnce = async (
         req.runPets,
     );
     ensureMLRuntime(native, modelPaths);
-    const t = Date.now();
-    const result = await native.analyzeImage({
+    return await native.analyzeImage({
         fileId: req.fileID,
         ...source,
         runFaces: req.runFaces,
@@ -512,8 +510,6 @@ const analyzeImageOnce = async (
         generateFaceCrops: req.generateFaceCrops,
         modelPaths,
     });
-    log.debugString(`Rust ML analyzeImage took ${Date.now() - t} ms`);
-    return result;
 };
 
 /**
@@ -577,16 +573,12 @@ export const computeCLIPTextEmbeddingIfAvailable = async (text: string) => {
     }
 
     const [clipTextModelPath, vocabPath] = pathsOrSkip;
-    const t = Date.now();
     try {
         const { embedding } = await native.runClipText({
             text,
             modelPath: clipTextModelPath,
             vocabPath,
         });
-        log.debugString(
-            `Rust ML CLIP text embedding took ${Date.now() - t} ms`,
-        );
         return embedding;
     } catch (e) {
         // Don't block this query on the redownload; a subsequent query will
