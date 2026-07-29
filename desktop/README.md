@@ -30,6 +30,14 @@ npm ci
 npm run postinstall
 ```
 
+> [!NOTE]
+>
+> `npm run postinstall` requires a Rust toolchain and initially runs `cargo codegen napi`. When changing the Rust Photos ML code, rebuild the desktop addon manually:
+>
+> ```sh
+> (cd "$(git rev-parse --show-toplevel)/rust" && cargo codegen napi)
+> ```
+
 Now you can run in development mode (supports hot reload for the renderer process)
 
 ```sh
