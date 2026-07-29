@@ -580,7 +580,7 @@ run_preflight_checks() {
           preflight_errors+=("desktop ML addon not found under desktop/rust-bindings (run 'npm ci && npm run postinstall' in desktop/, or 'cargo codegen napi' from rust/)")
         fi
         if [[ ! -d "$ROOT_DIR/desktop/build/onnxruntime" ]]; then
-          preflight_errors+=("ONNX Runtime library not found under desktop/build/onnxruntime (run 'node scripts/ort.js' in desktop/)")
+          preflight_errors+=("ONNX Runtime library not found under desktop/build/onnxruntime (run 'node scripts/ml-native.js' in desktop/)")
         fi
         ;;
       android|ios)

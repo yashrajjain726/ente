@@ -16,7 +16,7 @@
  * The desktop build artifacts it needs are produced by the desktop
  * postinstall: the addon in `desktop/rust-bindings/` (via `cargo codegen
  * napi`) and the ONNX Runtime library in `desktop/build/onnxruntime/` (via
- * `node scripts/ort.js`).
+ * `node scripts/ml-native.js`).
  */
 
 const fsp = require("node:fs/promises");
@@ -62,7 +62,7 @@ const loadMLAddon = () => {
 };
 
 /**
- * The ONNX Runtime dynamic library downloaded by desktop's `scripts/ort.js`
+ * The ONNX Runtime dynamic library downloaded by desktop's `scripts/ml-native.js`
  * for the current architecture, located by scanning so that this script does
  * not duplicate the pinned library version.
  */
@@ -82,7 +82,7 @@ const onnxRuntimeLibraryPath = async () => {
     );
     if (!library)
         throw new Error(
-            `No ONNX Runtime library found in ${libraryDir} (run "node scripts/ort.js" in desktop/)`,
+            `No ONNX Runtime library found in ${libraryDir} (run "node scripts/ml-native.js" in desktop/)`,
         );
     return path.join(libraryDir, library.name);
 };

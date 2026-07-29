@@ -76,7 +76,7 @@ On macOS, we use the `sips` CLI tool for these tasks, but that is already availa
 
 The ML pipeline (natural language search using CLIP, and face detection and recognition) is implemented by the Rust crate shared with the mobile apps (`rust/crates/photos`), exposed to us as a Node native addon built from source by `cargo codegen napi` (see "[Note: ML with Rust]").
 
-The addon loads [ONNX Runtime](https://onnxruntime.ai) dynamically at runtime, using Ente's pinned custom builds (CoreML-enabled on macOS) that `scripts/ort.js` downloads into the extra resources (`build`) folder. See "[Note: ONNX Runtime binaries]".
+The addon loads [ONNX Runtime](https://onnxruntime.ai) dynamically at runtime, using Ente's pinned custom builds (CoreML-enabled on macOS) that `scripts/ml-native.js` downloads into the extra resources (`build`) folder. See "[Note: ONNX Runtime binaries]".
 
 ### ZIP
 

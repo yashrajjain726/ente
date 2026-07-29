@@ -40,10 +40,6 @@ const run = (cmd) => {
 run("npm rebuild --ignore-scripts=false ffmpeg-static electron-winstaller");
 run("npm exec -- electron-builder install-app-deps");
 run("node scripts/vips.js");
-run("node scripts/ort.js");
-// Build the Rust ML addon from source (requires a Rust toolchain). See
-// [Note: ML with Rust].
-console.log("> cargo codegen napi");
-execSync("cargo codegen napi", { cwd: "../rust", stdio: "inherit" });
+run("node scripts/ml-native.js");
 
 writeFileSync(stamp, treeHash());

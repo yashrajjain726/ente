@@ -1,6 +1,5 @@
 const fsp = require("fs/promises");
-const { stageMLAddons } = require("./ml-native");
-const { ensureONNXRuntime } = require("./ort");
+const { ensureONNXRuntime, stageMLAddons } = require("./ml-native");
 
 /**
  * This hook is invoked during the initial build (e.g. when triggered by

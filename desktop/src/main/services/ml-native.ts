@@ -11,7 +11,7 @@
  * (rust/crates/photos). The desktop app talks to it through a Node native
  * addon (rust/bindings/napi/photos), which loads ONNX Runtime dynamically at
  * runtime from Ente's pinned custom builds (see [Note: ONNX Runtime binaries]
- * in scripts/ort.js).
+ * in scripts/ml-native.js).
  *
  * During development, `cargo codegen napi` (invoked by our postinstall)
  * builds the addon into the gitignored `rust-bindings/` directory. When
