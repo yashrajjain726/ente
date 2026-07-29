@@ -21,6 +21,7 @@ import 'package:photos/models/memory_lane/memory_lane_models.dart';
 import 'package:photos/models/metadata/file_magic.dart';
 import 'package:photos/models/ml/face/face.dart';
 import 'package:photos/service_locator.dart' show entityService;
+import 'package:photos/services/collections_service.dart';
 import 'package:photos/utils/face_crop_util.dart';
 import 'package:photos/utils/file_key.dart';
 
@@ -631,56 +632,94 @@ class MemoryShareService {
     String? birthDate,
   }) async {
     try {
-      if (entries.isEmpty) {
-        throw Exception("No uploaded files to share");
-      }
-      final uniqueFileIDs = entries
-          .map((entry) => entry.fileId)
-          .toSet()
-          .toList();
-      final filesByID = await FilesDB.instance.getFileIDToFileFromIDs(
-        uniqueFileIDs,
-      );
-      final laneItems = <_MemoryLaneShareItem>[];
-      final seenUploadedFileIDs = <int>{};
-      for (final entry in entries) {
-        final file = filesByID[entry.fileId];
-        final uploadedFileID = file?.uploadedFileID;
-        if (file == null ||
-            uploadedFileID == null ||
-            !seenUploadedFileIDs.add(uploadedFileID)) {
-          continue;
-        }
-        laneItems.add(_MemoryLaneShareItem(file: file, entry: entry));
-      }
-      if (laneItems.isEmpty) {
-        throw Exception("No uploaded files to share");
-      }
-      final facesByFileID = await _loadLaneFacesByFileID(laneItems);
-      final metadata = _buildMemoryLaneMetadata(
-        laneItems,
+      return await _getOrCreateMemoryLaneLink(
+        entries: entries,
         title: title,
         personId: personId,
         personName: personName,
         birthDate: birthDate,
-        facesByFileID: facesByFileID,
-      );
-      final memoryHash = _getMemoryLaneHash(metadata);
-      final existingShare = await _findMemoryShareByHash(memoryHash);
-      if (existingShare != null &&
-          existingShare.type == MemoryShareType.lane &&
-          Uri.parse(existingShare.url).fragment.isNotEmpty) {
-        return (existingShare.url, existingShare.id);
-      }
-      return _createMemoryLaneLink(
-        laneItems: laneItems,
-        metadata: metadata,
-        memoryHash: memoryHash,
       );
     } catch (e, s) {
       _logger.severe("Failed to create memory lane share link data", e, s);
       rethrow;
     }
+  }
+
+  Future<(String, int)> _getOrCreateMemoryLaneLink({
+    required List<MemoryLaneEntry> entries,
+    required String title,
+    String? personId,
+    String? personName,
+    String? birthDate,
+  }) async {
+    if (entries.isEmpty) {
+      throw Exception("No uploaded files to share");
+    }
+    final laneItems = await _getShareableMemoryLaneItems(entries);
+    if (laneItems.isEmpty) {
+      throw Exception("No uploaded files to share");
+    }
+    final facesByFileID = await _loadLaneFacesByFileID(laneItems);
+    final metadata = _buildMemoryLaneMetadata(
+      laneItems,
+      title: title,
+      personId: personId,
+      personName: personName,
+      birthDate: birthDate,
+      facesByFileID: facesByFileID,
+    );
+    final memoryHash = _getMemoryLaneHash(metadata);
+    final existingShare = await _findMemoryShareByHash(memoryHash);
+    if (existingShare != null &&
+        existingShare.type == MemoryShareType.lane &&
+        Uri.parse(existingShare.url).fragment.isNotEmpty) {
+      return (existingShare.url, existingShare.id);
+    }
+
+    return _createMemoryLaneLink(
+      laneItems: laneItems,
+      metadata: metadata,
+      memoryHash: memoryHash,
+    );
+  }
+
+  Future<List<_MemoryLaneShareItem>> _getShareableMemoryLaneItems(
+    List<MemoryLaneEntry> entries,
+  ) async {
+    final uniqueFileIDs = entries.map((entry) => entry.fileId).toSet().toList();
+    final files = await FilesDB.instance.getFilesFromIDs(uniqueFileIDs);
+    final activeCollectionIDs = CollectionsService.instance
+        .getActiveCollections()
+        .where((collection) => !collection.isHidden())
+        .map((collection) => collection.id)
+        .toSet();
+    final filesByID = <int, EnteFile>{};
+    for (final file in files) {
+      final uploadedFileID = file.uploadedFileID;
+      final collectionID = file.collectionID;
+      if (uploadedFileID == null ||
+          collectionID == null ||
+          !activeCollectionIDs.contains(collectionID) ||
+          file.encryptedKey == null ||
+          file.keyDecryptionNonce == null) {
+        continue;
+      }
+      filesByID.putIfAbsent(uploadedFileID, () => file);
+    }
+
+    final laneItems = <_MemoryLaneShareItem>[];
+    final seenUploadedFileIDs = <int>{};
+    for (final entry in entries) {
+      final file = filesByID[entry.fileId];
+      final uploadedFileID = file?.uploadedFileID;
+      if (file == null ||
+          uploadedFileID == null ||
+          !seenUploadedFileIDs.add(uploadedFileID)) {
+        continue;
+      }
+      laneItems.add(_MemoryLaneShareItem(file: file, entry: entry));
+    }
+    return laneItems;
   }
 
   Future<MemoryShare?> _findMemoryShareByHash(String memoryHash) async {
