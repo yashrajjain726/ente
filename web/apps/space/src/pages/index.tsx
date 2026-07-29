@@ -37,6 +37,7 @@ import {
     type SpaceInviteIntent,
     type SpaceInviteRoute,
 } from "services/spaceInvite";
+import { isSpaceWebPushPilotPublicPage } from "services/spaceWebPushPilot";
 import {
     useSpaceAppState,
     type OnboardingEntrySource,
@@ -645,9 +646,13 @@ export const Page: React.FC<PageProps> = ({ invitePreview }) => {
                             postsCount={publicLink.postsCount}
                             profile={publicLink.profile}
                             publicNotificationControl={
-                                <SpacePublicProfileNotificationControl
-                                    session={publicLink}
-                                />
+                                isSpaceWebPushPilotPublicPage(
+                                    publicIdentity.username,
+                                ) ? (
+                                    <SpacePublicProfileNotificationControl
+                                        session={publicLink}
+                                    />
+                                ) : undefined
                             }
                             showAddingFriendSpinner={
                                 isAddingFriend && Boolean(profile)

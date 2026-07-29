@@ -1,3 +1,4 @@
+import { savedPartialLocalUser } from "ente-accounts-rs/services/accounts-db";
 import { isSpaceIOS, isSpaceStandalone } from "hooks/useSpacePWAInstallPrompt";
 import React from "react";
 import {
@@ -8,6 +9,7 @@ import {
     unsubscribeFromSpaceWebPush,
     type SpaceWebPushState,
 } from "services/spaceWebPush";
+import { isSpaceWebPushPilotAccount } from "services/spaceWebPushPilot";
 
 type PromptStatus = "enabling" | "error" | "hidden" | "loading" | "ready";
 
@@ -49,6 +51,7 @@ const isDismissed = () => {
 export const useSpaceWebPushPrompt = () => {
     const updating = React.useRef(false);
     const [isAvailable, setIsAvailable] = React.useState(false);
+    const [isPilotEligible, setIsPilotEligible] = React.useState(false);
     const [isSubscribed, setIsSubscribed] = React.useState<boolean | null>(
         null,
     );
@@ -59,8 +62,14 @@ export const useSpaceWebPushPrompt = () => {
     const [status, setStatus] = React.useState<PromptStatus>("loading");
 
     React.useEffect(() => {
+        const pilotEligible = isSpaceWebPushPilotAccount(
+            savedPartialLocalUser()?.email,
+        );
+        setIsPilotEligible(pilotEligible);
         const available =
-            isSpaceWebPushSupported() && (!isSpaceIOS() || isSpaceStandalone());
+            pilotEligible &&
+            isSpaceWebPushSupported() &&
+            (!isSpaceIOS() || isSpaceStandalone());
         setIsAvailable(available);
         if (!available) {
             setStatus("hidden");
@@ -171,6 +180,7 @@ export const useSpaceWebPushPrompt = () => {
         enable,
         isAvailable,
         isEnabling: status == "enabling",
+        isPilotEligible,
         isResolved: status != "loading",
         isSubscribed,
         needsBravePushMessaging,
