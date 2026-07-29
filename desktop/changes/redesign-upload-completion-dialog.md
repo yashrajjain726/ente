@@ -1,0 +1,1 @@
+- Redesigned upload completion dialog.
