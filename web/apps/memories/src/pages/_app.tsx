@@ -15,7 +15,8 @@ const memoriesAppTitle = "Memories, shared with you";
 const memoriesAppDescription = "Tap to relive with Ente";
 
 function MemoriesAppHead() {
-    const previewImage = "https://memories.ente.com/images/memories-meta.png";
+    const previewImage =
+        "https://memories.ente.com/images/memories-meta-new.png";
 
     return (
         <>
