@@ -123,4 +123,4 @@ const stageMLAddons = async (appDir, platform, arch) => {
             await fsp.rm(path.join(stageDir, entry), { recursive: true });
 };
 
-module.exports = { stageMLAddons };
+module.exports = { napiTriple, stageMLAddons };

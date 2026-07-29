@@ -29,7 +29,7 @@ usage() {
 Usage: infra/ml/test/run_ml_parity_tests.sh [flags]
 
 Flags:
-  --platforms all|android|ios           (default: all)
+  --platforms all|desktop|android|ios   (default: all)
   --output-dir <path>                   (default: infra/ml/test/out/parity)
   --verbose                             (default: disabled)
   --render-detection-overlays           (default: disabled; render annotated face detection images to out/parity/detections/<platform>/)
@@ -283,9 +283,9 @@ print_kv "mobile_ml_route:" "rust"
 declare -a selected_platforms=()
 case "$PLATFORMS" in
   all)
-    selected_platforms=(android ios)
+    selected_platforms=(desktop android ios)
     ;;
-  android|ios)
+  desktop|android|ios)
     selected_platforms=("$PLATFORMS")
     ;;
   *)
@@ -572,6 +572,17 @@ run_preflight_checks() {
 
   for platform in "${selected_platforms[@]}"; do
     case "$platform" in
+      desktop)
+        if ! command -v node >/dev/null 2>&1; then
+          preflight_errors+=("node is required for desktop parity")
+        fi
+        if ! compgen -G "$ROOT_DIR/desktop/rust-bindings/index.*.node" >/dev/null; then
+          preflight_errors+=("desktop ML addon not found under desktop/rust-bindings (run 'npm ci && npm run postinstall' in desktop/, or 'cargo codegen napi' from rust/)")
+        fi
+        if [[ ! -d "$ROOT_DIR/desktop/build/onnxruntime" ]]; then
+          preflight_errors+=("ONNX Runtime library not found under desktop/build/onnxruntime (run 'node scripts/ort.js' in desktop/)")
+        fi
+        ;;
       android|ios)
         if ! command -v flutter >/dev/null 2>&1; then
           preflight_errors+=("flutter is required for $platform parity")
@@ -744,8 +755,11 @@ for platform in "${selected_platforms[@]}"; do
   esac
 done
 
+# Every platform runner uses the local model cache; only the mobile runners
+# additionally need it served over HTTP (the desktop runner reads the files
+# directly).
+prepare_local_model_mirror_cache "$LOCAL_MODEL_MIRROR_DIR"
 if $has_mobile_platform; then
-  prepare_local_model_mirror_cache "$LOCAL_MODEL_MIRROR_DIR"
   if ! start_local_mirror_server "$ML_DIR" "$LOCAL_MIRROR_LOG"; then
     echo "Proceeding without local parity mirror."
   fi
@@ -950,6 +964,30 @@ run_mobile_runner() {
   return 0
 }
 
+run_desktop_runner() {
+  local platform_output_dir="$OUTPUT_DIR/desktop"
+  local output_path="$platform_output_dir/results.json"
+
+  echo "Running desktop parity runner"
+  if ! node "$ML_DIR/tools/desktop_parity_runner.js" \
+    --manifest "$MANIFEST_PATH" \
+    --ml-dir "$ML_DIR" \
+    --models-dir "$LOCAL_MODEL_MIRROR_DIR" \
+    --asset-lock "$ASSET_LOCK_PATH" \
+    --code-revision "$CODE_REVISION" \
+    --output "$output_path"; then
+    echo "Desktop parity runner failed; desktop parity output not generated."
+    return 1
+  fi
+
+  if [[ ! -f "$output_path" ]]; then
+    echo "Desktop parity runner finished without output at $output_path."
+    return 1
+  fi
+
+  return 0
+}
+
 run_android_runner() {
   run_mobile_runner \
     "android" \
@@ -967,6 +1005,9 @@ run_ios_runner() {
 run_platform_runner() {
   local platform="$1"
   case "$platform" in
+    desktop)
+      run_desktop_runner
+      ;;
     android)
       run_android_runner
       ;;
