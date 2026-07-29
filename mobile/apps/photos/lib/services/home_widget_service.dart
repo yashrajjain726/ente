@@ -9,10 +9,16 @@ import 'package:path_provider_foundation/path_provider_foundation.dart';
 import 'package:photos/core/constants.dart';
 import 'package:photos/models/file/file.dart';
 import 'package:photos/module/download/thumbnail.dart';
+import 'package:photos/service_locator.dart';
 import 'package:photos/services/album_home_widget_service.dart';
+import 'package:photos/services/app_navigation_service.dart';
 import 'package:photos/services/memory_home_widget_service.dart';
 import 'package:photos/services/people_home_widget_service.dart';
 import 'package:photos/services/smart_memories_service.dart';
+import 'package:photos/ui/settings/ml/machine_learning_settings_page.dart';
+import 'package:photos/ui/settings/widgets/albums_widget_settings.dart';
+import 'package:photos/ui/settings/widgets/memories_widget_settings.dart';
+import 'package:photos/ui/settings/widgets/people_widget_settings.dart';
 import 'package:synchronized/synchronized.dart';
 
 enum WidgetStatus {
@@ -253,43 +259,74 @@ class HomeWidgetService {
       return;
     }
 
+    _logger.info("Handling widget launch with URI: $uri");
+
     final generatedId = int.tryParse(
       uri.queryParameters[GENERATED_ID_PARAM] ?? "",
     );
-    if (generatedId == null) {
-      _logger.warning("Widget launch failed: Invalid or missing generated ID");
-      return;
-    }
+
+    final bool isConfigureRoute =
+        uri.host == 'configure' || generatedId == null;
 
     // Route to appropriate handler based on widget scheme
     switch (uri.scheme) {
       case MEMORY_WIDGET_SCHEME:
-        await MemoryHomeWidgetService.instance.onLaunchFromWidget(generatedId);
+        if (isConfigureRoute) {
+          _logger.info("Navigating to Memories widget customization screen");
+          await AppNavigationService.instance.pushPage(
+            const MemoriesWidgetSettings(),
+          );
+        } else {
+          await MemoryHomeWidgetService.instance.onLaunchFromWidget(
+            generatedId,
+          );
+        }
         break;
 
       case PEOPLE_WIDGET_SCHEME:
-        final personId = uri.queryParameters[MAIN_KEY_PARAM] ?? "";
-        await PeopleHomeWidgetService.instance.onLaunchFromWidget(
-          generatedId,
-          personId,
-        );
+        if (isConfigureRoute) {
+          _logger.info("Navigating to People widget customization screen");
+          if (!hasGrantedMLConsent) {
+            await AppNavigationService.instance.pushPage(
+              const MachineLearningSettingsPage(),
+              forceCustomPageRoute: true,
+            );
+          } else {
+            await AppNavigationService.instance.pushPage(
+              const PeopleWidgetSettings(),
+            );
+          }
+        } else {
+          final personId = uri.queryParameters[MAIN_KEY_PARAM] ?? "";
+          await PeopleHomeWidgetService.instance.onLaunchFromWidget(
+            generatedId,
+            personId,
+          );
+        }
         break;
 
       case ALBUM_WIDGET_SCHEME:
-        final collectionId = int.tryParse(
-          uri.queryParameters[MAIN_KEY_PARAM] ?? "",
-        );
-        if (collectionId == null) {
-          _logger.warning(
-            "Album widget launch failed: Invalid or missing collection ID",
+        if (isConfigureRoute) {
+          _logger.info("Navigating to Album widget customization screen");
+          await AppNavigationService.instance.pushPage(
+            const AlbumsWidgetSettings(),
           );
-          return;
-        }
+        } else {
+          final collectionId = int.tryParse(
+            uri.queryParameters[MAIN_KEY_PARAM] ?? "",
+          );
+          if (collectionId == null) {
+            _logger.warning(
+              "Album widget launch failed: Invalid or missing collection ID",
+            );
+            return;
+          }
 
-        await AlbumHomeWidgetService.instance.onLaunchFromWidget(
-          generatedId,
-          collectionId,
-        );
+          await AlbumHomeWidgetService.instance.onLaunchFromWidget(
+            generatedId,
+            collectionId,
+          );
+        }
         break;
 
       default:
