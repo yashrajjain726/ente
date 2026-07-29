@@ -80,7 +80,7 @@ const ChangelogContent: React.FC = () => {
         <Stack sx={{ gap: 2, mb: 1 }}>
             <Typography variant="h6">
                 {ut(
-                    "Redesigned uploads, family plan management, smarter Takeout imports, and more",
+                    "Better upload and family plan management experience, smarter Takeout imports, and more",
                 )}
             </Typography>
             <Typography sx={{ color: "text.muted" }}>
