@@ -22,7 +22,7 @@ import { wait } from "ente-utils/promise";
 import { savedCollectionFiles } from "../photos-fdb";
 import {
     fetchIndexableImageSource,
-    fetchRenderableBlob,
+    renderableImageBytes,
     type IndexableImageSource,
 } from "./blob";
 import {
@@ -650,7 +650,6 @@ const index = async (
     try {
         result = await analyzeImageWithConversionFallback(
             file,
-            processableUploadItem,
             source,
             { runFaces, runClip },
             electron,
@@ -765,7 +764,6 @@ const petsIndexingEnabled = false;
  */
 const analyzeImageWithConversionFallback = async (
     file: EnteFile,
-    processableUploadItem: ProcessableUploadItem | undefined,
     source: IndexableImageSource,
     { runFaces, runClip }: { runFaces: boolean; runClip: boolean },
     electron: ElectronMLWorker,
@@ -790,17 +788,8 @@ const analyzeImageWithConversionFallback = async (
         );
         let bytes: Uint8Array;
         try {
-            const blob = await fetchRenderableBlob(
-                file,
-                processableUploadItem,
-                electron,
-            );
-            bytes = new Uint8Array(await blob.arrayBuffer());
+            bytes = await renderableImageBytes(file, source);
         } catch (conversionError) {
-            // Fetching the source for conversion can still fail transiently.
-            // Do not turn such a download error into a permanent image error.
-            if (isNetworkDownloadError(conversionError)) throw conversionError;
-
             const message =
                 conversionError instanceof Error
                     ? conversionError.message

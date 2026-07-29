@@ -22,7 +22,7 @@ import { decodeLivePhoto } from "ente-media/live-photo";
  * {@link fetchRenderableBlob} there is no JPEG conversion involved.
  */
 export interface IndexableImageSource {
-    bytes: Uint8Array;
+    bytes: Uint8Array<ArrayBuffer>;
 }
 
 /**
@@ -102,6 +102,24 @@ export const fetchIndexableImageSource = async (
     } else {
         return { bytes: new Uint8Array(await originalFileBlob.arrayBuffer()) };
     }
+};
+
+/**
+ * Return renderable image bytes derived from an already fetched source.
+ *
+ * This is used when the native decoder rejects a format that the desktop app
+ * can convert to JPEG. Keeping conversion separate from fetching ensures the
+ * fallback uses the same stable bytes as the initial analysis attempt.
+ */
+export const renderableImageBytes = async (
+    file: EnteFile,
+    source: IndexableImageSource,
+): Promise<Uint8Array> => {
+    const blob = await renderableImageBlob(
+        new Blob([source.bytes]),
+        fileFileName(file),
+    );
+    return new Uint8Array(await blob.arrayBuffer());
 };
 
 /**
