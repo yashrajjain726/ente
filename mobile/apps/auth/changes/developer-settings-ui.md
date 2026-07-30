@@ -1,1 +1,0 @@
-- Refreshed the developer settings screen.
