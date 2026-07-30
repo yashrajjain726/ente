@@ -205,7 +205,6 @@ func (r *WebPushRepository) ListActiveAccountSubscriptions(
 func (r *WebPushRepository) ListPostSubscriptions(
 	ctx context.Context,
 	spaceID string,
-	friendUserIDs []int64,
 ) ([]SpaceWebPushSubscriptionRecord, error) {
 	rows, err := r.DB.QueryContext(ctx, `
 		SELECT push.target_id, push.endpoint, push.p256dh, push.auth,
@@ -213,11 +212,18 @@ func (r *WebPushRepository) ListPostSubscriptions(
 		FROM space_web_push_subscriptions push
 		JOIN space_browser_sessions session
 		  ON session.token_hash = push.session_token_hash
-		 AND session.expires_at > $3
+		 AND session.expires_at > $2
 		JOIN users active_user
 		  ON active_user.user_id = session.user_id
 		 AND active_user.encrypted_email IS NOT NULL
-		WHERE session.user_id = ANY($1)
+		WHERE EXISTS (
+			SELECT 1
+			FROM space_friend_shares friendship
+			JOIN spaces friend_space
+			  ON friend_space.space_id = friendship.friend_space_id
+			WHERE friendship.space_id = $1
+			  AND friend_space.owner_id = session.user_id
+		)
 
 		UNION ALL
 
@@ -232,8 +238,8 @@ func (r *WebPushRepository) ListPostSubscriptions(
 		JOIN users active_user
 		  ON active_user.user_id = space.owner_id
 		 AND active_user.encrypted_email IS NOT NULL
-		WHERE link.space_id = $2
-	`, pq.Array(friendUserIDs), spaceID, timeutil.Microseconds())
+		WHERE link.space_id = $1
+	`, spaceID, timeutil.Microseconds())
 	if err != nil {
 		return nil, stacktrace.Propagate(err, "")
 	}

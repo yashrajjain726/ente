@@ -37,8 +37,8 @@ func newRecordingSpaceActivityNotifier() *recordingSpaceActivityNotifier {
 	return &recordingSpaceActivityNotifier{events: make(chan recordedSpaceActivity, 8)}
 }
 
-func (n *recordingSpaceActivityNotifier) OnSpacePostCreated(actorUserID int64, actorSpaceID, actorSlug string, recipientUserIDs []int64) {
-	n.record(spaceActivityPostCreated, actorUserID, actorSpaceID, actorSlug, recipientUserIDs...)
+func (n *recordingSpaceActivityNotifier) OnSpacePostCreated(actorUserID int64, actorSpaceID, actorSlug string) {
+	n.record(spaceActivityPostCreated, actorUserID, actorSpaceID, actorSlug)
 }
 
 func (n *recordingSpaceActivityNotifier) OnSpacePostLiked(actorUserID int64, actorSpaceID, actorSlug string, recipientUserID int64) {

@@ -12,7 +12,6 @@ import (
 	"github.com/ente/museum/space/repo"
 	"github.com/ente/stacktrace"
 	"github.com/gin-gonic/gin"
-	log "github.com/sirupsen/logrus"
 )
 
 const spacePostLimitWarningThreshold = 200
@@ -24,7 +23,6 @@ type SpaceAbuseNotifier interface {
 type PostsController struct {
 	PostsRepo        *repo.PostsRepository
 	SpacesRepo       *repo.SpacesRepository
-	FriendsRepo      *repo.FriendsRepository
 	AssetsRepo       *repo.AssetsRepository
 	ActivityNotifier SpaceActivityNotifier
 	AbuseNotifier    SpaceAbuseNotifier
@@ -97,14 +95,7 @@ func (c *PostsController) Create(ctx context.Context, space *repo.SpaceRecord, r
 }
 
 func (c *PostsController) notifyFriendsOfNewPost(ownerID int64, spaceID, spaceSlug string) {
-	go func() {
-		recipientUserIDs, err := c.FriendsRepo.ListFriendOwnerIDsForSpace(context.Background(), spaceID)
-		if err != nil {
-			log.WithField("space_id", spaceID).WithError(err).Error("Failed to list friends for Space post notification")
-			return
-		}
-		c.ActivityNotifier.OnSpacePostCreated(ownerID, spaceID, spaceSlug, recipientUserIDs)
-	}()
+	go c.ActivityNotifier.OnSpacePostCreated(ownerID, spaceID, spaceSlug)
 }
 
 func (c *PostsController) postResponses(ctx context.Context, posts []repo.SpacePostRecord, includeAuthor bool) ([]models.PostResponse, error) {

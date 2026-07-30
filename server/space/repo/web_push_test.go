@@ -16,6 +16,19 @@ func TestWebPushSubscriptionsFollowTargetsAndActiveSessions(t *testing.T) {
 	friendID := insertSpaceUser(t, module, "space-web-push-friend@example.com", "friend-public")
 	space, err := testCreateSpace(ctx, module, ownerID, "space_push_owner", "root", "public", "secret", "nonce", "profile")
 	require.NoError(t, err)
+	friendSpace, err := testCreateSpace(ctx, module, friendID, "space_push_friend", "friend-root", "friend-public", "friend-secret", "friend-nonce", "friend-profile")
+	require.NoError(t, err)
+	require.NoError(t, testAddFriend(
+		ctx,
+		module,
+		friendID,
+		friendSpace.SpaceID,
+		space.SpaceID,
+		"owner-share-key",
+		space.CurrentVersion,
+		"friend-share-key",
+		friendSpace.CurrentVersion,
+	))
 	link, err := module.Links.Create(
 		ctx,
 		space.SpaceID,
@@ -34,7 +47,7 @@ func TestWebPushSubscriptionsFollowTargetsAndActiveSessions(t *testing.T) {
 	require.NoError(t, module.Sessions.CreateBrowserSession(ctx, activeSession, friendID, "active-wrap", timeutil.NDaysFromNow(1)))
 	require.NoError(t, module.Sessions.CreateBrowserSession(ctx, expiredSession, friendID, "expired-wrap", timeutil.Microseconds()-1))
 
-	activeTargetID, err := module.WebPush.UpsertAccountSubscription(
+	_, err = module.WebPush.UpsertAccountSubscription(
 		ctx,
 		activeSession,
 		"https://push.example/active",
@@ -42,7 +55,7 @@ func TestWebPushSubscriptionsFollowTargetsAndActiveSessions(t *testing.T) {
 		"active-auth",
 	)
 	require.NoError(t, err)
-	_, err = module.WebPush.UpsertAccountSubscription(
+	accountTargetID, err := module.WebPush.UpsertAccountSubscription(
 		ctx,
 		activeSession,
 		"https://push.example/replaced",
@@ -66,7 +79,7 @@ func TestWebPushSubscriptionsFollowTargetsAndActiveSessions(t *testing.T) {
 		"public-auth",
 	)
 	require.NoError(t, err)
-	require.NotEqual(t, activeTargetID, publicTargetID)
+	require.NotEqual(t, accountTargetID, publicTargetID)
 
 	accountSubscriptions, err := module.WebPush.ListActiveAccountSubscriptions(ctx, []int64{friendID})
 	require.NoError(t, err)
@@ -74,15 +87,24 @@ func TestWebPushSubscriptionsFollowTargetsAndActiveSessions(t *testing.T) {
 	require.Equal(t, "https://push.example/replaced", accountSubscriptions[0].Endpoint)
 	require.Equal(t, friendID, accountSubscriptions[0].UserID)
 
-	postSubscriptions, err := module.WebPush.ListPostSubscriptions(ctx, space.SpaceID, nil)
+	postSubscriptions, err := module.WebPush.ListPostSubscriptions(ctx, space.SpaceID)
 	require.NoError(t, err)
-	require.Equal(t, []SpaceWebPushSubscriptionRecord{{
-		TargetID: publicTargetID,
-		Endpoint: "https://push.example/public",
-		P256dh:   "public-p256dh",
-		Auth:     "public-auth",
-		Public:   true,
-	}}, postSubscriptions)
+	require.ElementsMatch(t, []SpaceWebPushSubscriptionRecord{
+		{
+			TargetID: accountTargetID,
+			Endpoint: "https://push.example/replaced",
+			P256dh:   "replaced-p256dh",
+			Auth:     "replaced-auth",
+			UserID:   friendID,
+		},
+		{
+			TargetID: publicTargetID,
+			Endpoint: "https://push.example/public",
+			P256dh:   "public-p256dh",
+			Auth:     "public-auth",
+			Public:   true,
+		},
+	}, postSubscriptions)
 
 	require.NoError(t, module.Sessions.DeleteBrowserSession(ctx, activeSession))
 	var count int

@@ -38,7 +38,7 @@ func NewModule(
 		SessionsRepo: repos.Sessions,
 	}
 	spaces := &SpacesController{SpacesRepo: repos.Spaces, AssetsRepo: repos.Assets, auth: authDeps}
-	posts := &PostsController{PostsRepo: repos.Posts, SpacesRepo: repos.Spaces, FriendsRepo: repos.Friends, AssetsRepo: repos.Assets, ActivityNotifier: activityNotifier, auth: authDeps}
+	posts := &PostsController{PostsRepo: repos.Posts, SpacesRepo: repos.Spaces, AssetsRepo: repos.Assets, ActivityNotifier: activityNotifier, auth: authDeps}
 	assets := &AssetsController{AssetsRepo: repos.Assets, SpacesRepo: repos.Spaces, auth: authDeps}
 	links := &LinksController{LinksRepo: repos.Links, SpacesRepo: repos.Spaces, FriendsRepo: repos.Friends, Posts: posts, Assets: assets}
 	return &Module{

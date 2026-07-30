@@ -28,13 +28,13 @@ func setupPostsControllerTest(t *testing.T) (*PostsController, *spacerepo.Module
 
 type noopSpaceActivityNotifier struct{}
 
-func (noopSpaceActivityNotifier) OnSpacePostCreated(int64, string, string, []int64) {}
-func (noopSpaceActivityNotifier) OnSpacePostLiked(int64, string, string, int64)     {}
-func (noopSpaceActivityNotifier) OnSpacePostReplied(int64, string, string, int64)   {}
-func (noopSpaceActivityNotifier) OnSpaceMessageSent(int64, string, string, int64)   {}
-func (noopSpaceActivityNotifier) OnSpaceMessageLiked(int64, string, string, int64)  {}
-func (noopSpaceActivityNotifier) OnSpaceFriendAdded(int64, string, string, int64)   {}
-func (noopSpaceActivityNotifier) OnSpaceFriendRequested(int64, string, int64)       {}
+func (noopSpaceActivityNotifier) OnSpacePostCreated(int64, string, string)         {}
+func (noopSpaceActivityNotifier) OnSpacePostLiked(int64, string, string, int64)    {}
+func (noopSpaceActivityNotifier) OnSpacePostReplied(int64, string, string, int64)  {}
+func (noopSpaceActivityNotifier) OnSpaceMessageSent(int64, string, string, int64)  {}
+func (noopSpaceActivityNotifier) OnSpaceMessageLiked(int64, string, string, int64) {}
+func (noopSpaceActivityNotifier) OnSpaceFriendAdded(int64, string, string, int64)  {}
+func (noopSpaceActivityNotifier) OnSpaceFriendRequested(int64, string, int64)      {}
 
 func testSpaceBytes(value string) []byte {
 	return []byte(value)
