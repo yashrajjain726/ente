@@ -154,7 +154,7 @@ func (n *SpaceWebPushSender) sendAccountActivity(
 	}
 	subscriptions, err := n.WebPushRepo.ListActiveAccountSubscriptions(
 		context.Background(),
-		[]int64{recipientUserID},
+		recipientUserID,
 	)
 	if err != nil {
 		log.WithField("event", event).WithError(err).
@@ -253,8 +253,8 @@ func (n *SpaceWebPushSender) sendSubscription(
 	}, options)
 	if err != nil {
 		log.WithFields(log.Fields{
-			"event":   event,
-			"user_id": subscription.UserID,
+			"event":     event,
+			"target_id": subscription.TargetID,
 		}).WithError(err).Error("Failed to send Space web push")
 		return
 	}
@@ -268,9 +268,9 @@ func (n *SpaceWebPushSender) sendSubscription(
 	}
 	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
 		log.WithFields(log.Fields{
-			"event":   event,
-			"status":  response.StatusCode,
-			"user_id": subscription.UserID,
+			"event":     event,
+			"status":    response.StatusCode,
+			"target_id": subscription.TargetID,
 		}).Warn("Space web push provider rejected notification")
 	}
 }

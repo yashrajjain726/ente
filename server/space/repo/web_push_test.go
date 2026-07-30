@@ -81,11 +81,10 @@ func TestWebPushSubscriptionsFollowTargetsAndActiveSessions(t *testing.T) {
 	require.NoError(t, err)
 	require.NotEqual(t, accountTargetID, publicTargetID)
 
-	accountSubscriptions, err := module.WebPush.ListActiveAccountSubscriptions(ctx, []int64{friendID})
+	accountSubscriptions, err := module.WebPush.ListActiveAccountSubscriptions(ctx, friendID)
 	require.NoError(t, err)
 	require.Len(t, accountSubscriptions, 1)
 	require.Equal(t, "https://push.example/replaced", accountSubscriptions[0].Endpoint)
-	require.Equal(t, friendID, accountSubscriptions[0].UserID)
 
 	postSubscriptions, err := module.WebPush.ListPostSubscriptions(ctx, space.SpaceID)
 	require.NoError(t, err)
@@ -95,7 +94,6 @@ func TestWebPushSubscriptionsFollowTargetsAndActiveSessions(t *testing.T) {
 			Endpoint: "https://push.example/replaced",
 			P256dh:   "replaced-p256dh",
 			Auth:     "replaced-auth",
-			UserID:   friendID,
 		},
 		{
 			TargetID: publicTargetID,
