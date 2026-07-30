@@ -39,6 +39,7 @@ process.parentPort.once("message", (e) => {
     // Initialize ourselves with the data we got from our parent.
     const { mlNativePaths } = parseInitData(e.data);
     loadMLNative(mlNativePaths);
+    if (_native) void warmUpClipTextEncoder(_native);
     // Expose an instance of `ElectronMLWorker` on the port we got from our
     // parent.
     expose(
@@ -577,6 +578,32 @@ const evictModelIfReportedCorrupt = async (e: unknown) => {
 // Zero-copy view over the transferred bytes.
 const uint8ArrayToBuffer = (bytes: Uint8Array) =>
     Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+
+/**
+ * Run a throwaway CLIP text query so that the Rust side builds and caches the
+ * text encoder session before the user's first search. Mirrors the mobile
+ * app's warm up (see ml_computer.dart).
+ *
+ * Best effort - on failure, queries build the session on demand as before.
+ */
+const warmUpClipTextEncoder = async (native: MLNative) => {
+    try {
+        const [model, vocab] = await Promise.all([
+            modelPath(modelSpecs.clipText),
+            modelPath(modelSpecs.clipTextVocab),
+        ]);
+        await native.runClipText({
+            text: "warm up text encoder",
+            modelPath: model,
+            vocabPath: vocab,
+        });
+    } catch (e) {
+        if (!(await evictModelIfReportedCorrupt(e)))
+            log.warn("Failed to warm up the CLIP text encoder", e);
+    } finally {
+        logMLRuntimeEvents(native);
+    }
+};
 
 /**
  * Compute CLIP embeddings for a text snippet, if the model is available.
