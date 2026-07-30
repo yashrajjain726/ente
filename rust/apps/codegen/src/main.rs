@@ -227,6 +227,13 @@ fn generate_napi() -> Result<(), DynError> {
         .set_modified(SystemTime::now())?;
 
     let type_def_dir = target_dir()?.join("napi-type-defs");
+    match fs::remove_dir_all(&type_def_dir) {
+        Ok(()) => {}
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+        Err(error) => {
+            return Err(format!("failed to clear {}: {error}", type_def_dir.display()).into());
+        }
+    }
     fs::create_dir_all(&type_def_dir)?;
     run_command(
         Command::new("cargo")
