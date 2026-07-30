@@ -556,6 +556,10 @@ class _GalleryAppBarWidgetState extends State<GalleryAppBarWidget> {
       return actions;
     }
 
+    if (galleryType == GalleryType.trash) {
+      return actions;
+    }
+
     actions.add(
       galleryAppBarPopupMenuAction<AlbumPopupAction>(
         tooltip: strings.more,
@@ -882,13 +886,6 @@ class _GalleryAppBarWidgetState extends State<GalleryAppBarWidget> {
           AlbumPopupAction.downloadAlbum,
           strings.download,
           galleryAppBarMenuIcon(HugeIcons.strokeRoundedDownload01, iconColor),
-        ),
-      if (galleryType == GalleryType.trash)
-        _menuOption(
-          AlbumPopupAction.emptyTrash,
-          strings.deleteAll,
-          galleryAppBarMenuIcon(HugeIcons.strokeRoundedDelete01, warningColor),
-          labelColor: warningColor,
         ),
     ];
   }
