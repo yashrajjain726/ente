@@ -26,8 +26,8 @@ const (
 )
 
 type WebPushController struct {
-	WebPushRepo *repo.WebPushRepository
-	Links       *LinksController
+	webPushRepo *repo.WebPushRepository
+	links       *LinksController
 	config      *SpaceWebPushConfig
 }
 
@@ -38,7 +38,7 @@ type SpaceWebPushConfig struct {
 }
 
 func (c *WebPushController) VAPIDPublicKey() (*models.SpaceWebPushVAPIDKeyResponse, error) {
-	if c == nil || c.config == nil {
+	if c.config == nil {
 		return nil, &ente.ApiError{
 			Code:           ente.ErrorCode("SPACE_WEB_PUSH_UNAVAILABLE"),
 			Message:        "space web push is unavailable",
@@ -53,15 +53,12 @@ func (c *WebPushController) UpsertAccountSubscription(
 	sessionToken string,
 	req models.SpaceWebPushSubscriptionRequest,
 ) (*models.SpaceWebPushTargetResponse, error) {
-	if c == nil || c.WebPushRepo == nil {
-		return nil, ente.ErrNotFound
-	}
 	endpoint, p256dh, auth, err := validatedWebPushSubscription(req)
 	if err != nil {
 		return nil, err
 	}
 	sessionHash := sha256.Sum256([]byte(sessionToken))
-	targetID, err := c.WebPushRepo.UpsertAccountSubscription(
+	targetID, err := c.webPushRepo.UpsertAccountSubscription(
 		ctx,
 		sessionHash[:],
 		endpoint,
@@ -79,15 +76,12 @@ func (c *WebPushController) DeleteAccountSubscription(
 	sessionToken string,
 	req models.SpaceWebPushUnsubscriptionRequest,
 ) error {
-	if c == nil || c.WebPushRepo == nil {
-		return ente.ErrNotFound
-	}
 	endpoint := strings.TrimSpace(req.Endpoint)
 	if err := validateWebPushEndpoint(endpoint); err != nil {
 		return err
 	}
 	sessionHash := sha256.Sum256([]byte(sessionToken))
-	return c.WebPushRepo.DeleteAccountSubscription(ctx, sessionHash[:], endpoint)
+	return c.webPushRepo.DeleteAccountSubscription(ctx, sessionHash[:], endpoint)
 }
 
 func (c *WebPushController) UpsertLinkSubscription(
@@ -95,18 +89,15 @@ func (c *WebPushController) UpsertLinkSubscription(
 	slug string,
 	req models.SpaceWebPushSubscriptionRequest,
 ) (*models.SpaceWebPushTargetResponse, error) {
-	if c == nil || c.WebPushRepo == nil || c.Links == nil {
-		return nil, ente.ErrNotFound
-	}
 	endpoint, p256dh, auth, err := validatedWebPushSubscription(req)
 	if err != nil {
 		return nil, err
 	}
-	link, err := c.Links.Authorize(ctx, slug)
+	link, err := c.links.Authorize(ctx, slug)
 	if err != nil {
 		return nil, err
 	}
-	targetID, err := c.WebPushRepo.UpsertLinkSubscription(
+	targetID, err := c.webPushRepo.UpsertLinkSubscription(
 		ctx,
 		link.LinkID,
 		endpoint,
@@ -134,18 +125,15 @@ func (c *WebPushController) DeleteLinkSubscription(
 	slug string,
 	req models.SpaceWebPushUnsubscriptionRequest,
 ) error {
-	if c == nil || c.WebPushRepo == nil || c.Links == nil {
-		return ente.ErrNotFound
-	}
 	endpoint := strings.TrimSpace(req.Endpoint)
 	if err := validateWebPushEndpoint(endpoint); err != nil {
 		return err
 	}
-	link, err := c.Links.Authorize(ctx, slug)
+	link, err := c.links.Authorize(ctx, slug)
 	if err != nil {
 		return err
 	}
-	return c.WebPushRepo.DeleteLinkSubscription(ctx, link.LinkID, endpoint)
+	return c.webPushRepo.DeleteLinkSubscription(ctx, link.LinkID, endpoint)
 }
 
 func validatedWebPushSubscription(

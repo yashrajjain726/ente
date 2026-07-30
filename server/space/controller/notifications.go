@@ -37,20 +37,33 @@ const (
 
 var sendSpaceWebPush = webpush.SendNotificationWithContext
 
+type SpaceActivityActor struct {
+	UserID  int64
+	SpaceID string
+	Slug    string
+}
+
+func spaceActivityActor(space *repo.SpaceRecord) SpaceActivityActor {
+	return SpaceActivityActor{
+		UserID:  space.OwnerID,
+		SpaceID: space.SpaceID,
+		Slug:    space.SpaceSlug,
+	}
+}
+
 type SpaceActivityNotifier interface {
-	OnSpacePostCreated(actorUserID int64, actorSpaceID, actorSlug string)
-	OnSpacePostLiked(actorUserID int64, actorSpaceID, actorSlug string, recipientUserID int64)
-	OnSpacePostReplied(actorUserID int64, actorSpaceID, actorSlug string, recipientUserID int64)
-	OnSpaceMessageSent(actorUserID int64, actorSpaceID, actorSlug string, recipientUserID int64)
-	OnSpaceMessageLiked(actorUserID int64, actorSpaceID, actorSlug string, recipientUserID int64)
-	OnSpaceFriendAdded(actorUserID int64, actorSpaceID, actorSlug string, recipientUserID int64)
-	OnSpaceFriendRequested(actorUserID int64, actorSlug string, recipientUserID int64)
+	OnSpacePostCreated(actor SpaceActivityActor)
+	OnSpacePostLiked(actor SpaceActivityActor, recipientUserID int64)
+	OnSpacePostReplied(actor SpaceActivityActor, recipientUserID int64)
+	OnSpaceMessageSent(actor SpaceActivityActor, recipientUserID int64)
+	OnSpaceMessageLiked(actor SpaceActivityActor, recipientUserID int64)
+	OnSpaceFriendAdded(actor SpaceActivityActor, recipientUserID int64)
+	OnSpaceFriendRequested(actor SpaceActivityActor, recipientUserID int64)
 }
 
 type SpaceWebPushSender struct {
-	WebPushRepo *repo.WebPushRepository
-	HTTPClient  webpush.HTTPClient
-	config      *SpaceWebPushConfig
+	webPushRepo *repo.WebPushRepository
+	options     *webpush.Options
 	sendLimiter *limiter.Limiter
 	sendSlots   chan struct{}
 }
@@ -67,25 +80,31 @@ func NewSpaceWebPushSender(
 	webPushRepo *repo.WebPushRepository,
 	config *SpaceWebPushConfig,
 ) *SpaceWebPushSender {
-	return &SpaceWebPushSender{
-		WebPushRepo: webPushRepo,
-		HTTPClient:  newSpaceWebPushHTTPClient(),
-		config:      config,
+	sender := &SpaceWebPushSender{
+		webPushRepo: webPushRepo,
 		sendLimiter: util.NewRateLimiter(spaceWebPushSendRate),
 		sendSlots:   make(chan struct{}, spaceWebPushConcurrency),
 	}
+	if config != nil {
+		sender.options = &webpush.Options{
+			HTTPClient:      newSpaceWebPushHTTPClient(),
+			Subscriber:      config.subscriber,
+			TTL:             spaceWebPushTTLSeconds,
+			Urgency:         webpush.UrgencyNormal,
+			VAPIDPublicKey:  config.publicKey,
+			VAPIDPrivateKey: config.privateKey,
+		}
+	}
+	return sender
 }
 
-func (n *SpaceWebPushSender) OnSpacePostCreated(
-	actorUserID int64,
-	actorSpaceID, actorSlug string,
-) {
+func (n *SpaceWebPushSender) OnSpacePostCreated(actor SpaceActivityActor) {
 	if !n.available() {
 		return
 	}
-	subscriptions, err := n.WebPushRepo.ListPostSubscriptions(
+	subscriptions, err := n.webPushRepo.ListPostSubscriptions(
 		context.Background(),
-		actorSpaceID,
+		actor.SpaceID,
 	)
 	if err != nil {
 		log.WithField("event", spaceActivityPostCreated).WithError(err).
@@ -93,8 +112,7 @@ func (n *SpaceWebPushSender) OnSpacePostCreated(
 		return
 	}
 	n.send(
-		actorUserID,
-		actorSlug,
+		actor,
 		"posted a new photo",
 		"Check it out",
 		spaceActivityPostCreated,
@@ -103,111 +121,78 @@ func (n *SpaceWebPushSender) OnSpacePostCreated(
 	)
 }
 
-func (n *SpaceWebPushSender) OnSpacePostLiked(
-	actorUserID int64,
-	actorSpaceID, actorSlug string,
-	recipientUserID int64,
-) {
-	n.sendAccountActivity(actorUserID, actorSlug, "liked your post", "", spaceActivityPostLiked, conversationURL(actorSpaceID), recipientUserID)
+func (n *SpaceWebPushSender) OnSpacePostLiked(actor SpaceActivityActor, recipientUserID int64) {
+	n.sendAccountActivity(actor, "liked your post", "", spaceActivityPostLiked, conversationURL(actor.SpaceID), recipientUserID)
 }
 
-func (n *SpaceWebPushSender) OnSpacePostReplied(
-	actorUserID int64,
-	actorSpaceID, actorSlug string,
-	recipientUserID int64,
-) {
-	n.sendAccountActivity(actorUserID, actorSlug, "replied to your post", "Check it out", spaceActivityPostReplied, conversationURL(actorSpaceID), recipientUserID)
+func (n *SpaceWebPushSender) OnSpacePostReplied(actor SpaceActivityActor, recipientUserID int64) {
+	n.sendAccountActivity(actor, "replied to your post", "Check it out", spaceActivityPostReplied, conversationURL(actor.SpaceID), recipientUserID)
 }
 
-func (n *SpaceWebPushSender) OnSpaceMessageSent(
-	actorUserID int64,
-	actorSpaceID, actorSlug string,
-	recipientUserID int64,
-) {
-	n.sendAccountActivity(actorUserID, actorSlug, "sent you a message", "Check it out", spaceActivityMessageSent, conversationURL(actorSpaceID), recipientUserID)
+func (n *SpaceWebPushSender) OnSpaceMessageSent(actor SpaceActivityActor, recipientUserID int64) {
+	n.sendAccountActivity(actor, "sent you a message", "Check it out", spaceActivityMessageSent, conversationURL(actor.SpaceID), recipientUserID)
 }
 
-func (n *SpaceWebPushSender) OnSpaceMessageLiked(
-	actorUserID int64,
-	actorSpaceID, actorSlug string,
-	recipientUserID int64,
-) {
-	n.sendAccountActivity(actorUserID, actorSlug, "liked a message", "View conversation", spaceActivityMessageLiked, conversationURL(actorSpaceID), recipientUserID)
+func (n *SpaceWebPushSender) OnSpaceMessageLiked(actor SpaceActivityActor, recipientUserID int64) {
+	n.sendAccountActivity(actor, "liked a message", "View conversation", spaceActivityMessageLiked, conversationURL(actor.SpaceID), recipientUserID)
 }
 
-func (n *SpaceWebPushSender) OnSpaceFriendAdded(
-	actorUserID int64,
-	actorSpaceID, actorSlug string,
-	recipientUserID int64,
-) {
+func (n *SpaceWebPushSender) OnSpaceFriendAdded(actor SpaceActivityActor, recipientUserID int64) {
 	n.sendAccountActivity(
-		actorUserID,
-		actorSlug,
+		actor,
 		"is now your friend",
-		"Say hi to "+spaceActivityActorLabel(actorSlug),
+		"Say hi to "+spaceActivityActorLabel(actor.Slug),
 		spaceActivityFriendAdded,
-		conversationURL(actorSpaceID),
+		conversationURL(actor.SpaceID),
 		recipientUserID,
 	)
 }
 
-func (n *SpaceWebPushSender) OnSpaceFriendRequested(
-	actorUserID int64,
-	actorSlug string,
-	recipientUserID int64,
-) {
-	n.sendAccountActivity(actorUserID, actorSlug, "sent you a friend request", "Review request", spaceActivityFriendRequested, "/app/messages", recipientUserID)
+func (n *SpaceWebPushSender) OnSpaceFriendRequested(actor SpaceActivityActor, recipientUserID int64) {
+	n.sendAccountActivity(actor, "sent you a friend request", "Review request", spaceActivityFriendRequested, "/app/messages", recipientUserID)
 }
 
 func (n *SpaceWebPushSender) sendAccountActivity(
-	actorUserID int64,
-	actorSlug, activity, action, event, destination string,
+	actor SpaceActivityActor,
+	activity, action, event, destination string,
 	recipientUserID int64,
 ) {
 	if !n.available() || recipientUserID <= 0 {
 		return
 	}
-	subscriptions, err := n.WebPushRepo.ListActiveAccountSubscriptions(
+	subscriptions, err := n.webPushRepo.ListActiveAccountSubscriptions(
 		context.Background(),
-		[]int64{recipientUserID},
+		recipientUserID,
 	)
 	if err != nil {
 		log.WithField("event", event).WithError(err).
 			Error("Failed to list Space web push subscriptions")
 		return
 	}
-	n.send(actorUserID, actorSlug, activity, action, event, destination, subscriptions)
+	n.send(actor, activity, action, event, destination, subscriptions)
 }
 
 func (n *SpaceWebPushSender) available() bool {
-	return n != nil &&
-		n.WebPushRepo != nil &&
-		n.HTTPClient != nil &&
-		n.config != nil &&
-		n.sendLimiter != nil &&
-		n.sendSlots != nil &&
+	return n.webPushRepo != nil &&
+		n.options != nil &&
 		!viper.GetBool("internal.silent")
 }
 
 func (n *SpaceWebPushSender) send(
-	actorUserID int64,
-	actorSlug, activity, action, event, destination string,
+	actor SpaceActivityActor,
+	activity, action, event, destination string,
 	subscriptions []repo.SpaceWebPushSubscriptionRecord,
 ) {
-	options := spaceWebPushOptions(n.config, n.HTTPClient)
-	if options == nil {
-		return
-	}
 	subscriptions = deduplicateSpaceWebPushSubscriptions(subscriptions)
 	if len(subscriptions) == 0 {
 		return
 	}
 	limitContext, err := n.sendLimiter.Get(
 		context.Background(),
-		strconv.FormatInt(actorUserID, 10),
+		strconv.FormatInt(actor.UserID, 10),
 	)
 	if err != nil {
-		log.WithField("actor_user_id", actorUserID).WithError(err).
+		log.WithField("actor_user_id", actor.UserID).WithError(err).
 			Error("Failed to check Space web push rate limit")
 		return
 	}
@@ -216,7 +201,7 @@ func (n *SpaceWebPushSender) send(
 	}
 	if limitContext.Remaining == 0 {
 		log.WithFields(log.Fields{
-			"actor_user_id": actorUserID,
+			"actor_user_id": actor.UserID,
 			"reset_at":      limitContext.Reset,
 		}).Warn("Space web push rate limit reached")
 	}
@@ -225,7 +210,7 @@ func (n *SpaceWebPushSender) send(
 	for _, subscription := range subscriptions {
 		payload := spaceWebPushPayload{
 			Title:  "Ente Space",
-			Body:   fmt.Sprintf("%s %s", spaceActivityActorLabel(actorSlug), activity),
+			Body:   fmt.Sprintf("%s %s", spaceActivityActorLabel(actor.Slug), activity),
 			Action: action,
 		}
 		if subscription.Public {
@@ -245,7 +230,7 @@ func (n *SpaceWebPushSender) send(
 		go func(subscription repo.SpaceWebPushSubscriptionRecord, payload []byte) {
 			defer waitGroup.Done()
 			defer func() { <-n.sendSlots }()
-			n.sendSubscription(event, payload, subscription, options)
+			n.sendSubscription(event, payload, subscription)
 		}(subscription, encoded)
 	}
 	waitGroup.Wait()
@@ -255,7 +240,6 @@ func (n *SpaceWebPushSender) sendSubscription(
 	event string,
 	payload []byte,
 	subscription repo.SpaceWebPushSubscriptionRecord,
-	options *webpush.Options,
 ) {
 	ctx, cancel := context.WithTimeout(context.Background(), spaceWebPushSendTimeout)
 	defer cancel()
@@ -265,17 +249,17 @@ func (n *SpaceWebPushSender) sendSubscription(
 			P256dh: subscription.P256dh,
 			Auth:   subscription.Auth,
 		},
-	}, options)
+	}, n.options)
 	if err != nil {
 		log.WithFields(log.Fields{
-			"event":   event,
-			"user_id": subscription.UserID,
+			"event":     event,
+			"target_id": subscription.TargetID,
 		}).WithError(err).Error("Failed to send Space web push")
 		return
 	}
 	defer response.Body.Close()
 	if response.StatusCode == http.StatusNotFound || response.StatusCode == http.StatusGone {
-		if err := n.WebPushRepo.DeleteEndpoint(context.Background(), subscription.Endpoint); err != nil {
+		if err := n.webPushRepo.DeleteEndpoint(context.Background(), subscription.Endpoint); err != nil {
 			log.WithField("event", event).WithError(err).
 				Error("Failed to delete expired Space web push subscription")
 		}
@@ -283,27 +267,10 @@ func (n *SpaceWebPushSender) sendSubscription(
 	}
 	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
 		log.WithFields(log.Fields{
-			"event":   event,
-			"status":  response.StatusCode,
-			"user_id": subscription.UserID,
+			"event":     event,
+			"status":    response.StatusCode,
+			"target_id": subscription.TargetID,
 		}).Warn("Space web push provider rejected notification")
-	}
-}
-
-func spaceWebPushOptions(
-	config *SpaceWebPushConfig,
-	client webpush.HTTPClient,
-) *webpush.Options {
-	if config == nil {
-		return nil
-	}
-	return &webpush.Options{
-		HTTPClient:      client,
-		Subscriber:      config.subscriber,
-		TTL:             spaceWebPushTTLSeconds,
-		Urgency:         webpush.UrgencyNormal,
-		VAPIDPublicKey:  config.publicKey,
-		VAPIDPrivateKey: config.privateKey,
 	}
 }
 

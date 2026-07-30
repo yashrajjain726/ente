@@ -90,12 +90,12 @@ func (c *PostsController) Create(ctx context.Context, space *repo.SpaceRecord, r
 			space.SpaceID, space.OwnerID, postCount, repo.MaxPostsPerSpace,
 		))
 	}
-	c.notifyFriendsOfNewPost(space.OwnerID, space.SpaceID, space.SpaceSlug)
+	c.notifyFriendsOfNewPost(spaceActivityActor(space))
 	return &models.CreatePostResponse{PostID: postID}, nil
 }
 
-func (c *PostsController) notifyFriendsOfNewPost(ownerID int64, spaceID, spaceSlug string) {
-	go c.ActivityNotifier.OnSpacePostCreated(ownerID, spaceID, spaceSlug)
+func (c *PostsController) notifyFriendsOfNewPost(actor SpaceActivityActor) {
+	go c.ActivityNotifier.OnSpacePostCreated(actor)
 }
 
 func (c *PostsController) postResponses(ctx context.Context, posts []repo.SpacePostRecord, includeAuthor bool) ([]models.PostResponse, error) {
@@ -228,12 +228,7 @@ func (c *PostsController) SetLike(ctx context.Context, actorSpace *repo.SpaceRec
 		return nil, err
 	}
 	if like && created {
-		go c.ActivityNotifier.OnSpacePostLiked(
-			actorSpace.OwnerID,
-			actorSpace.SpaceID,
-			actorSpace.SpaceSlug,
-			post.OwnerID,
-		)
+		go c.ActivityNotifier.OnSpacePostLiked(spaceActivityActor(actorSpace), post.OwnerID)
 	}
 	return &models.LikePostResponse{Liked: like}, nil
 }

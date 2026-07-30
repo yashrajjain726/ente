@@ -256,7 +256,6 @@ type SpaceWebPushSubscriptionRecord struct {
 	Endpoint string
 	P256dh   string
 	Auth     string
-	UserID   int64
 	Public   bool
 }
 

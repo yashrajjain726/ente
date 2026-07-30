@@ -2,12 +2,12 @@ package repo
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 
 	"github.com/ente/museum/ente/base"
 	timeutil "github.com/ente/museum/pkg/utils/time"
 	"github.com/ente/stacktrace"
-	"github.com/lib/pq"
 )
 
 const spaceWebPushLinkSubscriptionLimit = 10000
@@ -164,13 +164,10 @@ func (r *WebPushRepository) DeleteEndpoint(ctx context.Context, endpoint string)
 
 func (r *WebPushRepository) ListActiveAccountSubscriptions(
 	ctx context.Context,
-	userIDs []int64,
+	userID int64,
 ) ([]SpaceWebPushSubscriptionRecord, error) {
-	if len(userIDs) == 0 {
-		return nil, nil
-	}
 	rows, err := r.DB.QueryContext(ctx, `
-		SELECT push.target_id, push.endpoint, push.p256dh, push.auth, session.user_id
+		SELECT push.target_id, push.endpoint, push.p256dh, push.auth, FALSE
 		FROM space_web_push_subscriptions push
 		JOIN space_browser_sessions session
 		  ON session.token_hash = push.session_token_hash
@@ -178,28 +175,13 @@ func (r *WebPushRepository) ListActiveAccountSubscriptions(
 		JOIN users active_user
 		  ON active_user.user_id = session.user_id
 		 AND active_user.encrypted_email IS NOT NULL
-		WHERE session.user_id = ANY($1)
-	`, pq.Array(userIDs), timeutil.Microseconds())
+		WHERE session.user_id = $1
+	`, userID, timeutil.Microseconds())
 	if err != nil {
 		return nil, stacktrace.Propagate(err, "")
 	}
 	defer rows.Close()
-
-	var subscriptions []SpaceWebPushSubscriptionRecord
-	for rows.Next() {
-		var subscription SpaceWebPushSubscriptionRecord
-		if err := rows.Scan(
-			&subscription.TargetID,
-			&subscription.Endpoint,
-			&subscription.P256dh,
-			&subscription.Auth,
-			&subscription.UserID,
-		); err != nil {
-			return nil, stacktrace.Propagate(err, "")
-		}
-		subscriptions = append(subscriptions, subscription)
-	}
-	return subscriptions, stacktrace.Propagate(rows.Err(), "")
+	return scanWebPushSubscriptions(rows)
 }
 
 func (r *WebPushRepository) ListPostSubscriptions(
@@ -207,8 +189,7 @@ func (r *WebPushRepository) ListPostSubscriptions(
 	spaceID string,
 ) ([]SpaceWebPushSubscriptionRecord, error) {
 	rows, err := r.DB.QueryContext(ctx, `
-		SELECT push.target_id, push.endpoint, push.p256dh, push.auth,
-		       session.user_id, FALSE
+		SELECT push.target_id, push.endpoint, push.p256dh, push.auth, FALSE
 		FROM space_web_push_subscriptions push
 		JOIN space_browser_sessions session
 		  ON session.token_hash = push.session_token_hash
@@ -227,8 +208,7 @@ func (r *WebPushRepository) ListPostSubscriptions(
 
 		UNION ALL
 
-		SELECT push.target_id, push.endpoint, push.p256dh, push.auth,
-		       0, TRUE
+		SELECT push.target_id, push.endpoint, push.p256dh, push.auth, TRUE
 		FROM space_web_push_subscriptions push
 		JOIN space_links link
 		  ON link.link_id = push.link_id
@@ -244,7 +224,10 @@ func (r *WebPushRepository) ListPostSubscriptions(
 		return nil, stacktrace.Propagate(err, "")
 	}
 	defer rows.Close()
+	return scanWebPushSubscriptions(rows)
+}
 
+func scanWebPushSubscriptions(rows *sql.Rows) ([]SpaceWebPushSubscriptionRecord, error) {
 	var subscriptions []SpaceWebPushSubscriptionRecord
 	for rows.Next() {
 		var subscription SpaceWebPushSubscriptionRecord
@@ -253,7 +236,6 @@ func (r *WebPushRepository) ListPostSubscriptions(
 			&subscription.Endpoint,
 			&subscription.P256dh,
 			&subscription.Auth,
-			&subscription.UserID,
 			&subscription.Public,
 		); err != nil {
 			return nil, stacktrace.Propagate(err, "")
