@@ -23,7 +23,7 @@ func setupPostsControllerTest(t *testing.T) (*PostsController, *spacerepo.Module
 	})
 	gin.SetMode(gin.TestMode)
 	repos := spacerepo.NewModule(db, nil)
-	return NewModule(repos, nil, noopSpaceActivityNotifier{}).Posts, repos, context.Background()
+	return NewModule(repos, nil, noopSpaceActivityNotifier{}, nil).Posts, repos, context.Background()
 }
 
 type noopSpaceActivityNotifier struct{}

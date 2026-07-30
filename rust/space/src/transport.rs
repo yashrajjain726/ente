@@ -406,30 +406,30 @@ pub struct SpaceLinkProfileResponse {
     pub profile: SpaceProfileResponse,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct WebPushSubscriptionKeys {
-    pub p256dh: String,
-    pub auth: String,
+pub(crate) struct WebPushSubscriptionKeys {
+    pub(crate) p256dh: String,
+    pub(crate) auth: String,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct WebPushSubscriptionRequest {
-    pub endpoint: String,
-    pub keys: WebPushSubscriptionKeys,
+pub(crate) struct WebPushSubscriptionRequest {
+    pub(crate) endpoint: String,
+    pub(crate) keys: WebPushSubscriptionKeys,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct WebPushUnsubscriptionRequest {
-    pub endpoint: String,
+pub(crate) struct WebPushUnsubscriptionRequest {
+    pub(crate) endpoint: String,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct WebPushTargetResponse {
-    pub target_id: String,
+pub(crate) struct WebPushTargetResponse {
+    pub(crate) target_id: String,
 }
 
 #[cfg(test)]

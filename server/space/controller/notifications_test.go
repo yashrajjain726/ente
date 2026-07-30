@@ -18,7 +18,6 @@ import (
 	timeutil "github.com/ente/museum/pkg/utils/time"
 	"github.com/ente/museum/space/models"
 	"github.com/ente/museum/space/repo"
-	"github.com/spf13/viper"
 	"github.com/stretchr/testify/require"
 )
 
@@ -127,29 +126,30 @@ func TestSpaceWebPushAddressMustBePublic(t *testing.T) {
 func TestSpaceWebPushConfigRequiresMatchingKeysAndBareSubscriber(t *testing.T) {
 	privateKey, publicKey, err := webpush.GenerateVAPIDKeys()
 	require.NoError(t, err)
-	viper.Set("space.webPush.publicKey", publicKey)
-	viper.Set("space.webPush.privateKey", privateKey)
-	viper.Set("space.webPush.subscriber", "security@ente.io")
-	t.Cleanup(func() {
-		viper.Set("space.webPush.publicKey", "")
-		viper.Set("space.webPush.privateKey", "")
-		viper.Set("space.webPush.subscriber", "")
-	})
-
-	config, ok := configuredSpaceWebPush()
-	require.True(t, ok)
-	require.Equal(t, publicKey, config.PublicKey)
+	config := NewSpaceWebPushConfig(publicKey, privateKey, "security@ente.io")
+	require.NotNil(t, config)
+	require.Equal(t, publicKey, config.publicKey)
 
 	otherPrivateKey, _, err := webpush.GenerateVAPIDKeys()
 	require.NoError(t, err)
-	viper.Set("space.webPush.privateKey", otherPrivateKey)
-	_, ok = configuredSpaceWebPush()
-	require.False(t, ok)
+	require.Nil(t, NewSpaceWebPushConfig(publicKey, otherPrivateKey, "security@ente.io"))
+	require.Nil(t, NewSpaceWebPushConfig(publicKey, privateKey, "mailto:security@ente.io"))
+	require.Nil(t, NewSpaceWebPushConfig("", "", ""))
+}
 
-	viper.Set("space.webPush.privateKey", privateKey)
-	viper.Set("space.webPush.subscriber", "mailto:security@ente.io")
-	_, ok = configuredSpaceWebPush()
-	require.False(t, ok)
+func newSpaceWebPushTestConfig(t *testing.T) *SpaceWebPushConfig {
+	t.Helper()
+	privateKey, publicKey, err := webpush.GenerateVAPIDKeys()
+	require.NoError(t, err)
+	config := NewSpaceWebPushConfig(publicKey, privateKey, "security@ente.io")
+	require.NotNil(t, config)
+	return config
+}
+
+func TestUnconfiguredSpaceWebPushSenderIsUnavailable(t *testing.T) {
+	sender := NewSpaceWebPushSender(&repo.WebPushRepository{}, nil)
+	require.False(t, sender.available())
+	sender.OnSpacePostReplied(1, "alice_space", "alice", 2)
 }
 
 func TestSpaceWebPushDeduplicatesSharedEndpointForAccount(t *testing.T) {
@@ -167,7 +167,7 @@ func TestSpaceWebPushDeduplicatesSharedEndpointForAccount(t *testing.T) {
 func TestNewPostNotifiesWithNoAccountFriends(t *testing.T) {
 	_, repos, _ := setupPostsControllerTest(t)
 	notifier := newRecordingSpaceActivityNotifier()
-	posts := NewModule(repos, nil, notifier).Posts
+	posts := NewModule(repos, nil, notifier, nil).Posts
 
 	posts.notifyFriendsOfNewPost(1, "space_id", "alice")
 
@@ -182,7 +182,7 @@ func TestNewPostNotifiesWithNoAccountFriends(t *testing.T) {
 func TestPostLikeSendsActivityOnlyOnLikeTransition(t *testing.T) {
 	_, repos, ctx := setupPostsControllerTest(t)
 	notifier := newRecordingSpaceActivityNotifier()
-	posts := NewModule(repos, nil, notifier).Posts
+	posts := NewModule(repos, nil, notifier, nil).Posts
 	aliceID := insertSpaceControllerUser(t, repos, "alice-post-like-push@example.com", "alice-public")
 	bobID := insertSpaceControllerUser(t, repos, "bob-post-like-push@example.com", "bob-public")
 	aliceSpace, err := testCreateSpace(ctx, repos, aliceID, "alice_post_like_push", "alice-space-key", "alice-post-public", "alice-post-secret", "nonce", "alice-profile")
@@ -218,7 +218,7 @@ func TestPostLikeSendsActivityOnlyOnLikeTransition(t *testing.T) {
 func TestMessageActivitiesAndLikeTransition(t *testing.T) {
 	_, repos, ctx := setupMessagesControllerTest(t)
 	notifier := newRecordingSpaceActivityNotifier()
-	messages := NewModule(repos, nil, notifier).Messages
+	messages := NewModule(repos, nil, notifier, nil).Messages
 	aliceID, aliceSpace := createMessageControllerUserAndSpace(t, repos, "alice-message-push", "alice-public")
 	bobID, bobSpace := createMessageControllerUserAndSpace(t, repos, "bob-message-push", "bob-public")
 	require.NoError(t, testAddFriend(ctx, repos, bobID, bobSpace.SpaceID, aliceSpace.SpaceID, "alice-share-key", aliceSpace.CurrentVersion, "bob-share-key", bobSpace.CurrentVersion))
@@ -271,7 +271,7 @@ func TestMessageActivitiesAndLikeTransition(t *testing.T) {
 func TestFriendActivitiesOnlyOnRelationshipTransitions(t *testing.T) {
 	_, repos, ctx := setupFriendsControllerTest(t)
 	notifier := newRecordingSpaceActivityNotifier()
-	friends := NewModule(repos, nil, notifier).Friends
+	friends := NewModule(repos, nil, notifier, nil).Friends
 	aliceID := insertSpaceControllerUser(t, repos, "alice-friend-push@example.com", "alice-public")
 	bobID := insertSpaceControllerUser(t, repos, "bob-friend-push@example.com", "bob-public")
 	aliceSpace, err := testCreateSpace(ctx, repos, aliceID, "alice_friend_push", "alice-space-key", "alice-public", "alice-secret", "nonce", "alice-profile")
@@ -321,16 +321,7 @@ func TestSpaceWebPushSenderUsesGenericPayloadAndPrunesDeadEndpoint(t *testing.T)
 	_, err := repos.WebPush.UpsertAccountSubscription(ctx, sessionHash, "https://push.example/subscription", "p256dh", "auth")
 	require.NoError(t, err)
 
-	vapidPrivateKey, vapidPublicKey, err := webpush.GenerateVAPIDKeys()
-	require.NoError(t, err)
-	viper.Set("space.webPush.publicKey", vapidPublicKey)
-	viper.Set("space.webPush.privateKey", vapidPrivateKey)
-	viper.Set("space.webPush.subscriber", "security@ente.io")
-	t.Cleanup(func() {
-		viper.Set("space.webPush.publicKey", "")
-		viper.Set("space.webPush.privateKey", "")
-		viper.Set("space.webPush.subscriber", "")
-	})
+	config := newSpaceWebPushTestConfig(t)
 
 	originalSend := sendSpaceWebPush
 	t.Cleanup(func() { sendSpaceWebPush = originalSend })
@@ -344,7 +335,7 @@ func TestSpaceWebPushSenderUsesGenericPayloadAndPrunesDeadEndpoint(t *testing.T)
 		return &http.Response{StatusCode: http.StatusGone, Body: io.NopCloser(strings.NewReader(""))}, nil
 	}
 
-	sender := NewSpaceWebPushSender(repos.WebPush)
+	sender := NewSpaceWebPushSender(repos.WebPush, config)
 	sender.OnSpacePostReplied(1, "alice_space", "alice", recipientID)
 	require.Equal(t, spaceWebPushPayload{
 		Title:  "Ente Space",
@@ -358,16 +349,7 @@ func TestSpaceWebPushSenderUsesGenericPayloadAndPrunesDeadEndpoint(t *testing.T)
 }
 
 func TestPublicPostPushCarriesOnlyOpaqueLocalRouteTarget(t *testing.T) {
-	vapidPrivateKey, vapidPublicKey, err := webpush.GenerateVAPIDKeys()
-	require.NoError(t, err)
-	viper.Set("space.webPush.publicKey", vapidPublicKey)
-	viper.Set("space.webPush.privateKey", vapidPrivateKey)
-	viper.Set("space.webPush.subscriber", "security@ente.io")
-	t.Cleanup(func() {
-		viper.Set("space.webPush.publicKey", "")
-		viper.Set("space.webPush.privateKey", "")
-		viper.Set("space.webPush.subscriber", "")
-	})
+	config := newSpaceWebPushTestConfig(t)
 
 	originalSend := sendSpaceWebPush
 	t.Cleanup(func() { sendSpaceWebPush = originalSend })
@@ -377,7 +359,7 @@ func TestPublicPostPushCarriesOnlyOpaqueLocalRouteTarget(t *testing.T) {
 		return &http.Response{StatusCode: http.StatusCreated, Body: io.NopCloser(strings.NewReader(""))}, nil
 	}
 
-	sender := NewSpaceWebPushSender(nil)
+	sender := NewSpaceWebPushSender(nil, config)
 	sender.send(
 		2,
 		"alice",
@@ -402,16 +384,7 @@ func TestPublicPostPushCarriesOnlyOpaqueLocalRouteTarget(t *testing.T) {
 }
 
 func TestSpaceWebPushSendRateAppliesOncePerActivity(t *testing.T) {
-	vapidPrivateKey, vapidPublicKey, err := webpush.GenerateVAPIDKeys()
-	require.NoError(t, err)
-	viper.Set("space.webPush.publicKey", vapidPublicKey)
-	viper.Set("space.webPush.privateKey", vapidPrivateKey)
-	viper.Set("space.webPush.subscriber", "security@ente.io")
-	t.Cleanup(func() {
-		viper.Set("space.webPush.publicKey", "")
-		viper.Set("space.webPush.privateKey", "")
-		viper.Set("space.webPush.subscriber", "")
-	})
+	config := newSpaceWebPushTestConfig(t)
 
 	originalSend := sendSpaceWebPush
 	t.Cleanup(func() { sendSpaceWebPush = originalSend })
@@ -429,7 +402,7 @@ func TestSpaceWebPushSendRateAppliesOncePerActivity(t *testing.T) {
 			Auth:     "auth",
 		}
 	}
-	NewSpaceWebPushSender(nil).send(
+	NewSpaceWebPushSender(nil, config).send(
 		3,
 		"alice",
 		"posted a new photo",

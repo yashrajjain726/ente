@@ -262,20 +262,17 @@ impl SpaceLinkCtx {
 
     pub async fn subscribe_web_push(
         &self,
-        endpoint: &str,
-        p256dh: &str,
-        auth: &str,
+        endpoint: String,
+        p256dh: String,
+        auth: String,
     ) -> Result<String> {
         let response: WebPushTargetResponse = self
             .api
             .put(&format!("{}/push/subscription", self.prefix()))
             .header(AUTH_HEADER, &self.auth_key)
             .json(&WebPushSubscriptionRequest {
-                endpoint: endpoint.to_owned(),
-                keys: WebPushSubscriptionKeys {
-                    p256dh: p256dh.to_owned(),
-                    auth: auth.to_owned(),
-                },
+                endpoint,
+                keys: WebPushSubscriptionKeys { p256dh, auth },
             })
             .send()
             .await?
@@ -285,13 +282,11 @@ impl SpaceLinkCtx {
         Ok(response.target_id)
     }
 
-    pub async fn unsubscribe_web_push(&self, endpoint: &str) -> Result<()> {
+    pub async fn unsubscribe_web_push(&self, endpoint: String) -> Result<()> {
         self.api
             .delete(&format!("{}/push/subscription", self.prefix()))
             .header(AUTH_HEADER, &self.auth_key)
-            .json(&WebPushUnsubscriptionRequest {
-                endpoint: endpoint.to_owned(),
-            })
+            .json(&WebPushUnsubscriptionRequest { endpoint })
             .send()
             .await?
             .error_for_status()?;
@@ -515,6 +510,11 @@ mod tests {
     use mockito::{Matcher, Server};
     use serde_json::json;
 
+    const WEB_PUSH_ENDPOINT: &str = "https://push.example/subscription";
+    const WEB_PUSH_P256DH: &str =
+        "BGsX0fLhLEJH-Lzm5WOkQPJ3A32BLeszoPShOUXYmMKWT-NC4v4af5uO5-tKfA-eFivOM1drMV7Oy7ZAaDe_UfU";
+    const WEB_PUSH_AUTH: &str = "AAAAAAAAAAAAAAAAAAAAAA";
+
     #[test]
     fn generated_access_keys_are_valid() {
         for _ in 0..100 {
@@ -598,30 +598,6 @@ mod tests {
             )
             .create_async()
             .await;
-        let subscribe = server
-            .mock("PUT", format!("{prefix}/push/subscription").as_str())
-            .match_header("x-ente-space-link-auth", auth.as_str())
-            .match_body(Matcher::Json(json!({
-                "endpoint": "https://push.example/subscription",
-                "keys": {
-                    "p256dh": "p256dh",
-                    "auth": "auth"
-                }
-            })))
-            .with_status(200)
-            .with_body(json!({"targetId": "wpt_target"}).to_string())
-            .create_async()
-            .await;
-        let unsubscribe = server
-            .mock("DELETE", format!("{prefix}/push/subscription").as_str())
-            .match_header("x-ente-space-link-auth", auth.as_str())
-            .match_body(Matcher::Json(json!({
-                "endpoint": "https://push.example/subscription"
-            })))
-            .with_status(204)
-            .create_async()
-            .await;
-
         let ctx = SpaceLinkCtx::open(OpenSpaceLinkCtxInput {
             base_url: server.url(),
             space_slug: "Alice".to_owned(),
@@ -636,18 +612,72 @@ mod tests {
         assert_eq!(ctx.profile().profile, profile);
         assert_eq!(ctx.profile().friends, 2);
         assert_eq!(ctx.posts(), 3);
-        assert_eq!(
-            ctx.subscribe_web_push("https://push.example/subscription", "p256dh", "auth")
-                .await
-                .unwrap(),
-            "wpt_target"
-        );
-        ctx.unsubscribe_web_push("https://push.example/subscription")
-            .await
-            .unwrap();
         bootstrap.assert_async().await;
         profile_request.assert_async().await;
         versions.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn public_link_serializes_web_push_subscriptions() {
+        let mut server = Server::new_async().await;
+        let prefix = "/space/public/by-slug/alice/link";
+        let link_auth = "link-auth";
+        let subscribe = server
+            .mock("PUT", format!("{prefix}/push/subscription").as_str())
+            .match_header("x-ente-space-link-auth", link_auth)
+            .match_body(Matcher::Json(json!({
+                "endpoint": WEB_PUSH_ENDPOINT,
+                "keys": {
+                    "p256dh": WEB_PUSH_P256DH,
+                    "auth": WEB_PUSH_AUTH
+                }
+            })))
+            .with_status(200)
+            .with_body(json!({"targetId": "wpt_target"}).to_string())
+            .create_async()
+            .await;
+        let unsubscribe = server
+            .mock("DELETE", format!("{prefix}/push/subscription").as_str())
+            .match_header("x-ente-space-link-auth", link_auth)
+            .match_body(Matcher::Json(json!({
+                "endpoint": WEB_PUSH_ENDPOINT
+            })))
+            .with_status(204)
+            .create_async()
+            .await;
+        let ctx = SpaceLinkCtx {
+            api: build_api(&server.url(), None, None, None, None).unwrap(),
+            space_slug: "alice".to_owned(),
+            auth_key: link_auth.to_owned(),
+            wrap_key: Vec::new(),
+            profile: DecryptedSpaceProfile {
+                space_id: "space-alice".to_owned(),
+                space_slug: "alice".to_owned(),
+                version: 1,
+                friends: 0,
+                profile: Vec::new(),
+                avatar: None,
+                cover: None,
+                updated_at: None,
+            },
+            posts: 0,
+            key_history: Mutex::new(BTreeMap::new()),
+        };
+
+        assert_eq!(
+            ctx.subscribe_web_push(
+                WEB_PUSH_ENDPOINT.to_owned(),
+                WEB_PUSH_P256DH.to_owned(),
+                WEB_PUSH_AUTH.to_owned(),
+            )
+            .await
+            .unwrap(),
+            "wpt_target"
+        );
+        ctx.unsubscribe_web_push(WEB_PUSH_ENDPOINT.to_owned())
+            .await
+            .unwrap();
+
         subscribe.assert_async().await;
         unsubscribe.assert_async().await;
     }

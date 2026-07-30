@@ -16,16 +16,15 @@ import (
 	timeutil "github.com/ente/museum/pkg/utils/time"
 	"github.com/ente/museum/space/controller"
 	"github.com/gin-gonic/gin"
-	"github.com/spf13/viper"
 	"github.com/stretchr/testify/require"
 )
 
 func TestSpaceWebPushAccountSubscriptionAPI(t *testing.T) {
-	handlers, repos, userID := setupSpaceSessionAPITest(t)
+	webPushConfig, vapidPublicKey := newSpaceWebPushAPITestConfig(t)
+	handlers, repos, userID := setupSpaceSessionAPITest(t, webPushConfig)
 	sessionToken := "space-web-push-session"
 	sessionHash := sha256.Sum256([]byte(sessionToken))
 	require.NoError(t, repos.Sessions.CreateBrowserSession(context.Background(), sessionHash[:], userID, "wrap-key", timeutil.NDaysFromNow(1)))
-	vapidPublicKey := setSpaceWebPushTestConfig(t)
 
 	publicRouter := gin.New()
 	publicRouter.GET("/space/push/vapid-key", handlers.GetWebPushVAPIDKey)
@@ -85,9 +84,7 @@ func TestSpaceWebPushAccountSubscriptionAPI(t *testing.T) {
 }
 
 func TestSpaceWebPushVAPIDKeyRequiresCompleteConfig(t *testing.T) {
-	handlers, _, _ := setupSpaceSessionAPITest(t)
-	setSpaceWebPushTestConfig(t)
-	viper.Set("space.webPush.privateKey", "")
+	handlers, _, _ := setupSpaceSessionAPITest(t, nil)
 
 	router := gin.New()
 	router.GET("/space/push/vapid-key", handlers.GetWebPushVAPIDKey)
@@ -97,17 +94,13 @@ func TestSpaceWebPushVAPIDKeyRequiresCompleteConfig(t *testing.T) {
 	require.Equal(t, http.StatusServiceUnavailable, recorder.Code)
 }
 
-func setSpaceWebPushTestConfig(t *testing.T) string {
+func newSpaceWebPushAPITestConfig(
+	t *testing.T,
+) (*controller.SpaceWebPushConfig, string) {
 	t.Helper()
 	privateKey, publicKey, err := webpush.GenerateVAPIDKeys()
 	require.NoError(t, err)
-	viper.Set("space.webPush.publicKey", publicKey)
-	viper.Set("space.webPush.privateKey", privateKey)
-	viper.Set("space.webPush.subscriber", "security@ente.io")
-	t.Cleanup(func() {
-		viper.Set("space.webPush.publicKey", "")
-		viper.Set("space.webPush.privateKey", "")
-		viper.Set("space.webPush.subscriber", "")
-	})
-	return publicKey
+	config := controller.NewSpaceWebPushConfig(publicKey, privateKey, "security@ente.io")
+	require.NotNil(t, config)
+	return config, publicKey
 }

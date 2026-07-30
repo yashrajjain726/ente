@@ -17,7 +17,6 @@ import (
 	"github.com/ente/museum/space/repo"
 	"github.com/ente/stacktrace"
 	"github.com/gin-gonic/gin"
-	"github.com/spf13/viper"
 )
 
 const (
@@ -29,24 +28,24 @@ const (
 type WebPushController struct {
 	WebPushRepo *repo.WebPushRepository
 	Links       *LinksController
+	config      *SpaceWebPushConfig
 }
 
-type spaceWebPushConfig struct {
-	PublicKey  string
-	PrivateKey string
-	Subscriber string
+type SpaceWebPushConfig struct {
+	publicKey  string
+	privateKey string
+	subscriber string
 }
 
 func (c *WebPushController) VAPIDPublicKey() (*models.SpaceWebPushVAPIDKeyResponse, error) {
-	config, ok := configuredSpaceWebPush()
-	if !ok {
+	if c == nil || c.config == nil {
 		return nil, &ente.ApiError{
 			Code:           ente.ErrorCode("SPACE_WEB_PUSH_UNAVAILABLE"),
 			Message:        "space web push is unavailable",
 			HttpStatusCode: http.StatusServiceUnavailable,
 		}
 	}
-	return &models.SpaceWebPushVAPIDKeyResponse{PublicKey: config.PublicKey}, nil
+	return &models.SpaceWebPushVAPIDKeyResponse{PublicKey: c.config.publicKey}, nil
 }
 
 func (c *WebPushController) UpsertAccountSubscription(
@@ -183,29 +182,29 @@ func validateWebPushSubscription(endpoint, p256dh, auth string) error {
 	return nil
 }
 
-func configuredSpaceWebPush() (spaceWebPushConfig, bool) {
-	config := spaceWebPushConfig{
-		PublicKey:  strings.TrimSpace(viper.GetString("space.webPush.publicKey")),
-		PrivateKey: strings.TrimSpace(viper.GetString("space.webPush.privateKey")),
-		Subscriber: strings.TrimSpace(viper.GetString("space.webPush.subscriber")),
+func NewSpaceWebPushConfig(publicKey, privateKey, subscriber string) *SpaceWebPushConfig {
+	config := &SpaceWebPushConfig{
+		publicKey:  strings.TrimSpace(publicKey),
+		privateKey: strings.TrimSpace(privateKey),
+		subscriber: strings.TrimSpace(subscriber),
 	}
-	decodedPublicKey, publicKeyErr := decodeBase64URL(config.PublicKey)
+	decodedPublicKey, publicKeyErr := decodeBase64URL(config.publicKey)
 	_, publicCurveErr := ecdh.P256().NewPublicKey(decodedPublicKey)
-	decodedPrivateKey, privateKeyErr := decodeBase64URL(config.PrivateKey)
-	privateKey, privateCurveErr := ecdh.P256().NewPrivateKey(decodedPrivateKey)
-	subscriber, subscriberErr := mail.ParseAddress(config.Subscriber)
+	decodedPrivateKey, privateKeyErr := decodeBase64URL(config.privateKey)
+	parsedPrivateKey, privateCurveErr := ecdh.P256().NewPrivateKey(decodedPrivateKey)
+	parsedSubscriber, subscriberErr := mail.ParseAddress(config.subscriber)
 	if publicKeyErr != nil ||
 		len(decodedPublicKey) != 65 ||
 		publicCurveErr != nil ||
 		privateKeyErr != nil ||
 		len(decodedPrivateKey) != 32 ||
 		privateCurveErr != nil ||
-		!bytes.Equal(privateKey.PublicKey().Bytes(), decodedPublicKey) ||
+		!bytes.Equal(parsedPrivateKey.PublicKey().Bytes(), decodedPublicKey) ||
 		subscriberErr != nil ||
-		subscriber.Address != config.Subscriber {
-		return spaceWebPushConfig{}, false
+		parsedSubscriber.Address != config.subscriber {
+		return nil
 	}
-	return config, true
+	return config
 }
 
 func decodeBase64URL(value string) ([]byte, error) {

@@ -609,7 +609,7 @@ impl SpaceLinkCtxHandle {
         auth: String,
     ) -> Result<String, WasmSpaceError> {
         self.inner
-            .subscribe_web_push(&endpoint, &p256dh, &auth)
+            .subscribe_web_push(endpoint, p256dh, auth)
             .await
             .map_err(Into::into)
     }
@@ -618,7 +618,7 @@ impl SpaceLinkCtxHandle {
     #[wasm_bindgen(js_name = unsubscribeWebPush)]
     pub async fn unsubscribe_web_push(&self, endpoint: String) -> Result<(), WasmSpaceError> {
         self.inner
-            .unsubscribe_web_push(&endpoint)
+            .unsubscribe_web_push(endpoint)
             .await
             .map_err(Into::into)
     }

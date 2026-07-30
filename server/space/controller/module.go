@@ -25,7 +25,12 @@ type UserTokenTerminator interface {
 	TerminateSession(userID int64, token string) error
 }
 
-func NewModule(repos *repo.Module, userAuthRepo *baserepo.UserAuthRepository, activityNotifier SpaceActivityNotifier) *Module {
+func NewModule(
+	repos *repo.Module,
+	userAuthRepo *baserepo.UserAuthRepository,
+	activityNotifier SpaceActivityNotifier,
+	webPushConfig *SpaceWebPushConfig,
+) *Module {
 	authDeps := authDeps{
 		UserAuthRepo: userAuthRepo,
 		SpacesRepo:   repos.Spaces,
@@ -44,7 +49,7 @@ func NewModule(repos *repo.Module, userAuthRepo *baserepo.UserAuthRepository, ac
 		Assets:   assets,
 		Read:     &ReadMarkersController{ReadMarkersRepo: repos.Read},
 		Sessions: &SessionsController{SessionsRepo: repos.Sessions},
-		WebPush:  &WebPushController{WebPushRepo: repos.WebPush, Links: links},
+		WebPush:  &WebPushController{WebPushRepo: repos.WebPush, Links: links, config: webPushConfig},
 		Cleanup:  &CleanupController{AssetsRepo: repos.Assets},
 		Links:    links,
 		auth:     authDeps,

@@ -50,6 +50,7 @@ type SpaceActivityNotifier interface {
 type SpaceWebPushSender struct {
 	WebPushRepo *repo.WebPushRepository
 	HTTPClient  webpush.HTTPClient
+	config      *SpaceWebPushConfig
 	sendLimiter *limiter.Limiter
 	sendSlots   chan struct{}
 }
@@ -62,10 +63,14 @@ type spaceWebPushPayload struct {
 	TargetID string `json:"targetId,omitempty"`
 }
 
-func NewSpaceWebPushSender(webPushRepo *repo.WebPushRepository) *SpaceWebPushSender {
+func NewSpaceWebPushSender(
+	webPushRepo *repo.WebPushRepository,
+	config *SpaceWebPushConfig,
+) *SpaceWebPushSender {
 	return &SpaceWebPushSender{
 		WebPushRepo: webPushRepo,
 		HTTPClient:  newSpaceWebPushHTTPClient(),
+		config:      config,
 		sendLimiter: util.NewRateLimiter(spaceWebPushSendRate),
 		sendSlots:   make(chan struct{}, spaceWebPushConcurrency),
 	}
@@ -180,6 +185,7 @@ func (n *SpaceWebPushSender) available() bool {
 	return n != nil &&
 		n.WebPushRepo != nil &&
 		n.HTTPClient != nil &&
+		n.config != nil &&
 		n.sendLimiter != nil &&
 		n.sendSlots != nil &&
 		!viper.GetBool("internal.silent")
@@ -190,8 +196,8 @@ func (n *SpaceWebPushSender) send(
 	actorSlug, activity, action, event, destination string,
 	subscriptions []repo.SpaceWebPushSubscriptionRecord,
 ) {
-	options, ok := spaceWebPushOptions(n.HTTPClient)
-	if !ok {
+	options := spaceWebPushOptions(n.config, n.HTTPClient)
+	if options == nil {
 		return
 	}
 	subscriptions = deduplicateSpaceWebPushSubscriptions(subscriptions)
@@ -286,19 +292,21 @@ func (n *SpaceWebPushSender) sendSubscription(
 	}
 }
 
-func spaceWebPushOptions(client webpush.HTTPClient) (*webpush.Options, bool) {
-	config, ok := configuredSpaceWebPush()
-	if !ok {
-		return nil, false
+func spaceWebPushOptions(
+	config *SpaceWebPushConfig,
+	client webpush.HTTPClient,
+) *webpush.Options {
+	if config == nil {
+		return nil
 	}
 	return &webpush.Options{
 		HTTPClient:      client,
-		Subscriber:      config.Subscriber,
+		Subscriber:      config.subscriber,
 		TTL:             spaceWebPushTTLSeconds,
 		Urgency:         webpush.UrgencyNormal,
-		VAPIDPublicKey:  config.PublicKey,
-		VAPIDPrivateKey: config.PrivateKey,
-	}, true
+		VAPIDPublicKey:  config.publicKey,
+		VAPIDPrivateKey: config.privateKey,
+	}
 }
 
 func deduplicateSpaceWebPushSubscriptions(

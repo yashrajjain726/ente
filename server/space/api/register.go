@@ -5,7 +5,6 @@ import "github.com/gin-gonic/gin"
 func Register(privateAPI, publicAPI gin.IRouter, handlers *Handlers) {
 	privateAPI.GET("/account/space", handlers.ListSpaces)
 	privateAPI.POST("/account/space", handlers.CreateSpace)
-	privateAPI.GET("/account/space/push/vapid-key", handlers.GetWebPushVAPIDKey)
 	privateAPI.PUT("/account/space/push/subscription", handlers.UpsertWebPushSubscription)
 	privateAPI.DELETE("/account/space/push/subscription", handlers.DeleteWebPushSubscription)
 
