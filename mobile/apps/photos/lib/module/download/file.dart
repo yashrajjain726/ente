@@ -79,12 +79,14 @@ Future<File?> _getLocalDiskFile(
   bool isOrigin = false,
 }) {
   if (file.isSharedMediaToAppSandbox) {
-    final localFile = File(getSharedMediaFilePath(file));
+    final localFile = File(getSharedMediaPathFromLocalID(file.localID!));
     return localFile.exists().then((exist) {
       return exist ? localFile : null;
     });
   } else if (file.fileType == FileType.livePhoto && liveVideo) {
-    return Motionphoto.getLivePhotoFile(file.localID!);
+    return Motionphoto.getLivePhotoFile(
+      (file.asTrashFile?.systemTrashID?.toString() ?? file.localID)!,
+    );
   } else {
     return file.getAsset.then((asset) async {
       if (asset == null || !(await asset.exists)) {
