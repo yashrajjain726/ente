@@ -62,17 +62,15 @@ func (c *FriendsController) Add(ctx context.Context, requesterSpace *repo.SpaceR
 		return nil, err
 	}
 	if becameFriends {
-		if c.ActivityNotifier != nil {
-			go c.ActivityNotifier.OnSpaceFriendAdded(
-				requesterSpace.OwnerID,
-				requesterSpace.SpaceID,
-				requesterSpace.SpaceSlug,
-				request.RequesterID,
-			)
-		}
+		go c.ActivityNotifier.OnSpaceFriendAdded(
+			requesterSpace.OwnerID,
+			requesterSpace.SpaceID,
+			requesterSpace.SpaceSlug,
+			request.RequesterID,
+		)
 		return &models.FriendStatusResponse{Status: "friend"}, nil
 	}
-	if created && c.ActivityNotifier != nil {
+	if created {
 		go c.ActivityNotifier.OnSpaceFriendRequested(
 			requesterSpace.OwnerID,
 			requesterSpace.SpaceSlug,
@@ -135,7 +133,7 @@ func (c *FriendsController) ConfirmRequest(ctx context.Context, targetSpace *rep
 		}
 		return nil, err
 	}
-	if created && c.ActivityNotifier != nil {
+	if created {
 		go c.ActivityNotifier.OnSpaceFriendAdded(
 			targetSpace.OwnerID,
 			targetSpace.SpaceID,

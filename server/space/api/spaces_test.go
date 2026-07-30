@@ -34,6 +34,7 @@ func TestSpaceSlugAvailabilityRouteReturnsOK(t *testing.T) {
 	Register(router.Group(""), router.Group(""), NewHandlers(controller.NewModule(
 		repos,
 		&baserepo.UserAuthRepository{DB: db},
+		controller.NewSpaceWebPushSender(repos.WebPush),
 	)))
 
 	existing := httptest.NewRecorder()

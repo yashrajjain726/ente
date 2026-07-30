@@ -23,8 +23,18 @@ func setupPostsControllerTest(t *testing.T) (*PostsController, *spacerepo.Module
 	})
 	gin.SetMode(gin.TestMode)
 	repos := spacerepo.NewModule(db, nil)
-	return NewModule(repos, nil).Posts, repos, context.Background()
+	return NewModule(repos, nil, noopSpaceActivityNotifier{}).Posts, repos, context.Background()
 }
+
+type noopSpaceActivityNotifier struct{}
+
+func (noopSpaceActivityNotifier) OnSpacePostCreated(int64, string, string, []int64) {}
+func (noopSpaceActivityNotifier) OnSpacePostLiked(int64, string, string, int64)     {}
+func (noopSpaceActivityNotifier) OnSpacePostReplied(int64, string, string, int64)   {}
+func (noopSpaceActivityNotifier) OnSpaceMessageSent(int64, string, string, int64)   {}
+func (noopSpaceActivityNotifier) OnSpaceMessageLiked(int64, string, string, int64)  {}
+func (noopSpaceActivityNotifier) OnSpaceFriendAdded(int64, string, string, int64)   {}
+func (noopSpaceActivityNotifier) OnSpaceFriendRequested(int64, string, int64)       {}
 
 func testSpaceBytes(value string) []byte {
 	return []byte(value)

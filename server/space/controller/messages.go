@@ -69,14 +69,12 @@ func (c *MessagesController) Create(ctx context.Context, senderSpace *repo.Space
 		}
 		return nil, err
 	}
-	if c.ActivityNotifier != nil {
-		go c.ActivityNotifier.OnSpaceMessageSent(
-			senderSpace.OwnerID,
-			senderSpace.SpaceID,
-			senderSpace.SpaceSlug,
-			recipientSpace.OwnerID,
-		)
-	}
+	go c.ActivityNotifier.OnSpaceMessageSent(
+		senderSpace.OwnerID,
+		senderSpace.SpaceID,
+		senderSpace.SpaceSlug,
+		recipientSpace.OwnerID,
+	)
 	return toMessageResponse(*message), nil
 }
 
@@ -126,14 +124,12 @@ func (c *MessagesController) ReplyToPost(ctx context.Context, senderSpace *repo.
 		}
 		return nil, err
 	}
-	if c.ActivityNotifier != nil {
-		go c.ActivityNotifier.OnSpacePostReplied(
-			senderSpace.OwnerID,
-			senderSpace.SpaceID,
-			senderSpace.SpaceSlug,
-			recipientSpace.OwnerID,
-		)
-	}
+	go c.ActivityNotifier.OnSpacePostReplied(
+		senderSpace.OwnerID,
+		senderSpace.SpaceID,
+		senderSpace.SpaceSlug,
+		recipientSpace.OwnerID,
+	)
 	return toMessageResponse(*message), nil
 }
 
@@ -234,7 +230,7 @@ func (c *MessagesController) SetLike(ctx context.Context, actorSpace *repo.Space
 		return nil, err
 	}
 	var recipientUserID int64
-	if like && c.ActivityNotifier != nil {
+	if like {
 		otherSpace, err := c.SpacesRepo.GetSpaceByID(ctx, otherSpaceID)
 		if err != nil {
 			return nil, err
@@ -245,7 +241,7 @@ func (c *MessagesController) SetLike(ctx context.Context, actorSpace *repo.Space
 	if err != nil {
 		return nil, err
 	}
-	if like && changed && c.ActivityNotifier != nil {
+	if like && changed {
 		go c.ActivityNotifier.OnSpaceMessageLiked(
 			actorSpace.OwnerID,
 			actorSpace.SpaceID,

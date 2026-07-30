@@ -97,9 +97,6 @@ func (c *PostsController) Create(ctx context.Context, space *repo.SpaceRecord, r
 }
 
 func (c *PostsController) notifyFriendsOfNewPost(ownerID int64, spaceID, spaceSlug string) {
-	if c.ActivityNotifier == nil || c.FriendsRepo == nil {
-		return
-	}
 	go func() {
 		recipientUserIDs, err := c.FriendsRepo.ListFriendOwnerIDsForSpace(context.Background(), spaceID)
 		if err != nil {
@@ -239,7 +236,7 @@ func (c *PostsController) SetLike(ctx context.Context, actorSpace *repo.SpaceRec
 	if err != nil {
 		return nil, err
 	}
-	if like && created && c.ActivityNotifier != nil {
+	if like && created {
 		go c.ActivityNotifier.OnSpacePostLiked(
 			actorSpace.OwnerID,
 			actorSpace.SpaceID,

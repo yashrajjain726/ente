@@ -57,7 +57,11 @@ func setupSpaceSessionAPITest(t *testing.T) (*Handlers, *spacerepo.Module, int64
 		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 	`, userID, "salt", []byte{1, 2, 3}, "encrypted-key", "nonce", "public-key", "encrypted-secret-key", "secret-nonce")
 	require.NoError(t, err)
-	return NewHandlers(controller.NewModule(repos, &baserepo.UserAuthRepository{DB: db})), repos, userID
+	return NewHandlers(controller.NewModule(
+		repos,
+		&baserepo.UserAuthRepository{DB: db},
+		controller.NewSpaceWebPushSender(repos.WebPush),
+	)), repos, userID
 }
 
 func TestCreateSpaceBrowserSessionReturnsTokenWhenCacheEvictionFails(t *testing.T) {

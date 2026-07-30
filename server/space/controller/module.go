@@ -25,11 +25,7 @@ type UserTokenTerminator interface {
 	TerminateSession(userID int64, token string) error
 }
 
-func NewModule(repos *repo.Module, userAuthRepo *baserepo.UserAuthRepository, activityNotifiers ...SpaceActivityNotifier) *Module {
-	var activityNotifier SpaceActivityNotifier
-	if len(activityNotifiers) > 0 {
-		activityNotifier = activityNotifiers[0]
-	}
+func NewModule(repos *repo.Module, userAuthRepo *baserepo.UserAuthRepository, activityNotifier SpaceActivityNotifier) *Module {
 	authDeps := authDeps{
 		UserAuthRepo: userAuthRepo,
 		SpacesRepo:   repos.Spaces,
