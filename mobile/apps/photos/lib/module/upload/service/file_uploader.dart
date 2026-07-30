@@ -188,18 +188,17 @@ class FileUploader {
     );
     // Else wait for the existing upload to complete,
     // and add it to the relevant collection
-    return request.item.completer.future.then((uploadedFile) {
-      // If the fileUploader completer returned null,
+    return request.item.completer.future.then((uploadedFile) async {
       _logger.info(
         "original upload completer resolved, try adding the file to another "
         "collection",
       );
 
-      return CollectionsService.instance
-          .addOrCopyToCollection(collectionID, [uploadedFile])
-          .then((aVoid) {
-            return uploadedFile;
-          });
+      final fileInCollection = uploadedFile.copyWith();
+      await CollectionsService.instance.addOrCopyToCollection(collectionID, [
+        fileInCollection,
+      ]);
+      return fileInCollection;
     });
   }
 

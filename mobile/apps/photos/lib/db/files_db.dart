@@ -1011,7 +1011,7 @@ class FilesDB with SqlDbBase {
       'SELECT * FROM $filesTable WHERE ($columnUploadedFileID IS NULL OR '
       '$columnUploadedFileID IS -1) AND $columnCollectionID IS NOT NULL AND '
       '$columnCollectionID IS NOT -1 AND $columnLocalID IS NOT NULL AND '
-      '$columnLocalID IS NOT -1 GROUP BY $columnLocalID '
+      '$columnLocalID IS NOT -1 '
       'ORDER BY $columnCreationTime DESC',
     );
     final files = convertToFiles(results);
