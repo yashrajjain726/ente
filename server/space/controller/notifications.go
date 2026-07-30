@@ -62,9 +62,8 @@ type SpaceActivityNotifier interface {
 }
 
 type SpaceWebPushSender struct {
-	WebPushRepo *repo.WebPushRepository
-	HTTPClient  webpush.HTTPClient
-	config      *SpaceWebPushConfig
+	webPushRepo *repo.WebPushRepository
+	options     *webpush.Options
 	sendLimiter *limiter.Limiter
 	sendSlots   chan struct{}
 }
@@ -81,20 +80,29 @@ func NewSpaceWebPushSender(
 	webPushRepo *repo.WebPushRepository,
 	config *SpaceWebPushConfig,
 ) *SpaceWebPushSender {
-	return &SpaceWebPushSender{
-		WebPushRepo: webPushRepo,
-		HTTPClient:  newSpaceWebPushHTTPClient(),
-		config:      config,
+	sender := &SpaceWebPushSender{
+		webPushRepo: webPushRepo,
 		sendLimiter: util.NewRateLimiter(spaceWebPushSendRate),
 		sendSlots:   make(chan struct{}, spaceWebPushConcurrency),
 	}
+	if config != nil {
+		sender.options = &webpush.Options{
+			HTTPClient:      newSpaceWebPushHTTPClient(),
+			Subscriber:      config.subscriber,
+			TTL:             spaceWebPushTTLSeconds,
+			Urgency:         webpush.UrgencyNormal,
+			VAPIDPublicKey:  config.publicKey,
+			VAPIDPrivateKey: config.privateKey,
+		}
+	}
+	return sender
 }
 
 func (n *SpaceWebPushSender) OnSpacePostCreated(actor SpaceActivityActor) {
 	if !n.available() {
 		return
 	}
-	subscriptions, err := n.WebPushRepo.ListPostSubscriptions(
+	subscriptions, err := n.webPushRepo.ListPostSubscriptions(
 		context.Background(),
 		actor.SpaceID,
 	)
@@ -152,7 +160,7 @@ func (n *SpaceWebPushSender) sendAccountActivity(
 	if !n.available() || recipientUserID <= 0 {
 		return
 	}
-	subscriptions, err := n.WebPushRepo.ListActiveAccountSubscriptions(
+	subscriptions, err := n.webPushRepo.ListActiveAccountSubscriptions(
 		context.Background(),
 		recipientUserID,
 	)
@@ -165,12 +173,8 @@ func (n *SpaceWebPushSender) sendAccountActivity(
 }
 
 func (n *SpaceWebPushSender) available() bool {
-	return n != nil &&
-		n.WebPushRepo != nil &&
-		n.HTTPClient != nil &&
-		n.config != nil &&
-		n.sendLimiter != nil &&
-		n.sendSlots != nil &&
+	return n.webPushRepo != nil &&
+		n.options != nil &&
 		!viper.GetBool("internal.silent")
 }
 
@@ -179,10 +183,6 @@ func (n *SpaceWebPushSender) send(
 	activity, action, event, destination string,
 	subscriptions []repo.SpaceWebPushSubscriptionRecord,
 ) {
-	options := spaceWebPushOptions(n.config, n.HTTPClient)
-	if options == nil {
-		return
-	}
 	subscriptions = deduplicateSpaceWebPushSubscriptions(subscriptions)
 	if len(subscriptions) == 0 {
 		return
@@ -230,7 +230,7 @@ func (n *SpaceWebPushSender) send(
 		go func(subscription repo.SpaceWebPushSubscriptionRecord, payload []byte) {
 			defer waitGroup.Done()
 			defer func() { <-n.sendSlots }()
-			n.sendSubscription(event, payload, subscription, options)
+			n.sendSubscription(event, payload, subscription)
 		}(subscription, encoded)
 	}
 	waitGroup.Wait()
@@ -240,7 +240,6 @@ func (n *SpaceWebPushSender) sendSubscription(
 	event string,
 	payload []byte,
 	subscription repo.SpaceWebPushSubscriptionRecord,
-	options *webpush.Options,
 ) {
 	ctx, cancel := context.WithTimeout(context.Background(), spaceWebPushSendTimeout)
 	defer cancel()
@@ -250,7 +249,7 @@ func (n *SpaceWebPushSender) sendSubscription(
 			P256dh: subscription.P256dh,
 			Auth:   subscription.Auth,
 		},
-	}, options)
+	}, n.options)
 	if err != nil {
 		log.WithFields(log.Fields{
 			"event":     event,
@@ -260,7 +259,7 @@ func (n *SpaceWebPushSender) sendSubscription(
 	}
 	defer response.Body.Close()
 	if response.StatusCode == http.StatusNotFound || response.StatusCode == http.StatusGone {
-		if err := n.WebPushRepo.DeleteEndpoint(context.Background(), subscription.Endpoint); err != nil {
+		if err := n.webPushRepo.DeleteEndpoint(context.Background(), subscription.Endpoint); err != nil {
 			log.WithField("event", event).WithError(err).
 				Error("Failed to delete expired Space web push subscription")
 		}
@@ -272,23 +271,6 @@ func (n *SpaceWebPushSender) sendSubscription(
 			"status":    response.StatusCode,
 			"target_id": subscription.TargetID,
 		}).Warn("Space web push provider rejected notification")
-	}
-}
-
-func spaceWebPushOptions(
-	config *SpaceWebPushConfig,
-	client webpush.HTTPClient,
-) *webpush.Options {
-	if config == nil {
-		return nil
-	}
-	return &webpush.Options{
-		HTTPClient:      client,
-		Subscriber:      config.subscriber,
-		TTL:             spaceWebPushTTLSeconds,
-		Urgency:         webpush.UrgencyNormal,
-		VAPIDPublicKey:  config.publicKey,
-		VAPIDPrivateKey: config.privateKey,
 	}
 }
 
