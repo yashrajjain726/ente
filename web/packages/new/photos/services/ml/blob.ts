@@ -19,7 +19,7 @@ import { decodeLivePhoto } from "ente-media/live-photo";
  * file.
  *
  * The native side decodes all the formats we care about itself, so unlike
- * {@link fetchRenderableBlob} there is no JPEG conversion involved.
+ * {@link fetchRenderableEnteFileBlob} there is no JPEG conversion involved.
  */
 export interface IndexableImageSource {
     bytes: Uint8Array<ArrayBuffer>;
@@ -120,64 +120,6 @@ export const renderableImageBytes = async (
         fileFileName(file),
     );
     return new Uint8Array(await blob.arrayBuffer());
-};
-
-/**
- * Return a renderable blob (converting to JPEG if needed) for the given data.
- *
- * The blob from the relevant image component is either constructed using the
- * given {@link uploadItem} if present, otherwise it is downloaded from remote.
- *
- * - For images it is constructed from the image.
- * - For videos it is constructed from the thumbnail.
- * - For live photos it is constructed from the image component of the live
- *   photo.
- *
- * Then, if the image blob we have seems to be something that the browser cannot
- * handle, we convert it into a JPEG blob so that it can subsequently be used to
- * create an {@link ImageBitmap}.
- *
- * @param file The {@link EnteFile} to index.
- *
- * @param uploadItem If we're called during the upload process, then this will
- * be set to the {@link FilesystemUploadItem} that was uploaded so that we can
- * directly use the on-disk file instead of needing to download the original.
- *
- * @param electron The {@link ElectronMLWorker} instance that we can use to IPC
- * with the Node.js layer.
- */
-export const fetchRenderableBlob = async (
-    file: EnteFile,
-    puItem: ProcessableUploadItem | undefined,
-    electron: ElectronMLWorker,
-): Promise<Blob> =>
-    (puItem
-        ? await fetchRenderableUploadItemBlob(file, puItem, electron)
-        : undefined) ?? (await fetchRenderableEnteFileBlob(file));
-
-const fetchRenderableUploadItemBlob = async (
-    file: EnteFile,
-    puItem: ProcessableUploadItem,
-    electron: ElectronMLWorker,
-) => {
-    if (file.metadata.fileType == FileType.video) {
-        const thumbnailData = await downloadManager.thumbnailData(file);
-        return new Blob([thumbnailData!]);
-    } else {
-        const uploadItem =
-            puItem instanceof File
-                ? puItem
-                : await fileSystemUploadItemIfUnchanged(
-                      puItem,
-                      electron.fsStatMtime,
-                  );
-        if (!uploadItem) {
-            // The file on disk has changed. Fetch it from remote.
-            return undefined;
-        }
-        const blob = await readNonVideoUploadItem(uploadItem, electron);
-        return renderableImageBlob(blob, fileFileName(file));
-    }
 };
 
 /**
