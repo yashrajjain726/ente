@@ -506,7 +506,10 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                         label="Change cover image"
                         onClick={onChangeCoverImage}
                     />
-                    <SettingsEyebrow>PREFERENCES</SettingsEyebrow>
+                    {(webPushPrompt.isPilotEligible ||
+                        installPrompt.canInstall) && (
+                        <SettingsEyebrow>PREFERENCES</SettingsEyebrow>
+                    )}
                     {webPushPrompt.isPilotEligible && (
                         <SettingsRow
                             icon={Notification02Icon}
