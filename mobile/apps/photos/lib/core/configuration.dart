@@ -27,6 +27,7 @@ import "package:photos/db/gallery_downloads_db.dart";
 import "package:photos/db/memories_db.dart";
 import "package:photos/db/memory_shares_db.dart";
 import "package:photos/db/ml/db.dart";
+import "package:photos/db/social_db.dart";
 import 'package:photos/db/trash_db.dart';
 import 'package:photos/db/upload_locks_db.dart';
 import "package:photos/events/app_mode_changed_event.dart";
@@ -234,6 +235,7 @@ class Configuration implements LockScreenHost, AccountDeletionHost {
     await UploadLocksDB.instance.clearTable();
     await TrashDB.instance.clearTable();
     await ContactsDatabase().clearTable();
+    await SocialDB.instance.clearAllData();
 
     // Clear all in-memory caches
     ThumbnailInMemoryLruCache.clearAll();
