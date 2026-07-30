@@ -600,6 +600,29 @@ impl SpaceLinkCtxHandle {
         .map_err(Into::into)
     }
 
+    /// Subscribe this browser to new posts from the linked Space.
+    #[wasm_bindgen(js_name = subscribeWebPush)]
+    pub async fn subscribe_web_push(
+        &self,
+        endpoint: String,
+        p256dh: String,
+        auth: String,
+    ) -> Result<String, WasmSpaceError> {
+        self.inner
+            .subscribe_web_push(endpoint, p256dh, auth)
+            .await
+            .map_err(Into::into)
+    }
+
+    /// Remove this linked Space from the browser's push targets.
+    #[wasm_bindgen(js_name = unsubscribeWebPush)]
+    pub async fn unsubscribe_web_push(&self, endpoint: String) -> Result<(), WasmSpaceError> {
+        self.inner
+            .unsubscribe_web_push(endpoint)
+            .await
+            .map_err(Into::into)
+    }
+
     /// Download and decrypt one post photo.
     #[wasm_bindgen(js_name = downloadPostAsset)]
     pub async fn download_post_asset(

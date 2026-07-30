@@ -63,6 +63,7 @@ func TestSpaceRoutesUseRouteSpecificRateLimits(t *testing.T) {
 	require.Same(t, limit200ReqPerMin, rateLimiter.getLimiter("/space/public/by-slug/:spaceSlug/link/posts", http.MethodGet))
 	require.Same(t, limit200ReqPerMin, rateLimiter.getLimiter("/space/public/by-slug/:spaceSlug/link/versions", http.MethodGet))
 	require.Same(t, limit500ReqPerMin, rateLimiter.getLimiter("/space/public/by-slug/:spaceSlug/link/assets/redirect", http.MethodGet))
+	require.Same(t, limit10ReqPerMin, rateLimiter.getLimiter("/space/public/by-slug/:spaceSlug/link/push/subscription", http.MethodPut))
 	require.Same(t, limit10ReqPerMin, rateLimiter.getLimiter("/spaces/:spaceID/uploads/presign", http.MethodPost))
 	require.Same(t, limit200ReqPerMin, rateLimiter.getLimiter("/spaces/:spaceID/profile", http.MethodGet))
 	require.Same(t, limit500ReqPerMin, rateLimiter.getLimiter("/spaces/:spaceID/assets/redirect", http.MethodGet))

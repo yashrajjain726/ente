@@ -195,6 +195,11 @@ func (c *LinksController) authorize(ctx *gin.Context, slug string) (*repo.SpaceL
 	return link, space, nil
 }
 
+func (c *LinksController) Authorize(ctx *gin.Context, slug string) (*repo.SpaceLinkRecord, error) {
+	link, _, err := c.authorize(ctx, slug)
+	return link, err
+}
+
 func (c *LinksController) Profile(ctx *gin.Context, slug string) (*models.SpaceLinkProfileResponse, error) {
 	link, space, err := c.authorize(ctx, slug)
 	if err != nil {

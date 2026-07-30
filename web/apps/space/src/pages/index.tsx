@@ -3,6 +3,7 @@ import { AuthenticatedFriendProfile } from "components/AuthenticatedFriendProfil
 import { SpaceButtonSpinner } from "components/SpaceButtonSpinner";
 import { SpaceMobileBestToast } from "components/SpaceMobileBestToast";
 import { SpacePageMeta } from "components/SpacePageMeta";
+import { SpacePublicProfileNotificationControl } from "components/SpacePublicProfileNotificationControl";
 import { SpaceRouteFallback } from "components/SpaceRouteFallback";
 import log from "ente-base/log";
 import React, { useEffect, useMemo, useState } from "react";
@@ -36,6 +37,7 @@ import {
     type SpaceInviteIntent,
     type SpaceInviteRoute,
 } from "services/spaceInvite";
+import { isSpaceWebPushPilotPublicPage } from "services/spaceWebPushPilot";
 import {
     useSpaceAppState,
     type OnboardingEntrySource,
@@ -643,6 +645,15 @@ export const Page: React.FC<PageProps> = ({ invitePreview }) => {
                             postGroups={publicPostGroups}
                             postsCount={publicLink.postsCount}
                             profile={publicLink.profile}
+                            publicNotificationControl={
+                                isSpaceWebPushPilotPublicPage(
+                                    publicIdentity.username,
+                                ) ? (
+                                    <SpacePublicProfileNotificationControl
+                                        session={publicLink}
+                                    />
+                                ) : undefined
+                            }
                             showAddingFriendSpinner={
                                 isAddingFriend && Boolean(profile)
                             }

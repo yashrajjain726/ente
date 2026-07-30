@@ -16,6 +16,7 @@ type Module struct {
 	Sessions *SessionsRepository
 	Drips    *DripsRepository
 	Links    *LinksRepository
+	WebPush  *WebPushRepository
 }
 
 type SpacesRepository struct {
@@ -52,6 +53,10 @@ type DripsRepository struct {
 }
 
 type LinksRepository struct {
+	DB *sql.DB
+}
+
+type WebPushRepository struct {
 	DB *sql.DB
 }
 
@@ -246,6 +251,14 @@ type SpaceLinkRecord struct {
 	UpdatedAt          int64
 }
 
+type SpaceWebPushSubscriptionRecord struct {
+	TargetID string
+	Endpoint string
+	P256dh   string
+	Auth     string
+	Public   bool
+}
+
 func NewModule(db *sql.DB, s3Config *s3config.S3Config) *Module {
 	return &Module{
 		Spaces:   &SpacesRepository{DB: db},
@@ -257,5 +270,6 @@ func NewModule(db *sql.DB, s3Config *s3config.S3Config) *Module {
 		Sessions: &SessionsRepository{DB: db},
 		Drips:    &DripsRepository{DB: db},
 		Links:    &LinksRepository{DB: db},
+		WebPush:  &WebPushRepository{DB: db},
 	}
 }

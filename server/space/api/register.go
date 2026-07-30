@@ -5,6 +5,8 @@ import "github.com/gin-gonic/gin"
 func Register(privateAPI, publicAPI gin.IRouter, handlers *Handlers) {
 	privateAPI.GET("/account/space", handlers.ListSpaces)
 	privateAPI.POST("/account/space", handlers.CreateSpace)
+	privateAPI.PUT("/account/space/push/subscription", handlers.UpsertWebPushSubscription)
+	privateAPI.DELETE("/account/space/push/subscription", handlers.DeleteWebPushSubscription)
 
 	spaceAPI := privateAPI.Group("/spaces/:spaceID", handlers.RequireSelectedSpace())
 	selected := handlers.withSelectedSpace
@@ -54,6 +56,9 @@ func Register(privateAPI, publicAPI gin.IRouter, handlers *Handlers) {
 	publicAPI.GET("/space/public/by-slug/:spaceSlug/link/posts", handlers.SpaceLinkPosts)
 	publicAPI.GET("/space/public/by-slug/:spaceSlug/link/versions", handlers.SpaceLinkVersions)
 	publicAPI.GET("/space/public/by-slug/:spaceSlug/link/assets/redirect", handlers.SpaceLinkAssetRedirect)
+	publicAPI.GET("/space/push/vapid-key", handlers.GetWebPushVAPIDKey)
+	publicAPI.PUT("/space/public/by-slug/:spaceSlug/link/push/subscription", handlers.UpsertSpaceLinkWebPushSubscription)
+	publicAPI.DELETE("/space/public/by-slug/:spaceSlug/link/push/subscription", handlers.DeleteSpaceLinkWebPushSubscription)
 	publicAPI.POST("/account/space/sessions/bootstrap", handlers.BootstrapBrowserSession)
 	publicAPI.DELETE("/account/space/sessions/current", handlers.DeleteBrowserSession)
 }

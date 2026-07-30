@@ -28,6 +28,7 @@ import { SpaceLoadingSpinner } from "components/SpaceRouteFallback";
 import { SpaceShareInviteButton } from "components/SpaceShareInviteButton";
 import log from "ente-base/log";
 import { useBrowserBackClose } from "hooks/useBrowserBackClose";
+import { useHideOnScrollDirection } from "hooks/useHideOnScrollDirection";
 import React, { useState } from "react";
 import type { SetupProfile } from "screens/SetupProfileScreen";
 import type {
@@ -63,12 +64,9 @@ const headerAvatarSize = 28;
 const feedAvatarSize = 38;
 const headerHeight = 64;
 const headerIconSize = 30;
-const headerHideStartY = 96;
-const headerScrollDelta = 4;
 const headerSideWidth = 32;
 const feedLikeActionSize = spaceTouchTargetSize;
 const feedActionIconSize = 20;
-const feedReplyIconSize = 17;
 const emptyFeedItemGap = "22px";
 const feedHorizontalPadding = "16px";
 const minimumFeedPhotoFrameAspectRatio = 3 / 4;
@@ -82,38 +80,23 @@ const avatarFadeSx = {
     animation: "spaceAvatarFade 320ms cubic-bezier(0.22, 1, 0.36, 1) both",
     "@media (prefers-reduced-motion: reduce)": { animation: "none" },
 } as const;
-const feedCaptionTextSx = {
-    color: textBase,
+const feedPhotoCaptionTextSx = {
+    color: "#FFFFFF",
     fontFamily: '"Inter Variable", Inter, sans-serif',
     fontSize: 13,
-    fontWeight: 600,
-    lineHeight: "18px",
-    m: 0,
-    minWidth: 0,
-    overflow: "hidden",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-};
-
-const FeedReplyIcon: React.FC = () => (
-    <svg
-        width={feedReplyIconSize}
-        height={feedReplyIconSize}
-        viewBox="0 0 12 9"
-        fill="none"
-        xmlns="http://www.w3.org/2000/svg"
-    >
-        <path
-            fillRule="evenodd"
-            clipRule="evenodd"
-            d="M4.5241 0.242677C4.62341 0.34442 4.67919 0.482337 4.67919 0.626134C4.67919 0.76993 4.62341 0.907847 4.5241 1.00959L1.89369 3.70102H7.68483C8.3587 3.70102 9.35854 3.9036 10.2042 4.52653C11.0775 5.17045 11.7507 6.23762 11.7507 7.86116C11.7507 8.00507 11.6948 8.14309 11.5953 8.24485C11.4959 8.34661 11.361 8.40378 11.2203 8.40378C11.0797 8.40378 10.9448 8.34661 10.8453 8.24485C10.7459 8.14309 10.69 8.00507 10.69 7.86116C10.69 6.59069 10.1844 5.84982 9.58481 5.40776C8.95761 4.94544 8.18899 4.78627 7.68483 4.78627H1.89369L4.5241 7.4777C4.5762 7.52738 4.61799 7.58728 4.64698 7.65384C4.67597 7.72041 4.69155 7.79226 4.69281 7.86512C4.69406 7.93798 4.68096 8.01035 4.65429 8.07791C4.62762 8.14548 4.58792 8.20686 4.53756 8.25839C4.4872 8.30991 4.42722 8.35053 4.36118 8.37782C4.29515 8.40512 4.22442 8.41852 4.15321 8.41723C4.082 8.41595 4.01178 8.4 3.94673 8.37034C3.88167 8.34068 3.82313 8.29792 3.77457 8.24461L0.23908 4.6271C0.139767 4.52536 0.0839844 4.38744 0.0839844 4.24364C0.0839844 4.09985 0.139767 3.96193 0.23908 3.86019L3.77457 0.242677C3.87401 0.141061 4.0088 0.0839844 4.14934 0.0839844C4.28987 0.0839844 4.42466 0.141061 4.5241 0.242677Z"
-            fill="currentColor"
-            stroke="currentColor"
-            strokeWidth="0.166667"
-        />
-    </svg>
-);
-
+    fontWeight: 650,
+    lineHeight: "19px",
+    textAlign: "center",
+    textWrap: "balance",
+} as const;
+const feedPhotoCaptionBubbleSx = {
+    bgcolor: "rgba(48, 48, 48, 0.86)",
+    borderRadius: "10px",
+    boxDecorationBreak: "clone",
+    px: "8px",
+    py: "2px",
+    WebkitBoxDecorationBreak: "clone",
+} as const;
 interface HomeScreenProps {
     feedItems: SpacePost[];
     friendRequestSentToastName?: string;
@@ -521,71 +504,23 @@ const useDecodedImage = (
     return { ready: !src, src };
 };
 
-const pageScrollY = () =>
-    Math.max(
-        0,
-        window.scrollY ||
-            document.scrollingElement?.scrollTop ||
-            document.documentElement.scrollTop ||
-            document.body.scrollTop ||
-            0,
-    );
-
 const scrollPageToTop = () => {
-    const scrollOptions: ScrollToOptions = { behavior: "auto", top: 0 };
-    document.scrollingElement?.scrollTo(scrollOptions);
-    window.scrollTo(scrollOptions);
+    const behavior = window.matchMedia("(prefers-reduced-motion: reduce)")
+        .matches
+        ? "auto"
+        : "smooth";
+    window.scrollTo({ behavior, top: 0 });
 };
 
 const scheduleScrollPageToTop = () => {
-    const timeoutID = window.setTimeout(scrollPageToTop, 0);
-    return () => window.clearTimeout(timeoutID);
-};
-
-const useHideHeaderOnScrollDirection = () => {
-    const [isHidden, setIsHidden] = useState(false);
-    const lastScrollYRef = React.useRef(0);
-    const frameRef = React.useRef<number | null>(null);
-
-    React.useEffect(() => {
-        lastScrollYRef.current = pageScrollY();
-
-        const updateVisibility = () => {
-            frameRef.current = null;
-            const nextScrollY = pageScrollY();
-            const delta = nextScrollY - lastScrollYRef.current;
-            lastScrollYRef.current = nextScrollY;
-
-            if (nextScrollY <= headerHideStartY) {
-                setIsHidden(false);
-                return;
-            }
-
-            if (delta > headerScrollDelta) {
-                setIsHidden(true);
-                return;
-            }
-
-            if (delta < -1) setIsHidden(false);
-        };
-
-        const scheduleUpdate = () => {
-            if (frameRef.current != null) return;
-            frameRef.current = window.requestAnimationFrame(updateVisibility);
-        };
-
-        window.addEventListener("scroll", scheduleUpdate, { passive: true });
-        document.addEventListener("scroll", scheduleUpdate, { passive: true });
-        return () => {
-            window.removeEventListener("scroll", scheduleUpdate);
-            document.removeEventListener("scroll", scheduleUpdate);
-            if (frameRef.current != null) {
-                window.cancelAnimationFrame(frameRef.current);
-            }
-        };
-    }, []);
-
-    return isHidden;
+    let scrollFrame = 0;
+    const closeFrame = window.requestAnimationFrame(() => {
+        scrollFrame = window.requestAnimationFrame(scrollPageToTop);
+    });
+    return () => {
+        window.cancelAnimationFrame(closeFrame);
+        window.cancelAnimationFrame(scrollFrame);
+    };
 };
 
 const usePostingDotCount = (isPosting: boolean) => {
@@ -642,7 +577,6 @@ const FeedLikeButton: React.FC<FeedLikeButtonProps> = ({
                 flexShrink: 0,
                 height: feedLikeActionSize,
                 justifyContent: "center",
-                mr: "9px",
                 p: 0,
                 position: "relative",
                 transition:
@@ -691,6 +625,98 @@ const FeedLikeButton: React.FC<FeedLikeButtonProps> = ({
     );
 };
 
+const FeedPhotoCaption: React.FC<{ caption: string }> = ({ caption }) => {
+    const measureContainerRef = React.useRef<HTMLDivElement | null>(null);
+    const measureTextRef = React.useRef<HTMLSpanElement | null>(null);
+    const [displayCaption, setDisplayCaption] = useState(caption);
+
+    React.useEffect(() => {
+        const container = measureContainerRef.current;
+        const text = measureTextRef.current;
+        if (!container || !text) return;
+
+        const measure = () => {
+            const fits = (value: string) => {
+                text.textContent = value;
+                return text.getClientRects().length <= 2;
+            };
+            if (fits(caption)) {
+                setDisplayCaption(caption);
+                return;
+            }
+
+            let lower = 0;
+            let upper = caption.length;
+            while (lower < upper) {
+                const middle = Math.ceil((lower + upper) / 2);
+                if (fits(`${caption.slice(0, middle).trimEnd()}…`)) {
+                    lower = middle;
+                } else {
+                    upper = middle - 1;
+                }
+            }
+
+            const prefix = caption.slice(0, lower).trimEnd();
+            const lastSpace = prefix.lastIndexOf(" ");
+            setDisplayCaption(
+                `${lastSpace > 0 ? prefix.slice(0, lastSpace) : prefix}…`,
+            );
+        };
+
+        measure();
+        const observer = new ResizeObserver(measure);
+        observer.observe(container);
+        return () => observer.disconnect();
+    }, [caption]);
+
+    return (
+        <>
+            <Box
+                aria-hidden
+                ref={measureContainerRef}
+                sx={{
+                    ...feedPhotoCaptionTextSx,
+                    left: "15%",
+                    position: "absolute",
+                    top: 0,
+                    visibility: "hidden",
+                    width: "70%",
+                }}
+            >
+                <Box
+                    ref={measureTextRef}
+                    component="span"
+                    sx={feedPhotoCaptionBubbleSx}
+                >
+                    {caption}
+                </Box>
+            </Box>
+            <Box
+                title={caption}
+                sx={{
+                    ...feedPhotoCaptionTextSx,
+                    bottom: 20,
+                    display: "-webkit-box",
+                    left: "50%",
+                    maxWidth: "70%",
+                    pointerEvents: "none",
+                    position: "absolute",
+                    textShadow: "0 1px 10px rgba(0, 0, 0, 0.74)",
+                    transform: "translateX(-50%)",
+                    WebkitBoxOrient: "vertical",
+                    WebkitLineClamp: 2,
+                    width: "max-content",
+                    zIndex: 2,
+                }}
+            >
+                <Box component="span" sx={feedPhotoCaptionBubbleSx}>
+                    {displayCaption}
+                </Box>
+            </Box>
+        </>
+    );
+};
+
 const FeedItem: React.FC<FeedItemProps> = ({
     aspectRatio,
     avatarUrl,
@@ -728,7 +754,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
         () => thumbHashDataURLFromBase64(thumbHash),
         [thumbHash],
     );
-    const showFooter = !isOwnPost || Boolean(displayCaption);
+    const showFooter = !isOwnPost;
     const canOpenAuthor = isOwnPost
         ? Boolean(onOpenProfile)
         : Boolean(onOpenFriend);
@@ -1231,6 +1257,9 @@ const FeedItem: React.FC<FeedItemProps> = ({
                         )}
                     </Box>
                 </Box>
+                {displayCaption && (
+                    <FeedPhotoCaption caption={displayCaption} />
+                )}
             </Box>
             {showFooter && (
                 <Box
@@ -1238,98 +1267,62 @@ const FeedItem: React.FC<FeedItemProps> = ({
                         alignItems: "center",
                         boxSizing: "border-box",
                         display: "grid",
-                        gap: "8px",
-                        gridTemplateColumns: isOwnPost
-                            ? "minmax(0, 1fr)"
-                            : "minmax(0, 1fr) auto",
+                        gap: "6px",
+                        gridTemplateColumns: "minmax(0, 1fr) auto",
                         minHeight: feedLikeActionSize,
                         mt: "8px",
-                        pl: "9px",
+                        px: "4px",
                         width: "100%",
                     }}
                 >
-                    {displayCaption ? (
-                        <Box
-                            component="button"
-                            type="button"
-                            aria-label={`Open ${name} post`}
-                            disabled={!canOpenPhoto}
-                            onClick={() => openPhoto()}
-                            title={displayCaption}
-                            sx={{
-                                ...feedCaptionTextSx,
-                                appearance: "none",
-                                bgcolor: "transparent",
-                                border: 0,
-                                cursor: canOpenPhoto ? "pointer" : "default",
-                                display: "block",
-                                p: 0,
-                                textAlign: "left",
-                                width: "100%",
-                                "&:disabled": { color: textBase },
-                                "&:focus-visible": {
-                                    borderRadius: "4px",
-                                    outline: `2px solid ${green}`,
-                                    outlineOffset: 2,
-                                },
-                            }}
-                        >
-                            {displayCaption}
-                        </Box>
-                    ) : (
-                        <Box component="p" sx={feedCaptionTextSx} />
-                    )}
-                    {!isOwnPost && (
-                        <Box
-                            sx={{
-                                alignItems: "center",
-                                display: "flex",
-                                gap: "6px",
-                                justifyContent: "flex-end",
-                            }}
-                        >
-                            <Box
-                                component="button"
-                                type="button"
-                                aria-label={`Reply to ${firstName}'s post`}
-                                disabled={!canOpenPhoto}
-                                onClick={() => openPhoto(true)}
-                                sx={{
-                                    alignItems: "center",
-                                    appearance: "none",
-                                    bgcolor: feedActionBackground,
-                                    border: 0,
-                                    borderRadius: "50%",
-                                    color: textBase,
-                                    cursor: canOpenPhoto
-                                        ? "pointer"
-                                        : "default",
-                                    display: "inline-flex",
-                                    height: feedLikeActionSize,
-                                    justifyContent: "center",
-                                    p: 0,
-                                    flexShrink: 0,
-                                    transition:
-                                        "color 120ms ease, transform 120ms ease",
-                                    width: feedLikeActionSize,
-                                    "&:focus-visible": {
-                                        outline: `2px solid ${green}`,
-                                        outlineOffset: 2,
-                                    },
-                                    "&:not(:disabled):hover": {
-                                        bgcolor: feedActionBackgroundHover,
-                                    },
-                                }}
-                            >
-                                <FeedReplyIcon />
-                            </Box>
-                            <FeedLikeButton
-                                isLiked={isLiked}
-                                onClick={handleLikeClick}
-                                popID={likePopID}
-                            />
-                        </Box>
-                    )}
+                    <Box
+                        component="button"
+                        type="button"
+                        aria-label={`Reply privately to ${firstName}'s post`}
+                        disabled={!canOpenPhoto}
+                        onClick={() => openPhoto(true)}
+                        sx={{
+                            appearance: "none",
+                            bgcolor: feedActionBackground,
+                            border: 0,
+                            borderRadius: "22px",
+                            color: textSecondary,
+                            cursor: canOpenPhoto ? "pointer" : "default",
+                            fontFamily: '"Inter Variable", Inter, sans-serif',
+                            fontSize: 14,
+                            fontWeight: 500,
+                            height: feedLikeActionSize,
+                            lineHeight: "20px",
+                            minWidth: 0,
+                            overflow: "hidden",
+                            px: "16px",
+                            textAlign: "left",
+                            textOverflow: "ellipsis",
+                            transition:
+                                "background-color 120ms ease, transform 120ms ease",
+                            whiteSpace: "nowrap",
+                            "&:active": {
+                                transform: canOpenPhoto
+                                    ? "scale(0.99)"
+                                    : undefined,
+                            },
+                            "&:disabled": { color: textSecondary },
+                            "&:focus-visible": {
+                                outline: `2px solid ${green}`,
+                                outlineOffset: 2,
+                            },
+                            "&:not(:disabled):hover": {
+                                bgcolor: feedActionBackgroundHover,
+                            },
+                        }}
+                    >
+                        Reply privately to {firstName}...
+                    </Box>
+                    <FeedLikeButton
+                        isLiked={isLiked}
+                        onClick={handleLikeClick}
+                        popID={likePopID}
+                    />
                 </Box>
             )}
         </Box>
@@ -1535,7 +1528,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         Record<string, string>
     >({});
     const [feedScrollRequest, setFeedScrollRequest] = useState(0);
-    const isHeaderTriggered = useHideHeaderOnScrollDirection();
+    const isHeaderTriggered = useHideOnScrollDirection();
     const [isHeaderFocused, setIsHeaderFocused] = useState(false);
     const isHeaderHidden = isHeaderTriggered && !isHeaderFocused;
     const postInputRef = React.useRef<HTMLInputElement | null>(null);
@@ -2469,6 +2462,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                         }
                         onDraftPostExitStart={() => {
                             setIsDraftPostExiting(true);
+                        }}
+                        onDraftPostPublished={() => {
                             setFeedScrollRequest((request) => request + 1);
                         }}
                         onSetPostLiked={onSetPostLiked}

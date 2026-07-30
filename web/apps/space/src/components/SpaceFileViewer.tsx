@@ -302,6 +302,53 @@ const resizeCaptionInput = (
         input.scrollHeight > captionInputMaxHeight ? "auto" : "hidden";
 };
 
+const viewerCaptionTextSx = {
+    color: "#FFFFFF",
+    fontFamily: '"Inter Variable", Inter, sans-serif',
+    fontSize: 14,
+    fontWeight: 650,
+    lineHeight: "21px",
+    textAlign: "center",
+    textWrap: "balance",
+    whiteSpace: "pre-wrap",
+} as const;
+const viewerCaptionBubbleSx = {
+    bgcolor: "rgba(48, 48, 48, 0.86)",
+    borderRadius: "10px",
+    boxDecorationBreak: "clone",
+    px: "8px",
+    py: "2px",
+    WebkitBoxDecorationBreak: "clone",
+} as const;
+
+const SpaceViewerCaption: React.FC<{ caption: string }> = ({ caption }) => {
+    return (
+        <Box
+            component="p"
+            data-space-viewer-chrome="true"
+            title={caption}
+            sx={{
+                ...viewerCaptionTextSx,
+                bottom: "14%",
+                left: "50%",
+                m: 0,
+                maxWidth: "70vw",
+                minWidth: 0,
+                overflowWrap: "break-word",
+                position: "fixed",
+                textShadow: "0 1px 10px rgba(0, 0, 0, 0.74)",
+                transform: "translateX(-50%)",
+                width: "70vw",
+                zIndex: 2,
+            }}
+        >
+            <Box component="span" sx={viewerCaptionBubbleSx}>
+                {caption}
+            </Box>
+        </Box>
+    );
+};
+
 export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
     draftPostPreparationError,
     focusReplyOnOpen = false,
@@ -1925,46 +1972,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                 </Box>
             )}
             {hasDisplayCaption && !isCaptionEditing && (
-                <Box
-                    component="p"
-                    data-space-viewer-chrome="true"
-                    title={displayCaption}
-                    sx={{
-                        boxSizing: "border-box",
-                        color: textBase,
-                        fontFamily: '"Inter Variable", Inter, sans-serif',
-                        fontSize: 14,
-                        fontWeight: 650,
-                        left: "50%",
-                        lineHeight: "23px",
-                        m: 0,
-                        maxWidth: "90vw",
-                        minWidth: 0,
-                        overflowWrap: "break-word",
-                        position: "fixed",
-                        textAlign: "center",
-                        textShadow: "0 1px 10px rgba(0, 0, 0, 0.74)",
-                        bottom: "14%",
-                        transform: "translateX(-50%)",
-                        whiteSpace: "pre-wrap",
-                        width: "90vw",
-                        zIndex: 2,
-                    }}
-                >
-                    <Box
-                        component="span"
-                        sx={{
-                            bgcolor: "rgba(48, 48, 48, 0.82)",
-                            borderRadius: "10px",
-                            boxDecorationBreak: "clone",
-                            px: "8px",
-                            py: "2px",
-                            WebkitBoxDecorationBreak: "clone",
-                        }}
-                    >
-                        {displayCaption}
-                    </Box>
-                </Box>
+                <SpaceViewerCaption caption={displayCaption} />
             )}
             {showPhotoLikeButton && !isCaptionEditing && (
                 <Box

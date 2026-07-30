@@ -20,6 +20,28 @@ type SpaceBrowserSessionBootstrapResponse struct {
 	SessionWrapKey string `json:"sessionWrapKey"`
 }
 
+type SpaceWebPushVAPIDKeyResponse struct {
+	PublicKey string `json:"publicKey"`
+}
+
+type SpaceWebPushSubscriptionKeys struct {
+	P256dh string `json:"p256dh" binding:"required"`
+	Auth   string `json:"auth" binding:"required"`
+}
+
+type SpaceWebPushSubscriptionRequest struct {
+	Endpoint string                       `json:"endpoint" binding:"required"`
+	Keys     SpaceWebPushSubscriptionKeys `json:"keys" binding:"required"`
+}
+
+type SpaceWebPushUnsubscriptionRequest struct {
+	Endpoint string `json:"endpoint" binding:"required"`
+}
+
+type SpaceWebPushTargetResponse struct {
+	TargetID string `json:"targetId"`
+}
+
 type GetSpaceProfileRequest struct {
 	SpaceID       string `form:"spaceId"`
 	ViewerSpaceID string `form:"viewerSpaceId"`

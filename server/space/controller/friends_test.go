@@ -13,7 +13,7 @@ import (
 func setupFriendsControllerTest(t *testing.T) (*FriendsController, *spacerepo.Module, context.Context) {
 	t.Helper()
 	_, repos, ctx := setupPostsControllerTest(t)
-	return NewModule(repos, nil).Friends, repos, ctx
+	return NewModule(repos, nil, noopSpaceActivityNotifier{}, nil).Friends, repos, ctx
 }
 
 func TestFriendRelationshipReportsSelfFriendAndEmpty(t *testing.T) {

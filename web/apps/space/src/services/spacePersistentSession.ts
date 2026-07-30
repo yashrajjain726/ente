@@ -27,7 +27,7 @@ import {
 import { z } from "zod";
 
 const spaceBrowserSessionStorageKey = "spaceBrowserSession";
-const spaceSessionTokenHeader = "X-Space-Session-Token";
+export const spaceSessionTokenHeader = "X-Space-Session-Token";
 
 const OwnedSpace = z.object({
     spaceId: z.string(),

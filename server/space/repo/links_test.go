@@ -94,6 +94,9 @@ func TestSpaceKeyRotationRewrapsOrDisablesActiveLink(t *testing.T) {
 	)
 	require.NoError(t, err)
 	expectedLinkID := link.LinkID
+	endpoint := "https://push.example/key-rotation"
+	_, err = module.WebPush.UpsertLinkSubscription(ctx, link.LinkID, endpoint, "p256dh", "auth")
+	require.NoError(t, err)
 
 	rotated, err := module.Spaces.RotateKey(
 		ctx,
@@ -110,6 +113,7 @@ func TestSpaceKeyRotationRewrapsOrDisablesActiveLink(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, rotated.CurrentVersion, link.KeyVersion)
 	require.Equal(t, []byte("encrypted-space-key-v2"), link.EncryptedSpaceKey)
+	require.Equal(t, int64(1), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_web_push_subscriptions WHERE endpoint = $1`, endpoint))
 
 	_, err = module.Spaces.RotateKey(
 		ctx,
@@ -124,4 +128,5 @@ func TestSpaceKeyRotationRewrapsOrDisablesActiveLink(t *testing.T) {
 	require.NoError(t, err)
 	_, err = module.Links.GetActive(ctx, space.SpaceID)
 	require.True(t, errors.Is(stacktrace.RootCause(err), sql.ErrNoRows))
+	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_web_push_subscriptions WHERE endpoint = $1`, endpoint))
 }

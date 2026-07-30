@@ -25,6 +25,28 @@ func isSpaceLinkUniqueViolation(err error, constraint string) bool {
 		pgErr.Constraint == constraint
 }
 
+func deactivateSpaceLinksTx(ctx context.Context, tx *sql.Tx, spaceIDs []string) error {
+	spaceIDArray := pq.Array(spaceIDs)
+	if _, err := tx.ExecContext(ctx, `
+		UPDATE space_links
+		SET active = FALSE
+		WHERE space_id = ANY($1) AND active = TRUE
+	`, spaceIDArray); err != nil {
+		return stacktrace.Propagate(err, "failed to deactivate space links")
+	}
+	if _, err := tx.ExecContext(ctx, `
+		DELETE FROM space_web_push_subscriptions
+		WHERE link_id IN (
+			SELECT link_id
+			FROM space_links
+			WHERE space_id = ANY($1) AND active = FALSE
+		)
+	`, spaceIDArray); err != nil {
+		return stacktrace.Propagate(err, "failed to delete inactive link subscriptions")
+	}
+	return nil
+}
+
 func spaceLinkScanDest(rec *SpaceLinkRecord) []any {
 	return []any{
 		&rec.LinkID,
@@ -206,12 +228,8 @@ func (r *LinksRepository) Rotate(
 	if recentRotations >= maxSpaceLinkRotationsPerDay {
 		return nil, ErrSpaceLinkRotationLimitReached
 	}
-	if _, err := tx.ExecContext(ctx, `
-		UPDATE space_links
-		SET active = FALSE
-		WHERE space_id = $1 AND active = TRUE
-	`, spaceID); err != nil {
-		return nil, stacktrace.Propagate(err, "")
+	if err := deactivateSpaceLinksTx(ctx, tx, []string{spaceID}); err != nil {
+		return nil, err
 	}
 	var linkID int64
 	err = tx.QueryRowContext(ctx, `
