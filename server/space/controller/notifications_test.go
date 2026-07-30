@@ -37,40 +37,40 @@ func newRecordingSpaceActivityNotifier() *recordingSpaceActivityNotifier {
 	return &recordingSpaceActivityNotifier{events: make(chan recordedSpaceActivity, 8)}
 }
 
-func (n *recordingSpaceActivityNotifier) OnSpacePostCreated(actorUserID int64, actorSpaceID, actorSlug string) {
-	n.record(spaceActivityPostCreated, actorUserID, actorSpaceID, actorSlug)
+func (n *recordingSpaceActivityNotifier) OnSpacePostCreated(actor SpaceActivityActor) {
+	n.record(spaceActivityPostCreated, actor)
 }
 
-func (n *recordingSpaceActivityNotifier) OnSpacePostLiked(actorUserID int64, actorSpaceID, actorSlug string, recipientUserID int64) {
-	n.record(spaceActivityPostLiked, actorUserID, actorSpaceID, actorSlug, recipientUserID)
+func (n *recordingSpaceActivityNotifier) OnSpacePostLiked(actor SpaceActivityActor, recipientUserID int64) {
+	n.record(spaceActivityPostLiked, actor, recipientUserID)
 }
 
-func (n *recordingSpaceActivityNotifier) OnSpacePostReplied(actorUserID int64, actorSpaceID, actorSlug string, recipientUserID int64) {
-	n.record(spaceActivityPostReplied, actorUserID, actorSpaceID, actorSlug, recipientUserID)
+func (n *recordingSpaceActivityNotifier) OnSpacePostReplied(actor SpaceActivityActor, recipientUserID int64) {
+	n.record(spaceActivityPostReplied, actor, recipientUserID)
 }
 
-func (n *recordingSpaceActivityNotifier) OnSpaceMessageSent(actorUserID int64, actorSpaceID, actorSlug string, recipientUserID int64) {
-	n.record(spaceActivityMessageSent, actorUserID, actorSpaceID, actorSlug, recipientUserID)
+func (n *recordingSpaceActivityNotifier) OnSpaceMessageSent(actor SpaceActivityActor, recipientUserID int64) {
+	n.record(spaceActivityMessageSent, actor, recipientUserID)
 }
 
-func (n *recordingSpaceActivityNotifier) OnSpaceMessageLiked(actorUserID int64, actorSpaceID, actorSlug string, recipientUserID int64) {
-	n.record(spaceActivityMessageLiked, actorUserID, actorSpaceID, actorSlug, recipientUserID)
+func (n *recordingSpaceActivityNotifier) OnSpaceMessageLiked(actor SpaceActivityActor, recipientUserID int64) {
+	n.record(spaceActivityMessageLiked, actor, recipientUserID)
 }
 
-func (n *recordingSpaceActivityNotifier) OnSpaceFriendAdded(actorUserID int64, actorSpaceID, actorSlug string, recipientUserID int64) {
-	n.record(spaceActivityFriendAdded, actorUserID, actorSpaceID, actorSlug, recipientUserID)
+func (n *recordingSpaceActivityNotifier) OnSpaceFriendAdded(actor SpaceActivityActor, recipientUserID int64) {
+	n.record(spaceActivityFriendAdded, actor, recipientUserID)
 }
 
-func (n *recordingSpaceActivityNotifier) OnSpaceFriendRequested(actorUserID int64, actorSlug string, recipientUserID int64) {
-	n.record(spaceActivityFriendRequested, actorUserID, "", actorSlug, recipientUserID)
+func (n *recordingSpaceActivityNotifier) OnSpaceFriendRequested(actor SpaceActivityActor, recipientUserID int64) {
+	n.record(spaceActivityFriendRequested, actor, recipientUserID)
 }
 
-func (n *recordingSpaceActivityNotifier) record(event string, actorUserID int64, actorSpaceID, actorSlug string, recipientIDs ...int64) {
+func (n *recordingSpaceActivityNotifier) record(event string, actor SpaceActivityActor, recipientIDs ...int64) {
 	n.events <- recordedSpaceActivity{
 		event:        event,
-		actorUserID:  actorUserID,
-		actorSpaceID: actorSpaceID,
-		actorSlug:    actorSlug,
+		actorUserID:  actor.UserID,
+		actorSpaceID: actor.SpaceID,
+		actorSlug:    actor.Slug,
 		recipientIDs: append([]int64(nil), recipientIDs...),
 	}
 }
@@ -149,7 +149,7 @@ func newSpaceWebPushTestConfig(t *testing.T) *SpaceWebPushConfig {
 func TestUnconfiguredSpaceWebPushSenderIsUnavailable(t *testing.T) {
 	sender := NewSpaceWebPushSender(&repo.WebPushRepository{}, nil)
 	require.False(t, sender.available())
-	sender.OnSpacePostReplied(1, "alice_space", "alice", 2)
+	sender.OnSpacePostReplied(SpaceActivityActor{UserID: 1, SpaceID: "alice_space", Slug: "alice"}, 2)
 }
 
 func TestSpaceWebPushDeduplicatesSharedEndpointForAccount(t *testing.T) {
@@ -169,7 +169,7 @@ func TestNewPostNotifiesWithNoAccountFriends(t *testing.T) {
 	notifier := newRecordingSpaceActivityNotifier()
 	posts := NewModule(repos, nil, notifier, nil).Posts
 
-	posts.notifyFriendsOfNewPost(1, "space_id", "alice")
+	posts.notifyFriendsOfNewPost(SpaceActivityActor{UserID: 1, SpaceID: "space_id", Slug: "alice"})
 
 	require.Equal(t, recordedSpaceActivity{
 		event:        spaceActivityPostCreated,
@@ -289,6 +289,7 @@ func TestFriendActivitiesOnlyOnRelationshipTransitions(t *testing.T) {
 	require.Equal(t, recordedSpaceActivity{
 		event:        spaceActivityFriendRequested,
 		actorUserID:  bobID,
+		actorSpaceID: bobSpace.SpaceID,
 		actorSlug:    bobSpace.SpaceSlug,
 		recipientIDs: []int64{aliceID},
 	}, requireSpaceActivity(t, notifier))
@@ -336,7 +337,7 @@ func TestSpaceWebPushSenderUsesGenericPayloadAndPrunesDeadEndpoint(t *testing.T)
 	}
 
 	sender := NewSpaceWebPushSender(repos.WebPush, config)
-	sender.OnSpacePostReplied(1, "alice_space", "alice", recipientID)
+	sender.OnSpacePostReplied(SpaceActivityActor{UserID: 1, SpaceID: "alice_space", Slug: "alice"}, recipientID)
 	require.Equal(t, spaceWebPushPayload{
 		Title:  "Ente Space",
 		Body:   "@alice replied to your post",
@@ -361,8 +362,7 @@ func TestPublicPostPushCarriesOnlyOpaqueLocalRouteTarget(t *testing.T) {
 
 	sender := NewSpaceWebPushSender(nil, config)
 	sender.send(
-		2,
-		"alice",
+		SpaceActivityActor{UserID: 2, Slug: "alice"},
 		"posted a new photo",
 		"Check it out",
 		spaceActivityPostCreated,
@@ -403,8 +403,7 @@ func TestSpaceWebPushSendRateAppliesOncePerActivity(t *testing.T) {
 		}
 	}
 	NewSpaceWebPushSender(nil, config).send(
-		3,
-		"alice",
+		SpaceActivityActor{UserID: 3, Slug: "alice"},
 		"posted a new photo",
 		"Check it out",
 		spaceActivityPostCreated,
