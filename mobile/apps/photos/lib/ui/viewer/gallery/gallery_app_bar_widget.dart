@@ -89,14 +89,18 @@ class GalleryAppBarWidget extends StatefulWidget {
         files: files,
         bottom: bottom,
       ),
-      geometryBuilder: (context) =>
-          _resolveSliverGeometry(context, subtitle: subtitle),
+      geometryBuilder: (context) => _resolveSliverGeometry(
+        context,
+        subtitle: subtitle,
+        description: collection?.displayDescription,
+      ),
     );
   }
 
   static HeaderAppBarGeometry _resolveSliverGeometry(
     BuildContext context, {
     String? subtitle,
+    String? description,
   }) {
     final inheritedSearchFilterData = InheritedSearchFilterData.maybeOf(
       context,
@@ -106,6 +110,10 @@ class GalleryAppBarWidget extends StatefulWidget {
     final bottomHeight = isHierarchicalSearchable
         ? AppBarFilterChips.preferredHeight(context)
         : 0.0;
+    final collapsibleBottomHeight = AlbumDescriptionHeader.preferredHeight(
+      context,
+      description,
+    );
     return SliverAppBarComponent.resolveGeometry(
       context,
       subtitle: subtitle,
