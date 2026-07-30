@@ -10,8 +10,8 @@
  * `electron-builder.yml` copies into the packaged app's resources. On macOS
  * the packaged app is universal, so both the arm64 and x64 addons must be
  * present (and identical) in every per-arch build that gets merged; anything
- * that is not the host architecture is cross-compiled, which requires the
- * corresponding Rust target to be installed (`rustup target add ...`).
+ * that is not the host architecture is cross-compiled, so this script installs
+ * the corresponding Rust target as needed (`rustup target add ...`).
  */
 
 /**
@@ -183,6 +183,22 @@ const rustTriple = (platform, arch) => {
     }
 };
 
+/** Install the given Rust target for the active toolchain if it is missing. */
+const ensureRustTarget = (target, appDir) => {
+    const installed = execFileSync(
+        "rustup",
+        ["target", "list", "--installed"],
+        { cwd: appDir, encoding: "utf8" },
+    ).split(/\r?\n/);
+    if (installed.includes(target)) return;
+
+    console.log(`Installing Rust target ${target}`);
+    execFileSync("rustup", ["target", "add", target], {
+        cwd: appDir,
+        stdio: "inherit",
+    });
+};
+
 /**
  * Build the addon for the given platform-arch into `rust-bindings/`.
  *
@@ -192,6 +208,9 @@ const rustTriple = (platform, arch) => {
  * for the host architecture, to keep the addon's glibc requirement at 2.17.
  */
 const buildAddon = async (appDir, platform, arch) => {
+    if (arch != process.arch)
+        ensureRustTarget(rustTriple(platform, arch), appDir);
+
     const addonPath = path.join(
         appDir,
         "rust-bindings",
