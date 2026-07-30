@@ -60,6 +60,7 @@ import 'package:ente_ui/pages/base_home_page.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart' as widgets;
 import 'package:flutter_speed_dial/flutter_speed_dial.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'package:hugeicons/hugeicons.dart';
@@ -1128,6 +1129,16 @@ class _HomePageState extends State<HomePage> {
           pressed.contains(LogicalKeyboardKey.shiftRight) ||
           pressed.contains(LogicalKeyboardKey.shift);
 
+      final focusContext = primaryFocus?.context;
+      final bool isFocusedCopyShortcut =
+          focusContext != null &&
+          ((event.logicalKey == LogicalKeyboardKey.keyC &&
+                  widgets.Actions.maybeFind<CopyIntent>(focusContext) !=
+                      null) ||
+              (event.logicalKey == LogicalKeyboardKey.keyN &&
+                  widgets.Actions.maybeFind<CopyNextIntent>(focusContext) !=
+                      null));
+
       if (isMetaKeyPressed && event.logicalKey == LogicalKeyboardKey.keyW) {
         if (PlatformDetector.isDesktop()) {
           windowManager.close();
@@ -1154,8 +1165,7 @@ class _HomePageState extends State<HomePage> {
           !pressed.contains(LogicalKeyboardKey.altLeft) &&
           !pressed.contains(LogicalKeyboardKey.alt) &&
           !pressed.contains(LogicalKeyboardKey.altRight) &&
-          event.logicalKey != LogicalKeyboardKey.keyC &&
-          event.logicalKey != LogicalKeyboardKey.keyN &&
+          !isFocusedCopyShortcut &&
           event.character != null &&
           event.character!.trim().isNotEmpty) {
         final String searchText = _showSearchBox
