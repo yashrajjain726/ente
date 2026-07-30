@@ -12,5 +12,6 @@ mod postprocess;
 mod preprocess;
 pub mod runtime;
 pub mod types;
+#[cfg(feature = "usearch")]
 pub mod vector_db;
 mod webgpu;

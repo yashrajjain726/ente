@@ -76,9 +76,9 @@ fn take_rgb_image(decoded: &mut DecodedImage) -> MlResult<RgbImage> {
     let expected_len = (decoded.dimensions.width as usize)
         .checked_mul(decoded.dimensions.height as usize)
         .and_then(|pixels| pixels.checked_mul(3))
-        .ok_or_else(|| MlError::Preprocess("RGB source dimensions overflow".to_string()))?;
+        .ok_or_else(|| MlError::Image("RGB source dimensions overflow".to_string()))?;
     if decoded.rgb.len() != expected_len {
-        return Err(MlError::Preprocess(format!(
+        return Err(MlError::Image(format!(
             "invalid RGB source length: expected {expected_len}, got {}",
             decoded.rgb.len()
         )));
@@ -143,7 +143,7 @@ fn estimate_similarity_transform(src_points: &[[f32; 2]; 5]) -> MlResult<Alignme
 
     let rank = singular.iter().filter(|v| **v > 1e-6).count();
     if rank == 0 {
-        return Err(MlError::Postprocess(
+        return Err(MlError::Image(
             "failed to estimate similarity transform (rank=0)".to_string(),
         ));
     }
@@ -236,7 +236,7 @@ fn warp_face_image(source: &RgbImage, affine_matrix: &[[f32; 3]; 3]) -> MlResult
         transform[2][1],
         transform[2][2],
     ])
-    .ok_or_else(|| MlError::Postprocess("invalid affine matrix projection".to_string()))?;
+    .ok_or_else(|| MlError::Image("invalid affine matrix projection".to_string()))?;
 
     let mut output = RgbImage::from_pixel(FACE_INPUT_SIZE, FACE_INPUT_SIZE, Rgb([114, 114, 114]));
     warp_into(
@@ -405,7 +405,10 @@ fn variance_2d(matrix: &[i32], rows: usize, cols: usize) -> f32 {
 #[cfg(test)]
 mod tests {
     use super::run_face_alignment;
-    use crate::ml::types::{DecodedImage, Dimensions};
+    use crate::ml::{
+        error::MlError,
+        types::{DecodedImage, Dimensions, FaceDetection},
+    };
 
     #[test]
     fn face_alignment_restores_the_decoded_rgb_allocation() {
@@ -424,5 +427,26 @@ mod tests {
         assert!(results.is_empty());
         assert_eq!(decoded.rgb, (0..12).collect::<Vec<_>>());
         assert_eq!(decoded.rgb.as_ptr(), allocation);
+    }
+
+    #[test]
+    fn degenerate_landmarks_are_classified_as_an_image_error() {
+        let mut decoded = DecodedImage {
+            dimensions: Dimensions {
+                width: 2,
+                height: 2,
+            },
+            rgb: (0..12).collect(),
+        };
+        let detection = FaceDetection {
+            score: 1.0,
+            box_xyxy: [0.0, 0.0, 1.0, 1.0],
+            keypoints: [[0.5, 0.5]; 5],
+        };
+
+        let result = run_face_alignment(1, &mut decoded, vec![detection]);
+
+        assert!(matches!(result, Err(MlError::Image(_))));
+        assert_eq!(decoded.rgb, (0..12).collect::<Vec<_>>());
     }
 }

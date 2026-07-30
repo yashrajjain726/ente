@@ -244,7 +244,7 @@ fn crop_and_resize_rgb<'a>(
     let clamped_w = w.min(src_w.saturating_sub(x));
     let clamped_h = h.min(src_h.saturating_sub(y));
     if clamped_w == 0 || clamped_h == 0 {
-        return Err(MlError::Preprocess(
+        return Err(MlError::Image(
             "crop_and_resize_rgb: crop region extends beyond source image".to_string(),
         ));
     }
@@ -313,16 +313,16 @@ impl<'a> RgbRegion<'a> {
             || x > decoded.dimensions.width.saturating_sub(width)
             || y > decoded.dimensions.height.saturating_sub(height)
         {
-            return Err(MlError::Preprocess(
+            return Err(MlError::Image(
                 "RGB region extends beyond decoded image".to_string(),
             ));
         }
         let expected_len = (decoded.dimensions.width as usize)
             .checked_mul(decoded.dimensions.height as usize)
             .and_then(|pixels| pixels.checked_mul(3))
-            .ok_or_else(|| MlError::Preprocess("decoded RGB dimensions overflow".to_string()))?;
+            .ok_or_else(|| MlError::Image("decoded RGB dimensions overflow".to_string()))?;
         if decoded.rgb.len() < expected_len {
-            return Err(MlError::Preprocess(
+            return Err(MlError::Image(
                 "decoded RGB buffer is shorter than its dimensions".to_string(),
             ));
         }

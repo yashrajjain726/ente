@@ -9,7 +9,8 @@ use ente_assets::{Asset, AssetFile, AssetStore, download};
 use ente_photos::ml::{
     error::MlError,
     indexing::{
-        AnalyzeImageRequest, AnalyzeImageResult, analyze_image, init_ml_runtime, release_ml_runtime,
+        AnalyzeImageRequest, AnalyzeImageResult, ImageSource, analyze_image, init_ml_runtime,
+        release_ml_runtime,
     },
     runtime::ModelPaths,
     types::FaceResult as RustFaceResult,
@@ -241,10 +242,11 @@ impl MlIndexingTestContext {
             let file_id = file_id_for_manifest_path(&fixture.path)?;
             let req = AnalyzeImageRequest {
                 file_id: (index + 1) as i64,
-                image_path: image_path.to_string_lossy().into_owned(),
+                source: ImageSource::Path(image_path.to_string_lossy().into_owned()),
                 run_faces: true,
                 run_clip: true,
                 run_pets: false,
+                generate_face_crops: true,
                 model_paths: runtime.model_paths().clone(),
             };
 
@@ -254,16 +256,28 @@ impl MlIndexingTestContext {
             }
 
             match analyze_image(req) {
-                Ok(result) => match comparable_from_rust(&file_id, &result) {
-                    Ok(comparable) => {
-                        if rust_results.insert(file_id.clone(), comparable).is_some() {
-                            failures.push(format!("{file_id}: duplicate Rust result"));
+                Ok(result) => {
+                    let face_count = result.faces.as_ref().map_or(0, Vec::len);
+                    let crop_count = result
+                        .face_crops
+                        .as_ref()
+                        .map_or(0, |crops| crops.iter().flatten().count());
+                    if crop_count != face_count {
+                        failures.push(format!(
+                            "{file_id}: face crop count {crop_count} does not match face count {face_count}"
+                        ));
+                    }
+                    match comparable_from_rust(&file_id, &result) {
+                        Ok(comparable) => {
+                            if rust_results.insert(file_id.clone(), comparable).is_some() {
+                                failures.push(format!("{file_id}: duplicate Rust result"));
+                            }
+                        }
+                        Err(error) => {
+                            failures.push(format!("{file_id}: invalid Rust result: {error:#}"))
                         }
                     }
-                    Err(error) => {
-                        failures.push(format!("{file_id}: invalid Rust result: {error:#}"))
-                    }
-                },
+                }
                 Err(error) => failures.push(format!("{file_id}: Rust ML indexing failed: {error}")),
             }
         }

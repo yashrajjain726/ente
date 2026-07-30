@@ -28,6 +28,7 @@ pub struct AnalyzeImageRequest {
 pub enum RustMlError {
     InvalidRequest(String),
     Decode(String),
+    Image(String),
     Preprocess(String),
     Ort(String),
     CorruptModel(String),
@@ -150,10 +151,11 @@ pub fn release_ml_runtime() {
 pub fn analyze_image_rust(req: AnalyzeImageRequest) -> Result<AnalyzeImageResult, RustMlError> {
     let shared_req = indexing::AnalyzeImageRequest {
         file_id: req.file_id,
-        image_path: req.image_path,
+        source: indexing::ImageSource::Path(req.image_path),
         run_faces: req.run_faces,
         run_clip: req.run_clip,
         run_pets: req.run_pets,
+        generate_face_crops: false,
         model_paths: to_model_paths(&req.model_paths),
     };
 
@@ -225,6 +227,7 @@ impl From<MlError> for RustMlError {
         match value {
             MlError::InvalidRequest(message) => RustMlError::InvalidRequest(message),
             MlError::Decode(message) => RustMlError::Decode(message),
+            MlError::Image(message) => RustMlError::Image(message),
             MlError::Preprocess(message) => RustMlError::Preprocess(message),
             MlError::Ort(message) => RustMlError::Ort(message),
             MlError::CorruptModel(message) => RustMlError::CorruptModel(message),

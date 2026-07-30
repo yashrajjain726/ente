@@ -21,7 +21,7 @@ regex = "1.11.1"
 thiserror.workspace = true
 # The FRB photos bridge calls the SimSIMD symbol exported by usearch 2.21.x.
 # Newer usearch releases switched that implementation to numkong symbols.
-usearch = "=2.21.4"
+usearch = { version = "=2.21.4", optional = true }
 
 # ORT source and revision are pinned once in the workspace manifest; only the
 # per-target feature sets are declared here.
@@ -49,7 +49,27 @@ ort = { workspace = true, features = [
     "xnnpack",
 ] }
 
-[target.'cfg(not(any(target_os = "ios", target_os = "android")))'.dependencies]
+[target.'cfg(target_os = "macos")'.dependencies]
+ort = { workspace = true, features = [
+    "ndarray",
+    "half",
+    "coreml",
+    "api-27",
+    "load-dynamic",
+    "copy-dylibs",
+] }
+
+[target.'cfg(any(target_os = "linux", target_os = "windows"))'.dependencies]
+ort = { workspace = true, features = [
+    "ndarray",
+    "half",
+    "api-27",
+    "load-dynamic",
+    "copy-dylibs",
+    "webgpu",
+] }
+
+[target.'cfg(not(any(target_os = "ios", target_os = "android", target_os = "macos", target_os = "linux", target_os = "windows")))'.dependencies]
 ort = { workspace = true, features = [
     "ndarray",
     "half",

@@ -859,21 +859,22 @@ Future<MLResult> analyzeImageRust(Map args) async {
     try {
       rustResult = await runRustAnalyzeForPath(imagePath);
     } catch (e, s) {
-      if (!_isRustDecodeIssue(e)) {
+      if (!_isRustImageIssue(e)) {
         if (_isRustCorruptModelIssue(e)) {
           rethrow;
         }
         _logger.severe(
-          "Rust pipeline failed (non-decode) for fileID $enteFileID (format: $fileFormat)",
+          "Rust pipeline failed (non-image) for fileID $enteFileID (format: $fileFormat)",
           e,
           s,
         );
         rethrow;
       }
 
-      // A Rust decode error may be a resource-limit rejection. Retrying it
-      // through an unbounded Dart decoder can exhaust the mobile process.
-      throw _asInvalidImageFormatExceptionForRustDecodeFailure(
+      // A Rust image error is deterministic for this file. In particular, a
+      // decode error may be a resource-limit rejection, so retrying it through
+      // an unbounded Dart decoder can exhaust the mobile process.
+      throw _asInvalidImageFormatExceptionForRustImageFailure(
         enteFileID: enteFileID,
         fileFormat: fileFormat,
         primaryError: e,
@@ -1023,8 +1024,9 @@ String formatExpectedMlSkipReasonForLogs(Object error) {
   return firstLine.isEmpty ? "unknown ML skip reason" : firstLine;
 }
 
-bool _isRustDecodeIssue(Object error) {
-  return error is rust_ml.RustMlError_Decode;
+bool _isRustImageIssue(Object error) {
+  return error is rust_ml.RustMlError_Decode ||
+      error is rust_ml.RustMlError_Image;
 }
 
 bool _isRustCorruptModelIssue(Object error) {
@@ -1043,13 +1045,13 @@ String _normalizedErrorMessage(Object error) {
   return error.toString().toLowerCase();
 }
 
-Exception _asInvalidImageFormatExceptionForRustDecodeFailure({
+Exception _asInvalidImageFormatExceptionForRustImageFailure({
   required int enteFileID,
   required String fileFormat,
   required Object primaryError,
 }) {
   final details = <String>[
-    "InvalidImageFormatException: Rust decode failed for fileID $enteFileID (format: $fileFormat)",
+    "InvalidImageFormatException: Rust image processing failed for fileID $enteFileID (format: $fileFormat)",
     "primary_error: $primaryError",
   ];
   return Exception(details.join("; "));
