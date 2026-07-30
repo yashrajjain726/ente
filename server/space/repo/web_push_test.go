@@ -139,6 +139,33 @@ func TestWebPushSubscriptionsFollowTargetsAndActiveSessions(t *testing.T) {
 	require.Zero(t, count)
 }
 
+func TestResetUserAccessDeletesLinkSubscriptions(t *testing.T) {
+	module := newSpaceTestModule(t)
+	ctx := context.Background()
+	ownerID := insertSpaceUser(t, module, "space-web-push-reset@example.com", "reset-public")
+	space, err := testCreateSpace(ctx, module, ownerID, "space_push_reset", "root", "public", "secret", "nonce", "profile")
+	require.NoError(t, err)
+	link, err := module.Links.Create(
+		ctx,
+		space.SpaceID,
+		bytes.Repeat([]byte{9}, 32),
+		bytes.Repeat([]byte{10}, 16),
+		67108864,
+		2,
+		space.CurrentVersion,
+		[]byte("encrypted-space-key"),
+		[]byte("encrypted-access-key"),
+	)
+	require.NoError(t, err)
+	endpoint := "https://push.example/reset"
+	_, err = module.WebPush.UpsertLinkSubscription(ctx, link.LinkID, endpoint, "p256dh", "auth")
+	require.NoError(t, err)
+
+	require.NoError(t, module.ResetUserAccess(ctx, ownerID))
+
+	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_web_push_subscriptions WHERE endpoint = $1`, endpoint))
+}
+
 func TestWebPushSharedEndpointKeepsIndependentTargets(t *testing.T) {
 	module := newSpaceTestModule(t)
 	ctx := context.Background()

@@ -294,12 +294,8 @@ func (r *SpacesRepository) RotateKey(ctx context.Context, spaceID string, keyVer
 			return nil, ErrSpaceLinkStateChanged
 		}
 	} else {
-		if _, err := tx.ExecContext(ctx, `
-			UPDATE space_links
-			SET active = FALSE
-			WHERE space_id = $1 AND active = TRUE
-		`, spaceID); err != nil {
-			return nil, stacktrace.Propagate(err, "")
+		if err := deactivateSpaceLinksTx(ctx, tx, []string{spaceID}); err != nil {
+			return nil, err
 		}
 	}
 	rec, err := scanSpaceRecord(tx.QueryRowContext(ctx, `
