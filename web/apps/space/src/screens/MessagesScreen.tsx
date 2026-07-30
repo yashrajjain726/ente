@@ -2355,7 +2355,6 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                             >
                                                 <MenuList
                                                     autoFocus
-                                                    autoFocusItem
                                                     onKeyDown={
                                                         handleMessageActionsKeyDown
                                                     }
