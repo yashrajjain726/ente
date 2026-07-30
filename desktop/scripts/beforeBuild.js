@@ -74,21 +74,3 @@ module.exports = async (context) => {
 
     return true;
 };
-
-// electron-updater compares this value with the Darwin version returned by
-// os.release(); 22.4.0 corresponds to macOS 13.3.
-module.exports.artifactBuildCompleted = (event) => {
-    if (
-        event.packager.platform.nodeName == "darwin" &&
-        event.file.endsWith(".zip")
-    ) {
-        // Release info is spread into the top-level update document. In
-        // contrast, this ZIP's updateInfo contains a sha512 and electron-builder
-        // therefore nests all of it under files[0].
-        event.packager.platformSpecificBuildOptions.releaseInfo = {
-            ...(event.packager.platformSpecificBuildOptions.releaseInfo ??
-                event.packager.config.releaseInfo),
-            minimumSystemVersion: "22.4.0",
-        };
-    }
-};
