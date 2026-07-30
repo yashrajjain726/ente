@@ -4,7 +4,7 @@ use std::ffi::OsStr;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use std::time::SystemTime;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use camino::Utf8PathBuf;
 use lib_flutter_rust_bridge_codegen::codegen::{
@@ -220,12 +220,6 @@ fn generate_napi() -> Result<(), DynError> {
     let out_dir = desktop_dir.join("rust-bindings");
     write_generated_gitignore(&out_dir)?;
 
-    // The macros only run when the crate is recompiled, so force that.
-    fs::File::options()
-        .write(true)
-        .open(rust_root.join("bindings/napi/photos/src/lib.rs"))?
-        .set_modified(SystemTime::now())?;
-
     let type_def_dir = target_dir()?.join("napi-type-defs");
     match fs::remove_dir_all(&type_def_dir) {
         Ok(()) => {}
@@ -235,6 +229,12 @@ fn generate_napi() -> Result<(), DynError> {
         }
     }
     fs::create_dir_all(&type_def_dir)?;
+    // napi-build registers this variable with Cargo, and napi-cli gives it a
+    // unique value to force the macros to emit fresh definitions each run.
+    let force_build = SystemTime::now()
+        .duration_since(UNIX_EPOCH)?
+        .as_nanos()
+        .to_string();
     run_command(
         Command::new("cargo")
             .arg("check")
@@ -244,6 +244,7 @@ fn generate_napi() -> Result<(), DynError> {
             .arg("--target-dir")
             .arg(target_dir()?)
             .env("NAPI_TYPE_DEF_TMP_FOLDER", &type_def_dir)
+            .env("NAPI_FORCE_BUILD_ENTE_PHOTOS_NAPI", force_build)
             .current_dir(&rust_root),
         "failed to type-check the desktop Node bindings".to_owned(),
     )?;
