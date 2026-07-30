@@ -31,8 +31,10 @@ const (
 	spaceActivityFriendRequested = "friend_requested"
 	spaceWebPushSendRate         = "50-H"
 	spaceWebPushTTLSeconds       = 24 * 60 * 60
-	spaceWebPushSendTimeout      = 30 * time.Second
-	spaceWebPushConcurrency      = 10
+	// Firefox Android's FCM bridge rejects encrypted records larger than 2744 bytes.
+	spaceWebPushRecordSize  = 2744
+	spaceWebPushSendTimeout = 30 * time.Second
+	spaceWebPushConcurrency = 10
 )
 
 var sendSpaceWebPush = webpush.SendNotificationWithContext
@@ -88,6 +90,7 @@ func NewSpaceWebPushSender(
 	if config != nil {
 		sender.options = &webpush.Options{
 			HTTPClient:      newSpaceWebPushHTTPClient(),
+			RecordSize:      spaceWebPushRecordSize,
 			Subscriber:      config.subscriber,
 			TTL:             spaceWebPushTTLSeconds,
 			Urgency:         webpush.UrgencyNormal,

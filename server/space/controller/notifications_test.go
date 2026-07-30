@@ -329,6 +329,7 @@ func TestSpaceWebPushSenderUsesGenericPayloadAndPrunesDeadEndpoint(t *testing.T)
 	var payload spaceWebPushPayload
 	sendSpaceWebPush = func(_ context.Context, message []byte, subscription *webpush.Subscription, options *webpush.Options) (*http.Response, error) {
 		require.Equal(t, "https://push.example/subscription", subscription.Endpoint)
+		require.Equal(t, uint32(spaceWebPushRecordSize), options.RecordSize)
 		require.Equal(t, spaceWebPushTTLSeconds, options.TTL)
 		require.Equal(t, webpush.UrgencyNormal, options.Urgency)
 		require.Equal(t, "security@ente.io", options.Subscriber)
