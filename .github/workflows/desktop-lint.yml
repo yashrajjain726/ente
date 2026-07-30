@@ -6,6 +6,11 @@ on:
             - ".github/workflows/desktop-lint.yml"
             - "desktop/**"
             - "rust/bindings/napi/**"
+            - "rust/crates/photos/**"
+            - "rust/crates/image/**"
+            - "rust/apps/codegen/**"
+            - "rust/Cargo.toml"
+            - "rust/Cargo.lock"
 
 permissions:
     contents: read
