@@ -74,6 +74,8 @@ class GalleryAppBarWidget extends StatefulWidget {
     Future<void> Function()? onDisableDeviceFolderBackup,
     Collection? collection,
     List<EnteFile>? files,
+    Widget? bottom,
+    double? bottomPreferredHeight,
   }) {
     return GalleryAppBarConfig(
       sliverBuilder: (_) => GalleryAppBarWidget._(
@@ -86,6 +88,8 @@ class GalleryAppBarWidget extends StatefulWidget {
         onDisableDeviceFolderBackup: onDisableDeviceFolderBackup,
         collection: collection,
         files: files,
+        bottom: bottom,
+        bottomPreferredHeight: bottomPreferredHeight,
       ),
       geometryBuilder: (context) => _resolveSliverGeometry(
         context,
@@ -132,6 +136,8 @@ class GalleryAppBarWidget extends StatefulWidget {
   final Future<void> Function()? onDisableDeviceFolderBackup;
   final Collection? collection;
   final List<EnteFile>? files;
+  final Widget? bottom;
+  final double? bottomPreferredHeight;
 
   const GalleryAppBarWidget._(
     this.type,
@@ -143,6 +149,8 @@ class GalleryAppBarWidget extends StatefulWidget {
     this.onDisableDeviceFolderBackup,
     this.collection,
     this.files,
+    this.bottom,
+    this.bottomPreferredHeight,
   });
 
   @override
@@ -269,7 +277,19 @@ class _GalleryAppBarWidgetState extends State<GalleryAppBarWidget> {
       widget.collection?.displayDescription,
     );
 
-    if (!isHierarchicalSearchable) {
+    if (widget.bottom != null) {
+      return _GallerySliverAppBar(
+        title: _appBarTitle,
+        subtitle: widget.subtitle,
+        actions: _getDefaultActions(context),
+        bottom: PreferredSize(
+          preferredSize: Size.fromHeight(widget.bottomPreferredHeight!),
+          child: widget.bottom!,
+        ),
+      );
+    }
+
+    if (!isHierarchicalSearchable && widget.bottom == null) {
       return _GallerySliverAppBar(
         title: _appBarTitle,
         subtitle: widget.subtitle,
