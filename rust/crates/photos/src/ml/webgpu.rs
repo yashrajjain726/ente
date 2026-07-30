@@ -1,5 +1,5 @@
-//! Mechanics: immediately before a WebGPU session is built, a per-model
-//! counter file next to the model is incremented and fsynced ("armed"). After
+//! Immediately before a WebGPU session is built, a per-model counter file
+//! next to the model is incremented and fsynced ("armed"). After
 //! the session has been built *and* has survived one warm-up inference, the
 //! file is removed ("disarmed"). A crash, kill, or soft failure in between
 //! leaves the incremented counter behind. Once any model's counter reaches
@@ -41,8 +41,6 @@ use std::{
 ))]
 const CANARY_FILE_PREFIX: &str = ".ente-webgpu-canary-v1.";
 
-/// Number of consecutive failed or interrupted WebGPU attempts for one model
-/// after which WebGPU is durably disabled.
 #[cfg(any(
     target_os = "android",
     target_os = "linux",
@@ -61,10 +59,6 @@ pub(crate) fn set_enabled(enabled: bool) {
     let _ = enabled;
 }
 
-/// Whether a WebGPU session may be attempted for this model. False when the
-/// app has not opted in, or when any model in the same directory has tripped
-/// the crash canary. Fails closed on IO errors.
-///
 /// The GPU adapter allowlist is deliberately not checked here: probing the
 /// adapter touches the Vulkan driver, so it must run inside the armed canary
 /// window (see `onnx::build_webgpu_session_with_canary`), where a probe crash
@@ -91,7 +85,7 @@ const ALLOWLISTED_VULKAN_VENDOR_IDS: [u32; 3] = [
 /// its adapter independently of this probe, so a mixed set could otherwise
 /// let Dawn pick a denied adapter. Android's Vulkan loader exposes a single
 /// vendor driver in practice, so on real devices this is a single-adapter
-/// check. An empty list fails closed.
+/// check.
 #[cfg(any(target_os = "android", test))]
 fn vendors_allowlisted(vendor_ids: &[u32]) -> bool {
     !vendor_ids.is_empty()
@@ -100,8 +94,8 @@ fn vendors_allowlisted(vendor_ids: &[u32]) -> bool {
             .all(|vendor_id| ALLOWLISTED_VULKAN_VENDOR_IDS.contains(vendor_id))
 }
 
-/// Outcome of the Vulkan adapter allowlist check. `Denied` means the probe
-/// completed and the adapter is not allowlisted — a clean policy decision.
+/// `Denied` means the probe completed and the adapter is not allowlisted — a
+/// clean policy decision.
 /// `Failed` means the probe itself did not complete, which callers must treat
 /// as a failed WebGPU attempt (counted by the crash canary) rather than a
 /// policy decision: a driver that cannot even create a Vulkan instance must
@@ -114,10 +108,8 @@ pub(crate) enum AdapterCheck {
     Failed,
 }
 
-/// Checks the device's Vulkan adapters against the Chromium Android WebGPU
-/// allowlist. Probes once per process. Keeping this inside the Rust
-/// eligibility path ensures an unsupported adapter cannot be bypassed by any
-/// Dart inference entry point.
+/// Keeping this inside the Rust eligibility path ensures an unsupported
+/// adapter cannot be bypassed by any Dart inference entry point.
 ///
 /// Must only be called inside an armed canary window: the probe is the first
 /// code in the process to touch the Vulkan driver.
@@ -143,9 +135,6 @@ pub(crate) fn check_adapter() -> AdapterCheck {
     })
 }
 
-/// Enumerates the vendor IDs of all Vulkan physical devices via the system
-/// Vulkan loader. Any failure (no loader, no driver, no devices) is an error
-/// so that the caller fails closed.
 #[cfg(target_os = "android")]
 fn probe_vulkan_vendor_ids() -> Result<Vec<u32>, String> {
     use ash::vk;
@@ -188,9 +177,8 @@ pub(crate) struct ArmedCanary {
     path: PathBuf,
 }
 
-/// Increments and fsyncs the model's consecutive-failure counter before a
-/// WebGPU attempt. On error the caller must skip WebGPU (fail closed): without
-/// a durable record, a crash during the attempt would go unnoticed.
+/// On error the caller must skip WebGPU (fail closed): without a durable
+/// record, a crash during the attempt would go unnoticed.
 #[cfg(any(
     target_os = "android",
     target_os = "linux",
@@ -217,8 +205,6 @@ pub(crate) fn arm_canary(model_path: &str, model_namespace: &str) -> io::Result<
     test
 ))]
 impl ArmedCanary {
-    /// Marks the attempt as successful by removing the counter file, resetting
-    /// the model's consecutive-failure count to zero.
     pub(crate) fn disarm(self) {
         if let Err(error) = remove_file_durably(&self.path) {
             crate::ml::runtime::rt_log(&format!(
@@ -245,8 +231,6 @@ fn model_dir(model_path: &str) -> Option<PathBuf> {
         .map(Path::to_path_buf)
 }
 
-/// True if any model's canary in this directory records too many consecutive
-/// failures. Unreadable state fails closed.
 #[cfg(any(
     target_os = "android",
     target_os = "linux",
@@ -277,8 +261,6 @@ fn quarantined(dir: &Path) -> bool {
     false
 }
 
-/// A missing file means zero consecutive failures. Unparseable contents are an
-/// error so that callers fail closed.
 #[cfg(any(
     target_os = "android",
     target_os = "linux",
