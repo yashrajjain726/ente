@@ -49,7 +49,7 @@ func NewModule(
 		Assets:   assets,
 		Read:     &ReadMarkersController{ReadMarkersRepo: repos.Read},
 		Sessions: &SessionsController{SessionsRepo: repos.Sessions},
-		WebPush:  &WebPushController{WebPushRepo: repos.WebPush, Links: links, config: webPushConfig},
+		WebPush:  &WebPushController{webPushRepo: repos.WebPush, links: links, config: webPushConfig},
 		Cleanup:  &CleanupController{AssetsRepo: repos.Assets},
 		Links:    links,
 		auth:     authDeps,
