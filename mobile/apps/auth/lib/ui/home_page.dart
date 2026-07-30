@@ -1158,21 +1158,20 @@ class _HomePageState extends State<HomePage> {
           event.logicalKey != LogicalKeyboardKey.keyN &&
           event.character != null &&
           event.character!.trim().isNotEmpty) {
-        final String searchStarter = event.character!;
+        final String searchText = _showSearchBox
+            ? _textController.text + event.character!
+            : event.character!;
         setState(() {
           _showSearchBox = true;
+          _searchText = searchText;
+          _textController.value = TextEditingValue(
+            text: searchText,
+            selection: TextSelection.collapsed(offset: searchText.length),
+          );
         });
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (!mounted) return;
           searchBoxFocusNode.requestFocus();
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (!mounted) return;
-            _searchText = searchStarter;
-            _textController.value = TextEditingValue(
-              text: searchStarter,
-              selection: TextSelection.collapsed(offset: searchStarter.length),
-            );
-          });
         });
         return true;
       }
@@ -1606,6 +1605,7 @@ class _HomePageState extends State<HomePage> {
                 autocorrect: false,
                 enableSuggestions: false,
                 autofocus: _autoFocusSearch && !Platform.isAndroid,
+                selectAllOnFocus: false,
                 controller: _textController,
                 onChanged: (val) {
                   _searchText = val;
