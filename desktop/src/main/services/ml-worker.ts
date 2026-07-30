@@ -151,53 +151,68 @@ const logMLRuntimeEvents = (native: MLNative) => {
 
 /**
  * The ML models (and the CLIP tokenizer vocabulary) used by the Rust
- * pipeline, identified by their name in the models.ente.com bucket and pinned
- * by their SHA-256. These are the same assets that the mobile apps use (see
- * ml_model_assets.dart).
+ * pipeline, identified by their name in the models.ente.com bucket. These are
+ * the same assets that the mobile apps use (see ml_model_assets.dart).
+ *
+ * Fresh downloads are verified against the pinned SHA-256; copies already on
+ * disk are revalidated with only a cheap size check (a corrupt model that
+ * nevertheless retains the expected size gets caught by the Rust side, which
+ * reports it back to us for eviction and redownload).
  */
 const modelSpecs = {
     faceDetection: {
         name: "yolov5s_face_640_640_static_b1.onnx",
+        byteSize: 32355091,
         sha256: "e047647409403d52696035ecd445792173e50d7fbdcccac97b958a585db9aa3d",
     },
     faceEmbedding: {
         name: "mobilefacenet_portable_static_b1.onnx",
+        byteSize: 5278803,
         sha256: "0763fc33f54e138476194da95987e133b3e976075a6b1d3e1b2caedb251b1a36",
     },
     clipImage: {
         name: "mobileclip_s2_image_gelu_opset20.onnx",
+        byteSize: 143057352,
         sha256: "205a430af825e501c5138e5bb9abea942482a7a4fd4a680e98e47cf0830dce7e",
     },
     clipText: {
         name: "mobileclip_s2_text_opset18_quant.onnx",
+        byteSize: 67144712,
         sha256: "d92f33dfcff83077fc2e0d3414250710efbb51795dfd89767bdbefb5fdc47322",
     },
     clipTextVocab: {
         name: "bpe_simple_vocab_16e6.txt",
+        byteSize: 3194984,
         sha256: "67603cfda2e032ad77b5f8808af37789d590db664b26df8705d2bf8b3c553fc8",
     },
     petFaceDetection: {
         name: "yolov5s_pet_face_fp16_V2.onnx",
+        byteSize: 14758020,
         sha256: "7876d97992eeb5f3a9f3b35eff5e0e133012928172a8b005093108d8c3ad2d1c",
     },
     petFaceEmbeddingDog: {
         name: "dog_face_embedding128.onnx",
+        byteSize: 4141071,
         sha256: "fb04d781eb1f7adf6ce3432dc0c5873f16cc051b5c98c14c754afb39e2b92462",
     },
     petFaceEmbeddingCat: {
         name: "cat_face_embedding128.onnx",
+        byteSize: 4141071,
         sha256: "32b10694a27f6404d2beaddbd64f07ad555f72dccb12ee60a7afe5dcf6aad6cd",
     },
     petBodyDetection: {
         name: "yolov5s_object_fp16.onnx",
+        byteSize: 14987107,
         sha256: "113f0c18632eb2c4f6deebcd40eb01c676492e9b43923c2d336e1b4012fce9ef",
     },
     petBodyEmbeddingDog: {
         name: "dog_body_embedding192.onnx",
+        byteSize: 4569361,
         sha256: "1d85aa20358137e30f11c2d0baa9a2248b9997928d501fe15365d1fc57522770",
     },
     petBodyEmbeddingCat: {
         name: "cat_body_embedding192.onnx",
+        byteSize: 4569361,
         sha256: "62fb5891e61be69a96510d8ec56e7525a9541b0283e54574d27c86c9b4a26ddf",
     },
 } as const;
@@ -210,7 +225,7 @@ const modelSavePath = (modelName: string) =>
 
 /**
  * Cached promises to the on-disk paths of verified models, so that each model
- * is downloaded and hash-verified at most once per process. Multiple parallel
+ * is downloaded and verified at most once per process. Multiple parallel
  * calls for the same model await the same promise.
  */
 const _verifiedModelPaths = new Map<string, Promise<string>>();
@@ -245,7 +260,9 @@ const evictModel = async (modelPath: string) => {
 /**
  * Download the model described by {@link spec} if we don't already have it.
  *
- * Also verify the SHA-256 of the on-disk model, redownloading it on mismatch.
+ * An existing on-disk copy is revalidated with only a cheap size check so
+ * that resolving already downloaded models stays fast; fresh downloads are
+ * verified against the pinned SHA-256.
  *
  * @returns the path to the model on the local machine.
  */
@@ -254,25 +271,43 @@ const modelPathDownloadingIfNeeded = async (spec: ModelSpec) => {
 
     await cleanupOldModelsIfNeeded();
 
-    if (!existsSync(savePath)) {
-        log.info(`ML model ${spec.name} not found, downloading`);
-        await downloadModel(savePath, spec.name);
-    }
-
-    let sha256 = await computeFileSHA256(savePath);
-    if (sha256 != spec.sha256) {
+    if (existsSync(savePath)) {
+        const size = (await fs.stat(savePath)).size;
+        if (size == spec.byteSize) return savePath;
         log.error(
-            `The SHA-256 ${sha256} of model ${spec.name} does not match the expected value, downloading again`,
+            `The size ${size} of model ${spec.name} does not match the expected size, downloading again`,
         );
-        await downloadModel(savePath, spec.name);
-        sha256 = await computeFileSHA256(savePath);
-        if (sha256 != spec.sha256)
-            throw new Error(
-                `The SHA-256 of the downloaded model ${spec.name} does not match the expected value`,
-            );
+    } else {
+        log.info(`ML model ${spec.name} not found, downloading`);
     }
 
+    await downloadModelVerifyingSHA256(savePath, spec);
     return savePath;
+};
+
+/**
+ * Download the model described by {@link spec} to {@link savePath}, verifying
+ * the SHA-256 of the downloaded contents and retrying once on mismatch.
+ */
+const downloadModelVerifyingSHA256 = async (
+    savePath: string,
+    spec: ModelSpec,
+) => {
+    await downloadModel(savePath, spec.name);
+    if ((await computeFileSHA256(savePath)) == spec.sha256) return;
+
+    log.error(
+        `The SHA-256 of the downloaded model ${spec.name} does not match the expected value, downloading again`,
+    );
+    await downloadModel(savePath, spec.name);
+    if ((await computeFileSHA256(savePath)) == spec.sha256) return;
+
+    // Don't leave the bad download behind: were it to happen to pass the size
+    // check, a later call would use it without noticing.
+    await fs.rm(savePath, { force: true });
+    throw new Error(
+        `The SHA-256 of the downloaded model ${spec.name} does not match the expected value`,
+    );
 };
 
 const computeFileSHA256 = (filePath: string) =>
