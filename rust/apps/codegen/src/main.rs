@@ -208,12 +208,6 @@ fn generate_frb_package(package_dir: &Path) -> Result<(), DynError> {
     Ok(())
 }
 
-/// Regenerates `desktop/rust-bindings/index.d.ts` without building or linking
-/// the addon: `cargo check` expands the `#[napi]` macros, which emit type
-/// definitions when `NAPI_TYPE_DEF_TMP_FOLDER` is set, and napi-cli's
-/// `generateTypeDef` API renders those into the declaration file. The addon
-/// itself is built by the desktop build scripts (see [Note: Packaging the
-/// N-API addon] in `desktop/scripts/napi.js`).
 fn generate_napi() -> Result<(), DynError> {
     let rust_root = rust_root()?;
     let desktop_dir = repo_root()?.join("desktop");
@@ -229,8 +223,6 @@ fn generate_napi() -> Result<(), DynError> {
         }
     }
     fs::create_dir_all(&type_def_dir)?;
-    // napi-build registers this variable with Cargo, and napi-cli gives it a
-    // unique value to force the macros to emit fresh definitions each run.
     let force_build = SystemTime::now()
         .duration_since(UNIX_EPOCH)?
         .as_nanos()
