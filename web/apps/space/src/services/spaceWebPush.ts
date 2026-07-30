@@ -221,8 +221,8 @@ const subscriptionDetails = (
     return { endpoint: serialized.endpoint, p256dh, auth };
 };
 
-const sameBytes = (left: ArrayBuffer | null, right: ArrayBuffer) => {
-    if (left?.byteLength != right.byteLength) return false;
+const sameBytes = (left: ArrayBuffer, right: ArrayBuffer) => {
+    if (left.byteLength != right.byteLength) return false;
     const leftBytes = new Uint8Array(left);
     const rightBytes = new Uint8Array(right);
     return leftBytes.every((value, index) => value == rightBytes[index]);
@@ -231,12 +231,13 @@ const sameBytes = (left: ArrayBuffer | null, right: ArrayBuffer) => {
 const currentSubscription = async (prepared: PreparedSpaceWebPush) => {
     const subscription =
         await prepared.registration.pushManager.getSubscription();
+    // Firefox Android omits this key when restoring a valid subscription.
+    const applicationServerKey =
+        subscription?.options.applicationServerKey ?? null;
     if (
         !subscription ||
-        sameBytes(
-            subscription.options.applicationServerKey,
-            base64URLKey(prepared.publicKey),
-        )
+        !applicationServerKey ||
+        sameBytes(applicationServerKey, base64URLKey(prepared.publicKey))
     ) {
         return subscription;
     }
