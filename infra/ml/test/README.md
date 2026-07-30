@@ -13,7 +13,7 @@ This directory contains the ML indexing parity framework for desktop, Android, i
 ## Prerequisites
 
 - Python + `uv`
-- Node + the desktop build artifacts (`npm ci && npm run postinstall` in `desktop/`) when running desktop parity
+- Node + the desktop build artifacts (`npm ci && npm run postinstall && node scripts/napi.js build` in `desktop/`) when running desktop parity
 - Flutter SDK (Android/iOS parity)
 - Android emulator/device and iOS simulator/device when running mobile parity
 

@@ -40,6 +40,6 @@ const run = (cmd) => {
 run("npm rebuild --ignore-scripts=false ffmpeg-static electron-winstaller");
 run("npm exec -- electron-builder install-app-deps");
 run("node scripts/vips.js");
-run("node scripts/ml-native.js");
+run("node scripts/ort.js");
 
 writeFileSync(stamp, treeHash());

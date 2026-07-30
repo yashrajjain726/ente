@@ -20,7 +20,7 @@ Other useful commands:
 ```sh
 cargo codegen native  # Regenerate bindings used by native apps
 cargo codegen frb     # Regenerate bindings used by Flutter apps
-cargo codegen napi    # Rebuild the desktop (Electron) ML addon and its bindings
+cargo codegen napi    # Regenerate bindings used by Desktop (Electron) apps
 
 # Run integration tests against a local Museum
 cargo test --features museum,ente-photos/ml-assets

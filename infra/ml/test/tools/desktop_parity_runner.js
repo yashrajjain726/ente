@@ -13,10 +13,10 @@
  * the shared Rust pipeline itself lives in the ente-photos crate's
  * ml_indexing integration test.
  *
- * The desktop build artifacts it needs are produced by the desktop
- * postinstall: the addon in `desktop/rust-bindings/` (via `cargo codegen
- * napi`) and the ONNX Runtime library in `desktop/build/onnxruntime/` (via
- * `node scripts/ml-native.js`).
+ * The desktop build artifacts it needs are the addon in
+ * `desktop/rust-bindings/` (built by `node scripts/napi.js build`) and the
+ * ONNX Runtime library in `desktop/build/onnxruntime/` (downloaded by the
+ * desktop postinstall).
  */
 
 const fsp = require("node:fs/promises");
@@ -28,7 +28,7 @@ const desktopDir = path.join(repoRoot, "desktop");
 
 // The desktop build scripts own the addon naming scheme.
 const { napiTriple } = require(
-    path.join(desktopDir, "scripts", "ml-native.js"),
+    path.join(desktopDir, "scripts", "napi.js"),
 );
 
 const requiredFlags = [
@@ -51,7 +51,7 @@ const parseCLIArgs = () => {
     return values;
 };
 
-/** Load the Rust ML addon built by `cargo codegen napi`. */
+/** Load the Rust ML addon built by desktop's `scripts/napi.js`. */
 const loadMLAddon = () => {
     const addonPath = path.join(
         desktopDir,
@@ -62,7 +62,7 @@ const loadMLAddon = () => {
 };
 
 /**
- * The ONNX Runtime dynamic library downloaded by desktop's `scripts/ml-native.js`
+ * The ONNX Runtime dynamic library downloaded by desktop's `scripts/ort.js`
  * for the current architecture, located by scanning so that this script does
  * not duplicate the pinned library version.
  */
@@ -82,7 +82,7 @@ const onnxRuntimeLibraryPath = async () => {
     );
     if (!library)
         throw new Error(
-            `No ONNX Runtime library found in ${libraryDir} (run "node scripts/ml-native.js" in desktop/)`,
+            `No ONNX Runtime library found in ${libraryDir} (run "npm run postinstall" in desktop/)`,
         );
     return path.join(libraryDir, library.name);
 };

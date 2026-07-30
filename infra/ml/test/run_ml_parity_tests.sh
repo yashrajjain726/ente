@@ -577,10 +577,10 @@ run_preflight_checks() {
           preflight_errors+=("node is required for desktop parity")
         fi
         if ! compgen -G "$ROOT_DIR/desktop/rust-bindings/index.*.node" >/dev/null; then
-          preflight_errors+=("desktop ML addon not found under desktop/rust-bindings (run 'npm ci && npm run postinstall' in desktop/, or 'cargo codegen napi' from rust/)")
+          preflight_errors+=("desktop ML addon not found under desktop/rust-bindings (run 'npm ci && npm run postinstall && node scripts/napi.js build' in desktop/)")
         fi
         if [[ ! -d "$ROOT_DIR/desktop/build/onnxruntime" ]]; then
-          preflight_errors+=("ONNX Runtime library not found under desktop/build/onnxruntime (run 'node scripts/ml-native.js' in desktop/)")
+          preflight_errors+=("ONNX Runtime library not found under desktop/build/onnxruntime (run 'npm run postinstall' in desktop/)")
         fi
         ;;
       android|ios)

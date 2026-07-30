@@ -32,7 +32,7 @@ npm run postinstall
 
 > [!NOTE]
 >
-> `npm run postinstall` requires a Rust toolchain and initially runs `cargo codegen napi`. When changing the Rust Photos ML code, rebuild the desktop addon manually:
+> `npm run postinstall` fetches binary dependencies but does not compile the Rust ML addon. `npm run dev` builds an optimized addon automatically. When changing the Rust Photos ML code, regenerate the bindings with:
 >
 > ```sh
 > (cd "$(git rev-parse --show-toplevel)/rust" && cargo codegen napi)

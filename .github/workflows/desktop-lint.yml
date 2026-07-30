@@ -43,7 +43,9 @@ jobs:
                   save-if: false
 
             # tsc typechecks against the generated rust-bindings/index.d.ts.
-            - name: Generate ML addon bindings
+            # This generates only the declarations (via cargo check); it does
+            # not build the addon.
+            - name: Generate N-API rust bindings
               working-directory: rust
               run: cargo codegen napi
 

@@ -11,13 +11,14 @@
  * (rust/crates/photos). The desktop app talks to it through a Node native
  * addon (rust/bindings/napi/photos), which loads ONNX Runtime dynamically at
  * runtime from Ente's pinned custom builds (see [Note: ONNX Runtime binaries]
- * in scripts/ml-native.js).
+ * in scripts/ort.js).
  *
- * During development, `cargo codegen napi` (invoked by our postinstall)
- * builds the addon into the gitignored `rust-bindings/` directory. When
- * packaging, `beforeBuild.js` stages the addon for the architectures being
- * built into `build/ml-native/`, which electron-builder copies (along with
- * `build/onnxruntime/`) into the app's resources directory.
+ * During development, `scripts/napi.js` (invoked by `npm run dev`) builds the
+ * addon into the gitignored `rust-bindings/` directory. When packaging,
+ * `beforeBuild.js` builds and stages the addon for the target architectures
+ * into `build/napi/`, which electron-builder copies (along with the ONNX
+ * Runtime libraries staged in `build/onnxruntime/`) into the app's resources
+ * directory.
  */
 
 import path from "node:path";
@@ -75,7 +76,7 @@ export const mlNativePaths = (): MLNativePaths => {
     const addonName = `index.${napiTriple()}.node`;
     const addon = isDev
         ? path.resolve("rust-bindings", addonName)
-        : path.join(process.resourcesPath, "ml-native", addonName);
+        : path.join(process.resourcesPath, "napi", addonName);
     const onnxRuntimeLibrary = path.join(
         isDev ? path.resolve("build") : process.resourcesPath,
         "onnxruntime",

@@ -4,6 +4,7 @@ use std::ffi::OsStr;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::time::SystemTime;
 
 use camino::Utf8PathBuf;
 use lib_flutter_rust_bridge_codegen::codegen::{
@@ -207,44 +208,48 @@ fn generate_frb_package(package_dir: &Path) -> Result<(), DynError> {
     Ok(())
 }
 
+/// Regenerates `desktop/rust-bindings/index.d.ts` without building or linking
+/// the addon: `cargo check` expands the `#[napi]` macros, which emit type
+/// definitions when `NAPI_TYPE_DEF_TMP_FOLDER` is set, and napi-cli's
+/// `generateTypeDef` API renders those into the declaration file. The addon
+/// itself is built by the desktop build scripts (see [Note: Packaging the
+/// N-API addon] in `desktop/scripts/napi.js`).
 fn generate_napi() -> Result<(), DynError> {
     let rust_root = rust_root()?;
     let desktop_dir = repo_root()?.join("desktop");
     let out_dir = desktop_dir.join("rust-bindings");
     write_generated_gitignore(&out_dir)?;
 
-    let npm = if cfg!(windows) { "npm.cmd" } else { "npm" };
-    let linux_cross_args = if cfg!(target_os = "linux") {
-        let target = match env::consts::ARCH {
-            "x86_64" => "x86_64-unknown-linux-gnu",
-            "aarch64" => "aarch64-unknown-linux-gnu",
-            arch => return Err(format!("unsupported Linux architecture for NAPI: {arch}").into()),
-        };
-        vec!["--target", target, "--use-napi-cross"]
-    } else {
-        Vec::new()
-    };
+    // The macros only run when the crate is recompiled, so force that.
+    fs::File::options()
+        .write(true)
+        .open(rust_root.join("bindings/napi/photos/src/lib.rs"))?
+        .set_modified(SystemTime::now())?;
+
+    let type_def_dir = target_dir()?.join("napi-type-defs");
+    fs::create_dir_all(&type_def_dir)?;
     run_command(
-        Command::new(npm)
-            .arg("exec")
-            .arg("--")
-            .arg("napi")
-            .arg("build")
-            .arg("--manifest-path")
-            .arg(rust_root.join("bindings/napi/photos/Cargo.toml"))
+        Command::new("cargo")
+            .arg("check")
+            .arg("--locked")
+            .arg("-p")
+            .arg("ente_photos_napi")
             .arg("--target-dir")
             .arg(target_dir()?)
-            .arg("--release")
-            .arg("--strip")
-            .arg("--platform")
-            .arg("--no-js")
-            .arg("--dts")
-            .arg("index.d.ts")
-            .arg("--output-dir")
-            .arg(&out_dir)
-            .args(linux_cross_args)
+            .env("NAPI_TYPE_DEF_TMP_FOLDER", &type_def_dir)
+            .current_dir(&rust_root),
+        "failed to type-check the desktop Node bindings".to_owned(),
+    )?;
+
+    run_command(
+        Command::new("node")
+            .arg("scripts/napi.js")
+            .arg("dts")
+            .arg(&type_def_dir)
+            .arg(out_dir.join("index.d.ts"))
             .current_dir(&desktop_dir),
-        "failed to build the desktop Node addon (run npm install in desktop/ first)".to_owned(),
+        "failed to render the TypeScript declarations (run npm install in desktop/ first)"
+            .to_owned(),
     )
 }
 

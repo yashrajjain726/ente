@@ -51,9 +51,9 @@ Installs skip dependency lifecycle scripts (`ignore-scripts` in `.npmrc`) so tha
 
 - Downloads the `vips` binary used during development (see `scripts/vips.js`).
 
-- Downloads the ONNX Runtime library used by the ML pipeline (see `scripts/ml-native.js`).
+- Downloads the ONNX Runtime libraries used by the ML pipeline (see `scripts/ort.js`).
 
-- Builds the Rust ML addon from source by running `cargo codegen napi`, which places the built addon and its generated TypeScript declarations in the gitignored `rust-bindings/` directory. Rerun this codegen (from `../rust`) after changing the Rust ML code.
+Postinstall does not compile the Rust ML addon. `npm run dev` builds an optimized host addon through `scripts/napi.js`; packaging builds optimized target addons through electron-builder's `beforeBuild` hook. `cargo codegen napi` only regenerates the TypeScript declarations in the gitignored `rust-bindings/` directory.
 
 ### lint, lint:fix
 

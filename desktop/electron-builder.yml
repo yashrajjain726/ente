@@ -42,7 +42,7 @@ mac:
     category: public.app-category.photography
     hardenedRuntime: true
     mergeASARs: false
-    # The Rust ML addon and the ONNX Runtime library are shipped as separate
+    # The Rust N-API addon and the ONNX Runtime library are shipped as separate
     # per-arch Mach-Os (in both slices of the universal build) instead of fat
     # binaries; the app picks the one matching the process arch at runtime.
-    x64ArchFiles: "**/{ml-native,onnxruntime}/**"
+    x64ArchFiles: "**/{napi,onnxruntime}/**"
