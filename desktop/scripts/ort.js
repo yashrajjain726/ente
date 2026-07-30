@@ -8,9 +8,8 @@
  *
  * This script is the only place that downloads those builds. Postinstall runs
  * it once to acquire both architectures for the host platform. The extracted
- * libraries are kept under `node_modules/.cache/ente-onnxruntime/`, separate
- * from compilation and packaging. It also stages the host libraries into
- * `build/onnxruntime/` for development.
+ * libraries are kept under `node_modules/.cache/ente-onnxruntime/`, where the
+ * development app loads them directly.
  *
  * During packaging, `beforeBuild.js` calls {@link stageONNXRuntime} to copy the
  * already-installed libraries needed by the current target into
@@ -142,10 +141,6 @@ const stageONNXRuntime = async (platform, arch, appDir) => {
 const installONNXRuntime = async (platform, appDir) => {
     for (const arch of ["arm64", "x64"])
         await downloadONNXRuntimeIfNeeded(platform, arch, appDir);
-
-    // Make the host runtime available to the development app. macOS needs
-    // both libraries because its packaged application is universal.
-    await stageONNXRuntime(platform, process.arch, appDir);
 };
 
 const main = () => {

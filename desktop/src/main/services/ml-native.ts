@@ -14,11 +14,10 @@
  * in scripts/ort.js).
  *
  * During development, `scripts/napi.js` (invoked by `npm run dev`) builds the
- * addon into the gitignored `rust-bindings/` directory. When packaging,
- * `beforeBuild.js` builds and stages the addon for the target architectures
- * into `build/napi/`, which electron-builder copies (along with the ONNX
- * Runtime libraries staged in `build/onnxruntime/`) into the app's resources
- * directory.
+ * addon into the gitignored `rust-bindings/` directory, while ONNX Runtime is
+ * loaded directly from the postinstall cache. When packaging, `beforeBuild.js`
+ * stages both the addon and ONNX Runtime for the target architectures, and
+ * electron-builder copies them into the app's resources directory.
  */
 
 import path from "node:path";
@@ -77,9 +76,11 @@ export const mlNativePaths = (): MLNativePaths => {
     const addon = isDev
         ? path.resolve("rust-bindings", addonName)
         : path.join(process.resourcesPath, "napi", addonName);
+    const onnxRuntimeRoot = isDev
+        ? path.resolve("node_modules", ".cache", "ente-onnxruntime")
+        : path.join(process.resourcesPath, "onnxruntime");
     const onnxRuntimeLibrary = path.join(
-        isDev ? path.resolve("build") : process.resourcesPath,
-        "onnxruntime",
+        onnxRuntimeRoot,
         process.arch,
         onnxRuntimeLibraryName(),
     );
