@@ -352,12 +352,11 @@ ClusteringResult runLinearClustering(Map args) {
         faceID: face.faceID,
         faceScore: face.faceScore,
         blurValue: face.blurValue,
-        badFace:
-            face.faceScore < kMinimumQualityFaceScore ||
-            face.blurValue < kLaplacianSoftThreshold ||
-            (face.blurValue < kLaplacianVerySoftThreshold &&
-                face.faceScore < kMediumQualityFaceScore) ||
-            face.isSideways,
+        badFace: isBadFaceForClustering(
+          faceScore: face.faceScore,
+          blurValue: face.blurValue,
+          isSideways: face.isSideways,
+        ),
         vEmbedding: Vector.fromList(
           EVector.fromBuffer(face.embeddingBytes).values,
           dtype: DType.float32,
