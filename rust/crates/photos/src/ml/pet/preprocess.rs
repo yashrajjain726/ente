@@ -64,20 +64,7 @@ pub(super) struct PixelCrop {
     pub(super) height: u32,
 }
 
-/// Preprocess a cropped pet face/body image for embedding extraction.
-///
-/// Steps:
-///   1. Resize to 224x224 using bilinear interpolation
-///   2. Normalize using ImageNet mean/std
-///   3. Output CHW layout as float32
-///
-/// This mirrors the Python pipeline's preprocessing:
-/// ```python
-/// img = cv2.resize(crop, (224, 224))
-/// img = img / 255.0
-/// img = (img - IMAGENET_MEAN) / IMAGENET_STD
-/// img = img.transpose(2, 0, 1)  # HWC -> CHW
-/// ```
+/// Mirrors the Python pet pipeline's ImageNet-normalized CHW preprocessing.
 pub(super) struct PetEmbeddingPreprocessor {
     crop_resizer: RgbCropResizer,
 }
@@ -141,7 +128,6 @@ fn relative_crop(decoded: &DecodedImage, box_xyxy: &[f32; 4]) -> MlResult<PixelC
     })
 }
 
-/// Resizes row-strided crop views while retaining FIR's internal workspace.
 pub(super) struct RgbCropResizer {
     resizer: Resizer,
     resized: FirImage<'static>,

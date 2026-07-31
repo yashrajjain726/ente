@@ -46,8 +46,6 @@ pub(crate) fn to_face_id(file_id: i64, box_xyxy: [f32; 4]) -> String {
     format!("{file_id}_{x_min}_{y_min}_{x_max}_{y_max}")
 }
 
-// ── Pet Recognition Types ──────────────────────────────────────────────
-
 #[derive(Clone, Debug)]
 pub struct PetFaceDetection {
     pub score: f32,

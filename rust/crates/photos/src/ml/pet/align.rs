@@ -10,21 +10,10 @@ use super::{
     preprocess::{PetFaceEmbeddingInputs, PixelCrop, RgbCropResizer, append_imagenet_tensor},
 };
 
-/// Minimum eye distance in pixels below which alignment is skipped.
 const MIN_EYE_DISTANCE: f32 = 5.0;
-/// Angle threshold in degrees; below this, skip rotation and just crop.
 const ANGLE_SKIP_DEG: f32 = 1.0;
-/// Expand factor applied to each side of the bounding box when cropping.
 const CROP_EXPAND: f32 = 0.1;
 
-/// Run pet face alignment using 3-point landmarks (left_eye, right_eye, nose).
-///
-/// Mirrors `pet_pipeline/detection.py` `_align_face()`:
-///   1. Skip if eye distance < 5 px
-///   2. If angle < 1°, crop bounding box directly (no rotation)
-///   3. Otherwise rotate around face center, then crop with 10% expand
-///   4. Resize to 224×224
-///   5. Apply ImageNet normalization (CHW)
 pub(crate) fn run_pet_face_alignment(
     file_id: i64,
     decoded: &DecodedImage,
@@ -45,7 +34,6 @@ pub(crate) fn run_pet_face_alignment(
     let mut crop_resizer = RgbCropResizer::new(PET_EMBEDDING_INPUT_SIZE as u32);
 
     for detection in detections {
-        // Convert relative keypoints to absolute
         let left_eye = [
             detection.keypoints[0][0] * img_wf,
             detection.keypoints[0][1] * img_hf,
@@ -59,12 +47,10 @@ pub(crate) fn run_pet_face_alignment(
         let dy = right_eye[1] - left_eye[1];
         let eye_dist = (dx * dx + dy * dy).sqrt();
 
-        // Skip if eyes are too close together
         if eye_dist < MIN_EYE_DISTANCE {
             continue;
         }
 
-        // Absolute bounding box (clamped to image bounds on both sides)
         let max_xf = (img_w as f32 - 1.0).max(0.0);
         let max_yf = (img_h as f32 - 1.0).max(0.0);
         let box_x1 = (detection.box_xyxy[0] * img_wf).clamp(0.0, max_xf) as i32;
@@ -76,7 +62,6 @@ pub(crate) fn run_pet_face_alignment(
         let angle_rad = dy.atan2(dx);
 
         let aligned_rgb = if angle_deg.abs() < ANGLE_SKIP_DEG {
-            // No rotation needed — just crop the bounding box directly
             let cx1 = box_x1.max(0) as u32;
             let cy1 = box_y1.max(0) as u32;
             let cx2 = (box_x2 as u32).min(img_w);
@@ -88,7 +73,6 @@ pub(crate) fn run_pet_face_alignment(
             }
             crop_and_resize_decoded(&mut crop_resizer, decoded, cx1, cy1, crop_w, crop_h)?
         } else {
-            // Rotate only a padded region around the face, not the full image.
             let bw = (box_x2 - box_x1) as f32;
             let bh = (box_y2 - box_y1) as f32;
             let pad = (bw.max(bh) * (CROP_EXPAND + 0.5)).ceil() as i32;
@@ -105,11 +89,9 @@ pub(crate) fn run_pet_face_alignment(
 
             let region = RgbRegion::new(decoded, region_x1, region_y1, region_w, region_h)?;
 
-            // Face center relative to the extracted region
             let local_cx = (box_x1 + box_x2) as f64 / 2.0 - region_x1 as f64;
             let local_cy = (box_y1 + box_y2) as f64 / 2.0 - region_y1 as f64;
 
-            // Crop coordinates relative to the region
             let nx1 = (box_x1 as f32 - bw * CROP_EXPAND - region_x1 as f32).max(0.0) as u32;
             let ny1 = (box_y1 as f32 - bh * CROP_EXPAND - region_y1 as f32).max(0.0) as u32;
             let nx2 =
@@ -168,8 +150,6 @@ pub(crate) fn run_pet_face_alignment(
     Ok((aligned_inputs, face_results))
 }
 
-/// Render a crop of an image rotated around a center point using bilinear
-/// interpolation with BORDER_REPLICATE behaviour.
 fn rotate_crop_around_center(
     source: &RgbRegion<'_>,
     angle_rad: f64,
@@ -179,10 +159,6 @@ fn rotate_crop_around_center(
 ) -> RgbImage {
     let cos_a = angle_rad.cos();
     let sin_a = angle_rad.sin();
-
-    // Build forward rotation matrix (output -> input):
-    //   x_in = cos_a * (x_out - cx) + sin_a * (y_out - cy) + cx
-    //   y_in = -sin_a * (x_out - cx) + cos_a * (y_out - cy) + cy
 
     let mut output = RgbImage::new(crop.width, crop.height);
     let w_f = source.width as f64;
@@ -197,11 +173,9 @@ fn rotate_crop_around_center(
             let src_x = cos_a * dx + sin_a * dy + cx;
             let src_y = -sin_a * dx + cos_a * dy + cy;
 
-            // BORDER_REPLICATE: clamp to valid range
             let sx = src_x.max(0.0).min(w_f - 1.0);
             let sy = src_y.max(0.0).min(h_f - 1.0);
 
-            // Bilinear interpolation
             let x0 = sx.floor() as u32;
             let y0 = sy.floor() as u32;
             let x1 = (x0 + 1).min(source.width - 1);
@@ -229,7 +203,6 @@ fn rotate_crop_around_center(
     output
 }
 
-/// Crop a region from an RGB image and resize to 224×224 using bilinear interpolation.
 fn crop_and_resize_rgb<'a>(
     resizer: &'a mut RgbCropResizer,
     source: &RgbImage,
@@ -240,7 +213,6 @@ fn crop_and_resize_rgb<'a>(
 ) -> MlResult<&'a [u8]> {
     let src_w = source.width();
     let src_h = source.height();
-    // Clamp crop region to source bounds to avoid edge-replication artifacts.
     let clamped_w = w.min(src_w.saturating_sub(x));
     let clamped_h = h.min(src_h.saturating_sub(y));
     if clamped_w == 0 || clamped_h == 0 {
@@ -296,7 +268,6 @@ fn resize_crop<'a>(
     resizer.resize(rgb, source_width, source_height, crop)
 }
 
-/// A row-strided view into a rectangular region of the decoded RGB buffer.
 struct RgbRegion<'a> {
     rgb: &'a [u8],
     image_width: usize,

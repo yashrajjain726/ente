@@ -12,7 +12,6 @@ use crate::ml::{
     onnx,
 };
 
-/// Log to Android logcat or stderr.
 pub(crate) fn rt_log(msg: &str) {
     #[cfg(target_os = "android")]
     {
@@ -736,8 +735,6 @@ mod tests {
     #[test]
     fn model_execution_modes_match_platform_policy() {
         let runtime = MlRuntime::new();
-        // Pet models stay CPU-only on every platform until they are
-        // validated on the GPU execution providers.
         let expected_pet_mode = onnx::ExecutionMode::CpuOnly;
 
         assert_eq!(

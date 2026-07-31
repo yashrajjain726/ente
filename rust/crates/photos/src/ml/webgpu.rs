@@ -1,14 +1,7 @@
-//! Immediately before a WebGPU session is built, a per-model counter file
-//! next to the model is incremented and fsynced ("armed"). After
-//! the session has been built *and* has survived one warm-up inference, the
-//! file is removed ("disarmed"). A crash, kill, or soft failure in between
-//! leaves the incremented counter behind. Once any model's counter reaches
-//! [`MAX_CONSECUTIVE_FAILURES`], WebGPU is no longer attempted for models in
-//! that directory — durably, across process restarts.
-//!
-//! Everything here is called from `onnx::build_session` while the caller
-//! holds the per-model slot lock, so accesses to one model's counter file are
-//! already serialized and no in-memory state is needed beyond the enable flag.
+//! Durable WebGPU crash canary: arm before touching the driver and disarm only
+//! after session construction and warm-up. Three recorded failures quarantine
+//! the model directory across restarts. The caller's model-slot lock serializes
+//! access.
 
 #[cfg(all(
     not(target_os = "windows"),
@@ -31,8 +24,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-/// Bump the version to discard all previous canary state, e.g. after a major
-/// ONNX Runtime or Dawn upgrade that warrants re-trialing quarantined devices.
+/// Bump to retry quarantined devices after major ONNX Runtime or Dawn changes.
 #[cfg(any(
     target_os = "android",
     target_os = "linux",
@@ -59,21 +51,15 @@ pub(crate) fn set_enabled(enabled: bool) {
     let _ = enabled;
 }
 
-/// The GPU adapter allowlist is deliberately not checked here: probing the
-/// adapter touches the Vulkan driver, so it must run inside the armed canary
-/// window (see `onnx::build_webgpu_session_with_canary`), where a probe crash
-/// is recorded like any other WebGPU crash.
+/// Adapter probing touches Vulkan and therefore happens after arming, not here.
 #[cfg(any(target_os = "android", target_os = "linux", target_os = "windows"))]
 pub(crate) fn attempt_permitted(model_path: &str) -> bool {
     WEBGPU_ENABLED.load(Ordering::Relaxed)
         && model_dir(model_path).is_some_and(|dir| !quarantined(&dir))
 }
 
-/// Vulkan vendor IDs of GPUs for which Chromium ships WebGPU on Android 12+,
-/// mirroring `gpu/config/webgpu_blocklist_impl.cc` (Chromium main, 2026-07).
-/// Notably absent, matching Chromium: Imagination/PowerVR (allowed there only
-/// on Android 16+), Samsung Xclipse (still work-in-progress), and everything
-/// else. Revisit whenever the pinned ONNX Runtime/Dawn build is bumped.
+/// Mirrors Chromium's `gpu/config/webgpu_blocklist_impl.cc` Android 12+ policy
+/// as of 2026-07; revisit with pinned ONNX Runtime or Dawn upgrades.
 #[cfg(any(target_os = "android", test))]
 const ALLOWLISTED_VULKAN_VENDOR_IDS: [u32; 3] = [
     0x13B5, // ARM (Mali, Immortalis)
@@ -81,11 +67,7 @@ const ALLOWLISTED_VULKAN_VENDOR_IDS: [u32; 3] = [
     0x8086, // Intel
 ];
 
-/// WebGPU requires every enumerated adapter to be allowlisted: Dawn selects
-/// its adapter independently of this probe, so a mixed set could otherwise
-/// let Dawn pick a denied adapter. Android's Vulkan loader exposes a single
-/// vendor driver in practice, so on real devices this is a single-adapter
-/// check.
+/// Dawn chooses independently, so every enumerated adapter must be allowlisted.
 #[cfg(any(target_os = "android", test))]
 fn vendors_allowlisted(vendor_ids: &[u32]) -> bool {
     !vendor_ids.is_empty()
@@ -94,25 +76,16 @@ fn vendors_allowlisted(vendor_ids: &[u32]) -> bool {
             .all(|vendor_id| ALLOWLISTED_VULKAN_VENDOR_IDS.contains(vendor_id))
 }
 
-/// `Denied` means the probe completed and the adapter is not allowlisted — a
-/// clean policy decision.
-/// `Failed` means the probe itself did not complete, which callers must treat
-/// as a failed WebGPU attempt (counted by the crash canary) rather than a
-/// policy decision: a driver that cannot even create a Vulkan instance must
-/// eventually quarantine instead of being re-probed on every launch.
 #[cfg(target_os = "android")]
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub(crate) enum AdapterCheck {
     Allowed,
     Denied,
+    /// Probe failures count toward quarantine; policy denials do not.
     Failed,
 }
 
-/// Keeping this inside the Rust eligibility path ensures an unsupported
-/// adapter cannot be bypassed by any Dart inference entry point.
-///
-/// Must only be called inside an armed canary window: the probe is the first
-/// code in the process to touch the Vulkan driver.
+/// Must run inside an armed canary because this is the first Vulkan driver access.
 #[cfg(target_os = "android")]
 pub(crate) fn check_adapter() -> AdapterCheck {
     static VERDICT: OnceLock<AdapterCheck> = OnceLock::new();
@@ -139,17 +112,14 @@ pub(crate) fn check_adapter() -> AdapterCheck {
 fn probe_vulkan_vendor_ids() -> Result<Vec<u32>, String> {
     use ash::vk;
 
-    // SAFETY: loads the system Vulkan loader (`libvulkan.so`, present on all
-    // Android 7+ devices); `entry` keeps the library loaded until it drops at
-    // the end of this function, after the instance has been destroyed.
+    // SAFETY: loads Android's system Vulkan loader and keeps it alive through
+    // instance destruction.
     let entry = unsafe { ash::Entry::load() }
         .map_err(|error| format!("loading Vulkan loader failed: {error}"))?;
-    // SAFETY: a default `InstanceCreateInfo` (Vulkan 1.0, no layers or
-    // extensions) is a valid instance description.
+    // SAFETY: the default Vulkan 1.0 instance description is valid.
     let instance = unsafe { entry.create_instance(&vk::InstanceCreateInfo::default(), None) }
         .map_err(|error| format!("creating Vulkan instance failed: {error}"))?;
-    // SAFETY: `instance` is a live instance; it is destroyed below on every
-    // path and not used afterwards.
+    // SAFETY: `instance` is live and is destroyed below before returning.
     let vendor_ids = unsafe { instance.enumerate_physical_devices() }
         .map(|devices| {
             devices
@@ -164,9 +134,7 @@ fn probe_vulkan_vendor_ids() -> Result<Vec<u32>, String> {
     vendor_ids
 }
 
-/// A durable record of an in-flight WebGPU attempt for one model. Dropping it
-/// without calling [`ArmedCanary::disarm`] leaves the attempt recorded as
-/// failed, which is exactly what a crash does implicitly.
+/// Dropping without disarming intentionally preserves the failed-attempt record.
 #[cfg(any(
     target_os = "android",
     target_os = "linux",
@@ -177,8 +145,6 @@ pub(crate) struct ArmedCanary {
     path: PathBuf,
 }
 
-/// On error the caller must skip WebGPU (fail closed): without a durable
-/// record, a crash during the attempt would go unnoticed.
 #[cfg(any(
     target_os = "android",
     target_os = "linux",
@@ -358,8 +324,6 @@ mod tests {
 
     #[test]
     fn denies_when_any_adapter_is_not_allowlisted() {
-        // Dawn selects its adapter independently of the probe, so a mixed
-        // set must fail closed.
         assert!(!vendors_allowlisted(&[0x5143, 0x1AE0]));
         assert!(!vendors_allowlisted(&[0x1010, 0x13B5]));
     }
@@ -383,7 +347,6 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let model = model_path(dir.path());
 
-        // Dropped without disarming, as after a crash or background kill.
         drop(arm_canary(&model, "clip-image").unwrap());
 
         assert!(!quarantined(dir.path()));
