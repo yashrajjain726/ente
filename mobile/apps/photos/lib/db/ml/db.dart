@@ -513,16 +513,18 @@ class MLDataDB with SqlDbBase implements IMLDataDB<int> {
       GROUP BY fc.$clusterIDColumn
       HAVING COUNT(*) = 1
       ''');
-    return rows
-        .where(
-          (row) => isBadFaceForClustering(
-            faceScore: row[faceScore] as double,
-            blurValue: row[faceBlur] as double,
-            isSideways: (row[isSideways] as int) == 1,
-          ),
-        )
-        .map((row) => row[clusterIDColumn] as String)
-        .toSet();
+    final badClusterIDs = <String>{};
+    for (final row in rows) {
+      final badFace = isBadFaceForClustering(
+        faceScore: row[faceScore] as double,
+        blurValue: row[faceBlur] as double,
+        isSideways: (row[isSideways] as int) == 1,
+      );
+      if (badFace) {
+        badClusterIDs.add(row[clusterIDColumn] as String);
+      }
+    }
+    return badClusterIDs;
   }
 
   @override
@@ -532,7 +534,7 @@ class MLDataDB with SqlDbBase implements IMLDataDB<int> {
       SELECT $clusterIDColumn
       FROM $notPersonFeedback
       GROUP BY $clusterIDColumn
-      HAVING COUNT(DISTINCT $personIdColumn) >= 3
+      HAVING COUNT(*) >= 3
       ''');
     return rows.map((row) => row[clusterIDColumn] as String).toSet();
   }

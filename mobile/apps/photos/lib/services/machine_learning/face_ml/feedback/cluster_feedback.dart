@@ -69,11 +69,11 @@ class ClusterFeedbackService<T> {
   }
 
   Future<Set<String>> _getExcludedSuggestionClusterIDs() async {
-    final excludedClusterIDs = await mlDataDB.getBadFaceSingletonClusterIDs();
-    excludedClusterIDs.addAll(
-      await mlDataDB.getClustersWithThreeOrMoreNotPersonFeedback(),
-    );
-    return excludedClusterIDs;
+    final results = await Future.wait([
+      mlDataDB.getBadFaceSingletonClusterIDs(),
+      mlDataDB.getClustersWithThreeOrMoreNotPersonFeedback(),
+    ]);
+    return results[0].union(results[1]);
   }
 
   /// Returns a list of cluster suggestions for a person.
