@@ -263,8 +263,8 @@ class SelectablePersonSearchExample extends StatelessWidget {
                   ),
                   if (isPinnedPerson)
                     const Positioned(
-                      left: -6,
-                      top: -6,
+                      left: 8,
+                      bottom: 8,
                       child: PinnedPersonBadge(),
                     ),
                 ],

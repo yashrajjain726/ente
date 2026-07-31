@@ -23,6 +23,7 @@ import "package:photos/ui/viewer/people/add_person_action_sheet.dart";
 import "package:photos/ui/viewer/people/face_thumbnail_squircle.dart";
 import "package:photos/ui/viewer/people/people_page.dart";
 import 'package:photos/ui/viewer/people/person_face_widget.dart';
+import "package:photos/ui/viewer/people/pinned_person_badge.dart";
 import "package:photos/ui/viewer/search/result/people_section_all_page.dart";
 import "package:photos/ui/viewer/search/result/search_result_page.dart";
 import "package:photos/ui/viewer/search_tab/search_tab_horizontal_scroll.dart";
@@ -184,6 +185,8 @@ class PersonSearchExample extends StatelessWidget {
     final bool isCluster =
         searchResult.type() == ResultType.faces &&
         searchResult.params.containsKey(kClusterParamId);
+    final bool isPinnedPerson =
+        !isCluster && (searchResult.params[kPersonPinned] as bool? ?? false);
 
     return ListenableBuilder(
       listenable: selectedPeople ?? ValueNotifier(false),
@@ -276,6 +279,12 @@ class PersonSearchExample extends StatelessWidget {
                           : null,
                     ),
                   ),
+                  if (isPinnedPerson)
+                    const Positioned(
+                      left: 8,
+                      bottom: 8,
+                      child: PinnedPersonBadge(),
+                    ),
                 ],
               ),
               isCluster
