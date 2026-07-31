@@ -97,6 +97,19 @@ func requireCollectionShareStatus(
 	}
 }
 
+func collectionUpdationTime(t *testing.T, db *sql.DB, collectionID int64) int64 {
+	t.Helper()
+	var updationTime int64
+	err := db.QueryRow(
+		`SELECT updation_time FROM collections WHERE collection_id = $1`,
+		collectionID,
+	).Scan(&updationTime)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return updationTime
+}
+
 func addShareTestShare(
 	t *testing.T,
 	collectionRepo *repo.CollectionRepository,
@@ -367,6 +380,37 @@ func TestAutomaticShareLifecycle(t *testing.T) {
 		1,
 	)
 	requireCollectionShareStatus(t, status, ente.CollectionShared, err)
+}
+
+func TestUnShareContextBumpsCollectionForDeletedShareRow(t *testing.T) {
+	db, collectionRepo, ownerID, shareeID := setupCollectionShareTest(t)
+	ctx := context.Background()
+	collectionID := createShareTestCollection(t, collectionRepo, ownerID)
+	if err := collectionRepo.Share(
+		collectionID,
+		ownerID,
+		shareeID,
+		"share-key",
+		ente.VIEWER,
+		1,
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	status, err := collectionRepo.UnShareContext(ctx, collectionID, shareeID)
+	requireCollectionShareStatus(t, status, ente.CollectionUnshared, err)
+	if _, err := db.Exec(
+		`UPDATE collections SET updation_time = 1 WHERE collection_id = $1`,
+		collectionID,
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	status, err = collectionRepo.UnShareContext(ctx, collectionID, shareeID)
+	requireCollectionShareStatus(t, status, ente.CollectionAlreadyUnshared, err)
+	if got := collectionUpdationTime(t, db, collectionID); got == 1 {
+		t.Fatal("collection updation_time was not bumped for deleted share row")
+	}
 }
 
 func TestUncategorizedCollectionsOnlyAllowViewerShares(t *testing.T) {

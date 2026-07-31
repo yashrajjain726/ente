@@ -676,22 +676,16 @@ func (repo *CollectionRepository) UnShareContext(
 		return "", stacktrace.Propagate(err, "")
 	}
 
-	result, err := tx.ExecContext(ctx, `UPDATE collection_files
+	_, err = tx.ExecContext(ctx, `UPDATE collection_files
 		SET is_deleted = TRUE, updation_time = $1
 		WHERE collection_id = $2 AND f_owner_id = $3 AND is_deleted = FALSE`,
 		updationTime, collectionID, toUserID)
 	if err != nil {
 		return "", stacktrace.Propagate(err, "")
 	}
-	fileRows, err := result.RowsAffected()
-	if err != nil {
+	if _, err = tx.ExecContext(ctx, `UPDATE collections SET updation_time = $1
+		WHERE collection_id = $2`, updationTime, collectionID); err != nil {
 		return "", stacktrace.Propagate(err, "")
-	}
-	if status == ente.CollectionUnshared || fileRows > 0 {
-		if _, err = tx.ExecContext(ctx, `UPDATE collections SET updation_time = $1
-			WHERE collection_id = $2`, updationTime, collectionID); err != nil {
-			return "", stacktrace.Propagate(err, "")
-		}
 	}
 	if err := tx.Commit(); err != nil {
 		return "", stacktrace.Propagate(err, "")
