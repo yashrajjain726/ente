@@ -668,11 +668,12 @@ Future<LocalDeletionResult> deleteLocalFilesInBatches(
     "Deleting " + localIDs.length.toString() + " backed up files...",
     key: dialogKey,
   );
-  // ignore: unawaited_futures
-  showDialog(
+  ModalRoute<void>? dialogRoute;
+  final dialogPopped = showDialog<void>(
     useRootNavigator: false,
     context: context,
     builder: (context) {
+      dialogRoute = ModalRoute.of<void>(context);
       return dialog;
     },
     barrierColor: Colors.black.withValues(alpha: 0.85),
@@ -696,7 +697,8 @@ Future<LocalDeletionResult> deleteLocalFilesInBatches(
   } finally {
     final dialogContext = dialogKey.currentContext;
     if (dialogContext != null && dialogContext.mounted) {
-      Navigator.of(dialogContext).pop('dialog');
+      Navigator.of(dialogContext).pop();
+      await (dialogRoute?.completed ?? dialogPopped);
     }
   }
 }
