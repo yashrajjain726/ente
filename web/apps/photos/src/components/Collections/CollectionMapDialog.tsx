@@ -721,6 +721,8 @@ function useMapData(
     // close) so we can tell a same-collection background reload apart from a
     // switch to a different collection.
     const lastLoadedSummaryIdRef = useRef<number | undefined>(undefined);
+    // Invalidates in-flight loads when a newer load starts or the dialog closes.
+    const loadGenerationRef = useRef(0);
 
     //Syncing the refs with the state for the stale closure prevention.
     useEffect(() => {
@@ -810,6 +812,7 @@ function useMapData(
     useEffect(() => {
         if (!open) {
             loadedCollectionRef.current = null;
+            loadGenerationRef.current += 1;
             pendingThumbsRef.current.clear();
             isThumbnailWorkerRunningRef.current = false;
         }
@@ -825,14 +828,21 @@ function useMapData(
         const loaded = loadedCollectionRef.current;
 
         // The files array identity changes on every remote pull (e.g. the
-        // desktop app pulls on each window focus), so compare by id instead of
-        // reference to avoid tearing down the map for a no-op reload.
+        // desktop app pulls on each window focus), so compare stable file
+        // revisions to avoid tearing down the map for a no-op reload while
+        // still detecting metadata changes such as edited locations.
         const sameFiles =
             loaded?.files === files ||
             (!!loaded &&
                 loaded.files.length === files.length &&
-                // id-order compare; derivation is deterministic, deep equality not needed
-                loaded.files.every((f, i) => f.id === files[i]?.id));
+                loaded.files.every((file, index) => {
+                    const nextFile = files[index];
+                    return (
+                        file.id === nextFile?.id &&
+                        file.collectionID === nextFile.collectionID &&
+                        file.updationTime === nextFile.updationTime
+                    );
+                }));
 
         //preventing reloading of the data if it's already loaded.
         if (
@@ -845,6 +855,7 @@ function useMapData(
         }
 
         const loadMapData = async () => {
+            const generation = ++loadGenerationRef.current;
             //In this ref we are actually setting a new Set() so clearing that before any compute happens.
             pendingThumbsRef.current.clear();
             // When switching to a different collection, blank the previous
@@ -871,6 +882,7 @@ function useMapData(
 
                 const { points, latestFileId } =
                     await buildMapIndexPoints(uniqueFiles);
+                if (generation !== loadGenerationRef.current) return;
 
                 //mapIndex has the SuperCluster Spatial Index
                 const mapIndex = buildMapIndex(points);
@@ -911,6 +923,7 @@ function useMapData(
 
                 return;
             } catch (e) {
+                if (generation !== loadGenerationRef.current) return;
                 setState((prev) => ({
                     ...prev,
                     isLoading: false,
@@ -919,9 +932,11 @@ function useMapData(
                 onGenericError(e);
             } finally {
                 // Ensure we never leave the dialog stuck in a loading state
-                setState((prev) =>
-                    prev.isLoading ? { ...prev, isLoading: false } : prev,
-                );
+                if (generation === loadGenerationRef.current) {
+                    setState((prev) =>
+                        prev.isLoading ? { ...prev, isLoading: false } : prev,
+                    );
+                }
             }
         };
 
