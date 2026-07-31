@@ -9573,7 +9573,7 @@ dependencies = [
 [[package]]
 name = "transcribe-rs"
 version = "0.3.11"
-source = "git+https://github.com/laurens-pilot/transcribe-rs.git?rev=cc7d0a39126366fad44624ad962e772ceb2a59fd#cc7d0a39126366fad44624ad962e772ceb2a59fd"
+source = "git+https://github.com/cjpais/transcribe-rs.git?rev=efc66111d519a434e28d51d94740008a7ce29360#efc66111d519a434e28d51d94740008a7ce29360"
 dependencies = [
  "base64 0.22.1",
  "derive_builder",
