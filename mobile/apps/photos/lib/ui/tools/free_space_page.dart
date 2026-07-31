@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 import 'package:logging/logging.dart';
 import "package:photos/generated/l10n.dart";
 import 'package:photos/models/freeable_space_info.dart';
+import "package:photos/services/files_service.dart";
 import "package:photos/services/free_space/deletion_batch_runner.dart";
 import "package:photos/ui/notification/toast.dart";
 import 'package:photos/utils/delete_file_util.dart';
@@ -117,14 +118,34 @@ class _FreeSpacePageState extends State<FreeSpacePage> {
     }
 
     try {
-      var result = await deleteLocalFiles(context, status.localIDs);
+      late final Set<String> currentLocalIDs;
+      try {
+        final refreshedStatus = await FilesService.instance
+            .getFreeableSpaceInfo();
+        currentLocalIDs = retainOriginalDeletionCandidates(
+          refreshedLocalIDs: refreshedStatus.localIDs,
+          originalLocalIDs: status.localIDs,
+        );
+      } catch (e, s) {
+        Logger(
+          "FreeSpacePage",
+        ).severe("Could not refresh free-up-space candidates", e, s);
+        if (mounted) {
+          showToast(context, AppLocalizations.of(context).couldNotFreeUpSpace);
+        }
+        return;
+      }
+
+      if (!mounted) return;
+      final currentLocalIDList = currentLocalIDs.toList();
+      var result = await deleteLocalFiles(context, currentLocalIDList);
 
       if (result.status == LocalDeletionStatus.failed &&
           result.canAttemptRecovery) {
         if (!mounted) return;
         result = await deleteLocalFilesAfterRemovingAlreadyDeletedIDs(
           context,
-          status.localIDs,
+          currentLocalIDList,
         );
       }
 
@@ -134,7 +155,7 @@ class _FreeSpacePageState extends State<FreeSpacePage> {
         if (!mounted) return;
         result = await retryFreeUpSpaceAfterRemovingAssetsNonExistingInDisk(
           context,
-          originalLocalIDs: status.localIDs,
+          originalLocalIDs: currentLocalIDs,
         );
       }
 

@@ -27,6 +27,8 @@ Success must not be inferred from `deletedIDs.isNotEmpty`. Already-missing or sh
 ## Recovery flow
 
 1. **Normal deletion**
+   - Refresh the freeable candidates and retain only IDs included in the
+     original confirmed operation.
    - Delete the requested platform assets in batches.
    - If completed, finish successfully.
    - If cancelled, stop without another automatic attempt.

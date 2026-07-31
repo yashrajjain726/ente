@@ -140,7 +140,7 @@ void main() {
     expect(result.alreadyMissingIDs, {"stale-id"});
   });
 
-  test("final recovery retains only originally confirmed candidates", () {
+  test("retains only originally confirmed, still-freeable candidates", () {
     final candidates = retainOriginalDeletionCandidates(
       refreshedLocalIDs: ["folder-file", "unrelated-file"],
       originalLocalIDs: ["folder-file", "already-handled-file"],
