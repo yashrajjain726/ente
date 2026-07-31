@@ -299,7 +299,8 @@ func (c *CollectionController) BulkUnShare(
 	ctx *gin.Context,
 	req ente.BulkCollectionUnshareRequest,
 ) ([]ente.BulkCollectionShareResult, error) {
-	// Automatic callers must submit only shares they previously created.
+	// Source is request-scoped; share provenance is not persisted.
+	// Automatic callers must exclude shares that should be preserved.
 	if err := validateCollectionUnshareBatch(req.CollectionIDs, req.Source); err != nil {
 		return nil, err
 	}
