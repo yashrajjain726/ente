@@ -30,6 +30,7 @@ import 'package:photos/services/sync/remote_sync_service.dart';
 import 'package:photos/services/sync/sync_service.dart';
 import "package:photos/settings/local_settings.dart";
 import 'package:photos/ui/common/linear_progress_dialog.dart';
+import 'package:photos/ui/common/progress_dialog.dart';
 import 'package:photos/ui/components/buttons/button_widget.dart'
     show ButtonAction;
 import 'package:photos/ui/notification/toast.dart';
@@ -391,8 +392,7 @@ Future<LocalDeletionResult> deleteLocalFiles(
     final sharedMediaResult = await _deleteAndCheckpointSharedMediaFiles(
       localSharedMediaIDs,
     );
-    if (!sharedMediaResult.canAttemptRecovery &&
-        sharedMediaResult.status == LocalDeletionStatus.failed) {
+    if (sharedMediaResult.isTerminalFailure) {
       return sharedMediaResult;
     }
     if (!context.mounted) {
@@ -472,28 +472,22 @@ Future<LocalDeletionResult> deleteLocalFilesAfterRemovingAlreadyDeletedIDs(
       await _checkpointRemovedLocalIDs(alreadyDeletedIDs);
     } catch (e, s) {
       _logger.severe("Could not checkpoint already-missing files", e, s);
-      return LocalDeletionResult(
-        status: LocalDeletionStatus.failed,
-        alreadyMissingIDs: alreadyDeletedIDs,
-      );
+      return const LocalDeletionResult(status: LocalDeletionStatus.failed);
     }
 
     sharedMediaResult = await _deleteAndCheckpointSharedMediaFiles(
       localSharedMediaIDs,
     );
-    if (!sharedMediaResult.canAttemptRecovery &&
-        sharedMediaResult.status == LocalDeletionStatus.failed) {
+    if (sharedMediaResult.isTerminalFailure) {
       return LocalDeletionResult(
         status: LocalDeletionStatus.failed,
         deletedIDs: sharedMediaResult.deletedIDs,
-        alreadyMissingIDs: alreadyDeletedIDs,
       );
     }
   } catch (e, s) {
     _logger.severe("Could not delete local files", e, s);
-    return LocalDeletionResult(
+    return const LocalDeletionResult(
       status: LocalDeletionStatus.failed,
-      alreadyMissingIDs: alreadyDeletedIDs,
       canAttemptRecovery: true,
     );
   } finally {
@@ -507,16 +501,11 @@ Future<LocalDeletionResult> deleteLocalFilesAfterRemovingAlreadyDeletedIDs(
     return LocalDeletionResult(
       status: LocalDeletionStatus.failed,
       deletedIDs: sharedMediaResult.deletedIDs,
-      alreadyMissingIDs: alreadyDeletedIDs,
     );
   }
 
   final platformResult = await _deletePlatformAssets(context, localAssetIDs);
-  return combineDeletionResults(
-    sharedMediaResult,
-    platformResult,
-    alreadyMissingIDs: alreadyDeletedIDs,
-  );
+  return combineDeletionResults(sharedMediaResult, platformResult);
 }
 
 /// Only to be used on Android
@@ -566,8 +555,7 @@ retryFreeUpSpaceAfterRemovingAssetsNonExistingInDisk(
     sharedMediaResult = await _deleteAndCheckpointSharedMediaFiles(
       localSharedMediaIDs,
     );
-    if (!sharedMediaResult.canAttemptRecovery &&
-        sharedMediaResult.status == LocalDeletionStatus.failed) {
+    if (sharedMediaResult.isTerminalFailure) {
       return LocalDeletionResult(
         status: LocalDeletionStatus.failed,
         deletedIDs: sharedMediaResult.deletedIDs,
@@ -595,7 +583,6 @@ retryFreeUpSpaceAfterRemovingAssetsNonExistingInDisk(
   return LocalDeletionResult(
     status: result.status,
     deletedIDs: result.deletedIDs,
-    alreadyMissingIDs: result.alreadyMissingIDs,
   );
 }
 
@@ -758,7 +745,7 @@ Future<LocalDeletionResult> _deleteAndCheckpointSharedMediaFiles(
   );
 }
 
-Future<void> _hideProgressDialog(dynamic dialog) async {
+Future<void> _hideProgressDialog(ProgressDialog dialog) async {
   try {
     await dialog.hide();
   } catch (e, s) {

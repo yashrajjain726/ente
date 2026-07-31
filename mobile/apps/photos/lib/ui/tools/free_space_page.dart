@@ -12,6 +12,7 @@ import "package:photos/services/free_space/deletion_batch_runner.dart";
 import "package:photos/ui/notification/toast.dart";
 import 'package:photos/utils/delete_file_util.dart';
 
+final _logger = Logger("FreeSpacePage");
 bool _isFreeSpaceDeletionInProgress = false;
 
 class FreeSpacePage extends StatefulWidget {
@@ -52,10 +53,8 @@ class _FreeSpacePageState extends State<FreeSpacePage> {
   }
 
   Widget _getBody(FreeableSpaceInfo status) {
-    Logger(
-      "FreeSpacePage",
-    ).info("Number of uploaded files: " + status.localIDs.length.toString());
-    Logger("FreeSpacePage").info("Space consumed: " + status.size.toString());
+    _logger.info("Number of uploaded files: ${status.localIDs.length}");
+    _logger.info("Space consumed: ${status.size}");
     final count = status.localIDs.length;
     final formattedCount = NumberFormat().format(count);
     final formattedSize = formatBytes(status.size);
@@ -127,9 +126,7 @@ class _FreeSpacePageState extends State<FreeSpacePage> {
           originalLocalIDs: status.localIDs,
         );
       } catch (e, s) {
-        Logger(
-          "FreeSpacePage",
-        ).severe("Could not refresh free-up-space candidates", e, s);
+        _logger.severe("Could not refresh free-up-space candidates", e, s);
         if (mounted) {
           showToast(context, AppLocalizations.of(context).couldNotFreeUpSpace);
         }
@@ -140,8 +137,7 @@ class _FreeSpacePageState extends State<FreeSpacePage> {
       final currentLocalIDList = currentLocalIDs.toList();
       var result = await deleteLocalFiles(context, currentLocalIDList);
 
-      if (result.status == LocalDeletionStatus.failed &&
-          result.canAttemptRecovery) {
+      if (result.shouldAttemptRecovery) {
         if (!mounted) return;
         result = await deleteLocalFilesAfterRemovingAlreadyDeletedIDs(
           context,
@@ -149,9 +145,7 @@ class _FreeSpacePageState extends State<FreeSpacePage> {
         );
       }
 
-      if (result.status == LocalDeletionStatus.failed &&
-          result.canAttemptRecovery &&
-          Platform.isAndroid) {
+      if (result.shouldAttemptRecovery && Platform.isAndroid) {
         if (!mounted) return;
         result = await retryFreeUpSpaceAfterRemovingAssetsNonExistingInDisk(
           context,

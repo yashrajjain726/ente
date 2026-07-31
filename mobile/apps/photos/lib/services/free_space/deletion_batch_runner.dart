@@ -9,18 +9,19 @@ enum LocalDeletionStatus { completed, cancelled, failed }
 class LocalDeletionResult {
   final LocalDeletionStatus status;
   final Set<String> deletedIDs;
-  final Set<String> alreadyMissingIDs;
   final bool canAttemptRecovery;
 
   const LocalDeletionResult({
     required this.status,
     this.deletedIDs = const <String>{},
-    this.alreadyMissingIDs = const <String>{},
     this.canAttemptRecovery = false,
   });
 
   bool get isCompleted => status == LocalDeletionStatus.completed;
   bool get isCancelled => status == LocalDeletionStatus.cancelled;
+  bool get isFailed => status == LocalDeletionStatus.failed;
+  bool get shouldAttemptRecovery => isFailed && canAttemptRecovery;
+  bool get isTerminalFailure => isFailed && !canAttemptRecovery;
 }
 
 Set<String> retainOriginalDeletionCandidates({
@@ -105,43 +106,31 @@ Future<LocalDeletionResult> executeDeletionBatches({
 
 LocalDeletionResult combineDeletionResults(
   LocalDeletionResult sharedMediaResult,
-  LocalDeletionResult platformResult, {
-  Set<String> alreadyMissingIDs = const <String>{},
-}) {
+  LocalDeletionResult platformResult,
+) {
   final deletedIDs = <String>{
     ...sharedMediaResult.deletedIDs,
     ...platformResult.deletedIDs,
-  };
-  final missingIDs = <String>{
-    ...alreadyMissingIDs,
-    ...sharedMediaResult.alreadyMissingIDs,
-    ...platformResult.alreadyMissingIDs,
   };
   if (platformResult.isCancelled) {
     return LocalDeletionResult(
       status: LocalDeletionStatus.cancelled,
       deletedIDs: deletedIDs,
-      alreadyMissingIDs: missingIDs,
     );
   }
-  if (sharedMediaResult.status == LocalDeletionStatus.failed ||
-      platformResult.status == LocalDeletionStatus.failed) {
+  if (sharedMediaResult.isFailed || platformResult.isFailed) {
     final sharedFailureCanRecover =
-        sharedMediaResult.status != LocalDeletionStatus.failed ||
-        sharedMediaResult.canAttemptRecovery;
+        !sharedMediaResult.isFailed || sharedMediaResult.canAttemptRecovery;
     final platformFailureCanRecover =
-        platformResult.status != LocalDeletionStatus.failed ||
-        platformResult.canAttemptRecovery;
+        !platformResult.isFailed || platformResult.canAttemptRecovery;
     return LocalDeletionResult(
       status: LocalDeletionStatus.failed,
       deletedIDs: deletedIDs,
-      alreadyMissingIDs: missingIDs,
       canAttemptRecovery: sharedFailureCanRecover && platformFailureCanRecover,
     );
   }
   return LocalDeletionResult(
     status: LocalDeletionStatus.completed,
     deletedIDs: deletedIDs,
-    alreadyMissingIDs: missingIDs,
   );
 }

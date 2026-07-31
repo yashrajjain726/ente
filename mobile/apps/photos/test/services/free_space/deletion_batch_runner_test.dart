@@ -2,6 +2,27 @@ import "package:flutter_test/flutter_test.dart";
 import "package:photos/services/free_space/deletion_batch_runner.dart";
 
 void main() {
+  test("derives recovery predicates only for failed results", () {
+    const recoverableFailure = LocalDeletionResult(
+      status: LocalDeletionStatus.failed,
+      canAttemptRecovery: true,
+    );
+    const terminalFailure = LocalDeletionResult(
+      status: LocalDeletionStatus.failed,
+    );
+    const completed = LocalDeletionResult(
+      status: LocalDeletionStatus.completed,
+      canAttemptRecovery: true,
+    );
+
+    expect(recoverableFailure.shouldAttemptRecovery, isTrue);
+    expect(recoverableFailure.isTerminalFailure, isFalse);
+    expect(terminalFailure.shouldAttemptRecovery, isFalse);
+    expect(terminalFailure.isTerminalFailure, isTrue);
+    expect(completed.shouldAttemptRecovery, isFalse);
+    expect(completed.isTerminalFailure, isFalse);
+  });
+
   test("stops after the first platform exception", () async {
     final attemptedBatches = <List<String>>[];
 
@@ -125,19 +146,17 @@ void main() {
     expect(attemptedBatchSizes, [1900, 1]);
   });
 
-  test("reconciled stale IDs do not hide a platform failure", () {
+  test("completed reconciliation does not hide a platform failure", () {
     final result = combineDeletionResults(
       const LocalDeletionResult(status: LocalDeletionStatus.completed),
       const LocalDeletionResult(
         status: LocalDeletionStatus.failed,
         canAttemptRecovery: true,
       ),
-      alreadyMissingIDs: {"stale-id"},
     );
 
     expect(result.status, LocalDeletionStatus.failed);
     expect(result.canAttemptRecovery, isTrue);
-    expect(result.alreadyMissingIDs, {"stale-id"});
   });
 
   test("retains only originally confirmed, still-freeable candidates", () {
