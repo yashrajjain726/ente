@@ -1,5 +1,5 @@
 use ente_photos::ml::{
-    error::MlError, indexing as shared_indexing, runtime::ModelPaths as SharedModelPaths,
+    assets, error::MlError, indexing as shared_indexing, runtime::ModelPaths as SharedModelPaths,
     types as shared_types,
 };
 use napi::bindgen_prelude::*;
@@ -44,6 +44,84 @@ pub struct ModelPaths {
     pub pet_body_detection: String,
     pub pet_body_embedding_dog: String,
     pub pet_body_embedding_cat: String,
+}
+
+#[napi(object)]
+pub struct ClipTextModelPaths {
+    pub model_path: String,
+    pub vocab_path: String,
+}
+
+#[napi]
+pub struct AssetStore {
+    inner: ente_assets::AssetStore,
+}
+
+#[napi]
+impl AssetStore {
+    #[napi(constructor)]
+    pub fn new(assets_dir: String, legacy_models_dir: String) -> Self {
+        let inner = ente_assets::AssetStore::new(assets_dir);
+        for warning in
+            assets::migrate_desktop_models(&inner, std::path::Path::new(&legacy_models_dir))
+        {
+            eprintln!("Photos model migration: {warning}");
+        }
+        Self { inner }
+    }
+
+    #[napi]
+    pub async fn indexing_model_paths(
+        &self,
+        run_faces: bool,
+        run_clip: bool,
+        run_pets: bool,
+    ) -> Result<ModelPaths> {
+        let models = assets::indexing_models(run_faces, run_clip, run_pets);
+        let model_assets = models
+            .iter()
+            .copied()
+            .map(assets::model_asset)
+            .collect::<Vec<_>>();
+        self.inner
+            .download(
+                &model_assets,
+                |_| {},
+                ente_assets::download::CancellationToken::default(),
+            )
+            .await
+            .map_err(asset_error_to_napi)?;
+        Ok(to_napi_model_paths(assets::indexing_model_paths(
+            &self.inner,
+            run_faces,
+            run_clip,
+            run_pets,
+        )))
+    }
+
+    #[napi]
+    pub async fn clip_text_model_paths(&self) -> Result<ClipTextModelPaths> {
+        let asset = assets::model_asset(assets::Model::ClipText);
+        self.inner
+            .download(
+                std::slice::from_ref(&asset),
+                |_| {},
+                ente_assets::download::CancellationToken::default(),
+            )
+            .await
+            .map_err(asset_error_to_napi)?;
+        let paths = assets::clip_text_paths(&self.inner);
+        Ok(ClipTextModelPaths {
+            model_path: paths.model.to_string_lossy().into_owned(),
+            vocab_path: paths.vocab.to_string_lossy().into_owned(),
+        })
+    }
+
+    #[napi]
+    pub fn remove_model(&self, model_path: String) -> Result<bool> {
+        assets::remove_model_at_path(&self.inner, std::path::Path::new(&model_path))
+            .map_err(|error| Error::from_reason(format!("Assets: {error}")))
+    }
 }
 
 #[napi(object)]
@@ -255,6 +333,10 @@ fn ml_error_to_napi(error: MlError) -> Error {
     Error::from_reason(format!("{kind}: {detail}"))
 }
 
+fn asset_error_to_napi(error: ente_assets::download::Error) -> Error {
+    Error::from_reason(format!("Assets: {error}"))
+}
+
 fn to_shared_model_paths(paths: &ModelPaths) -> SharedModelPaths {
     SharedModelPaths {
         face_detection: paths.face_detection.clone(),
@@ -267,6 +349,21 @@ fn to_shared_model_paths(paths: &ModelPaths) -> SharedModelPaths {
         pet_body_detection: paths.pet_body_detection.clone(),
         pet_body_embedding_dog: paths.pet_body_embedding_dog.clone(),
         pet_body_embedding_cat: paths.pet_body_embedding_cat.clone(),
+    }
+}
+
+fn to_napi_model_paths(paths: SharedModelPaths) -> ModelPaths {
+    ModelPaths {
+        face_detection: paths.face_detection,
+        face_embedding: paths.face_embedding,
+        clip_image: paths.clip_image,
+        clip_text: paths.clip_text,
+        pet_face_detection: paths.pet_face_detection,
+        pet_face_embedding_dog: paths.pet_face_embedding_dog,
+        pet_face_embedding_cat: paths.pet_face_embedding_cat,
+        pet_body_detection: paths.pet_body_detection,
+        pet_body_embedding_dog: paths.pet_body_embedding_dog,
+        pet_body_embedding_cat: paths.pet_body_embedding_cat,
     }
 }
 

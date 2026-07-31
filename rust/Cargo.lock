@@ -2608,6 +2608,7 @@ dependencies = [
 name = "ente_photos_napi"
 version = "0.0.0"
 dependencies = [
+ "ente-assets",
  "ente-photos",
  "napi",
  "napi-build",
@@ -5626,6 +5627,7 @@ dependencies = [
  "napi-sys",
  "nohash-hasher",
  "rustc-hash",
+ "tokio",
 ]
 
 [[package]]
