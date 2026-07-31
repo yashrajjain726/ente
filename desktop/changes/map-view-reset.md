@@ -1,0 +1,1 @@
+- Fixed collection maps resetting after returning to the desktop app.
