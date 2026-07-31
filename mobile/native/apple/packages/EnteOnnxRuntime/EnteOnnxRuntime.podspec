@@ -7,11 +7,11 @@ Pod::Spec.new do |s|
   s.name     = 'EnteOnnxRuntime'
   s.version  = '1.28.0-r1'
   s.summary  = "Ente's custom prebuilt ONNX Runtime static-library XCFramework for iOS."
-  s.homepage = 'https://github.com/laurens-pilot/ort-packaging'
+  s.homepage = 'https://github.com/ente/ort-packaging'
   s.authors  = { 'Ente' => 'engineering@ente.io' }
   s.license  = { :type => 'MIT', :file => 'ONNXRUNTIME-LICENSE' }
   s.source   = {
-    :http   => 'https://github.com/laurens-pilot/ort-packaging/releases/download/ort-1.28.0-r1/onnxruntime-coreml-ios-1.28.0-r1.zip',
+    :http   => 'https://github.com/ente/ort-packaging/releases/download/ort-1.28.0-r1/onnxruntime-coreml-ios-1.28.0-r1.zip',
     :sha256 => 'a7115a93a403c037692149a0013d30ddb0e33fc6899bb596ba791d5d743fa657',
   }
 

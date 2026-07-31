@@ -4,7 +4,7 @@
  * The Rust ML addon (see [Note: ML with Rust]) loads ONNX Runtime dynamically
  * at runtime. We use Ente's pinned custom builds — CoreML-enabled on macOS and
  * WebGPU-capable elsewhere — published at
- * https://github.com/laurens-pilot/ort-packaging/releases
+ * https://github.com/ente/ort-packaging/releases
  *
  * This script is the only place that downloads those builds. Postinstall runs
  * it once to acquire both architectures for the host platform. The extracted
@@ -23,7 +23,7 @@ const { execFileSync } = require("node:child_process");
 
 const ortVersion = "1.28.0-r1";
 
-const ortReleaseURL = `https://github.com/laurens-pilot/ort-packaging/releases/download/ort-${ortVersion}`;
+const ortReleaseURL = `https://github.com/ente/ort-packaging/releases/download/ort-${ortVersion}`;
 
 /**
  * SHA-256 checksums of the release assets, pinned here so that the library we

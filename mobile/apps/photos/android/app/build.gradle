@@ -37,7 +37,7 @@ repositories {
         forRepository {
             ivy {
                 name = 'enteOnnxRuntimePackaging'
-                url = 'https://github.com/laurens-pilot/ort-packaging/releases/download'
+                url = 'https://github.com/ente/ort-packaging/releases/download'
                 patternLayout {
                     artifact 'ort-[revision]/[artifact]-[revision].[ext]'
                 }
