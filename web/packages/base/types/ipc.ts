@@ -813,9 +813,10 @@ export interface MLWorkerAnalyzeImageRequest {
  * Broad category for an error encountered while analyzing an image.
  *
  * Only `image` indicates a permanent problem inherent to the image. `init`
- * blocks indexing for the lifetime of the utility process, while `ort` and
- * `misc` remain retryable. None of those other kinds should permanently mark
- * the file as unindexable.
+ * blocks indexing for the lifetime of the utility process (this includes
+ * corrupt on-disk models, which won't fix themselves and need manual
+ * intervention), while `ort` and `misc` remain retryable. None of those other
+ * kinds should permanently mark the file as unindexable.
  */
 export type MLWorkerAnalyzeImageErrorKind = "init" | "ort" | "image" | "misc";
 

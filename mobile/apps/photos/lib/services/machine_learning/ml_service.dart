@@ -537,9 +537,9 @@ class MLService {
         "`indexAllImages()` finished. Analyzed $fileAnalyzedCount images, in ${stopwatch.elapsed.inSeconds} seconds (avg of ${stopwatch.elapsed.inSeconds / fileAnalyzedCount} seconds per image)",
       );
       _logStatus();
-    } on RustCorruptModelCacheDeletedException catch (e) {
-      _logger.warning(
-        "Stopping image indexing because corrupt Rust ONNX model cache was deleted at ${e.modelPath}",
+    } on RustCorruptModelException catch (e) {
+      _logger.severe(
+        "Stopping image indexing because Rust ML reported a corrupt model at ${e.modelPath}",
       );
     } catch (e, s) {
       _logger.severe("indexAllImages failed", e, s);
@@ -917,12 +917,12 @@ class MLService {
       final String format = instruction.file.displayName.split('.').last;
       final int? size = instruction.file.fileSize;
       final fileType = instruction.file.fileType;
-      if (e is RustCorruptModelCacheDeletedException) {
+      if (e is RustCorruptModelException) {
         pauseIndexingAndClustering();
-        _logger.warning(
+        _logger.severe(
           "Stopping ML indexing for fileID ${instruction.fileKey} "
-          "(format $format, type $fileType, size $size) because corrupt Rust "
-          "ONNX model cache was deleted at ${e.modelPath}",
+          "(format $format, type $fileType, size $size) because Rust ML "
+          "reported a corrupt model at ${e.modelPath}",
         );
         rethrow;
       }

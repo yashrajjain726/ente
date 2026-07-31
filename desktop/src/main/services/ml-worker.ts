@@ -238,9 +238,6 @@ export interface MLWorkerAnalyzeImageRequest {
 /**
  * Analyze a single image with the Rust ML pipeline, downloading any needed
  * models first.
- *
- * If the Rust side reports the on-disk model as corrupt, delete and
- * redownload it, and retry once.
  */
 export const analyzeImage = async (
     req: MLWorkerAnalyzeImageRequest,
@@ -256,29 +253,29 @@ const analyzeImageOrThrow = async (req: MLWorkerAnalyzeImageRequest) => {
     const native = mlNative();
     try {
         return await analyzeImageOnce(native, req);
-    } catch (e) {
-        if (!evictModelIfReportedCorrupt(e)) throw e;
-        _preparedRuntimeKey = undefined;
-        return await analyzeImageOnce(native, req);
     } finally {
         logMLRuntimeEvents(native);
     }
 };
 
+// A corrupt on-disk model won't fix itself (models are hash-verified on
+// download), so treat it like an init failure: suspend indexing for the rest
+// of the process lifetime instead of retrying.
 const categorizeAnalyzeImageError = (e: unknown): MLWorkerAnalyzeImageError => {
     if (e instanceof CategorizedMLWorkerError) {
         return { kind: e.kind, message: e.message };
     }
 
     const message = e instanceof Error ? e.message : String(e);
-    const kind: MLWorkerAnalyzeImageErrorKind =
-        message.startsWith("Decode: ") || message.startsWith("Image: ")
-            ? "image"
-            : message.startsWith("Ort: ") ||
-                message.startsWith("CorruptModel: ") ||
-                message.startsWith("Runtime: ")
-              ? "ort"
-              : "misc";
+    const kind: MLWorkerAnalyzeImageErrorKind = message.startsWith(
+        "CorruptModel: ",
+    )
+        ? "init"
+        : message.startsWith("Decode: ") || message.startsWith("Image: ")
+          ? "image"
+          : message.startsWith("Ort: ") || message.startsWith("Runtime: ")
+            ? "ort"
+            : "misc";
     return { kind, message };
 };
 
@@ -312,32 +309,6 @@ const analyzeImageOnce = async (
     });
 };
 
-/**
- * If {@link e} is the addon's tagged "CorruptModel" error, return the path of
- * the corrupt model file it reports.
- */
-const corruptModelPathFromError = (e: unknown) => {
-    if (!(e instanceof Error)) return undefined;
-    if (!e.message.startsWith("CorruptModel: ")) return undefined;
-    return e.message.slice("CorruptModel: ".length).trim();
-};
-
-/**
- * If {@link e} is the addon's tagged "CorruptModel" error, evict the model it
- * names so that its next use downloads a fresh copy, and return `true`.
- */
-const evictModelIfReportedCorrupt = (e: unknown) => {
-    const corruptModelPath = corruptModelPathFromError(e);
-    if (!corruptModelPath) return false;
-    if (!assetStore().removeModel(corruptModelPath)) return false;
-    _indexingModelPaths.clear();
-    log.error(
-        `Rust ML reported a corrupt model at ${corruptModelPath}, evicting it so that it gets redownloaded`,
-    );
-    _clipTextModelPaths = undefined;
-    return true;
-};
-
 // Zero-copy view over the transferred bytes.
 const uint8ArrayToBuffer = (bytes: Uint8Array) =>
     Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength);
@@ -368,8 +339,7 @@ const warmUpClipTextEncoder = async (native: MLNative) => {
             vocabPath,
         });
     } catch (e) {
-        if (!evictModelIfReportedCorrupt(e))
-            log.warn("Failed to warm up the CLIP text encoder", e);
+        log.warn("Failed to warm up the CLIP text encoder", e);
     } finally {
         logMLRuntimeEvents(native);
     }
@@ -409,11 +379,6 @@ export const computeCLIPTextEmbeddingIfAvailable = async (text: string) => {
             vocabPath,
         });
         return embedding;
-    } catch (e) {
-        // Don't block this query on the redownload; a subsequent query will
-        // pick up the fresh copy.
-        if (!evictModelIfReportedCorrupt(e)) throw e;
-        return undefined;
     } finally {
         logMLRuntimeEvents(native);
     }
