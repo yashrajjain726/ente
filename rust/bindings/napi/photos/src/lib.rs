@@ -116,12 +116,6 @@ impl AssetStore {
             vocab_path: paths.vocab.to_string_lossy().into_owned(),
         })
     }
-
-    #[napi]
-    pub fn remove_model(&self, model_path: String) -> Result<bool> {
-        assets::remove_model_at_path(&self.inner, std::path::Path::new(&model_path))
-            .map_err(|error| Error::from_reason(format!("Assets: {error}")))
-    }
 }
 
 #[napi(object)]

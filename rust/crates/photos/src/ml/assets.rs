@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use ente_assets::{Asset, AssetFile, AssetStore, AssetStoreError};
+use ente_assets::{Asset, AssetFile, AssetStore};
 
 use super::runtime::ModelPaths;
 
@@ -122,23 +122,6 @@ pub fn clip_text_paths(store: &AssetStore) -> ClipTextPaths {
             .file_path(&asset, files[1].name)
             .expect("CLIP text vocabulary file"),
     }
-}
-
-pub fn remove_model_at_path(store: &AssetStore, path: &Path) -> Result<bool, AssetStoreError> {
-    for model in ALL_MODELS {
-        let asset = model_asset(model);
-        if model
-            .spec()
-            .files
-            .iter()
-            .filter_map(|file| store.file_path(&asset, file.name))
-            .any(|candidate| candidate == path)
-        {
-            store.remove(&asset)?;
-            return Ok(true);
-        }
-    }
-    Ok(false)
 }
 
 pub fn migrate_desktop_models(store: &AssetStore, legacy_dir: &Path) -> Vec<String> {

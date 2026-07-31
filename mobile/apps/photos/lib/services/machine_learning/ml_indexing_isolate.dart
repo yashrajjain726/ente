@@ -63,9 +63,9 @@ class MLIndexingIsolate extends SuperIsolate {
         ...rustRuntimeArgs,
         "enableWebGpu": enableWebGpu,
       });
-      if (isolateResult is RustCorruptModelCacheDeletedException) {
-        _logger.warning(
-          "Deleted corrupt Rust ONNX model cache at ${isolateResult.modelPath}; "
+      if (isolateResult is RustCorruptModelException) {
+        _logger.severe(
+          "Rust ML reported a corrupt model at ${isolateResult.modelPath}; "
           "stopping ML indexing for fileID ${instruction.fileKey}",
         );
         shouldPauseIndexingAndClustering = true;
@@ -82,8 +82,7 @@ class MLIndexingIsolate extends SuperIsolate {
       _runtimeFlagCombinations.add(result.remoteFlags);
       return result;
     } catch (e, s) {
-      if (e is RustCorruptModelCacheDeletedException ||
-          isExpectedMlSkipError(e)) {
+      if (e is RustCorruptModelException || isExpectedMlSkipError(e)) {
         rethrow;
       }
       _logger.severe(
