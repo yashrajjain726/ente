@@ -1,0 +1,1 @@
+- Made freeing device space resilient to stale local media entries.

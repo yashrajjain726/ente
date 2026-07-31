@@ -7,8 +7,11 @@ import 'package:intl/intl.dart';
 import 'package:logging/logging.dart';
 import "package:photos/generated/l10n.dart";
 import 'package:photos/models/freeable_space_info.dart';
+import "package:photos/services/free_space/deletion_batch_runner.dart";
 import "package:photos/ui/notification/toast.dart";
 import 'package:photos/utils/delete_file_util.dart';
+
+bool _isFreeSpaceDeletionInProgress = false;
 
 class FreeSpacePage extends StatefulWidget {
   final FreeableSpaceInfo status;
@@ -25,6 +28,8 @@ class FreeSpacePage extends StatefulWidget {
 }
 
 class _FreeSpacePageState extends State<FreeSpacePage> {
+  bool _isFreeingSpace = false;
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -90,6 +95,7 @@ class _FreeSpacePageState extends State<FreeSpacePage> {
             const SizedBox(height: 32),
             ButtonComponent(
               shouldSurfaceExecutionStates: false,
+              isDisabled: _isFreeingSpace,
               onTap: () async {
                 await _showConfirmFreeSpaceSheet(context, status);
               },
@@ -102,29 +108,47 @@ class _FreeSpacePageState extends State<FreeSpacePage> {
   }
 
   Future<void> _freeStorage(FreeableSpaceInfo status) async {
-    bool isSuccess = await deleteLocalFiles(context, status.localIDs);
-
-    if (isSuccess == false) {
-      if (!mounted) return;
-      isSuccess = await deleteLocalFilesAfterRemovingAlreadyDeletedIDs(
-        context,
-        status.localIDs,
-      );
+    if (_isFreeSpaceDeletionInProgress) {
+      return;
+    }
+    _isFreeSpaceDeletionInProgress = true;
+    if (mounted) {
+      setState(() => _isFreeingSpace = true);
     }
 
-    if (isSuccess == false && Platform.isAndroid) {
-      if (!mounted) return;
-      isSuccess = await retryFreeUpSpaceAfterRemovingAssetsNonExistingInDisk(
-        context,
-      );
-    }
+    try {
+      var result = await deleteLocalFiles(context, status.localIDs);
 
-    if (isSuccess) {
+      if (result.status == LocalDeletionStatus.failed &&
+          result.canAttemptRecovery) {
+        if (!mounted) return;
+        result = await deleteLocalFilesAfterRemovingAlreadyDeletedIDs(
+          context,
+          status.localIDs,
+        );
+      }
+
+      if (result.status == LocalDeletionStatus.failed &&
+          result.canAttemptRecovery &&
+          Platform.isAndroid) {
+        if (!mounted) return;
+        result = await retryFreeUpSpaceAfterRemovingAssetsNonExistingInDisk(
+          context,
+          originalLocalIDs: status.localIDs,
+        );
+      }
+
       if (!mounted) return;
-      Navigator.of(context).pop(true);
-    } else {
-      if (!mounted) return;
-      showToast(context, AppLocalizations.of(context).couldNotFreeUpSpace);
+      if (result.isCompleted) {
+        Navigator.of(context).pop(true);
+      } else if (!result.isCancelled) {
+        showToast(context, AppLocalizations.of(context).couldNotFreeUpSpace);
+      }
+    } finally {
+      _isFreeSpaceDeletionInProgress = false;
+      if (mounted) {
+        setState(() => _isFreeingSpace = false);
+      }
     }
   }
 
