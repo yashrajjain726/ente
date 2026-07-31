@@ -503,6 +503,41 @@ class MLDataDB with SqlDbBase implements IMLDataDB<int> {
   }
 
   @override
+  Future<Set<String>> getBadFaceSingletonClusterIDs() async {
+    final db = await asyncDB;
+    final rows = await db.getAll('''
+      SELECT fc.$clusterIDColumn, f.$faceScore, f.$faceBlur, f.$isSideways
+      FROM $faceClustersTable fc
+      INNER JOIN $facesTable f
+        ON fc.$faceIDColumn = f.$faceIDColumn
+      GROUP BY fc.$clusterIDColumn
+      HAVING COUNT(*) = 1
+      ''');
+    return rows
+        .where(
+          (row) => isBadFaceForClustering(
+            faceScore: row[faceScore] as double,
+            blurValue: row[faceBlur] as double,
+            isSideways: (row[isSideways] as int) == 1,
+          ),
+        )
+        .map((row) => row[clusterIDColumn] as String)
+        .toSet();
+  }
+
+  @override
+  Future<Set<String>> getClustersWithThreeOrMoreNotPersonFeedback() async {
+    final db = await asyncDB;
+    final rows = await db.getAll('''
+      SELECT $clusterIDColumn
+      FROM $notPersonFeedback
+      GROUP BY $clusterIDColumn
+      HAVING COUNT(DISTINCT $personIdColumn) >= 3
+      ''');
+    return rows.map((row) => row[clusterIDColumn] as String).toSet();
+  }
+
+  @override
   Future<Set<String>> getPersonIgnoredClusters(String personID) async {
     final db = await asyncDB;
     // find out clusterIds that are assigned to other persons using the clusters table
