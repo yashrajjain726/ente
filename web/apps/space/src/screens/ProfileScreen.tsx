@@ -221,20 +221,24 @@ const ProfileStatsSkeleton: React.FC = () => (
     </Box>
 );
 
-interface PublicProfileAddFriendButtonProps {
-    isAddingFriend: boolean;
-    onAddFriend: () => void;
-    showSpinner: boolean;
+interface PublicProfileActionButtonProps {
+    disabled?: boolean;
+    label: string;
+    onClick: () => void;
+    showSpinner?: boolean;
 }
 
-const PublicProfileAddFriendButton: React.FC<
-    PublicProfileAddFriendButtonProps
-> = ({ isAddingFriend, onAddFriend, showSpinner }) => (
+const PublicProfileActionButton: React.FC<PublicProfileActionButtonProps> = ({
+    disabled = false,
+    label,
+    onClick,
+    showSpinner = false,
+}) => (
     <Box
         component="button"
         type="button"
-        disabled={isAddingFriend}
-        onClick={onAddFriend}
+        disabled={disabled}
+        onClick={onClick}
         sx={{
             alignItems: "center",
             appearance: "none",
@@ -242,7 +246,7 @@ const PublicProfileAddFriendButton: React.FC<
             border: 0,
             borderRadius: "14px",
             color: "#000",
-            cursor: isAddingFriend ? "default" : "pointer",
+            cursor: disabled ? "default" : "pointer",
             display: "flex",
             flexShrink: 0,
             fontFamily: '"Inter Variable", Inter, sans-serif',
@@ -253,14 +257,14 @@ const PublicProfileAddFriendButton: React.FC<
             lineHeight: "18px",
             px: "14px",
             py: "8px",
-            "&:hover": { bgcolor: isAddingFriend ? "#FFF" : "#F4F4F4" },
+            "&:hover": { bgcolor: disabled ? "#FFF" : "#F4F4F4" },
             "&:focus-visible": {
                 outline: `2px solid ${green}`,
                 outlineOffset: 2,
             },
         }}
     >
-        {showSpinner ? <SpaceButtonSpinner /> : "Add Friend"}
+        {showSpinner ? <SpaceButtonSpinner /> : label}
     </Box>
 );
 
@@ -453,6 +457,7 @@ interface ProfileScreenProps {
     onBack?: () => void;
     onAddFriend?: () => void;
     onAddFriendForPostAction?: (intent: SpaceInviteIntent) => void;
+    onCreateSpace?: () => void;
     onCreatePost?: (
         image: DraftSpacePostImage,
         caption: string,
@@ -492,6 +497,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     onBack,
     onAddFriend,
     onAddFriendForPostAction,
+    onCreateSpace,
     onCreatePost,
     onDeletePost,
     onDraftPostPublished,
@@ -1153,13 +1159,21 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                     }}
                                 />
                             </Box>
-                            {onAddFriend && (
-                                <PublicProfileAddFriendButton
-                                    isAddingFriend={isAddingFriend}
-                                    onAddFriend={onAddFriend}
-                                    showSpinner={showAddingFriendSpinner}
-                                />
-                            )}
+                            {isAnonymousPublicProfile
+                                ? onCreateSpace && (
+                                      <PublicProfileActionButton
+                                          label="Create your Space"
+                                          onClick={onCreateSpace}
+                                      />
+                                  )
+                                : onAddFriend && (
+                                      <PublicProfileActionButton
+                                          disabled={isAddingFriend}
+                                          label="Add Friend"
+                                          onClick={onAddFriend}
+                                          showSpinner={showAddingFriendSpinner}
+                                      />
+                                  )}
                         </>
                     ) : (
                         <>
