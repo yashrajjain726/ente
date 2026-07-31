@@ -39,7 +39,69 @@ void main() {
     await tester.pump(const Duration(milliseconds: 200));
     expect(await firstShow, isTrue);
 
-    await firstDialog.hide();
+    final hideFuture = firstDialog.hide();
     await tester.pumpAndSettle();
+    expect(await hideFuture, isTrue);
   });
+
+  testWidgets("waits for sequential dismissals before the page is popped", (
+    tester,
+  ) async {
+    bool? routeResult;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (context) => Scaffold(
+            body: TextButton(
+              onPressed: () async {
+                routeResult = await Navigator.of(context).push<bool>(
+                  MaterialPageRoute(builder: (_) => const _DeletionPage()),
+                );
+              },
+              child: const Text("Open"),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text("Open"));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text("Delete"));
+    for (var index = 0; index < 12; index++) {
+      await tester.pump(const Duration(milliseconds: 250));
+    }
+    await tester.pumpAndSettle();
+
+    expect(find.text("Delete"), findsNothing);
+    expect(routeResult, isTrue);
+  });
+}
+
+class _DeletionPage extends StatelessWidget {
+  const _DeletionPage();
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: TextButton(
+        onPressed: () async {
+          for (final message in ["Deleting", "Loading", "Deleting again"]) {
+            final dialog = ProgressDialog(context, isDismissible: false);
+            dialog.style(
+              message: message,
+              progressWidget: const SizedBox.shrink(),
+            );
+            await dialog.show();
+            await dialog.hide();
+          }
+          if (context.mounted) {
+            Navigator.of(context).pop(true);
+          }
+        },
+        child: const Text("Delete"),
+      ),
+    );
+  }
 }
