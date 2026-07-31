@@ -17,6 +17,14 @@ import {
 const green = "#08C225";
 const dangerColor = "#F63A3A";
 
+const isMobileBrowser = () => {
+    const { maxTouchPoints, userAgent } = navigator;
+    return (
+        /Android|iPad|iPhone|iPod/i.test(userAgent) ||
+        (userAgent.includes("Macintosh") && maxTouchPoints > 1)
+    );
+};
+
 export const SpaceShareLinkDialogHost: React.FC = () => {
     const isBottomSheet = useMediaQuery("(max-width: 599px)");
     const linkRequestID = React.useRef(0);
@@ -26,6 +34,7 @@ export const SpaceShareLinkDialogHost: React.FC = () => {
     const [error, setError] = React.useState<string>();
     const [copied, setCopied] = React.useState(false);
     const [linkChanged, setLinkChanged] = React.useState(false);
+    const [useNativeShare, setUseNativeShare] = React.useState(false);
     const [mode, setMode] = React.useState<SpaceShareLinkDialogMode>("profile");
     const [isChangeConfirmationOpen, setIsChangeConfirmationOpen] =
         React.useState(false);
@@ -40,6 +49,9 @@ export const SpaceShareLinkDialogHost: React.FC = () => {
         setError(undefined);
         setCopied(false);
         setLinkChanged(false);
+        setUseNativeShare(
+            isMobileBrowser() && typeof navigator.share == "function",
+        );
         void getOrCreateCurrentSpaceLink()
             .then((nextLink) => {
                 if (linkRequestID.current == requestID) setLink(nextLink);
@@ -85,7 +97,7 @@ export const SpaceShareLinkDialogHost: React.FC = () => {
 
     const share = async () => {
         if (!url) return;
-        if (typeof navigator.share != "function") {
+        if (!useNativeShare) {
             await copy();
             return;
         }
@@ -212,12 +224,14 @@ export const SpaceShareLinkDialogHost: React.FC = () => {
                             disabled={!link || loading}
                             label={
                                 copied
-                                    ? "Link copied"
+                                    ? "Copied"
                                     : loading
                                       ? "Getting link…"
-                                      : linkChanged
-                                        ? "Share new link"
-                                        : "Share profile"
+                                      : useNativeShare
+                                        ? linkChanged
+                                            ? "Share new link"
+                                            : "Share profile"
+                                        : "Copy link"
                             }
                             onClick={share}
                             variant="primary"
