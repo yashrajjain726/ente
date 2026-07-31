@@ -506,36 +506,29 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                         label="Change cover image"
                         onClick={onChangeCoverImage}
                     />
-                    {(webPushPrompt.isPilotEligible ||
-                        installPrompt.canInstall) && (
-                        <SettingsEyebrow>PREFERENCES</SettingsEyebrow>
-                    )}
-                    {webPushPrompt.isPilotEligible && (
-                        <SettingsRow
-                            icon={Notification02Icon}
-                            label="Notifications"
-                            onClick={
-                                requiresIOSInstall
-                                    ? toggleNotifications
-                                    : undefined
-                            }
-                            trailingOnClick={
-                                webPushPrompt.isResolved &&
-                                !webPushPrompt.isEnabling &&
-                                webPushPrompt.isAvailable
-                                    ? toggleNotifications
-                                    : undefined
-                            }
-                            toggleState={
-                                requiresIOSInstall
-                                    ? undefined
-                                    : webPushPrompt.isResolved &&
-                                        webPushPrompt.isAvailable
-                                      ? Boolean(webPushPrompt.isSubscribed)
-                                      : null
-                            }
-                        />
-                    )}
+                    <SettingsEyebrow>PREFERENCES</SettingsEyebrow>
+                    <SettingsRow
+                        icon={Notification02Icon}
+                        label="Notifications"
+                        onClick={
+                            requiresIOSInstall ? toggleNotifications : undefined
+                        }
+                        trailingOnClick={
+                            webPushPrompt.isResolved &&
+                            !webPushPrompt.isEnabling &&
+                            webPushPrompt.isAvailable
+                                ? toggleNotifications
+                                : undefined
+                        }
+                        toggleState={
+                            requiresIOSInstall
+                                ? undefined
+                                : webPushPrompt.isResolved &&
+                                    webPushPrompt.isAvailable
+                                  ? Boolean(webPushPrompt.isSubscribed)
+                                  : null
+                        }
+                    />
                     {installPrompt.canInstall && (
                         <SettingsRow
                             icon={ScreenAddToHomeIcon}
