@@ -15,6 +15,7 @@ import "package:photos/models/search/search_types.dart";
 import "package:photos/models/selected_people.dart";
 import "package:photos/service_locator.dart" show isLocalGalleryMode;
 import "package:photos/theme/ente_theme.dart";
+import "package:photos/ui/components/collection_share_badge.dart";
 import "package:photos/ui/settings/ml/machine_learning_settings_page.dart";
 import "package:photos/ui/viewer/actions/select_all_status_icon.dart";
 import "package:photos/ui/viewer/file/no_thumbnail_widget.dart";
@@ -23,7 +24,6 @@ import "package:photos/ui/viewer/people/add_person_action_sheet.dart";
 import "package:photos/ui/viewer/people/face_thumbnail_squircle.dart";
 import "package:photos/ui/viewer/people/people_page.dart";
 import 'package:photos/ui/viewer/people/person_face_widget.dart';
-import "package:photos/ui/viewer/people/pinned_person_badge.dart";
 import "package:photos/ui/viewer/search/result/people_section_all_page.dart";
 import "package:photos/ui/viewer/search/result/search_result_page.dart";
 import "package:photos/ui/viewer/search_tab/search_tab_horizontal_scroll.dart";
@@ -280,11 +280,7 @@ class PersonSearchExample extends StatelessWidget {
                     ),
                   ),
                   if (isPinnedPerson)
-                    const Positioned(
-                      left: 8,
-                      bottom: 8,
-                      child: PinnedPersonBadge(),
-                    ),
+                    const Positioned(left: 8, bottom: 8, child: PinnedBadge()),
                 ],
               ),
               isCluster

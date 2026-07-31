@@ -11,14 +11,19 @@ const double kCollectionBadgeBorderWidth = 1.0;
 
 class CollectionStatusBadge extends StatelessWidget {
   final Widget child;
+  final double size;
 
-  const CollectionStatusBadge({super.key, required this.child});
+  const CollectionStatusBadge({
+    super.key,
+    required this.child,
+    this.size = kCollectionBadgeSize,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: kCollectionBadgeSize,
-      height: kCollectionBadgeSize,
+      width: size,
+      height: size,
       decoration: const BoxDecoration(shape: BoxShape.circle),
       child: Center(child: child),
     );
@@ -57,15 +62,18 @@ class CollectionFavoriteBadge extends StatelessWidget {
   }
 }
 
-class CollectionPinnedBadge extends StatelessWidget {
-  const CollectionPinnedBadge({super.key});
+class PinnedBadge extends StatelessWidget {
+  final double size;
+
+  const PinnedBadge({super.key, this.size = kCollectionBadgeSize});
 
   @override
   Widget build(BuildContext context) {
-    return const CollectionStatusBadge(
+    return CollectionStatusBadge(
+      size: size,
       child: ImageIcon(
-        AssetImage("assets/collection_pin.png"),
-        size: kCollectionBadgeIconSize,
+        const AssetImage("assets/collection_pin.png"),
+        size: size * kCollectionBadgeIconSize / kCollectionBadgeSize,
         color: Colors.white,
       ),
     );

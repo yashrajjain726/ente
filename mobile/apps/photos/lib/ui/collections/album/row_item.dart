@@ -383,7 +383,7 @@ class AlbumRowItemWidget extends StatelessWidget {
 
     final chips = <Widget>[
       if (isFavoriteAlbum) const CollectionFavoriteBadge(),
-      if (showPin) const CollectionPinnedBadge(),
+      if (showPin) const PinnedBadge(),
       if (showArchive) const CollectionArchivedBadge(),
     ];
 

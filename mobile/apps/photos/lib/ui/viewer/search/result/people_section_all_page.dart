@@ -27,13 +27,13 @@ import "package:photos/theme/text_style.dart";
 import "package:photos/ui/common/loading_widget.dart";
 import "package:photos/ui/components/banners/save_faces_banner.dart";
 import "package:photos/ui/components/bottom_action_bar/people_bottom_action_bar_widget.dart";
+import "package:photos/ui/components/collection_share_badge.dart";
 import "package:photos/ui/viewer/actions/select_all_status_icon.dart";
 import "package:photos/ui/viewer/file/no_thumbnail_widget.dart";
 import "package:photos/ui/viewer/file/thumbnail_widget.dart";
 import "package:photos/ui/viewer/people/face_thumbnail_squircle.dart";
 import "package:photos/ui/viewer/people/person_face_widget.dart";
 import "package:photos/ui/viewer/people/person_gallery_suggestion.dart";
-import "package:photos/ui/viewer/people/pinned_person_badge.dart";
 import "package:photos/ui/viewer/search/result/search_result_page.dart";
 import "package:photos/ui/viewer/search_tab/people_section.dart";
 import "package:photos/utils/people_sort_util.dart";
@@ -265,7 +265,7 @@ class SelectablePersonSearchExample extends StatelessWidget {
                     const Positioned(
                       left: 8,
                       bottom: 8,
-                      child: PinnedPersonBadge(),
+                      child: PinnedBadge(size: 16),
                     ),
                 ],
               ),
