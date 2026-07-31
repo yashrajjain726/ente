@@ -40,6 +40,7 @@ import 'package:photos/services/collections_service.dart';
 import 'package:photos/services/file_magic_service.dart';
 import 'package:photos/services/sync/local_sync_service.dart';
 import 'package:photos/services/sync/sync_service.dart';
+import "package:photos/utils/device_storage_error.dart";
 import "package:photos/utils/file_key.dart";
 import "package:photos/utils/network_util.dart";
 import 'package:shared_preferences/shared_preferences.dart';
@@ -271,10 +272,17 @@ class FileUploader {
     } catch (e) {
       if (e is LockAlreadyAcquiredError) {
         return _queue.moveToBackground(item);
-      } else {
-        _queue.fail(item, e);
+      }
+      if (isDeviceStorageFullError(e)) {
+        final error = DeviceStorageFullError();
+        _logger.warning("Device storage is full for ${file.tag}", e);
+        SyncService.instance.stopSync();
+        clearQueue(error);
+        _queue.fail(item, error);
         return null;
       }
+      _queue.fail(item, e);
+      return null;
     } finally {
       _queue.finishAttempt(item);
       _pollQueue();
@@ -775,7 +783,9 @@ class FileUploader {
       Bus.instance.fire(FileUploadedEvent(remoteFile));
       return remoteFile;
     } catch (e, s) {
-      if (!(e is NoActiveSubscriptionError ||
+      if (isDeviceStorageFullError(e)) {
+        uploadHardFailure = true;
+      } else if (!(e is NoActiveSubscriptionError ||
           e is StorageLimitExceededError ||
           e is WiFiUnavailableError ||
           e is SilentlyCancelUploadsError ||

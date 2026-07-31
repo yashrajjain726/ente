@@ -97,8 +97,11 @@ class RemoteSyncService {
         .listen((event) async {
           if (event.type == EventType.addedOrUpdated) {
             if (_existingSync == null) {
-              // ignore: unawaited_futures
-              sync();
+              try {
+                await sync();
+              } on DeviceStorageFullError catch (e) {
+                Bus.instance.fire(SyncStatusUpdate(SyncStatus.error, error: e));
+              }
             }
           }
         });
@@ -218,6 +221,7 @@ class RemoteSyncService {
             NoActiveSubscriptionError,
             WiFiUnavailableError,
             StorageLimitExceededError,
+            DeviceStorageFullError,
             SyncStopRequestedError,
             NoMediaLocationAccessError,
           }.contains(e.runtimeType)) {
