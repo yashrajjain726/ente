@@ -15,6 +15,7 @@ import "package:photos/models/search/search_types.dart";
 import "package:photos/models/selected_people.dart";
 import "package:photos/service_locator.dart" show isLocalGalleryMode;
 import "package:photos/theme/ente_theme.dart";
+import "package:photos/ui/components/collection_share_badge.dart";
 import "package:photos/ui/settings/ml/machine_learning_settings_page.dart";
 import "package:photos/ui/viewer/actions/select_all_status_icon.dart";
 import "package:photos/ui/viewer/file/no_thumbnail_widget.dart";
@@ -184,6 +185,8 @@ class PersonSearchExample extends StatelessWidget {
     final bool isCluster =
         searchResult.type() == ResultType.faces &&
         searchResult.params.containsKey(kClusterParamId);
+    final bool isPinnedPerson =
+        !isCluster && (searchResult.params[kPersonPinned] as bool? ?? false);
 
     return ListenableBuilder(
       listenable: selectedPeople ?? ValueNotifier(false),
@@ -276,6 +279,8 @@ class PersonSearchExample extends StatelessWidget {
                           : null,
                     ),
                   ),
+                  if (isPinnedPerson)
+                    const Positioned(left: 8, bottom: 8, child: PinnedBadge()),
                 ],
               ),
               isCluster
