@@ -12,7 +12,6 @@ use super::{COCO_CAT, COCO_DOG, PET_SPECIES_CAT, PET_SPECIES_DOG};
 const PET_FACE_IOU_THRESHOLD: f32 = 0.5;
 const PET_FACE_MIN_SCORE: f32 = 0.3;
 
-// Body detection thresholds
 const BODY_IOU_THRESHOLD: f32 = 0.5;
 const BODY_MIN_SCORE: f32 = 0.3;
 
@@ -21,12 +20,8 @@ const BODY_MIN_SCORE: f32 = 0.3;
 //   1 = cat (face detection class_id=1, COCO_CAT=15)
 // Dart maps COCO → species via: cocoClass == 15 ? 1 : 0
 
-/// Run pet face detection using YOLOv5-face model with 3 keypoints.
-///
 /// Output format per row: [x, y, w, h, obj_conf, lx, ly, rx, ry, nx, ny, ...]
 /// 3 keypoints: left_eye, right_eye, nose (6 values for coords).
-///
-/// This mirrors `pet_pipeline/detection.py` `FaceDetector.detect()`.
 pub(crate) fn run_pet_face_detection(
     runtime: &MlRuntimeView<'_>,
     input: &YoloInput,
@@ -62,14 +57,9 @@ fn postprocess_pet_face_tensor<T: onnx::FloatTensorData>(
     output_data: T,
     input: &YoloInput,
 ) -> MlResult<Vec<PetFaceDetection>> {
-    // Row format: [x, y, w, h, conf, lm_x1, lm_y1, lm_x2, lm_y2, lm_x3, lm_y3, cls0, cls1]
-    // row_len = 4 + 1 + 6 + 2 = 13 for 2-class model
-    // Use the output shape's last dimension to determine row length reliably.
     let row_len = if output_shape.len() >= 2 {
         *output_shape.last().unwrap() as usize
     } else if output_shape.len() == 1 {
-        // Flat output: total_elements, must infer row_len.
-        // Prefer 13 (2-class model) as the expected format, then fall back.
         let total = output_data.len();
         let inferred = if total.is_multiple_of(13) {
             13
@@ -83,7 +73,6 @@ fn postprocess_pet_face_tensor<T: onnx::FloatTensorData>(
                 total, output_shape
             )));
         };
-        // Warn if the total is ambiguously divisible by multiple candidates.
         let candidates = [11usize, 12, 13];
         let valid_count = candidates
             .iter()
@@ -135,7 +124,6 @@ fn postprocess_pet_face_tensor<T: onnx::FloatTensorData>(
             y_max_abs / YOLO_INPUT_SIZE as f32,
         ];
 
-        // 3 keypoints: left_eye, right_eye, nose
         let mut keypoints = [
             [
                 output_data.value(start + 5) / YOLO_INPUT_SIZE as f32,
@@ -178,12 +166,6 @@ fn postprocess_pet_face_tensor<T: onnx::FloatTensorData>(
     Ok(naive_nms_pet_face(detections, PET_FACE_IOU_THRESHOLD))
 }
 
-/// Run pet body detection using YOLOv5n model.
-///
-/// Filters detections by COCO class 15 (cat) or 16 (dog).
-/// Returns all qualifying detections after NMS.
-///
-/// This mirrors `pet_pipeline/detection.py` `BodyDetector.detect()`.
 pub(crate) fn run_pet_body_detection(
     runtime: &MlRuntimeView<'_>,
     input: &YoloInput,
@@ -212,7 +194,6 @@ fn postprocess_pet_body_tensor<T: onnx::FloatTensorData>(
     input: &YoloInput,
 ) -> MlResult<Vec<PetBodyDetection>> {
     // YOLOv5 output format: [x, y, w, h, obj_conf, cls0, cls1, ..., cls79]
-    // Total columns: 4 + 1 + 80 = 85
     let row_len = 85usize;
     if output_data.len() < row_len {
         return Ok(Vec::new());
@@ -261,8 +242,6 @@ fn winning_pet_body_class<T: onnx::FloatTensorData>(
 ) -> Option<(u8, f32)> {
     let obj_conf = output_data.value(row_start + 4);
 
-    // Most detector rows cannot produce a cat or dog above the score
-    // threshold. Reject those before scanning all 80 COCO classes.
     let cat_logit = output_data.value(row_start + 5 + COCO_CAT as usize);
     let dog_logit = output_data.value(row_start + 5 + COCO_DOG as usize);
     let best_pet_logit = if dog_logit.total_cmp(&cat_logit).is_ge() {
@@ -327,8 +306,6 @@ fn naive_nms_pet_face(
             if suppressed[j] {
                 continue;
             }
-            // Only suppress within the same class so a dog and cat
-            // occupying the same region are both retained.
             if detections[i].class_id == detections[j].class_id
                 && calculate_iou_4(&detections[i].box_xyxy, &detections[j].box_xyxy)
                     >= iou_threshold
@@ -359,8 +336,6 @@ fn naive_nms_pet_body(
             if suppressed[j] {
                 continue;
             }
-            // Only suppress within the same COCO class so a dog and cat
-            // occupying the same region are both retained.
             if detections[i].coco_class == detections[j].coco_class
                 && calculate_iou_4(&detections[i].box_xyxy, &detections[j].box_xyxy)
                     >= iou_threshold

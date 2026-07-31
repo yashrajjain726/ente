@@ -52,8 +52,6 @@ const COREML_PACKAGE_WEIGHT_BLOB: &str = "weight.bin";
 #[cfg(any(target_os = "ios", target_os = "macos"))]
 const ENABLE_PERSISTENT_COREML_CACHE: bool = true;
 
-/// An f32 model input that can be borrowed by multiple sessions.
-///
 /// The FP16 representation is created lazily and retained so that a shared
 /// preprocessing result only pays the conversion cost once.
 pub(crate) struct PreparedF32Input {
@@ -116,12 +114,8 @@ pub(crate) enum ExecutionMode {
     CpuOnly,
 }
 
-/// The preferred execution provider of the session attempt that succeeded.
-///
-/// Each accelerated session also registers the policy's fallback providers,
-/// but this identifies the provider whose attempt produced the session. The
-/// runtime aggregates it across the sessions used for a result so remotely
-/// stored embeddings can be attributed to the providers that computed them.
+/// Identifies the successful attempt's preferred provider, not its registered
+/// fallback providers, for result attribution.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[allow(dead_code)] // Accelerated variants are constructed only on their target OS.
 pub(crate) enum ExecutionProvider {
@@ -204,12 +198,9 @@ pub(crate) fn build_session(
     )))
 }
 
-/// Builds a session for one provider attempt and, for CoreML attempts, runs
-/// the golden self-test before the session is trusted. A self-test failure is
-/// reported as a session-construction failure, so the caller invalidates the
-/// CoreML cache (a corrupt compiled model would otherwise persist) and falls
-/// through to the next attempt. WebGPU attempts do not take this path; they
-/// are validated inside the crash-canary window.
+/// A CoreML self-test failure is treated as construction failure so the caller
+/// invalidates the possibly corrupt persistent cache. WebGPU validation stays
+/// inside its crash-canary window instead.
 fn build_and_validate_session(model_path: &str, attempt: ProviderAttempt) -> MlResult<Session> {
     #[cfg(any(
         target_os = "android",
@@ -249,12 +240,8 @@ fn build_and_validate_session(model_path: &str, attempt: ProviderAttempt) -> MlR
     Ok(session)
 }
 
-/// Builds the WebGPU session under the durable crash canary. The canary is
-/// armed before session construction and only disarmed after the session has
-/// passed the golden self-test, so a driver crash anywhere in between is
-/// recorded on disk. Soft failures (including self-test failures) return an
-/// error with the canary left armed (the drop keeps the counted attempt), and
-/// the caller falls through to the next execution provider.
+/// The durable canary remains armed through construction and self-test, so
+/// crashes and soft failures both count toward quarantine.
 #[cfg(any(target_os = "android", target_os = "linux", target_os = "windows"))]
 fn build_webgpu_session_with_canary(
     model_path: &str,
@@ -359,9 +346,6 @@ fn provider_attempt_failure_message(
     ))
 }
 
-/// Validates a freshly built accelerated session against the model's
-/// committed golden output. An error means the session must not be used; the
-/// caller falls through to the next execution provider attempt.
 #[cfg(any(
     target_os = "android",
     target_os = "ios",
@@ -376,8 +360,6 @@ fn run_session_self_test(
 ) -> MlResult<()> {
     let model_file = model_file_label(model_path);
     let Some(entry) = golden::lookup(model_path) else {
-        // Attempts are only constructed for models with a golden entry, so
-        // this is a defensive fail-closed path.
         return Err(MlError::Ort(format!(
             "golden self-test entry missing for '{model_file}'"
         )));
@@ -468,9 +450,7 @@ fn model_file_label(model_path: &str) -> &str {
         .unwrap_or(model_path)
 }
 
-/// Runs one golden input through the session and extracts the first output as
-/// f32. Shared with the golden generator so device and generator inference
-/// are identical by construction.
+/// Shared with the generator so its inference path stays identical to devices.
 pub(crate) fn run_golden_tensor(
     session: &mut Session,
     input_shape: &[i64],
@@ -611,9 +591,7 @@ fn coreml_provider(
     (provider.build().error_on_failure(), prepared_cache_dir)
 }
 
-/// Deletes the entire persistent cache tree while the feature is disabled, so
-/// flipping `ENABLE_PERSISTENT_COREML_CACHE` off in a release actually
-/// returns the disk space instead of stranding the caches forever.
+/// Disabling the feature must also reclaim caches created by earlier releases.
 #[cfg(any(target_os = "ios", target_os = "macos"))]
 fn remove_persistent_coreml_cache(model_path: &str) {
     let Some(coreml_root) = coreml_cache_root(Path::new(model_path))
@@ -656,8 +634,6 @@ fn platform_default_attempts(
             execution_provider: ExecutionProvider::WebGpu,
         });
     }
-    // Clean-session fallbacks for provider or driver failures that prevent
-    // the primary session from being constructed at all.
     attempts.push(xnnpack_attempt());
     attempts.push(ProviderAttempt::cpu_only());
     attempts
@@ -685,9 +661,7 @@ fn platform_default_attempts(
     attempts
 }
 
-/// Accelerated execution providers are only allowed for models with a
-/// committed golden self-test entry (fail closed). A miss for a production
-/// model means a model update shipped without regenerating `golden_data.rs`.
+/// Missing goldens fail closed, usually indicating they were not regenerated after an update.
 #[cfg(any(
     target_os = "android",
     target_os = "ios",
@@ -741,7 +715,6 @@ fn prepare_coreml_cache_directory(
     let model_path = Path::new(model_path);
     let schema_root = coreml_cache_root(model_path);
 
-    // Best effort: a prune failure must not cost this load its cache.
     if let Some(coreml_root) = schema_root.parent() {
         match prune_stale_coreml_schema_directories(coreml_root, COREML_CACHE_SCHEMA) {
             Ok(removed) => {
@@ -770,9 +743,7 @@ fn prepare_coreml_cache_directory(
     Ok(cache_dir)
 }
 
-/// A missing completion marker means the process stopped before ONNX Runtime
-/// finished constructing the session. Recreate the directory so ORT cannot
-/// mistake a partial model package for a valid cache hit.
+/// Rebuild unmarked entries so ORT cannot reuse a package interrupted mid-build.
 #[cfg(any(target_os = "ios", target_os = "macos", test))]
 fn prepare_coreml_cache_entry(cache_dir: &Path) -> std::io::Result<()> {
     if cache_dir.exists() && !coreml_cache_complete_marker(cache_dir).is_file() {
@@ -781,11 +752,8 @@ fn prepare_coreml_cache_entry(cache_dir: &Path) -> std::io::Result<()> {
     std::fs::create_dir_all(cache_dir)
 }
 
-/// Runs after a session was built successfully from `cache_dir`: trims the
-/// redundant generated-package weights, then marks the entry complete. Trim
-/// failures are reported but do not fail the load; an untrimmed cache is
-/// merely larger. Trimming before marking means a crash mid-trim leaves no
-/// completion marker, so the next load rebuilds the entry from scratch.
+/// Trim before marking complete so a crash mid-trim forces a clean rebuild.
+/// Trim failures only waste disk space and therefore do not fail the load.
 fn finalize_coreml_cache(cache_dir: &Path, model_path: &str) {
     match trim_coreml_cache_weights(cache_dir) {
         Ok(0) => {}
@@ -817,25 +785,14 @@ fn finalize_coreml_cache(cache_dir: &Path, model_path: &str) {
     }
 }
 
-/// Truncates the weight blobs inside every cached generated package that
-/// already contains a compiled model, returning the bytes reclaimed.
-///
 /// On a warm cache hit ONNX Runtime 1.27 only checks that the generated
-/// MLProgram package directory exists and then loads
-/// `compiled_model.mlmodelc` (`model_builder.cc` constructor, `model.mm`
-/// `CompileOrReadCachedModel`), so the package's own weight copy is dead
-/// bytes — roughly half the cache footprint. Packages without a compiled
-/// model are left intact because ONNX Runtime would recompile from them.
-/// Should a future runtime read the package weights again, session
-/// construction fails, the caller invalidates the entry, and the next load
-/// rebuilds it from the ONNX source.
+/// package directory and loads `compiled_model.mlmodelc`, making the package's
+/// own weights redundant. Uncompiled packages remain intact; incompatible
+/// future runtimes will fail construction and trigger cache invalidation.
 fn trim_coreml_cache_weights(cache_dir: &Path) -> std::io::Result<u64> {
     let mut reclaimed = 0;
-    // Layout per ORT 1.27: <cache_dir>/<model_hash>/<partition>/model is the
-    // generated MLProgram package. `CompileOrReadCachedModel` strips the last
-    // path component only for the NeuralNetwork format, so for MLProgram the
-    // compiled model is stored INSIDE the package directory:
-    // <partition>/model/compiled_model.mlmodelc.
+    // ORT 1.27 stores the compiled MLProgram inside
+    // <cache_dir>/<model_hash>/<partition>/model/compiled_model.mlmodelc.
     for model_hash_entry in std::fs::read_dir(cache_dir)? {
         let model_hash_entry = model_hash_entry?;
         if !model_hash_entry.file_type()?.is_dir() {
@@ -896,9 +853,7 @@ fn coreml_cache_complete_marker(cache_dir: &Path) -> PathBuf {
     cache_dir.join(COREML_CACHE_COMPLETE_MARKER)
 }
 
-/// Keep generated CoreML artifacts in Library/Caches so iOS can evict them and
-/// exclude them from backups. Model files are stored below Library/Application
-/// Support; fall back to the process temporary directory for unusual layouts.
+/// Use Library/Caches for eviction and backup exclusion, or temp for unusual layouts.
 #[cfg(any(target_os = "ios", target_os = "macos", test))]
 fn coreml_cache_root(model_path: &Path) -> PathBuf {
     let cache_base = model_path
@@ -954,10 +909,7 @@ fn sanitize_cache_component(value: &str) -> String {
         .collect()
 }
 
-/// Removes cache trees written under superseded `COREML_CACHE_SCHEMA`
-/// versions, returning the names of the removed directories. Without this, a
-/// schema bump (ORT upgrade or CoreML policy change) would orphan the
-/// previous schema's caches — hundreds of MB — forever.
+/// Schema bumps must not orphan the previous version's large cache trees.
 #[cfg(any(target_os = "ios", target_os = "macos", test))]
 fn prune_stale_coreml_schema_directories(
     coreml_root: &Path,
@@ -980,8 +932,6 @@ fn prune_stale_coreml_schema_directories(
     Ok(removed)
 }
 
-/// Retain exactly one generated cache for each logical model slot. The active
-/// directory is identity-specific so ONNX Runtime cannot reuse stale output.
 #[cfg(any(target_os = "ios", target_os = "macos", test))]
 fn prune_superseded_coreml_cache_directories(
     model_cache_root: &Path,
@@ -1055,7 +1005,6 @@ fn ensure_finite_f16(data: &[half::f16]) -> MlResult<()> {
     ))
 }
 
-/// Returns true if the session's first input expects FP16 tensors.
 fn session_expects_f16(session: &Session) -> bool {
     session
         .inputs()
@@ -1067,8 +1016,6 @@ fn session_expects_f16(session: &Session) -> bool {
         .unwrap_or(false)
 }
 
-/// Run inference accepting f32 data and returning f32 results.
-/// Automatically converts inputs/outputs for FP16 models.
 pub(crate) fn run_f32<const N: usize>(
     session: &mut Session,
     input: Vec<f32>,
@@ -1088,7 +1035,6 @@ pub(crate) fn run_f32<const N: usize>(
     }
     let output = &outputs[0];
 
-    // Extract output: try f32 first, fall back to f16 with conversion.
     if let Ok((tensor_shape, tensor_data)) = output.try_extract_tensor::<f32>() {
         let shape = tensor_shape.iter().copied().collect::<Vec<_>>();
         let data = tensor_data.to_vec();
@@ -1104,9 +1050,6 @@ pub(crate) fn run_f32<const N: usize>(
     }
 }
 
-/// Run inference using a reusable input and process the first output in place.
-/// Both f32 and f16 outputs remain borrowed from ONNX Runtime; consumers
-/// convert only the values they inspect.
 pub(crate) fn with_prepared_float_output<const N: usize, T>(
     session: &mut Session,
     input: &PreparedF32Input,
@@ -1312,12 +1255,6 @@ mod tests {
         assert!(removed.is_empty());
     }
 
-    /// Mirrors the ORT 1.27 MLProgram cache layout: the generated package at
-    /// `<cache_dir>/<model_hash>/<partition>/model/` holds its weights under
-    /// `Data/com.microsoft.OnnxRuntime/weights/weight.bin`, and the compiled
-    /// model is stored INSIDE the package directory as
-    /// `model/compiled_model.mlmodelc` (which keeps its own
-    /// `weights/weight.bin` copy).
     fn write_cache_partition(
         cache_dir: &Path,
         partition: &str,
@@ -1352,13 +1289,9 @@ mod tests {
         assert_eq!(reclaimed, b"weights".len() as u64);
         assert!(compiled_blob.exists());
         assert_eq!(std::fs::metadata(&compiled_blob).unwrap().len(), 0);
-        // The package directory itself must survive: ONNX Runtime checks its
-        // existence to decide the model is cached.
         let package_dir = compiled_blob.ancestors().nth(4).unwrap();
         assert!(package_dir.ends_with("model"));
         assert!(package_dir.is_dir());
-        // The compiled model's own weight copy is what warm loads read; the
-        // trim walk must never descend into the `.mlmodelc` bundle.
         assert_eq!(
             std::fs::read(
                 package_dir

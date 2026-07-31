@@ -1,17 +1,9 @@
-//! Bounded buffer of notable ML runtime events for the app layer.
-//!
-//! The Rust runtime degrades gracefully (execution provider fallbacks, golden
-//! self-test failures, WebGPU quarantine) without failing the calling
-//! operation, so the app would otherwise never learn that a device is running
-//! in a degraded or misbehaving configuration. Callers record events here and
-//! the app drains them via `take_events` after ML operations, logging them at
-//! the appropriate severity.
+//! Reports graceful ML fallbacks and quarantines that would otherwise be
+//! invisible to the app because the calling operation still succeeds.
 
 use std::sync::Mutex;
 
-/// Oldest events are dropped first once the buffer is full; a drop is only
-/// possible when the app has not drained for many sessions, in which case the
-/// newest events are the actionable ones.
+/// Prefer recent, actionable events when the app has not drained the buffer.
 const MAX_BUFFERED_EVENTS: usize = 64;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -39,7 +31,6 @@ pub struct MlRuntimeEvent {
 
 static EVENTS: Mutex<Vec<MlRuntimeEvent>> = Mutex::new(Vec::new());
 
-/// Records an event for the app layer and mirrors it to the runtime log.
 pub(crate) fn record(severity: Severity, message: String) {
     crate::ml::runtime::rt_log(&format!("[{}] {message}", severity.as_str()));
     let mut events = EVENTS
@@ -57,7 +48,6 @@ pub(crate) fn record(severity: Severity, message: String) {
     events.push(MlRuntimeEvent { severity, message });
 }
 
-/// Returns all buffered events, leaving the buffer empty.
 pub fn take_events() -> Vec<MlRuntimeEvent> {
     let mut events = EVENTS
         .lock()

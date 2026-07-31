@@ -11,18 +11,6 @@ use super::{
     preprocess::{IndexedEmbeddingBatch, PetEmbeddingPreprocessor, PetFaceEmbeddingInputs},
 };
 
-/// Run pet face embedding on aligned face inputs.
-///
-/// The species parameter (0=dog, 1=cat) selects the model to use.
-///
-/// Input per face: CHW float32 of shape [1, 3, 224, 224], ImageNet-normalized.
-/// Output: L2-normalized embedding vector (128-d for BYOL).
-///
-/// This mirrors `pet_pipeline/embedding.py` `Embedder.embed_face()`.
-/// Run pet face embedding using each face's own `class_id` to select the model.
-///
-/// Faces are grouped by species and batched per model to avoid running the
-/// wrong embedding model on any detection.
 pub(crate) fn run_pet_face_embedding(
     runtime: &MlRuntimeView<'_>,
     aligned_faces: PetFaceEmbeddingInputs,
@@ -88,13 +76,6 @@ pub(crate) fn run_pet_face_embedding(
     Ok(())
 }
 
-/// Run pet body embedding on cropped body regions.
-///
-/// Each body's own `coco_class` (16=dog, 15=cat) selects the embedding model,
-/// so mixed-species images get the correct model per detection.
-/// Bodies are grouped by species and batched per model.
-///
-/// This mirrors `pet_pipeline/embedding.py` `Embedder.embed_body()`.
 pub(crate) fn run_pet_body_embedding(
     runtime: &MlRuntimeView<'_>,
     decoded: &DecodedImage,
@@ -106,7 +87,6 @@ pub(crate) fn run_pet_body_embedding(
 
     let per_body_len = PET_EMBEDDING_INPUT_SIZE * PET_EMBEDDING_INPUT_SIZE * PET_EMBEDDING_CHANNELS;
 
-    // Preprocess all crops and group by species.
     // Skip detections whose crop is invalid (e.g. zero-area edge boxes)
     // rather than aborting the whole image.
     let cat_count = body_results
