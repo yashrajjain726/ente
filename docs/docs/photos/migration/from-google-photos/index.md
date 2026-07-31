@@ -45,7 +45,11 @@ Follow the following steps to recover your data from Google Photos and preserve 
 
         ![Google Takeout Selection](google-photos-6.webp)
 
-10. Choose where to import your photos:
+10. Review the import options shown by the desktop app:
+    - **Favorites**: Keep this enabled to add items marked as favorites in Google Photos to Ente's Favorites album.
+    - **Partner-shared photos**: Choose whether photos saved from Google Photos Partner Sharing should be imported. Skip them if the original owner is also importing their library and you want to avoid duplicate copies.
+
+11. Choose where to import your photos:
 
     **If you selected a folder**, decide whether you want to:
     - **Import to existing album** → Pick one of your current albums, or
@@ -56,7 +60,9 @@ Follow the following steps to recover your data from Google Photos and preserve 
     **If you selected ZIP files directly**:
     - Photos are automatically organized into separate albums based on the folder structure within the ZIPs
 
-11. Wait for the uploads to complete. Ente will parse Google's metadata and preserve everything with your photos, end-to-end encrypted!
+12. Review the photo, video, and album counts, then start the upload. The progress dialog shows completed, skipped, and failed files so you can check the result.
+
+Ente will parse Google's metadata and preserve everything with your photos, end-to-end encrypted!
 
 ---
 
