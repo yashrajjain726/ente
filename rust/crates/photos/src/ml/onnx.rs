@@ -785,13 +785,13 @@ fn finalize_coreml_cache(cache_dir: &Path, model_path: &str) {
     }
 }
 
-/// On a warm cache hit ONNX Runtime 1.27 only checks that the generated
+/// On a warm cache hit ONNX Runtime 1.28 only checks that the generated
 /// package directory and loads `compiled_model.mlmodelc`, making the package's
 /// own weights redundant. Uncompiled packages remain intact; incompatible
 /// future runtimes will fail construction and trigger cache invalidation.
 fn trim_coreml_cache_weights(cache_dir: &Path) -> std::io::Result<u64> {
     let mut reclaimed = 0;
-    // ORT 1.27 stores the compiled MLProgram inside
+    // ORT 1.28 stores the compiled MLProgram inside
     // <cache_dir>/<model_hash>/<partition>/model/compiled_model.mlmodelc.
     for model_hash_entry in std::fs::read_dir(cache_dir)? {
         let model_hash_entry = model_hash_entry?;

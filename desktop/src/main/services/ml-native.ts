@@ -61,9 +61,9 @@ const napiTriple = () => {
 const onnxRuntimeLibraryName = () => {
     switch (process.platform) {
         case "darwin":
-            return "libonnxruntime.1.27.0.dylib";
+            return "libonnxruntime.1.28.0.dylib";
         case "linux":
-            return "libonnxruntime.so.1.27.0";
+            return "libonnxruntime.so.1.28.0";
         case "win32":
             return "onnxruntime.dll";
         default:

@@ -16,7 +16,7 @@ Playground notebooks use their own Python project:
 
 - `infra/ml/playground/pyproject.toml`
 
-ONNX Runtime 1.27 no longer publishes Apple x86_64 binaries. On macOS, the
+ONNX Runtime 1.28 does not publish Apple x86_64 binaries. On macOS, the
 parity and playground Python environments therefore require Apple Silicon and
 macOS 14 or newer.
 
