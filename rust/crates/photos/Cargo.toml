@@ -24,7 +24,7 @@ thiserror.workspace = true
 # Newer usearch releases switched that implementation to numkong symbols.
 usearch = { version = "=2.21.4", optional = true }
 
-# ORT source and revision are pinned once in the workspace manifest; only the
+# ORT source and version are pinned once in the workspace manifest; only the
 # per-target feature sets are declared here.
 # The iOS Cargokit build sets ORT_LIB_PATH to the directory containing the
 # verified custom static archive.
@@ -35,7 +35,7 @@ ort = { workspace = true, features = [
     "half",
     # CoreML is the preferred iOS execution provider for Rust ML sessions.
     "coreml",
-    "api-27",
+    "api-28",
 ] }
 
 [target.'cfg(target_os = "android")'.dependencies]
@@ -43,7 +43,7 @@ ash = { version = "0.38", default-features = false, features = ["loaded"] }
 ort = { workspace = true, features = [
     "ndarray",
     "half",
-    "api-27",
+    "api-28",
     "load-dynamic",
     "copy-dylibs",
     "webgpu",
@@ -55,7 +55,7 @@ ort = { workspace = true, features = [
     "ndarray",
     "half",
     "coreml",
-    "api-27",
+    "api-28",
     "load-dynamic",
     "copy-dylibs",
 ] }
@@ -64,7 +64,7 @@ ort = { workspace = true, features = [
 ort = { workspace = true, features = [
     "ndarray",
     "half",
-    "api-27",
+    "api-28",
     "load-dynamic",
     "copy-dylibs",
     "webgpu",
@@ -74,7 +74,7 @@ ort = { workspace = true, features = [
 ort = { workspace = true, features = [
     "ndarray",
     "half",
-    "api-27",
+    "api-28",
     "load-dynamic",
     "copy-dylibs",
 ] }
