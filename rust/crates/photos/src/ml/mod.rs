@@ -1,3 +1,4 @@
+pub mod assets;
 mod clip;
 pub mod error;
 pub mod events;
