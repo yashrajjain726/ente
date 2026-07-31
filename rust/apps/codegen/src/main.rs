@@ -211,6 +211,8 @@ fn generate_frb_package(package_dir: &Path) -> Result<(), DynError> {
 fn generate_napi() -> Result<(), DynError> {
     let rust_root = rust_root()?;
     let desktop_dir = repo_root()?.join("desktop");
+    ensure_napi_codegen_dependencies(&desktop_dir)?;
+
     let out_dir = desktop_dir.join("rust-bindings");
     write_generated_gitignore(&out_dir)?;
 
@@ -248,9 +250,43 @@ fn generate_napi() -> Result<(), DynError> {
             .arg(&type_def_dir)
             .arg(out_dir.join("index.d.ts"))
             .current_dir(&desktop_dir),
-        "failed to render the TypeScript declarations (run npm install in desktop/ first)"
-            .to_owned(),
+        "failed to render the TypeScript declarations".to_owned(),
     )
+}
+
+fn ensure_napi_codegen_dependencies(desktop_dir: &Path) -> Result<(), DynError> {
+    let status = Command::new("node")
+        .arg("-e")
+        .arg("try { require.resolve('@napi-rs/cli') } catch { process.exit(1) }")
+        .current_dir(desktop_dir)
+        .status()
+        .map_err(|error| {
+            format!(
+                concat!(
+                    "N-API codegen requires Node.js and the desktop npm dependencies.\n\n",
+                    "Failed to run Node.js:\n",
+                    "  {}\n\n",
+                    "After installing Node.js, run:\n",
+                    "  (cd \"{}\" && npm ci)"
+                ),
+                error,
+                desktop_dir.display(),
+            )
+        })?;
+
+    if !status.success() {
+        return Err(format!(
+            concat!(
+                "N-API codegen requires the desktop npm dependencies.\n\n",
+                "Run:\n",
+                "  (cd \"{}\" && npm ci)"
+            ),
+            desktop_dir.display(),
+        )
+        .into());
+    }
+
+    Ok(())
 }
 
 fn format_frb_bindings(target: FrbTarget) -> Result<(), DynError> {
