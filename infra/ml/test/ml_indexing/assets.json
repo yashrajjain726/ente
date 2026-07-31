@@ -18,7 +18,7 @@
       "aarch64-apple-darwin": {
         "url": "https://github.com/microsoft/onnxruntime/releases/download/v1.28.0/onnxruntime-osx-arm64-1.28.0.tgz",
         "sha256": "1268b359718099bde2cedb55787f182a130067bc4f31e8c88478c445b850d3d8",
-        "library_path": "./onnxruntime-osx-arm64-1.28.0/lib/libonnxruntime.dylib",
+        "library_path": "onnxruntime-osx-arm64-1.28.0/lib/libonnxruntime.dylib",
         "library_sha256": "dc19bbcb2f5c9fb3c68b4f9248aa0a35065ff702c5dbeae75eac54a74da97b6d"
       },
       "x86_64-unknown-linux-gnu": {

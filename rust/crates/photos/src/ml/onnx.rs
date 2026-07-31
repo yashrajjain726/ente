@@ -40,7 +40,7 @@ use crate::ml::runtime::rt_log;
 use crate::ml::webgpu;
 
 #[cfg(any(target_os = "ios", target_os = "macos", test))]
-const COREML_CACHE_SCHEMA: &str = "ort-1_27-mlprogram-all-default-v1";
+const COREML_CACHE_SCHEMA: &str = "ort-1_28-mlprogram-all-default-v1";
 const COREML_CACHE_COMPLETE_MARKER: &str = ".ente-cache-complete";
 /// The name ONNX Runtime's CoreML EP gives the compiled model it stores
 /// inside each generated MLProgram package directory in the cache
@@ -1181,7 +1181,7 @@ mod tests {
         assert_eq!(
             coreml_cache_root(model),
             Path::new(
-                "/var/mobile/Containers/Data/Application/APP/Library/Caches/ente/ml/coreml/ort-1_27-mlprogram-all-default-v1"
+                "/var/mobile/Containers/Data/Application/APP/Library/Caches/ente/ml/coreml/ort-1_28-mlprogram-all-default-v1"
             )
         );
     }
@@ -1227,8 +1227,8 @@ mod tests {
     #[test]
     fn prunes_stale_schema_directories_keeping_current_and_files() {
         let coreml_root = tempfile::tempdir().unwrap();
-        let stale = coreml_root.path().join("ort-1_26-mlprogram-all-default-v1");
-        let current = coreml_root.path().join("ort-1_27-mlprogram-all-default-v1");
+        let stale = coreml_root.path().join("ort-1_27-mlprogram-all-default-v1");
+        let current = coreml_root.path().join("ort-1_28-mlprogram-all-default-v1");
         std::fs::create_dir(&stale).unwrap();
         std::fs::write(stale.join("cached"), b"stale").unwrap();
         std::fs::create_dir(&current).unwrap();
@@ -1236,11 +1236,11 @@ mod tests {
 
         let removed = prune_stale_coreml_schema_directories(
             coreml_root.path(),
-            "ort-1_27-mlprogram-all-default-v1",
+            "ort-1_28-mlprogram-all-default-v1",
         )
         .unwrap();
 
-        assert_eq!(removed, vec!["ort-1_26-mlprogram-all-default-v1"]);
+        assert_eq!(removed, vec!["ort-1_27-mlprogram-all-default-v1"]);
         assert!(!stale.exists());
         assert!(current.exists());
         assert!(coreml_root.path().join("stray-file").exists());
