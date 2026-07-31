@@ -135,9 +135,8 @@ fn decode_reader_with_image_crate<R>(
 where
     R: BufRead + Seek,
 {
-    // HEIF-family readers resolve to ente_heic's lazy hook adapter here. Keep
-    // the decoder intact until DynamicImage allocates and supplies its output
-    // buffer so the adapter can decode directly into it.
+    // ente_heic decodes lazily into DynamicImage's output buffer, so the
+    // decoder must remain intact through `from_decoder`.
     let mut decoder = reader.into_decoder()?;
     let icc_profile = match decoder.icc_profile() {
         Ok(icc_profile) => icc_profile,
@@ -461,9 +460,7 @@ fn read_exif_orientation_from_bytes(image_bytes: &[u8]) -> Option<u8> {
         .filter(|value| (1..=8).contains(value))
 }
 
-/// JPEG XL must never have an EXIF-derived orientation applied: jxl-oxide
-/// already applies the authoritative codestream orientation (ISO/IEC
-/// 18181-2), and encoders keep a redundant EXIF tag in the container.
+/// jxl-oxide applies codestream orientation; ignore redundant container EXIF.
 fn bytes_look_like_jxl(image_bytes: &[u8]) -> bool {
     const BARE_CODESTREAM_SIGNATURE: [u8; 2] = [0xFF, 0x0A];
     const CONTAINER_SIGNATURE: [u8; 12] = [
@@ -622,14 +619,10 @@ mod tests {
     }
 
     fn exif_orientation(orientation: u16) -> Vec<u8> {
+        // Little-endian TIFF with one inline SHORT orientation and no next IFD.
         let mut exif = vec![
-            b'I', b'I', 42, 0, 8, 0, 0, 0, // Little-endian TIFF header and IFD offset.
-            1, 0, // One IFD entry.
-            0x12, 0x01, // Orientation tag.
-            3, 0, // SHORT.
-            1, 0, 0, 0, // One value.
-            0, 0, 0, 0, // Inline value, filled below.
-            0, 0, 0, 0, // No next IFD.
+            b'I', b'I', 42, 0, 8, 0, 0, 0, 1, 0, 0x12, 0x01, 3, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0,
         ];
         exif[18..20].copy_from_slice(&orientation.to_le_bytes());
         exif

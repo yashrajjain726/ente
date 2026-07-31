@@ -132,7 +132,6 @@ where
     }
 }
 
-/// Subpixel types for which moxcms can transform pixel buffers to sRGB.
 trait TransformSubpixel: Copy {
     fn transform_to_srgb(
         pixels: &mut [Self],
@@ -149,10 +148,8 @@ impl TransformSubpixel for u8 {
         encoded_profile: &[u8],
         layout: Layout,
     ) -> Result<Option<Vec<Self>>, String> {
-        // A2B LUTs take ICC precedence over matrix/TRC, and the in-place
-        // executor only implements matrix math, so LUT-carrying profiles go
-        // out-of-place; the matrix path is the fallback when the LUT does
-        // not cover the default intent (moxcms has no cross-intent fallback).
+        // ICC gives A2B LUTs precedence, but moxcms executes them only out of
+        // place. Fall back to matrix/TRC without a default Perceptual LUT.
         if profile_has_device_to_pcs_lut(source_profile)
             && let Ok(transformed) = transform_u8_out_of_place(pixels, source_profile, layout)
         {
@@ -244,8 +241,6 @@ fn cached_color_profile(encoded: &[u8]) -> Result<Arc<ColorProfile>, String> {
     Ok(profile)
 }
 
-/// Cache only exact profile bytes, bound both entry count and profile size,
-/// and retain at most one u8 transform per pixel layout in each entry.
 fn cached_u8_transform(
     encoded: &[u8],
     source_profile: &ColorProfile,
@@ -508,8 +503,6 @@ mod tests {
         })
     }
 
-    /// An RGB profile that converts only through an A2B LUT (no TRC tags),
-    /// like calibrated display/scanner profiles.
     fn lut_based_rgb_profile() -> ColorProfile {
         let mut profile = ColorProfile::new_display_p3();
         profile.red_trc = None;
@@ -666,8 +659,6 @@ mod tests {
         assert_eq!(actual, expected);
     }
 
-    /// A profile with matrix/TRC AND A2B LUT tags must be converted via the
-    /// LUT (ICC precedence), even though the in-place constructor accepts it.
     #[test]
     fn profile_with_matrix_and_lut_tags_is_transformed_via_the_lut() {
         let mut profile = ColorProfile::new_display_p3();
@@ -712,8 +703,6 @@ mod tests {
         assert_eq!(actual, expected);
     }
 
-    /// A colorimetric-only A2B LUT (no A2B0) is unusable under moxcms's
-    /// default Perceptual intent; the matrix path must still convert.
     #[test]
     fn profile_with_unusable_lut_intent_falls_back_to_the_matrix_transform() {
         let mut profile = ColorProfile::new_display_p3();
