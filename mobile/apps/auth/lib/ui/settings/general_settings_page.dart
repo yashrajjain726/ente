@@ -105,7 +105,6 @@ class GeneralSettingsPage extends StatelessWidget {
             if (Platform.isMacOS)
               _toggleItem(
                 title: l10n.menubarMode,
-                subtitle: l10n.menubarModeDescription,
                 value: PreferenceService.instance.isMenubarModeEnabled,
                 onChanged: () async {
                   await PreferenceService.instance.setMenubarModeEnabled(
@@ -131,13 +130,11 @@ class GeneralSettingsPage extends StatelessWidget {
 
   AuthSettingsItem _toggleItem({
     required String title,
-    String? subtitle,
     required ValueGetter<bool> value,
     required Future<void> Function() onChanged,
   }) {
     return AuthSettingsItem(
       title: title,
-      subtitle: subtitle,
       showChevron: false,
       trailing: ToggleSwitchComponent.async(value: value, onChanged: onChanged),
     );
