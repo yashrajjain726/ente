@@ -44,7 +44,7 @@ struct ChatView: View {
     }
 
     private var modelSettingsSignature: String {
-        "\(modelSettings.useCustomModel)|\(modelSettings.modelUrl)|\(modelSettings.mmprojUrl)"
+        modelSettings.modelId
     }
 
     private let drawerWidth: CGFloat = 320
@@ -71,7 +71,6 @@ struct ChatView: View {
                 } else {
                     mainContent(showsMenuButton: true)
                         .overlay(alignment: .leading) {
-                            #if os(iOS)
                             Color.clear
                                 .frame(width: 24)
                                 .contentShape(Rectangle())
@@ -86,14 +85,12 @@ struct ChatView: View {
                                             viewState.isDrawerOpen = true
                                         }
                                 )
-                            #endif
                         }
 
                     if viewState.isDrawerOpen {
                         Color.black.opacity(0.25)
                             .ignoresSafeArea()
                             .onTapGesture { viewState.isDrawerOpen = false }
-                            #if os(iOS)
                             .gesture(
                                 DragGesture(minimumDistance: 20)
                                     .onEnded { value in
@@ -103,7 +100,6 @@ struct ChatView: View {
                                         viewState.isDrawerOpen = false
                                     }
                             )
-                            #endif
                     }
 
                     drawerView(isPinned: false)
@@ -148,6 +144,7 @@ struct ChatView: View {
         }
         .sheet(isPresented: $viewState.showSettings) {
             SettingsView(
+                knowledgeStore: viewModel.knowledgeStore,
                 onSignIn: {
                     viewState.pendingSignInRequest = true
                     viewState.showSettings = false
@@ -162,14 +159,6 @@ struct ChatView: View {
                 viewState.pendingSignInRequest = false
                 handleSignInRequest()
             }
-        }
-        .sheet(isPresented: $viewState.showAttachmentDownloads) {
-            AttachmentDownloadsSheet(
-                downloads: viewModel.attachmentDownloads,
-                sessionTitle: { viewModel.sessionTitle(for: $0) },
-                onCancel: { viewModel.cancelAttachmentDownload($0) },
-                onDismiss: { viewState.showAttachmentDownloads = false }
-            )
         }
         .sheet(item: $viewState.pendingWhatsNew, onDismiss: {
             markWhatsNewSeen()
@@ -232,9 +221,7 @@ struct ChatView: View {
                 viewState.pendingWhatsNew = WhatsNewService.shared.pendingWhatsNew()
             }
         }
-        #if os(iOS)
         .ignoresSafeArea(.keyboard)
-        #endif
     }
 
     @ViewBuilder
@@ -245,7 +232,6 @@ struct ChatView: View {
                 showBrand: viewModel.messages.isEmpty,
                 showSignIn: false,
                 showsMenuButton: showsMenuButton,
-                attachmentDownloadSummary: viewModel.attachmentDownloadSummary,
                 modelDownloadState: viewModel.downloadToast,
                 onMenu: { viewState.isDrawerOpen.toggle() },
                 onSignIn: {
@@ -254,9 +240,6 @@ struct ChatView: View {
                 onNewChat: {
                     viewModel.startNewSession()
                     viewState.isDrawerOpen = false
-                },
-                onAttachmentDownloads: {
-                    viewState.showAttachmentDownloads = true
                 }
             )
 
@@ -286,7 +269,7 @@ struct ChatView: View {
                         viewModel.beginEditing(message: message)
                     },
                     onCopy: { message in
-                        copyToPasteboard(message.text)
+                        copyToPasteboard(message.role == .assistant ? cleanAssistantText(storedText: message.text) : message.text)
                         showToast("Copied to clipboard", duration: 1)
                     },
                     onRetry: { message in
@@ -329,7 +312,6 @@ struct ChatView: View {
                         isDownloading: viewModel.isDownloading,
                         editingMessage: editingMessage,
                         isProcessingAttachments: viewModel.isProcessingAttachments,
-                        isAttachmentDownloadBlocked: viewModel.isAttachmentDownloadBlocked,
                         voiceInputState: viewModel.voiceInputState,
                         moveCursorToEndToken: viewModel.draftCursorMoveToken,
                         onSend: {
@@ -392,6 +374,7 @@ struct ChatView: View {
                         isDownloading: viewModel.isDownloading,
                         downloadPercent: viewModel.downloadToast?.percent,
                         statusText: viewModel.downloadToast?.status,
+                        isLoadingModel: viewModel.downloadToast?.phase == .loading,
                         totalBytes: viewModel.modelDownloadSizeBytes,
                         sizeText: viewModel.modelDownloadSizeText,
                         onDownload: {
@@ -489,7 +472,6 @@ private final class ChatViewState: ObservableObject {
     @Published var showSettings = false
     @Published var toastMessage: ToastMessage?
     @Published var deleteSession: ChatSession?
-    @Published var showAttachmentDownloads = false
     @Published var showSignInComingSoon = false
     @Published var pendingSignInRequest = false
     @Published var didAutoFocusInput = false

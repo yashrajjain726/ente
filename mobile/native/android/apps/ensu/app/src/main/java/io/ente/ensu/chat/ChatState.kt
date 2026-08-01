@@ -1,6 +1,7 @@
 package io.ente.ensu.chat
 
 import io.ente.ensu.device.ChatDeviceCapability
+import io.ente.ensu.llm.DownloadPhase
 import io.ente.ensu.chat.Attachment
 import io.ente.ensu.chat.ChatMessage
 import io.ente.ensu.chat.ChatSession
@@ -16,17 +17,16 @@ data class ChatState(
     val isDownloading: Boolean = false,
     val downloadPercent: Int? = null,
     val downloadStatus: String? = null,
+    val downloadPhase: DownloadPhase? = null,
     val messageText: String = "",
     val attachments: List<Attachment> = emptyList(),
     val editingMessageId: String? = null,
     val branchSelections: Map<String, Int> = emptyMap(),
     val isProcessingAttachments: Boolean = false,
-    val attachmentDownloads: List<io.ente.ensu.chat.AttachmentDownloadItem> = emptyList(),
-    val attachmentDownloadProgress: Int? = null,
-    val isAttachmentDownloadBlocked: Boolean = false,
     val transientAssistantError: String? = null,
     val transientAssistantParentId: String? = null,
     val isModelDownloaded: Boolean = false,
+    val isModelStateKnown: Boolean = false,
     val modelDownloadSizeBytes: Long? = null,
     val hasRequestedModelDownload: Boolean = false,
     val deviceCapability: ChatDeviceCapability = ChatDeviceCapability.Unknown,

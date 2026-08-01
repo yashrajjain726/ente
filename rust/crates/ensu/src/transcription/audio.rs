@@ -4,7 +4,7 @@ use std::time::Duration;
 use rubato::{FftFixedIn, Resampler};
 use transcribe_rs::vad::{SileroVad, SmoothedVad, Vad};
 
-use crate::transcription::{Result, error};
+use crate::transcription::{Result, TranscriptionError};
 
 const TARGET_SAMPLE_RATE: usize = 16_000;
 const RESAMPLER_CHUNK_SIZE: usize = 1024;
@@ -19,10 +19,14 @@ pub fn extract_speech_from_pcm16(
     pcm_le: &[u8],
 ) -> Result<Vec<f32>> {
     if input_sample_rate == 0 {
-        return Err(error("input sample rate must be greater than zero"));
+        return Err(TranscriptionError::InvalidAudio(
+            "input sample rate must be greater than zero".to_string(),
+        ));
     }
     if !pcm_le.len().is_multiple_of(2) {
-        return Err(error("PCM16 input must contain an even number of bytes"));
+        return Err(TranscriptionError::InvalidAudio(
+            "PCM16 input must contain an even number of bytes".to_string(),
+        ));
     }
 
     let samples = pcm_le
@@ -44,7 +48,7 @@ fn extract_speech(
 
     let vad_model_path = vad_model_path.as_ref();
     if !vad_model_path.is_file() {
-        return Err(error("Voice activity model is not downloaded"));
+        return Err(TranscriptionError::VadNotDownloaded);
     }
     let silero = SileroVad::new(vad_model_path, VAD_THRESHOLD)?;
     let mut vad = SmoothedVad::new(
@@ -101,7 +105,9 @@ impl FrameResampler {
     fn new(in_hz: usize, out_hz: usize, frame_dur: Duration) -> Result<Self> {
         let frame_samples = ((out_hz as f64 * frame_dur.as_secs_f64()).round()) as usize;
         if frame_samples == 0 {
-            return Err(error("frame duration too short"));
+            return Err(TranscriptionError::InvalidAudio(
+                "frame duration too short".to_string(),
+            ));
         }
 
         let resampler = if in_hz == out_hz {

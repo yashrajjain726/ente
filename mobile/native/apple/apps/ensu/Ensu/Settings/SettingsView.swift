@@ -1,7 +1,10 @@
 import SwiftUI
 import Foundation
 
+let isEnsuPacksEnabled = true
+
 struct SettingsView: View {
+    @ObservedObject var knowledgeStore: KnowledgeStore
     let onSignIn: () -> Void
 
     @Environment(\.dismiss) private var dismiss
@@ -77,12 +80,8 @@ struct SettingsView: View {
                 .padding(EnsuSpacing.lg)
             }
             .background(EnsuColor.backgroundBase)
-            #if os(iOS)
             .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always))
             .navigationBarTitleDisplayMode(.inline)
-            #else
-            .searchable(text: $query)
-            #endif
             .toolbar {
                 ToolbarItem(placement: .principal) {
                     Text("Settings")
@@ -166,13 +165,22 @@ struct SettingsView: View {
     private var signInTitle: String { "Sign In to Backup" }
 
     private var allItems: [SettingsItem] {
-        [
+        var items: [SettingsItem] = []
+        if isEnsuPacksEnabled {
+            items.append(SettingsItem(
+                title: "Ensu Packs",
+                iconName: "PackageIcon",
+                destination: AnyView(KnowledgeSettingsView(store: knowledgeStore))
+            ))
+        }
+        items.append(
             SettingsItem(
                 title: "Logs",
                 iconName: "Bug01Icon",
                 destination: AnyView(LogsView(embeddedInNavigation: true))
             )
-        ]
+        )
+        return items
     }
 
     private var advancedItems: [SettingsItem] {
@@ -274,9 +282,7 @@ private struct SystemPromptSettingsView: View {
         Group {
             if embeddedInNavigation {
                 content
-                    #if os(iOS)
                     .navigationBarTitleDisplayMode(.inline)
-                    #endif
                     .toolbar {
                         ToolbarItem(placement: .principal) {
                             Text("System Prompt")
@@ -285,7 +291,6 @@ private struct SystemPromptSettingsView: View {
                         }
                     }
             } else {
-                #if os(iOS)
                 NavigationStack {
                     content
                         .navigationBarTitleDisplayMode(.inline)
@@ -300,9 +305,6 @@ private struct SystemPromptSettingsView: View {
                             }
                         }
                 }
-                #else
-                content
-                #endif
             }
         }
         .onAppear {
@@ -315,32 +317,6 @@ private struct SystemPromptSettingsView: View {
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
-        #if os(macOS)
-        .safeAreaInset(edge: .top) {
-            if embeddedInNavigation {
-                EmptyView()
-            } else {
-                MacSheetHeader(
-                    leading: {
-                        EmptyView()
-                    },
-                    center: {
-                        Text("System Prompt")
-                            .font(EnsuTypography.large)
-                            .foregroundStyle(EnsuColor.textPrimary)
-                    },
-                    trailing: {
-                        Button("Done") {
-                            dismiss()
-                        }
-                        .font(EnsuTypography.small)
-                        .foregroundStyle(EnsuColor.textMuted)
-                        .buttonStyle(.plain)
-                    }
-                )
-            }
-        }
-        #endif
     }
 
     private var content: some View {
@@ -348,7 +324,7 @@ private struct SystemPromptSettingsView: View {
             VStack(alignment: .leading, spacing: EnsuSpacing.xxl) {
                 sectionHeader("Prompt text")
 
-                Text("This prompt is used as-is. Use $date anywhere to insert the current date and time.")
+                Text("This prompt is used as-is. Use $date anywhere to insert the current date.")
                     .font(EnsuTypography.small)
                     .foregroundStyle(EnsuColor.textMuted)
 

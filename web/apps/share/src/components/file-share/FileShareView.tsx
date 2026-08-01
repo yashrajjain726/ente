@@ -147,7 +147,10 @@ export const FileShareView: React.FC = () => {
                                     p: 3,
                                 }}
                             >
-                                <Typography variant="body" color="error">
+                                <Typography
+                                    variant="body"
+                                    sx={{ color: "error.main" }}
+                                >
                                     {error}
                                 </Typography>
                             </Box>

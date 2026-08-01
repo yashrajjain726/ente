@@ -2,22 +2,31 @@ package io.ente.ensu.chat
 import io.ente.ensu.llm.DownloadProgressTracker
 import io.ente.ensu.llm.ModelSettingsActions
 
-import io.ente.ensu.chat.RustChatRepository
+import io.ente.ensu.chat.ChatRepository
 import io.ente.ensu.device.isChatSupported
 import io.ente.ensu.logging.FileLogRepository
+import io.ente.ensu.llm.DownloadPhase
 import io.ente.ensu.llm.LlmMessage
 import io.ente.ensu.llm.LlmMessageRole
-import io.ente.ensu.llm.LlmModelTarget
-import io.ente.ensu.llm.RustLlmProvider
+import io.ente.ensu.llm.LlmModelSelection
+import io.ente.ensu.llm.LlmProvider
 import io.ente.ensu.chat.Attachment
 import io.ente.ensu.chat.ChatMessage
 import io.ente.ensu.chat.ChatSession
-import io.ente.ensu.config.ConfigDefaults
+import io.ente.ensu.bindings.AssetDownloadException
+import io.ente.ensu.bindings.DbException
+import io.ente.ensu.bindings.LlmException
+import io.ente.ensu.bindings.ConfigDefaults
 import io.ente.ensu.logging.LogLevel
 import io.ente.ensu.chat.MessageAuthor
 import io.ente.ensu.chat.sessionTitleFromText
 import io.ente.ensu.settings.SessionPreferencesDataStore
 import io.ente.ensu.AppState
+import io.ente.ensu.bindings.SourceCitation
+import io.ente.ensu.bindings.buildKnowledgePromptContext
+import io.ente.ensu.bindings.cleanAssistantText
+import io.ente.ensu.bindings.finalizeAssistantText
+import io.ente.ensu.knowledge.KnowledgeProvider
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -38,14 +47,16 @@ import kotlin.math.min
 internal class ChatStoreActions(
     private val state: MutableStateFlow<AppState>,
     private val sessionPreferences: SessionPreferencesDataStore,
-    private val chatRepository: RustChatRepository,
-    private val llmProvider: RustLlmProvider,
+    private val chatRepository: ChatRepository,
+    private val llmProvider: LlmProvider,
+    private val knowledgeProvider: KnowledgeProvider,
     private val clock: () -> Long,
     private val logRepository: FileLogRepository,
     private val messageStore: MutableMap<String, MutableList<ChatMessage>>,
     private val attachmentActions: AttachmentStoreActions,
     private val modelSettingsActions: ModelSettingsActions,
-    private val configDefaults: ConfigDefaults
+    private val configDefaults: ConfigDefaults,
+    private val awaitKnowledgeReady: suspend () -> Unit
 ) {
     private val branchSelections = mutableMapOf<String, MutableMap<String, String>>()
     private val sessionSummaries = mutableMapOf<String, String>()
@@ -112,7 +123,6 @@ internal class ChatStoreActions(
         markSessionAccess(session.id)
         trimSessionCaches()
         rebuildChatState(session.id)
-        attachmentActions.refreshAttachmentDownloadState()
         logRepository.log(LogLevel.Info, "Session created", tag = "Chat")
         return session.id
     }
@@ -121,6 +131,7 @@ internal class ChatStoreActions(
         if (state.value.chat.isDownloading) return
 
         resetGenerationState()
+        attachmentActions.discardAttachments(state.value.chat.attachments)
         state.update { appState ->
             appState.copy(
                 chat = appState.chat.copy(
@@ -133,7 +144,6 @@ internal class ChatStoreActions(
                 )
             )
         }
-        attachmentActions.refreshAttachmentDownloadState()
     }
 
     fun selectSession(sessionId: String) {
@@ -149,7 +159,6 @@ internal class ChatStoreActions(
         scope.launch(Dispatchers.IO) {
             loadMessagesFromDb(sessionId)
             rebuildChatState(sessionId)
-            attachmentActions.ensureAttachmentsAvailable(sessionId)
         }
     }
 
@@ -162,8 +171,8 @@ internal class ChatStoreActions(
         }
 
         chatRepository.deleteSession(sessionId)
+        if (isCurrent) attachmentActions.discardAttachments(currentState.chat.attachments)
         removeSessionCaches(sessionId)
-        attachmentActions.purgeAttachmentDownloads(sessionId)
         sessionSummaries.remove(sessionKey(sessionId))
         scope?.launch { sessionPreferences.setSessionSummary(sessionId, null) }
 
@@ -188,6 +197,7 @@ internal class ChatStoreActions(
                     streamingParentId = if (resetCurrent) null else appState.chat.streamingParentId,
                     downloadPercent = if (resetCurrent) null else appState.chat.downloadPercent,
                     downloadStatus = if (resetCurrent) null else appState.chat.downloadStatus,
+                    downloadPhase = if (resetCurrent) null else appState.chat.downloadPhase,
                     messageText = if (resetCurrent) "" else appState.chat.messageText,
                     attachments = if (resetCurrent) emptyList() else appState.chat.attachments,
                     editingMessageId = if (resetCurrent) null else appState.chat.editingMessageId
@@ -201,7 +211,6 @@ internal class ChatStoreActions(
                 scope.launch(Dispatchers.IO) {
                     loadMessagesFromDb(newCurrent)
                     rebuildChatState(newCurrent)
-                    attachmentActions.ensureAttachmentsAvailable(newCurrent)
                 }
             } else {
                 state.update { appState ->
@@ -267,6 +276,7 @@ internal class ChatStoreActions(
     }
 
     fun cancelEditing() {
+        attachmentActions.discardAttachments(state.value.chat.attachments)
         state.update { appState ->
             appState.copy(
                 chat = appState.chat.copy(
@@ -285,6 +295,8 @@ internal class ChatStoreActions(
     }
 
     fun retryAssistantMessage(messageId: String) {
+        val priorGeneration = generationJob
+        val priorSummary = sessionSummaryJob
         if (state.value.chat.isGenerating) {
             stopGeneration()
         }
@@ -302,12 +314,16 @@ internal class ChatStoreActions(
             messageStore[sessionId]?.firstOrNull { it.id == parentId }
         } ?: return
 
-        if (attachmentActions.missingAttachments(sessionId).isNotEmpty()) {
-            attachmentActions.ensureAttachmentsAvailable(sessionId)
-            return
+        priorGeneration?.cancel()
+        priorSummary?.cancel()
+        llmProvider.stopGeneration()
+        val ownerScope = scope ?: return
+        ownerScope.launch {
+            priorGeneration?.join()
+            priorSummary?.join()
+            llmProvider.resetContext()
+            startGeneration(sessionId, parent)
         }
-        llmProvider.resetContext()
-        startGeneration(sessionId, parent)
     }
 
     fun sendMessage() {
@@ -319,10 +335,6 @@ internal class ChatStoreActions(
         if (text.isEmpty() && attachments.isEmpty()) return
 
         val sessionId = currentState.chat.currentSessionId ?: createNewSession()
-        if (attachmentActions.missingAttachments(sessionId).isNotEmpty()) {
-            attachmentActions.ensureAttachmentsAvailable(sessionId)
-            return
-        }
         val timestamp = clock()
 
         val editingMessageId = currentState.chat.editingMessageId
@@ -393,7 +405,19 @@ internal class ChatStoreActions(
     fun loadSessionsFromDb() {
         val scope = scope ?: return
         scope.launch(Dispatchers.IO) {
-            val sessions = chatRepository.listSessions().map { session ->
+            val loaded = try {
+                chatRepository.listSessions()
+            } catch (error: DbException) {
+                logRepository.log(
+                    LogLevel.Error,
+                    "Failed to load sessions",
+                    details = error.message,
+                    tag = "Chat",
+                    throwable = error
+                )
+                return@launch
+            }
+            val sessions = loaded.map { session ->
                 val summary = sessionSummaries[sessionKey(session.id)]
                 if (!summary.isNullOrBlank()) {
                     session.copy(title = summary)
@@ -417,8 +441,6 @@ internal class ChatStoreActions(
             if (sessionStillExists && currentSessionId != null) {
                 loadMessagesFromDb(currentSessionId)
                 rebuildChatState(currentSessionId)
-            } else {
-                attachmentActions.refreshAttachmentDownloadState()
             }
             trimSessionCaches(sessions.map { it.id }.toSet())
         }
@@ -427,12 +449,15 @@ internal class ChatStoreActions(
     private fun startGeneration(sessionId: String, userMessage: ChatMessage) {
         val scope = scope ?: return
         if (!state.value.chat.deviceCapability.isChatSupported()) return
-        generationJob?.cancel()
-        sessionSummaryJob?.cancel()
+        val priorGeneration = generationJob
+        val priorSummary = sessionSummaryJob
+        priorGeneration?.cancel()
+        priorSummary?.cancel()
+        llmProvider.stopGeneration()
         stopRequested = false
 
         val settings = state.value.modelSettings
-        val target = modelSettingsActions.resolveTarget(settings)
+        val selection = modelSettingsActions.resolveSelection(settings)
         val prompt = buildPrompt(userMessage.text, userMessage.attachments)
 
         val generationToken = nextGenerationToken()
@@ -446,17 +471,51 @@ internal class ChatStoreActions(
                     streamingParentId = userMessage.id,
                     downloadPercent = null,
                     downloadStatus = null,
+                    downloadPhase = null,
                     hasRequestedModelDownload = true
                 )
             )
         }
         rebuildChatState(sessionId)
 
-        generationJob = scope.launch {
+        val activeJob = scope.launch {
+            priorGeneration?.join()
+            priorSummary?.join()
             val isActive = { isGenerationActive(generationToken, sessionId) }
+            if (!isActive()) return@launch
+            awaitKnowledgeReady()
+            if (!isActive()) return@launch
             val progressTracker = DownloadProgressTracker()
+            var embeddingAssetInvalid = false
+            val enabledDatasets = state.value.knowledge.enabledReadyDatasets
+            val knowledgeHits = if (
+                userMessage.text.isNotBlank() && enabledDatasets.isNotEmpty()
+            ) {
+                try {
+                    val hits = llmProvider.withChatModelReleasedForRetrieval { embed ->
+                        if (!isActive()) throw kotlinx.coroutines.CancellationException()
+                        val query = embed(userMessage.text.trim())
+                        if (!isActive()) throw kotlinx.coroutines.CancellationException()
+                        knowledgeProvider.search(
+                            datasets = enabledDatasets,
+                            query = query,
+                            maxHits = configDefaults.knowledgeEmbedding.maxHits
+                        )
+                    }
+                    if (!isActive()) return@launch
+                    hits
+                } catch (error: Throwable) {
+                    if (error is kotlinx.coroutines.CancellationException) return@launch
+                    embeddingAssetInvalid = error is LlmProvider.EmbeddingAssetInvalid
+                    emptyList()
+                }
+            } else {
+                emptyList()
+            }
+
+            if (!isActive()) return@launch
             try {
-                llmProvider.ensureModelReady(target) { progress ->
+                llmProvider.ensureModelReady(selection) { progress ->
                     if (!isActive()) return@ensureModelReady
                     val resolvedProgress = progressTracker.resolve(progress)
                     state.update { appState ->
@@ -465,7 +524,7 @@ internal class ChatStoreActions(
                                 isDownloading = resolvedProgress.isDownloading,
                                 downloadPercent = resolvedProgress.percent,
                                 downloadStatus = resolvedProgress.status,
-                                isModelDownloaded = if (resolvedProgress.isFinished) true else appState.chat.isModelDownloaded,
+                                downloadPhase = resolvedProgress.phase,
                                 modelDownloadSizeBytes = if (resolvedProgress.isFinished) null else appState.chat.modelDownloadSizeBytes
                             )
                         )
@@ -473,7 +532,8 @@ internal class ChatStoreActions(
                 }
             } catch (err: Throwable) {
                 val cancelled = err is kotlinx.coroutines.CancellationException ||
-                    err.message?.contains("cancel", ignoreCase = true) == true
+                    err is LlmException.Cancelled ||
+                    err is AssetDownloadException.Cancelled
                 if (!isActive()) return@launch
                 streamingParentId = null
                 state.update { appState ->
@@ -484,10 +544,12 @@ internal class ChatStoreActions(
                             streamingParentId = null,
                             downloadPercent = null,
                             downloadStatus = if (cancelled) "Download cancelled" else null,
+                            downloadPhase = null,
                             hasRequestedModelDownload = if (cancelled) false else appState.chat.hasRequestedModelDownload
                         )
                     )
                 }
+                modelSettingsActions.refreshModelDownloadInfo()
                 if (!cancelled) {
                     logRepository.log(
                         LogLevel.Error,
@@ -502,20 +564,18 @@ internal class ChatStoreActions(
 
             if (!isActive()) return@launch
 
-            state.update { appState ->
-                appState.copy(chat = appState.chat.copy(isModelDownloaded = true))
-            }
-
-            val generationLimits = resolveGenerationLimits(target)
-            val historySelection = buildHistorySelection(
+            val generationLimits = resolveGenerationLimits(selection)
+            val normalSystemPrompt = buildSystemPrompt()
+            val normalHistorySelection = buildHistorySelection(
                 sessionId = sessionId,
                 promptText = prompt.text,
                 promptImageCount = prompt.imageFiles.size,
                 currentMessageId = userMessage.id,
-                limits = generationLimits
+                limits = generationLimits,
+                systemPrompt = normalSystemPrompt
             )
 
-            if (historySelection.wasTrimmed && overflowBypassMessageId != userMessage.id) {
+            if (normalHistorySelection.wasTrimmed && overflowBypassMessageId != userMessage.id) {
                 overflowBypassMessageId = null
                 pendingOverflow = PendingOverflow(sessionId, userMessage.id)
                 streamingParentId = null
@@ -527,12 +587,14 @@ internal class ChatStoreActions(
                             streamingResponse = "",
                             streamingParentId = null,
                             downloadPercent = null,
-                            downloadStatus = null
+                            downloadStatus = null,
+                            downloadPhase = null
                         )
                     )
                 }
-                showOverflowDialog(historySelection, generationLimits)
+                showOverflowDialog(normalHistorySelection, generationLimits)
                 rebuildChatState(sessionId)
+                if (embeddingAssetInvalid) modelSettingsActions.refreshModelDownloadInfo()
                 return@launch
             }
 
@@ -540,13 +602,45 @@ internal class ChatStoreActions(
             pendingOverflow = null
             clearOverflowDialog()
 
-            val history = historySelection.messages
-            val systemPrompt = buildSystemPrompt()
+            val remainingKnowledgeBytes = (
+                (normalHistorySelection.inputBudget - normalHistorySelection.inputTokens)
+                    .coerceAtLeast(0) * 4 - 2
+                ).coerceAtLeast(0)
+            val knowledgeContext = runCatching {
+                buildKnowledgePromptContext(
+                    hits = knowledgeHits,
+                    maxUtf8Bytes = min(
+                        configDefaults.knowledgeEmbedding.maxContextUtf8Bytes.toInt(),
+                        remainingKnowledgeBytes
+                    ).toUInt()
+                )
+            }.getOrNull()
+            val candidateSystemPrompt = knowledgeContext?.let {
+                "$normalSystemPrompt\n\n${it.text}"
+            }
+            val knowledgeHistorySelection = candidateSystemPrompt?.let {
+                buildHistorySelection(
+                    sessionId = sessionId,
+                    promptText = prompt.text,
+                    promptImageCount = prompt.imageFiles.size,
+                    currentMessageId = userMessage.id,
+                    limits = generationLimits,
+                    systemPrompt = it
+                )
+            }
+            val useKnowledge = knowledgeHistorySelection?.wasTrimmed == false
+            val historySelection = if (useKnowledge) {
+                knowledgeHistorySelection ?: normalHistorySelection
+            } else {
+                normalHistorySelection
+            }
+            var activeCitations = if (useKnowledge) knowledgeContext?.citations.orEmpty() else emptyList()
+            val systemPrompt = if (useKnowledge) candidateSystemPrompt ?: normalSystemPrompt else normalSystemPrompt
             val systemMessage = LlmMessage(
                 text = systemPrompt,
                 role = LlmMessageRole.System
             )
-            val llmMessages = listOf(systemMessage) + history + LlmMessage(
+            var llmMessages = listOf(systemMessage) + historySelection.messages + LlmMessage(
                 text = prompt.text,
                 role = LlmMessageRole.User,
                 hasAttachments = userMessage.attachments.isNotEmpty()
@@ -556,19 +650,41 @@ internal class ChatStoreActions(
             var tokenCount = 0
 
             try {
-                val summary = llmProvider.generateChat(
-                    target = target,
-                    messages = llmMessages,
-                    imageFiles = prompt.imageFiles,
-                    temperature = modelSettingsActions.resolveTemperature(settings),
-                    maxTokens = generationLimits.maxOutput
-                ) { token ->
-                    buffer.append(token)
-                    tokenCount += estimateTokens(token)
-                    if (isActive()) {
-                        state.update { appState ->
-                            appState.copy(chat = appState.chat.copy(streamingResponse = buffer.toString()))
+                val generate: suspend () -> io.ente.ensu.llm.GenerationSummary = {
+                    llmProvider.generateChat(
+                        selection = selection,
+                        messages = llmMessages,
+                        imageFiles = prompt.imageFiles,
+                        temperature = modelSettingsActions.resolveTemperature(settings),
+                        maxTokens = generationLimits.maxOutput
+                    ) { token ->
+                        buffer.append(token)
+                        tokenCount += estimateTokens(token)
+                        if (isActive()) {
+                            state.update { appState ->
+                                appState.copy(chat = appState.chat.copy(streamingResponse = buffer.toString()))
+                            }
                         }
+                    }
+                }
+                val summary = try {
+                    generate()
+                } catch (error: Throwable) {
+                    if (error is LlmException.PromptTooLong &&
+                        buffer.isEmpty() &&
+                        activeCitations.isNotEmpty()
+                    ) {
+                        activeCitations = emptyList()
+                        llmMessages = listOf(
+                            LlmMessage(normalSystemPrompt, LlmMessageRole.System)
+                        ) + normalHistorySelection.messages + LlmMessage(
+                            text = prompt.text,
+                            role = LlmMessageRole.User,
+                            hasAttachments = userMessage.attachments.isNotEmpty()
+                        )
+                        generate()
+                    } else {
+                        throw error
                     }
                 }
 
@@ -579,10 +695,11 @@ internal class ChatStoreActions(
                     tokenCount,
                     summary.totalTimeMs,
                     interrupted = false,
-                    shouldUpdateUi = isActive()
+                    shouldUpdateUi = isActive(),
+                    citations = activeCitations
                 )
             } catch (err: Throwable) {
-                val interrupted = stopRequested || err.message?.contains("cancel", ignoreCase = true) == true
+                val interrupted = stopRequested || err is LlmException.Cancelled
                 finishGeneration(
                     sessionId,
                     userMessage,
@@ -590,7 +707,8 @@ internal class ChatStoreActions(
                     tokenCount,
                     totalTimeMs = null,
                     interrupted = interrupted,
-                    shouldUpdateUi = isActive()
+                    shouldUpdateUi = isActive(),
+                    citations = activeCitations
                 )
                 if (!interrupted) {
                     logRepository.log(
@@ -602,6 +720,13 @@ internal class ChatStoreActions(
                     )
                 }
             }
+            if (embeddingAssetInvalid) modelSettingsActions.refreshModelDownloadInfo()
+        }
+        generationJob = activeJob
+        activeJob.invokeOnCompletion {
+            scope.launch {
+                settleGenerationIfActive(generationToken, sessionId)
+            }
         }
     }
 
@@ -612,9 +737,24 @@ internal class ChatStoreActions(
         tokenCount: Int,
         totalTimeMs: Long?,
         interrupted: Boolean,
-        shouldUpdateUi: Boolean
+        shouldUpdateUi: Boolean,
+        citations: List<SourceCitation> = emptyList()
     ) {
-        val finalText = buffer.toString().trim()
+        val rawText = buffer.toString().trim()
+        val finalText = if (rawText.isNotEmpty()) {
+            runCatching { finalizeAssistantText(rawText, citations) }.getOrElse { error ->
+                logRepository.log(
+                    LogLevel.Warning,
+                    "Assistant source finalization failed",
+                    details = "session=$sessionId parent=${parentMessage.id}",
+                    tag = "Chat",
+                    throwable = error
+                )
+                runCatching { finalizeAssistantText(rawText, emptyList()) }.getOrDefault("")
+            }
+        } else {
+            rawText
+        }
         if (finalText.isNotEmpty()) {
             val tokensPerSecond = if (totalTimeMs != null && totalTimeMs > 0) {
                 tokenCount.toDouble() / (totalTimeMs / 1000.0)
@@ -648,7 +788,11 @@ internal class ChatStoreActions(
 
                     messageStore.getOrPut(sessionId) { mutableListOf() }.add(assistantMessage)
                     updateSelectionForParent(sessionId, parentMessage.id, assistantMessage.id)
-                    updateCurrentSessionPreview(sessionId, finalText, assistantMessage.timestampMillis)
+                    updateCurrentSessionPreview(
+                        sessionId,
+                        cleanAssistantText(finalText),
+                        assistantMessage.timestampMillis
+                    )
                 }
             } else {
                 logRepository.log(
@@ -672,13 +816,16 @@ internal class ChatStoreActions(
                         streamingParentId = null,
                         downloadPercent = null,
                         downloadStatus = null,
+                        downloadPhase = null,
                         messages = displayMessages,
                         branchSelections = branchSelectionIndices
                     )
                 )
             }
         }
-        scheduleSessionSummary(sessionId)
+        if (shouldUpdateUi) {
+            scheduleSessionSummary(sessionId)
+        }
     }
 
     private fun updateCurrentSessionPreview(sessionId: String, preview: String, timestamp: Long) {
@@ -726,13 +873,13 @@ internal class ChatStoreActions(
         sessionSummaryJob?.cancel()
         if (sessionSummaries.containsKey(sessionKey(sessionId))) return
         val summaryInput = buildSessionSummaryInput(sessionId) ?: return
-        val target = modelSettingsActions.resolveTarget(state.value.modelSettings)
+        val selection = modelSettingsActions.resolveSelection(state.value.modelSettings)
 
         sessionSummaryJob = scope.launch(Dispatchers.Default) {
             val summary = generateSessionSummary(
                 input = summaryInput.text,
                 fallback = summaryInput.fallback,
-                target = target
+                selection = selection
             ) ?: return@launch
             if (!isActive) return@launch
             withContext(Dispatchers.Main) {
@@ -756,19 +903,19 @@ internal class ChatStoreActions(
 
         val fallback = summarizeQuestion(firstUser.text)
         if (fallback.isBlank()) return null
-        val input = "User: ${firstUser.text}\nAssistant: ${firstAssistant.text}"
+        val input = "User: ${firstUser.text}\nAssistant: ${cleanAssistantText(firstAssistant.text)}"
         return SessionSummaryInput(text = input, fallback = fallback)
     }
 
     private suspend fun generateSessionSummary(
         input: String,
         fallback: String,
-        target: LlmModelTarget
+        selection: LlmModelSelection
     ): String? {
         if (!state.value.chat.deviceCapability.isChatSupported()) {
             return sessionTitleFromText(fallback, fallback = fallback)
         }
-        if (!llmProvider.isModelDownloaded(target)) {
+        if (!llmProvider.isChatModelReady(selection)) {
             return sessionTitleFromText(fallback, fallback = fallback)
         }
         val cleanedInput = sanitizeTitleText(input)
@@ -782,7 +929,7 @@ internal class ChatStoreActions(
         val buffer = StringBuilder()
         try {
             llmProvider.generateChat(
-                target = target,
+                selection = selection,
                 messages = messages,
                 imageFiles = emptyList(),
                 temperature = 0.2f,
@@ -1078,48 +1225,54 @@ internal class ChatStoreActions(
         promptText: String,
         promptImageCount: Int,
         currentMessageId: String,
-        limits: GenerationLimits
+        limits: GenerationLimits,
+        systemPrompt: String
     ): HistorySelection {
         val path = buildSelectedPath(sessionId)
         val historyMessages = path.takeWhile { it.id != currentMessageId }
         val inputBudget = max(0, limits.contextLength - limits.maxOutput - OVERFLOW_SAFETY_TOKENS)
-        val systemPrompt = buildSystemPrompt()
         val systemTokens = estimateTokens(systemPrompt)
         val promptTokens = estimatePromptTokens(promptText, promptImageCount)
         val historyTokens = historyMessages.sumOf { estimateTokens(historyText(it)) }
         val inputTokens = systemTokens + promptTokens + historyTokens
-        var remaining = inputBudget - systemTokens - promptTokens
+        val remaining = inputBudget - systemTokens - promptTokens
 
         if (remaining <= 0 || historyMessages.isEmpty()) {
             return HistorySelection(emptyList(), inputTokens, inputBudget, inputTokens > inputBudget)
         }
 
-        val selected = mutableListOf<LlmMessage>()
-        for (message in historyMessages.asReversed()) {
-            val text = historyText(message)
-            val cost = estimateTokens(text)
-            if (cost <= remaining) {
-                selected.add(
-                    LlmMessage(
-                        text = text,
-                        role = if (message.author == MessageAuthor.User) LlmMessageRole.User else LlmMessageRole.Assistant,
-                        hasAttachments = message.attachments.isNotEmpty()
-                    )
-                )
-                remaining -= cost
-            } else {
-                break
-            }
+        val quantum = max(1, inputBudget / 4)
+        val overflow = max(0, historyTokens - remaining)
+        val quantaToDiscard = (overflow + quantum - 1) / quantum
+        val discardTarget = quantaToDiscard * quantum
+        var discarded = 0
+        var startIndex = 0
+        while (startIndex < historyMessages.size && discarded < discardTarget) {
+            discarded += estimateTokens(historyText(historyMessages[startIndex]))
+            startIndex++
         }
 
-        return HistorySelection(selected.reversed(), inputTokens, inputBudget, inputTokens > inputBudget)
+        val retained = historyMessages.drop(startIndex).ifEmpty {
+            historyMessages.takeLast(1).filter { estimateTokens(historyText(it)) <= remaining }
+        }
+
+        val selected = retained.map { message ->
+            val text = historyText(message)
+            LlmMessage(
+                text = text,
+                role = if (message.author == MessageAuthor.User) LlmMessageRole.User else LlmMessageRole.Assistant,
+                hasAttachments = message.attachments.isNotEmpty()
+            )
+        }
+
+        return HistorySelection(selected, inputTokens, inputBudget, inputTokens > inputBudget)
     }
 
-    private fun resolveGenerationLimits(target: LlmModelTarget): GenerationLimits {
-        val contextLength = llmProvider.loadedContextLength(target)
-            ?: target.contextLength
+    private fun resolveGenerationLimits(selection: LlmModelSelection): GenerationLimits {
+        val contextLength = llmProvider.loadedContextLength(selection)
+            ?: selection.contextLength
             ?: DEFAULT_CONTEXT_LENGTH
-        val maxOutput = resolveMaxOutputTokens(target.maxTokens, contextLength)
+        val maxOutput = resolveMaxOutputTokens(selection.maxTokens, contextLength)
         return GenerationLimits(contextLength = contextLength, maxOutput = maxOutput)
     }
 
@@ -1153,6 +1306,7 @@ internal class ChatStoreActions(
     private fun historyText(message: ChatMessage): String {
         var text = message.text
         if (message.author == MessageAuthor.Assistant) {
+            text = cleanAssistantText(text)
             text = text.replace(Regex("<think>[\\s\\S]*?</think>"), "")
             text = text.replace(Regex("<todo_list>[\\s\\S]*?</todo_list>"), "")
         } else if (message.attachments.isNotEmpty()) {
@@ -1187,10 +1341,26 @@ internal class ChatStoreActions(
         stopRequested = false
     }
 
-    private fun resetGenerationState(
-        downloadStatus: String? = null,
-        hasRequestedModelDownload: Boolean? = null
-    ) {
+    private fun settleGenerationIfActive(token: Long, sessionId: String) {
+        if (!isGenerationActive(token, sessionId) || !state.value.chat.isGenerating) return
+        streamingParentId = null
+        state.update { appState ->
+            appState.copy(
+                chat = appState.chat.copy(
+                    isGenerating = false,
+                    isDownloading = false,
+                    streamingResponse = "",
+                    streamingParentId = null,
+                    downloadPercent = null,
+                    downloadStatus = null,
+                    downloadPhase = null
+                )
+            )
+        }
+        rebuildChatState(sessionId)
+    }
+
+    private fun resetGenerationState() {
         cancelGeneration()
         state.update { appState ->
             appState.copy(
@@ -1200,9 +1370,8 @@ internal class ChatStoreActions(
                     streamingResponse = "",
                     streamingParentId = null,
                     downloadPercent = null,
-                    downloadStatus = downloadStatus,
-                    hasRequestedModelDownload =
-                        hasRequestedModelDownload ?: appState.chat.hasRequestedModelDownload
+                    downloadStatus = null,
+                    downloadPhase = null
                 )
             )
         }
@@ -1227,11 +1396,11 @@ internal class ChatStoreActions(
     )
 
     private fun buildSystemPrompt(nowMillis: Long = clock()): String {
-        val dateAndTime = SimpleDateFormat("yyyy-MM-dd HH:mm:ss z", Locale.getDefault())
+        val date = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
             .format(Date(nowMillis))
         val promptBody = state.value.developerSettings.systemPrompt.trim()
             .ifEmpty { configDefaults.mobileSystemPromptBody }
-        return promptBody.replace(configDefaults.systemPromptDatePlaceholder, dateAndTime)
+        return promptBody.replace(configDefaults.systemPromptDatePlaceholder, date)
     }
 
     companion object {

@@ -640,7 +640,7 @@ const AllPeopleContent: React.FC<AllPeopleContentProps> = ({
         return (
             <DialogContent sx={{ height: "80svh" }}>
                 <CenteredMessage>
-                    <Typography color="text.muted">
+                    <Typography sx={{ color: "text.muted" }}>
                         {t("no_results")}
                     </Typography>
                 </CenteredMessage>
@@ -659,9 +659,10 @@ const AllPeopleContent: React.FC<AllPeopleContentProps> = ({
         <DialogContent
             sx={{
                 "&&": { padding: 0 },
-                height: hasSearchQuery
-                    ? "80svh"
-                    : `min(80svh, ${listContentHeight}px)`,
+                height:
+                    hasSearchQuery || items.length === 0
+                        ? "80svh"
+                        : `min(80svh, ${listContentHeight}px)`,
                 display: "flex",
                 flexDirection: "column",
             }}

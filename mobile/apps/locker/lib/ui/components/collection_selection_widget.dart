@@ -1,11 +1,10 @@
-import 'package:collection/collection.dart' show IterableExtension;
 import 'package:dotted_border/dotted_border.dart';
 import "package:ente_components/ente_components.dart";
-import 'package:ente_ui/theme/ente_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:locker/extensions/collection_extension.dart';
 import 'package:locker/l10n/l10n.dart';
 import 'package:locker/services/collections/models/collection.dart';
+import 'package:locker/services/configuration.dart';
 import 'package:locker/utils/collection_actions.dart';
 import 'package:locker/utils/collection_list_util.dart';
 
@@ -14,6 +13,7 @@ class CollectionSelectionWidget extends StatefulWidget {
   final Set<int> selectedCollectionIds;
   final Function(int) onToggleCollection;
   final Function(List<Collection>)? onCollectionsUpdated;
+  final double maxHeight;
 
   final String title;
 
@@ -23,6 +23,7 @@ class CollectionSelectionWidget extends StatefulWidget {
     required this.selectedCollectionIds,
     required this.onToggleCollection,
     this.onCollectionsUpdated,
+    this.maxHeight = 168,
     required this.title,
   });
 
@@ -45,25 +46,26 @@ class _CollectionSelectionWidgetState extends State<CollectionSelectionWidget> {
   @override
   void initState() {
     super.initState();
-    _availableCollections = uniqueCollectionsById(widget.collections);
-    _uncategorizedCollection = _availableCollections.firstWhereOrNull(
-      (collection) => collection.type == CollectionType.uncategorized,
-    );
-    _availableCollections.removeWhere(
-      (collection) => collection.type == CollectionType.uncategorized,
-    );
+    _updateCollections();
   }
 
   @override
   void didUpdateWidget(CollectionSelectionWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.collections != widget.collections) {
-      _availableCollections = uniqueCollectionsById(widget.collections);
-      _uncategorizedCollection = _availableCollections.firstWhereOrNull(
-        (collection) => collection.type == CollectionType.uncategorized,
-      );
+      _updateCollections();
+    }
+  }
+
+  void _updateCollections() {
+    _availableCollections = uniqueCollectionsById(widget.collections);
+    _uncategorizedCollection = findUserUncategorizedCollection(
+      _availableCollections,
+      Configuration.instance.getUserID()!,
+    );
+    if (_uncategorizedCollection != null) {
       _availableCollections.removeWhere(
-        (collection) => collection.type == CollectionType.uncategorized,
+        (collection) => collection.id == _uncategorizedCollection!.id,
       );
     }
   }
@@ -135,20 +137,23 @@ class _CollectionSelectionWidgetState extends State<CollectionSelectionWidget> {
       children: [
         if (widget.title.isNotEmpty) ...[
           Text(widget.title, style: TextStyles.bodyBold),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
         ],
         ClipRRect(
           borderRadius: BorderRadius.circular(16),
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxHeight: 168),
-            child: Scrollbar(
-              controller: _scrollController,
-              thumbVisibility: true,
-              radius: const Radius.circular(4),
-              child: SingleChildScrollView(
+            constraints: BoxConstraints(maxHeight: widget.maxHeight),
+            child: SizedBox(
+              width: double.infinity,
+              child: Scrollbar(
                 controller: _scrollController,
-                padding: const EdgeInsets.only(right: 12, bottom: 12),
-                child: Wrap(spacing: 8, runSpacing: 12, children: chips),
+                thumbVisibility: true,
+                radius: const Radius.circular(4),
+                child: SingleChildScrollView(
+                  controller: _scrollController,
+                  padding: const EdgeInsets.only(right: 12, bottom: 12),
+                  child: Wrap(spacing: 8, runSpacing: 12, children: chips),
+                ),
               ),
             ),
           ),
@@ -158,8 +163,7 @@ class _CollectionSelectionWidgetState extends State<CollectionSelectionWidget> {
   }
 
   Widget _buildNewCollectionChip() {
-    final colorScheme = getEnteColorScheme(context);
-    final textTheme = getEnteTextTheme(context);
+    final colors = context.componentColors;
 
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
@@ -170,7 +174,7 @@ class _CollectionSelectionWidgetState extends State<CollectionSelectionWidget> {
         options: RoundedRectDottedBorderOptions(
           strokeWidth: 1,
           padding: EdgeInsets.zero,
-          color: colorScheme.textFaint,
+          color: colors.textLighter,
           dashPattern: const [5, 5],
           radius: const Radius.circular(16),
         ),
@@ -180,11 +184,11 @@ class _CollectionSelectionWidgetState extends State<CollectionSelectionWidget> {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.add_rounded, size: 18, color: colorScheme.textMuted),
+              Icon(Icons.add_rounded, size: 18, color: colors.textLight),
               const SizedBox(width: 6),
               Text(
                 context.l10n.collectionLabel,
-                style: textTheme.small.copyWith(color: colorScheme.textMuted),
+                style: TextStyles.body.copyWith(color: colors.textLight),
               ),
             ],
           ),

@@ -4,7 +4,7 @@ import { downloadManager } from "@/public-album/download/services/download-manag
 import CheckIcon from "@mui/icons-material/Check";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import DownloadOutlinedIcon from "@mui/icons-material/DownloadOutlined";
-import ErrorOutlineIcon from "@mui/icons-material/ErrorOutline";
+import ErrorOutlinedIcon from "@mui/icons-material/ErrorOutlined";
 import FullscreenOutlinedIcon from "@mui/icons-material/FullscreenOutlined";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
@@ -576,9 +576,9 @@ export const PublicAlbumSingleFileViewer: React.FC<
                     >
                         <Stack
                             direction="row"
-                            justifyContent="space-between"
-                            alignItems="center"
                             sx={{
+                                justifyContent: "space-between",
+                                alignItems: "center",
                                 pointerEvents: topControlsVisible
                                     ? "auto"
                                     : "none",
@@ -586,8 +586,8 @@ export const PublicAlbumSingleFileViewer: React.FC<
                         >
                             <Stack
                                 direction="row"
-                                alignItems="center"
                                 spacing={1.5}
+                                sx={{ alignItems: "center" }}
                             >
                                 <Box
                                     component="a"
@@ -619,7 +619,7 @@ export const PublicAlbumSingleFileViewer: React.FC<
                                             transform: "translateY(1px)",
                                         }}
                                     >
-                                        <ErrorOutlineIcon
+                                        <ErrorOutlinedIcon
                                             aria-hidden="true"
                                             sx={{
                                                 fontSize: 20,
@@ -648,8 +648,8 @@ export const PublicAlbumSingleFileViewer: React.FC<
                                     isLivePhotoFile && (
                                         <Stack
                                             direction="row"
-                                            alignItems="center"
                                             spacing={0.5}
+                                            sx={{ alignItems: "center" }}
                                         >
                                             <FileViewerStyleButton
                                                 onClick={
@@ -707,8 +707,8 @@ export const PublicAlbumSingleFileViewer: React.FC<
                             </Stack>
                             <Stack
                                 direction="row"
-                                alignItems="center"
                                 spacing={1}
+                                sx={{ alignItems: "center" }}
                             >
                                 <Button
                                     variant="contained"
@@ -728,7 +728,7 @@ export const PublicAlbumSingleFileViewer: React.FC<
                                         },
                                     }}
                                 >
-                                    {t("get_ente_photos")}
+                                    {t("join_ente")}
                                 </Button>
                                 <IconButton
                                     onClick={(event) =>

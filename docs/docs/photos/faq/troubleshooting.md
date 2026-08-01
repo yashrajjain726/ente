@@ -271,13 +271,9 @@ When photos are uploaded on the web app, the most common cause of thumbnails not
 
 **Firefox users:** If you have "block canvas fingerprinting" enabled (`privacy.resistFingerprinting` set to true in `about:config`), Firefox will prevent the app from generating thumbnails.
 
-**Brave users:** Brave Shields can block canvas access and prevent the app from generating thumbnails.
+**Brave users:** Brave Shields can block canvas access and prevent the app from generating thumbnails. To fix this, disable canvas fingerprinting for Ente's domain, or turn off Brave Shields for Ente's domain, or whitelist Ente in any browser extension that blocks canvas access.
 
-**Solution:**
-
-- Disable canvas fingerprinting for Ente's domain, OR
-- Turn off Brave Shields for Ente's domain, OR
-- Check if you're using browser extensions that block canvas access and whitelist Ente
+**Tor Browser users:** When the upload error appears, click the photo icon on the left side of the address bar and choose **Allow** so Ente can generate thumbnails.
 
 > [!IMPORTANT]
 >
@@ -558,6 +554,16 @@ If videos aren't playing on photos.ente.com, browser content blockers or ad bloc
 Disable your content blocker or add `photos.ente.com` to your allowlist. Wait 15-20 seconds for changes to take effect before trying again.
 
 **Known issue with AdGuard:** AdGuard's basic filter blocks videos in Ente when using AdGuard Mini on Safari. This has been [reported to AdGuard filter developers](https://github.com/AdguardTeam/AdguardFilters/issues/216424).
+
+### Why do some of my videos stutter or freeze when I play them on iOS? {#ios-video-stutter-playback}
+
+This is an iOS-specific issue: for some videos, Apple Photos rejects the file and doesn't store it on your device, even though Ente backed it up successfully. Since the video isn't fully available locally, playback in the Ente app can stutter or freeze. The video itself is still safely stored in Ente - nothing is lost.
+
+Because this happens at the iOS level, there isn't much the app can do to prevent it directly. The workaround is to enable video streaming on desktop.
+
+As videos are processed, your iPhone automatically uses the streamable version for smooth playback, while your original file stays untouched.
+
+Learn more about [Video streaming](/photos/features/utilities/video-streaming).
 
 ## Performance Issues
 

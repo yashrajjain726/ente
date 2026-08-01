@@ -1,8 +1,6 @@
 import "package:ente_components/ente_components.dart";
-import "package:ente_ui/components/alert_bottom_sheet.dart";
 import "package:ente_ui/components/buttons/button_widget.dart";
 import "package:ente_ui/components/buttons/models/button_result.dart";
-import "package:ente_ui/theme/ente_theme.dart";
 import "package:ente_ui/utils/dialog_util.dart";
 import "package:ente_ui/utils/toast_util.dart";
 import "package:ente_utils/share_utils.dart";
@@ -12,6 +10,8 @@ import "package:hugeicons/hugeicons.dart";
 import "package:locker/l10n/l10n.dart";
 import "package:locker/services/files/links/links_service.dart";
 import "package:locker/services/files/sync/models/file.dart";
+import "package:locker/utils/bottom_sheet_illustration.dart";
+import "package:locker/utils/error_sheet.dart";
 
 Future<void> showShareLinkSheet(
   BuildContext context,
@@ -47,8 +47,7 @@ class ShareLinkSheet extends StatefulWidget {
 class _ShareLinkSheetState extends State<ShareLinkSheet> {
   @override
   Widget build(BuildContext context) {
-    final colorScheme = getEnteColorScheme(context);
-    final textTheme = getEnteTextTheme(context);
+    final colors = context.componentColors;
     final l10n = context.l10n;
 
     return BottomSheetComponent(
@@ -59,12 +58,12 @@ class _ShareLinkSheetState extends State<ShareLinkSheet> {
         children: [
           Text(
             l10n.shareThisLink,
-            style: textTheme.body.copyWith(color: colorScheme.textMuted),
+            style: TextStyles.body.copyWith(color: colors.textLight),
           ),
           const SizedBox(height: 24),
           Container(
             decoration: BoxDecoration(
-              color: colorScheme.backgroundElevated,
+              color: colors.fillLight,
               borderRadius: BorderRadius.circular(12),
             ),
             child: Stack(
@@ -79,8 +78,8 @@ class _ShareLinkSheetState extends State<ShareLinkSheet> {
                       Expanded(
                         child: SelectableText(
                           widget.url,
-                          style: textTheme.small.copyWith(
-                            color: colorScheme.textBase,
+                          style: TextStyles.body.copyWith(
+                            color: colors.textBase,
                             fontFamily: 'monospace',
                           ),
                         ),
@@ -97,7 +96,7 @@ class _ShareLinkSheetState extends State<ShareLinkSheet> {
                       visualDensity: VisualDensity.compact,
                       icon: HugeIcon(
                         icon: HugeIcons.strokeRoundedCopy01,
-                        color: colorScheme.textBase,
+                        color: colors.textBase,
                         size: 18,
                       ),
                       tooltip: 'Copy link',
@@ -132,19 +131,21 @@ class _ShareLinkSheetState extends State<ShareLinkSheet> {
   Future<void> _deleteShareLink(BuildContext context) async {
     final l10n = context.l10n;
 
-    final result = await showAlertBottomSheet<ButtonResult>(
-      context,
-      title: l10n.deleteShareLinkDialogTitle,
-      message: l10n.deleteShareLinkConfirmation,
-      assetPath: 'assets/file_delete_icon.png',
-      buttons: [
-        ButtonComponent(
-          label: l10n.delete,
-          variant: ButtonComponentVariant.critical,
-          onTap: () =>
-              Navigator.of(context).pop(ButtonResult(ButtonAction.first)),
-        ),
-      ],
+    final result = await showBottomSheetComponent<ButtonResult>(
+      context: context,
+      builder: (_) => BottomSheetComponent(
+        title: l10n.deleteShareLinkDialogTitle,
+        message: l10n.deleteShareLinkConfirmation,
+        illustration: LockerBottomSheetIllustration.fileDelete,
+        actions: [
+          ButtonComponent(
+            label: l10n.delete,
+            variant: ButtonComponentVariant.critical,
+            onTap: () =>
+                Navigator.of(context).pop(ButtonResult(ButtonAction.first)),
+          ),
+        ],
+      ),
     );
 
     if (result?.action == ButtonAction.first && context.mounted) {
@@ -166,7 +167,7 @@ class _ShareLinkSheetState extends State<ShareLinkSheet> {
         await dialog.hide();
 
         if (context.mounted) {
-          await showGenericErrorBottomSheet(context: context, error: e);
+          await showLockerErrorSheet(context, e);
         }
       }
     }

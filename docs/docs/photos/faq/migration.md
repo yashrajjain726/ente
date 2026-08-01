@@ -119,6 +119,12 @@ If photos already uploaded without the right album assignment, Ente can't recons
 2. Re-arrange the extracted Takeout contents into a single merged folder as shown above.
 3. Re-upload through the desktop app.
 
+### Why are "Photos from 20XX" yearly albums appearing on migration from Google photos? {#yearly-albums-recreated}
+
+These albums come from Google Takeout, which sorts any photos that weren't in a specific album into "Photos from 2020", "Photos from 2021", and so on. When you imported, Ente created one album per Takeout folder.
+
+New photos you back up afterwards (for example, from your phone's camera) go to their normal device-folder albums, not into yearly albums. Changing a photo's date also does not move it into a yearly album. These yearly albums are a one-time import artifact - they won't regenerate or grow on their own.
+
 ### Why is my storage usage in Ente higher than what Google Photos showed? {#ente-storage-higher-than-google}
 
 Google Photos and Ente count storage differently:
@@ -163,7 +169,7 @@ Each partner should export their own library via [Google Takeout](/photos/migrat
 
 > [!NOTE]
 >
-> Photos only visible to you through Partner Sharing (not saved to your library) are **not** included in your Takeout. Only the partner who originally took those photos will have them in their export. There is also no built-in filter to remove partner-shared photos from a Takeout import - so duplicates may occur if both partners import and then share entire libraries on Ente.
+> Photos only visible to you through Partner Sharing (not saved to your library) are **not** included in your Takeout. Only the partner who originally took those photos will have them in their export. For partner-shared photos that are present in your Takeout, the desktop importer lets you choose whether to import or skip them. Skip them if the original owner is also importing their library and you want to avoid duplicate copies.
 
 #### 2. Set up sharing on Ente
 
@@ -205,7 +211,9 @@ Once this is done, you can reupload your entire Google Takeout folder again usin
 
 ### Is there a way to remove partner sharing photos when importing via Google Takeout?
 
-There is currently no built-in filter to automatically remove partner-shared photos when importing from Google Takeout.
+Yes. When the desktop app detects a Google Takeout import, use the **Partner-shared photos** option in the import confirmation dialog to include or skip them.
+
+This only applies to partner-shared photos that Google included in your Takeout. Photos that were only visible through Partner Sharing and were never saved to your library are not included in your Takeout.
 
 ## Importing from Apple Photos
 

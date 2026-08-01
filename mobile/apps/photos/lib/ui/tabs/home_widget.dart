@@ -3,6 +3,7 @@ import "dart:convert";
 import "dart:io";
 
 import "package:app_links/app_links.dart";
+import "package:ente_components/ente_components.dart";
 import "package:ente_crypto/ente_crypto.dart";
 import "package:ente_pure_utils/ente_pure_utils.dart";
 import "package:flutter/material.dart";
@@ -11,7 +12,6 @@ import "package:flutter/services.dart";
 import "package:flutter_local_notifications/flutter_local_notifications.dart";
 import "package:logging/logging.dart";
 import "package:media_extension/media_extension_action_types.dart";
-import "package:modal_bottom_sheet/modal_bottom_sheet.dart";
 import "package:move_to_background/move_to_background.dart";
 import "package:package_info_plus/package_info_plus.dart";
 import "package:photos/core/configuration.dart";
@@ -56,7 +56,6 @@ import "package:photos/services/sync/local_sync_service.dart";
 import "package:photos/services/sync/remote_sync_service.dart";
 import "package:photos/services/update_service.dart";
 import "package:photos/states/user_details_state.dart";
-import "package:photos/theme/colors.dart";
 import "package:photos/theme/ente_theme.dart";
 import "package:photos/ui/collections/collection_action_sheet.dart";
 import "package:photos/ui/components/buttons/button_widget.dart";
@@ -193,8 +192,8 @@ class _HomeWidgetState extends State<HomeWidget> {
           if (pageDelta <= 1) {
             _pageController.animateToPage(
               event.selectedIndex,
-              duration: const Duration(milliseconds: 100),
-              curve: Curves.easeIn,
+              duration: const Duration(milliseconds: 200),
+              curve: Curves.easeInOut,
             );
           } else {
             _pageController.jumpToPage(event.selectedIndex);
@@ -261,13 +260,6 @@ class _HomeWidgetState extends State<HomeWidget> {
           if (mounted) {
             setState(() {});
             syncWidget();
-            if (!NotificationService.instance.hasGrantedPermissions() &&
-                isLocalGalleryMode &&
-                !Configuration.instance.hasConfiguredAccount()) {
-              Future.delayed(const Duration(seconds: 2), () {
-                NotificationService.instance.requestPermissions().ignore();
-              });
-            }
           }
         });
       }
@@ -283,6 +275,7 @@ class _HomeWidgetState extends State<HomeWidget> {
     updateService.shouldShowUpdateNotification().then((value) {
       Future.delayed(Duration.zero, () {
         if (value) {
+          if (!mounted) return;
           showDialog(
             useRootNavigator: false,
             context: context,
@@ -381,6 +374,9 @@ class _HomeWidgetState extends State<HomeWidget> {
 
       final Collection? collection = await CollectionsService.instance
           .getCollectionFromPublicLink(context, uri);
+      if (!mounted) {
+        return;
+      }
       if (collection == null) {
         return;
       }
@@ -432,6 +428,7 @@ class _HomeWidgetState extends State<HomeWidget> {
                 publicUrl.opsLimit!,
               );
 
+              if (!mounted) return;
               unawaited(
                 CollectionsService.instance
                     .verifyPublicCollectionPassword(
@@ -443,6 +440,7 @@ class _HomeWidgetState extends State<HomeWidget> {
                       if (result) {
                         await dialog.show();
 
+                        if (!mounted) return;
                         final List<EnteFile> sharedFiles = await _diffFetcher
                             .getPublicFiles(
                               context,
@@ -450,8 +448,10 @@ class _HomeWidgetState extends State<HomeWidget> {
                               collection.pubMagicMetadata.asc ?? false,
                             );
                         await dialog.hide();
+                        if (!mounted) return;
                         Navigator.of(context).pop();
 
+                        if (!mounted) return;
                         await routeToPage(
                           context,
                           SharedPublicCollectionPage(
@@ -465,6 +465,7 @@ class _HomeWidgetState extends State<HomeWidget> {
               );
             } catch (e, s) {
               _logger.severe("Failed to decrypt password for album", e, s);
+              if (!mounted) return;
               await showGenericErrorDialog(context: context, error: e);
               return;
             }
@@ -473,6 +474,7 @@ class _HomeWidgetState extends State<HomeWidget> {
       } else {
         await dialog.show();
 
+        if (!mounted) return;
         final List<EnteFile> sharedFiles = await _diffFetcher.getPublicFiles(
           context,
           collection.id,
@@ -480,6 +482,7 @@ class _HomeWidgetState extends State<HomeWidget> {
         );
         await dialog.hide();
 
+        if (!mounted) return;
         await routeToPage(
           context,
           SharedPublicCollectionPage(
@@ -489,6 +492,7 @@ class _HomeWidgetState extends State<HomeWidget> {
           ),
         );
         if (sharedFiles.length == 1) {
+          if (!mounted) return;
           await routeToPage(
             context,
             DetailPage(
@@ -1027,6 +1031,7 @@ class _HomeWidgetState extends State<HomeWidget> {
       _shouldRenderCreateCollectionSheet = false;
       ReceiveSharingIntent.instance.reset();
       Future.delayed(const Duration(milliseconds: 10), () {
+        if (!context.mounted) return;
         showCollectionActionSheet(
           context,
           sharedFiles: _sharedFiles,
@@ -1178,6 +1183,7 @@ class _HomeWidgetState extends State<HomeWidget> {
       // but keep in mind it could be `null`.
       if (initialLink != null) {
         _logger.info("Initial link received: host ${initialLink.host}");
+        if (!mounted) return false;
         _getCredentials(context, initialLink);
         return true;
       } else {
@@ -1193,6 +1199,7 @@ class _HomeWidgetState extends State<HomeWidget> {
     _authDeepLinkSubscription = appLinks.uriLinkStream.listen(
       (link) {
         _logger.info("Link received: host ${link.host}");
+        if (!mounted) return;
         _getCredentials(context, link);
       },
       onError: (err) {
@@ -1232,27 +1239,10 @@ class _HomeWidgetState extends State<HomeWidget> {
         updateService.hideChangeLog().ignore();
         return;
       }
-      final colorScheme = getEnteColorScheme(context);
-      final sheetAction = await showBarModalBottomSheet<ChangeLogPageAction>(
-        topControl: const SizedBox.shrink(),
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.only(
-            topLeft: Radius.circular(5),
-            topRight: Radius.circular(5),
-          ),
-        ),
-        backgroundColor: colorScheme.backgroundElevated,
-        enableDrag: false,
-        barrierColor: backdropFaintDark,
+      if (!context.mounted) return;
+      final sheetAction = await showBottomSheetComponent<ChangeLogPageAction>(
         context: context,
-        builder: (BuildContext context) {
-          return Padding(
-            padding: EdgeInsets.only(
-              bottom: MediaQuery.of(context).viewInsets.bottom,
-            ),
-            child: const ChangeLogPage(),
-          );
-        },
+        builder: (context) => const ChangeLogPage(),
       );
       // Do not show change dialog again
       await updateService.hideChangeLog();
@@ -1260,6 +1250,7 @@ class _HomeWidgetState extends State<HomeWidget> {
         return;
       }
       if (sheetAction == ChangeLogPageAction.openReferrals) {
+        if (!context.mounted) return;
         await routeToPage(context, const ReferralScreen());
       }
     } finally {

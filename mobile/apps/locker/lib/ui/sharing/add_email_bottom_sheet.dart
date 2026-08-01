@@ -9,9 +9,6 @@ import "package:ente_sharing/verify_identity_dialog.dart";
 import "package:ente_ui/components/captioned_text_widget_v2.dart";
 import "package:ente_ui/components/divider_widget.dart";
 import "package:ente_ui/components/menu_item_widget_v2.dart";
-import "package:ente_ui/theme/colors.dart";
-import "package:ente_ui/theme/ente_theme.dart";
-import "package:ente_ui/theme/text_style.dart";
 import "package:flutter/material.dart";
 import "package:intl/intl.dart";
 import "package:locker/l10n/l10n.dart";
@@ -87,8 +84,6 @@ class _AddEmailSheetState extends State<AddEmailSheet> {
       content: ValueListenableBuilder<int>(
         valueListenable: ContactsDisplayService.instance.changes,
         builder: (context, _, _) {
-          final colorScheme = getEnteColorScheme(context);
-          final textTheme = getEnteTextTheme(context);
           return Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -96,11 +91,11 @@ class _AddEmailSheetState extends State<AddEmailSheet> {
               _buildEmailInputField(),
               if (_suggestedUsers.isNotEmpty) ...[
                 const SizedBox(height: 20),
-                _buildExistingContactsSection(colorScheme, textTheme),
+                _buildExistingContactsSection(),
               ],
               if (_shareLater) ...[
                 const SizedBox(height: 12),
-                _buildScheduleDateTimeRow(colorScheme, textTheme),
+                _buildScheduleDateTimeRow(),
               ],
             ],
           );
@@ -127,10 +122,8 @@ class _AddEmailSheetState extends State<AddEmailSheet> {
     );
   }
 
-  Widget _buildExistingContactsSection(
-    EnteColorScheme colorScheme,
-    EnteTextTheme textTheme,
-  ) {
+  Widget _buildExistingContactsSection() {
+    final colors = context.componentColors;
     final filteredUsers =
         _suggestedUsers
             .where(
@@ -155,7 +148,7 @@ class _AddEmailSheetState extends State<AddEmailSheet> {
       children: [
         Text(
           context.l10n.chooseFromAnExistingContact,
-          style: textTheme.small.copyWith(color: colorScheme.textMuted),
+          style: TextStyles.body.copyWith(color: colors.textLight),
         ),
         const SizedBox(height: 8),
         Row(
@@ -182,7 +175,7 @@ class _AddEmailSheetState extends State<AddEmailSheet> {
                           if (!isFirst)
                             DividerWidget(
                               dividerType: DividerType.menu,
-                              bgColor: colorScheme.fillFaint,
+                              bgColor: colors.fillLight,
                             ),
                           MenuItemWidgetV2(
                             captionedTextWidget: CaptionedTextWidgetV2(
@@ -194,7 +187,7 @@ class _AddEmailSheetState extends State<AddEmailSheet> {
                               type: AvatarType.mini,
                               config: Configuration.instance,
                             ),
-                            menuItemColor: colorScheme.fillFaint,
+                            menuItemColor: colors.fillLight,
                             surfaceExecutionStates: false,
                             onTap: () async {
                               _textFieldFocusNode.unfocus();
@@ -228,7 +221,6 @@ class _AddEmailSheetState extends State<AddEmailSheet> {
                 itemCount: filteredUsers.length,
                 visibleItems: 2,
                 containerHeight: maxVisibleHeight,
-                colorScheme: colorScheme,
               ),
             ],
           ],
@@ -237,10 +229,8 @@ class _AddEmailSheetState extends State<AddEmailSheet> {
     );
   }
 
-  Widget _buildScheduleDateTimeRow(
-    EnteColorScheme colorScheme,
-    EnteTextTheme textTheme,
-  ) {
+  Widget _buildScheduleDateTimeRow() {
+    final colors = context.componentColors;
     final dateText = _scheduledDate != null
         ? DateFormat("dd/MM/yy").format(_scheduledDate!)
         : "DD/MM/YY";
@@ -256,7 +246,7 @@ class _AddEmailSheetState extends State<AddEmailSheet> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
               decoration: BoxDecoration(
-                color: colorScheme.fillFaint,
+                color: colors.fillLight,
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Row(
@@ -264,15 +254,15 @@ class _AddEmailSheetState extends State<AddEmailSheet> {
                   Icon(
                     Icons.calendar_today_outlined,
                     size: 18,
-                    color: colorScheme.textMuted,
+                    color: colors.textLight,
                   ),
                   const SizedBox(width: 8),
                   Text(
                     dateText,
-                    style: textTheme.small.copyWith(
+                    style: TextStyles.body.copyWith(
                       color: _scheduledDate != null
-                          ? colorScheme.textBase
-                          : colorScheme.textMuted,
+                          ? colors.textBase
+                          : colors.textLight,
                     ),
                   ),
                 ],
@@ -287,7 +277,7 @@ class _AddEmailSheetState extends State<AddEmailSheet> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
               decoration: BoxDecoration(
-                color: colorScheme.fillFaint,
+                color: colors.fillLight,
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Row(
@@ -295,15 +285,15 @@ class _AddEmailSheetState extends State<AddEmailSheet> {
                   Icon(
                     Icons.access_time_outlined,
                     size: 18,
-                    color: colorScheme.textMuted,
+                    color: colors.textLight,
                   ),
                   const SizedBox(width: 8),
                   Text(
                     timeText,
-                    style: textTheme.small.copyWith(
+                    style: TextStyles.body.copyWith(
                       color: _scheduledTime != null
-                          ? colorScheme.textBase
-                          : colorScheme.textMuted,
+                          ? colors.textBase
+                          : colors.textLight,
                     ),
                   ),
                 ],

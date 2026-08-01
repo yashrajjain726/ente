@@ -11,6 +11,7 @@ import 'package:photos/models/file/file.dart';
 import 'package:photos/models/file/file_type.dart';
 import 'package:photos/models/files_split.dart';
 import 'package:photos/models/selected_files.dart';
+import 'package:photos/settings/local_settings.dart';
 import 'package:photos/service_locator.dart';
 import 'package:photos/utils/delete_file_util.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -101,11 +102,6 @@ void main() {
         expect(find.byType(RadioComponent), findsNothing);
         expect(find.byType(MenuGroupComponent), findsNothing);
         expect(find.byType(MenuComponent), findsNothing);
-        expect(find.text('Delete from both'), findsOneWidget);
-        expect(find.text('More options'), findsOneWidget);
-
-        await tester.tap(find.text('More options'));
-        await tester.pumpAndSettle();
 
         expect(find.byType(ButtonComponent), findsNWidgets(3));
         final buttons = tester.widgetList<ButtonComponent>(
@@ -133,6 +129,29 @@ void main() {
         ]);
       },
     );
+
+    testWidgets('mixed delete sheet with saved default starts collapsed', (
+      tester,
+    ) async {
+      await localSettings.setDeletePreference(DeletePreference.DeleteFromBoth);
+      final file = _file(generatedID: 22, uploadedID: 32, localID: 'local-22');
+      final selectedFiles = SelectedFiles()..selectAll({file});
+
+      await _pumpDeleteSheet(
+        tester,
+        selectedFiles: selectedFiles,
+        split: FilesSplit(
+          pendingUploads: const [],
+          ownedByCurrentUser: [file],
+          ownedByOtherUsers: const [],
+        ),
+      );
+
+      expect(find.byType(ButtonComponent), findsOneWidget);
+      expect(find.text('Delete from both'), findsOneWidget);
+      expect(find.text('More options'), findsOneWidget);
+      expect(find.text('Set as my default choice'), findsNothing);
+    });
 
     testWidgets('plural delete sheet copy matches deletion context', (
       tester,
@@ -208,8 +227,6 @@ void main() {
           },
         );
 
-        await tester.tap(find.text('More options'));
-        await tester.pumpAndSettle();
         await tester.tap(find.text('Delete from Ente'));
         await tester.pumpAndSettle();
 
@@ -269,8 +286,6 @@ void main() {
           },
         );
 
-        await tester.tap(find.text('More options'));
-        await tester.pumpAndSettle();
         await tester.tap(find.text('Delete from device'));
         await tester.pumpAndSettle();
 

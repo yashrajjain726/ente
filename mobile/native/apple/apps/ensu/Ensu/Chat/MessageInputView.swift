@@ -1,9 +1,7 @@
 import SwiftUI
 import PhotosUI
 import UniformTypeIdentifiers
-#if os(iOS)
 import UIKit
-#endif
 
 struct MessageInputView: View {
     @Binding var text: String
@@ -12,7 +10,6 @@ struct MessageInputView: View {
     let isDownloading: Bool
     let editingMessage: RenderedChatMessage?
     let isProcessingAttachments: Bool
-    let isAttachmentDownloadBlocked: Bool
     let voiceInputState: VoiceInputState
     let moveCursorToEndToken: UUID
     let onSend: () -> Void
@@ -30,21 +27,16 @@ struct MessageInputView: View {
     @State private var selectedPhotoItem: PhotosPickerItem?
     @State private var inputResetToken = UUID()
 
-    private var placeholder: String {
-        if isAttachmentDownloadBlocked {
-            return "Downloading attachments..."
-        }
-        return "Write a message..."
-    }
+    private let placeholder = "Write a message..."
 
     private var canSend: Bool {
         let hasContent = !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !attachments.isEmpty
-        return hasContent && !isGenerating && !isDownloading && !isAttachmentDownloadBlocked && !voiceInputState.blocksSend
+        return hasContent && !isGenerating && !isDownloading && !voiceInputState.blocksSend
     }
 
     private var isSendEnabled: Bool {
         let hasContent = !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !attachments.isEmpty
-        return hasContent && !isDownloading && !isAttachmentDownloadBlocked && !voiceInputState.blocksSend
+        return hasContent && !isDownloading && !voiceInputState.blocksSend
     }
 
     private var isImageAttachmentLimitReached: Bool {
@@ -115,7 +107,7 @@ struct MessageInputView: View {
                             Image(systemName: "exclamationmark.circle")
                                 .font(.system(size: 12, weight: .semibold))
                                 .foregroundStyle(EnsuColor.stopButton)
-                        case .idle, .unsupported:
+                        case .idle:
                             EmptyView()
                         }
                         Text(voiceStatus)
@@ -138,8 +130,7 @@ struct MessageInputView: View {
                         .lineLimit(1...5)
                         .font(EnsuTypography.message)
                         .foregroundStyle(EnsuColor.textPrimary)
-                        .platformTextFieldStyle()
-                        .platformTextInputAutocapitalization(.sentences)
+                        .textInputAutocapitalization(.sentences)
                         .padding(.vertical, textFieldPadding)
                         .onSubmit {
                             if canSend {
@@ -154,7 +145,6 @@ struct MessageInputView: View {
                                 inputResetToken = UUID()
                             }
                         }
-                        #if os(iOS)
                         .background(
                             CursorEndSynchronizer(
                                 token: moveCursorToEndToken,
@@ -162,12 +152,10 @@ struct MessageInputView: View {
                             )
                             .frame(width: 0, height: 0)
                         )
-                        #endif
 
                     if editingMessage == nil {
                         let canUseAttachment = !isGenerating &&
                             !isDownloading &&
-                            !isAttachmentDownloadBlocked &&
                             !isImageAttachmentLimitReached
                         PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
                             Image("Upload01Icon")
@@ -183,10 +171,6 @@ struct MessageInputView: View {
                                 hapticTap()
                             }
                         })
-                        #if os(macOS)
-                        .buttonStyle(.plain)
-                        .frame(width: 32, height: 32, alignment: .center)
-                        #endif
                         .onChange(of: selectedPhotoItem) { newItem in
                             guard let newItem else { return }
                             guard !isImageAttachmentLimitReached else {
@@ -205,10 +189,10 @@ struct MessageInputView: View {
                         }
                     }
 
-                    if voiceInputState != .unsupported && editingMessage == nil {
+                    if editingMessage == nil {
                         let isVoiceBusy = voiceInputState.isTranscriptionBusy
                         let canUseVoice = voiceInputState.isRecording ||
-                            (!isGenerating && !isDownloading && !isAttachmentDownloadBlocked && !isVoiceBusy)
+                            (!isGenerating && !isDownloading && !isVoiceBusy)
 
                         Button {
                             if voiceInputState.isRecording {
@@ -242,9 +226,6 @@ struct MessageInputView: View {
                             }
                         }
                         .disabled(!canUseVoice)
-                        #if os(macOS)
-                        .buttonStyle(.plain)
-                        #endif
                     }
 
                     Button {
@@ -290,7 +271,6 @@ struct MessageInputView: View {
                 .clipShape(RoundedRectangle(cornerRadius: EnsuCornerRadius.input + 4, style: .continuous))
                 .shadow(color: Color.black.opacity(0.12), radius: 10, x: 0, y: 6)
                 .overlay(alignment: .topTrailing) {
-                    #if os(iOS)
                     if isFocused {
                         Button {
                             hapticTap()
@@ -308,7 +288,6 @@ struct MessageInputView: View {
                         }
                         .offset(y: -(32 + EnsuSpacing.sm))
                     }
-                    #endif
                 }
                 .padding(.horizontal, EnsuSpacing.pageHorizontal)
                 .padding(.bottom, bottomPadding)
@@ -326,20 +305,14 @@ struct MessageInputView: View {
 }
 
     private var attachmentIconSize: CGFloat {
-        #if os(macOS)
-        return 18
-        #else
         return 16
-        #endif
     }
 
-    #if os(iOS)
     private var keyboardDismissIconName: String {
         UIImage(systemName: "keyboard.chevron.compact.down") != nil
             ? "keyboard.chevron.compact.down"
             : "chevron.down"
     }
-    #endif
 
     private var attachmentFlowLayout: some View {
         FlowLayout(spacing: EnsuSpacing.sm) {
@@ -438,7 +411,6 @@ struct InputBarHeightKey: PreferenceKey {
     }
 }
 
-#if os(iOS)
 private struct CursorEndSynchronizer: UIViewRepresentable {
     let token: UUID
     let text: String
@@ -523,4 +495,3 @@ private extension UIView {
         return inputs
     }
 }
-#endif

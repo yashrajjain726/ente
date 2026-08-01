@@ -3,18 +3,17 @@ import "dart:io";
 
 import "package:ente_components/ente_components.dart";
 import "package:flutter/material.dart";
+import "package:photo_manager/photo_manager.dart";
 import "package:photos/core/event_bus.dart";
 import "package:photos/events/details_sheet_event.dart";
 import "package:photos/generated/l10n.dart";
 import "package:photos/models/file/extensions/file_props.dart";
 import 'package:photos/models/file/file.dart';
+import 'package:photos/module/metadata/panorama.dart';
 import "package:photos/service_locator.dart";
-import "package:photos/services/media_store_service.dart";
-import "package:photos/theme/ente_theme.dart";
 import "package:photos/ui/notification/toast.dart";
 import 'package:photos/ui/viewer/file/file_details_widget.dart';
 import "package:photos/utils/delete_file_util.dart";
-import "package:photos/utils/panorama_util.dart";
 
 Future<void> showSingleFileDeleteSheet(
   BuildContext context,
@@ -30,7 +29,8 @@ Future<void> showSingleFileDeleteSheet(
       showShortToast(context, l10n.noDeviceThatCanBeDeleted);
       return;
     }
-    if (Platform.isAndroid && await MediaStoreService.canManageMedia()) {
+    if (Platform.isAndroid && await PhotoManager.canManageMedia()) {
+      if (!context.mounted) return;
       await showBottomSheetComponent<bool>(
         context: context,
         useRootNavigator: Platform.isIOS,
@@ -54,6 +54,7 @@ Future<void> showSingleFileDeleteSheet(
         ),
       );
     } else {
+      if (!context.mounted) return;
       final deletedFiles = await deleteFilesOnDeviceOnly(context, [file]);
       if (deletedFiles.isNotEmpty &&
           ((isLocal && !isRemote) || isLocalOnlyContext)) {
@@ -81,6 +82,7 @@ Future<void> showSingleFileDeleteSheet(
       },
       onDeleteFromRemote: () async {
         await deleteFilesFromRemoteOnly(context, [file]);
+        if (!context.mounted) return;
         showShortToast(context, l10n.movedToTrash);
         if (((isRemote && !isLocal) || !isLocalOnlyContext)) {
           onFileRemoved?.call(file);
@@ -93,6 +95,7 @@ Future<void> showSingleFileDeleteSheet(
     ),
   );
   if (didDelete == true && isLocal) {
+    if (!context.mounted) return;
     await showMediaManagementHintSheet(context);
   }
 }
@@ -170,9 +173,12 @@ class _DraggableDetailsSheetState extends State<_DraggableDetailsSheet> {
       snapSizes: disableSnap ? null : const [0.75],
       expand: false,
       builder: (context, scrollController) => Container(
+        clipBehavior: Clip.antiAlias,
         decoration: BoxDecoration(
-          color: getEnteColorScheme(context).backgroundElevated,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+          color: context.componentColors.backgroundBase,
+          borderRadius: const BorderRadius.vertical(
+            top: Radius.circular(Radii.bottomSheet),
+          ),
         ),
         child: FileDetailsWidget(
           widget.file,

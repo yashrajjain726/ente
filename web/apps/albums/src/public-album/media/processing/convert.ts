@@ -3,7 +3,6 @@ import {
     renderableImageBlobWeb,
 } from "ente-gallery/services/convert-core";
 import type { EnteFile } from "ente-media/file";
-import { convertToMP4 } from "./ffmpeg";
 
 export const renderableImageBlob = async (
     imageBlob: Blob,
@@ -15,4 +14,9 @@ export const playableVideoURL = async (
     videoFileName: string,
     videoBlob: Blob,
 ): Promise<string> =>
-    playableVideoURLWeb(videoFileName, videoBlob, { convertToMP4 });
+    playableVideoURLWeb(videoFileName, videoBlob, {
+        convertToMP4: async (blob) => {
+            const ffmpeg = await import("ente-gallery/services/ffmpeg");
+            return ffmpeg.convertToMP4(blob);
+        },
+    });

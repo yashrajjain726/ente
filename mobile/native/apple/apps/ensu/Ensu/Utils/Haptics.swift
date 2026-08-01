@@ -1,6 +1,5 @@
 import Foundation
 
-#if canImport(UIKit)
 import UIKit
 
 func hapticTap() {
@@ -27,30 +26,3 @@ func hapticError() {
     UINotificationFeedbackGenerator().notificationOccurred(.error)
 }
 
-#elseif canImport(AppKit)
-import AppKit
-
-func hapticTap() {
-    NSHapticFeedbackManager.defaultPerformer.perform(.generic, performanceTime: .now)
-}
-
-func hapticMedium() {
-    NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
-}
-
-func hapticHeavy() {
-    NSHapticFeedbackManager.defaultPerformer.perform(.levelChange, performanceTime: .now)
-}
-
-func hapticSuccess() {
-    hapticTap()
-}
-
-func hapticWarning() {
-    hapticMedium()
-}
-
-func hapticError() {
-    hapticHeavy()
-}
-#endif

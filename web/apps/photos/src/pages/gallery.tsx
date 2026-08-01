@@ -7,6 +7,7 @@ import { AlbumAddedNotification } from "@/components/AlbumAddedNotification";
 import { AuthenticateUser } from "@/components/AuthenticateUser";
 import { GalleryBarAndListHeader } from "@/components/Collections/GalleryBarAndListHeader";
 import { PickCoverPhotoDialog } from "@/components/Collections/PickCoverPhotoDialog";
+import { FamilyManagement } from "@/components/FamilyManagement";
 import type { FileListHeaderOrFooter } from "@/components/FileList";
 import { FileListWithViewer } from "@/components/FileListWithViewer";
 import { FixCreationTime } from "@/components/FixCreationTime";
@@ -79,6 +80,7 @@ import {
 import { WhatsNew } from "ente-new/photos/components/WhatsNew";
 import {
     GalleryEmptyState,
+    GalleryEmptyStateV2,
     PeopleEmptyState,
     SearchResultsHeader,
     type RemotePullOpts,
@@ -128,6 +130,7 @@ import {
     addManualFileAssignmentsToPerson,
     isMLEnabled,
 } from "ente-new/photos/services/ml";
+import { enableV2 } from "ente-new/photos/utils/feature-flags";
 
 import { uploadManager } from "@/services/upload-manager";
 import watcher from "@/services/watch";
@@ -136,7 +139,10 @@ import {
     performFileOp,
     type SelectedState,
 } from "@/utils/file";
-import { quickLinkNameForFiles, resolveQuickLinkURL } from "@/utils/quick-link";
+import {
+    quickLinkNameForFiles,
+    resolveQuickLinkURL,
+} from "ente-gallery/utils/quick-link";
 import {
     savedCollectionFiles,
     savedCollections,
@@ -300,6 +306,10 @@ const Page: React.FC = () => {
         useModalVisibility();
     const { show: showPlanSelector, props: planSelectorVisibilityProps } =
         useModalVisibility();
+    const {
+        show: showFamilyManagement,
+        props: familyManagementVisibilityProps,
+    } = useModalVisibility();
     const { show: showWhatsNew, props: whatsNewVisibilityProps } =
         useModalVisibility();
     const { show: showFixCreationTime, props: fixCreationTimeVisibilityProps } =
@@ -393,6 +403,7 @@ const Page: React.FC = () => {
         favoriteFileIDs,
         collectionNameByID,
         fileNormalCollectionIDs,
+        hiddenCollectionIDs,
         normalCollectionSummaries,
         hiddenFileIDs,
         tempDeletedFileIDs,
@@ -418,6 +429,21 @@ const Page: React.FC = () => {
     const activePerson =
         state.view?.type == "people" ? state.view.activePerson : undefined;
     const activePersonID = activePerson?.id;
+    const fileCollectionIDs = useMemo(
+        () =>
+            state.collectionFiles.reduce((result, file) => {
+                const collectionIDs = result.get(file.id);
+                if (collectionIDs) {
+                    if (!collectionIDs.includes(file.collectionID)) {
+                        collectionIDs.push(file.collectionID);
+                    }
+                } else {
+                    result.set(file.id, [file.collectionID]);
+                }
+                return result;
+            }, new Map<number, number[]>()),
+        [state.collectionFiles],
+    );
 
     /**
      * the below function is used to conditionallay render the setCover option in the dropdown
@@ -1093,6 +1119,9 @@ const Page: React.FC = () => {
                         albumId: collection.id,
                         albumName: collection.name,
                     });
+                    setOpenCollectionSelector(false);
+                    setPostCreateAlbumOp(undefined);
+                    return;
                 }
 
                 setPostCreateAlbumOp((postCreateAlbumOp) => {
@@ -1878,6 +1907,10 @@ const Page: React.FC = () => {
         () => setOpenCollectionSelector(false),
         [],
     );
+    const handleCollectionSelectorExited = useCallback(
+        () => setCollectionSelectorAttributes(undefined),
+        [],
+    );
 
     /**
      * Handles adding a single file to a collection by opening a collection selector dialog.
@@ -1982,10 +2015,16 @@ const Page: React.FC = () => {
             <PlanSelector
                 {...planSelectorVisibilityProps}
                 setLoading={(v) => setBlockingLoad(v)}
+                onManageFamily={showFamilyManagement}
+            />
+            <FamilyManagement
+                {...familyManagementVisibilityProps}
+                onShowPlanSelector={showPlanSelector}
             />
             <CollectionSelector
                 open={openCollectionSelector}
                 onClose={handleCloseCollectionSelector}
+                onExited={handleCollectionSelectorExited}
                 attributes={collectionSelectorAttributes}
                 collectionSummaries={
                     collectionSelectorAttributes?.showHiddenCollections
@@ -2179,10 +2218,17 @@ const Page: React.FC = () => {
             !isFirstLoad &&
             !state.collectionFiles.length &&
             activeCollectionID === PseudoCollectionID.all ? (
-                <GalleryEmptyState
-                    isUploadInProgress={uploadManager.isUploadInProgress()}
-                    onUpload={openUploader}
-                />
+                enableV2 ? (
+                    <GalleryEmptyStateV2
+                        isUploadInProgress={uploadManager.isUploadInProgress()}
+                        onUpload={openUploader}
+                    />
+                ) : (
+                    <GalleryEmptyState
+                        isUploadInProgress={uploadManager.isUploadInProgress()}
+                        onUpload={openUploader}
+                    />
+                )
             ) : !isInSearchMode &&
               !isFirstLoad &&
               state.view?.type == "people" &&
@@ -2220,6 +2266,8 @@ const Page: React.FC = () => {
                         favoriteFileIDs,
                         collectionNameByID,
                         fileNormalCollectionIDs,
+                        fileCollectionIDs,
+                        hiddenCollectionIDs,
                         pendingFavoriteUpdates,
                         pendingVisibilityUpdates,
                         onAddSaveGroup,
@@ -2269,6 +2317,7 @@ const Page: React.FC = () => {
             />
             <SingleInputDialog
                 {...albumNameInputVisibilityProps}
+                variant={enableV2 ? "v2" : "default"}
                 title={t("new_album")}
                 label={t("album_name")}
                 submitButtonTitle={t("create")}

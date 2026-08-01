@@ -1,26 +1,34 @@
 import { expose, wrap } from "comlink";
 import { clientIdentifier } from "ente-base/app";
 import { assertionFailed } from "ente-base/assert";
+import { lowercaseExtension } from "ente-base/file-name";
 import { isHTTP4xxError, isHTTPErrorWithStatus } from "ente-base/http";
 import log from "ente-base/log";
 import { logUnhandledErrorsAndRejectionsInWorker } from "ente-base/log-web";
-import type { ElectronMLWorker } from "ente-base/types/ipc";
+import type {
+    ElectronMLWorker,
+    MLWorkerAnalyzeImageErrorKind,
+    MLWorkerAnalyzeImageRequest,
+    MLWorkerAnalyzeImageResult,
+} from "ente-base/types/ipc";
 import { isNetworkDownloadError } from "ente-gallery/services/download";
 import type { ProcessableUploadItem } from "ente-gallery/services/upload";
 import { fileLogID, type EnteFile } from "ente-media/file";
+import { fileFileName } from "ente-media/file-metadata";
+import { FileType } from "ente-media/file-type";
+import { needsJPEGConversion } from "ente-media/formats";
 import { savedTrashItemFileIDs } from "ente-new/photos/services/trash";
 import { wait } from "ente-utils/promise";
 import { savedCollectionFiles } from "../photos-fdb";
 import {
-    createImageBitmapAndData,
-    fetchRenderableBlob,
-    type ImageBitmapAndData,
+    fetchIndexableImageSource,
+    renderableImageBytes,
+    type IndexableImageSource,
 } from "./blob";
 import {
     _clipMatches,
     clearCachedCLIPIndexes,
     clipIndexingVersion,
-    indexCLIP,
     type CLIPIndex,
 } from "./clip";
 import {
@@ -29,7 +37,7 @@ import {
     type ClusterFacesReason,
     type ClusteringProgress,
 } from "./cluster";
-import { saveFaceCrops } from "./crop";
+import { saveFaceCropBlobs } from "./crop";
 import {
     markIndexingFailed,
     readNextIndexableFileIDs,
@@ -37,7 +45,8 @@ import {
     saveIndexes,
     updateAssumingLocalFiles,
 } from "./db";
-import { faceIndexingVersion, indexFaces, type FaceIndex } from "./face";
+import { faceIndexingVersion, type FaceIndex } from "./face";
+import { mlIndexFlagsForRustResult } from "./index-flags";
 import {
     fetchMLData,
     putMLData,
@@ -115,8 +124,11 @@ export class MLWorker {
     private liveQ: IndexableItem[] = [];
     private idleTimeout: ReturnType<typeof setTimeout> | undefined;
     private idleDuration = idleDurationStart; /* unit: seconds */
-    /** Resolvers for pending promises returned from calls to {@link index}. */
-    private onNextIdles: ((count: number) => void)[] = [];
+    /** Settlers for pending promises returned from calls to {@link index}. */
+    private onNextIdles: {
+        resolve: (count: number) => void;
+        reject: (e: Error) => void;
+    }[] = [];
     /**
      * Number of items processed since the last time {@link onNextIdles} was
      * drained.
@@ -140,6 +152,27 @@ export class MLWorker {
     init(port: MessagePort, delegate: MLWorkerDelegate) {
         this.electron = wrap<ElectronMLWorker>(port);
         this.delegate = delegate;
+        port.addEventListener("close", () => this.electronPortDidClose(), {
+            once: true,
+        });
+    }
+
+    /**
+     * Called when the port to the ML utility process closes, which happens if
+     * the utility process exits (e.g. if it crashes).
+     *
+     * Reject any pending promises returned by {@link index} so that a sync
+     * awaiting us doesn't hang forever, then inform the main thread, which
+     * will discard us. Anything else in flight dies with us; the next sync
+     * will retry with a new worker.
+     */
+    private electronPortDidClose() {
+        const onNextIdles = this.onNextIdles;
+        this.onNextIdles = [];
+        onNextIdles.forEach(({ reject }) =>
+            reject(new Error("The ML utility process exited")),
+        );
+        this.delegate?.workerDidLoseElectronPort();
     }
 
     /**
@@ -151,11 +184,14 @@ export class MLWorker {
      * save it locally. Otherwise we index them.
      *
      * @return The count of items processed since the last last time we were
-     * idle.
+     * idle. The returned promise rejects if the port to the ML utility process
+     * closes while we're indexing.
      */
     index() {
-        const nextIdle = new Promise<number>((resolve) =>
-            this.onNextIdles.push(resolve),
+        if (_blockingMLInitError) return Promise.resolve(0);
+
+        const nextIdle = new Promise<number>((resolve, reject) =>
+            this.onNextIdles.push({ resolve, reject }),
         );
         this.wakeUp();
         return nextIdle;
@@ -185,6 +221,8 @@ export class MLWorker {
      * us and won't need to download the file from remote.
      */
     onUpload(file: EnteFile, processableUploadItem: ProcessableUploadItem) {
+        if (_blockingMLInitError) return;
+
         // Add the recently uploaded file to the live indexing queue.
         this.liveQ.push({
             file,
@@ -233,16 +271,20 @@ export class MLWorker {
                   return [];
               });
 
-        this.countSinceLastIdle += items.length;
-
         // If there is items remaining,
         if (items.length > 0) {
             // Index them.
-            const indexedCount = await indexNextBatch(
+            const { indexedCount, blockingInitError } = await indexNextBatch(
                 items,
                 this.electron!,
                 this.delegate,
             );
+            if (blockingInitError) {
+                this.suspendForMLInitError(blockingInitError);
+                return;
+            }
+
+            this.countSinceLastIdle += items.length;
             if (indexedCount > 0) {
                 // We made some progress, so there are no complete blockers
                 // (e.g. network being offline). Reset the idle duration and
@@ -269,12 +311,36 @@ export class MLWorker {
         this.idleTimeout = setTimeout(scheduleTick, this.idleDuration * 1000);
         this.delegate?.workerDidUpdateStatus();
 
-        // Resolve any awaiting promises returned from `index`.
+        // Release the native ML sessions while we're idling so that the
+        // utility process doesn't hold on to the model memory. They get
+        // recreated transparently on the next analysis.
+        void this.electron?.releaseMLRuntime().catch((e: unknown) => {
+            log.warn("Failed to release the native ML runtime", e);
+        });
+
+        this.resolvePendingIndexRequests();
+    }
+
+    /** Stop indexing until this web worker (and its utility process) is replaced. */
+    private suspendForMLInitError(error: MLAnalyzeError) {
+        log.error(
+            "Suspending ML indexing because the native runtime failed to initialize",
+            error,
+        );
+        this.liveQ = [];
+        this.state = "idle";
+        this.idleTimeout = undefined;
+        this.delegate?.workerDidUpdateStatus();
+        this.resolvePendingIndexRequests();
+    }
+
+    /** Resolve callers waiting for the worker to next become idle. */
+    private resolvePendingIndexRequests() {
         const onNextIdles = this.onNextIdles;
         const countSinceLastIdle = this.countSinceLastIdle;
         this.onNextIdles = [];
         this.countSinceLastIdle = 0;
-        onNextIdles.forEach((f) => f(countSinceLastIdle));
+        onNextIdles.forEach(({ resolve }) => resolve(countSinceLastIdle));
 
         // If no one was waiting, then let the main thread know via a different
         // channel so that it can update the clusters and people.
@@ -356,7 +422,7 @@ logUnhandledErrorsAndRejectionsInWorker();
 /**
  * Index the given batch of items.
  *
- * @returns the count of items which were indexed.
+ * @returns the number of indexed items and any process-blocking init error.
  */
 const indexNextBatch = async (
     items: IndexableItem[],
@@ -368,7 +434,7 @@ const indexNextBatch = async (
     // were able to upload just a bit ago but don't have network now.
     if (!self.navigator.onLine) {
         log.info("Skipping ML indexing since we are not online");
-        return 0;
+        return { indexedCount: 0 };
     }
 
     // Keep track if any of the items failed.
@@ -378,7 +444,7 @@ const indexNextBatch = async (
     const tasks = new Array<Promise<void> | undefined>(4).fill(undefined);
 
     let i = 0;
-    while (i < items.length) {
+    while (i < items.length && !_blockingMLInitError) {
         for (let j = 0; j < tasks.length; j++) {
             if (i < items.length && !tasks[j]) {
                 // Use an IIFE to capture the value of j at the time of
@@ -391,6 +457,9 @@ const indexNextBatch = async (
                         .catch((e: unknown) => {
                             const f = fileLogID(item.file);
                             log.error(`Failed to index ${f}`, e);
+                            if (isMLInitError(e)) {
+                                _blockingMLInitError ??= e;
+                            }
                             failureCount++;
                             tasks[j] = undefined;
                         }))(items[i++]!, j);
@@ -415,16 +484,16 @@ const indexNextBatch = async (
     // Clear any cached CLIP indexes, since now we might have new ones.
     clearCachedCLIPIndexes();
 
-    const indexedCount = items.length - failureCount;
+    const attemptedCount = i;
+    const indexedCount = attemptedCount - failureCount;
 
     log.info(
         failureCount > 0
             ? `Indexed ${indexedCount} files (${failureCount} failed)`
-            : `Indexed ${items.length} files`,
+            : `Indexed ${attemptedCount} files`,
     );
 
-    // Return the count of indexed files.
-    return indexedCount;
+    return { indexedCount, blockingInitError: _blockingMLInitError };
 };
 
 /**
@@ -452,6 +521,13 @@ const syncWithLocalFilesAndGetFilesToIndex = async (
     const fileIDsToIndex = await readNextIndexableFileIDs(count);
     return new Map(fileIDsToIndex.map((id) => [id, fileByID.get(id)!]));
 };
+
+/**
+ * The maximum size (in bytes) of files that we will index.
+ *
+ * The same limit is used by the mobile app.
+ */
+const maxIndexableFileSize = 100 * 1000 * 1000; /* 100 MB */
 
 /**
  * Index file, save the persist the results locally, and put them on remote.
@@ -540,9 +616,19 @@ const index = async (
 
     // There is at least one ML data type that still needs to be indexed.
 
-    let renderableBlob: Blob;
+    let source: IndexableImageSource;
     try {
-        renderableBlob = await fetchRenderableBlob(
+        // Videos are indexed using their thumbnails, so the size of the video
+        // file itself does not matter.
+        if (
+            file.metadata.fileType != FileType.video &&
+            (file.info?.fileSize ?? 0) > maxIndexableFileSize
+        ) {
+            throw new Error(
+                `File too large to index (${file.info?.fileSize} bytes)`,
+            );
+        }
+        source = await fetchIndexableImageSource(
             file,
             processableUploadItem,
             electron,
@@ -555,104 +641,277 @@ const index = async (
         throw e;
     }
 
-    let image: ImageBitmapAndData;
+    const runFaces = !existingFaceIndex;
+    const runClip = !existingCLIPIndex;
+
+    const startTime = Date.now();
+
+    let result: MLWorkerAnalyzeImageResult;
     try {
-        image = await createImageBitmapAndData(renderableBlob);
+        result = await analyzeImageWithConversionFallback(
+            file,
+            source,
+            { runFaces, runClip },
+            electron,
+        );
     } catch (e) {
-        // If we cannot get the raw image data for the file, then retrying again
-        // won't help (if in the future we enhance the underlying code for
-        // `indexableBlobs` to handle this failing type we can trigger a
-        // reindexing attempt for failed files).
-        //
+        // Only failures inherent to the image (including the JPEG conversion
+        // fallback below) are permanent. Runtime and infrastructure failures
+        // should be retried after the underlying issue is resolved.
         // See: [Note: Transient and permanent indexing failures]
-        await markIndexingFailed(fileID);
+        if (isMLImageError(e)) await markIndexingFailed(fileID);
         throw e;
     }
 
+    const faceIndex = existingFaceIndex ?? faceIndexFromAnalysisResult(result);
+    const clipIndex = existingCLIPIndex ?? clipIndexFromAnalysisResult(result);
+    const indexFlags = mlIndexFlagsForRustResult(result);
+
+    log.debug(() => {
+        const ms = Date.now() - startTime;
+        const msg = [];
+        if (runFaces) msg.push(`${faceIndex.faces.length} faces`);
+        if (runClip) msg.push("clip");
+        return `Indexed ${msg.join(" and ")} in ${f} (${ms} ms)`;
+    });
+
+    const remoteFaceIndex =
+        existingFaceIndex && existingRemoteFaceIndex
+            ? existingRemoteFaceIndex
+            : {
+                  version: faceIndexingVersion,
+                  client: clientIdentifier,
+                  flags: indexFlags,
+                  ...faceIndex,
+              };
+
+    const remoteCLIPIndex =
+        existingCLIPIndex && existingRemoteCLIPIndex
+            ? existingRemoteCLIPIndex
+            : {
+                  version: clipIndexingVersion,
+                  client: clientIdentifier,
+                  flags: indexFlags,
+                  ...clipIndex,
+              };
+
+    // Perform an "upsert" by using the existing raw data we got from the
+    // remote as the base, and inserting or overwriting only the parts we
+    // actually (re)indexed. Preserving the raw entry for a kept
+    // face/clip retains any inner keys that the current client's Zod
+    // schema doesn't know about (e.g. a `flags` bitmask set by a
+    // different client). See: [Note: Preserve unknown ML data fields].
+
+    const existingRawMLData = remoteMLData?.raw ?? {};
+    const rawMLData: RawRemoteMLData = {
+        ...existingRawMLData,
+        ...(existingFaceIndex ? {} : { face: remoteFaceIndex }),
+        ...(existingCLIPIndex ? {} : { clip: remoteCLIPIndex }),
+    };
+
+    log.debug(() => ["Uploading ML data", rawMLData]);
+
     try {
-        let faceIndex: FaceIndex;
-        let clipIndex: CLIPIndex;
-
-        const startTime = Date.now();
-
-        try {
-            [faceIndex, clipIndex] = await Promise.all([
-                existingFaceIndex ?? indexFaces(file, image, electron),
-                existingCLIPIndex ?? indexCLIP(image, electron),
-            ]);
-        } catch (e) {
-            // See: [Note: Transient and permanent indexing failures]
-            await markIndexingFailed(fileID);
-            throw e;
-        }
-
-        log.debug(() => {
-            const ms = Date.now() - startTime;
-            const msg = [];
-            if (!existingFaceIndex) msg.push(`${faceIndex.faces.length} faces`);
-            if (!existingCLIPIndex) msg.push("clip");
-            return `Indexed ${msg.join(" and ")} in ${f} (${ms} ms)`;
-        });
-
-        const remoteFaceIndex = existingRemoteFaceIndex ?? {
-            version: faceIndexingVersion,
-            client: clientIdentifier,
-            ...faceIndex,
-        };
-
-        const remoteCLIPIndex = existingRemoteCLIPIndex ?? {
-            version: clipIndexingVersion,
-            client: clientIdentifier,
-            ...clipIndex,
-        };
-
-        // Perform an "upsert" by using the existing raw data we got from the
-        // remote as the base, and inserting or overwriting only the parts we
-        // actually (re)indexed. Preserving the raw entry for a kept
-        // face/clip retains any inner keys that the current client's Zod
-        // schema doesn't know about (e.g. a `flags` bitmask set by a
-        // different client). See: [Note: Preserve unknown ML data fields].
-
-        const existingRawMLData = remoteMLData?.raw ?? {};
-        const rawMLData: RawRemoteMLData = {
-            ...existingRawMLData,
-            ...(existingFaceIndex ? {} : { face: remoteFaceIndex }),
-            ...(existingCLIPIndex ? {} : { clip: remoteCLIPIndex }),
-        };
-
-        log.debug(() => ["Uploading ML data", rawMLData]);
-
-        try {
-            const lastUpdatedAt = remoteMLData?.updatedAt ?? 0;
-            await putMLData(file, rawMLData, lastUpdatedAt);
-        } catch (e) {
-            // See: [Note: Transient and permanent indexing failures]
-            if (isHTTP4xxError(e)) {
-                // 409 Conflict indicates that we tried overwriting existing
-                // mldata. Don't mark it as a failure, the file has already been
-                // processed.
-                if (!isHTTPErrorWithStatus(e, 409)) {
-                    await markIndexingFailed(fileID);
-                }
-            }
-            throw e;
-        }
-
-        await saveIndexes({ fileID, ...faceIndex }, { fileID, ...clipIndex });
-
-        // This step, saving face crops, is conceptually not part of the
-        // indexing pipeline; we just do it here since we have already have the
-        // ImageBitmap at hand.
-        if (!existingFaceIndex) {
-            try {
-                await saveFaceCrops(image.bitmap, faceIndex);
-            } catch (e) {
-                // Ignore errors that happen during this since it does not
-                // impact the generated face index.
-                log.error(`Failed to save face crops for ${f}`, e);
+        const lastUpdatedAt = remoteMLData?.updatedAt ?? 0;
+        await putMLData(file, rawMLData, lastUpdatedAt);
+    } catch (e) {
+        // See: [Note: Transient and permanent indexing failures]
+        if (isHTTP4xxError(e)) {
+            // 409 Conflict indicates that we tried overwriting existing
+            // mldata. Don't mark it as a failure, the file has already been
+            // processed.
+            if (!isHTTPErrorWithStatus(e, 409)) {
+                await markIndexingFailed(fileID);
             }
         }
-    } finally {
-        image.bitmap.close();
+        throw e;
     }
+
+    await saveIndexes({ fileID, ...faceIndex }, { fileID, ...clipIndex });
+
+    // This step, saving face crops, is conceptually not part of the indexing
+    // pipeline; we just do it here since the analysis has already generated
+    // the crops for us from its decode of the original.
+    if (runFaces && result.faceCrops) {
+        try {
+            await saveFaceCropBlobs(result.faceCrops, faceIndex);
+        } catch (e) {
+            // Ignore errors that happen during this since it does not
+            // impact the generated face index.
+            log.error(`Failed to save face crops for ${f}`, e);
+        }
+    }
+};
+
+/**
+ * `true` if the pet recognition models should also run while indexing.
+ *
+ * Pet recognition is still under development and not yet enabled anywhere.
+ * When it ships, this gate should mirror the mobile one (mobile's
+ * `flagService.petEnabled` is derived from the remote `internalUser` flag),
+ * and the pet results in the analysis response, currently ignored, will need
+ * to be persisted.
+ */
+const petsIndexingEnabled = false;
+
+/**
+ * Run the native ML pipeline on the given image source.
+ *
+ * The native side decodes all common formats (including HEIC, JXL and TIFF)
+ * by itself, but not some rarer ones (e.g. camera RAW). For formats which the
+ * app handles by converting to JPEG, retry the analysis with the converted
+ * JPEG if the native decode reports a failure.
+ */
+const analyzeImageWithConversionFallback = async (
+    file: EnteFile,
+    source: IndexableImageSource,
+    { runFaces, runClip }: { runFaces: boolean; runClip: boolean },
+    electron: ElectronMLWorker,
+): Promise<MLWorkerAnalyzeImageResult> => {
+    const request = {
+        fileID: file.id,
+        runFaces,
+        runClip,
+        runPets: petsIndexingEnabled,
+        generateFaceCrops: runFaces,
+    };
+
+    try {
+        return await enqueueAnalyzeImage(electron, { ...request, ...source });
+    } catch (e) {
+        const ext = lowercaseExtension(fileFileName(file));
+        if (!isMLDecodeError(e) || !ext || !needsJPEGConversion(ext)) throw e;
+
+        log.info(
+            `Native decode of ${fileLogID(file)} failed, retrying with a JPEG conversion`,
+            e,
+        );
+        let bytes: Uint8Array;
+        try {
+            bytes = await renderableImageBytes(file, source);
+        } catch (conversionError) {
+            const message =
+                conversionError instanceof Error
+                    ? conversionError.message
+                    : String(conversionError);
+            throw new MLAnalyzeError(
+                "image",
+                `JPEG conversion fallback failed: ${message}`,
+            );
+        }
+        return await enqueueAnalyzeImage(electron, { ...request, bytes });
+    }
+};
+
+/** `true` for a permanent failure inherent to the image being analyzed. */
+const isMLImageError = (e: unknown): e is MLAnalyzeError =>
+    e instanceof MLAnalyzeError && e.kind == "image";
+
+/** `true` specifically for the Rust image decoder failure that permits fallback. */
+const isMLDecodeError = (e: unknown) =>
+    isMLImageError(e) && e.message.startsWith("Decode: ");
+
+const isMLInitError = (e: unknown): e is MLAnalyzeError =>
+    e instanceof MLAnalyzeError && e.kind == "init";
+
+class MLAnalyzeError extends Error {
+    constructor(
+        public readonly kind: MLWorkerAnalyzeImageErrorKind,
+        message: string,
+    ) {
+        super(message);
+        this.name = "MLAnalyzeError";
+    }
+}
+
+/**
+ * A promise queue serializing calls to {@link ElectronMLWorker.analyzeImage}.
+ *
+ * We process multiple files in parallel so that the fetch (and decrypt) of
+ * subsequent items can proceed while one is being analyzed, but keep only a
+ * single native inference outstanding at a time: the native model sessions
+ * serialize anyway, and queueing on our end avoids tying up worker threads in
+ * the utility process.
+ */
+let _analyzeImageQueue: Promise<unknown> = Promise.resolve();
+
+/** The native addon is loaded only once, so this error cannot recover here. */
+let _blockingMLInitError: MLAnalyzeError | undefined;
+
+const enqueueAnalyzeImage = (
+    electron: ElectronMLWorker,
+    request: MLWorkerAnalyzeImageRequest,
+): Promise<MLWorkerAnalyzeImageResult> => {
+    const result = _analyzeImageQueue.then(async () => {
+        const response = await electron.analyzeImage(request);
+        if (!response.ok) {
+            throw new MLAnalyzeError(
+                response.error.kind,
+                response.error.message,
+            );
+        }
+        return response.result;
+    });
+    _analyzeImageQueue = result.catch(() => undefined);
+    return result;
+};
+
+/**
+ * Convert the face related parts of an analysis result into the
+ * {@link FaceIndex} shape that we persist and upload.
+ *
+ * The coordinates in the result are already relative (normalized 0-1), and
+ * the faceIDs already have the format that the (legacy) web pipeline used, so
+ * this is a mechanical reshaping.
+ */
+const faceIndexFromAnalysisResult = (
+    result: MLWorkerAnalyzeImageResult,
+): FaceIndex => {
+    const faces = result.faces;
+    if (!faces) throw new Error("Analysis result is missing the face index");
+
+    const { width, height } = result.decodedImageSize;
+
+    return {
+        width,
+        height,
+        faces: faces.map((face) => ({
+            faceID: face.faceId,
+            detection: {
+                box: {
+                    x: face.detection.boxXyxy[0]!,
+                    y: face.detection.boxXyxy[1]!,
+                    width:
+                        face.detection.boxXyxy[2]! - face.detection.boxXyxy[0]!,
+                    height:
+                        face.detection.boxXyxy[3]! - face.detection.boxXyxy[1]!,
+                },
+                landmarks: face.detection.keypoints.map((point) => ({
+                    x: point[0]!,
+                    y: point[1]!,
+                })),
+            },
+            score: face.detection.score,
+            blur: face.blurValue,
+            // Keep persisted and remote indexes as ordinary arrays. The
+            // native/IPC boundary uses Float32Array to avoid widening and an
+            // extra allocation, but JSON does not serialize typed arrays as
+            // arrays.
+            embedding: Array.from(face.embedding),
+        })),
+    };
+};
+
+/**
+ * Extract the CLIP image embedding from an analysis result.
+ *
+ * The embedding produced by the native pipeline is already normalized.
+ */
+const clipIndexFromAnalysisResult = (
+    result: MLWorkerAnalyzeImageResult,
+): CLIPIndex => {
+    const embedding = result.clip?.embedding;
+    if (!embedding)
+        throw new Error("Analysis result is missing the CLIP embedding");
+    return { embedding: Array.from(embedding) };
 };

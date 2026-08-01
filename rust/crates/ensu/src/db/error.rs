@@ -28,7 +28,10 @@ pub enum Error {
     NotFound { entity: EntityType, id: uuid::Uuid },
 
     #[error(transparent)]
-    Crypto(#[from] ente_core::crypto::CryptoError),
+    Crypto(#[from] ente_core::crypto::Error),
+
+    #[error(transparent)]
+    Base64Decode(#[from] ente_core::b64::DecodeError),
 
     #[error(transparent)]
     SerdeJson(#[from] serde_json::Error),
@@ -42,16 +45,30 @@ pub enum Error {
     #[error(transparent)]
     Io(#[from] std::io::Error),
 
-    #[error(transparent)]
-    Image(#[from] ente_image::ImageError),
+    #[error("database is readonly")]
+    ReadonlyDatabase,
 
     #[cfg(feature = "sqlite")]
     #[error(transparent)]
-    Sqlite(#[from] rusqlite::Error),
+    Sqlite(rusqlite::Error),
 
     #[error("unsupported operation: {0}")]
     UnsupportedOperation(String),
 
     #[error("migration error: {0}")]
     Migration(String),
+}
+
+#[cfg(feature = "sqlite")]
+impl From<rusqlite::Error> for Error {
+    fn from(err: rusqlite::Error) -> Self {
+        match &err {
+            rusqlite::Error::SqliteFailure(failure, _)
+                if failure.code == rusqlite::ErrorCode::ReadOnly =>
+            {
+                Error::ReadonlyDatabase
+            }
+            _ => Error::Sqlite(err),
+        }
+    }
 }

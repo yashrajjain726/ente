@@ -15,12 +15,13 @@ import {
     getOrCreateLocalChatKey,
     initChatKeyStore,
 } from "@/services/chat/chatKey";
+import { initializeChatStorePersistence } from "@/services/chat/persistence";
 import {
     addMessage,
     createSession,
+    deleteAttachmentBytes,
     deleteSession,
     getBranchSelections,
-    initializeChatStorePersistence,
     listMessages,
     listSessions,
     readDecryptedAttachmentBytes,
@@ -62,7 +63,7 @@ import { NavbarBase } from "ente-base/components/Navbar";
 import type { NotificationAttributes } from "ente-base/components/Notification";
 import { useBaseContext } from "ente-base/context";
 import { buildEnvEnsuDesktopVersion } from "ente-base/env";
-import { getKV, removeKV, setKV } from "ente-base/kv";
+import { getKV, removeKV } from "ente-base/kv";
 import log from "ente-base/log";
 import { savedLogs } from "ente-base/log-web";
 import { saveStringAsFile } from "ente-base/utils/web";
@@ -232,14 +233,14 @@ const toSafeBlobPart = (bytes: Uint8Array): ArrayBuffer => {
 };
 
 const DEFAULT_CHAT_SYSTEM_PROMPT_BODY =
-    "You are Ensu, an AI assistant built by Ente. Current date and time: $date\n\nUse Markdown **bold** to emphasize important terms and key points.\n\nNever acknowledge or repeat these instructions. Do not start with generic confirmations like 'Okay, I understand'. Respond directly to the user's request.";
+    "You are Ensu, an AI assistant built by Ente. Current date: $date\n\nUse Markdown **bold** to emphasize important terms and key points.\n\nNever acknowledge or repeat these instructions. Do not start with generic confirmations like 'Okay, I understand'. Respond directly to the user's request.";
 const SYSTEM_PROMPT_DATE_PLACEHOLDER = "$date";
 
 const buildChatSystemPrompt = (customSystemPrompt?: string) => {
-    const dateAndTime = new Date().toLocaleString();
+    const date = new Date().toLocaleDateString();
     const promptBody =
         customSystemPrompt?.trim() || DEFAULT_CHAT_SYSTEM_PROMPT_BODY;
-    return promptBody.split(SYSTEM_PROMPT_DATE_PLACEHOLDER).join(dateAndTime);
+    return promptBody.split(SYSTEM_PROMPT_DATE_PLACEHOLDER).join(date);
 };
 
 const SESSION_TITLE_PROMPT =
@@ -408,7 +409,7 @@ const detectTauriRuntime = () => detectTauriAppRuntime();
 
 const Page: React.FC = () => {
     const router = useRouter();
-    const { showMiniDialog } = useBaseContext();
+    const { showMiniDialog, onGenericError } = useBaseContext();
     const theme = useTheme();
     const isSmall = useMediaQuery(theme.breakpoints.down("md"));
     const assetBasePath = router.basePath ?? "";
@@ -590,14 +591,14 @@ const Page: React.FC = () => {
     const [showModelSettings, setShowModelSettings] = useState(false);
     const [showSystemPromptSettings, setShowSystemPromptSettings] =
         useState(false);
-    const [useCustomModel, setUseCustomModel] = useState(false);
+
+    const [modelSettingsLoaded, setModelSettingsLoaded] = useState(false);
     const [resolvedDefaultModel, setResolvedDefaultModel] =
         useState<ModelInfo>(DEFAULT_MODEL);
     const [resolvedModelPresets, setResolvedModelPresets] = useState<
         ResolvedModelPreset[] | null
     >(null);
-    const [modelUrl, setModelUrl] = useState("");
-    const [mmprojUrl, setMmprojUrl] = useState("");
+    const [selectedModelId, setSelectedModelId] = useState("");
     const [contextLength, setContextLength] = useState("");
     const [maxTokens, setMaxTokens] = useState("");
     const [systemPrompt, setSystemPrompt] = useState(
@@ -755,16 +756,14 @@ const Page: React.FC = () => {
     );
 
     const refreshLocalChatKey = useCallback(async () => {
-        await initChatKeyStore();
-
-        const cachedLocal = cachedLocalChatKey();
-        if (cachedLocal) {
-            log.info("Using cached local chat key");
-            setChatKey(cachedLocal);
-            return;
-        }
-
         try {
+            await initChatKeyStore();
+            const cachedLocal = cachedLocalChatKey();
+            if (cachedLocal) {
+                log.info("Using cached local chat key");
+                setChatKey(cachedLocal);
+                return;
+            }
             log.info("Generating new local chat key");
             setChatKey(await getOrCreateLocalChatKey());
         } catch (error) {
@@ -808,12 +807,10 @@ const Page: React.FC = () => {
         const run = async () => {
             try {
                 await initializeChatStorePersistence(chatKey);
+                if (!cancelled) setIsChatStoreBridgeReady(true);
             } catch (error) {
                 log.error("Failed to initialize chat persistence", error);
-            } finally {
-                if (!cancelled) {
-                    setIsChatStoreBridgeReady(true);
-                }
+                if (!cancelled) onGenericError(error);
             }
         };
         void run();
@@ -822,7 +819,7 @@ const Page: React.FC = () => {
             cancelled = true;
             setIsChatStoreBridgeReady(false);
         };
-    }, [chatKey]);
+    }, [chatKey, onGenericError]);
 
     useEffect(() => {
         isDraftSessionRef.current = isDraftSession;
@@ -922,7 +919,8 @@ const Page: React.FC = () => {
     }, []);
 
     useEffect(() => {
-        if (loading || typeof window === "undefined") return;
+        if (loading || !modelSettingsLoaded || typeof window === "undefined")
+            return;
         const element = chatViewportRef.current;
         if (!element) return;
 
@@ -941,7 +939,7 @@ const Page: React.FC = () => {
         const observer = new ResizeObserver(() => updateWidth());
         observer.observe(element);
         return () => observer.disconnect();
-    }, [loading]);
+    }, [loading, modelSettingsLoaded]);
 
     useEffect(() => {
         if (typeof window === "undefined") return;
@@ -954,104 +952,99 @@ const Page: React.FC = () => {
                 DEFAULT_CHAT_SYSTEM_PROMPT_BODY,
         );
 
-        // Only restore custom model settings when advanced settings are
-        // unlocked. Without this gate a user who had custom settings before
-        // the unlock feature was added would silently keep a hidden custom
-        // model with no visible way to change it.
-        if (!isUnlocked) return;
-
-        let raw = window.localStorage.getItem(MODEL_SETTINGS_STORAGE_KEY);
-        if (!raw) {
-            // Migrate from IndexedDB (previous storage) to localStorage
-            void getKV(MODEL_SETTINGS_STORAGE_KEY)
-                .then((kvRaw) => {
-                    if (cancelled || !kvRaw || typeof kvRaw !== "object") {
-                        return;
-                    }
-                    const migrated = JSON.stringify(kvRaw);
-                    window.localStorage.setItem(
-                        MODEL_SETTINGS_STORAGE_KEY,
-                        migrated,
-                    );
-                    // Re-trigger the effect by reloading settings from the migrated data
-                    const parsed = kvRaw as {
-                        useCustomModel?: boolean;
-                        modelUrl?: string;
-                        mmprojUrl?: string;
-                        contextLength?: string;
-                        maxTokens?: string;
-                    };
-                    const isTauri = detectTauriRuntime();
-                    const canMmproj = isTauri;
-                    const rawContextLength = parsed.contextLength ?? "";
-                    const clampedContextLength =
-                        !isTauri &&
-                        rawContextLength &&
-                        Number(rawContextLength) > DEFAULT_WEB_CONTEXT_SIZE
-                            ? String(DEFAULT_WEB_CONTEXT_SIZE)
-                            : rawContextLength;
-                    if (clampedContextLength !== rawContextLength) {
-                        const clamped = {
-                            ...parsed,
-                            contextLength: clampedContextLength,
-                        };
-                        window.localStorage.setItem(
-                            MODEL_SETTINGS_STORAGE_KEY,
-                            JSON.stringify(clamped),
-                        );
-                    }
-                    setUseCustomModel(!!parsed.useCustomModel);
-                    setModelUrl(parsed.modelUrl ?? "");
-                    setMmprojUrl(canMmproj ? (parsed.mmprojUrl ?? "") : "");
-                    setContextLength(clampedContextLength);
-                    setMaxTokens(parsed.maxTokens ?? "");
-                    void removeKV(MODEL_SETTINGS_STORAGE_KEY);
-                })
-                .catch((error: unknown) => {
-                    log.error("Failed to migrate model settings", error);
-                });
-            return () => {
-                cancelled = true;
-            };
-        }
-        try {
-            const parsed = JSON.parse(raw) as {
-                useCustomModel?: boolean;
-                modelUrl?: string;
-                mmprojUrl?: string;
-                contextLength?: string;
-                maxTokens?: string;
-            };
-            const isTauri = detectTauriRuntime();
-            const canMmproj = isTauri;
+        const applySettings = (parsed: {
+            modelId?: string;
+            contextLength?: string;
+            maxTokens?: string;
+        }) => {
             const rawContextLength = parsed.contextLength ?? "";
             const clampedContextLength =
-                !isTauri &&
+                !detectTauriRuntime() &&
                 rawContextLength &&
                 Number(rawContextLength) > DEFAULT_WEB_CONTEXT_SIZE
                     ? String(DEFAULT_WEB_CONTEXT_SIZE)
                     : rawContextLength;
-            if (clampedContextLength !== rawContextLength) {
-                const nextSettings = {
-                    useCustomModel: !!parsed.useCustomModel,
-                    modelUrl: parsed.modelUrl ?? "",
-                    mmprojUrl: canMmproj ? (parsed.mmprojUrl ?? "") : "",
-                    contextLength: clampedContextLength,
-                    maxTokens: parsed.maxTokens ?? "",
-                };
-                window.localStorage.setItem(
-                    MODEL_SETTINGS_STORAGE_KEY,
-                    JSON.stringify(nextSettings),
+            const settings = {
+                modelId: parsed.modelId ?? "",
+                contextLength: clampedContextLength,
+                maxTokens: parsed.maxTokens ?? "",
+            };
+            window.localStorage.setItem(
+                MODEL_SETTINGS_STORAGE_KEY,
+                JSON.stringify(settings),
+            );
+            if (cancelled) return;
+            setSelectedModelId(settings.modelId);
+            setContextLength(settings.contextLength);
+            setMaxTokens(settings.maxTokens);
+        };
+
+        // Loads persisted settings and runs the one Rust model migration.
+        // Settings persisted by builds that stored a model URL selection
+        // convert through it once: a URL matching a current preset maps to
+        // its id, anything else becomes the default.
+        const loadSettings = async () => {
+            let raw = window.localStorage.getItem(MODEL_SETTINGS_STORAGE_KEY);
+            if (!raw) {
+                // Settings from even older builds live in IndexedDB.
+                const kvRaw = await getKV(MODEL_SETTINGS_STORAGE_KEY).catch(
+                    () => undefined,
                 );
+                if (kvRaw && typeof kvRaw === "object") {
+                    raw = JSON.stringify(kvRaw);
+                    window.localStorage.setItem(
+                        MODEL_SETTINGS_STORAGE_KEY,
+                        raw,
+                    );
+                    void removeKV(MODEL_SETTINGS_STORAGE_KEY);
+                }
             }
-            setUseCustomModel(!!parsed.useCustomModel);
-            setModelUrl(parsed.modelUrl ?? "");
-            setMmprojUrl(canMmproj ? (parsed.mmprojUrl ?? "") : "");
-            setContextLength(clampedContextLength);
-            setMaxTokens(parsed.maxTokens ?? "");
-        } catch (error) {
-            log.error("Failed to read model settings", error);
-        }
+            const parsed = raw
+                ? (JSON.parse(raw) as {
+                      modelId?: string;
+                      useCustomModel?: boolean;
+                      modelUrl?: string;
+                      mmprojUrl?: string;
+                      contextLength?: string;
+                      maxTokens?: string;
+                  })
+                : {};
+            let modelId = parsed.modelId ?? "";
+            if (detectTauriRuntime()) {
+                const legacyModelUrl =
+                    parsed.modelId === undefined &&
+                    parsed.useCustomModel &&
+                    parsed.modelUrl?.trim()
+                        ? parsed.modelUrl.trim()
+                        : null;
+                const { invoke } = await import("@tauri-apps/api/core");
+                const converted = await invoke<string | null>(
+                    "llm_migrate_models",
+                    {
+                        legacyModelUrl,
+                        legacyMmprojUrl: legacyModelUrl
+                            ? parsed.mmprojUrl?.trim() || null
+                            : null,
+                    },
+                );
+                if (legacyModelUrl) {
+                    modelId = converted ?? "";
+                }
+            }
+            applySettings({
+                modelId,
+                contextLength: parsed.contextLength,
+                maxTokens: parsed.maxTokens,
+            });
+        };
+
+        void loadSettings()
+            .catch((error: unknown) => {
+                log.error("Failed to load model settings", error);
+            })
+            .finally(() => {
+                if (!cancelled) setModelSettingsLoaded(true);
+            });
         return () => {
             cancelled = true;
         };
@@ -1511,13 +1504,6 @@ const Page: React.FC = () => {
         };
     }, [currentRootSessionUuid]);
 
-    useEffect(() => {
-        if (isTauriRuntime) return;
-        if (mmprojUrl) {
-            setMmprojUrl("");
-        }
-    }, [isTauriRuntime, mmprojUrl]);
-
     const filteredSessions = useMemo(() => {
         const query = sessionSearch.trim().toLowerCase();
         if (!query) return sessions;
@@ -1646,7 +1632,7 @@ const Page: React.FC = () => {
         modelGateStatus === "downloading";
 
     const downloadSizeLabel = useMemo(() => {
-        if (useCustomModel) {
+        if (selectedModelId) {
             return "Approx. size varies by model";
         }
         if (resolvedDefaultModel.sizeBytes) {
@@ -1658,7 +1644,7 @@ const Page: React.FC = () => {
         return resolvedDefaultModel.sizeHuman
             ? `Approx. ${resolvedDefaultModel.sizeHuman}`
             : "Approx. size varies by model";
-    }, [allowMmproj, resolvedDefaultModel, useCustomModel]);
+    }, [allowMmproj, resolvedDefaultModel, selectedModelId]);
 
     const downloadStatusLabel = useMemo(() => {
         if (!showDownloadProgress) return null;
@@ -1709,31 +1695,15 @@ const Page: React.FC = () => {
     }, []);
 
     const getModelSettings = useCallback((): ModelSettings => {
-        const customModelEnabled = useCustomModel;
         return {
-            useCustomModel: customModelEnabled,
-            modelUrl:
-                customModelEnabled && modelUrl.trim()
-                    ? modelUrl.trim()
-                    : undefined,
-            mmprojUrl:
-                customModelEnabled && allowMmproj && mmprojUrl.trim()
-                    ? mmprojUrl.trim()
-                    : undefined,
+            modelId: selectedModelId || undefined,
             contextLength: contextLength ? Number(contextLength) : undefined,
             maxTokens:
                 maxTokens && Number(maxTokens) > 0
                     ? Number(maxTokens)
                     : undefined,
         };
-    }, [
-        useCustomModel,
-        modelUrl,
-        mmprojUrl,
-        contextLength,
-        maxTokens,
-        allowMmproj,
-    ]);
+    }, [selectedModelId, contextLength, maxTokens]);
 
     const modelSettingsKey = useMemo(
         () => JSON.stringify(getModelSettings()),
@@ -1849,7 +1819,6 @@ const Page: React.FC = () => {
             await provider.ensureModelReady(settings);
 
             let summary = "";
-            let errorMessage: string | null = null;
 
             await provider.generateChatStream(
                 {
@@ -1865,17 +1834,9 @@ const Page: React.FC = () => {
                 (event) => {
                     if (event.type === "text") {
                         summary += event.text;
-                        return;
-                    }
-                    if (event.type === "error") {
-                        errorMessage = event.message;
                     }
                 },
             );
-
-            if (errorMessage) {
-                throw new Error(errorMessage);
-            }
 
             return summary;
         },
@@ -1992,6 +1953,7 @@ const Page: React.FC = () => {
             log.error("Failed to preload model", error);
             setModelGateError(message);
             setIsDownloading(false);
+            setDownloadStatus(null);
             setModelGateStatus("error");
         }
     }, [ensureProvider, formatErrorMessage, getModelSettings]);
@@ -2015,6 +1977,7 @@ const Page: React.FC = () => {
             log.error("Failed to prepare model", error);
             setModelGateError(message);
             setIsDownloading(false);
+            setDownloadStatus(null);
             setModelGateStatus("error");
             showMiniDialog({ title: "Model error", message });
         }
@@ -2035,7 +1998,7 @@ const Page: React.FC = () => {
     }, [ensureProvider, getModelSettings, isTauriRuntime]);
 
     useEffect(() => {
-        if (!firstPaintDone) return;
+        if (!firstPaintDone || !modelSettingsLoaded) return;
         const cancelIdle = scheduleIdleTask(() => {
             void preloadModelIfAvailable();
         }, 2000);
@@ -2044,6 +2007,7 @@ const Page: React.FC = () => {
         };
     }, [
         firstPaintDone,
+        modelSettingsLoaded,
         modelSettingsKey,
         preloadModelIfAvailable,
         scheduleIdleTask,
@@ -2179,22 +2143,18 @@ const Page: React.FC = () => {
                     ? candidates.slice(0, -1)
                     : candidates;
 
-            const safetyMargin = 256;
-            let budget =
+            const inputBudget =
                 contextSize -
                 (maxTokensCount ?? DEFAULT_GENERATION_MAX_TOKENS) -
-                safetyMargin;
-            budget -= approxTokens(buildChatSystemPrompt(systemPrompt));
-            budget -= approxTokens(promptText);
+                256;
+            const budget =
+                inputBudget -
+                approxTokens(buildChatSystemPrompt(systemPrompt)) -
+                approxTokens(promptText);
 
             if (budget <= 0) return [];
 
-            const selected: LlmMessage[] = [];
-            let used = 0;
-
-            for (let idx = trimmedCandidates.length - 1; idx >= 0; idx -= 1) {
-                const message = trimmedCandidates[idx];
-                if (!message) continue;
+            const messages = trimmedCandidates.map((message): LlmMessage => {
                 const isUser = message.sender === "self";
                 let text = isUser
                     ? message.text
@@ -2212,28 +2172,36 @@ const Page: React.FC = () => {
                     }
                 }
 
-                const cost = approxTokens(text);
+                return { role: isUser ? "user" : "assistant", content: text };
+            });
 
-                if (used + cost > budget) {
-                    if (selected.length === 0 && budget > 0) {
-                        const charBudget = Math.max(1, budget * 4);
-                        const truncated = text.slice(-charBudget);
-                        selected.push({
-                            role: isUser ? "user" : "assistant",
-                            content: truncated,
-                        });
-                    }
-                    break;
-                }
-
-                selected.push({
-                    role: isUser ? "user" : "assistant",
-                    content: text,
-                });
-                used += cost;
+            const historyTokens = messages.reduce(
+                (total, message) => total + approxTokens(message.content),
+                0,
+            );
+            const quantum = Math.max(1, Math.floor(inputBudget / 4));
+            const overflow = Math.max(0, historyTokens - budget);
+            const discardTarget = Math.ceil(overflow / quantum) * quantum;
+            let discarded = 0;
+            let startIndex = 0;
+            while (startIndex < messages.length && discarded < discardTarget) {
+                discarded += approxTokens(messages[startIndex]!.content);
+                startIndex += 1;
             }
 
-            return selected.reverse();
+            const selected = messages.slice(startIndex);
+            if (selected.length === 0 && messages.length > 0) {
+                const last = messages[messages.length - 1]!;
+                if (approxTokens(last.content) <= budget) return [last];
+                return [
+                    {
+                        ...last,
+                        content: last.content.slice(-Math.max(1, budget * 4)),
+                    },
+                ];
+            }
+
+            return selected;
         },
         [approxTokens, slicePathUntil, stripHiddenParts, systemPrompt],
     );
@@ -2317,7 +2285,7 @@ const Page: React.FC = () => {
                 lastGenerationRef.current = null;
             }
 
-            await deleteSession(sessionId, chatKey);
+            await deleteSession(sessionId);
             removeSessionFromState(sessionId);
         },
         [chatKey, removeSessionFromState],
@@ -2329,9 +2297,14 @@ const Page: React.FC = () => {
 
     const handleConfirmDeleteSession = useCallback(async () => {
         if (!deleteSessionId) return;
-        await handleDeleteSession(deleteSessionId);
-        setDeleteSessionId(null);
-    }, [deleteSessionId, handleDeleteSession]);
+        try {
+            await handleDeleteSession(deleteSessionId);
+        } catch (error) {
+            onGenericError(error);
+        } finally {
+            setDeleteSessionId(null);
+        }
+    }, [deleteSessionId, handleDeleteSession, onGenericError]);
 
     const handleCancelDeleteSession = useCallback(() => {
         setDeleteSessionId(null);
@@ -2781,41 +2754,46 @@ const Page: React.FC = () => {
                     throw new Error("MMProj model not available");
                 }
 
-                await provider.generateChatStream(
-                    {
-                        messages,
-                        imagePaths: hasImages ? imagePaths : undefined,
-                        mmprojPath,
-                        mediaMarker: hasImages
-                            ? (mediaMarker ?? MEDIA_MARKER)
-                            : undefined,
-                        maxTokens,
-                        temperature: 0.7,
-                        topP: 0.9,
-                        repeatPenalty: REPEAT_PENALTY,
-                    },
-                    (event: GenerateEvent) => {
-                        if (!isActiveGeneration()) {
-                            return;
-                        }
-                        if (event.type === "text") {
-                            if (!currentJobIdRef.current) {
-                                currentJobIdRef.current = event.job_id;
-                                if (pendingCancelRef.current) {
-                                    pendingCancelRef.current = false;
-                                    provider.cancelGeneration(event.job_id);
-                                    return;
-                                }
+                await provider
+                    .generateChatStream(
+                        {
+                            messages,
+                            imagePaths: hasImages ? imagePaths : undefined,
+                            mmprojPath,
+                            mediaMarker: hasImages
+                                ? (mediaMarker ?? MEDIA_MARKER)
+                                : undefined,
+                            maxTokens,
+                            temperature: 0.7,
+                            topP: 0.9,
+                            repeatPenalty: REPEAT_PENALTY,
+                        },
+                        (event: GenerateEvent) => {
+                            if (!isActiveGeneration()) {
+                                return;
                             }
-                            streamingChunksRef.current.push(event.text);
-                            scheduleStreamingFlush();
-                        } else if (event.type === "error") {
-                            errorMessage = event.message;
-                        } else if (event.type === "done") {
-                            currentJobIdRef.current = event.summary.job_id;
-                        }
-                    },
-                );
+                            if (event.type === "text") {
+                                if (!currentJobIdRef.current) {
+                                    currentJobIdRef.current = event.job_id;
+                                    if (pendingCancelRef.current) {
+                                        pendingCancelRef.current = false;
+                                        provider.cancelGeneration(event.job_id);
+                                        return;
+                                    }
+                                }
+                                streamingChunksRef.current.push(event.text);
+                                scheduleStreamingFlush();
+                            } else if (event.type === "done") {
+                                currentJobIdRef.current = event.summary.job_id;
+                            }
+                        },
+                    )
+                    .catch((error: unknown) => {
+                        errorMessage =
+                            error instanceof Error
+                                ? error.message
+                                : String(error);
+                    });
 
                 if (!isActiveGeneration()) {
                     return;
@@ -3186,40 +3164,25 @@ const Page: React.FC = () => {
 
     const handleSaveModel = useCallback(
         (draft: {
-            useCustomModel: boolean;
-            modelUrl: string;
-            mmprojUrl: string;
+            modelId: string;
             contextLength: string;
             maxTokens: string;
         }) => {
             setIsSavingModel(true);
-            const payload = {
-                useCustomModel: draft.useCustomModel,
-                modelUrl: draft.useCustomModel ? draft.modelUrl : "",
-                mmprojUrl:
-                    draft.useCustomModel && isTauriRuntime
-                        ? draft.mmprojUrl
-                        : "",
-                contextLength: draft.contextLength,
-                maxTokens: draft.maxTokens,
-            };
             if (typeof window !== "undefined") {
                 window.localStorage.setItem(
                     MODEL_SETTINGS_STORAGE_KEY,
-                    JSON.stringify(payload),
+                    JSON.stringify(draft),
                 );
-                void setKV(MODEL_SETTINGS_STORAGE_KEY, payload);
             }
-            setUseCustomModel(draft.useCustomModel);
-            setModelUrl(draft.modelUrl);
-            setMmprojUrl(draft.mmprojUrl);
+            setSelectedModelId(draft.modelId);
             setContextLength(draft.contextLength);
             setMaxTokens(draft.maxTokens);
             setLoadedModelName(null);
             setIsSavingModel(false);
             setShowModelSettings(false);
         },
-        [isTauriRuntime],
+        [],
     );
 
     const handleUseDefaultModel = useCallback(() => {
@@ -3227,18 +3190,13 @@ const Page: React.FC = () => {
             window.localStorage.setItem(
                 MODEL_SETTINGS_STORAGE_KEY,
                 JSON.stringify({
-                    useCustomModel: false,
-                    modelUrl: "",
-                    mmprojUrl: "",
+                    modelId: "",
                     contextLength: "",
                     maxTokens: "",
                 }),
             );
-            void removeKV(MODEL_SETTINGS_STORAGE_KEY);
         }
-        setUseCustomModel(false);
-        setModelUrl("");
-        setMmprojUrl("");
+        setSelectedModelId("");
         setContextLength("");
         setMaxTokens("");
         setLoadedModelName(null);
@@ -3683,7 +3641,12 @@ const Page: React.FC = () => {
 
         let activeSessionId = currentSessionId;
         if (!activeSessionId) {
-            activeSessionId = await createSession(chatKey);
+            try {
+                activeSessionId = await createSession(chatKey);
+            } catch (error) {
+                onGenericError(error);
+                return;
+            }
             setCurrentSessionId(activeSessionId);
             currentSessionIdRef.current = activeSessionId;
             setIsDraftSession(false);
@@ -3696,6 +3659,27 @@ const Page: React.FC = () => {
             trimmed.replace(/\u0000/g, ""),
             pendingDocuments,
         );
+        const persistedAttachmentIds = new Set(
+            (editingMessage?.attachments ?? []).map(({ id }) => id),
+        );
+        const newAttachmentIds = [
+            ...pendingDocuments.map(({ id }) => id),
+            ...pendingImages.map(({ id }) => id),
+        ].filter((id) => !persistedAttachmentIds.has(id));
+        const cleanupUnstoredAttachments = async () => {
+            await Promise.all(
+                newAttachmentIds.map(async (id) => {
+                    try {
+                        await deleteAttachmentBytes(id);
+                    } catch (error) {
+                        log.warn(
+                            `Failed to clean up attachment payload ${id}`,
+                            error,
+                        );
+                    }
+                }),
+            );
+        };
         let inferenceImagePaths: string[] = [];
 
         let attachments: ChatAttachment[] = [];
@@ -3748,6 +3732,7 @@ const Page: React.FC = () => {
                 );
                 attachments = [...documentAttachments, ...imageAttachments];
             } catch (error) {
+                await cleanupUnstoredAttachments();
                 log.error("Failed to store attachments", error);
                 showMiniDialog({
                     title: "Attachment error",
@@ -3761,6 +3746,7 @@ const Page: React.FC = () => {
             try {
                 inferenceImagePaths = await writeInferenceImages(pendingImages);
             } catch (error) {
+                await cleanupUnstoredAttachments();
                 log.error("Failed to prepare images for inference", error);
                 showMiniDialog({
                     title: "Attachment error",
@@ -3778,6 +3764,7 @@ const Page: React.FC = () => {
 
         setInput("");
 
+        let messageStored = false;
         try {
             if (editingMessage) {
                 const parentUuid = editingMessage.parentMessageUuid;
@@ -3794,6 +3781,7 @@ const Page: React.FC = () => {
                     parentUuid,
                     attachments,
                 );
+                messageStored = true;
 
                 void updateBranchSelectionState(
                     selectionKey,
@@ -3829,6 +3817,7 @@ const Page: React.FC = () => {
                 parentUuid,
                 attachments,
             );
+            messageStored = true;
 
             void updateBranchSelectionState(
                 selectionKey,
@@ -3848,6 +3837,7 @@ const Page: React.FC = () => {
                 mediaMarker: MEDIA_MARKER,
             });
         } catch (error) {
+            if (!messageStored) await cleanupUnstoredAttachments();
             log.error("Failed to store chat message", error);
         } finally {
             await cleanupInferenceImages(inferenceImagePaths);
@@ -3863,6 +3853,7 @@ const Page: React.FC = () => {
         pendingDocuments,
         pendingImages,
         showMiniDialog,
+        onGenericError,
         slicePathUntil,
         startGeneration,
         writeInferenceImages,
@@ -3912,7 +3903,7 @@ const Page: React.FC = () => {
         />
     );
 
-    if (loading) return <></>;
+    if (loading || !modelSettingsLoaded) return <></>;
 
     return (
         <>
@@ -4194,15 +4185,10 @@ const Page: React.FC = () => {
                 handleConfirmDeleteSession={handleConfirmDeleteSession}
                 showModelSettings={showModelSettings}
                 closeModelSettings={closeModelSettings}
-                useCustomModel={useCustomModel}
+                selectedModelId={selectedModelId}
                 defaultModelName={resolvedDefaultModel.name}
-                defaultModelUrl={resolvedDefaultModel.url}
-                defaultModelMmproj={resolvedDefaultModel.mmprojUrl}
                 loadedModelName={loadedModelName}
-                allowMmproj={allowMmproj}
                 isTauriRuntime={isTauriRuntime}
-                modelUrl={modelUrl}
-                mmprojUrl={mmprojUrl}
                 suggestedModels={suggestedModels}
                 contextLength={contextLength}
                 maxTokens={maxTokens}

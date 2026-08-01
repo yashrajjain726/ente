@@ -83,13 +83,13 @@ Yes! Ente's custom domains feature lets you serve your public album links using 
 For example, instead of:
 
 ```
-https://albums.ente.com/?t=...
+https://albums.ente.com/...#...
 ```
 
 You can use:
 
 ```
-https://pics.example.org/?t=...
+https://pics.example.org/...#...
 ```
 
 **Requirements:**
@@ -431,7 +431,7 @@ Yes, you have several options:
 3. **Disable uploads**: Edit the link settings and turn off "Allow adding photos"
 4. **Change to view-only**: Convert the collect link to a regular public link (view only)
 
-You can manage these settings by going to your Sharing section and selecting the link you want to modify.
+You can manage these settings by opening the shared album (under the "Shared" tab in the Albums section) and selecting the link you want to modify.
 
 ### Can I see who added photos to my collect link? {#collect-link-attribution}
 
@@ -459,9 +459,10 @@ Anonymous viewers (people without an Ente account) can also show a name if they'
 
 Yes! Quick links automatically create a special album behind the scenes. You can convert this to a regular album at any time:
 
-1. Open the Sharing tab in the Ente app
-2. Find the quick link under "Quick links" section
-3. Select the option to convert it to a regular album
+1. Open the Albums tab in the Ente app
+2. Tap on 'v' icon at the right.
+3. Tap "Links"
+4. Find the quick link and select the option to convert it to a regular album
 
 This gives you more control over the album, including the ability to rename it and organize it like any other album.
 
@@ -559,15 +560,12 @@ Deduplication and the similar-images tool only work within albums you own, not a
 **On mobile:**
 
 - Open the Albums tab
-- Shared albums appear alongside your own albums
-- Look for the "Shared by" indicator under the album name
+- Tap the "Shared" tab to see albums you've shared, or the "Received" tab to see albums shared with you
 
 **On web/desktop:**
 
 - Shared albums appear in your album list
 - They're marked with a sharing icon
-
-You can also view all sharing activity in the Sharing tab/section.
 
 ## Permissions and Access
 
@@ -652,7 +650,7 @@ Create a public link for your album, then add an iframe to your HTML with the UR
 
 ```html
 <iframe
-    src="https://embed.ente.com/?t=...#..."
+    src="https://embed.ente.com/...#..."
     width="800"
     height="600"
     frameborder="0"
@@ -672,7 +670,7 @@ If you're using the easy method (copy embed HTML button), the app automatically 
 If you're creating the embed code manually and have a custom domain configured:
 
 - Replace your custom domain with `embed.ente.com` in the iframe src
-- For example: `https://embed.ente.com/?t=...` (not `https://pics.example.org/?t=...`)
+- For example: `https://embed.ente.com/...#...` (not `https://pics.example.org/...#...`)
 
 The embed will still work perfectly - it's just served from the embed subdomain instead of your custom domain.
 

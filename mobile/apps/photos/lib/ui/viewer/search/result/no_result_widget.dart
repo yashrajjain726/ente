@@ -31,6 +31,7 @@ class _NoResultWidgetState extends State<NoResultWidget> {
     InheritedAllSectionsExamples.of(context).allSectionsExamplesFuture.then((
       value,
     ) {
+      if (!mounted) return;
       final sectionResultsByType = value.sectionResults;
       if (sectionResultsByType.isEmpty) return;
       for (int i = 0; i < searchTypes.length; i++) {
@@ -81,7 +82,6 @@ class _NoResultWidgetState extends State<NoResultWidget> {
     return Scaffold(
       body: SingleChildScrollView(
         physics: const BouncingScrollPhysics(),
-        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
         padding: const EdgeInsets.fromLTRB(12, 0, 12, bottomPadding),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,

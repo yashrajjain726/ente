@@ -7,6 +7,58 @@ description: Release notes of recent updates to Ente Photos mobile and desktop a
 
 A short summary list of changes to the Ente Photos mobile and desktop apps. For a more descriptive list with screenshots and blog post links, see the [news](https://ente.com/news).
 
+## v1.7.27 (desktop) - Jul 2026
+
+- Added Close button to the download notification toast.
+- Fix ML indexing and search getting stuck when the library contains very large images.
+- Harden IPC boundary between the renderer and main process.
+- Hide archived albums from the main Gallery album bar.
+- Choose whether to import Google Photos favourites into Ente's favourite album.
+- Fix the File Info panel closing after saving caption edits.
+- Manage your family plan directly within the app.
+- Upgrade to MUI v9.
+- Redesigned stop-upload confirmation dialog.
+- Redesigned upload completion dialog.
+- Redesigned upload progress with completed, skipped, and failed file tracking.
+- Review photo, video, and album counts before uploading.
+- Search for people by name in the Add a person dialog.
+- Fix shared file action menus to show only available actions.
+- Show hidden album presence in the File Info panel.
+- Import or skip partner-shared photos during Google Photos Takeout.
+
+## v1.3.59 (mobile) - Jul 2026
+
+- Comment and react to shared memories.
+- Choose which photos and videos are included before creating a shared memory link.
+- Redesigned the photo viewer and info sheet for a cleaner, more readable experience.
+- Added support for saving contact names and profile photos.
+- Removed indirect connections from Contacts.
+- Redesigned the Family plan dashboard.
+- Improved backup reliability and progress updates.
+- Improved thumbnail and file download reliability.
+- Reduced background processing while browsing photos for smoother swiping.
+- Improved handling of photos and videos with incomplete metadata.
+- Reduced cache buildup by clearing caches more effectively during ML indexing.
+- Improved text detection and text selection reliability and performance.
+- Fixed app bar titles being truncated when **Bold Text** is enabled.
+- Fixed syncing edited iOS photos after local gallery changes.
+- Fixed the **"No text detected"** message appearing unexpectedly when opening some photos.
+- Fixed crashes when leaving screens, closing dialogs, or switching app state during background work.
+
+## v1.3.58 (mobile) - Jul 2026
+
+* Added support for casting albums to multiple screens and managing active cast sessions.
+* Improved the account deletion flow with clearer impact details and confirmation.
+* Simplified delete confirmations into a single prompt that remembers the last selected option.
+* Clear cached images and videos from device storage during logout and automatic cache cleanup.
+* Fixed backup folder selection when switching from the local gallery to an account.
+* Reduced storage growth on iOS by deleting temporary photo copies after machine-learning processing.
+* Show smaller detected people groups in Search when larger groups are unavailable.
+
+## v1.7.26 (desktop) - Jul 2026
+
+- Fix machine learning features failing to load.
+
 ## v1.7.25 (desktop) - Jun 2026
 
 - Reduce desktop app package size by excluding unused ONNX Runtime native binaries.

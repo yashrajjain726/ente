@@ -21,6 +21,8 @@ import "package:photos/models/file/trash_file.dart";
 import "package:photos/models/gallery_type.dart";
 import "package:photos/models/metadata/common_keys.dart";
 import 'package:photos/models/selected_files.dart';
+import 'package:photos/module/download/file.dart';
+import 'package:photos/module/download/gallery.dart';
 import "package:photos/service_locator.dart";
 import 'package:photos/services/collections_service.dart';
 import 'package:photos/services/hidden_service.dart';
@@ -36,8 +38,6 @@ import "package:photos/ui/viewer/file/detail_page.dart";
 import "package:photos/ui/viewer/file_details/favorite_widget.dart";
 import "package:photos/ui/viewer/file_details/upload_icon_widget.dart";
 import 'package:photos/utils/dialog_util.dart';
-import "package:photos/utils/file_download_util.dart";
-import 'package:photos/utils/file_util.dart';
 import "package:photos/utils/magic_util.dart";
 import "package:photos/utils/share_util.dart";
 
@@ -74,7 +74,6 @@ class FileAppBarState extends State<FileAppBar> {
   bool isGuestView = false;
   bool shouldLoopVideo = localSettings.shouldLoopVideo();
   bool _reloadActions = false;
-  ValueNotifier<bool>? _isInSharedCollectionNotifier;
   ValueNotifier<String?>? _showingThumbnailFallbackNotifier;
 
   @override
@@ -103,29 +102,13 @@ class FileAppBarState extends State<FileAppBar> {
   void didChangeDependencies() {
     super.didChangeDependencies();
     final detailPageState = InheritedDetailPageState.maybeOf(context);
-    _updateIsInSharedCollectionNotifier(
-      detailPageState?.isInSharedCollectionNotifier,
-    );
     _updateShowingThumbnailFallbackNotifier(
       detailPageState?.showingThumbnailFallbackNotifier,
     );
   }
 
-  void _onSharedCollectionChanged() {
-    _requestActionsReload();
-  }
-
   void _onThumbnailFallbackChanged() {
     _requestActionsReload();
-  }
-
-  void _updateIsInSharedCollectionNotifier(ValueNotifier<bool>? notifier) {
-    if (_isInSharedCollectionNotifier == notifier) {
-      return;
-    }
-    _isInSharedCollectionNotifier?.removeListener(_onSharedCollectionChanged);
-    _isInSharedCollectionNotifier = notifier;
-    _isInSharedCollectionNotifier?.addListener(_onSharedCollectionChanged);
   }
 
   void _updateShowingThumbnailFallbackNotifier(
@@ -143,7 +126,6 @@ class FileAppBarState extends State<FileAppBar> {
 
   @override
   void dispose() {
-    _isInSharedCollectionNotifier?.removeListener(_onSharedCollectionChanged);
     _showingThumbnailFallbackNotifier?.removeListener(
       _onThumbnailFallbackChanged,
     );
@@ -274,11 +256,6 @@ class FileAppBarState extends State<FileAppBar> {
     final Collection? collection = collectionID != null
         ? CollectionsService.instance.getCollectionByID(collectionID)
         : null;
-    final isInSharedCollection =
-        InheritedDetailPageState.maybeOf(
-          context,
-        )?.isInSharedCollectionNotifier.value ??
-        false;
     bool isFileHidden = false;
     if (isOwnedByUser && isFileUploaded) {
       isFileHidden = collection?.isHidden() ?? false;
@@ -350,17 +327,6 @@ class FileAppBarState extends State<FileAppBar> {
             AppLocalizations.of(context).edit,
             value: 11,
             hugeIcon: HugeIcons.strokeRoundedSlidersHorizontal,
-          ),
-        );
-      }
-      // Add to Album option - shown when file is in shared collection
-      // (moved from bottom bar to make room for social icons)
-      if (isInSharedCollection && isFileUploaded && !isFileHidden) {
-        items.add(
-          _fileMenuOption(
-            AppLocalizations.of(context).addToAlbum,
-            value: 10,
-            hugeIcon: HugeIcons.strokeRoundedImageAdd01,
           ),
         );
       }
@@ -562,14 +528,6 @@ class FileAppBarState extends State<FileAppBar> {
       if (collection != null) {
         await _handleSuggestDelete(collection);
       }
-    } else if (value == 10) {
-      final selectedFiles = SelectedFiles();
-      selectedFiles.files.add(widget.file);
-      showCollectionActionSheet(
-        context,
-        selectedFiles: selectedFiles,
-        actionType: CollectionActionType.addFiles,
-      );
     }
   }
 
@@ -607,6 +565,7 @@ class FileAppBarState extends State<FileAppBar> {
       }
     } catch (e, s) {
       _logger.severe("failed to update file visibility", e, s);
+      if (!context.mounted) return;
       await showGenericErrorDialog(context: context, error: e);
     }
   }
@@ -614,7 +573,7 @@ class FileAppBarState extends State<FileAppBar> {
   Future<void> _handleUnHideRequest(BuildContext context) async {
     final selectedFiles = SelectedFiles();
     selectedFiles.files.add(widget.file);
-    showCollectionActionSheet(
+    await showCollectionActionSheet(
       context,
       selectedFiles: selectedFiles,
       actionType: CollectionActionType.unHide,
@@ -652,7 +611,7 @@ class FileAppBarState extends State<FileAppBar> {
       return;
     }
 
-    final fileToDownload = !file.isRemoteFile
+    final fileToDownload = !file.isRemoteOnlyFile
         ? (file.copyWith()..localID = null)
         : file;
     final persistToFilesDB =
@@ -671,6 +630,7 @@ class FileAppBarState extends State<FileAppBar> {
       return;
     }
 
+    if (!mounted) return;
     final dialog = createProgressDialog(
       context,
       AppLocalizations.of(context).downloading,
@@ -711,9 +671,14 @@ class FileAppBarState extends State<FileAppBar> {
       isDismissible: true,
     );
     await dialog.show();
+    if (!mounted) return;
     final Collection? sharedLinkCollection = await CollectionActions(
       CollectionsService.instance,
     ).createSharedCollectionLink(context, [file]);
+    if (!mounted) {
+      await dialog.hide();
+      return;
+    }
     if (sharedLinkCollection == null) {
       await dialog.hide();
       return;
@@ -723,6 +688,7 @@ class FileAppBarState extends State<FileAppBar> {
     );
     await dialog.hide();
     unawaited(Clipboard.setData(ClipboardData(text: url)));
+    if (!mounted) return;
     await shareLinkWithDescription(url, context: context);
   }
 
@@ -740,6 +706,7 @@ class FileAppBarState extends State<FileAppBar> {
       final m = MediaExtension();
       final bool result = await m.setAs("file://${fileToSave.path}", "image/*");
       if (result == false) {
+        if (!mounted) return;
         showShortToast(
           context,
           AppLocalizations.of(context).somethingWentWrong,
@@ -749,6 +716,7 @@ class FileAppBarState extends State<FileAppBar> {
     } catch (e) {
       await dialog.hide();
       _logger.severe("Failed to use as", e);
+      if (!mounted) return;
       await showGenericErrorDialog(context: context, error: e);
     }
   }
@@ -758,6 +726,7 @@ class FileAppBarState extends State<FileAppBar> {
       Bus.instance.fire(GuestViewEvent(true, true));
       await localSettings.setOnGuestView(true);
     } else {
+      if (!mounted) return;
       await showErrorDialog(
         context,
         AppLocalizations.of(context).noSystemLockFound,
@@ -810,10 +779,12 @@ class FileAppBarState extends State<FileAppBar> {
 
       if (!wasAdded) {
         // File was already in queue
+        if (!mounted) return;
         showToast(context, AppLocalizations.of(context).videoAlreadyInQueue);
         return;
       }
 
+      if (!mounted) return;
       showToast(context, AppLocalizations.of(context).addedToQueue);
 
       if (mounted) {
@@ -823,6 +794,7 @@ class FileAppBarState extends State<FileAppBar> {
       }
     } catch (e, s) {
       _logger.severe("Failed to $streamType video stream", e, s);
+      if (!mounted) return;
       await showGenericErrorDialog(context: context, error: e);
     }
   }

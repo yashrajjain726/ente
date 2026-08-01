@@ -30,9 +30,7 @@ final class KeychainStore {
         // Insert.
         var insertQuery = query
         insertQuery[kSecValueData as String] = data
-        #if os(iOS)
         insertQuery[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
-        #endif
         let addStatus = SecItemAdd(insertQuery as CFDictionary, nil)
         if addStatus != errSecSuccess {
             throw KeychainStoreError.unexpectedStatus(addStatus)

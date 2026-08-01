@@ -1,9 +1,5 @@
 import SwiftUI
-#if os(iOS)
 import UIKit
-#elseif os(macOS)
-import AppKit
-#endif
 
 struct PrimaryButton: View {
     let text: String
@@ -47,16 +43,15 @@ private struct PrimaryButtonStyle: ButtonStyle {
 struct StyledTextField: View {
     let hint: String
     @Binding var text: String
-    var keyboardType: PlatformKeyboardType = .default
+    var keyboardType: UIKeyboardType = .default
 
     var body: some View {
         TextField(hint, text: $text)
             .font(EnsuTypography.body)
             .foregroundStyle(EnsuColor.textPrimary)
-            .platformTextFieldStyle()
-            .platformTextInputAutocapitalization(.never)
+            .textInputAutocapitalization(.never)
             .autocorrectionDisabled()
-            .platformKeyboardType(keyboardType)
+            .keyboardType(keyboardType)
             .padding(.horizontal, EnsuSpacing.inputHorizontal)
             .padding(.vertical, EnsuSpacing.inputVertical)
             .background(EnsuColor.fillFaint)
@@ -272,7 +267,6 @@ struct ImageAttachmentThumbnail: View {
             return nil
         }
 
-        #if os(iOS)
         guard let image = UIImage(contentsOfFile: url.path) else {
             return nil
         }
@@ -281,18 +275,6 @@ struct ImageAttachmentThumbnail: View {
             pixelWidth: image.size.width,
             pixelHeight: image.size.height
         )
-        #elseif os(macOS)
-        guard let image = NSImage(contentsOf: url) else {
-            return nil
-        }
-        return PlatformImageContent(
-            image: Image(nsImage: image),
-            pixelWidth: image.size.width,
-            pixelHeight: image.size.height
-        )
-        #else
-        return nil
-        #endif
     }
 }
 

@@ -33,8 +33,4 @@ pub enum GenerationEvent {
     Done {
         summary: GenerationSummary,
     },
-    Error {
-        job_id: JobId,
-        message: String,
-    },
 }

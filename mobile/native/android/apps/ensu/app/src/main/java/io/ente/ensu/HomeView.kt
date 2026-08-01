@@ -58,7 +58,7 @@ import io.ente.ensu.designsystem.EnsuSpacing
 import io.ente.ensu.designsystem.EnsuTypography
 import io.ente.ensu.chat.Attachment
 import io.ente.ensu.chat.AttachmentType
-import io.ente.ensu.config.ConfigDefaults
+import io.ente.ensu.bindings.ConfigDefaults
 import io.ente.ensu.chat.MaxImageAttachmentsPerMessage
 import io.ente.ensu.AppState
 import io.ente.ensu.AppStore
@@ -92,7 +92,6 @@ fun HomeView(
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route ?: HomeRoute.Chat
     val isChatRoute = currentRoute == HomeRoute.Chat
-    var showAttachmentDownloads by remember { mutableStateOf(false) }
     var deleteSessionTarget by remember { mutableStateOf<io.ente.ensu.chat.ChatSession?>(null) }
     var showLogShareDialog by remember { mutableStateOf(false) }
     var showSignInComingSoon by remember { mutableStateOf(false) }
@@ -257,7 +256,6 @@ fun HomeView(
                 store.startNewSessionDraft()
                 store.persistSelectedSession(scope, null)
             },
-            onAttachmentDownloads = { showAttachmentDownloads = true },
             onShowLogShareDialog = { showLogShareDialog = true },
             onAttachmentSelected = handleAttachmentSelected,
             onOpenAttachment = { attachment ->
@@ -283,14 +281,6 @@ fun HomeView(
             title = "Coming soon",
             message = "Sign in and cloud backup will be available in a future update.",
             onDismiss = { showSignInComingSoon = false }
-        )
-    }
-
-    if (showAttachmentDownloads) {
-        AttachmentDownloadsDialog(
-            downloads = appState.chat.attachmentDownloads,
-            onCancel = { store.cancelAttachmentDownload(it) },
-            onDismiss = { showAttachmentDownloads = false }
         )
     }
 
@@ -421,7 +411,7 @@ private fun buildAttachmentFromUri(
 
         if (type == AttachmentType.Image) {
             val inputStream = resolver.openInputStream(uri) ?: return@runCatching null
-            val originalBytes = inputStream.use { input -> input.readBytes() }
+            val originalBytes = inputStream.use { input -> input.readAttachmentImageBytes() }
             val compressedBytes = compressAttachmentImage(originalBytes)
             FileOutputStream(destination).use { output ->
                 output.write(compressedBytes)

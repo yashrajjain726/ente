@@ -27,13 +27,13 @@ import "package:photos/theme/text_style.dart";
 import "package:photos/ui/common/loading_widget.dart";
 import "package:photos/ui/components/banners/save_faces_banner.dart";
 import "package:photos/ui/components/bottom_action_bar/people_bottom_action_bar_widget.dart";
+import "package:photos/ui/components/collection_share_badge.dart";
 import "package:photos/ui/viewer/actions/select_all_status_icon.dart";
 import "package:photos/ui/viewer/file/no_thumbnail_widget.dart";
 import "package:photos/ui/viewer/file/thumbnail_widget.dart";
 import "package:photos/ui/viewer/people/face_thumbnail_squircle.dart";
 import "package:photos/ui/viewer/people/person_face_widget.dart";
 import "package:photos/ui/viewer/people/person_gallery_suggestion.dart";
-import "package:photos/ui/viewer/people/pinned_person_badge.dart";
 import "package:photos/ui/viewer/search/result/search_result_page.dart";
 import "package:photos/ui/viewer/search_tab/people_section.dart";
 import "package:photos/utils/people_sort_util.dart";
@@ -62,6 +62,7 @@ class _PeopleSectionAllPageState extends State<PeopleSectionAllPage> {
             selectedPeople: _selectedPeople,
             showSearchBar: true,
             startInSearchMode: widget.startInSearchMode,
+            includeEmptyPersons: true,
           ),
           bottomNavigationBar: hasSelection
               ? PeopleBottomActionBarWidget(
@@ -81,12 +82,14 @@ class PeopleSectionAllSelectionWrapper extends StatefulWidget {
   final SelectedPeople selectedPeople;
   final bool showSearchBar;
   final bool startInSearchMode;
+  final bool includeEmptyPersons;
 
   const PeopleSectionAllSelectionWrapper({
     super.key,
     required this.selectedPeople,
     this.showSearchBar = false,
     this.startInSearchMode = false,
+    this.includeEmptyPersons = false,
   });
 
   @override
@@ -102,6 +105,7 @@ class _PeopleSectionAllSelectionWrapperState
       selectedPeople: widget.selectedPeople,
       showSearchBar: widget.showSearchBar,
       startInSearchMode: widget.startInSearchMode,
+      includeEmptyPersons: widget.includeEmptyPersons,
     );
   }
 }
@@ -259,9 +263,9 @@ class SelectablePersonSearchExample extends StatelessWidget {
                   ),
                   if (isPinnedPerson)
                     const Positioned(
-                      left: -6,
-                      top: -6,
-                      child: PinnedPersonBadge(),
+                      left: 8,
+                      bottom: 8,
+                      child: PinnedBadge(size: 16),
                     ),
                 ],
               ),
@@ -319,12 +323,14 @@ class PeopleSectionAllWidget extends StatefulWidget {
     this.namedOnly = false,
     this.showSearchBar = false,
     this.startInSearchMode = false,
+    this.includeEmptyPersons = false,
   });
 
   final SelectedPeople? selectedPeople;
   final bool namedOnly;
   final bool showSearchBar;
   final bool startInSearchMode;
+  final bool includeEmptyPersons;
 
   @override
   State<PeopleSectionAllWidget> createState() => _PeopleSectionAllWidgetState();
@@ -489,6 +495,7 @@ class _PeopleSectionAllWidgetState extends State<PeopleSectionAllWidget> {
       null,
       minClusterSize: kMinimumClusterSizeAllFaces,
       showIgnoredOnly: _showingIgnoredPeople,
+      includeEmptyPersons: widget.includeEmptyPersons,
     );
     normalFaces.clear();
     extraFaces.clear();
@@ -650,6 +657,7 @@ class _PeopleSectionAllWidgetState extends State<PeopleSectionAllWidget> {
         MediaQuery.textScalerOf(context).scale(smallFontSize) / smallFontSize;
     const horizontalEdgePadding = 20.0;
     const gridPadding = 16.0;
+    const labelHeight = 28.0;
 
     return FutureBuilder<List<GenericSearchResult>>(
       future: sectionData,
@@ -698,6 +706,7 @@ class _PeopleSectionAllWidgetState extends State<PeopleSectionAllWidget> {
                   ((horizontalEdgePadding * 2) +
                       ((crossAxisCount - 1) * gridPadding))) /
               crossAxisCount;
+          final gridItemHeight = itemSize + (labelHeight * textScaleFactor);
 
           if (_isSearching) {
             final searchResults = [
@@ -718,8 +727,7 @@ class _PeopleSectionAllWidgetState extends State<PeopleSectionAllWidget> {
                     mainAxisSpacing: gridPadding,
                     crossAxisSpacing: gridPadding,
                     crossAxisCount: crossAxisCount,
-                    childAspectRatio:
-                        itemSize / (itemSize + (24 * textScaleFactor)),
+                    childAspectRatio: itemSize / gridItemHeight,
                   ),
                   delegate: SliverChildBuilderDelegate(
                     childCount: searchResults.length,
@@ -789,8 +797,7 @@ class _PeopleSectionAllWidgetState extends State<PeopleSectionAllWidget> {
                     mainAxisSpacing: gridPadding,
                     crossAxisSpacing: gridPadding,
                     crossAxisCount: crossAxisCount,
-                    childAspectRatio:
-                        itemSize / (itemSize + (24 * textScaleFactor)),
+                    childAspectRatio: itemSize / gridItemHeight,
                   ),
                   delegate: SliverChildBuilderDelegate(
                     childCount: filteredNormalFaces.length,
@@ -827,8 +834,7 @@ class _PeopleSectionAllWidgetState extends State<PeopleSectionAllWidget> {
                       mainAxisSpacing: gridPadding,
                       crossAxisSpacing: gridPadding,
                       crossAxisCount: crossAxisCount,
-                      childAspectRatio:
-                          itemSize / (itemSize + (24 * textScaleFactor)),
+                      childAspectRatio: itemSize / gridItemHeight,
                     ),
                     delegate: SliverChildBuilderDelegate(
                       childCount: filteredExtraFaces.length,

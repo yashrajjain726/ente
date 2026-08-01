@@ -1,19 +1,23 @@
 package io.ente.ensu.llm
 
-
-
-data class LlmModelTarget(
+data class LlmModelSelection(
     val id: String,
-    val url: String,
-    val mmprojUrl: String? = null,
     val contextLength: Int? = null,
     val maxTokens: Int? = null
 )
 
 data class DownloadProgress(
-    val percent: Int,
-    val status: String
+    val percent: Int?,
+    val status: String,
+    val phase: DownloadPhase = DownloadPhase.Downloading
 )
+
+enum class DownloadPhase {
+    Downloading,
+    Loading,
+    Ready,
+    Failed
+}
 
 enum class LlmMessageRole {
     User,

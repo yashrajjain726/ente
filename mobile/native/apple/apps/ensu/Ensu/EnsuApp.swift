@@ -2,17 +2,17 @@ import SwiftUI
 
 @main
 struct EnsuApp: App {
-    #if os(iOS)
-    @UIApplicationDelegateAdaptor(EnsuAppDelegate.self) private var appDelegate
-    #endif
+    private let assetStore: AssetStore
 
     init() {
         EnsuLogging.shared.start()
+        AssetStore.registerBackgroundTask()
+        assetStore = AssetStore()
     }
 
     var body: some Scene {
         WindowGroup {
-            RootView()
+            RootView(assetStore: assetStore)
         }
     }
 }

@@ -1,61 +1,58 @@
 use std::path::{Path, PathBuf};
-use std::sync::{Mutex, OnceLock};
+use std::sync::{Mutex, MutexGuard, PoisonError};
 
 use transcribe_rs::onnx::Quantization;
 use transcribe_rs::onnx::parakeet::{ParakeetModel, ParakeetParams, TimestampGranularity};
 
 use crate::transcription::audio::extract_speech_from_pcm16;
-use crate::transcription::model::{model_path, vad_model_path};
 use crate::transcription::text::filter_transcription_output;
-use crate::transcription::{Result, error};
+use crate::transcription::{Result, TranscriptionError};
 
-static MANAGER: OnceLock<Mutex<TranscriptionManager>> = OnceLock::new();
-
-struct TranscriptionManager {
-    loaded_path: Option<PathBuf>,
-    model: Option<ParakeetModel>,
+pub struct Transcriber {
+    model_dir: PathBuf,
+    vad_model_path: PathBuf,
+    loaded: Mutex<Option<ParakeetModel>>,
 }
 
-impl TranscriptionManager {
-    fn new() -> Self {
+impl Transcriber {
+    pub fn new(model_dir: impl Into<PathBuf>, vad_model_path: impl Into<PathBuf>) -> Self {
         Self {
-            loaded_path: None,
-            model: None,
+            model_dir: model_dir.into(),
+            vad_model_path: vad_model_path.into(),
+            loaded: Mutex::new(None),
         }
     }
 
-    fn transcribe(
-        &mut self,
-        models_dir: impl AsRef<Path>,
-        _vad_cache_dir: impl AsRef<Path>,
-        input_sample_rate: u32,
-        pcm_le: Vec<u8>,
-    ) -> Result<String> {
+    pub fn load_model(&self) -> Result<()> {
+        if !self.model_dir.is_dir() {
+            return Err(TranscriptionError::NotDownloaded);
+        }
+        ensure_loaded(&mut self.lock(), &self.model_dir)?;
+        Ok(())
+    }
+
+    pub fn unload_model(&self) {
+        *self.lock() = None;
+    }
+
+    pub fn transcribe(&self, input_sample_rate: u32, pcm_le: Vec<u8>) -> Result<String> {
         if pcm_le.is_empty() {
             return Ok(String::new());
         }
-
-        let models_dir = models_dir.as_ref();
-        let model_dir = model_path(models_dir);
-        if !model_dir.is_dir() {
-            return Err(error("Transcription model is not downloaded"));
+        if !self.model_dir.is_dir() {
+            return Err(TranscriptionError::NotDownloaded);
         }
-        let vad_model_path = vad_model_path(models_dir);
-        if !vad_model_path.is_file() {
-            return Err(error("Voice activity model is not downloaded"));
+        if !self.vad_model_path.is_file() {
+            return Err(TranscriptionError::VadNotDownloaded);
         }
 
-        self.ensure_loaded(&model_dir)?;
-
-        let speech = extract_speech_from_pcm16(&vad_model_path, input_sample_rate, &pcm_le)?;
+        let speech = extract_speech_from_pcm16(&self.vad_model_path, input_sample_rate, &pcm_le)?;
         if speech.is_empty() {
             return Ok(String::new());
         }
 
-        let model = self
-            .model
-            .as_mut()
-            .ok_or_else(|| error("Transcription model is not loaded"))?;
+        let mut loaded = self.lock();
+        let model = ensure_loaded(&mut loaded, &self.model_dir)?;
         let result = model.transcribe_with(
             &speech,
             &ParakeetParams {
@@ -67,60 +64,17 @@ impl TranscriptionManager {
         Ok(filter_transcription_output(&result.text))
     }
 
-    fn load(&mut self, models_dir: impl AsRef<Path>) -> Result<()> {
-        let models_dir = models_dir.as_ref();
-        let model_dir = model_path(models_dir);
-        if !model_dir.is_dir() {
-            return Err(error("Transcription model is not downloaded"));
-        }
-
-        self.ensure_loaded(&model_dir)
-    }
-
-    fn ensure_loaded(&mut self, model_dir: &Path) -> Result<()> {
-        if self.loaded_path.as_deref() == Some(model_dir) && self.model.is_some() {
-            return Ok(());
-        }
-
-        let model = ParakeetModel::load(model_dir, &Quantization::Int8)?;
-        self.loaded_path = Some(model_dir.to_path_buf());
-        self.model = Some(model);
-        Ok(())
-    }
-
-    fn unload(&mut self) {
-        self.loaded_path = None;
-        self.model = None;
+    fn lock(&self) -> MutexGuard<'_, Option<ParakeetModel>> {
+        self.loaded.lock().unwrap_or_else(PoisonError::into_inner)
     }
 }
 
-fn manager() -> &'static Mutex<TranscriptionManager> {
-    MANAGER.get_or_init(|| Mutex::new(TranscriptionManager::new()))
-}
-
-pub fn transcribe_pcm16(
-    models_dir: impl AsRef<Path>,
-    vad_cache_dir: impl AsRef<Path>,
-    input_sample_rate: u32,
-    pcm_le: Vec<u8>,
-) -> Result<String> {
-    manager()
-        .lock()
-        .map_err(|_| error("transcription manager lock poisoned"))?
-        .transcribe(models_dir, vad_cache_dir, input_sample_rate, pcm_le)
-}
-
-pub fn load_model(models_dir: impl AsRef<Path>) -> Result<()> {
-    manager()
-        .lock()
-        .map_err(|_| error("transcription manager lock poisoned"))?
-        .load(models_dir)
-}
-
-pub fn unload_model() -> Result<()> {
-    manager()
-        .lock()
-        .map_err(|_| error("transcription manager lock poisoned"))?
-        .unload();
-    Ok(())
+fn ensure_loaded<'a>(
+    loaded: &'a mut Option<ParakeetModel>,
+    model_dir: &Path,
+) -> Result<&'a mut ParakeetModel> {
+    match loaded {
+        Some(model) => Ok(model),
+        slot => Ok(slot.insert(ParakeetModel::load(model_dir, &Quantization::Int8)?)),
+    }
 }

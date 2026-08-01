@@ -271,13 +271,18 @@ _windowsLocalAuthenticationExceptionForLocalAuthException(
 Future<bool> requestAuthentication(
   BuildContext context,
   String defaultReason, {
+  String? title,
   String? macOSReason,
   bool isOpeningApp = false,
   bool isAuthenticatingForInAppChange = false,
 }) async {
+  final l10n = context.strings;
   final String? savedPin = await LockScreenSettings.instance.getPin();
   final String? savedPassword = await LockScreenSettings.instance.getPassword();
   if (savedPassword != null || savedPin != null) {
+    if (!context.mounted) {
+      return false;
+    }
     return await LocalAuthenticationService.instance
         .requestEnteAuthForLockScreen(
           context,
@@ -291,7 +296,6 @@ Future<bool> requestAuthentication(
   try {
     await localAuth.stopAuthentication();
     await _logLocalAuthState(localAuth);
-    final l10n = context.strings;
     final result = await localAuth.authenticate(
       localizedReason: Platform.isMacOS
           ? (macOSReason ?? defaultReason)
@@ -300,7 +304,7 @@ Future<bool> requestAuthentication(
         AndroidAuthMessages(
           cancelButton: l10n.androidCancelButton,
           signInHint: l10n.androidBiometricHint,
-          signInTitle: l10n.androidSignInTitle,
+          signInTitle: title ?? l10n.androidSignInTitle,
         ),
         IOSAuthMessages(
           cancelButton: l10n.iOSOkButton,

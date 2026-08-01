@@ -249,6 +249,14 @@ export type FileViewerProps = ModalVisibilityProps & {
      */
     fileNormalCollectionIDs?: FileInfoProps["fileCollectionIDs"];
     /**
+     * A mapping from file IDs to all collection IDs that they are a part of.
+     */
+    fileCollectionIDs?: FileInfoProps["fileCollectionIDs"];
+    /**
+     * IDs of hidden collections.
+     */
+    hiddenCollectionIDs?: FileInfoProps["hiddenCollectionIDs"];
+    /**
      * Collection summaries indexed by their IDs.
      */
     collectionSummaries?: CollectionSummaries;
@@ -393,6 +401,8 @@ export const FileViewer: React.FC<FileViewerProps> = ({
     pendingFavoriteUpdates,
     pendingVisibilityUpdates,
     fileNormalCollectionIDs,
+    fileCollectionIDs,
+    hiddenCollectionIDs,
     collectionSummaries,
     collectionNameByID,
     onTriggerRemotePull,
@@ -1228,8 +1238,13 @@ export const FileViewer: React.FC<FileViewerProps> = ({
                   collection: Collection,
                   enteFile: EnteFile,
               ) => {
-                  onSaveEditedImageCopy(editedFile, collection, enteFile);
-                  handleClose();
+                  const didStartSave = onSaveEditedImageCopy(
+                      editedFile,
+                      collection,
+                      enteFile,
+                  );
+                  if (didStartSave) handleClose();
+                  return didStartSave;
               }
             : undefined;
     }, [onSaveEditedImageCopy, handleClose]);
@@ -2144,8 +2159,9 @@ export const FileViewer: React.FC<FileViewerProps> = ({
                 exif={activeFileExif}
                 allowEdits={activeAnnotatedFile.annotation.isOwnFile}
                 allowMap={haveUser}
-                showCollections={haveUser && !isInHiddenSection}
-                fileCollectionIDs={fileNormalCollectionIDs}
+                showCollections={haveUser}
+                fileCollectionIDs={fileCollectionIDs ?? fileNormalCollectionIDs}
+                hiddenCollectionIDs={hiddenCollectionIDs}
                 onFileMetadataUpdate={handleFileMetadataUpdate}
                 onUpdateCaption={handleUpdateCaption}
                 onSelectCollection={handleSelectCollection}
@@ -2241,7 +2257,7 @@ export const FileViewer: React.FC<FileViewerProps> = ({
                     </MoreMenuItem>
                 )}
                 {handleAddFileToCollection &&
-                    activeAnnotatedFile.annotation.isOwnFile && (
+                    !(isInTrashSection || isInHiddenSection) && (
                         <MoreMenuItem onClick={handleAddFileToCollection}>
                             <MoreMenuItemTitle>
                                 {t("add_to_album")}

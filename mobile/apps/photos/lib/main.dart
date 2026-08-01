@@ -3,6 +3,7 @@ import 'dart:io';
 
 import "package:adaptive_theme/adaptive_theme.dart";
 import "package:computer/computer.dart";
+import "package:ente_account_deletion/account_deletion.dart";
 import "package:ente_components/ente_components.dart" as components;
 import 'package:ente_crypto/ente_crypto.dart';
 import "package:ente_crypto_api/ente_crypto_api.dart" show registerCryptoApi;
@@ -37,13 +38,15 @@ import "package:photos/db/ml/db.dart";
 import 'package:photos/ente_theme_data.dart';
 import "package:photos/generated/l10n.dart";
 import "package:photos/l10n/l10n.dart";
+import 'package:photos/module/upload/service/file_uploader.dart';
+import 'package:photos/module/upload/service/local_file_update_service.dart';
 import "package:photos/service_locator.dart";
+import "package:photos/services/account/store_purchase_integration.dart";
 import "package:photos/services/account/user_service.dart";
 import 'package:photos/services/app_lifecycle_service.dart';
 import 'package:photos/services/collections_service.dart';
 import 'package:photos/services/favorites_service.dart';
 import 'package:photos/services/home_widget_service.dart';
-import 'package:photos/services/local_file_update_service.dart';
 import "package:photos/services/machine_learning/face_ml/person/person_service.dart";
 import 'package:photos/services/machine_learning/ml_service.dart';
 import 'package:photos/services/machine_learning/semantic_search/semantic_search_service.dart';
@@ -58,11 +61,9 @@ import 'package:photos/services/sync/local_sync_service.dart';
 import 'package:photos/services/sync/remote_sync_service.dart';
 import "package:photos/services/sync/sync_service.dart";
 import "package:photos/services/video_preview_service.dart";
-import "package:photos/services/wake_lock_service.dart";
 import "package:photos/src/rust/frb_generated.dart";
 import "package:photos/utils/device_info.dart";
 import "package:photos/utils/email_util.dart";
-import 'package:photos/utils/file_uploader.dart';
 import "package:photos/utils/intent_util.dart";
 import "package:photos/utils/photos_crypto_api_adapter.dart";
 import 'package:rive/rive.dart' as rive;
@@ -80,6 +81,7 @@ const kBGPushTimeout = Duration(seconds: 28);
 const kFGTaskDeathTimeoutInMicroseconds = 5000000;
 bool isProcessBg = true;
 bool _stopHearBeat = false;
+bool _isSyncInitialized = false;
 bool _isRustInitialized = false;
 Future<void>? _rustInitFuture;
 
@@ -88,6 +90,7 @@ enum ForegroundStartupMode { normal, picker }
 void main() async {
   debugRepaintRainbowEnabled = false;
   WidgetsFlutterBinding.ensureInitialized();
+  await initializeStorePurchases();
   ente_ui.AppThemeConfig.initialize(ente_ui.EnteApp.photos);
   await initIsIPad();
   if (isIPad) {
@@ -309,6 +312,7 @@ Future<void> _runMinimally(String taskId, TimeLogger tlog) async {
     await LocalSyncService.instance.init(prefs);
     RemoteSyncService.instance.init(prefs);
     await SyncService.instance.init(prefs);
+    _isSyncInitialized = true;
 
     // Misc Services
     await UserService.instance.init();
@@ -424,6 +428,7 @@ Future<void> _init(
       NetworkClient.instance.downloadDio,
       packageInfo,
     );
+    wakeLockService.init(isBackground: isBackground);
 
     _logger.info("Configuration init $tlog");
     await Configuration.instance.init(preferences);
@@ -437,6 +442,10 @@ Future<void> _init(
       hasOptedForOfflineMode: isLocalGalleryMode,
       appLogoAsset: 'assets/ente-branding.svg',
       appLogoHeight: 18,
+    );
+    AccountDeletionSettings.instance.init(
+      host: Configuration.instance,
+      enteDio: NetworkClient.instance.enteDio,
     );
 
     await MemoryShareService.instance.init();
@@ -482,6 +491,7 @@ Future<void> _init(
 
     _logger.info("SyncService init $tlog");
     await SyncService.instance.init(preferences);
+    _isSyncInitialized = true;
     _logger.info("SyncService init done $tlog");
 
     if (!isBackground && flagService.internalUser) {
@@ -506,11 +516,15 @@ Future<void> _init(
     _logger.info("PushService/HomeWidget done $tlog");
     unawaited(MLService.instance.init());
     PersonService.init(entityService, MLDataDB.instance, preferences);
-    await PersonService.instance.refreshPersonCache();
-    if (!isBackground && flagService.enableContact) {
+    try {
+      await PersonService.instance.refreshPersonCache();
+    } catch (e, s) {
+      PersonService.instance.clearCache();
+      _logger.severe("Person cache warm-up failed", e, s);
+    }
+    if (!isBackground) {
       unawaited(_warmContactsCacheInBackground());
     }
-    EnteWakeLockService.instance.init(preferences);
     wrappedService.scheduleInitialLoad();
     logLocalSettings();
     initComplete = true;
@@ -679,7 +693,11 @@ Future<void> _handleBackgroundPush(Object message) async {
         DateTime.now().microsecondsSinceEpoch,
       );
 
-      await _init(true, via: 'firebasePush');
+      if (!_isSyncInitialized) {
+        await _init(true, via: 'firebasePush');
+      } else {
+        _logger.info("Skipping background init; sync already initialized");
+      }
       if (PushService.shouldSync(message)) {
         await _sync('firebaseBgSyncNoActiveProcess');
       }

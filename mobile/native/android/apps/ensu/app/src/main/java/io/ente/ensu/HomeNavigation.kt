@@ -30,13 +30,15 @@ import io.ente.ensu.settings.AdvancedSettingsDataStore
 import io.ente.ensu.designsystem.EnsuColor
 import io.ente.ensu.chat.Attachment
 import io.ente.ensu.chat.AttachmentType
-import io.ente.ensu.config.ConfigDefaults
+import io.ente.ensu.bindings.ConfigDefaults
 import io.ente.ensu.AppState
 import io.ente.ensu.AppStore
 import io.ente.ensu.llm.ModelSettingsScreen
 import io.ente.ensu.logging.LogViewerScreen
 import io.ente.ensu.settings.SettingsScreen
 import io.ente.ensu.settings.SystemPromptSettingsScreen
+import io.ente.ensu.settings.KnowledgeSettingsScreen
+import io.ente.ensu.device.isChatSupported
 
 @Composable
 internal fun HomeNavigation(
@@ -53,7 +55,6 @@ internal fun HomeNavigation(
     onSignIn: () -> Unit,
     onOpenDrawer: () -> Unit,
     onNewChat: () -> Unit,
-    onAttachmentDownloads: () -> Unit,
     onShowLogShareDialog: () -> Unit,
     onAttachmentSelected: (AttachmentType) -> Unit,
     onOpenAttachment: (Attachment) -> Unit
@@ -68,13 +69,10 @@ internal fun HomeNavigation(
                         TopBar(
                             sessionTitle = currentSession?.title,
                             showBrand = appState.chat.messages.isEmpty(),
-                            attachmentDownloads = appState.chat.attachmentDownloads,
-                            attachmentDownloadProgress = appState.chat.attachmentDownloadProgress,
                             modelDownloadStatus = appState.chat.downloadStatus,
                             modelDownloadPercent = appState.chat.downloadPercent,
                             onOpenDrawer = onOpenDrawer,
-                            onNewChat = onNewChat,
-                            onAttachmentDownloads = onAttachmentDownloads
+                            onNewChat = onNewChat
                         )
                         androidx.compose.material3.HorizontalDivider(color = EnsuColor.border())
                     }
@@ -93,6 +91,9 @@ internal fun HomeNavigation(
                 }
                 HomeRoute.Settings -> {
                     SimpleTopBar(title = "Settings") { navController.popBackStack() }
+                }
+                HomeRoute.Knowledge -> {
+                    SimpleTopBar(title = "Ensu Packs") { navController.popBackStack() }
                 }
                 else -> Unit
             }
@@ -117,6 +118,8 @@ internal fun HomeNavigation(
                 ) {
                     ChatView(
                         chatState = appState.chat,
+                        assetStore = store.assetStore,
+                        transcriber = store.transcriber,
                         isDrawerOpen = drawerState.currentValue == DrawerValue.Open,
                         onMessageChange = store::updateMessageText,
                         onSend = store::sendMessage,
@@ -148,6 +151,7 @@ internal fun HomeNavigation(
                         buildVersion = appVersion,
                         isAdvancedUnlocked = appState.developerSettings.isAdvancedUnlocked,
                         onOpenLogs = { navController.navigate(HomeRoute.Logs) },
+                        onOpenKnowledge = { navController.navigate(HomeRoute.Knowledge) },
                         onOpenModelSettings = { navController.navigate(HomeRoute.ModelSettings) },
                         onOpenSystemPromptSettings = { navController.navigate(HomeRoute.SystemPromptSettings) },
                         onUnlockAdvanced = {
@@ -155,6 +159,21 @@ internal fun HomeNavigation(
                             advancedSettingsDataStore.persistUnlockAdvancedSettings()
                         },
                         onSignIn = onSignIn
+                    )
+                }
+                composable(
+                    route = HomeRoute.Knowledge,
+                    enterTransition = { forwardEnter() },
+                    exitTransition = { forwardExit() },
+                    popEnterTransition = { backEnter() },
+                    popExitTransition = { backExit() }
+                ) {
+                    KnowledgeSettingsScreen(
+                        state = appState.knowledge,
+                        packDownloadsAllowed = appState.chat.deviceCapability.isChatSupported(),
+                        onDownloadOrUpdate = store::downloadOrUpdateKnowledgePack,
+                        onCancel = store::cancelKnowledgePackDownload,
+                        onSetEnabled = store::setKnowledgePackEnabled
                     )
                 }
                 composable(
@@ -224,6 +243,7 @@ internal object HomeRoute {
     const val Logs = "logs"
     const val ModelSettings = "model-settings"
     const val SystemPromptSettings = "system-prompt-settings"
+    const val Knowledge = "knowledge"
 }
 
 internal fun AnimatedContentTransitionScope<NavBackStackEntry>.forwardEnter() =

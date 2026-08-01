@@ -21,9 +21,9 @@ import 'package:photos/models/file/file.dart';
 import "package:photos/models/files_split.dart";
 import "package:photos/models/freeable_space_info.dart";
 import 'package:photos/models/selected_files.dart';
+import 'package:photos/module/download/file.dart';
 import "package:photos/service_locator.dart";
 import "package:photos/services/files_service.dart";
-import "package:photos/services/media_store_service.dart";
 import "package:photos/services/sync/local_sync_service.dart";
 import 'package:photos/services/sync/remote_sync_service.dart';
 import 'package:photos/services/sync/sync_service.dart';
@@ -34,9 +34,39 @@ import 'package:photos/ui/components/buttons/button_widget.dart'
 import 'package:photos/ui/notification/toast.dart';
 import "package:photos/utils/device_info.dart";
 import 'package:photos/utils/dialog_util.dart';
-import 'package:photos/utils/file_util.dart';
 
 final _logger = Logger("DeleteFileUtil");
+
+Future<({Set<String> deletedIDs, Set<String> trashedIDs})>
+_tryTrashOrDeleteFiles(List<String> assetIDs) async {
+  if (assetIDs.isEmpty) {
+    return (deletedIDs: <String>{}, trashedIDs: <String>{});
+  }
+  try {
+    if (flagService.internalUser &&
+        Platform.isAndroid &&
+        !await isAndroidSDKVersionLowerThan(android11SDKINT)) {
+      final assets = (await Future.wait(
+        assetIDs.map(AssetEntity.fromId),
+      )).whereType<AssetEntity>().toList();
+      return (
+        deletedIDs: <String>{},
+        trashedIDs: (await PhotoManager.editor.android.moveToTrash(
+          assets,
+        )).toSet(),
+      );
+    }
+    final removedIDs = (await PhotoManager.editor.deleteWithIds(
+      assetIDs,
+    )).toSet();
+    return Platform.isAndroid
+        ? (deletedIDs: removedIDs, trashedIDs: <String>{})
+        : (deletedIDs: <String>{}, trashedIDs: removedIDs);
+  } catch (e, s) {
+    _logger.severe("Could not delete file", e, s);
+    return (deletedIDs: <String>{}, trashedIDs: <String>{});
+  }
+}
 
 Future<void> deleteFilesFromEverywhere(
   BuildContext context,
@@ -45,7 +75,7 @@ Future<void> deleteFilesFromEverywhere(
   _logger.info("Trying to deleteFilesFromEverywhere " + files.toString());
   final List<String> localAssetIDs = [];
   final List<String> localSharedMediaIDs = [];
-  final List<String> alreadyDeletedIDs = []; // to ignore already deleted files
+  final List<String> alreadyDeletedIDs = []; // Files already missing from disk.
   bool hasLocalOnlyFiles = false;
   for (final file in files) {
     if (file.localID != null) {
@@ -62,22 +92,17 @@ Future<void> deleteFilesFromEverywhere(
       hasLocalOnlyFiles = true;
     }
   }
-  Set<String> deletedIDs = <String>{};
-  try {
-    deletedIDs = (await PhotoManager.editor.deleteWithIds(
-      localAssetIDs,
-    )).toSet();
-  } catch (e, s) {
-    _logger.severe("Could not delete file", e, s);
-  }
-  deletedIDs.addAll(await _tryDeleteSharedMediaFiles(localSharedMediaIDs));
+  final result = await _tryTrashOrDeleteFiles(localAssetIDs);
+  final deletedIDs = result.deletedIDs
+    ..addAll(await _tryDeleteSharedMediaFiles(localSharedMediaIDs));
+  final removedIDs = deletedIDs.union(result.trashedIDs);
   final updatedCollectionIDs = <int>{};
   final List<TrashRequest> uploadedFilesToBeTrashed = [];
   final List<EnteFile> deletedFiles = [];
   for (final file in files) {
     if (file.localID != null) {
-      // Remove only those files that have already been removed from disk
-      if (deletedIDs.contains(file.localID) ||
+      // Handle only files deleted, moved to trash, or already missing.
+      if (removedIDs.contains(file.localID) ||
           alreadyDeletedIDs.contains(file.localID)) {
         deletedFiles.add(file);
         if (file.uploadedFileID != null) {
@@ -129,10 +154,11 @@ Future<void> deleteFilesFromEverywhere(
         source: "deleteFilesEverywhere",
       ),
     );
-    if (hasLocalOnlyFiles && Platform.isAndroid) {
-      showShortToast(context, AppLocalizations.of(context).filesDeleted);
-    } else {
-      showShortToast(context, AppLocalizations.of(context).movedToTrash);
+    if (context.mounted) {
+      final message = hasLocalOnlyFiles && deletedIDs.isNotEmpty
+          ? AppLocalizations.of(context).filesDeleted
+          : AppLocalizations.of(context).movedToTrash;
+      showShortToast(context, message);
     }
   }
   if (uploadedFilesToBeTrashed.isNotEmpty) {
@@ -200,9 +226,8 @@ Future<List<EnteFile>> deleteFilesOnDeviceOnly(
   _logger.info("Trying to deleteFilesOnDeviceOnly" + files.toString());
   final List<String> localAssetIDs = [];
   final List<String> localSharedMediaIDs = [];
-  final List<String> alreadyDeletedIDs = []; // to ignore already deleted files
-  final List<String?> localOnlyIDs = [];
-  bool hasLocalOnlyFiles = false;
+  final List<String> alreadyDeletedIDs = []; // Files already missing from disk.
+  final localOnlyIDs = <String?>{};
   for (final file in files) {
     if (file.localID != null) {
       if (!(await _localFileExist(file))) {
@@ -215,26 +240,20 @@ Future<List<EnteFile>> deleteFilesOnDeviceOnly(
       }
     }
     if (file.uploadedFileID == null) {
-      hasLocalOnlyFiles = true;
       localOnlyIDs.add(file.localID);
     }
   }
-  Set<String> deletedIDs = <String>{};
-  try {
-    deletedIDs = (await PhotoManager.editor.deleteWithIds(
-      localAssetIDs,
-    )).toSet();
-  } catch (e, s) {
-    _logger.severe("Could not delete file", e, s);
-  }
-  deletedIDs.addAll(await _tryDeleteSharedMediaFiles(localSharedMediaIDs));
+  final result = await _tryTrashOrDeleteFiles(localAssetIDs);
+  final deletedIDs = result.deletedIDs
+    ..addAll(await _tryDeleteSharedMediaFiles(localSharedMediaIDs));
+  final removedIDs = deletedIDs.union(result.trashedIDs);
   final List<EnteFile> deletedFiles = [];
   for (final file in files) {
-    // Remove only those files that have been removed from disk
-    if (deletedIDs.contains(file.localID) ||
+    // Handle only files deleted, moved to trash, or already missing.
+    if (removedIDs.contains(file.localID) ||
         alreadyDeletedIDs.contains(file.localID)) {
       deletedFiles.add(file);
-      if (hasLocalOnlyFiles && localOnlyIDs.contains(file.localID)) {
+      if (localOnlyIDs.contains(file.localID)) {
         await FilesDB.instance.deleteLocalFile(file);
       } else {
         file.localID = null;
@@ -250,6 +269,12 @@ Future<List<EnteFile>> deleteFilesOnDeviceOnly(
         source: "deleteFilesOnDeviceOnly",
       ),
     );
+  }
+  if (removedIDs.isNotEmpty && context.mounted) {
+    final message = deletedIDs.isNotEmpty
+        ? AppLocalizations.of(context).filesDeleted
+        : AppLocalizations.of(context).movedToTrash;
+    showShortToast(context, message);
   }
   return deletedFiles;
 }
@@ -303,6 +328,7 @@ Future<bool> deleteFromTrash(BuildContext context, List<EnteFile> files) async {
       actionResult.action == ButtonAction.fourth) {
     return didDeletionStart ? true : false;
   } else if (actionResult.action == ButtonAction.error) {
+    if (!context.mounted) return false;
     await showGenericErrorDialog(
       context: context,
       error: actionResult.exception,
@@ -333,6 +359,7 @@ Future<bool> emptyTrash(BuildContext context) async {
       actionResult!.action == ButtonAction.cancel) {
     return false;
   } else if (actionResult.action == ButtonAction.error) {
+    if (!context.mounted) return false;
     await showGenericErrorDialog(
       context: context,
       error: actionResult.exception,
@@ -372,7 +399,11 @@ Future<bool> deleteLocalFiles(
     final tooManyAssets = localAssetIDs.length > largeCountThreshold;
     final bool shouldDeleteInBatches =
         await isAndroidSDKVersionLowerThan(android11SDKINT) || tooManyAssets;
-    if (shouldDeleteInBatches) {
+    if (!context.mounted) {
+      _logger.info(
+        "Skipping platform asset deletion after the initiating page was disposed",
+      );
+    } else if (shouldDeleteInBatches) {
       if (tooManyAssets) {
         _logger.info(
           "Too many assets (${localAssetIDs.length}) to delete in one shot, deleting in batches",
@@ -462,7 +493,11 @@ Future<bool> deleteLocalFilesAfterRemovingAlreadyDeletedIDs(
     final bool shouldDeleteInBatches = await isAndroidSDKVersionLowerThan(
       android11SDKINT,
     );
-    if (shouldDeleteInBatches) {
+    if (!context.mounted) {
+      _logger.info(
+        "Skipping platform asset deletion after the initiating page was disposed",
+      );
+    } else if (shouldDeleteInBatches) {
       _logger.info("Deleting in batches");
       deletedIDs.addAll(
         await deleteLocalFilesInBatches(context, localAssetIDs),
@@ -548,7 +583,11 @@ Future<bool> retryFreeUpSpaceAfterRemovingAssetsNonExistingInDisk(
     final bool shouldDeleteInBatches = await isAndroidSDKVersionLowerThan(
       android11SDKINT,
     );
-    if (shouldDeleteInBatches) {
+    if (!context.mounted) {
+      _logger.info(
+        "Skipping platform asset deletion after the initiating page was disposed",
+      );
+    } else if (shouldDeleteInBatches) {
       _logger.info("Deleting in batches");
       deletedIDs.addAll(
         await deleteLocalFilesInBatches(context, localAssetIDs),
@@ -696,6 +735,7 @@ Future<void> _recursivelyReduceBatchSizeAndRetryDeletion({
       "Failed to delete local files in batches of $batchSize. Reducing batch size and retrying.",
       e,
     );
+    if (!context.mounted) return;
     await _recursivelyReduceBatchSizeAndRetryDeletion(
       batchSize: (batchSize / 2).floor(),
       context: context,
@@ -749,10 +789,10 @@ Future<void> showMediaManagementHintSheet(BuildContext context) async {
   if (!Platform.isAndroid) {
     return;
   }
-  if (!await MediaStoreService.isMediaManagementSupported()) {
+  if (await isAndroidSDKVersionLowerThan(android12SDKINT)) {
     return;
   }
-  if (await MediaStoreService.canManageMedia()) {
+  if (await PhotoManager.canManageMedia()) {
     return;
   }
   if (localSettings.isMediaManagementHintDismissed) {
@@ -762,6 +802,7 @@ Future<void> showMediaManagementHintSheet(BuildContext context) async {
   if (!localSettings.hasMediaManagementHintDeleteAttemptsReached()) {
     return;
   }
+  if (!context.mounted) return;
   final shouldDismissHint = await showBottomSheetComponent<bool>(
     context: context,
     useRootNavigator: Platform.isIOS,
@@ -776,7 +817,7 @@ Future<void> showMediaManagementHintSheet(BuildContext context) async {
           label: l10n.openSettings,
           shouldSurfaceExecutionStates: false,
           onTap: () async {
-            await MediaStoreService.openManageMediaSettings();
+            await PhotoManager.requestManageMedia();
             if (sheetContext.mounted) {
               Navigator.of(sheetContext).pop(false);
             }
@@ -846,7 +887,8 @@ Future<void> showDeleteSheet(
       return;
     }
     var didDelete = false;
-    if (Platform.isAndroid && await MediaStoreService.canManageMedia()) {
+    if (Platform.isAndroid && await PhotoManager.canManageMedia()) {
+      if (!context.mounted) return;
       didDelete =
           await showBottomSheetComponent<bool>(
             context: context,
@@ -873,6 +915,7 @@ Future<void> showDeleteSheet(
           ) ==
           true;
     } else {
+      if (!context.mounted) return;
       await deleteOnDeviceOnlyAction(context, localGalleryDeletableFiles);
       didDelete = true;
     }
@@ -880,6 +923,7 @@ Future<void> showDeleteSheet(
       return;
     }
     selectedFiles.unSelectAll(localGalleryDeletableFiles.toSet());
+    if (!context.mounted) return;
     await showMediaManagementHintSheet(context);
     return;
   }
@@ -895,6 +939,7 @@ Future<void> showDeleteSheet(
 
   Future<void> deleteFromEnte() async {
     await deleteFromRemoteOnlyAction(context, deletableFiles);
+    if (!context.mounted) return;
     showShortToast(context, l10n.movedToTrash);
   }
 
@@ -922,6 +967,7 @@ Future<void> showDeleteSheet(
   if (actionResult == true) {
     selectedFiles.clearAll();
     if (didDeleteLocalFiles) {
+      if (!context.mounted) return;
       await showMediaManagementHintSheet(context);
     }
   }
@@ -1028,6 +1074,15 @@ class DeleteConfirmationSheetState extends State<DeleteConfirmationSheet> {
   var _isMoreOptionsShown = false;
   var _isSetAsDefaultSelected = false;
 
+  @override
+  void initState() {
+    super.initState();
+    // Always display the more options if the user hasn't set a preference yet.
+    if (localSettings.getDeletePreference() == null) {
+      _isMoreOptionsShown = true;
+    }
+  }
+
   Future<void> _onDelete(
     BuildContext context,
     Future<void> Function() callback,
@@ -1108,7 +1163,7 @@ class DeleteConfirmationSheetState extends State<DeleteConfirmationSheet> {
                 children: [...previousChildren, ?currentChild],
               );
             },
-            child: (_isMoreOptionsShown)
+            child: (widget.isLocal && widget.isRemote && _isMoreOptionsShown)
                 ? Column(
                     spacing: Spacing.md,
                     children: [
@@ -1121,6 +1176,7 @@ class DeleteConfirmationSheetState extends State<DeleteConfirmationSheet> {
                               .DeleteFromLocalOnly,
                             );
                           }
+                          if (!context.mounted) return;
                           await _onDelete(context, widget.onDeleteFromLocal);
                         },
                       ),
@@ -1133,6 +1189,7 @@ class DeleteConfirmationSheetState extends State<DeleteConfirmationSheet> {
                               .DeleteFromRemoteOnly,
                             );
                           }
+                          if (!context.mounted) return;
                           await _onDelete(context, widget.onDeleteFromRemote);
                         },
                       ),
@@ -1145,6 +1202,7 @@ class DeleteConfirmationSheetState extends State<DeleteConfirmationSheet> {
                               .DeleteFromBoth,
                             );
                           }
+                          if (!context.mounted) return;
                           await _onDelete(context, widget.onDeleteFromBoth);
                         },
                       ),

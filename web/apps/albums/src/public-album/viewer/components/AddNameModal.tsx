@@ -217,7 +217,6 @@ export const AddNameModal: React.FC<AddNameModalProps> = ({
         <StyledDialog
             open={open}
             onClose={handleClose}
-            disableEscapeKeyDown={isSubmitting}
             slotProps={{ transition: { onExited: handleExited } }}
         >
             <DialogWrapper>

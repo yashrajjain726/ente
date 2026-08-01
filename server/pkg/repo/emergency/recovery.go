@@ -135,6 +135,24 @@ func (repo *Repository) UpdateRecoveryStatusForID(ctx context.Context, sessionID
 	return rows > 0, nil
 }
 
+func (repo *Repository) UpdateRecoveryStatusForSession(ctx context.Context, sessionID uuid.UUID, userID, emergencyContactID int64, status ente.RecoveryStatus) (bool, error) {
+	validPrevStatus := validPreviousStatus(status)
+	var result sql.Result
+	var err error
+	if status == ente.RecoveryStatusReady {
+		result, err = repo.DB.ExecContext(ctx, `UPDATE emergency_recovery SET status=$1, wait_till=$2 WHERE id=$3 and user_id=$4 and emergency_contact_id=$5 and status = ANY($6)`,
+			status, time.Microseconds(), sessionID, userID, emergencyContactID, pq.Array(validPrevStatus))
+	} else {
+		result, err = repo.DB.ExecContext(ctx, `UPDATE emergency_recovery SET status=$1 WHERE id=$2 and user_id=$3 and emergency_contact_id=$4 and status = ANY($5)`,
+			status, sessionID, userID, emergencyContactID, pq.Array(validPrevStatus))
+	}
+	if err != nil {
+		return false, stacktrace.Propagate(err, "")
+	}
+	rows, _ := result.RowsAffected()
+	return rows > 0, nil
+}
+
 func (repo *Repository) GetRecoverRowByID(ctx context.Context, sessionID uuid.UUID) (*RecoverRow, error) {
 	var row RecoverRow
 	err := repo.DB.QueryRowContext(ctx, `SELECT id, user_id, emergency_contact_id, status, wait_till, next_reminder_at, created_at

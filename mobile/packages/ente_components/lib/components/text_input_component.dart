@@ -43,8 +43,10 @@ class TextInputComponent extends StatefulWidget {
     this.isEmptyNotifier,
     this.inputFormatters,
     this.keyboardType,
+    this.textInputAction,
     this.enableFillColor = true,
     this.autocorrect = true,
+    this.enableSuggestions = true,
     this.isRequired = false,
     this.prefix,
     this.suffix,
@@ -52,6 +54,7 @@ class TextInputComponent extends StatefulWidget {
     this.messageType = TextInputComponentMessageType.helper,
     this.messageIcon,
     this.isDisabled = false,
+    this.readOnly = false,
     this.autofillHints,
     this.maxLines,
     this.minLines,
@@ -87,14 +90,21 @@ class TextInputComponent extends StatefulWidget {
   final ValueNotifier<bool>? isEmptyNotifier;
   final List<TextInputFormatter>? inputFormatters;
   final TextInputType? keyboardType;
+
+  /// Platform IME action. When set to [TextInputAction.next], completing the
+  /// field moves focus to the next node instead of doing nothing.
+  final TextInputAction? textInputAction;
   final bool enableFillColor;
   final bool autocorrect;
+  final bool enableSuggestions;
   final bool isRequired;
 
   /// Caller-owned leading widget. Pass explicit color and size when needed.
   final Widget? prefix;
 
-  /// Caller-owned trailing widget. Multiline fields pin this slot to the top.
+  /// Caller-owned trailing widget. Sits in an icon slot that is at least
+  /// [IconSizes.medium] square and grows to fit wider content (e.g. a row of
+  /// affordances). Multiline fields pin this slot to the top.
   final Widget? suffix;
 
   /// Optional tap handler for [suffix]. When provided, the trailing affordance
@@ -103,6 +113,11 @@ class TextInputComponent extends StatefulWidget {
   final TextInputComponentMessageType messageType;
   final IconData? messageIcon;
   final bool isDisabled;
+
+  /// When true the field is non-editable but keeps the enabled visual style
+  /// (unlike [isDisabled], which also mutes the text and disables the suffix
+  /// tap). Text stays selectable and the soft keyboard is suppressed.
+  final bool readOnly;
   final Iterable<String>? autofillHints;
   final int? maxLines;
   final int? minLines;
@@ -151,6 +166,9 @@ class _TextInputComponentState extends State<TextInputComponent> {
   @override
   void didUpdateWidget(covariant TextInputComponent oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.isDisabled != widget.isDisabled) {
+      _configureGroupId();
+    }
     if (oldWidget.submitNotifier != widget.submitNotifier) {
       oldWidget.submitNotifier?.removeListener(_handleSubmitRequested);
       widget.submitNotifier?.addListener(_handleSubmitRequested);
@@ -201,7 +219,7 @@ class _TextInputComponentState extends State<TextInputComponent> {
     super.dispose();
   }
 
-  Object? _groupId;
+  late Object _groupId;
   final _defaultGroupId = Object();
   final _disabledGroupId = Object();
 
@@ -285,9 +303,11 @@ class _TextInputComponentState extends State<TextInputComponent> {
                         ],
                         Expanded(
                           child: TextField(
+                            groupId: _groupId,
                             controller: _controller,
                             focusNode: _focusNode,
                             enabled: !widget.isDisabled,
+                            readOnly: widget.readOnly,
                             autofocus: widget.autofocus,
                             obscureText: _obscureText,
                             maxLines: widget.isPasswordInput
@@ -297,6 +317,7 @@ class _TextInputComponentState extends State<TextInputComponent> {
                                 ? null
                                 : widget.minLines,
                             keyboardType: widget.keyboardType,
+                            textInputAction: widget.textInputAction,
                             textCapitalization: widget.textCapitalization,
                             inputFormatters: _inputFormatters,
                             autofillHints:
@@ -306,7 +327,9 @@ class _TextInputComponentState extends State<TextInputComponent> {
                                     : const []),
                             autocorrect:
                                 widget.autocorrect && !widget.isPasswordInput,
-                            enableSuggestions: !widget.isPasswordInput,
+                            enableSuggestions:
+                                widget.enableSuggestions &&
+                                !widget.isPasswordInput,
                             textAlignVertical: _isMultiline
                                 ? TextAlignVertical.top
                                 : TextAlignVertical.center,
@@ -530,9 +553,12 @@ class _TextInputComponentState extends State<TextInputComponent> {
   }
 
   Widget _slot(Widget child) {
-    return SizedBox.square(
-      dimension: _kIconContainerSize,
-      child: Center(child: child),
+    return ConstrainedBox(
+      constraints: const BoxConstraints(
+        minWidth: _kIconContainerSize,
+        minHeight: _kIconContainerSize,
+      ),
+      child: Center(widthFactor: 1, heightFactor: 1, child: child),
     );
   }
 
@@ -567,7 +593,9 @@ class _TextInputComponentState extends State<TextInputComponent> {
       TextInput.finishAutofillContext();
     }
     if (widget.onSubmit == null) {
-      if (widget.shouldUnfocusOnClearOrSubmit) {
+      if (widget.textInputAction == TextInputAction.next) {
+        _focusNode.nextFocus();
+      } else if (widget.shouldUnfocusOnClearOrSubmit) {
         FocusScope.of(context).unfocus();
       }
       return;
@@ -583,6 +611,7 @@ class _TextInputComponentState extends State<TextInputComponent> {
     if (widget.onSubmit == null || widget.isDisabled || _isSubmitting) {
       return;
     }
+    final popNavAfterSubmission = widget.popNavAfterSubmission;
 
     setState(() {
       _isSubmitting = true;
@@ -595,18 +624,19 @@ class _TextInputComponentState extends State<TextInputComponent> {
     try {
       await widget.onSubmit!.call(_controller.text);
     } catch (error) {
-      if (error.toString().contains('Incorrect password')) {
-        _surfaceWrongPasswordState();
-      }
       if (mounted) {
+        if (error.toString().contains('Incorrect password')) {
+          _surfaceWrongPasswordState();
+        }
         setState(() => _isSubmitting = false);
+        if (popNavAfterSubmission) {
+          _popNavigatorStack(
+            context,
+            e: error is Exception ? error : Exception(error.toString()),
+          );
+        }
       }
-      if (widget.popNavAfterSubmission) {
-        _popNavigatorStack(
-          context,
-          e: error is Exception ? error : Exception(error.toString()),
-        );
-      } else {
+      if (!popNavAfterSubmission) {
         rethrow;
       }
       return;

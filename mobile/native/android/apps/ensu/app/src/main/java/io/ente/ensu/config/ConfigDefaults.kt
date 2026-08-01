@@ -1,4 +1,10 @@
 package io.ente.ensu.config
 
-typealias ConfigModelPreset = io.ente.ensu.bindings.ConfigModelPreset
-typealias ConfigDefaults = io.ente.ensu.bindings.ConfigDefaults
+import io.ente.ensu.bindings.ConfigDefaults
+import io.ente.ensu.bindings.configDefaults
+import io.ente.ensu.bindings.uniffiEnsureInitialized
+
+fun loadConfigDefaults(): ConfigDefaults {
+    uniffiEnsureInitialized()
+    return configDefaults()
+}

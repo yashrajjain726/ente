@@ -1,11 +1,6 @@
 import SwiftUI
-#if canImport(UIKit)
 import UIKit
 typealias PlatformColor = UIColor
-#elseif canImport(AppKit)
-import AppKit
-typealias PlatformColor = NSColor
-#endif
 
 enum EnsuColor {
     static let backgroundBase = Color(PlatformColor.dynamic(light: "#F8F5F0", dark: "#141414"))
@@ -129,15 +124,8 @@ extension PlatformColor {
     }
 
     static func dynamic(light: String, dark: String) -> PlatformColor {
-        #if canImport(UIKit)
         return PlatformColor { trait in
             trait.userInterfaceStyle == .dark ? PlatformColor(hex: dark) : PlatformColor(hex: light)
         }
-        #else
-        return PlatformColor(name: nil) { appearance in
-            let isDark = appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
-            return PlatformColor(hex: isDark ? dark : light)
-        }
-        #endif
     }
 }

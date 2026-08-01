@@ -122,7 +122,6 @@ class _AlbumVerticalListWidgetState extends State<AlbumVerticalListWidget> {
 
     return ListView.separated(
       controller: widget.scrollController,
-      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
       itemBuilder: (context, index) {
         // Create new album button
         if (index == 0 && widget.shouldShowCreateAlbum) {
@@ -238,15 +237,19 @@ class _AlbumVerticalListWidgetState extends State<AlbumVerticalListWidget> {
       return;
     }
 
+    if (!context.mounted) return;
     final success = await _addToCollection(context, item.id, true);
     if (success) {
+      if (!context.mounted) return;
       showShortToast(
         context,
         AppLocalizations.of(
           context,
         ).addedSuccessfullyTo(albumName: item.displayName),
       );
+      if (!context.mounted) return;
       Navigator.pop(context);
+      if (!context.mounted) return;
       await _navigateToCollection(context, item);
     }
   }
@@ -321,8 +324,9 @@ class _AlbumVerticalListWidgetState extends State<AlbumVerticalListWidget> {
         popnavAfterSubmission: true,
       );
       if (result is Exception) {
-        await showGenericErrorDialog(context: context, error: result);
         _logger.severe("Failed to name album", result);
+        if (!context.mounted) return;
+        await showGenericErrorDialog(context: context, error: result);
       }
     } else {
       Navigator.pop(context);
@@ -352,20 +356,26 @@ class _AlbumVerticalListWidgetState extends State<AlbumVerticalListWidget> {
         if (widget.enableSelection) {
           Bus.instance.fire(CreateNewAlbumEvent(collection));
         } else {
+          if (!context.mounted) return;
           if (await _runCollectionAction(
             context,
             collection,
             showProgressDialog: false,
           )) {
             if (widget.actionType == CollectionActionType.restoreFiles) {
+              if (!context.mounted) return;
               showShortToast(context, 'Restored files to album ' + albumName);
             } else {
+              if (!context.mounted) return;
               showShortToast(context, "Album '" + albumName + "' created.");
             }
 
+            if (!context.mounted) return;
             Navigator.pop(context);
+            if (!context.mounted) return;
             Navigator.pop(context);
 
+            if (!context.mounted) return;
             await _navigateToCollection(
               context,
               collection,
@@ -398,6 +408,7 @@ class _AlbumVerticalListWidgetState extends State<AlbumVerticalListWidget> {
       bool hasVerifiedLock = false;
 
       if (widget.actionType == CollectionActionType.addFiles) {
+        if (!context.mounted) return;
         toastMessage = AppLocalizations.of(
           context,
         ).addedSuccessfullyTo(albumName: item.displayName);
@@ -405,18 +416,21 @@ class _AlbumVerticalListWidgetState extends State<AlbumVerticalListWidget> {
       } else if (widget.actionType == CollectionActionType.moveFiles ||
           widget.actionType == CollectionActionType.restoreFiles ||
           widget.actionType == CollectionActionType.unHide) {
+        if (!context.mounted) return;
         toastMessage = AppLocalizations.of(
           context,
         ).movedSuccessfullyTo(albumName: item.displayName);
         shouldNavigateToCollection = true;
       } else if (widget.actionType ==
           CollectionActionType.moveToHiddenCollection) {
+        if (!context.mounted) return;
         toastMessage = AppLocalizations.of(
           context,
         ).movedSuccessfullyTo(albumName: item.displayName);
         shouldNavigateToCollection = true;
         hasVerifiedLock = true;
       } else if (widget.actionType == CollectionActionType.addToHiddenAlbum) {
+        if (!context.mounted) return;
         toastMessage = AppLocalizations.of(
           context,
         ).addedSuccessfullyTo(albumName: item.displayName);
@@ -426,10 +440,13 @@ class _AlbumVerticalListWidgetState extends State<AlbumVerticalListWidget> {
         toastMessage = "";
       }
       if (toastMessage.isNotEmpty) {
+        if (!context.mounted) return;
         showShortToast(context, toastMessage);
       }
       if (shouldNavigateToCollection) {
+        if (!context.mounted) return;
         Navigator.pop(context);
+        if (!context.mounted) return;
         await _navigateToCollection(
           context,
           item,
@@ -541,6 +558,7 @@ class _AlbumVerticalListWidgetState extends State<AlbumVerticalListWidget> {
       return true;
     } on AssertionError catch (e) {
       await dialog.hide();
+      if (!context.mounted) return false;
       // ignore: unawaited_futures
       showErrorDialog(
         context,
@@ -551,6 +569,7 @@ class _AlbumVerticalListWidgetState extends State<AlbumVerticalListWidget> {
     } catch (e, s) {
       _logger.severe("Could not move to album", e, s);
       await dialog.hide();
+      if (!context.mounted) return false;
       await showGenericErrorDialog(context: context, error: e);
       return false;
     }
@@ -578,6 +597,7 @@ class _AlbumVerticalListWidgetState extends State<AlbumVerticalListWidget> {
       return true;
     } on AssertionError catch (e) {
       await dialog.hide();
+      if (!context.mounted) return false;
       // ignore: unawaited_futures
       showErrorDialog(
         context,
@@ -588,6 +608,7 @@ class _AlbumVerticalListWidgetState extends State<AlbumVerticalListWidget> {
     } catch (e, s) {
       _logger.severe("Could not move to album", e, s);
       await dialog.hide();
+      if (!context.mounted) return false;
       await showGenericErrorDialog(context: context, error: e);
       return false;
     }

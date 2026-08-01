@@ -1,13 +1,10 @@
 import SwiftUI
-#if canImport(UIKit)
 import UIKit
-#endif
 
 final class KeyboardObserver: ObservableObject {
     @Published var height: CGFloat = 0
     @Published var isVisible: Bool = false
 
-    #if canImport(UIKit)
     private var showObserver: NSObjectProtocol?
     private var hideObserver: NSObjectProtocol?
 
@@ -38,15 +35,10 @@ final class KeyboardObserver: ObservableObject {
         if let showObserver { NotificationCenter.default.removeObserver(showObserver) }
         if let hideObserver { NotificationCenter.default.removeObserver(hideObserver) }
     }
-    #else
-    init() {}
-    #endif
 }
 
 extension View {
     func hideKeyboard() {
-        #if canImport(UIKit)
         UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
-        #endif
     }
 }

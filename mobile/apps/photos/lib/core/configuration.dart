@@ -4,10 +4,13 @@ import "dart:io";
 
 import 'package:backup_exclusion/backup_exclusion.dart';
 import 'package:bip39/bip39.dart' as bip39;
+import 'package:ente_account_deletion/account_deletion.dart';
 import 'package:ente_contacts/contacts.dart';
 import "package:ente_crypto/ente_crypto.dart";
 import 'package:ente_lock_screen/lock_screen_host.dart';
+import 'package:ente_pure_utils/ente_pure_utils.dart';
 import "package:flutter/services.dart";
+import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:logging/logging.dart';
 import 'package:path_provider/path_provider.dart';
@@ -32,6 +35,7 @@ import 'package:photos/events/user_logged_out_event.dart';
 import 'package:photos/gateways/users/models/key_attributes.dart';
 import 'package:photos/gateways/users/models/key_gen_result.dart';
 import 'package:photos/gateways/users/models/private_key_attributes.dart';
+import 'package:photos/module/upload/upload_artifact.dart';
 import 'package:photos/service_locator.dart';
 import 'package:photos/services/collections_service.dart';
 import 'package:photos/services/favorites_service.dart';
@@ -44,13 +48,12 @@ import "package:photos/services/notification_service.dart";
 import 'package:photos/services/search_service.dart';
 import 'package:photos/services/sync/sync_service.dart';
 import 'package:photos/services/video_preview_service.dart';
-import 'package:photos/utils/file_uploader.dart';
 import 'package:photos/utils/validator_util.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import "package:tuple/tuple.dart";
 import 'package:uuid/uuid.dart';
 
-class Configuration implements LockScreenHost {
+class Configuration implements LockScreenHost, AccountDeletionHost {
   Configuration._privateConstructor();
 
   static final Configuration instance = Configuration._privateConstructor();
@@ -165,7 +168,7 @@ class Configuration implements LockScreenHost {
         final files = tempDocumentsDir.listSync();
         for (final file in files) {
           if (file is File) {
-            if (file.path.contains(uploadTempFilePrefix)) {
+            if (isUploadTempArtifactPath(file.path)) {
               skippedTempUploadFiles++;
               continue;
             }
@@ -206,6 +209,8 @@ class Configuration implements LockScreenHost {
       }
     }
 
+    await _clearTempFolderOnLogout();
+
     // Clear preferences and secure storage
     await _preferences.clear();
     await _secureStorage.deleteAll();
@@ -233,6 +238,13 @@ class Configuration implements LockScreenHost {
     // Clear all in-memory caches
     ThumbnailInMemoryLruCache.clearAll();
     FileLruCache.clearAll();
+
+    // Clear image cache
+    try {
+      await DefaultCacheManager().emptyCache();
+    } catch (e) {
+      _logger.warning("Failed to clear image cache", e);
+    }
 
     // Clear video cache
     try {
@@ -277,7 +289,6 @@ class Configuration implements LockScreenHost {
 
     if (!autoLogout) {
       // Following services won't be initialized if it's the case of autoLogout
-      FileUploader.instance.clearCachedUploadURLs();
       CollectionsService.instance.clearCache();
       FavoritesService.instance.clearCache();
       SearchService.instance.clearCache();
@@ -295,6 +306,16 @@ class Configuration implements LockScreenHost {
       Bus.instance.fire(UserLoggedOutEvent());
     } else {
       await _preferences.setBool("auto_logout", true);
+    }
+  }
+
+  Future<void> _clearTempFolderOnLogout() async {
+    try {
+      await deleteDirectoryContents(_tempDocumentsDirPath);
+      await Directory(_tempDocumentsDirPath).create(recursive: true);
+      _logger.info("Cleared temp folder on logout");
+    } catch (e, s) {
+      _logger.warning("Failed to clear temp folder on logout", e, s);
     }
   }
 
@@ -566,6 +587,16 @@ class Configuration implements LockScreenHost {
     } else {
       return KeyAttributes.fromJson(jsonValue);
     }
+  }
+
+  @override
+  String decryptDeleteChallenge(String encryptedChallenge) {
+    final challenge = CryptoUtil.openSealSync(
+      CryptoUtil.base642bin(encryptedChallenge),
+      CryptoUtil.base642bin(getKeyAttributes()!.publicKey),
+      getSecretKey()!,
+    );
+    return utf8.decode(challenge);
   }
 
   Future<void> setKey(String? key) async {

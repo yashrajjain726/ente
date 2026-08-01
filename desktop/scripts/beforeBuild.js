@@ -1,10 +1,14 @@
 const fsp = require("fs/promises");
+const { stageNapiAddons } = require("./napi");
+const { stageONNXRuntime } = require("./ort");
 
 /**
  * This hook is invoked during the initial build (e.g. when triggered by
  * "npm run build"), and importantly, on each rebuild for a different
- * architecture during the build. We use it to ensure the vips binary matches
- * the current architecture. See "[Note: vips]" for more details.
+ * architecture during the build. We use it to stage the vips binary, the ONNX
+ * Runtime library, and the Rust N-API addon for the current architecture.
+ * See "[Note: vips]", "[Note: ONNX Runtime binaries]" and "[Note: Packaging
+ * the N-API addon]" for more details.
  *
  * The documentation for this hook is at:
  * https://www.electron.build/app-builder-lib.interface.configuration#beforebuild
@@ -30,6 +34,11 @@ const fsp = require("fs/promises");
 module.exports = async (context) => {
     const { appDir, platform, arch } = context;
 
+    // Stage the already-downloaded ONNX Runtime library, then build and stage
+    // the release Rust addon for the architecture being packaged.
+    await stageONNXRuntime(platform.nodeName, arch, appDir);
+    await stageNapiAddons(appDir, platform.nodeName, arch);
+
     // The arch used by Electron Builder is not the same as the arch used by
     // Node's process, but for the two cases that we care about, "x64" and
     // "arm64", both of them use the string constant and thus can be compared.
@@ -54,11 +63,14 @@ module.exports = async (context) => {
     switch (`${platform.nodeName}-${arch}`) {
         case "linux-x64":
             await download("vips-x64", "vips");
+            break;
         case "linux-arm64":
             await download("vips-arm64", "vips");
+            break;
         case "win32-x64":
             await download("vips-x86_64.exe", "vips.exe");
-        case "linux-arm64":
+            break;
+        case "win32-arm64":
             await download("vips-aarch64.exe", "vips.exe");
     }
 
