@@ -26,14 +26,12 @@ Just being around might seem a small thing, but it provides us energy. Knowing t
 
 Visit our Crowdin projects to help with translations:
 
-| Project                                                             |                                                                                                                                   |
-| ------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| [Auth](https://crowdin.com/project/ente-authenticator-app)          | [![Crowdin](https://badges.crowdin.net/ente-authenticator-app/localized.svg)](https://crowdin.com/project/ente-authenticator-app) |
-| [Locker](https://crowdin.com/project/ente-locker)                   | [![Crowdin](https://badges.crowdin.net/ente-locker/localized.svg)](https://crowdin.com/project/ente-locker)                       |
-| [Photos](https://crowdin.com/project/ente-photos-app)               | [![Crowdin](https://badges.crowdin.net/ente-photos-app/localized.svg)](https://crowdin.com/project/ente-photos-app)               |
-| [Photos Web / Desktop](https://crowdin.com/project/ente-photos-web) | [![Crowdin](https://badges.crowdin.net/ente-photos-web/localized.svg)](https://crowdin.com/project/ente-photos-web)               |
+| Project                                                     |                                                                                                                   |
+| ----------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| [Mobile](https://crowdin.com/project/ente-photos-app)       | [![Crowdin](https://badges.crowdin.net/ente-photos-app/localized.svg)](https://crowdin.com/project/ente-photos-app) |
+| [Web / Desktop](https://crowdin.com/project/ente-photos-web) | [![Crowdin](https://badges.crowdin.net/ente-photos-web/localized.svg)](https://crowdin.com/project/ente-photos-web) |
 
-If your language is not listed for translation, please [create a GitHub issue](https://github.com/ente/ente/issues/new?title=Request+for+New+Language+Translation&body=Language+name%3A+%0AProject%3A+auth%2Flocker%2Fphotos%2Fweb) to have it added. It is okay to have partial translations. Once ~90% of the strings in a language get translated, we will start surfacing it in the apps.
+If your language is not listed for translation, please [create a GitHub issue](https://github.com/ente/ente/issues/new?title=Request+for+New+Language+Translation&body=Language+name%3A+%0AProject%3A+mobile%2Fweb) to have it added. It is okay to have partial translations. Once ~90% of the strings in a language get translated, we will start surfacing it in the apps.
 
 ## Document
 

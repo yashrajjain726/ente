@@ -24,6 +24,7 @@ const List<Locale> appSupportedLocales = <Locale>[
   Locale("uk"),
   Locale("vi"),
   Locale("zh", "CN"),
+  Locale("zh", "TW"),
 ];
 
 List<Locale> _onDeviceLocales = [];
@@ -39,7 +40,7 @@ Locale localResolutionCallBack(
   };
   for (final deviceLocale in _onDeviceLocales) {
     final locale = _normalizedLocale(deviceLocale);
-    if (appSupportedLocales.contains(locale) || locale.languageCode == 'zh') {
+    if (appSupportedLocales.contains(locale)) {
       autoDetectedLocale = locale;
       return locale;
     }

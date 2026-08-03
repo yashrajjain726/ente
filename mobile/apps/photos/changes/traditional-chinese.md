@@ -1,0 +1,1 @@
+- Added Traditional Chinese as a selectable language.
