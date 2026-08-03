@@ -112,6 +112,9 @@
   "passwordEmptyError": "Mật khẩu không thể để trống",
   "passwordTooShort": "Mật khẩu tối thiểu 8 ký tự.",
   "importFromApp": "Nhập mã từ {appName}",
+  "importGoogleAuthGuide": "Xuất các tài khoản từ Google Authenticator sang mã QR bằng tùy chọn \"Chuyển tài khoản\". Sau đó, quét mã QR hoặc nhập mã từ hình ảnh.",
+  "scannerTorchOn": "Bật đèn flash",
+  "scannerTorchOff": "Tắt đèn flash",
   "importSelectJsonFile": "Chọn tệp JSON",
   "importSelectAppExport": "Chọn tệp xuất từ {appName}",
   "importEnteEncGuide": "Chọn tệp JSON Ente đã mã hóa",
@@ -121,6 +124,7 @@
   "import2FasGuide": "Dùng tùy chọn \"Cài đặt->Sao lưu -Xuất dữ liệu\" của 2FAS.\n\nNếu bản sao lưu của bạn có mã hóa, bạn phải có mật khẩu để giải mã.",
   "importLastpassGuide": "Dùng tùy chọn \"Chuyển tài khoản\" của Lastpass Authenticator và nhấn \"Xuất tài khoản ra tệp\". Nhập tệp JSON đã tải xuống.",
   "importProtonAuthGuide": "Dùng tùy chọn \"Xuất\" trong Proton Authenticator để xuất các mã của bạn.\n\nNếu tệp xuất của bạn được mã hóa, bạn sẽ cần nhập mật khẩu để giải mã nó.",
+  "importOtpAuthGuide": "Xuất bản sao lưu đã mã hóa từ OTP Auth, sau đó chọn tệp .otpauthdb hoặc .otpauthdp. Hệ thống cũng hỗ trợ các tệp xuất .otpauth cho từng tài khoản riêng lẻ.",
   "invalidProtonExportTitle": "Tệp xuất dữ liệu từ Proton không hợp lệ",
   "invalidProtonExportMessage": "Tệp đã chọn không phải tệp xuất dữ liệu từ Proton Authenticator hợp lệ.",
   "exportCodes": "Xuất mã",
@@ -193,6 +197,7 @@
   "deleteAccountQuery": "Chúng tôi rất tiếc khi thấy bạn ra đi. Có phải bạn gặp vấn đề?",
   "yesSendFeedbackAction": "Có, gửi phản hồi",
   "noDeleteAccountAction": "Không, xóa tài khoản",
+  "authToInitiateAccountDeletion": "Mở khóa để xóa tài khoản của bạn",
   "sendEmail": "Gửi email",
   "createNewAccount": "Tạo tài khoản mới",
   "weakStrength": "Yếu",
@@ -327,6 +332,16 @@
         "description": "The number of codes imported",
         "type": "int",
         "example": "1"
+      }
+    }
+  },
+  "importGoogleAuthConfirmation": "{codeCount, plural, other{Nhập {codeCount} mã từ Google Authenticator?}}",
+  "@importGoogleAuthConfirmation": {
+    "placeholders": {
+      "codeCount": {
+        "description": "The number of Google Authenticator codes to import",
+        "type": "int",
+        "example": "2"
       }
     }
   },
@@ -484,6 +499,9 @@
   "somethingWentWrongParsingCode": "Chúng tôi không thể phân tích {x} mã.",
   "updateNotAvailable": "Cập nhật không khả dụng",
   "viewRawCodes": "Xem mã thô",
+  "parsingError": "Lỗi phân tích",
+  "deleteUnparseableCodeTitle": "Xóa mã không thể phân tích?",
+  "deleteUnparseableCodeMessage": "Thao tác này sẽ xóa vĩnh viễn mã này khỏi Auth. Nó sẽ không được chuyển vào thùng rác.",
   "rawCodes": "Mã thô",
   "rawCodeData": "Dữ liệu mã thô",
   "appLock": "Khóa ứng dụng",
