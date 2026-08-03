@@ -522,6 +522,8 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
 }) => {
     const [selectedPost, setSelectedPost] =
         useState<SelectedProfilePost | null>(null);
+    const [isDraftPostExitAnimating, setIsDraftPostExitAnimating] =
+        useState(false);
     const [isDraftPostExiting, setIsDraftPostExiting] = useState(false);
     const [isPostPhotoOpening, setIsPostPhotoOpening] = useState(false);
     const [deletedPostIDs, setDeletedPostIDs] = useState<Set<string>>(
@@ -669,6 +671,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     };
     const closeSelectedPost = () => {
         activeLocalPostObjectUrlRef.current = null;
+        setIsDraftPostExitAnimating(false);
         setIsDraftPostExiting(false);
         setSelectedPost(null);
         revokeLocalPostObjectUrls();
@@ -1006,7 +1009,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             }}
         >
             {selectedPost && (
-                <SpaceViewerFeedBackdrop exiting={isDraftPostExiting} />
+                <SpaceViewerFeedBackdrop exiting={isDraftPostExitAnimating} />
             )}
             <Box
                 sx={{
@@ -1982,6 +1985,9 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                 ? onAddFriendForPostAction
                                 : undefined
                         }
+                        onDraftPostExitAnimationStart={() => {
+                            setIsDraftPostExitAnimating(true);
+                        }}
                         onDraftPostExitStart={() => setIsDraftPostExiting(true)}
                         onDeletePost={
                             isOwnerProfile ? deleteSelectedPost : undefined

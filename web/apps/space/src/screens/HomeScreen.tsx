@@ -1518,6 +1518,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 }) => {
     const [selectedViewer, setSelectedViewer] =
         useState<SelectedHomeViewer | null>(null);
+    const [isDraftPostExitAnimating, setIsDraftPostExitAnimating] =
+        useState(false);
     const [isDraftPostExiting, setIsDraftPostExiting] = useState(false);
     const [isInviteSharing, setIsInviteSharing] = useState(false);
     const [isPostPhotoOpening, setIsPostPhotoOpening] = useState(false);
@@ -1619,6 +1621,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     };
     const closeSelectedPhoto = () => {
         activeLocalPostObjectUrlRef.current = null;
+        setIsDraftPostExitAnimating(false);
         setIsDraftPostExiting(false);
         setSelectedViewer(null);
         revokeLocalPostObjectUrls();
@@ -1980,7 +1983,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             }}
         >
             {selectedViewer && (
-                <SpaceViewerFeedBackdrop exiting={isDraftPostExiting} />
+                <SpaceViewerFeedBackdrop exiting={isDraftPostExitAnimating} />
             )}
             <Box
                 sx={{
@@ -2462,6 +2465,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                                   }
                                 : undefined
                         }
+                        onDraftPostExitAnimationStart={() => {
+                            setIsDraftPostExitAnimating(true);
+                        }}
                         onDraftPostExitStart={() => {
                             setIsDraftPostExiting(true);
                         }}
