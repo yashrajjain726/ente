@@ -40,7 +40,7 @@ use crate::ml::runtime::rt_log;
 use crate::ml::webgpu;
 
 #[cfg(any(target_os = "ios", target_os = "macos", test))]
-const COREML_CACHE_SCHEMA: &str = "ort-1_27-mlprogram-all-default-v1";
+const COREML_CACHE_SCHEMA: &str = "ort-1_28-mlprogram-all-default-v1";
 const COREML_CACHE_COMPLETE_MARKER: &str = ".ente-cache-complete";
 /// The name ONNX Runtime's CoreML EP gives the compiled model it stores
 /// inside each generated MLProgram package directory in the cache
@@ -785,13 +785,13 @@ fn finalize_coreml_cache(cache_dir: &Path, model_path: &str) {
     }
 }
 
-/// On a warm cache hit ONNX Runtime 1.27 only checks that the generated
+/// On a warm cache hit ONNX Runtime 1.28 only checks that the generated
 /// package directory and loads `compiled_model.mlmodelc`, making the package's
 /// own weights redundant. Uncompiled packages remain intact; incompatible
 /// future runtimes will fail construction and trigger cache invalidation.
 fn trim_coreml_cache_weights(cache_dir: &Path) -> std::io::Result<u64> {
     let mut reclaimed = 0;
-    // ORT 1.27 stores the compiled MLProgram inside
+    // ORT 1.28 stores the compiled MLProgram inside
     // <cache_dir>/<model_hash>/<partition>/model/compiled_model.mlmodelc.
     for model_hash_entry in std::fs::read_dir(cache_dir)? {
         let model_hash_entry = model_hash_entry?;
@@ -1181,7 +1181,7 @@ mod tests {
         assert_eq!(
             coreml_cache_root(model),
             Path::new(
-                "/var/mobile/Containers/Data/Application/APP/Library/Caches/ente/ml/coreml/ort-1_27-mlprogram-all-default-v1"
+                "/var/mobile/Containers/Data/Application/APP/Library/Caches/ente/ml/coreml/ort-1_28-mlprogram-all-default-v1"
             )
         );
     }
@@ -1227,8 +1227,8 @@ mod tests {
     #[test]
     fn prunes_stale_schema_directories_keeping_current_and_files() {
         let coreml_root = tempfile::tempdir().unwrap();
-        let stale = coreml_root.path().join("ort-1_26-mlprogram-all-default-v1");
-        let current = coreml_root.path().join("ort-1_27-mlprogram-all-default-v1");
+        let stale = coreml_root.path().join("ort-1_27-mlprogram-all-default-v1");
+        let current = coreml_root.path().join("ort-1_28-mlprogram-all-default-v1");
         std::fs::create_dir(&stale).unwrap();
         std::fs::write(stale.join("cached"), b"stale").unwrap();
         std::fs::create_dir(&current).unwrap();
@@ -1236,11 +1236,11 @@ mod tests {
 
         let removed = prune_stale_coreml_schema_directories(
             coreml_root.path(),
-            "ort-1_27-mlprogram-all-default-v1",
+            "ort-1_28-mlprogram-all-default-v1",
         )
         .unwrap();
 
-        assert_eq!(removed, vec!["ort-1_26-mlprogram-all-default-v1"]);
+        assert_eq!(removed, vec!["ort-1_27-mlprogram-all-default-v1"]);
         assert!(!stale.exists());
         assert!(current.exists());
         assert!(coreml_root.path().join("stray-file").exists());

@@ -22,7 +22,7 @@ A new Flutter FFI plugin project.
   s.dependency 'Flutter'
   s.platform = :ios, '15.1'
 
-  # Flutter.framework does not contain an i386 slice, and ONNX Runtime 1.27
+  # Flutter.framework does not contain an i386 slice, and ONNX Runtime 1.28
   # does not publish an x86_64 iOS Simulator binary.
   s.user_target_xcconfig = { 'EXCLUDED_ARCHS[sdk=iphonesimulator*]' => 'i386 x86_64' }
   s.swift_version = '5.0'
@@ -57,7 +57,7 @@ A new Flutter FFI plugin project.
   }
   s.pod_target_xcconfig = {
     'DEFINES_MODULE' => 'YES',
-    # ONNX Runtime 1.27 supports only the ARM64 iOS Simulator slice.
+    # ONNX Runtime 1.28 supports only the ARM64 iOS Simulator slice.
     'EXCLUDED_ARCHS[sdk=iphonesimulator*]' => 'i386 x86_64',
     # Root the primary Flutter Rust Bridge dispatcher so the linker pulls in
     # the bridge and its transitive FFI exports without force-loading ONNX

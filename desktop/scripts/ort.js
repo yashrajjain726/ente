@@ -4,7 +4,7 @@
  * The Rust ML addon (see [Note: ML with Rust]) loads ONNX Runtime dynamically
  * at runtime. We use Ente's pinned custom builds — CoreML-enabled on macOS and
  * WebGPU-capable elsewhere — published at
- * https://github.com/laurens-pilot/ort-packaging/releases
+ * https://github.com/ente/ort-packaging/releases
  *
  * This script is the only place that downloads those builds. Postinstall runs
  * it once to acquire both architectures for the host platform. The extracted
@@ -21,9 +21,9 @@ const fsp = require("node:fs/promises");
 const path = require("node:path");
 const { execFileSync } = require("node:child_process");
 
-const ortVersion = "1.27.0-r4";
+const ortVersion = "1.28.0-r1";
 
-const ortReleaseURL = `https://github.com/laurens-pilot/ort-packaging/releases/download/ort-${ortVersion}`;
+const ortReleaseURL = `https://github.com/ente/ort-packaging/releases/download/ort-${ortVersion}`;
 
 /**
  * SHA-256 checksums of the release assets, pinned here so that the library we
@@ -34,17 +34,17 @@ const ortReleaseURL = `https://github.com/laurens-pilot/ort-packaging/releases/d
  */
 const ortAssetSHA256s = {
     "darwin-arm64":
-        "dbb243c3b43963fda6c9475a978d0954b69490d386bc3ecb54a471b2a13ba043",
+        "de08b6c23398f1d6639c66519b44b06f7cd0f7c44a5ad7bade3c4d8b049c5428",
     "darwin-x64":
-        "d655686380c1976a9067a48d82645a381e4bc4bdfcc44c88f300befc24c4ae8e",
+        "eee287e7d221a9b17928ee8f368dfaccb1467fe58fbb54fa08cab0ae903ba057",
     "linux-arm64":
-        "0b0367bddd96fb0263781022f715ec531a9856e14d8ed91beea80da8d9bb6a2e",
+        "90b9cf4501213e09f97804ac0d7d0cd80d7f5da2a5d5cc599606b11e3c35fc78",
     "linux-x64":
-        "d417b8d92498f3e754e23fbeac0751f13375061c6c31cc83e869f33a37fca8ad",
+        "2293762c2b665e55282b677de7f8e4ae106507a72c9985bdb930685c0d902fd5",
     "win32-arm64":
-        "9e3179a985e08700b37f15af7049bca4fc007cb4d5a7e2ff1d81df10e330544e",
+        "552950610a7be5348c0d5ba6ef3ee6c3010bbe374b57d0d37f14be0408d88dec",
     "win32-x64":
-        "0534f35981fe3174379c7e80f93977edd990ce67c40f6cbdde1e6890eb798911",
+        "10bdfec578e0ecc6064ea562a63e1165593cfbb2cec47250616aa64ef8456f5c",
 };
 
 const ortAssetName = (platform, arch) => {
