@@ -262,6 +262,9 @@ func (r *RateLimitMiddleware) getLimiter(reqPath string, reqMethod string) *limi
 	if isPublicCollectionUploadURLPath(reqPath) {
 		return r.limit250ReqPerMin
 	}
+	if reqPath == "/collections/share/bulk" || reqPath == "/collections/unshare/bulk" {
+		return r.limit60ReqPerMin
+	}
 	if reqPath == "/users/public-key" {
 		return r.limit60ReqPerMin
 	}

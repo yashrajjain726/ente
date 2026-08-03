@@ -1,6 +1,7 @@
 package collections
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"net/http/httptest"
@@ -38,13 +39,22 @@ func newShareTestCollectionRepo(db *sql.DB) *repo.CollectionRepository {
 }
 
 func createShareTestCollection(t *testing.T, collectionRepo *repo.CollectionRepository, ownerID int64) int64 {
+	return createShareTestCollectionOfType(t, collectionRepo, ownerID, "album")
+}
+
+func createShareTestCollectionOfType(
+	t *testing.T,
+	collectionRepo *repo.CollectionRepository,
+	ownerID int64,
+	collectionType string,
+) int64 {
 	t.Helper()
 	collection, err := collectionRepo.Create(ente.Collection{
 		Owner:              ente.CollectionUser{ID: ownerID},
 		EncryptedKey:       "encrypted-key",
 		KeyDecryptionNonce: "key-nonce",
 		Name:               "Test collection",
-		Type:               "album",
+		Type:               collectionType,
 		Attributes:         ente.CollectionAttributes{},
 		UpdationTime:       1,
 		App:                string(ente.Photos),
@@ -53,6 +63,51 @@ func createShareTestCollection(t *testing.T, collectionRepo *repo.CollectionRepo
 		t.Fatal(err)
 	}
 	return collection.ID
+}
+
+func setupCollectionShareTest(
+	t *testing.T,
+) (*sql.DB, *repo.CollectionRepository, int64, int64) {
+	t.Helper()
+	testutil.WithServerRoot(t)
+	db := testutil.RequireTestDB(t)
+	testutil.ResetTables(t, db)
+	t.Cleanup(func() { testutil.ResetTables(t, db) })
+	ownerID := testutil.InsertUser(t, db, testutil.UserFixture{
+		UserID:       1,
+		Email:        "owner@example.com",
+		CreationTime: 1,
+	})
+	shareeID := testutil.InsertUser(t, db, testutil.UserFixture{
+		UserID:       2,
+		Email:        "sharee@example.com",
+		CreationTime: 1,
+	})
+	return db, newShareTestCollectionRepo(db), ownerID, shareeID
+}
+
+func requireCollectionShareStatus(
+	t *testing.T,
+	status, want ente.CollectionShareStatus,
+	err error,
+) {
+	t.Helper()
+	if err != nil || status != want {
+		t.Fatalf("share status = %q, want %q; error = %v", status, want, err)
+	}
+}
+
+func collectionUpdationTime(t *testing.T, db *sql.DB, collectionID int64) int64 {
+	t.Helper()
+	var updationTime int64
+	err := db.QueryRow(
+		`SELECT updation_time FROM collections WHERE collection_id = $1`,
+		collectionID,
+	).Scan(&updationTime)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return updationTime
 }
 
 func addShareTestShare(
@@ -248,5 +303,221 @@ func TestCollectionOwnerCannotBecomeShareeOrBeUnshared(t *testing.T) {
 	}
 	if ownerShareDeleted || ownerFileDeleted {
 		t.Fatalf("owner state changed: share deleted=%t, file deleted=%t", ownerShareDeleted, ownerFileDeleted)
+	}
+}
+
+func TestAutomaticShareLifecycle(t *testing.T) {
+	db, collectionRepo, ownerID, shareeID := setupCollectionShareTest(t)
+	ctx := context.Background()
+
+	manualCollectionID := createShareTestCollection(t, collectionRepo, ownerID)
+	if err := collectionRepo.Share(
+		manualCollectionID,
+		ownerID,
+		shareeID,
+		"manual-key",
+		ente.ADMIN,
+		1,
+	); err != nil {
+		t.Fatal(err)
+	}
+	status, err := collectionRepo.ShareAutomatically(
+		ctx,
+		manualCollectionID,
+		ownerID,
+		shareeID,
+		"automatic-key",
+		ente.VIEWER,
+		2,
+	)
+	requireCollectionShareStatus(t, status, ente.CollectionAlreadyShared, err)
+
+	var encryptedKey, role string
+	var isDeleted bool
+	err = db.QueryRow(
+		`SELECT encrypted_key, role_type, is_deleted
+		 FROM collection_shares
+		 WHERE collection_id = $1 AND to_user_id = $2`,
+		manualCollectionID,
+		shareeID,
+	).Scan(&encryptedKey, &role, &isDeleted)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if encryptedKey != "manual-key" || role != string(ente.ADMIN) || isDeleted {
+		t.Fatalf(
+			"manual share changed: key=%q role=%q deleted=%t",
+			encryptedKey,
+			role,
+			isDeleted,
+		)
+	}
+	status, err = collectionRepo.UnShareContext(
+		ctx,
+		manualCollectionID,
+		shareeID,
+	)
+	requireCollectionShareStatus(t, status, ente.CollectionUnshared, err)
+	status, err = collectionRepo.ShareAutomatically(
+		ctx,
+		manualCollectionID,
+		ownerID,
+		shareeID,
+		"automatic-key",
+		ente.VIEWER,
+		3,
+	)
+	requireCollectionShareStatus(t, status, ente.CollectionBlockedPriorRemoval, err)
+
+	automaticCollectionID := createShareTestCollection(t, collectionRepo, ownerID)
+	status, err = collectionRepo.ShareAutomatically(
+		ctx,
+		automaticCollectionID,
+		ownerID,
+		shareeID,
+		"automatic-key",
+		ente.VIEWER,
+		1,
+	)
+	requireCollectionShareStatus(t, status, ente.CollectionShared, err)
+}
+
+func TestUnShareContextBumpsCollectionForDeletedShareRow(t *testing.T) {
+	db, collectionRepo, ownerID, shareeID := setupCollectionShareTest(t)
+	ctx := context.Background()
+	collectionID := createShareTestCollection(t, collectionRepo, ownerID)
+	if err := collectionRepo.Share(
+		collectionID,
+		ownerID,
+		shareeID,
+		"share-key",
+		ente.VIEWER,
+		1,
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	status, err := collectionRepo.UnShareContext(ctx, collectionID, shareeID)
+	requireCollectionShareStatus(t, status, ente.CollectionUnshared, err)
+	if _, err := db.Exec(
+		`UPDATE collections SET updation_time = 1 WHERE collection_id = $1`,
+		collectionID,
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	status, err = collectionRepo.UnShareContext(ctx, collectionID, shareeID)
+	requireCollectionShareStatus(t, status, ente.CollectionAlreadyUnshared, err)
+	if got := collectionUpdationTime(t, db, collectionID); got == 1 {
+		t.Fatal("collection updation_time was not bumped for deleted share row")
+	}
+}
+
+func TestUncategorizedCollectionsOnlyAllowViewerShares(t *testing.T) {
+	_, collectionRepo, ownerID, shareeID := setupCollectionShareTest(t)
+	collectionID := createShareTestCollectionOfType(
+		t,
+		collectionRepo,
+		ownerID,
+		"uncategorized",
+	)
+	controller := &CollectionController{CollectionRepo: collectionRepo}
+	item := ente.BulkCollectionShareItem{
+		CollectionID: collectionID,
+		EncryptedKey: b64OfLen(sealedCollectionKeyLen),
+		Role:         ente.VIEWER,
+	}
+
+	status, err := controller.shareCollectionWithUserID(
+		context.Background(),
+		ownerID,
+		shareeID,
+		ente.ManualShare,
+		item,
+	)
+	requireCollectionShareStatus(t, status, ente.CollectionShared, err)
+
+	item.Role = ente.ADMIN
+	_, err = controller.shareCollectionWithUserID(
+		context.Background(),
+		ownerID,
+		shareeID,
+		ente.ManualShare,
+		item,
+	)
+	if !errors.Is(err, ente.ErrBadRequest) {
+		t.Fatalf("admin share error = %v, want %v", err, ente.ErrBadRequest)
+	}
+}
+
+func TestBulkShareAndUnshareReturnPerCollectionStatuses(t *testing.T) {
+	db, collectionRepo, ownerID, shareeID := setupCollectionShareTest(t)
+	albumID := createShareTestCollection(t, collectionRepo, ownerID)
+	neverSharedID := createShareTestCollection(t, collectionRepo, ownerID)
+	uncategorizedID := createShareTestCollectionOfType(
+		t,
+		collectionRepo,
+		ownerID,
+		"uncategorized",
+	)
+	controller := &CollectionController{
+		CollectionRepo: collectionRepo,
+		CastRepo:       &castRepo.Repository{DB: db},
+	}
+	ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+	ctx.Request = httptest.NewRequest("POST", "/collections/share/bulk", nil)
+	ctx.Request.Header.Set("X-Auth-User-ID", strconv.FormatInt(ownerID, 10))
+
+	results, err := controller.BulkShare(ctx, ente.BulkCollectionShareRequest{
+		RecipientUserID: shareeID,
+		Source:          ente.AutomaticShare,
+		Collections: []ente.BulkCollectionShareItem{
+			{
+				CollectionID: albumID,
+				EncryptedKey: b64OfLen(sealedCollectionKeyLen),
+				Role:         ente.VIEWER,
+			},
+			{
+				CollectionID: uncategorizedID,
+				EncryptedKey: b64OfLen(sealedCollectionKeyLen),
+				Role:         ente.ADMIN,
+			},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if results[0].Status != ente.CollectionShared ||
+		results[1].Status != ente.CollectionShareOperationFailed {
+		t.Fatalf("bulk share results = %+v", results)
+	}
+
+	unshareResults, err := controller.BulkUnShare(ctx, ente.BulkCollectionUnshareRequest{
+		RecipientUserID: shareeID,
+		Source:          ente.AutomaticShare,
+		CollectionIDs:   []int64{albumID, neverSharedID},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if unshareResults[0].Status != ente.CollectionUnshared ||
+		unshareResults[1].Status != ente.CollectionNotShared {
+		t.Fatalf("bulk unshare results = %+v", unshareResults)
+	}
+}
+
+func TestBulkShareRejectsOversizedBatch(t *testing.T) {
+	items := make([]ente.BulkCollectionShareItem, ente.MaxCollectionShareBatchSize+1)
+	for index := range items {
+		items[index].CollectionID = int64(index + 1)
+	}
+	controller := &CollectionController{}
+	_, err := controller.BulkShare(&gin.Context{}, ente.BulkCollectionShareRequest{
+		RecipientUserID: 1,
+		Source:          ente.AutomaticShare,
+		Collections:     items,
+	})
+	if !errors.Is(err, ente.ErrBatchSizeTooLarge) {
+		t.Fatalf("oversized batch error = %v, want %v", err, ente.ErrBatchSizeTooLarge)
 	}
 }
