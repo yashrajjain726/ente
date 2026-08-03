@@ -2037,8 +2037,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                             WebkitMaskImage:
                                 "linear-gradient(to bottom, #000 0%, transparent 100%)",
                             backdropFilter: "blur(4px)",
-                            background:
-                                "linear-gradient(to bottom, rgba(245, 245, 247, 0.8), transparent)",
+                            background: `linear-gradient(to bottom, ${homeBackground}, rgba(245, 245, 247, 0.35) 75%, transparent)`,
                             content: '""',
                             height: "calc(100% + 28px)",
                             left: 0,
