@@ -40,7 +40,7 @@ Locale localResolutionCallBack(
   };
   for (final deviceLocale in _onDeviceLocales) {
     final locale = _normalizedLocale(deviceLocale);
-    if (appSupportedLocales.contains(locale) || locale.languageCode == 'zh') {
+    if (appSupportedLocales.contains(locale)) {
       autoDetectedLocale = locale;
       return locale;
     }

@@ -7,7 +7,6 @@ on:
             - ".github/workflows/mobile-crowdin-push-sources.yml"
             - "mobile/packages/strings/lib/l10n/arb/strings_en.arb"
             - "mobile/packages/strings/crowdin.yml"
-    workflow_dispatch:
 
 concurrency:
     group: ${{ github.workflow }}
