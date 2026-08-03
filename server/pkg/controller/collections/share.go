@@ -69,7 +69,7 @@ func (c *CollectionController) BulkShare(
 		return nil, err
 	}
 	fromUserID := auth.GetUserID(ctx.Request.Header)
-	if err := c.validateBulkShareRecipient(fromUserID, req.RecipientUserID); err != nil {
+	if err := validateBulkShareRecipient(fromUserID, req.RecipientUserID); err != nil {
 		return nil, err
 	}
 
@@ -98,15 +98,14 @@ func (c *CollectionController) BulkShare(
 	return results, nil
 }
 
-func (c *CollectionController) validateBulkShareRecipient(actorUserID, recipientUserID int64) error {
+func validateBulkShareRecipient(actorUserID, recipientUserID int64) error {
+	if recipientUserID <= 0 {
+		return stacktrace.Propagate(ente.ErrBadRequest, "invalid recipient user ID")
+	}
 	if actorUserID == recipientUserID {
 		return stacktrace.Propagate(ente.ErrBadRequest, "Can not share collections with self")
 	}
-	_, err := c.UserRepo.Get(recipientUserID)
-	if errors.Is(err, sql.ErrNoRows) {
-		return stacktrace.Propagate(ente.ErrNotFound, "")
-	}
-	return stacktrace.Propagate(err, "")
+	return nil
 }
 
 func (c *CollectionController) shareCollectionWithUserID(
@@ -305,7 +304,7 @@ func (c *CollectionController) BulkUnShare(
 		return nil, err
 	}
 	fromUserID := auth.GetUserID(ctx.Request.Header)
-	if err := c.validateBulkShareRecipient(fromUserID, req.RecipientUserID); err != nil {
+	if err := validateBulkShareRecipient(fromUserID, req.RecipientUserID); err != nil {
 		return nil, err
 	}
 

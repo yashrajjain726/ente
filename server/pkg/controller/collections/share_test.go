@@ -462,11 +462,7 @@ func TestBulkShareAndUnshareReturnPerCollectionStatuses(t *testing.T) {
 	)
 	controller := &CollectionController{
 		CollectionRepo: collectionRepo,
-		UserRepo: &repo.UserRepository{
-			DB:                  db,
-			SecretEncryptionKey: testutil.SecretEncryptionKey(),
-		},
-		CastRepo: &castRepo.Repository{DB: db},
+		CastRepo:       &castRepo.Repository{DB: db},
 	}
 	ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
 	ctx.Request = httptest.NewRequest("POST", "/collections/share/bulk", nil)
