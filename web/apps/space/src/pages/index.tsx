@@ -541,6 +541,18 @@ export const Page: React.FC<PageProps> = ({ invitePreview }) => {
     }
 
     if (routeMode.kind == "public-profile") {
+        if (!publicIdentity && publicError) {
+            return (
+                <>
+                    <SpacePageMeta
+                        themeColor={profileBackground}
+                        preview="invite"
+                    />
+                    <PublicProfileUnavailable />
+                </>
+            );
+        }
+
         if (
             profileLoadStatus == "loading" ||
             (profile && authenticatedProfileRouteStatus != "complete")
@@ -561,20 +573,8 @@ export const Page: React.FC<PageProps> = ({ invitePreview }) => {
             return <SpaceRouteFallback background={profileBackground} />;
         }
 
-        if (!publicIdentity && !publicError) {
-            return <SpaceRouteFallback background={profileBackground} />;
-        }
-
         if (!publicIdentity) {
-            return (
-                <>
-                    <SpacePageMeta
-                        themeColor={profileBackground}
-                        preview="invite"
-                    />
-                    <PublicProfileUnavailable />
-                </>
-            );
+            return <SpaceRouteFallback background={profileBackground} />;
         }
 
         const inviteFriend = {
