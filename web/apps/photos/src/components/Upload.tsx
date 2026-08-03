@@ -21,28 +21,10 @@ import {
     uploadManager,
 } from "@/services/upload-manager";
 import watcher from "@/services/watch";
-import { Album02Icon, Folder01Icon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
-import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import DiscFullIcon from "@mui/icons-material/DiscFull";
-import GoogleIcon from "@mui/icons-material/Google";
-import {
-    Box,
-    CircularProgress,
-    Dialog,
-    DialogTitle,
-    Link,
-    Stack,
-    styled,
-    Typography,
-    type DialogProps,
-} from "@mui/material";
+import { Dialog, type DialogProps } from "@mui/material";
 import type { LocalUser } from "ente-accounts/services/user";
 import { isDesktop } from "ente-base/app";
-import { SpacedRow } from "ente-base/components/containers";
-import { DialogCloseIconButton } from "ente-base/components/mui/DialogCloseIconButton";
-import { FocusVisibleButton } from "ente-base/components/mui/FocusVisibleButton";
-import { RowButton } from "ente-base/components/RowButton";
 import { SingleInputDialog } from "ente-base/components/SingleInputDialog";
 import {
     useModalVisibility,
@@ -65,7 +47,6 @@ import type {
 import type { UploadTypeSelectorIntent } from "ente-gallery/components/Upload";
 import { UploadProgressV2 } from "ente-gallery/components/upload-progress-v2/UploadProgressV2";
 import { CanvasReadbackBlockedDialog } from "ente-gallery/components/upload/CanvasReadbackBlockedDialog";
-import { UploadProgress } from "ente-gallery/components/UploadProgress";
 import { useFileInput } from "ente-gallery/components/utils/use-file-input";
 import {
     groupItemsBasedOnParentFolder,
@@ -108,7 +89,6 @@ import {
 } from "ente-new/photos/services/collection";
 import { redirectToCustomerPortal } from "ente-new/photos/services/user-details";
 import { usePhotosAppContext } from "ente-new/photos/types/context";
-import { enableV2 } from "ente-new/photos/utils/feature-flags";
 import { firstNonEmpty } from "ente-utils/array";
 import { t } from "i18next";
 import React, { useCallback, useEffect, useRef, useState } from "react";
@@ -869,15 +849,6 @@ export const Upload: React.FC<UploadProps> = ({
     ) => {
         if (uploadItemsAndPaths.current !== uploadItemAndPaths) return;
 
-        if (!enableV2) {
-            void commitUploadToExistingCollection(
-                collection,
-                uploadItemAndPaths,
-                true,
-            );
-            return;
-        }
-
         const isTakeoutHint = containsJSONFiles(uploadItemAndPaths);
         if (uploadItemAndPaths.length > 1 || isTakeoutHint)
             setUploadConfirmation({
@@ -983,7 +954,6 @@ export const Upload: React.FC<UploadProps> = ({
         const uploadItemAndPaths = uploadItemsAndPaths.current;
         const isTakeoutHint = containsJSONFiles(uploadItemAndPaths);
         if (
-            enableV2 &&
             !skipConfirmation &&
             (uploadItemAndPaths.length > 1 || isTakeoutHint)
         )
@@ -1020,7 +990,7 @@ export const Upload: React.FC<UploadProps> = ({
 
         if (uploadItemsAndPaths.current !== uploadItemAndPaths) return;
 
-        if (skipConfirmation || !enableV2) {
+        if (skipConfirmation) {
             void commitUploadToNewCollections(
                 uploadItemAndPaths,
                 collectionNameToUploadItems,
@@ -1429,63 +1399,44 @@ export const Upload: React.FC<UploadProps> = ({
                 }
                 onSelect={handleUploadTypeSelect}
             />
-            {enableV2 ? (
-                <UploadProgressV2
-                    open={uploadProgressView}
-                    onClose={closeUploadProgress}
-                    percentComplete={percentComplete}
-                    uploadFileNames={uploadFileNames!}
-                    uploadCounter={uploadCounter}
-                    uploadPhase={uploadPhase}
-                    inProgressUploads={inProgressUploads}
-                    hasLivePhotos={hasLivePhotos}
-                    retryFailed={retryFailed}
-                    finishedUploads={finishedUploads}
-                    preUploadSkippedFiles={preUploadSkippedFiles}
-                    cancelUploads={cancelUploads}
-                />
-            ) : (
-                <UploadProgress
-                    open={uploadProgressView}
-                    onClose={closeUploadProgress}
-                    percentComplete={percentComplete}
-                    uploadFileNames={uploadFileNames!}
-                    uploadCounter={uploadCounter}
-                    uploadPhase={uploadPhase}
-                    inProgressUploads={inProgressUploads}
-                    hasLivePhotos={hasLivePhotos}
-                    retryFailed={retryFailed}
-                    finishedUploads={finishedUploads}
-                    preUploadSkippedFiles={preUploadSkippedFiles}
-                    cancelUploads={cancelUploads}
-                />
-            )}
+            <UploadProgressV2
+                open={uploadProgressView}
+                onClose={closeUploadProgress}
+                percentComplete={percentComplete}
+                uploadFileNames={uploadFileNames!}
+                uploadCounter={uploadCounter}
+                uploadPhase={uploadPhase}
+                inProgressUploads={inProgressUploads}
+                hasLivePhotos={hasLivePhotos}
+                retryFailed={retryFailed}
+                finishedUploads={finishedUploads}
+                preUploadSkippedFiles={preUploadSkippedFiles}
+                cancelUploads={cancelUploads}
+            />
             <CanvasReadbackBlockedDialog
                 open={showCanvasReadbackBlockedDialog}
                 onClose={() => setShowCanvasReadbackBlockedDialog(false)}
             />
-            {enableV2 && (
-                <UploadConfirmationDialog
-                    open={!!uploadConfirmation}
-                    loading={uploadConfirmation?.phase == "counting"}
-                    isTakeout={uploadConfirmation?.isTakeout ?? false}
-                    fileCount={readyConfirmation?.fileCount ?? 0}
-                    albumCount={readyConfirmation?.albumCount ?? 0}
-                    importFavorites={readyConfirmation?.importFavorites ?? true}
-                    onImportFavoritesChange={handleImportFavoritesChange}
-                    includePartnerSharedFiles={
-                        readyConfirmation?.includePartnerSharedFiles ?? true
-                    }
-                    onIncludePartnerSharedFilesChange={
-                        handleIncludePartnerSharedFilesChange
-                    }
-                    onConfirm={handleUploadConfirm}
-                    onCancel={cancelPendingUpload}
-                />
-            )}
+            <UploadConfirmationDialog
+                open={!!uploadConfirmation}
+                loading={uploadConfirmation?.phase == "counting"}
+                isTakeout={uploadConfirmation?.isTakeout ?? false}
+                fileCount={readyConfirmation?.fileCount ?? 0}
+                albumCount={readyConfirmation?.albumCount ?? 0}
+                importFavorites={readyConfirmation?.importFavorites ?? true}
+                onImportFavoritesChange={handleImportFavoritesChange}
+                includePartnerSharedFiles={
+                    readyConfirmation?.includePartnerSharedFiles ?? true
+                }
+                onIncludePartnerSharedFilesChange={
+                    handleIncludePartnerSharedFilesChange
+                }
+                onConfirm={handleUploadConfirm}
+                onCancel={cancelPendingUpload}
+            />
             <SingleInputDialog
                 {...newAlbumNameInputVisibilityProps}
-                variant={enableV2 ? "v2" : "default"}
+                variant="v2"
                 onClose={handleNewAlbumNameInputClose}
                 title={t("new_album")}
                 label={t("album_name")}
@@ -1897,20 +1848,13 @@ const UploadOptions: React.FC<UploadOptionsProps> = ({
     const handleSelectFolder = () => handleSelect("folders");
 
     return showTakeoutOptions ? (
-        enableV2 ? (
-            <TakeoutOptionsV2
-                onBack={handleTakeoutClose}
-                onSelectFolder={handleSelectFolder}
-                onSelectZips={handleSelectGooglePhotos}
-                {...{ onClose }}
-            />
-        ) : (
-            <TakeoutOptions
-                onSelect={handleSelect}
-                onClose={handleTakeoutClose}
-            />
-        )
-    ) : enableV2 && intent != "collect" ? (
+        <TakeoutOptionsV2
+            onBack={handleTakeoutClose}
+            onSelectFolder={handleSelectFolder}
+            onSelectZips={handleSelectGooglePhotos}
+            {...{ onClose }}
+        />
+    ) : (
         <DefaultOptionsV2
             intent={intent}
             isFileSelectionPending={pendingUploadType == "files"}
@@ -1920,138 +1864,5 @@ const UploadOptions: React.FC<UploadOptionsProps> = ({
             onSelectFolder={handleSelectFolder}
             {...{ onClose }}
         />
-    ) : (
-        <DefaultOptions
-            {...{ intent, pendingUploadType, onClose }}
-            onSelect={handleSelect}
-        />
     );
 };
-
-const DefaultOptions: React.FC<
-    Pick<
-        UploadOptionsProps,
-        "intent" | "pendingUploadType" | "onClose" | "onSelect"
-    >
-> = ({ intent, pendingUploadType, onClose, onSelect }) => {
-    return (
-        <>
-            <SpacedRow>
-                <DialogTitle variant="h5">
-                    {intent == "collect"
-                        ? t("select_photos")
-                        : intent == "import"
-                          ? t("import")
-                          : t("upload")}
-                </DialogTitle>
-                <DialogCloseIconButton {...{ onClose }} />
-            </SpacedRow>
-            <Box sx={{ p: "12px", pt: "16px" }}>
-                <RoundedButtonStack>
-                    {intent != "import" && (
-                        <RowButton
-                            startIcon={
-                                <HugeiconsIcon icon={Album02Icon} size={20} />
-                            }
-                            endIcon={
-                                pendingUploadType == "files" ? (
-                                    <PendingIndicator />
-                                ) : (
-                                    <ChevronRightIcon />
-                                )
-                            }
-                            label={t("files")}
-                            onClick={() => onSelect("files")}
-                        />
-                    )}
-                    <RowButton
-                        startIcon={
-                            <HugeiconsIcon icon={Folder01Icon} size={20} />
-                        }
-                        endIcon={
-                            pendingUploadType == "folders" ? (
-                                <PendingIndicator />
-                            ) : (
-                                <ChevronRightIcon />
-                            )
-                        }
-                        label={t("folder")}
-                        onClick={() => onSelect("folders")}
-                    />
-                    {intent != "collect" && (
-                        <RowButton
-                            startIcon={<GoogleIcon />}
-                            endIcon={<ChevronRightIcon />}
-                            label={t("google_takeout")}
-                            onClick={() => onSelect("zips")}
-                        />
-                    )}
-                </RoundedButtonStack>
-                <Typography
-                    sx={{
-                        color: "text.muted",
-                        p: "12px",
-                        pt: "24px",
-                        textAlign: "center",
-                    }}
-                >
-                    {t("drag_and_drop_hint")}
-                </Typography>
-            </Box>
-        </>
-    );
-};
-
-const PendingIndicator = () => (
-    <CircularProgress size={18} sx={{ color: "stroke.muted" }} />
-);
-
-const TakeoutOptions: React.FC<
-    Pick<UploadOptionsProps, "onSelect" | "onClose">
-> = ({ onSelect, onClose }) => (
-    <>
-        <SpacedRow>
-            <DialogTitle variant="h5">{t("google_takeout")}</DialogTitle>
-            <DialogCloseIconButton {...{ onClose }} />
-        </SpacedRow>
-        <Stack sx={{ padding: "18px 12px 20px 12px", gap: "16px" }}>
-            <Stack sx={{ gap: "8px", "& button": { borderRadius: "16px" } }}>
-                <FocusVisibleButton
-                    color="accent"
-                    fullWidth
-                    onClick={() => onSelect("folders")}
-                >
-                    {t("select_folder")}
-                </FocusVisibleButton>
-                <FocusVisibleButton
-                    color="secondary"
-                    fullWidth
-                    onClick={() => onSelect("zips")}
-                >
-                    {t("select_zips")}
-                </FocusVisibleButton>
-                <Link
-                    href="https://ente.com/help/photos/migration/from-google-photos/"
-                    target="_blank"
-                    rel="noopener"
-                >
-                    <FocusVisibleButton color="secondary" fullWidth>
-                        {t("faq")}
-                    </FocusVisibleButton>
-                </Link>
-            </Stack>
-            <Typography variant="small" sx={{ color: "text.muted" }}>
-                {t("takeout_hint")}
-            </Typography>
-        </Stack>
-    </>
-);
-
-const RoundedButtonStack = styled("div")`
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    & > button {
-        border-radius: 16px;
-    }
-`;

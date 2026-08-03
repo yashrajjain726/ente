@@ -4,4 +4,4 @@
  *
  * The "intent" does not change the eventual upload outcome, only the UX flow.
  */
-export type UploadTypeSelectorIntent = "upload" | "import" | "collect";
+export type UploadTypeSelectorIntent = "upload" | "import";
