@@ -20,6 +20,10 @@
       ]
     },
     {
+      "title": "ABB",
+      "slug": "abb"
+    },
+    {
       "title": "Accredible",
       "slug": "accredible",
       "altNames": [
@@ -1658,6 +1662,10 @@
     },
     {
       "title": "NVIDIA"
+    },
+        {
+      "title": "OCENSA",
+      "slug": "ocensa"
     },
     {
       "title": "Odido"
