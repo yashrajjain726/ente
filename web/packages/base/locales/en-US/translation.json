@@ -33,6 +33,7 @@
     "status_sent": "Sent!",
     "password": "Password",
     "link_password_description": "Enter password to unlock the album",
+    "opening_encrypted_album": "Opening encrypted album",
     "unlock": "Unlock",
     "set_password": "Set password",
     "sign_in": "Sign in",
