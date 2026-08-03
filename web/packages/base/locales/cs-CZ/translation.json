@@ -770,7 +770,6 @@
     "view_logs": "Zobrazit záznamy",
     "view_logs_message": "<p>Zobrazí se ladicí záznamy, které nám můžete zaslat e-mailem, abychom Vám pomohli vyřešit Váš problém.</p><p>Upozorňujeme, že budou zahrnuty názvy souborů, které pomohou sledovat problémy s konkrétními soubory.</p>",
     "weak_device_hint": "Webový prohlížeč, který používáte, není dostatečně výkonný pro šifrování Vašich fotografií. Zkuste se prosím přihlásit do Ente na svém počítači, nebo si stáhněte mobilní/desktopovou aplikaci Ente.",
-    "drag_and_drop_hint": "Nebo přetáhněte do okna Ente",
     "authenticate": "Ověřit",
     "uploaded_to_single_collection": "Nahráno do jedné sbírky",
     "uploaded_to_separate_collections": "Nahráno do samostatných sbírek",

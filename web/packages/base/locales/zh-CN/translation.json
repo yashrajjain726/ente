@@ -770,7 +770,6 @@
     "view_logs": "查看日志",
     "view_logs_message": "<p>这将显示调试日志，您可以通过电子邮件将其发送给我们以帮助调试您的问题。</p><p>请注意，将包含文件名以帮助跟踪特定文件的问题。</p>",
     "weak_device_hint": "您使用的网络浏览器功能不够强大，无法加密您的照片。 请尝试在电脑上登录Ente，或下载Ente移动/桌面应用程序。",
-    "drag_and_drop_hint": "或者拖动并拖动到 Ente 窗口",
     "authenticate": "身份认证",
     "uploaded_to_single_collection": "已上传到单个收藏",
     "uploaded_to_separate_collections": "已上传到单独收藏",

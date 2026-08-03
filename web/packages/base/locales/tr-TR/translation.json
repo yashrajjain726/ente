@@ -770,7 +770,6 @@
     "view_logs": "Kayıtları görüntüle",
     "view_logs_message": "<p>Bu, yaşadığınız sorunu inceleyebilmemiz için bize e-posta ile gönderebileceğiniz hata ayıklama kayıtlarını gösterir.</p><p>Belirli dosyalarla ilgili sorunları takip edebilmemiz için dosya adları da dahil edilecektir.</p>",
     "weak_device_hint": "Kullandığınız web tarayıcısı, fotoğraflarınızı şifrelemek için yeterince güçlü değil. Lütfen bilgisayarınızdan Ente'ye giriş yapın veya Ente'nin mobil/masaüstü uygulamasını indirin.",
-    "drag_and_drop_hint": "Ya da dosyaları Ente penceresine sürükleyip bırakın",
     "authenticate": "Doğrula",
     "uploaded_to_single_collection": "Tek bir koleksiyona yüklendi",
     "uploaded_to_separate_collections": "Ayrı koleksiyonlara yüklendi",

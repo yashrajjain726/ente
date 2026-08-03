@@ -770,7 +770,6 @@
     "view_logs": "檢視記錄",
     "view_logs_message": "<p>這會顯示除錯記錄，您可以將其寄給我們以協助除錯。</p><p>注意：為了追蹤特定檔案的問題，記錄中會包含檔名。</p>",
     "weak_device_hint": "您正在使用的網頁瀏覽器效能不足以加密您的相片。請改用電腦登入 Ente，或下載 Ente 的手機/桌面 App。",
-    "drag_and_drop_hint": "或拖放到 Ente 視窗中",
     "authenticate": "驗證",
     "uploaded_to_single_collection": "已上傳至單一集合",
     "uploaded_to_separate_collections": "已上傳至不同集合",

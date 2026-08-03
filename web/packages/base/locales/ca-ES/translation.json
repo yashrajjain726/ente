@@ -770,7 +770,6 @@
     "view_logs": "Veure registres",
     "view_logs_message": "<p>Això mostrarà registres de depuració, que pots enviar-nos per correu per ajudar a depurar el teu problema.</p><p>Tingues en compte que els noms dels fitxers s'inclouran per ajudar a rastrejar problemes amb fitxers específics.</p>",
     "weak_device_hint": "El navegador web que estàs utilitzant no és prou potent per xifrar les teves fotos. Si us plau, intenta iniciar sessió a Ente al teu ordinador, o descarrega l'aplicació mòbil/escriptori d'Ente.",
-    "drag_and_drop_hint": "O arrossega i deixa anar a la finestra d'Ente",
     "authenticate": "Autentica",
     "uploaded_to_single_collection": "Pujat a una sola col·lecció",
     "uploaded_to_separate_collections": "Pujat a col·leccions separades",

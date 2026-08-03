@@ -770,7 +770,6 @@
     "view_logs": "ログを表示",
     "view_logs_message": "<p>デバッグログが表示されますので、問題を解決するためにメールでお問い合わせください。 <p></p><p>問題の特定追跡のため、ファイル名が含まれることに注意してください。</p>",
     "weak_device_hint": "使用しているWebブラウザは、写真を暗号化するのに十分な強力ではありません。 パソコンでEnteにログインするか、Enteモバイル/デスクトップアプリをダウンロードしてください。",
-    "drag_and_drop_hint": "または、Ente ウィンドウにドラッグ＆ドロップします",
     "authenticate": "認証",
     "uploaded_to_single_collection": "1つのコレクションにアップロードしました",
     "uploaded_to_separate_collections": "別々のコレクションにアップロードしました",

@@ -770,7 +770,6 @@
     "view_logs": "Xem nhật ký",
     "view_logs_message": "<p>Tải xuống nhật ký lỗi, để bạn có thể gửi qua email cho chúng tôi.</p><p>Lưu ý rằng, trong nhật ký lỗi sẽ bao gồm tên các tệp để giúp theo dõi vấn đề với từng tệp cụ thể.</p>",
     "weak_device_hint": "Trình duyệt bạn đang sử dụng không đủ mạnh để mã hóa ảnh. Vui lòng dùng Ente trên máy tính, hoặc tải xuống ứng dụng di động/máy tính của Ente.",
-    "drag_and_drop_hint": "Hoặc kéo thả vào cửa sổ Ente",
     "authenticate": "Xác thực",
     "uploaded_to_single_collection": "Đã tải lên một bộ sưu tập",
     "uploaded_to_separate_collections": "Đã tải lên các bộ sưu tập riêng biệt",

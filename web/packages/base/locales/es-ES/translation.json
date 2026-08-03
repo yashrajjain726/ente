@@ -770,7 +770,6 @@
     "view_logs": "Ver Registros",
     "view_logs_message": "<p>Esto descargará los registros de depuración, que puede enviarnos por correo electrónico para ayudarnos a depurar su problema.</p><p>Tenga en cuenta que los nombres de los archivos se incluirán para ayudar al seguimiento de problemas con archivos específicos.</p>",
     "weak_device_hint": "El navegador web que está utilizando no es lo suficientemente poderoso para cifrar sus fotos. Por favor, intente iniciar sesión en ente en su computadora, o descargue la aplicación ente para móvil/escritorio.",
-    "drag_and_drop_hint": "O arrastre y suelte en la ventana ente",
     "authenticate": "Autenticado",
     "uploaded_to_single_collection": "Subir a una sola colección",
     "uploaded_to_separate_collections": "Subir a colecciones separadas",

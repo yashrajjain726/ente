@@ -770,7 +770,6 @@
     "view_logs": "Peržiūrėti žurnalus",
     "view_logs_message": "<p>Tai parodys derinimo žurnalus, kuriuos galėsite išsiųsti mums el. laišku, kad padėtume išspręsti problemą.</p><p>Atkreipkite dėmesį, kad failų pavadinimai bus įtraukti, kad būtų lengviau atsekti problemas su konkrečiais failais.</p>",
     "weak_device_hint": "Interneto naršyklė, kurią naudojate, nėra pakankamai galinga, kad užšifruotų nuotraukas. Bandykite prisijungti prie „Ente“ kompiuteryje arba atsisiųskite „Ente“ mobiliąją / darbalaukio programą.",
-    "drag_and_drop_hint": "Arba nutempkite į „Ente“ langą",
     "authenticate": "Nustatyti tapatybę",
     "uploaded_to_single_collection": "Įkelta į vieną kolekciją",
     "uploaded_to_separate_collections": "Įkelta į atskiras kolekcijas",

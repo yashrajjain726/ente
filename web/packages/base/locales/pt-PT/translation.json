@@ -770,7 +770,6 @@
     "view_logs": "Ver registos",
     "view_logs_message": "<p>Isto irá mostrar registos de debug, que nos pode mandar por email para podermos ajudar.</p><p> Saiba que os nomes dos ficheiros serão incluídos para ajudar com problemas de ficheiros específicos.</p>",
     "weak_device_hint": "O navegador Web que está a utilizar não é suficientemente potente para encriptar as suas fotografias. Tente iniciar sessão no Ente no seu computador ou descarregue a aplicação móvel/desktop do Ente.",
-    "drag_and_drop_hint": "Ou arrastar e largar na janela Ente",
     "authenticate": "Autenticar",
     "uploaded_to_single_collection": "Carregado para uma coleção única",
     "uploaded_to_separate_collections": "Carregado para colecções separadas",

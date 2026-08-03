@@ -770,7 +770,6 @@
     "view_logs": "Ver registros",
     "view_logs_message": "<p>Isso exibirá registros de depuração, que você pode contatar-nos para ajudar a resolver sue problema.</p><p>Saiba que nomes de arquivo serão incluídos para rastrear problemas com certos arquivos.</p>",
     "weak_device_hint": "O navegador web que você está usando não é poderoso o suficiente para criptografar suas fotos. Tente registrar no Ente no computador, ou baixe o aplicativo móvel do Ente, ou do desktop.",
-    "drag_and_drop_hint": "Ou arraste e solte na janela Ente",
     "authenticate": "Autenticar",
     "uploaded_to_single_collection": "Enviado para coleção única",
     "uploaded_to_separate_collections": "Enviada para separar coleções",
