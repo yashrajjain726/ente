@@ -12,7 +12,7 @@ use ente_core::{
 use uuid::Uuid;
 
 use crate::{
-    ContactsError, Result,
+    Error, Result,
     legacy_kit_models::{
         LEGACY_KIT_PAYLOAD_VERSION, LegacyKit, LegacyKitRecoveryBundle, LegacyKitRecoverySession,
         LegacyKitShare, LegacyKitVariant,
@@ -41,7 +41,7 @@ pub(crate) fn create_legacy_kit_request(
 ) -> Result<(CreateLegacyKitRequest, Vec<LegacyKitShare>)> {
     validate_notice_period(notice_period_in_hours)?;
     if part_names.iter().any(|name| name.trim().is_empty()) {
-        return Err(ContactsError::InvalidInput(
+        return Err(Error::InvalidInput(
             "legacy kit part names must be non-empty".into(),
         ));
     }
@@ -175,7 +175,7 @@ impl LegacyKitRecoveryClient {
         email: Option<&str>,
     ) -> Result<LegacyKitRecoveryHandle> {
         let first_share = shares.first().ok_or_else(|| {
-            ContactsError::InvalidInput("at least two legacy kit shares are required".into())
+            Error::InvalidInput("at least two legacy kit shares are required".into())
         })?;
         let challenge = self
             .api
@@ -200,7 +200,7 @@ impl LegacyKitRecoveryClient {
     ) -> Result<LegacyKitRecoveryHandle> {
         let kit_secret = reconstruct_secret_2_of_3(shares)?;
         let first_share = shares.first().ok_or_else(|| {
-            ContactsError::InvalidInput("at least two legacy kit shares are required".into())
+            Error::InvalidInput("at least two legacy kit shares are required".into())
         })?;
         let used_part_indexes = used_part_indexes(shares)?;
         self.open_with_kit_secret(
@@ -355,7 +355,7 @@ pub(crate) fn validate_notice_period(hours: i32) -> Result<()> {
     if LEGACY_KIT_NOTICE_OPTIONS.contains(&hours) {
         Ok(())
     } else {
-        Err(ContactsError::InvalidInput(
+        Err(Error::InvalidInput(
             "legacy kit notice period must be one of 0, 24, 168, 360, 720 hours".into(),
         ))
     }
@@ -363,12 +363,12 @@ pub(crate) fn validate_notice_period(hours: i32) -> Result<()> {
 
 fn derive_kit_enc_key(kit_secret: &[u8]) -> Result<SecretVec> {
     let kit_key = crypto::Key::try_from_slice(kit_secret)?;
-    kdf::derive_subkey(&kit_key, 32, 1, b"lgkenc01").map_err(ContactsError::from)
+    kdf::derive_subkey(&kit_key, 32, 1, b"lgkenc01").map_err(Error::from)
 }
 
 fn derive_kit_auth_keypair(kit_secret: &[u8]) -> Result<(crypto::PublicKey, crypto::SecretKey)> {
     let kit_key = crypto::Key::try_from_slice(kit_secret)?;
-    let seed = kdf::derive_subkey(&kit_key, 32, 2, b"lgkauth1").map_err(ContactsError::from)?;
+    let seed = kdf::derive_subkey(&kit_key, 32, 2, b"lgkauth1").map_err(Error::from)?;
     let sk = crypto::SecretKey::from_seed(seed.as_ref())?;
     Ok((sk.public_key(), sk))
 }
@@ -381,7 +381,7 @@ fn decrypt_challenge(
     let encrypted_challenge = b64::decode(encrypted_challenge_b64)?;
     let plaintext = sealed::open(&encrypted_challenge, auth_public_key, auth_secret_key)?;
     String::from_utf8(plaintext).map_err(|error| {
-        ContactsError::InvalidInput(format!("legacy kit challenge was not valid UTF-8: {error}"))
+        Error::InvalidInput(format!("legacy kit challenge was not valid UTF-8: {error}"))
     })
 }
 
@@ -393,7 +393,7 @@ fn decrypt_master_key_with_recovery_key(
         .master_key_encrypted_with_recovery_key
         .as_ref()
         .ok_or_else(|| {
-            ContactsError::InvalidInput(
+            Error::InvalidInput(
                 "target key attributes missing masterKeyEncryptedWithRecoveryKey".into(),
             )
         })?;
@@ -401,9 +401,7 @@ fn decrypt_master_key_with_recovery_key(
         .master_key_decryption_nonce
         .as_ref()
         .ok_or_else(|| {
-            ContactsError::InvalidInput(
-                "target key attributes missing masterKeyDecryptionNonce".into(),
-            )
+            Error::InvalidInput("target key attributes missing masterKeyDecryptionNonce".into())
         })?;
     let encrypted_master_key = b64::decode(encrypted_master_key)?;
     let master_key_nonce = b64::decode(master_key_nonce)?;

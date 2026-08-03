@@ -123,7 +123,7 @@ async fn run_contacts_stage(pair: &legacy::LegacyPair) {
     assert!(diff.iter().any(|entry| entry.id == contact.id));
 
     match pair.trusted_ctx.get_contact(&contact.id).await {
-        Err(ente_contacts::ContactsError::Http(http::Error::Http { status: 404, .. })) => {}
+        Err(ente_contacts::Error::Http(http::Error::Http { status: 404, .. })) => {}
         other => panic!("expected trusted account to get 404 for owner contact, got {other:?}"),
     }
 
