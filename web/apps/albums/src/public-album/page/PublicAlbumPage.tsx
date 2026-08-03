@@ -48,7 +48,6 @@ import {
     LoadingIndicator,
     TranslucentLoadingOverlay,
 } from "ente-base/components/loaders";
-import { ActivityIndicator } from "ente-base/components/mui/ActivityIndicator";
 import { FocusVisibleButton } from "ente-base/components/mui/FocusVisibleButton";
 import { NavbarBase } from "ente-base/components/Navbar";
 import { useModalVisibility } from "ente-base/components/utils/modal";
@@ -701,23 +700,7 @@ export default function PublicAlbumPage() {
     );
 
     if (loading && (!publicFiles || !credentials.current)) {
-        return (
-            <Stack100vhCenter>
-                <Stack direction="row" sx={{ alignItems: "center", gap: 1.5 }}>
-                    <ActivityIndicator size={15} />
-                    <Typography
-                        variant="body"
-                        sx={{
-                            color: "text.muted",
-                            fontSize: "15px",
-                            lineHeight: "15px",
-                        }}
-                    >
-                        {t("opening_encrypted_album")}...
-                    </Typography>
-                </Stack>
-            </Stack100vhCenter>
-        );
+        return <LoadingIndicator />;
     } else if (errorMessage) {
         return (
             <Stack100vhCenter>
