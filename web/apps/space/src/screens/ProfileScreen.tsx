@@ -676,7 +676,9 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     const { clearBrowserBackState: clearSelectedPostHistory } =
         useBrowserBackClose({
             open: Boolean(selectedPost),
-            onClose: closeSelectedPost,
+            onClose: () => {
+                if (!isDraftPostExiting) closeSelectedPost();
+            },
             stateKey: "space-profile-viewer",
         });
     const rememberLoadedPhotoDimensions = (

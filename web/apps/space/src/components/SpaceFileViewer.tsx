@@ -150,6 +150,8 @@ interface SpaceViewerDeleteSnapshot {
     photos: SpaceViewerPhoto[];
 }
 
+type DraftPostExitPhase = "idle" | "waiting-for-keyboard" | "animating";
+
 interface SpaceFileViewerProps {
     draftPostPreparationError?: string;
     isDraftPostPreparing?: boolean;
@@ -446,7 +448,10 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
         React.useState<SpaceInviteIntent>("like");
     const [draftPostActionPhase, setDraftPostActionPhase] =
         React.useState<SpaceActionPhase | null>(null);
-    const [isDraftPostExit, setIsDraftPostExit] = React.useState(false);
+    const [draftPostExitPhase, setDraftPostExitPhase] =
+        React.useState<DraftPostExitPhase>("idle");
+    const isDraftPostExit = draftPostExitPhase != "idle";
+    const isDraftPostExitAnimating = draftPostExitPhase == "animating";
     const [isDesktopViewer, setIsDesktopViewer] = React.useState(
         () =>
             typeof window != "undefined" &&
@@ -589,6 +594,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
     }, [caption]);
 
     const closeViewer = () => {
+        if (isDraftPostExit) return;
         if (isCaptionEditing && !isCaptionUpdateActionRunning) {
             cancelCaptionEdit();
             return;
@@ -659,11 +665,6 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
             width: activePhoto.width,
         };
     }, [activePhoto.height, activePhoto.width]);
-
-    const startDraftPostExit = React.useCallback(() => {
-        setIsDraftPostExit(true);
-        onDraftPostExitStart?.();
-    }, [onDraftPostExitStart]);
 
     const dismissCaptionKeyboard = React.useCallback(
         (onDismissed: () => void) => {
@@ -738,7 +739,9 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
             }
 
             setQueuedDraftPost(undefined);
-            dismissCaptionKeyboard(startDraftPostExit);
+            setDraftPostExitPhase("waiting-for-keyboard");
+            onDraftPostExitStart?.();
+            dismissCaptionKeyboard(() => setDraftPostExitPhase("animating"));
             void publishPromise.catch((error: unknown) => {
                 log.error("Failed to publish space post", error);
             });
@@ -747,8 +750,8 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
             isDeleteExit,
             isDraftPostExit,
             dismissCaptionKeyboard,
+            onDraftPostExitStart,
             onPublishDraftPost,
-            startDraftPostExit,
         ],
     );
 
@@ -993,10 +996,10 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
     }, [onClose, onDraftPostPublished]);
 
     React.useEffect(() => {
-        if (!isDraftPostExit) return;
+        if (!isDraftPostExitAnimating) return;
         if (window.matchMedia("(prefers-reduced-motion: reduce)").matches)
             finishDraftPostExit();
-    }, [finishDraftPostExit, isDraftPostExit]);
+    }, [finishDraftPostExit, isDraftPostExitAnimating]);
 
     React.useEffect(() => {
         const root = viewerRootRef.current;
@@ -1242,7 +1245,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
             aria-modal="true"
             onTransitionEnd={(event) => {
                 if (
-                    !isDraftPostExit ||
+                    !isDraftPostExitAnimating ||
                     event.currentTarget != event.target ||
                     event.propertyName != "opacity"
                 )
@@ -1260,7 +1263,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                 isolation: "isolate",
                 maxWidth: "100vw",
                 minHeight: "100svh",
-                opacity: isDraftPostExit ? 0 : 1,
+                opacity: isDraftPostExitAnimating ? 0 : 1,
                 overflow: "hidden",
                 overflowX: "hidden",
                 pointerEvents: isDraftPostExit ? "none" : "auto",
