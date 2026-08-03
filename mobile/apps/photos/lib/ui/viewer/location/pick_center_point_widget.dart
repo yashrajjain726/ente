@@ -1,10 +1,10 @@
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:modal_bottom_sheet/modal_bottom_sheet.dart";
 import "package:photos/core/constants.dart";
 import "package:photos/core/event_bus.dart";
 import "package:photos/db/files_db.dart";
 import "package:photos/events/local_photos_updated_event.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/models/file_load_result.dart";
 import "package:photos/models/location/location.dart";
 import "package:photos/models/selected_files.dart";
@@ -65,11 +65,11 @@ class PickCenterPointWidget extends StatelessWidget {
                 children: [
                   BottomOfTitleBarWidget(
                     title: TitleBarTitleWidget(
-                      title: AppLocalizations.of(context).pickCenterPoint,
+                      title: StringsLocalizations.of(context).pickCenterPoint,
                     ),
                     caption:
                         locationTagName ??
-                        AppLocalizations.of(context).newLocation,
+                        StringsLocalizations.of(context).newLocation,
                     showCloseButton: true,
                   ),
                   Expanded(
@@ -107,7 +107,7 @@ class PickCenterPointWidget extends StatelessWidget {
                         header: Padding(
                           padding: const EdgeInsets.all(10),
                           child: NotificationTipWidget(
-                            AppLocalizations.of(context).locationPickerTip,
+                            StringsLocalizations.of(context).locationPickerTip,
                           ),
                         ),
                         disablePinnedGroupHeader: true,
@@ -144,7 +144,7 @@ class PickCenterPointWidget extends StatelessWidget {
                               key: ValueKey(value),
                               isDisabled: !value,
                               buttonType: ButtonType.neutral,
-                              labelText: AppLocalizations.of(
+                              labelText: StringsLocalizations.of(
                                 context,
                               ).useSelectedPhoto,
                               onTap: () async {

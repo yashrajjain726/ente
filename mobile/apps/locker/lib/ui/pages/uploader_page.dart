@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:ente_components/ente_components.dart';
 import 'package:ente_events/event_bus.dart';
+import "package:ente_strings/ente_strings.dart";
 import 'package:ente_ui/components/progress_dialog.dart';
 import 'package:ente_ui/pages/base_home_page.dart';
 import 'package:ente_ui/utils/dialog_util.dart';
@@ -10,7 +11,6 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:locker/core/errors.dart';
 import 'package:locker/events/user_details_refresh_event.dart';
-import "package:locker/l10n/l10n.dart";
 import 'package:locker/services/collections/collections_service.dart';
 import 'package:locker/services/collections/models/collection.dart';
 import 'package:locker/services/files/sync/metadata_updater_service.dart';
@@ -66,7 +66,7 @@ abstract class UploaderPageState<T extends UploaderPage> extends State<T> {
     var didUpload = false;
     var hasUploadError = false;
     var didShowDialog = false;
-    final l10n = context.l10n;
+    final l10n = context.strings;
     ProgressDialog? progressDialog;
 
     try {
@@ -109,7 +109,7 @@ abstract class UploaderPageState<T extends UploaderPage> extends State<T> {
         if (mounted) {
           final dialog = createProgressDialog(
             context,
-            l10n.uploadedFilesProgress(0, files.length),
+            l10n.uploadedFilesProgress(completed: 0, total: files.length),
           );
           progressDialog = dialog;
           didShowDialog = await dialog.show();
@@ -132,8 +132,8 @@ abstract class UploaderPageState<T extends UploaderPage> extends State<T> {
                   try {
                     progressDialog?.update(
                       message: l10n.uploadedFilesProgress(
-                        completedUploads,
-                        files.length,
+                        completed: completedUploads,
+                        total: files.length,
                       ),
                     );
                   } catch (e, s) {
@@ -224,29 +224,29 @@ abstract class UploaderPageState<T extends UploaderPage> extends State<T> {
   Future<void> _showUploadFailureError(Object error) async {
     if (error is NoActiveSubscriptionError) {
       await _showUploadErrorSheet(
-        context.l10n.uploadSubscriptionExpiredErrorTitle,
-        context.l10n.uploadSubscriptionExpiredErrorBody,
+        context.strings.uploadSubscriptionExpiredErrorTitle,
+        context.strings.uploadSubscriptionExpiredErrorBody,
       );
       return;
     }
     if (error is StorageLimitExceededError) {
       await _showUploadErrorSheet(
-        context.l10n.uploadStorageLimitErrorTitle,
-        context.l10n.uploadStorageLimitErrorBody,
+        context.strings.uploadStorageLimitErrorTitle,
+        context.strings.uploadStorageLimitErrorBody,
       );
       return;
     }
     if (error is FileLimitReachedError) {
       await _showUploadErrorSheet(
-        context.l10n.uploadFileCountLimitErrorTitle,
-        context.l10n.uploadFileCountLimitErrorBody,
+        context.strings.uploadFileCountLimitErrorTitle,
+        context.strings.uploadFileCountLimitErrorBody,
       );
       return;
     }
     if (error is FileTooLargeForPlanError) {
       await _showUploadErrorSheet(
-        context.l10n.uploadFileTooLargeErrorTitle,
-        context.l10n.uploadFileTooLargeErrorBody,
+        context.strings.uploadFileTooLargeErrorTitle,
+        context.strings.uploadFileTooLargeErrorBody,
       );
       return;
     }
@@ -264,7 +264,7 @@ abstract class UploaderPageState<T extends UploaderPage> extends State<T> {
         illustration: LockerBottomSheetIllustration.warningGrey,
         actions: [
           ButtonComponent(
-            label: context.l10n.contactSupport,
+            label: context.strings.contactSupport,
             onTap: () async {
               await sendEmail(context, to: "support@ente.com", body: message);
             },

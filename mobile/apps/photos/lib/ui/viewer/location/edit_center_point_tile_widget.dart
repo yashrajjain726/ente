@@ -1,5 +1,5 @@
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/models/location/location.dart";
 import "package:photos/service_locator.dart";
 import "package:photos/states/location_state.dart";
@@ -37,7 +37,7 @@ class EditCenterPointTileWidget extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  AppLocalizations.of(context).centerPoint,
+                  StringsLocalizations.of(context).centerPoint,
                   style: textTheme.body,
                 ),
                 const SizedBox(height: 4),

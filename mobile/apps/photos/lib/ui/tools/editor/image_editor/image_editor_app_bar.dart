@@ -1,7 +1,7 @@
 import "package:ente_components/ente_components.dart";
+import "package:ente_strings/ente_strings.dart";
 import 'package:flutter/material.dart';
 import "package:hugeicons/hugeicons.dart";
-import "package:photos/generated/l10n.dart";
 import "package:pro_image_editor/pro_image_editor.dart";
 
 class ImageEditorAppBar extends StatelessWidget implements PreferredSizeWidget {
@@ -44,7 +44,7 @@ class ImageEditorAppBar extends StatelessWidget implements PreferredSizeWidget {
               enableUndo ? close() : Navigator.of(context).pop();
             },
             child: Text(
-              AppLocalizations.of(context).cancel,
+              StringsLocalizations.of(context).cancel,
               style: actionTextStyle,
             ),
           ),
@@ -53,7 +53,7 @@ class ImageEditorAppBar extends StatelessWidget implements PreferredSizeWidget {
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
                 IconButton(
-                  tooltip: AppLocalizations.of(context).undo,
+                  tooltip: StringsLocalizations.of(context).undo,
                   onPressed: () {
                     undo != null ? undo!() : null;
                   },
@@ -64,7 +64,7 @@ class ImageEditorAppBar extends StatelessWidget implements PreferredSizeWidget {
                 ),
                 const SizedBox(width: 12),
                 IconButton(
-                  tooltip: AppLocalizations.of(context).redo,
+                  tooltip: StringsLocalizations.of(context).redo,
                   onPressed: () {
                     redo != null ? redo!() : null;
                   },
@@ -84,8 +84,8 @@ class ImageEditorAppBar extends StatelessWidget implements PreferredSizeWidget {
               onPressed: done,
               child: Text(
                 isMainEditor
-                    ? AppLocalizations.of(context).saveCopy
-                    : AppLocalizations.of(context).done,
+                    ? StringsLocalizations.of(context).saveCopy
+                    : StringsLocalizations.of(context).done,
                 style: actionTextStyle.copyWith(
                   color: isMainEditor
                       ? (enableUndo ? colors.primary : colors.textLight)

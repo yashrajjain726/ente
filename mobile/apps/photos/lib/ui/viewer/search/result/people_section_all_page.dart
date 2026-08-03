@@ -2,6 +2,7 @@ import "dart:async";
 
 import "package:ente_components/ente_components.dart";
 import "package:ente_pure_utils/ente_pure_utils.dart";
+import "package:ente_strings/ente_strings.dart";
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import "package:hugeicons/hugeicons.dart";
@@ -10,7 +11,6 @@ import "package:photos/core/event_bus.dart";
 import "package:photos/events/event.dart";
 import "package:photos/events/people_changed_event.dart";
 import "package:photos/events/people_sort_order_change_event.dart";
-import "package:photos/generated/intl/app_localizations.dart";
 import "package:photos/models/search/generic_search_result.dart";
 import "package:photos/models/search/recent_searches.dart";
 import "package:photos/models/search/search_constants.dart";
@@ -691,7 +691,7 @@ class _PeopleSectionAllWidgetState extends State<PeopleSectionAllWidget> {
               SliverFillRemaining(
                 child: Center(
                   child: Text(
-                    AppLocalizations.of(context).noResultsFound + '.',
+                    StringsLocalizations.of(context).noResultsFound + '.',
                   ),
                 ),
               ),
@@ -978,7 +978,7 @@ class _PeopleSectionAllWidgetState extends State<PeopleSectionAllWidget> {
     return TextInputComponent(
       controller: _searchController,
       focusNode: _searchFocusNode,
-      hintText: AppLocalizations.of(context).search,
+      hintText: StringsLocalizations.of(context).search,
       autofocus: true,
       shouldUnfocusOnClearOrSubmit: true,
       prefix: HugeIcon(
@@ -1006,7 +1006,7 @@ class _PeopleSectionAllWidgetState extends State<PeopleSectionAllWidget> {
       shouldSurfaceExecutionStates: false,
       icon: const HugeIcon(icon: HugeIcons.strokeRoundedFilterHorizontal),
       onTapDown: (details) async {
-        final l10n = AppLocalizations.of(context);
+        final l10n = StringsLocalizations.of(context);
         const sortKeys = PeopleSortKey.values;
         final PeopleSortKey? selectedKey = await showMenu<PeopleSortKey>(
           color: colorScheme.backgroundElevated,
@@ -1064,7 +1064,7 @@ class _PeopleSectionAllWidgetState extends State<PeopleSectionAllWidget> {
     bool isLast,
     EnteTextTheme textTheme,
     EnteColorScheme colorScheme,
-    AppLocalizations l10n,
+    StringsLocalizations l10n,
   ) {
     String label;
     switch (key) {
@@ -1147,7 +1147,7 @@ class _PeopleSectionAllWidgetState extends State<PeopleSectionAllWidget> {
     BuildContext context,
     EnteTextTheme textTheme,
     EnteColorScheme colorScheme,
-    AppLocalizations l10n,
+    StringsLocalizations l10n,
   ) {
     return PopupMenuItem<PeopleSortKey>(
       value: null,
@@ -1214,8 +1214,8 @@ class _PeopleSectionAllWidgetState extends State<PeopleSectionAllWidget> {
             children: [
               Text(
                 _showingAllFaces
-                    ? AppLocalizations.of(context).showLessFaces
-                    : AppLocalizations.of(context).showMoreFaces,
+                    ? StringsLocalizations.of(context).showLessFaces
+                    : StringsLocalizations.of(context).showMoreFaces,
                 style: getEnteTextTheme(
                   context,
                 ).small.copyWith(color: Theme.of(context).colorScheme.primary),

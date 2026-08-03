@@ -3,6 +3,7 @@ import 'dart:io';
 
 import "package:ente_components/ente_components.dart";
 import "package:ente_lock_screen/local_authentication_service.dart";
+import "package:ente_strings/ente_strings.dart";
 import 'package:flutter/material.dart';
 import "package:flutter/services.dart";
 import "package:hugeicons/hugeicons.dart";
@@ -12,7 +13,6 @@ import 'package:media_extension/media_extension.dart';
 import "package:photos/core/configuration.dart";
 import "package:photos/core/event_bus.dart";
 import "package:photos/events/guest_view_event.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/models/collection/collection.dart";
 import "package:photos/models/file/extensions/file_props.dart";
 import 'package:photos/models/file/file.dart';
@@ -271,7 +271,7 @@ class FileAppBarState extends State<FileAppBar> {
           onPressed: () {
             showShortToast(
               context,
-              AppLocalizations.of(context).pressAndHoldToPlayVideoDetailed,
+              StringsLocalizations.of(context).pressAndHoldToPlayVideoDetailed,
             );
           },
         ),
@@ -293,7 +293,7 @@ class FileAppBarState extends State<FileAppBar> {
     if (restrictFileActions) {
       items.add(
         _fileMenuOption(
-          AppLocalizations.of(context).info,
+          StringsLocalizations.of(context).info,
           value: 12,
           hugeIcon: HugeIcons.strokeRoundedInformationCircle,
         ),
@@ -302,7 +302,7 @@ class FileAppBarState extends State<FileAppBar> {
       if (isFileUploaded) {
         items.add(
           _fileMenuOption(
-            AppLocalizations.of(context).download,
+            StringsLocalizations.of(context).download,
             value: 1,
             hugeIcon: HugeIcons.strokeRoundedDownload01,
           ),
@@ -310,7 +310,7 @@ class FileAppBarState extends State<FileAppBar> {
         if (isOwnedByUser && !isFileHidden) {
           items.add(
             _fileMenuOption(
-              AppLocalizations.of(context).sendLink,
+              StringsLocalizations.of(context).sendLink,
               value: 14,
               hugeIcon: HugeIcons.strokeRoundedNavigation03,
             ),
@@ -324,7 +324,7 @@ class FileAppBarState extends State<FileAppBar> {
               widget.file.fileType == FileType.video)) {
         items.add(
           _fileMenuOption(
-            AppLocalizations.of(context).edit,
+            StringsLocalizations.of(context).edit,
             value: 11,
             hugeIcon: HugeIcons.strokeRoundedSlidersHorizontal,
           ),
@@ -337,8 +337,8 @@ class FileAppBarState extends State<FileAppBar> {
         items.add(
           _fileMenuOption(
             isArchived
-                ? AppLocalizations.of(context).unarchive
-                : AppLocalizations.of(context).archive,
+                ? StringsLocalizations.of(context).unarchive
+                : StringsLocalizations.of(context).archive,
             value: 2,
             hugeIcon: isArchived
                 ? HugeIcons.strokeRoundedUnarchive03
@@ -352,7 +352,7 @@ class FileAppBarState extends State<FileAppBar> {
           Platform.isAndroid) {
         items.add(
           _fileMenuOption(
-            AppLocalizations.of(context).setAs,
+            StringsLocalizations.of(context).setAs,
             value: 3,
             hugeIcon: HugeIcons.strokeRoundedImage01,
           ),
@@ -362,7 +362,7 @@ class FileAppBarState extends State<FileAppBar> {
         if (!isFileHidden) {
           items.add(
             _fileMenuOption(
-              AppLocalizations.of(context).hide,
+              StringsLocalizations.of(context).hide,
               value: 4,
               hugeIcon: HugeIcons.strokeRoundedViewOffSlash,
             ),
@@ -370,7 +370,7 @@ class FileAppBarState extends State<FileAppBar> {
         } else {
           items.add(
             _fileMenuOption(
-              AppLocalizations.of(context).unhide,
+              StringsLocalizations.of(context).unhide,
               value: 5,
               hugeIcon: HugeIcons.strokeRoundedView,
             ),
@@ -380,7 +380,7 @@ class FileAppBarState extends State<FileAppBar> {
 
       items.add(
         _fileMenuOption(
-          AppLocalizations.of(context).guestView,
+          StringsLocalizations.of(context).guestView,
           value: 6,
           hugeIcon: HugeIcons.strokeRoundedIncognito,
         ),
@@ -389,7 +389,7 @@ class FileAppBarState extends State<FileAppBar> {
       if (canSuggestDeleteAction) {
         items.add(
           _fileMenuOption(
-            AppLocalizations.of(context).suggestDeletion,
+            StringsLocalizations.of(context).suggestDeletion,
             value: 13,
             hugeIcon: HugeIcons.strokeRoundedFlag01,
           ),
@@ -398,7 +398,7 @@ class FileAppBarState extends State<FileAppBar> {
 
       items.add(
         _fileMenuOption(
-          AppLocalizations.of(context).info,
+          StringsLocalizations.of(context).info,
           value: 12,
           hugeIcon: HugeIcons.strokeRoundedInformationCircle,
         ),
@@ -410,7 +410,7 @@ class FileAppBarState extends State<FileAppBar> {
       if (_shouldShowCreateStreamOption()) {
         items.add(
           _fileMenuOption(
-            AppLocalizations.of(context).createStream,
+            StringsLocalizations.of(context).createStream,
             value: 8,
             hugeIcon: HugeIcons.strokeRoundedVideoReplay,
           ),
@@ -420,7 +420,7 @@ class FileAppBarState extends State<FileAppBar> {
       if (_shouldShowRecreateStreamOption()) {
         items.add(
           _fileMenuOption(
-            AppLocalizations.of(context).recreateStream,
+            StringsLocalizations.of(context).recreateStream,
             value: 9,
             hugeIcon: HugeIcons.strokeRoundedRefresh,
           ),
@@ -430,8 +430,8 @@ class FileAppBarState extends State<FileAppBar> {
       items.add(
         _fileMenuOption(
           shouldLoopVideo
-              ? AppLocalizations.of(context).loopVideoOn
-              : AppLocalizations.of(context).loopVideoOff,
+              ? StringsLocalizations.of(context).loopVideoOn
+              : StringsLocalizations.of(context).loopVideoOff,
           value: 7,
           hugeIcon: shouldLoopVideo
               ? HugeIcons.strokeRoundedRepeatOff
@@ -598,7 +598,7 @@ class FileAppBarState extends State<FileAppBar> {
         await getExistingLocalFolderNameForDownloadSkipToast(file);
     if (existingFolderName != null) {
       if (mounted) {
-        final l10n = AppLocalizations.of(context);
+        final l10n = StringsLocalizations.of(context);
         showToast(
           context,
           l10n.downloadSkippedAlreadyAvailableOnDevice(
@@ -633,7 +633,7 @@ class FileAppBarState extends State<FileAppBar> {
     if (!mounted) return;
     final dialog = createProgressDialog(
       context,
-      AppLocalizations.of(context).downloading,
+      StringsLocalizations.of(context).downloading,
       isDismissible: true,
     );
     await dialog.show();
@@ -646,7 +646,7 @@ class FileAppBarState extends State<FileAppBar> {
         await dialog.hide();
         return;
       }
-      showToast(context, AppLocalizations.of(context).fileSavedToGallery);
+      showToast(context, StringsLocalizations.of(context).fileSavedToGallery);
       await dialog.hide();
     } catch (e) {
       _logger.warning("Failed to save file", e);
@@ -661,13 +661,13 @@ class FileAppBarState extends State<FileAppBar> {
     if (!file.isUploaded || !file.isOwner) {
       showShortToast(
         context,
-        AppLocalizations.of(context).canOnlyCreateLinkForFilesOwnedByYou,
+        StringsLocalizations.of(context).canOnlyCreateLinkForFilesOwnedByYou,
       );
       return;
     }
     final dialog = createProgressDialog(
       context,
-      AppLocalizations.of(context).creatingLink,
+      StringsLocalizations.of(context).creatingLink,
       isDismissible: true,
     );
     await dialog.show();
@@ -695,7 +695,7 @@ class FileAppBarState extends State<FileAppBar> {
   Future<void> _setAs(EnteFile file) async {
     final dialog = createProgressDialog(
       context,
-      AppLocalizations.of(context).pleaseWait,
+      StringsLocalizations.of(context).pleaseWait,
     );
     await dialog.show();
     try {
@@ -709,7 +709,7 @@ class FileAppBarState extends State<FileAppBar> {
         if (!mounted) return;
         showShortToast(
           context,
-          AppLocalizations.of(context).somethingWentWrong,
+          StringsLocalizations.of(context).somethingWentWrong,
         );
       }
       await dialog.hide();
@@ -729,8 +729,8 @@ class FileAppBarState extends State<FileAppBar> {
       if (!mounted) return;
       await showErrorDialog(
         context,
-        AppLocalizations.of(context).noSystemLockFound,
-        AppLocalizations.of(context).guestViewEnablePreSteps,
+        StringsLocalizations.of(context).noSystemLockFound,
+        StringsLocalizations.of(context).guestViewEnablePreSteps,
       );
     }
   }
@@ -780,12 +780,15 @@ class FileAppBarState extends State<FileAppBar> {
       if (!wasAdded) {
         // File was already in queue
         if (!mounted) return;
-        showToast(context, AppLocalizations.of(context).videoAlreadyInQueue);
+        showToast(
+          context,
+          StringsLocalizations.of(context).videoAlreadyInQueue,
+        );
         return;
       }
 
       if (!mounted) return;
-      showToast(context, AppLocalizations.of(context).addedToQueue);
+      showToast(context, StringsLocalizations.of(context).addedToQueue);
 
       if (mounted) {
         setState(() {

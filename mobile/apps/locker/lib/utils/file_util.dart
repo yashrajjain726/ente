@@ -2,12 +2,12 @@ import "dart:io";
 import "dart:typed_data";
 
 import "package:ente_components/ente_components.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:ente_ui/utils/dialog_util.dart";
 import "package:ente_ui/utils/toast_util.dart";
 import "package:ente_utils/email_util.dart";
 import "package:file_saver/file_saver.dart";
 import "package:flutter/material.dart";
-import "package:locker/l10n/l10n.dart";
 import "package:locker/models/info/info_item.dart";
 import "package:locker/services/collections/collections_service.dart";
 import "package:locker/services/files/download/file_downloader.dart"
@@ -30,7 +30,7 @@ class FileUtil {
   static final Logger _logger = Logger("FileUtil");
 
   static Future<void> openFile(BuildContext context, EnteFile file) async {
-    final l10n = context.l10n;
+    final l10n = context.strings;
 
     Future<void> showOpenFileError({
       required String error,
@@ -84,7 +84,9 @@ class FileUtil {
         }
         if (total > 0 && downloaded >= 0) {
           final percentage = ((downloaded / total) * 100).clamp(0, 100).round();
-          dialog?.update(message: l10n.downloadingProgress(percentage));
+          dialog?.update(
+            message: l10n.downloadingProgress(percentage: percentage),
+          );
         } else {
           dialog?.update(message: l10n.downloading);
         }
@@ -151,7 +153,7 @@ class FileUtil {
     }
 
     final total = files.length;
-    final l10n = context.l10n;
+    final l10n = context.strings;
     final dialog = createProgressDialog(
       context,
       "${l10n.downloading} 0/$total",
@@ -203,7 +205,7 @@ class FileUtil {
             if (context.mounted) {
               dialog.update(
                 message:
-                    '${l10n.downloadingProgress(percentage)} ($index/$total)',
+                    '${l10n.downloadingProgress(percentage: percentage)} ($index/$total)',
               );
             }
           },
@@ -357,12 +359,12 @@ class FileUtil {
         await showBottomSheetComponent(
           context: context,
           builder: (_) => BottomSheetComponent(
-            title: context.l10n.errorOpeningFile,
-            message: context.l10n.unableToExtractFileInformation,
+            title: context.strings.errorOpeningFile,
+            message: context.strings.unableToExtractFileInformation,
             illustration: LockerBottomSheetIllustration.warningGrey,
             actions: [
               ButtonComponent(
-                label: context.l10n.contactSupport,
+                label: context.strings.contactSupport,
                 onTap: () async {
                   await sendLogs(context, "support@ente.com", postShare: () {});
                 },
@@ -517,12 +519,12 @@ class FileUtil {
     await showBottomSheetComponent(
       context: context,
       builder: (_) => BottomSheetComponent(
-        title: context.l10n.oops,
+        title: context.strings.oops,
         message: _openFileErrorMessage(context, error, resultType: resultType),
         illustration: LockerBottomSheetIllustration.warningGrey,
         actions: [
           ButtonComponent(
-            label: context.l10n.download,
+            label: context.strings.download,
             onTap: () async {
               Navigator.of(context).pop();
               await downloadFile(context, lockerFile!);
@@ -539,15 +541,17 @@ class FileUtil {
     ResultType? resultType,
   }) {
     if (resultType == ResultType.noAppToOpen) {
-      return context.l10n.noAppToOpenFileDownloadInstead;
+      return context.strings.noAppToOpenFileDownloadInstead;
     }
 
     final cleaned = error
         .replaceFirst(RegExp(r"^Exception:\s*"), "")
         .replaceAll("。", ".")
         .trim();
-    return context.l10n.couldNotOpenFile(
-      cleaned.isEmpty ? context.l10n.noAppToOpenFileDownloadInstead : cleaned,
+    return context.strings.couldNotOpenFile(
+      error: cleaned.isEmpty
+          ? context.strings.noAppToOpenFileDownloadInstead
+          : cleaned,
     );
   }
 }

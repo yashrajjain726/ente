@@ -3,12 +3,12 @@ import 'dart:io';
 
 import 'package:bip39/bip39.dart' as bip39;
 import 'package:ente_components/ente_components.dart';
+import "package:ente_strings/ente_strings.dart";
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hugeicons/hugeicons.dart';
 import 'package:photos/core/configuration.dart';
 import 'package:photos/core/constants.dart';
-import "package:photos/generated/l10n.dart";
 import 'package:photos/ui/notification/toast.dart';
 import 'package:photos/utils/share_util.dart';
 import 'package:share_plus/share_plus.dart';
@@ -59,7 +59,7 @@ class _RecoveryKeyPageState extends State<RecoveryKeyPage> {
         elevation: 0,
         scrolledUnderElevation: 0,
         title: Text(
-          widget.title ?? AppLocalizations.of(context).recoveryKey,
+          widget.title ?? StringsLocalizations.of(context).recoveryKey,
           style: TextStyles.large.copyWith(color: colors.textBase),
         ),
         centerTitle: true,
@@ -101,14 +101,18 @@ class _RecoveryKeyPageState extends State<RecoveryKeyPage> {
                 const SizedBox(height: 24),
                 Text(
                   widget.text ??
-                      AppLocalizations.of(context).recoveryKeyOnForgotPassword,
+                      StringsLocalizations.of(
+                        context,
+                      ).recoveryKeyOnForgotPassword,
                   textAlign: TextAlign.center,
                   style: TextStyles.body.copyWith(color: colors.textBase),
                 ),
                 const SizedBox(height: 20),
                 Text(
                   widget.subText ??
-                      AppLocalizations.of(context).recoveryKeySaveDescription,
+                      StringsLocalizations.of(
+                        context,
+                      ).recoveryKeySaveShortDescription,
                   textAlign: TextAlign.center,
                   style: TextStyles.body.copyWith(color: colors.textLight),
                 ),
@@ -143,7 +147,7 @@ class _RecoveryKeyPageState extends State<RecoveryKeyPage> {
                               if (!mounted) return;
                               showShortToast(
                                 context,
-                                AppLocalizations.of(
+                                StringsLocalizations.of(
                                   context,
                                 ).recoveryKeyCopiedToClipboard,
                               );
@@ -162,7 +166,7 @@ class _RecoveryKeyPageState extends State<RecoveryKeyPage> {
                         child: ButtonComponent(
                           variant: ButtonComponentVariant.secondary,
                           shouldSurfaceExecutionStates: false,
-                          label: AppLocalizations.of(context).shareKey,
+                          label: StringsLocalizations.of(context).shareKey,
                           onTap: () async {
                             unawaited(_shareRecoveryKey(recoveryKey));
                           },

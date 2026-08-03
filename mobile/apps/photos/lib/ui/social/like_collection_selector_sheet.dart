@@ -1,10 +1,10 @@
 import "package:ente_icons/ente_icons.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/foundation.dart";
 import "package:flutter/material.dart";
 import "package:logging/logging.dart";
 import "package:photos/core/constants.dart";
 import "package:photos/db/files_db.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/models/collection/collection.dart";
 import "package:photos/models/file/extensions/file_props.dart";
 import "package:photos/models/file/file.dart";
@@ -142,7 +142,7 @@ class _LikeCollectionSelectorSheetState
         if (flagService.internalUser || kDebugMode) {
           showShortToast(
             context,
-            AppLocalizations.of(context).failedToUpdateLike,
+            StringsLocalizations.of(context).failedToUpdateLike,
           );
         }
       }
@@ -196,7 +196,9 @@ class _LikeCollectionSelectorSheetState
       });
       showShortToast(
         context,
-        AppLocalizations.of(context).failedToLikeAlbums(count: failed.length),
+        StringsLocalizations.of(
+          context,
+        ).failedToLikeAlbums(count: failed.length),
       );
       // Don't close sheet - let user retry
       return;
@@ -309,7 +311,7 @@ class _LikeCollectionSelectorSheetState
   }
 
   Widget _buildErrorState() {
-    final l10n = AppLocalizations.of(context);
+    final l10n = StringsLocalizations.of(context);
     final textTheme = getEnteTextTheme(context);
 
     return Padding(
@@ -336,7 +338,7 @@ class _AlbumsHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
+    final l10n = StringsLocalizations.of(context);
     final textTheme = getEnteTextTheme(context);
     final colorScheme = getEnteColorScheme(context);
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
@@ -384,7 +386,7 @@ class _TitleSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
+    final l10n = StringsLocalizations.of(context);
     final textTheme = getEnteTextTheme(context);
     final colorScheme = getEnteColorScheme(context);
 

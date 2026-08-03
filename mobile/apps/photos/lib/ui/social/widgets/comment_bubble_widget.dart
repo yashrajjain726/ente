@@ -1,12 +1,12 @@
 import "dart:async";
 
 import "package:ente_icons/ente_icons.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:flutter/services.dart";
 import "package:logging/logging.dart";
 import "package:photos/core/event_bus.dart";
 import "package:photos/events/comment_deleted_event.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/models/api/collection/user.dart";
 import "package:photos/models/social/comment.dart";
 import "package:photos/models/social/reaction.dart";
@@ -232,7 +232,7 @@ class _CommentBubbleWidgetState extends State<CommentBubbleWidget>
         });
         showShortToast(
           context,
-          AppLocalizations.of(context).failedToLikeComment,
+          StringsLocalizations.of(context).failedToLikeComment,
         );
       }
       return;
@@ -329,7 +329,7 @@ class _CommentBubbleWidgetState extends State<CommentBubbleWidget>
         if (mounted) {
           showShortToast(
             context,
-            AppLocalizations.of(context).failedToDeleteComment,
+            StringsLocalizations.of(context).failedToDeleteComment,
           );
         }
       }
@@ -627,7 +627,7 @@ class _InlineParentQuote extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
+    final l10n = StringsLocalizations.of(context);
     final textTheme = getEnteTextTheme(context);
 
     if (isLoading) {

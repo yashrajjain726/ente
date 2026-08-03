@@ -2,6 +2,7 @@ import 'dart:async';
 
 import "package:ente_components/ente_components.dart";
 import 'package:ente_pure_utils/ente_pure_utils.dart';
+import "package:ente_strings/ente_strings.dart";
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import "package:hugeicons/hugeicons.dart";
@@ -12,7 +13,6 @@ import 'package:photos/ente_theme_data.dart';
 import 'package:photos/events/christmas_banner_event.dart';
 import 'package:photos/events/notification_event.dart';
 import 'package:photos/events/sync_status_update_event.dart';
-import "package:photos/generated/l10n.dart";
 import "package:photos/service_locator.dart";
 import 'package:photos/services/sync/sync_service.dart';
 import "package:photos/theme/ente_theme.dart";
@@ -149,7 +149,7 @@ class _StatusBarWidgetState extends State<StatusBarWidget> {
   }
 
   Widget _mlBanner(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
+    final l10n = StringsLocalizations.of(context);
     return _bannerPadding(
       BannerComponent(
         leadingIcon: HugeIcons.strokeRoundedAiBrain01,
@@ -171,7 +171,7 @@ class _StatusBarWidgetState extends State<StatusBarWidget> {
     return _bannerPadding(
       BannerComponent(
         leadingIcon: HugeIcons.strokeRoundedAlertCircle,
-        title: AppLocalizations.of(context).confirmYourRecoveryKey,
+        title: StringsLocalizations.of(context).confirmYourRecoveryKey,
         state: BannerComponentState.warning,
         onTap: () async {
           await routeToPage(
@@ -255,29 +255,29 @@ class _SyncStatusWidgetState extends State<SyncStatusWidget> {
 
   String _getRefreshingText(BuildContext context) {
     if (_event == null) {
-      return AppLocalizations.of(context).loadingGallery;
+      return StringsLocalizations.of(context).loadingGallery;
     }
     if (_event!.status == SyncStatus.startedFirstGalleryImport ||
         _event!.status == SyncStatus.completedFirstGalleryImport) {
-      return AppLocalizations.of(context).loadingGallery;
+      return StringsLocalizations.of(context).loadingGallery;
     }
     if (_event!.status == SyncStatus.applyingRemoteDiff) {
-      return AppLocalizations.of(context).syncing;
+      return StringsLocalizations.of(context).syncing;
     }
     if (_event!.status == SyncStatus.preparingForUpload) {
       if (_event!.total == null || _event!.total! <= 0) {
-        return AppLocalizations.of(context).encryptingBackup;
+        return StringsLocalizations.of(context).encryptingBackup;
       } else if (_event!.total == 1) {
-        return AppLocalizations.of(context).uploadingSingleMemory;
+        return StringsLocalizations.of(context).uploadingSingleMemory;
       } else {
-        return AppLocalizations.of(context).uploadingMultipleMemories(
+        return StringsLocalizations.of(context).uploadingMultipleMemories(
           count: NumberFormat().format(_event!.total!),
         );
       }
     }
     if (_event!.status == SyncStatus.inProgress) {
       final format = NumberFormat();
-      return AppLocalizations.of(context).syncProgress(
+      return StringsLocalizations.of(context).syncProgress(
         completed: format.format(_event!.completed!),
         total: format.format(_event!.total!),
       );
@@ -290,10 +290,10 @@ class _SyncStatusWidgetState extends State<SyncStatusWidget> {
     }
     if (_event!.status == SyncStatus.completedBackup) {
       if (_event!.wasStopped) {
-        return AppLocalizations.of(context).syncStopped;
+        return StringsLocalizations.of(context).syncStopped;
       }
     }
-    return AppLocalizations.of(context).allMemoriesPreserved;
+    return StringsLocalizations.of(context).allMemoriesPreserved;
   }
 }
 
@@ -367,7 +367,7 @@ class SyncStatusCompletedWidget extends StatelessWidget {
                 Padding(
                   padding: const EdgeInsets.only(left: 12),
                   child: Text(
-                    AppLocalizations.of(context).allMemoriesPreserved,
+                    StringsLocalizations.of(context).allMemoriesPreserved,
                   ),
                 ),
               ],

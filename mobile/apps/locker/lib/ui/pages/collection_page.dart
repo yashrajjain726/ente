@@ -2,11 +2,11 @@ import "dart:async";
 
 import 'package:ente_components/ente_components.dart';
 import 'package:ente_events/event_bus.dart';
+import 'package:ente_strings/ente_strings.dart';
 import 'package:flutter/material.dart';
 import "package:hugeicons/hugeicons.dart";
 import 'package:locker/events/collections_updated_event.dart';
 import "package:locker/extensions/collection_extension.dart";
-import 'package:locker/l10n/l10n.dart';
 import 'package:locker/models/selected_files.dart';
 import 'package:locker/services/collections/collections_service.dart';
 import 'package:locker/services/collections/models/collection.dart';
@@ -196,8 +196,8 @@ class _CollectionPageState extends UploaderPageState<CollectionPage>
           alignment: Alignment.bottomCenter,
           children: [
             AppBarComponent(
-              title: _collection.displayName ?? context.l10n.untitled,
-              subtitle: context.l10n.items(_displayedFiles.length),
+              title: _collection.displayName ?? context.strings.untitled,
+              subtitle: context.strings.items(count: _displayedFiles.length),
               actions: _buildActions(),
               controller: _scrollController,
               slivers: _buildSlivers(context),
@@ -270,8 +270,8 @@ class _CollectionPageState extends UploaderPageState<CollectionPage>
             child: Center(
               child: EmptyStateWidget(
                 assetPath: 'assets/empty_state.png',
-                title: context.l10n.collectionEmptyStateTitle,
-                subtitle: context.l10n.collectionEmptyStateSubtitle,
+                title: context.strings.nothingToSeeHere,
+                subtitle: context.strings.collectionEmptyStateSubtitle,
                 showBorder: false,
               ),
             ),

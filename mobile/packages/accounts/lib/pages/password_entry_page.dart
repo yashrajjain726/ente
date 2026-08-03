@@ -317,7 +317,7 @@ class _PasswordEntryPageState extends State<PasswordEntryPage> {
                             padding: const EdgeInsets.symmetric(vertical: 8),
                             child: Text(
                               context.strings.passwordStrength(
-                                passwordStrengthText,
+                                passwordStrengthValue: passwordStrengthText,
                               ),
                               style: TextStyle(color: passwordStrengthColor),
                             ),

@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:ente_auth/l10n/l10n.dart';
 import 'package:ente_auth/models/code.dart';
 import 'package:ente_auth/services/authenticator_service.dart';
 import 'package:ente_auth/store/code_store.dart';
@@ -9,6 +8,7 @@ import 'package:ente_auth/ui/components/buttons/button_widget.dart';
 import 'package:ente_auth/ui/settings/data/import/import_instruction_sheet.dart';
 import 'package:ente_auth/ui/settings/data/import/import_success.dart';
 import 'package:ente_auth/utils/dialog_util.dart';
+import 'package:ente_strings/ente_strings.dart';
 import 'package:ente_ui/components/progress_dialog.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -62,7 +62,7 @@ Future<void> showFileImportInstruction({
     title: title,
     body: body,
     content: content,
-    cancelLabel: context.l10n.cancel,
+    cancelLabel: context.strings.cancel,
     semanticsIdentifier: semanticsIdentifier,
     actions: [
       ImportInstructionAction(
@@ -94,7 +94,10 @@ Future<void> pickAndProcessImportFile({
   );
   if (result == null || !context.mounted) return;
 
-  final progressDialog = createProgressDialog(context, context.l10n.pleaseWait);
+  final progressDialog = createProgressDialog(
+    context,
+    context.strings.pleaseWait,
+  );
   try {
     if (showProgressBeforeProcessing) {
       await progressDialog.show();
@@ -111,11 +114,11 @@ Future<void> pickAndProcessImportFile({
     if (!context.mounted) return;
     final message =
         errorMessage?.call(context, error) ??
-        '${context.l10n.importFailureDesc}\n Error: $error';
+        '${context.strings.importFailureDesc}\n Error: $error';
     if (error is ImportEntryParseException) {
       await _showImportEntryParseError(context, error, message);
     } else {
-      await showErrorDialog(context, context.l10n.sorry, message);
+      await showErrorDialog(context, context.strings.sorry, message);
     }
   }
 }
@@ -127,10 +130,10 @@ Future<void> _showImportEntryParseError(
 ) async {
   final result = await showChoiceDialog(
     context,
-    title: context.l10n.sorry,
+    title: context.strings.sorry,
     body: message,
     firstButtonLabel: 'View entry',
-    secondButtonLabel: context.l10n.ok,
+    secondButtonLabel: context.strings.ok,
   );
   if (result?.action != ButtonAction.first || !context.mounted) return;
 
@@ -150,7 +153,7 @@ Future<String?> promptForImportPassword(
   await showTextInputDialog(
     context,
     title: title,
-    submitButtonLabel: context.l10n.submit,
+    submitButtonLabel: context.strings.submit,
     isPasswordInput: true,
     onSubmit: (value) async {
       password = value;

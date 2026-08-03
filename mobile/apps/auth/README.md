@@ -60,9 +60,9 @@ The architecture that powers end-to-end encrypted storage and sync of your token
 
 ## 🌍 Translate
 
-[![Crowdin](https://badges.crowdin.net/ente-authenticator-app/localized.svg)](https://crowdin.com/project/ente-authenticator-app)
+[![Crowdin](https://badges.crowdin.net/ente-photos-app/localized.svg)](https://crowdin.com/project/ente-photos-app)
 
-If you're interested in helping out with translation, please visit our [Crowdin project](https://crowdin.com/project/ente-authenticator-app) to get started. Thank you for your support.
+If you're interested in helping out with translation, please visit our [Crowdin project](https://crowdin.com/project/ente-photos-app) to get started. Thank you for your support.
 
 If your language is not listed for translation, please [create a GitHub issue](https://github.com/ente/ente/issues/new?title=Request+for+New+Language+Translation&body=Language+name%3A) to have it added.
 

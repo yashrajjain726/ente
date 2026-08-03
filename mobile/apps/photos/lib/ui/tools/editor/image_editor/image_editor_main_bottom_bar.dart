@@ -1,8 +1,8 @@
 import 'dart:math';
 
+import "package:ente_strings/ente_strings.dart";
 import 'package:flutter/material.dart';
 import "package:hugeicons/hugeicons.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/ui/tools/editor/image_editor/circular_icon_button.dart";
 import "package:photos/ui/tools/editor/image_editor/image_editor_configs_mixin.dart";
 import "package:photos/ui/tools/editor/image_editor/image_editor_constants.dart";
@@ -87,35 +87,35 @@ class ImageEditorMainBottomBarState extends State<ImageEditorMainBottomBar>
                       children: <Widget>[
                         CircularIconButton(
                           hugeIcon: HugeIcons.strokeRoundedCrop,
-                          label: AppLocalizations.of(context).crop,
+                          label: StringsLocalizations.of(context).crop,
                           onTap: () {
                             widget.editor.openCropRotateEditor();
                           },
                         ),
                         CircularIconButton(
                           hugeIcon: HugeIcons.strokeRoundedFilter,
-                          label: AppLocalizations.of(context).filter,
+                          label: StringsLocalizations.of(context).filter,
                           onTap: () {
                             widget.editor.openFilterEditor();
                           },
                         ),
                         CircularIconButton(
                           hugeIcon: HugeIcons.strokeRoundedSlidersHorizontal,
-                          label: AppLocalizations.of(context).adjust,
+                          label: StringsLocalizations.of(context).adjust,
                           onTap: () {
                             widget.editor.openTuneEditor();
                           },
                         ),
                         CircularIconButton(
                           hugeIcon: HugeIcons.strokeRoundedPaintBrush01,
-                          label: AppLocalizations.of(context).draw,
+                          label: StringsLocalizations.of(context).draw,
                           onTap: () {
                             widget.editor.openPaintEditor();
                           },
                         ),
                         CircularIconButton(
                           hugeIcon: HugeIcons.strokeRoundedSticker,
-                          label: AppLocalizations.of(context).sticker,
+                          label: StringsLocalizations.of(context).sticker,
                           onTap: () {
                             widget.editor.openEmojiEditor();
                           },

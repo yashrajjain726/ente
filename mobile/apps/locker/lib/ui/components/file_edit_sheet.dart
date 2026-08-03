@@ -1,6 +1,6 @@
 import 'package:ente_components/ente_components.dart';
+import 'package:ente_strings/ente_strings.dart';
 import 'package:flutter/material.dart';
-import 'package:locker/l10n/l10n.dart';
 import 'package:locker/services/collections/collections_service.dart';
 import 'package:locker/services/collections/models/collection.dart';
 import 'package:locker/services/files/sync/models/file.dart';
@@ -122,7 +122,7 @@ class _FileEditSheetState extends State<FileEditSheet> {
   @override
   Widget build(BuildContext context) {
     return BottomSheetComponent(
-      title: context.l10n.editItem,
+      title: context.strings.editItem,
       isKeyboardAware: true,
       content: Column(
         mainAxisSize: MainAxisSize.min,
@@ -131,8 +131,8 @@ class _FileEditSheetState extends State<FileEditSheet> {
           TextInputComponent(
             isRequired: true,
             controller: _titleController,
-            label: context.l10n.title,
-            hintText: context.l10n.enterNewTitle,
+            label: context.strings.title,
+            hintText: context.strings.enterNewTitle,
             maxLength: 200,
           ),
           const SizedBox(height: 24),
@@ -141,7 +141,7 @@ class _FileEditSheetState extends State<FileEditSheet> {
             selectedCollectionIds: _selectedCollectionIds,
             onToggleCollection: _toggleCollection,
             onCollectionsUpdated: _onCollectionsUpdated,
-            title: context.l10n.collections,
+            title: context.strings.collections,
           ),
         ],
       ),
@@ -149,7 +149,7 @@ class _FileEditSheetState extends State<FileEditSheet> {
         ValueListenableBuilder<TextEditingValue>(
           valueListenable: _titleController,
           builder: (context, _, _) => ButtonComponent(
-            label: context.l10n.save,
+            label: context.strings.save,
             onTap: _canSave ? _onSave : null,
           ),
         ),

@@ -7,7 +7,6 @@ import 'package:ente_auth/app/view/app.dart';
 import 'package:ente_auth/core/configuration.dart';
 import 'package:ente_auth/core/constants.dart';
 import 'package:ente_auth/ente_theme_data.dart';
-import 'package:ente_auth/l10n/l10n.dart';
 import 'package:ente_auth/locale.dart';
 import 'package:ente_auth/services/auth_theme_preferences.dart';
 import 'package:ente_auth/services/authenticator_service.dart';
@@ -35,7 +34,7 @@ import 'package:ente_lock_screen/ui/lock_screen.dart';
 import 'package:ente_logging/logging.dart';
 import 'package:ente_network/network.dart';
 import 'package:ente_pure_utils/ente_pure_utils.dart';
-import 'package:ente_strings/l10n/strings_localizations.dart';
+import 'package:ente_strings/ente_strings.dart';
 import 'package:ente_ui/theme/theme_config.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -134,7 +133,6 @@ Future<void> _runInForeground() async {
         localeListResolutionCallback: localResolutionCallBack,
         localizationsDelegates: const [
           ...StringsLocalizations.localizationsDelegates,
-          ...AppLocalizations.localizationsDelegates,
         ],
         supportedLocales: appSupportedLocales,
         backgroundLockLatency: const Duration(seconds: 0),

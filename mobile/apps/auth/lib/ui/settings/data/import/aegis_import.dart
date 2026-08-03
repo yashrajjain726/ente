@@ -2,12 +2,12 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:convert/convert.dart';
-import 'package:ente_auth/l10n/l10n.dart';
 import 'package:ente_auth/models/code.dart';
 import 'package:ente_auth/models/code_display.dart';
 import 'package:ente_auth/ui/settings/data/import/import_file_cleanup.dart';
 import 'package:ente_auth/ui/settings/data/import/import_flow.dart';
 import 'package:ente_auth/utils/dialog_util.dart';
+import 'package:ente_strings/ente_strings.dart';
 import 'package:ente_ui/components/progress_dialog.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -18,7 +18,7 @@ import 'package:pointycastle/key_derivators/scrypt.dart';
 import 'package:pointycastle/pointycastle.dart';
 
 Future<void> showAegisImportInstruction(BuildContext context) async {
-  final l10n = context.l10n;
+  final l10n = context.strings;
   await showFileImportInstruction(
     context: context,
     title: "Aegis Authenticator",
@@ -32,7 +32,7 @@ Future<void> showAegisImportInstruction(BuildContext context) async {
 Future<void> _pickAegisJsonFile(BuildContext context) async {
   await pickAndProcessImportFile(
     context: context,
-    dialogTitle: context.l10n.importSelectJsonFile,
+    dialogTitle: context.strings.importSelectJsonFile,
     logger: Logger('AegisImport'),
     logMessage: 'Exception while processing Aegis import',
     process: (path, progressDialog) =>
@@ -57,7 +57,7 @@ Future<int?> _processAegisExportFile(
       if (!context.mounted) return null;
       password = await promptForImportPassword(
         context,
-        title: context.l10n.enterPasswordToAegisVault,
+        title: context.strings.enterPasswordToAegisVault,
       );
       if (password == null) {
         await dialog.hide();
@@ -75,8 +75,8 @@ Future<int?> _processAegisExportFile(
         if (!context.mounted) return null;
         await showErrorDialog(
           context,
-          context.l10n.failedToDecryptAegisVault,
-          context.l10n.pleaseCheckPasswordAndTryAgain,
+          context.strings.failedToDecryptAegisVault,
+          context.strings.pleaseCheckPasswordAndTryAgain,
         );
       }
       return null;

@@ -4,13 +4,13 @@ import "dart:convert";
 import 'package:ente_components/ente_components.dart';
 import "package:ente_crypto_api/ente_crypto_api.dart";
 import "package:ente_pure_utils/ente_pure_utils.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:ente_ui/utils/dialog_util.dart";
 import "package:ente_ui/utils/toast_util.dart";
 import "package:ente_utils/share_utils.dart";
 import "package:flutter/material.dart";
 import "package:flutter/services.dart";
 import "package:hugeicons/hugeicons.dart";
-import "package:locker/l10n/l10n.dart";
 import "package:locker/services/collections/collections_api_client.dart";
 import "package:locker/services/collections/collections_service.dart";
 import "package:locker/services/collections/models/collection.dart";
@@ -48,7 +48,7 @@ class _ManageSharedLinkWidgetState extends State<ManageSharedLinkWidget> {
     return Scaffold(
       backgroundColor: colors.backgroundBase,
       body: AppBarComponent(
-        title: context.l10n.manageLink,
+        title: context.strings.manageLink,
         slivers: [
           SliverPadding(
             padding: const EdgeInsets.fromLTRB(
@@ -63,16 +63,16 @@ class _ManageSharedLinkWidgetState extends State<ManageSharedLinkWidget> {
                   MenuGroupComponent(
                     items: [
                       MenuComponent(
-                        title: context.l10n.linkExpiry,
+                        title: context.strings.linkExpiry,
                         subtitle: url.hasExpiry
                             ? (url.isExpired
-                                  ? context.l10n.linkExpired
+                                  ? context.strings.linkExpired
                                   : getFormattedTime(
                                       DateTime.fromMicrosecondsSinceEpoch(
                                         url.validTill,
                                       ),
                                     ))
-                            : context.l10n.never,
+                            : context.strings.never,
                         subtitleColor: url.isExpired ? colors.warning : null,
                         trailing: HugeIcon(
                           icon: HugeIcons.strokeRoundedArrowRight01,
@@ -98,9 +98,9 @@ class _ManageSharedLinkWidgetState extends State<ManageSharedLinkWidget> {
                   MenuGroupComponent(
                     items: [
                       MenuComponent(
-                        title: context.l10n.linkDeviceLimit,
+                        title: context.strings.linkDeviceLimit,
                         subtitle: url.deviceLimit == 0
-                            ? context.l10n.noDeviceLimit
+                            ? context.strings.noDeviceLimit
                             : "${url.deviceLimit}",
                         trailing: HugeIcon(
                           icon: HugeIcons.strokeRoundedArrowRight01,
@@ -122,16 +122,17 @@ class _ManageSharedLinkWidgetState extends State<ManageSharedLinkWidget> {
                       ),
                       MenuComponent(
                         key: ValueKey("Password lock ${url.passwordEnabled}"),
-                        title: context.l10n.passwordLock,
+                        title: context.strings.passwordLock,
                         trailing: ToggleSwitchComponent.async(
                           value: () => url.passwordEnabled,
                           onChanged: () async {
                             if (!url.passwordEnabled) {
                               await showTextInputSheet(
                                 context,
-                                title: context.l10n.setAPassword,
-                                submitButtonLabel: context.l10n.lockButtonLabel,
-                                hintText: context.l10n.enterPassword,
+                                title: context.strings.setAPassword,
+                                submitButtonLabel:
+                                    context.strings.lockButtonLabel,
+                                hintText: context.strings.enterPassword,
                                 onSubmit: (String password) async {
                                   if (password.trim().isEmpty) {
                                     return;
@@ -163,14 +164,14 @@ class _ManageSharedLinkWidgetState extends State<ManageSharedLinkWidget> {
                     items: [
                       if (url.isExpired)
                         MenuComponent(
-                          title: context.l10n.linkExpired,
+                          title: context.strings.linkExpired,
                           titleColor: colors.warning,
                           iconColor: colors.warning,
                           leading: const Icon(Icons.error_outline),
                         ),
                       if (!url.isExpired)
                         MenuComponent(
-                          title: context.l10n.copyLink,
+                          title: context.strings.copyLink,
                           titleBold: true,
                           leading: HugeIcon(
                             icon: HugeIcons.strokeRoundedCopy01,
@@ -187,14 +188,14 @@ class _ManageSharedLinkWidgetState extends State<ManageSharedLinkWidget> {
                             }
                             showShortToast(
                               context,
-                              context.l10n.linkCopiedToClipboard,
+                              context.strings.linkCopiedToClipboard,
                             );
                           },
                         ),
                       if (!url.isExpired)
                         MenuComponent(
                           key: sendLinkButtonKey,
-                          title: context.l10n.sendLink,
+                          title: context.strings.sendLink,
                           titleBold: true,
                           leading: HugeIcon(
                             icon: HugeIcons.strokeRoundedShare08,
@@ -211,7 +212,7 @@ class _ManageSharedLinkWidgetState extends State<ManageSharedLinkWidget> {
                   MenuGroupComponent(
                     items: [
                       MenuComponent(
-                        title: context.l10n.removeLink,
+                        title: context.strings.removeLink,
                         titleBold: true,
                         titleColor: colors.warning,
                         iconColor: colors.warning,
@@ -266,7 +267,7 @@ class _ManageSharedLinkWidgetState extends State<ManageSharedLinkWidget> {
     bool showProgressDialog = true,
   }) async {
     final dialog = showProgressDialog && context != null && context.mounted
-        ? createProgressDialog(context, context.l10n.pleaseWait)
+        ? createProgressDialog(context, context.strings.pleaseWait)
         : null;
     await dialog?.show();
     try {
@@ -276,7 +277,7 @@ class _ManageSharedLinkWidgetState extends State<ManageSharedLinkWidget> {
       );
       await dialog?.hide();
       if (context != null && context.mounted) {
-        showShortToast(context, context.l10n.collectionUpdated);
+        showShortToast(context, context.strings.collectionUpdated);
       }
       if (mounted) {
         setState(() {});

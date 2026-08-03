@@ -2,13 +2,13 @@ import 'dart:io';
 
 import 'package:ente_components/ente_components.dart';
 import 'package:ente_pure_utils/ente_pure_utils.dart';
+import "package:ente_strings/ente_strings.dart";
 import 'package:flutter/material.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import "package:logging/logging.dart";
 import 'package:path_provider/path_provider.dart';
 import 'package:photos/core/cache/video_cache_manager.dart';
 import 'package:photos/core/configuration.dart';
-import "package:photos/generated/l10n.dart";
 import "package:photos/service_locator.dart";
 import 'package:photos/ui/settings/components/settings_page_scaffold.dart';
 import 'package:photos/ui/tools/debug/path_storage_viewer.dart';
@@ -57,28 +57,28 @@ class _AppStorageViewerState extends State<AppStorageViewer> {
     paths.addAll([
       PathStorageItem.name(
         imageCachePath,
-        AppLocalizations.of(context).remoteImages,
+        StringsLocalizations.of(context).remoteImages,
         allowCacheClear: true,
       ),
       PathStorageItem.name(
         videoCachePath,
-        AppLocalizations.of(context).remoteVideos,
+        StringsLocalizations.of(context).remoteVideos,
         allowCacheClear: true,
       ),
       PathStorageItem.name(
         cacheDirectory,
-        AppLocalizations.of(context).remoteThumbnails,
+        StringsLocalizations.of(context).remoteThumbnails,
         allowCacheClear: true,
       ),
       PathStorageItem.name(
         tempDownload,
-        AppLocalizations.of(context).pendingSync,
+        StringsLocalizations.of(context).pendingSync,
       ),
       PathStorageItem.name(
         Platform.isAndroid
             ? androidGlideCacheDirectory
             : iOSPhotoManagerInAppCacheDirectory,
-        AppLocalizations.of(context).localGallery,
+        StringsLocalizations.of(context).localGallery,
         allowCacheClear: true,
       ),
     ]);
@@ -130,7 +130,7 @@ class _AppStorageViewerState extends State<AppStorageViewer> {
     debugPrint("$runtimeType building");
 
     return SettingsPageScaffold(
-      title: AppLocalizations.of(context).manageDeviceStorage,
+      title: StringsLocalizations.of(context).manageDeviceStorage,
       children: [
         Padding(
           padding: const EdgeInsets.only(
@@ -141,7 +141,7 @@ class _AppStorageViewerState extends State<AppStorageViewer> {
           child: Align(
             alignment: Alignment.centerLeft,
             child: Text(
-              AppLocalizations.of(context).cachedData,
+              StringsLocalizations.of(context).cachedData,
               style: TextStyles.mini.copyWith(
                 color: context.componentColors.textLight,
               ),
@@ -160,7 +160,7 @@ class _AppStorageViewerState extends State<AppStorageViewer> {
         ),
         const SizedBox(height: Spacing.xl),
         ButtonComponent(
-          label: AppLocalizations.of(context).clearCaches,
+          label: StringsLocalizations.of(context).clearCaches,
           variant: ButtonComponentVariant.neutral,
           onTap: () async {
             for (var pathItem in paths) {

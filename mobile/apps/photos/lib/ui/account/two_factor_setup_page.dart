@@ -2,11 +2,11 @@ import 'dart:async';
 
 import 'package:ente_crypto/ente_crypto.dart';
 import 'package:ente_pure_utils/ente_pure_utils.dart';
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import 'package:flutter/services.dart';
 import 'package:photos/core/configuration.dart';
 import 'package:photos/ente_theme_data.dart';
-import "package:photos/generated/l10n.dart";
 import 'package:photos/services/account/user_service.dart';
 import 'package:photos/ui/account/recovery_key_page.dart';
 import 'package:photos/ui/lifecycle_event_handler.dart';
@@ -79,7 +79,7 @@ class _TwoFactorSetupPageState extends State<TwoFactorSetupPage>
     return Scaffold(
       appBar: AppBar(
         elevation: 0,
-        title: Text(AppLocalizations.of(context).twofactorSetup),
+        title: Text(StringsLocalizations.of(context).twofactorSetup),
       ),
       body: _getBody(),
     );
@@ -100,8 +100,8 @@ class _TwoFactorSetupPageState extends State<TwoFactorSetupPage>
                     labelColor: Theme.of(context).colorScheme.greenAlternative,
                     unselectedLabelColor: Colors.grey,
                     tabs: [
-                      Tab(text: AppLocalizations.of(context).enterCode),
-                      Tab(text: AppLocalizations.of(context).scanCode),
+                      Tab(text: StringsLocalizations.of(context).enterCode),
+                      Tab(text: StringsLocalizations.of(context).scanCode),
                     ],
                     controller: _tabController,
                     indicatorSize: TabBarIndicatorSize.tab,
@@ -135,7 +135,7 @@ class _TwoFactorSetupPageState extends State<TwoFactorSetupPage>
         if (!mounted) return;
         showShortToast(
           context,
-          AppLocalizations.of(context).codeCopiedToClipboard,
+          StringsLocalizations.of(context).codeCopiedToClipboard,
         );
       },
       child: Column(
@@ -143,7 +143,7 @@ class _TwoFactorSetupPageState extends State<TwoFactorSetupPage>
         children: [
           const Padding(padding: EdgeInsets.all(12)),
           Text(
-            AppLocalizations.of(
+            StringsLocalizations.of(
               context,
             ).copypasteThisCodentoYourAuthenticatorApp,
             style: const TextStyle(height: 1.4, fontSize: 16),
@@ -169,7 +169,7 @@ class _TwoFactorSetupPageState extends State<TwoFactorSetupPage>
           ),
           const Padding(padding: EdgeInsets.all(6)),
           Text(
-            AppLocalizations.of(context).tapToCopy,
+            StringsLocalizations.of(context).tapToCopy,
             style: TextStyle(color: textColor.withValues(alpha: 0.5)),
           ),
         ],
@@ -183,7 +183,7 @@ class _TwoFactorSetupPageState extends State<TwoFactorSetupPage>
         children: [
           const Padding(padding: EdgeInsets.all(12)),
           Text(
-            AppLocalizations.of(
+            StringsLocalizations.of(
               context,
             ).scanThisBarcodeWithnyourAuthenticatorApp,
             style: const TextStyle(height: 1.4, fontSize: 16),
@@ -201,7 +201,7 @@ class _TwoFactorSetupPageState extends State<TwoFactorSetupPage>
       children: [
         const Padding(padding: EdgeInsets.all(12)),
         Text(
-          AppLocalizations.of(
+          StringsLocalizations.of(
             context,
           ).enterThe6digitCodeFromnyourAuthenticatorApp,
           style: const TextStyle(height: 1.4, fontSize: 16),
@@ -247,7 +247,7 @@ class _TwoFactorSetupPageState extends State<TwoFactorSetupPage>
                   await _enableTwoFactor(_code);
                 }
               : null,
-          child: Text(AppLocalizations.of(context).confirm),
+          child: Text(StringsLocalizations.of(context).confirm),
         ),
         const Padding(padding: EdgeInsets.only(bottom: 24)),
       ],
@@ -273,14 +273,14 @@ class _TwoFactorSetupPageState extends State<TwoFactorSetupPage>
       context,
       RecoveryKeyPage(
         recoveryKey,
-        AppLocalizations.of(context).ok,
+        StringsLocalizations.of(context).ok,
         isOnboarding: false,
         onDone: () {},
-        title: AppLocalizations.of(context).setupComplete,
-        text: AppLocalizations.of(
+        title: StringsLocalizations.of(context).setupComplete,
+        text: StringsLocalizations.of(
           context,
         ).saveYourRecoveryKeyIfYouHaventAlready,
-        subText: AppLocalizations.of(
+        subText: StringsLocalizations.of(
           context,
         ).thisCanBeUsedToRecoverYourAccountIfYou,
       ),

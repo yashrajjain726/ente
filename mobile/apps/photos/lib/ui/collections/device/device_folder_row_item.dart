@@ -1,8 +1,8 @@
 import 'package:ente_components/ente_components.dart';
 import 'package:ente_pure_utils/ente_pure_utils.dart';
+import "package:ente_strings/ente_strings.dart";
 import "package:figma_squircle/figma_squircle.dart";
 import 'package:flutter/material.dart';
-import "package:photos/generated/l10n.dart";
 import 'package:photos/models/device_collection.dart';
 import "package:photos/service_locator.dart";
 import "package:photos/ui/components/collection_share_badge.dart";
@@ -97,7 +97,7 @@ class DeviceFolderRowItem extends StatelessWidget {
           SizedBox(
             width: sideOfThumbnail,
             child: Text(
-              AppLocalizations.of(
+              StringsLocalizations.of(
                 context,
               ).itemCount(count: deviceCollection.count),
               textAlign: TextAlign.left,

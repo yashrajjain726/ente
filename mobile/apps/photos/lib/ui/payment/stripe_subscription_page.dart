@@ -1,13 +1,13 @@
 import 'dart:async';
 
 import "package:ente_pure_utils/ente_pure_utils.dart";
+import "package:ente_strings/ente_strings.dart";
 import 'package:flutter/material.dart';
 import "package:logging/logging.dart";
 import "package:photos/core/event_bus.dart";
 import "package:photos/events/subscription_purchased_event.dart";
 import 'package:photos/gateways/billing/models/billing_plan.dart';
 import 'package:photos/gateways/billing/models/subscription.dart';
-import "package:photos/generated/l10n.dart";
 import 'package:photos/models/user_details.dart';
 import "package:photos/service_locator.dart";
 import 'package:photos/services/account/user_service.dart';
@@ -123,7 +123,7 @@ class _StripeSubscriptionPageState extends State<StripeSubscriptionPage> {
       if (!mounted) return;
       showToast(
         context,
-        AppLocalizations.of(context).failedToRefreshStripeSubscription,
+        StringsLocalizations.of(context).failedToRefreshStripeSubscription,
       );
     }
     await _dialog.hide();
@@ -157,8 +157,8 @@ class _StripeSubscriptionPageState extends State<StripeSubscriptionPage> {
         ),
         title: Text(
           widget.isOnboarding
-              ? AppLocalizations.of(context).chooseYourPlan
-              : AppLocalizations.of(context).subscription,
+              ? StringsLocalizations.of(context).chooseYourPlan
+              : StringsLocalizations.of(context).subscription,
           style: textTheme.largeBold,
         ),
         centerTitle: true,
@@ -176,7 +176,7 @@ class _StripeSubscriptionPageState extends State<StripeSubscriptionPage> {
                   padding: const EdgeInsets.fromLTRB(24, 12, 24, 12),
                   child: ButtonWidgetV2(
                     buttonType: ButtonTypeV2.primary,
-                    labelText: AppLocalizations.of(context).continueLabel,
+                    labelText: StringsLocalizations.of(context).continueLabel,
                     isDisabled: _selectedPlanProductID == null,
                     onTap: _selectedPlanProductID == null
                         ? null
@@ -194,7 +194,7 @@ class _StripeSubscriptionPageState extends State<StripeSubscriptionPage> {
       _isLoading = true;
       _dialog = createProgressDialog(
         context,
-        AppLocalizations.of(context).pleaseWait,
+        StringsLocalizations.of(context).pleaseWait,
       );
       _fetchSub();
     }
@@ -251,7 +251,7 @@ class _StripeSubscriptionPageState extends State<StripeSubscriptionPage> {
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
           child: MenuItemWidgetNew(
-            title: AppLocalizations.of(context).manageFamily,
+            title: StringsLocalizations.of(context).manageFamily,
             menuItemColor: colorScheme.fillFaint,
             pressedColor: colorScheme.fillFaintPressed,
             trailingWidget: Icon(
@@ -355,8 +355,8 @@ class _StripeSubscriptionPageState extends State<StripeSubscriptionPage> {
             : '';
         await showErrorDialog(
           context,
-          AppLocalizations.of(context).sorry,
-          AppLocalizations.of(
+          StringsLocalizations.of(context).sorry,
+          StringsLocalizations.of(
             context,
           ).contactToManageSubscription(provider: capitalizedWord),
         );
@@ -374,7 +374,7 @@ class _StripeSubscriptionPageState extends State<StripeSubscriptionPage> {
             MaterialPageRoute(
               builder: (BuildContext context) {
                 return WebPage(
-                  AppLocalizations.of(context).paymentDetails,
+                  StringsLocalizations.of(context).paymentDetails,
                   url,
                 );
               },
@@ -395,8 +395,8 @@ class _StripeSubscriptionPageState extends State<StripeSubscriptionPage> {
       return const SizedBox.shrink();
     }
     final String title = isRenewCancelled
-        ? AppLocalizations.of(context).renewSubscription
-        : AppLocalizations.of(context).cancelSubscription;
+        ? StringsLocalizations.of(context).renewSubscription
+        : StringsLocalizations.of(context).cancelSubscription;
     return MenuItemWidgetNew(
       title: title,
       alwaysShowSuccessState: false,
@@ -413,17 +413,17 @@ class _StripeSubscriptionPageState extends State<StripeSubscriptionPage> {
           final choice = await showChoiceDialog(
             context,
             title: title,
-            body: AppLocalizations.of(context).areYouSureYouWantToRenew,
-            firstButtonLabel: AppLocalizations.of(context).yesRenew,
+            body: StringsLocalizations.of(context).areYouSureYouWantToRenew,
+            firstButtonLabel: StringsLocalizations.of(context).yesRenew,
           );
           confirmAction = choice!.action == ButtonAction.first;
         } else {
           final choice = await showChoiceDialog(
             context,
             title: title,
-            body: AppLocalizations.of(context).areYouSureYouWantToCancel,
-            firstButtonLabel: AppLocalizations.of(context).yesCancel,
-            secondButtonLabel: AppLocalizations.of(context).no,
+            body: StringsLocalizations.of(context).areYouSureYouWantToCancel,
+            firstButtonLabel: StringsLocalizations.of(context).yesCancel,
+            secondButtonLabel: StringsLocalizations.of(context).no,
             isCritical: true,
           );
           confirmAction = choice!.action == ButtonAction.first;
@@ -449,17 +449,17 @@ class _StripeSubscriptionPageState extends State<StripeSubscriptionPage> {
       showShortToast(
         context,
         isAutoRenewDisabled
-            ? AppLocalizations.of(context).failedToRenew
-            : AppLocalizations.of(context).failedToCancel,
+            ? StringsLocalizations.of(context).failedToRenew
+            : StringsLocalizations.of(context).failedToCancel,
       );
     }
     await _dialog.hide();
     if (!isAutoRenewDisabled && mounted) {
       await showTextInputDialog(
         context,
-        title: AppLocalizations.of(context).askCancelReason,
-        submitButtonLabel: AppLocalizations.of(context).send,
-        hintText: AppLocalizations.of(context).optionalAsShortAsYouLike,
+        title: StringsLocalizations.of(context).askCancelReason,
+        submitButtonLabel: StringsLocalizations.of(context).send,
+        hintText: StringsLocalizations.of(context).optionalAsShortAsYouLike,
         alwaysShowSuccessState: true,
         textCapitalization: TextCapitalization.words,
         onSubmit: (String text) async {
@@ -493,7 +493,7 @@ class _StripeSubscriptionPageState extends State<StripeSubscriptionPage> {
           child: SubscriptionPlanWidget(
             storage: _freePlan.storage,
             price: "",
-            period: AppLocalizations.of(context).freeTrial,
+            period: StringsLocalizations.of(context).freeTrial,
             isActive: widget.isOnboarding
                 ? _selectedPlanProductID == freeProductID
                 : _isFreePlanUser(),
@@ -530,8 +530,8 @@ class _StripeSubscriptionPageState extends State<StripeSubscriptionPage> {
                 _currentSubscription!.productID != freeProductID) {
               await showErrorDialog(
                 context,
-                AppLocalizations.of(context).sorry,
-                AppLocalizations.of(context).cancelOtherSubscription(
+                StringsLocalizations.of(context).sorry,
+                StringsLocalizations.of(context).cancelOtherSubscription(
                   paymentProvider: _currentSubscription!.paymentProvider,
                 ),
               );
@@ -549,8 +549,8 @@ class _StripeSubscriptionPageState extends State<StripeSubscriptionPage> {
               );
               await showErrorDialog(
                 context,
-                AppLocalizations.of(context).sorry,
-                AppLocalizations.of(context).youCannotDowngradeToThisPlan,
+                StringsLocalizations.of(context).sorry,
+                StringsLocalizations.of(context).youCannotDowngradeToThisPlan,
               );
               return;
             }
@@ -559,11 +559,11 @@ class _StripeSubscriptionPageState extends State<StripeSubscriptionPage> {
               // confirm if user wants to change plan or not
               final result = await showChoiceDialog(
                 context,
-                title: AppLocalizations.of(context).confirmPlanChange,
-                body: AppLocalizations.of(
+                title: StringsLocalizations.of(context).confirmPlanChange,
+                body: StringsLocalizations.of(
                   context,
                 ).areYouSureYouWantToChangeYourPlan,
-                firstButtonLabel: AppLocalizations.of(context).yes,
+                firstButtonLabel: StringsLocalizations.of(context).yes,
               );
               if (result?.action == ButtonAction.first) {
                 stripPurChaseAction = 'update';
@@ -683,8 +683,8 @@ class _StripeSubscriptionPageState extends State<StripeSubscriptionPage> {
         _currentSubscription!.productID != freeProductID) {
       await showErrorDialog(
         context,
-        AppLocalizations.of(context).sorry,
-        AppLocalizations.of(context).cancelOtherSubscription(
+        StringsLocalizations.of(context).sorry,
+        StringsLocalizations.of(context).cancelOtherSubscription(
           paymentProvider: _currentSubscription!.paymentProvider,
         ),
       );
@@ -702,8 +702,8 @@ class _StripeSubscriptionPageState extends State<StripeSubscriptionPage> {
       );
       await showErrorDialog(
         context,
-        AppLocalizations.of(context).sorry,
-        AppLocalizations.of(context).youCannotDowngradeToThisPlan,
+        StringsLocalizations.of(context).sorry,
+        StringsLocalizations.of(context).youCannotDowngradeToThisPlan,
       );
       return;
     }
@@ -712,9 +712,11 @@ class _StripeSubscriptionPageState extends State<StripeSubscriptionPage> {
     if (_isStripeSubscriber && _hasActiveSubscription) {
       final result = await showChoiceDialog(
         context,
-        title: AppLocalizations.of(context).confirmPlanChange,
-        body: AppLocalizations.of(context).areYouSureYouWantToChangeYourPlan,
-        firstButtonLabel: AppLocalizations.of(context).yes,
+        title: StringsLocalizations.of(context).confirmPlanChange,
+        body: StringsLocalizations.of(
+          context,
+        ).areYouSureYouWantToChangeYourPlan,
+        firstButtonLabel: StringsLocalizations.of(context).yes,
       );
       if (result!.action == ButtonAction.first) {
         stripPurChaseAction = 'update';

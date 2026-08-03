@@ -1,6 +1,6 @@
-import 'package:ente_auth/l10n/l10n.dart';
 import 'package:ente_auth/models/code.dart';
 import 'package:ente_auth/theme/ente_theme.dart';
+import 'package:ente_strings/ente_strings.dart';
 import 'package:flutter/material.dart';
 
 class ActionBarWidget extends StatefulWidget {
@@ -55,7 +55,10 @@ class _ActionBarWidgetState extends State<ActionBarWidget> {
                       },
                       child: Align(
                         alignment: Alignment.centerRight,
-                        child: Text(context.l10n.cancel, style: textTheme.mini),
+                        child: Text(
+                          context.strings.cancel,
+                          style: textTheme.mini,
+                        ),
                       ),
                     ),
                   ),

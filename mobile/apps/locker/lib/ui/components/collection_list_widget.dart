@@ -1,10 +1,10 @@
 import "package:ente_components/ente_components.dart";
 import "package:ente_sharing/models/user.dart";
 import "package:ente_sharing/user_avator_widget.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:hugeicons/hugeicons.dart";
 import "package:locker/extensions/collection_extension.dart";
-import "package:locker/l10n/l10n.dart";
 import "package:locker/models/selected_collections.dart";
 import "package:locker/services/collections/collections_service.dart";
 import "package:locker/services/collections/models/collection.dart";
@@ -102,7 +102,7 @@ class CollectionListWidget extends StatelessWidget {
                   builder: (context, snapshot) {
                     final fileCount = snapshot.data ?? 0;
                     return Text(
-                      context.l10n.items(fileCount),
+                      context.strings.items(count: fileCount),
                       style: TextStyles.mini.copyWith(color: colors.textLight),
                     );
                   },

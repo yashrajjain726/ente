@@ -1,8 +1,8 @@
 import 'dart:async';
 
 import "package:ente_components/ente_components.dart";
+import 'package:ente_strings/ente_strings.dart';
 import "package:flutter/material.dart";
-import 'package:locker/l10n/l10n.dart';
 import 'package:rive/rive.dart' as rive;
 
 class HomeEmptyStateWidget extends StatefulWidget {
@@ -65,7 +65,7 @@ class _HomeEmptyStateWidgetState extends State<HomeEmptyStateWidget> {
               ),
               const SizedBox(height: 40),
               Text(
-                context.l10n.homeEmptyStateLegacyDescription,
+                context.strings.homeEmptyStateLegacyDescription,
                 style: TextStyles.body.copyWith(color: colors.textLight),
                 textAlign: TextAlign.center,
               ),
@@ -73,13 +73,13 @@ class _HomeEmptyStateWidgetState extends State<HomeEmptyStateWidget> {
               Column(
                 children: [
                   ButtonComponent(
-                    label: context.l10n.setupYourLegacy,
+                    label: context.strings.setupYourLegacy,
                     onTap: widget.onSetupLegacy,
                     shouldSurfaceExecutionStates: false,
                   ),
                   const SizedBox(height: 12),
                   ButtonComponent(
-                    label: context.l10n.saveToLocker,
+                    label: context.strings.saveToLocker,
                     variant: ButtonComponentVariant.neutral,
                     onTap: widget.onSaveToLocker,
                     shouldSurfaceExecutionStates: false,

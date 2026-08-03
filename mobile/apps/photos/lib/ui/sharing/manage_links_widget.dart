@@ -6,13 +6,13 @@ import 'package:ente_components/ente_components.dart';
 import 'package:ente_crypto/ente_crypto.dart';
 import 'package:ente_pure_utils/ente_pure_utils.dart';
 import 'package:ente_qr_ui/ente_qr_ui.dart';
+import "package:ente_strings/ente_strings.dart";
 import 'package:flutter/material.dart';
 import "package:flutter/services.dart";
 import 'package:hugeicons/hugeicons.dart';
 import 'package:photos/core/constants.dart';
 import "package:photos/core/errors.dart";
 import "package:photos/gateways/collections/models/public_url.dart";
-import "package:photos/generated/l10n.dart";
 import 'package:photos/models/collection/collection.dart';
 import 'package:photos/services/collections_service.dart';
 import 'package:photos/ui/actions/collection/collection_sharing_actions.dart';
@@ -49,13 +49,13 @@ class _ManageSharedLinkWidgetState extends State<ManageSharedLinkWidget> {
     final normalizedLayout = normalizePublicLinkLayout(layout);
     switch (normalizedLayout) {
       case 'masonry':
-        return AppLocalizations.of(context).layoutMasonry;
+        return StringsLocalizations.of(context).layoutMasonry;
       case 'trip':
-        return AppLocalizations.of(context).layoutTrip;
+        return StringsLocalizations.of(context).layoutTrip;
       case 'grouped':
-        return AppLocalizations.of(context).layoutGrouped;
+        return StringsLocalizations.of(context).layoutGrouped;
       default:
-        return AppLocalizations.of(context).layoutMasonry;
+        return StringsLocalizations.of(context).layoutMasonry;
     }
   }
 
@@ -78,12 +78,12 @@ class _ManageSharedLinkWidgetState extends State<ManageSharedLinkWidget> {
     final colors = context.componentColors;
 
     return ShareScaffold(
-      title: AppLocalizations.of(context).manageLink,
+      title: StringsLocalizations.of(context).manageLink,
       children: [
         ShareMenuGroup(
           items: [
             ShareMenuItem(
-              title: AppLocalizations.of(context).albumLayout,
+              title: StringsLocalizations.of(context).albumLayout,
               subtitle: _getLayoutDisplayName(
                 collection.pubMagicMetadata.layout ?? "masonry",
                 context,
@@ -107,7 +107,7 @@ class _ManageSharedLinkWidgetState extends State<ManageSharedLinkWidget> {
           items: [
             ShareMenuItem(
               key: ValueKey("Allow collect $isCollectEnabled"),
-              title: AppLocalizations.of(context).allowAddingPhotos,
+              title: StringsLocalizations.of(context).allowAddingPhotos,
               icon: HugeIcons.strokeRoundedImageAdd01,
               trailing: ToggleSwitchComponent(
                 selected: isCollectEnabled,
@@ -120,7 +120,7 @@ class _ManageSharedLinkWidgetState extends State<ManageSharedLinkWidget> {
             ),
             ShareMenuItem(
               key: ValueKey("Enable comment $enableComment"),
-              title: AppLocalizations.of(context).enableComment,
+              title: StringsLocalizations.of(context).enableComment,
               icon: HugeIcons.strokeRoundedComment01,
               trailing: ToggleSwitchComponent(
                 selected: enableComment,
@@ -137,12 +137,12 @@ class _ManageSharedLinkWidgetState extends State<ManageSharedLinkWidget> {
         ShareMenuGroup(
           items: [
             ShareMenuItem(
-              title: AppLocalizations.of(context).linkExpiry,
+              title: StringsLocalizations.of(context).linkExpiry,
               subtitle: (url.hasExpiry
                   ? (url.isExpired
-                        ? AppLocalizations.of(context).linkExpired
-                        : AppLocalizations.of(context).linkEnabled)
-                  : AppLocalizations.of(context).linkNeverExpires),
+                        ? StringsLocalizations.of(context).linkExpired
+                        : StringsLocalizations.of(context).linkEnabled)
+                  : StringsLocalizations.of(context).linkNeverExpires),
               titleMaxLines: 1,
               icon: HugeIcons.strokeRoundedCalendar03,
               showChevron: true,
@@ -155,8 +155,8 @@ class _ManageSharedLinkWidgetState extends State<ManageSharedLinkWidget> {
         if (url.hasExpiry) ...[
           ShareSectionDescription(
             url.isExpired
-                ? AppLocalizations.of(context).expiredLinkInfo
-                : AppLocalizations.of(context).linkExpiresOn(
+                ? StringsLocalizations.of(context).expiredLinkInfo
+                : StringsLocalizations.of(context).linkExpiresOn(
                     expiryTime: getFormattedTime(
                       DateTime.fromMicrosecondsSinceEpoch(url.validTill),
                       context: context,
@@ -169,9 +169,9 @@ class _ManageSharedLinkWidgetState extends State<ManageSharedLinkWidget> {
         ShareMenuGroup(
           items: [
             ShareMenuItem(
-              title: AppLocalizations.of(context).linkDeviceLimit,
+              title: StringsLocalizations.of(context).linkDeviceLimit,
               subtitle: url.deviceLimit == 0
-                  ? AppLocalizations.of(context).noDeviceLimit
+                  ? StringsLocalizations.of(context).noDeviceLimit
                   : "${url.deviceLimit}",
               icon: HugeIcons.strokeRoundedLaptop,
               showChevron: true,
@@ -181,7 +181,7 @@ class _ManageSharedLinkWidgetState extends State<ManageSharedLinkWidget> {
             ),
             ShareMenuItem(
               key: ValueKey("Allow downloads $isDownloadEnabled"),
-              title: AppLocalizations.of(context).allowDownloads,
+              title: StringsLocalizations.of(context).allowDownloads,
               icon: HugeIcons.strokeRoundedDownload04,
               trailing: ToggleSwitchComponent(
                 selected: isDownloadEnabled,
@@ -194,10 +194,12 @@ class _ManageSharedLinkWidgetState extends State<ManageSharedLinkWidget> {
                     unawaited(
                       showErrorDialog(
                         context,
-                        AppLocalizations.of(
+                        StringsLocalizations.of(
                           context,
                         ).disableDownloadWarningTitle,
-                        AppLocalizations.of(context).disableDownloadWarningBody,
+                        StringsLocalizations.of(
+                          context,
+                        ).disableDownloadWarningBody,
                       ),
                     );
                   }
@@ -206,7 +208,7 @@ class _ManageSharedLinkWidgetState extends State<ManageSharedLinkWidget> {
             ),
             ShareMenuItem(
               key: ValueKey("Allow join $isJoinEnabled"),
-              title: AppLocalizations.of(context).allowJoiningAlbum,
+              title: StringsLocalizations.of(context).allowJoiningAlbum,
               icon: HugeIcons.strokeRoundedUserMultiple,
               trailing: ToggleSwitchComponent(
                 selected: isJoinEnabled,
@@ -217,7 +219,7 @@ class _ManageSharedLinkWidgetState extends State<ManageSharedLinkWidget> {
             ),
             ShareMenuItem(
               key: ValueKey("Password lock $isPasswordEnabled"),
-              title: AppLocalizations.of(context).passwordLock,
+              title: StringsLocalizations.of(context).passwordLock,
               icon: HugeIcons.strokeRoundedLockPassword,
               trailing: ToggleSwitchComponent(
                 selected: isPasswordEnabled,
@@ -226,11 +228,13 @@ class _ManageSharedLinkWidgetState extends State<ManageSharedLinkWidget> {
                     unawaited(
                       showTextInputDialog(
                         context,
-                        title: AppLocalizations.of(context).setAPassword,
-                        submitButtonLabel: AppLocalizations.of(
+                        title: StringsLocalizations.of(context).setAPassword,
+                        submitButtonLabel: StringsLocalizations.of(
                           context,
                         ).lockButtonLabel,
-                        hintText: AppLocalizations.of(context).enterPassword,
+                        hintText: StringsLocalizations.of(
+                          context,
+                        ).enterPassword,
                         isPasswordInput: true,
                         alwaysShowSuccessState: true,
                         onSubmit: (String password) async {
@@ -264,7 +268,7 @@ class _ManageSharedLinkWidgetState extends State<ManageSharedLinkWidget> {
         ShareMenuGroup(
           items: [
             ShareMenuItem(
-              title: AppLocalizations.of(context).removeLink,
+              title: StringsLocalizations.of(context).removeLink,
               leading: Icon(Icons.remove_circle_outline, color: colors.warning),
               isDestructive: true,
               onTap: () async {
@@ -297,7 +301,7 @@ class _ManageSharedLinkWidgetState extends State<ManageSharedLinkWidget> {
     if (url.isExpired) {
       return [
         ShareMenuItem(
-          title: AppLocalizations.of(context).linkHasExpired,
+          title: StringsLocalizations.of(context).linkHasExpired,
           leading: const Icon(Icons.error_outline_rounded),
           isDestructive: true,
           isDisabled: true,
@@ -307,7 +311,7 @@ class _ManageSharedLinkWidgetState extends State<ManageSharedLinkWidget> {
 
     return [
       ShareMenuItem(
-        title: AppLocalizations.of(context).copyLink,
+        title: StringsLocalizations.of(context).copyLink,
         icon: HugeIcons.strokeRoundedCopy01,
         showOnlyLoadingState: true,
         onTap: () async {
@@ -315,12 +319,12 @@ class _ManageSharedLinkWidgetState extends State<ManageSharedLinkWidget> {
           if (!context.mounted) return;
           showShortToast(
             context,
-            AppLocalizations.of(context).linkCopiedToClipboard,
+            StringsLocalizations.of(context).linkCopiedToClipboard,
           );
         },
       ),
       ShareMenuItem(
-        title: AppLocalizations.of(context).copyEmbedHtml,
+        title: StringsLocalizations.of(context).copyEmbedHtml,
         leading: const Icon(Icons.code_rounded),
         onTap: () async {
           final embedHtml = CollectionsService.instance.getEmbedHtml(
@@ -330,20 +334,20 @@ class _ManageSharedLinkWidgetState extends State<ManageSharedLinkWidget> {
           if (!context.mounted) return;
           showShortToast(
             context,
-            AppLocalizations.of(context).linkCopiedToClipboard,
+            StringsLocalizations.of(context).linkCopiedToClipboard,
           );
         },
       ),
       ShareMenuItem(
         key: sendLinkButtonKey,
-        title: AppLocalizations.of(context).sendLink,
+        title: StringsLocalizations.of(context).sendLink,
         icon: HugeIcons.strokeRoundedSent,
         onTap: () async {
           await shareAlbumLink(context, urlValue, sendLinkButtonKey);
         },
       ),
       ShareMenuItem(
-        title: AppLocalizations.of(context).sendQrCode,
+        title: StringsLocalizations.of(context).sendQrCode,
         icon: HugeIcons.strokeRoundedQrCode,
         onTap: () async {
           await showDialog<void>(
@@ -356,8 +360,8 @@ class _ManageSharedLinkWidgetState extends State<ManageSharedLinkWidget> {
                 shareFileName: 'ente_qr_${widget.collection!.displayName}.png',
                 shareText:
                     'Scan this QR code to view my ${widget.collection!.displayName} album on ente',
-                dialogTitle: AppLocalizations.of(context).qrCode,
-                shareButtonText: AppLocalizations.of(context).share,
+                dialogTitle: StringsLocalizations.of(context).qrCode,
+                shareButtonText: StringsLocalizations.of(context).share,
                 logoAssetPath: 'assets/qr_logo.png',
                 branding: const QrTextBranding(
                   text: 'ente',
@@ -376,7 +380,7 @@ class _ManageSharedLinkWidgetState extends State<ManageSharedLinkWidget> {
   }
 
   Future<void> _showLinkExpirySheet(BuildContext context, PublicURL url) async {
-    final l10n = AppLocalizations.of(context);
+    final l10n = StringsLocalizations.of(context);
     final expiryOptions = [
       (title: l10n.never, expireAfterInMicroseconds: 0),
       (
@@ -500,7 +504,7 @@ class _ManageSharedLinkWidgetState extends State<ManageSharedLinkWidget> {
     BuildContext context,
     PublicURL url,
   ) async {
-    final l10n = AppLocalizations.of(context);
+    final l10n = StringsLocalizations.of(context);
     final currentDeviceLimit = url.deviceLimit;
     final deviceLimits = [
       if (!publicLinkDeviceLimits.contains(currentDeviceLimit))
@@ -583,7 +587,10 @@ class _ManageSharedLinkWidgetState extends State<ManageSharedLinkWidget> {
     bool showProgressDialog = true,
   }) async {
     final dialog = showProgressDialog
-        ? createProgressDialog(context, AppLocalizations.of(context).pleaseWait)
+        ? createProgressDialog(
+            context,
+            StringsLocalizations.of(context).pleaseWait,
+          )
         : null;
     await dialog?.show();
     try {
@@ -593,7 +600,7 @@ class _ManageSharedLinkWidgetState extends State<ManageSharedLinkWidget> {
       );
       await dialog?.hide();
       if (context.mounted) {
-        showShortToast(context, AppLocalizations.of(context).albumUpdated);
+        showShortToast(context, StringsLocalizations.of(context).albumUpdated);
         setState(() {});
       }
     } catch (e) {
@@ -614,22 +621,22 @@ class _ManageSharedLinkWidgetState extends State<ManageSharedLinkWidget> {
   Future<void> _showLinkEditNotAllowedDialog(BuildContext context) async {
     final buttonResult = await showDialogWidget(
       context: context,
-      title: AppLocalizations.of(context).sorry,
-      body: AppLocalizations.of(context).subscribeToChangeLinkSetting,
+      title: StringsLocalizations.of(context).sorry,
+      body: StringsLocalizations.of(context).subscribeToChangeLinkSetting,
       buttons: [
         ButtonWidget(
           buttonType: ButtonType.primary,
           isInAlert: true,
           shouldStickToDarkTheme: true,
           buttonAction: ButtonAction.first,
-          labelText: AppLocalizations.of(context).subscribe,
+          labelText: StringsLocalizations.of(context).subscribe,
         ),
         ButtonWidget(
           buttonType: ButtonType.secondary,
           buttonAction: ButtonAction.cancel,
           isInAlert: true,
           shouldStickToDarkTheme: true,
-          labelText: AppLocalizations.of(context).ok,
+          labelText: StringsLocalizations.of(context).ok,
         ),
       ],
     );

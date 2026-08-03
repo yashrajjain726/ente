@@ -1,5 +1,5 @@
+import "package:ente_strings/ente_strings.dart";
 import 'package:flutter/material.dart';
-import "package:photos/generated/l10n.dart";
 import 'package:photos/models/file/file.dart';
 import 'package:photos/module/metadata/exif.dart';
 import "package:photos/theme/ente_theme.dart";
@@ -16,7 +16,7 @@ class ExifInfoDialog extends StatelessWidget {
       title: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(AppLocalizations.of(context).exif, style: textTheme.h3Bold),
+          Text(StringsLocalizations.of(context).exif, style: textTheme.h3Bold),
           Text(file.title!, style: textTheme.smallMuted),
         ],
       ),
@@ -27,7 +27,7 @@ class ExifInfoDialog extends StatelessWidget {
       actions: [
         TextButton(
           child: Text(
-            AppLocalizations.of(context).close,
+            StringsLocalizations.of(context).close,
             style: textTheme.body,
           ),
           onPressed: () {
@@ -48,7 +48,7 @@ class ExifInfoDialog extends StatelessWidget {
               .map((entry) => "${entry.key}: ${entry.value}")
               .join("\n");
           if (data.isEmpty) {
-            data = AppLocalizations.of(context).noExifData;
+            data = StringsLocalizations.of(context).noExifData;
           }
           return Container(
             padding: const EdgeInsets.all(2),

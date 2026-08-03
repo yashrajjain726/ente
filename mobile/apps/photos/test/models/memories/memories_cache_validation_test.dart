@@ -1,7 +1,7 @@
 import "package:flutter/widgets.dart";
 import "package:flutter_test/flutter_test.dart";
 import "package:intl/date_symbol_data_local.dart";
-import "package:photos/generated/l10n.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:photos/models/file/file.dart";
 import "package:photos/models/file/file_type.dart";
 import "package:photos/models/location/location.dart";
@@ -16,7 +16,7 @@ import "package:photos/models/memories/time_memory.dart";
 import "package:photos/models/memories/trip_memory.dart";
 
 void main() {
-  final l10n = lookupAppLocalizations(const Locale("en"));
+  final l10n = lookupStringsLocalizations(const Locale("en"));
   final calcTime = DateTime.utc(2026, 3, 26, 8);
 
   setUpAll(() async {

@@ -1,11 +1,11 @@
 import 'dart:ui';
 
 import 'package:ente_auth/events/codes_updated_event.dart';
-import 'package:ente_auth/l10n/l10n.dart';
 import 'package:ente_auth/services/preference_service.dart';
 import 'package:ente_components/ente_components.dart';
 import 'package:ente_events/event_bus.dart';
 import 'package:ente_pure_utils/ente_pure_utils.dart';
+import 'package:ente_strings/ente_strings.dart';
 import 'package:flutter/material.dart';
 
 class CoachMarkWidget extends StatelessWidget {
@@ -13,7 +13,7 @@ class CoachMarkWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = context.l10n;
+    final l10n = context.strings;
     final colors = context.componentColors;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,

@@ -2,10 +2,10 @@ import 'dart:async';
 
 import 'package:ente_components/ente_components.dart';
 import 'package:ente_events/event_bus.dart';
+import 'package:ente_strings/ente_strings.dart';
 import 'package:flutter/material.dart';
 import "package:hugeicons/hugeicons.dart";
 import 'package:locker/events/collections_updated_event.dart';
-import 'package:locker/l10n/l10n.dart';
 import 'package:locker/models/selected_collections.dart';
 import 'package:locker/services/collections/collections_service.dart';
 import 'package:locker/services/collections/models/collection.dart';
@@ -100,8 +100,8 @@ class _AllCollectionsPageState extends State<AllCollectionsPage> {
       _logger.severe("Failed to load collections", e);
       if (mounted && showLoading) {
         setState(() {
-          _error = context.l10n.failedToLoadCollections(
-            context.l10n.somethingWentWrong,
+          _error = context.strings.failedToLoadCollections(
+            error: context.strings.somethingWentWrong,
           );
           _isLoading = false;
         });
@@ -123,9 +123,9 @@ class _AllCollectionsPageState extends State<AllCollectionsPage> {
       body: Stack(
         children: [
           AppBarComponent(
-            title: context.l10n.collections,
+            title: context.strings.collections,
             subtitle: hasCollections
-                ? context.l10n.items(_sortedCollections.length)
+                ? context.strings.items(count: _sortedCollections.length)
                 : null,
             actions: hasCollections
                 ? [
@@ -182,13 +182,13 @@ class _AllCollectionsPageState extends State<AllCollectionsPage> {
               children: [
                 EmptyStateWidget(
                   assetPath: 'assets/empty_state.png',
-                  title: context.l10n.somethingWentWrong,
+                  title: context.strings.somethingWentWrong,
                   subtitle: _error!,
                   showBorder: false,
                 ),
                 const SizedBox(height: 20),
                 ButtonComponent(
-                  label: context.l10n.retry,
+                  label: context.strings.retry,
                   onTap: _loadCollections,
                 ),
               ],
@@ -209,7 +209,7 @@ class _AllCollectionsPageState extends State<AllCollectionsPage> {
               children: [
                 EmptyStateWidget(
                   assetPath: 'assets/empty_state.png',
-                  title: context.l10n.noCollections,
+                  title: context.strings.noCollections,
                   subtitle: "",
                   showBorder: false,
                 ),

@@ -1,8 +1,8 @@
 import 'package:email_validator/email_validator.dart';
 import 'package:ente_components/ente_components.dart';
+import "package:ente_strings/ente_strings.dart";
 import 'package:flutter/material.dart';
 import 'package:hugeicons/hugeicons.dart';
-import "package:photos/generated/l10n.dart";
 import "package:photos/models/api/collection/user.dart";
 import 'package:photos/models/collection/collection.dart';
 import "package:photos/services/account/user_service.dart";
@@ -79,7 +79,7 @@ class _AddParticipantPage extends State<AddParticipantPage> {
     final footerDescriptions = [
       if (filterSuggestedUsers.isNotEmpty)
         ShareSectionDescription(
-          AppLocalizations.of(
+          StringsLocalizations.of(
             context,
           ).longPressAnEmailToVerifyEndToEndEncryption,
         ),
@@ -94,12 +94,12 @@ class _AddParticipantPage extends State<AddParticipantPage> {
           padding: const EdgeInsets.symmetric(horizontal: Spacing.lg),
           sliver: SliverList.list(
             children: [
-              ShareSectionTitle(AppLocalizations.of(context).addANewEmail),
+              ShareSectionTitle(StringsLocalizations.of(context).addANewEmail),
               _enterEmailField(),
               if (filterSuggestedUsers.isNotEmpty) ...[
                 const SizedBox(height: Spacing.xxl),
                 ShareSectionTitle(
-                  AppLocalizations.of(context).orPickAnExistingOne,
+                  StringsLocalizations.of(context).orPickAnExistingOne,
                 ),
               ],
             ],
@@ -175,13 +175,13 @@ class _AddParticipantPage extends State<AddParticipantPage> {
     return [
       if (widget.actionTypesToShow.contains(ActionTypesToShow.addCollaborator))
         ShareSectionDescription(
-          AppLocalizations.of(
+          StringsLocalizations.of(
             context,
           ).collaboratorsCanAddPhotosAndVideosToTheSharedAlbum,
         ),
       if (widget.actionTypesToShow.contains(ActionTypesToShow.addAdmin))
         ShareSectionDescription(
-          AppLocalizations.of(context).adminsCanManagePhotosAndParticipants,
+          StringsLocalizations.of(context).adminsCanManagePhotosAndParticipants,
         ),
     ];
   }
@@ -248,7 +248,7 @@ class _AddParticipantPage extends State<AddParticipantPage> {
               ? ButtonComponentVariant.neutral
               : ButtonComponentVariant.primary,
           size: ButtonComponentSize.large,
-          label: AppLocalizations.of(
+          label: StringsLocalizations.of(
             context,
           ).addCollaborators(count: _selectedEmails.length),
           isDisabled: _selectedEmails.isEmpty,
@@ -273,7 +273,7 @@ class _AddParticipantPage extends State<AddParticipantPage> {
             if (!mounted) return;
             showToast(
               context,
-              AppLocalizations.of(
+              StringsLocalizations.of(
                 context,
               ).collaboratorsSuccessfullyAdded(count: noOfSuccessfullAdds),
             );
@@ -290,7 +290,7 @@ class _AddParticipantPage extends State<AddParticipantPage> {
         ButtonComponent(
           variant: ButtonComponentVariant.primary,
           size: ButtonComponentSize.large,
-          label: AppLocalizations.of(
+          label: StringsLocalizations.of(
             context,
           ).addViewers(count: _selectedEmails.length),
           isDisabled: _selectedEmails.isEmpty,
@@ -315,7 +315,7 @@ class _AddParticipantPage extends State<AddParticipantPage> {
             if (!mounted) return;
             showToast(
               context,
-              AppLocalizations.of(
+              StringsLocalizations.of(
                 context,
               ).viewersSuccessfullyAdded(count: noOfSuccessfullAdds),
             );
@@ -334,7 +334,7 @@ class _AddParticipantPage extends State<AddParticipantPage> {
               ? ButtonComponentVariant.primary
               : ButtonComponentVariant.neutral,
           size: ButtonComponentSize.large,
-          label: AppLocalizations.of(
+          label: StringsLocalizations.of(
             context,
           ).addAdmins(count: _selectedEmails.length),
           isDisabled: _selectedEmails.isEmpty,
@@ -359,7 +359,7 @@ class _AddParticipantPage extends State<AddParticipantPage> {
             if (!mounted) return;
             showToast(
               context,
-              AppLocalizations.of(
+              StringsLocalizations.of(
                 context,
               ).adminsSuccessfullyAdded(count: successful),
             );
@@ -393,7 +393,7 @@ class _AddParticipantPage extends State<AddParticipantPage> {
           child: TextInputComponent(
             controller: _textController,
             focusNode: textFieldFocusNode,
-            hintText: AppLocalizations.of(context).enterAnEmailAddress,
+            hintText: StringsLocalizations.of(context).enterAnEmailAddress,
             isClearable: true,
             shouldUnfocusOnClearOrSubmit: true,
             autofillHints: const [AutofillHints.email],
@@ -409,7 +409,7 @@ class _AddParticipantPage extends State<AddParticipantPage> {
         const SizedBox(width: Spacing.sm),
         IconButtonComponent(
           variant: IconButtonComponentVariant.green,
-          tooltip: AppLocalizations.of(context).add,
+          tooltip: StringsLocalizations.of(context).add,
           icon: const HugeIcon(icon: HugeIcons.strokeRoundedMailAdd01),
           onTap: _emailIsValid ? _addNewEmail : null,
         ),
@@ -486,15 +486,15 @@ class _AddParticipantPage extends State<AddParticipantPage> {
 
   String _getTitle() {
     if (widget.actionTypesToShow.length > 1) {
-      return AppLocalizations.of(context).addParticipants;
+      return StringsLocalizations.of(context).addParticipants;
     }
     switch (widget.actionTypesToShow.first) {
       case ActionTypesToShow.addViewer:
-        return AppLocalizations.of(context).addViewer;
+        return StringsLocalizations.of(context).addViewer;
       case ActionTypesToShow.addCollaborator:
-        return AppLocalizations.of(context).addCollaborator;
+        return StringsLocalizations.of(context).addCollaborator;
       case ActionTypesToShow.addAdmin:
-        return AppLocalizations.of(context).addAdmin;
+        return StringsLocalizations.of(context).addAdmin;
     }
   }
 
@@ -504,11 +504,11 @@ class _AddParticipantPage extends State<AddParticipantPage> {
     }
     switch (widget.actionTypesToShow.first) {
       case ActionTypesToShow.addCollaborator:
-        return AppLocalizations.of(
+        return StringsLocalizations.of(
           context,
         ).collaboratorsCanAddPhotosAndVideosToTheSharedAlbum;
       case ActionTypesToShow.addAdmin:
-        return AppLocalizations.of(
+        return StringsLocalizations.of(
           context,
         ).adminsCanManagePhotosAndParticipants;
       case ActionTypesToShow.addViewer:

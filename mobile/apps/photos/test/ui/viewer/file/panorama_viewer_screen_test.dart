@@ -5,7 +5,7 @@ import "dart:typed_data";
 import "package:ente_panorama_viewer/ente_panorama_viewer.dart";
 import "package:flutter/material.dart";
 import "package:flutter_test/flutter_test.dart";
-import "package:photos/generated/l10n.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:photos/ui/viewer/file/panorama_viewer_screen.dart";
 
 // A minimal valid 1x1 RGBA PNG, so Image.file/Image.memory can decode it.
@@ -110,8 +110,8 @@ void main() {
 
   Widget wrap(Widget child) {
     return MaterialApp(
-      localizationsDelegates: AppLocalizations.localizationsDelegates,
-      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: StringsLocalizations.localizationsDelegates,
+      supportedLocales: StringsLocalizations.supportedLocales,
       home: child,
     );
   }

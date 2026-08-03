@@ -1,8 +1,8 @@
 import 'package:ente_components/ente_components.dart';
 import 'package:ente_pure_utils/ente_pure_utils.dart';
+import "package:ente_strings/ente_strings.dart";
 import 'package:flutter/material.dart';
 import 'package:hugeicons/hugeicons.dart';
-import "package:photos/generated/l10n.dart";
 import 'package:photos/models/collection/collection.dart';
 import 'package:photos/services/collections_service.dart';
 import 'package:photos/ui/common/web_page.dart';
@@ -18,11 +18,11 @@ class LayoutPickerPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ShareScaffold(
-      title: AppLocalizations.of(context).albumLayout,
+      title: StringsLocalizations.of(context).albumLayout,
       actions: [
         IconButtonComponent(
           variant: IconButtonComponentVariant.primary,
-          tooltip: AppLocalizations.of(context).preview,
+          tooltip: StringsLocalizations.of(context).preview,
           shouldSurfaceExecutionStates: false,
           icon: const HugeIcon(icon: HugeIcons.strokeRoundedView),
           onTap: () async {
@@ -42,7 +42,7 @@ class LayoutPickerPage extends StatelessWidget {
       await routeToPage(
         context,
         WebPage(
-          AppLocalizations.of(context).preview,
+          StringsLocalizations.of(context).preview,
           publicUrl,
           canOpenInBrowser: false,
         ),
@@ -65,9 +65,9 @@ class ItemsWidget extends StatefulWidget {
 class _ItemsWidgetState extends State<ItemsWidget> {
   late String currentLayout;
   late final List<Tuple2<String, String>> _layoutOptions = [
-    Tuple2(AppLocalizations.of(context).layoutMasonry, "masonry"),
-    Tuple2(AppLocalizations.of(context).layoutTrip, "trip"),
-    Tuple2(AppLocalizations.of(context).layoutGrouped, "grouped"),
+    Tuple2(StringsLocalizations.of(context).layoutMasonry, "masonry"),
+    Tuple2(StringsLocalizations.of(context).layoutTrip, "trip"),
+    Tuple2(StringsLocalizations.of(context).layoutGrouped, "grouped"),
   ];
 
   @override
@@ -92,7 +92,7 @@ class _ItemsWidgetState extends State<ItemsWidget> {
         ShareMenuGroup(items: items),
         if (currentLayout == "trip")
           ShareSectionDescription(
-            AppLocalizations.of(context).mapsPrivacyNotice,
+            StringsLocalizations.of(context).mapsPrivacyNotice,
           ),
       ],
     );

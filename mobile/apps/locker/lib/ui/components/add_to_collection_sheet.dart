@@ -1,6 +1,6 @@
 import "package:ente_components/ente_components.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
-import "package:locker/l10n/l10n.dart";
 import "package:locker/services/collections/models/collection.dart";
 import "package:locker/ui/components/collection_selection_widget.dart";
 import "package:locker/utils/collection_list_util.dart";
@@ -62,18 +62,18 @@ class _AddToCollectionSheetState extends State<AddToCollectionSheet> {
     final maxCollectionListHeight = MediaQuery.sizeOf(context).height * 0.6;
 
     return BottomSheetComponent(
-      title: context.l10n.addToCollection,
+      title: context.strings.addToCollection,
       content: CollectionSelectionWidget(
         collections: _availableCollections,
         selectedCollectionIds: _selectedCollectionIds,
         onToggleCollection: _toggleCollection,
         onCollectionsUpdated: _onCollectionsUpdated,
         maxHeight: maxCollectionListHeight,
-        title: context.l10n.collections,
+        title: context.strings.collections,
       ),
       actions: [
         ButtonComponent(
-          label: context.l10n.save,
+          label: context.strings.save,
           onTap: _canSave ? _onSave : null,
         ),
       ],

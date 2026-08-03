@@ -1,8 +1,8 @@
+import "package:ente_strings/ente_strings.dart";
 import 'package:flutter/material.dart';
 import "package:intl/intl.dart";
 import "package:modal_bottom_sheet/modal_bottom_sheet.dart";
 import "package:photos/core/constants.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/models/local_entity_data.dart";
 import "package:photos/models/location_tag/location_tag.dart";
 import "package:photos/service_locator.dart";
@@ -97,7 +97,7 @@ class _EditLocationSheetState extends State<EditLocationSheet> {
             padding: const EdgeInsets.only(bottom: 16),
             child: BottomOfTitleBarWidget(
               title: TitleBarTitleWidget(
-                title: AppLocalizations.of(context).editLocationTagTitle,
+                title: StringsLocalizations.of(context).editLocation,
               ),
             ),
           ),
@@ -117,7 +117,7 @@ class _EditLocationSheetState extends State<EditLocationSheet> {
                           children: [
                             Expanded(
                               child: TextInputWidget(
-                                hintText: AppLocalizations.of(
+                                hintText: StringsLocalizations.of(
                                   context,
                                 ).locationName,
                                 focusNode: _focusNode,
@@ -148,7 +148,7 @@ class _EditLocationSheetState extends State<EditLocationSheet> {
                                     key: ValueKey(value),
                                     buttonType: ButtonType.secondary,
                                     buttonSize: ButtonSize.small,
-                                    labelText: AppLocalizations.of(
+                                    labelText: StringsLocalizations.of(
                                       context,
                                     ).save,
                                     isDisabled: value,
@@ -195,7 +195,7 @@ class _EditLocationSheetState extends State<EditLocationSheet> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  AppLocalizations.of(context).memoryCount(
+                                  StringsLocalizations.of(context).memoryCount(
                                     count: value,
                                     formattedCount: NumberFormat().format(
                                       value,
@@ -207,7 +207,7 @@ class _EditLocationSheetState extends State<EditLocationSheet> {
                                   Padding(
                                     padding: const EdgeInsets.only(top: 2),
                                     child: Text(
-                                      AppLocalizations.of(
+                                      StringsLocalizations.of(
                                         context,
                                       ).galleryMemoryLimitInfo,
                                       style: textTheme.miniMuted,

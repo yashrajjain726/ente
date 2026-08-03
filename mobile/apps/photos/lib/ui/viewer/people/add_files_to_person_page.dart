@@ -1,10 +1,10 @@
 import "dart:async";
 
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:logging/logging.dart";
 import "package:photos/core/event_bus.dart";
 import "package:photos/events/people_sort_order_change_event.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/models/file/file.dart";
 import "package:photos/models/search/generic_search_result.dart";
 import "package:photos/models/search/search_constants.dart";
@@ -62,7 +62,7 @@ class AddFilesToPersonPage extends StatefulWidget {
       if (persons.isEmpty) {
         showShortToast(
           context,
-          AppLocalizations.of(context).pleaseNamePersonInPeopleSectionFirst,
+          StringsLocalizations.of(context).pleaseNamePersonInPeopleSectionFirst,
         );
       }
       return persons;
@@ -208,7 +208,7 @@ class _AddFilesToPersonPageState extends State<AddFilesToPersonPage> {
         builder: (context, snapshot) {
           final slivers = <Widget>[
             SearchableAppBar(
-              title: Text(AppLocalizations.of(context).addPerson),
+              title: Text(StringsLocalizations.of(context).addPerson),
               onSearch: _updateSearchQuery,
               onSearchClosed: _clearSearchQuery,
               centerTitle: false,
@@ -255,7 +255,7 @@ class _AddFilesToPersonPageState extends State<AddFilesToPersonPage> {
             slivers.add(
               SliverFillRemaining(
                 child: Center(
-                  child: Text(AppLocalizations.of(context).noResultsFound),
+                  child: Text(StringsLocalizations.of(context).noResultsFound),
                 ),
               ),
             );
@@ -324,7 +324,7 @@ class _AddFilesToPersonPageState extends State<AddFilesToPersonPage> {
       ),
       child: GestureDetector(
         onTapDown: (TapDownDetails details) async {
-          final l10n = AppLocalizations.of(context);
+          final l10n = StringsLocalizations.of(context);
           const sortKeys = PeopleSortKey.values;
           final PeopleSortKey? selectedKey = await showMenu<PeopleSortKey>(
             color: colorScheme.backgroundElevated,
@@ -381,7 +381,7 @@ class _AddFilesToPersonPageState extends State<AddFilesToPersonPage> {
     bool isLast,
     EnteTextTheme textTheme,
     EnteColorScheme colorScheme,
-    AppLocalizations l10n,
+    StringsLocalizations l10n,
   ) {
     String label;
     switch (key) {
@@ -472,14 +472,14 @@ class _AddFilesToPersonPageState extends State<AddFilesToPersonPage> {
     if (uploadIds.isEmpty) {
       showShortToast(
         context,
-        AppLocalizations.of(context).onlyUploadedFilesCanBeAddedToPerson,
+        StringsLocalizations.of(context).onlyUploadedFilesCanBeAddedToPerson,
       );
       return;
     }
 
     final dialog = createProgressDialog(
       context,
-      AppLocalizations.of(context).saving,
+      StringsLocalizations.of(context).saving,
     );
     await dialog.show();
     try {

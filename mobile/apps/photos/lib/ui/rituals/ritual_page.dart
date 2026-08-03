@@ -4,6 +4,7 @@ import "dart:ui" as ui;
 
 import "package:ente_icons/ente_icons.dart";
 import "package:ente_pure_utils/ente_pure_utils.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:flutter/rendering.dart";
 import "package:hugeicons/hugeicons.dart";
@@ -11,7 +12,6 @@ import "package:intl/intl.dart";
 import "package:logging/logging.dart";
 import "package:path_provider/path_provider.dart";
 import "package:photos/db/files_db.dart";
-import "package:photos/l10n/l10n.dart";
 import "package:photos/models/collection/collection_items.dart";
 import "package:photos/models/file/file.dart";
 import "package:photos/models/rituals/ritual_models.dart";
@@ -56,7 +56,7 @@ class _RitualPageState extends State<RitualPage> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(context.l10n.somethingWentWrongPleaseTryAgain),
+            content: Text(context.strings.somethingWentWrongPleaseTryAgain),
           ),
         );
       }
@@ -151,7 +151,7 @@ class _RitualPageState extends State<RitualPage> {
       _logger.warning("Failed to share ritual", e, s);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(context.l10n.ritualShareUnavailable)),
+          SnackBar(content: Text(context.strings.ritualShareUnavailable)),
         );
       }
     } finally {
@@ -184,7 +184,7 @@ class _RitualPageState extends State<RitualPage> {
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 24),
                 child: Text(
-                  context.l10n.ritualUntitled,
+                  context.strings.ritualUntitled,
                   textAlign: TextAlign.center,
                 ),
               ),
@@ -217,7 +217,7 @@ class _RitualPageState extends State<RitualPage> {
                 background: actionBackground,
                 icon: HugeIcons.strokeRoundedCamera01,
                 onPressed: () => openRitualCamera(context, currentRitual),
-                tooltip: context.l10n.ritualOpenCameraTooltip,
+                tooltip: context.strings.ritualOpenCameraTooltip,
               ),
               const SizedBox(width: 8),
               _TopActionButton(
@@ -370,7 +370,7 @@ class _OverflowMenuButton extends StatelessWidget {
                 size: 20,
               ),
               const SizedBox(width: 10),
-              Text(context.l10n.edit),
+              Text(context.strings.edit),
             ],
           ),
         ),
@@ -391,7 +391,7 @@ class _OverflowMenuButton extends StatelessWidget {
               ),
               const SizedBox(width: 10),
               Text(
-                context.l10n.delete,
+                context.strings.delete,
                 style: const TextStyle(color: Colors.red),
               ),
             ],
@@ -547,7 +547,7 @@ class _RitualHeader extends StatelessWidget {
     final textTheme = getEnteTextTheme(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final title = ritual.title.isEmpty
-        ? context.l10n.ritualUntitled
+        ? context.strings.ritualUntitled
         : ritual.title;
     return Row(
       mainAxisSize: MainAxisSize.min,
@@ -1226,14 +1226,14 @@ Future<void> _openRitualAlbum(BuildContext context, Ritual ritual) async {
   if (albumId == null || albumId <= 0) {
     ScaffoldMessenger.of(
       context,
-    ).showSnackBar(SnackBar(content: Text(context.l10n.ritualAlbumMissing)));
+    ).showSnackBar(SnackBar(content: Text(context.strings.ritualAlbumMissing)));
     return;
   }
   final collection = CollectionsService.instance.getCollectionByID(albumId);
   if (collection == null) {
     ScaffoldMessenger.of(
       context,
-    ).showSnackBar(SnackBar(content: Text(context.l10n.ritualAlbumMissing)));
+    ).showSnackBar(SnackBar(content: Text(context.strings.ritualAlbumMissing)));
     return;
   }
   final thumbnail = await CollectionsService.instance.getCover(collection);
@@ -1256,14 +1256,14 @@ Future<void> _openRitualAlbumAndFile(
   if (albumId == null || albumId <= 0) {
     ScaffoldMessenger.of(
       context,
-    ).showSnackBar(SnackBar(content: Text(context.l10n.ritualAlbumMissing)));
+    ).showSnackBar(SnackBar(content: Text(context.strings.ritualAlbumMissing)));
     return;
   }
   final collection = CollectionsService.instance.getCollectionByID(albumId);
   if (collection == null) {
     ScaffoldMessenger.of(
       context,
-    ).showSnackBar(SnackBar(content: Text(context.l10n.ritualAlbumMissing)));
+    ).showSnackBar(SnackBar(content: Text(context.strings.ritualAlbumMissing)));
     return;
   }
 

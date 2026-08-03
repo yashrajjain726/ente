@@ -1,5 +1,6 @@
 import "package:ente_components/ente_components.dart";
 import "package:ente_logging/logging.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:ente_strings/extensions.dart";
 import "package:ente_ui/pages/log_file_viewer.dart";
 import "package:ente_ui/utils/toast_util.dart";
@@ -9,7 +10,6 @@ import "package:flutter/foundation.dart";
 import "package:flutter/material.dart";
 import "package:hugeicons/hugeicons.dart";
 import "package:locker/core/constants.dart";
-import "package:locker/l10n/l10n.dart";
 import "package:locker/ui/settings/components/settings_item.dart";
 import "package:locker/ui/settings/components/settings_page_scaffold.dart";
 import "package:url_launcher/url_launcher_string.dart";
@@ -29,7 +29,7 @@ class SupportPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = context.l10n;
+    final l10n = context.strings;
 
     return SettingsPageScaffold(
       title: l10n.helpAndSupport,
@@ -162,7 +162,7 @@ class SupportPage extends StatelessWidget {
   }
 
   Future<void> _onReportIssueTapped(BuildContext context) async {
-    final l10n = context.l10n;
+    final l10n = context.strings;
     await sendLogs(
       context,
       "support@ente.com",
@@ -181,7 +181,7 @@ class SupportPage extends StatelessWidget {
   Future<void> _viewLogs(BuildContext context) async {
     final logFile = SuperLogging.logFile;
     if (logFile == null) {
-      showShortToast(context, context.l10n.somethingWentWrong);
+      showShortToast(context, context.strings.somethingWentWrong);
       return;
     }
     await Navigator.of(
@@ -199,7 +199,7 @@ class SupportPage extends StatelessWidget {
     } catch (e, s) {
       _logger.severe("Failed to export logs", e, s);
       if (context.mounted) {
-        showShortToast(context, context.l10n.somethingWentWrong);
+        showShortToast(context, context.strings.somethingWentWrong);
       }
     }
   }

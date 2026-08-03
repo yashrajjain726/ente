@@ -2,7 +2,6 @@ import 'dart:io';
 
 import 'package:ente_auth/app/view/app.dart';
 import 'package:ente_auth/events/icons_changed_event.dart';
-import 'package:ente_auth/l10n/l10n.dart';
 import 'package:ente_auth/locale.dart';
 import 'package:ente_auth/services/preference_service.dart';
 import 'package:ente_auth/ui/settings/app_icon_selection_screen.dart';
@@ -15,6 +14,7 @@ import 'package:ente_components/ente_components.dart';
 import 'package:ente_events/event_bus.dart';
 import 'package:ente_logging/logging.dart';
 import 'package:ente_pure_utils/ente_pure_utils.dart';
+import 'package:ente_strings/ente_strings.dart';
 import 'package:flutter/material.dart';
 import 'package:hugeicons/hugeicons.dart';
 
@@ -23,7 +23,7 @@ class GeneralSettingsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = context.l10n;
+    final l10n = context.strings;
     return AuthSettingsPageScaffold(
       title: l10n.general,
       children: [

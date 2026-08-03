@@ -2,9 +2,9 @@ import "dart:async";
 
 import "package:ente_components/ente_components.dart";
 import "package:ente_pure_utils/ente_pure_utils.dart";
+import "package:ente_strings/ente_strings.dart";
 import 'package:flutter/material.dart';
 import "package:logging/logging.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/models/backup/backup_item.dart";
 import "package:photos/models/backup/backup_item_status.dart";
 import "package:photos/module/upload/service/file_uploader.dart";
@@ -142,14 +142,16 @@ class _BackupItemCardState extends State<BackupItemCard> {
                       context: context,
                       isDismissible: true,
                       builder: (_) => BottomSheetComponent(
-                        title: AppLocalizations.of(context).backupFailed,
-                        message: AppLocalizations.of(
+                        title: StringsLocalizations.of(context).backupFailed,
+                        message: StringsLocalizations.of(
                           context,
                         ).sorryBackupFailedDesc,
                         illustration: Image.asset("assets/warning-grey.png"),
                         actions: [
                           ButtonComponent(
-                            label: AppLocalizations.of(context).contactSupport,
+                            label: StringsLocalizations.of(
+                              context,
+                            ).contactSupport,
                             onTap: () async {
                               _logger.warning(
                                 "Backup failed for ${widget.item.file.displayName}",
@@ -157,7 +159,7 @@ class _BackupItemCardState extends State<BackupItemCard> {
                               );
                               await sendLogs(
                                 context,
-                                AppLocalizations.of(context).contactSupport,
+                                StringsLocalizations.of(context).contactSupport,
                                 "support@ente.com",
                                 postShare: () {},
                               );
@@ -167,7 +169,7 @@ class _BackupItemCardState extends State<BackupItemCard> {
                             },
                           ),
                           ButtonComponent(
-                            label: AppLocalizations.of(context).ok,
+                            label: StringsLocalizations.of(context).ok,
                             variant: ButtonComponentVariant.secondary,
                             onTap: () async {
                               Navigator.of(context).pop();

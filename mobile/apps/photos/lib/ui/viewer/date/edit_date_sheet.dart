@@ -1,6 +1,6 @@
+import "package:ente_strings/ente_strings.dart";
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import "package:photos/generated/l10n.dart";
 import "package:photos/models/file/file.dart";
 import "package:photos/theme/ente_theme.dart";
 import "package:photos/ui/components/buttons/button_widget.dart";
@@ -170,7 +170,7 @@ class _EditDateSheetState extends State<EditDateSheet> {
                   const SizedBox(height: 16),
                   ButtonWidget(
                     buttonType: ButtonType.primary,
-                    labelText: AppLocalizations.of(context).confirm,
+                    labelText: StringsLocalizations.of(context).confirm,
                     buttonSize: ButtonSize.large,
                     onTap: () async {
                       final newDate = await _editDates(
@@ -186,7 +186,7 @@ class _EditDateSheetState extends State<EditDateSheet> {
                   const SizedBox(height: 8),
                   ButtonWidget(
                     buttonType: ButtonType.neutral,
-                    labelText: AppLocalizations.of(context).cancel,
+                    labelText: StringsLocalizations.of(context).cancel,
                     buttonSize: ButtonSize.large,
                     onTap: () async {
                       Navigator.of(context).pop(null);
@@ -270,8 +270,10 @@ class DateAndTimeWidget extends StatelessWidget {
               alignment: Alignment.centerLeft,
               child: Text(
                 selectDate
-                    ? AppLocalizations.of(context).selectOneDateAndTimeForAll
-                    : AppLocalizations.of(context).selectStartOfRange,
+                    ? StringsLocalizations.of(
+                        context,
+                      ).selectOneDateAndTimeForAll
+                    : StringsLocalizations.of(context).selectStartOfRange,
                 style: TextStyle(color: colorScheme.textBase, fontSize: 16),
               ),
             ),
@@ -281,10 +283,10 @@ class DateAndTimeWidget extends StatelessWidget {
               alignment: Alignment.centerLeft,
               child: Text(
                 selectDate
-                    ? AppLocalizations.of(
+                    ? StringsLocalizations.of(
                         context,
                       ).thisWillMakeTheDateAndTimeOfAllSelected
-                    : AppLocalizations.of(
+                    : StringsLocalizations.of(
                         context,
                       ).allWillShiftRangeBasedOnFirst,
                 style: TextStyle(color: colorScheme.textFaint, fontSize: 12),
@@ -344,7 +346,7 @@ class DateAndTimeWidget extends StatelessWidget {
             Align(
               alignment: Alignment.centerLeft,
               child: Text(
-                AppLocalizations.of(context).newRange,
+                StringsLocalizations.of(context).newRange,
                 style: TextStyle(color: colorScheme.textBase, fontSize: 12),
               ),
             ),
@@ -441,11 +443,11 @@ class SelectDateOrShiftWidget extends StatelessWidget {
                 color: colorScheme.textBase,
               ),
               title: Text(
-                AppLocalizations.of(context).selectOneDateAndTime,
+                StringsLocalizations.of(context).selectOneDateAndTime,
                 style: TextStyle(color: colorScheme.textBase, fontSize: 16),
               ),
               subtitle: Text(
-                AppLocalizations.of(context).moveSelectedPhotosToOneDate,
+                StringsLocalizations.of(context).moveSelectedPhotosToOneDate,
                 style: TextStyle(color: colorScheme.textFaint, fontSize: 12),
               ),
               trailing: Icon(
@@ -467,11 +469,13 @@ class SelectDateOrShiftWidget extends StatelessWidget {
                 color: colorScheme.textBase,
               ),
               title: Text(
-                AppLocalizations.of(context).shiftDatesAndTime,
+                StringsLocalizations.of(context).shiftDatesAndTime,
                 style: TextStyle(color: colorScheme.textBase, fontSize: 16),
               ),
               subtitle: Text(
-                AppLocalizations.of(context).photosKeepRelativeTimeDifference,
+                StringsLocalizations.of(
+                  context,
+                ).photosKeepRelativeTimeDifference,
                 style: TextStyle(color: colorScheme.textFaint, fontSize: 12),
               ),
               trailing: Icon(
@@ -529,7 +533,7 @@ class PhotoDateHeaderWidget extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        AppLocalizations.of(
+                        StringsLocalizations.of(
                           context,
                         ).photosCount(count: photoCount),
                         style: TextStyle(

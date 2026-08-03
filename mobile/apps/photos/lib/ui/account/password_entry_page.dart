@@ -2,6 +2,7 @@ import "dart:async";
 
 import "package:ente_components/ente_components.dart";
 import 'package:ente_pure_utils/ente_pure_utils.dart';
+import "package:ente_strings/ente_strings.dart";
 import 'package:flutter/material.dart';
 import 'package:logging/logging.dart';
 import 'package:password_strength/password_strength.dart';
@@ -10,8 +11,6 @@ import 'package:photos/core/event_bus.dart';
 import 'package:photos/events/account_configured_event.dart';
 import 'package:photos/events/subscription_purchased_event.dart';
 import "package:photos/gateways/users/models/key_gen_result.dart";
-import "package:photos/generated/l10n.dart";
-import "package:photos/l10n/l10n.dart";
 import 'package:photos/services/account/user_service.dart';
 import 'package:photos/ui/account/recovery_key_page.dart';
 import 'package:photos/ui/common/web_page.dart';
@@ -77,13 +76,13 @@ class _PasswordEntryPageState extends State<PasswordEntryPage> {
   Widget build(BuildContext context) {
     final colors = context.componentColors;
 
-    String title = AppLocalizations.of(context).setPasswordTitle;
+    String title = StringsLocalizations.of(context).setPasswordTitle;
     if (widget.mode == PasswordEntryMode.update) {
-      title = AppLocalizations.of(context).changePasswordTitle;
+      title = StringsLocalizations.of(context).changePasswordTitle;
     } else if (widget.mode == PasswordEntryMode.reset) {
-      title = AppLocalizations.of(context).resetPasswordTitle;
+      title = StringsLocalizations.of(context).resetPasswordTitle;
     } else if (_volatilePassword != null) {
-      title = AppLocalizations.of(context).encryptionKeys;
+      title = StringsLocalizations.of(context).encryptionKeys;
     }
 
     final isFormValid = _passwordsMatch && _isPasswordValid;
@@ -139,13 +138,13 @@ class _PasswordEntryPageState extends State<PasswordEntryPage> {
 
     if (_passwordInInputBox.isNotEmpty && _showPasswordStrength) {
       if (_passwordStrength > kStrongPasswordStrengthThreshold) {
-        passwordMessage = AppLocalizations.of(context).strongPassword;
+        passwordMessage = StringsLocalizations.of(context).strongPassword;
         passwordMessageType = TextInputComponentMessageType.success;
       } else if (_passwordStrength > kMildPasswordStrengthThreshold) {
-        passwordMessage = AppLocalizations.of(context).moderateStrength;
+        passwordMessage = StringsLocalizations.of(context).moderateStrength;
         passwordMessageType = TextInputComponentMessageType.alert;
       } else {
-        passwordMessage = AppLocalizations.of(context).weakStrength;
+        passwordMessage = StringsLocalizations.of(context).weakStrength;
         passwordMessageType = TextInputComponentMessageType.alert;
       }
     }
@@ -158,10 +157,12 @@ class _PasswordEntryPageState extends State<PasswordEntryPage> {
         _passwordInInputBox.isNotEmpty &&
         _showConfirmPasswordValidation) {
       if (_passwordsMatch) {
-        confirmPasswordMessage = AppLocalizations.of(context).passwordsMatch;
+        confirmPasswordMessage = StringsLocalizations.of(
+          context,
+        ).passwordsMatch;
         confirmPasswordMessageType = TextInputComponentMessageType.success;
       } else {
-        confirmPasswordMessage = AppLocalizations.of(
+        confirmPasswordMessage = StringsLocalizations.of(
           context,
         ).passwordsDontMatch;
         confirmPasswordMessageType = TextInputComponentMessageType.error;
@@ -179,13 +180,15 @@ class _PasswordEntryPageState extends State<PasswordEntryPage> {
                 const SizedBox(height: 16),
                 Text(
                   widget.mode == PasswordEntryMode.set
-                      ? AppLocalizations.of(context).enterPasswordToEncrypt
-                      : AppLocalizations.of(context).enterNewPasswordToEncrypt,
+                      ? StringsLocalizations.of(context).enterPasswordToEncrypt
+                      : StringsLocalizations.of(
+                          context,
+                        ).enterNewPasswordToEncrypt,
                   style: TextStyles.body.copyWith(color: colors.textLight),
                 ),
                 const SizedBox(height: 8),
                 StyledText(
-                  text: AppLocalizations.of(context).passwordWarning,
+                  text: StringsLocalizations.of(context).passwordWarning,
                   style: TextStyles.body.copyWith(color: colors.textLight),
                   tags: {
                     'underline': StyledTextTag(
@@ -208,8 +211,8 @@ class _PasswordEntryPageState extends State<PasswordEntryPage> {
                   ),
                 ),
                 TextInputComponent(
-                  label: AppLocalizations.of(context).password,
-                  hintText: AppLocalizations.of(context).password,
+                  label: StringsLocalizations.of(context).password,
+                  hintText: StringsLocalizations.of(context).password,
                   controller: _passwordController1,
                   isPasswordInput: true,
                   isRequired: true,
@@ -243,8 +246,8 @@ class _PasswordEntryPageState extends State<PasswordEntryPage> {
                 ),
                 const SizedBox(height: 16),
                 TextInputComponent(
-                  label: AppLocalizations.of(context).confirmPassword,
-                  hintText: AppLocalizations.of(context).confirmPassword,
+                  label: StringsLocalizations.of(context).confirmPassword,
+                  hintText: StringsLocalizations.of(context).confirmPassword,
                   controller: _passwordController2,
                   isPasswordInput: true,
                   isRequired: true,
@@ -285,14 +288,14 @@ class _PasswordEntryPageState extends State<PasswordEntryPage> {
                   alignment: Alignment.centerRight,
                   child: ButtonComponent(
                     variant: ButtonComponentVariant.link,
-                    label: AppLocalizations.of(context).howItWorks,
+                    label: StringsLocalizations.of(context).howItWorks,
                     size: ButtonComponentSize.small,
                     onTap: () async {
                       await Navigator.of(context).push(
                         MaterialPageRoute(
                           builder: (BuildContext context) {
                             return WebPage(
-                              AppLocalizations.of(context).howItWorks,
+                              StringsLocalizations.of(context).howItWorks,
                               "https://ente.com/architecture",
                             );
                           },
@@ -321,7 +324,7 @@ class _PasswordEntryPageState extends State<PasswordEntryPage> {
     if (!mounted) return;
     final dialog = createProgressDialog(
       context,
-      AppLocalizations.of(context).generatingEncryptionKeys,
+      StringsLocalizations.of(context).generatingEncryptionKeys,
     );
     await dialog.show();
     try {
@@ -340,7 +343,7 @@ class _PasswordEntryPageState extends State<PasswordEntryPage> {
       if (!mounted) return;
       showShortToast(
         context,
-        AppLocalizations.of(context).passwordChangedSuccessfully,
+        StringsLocalizations.of(context).passwordChangedSuccessfully,
       );
       if (!mounted) return;
       Navigator.of(context).pop();
@@ -360,15 +363,15 @@ class _PasswordEntryPageState extends State<PasswordEntryPage> {
     bool logOutFromOther = true;
     await showChoiceDialog(
       context,
-      title: context.l10n.signOutFromOtherDevices,
-      body: context.l10n.signOutOtherBody,
+      title: context.strings.signOutFromOtherDevices,
+      body: context.strings.signOutOtherBody,
       isDismissible: false,
-      firstButtonLabel: context.l10n.signOutOtherDevices,
+      firstButtonLabel: context.strings.signOutOtherDevices,
       firstButtonType: ButtonType.critical,
       firstButtonOnTap: () async {
         logOutFromOther = true;
       },
-      secondButtonLabel: context.l10n.doNotSignOut,
+      secondButtonLabel: context.strings.doNotSignOut,
       secondButtonOnTap: () async {
         logOutFromOther = false;
       },
@@ -379,7 +382,7 @@ class _PasswordEntryPageState extends State<PasswordEntryPage> {
   Future<void> _showRecoveryCodeDialog(String password) async {
     final dialog = createProgressDialog(
       context,
-      AppLocalizations.of(context).generatingEncryptionKeys,
+      StringsLocalizations.of(context).generatingEncryptionKeys,
     );
     await dialog.show();
     try {
@@ -391,7 +394,7 @@ class _PasswordEntryPageState extends State<PasswordEntryPage> {
       Future<void> onDone() async {
         final dialog = createProgressDialog(
           context,
-          AppLocalizations.of(context).pleaseWait,
+          StringsLocalizations.of(context).pleaseWait,
         );
         await dialog.show();
         try {
@@ -423,7 +426,7 @@ class _PasswordEntryPageState extends State<PasswordEntryPage> {
         context,
         RecoveryKeyPage(
           result.privateKeyAttributes.recoveryKey,
-          AppLocalizations.of(context).continueLabel,
+          StringsLocalizations.of(context).continueLabel,
           onDone: onDone,
           isOnboarding: true,
         ),
@@ -436,8 +439,8 @@ class _PasswordEntryPageState extends State<PasswordEntryPage> {
         // ignore: unawaited_futures
         showAlertBottomSheet(
           context,
-          title: AppLocalizations.of(context).insecureDevice,
-          message: AppLocalizations.of(
+          title: StringsLocalizations.of(context).insecureDevice,
+          message: StringsLocalizations.of(
             context,
           ).sorryWeCouldNotGenerateSecureKeysOnThisDevicennplease,
           assetPath: 'assets/warning-grey.png',

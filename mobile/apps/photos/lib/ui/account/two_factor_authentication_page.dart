@@ -1,7 +1,7 @@
 import 'package:ente_components/ente_components.dart';
+import "package:ente_strings/ente_strings.dart";
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import "package:photos/generated/l10n.dart";
 import "package:photos/models/account/two_factor.dart";
 import 'package:photos/services/account/user_service.dart';
 import 'package:photos/ui/lifecycle_event_handler.dart';
@@ -64,7 +64,7 @@ class _TwoFactorAuthenticationPageState
           },
         ),
         title: Text(
-          AppLocalizations.of(context).twoFAVerification,
+          StringsLocalizations.of(context).twoFAVerification,
           style: TextStyles.large.copyWith(color: colors.textBase),
         ),
         centerTitle: true,
@@ -108,13 +108,13 @@ class _TwoFactorAuthenticationPageState
           children: [
             const SizedBox(height: 24),
             Text(
-              AppLocalizations.of(context).twoFAVerification,
+              StringsLocalizations.of(context).twoFAVerification,
               style: TextStyles.body.copyWith(color: colors.textBase),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 8),
             Text(
-              AppLocalizations.of(
+              StringsLocalizations.of(
                 context,
               ).enterThe6digitCodeFromnyourAuthenticatorApp,
               style: TextStyles.body.copyWith(color: colors.textLight),
@@ -142,7 +142,7 @@ class _TwoFactorAuthenticationPageState
             ),
             const Spacer(),
             ButtonComponent(
-              label: AppLocalizations.of(context).verify,
+              label: StringsLocalizations.of(context).verify,
               isDisabled: _code.length != 6,
               onTap: _code.length == 6
                   ? () => _verifyTwoFactorCode(_code)
@@ -151,7 +151,7 @@ class _TwoFactorAuthenticationPageState
             const SizedBox(height: 16),
             Center(
               child: ButtonComponent(
-                label: AppLocalizations.of(context).lostDevice,
+                label: StringsLocalizations.of(context).lostDevice,
                 variant: ButtonComponentVariant.link,
                 size: ButtonComponentSize.small,
                 onTap: () async {

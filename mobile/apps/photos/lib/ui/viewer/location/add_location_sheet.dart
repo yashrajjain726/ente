@@ -1,8 +1,8 @@
+import "package:ente_strings/ente_strings.dart";
 import 'package:flutter/material.dart';
 import "package:intl/intl.dart";
 import "package:modal_bottom_sheet/modal_bottom_sheet.dart";
 import "package:photos/core/constants.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/models/location/location.dart";
 import "package:photos/service_locator.dart";
 import 'package:photos/states/location_state.dart';
@@ -106,7 +106,7 @@ class _AddLocationSheetState extends State<AddLocationSheet> {
             padding: const EdgeInsets.only(bottom: 16),
             child: BottomOfTitleBarWidget(
               title: TitleBarTitleWidget(
-                title: AppLocalizations.of(context).addLocation,
+                title: StringsLocalizations.of(context).addLocation,
               ),
             ),
           ),
@@ -126,7 +126,7 @@ class _AddLocationSheetState extends State<AddLocationSheet> {
                           children: [
                             Expanded(
                               child: TextInputWidget(
-                                hintText: AppLocalizations.of(
+                                hintText: StringsLocalizations.of(
                                   context,
                                 ).locationName,
                                 focusNode: _focusNode,
@@ -152,7 +152,7 @@ class _AddLocationSheetState extends State<AddLocationSheet> {
                                     key: ValueKey(value),
                                     buttonType: ButtonType.secondary,
                                     buttonSize: ButtonSize.small,
-                                    labelText: AppLocalizations.of(
+                                    labelText: StringsLocalizations.of(
                                       context,
                                     ).addLocationButton,
                                     isDisabled: value,
@@ -171,7 +171,7 @@ class _AddLocationSheetState extends State<AddLocationSheet> {
                         if (widget.name.isEmpty) const SizedBox(height: 16),
                         if (widget.name.isEmpty)
                           Text(
-                            AppLocalizations.of(
+                            StringsLocalizations.of(
                               context,
                             ).locationTagFeatureDescription,
                             style: textTheme.smallMuted,
@@ -204,7 +204,7 @@ class _AddLocationSheetState extends State<AddLocationSheet> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  AppLocalizations.of(context).memoryCount(
+                                  StringsLocalizations.of(context).memoryCount(
                                     count: value,
                                     formattedCount: NumberFormat().format(
                                       value,
@@ -216,7 +216,7 @@ class _AddLocationSheetState extends State<AddLocationSheet> {
                                   Padding(
                                     padding: const EdgeInsets.only(top: 2),
                                     child: Text(
-                                      AppLocalizations.of(
+                                      StringsLocalizations.of(
                                         context,
                                       ).galleryMemoryLimitInfo,
                                       style: textTheme.miniMuted,

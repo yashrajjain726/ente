@@ -1,22 +1,22 @@
 # Translations
 
-We use Crowdin for translations, and the `intl` package to load these at runtime.
+We use Crowdin for translations and Flutter's localization generator to load them at runtime.
 
-Within our project we have the _source_ strings - these are the key value pairs in the `lib/l10n/intl_en.arb` file.
+All mobile apps share the source strings in `mobile/packages/strings/lib/l10n/arb/strings_en.arb`.
 
 Volunteers can add a new _translation_ in their language corresponding to each such source key-value to our [Crowdin project](https://crowdin.com/project/ente-photos-app).
 
-When a new source string is added, a [GitHub workflow](../../../../.github/workflows/mobile-photos-crowdin-push-sources.yml) runs to upload sources to Crowdin, so any new key value pair we add in the source `intl_en.arb` becomes available to translators to translate.
+When a new source string is added, a [GitHub workflow](../../../../.github/workflows/mobile-crowdin-push-sources.yml) uploads it to Crowdin.
 
 Every Monday, we run a [GitHub workflow](../../../../.github/workflows/mobile-crowdin-sync.yml) that
 
-- Downloads translations from Crowdin - So any new translations that translators have made on the Crowdin dashboard (for existing sources) will be added to the corresponding `intl_XX.arb`.
+- Downloads translations from Crowdin into the corresponding `strings_XX.arb`.
 
 The sync workflow also uploads the current source strings before downloading translations.
 
 ## Adding a new string
 
-1. Add the key-value pair to `lib/l10n/intl_en.arb`
+1. Add the key-value pair to `mobile/packages/strings/lib/l10n/arb/strings_en.arb`.
 
    Example:
 
@@ -38,18 +38,18 @@ The sync workflow also uploads the current source strings before downloading tra
    }
    ```
 
-1. Run `flutter gen-l10n` to regenerate the localization files (or run `flutter pub get` which triggers this automatically)
+1. Run `flutter gen-l10n` from `mobile/packages/strings`.
 
 1. Import the localization in your Dart file:
 
    ```dart
-   import "package:photos/generated/l10n.dart";
+   import "package:ente_strings/ente_strings.dart";
    ```
 
 1. Use the string in your code:
 
    ```dart
-   AppLocalizations.of(context).newStringKey
+   context.strings.newStringKey
    ```
 
 1. Commit the changes and create a PR in which it is advised to tag at least one of the developers (i.e. [laurenspriem](https://github.com/laurenspriem))
@@ -68,12 +68,12 @@ Use plural categories `one` and `other` in source ARBs, not `=1`.
 
 ## Updating an existing string
 
-1. Update the existing value for the key in the source `intl_en.arb`.
+1. Update the existing value for the key in `mobile/packages/strings/lib/l10n/arb/strings_en.arb`.
 1. Commit the changes and create a PR in which it is advised to tag at least one of the developers (i.e. [laurenspriem](https://github.com/laurenspriem))
 1. After the PR is merged, the source-push workflow will upload the changed source strings to Crowdin's dashboard, allowing translators to translate it.
 
 ## Deleting an existing string
 
-1. Remove the key value pair from the source `intl_en.arb`.
+1. Remove the key value pair from `mobile/packages/strings/lib/l10n/arb/strings_en.arb`.
 1. Commit the changes and create a PR in which it is advised to tag at least one of the developers (i.e. [laurenspriem](https://github.com/laurenspriem))
-1. After the PR is merged, the source-push workflow will update Crowdin. During the next sync, the workflow will remove that source item from the other `intl_XX.arb` files in the repository.
+1. After the PR is merged, the source-push workflow will update Crowdin. During the next sync, the workflow will remove that source item from the other `strings_XX.arb` files in the repository.

@@ -1,6 +1,7 @@
 import "dart:async";
 
 import "package:ente_pure_utils/ente_pure_utils.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:logging/logging.dart";
 import "package:photos/core/event_bus.dart";
@@ -11,7 +12,6 @@ import "package:photos/events/event.dart";
 import "package:photos/events/location_tag_updated_event.dart";
 import "package:photos/events/magic_cache_updated_event.dart";
 import "package:photos/events/people_changed_event.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/models/collection/collection.dart";
 import "package:photos/models/collection/collection_items.dart";
 import "package:photos/models/search/search_result.dart";
@@ -64,42 +64,44 @@ extension SectionTypeExtensions on SectionType {
   String sectionTitle(BuildContext context) {
     switch (this) {
       case SectionType.face:
-        return AppLocalizations.of(context).people;
+        return StringsLocalizations.of(context).people;
       case SectionType.magic:
-        return AppLocalizations.of(context).discover;
+        return StringsLocalizations.of(context).discover;
       case SectionType.wrapped:
         return "Ente Rewind";
       case SectionType.location:
-        return AppLocalizations.of(context).locations;
+        return StringsLocalizations.of(context).locations;
       case SectionType.ritual:
-        return AppLocalizations.of(context).ritualsTitle;
+        return StringsLocalizations.of(context).ritualsTitle;
       case SectionType.contacts:
-        return AppLocalizations.of(context).contacts;
+        return StringsLocalizations.of(context).contacts;
       case SectionType.album:
-        return AppLocalizations.of(context).albums;
+        return StringsLocalizations.of(context).albums;
       case SectionType.fileTypesAndExtension:
-        return AppLocalizations.of(context).fileTypes;
+        return StringsLocalizations.of(context).fileTypes;
     }
   }
 
   String getEmptyStateText(BuildContext context) {
     switch (this) {
       case SectionType.face:
-        return AppLocalizations.of(context).searchPersonsEmptySection;
+        return StringsLocalizations.of(context).searchPersonsEmptySection;
       case SectionType.magic:
-        return AppLocalizations.of(context).searchDiscoverEmptySection;
+        return StringsLocalizations.of(context).searchDiscoverEmptySection;
       case SectionType.wrapped:
         return "Check back soon for your 2025 highlights.";
       case SectionType.location:
-        return AppLocalizations.of(context).searchLocationEmptySection;
+        return StringsLocalizations.of(context).searchLocationEmptySection;
       case SectionType.ritual:
-        return AppLocalizations.of(context).ritualSearchEmpty;
+        return StringsLocalizations.of(context).ritualSearchEmpty;
       case SectionType.contacts:
-        return AppLocalizations.of(context).searchPeopleEmptySection;
+        return StringsLocalizations.of(context).searchPeopleEmptySection;
       case SectionType.album:
-        return AppLocalizations.of(context).searchAlbumsEmptySection;
+        return StringsLocalizations.of(context).searchAlbumsEmptySection;
       case SectionType.fileTypesAndExtension:
-        return AppLocalizations.of(context).searchFileTypesAndNamesEmptySection;
+        return StringsLocalizations.of(
+          context,
+        ).searchFileTypesAndNamesEmptySection;
     }
   }
 
@@ -153,13 +155,13 @@ extension SectionTypeExtensions on SectionType {
       case SectionType.wrapped:
         return "";
       case SectionType.location:
-        return AppLocalizations.of(context).addNew;
+        return StringsLocalizations.of(context).addNew;
       case SectionType.ritual:
         return "";
       case SectionType.contacts:
-        return AppLocalizations.of(context).invite;
+        return StringsLocalizations.of(context).invite;
       case SectionType.album:
-        return AppLocalizations.of(context).addNew;
+        return StringsLocalizations.of(context).addNew;
       case SectionType.fileTypesAndExtension:
         return "";
     }
@@ -191,7 +193,9 @@ extension SectionTypeExtensions on SectionType {
       case SectionType.contacts:
         return () async {
           await shareText(
-            AppLocalizations.of(context).shareTextRecommendUsingEnte,
+            StringsLocalizations.of(
+              context,
+            ).shareTextRecommendUsingEnteForPhotos,
           );
         };
       case SectionType.location:
@@ -208,9 +212,9 @@ extension SectionTypeExtensions on SectionType {
         return () async {
           final result = await showTextInputDialog(
             context,
-            title: AppLocalizations.of(context).newAlbum,
-            submitButtonLabel: AppLocalizations.of(context).create,
-            hintText: AppLocalizations.of(context).enterAlbumName,
+            title: StringsLocalizations.of(context).newAlbum,
+            submitButtonLabel: StringsLocalizations.of(context).create,
+            hintText: StringsLocalizations.of(context).enterAlbumName,
             alwaysShowSuccessState: false,
             initialValue: "",
             textCapitalization: TextCapitalization.words,

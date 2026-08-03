@@ -1,9 +1,9 @@
 import 'dart:async';
 
 import "package:ente_components/ente_components.dart";
+import 'package:ente_strings/ente_strings.dart';
 import 'package:flutter/material.dart';
 import 'package:hugeicons/hugeicons.dart';
-import 'package:locker/l10n/l10n.dart';
 import 'package:locker/ui/pages/account_credentials_page.dart';
 import 'package:locker/ui/pages/personal_note_page.dart';
 import 'package:locker/ui/pages/physical_records_page.dart';
@@ -25,7 +25,7 @@ class SaveOption {
 }
 
 List<SaveOption> saveOptions(BuildContext context) {
-  final l10n = context.l10n;
+  final l10n = context.strings;
   return [
     SaveOption(
       type: SaveOptionType.document,
@@ -128,13 +128,13 @@ class SaveBottomSheet extends StatelessWidget {
     final options = saveOptions(context);
 
     return BottomSheetComponent(
-      title: context.l10n.saveToLocker,
+      title: context.strings.saveToLocker,
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            context.l10n.informationDescription,
+            context.strings.informationDescription,
             style: TextStyles.body.copyWith(color: colors.textLight),
           ),
           const SizedBox(height: 24),

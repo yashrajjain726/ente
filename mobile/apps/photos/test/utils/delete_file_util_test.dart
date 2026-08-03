@@ -6,7 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:photos/app_mode.dart';
 import 'package:photos/ente_theme_data.dart';
-import 'package:photos/generated/intl/app_localizations.dart';
+import 'package:ente_strings/ente_strings.dart';
 import 'package:photos/models/file/file.dart';
 import 'package:photos/models/file/file_type.dart';
 import 'package:photos/models/files_split.dart';
@@ -601,8 +601,8 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           theme: darkThemeData,
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
-          supportedLocales: AppLocalizations.supportedLocales,
+          localizationsDelegates: StringsLocalizations.localizationsDelegates,
+          supportedLocales: StringsLocalizations.supportedLocales,
           home: Builder(
             builder: (builderContext) {
               context = builderContext;
@@ -718,8 +718,8 @@ class _TestApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       theme: darkThemeData,
-      localizationsDelegates: AppLocalizations.localizationsDelegates,
-      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: StringsLocalizations.localizationsDelegates,
+      supportedLocales: StringsLocalizations.supportedLocales,
       builder: EasyLoading.init(),
       home: Scaffold(
         body: Builder(

@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:collection/collection.dart';
 import 'package:ente_crypto/ente_crypto.dart';
+import "package:ente_strings/ente_strings.dart";
 import 'package:flutter/material.dart';
 import 'package:logging/logging.dart';
 import "package:photos/core/configuration.dart";
@@ -13,7 +14,6 @@ import 'package:photos/events/files_updated_event.dart';
 import 'package:photos/events/local_photos_updated_event.dart';
 import 'package:photos/gateways/collections/models/create_request.dart';
 import "package:photos/gateways/collections/models/metadata.dart";
-import "package:photos/generated/l10n.dart";
 import 'package:photos/models/collection/action.dart';
 import 'package:photos/models/collection/collection.dart';
 import 'package:photos/models/file/file.dart';
@@ -287,7 +287,7 @@ extension HiddenService on CollectionsService {
       unawaited(
         showErrorDialog(
           context,
-          AppLocalizations.of(context).oops,
+          StringsLocalizations.of(context).oops,
           e.message as String,
         ),
       );
@@ -551,7 +551,7 @@ extension HiddenService on CollectionsService {
   Future<void> cleanupHiddenFiles(BuildContext context) async {
     final dialog = createProgressDialog(
       context,
-      AppLocalizations.of(context).pleaseWait,
+      StringsLocalizations.of(context).pleaseWait,
     );
     await dialog.show();
 
@@ -606,7 +606,7 @@ extension HiddenService on CollectionsService {
 
       await dialog.hide();
       if (!context.mounted) return;
-      showShortToast(context, AppLocalizations.of(context).cleanupComplete);
+      showShortToast(context, StringsLocalizations.of(context).cleanupComplete);
     } catch (e, s) {
       _logger.severe("Failed to cleanup hidden files", e, s);
       await dialog.hide();

@@ -3,6 +3,7 @@ import "dart:math";
 
 import "package:ente_components/ente_components.dart";
 import 'package:ente_pure_utils/ente_pure_utils.dart';
+import "package:ente_strings/ente_strings.dart";
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import "package:hugeicons/hugeicons.dart";
@@ -12,8 +13,6 @@ import "package:photos/app_mode.dart";
 import "package:photos/core/event_bus.dart";
 import "package:photos/events/app_mode_changed_event.dart";
 import "package:photos/events/permission_granted_event.dart";
-import "package:photos/generated/intl/app_localizations.dart";
-import "package:photos/l10n/l10n.dart";
 import "package:photos/service_locator.dart";
 import "package:photos/services/machine_learning/ml_service.dart";
 import "package:photos/services/machine_learning/semantic_search/semantic_search_service.dart";
@@ -123,7 +122,7 @@ class _GrantPermissionsWidgetState extends State<GrantPermissionsWidget> {
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Text(
-            context.l10n.readyToBackupTitle,
+            context.strings.readyToBackupTitle,
             textAlign: TextAlign.center,
             style: const TextStyle(
               fontFamily: "Nunito",
@@ -137,7 +136,7 @@ class _GrantPermissionsWidgetState extends State<GrantPermissionsWidget> {
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Text(
-            context.l10n.readyToBackupSubtitle,
+            context.strings.readyToBackupSubtitle,
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.bodyMedium!.copyWith(
               fontWeight: FontWeight.w500,
@@ -178,7 +177,7 @@ class _GrantPermissionsWidgetState extends State<GrantPermissionsWidget> {
         await backupPreferenceService.setOnlyNewSinceSevenDaysAgo();
         await onPermissionGranted(state, shouldMarkLimitedFolders: false);
         if (mounted) {
-          showToast(context, context.l10n.backingUpLastSevenDaysPhotos);
+          showToast(context, context.strings.backingUpLastSevenDaysPhotos);
         }
       } else {
         await _showPermissionDeniedDialog();
@@ -246,11 +245,11 @@ class _GrantPermissionsWidgetState extends State<GrantPermissionsWidget> {
 
   Future<void> _showPermissionDeniedDialog() async {
     final title = widget.startWithoutAccount
-        ? context.l10n.grantPermission
-        : context.l10n.allowPermTitle;
+        ? context.strings.grantPermission
+        : context.strings.allowPermTitle;
     final message = widget.startWithoutAccount
-        ? context.l10n.grantPermissionDesc
-        : context.l10n.allowPermBody;
+        ? context.strings.grantPermissionDesc
+        : context.strings.allowPermBody;
     await showAlertBottomSheet(
       context,
       title: title,
@@ -259,7 +258,7 @@ class _GrantPermissionsWidgetState extends State<GrantPermissionsWidget> {
       buttons: [
         ButtonWidgetV2(
           buttonType: ButtonTypeV2.primary,
-          labelText: context.l10n.openSettings,
+          labelText: context.strings.openSettings,
           onTap: () async {
             await PhotoManager.openSetting();
           },
@@ -293,14 +292,14 @@ class _GrantPermissionsWidgetState extends State<GrantPermissionsWidget> {
           ButtonWidgetV2(
             key: const ValueKey("selectFoldersButton"),
             buttonType: ButtonTypeV2.primary,
-            labelText: context.l10n.selectFoldersForBackup,
+            labelText: context.strings.selectFoldersForBackup,
             onTap: _onTapSelectFolders,
           ),
           const SizedBox(height: 12),
           ButtonWidgetV2(
             key: const ValueKey("onlyNewPhotosButton"),
             buttonType: ButtonTypeV2.secondary,
-            labelText: context.l10n.startWithLatestPhotos,
+            labelText: context.strings.startWithLatestPhotos,
             onTap: () async {
               _onlyNewActionDebouncer.run(() async {
                 await _onTapOnlyNewPhotos();
@@ -312,7 +311,7 @@ class _GrantPermissionsWidgetState extends State<GrantPermissionsWidget> {
           ButtonWidgetV2(
             key: const ValueKey("skipForNowButton"),
             buttonType: ButtonTypeV2.link,
-            labelText: context.l10n.doThisLater,
+            labelText: context.strings.doThisLater,
             onTap: _onTapSkip,
             shouldSurfaceExecutionStates: false,
           ),
@@ -361,7 +360,7 @@ class _GrantPermissionsWidgetState extends State<GrantPermissionsWidget> {
                         _buildPermissionsAnimation(context),
                         const Flexible(child: SizedBox(height: 22)),
                         Text(
-                          AppLocalizations.of(
+                          StringsLocalizations.of(
                             context,
                           ).grantGalleryPermissionTitle,
                           textAlign: .center,
@@ -382,7 +381,7 @@ class _GrantPermissionsWidgetState extends State<GrantPermissionsWidget> {
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 16),
                           child: Text(
-                            AppLocalizations.of(
+                            StringsLocalizations.of(
                               context,
                             ).grantGalleryPermissionDesc,
                             textAlign: TextAlign.center,
@@ -395,7 +394,7 @@ class _GrantPermissionsWidgetState extends State<GrantPermissionsWidget> {
                         const Flexible(child: SizedBox(height: 32)),
                         ButtonWidgetV2(
                           buttonType: ButtonTypeV2.neutral,
-                          labelText: AppLocalizations.of(
+                          labelText: StringsLocalizations.of(
                             context,
                           ).grantPermission,
                           onTap: _onTapOfflineGrantPermission,
@@ -421,7 +420,7 @@ class _GrantPermissionsWidgetState extends State<GrantPermissionsWidget> {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12),
       child: StyledText(
-        text: AppLocalizations.of(context).byAgreeing,
+        text: StringsLocalizations.of(context).byAgreeing,
         textAlign: TextAlign.center,
         style: textTheme.bodyMuted,
         tags: {
@@ -431,7 +430,7 @@ class _GrantPermissionsWidgetState extends State<GrantPermissionsWidget> {
                   MaterialPageRoute(
                     builder: (BuildContext context) {
                       return WebPage(
-                        AppLocalizations.of(context).termsOfServicesTitle,
+                        StringsLocalizations.of(context).termsOfServicesTitle,
                         "https://ente.com/terms",
                       );
                     },
@@ -448,7 +447,7 @@ class _GrantPermissionsWidgetState extends State<GrantPermissionsWidget> {
                   MaterialPageRoute(
                     builder: (BuildContext context) {
                       return WebPage(
-                        AppLocalizations.of(context).privacyPolicyTitle,
+                        StringsLocalizations.of(context).privacyPolicyTitle,
                         "https://ente.com/privacy",
                       );
                     },

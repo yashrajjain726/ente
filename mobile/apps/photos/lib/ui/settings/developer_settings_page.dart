@@ -1,10 +1,10 @@
 import "package:ente_components/ente_components.dart";
+import "package:ente_strings/ente_strings.dart";
 import 'package:flutter/material.dart';
 import 'package:logging/logging.dart';
 import "package:photos/core/event_bus.dart";
 import "package:photos/core/network/network.dart";
 import "package:photos/events/app_mode_changed_event.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/service_locator.dart";
 import "package:photos/theme/ente_theme.dart";
 import "package:photos/ui/components/alert_bottom_sheet.dart";
@@ -48,7 +48,7 @@ class _DeveloperSettingsPageState extends State<DeveloperSettingsPage> {
           },
         ),
         title: Text(
-          AppLocalizations.of(context).developerSettings,
+          StringsLocalizations.of(context).developerSettings,
           style: textTheme.largeBold,
         ),
         centerTitle: true,
@@ -61,7 +61,7 @@ class _DeveloperSettingsPageState extends State<DeveloperSettingsPage> {
             children: [
               const SizedBox(height: 20),
               TextInputComponent(
-                label: AppLocalizations.of(context).serverEndpoint,
+                label: StringsLocalizations.of(context).serverEndpoint,
                 hintText: endpoint,
                 controller: _urlController,
                 autocorrect: false,
@@ -70,7 +70,7 @@ class _DeveloperSettingsPageState extends State<DeveloperSettingsPage> {
               ),
               const SizedBox(height: 20),
               ButtonComponent(
-                label: AppLocalizations.of(context).save,
+                label: StringsLocalizations.of(context).save,
                 onTap: () async {
                   final url = _urlController.text.trim();
                   _logger.info("Entered endpoint: $url");
@@ -92,7 +92,7 @@ class _DeveloperSettingsPageState extends State<DeveloperSettingsPage> {
                       if (!context.mounted) return;
                       showToast(
                         context,
-                        AppLocalizations.of(context).endpointUpdatedMessage,
+                        StringsLocalizations.of(context).endpointUpdatedMessage,
                       );
                       if (!context.mounted) return;
                       Navigator.of(context).pop();
@@ -104,9 +104,11 @@ class _DeveloperSettingsPageState extends State<DeveloperSettingsPage> {
                     if (!context.mounted) return;
                     await showAlertBottomSheet(
                       context,
-                      title: AppLocalizations.of(context).invalidEndpoint,
+                      title: StringsLocalizations.of(context).invalidEndpoint,
                       message:
-                          AppLocalizations.of(context).invalidEndpointMessage +
+                          StringsLocalizations.of(
+                            context,
+                          ).invalidEndpointMessage +
                           "\n" +
                           e.toString(),
                       assetPath: 'assets/warning-grey.png',

@@ -1,12 +1,12 @@
 import "dart:async";
 import "dart:typed_data";
 
+import "package:ente_strings/ente_strings.dart";
 import 'package:flutter/material.dart';
 import "package:logging/logging.dart";
 import "package:photos/core/event_bus.dart";
 import "package:photos/db/ml/db.dart";
 import "package:photos/events/people_changed_event.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/models/file/file.dart";
 import "package:photos/models/ml/face/person.dart";
 import "package:photos/services/machine_learning/face_ml/feedback/cluster_feedback.dart";
@@ -471,14 +471,16 @@ class _PersonGallerySuggestionState extends State<PersonGallerySuggestion>
                               style: textTheme.body,
                               children: [
                                 TextSpan(
-                                  text: AppLocalizations.of(context).areThey,
+                                  text: StringsLocalizations.of(
+                                    context,
+                                  ).areThey,
                                 ),
                                 TextSpan(
                                   text: relevantPerson.data.name,
                                   style: textTheme.bodyBold,
                                 ),
                                 TextSpan(
-                                  text: AppLocalizations.of(
+                                  text: StringsLocalizations.of(
                                     context,
                                   ).questionmark,
                                 ),
@@ -486,7 +488,7 @@ class _PersonGallerySuggestionState extends State<PersonGallerySuggestion>
                             ),
                           )
                         : Text(
-                            AppLocalizations.of(context).sameperson,
+                            StringsLocalizations.of(context).sameperson,
                             style: textTheme.body,
                             textAlign: TextAlign.center,
                           ),
@@ -525,7 +527,7 @@ class _PersonGallerySuggestionState extends State<PersonGallerySuggestion>
                                   ),
                                   const SizedBox(width: 8),
                                   Text(
-                                    AppLocalizations.of(context).no,
+                                    StringsLocalizations.of(context).no,
                                     style:
                                         (personPage
                                                 ? textTheme.bodyBold
@@ -564,7 +566,7 @@ class _PersonGallerySuggestionState extends State<PersonGallerySuggestion>
                                   ),
                                   const SizedBox(width: 8),
                                   Text(
-                                    AppLocalizations.of(context).yes,
+                                    StringsLocalizations.of(context).yes,
                                     style:
                                         (personPage
                                                 ? textTheme.bodyBold
@@ -591,7 +593,9 @@ class _PersonGallerySuggestionState extends State<PersonGallerySuggestion>
                             horizontal: 32,
                           ),
                           child: Text(
-                            AppLocalizations.of(context).saveAsAnotherPerson,
+                            StringsLocalizations.of(
+                              context,
+                            ).saveAsAnotherPerson,
                             style: textTheme.mini.copyWith(
                               color: colorScheme.textMuted,
                               decoration: TextDecoration.underline,

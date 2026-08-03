@@ -1,9 +1,9 @@
 import "dart:math" as math;
 
 import "package:ente_components/ente_components.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:flutter_svg/flutter_svg.dart";
-import "package:locker/l10n/l10n.dart";
 import "package:rive/rive.dart" as rive;
 
 const _bannerHeight = 147.0;
@@ -102,7 +102,7 @@ class _SaveToLockerBannerState extends State<SaveToLockerBanner> {
                 ),
                 child: Text.rich(
                   _titleSpan(
-                    context.l10n.saveToLocker,
+                    context.strings.saveToLocker,
                     _titleStyle.copyWith(color: colors.specialWhite),
                   ),
                 ),

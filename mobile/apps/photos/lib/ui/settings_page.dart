@@ -1,13 +1,13 @@
 import "package:ente_components/ente_components.dart";
 import "package:ente_lock_screen/local_authentication_service.dart";
 import "package:ente_pure_utils/ente_pure_utils.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/foundation.dart";
 import "package:flutter/material.dart";
 import "package:hugeicons/hugeicons.dart";
 import "package:log_viewer/log_viewer.dart";
 import "package:photos/core/configuration.dart";
 import "package:photos/emergency/emergency_page.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/models/user_details.dart";
 import "package:photos/service_locator.dart";
 import "package:photos/services/account/user_service.dart";
@@ -72,7 +72,7 @@ class _SettingsBody extends StatelessWidget {
       builder: (context, _) {
         final email = hasLoggedIn ? emailNotifier.value ?? "" : "";
         final title = email.isEmpty
-            ? AppLocalizations.of(context).settings
+            ? StringsLocalizations.of(context).settings
             : email;
 
         return SettingsPageScaffold(
@@ -107,7 +107,7 @@ class _SettingsBody extends StatelessWidget {
               const StorageCardWidget(),
               const SizedBox(height: 16),
               _buildMenuItem(
-                title: AppLocalizations.of(context).account,
+                title: StringsLocalizations.of(context).account,
                 icon: HugeIcons.strokeRoundedUser,
                 onTap: () async {
                   await routeToPage(context, const AccountSettingsPage());
@@ -115,7 +115,7 @@ class _SettingsBody extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               _buildMenuItem(
-                title: AppLocalizations.of(context).backup,
+                title: StringsLocalizations.of(context).backup,
                 icon: HugeIcons.strokeRoundedCloudUpload,
                 onTap: () async {
                   await routeToPage(context, const BackupSettingsPage());
@@ -125,7 +125,7 @@ class _SettingsBody extends StatelessWidget {
             ],
             // Privacy and personalization section
             _buildMenuItem(
-              title: AppLocalizations.of(context).security,
+              title: StringsLocalizations.of(context).security,
               icon: HugeIcons.strokeRoundedSecurityCheck,
               onTap: () async {
                 await routeToPage(context, const SecuritySettingsPage());
@@ -133,7 +133,7 @@ class _SettingsBody extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             _buildMenuItem(
-              title: AppLocalizations.of(context).appearance,
+              title: StringsLocalizations.of(context).appearance,
               icon: HugeIcons.strokeRoundedPaintBoard,
               onTap: () async {
                 await routeToPage(context, const AppearanceSettingsPage());
@@ -157,7 +157,7 @@ class _SettingsBody extends StatelessWidget {
             const SizedBox(height: 8),
             // Support section
             _buildMenuItem(
-              title: AppLocalizations.of(context).helpAndSupport,
+              title: StringsLocalizations.of(context).helpAndSupport,
               icon: HugeIcons.strokeRoundedHelpCircle,
               onTap: () async {
                 await routeToPage(context, const HelpSupportPage());
@@ -165,7 +165,7 @@ class _SettingsBody extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             _buildMenuItem(
-              title: AppLocalizations.of(context).about,
+              title: StringsLocalizations.of(context).about,
               icon: HugeIcons.strokeRoundedInformationCircle,
               onTap: () async {
                 await routeToPage(context, const AboutUsPage());
@@ -260,9 +260,9 @@ class _SettingsBody extends StatelessWidget {
 
   Widget _buildOfflineLoginCard(BuildContext context, ColorTokens colors) {
     return _buildMenuItem(
-      title: AppLocalizations.of(context).alreadyHaveAnAccount,
+      title: StringsLocalizations.of(context).alreadyHaveAnAccount,
       icon: HugeIcons.strokeRoundedLogin01,
-      subtitle: AppLocalizations.of(context).loginToEnte,
+      subtitle: StringsLocalizations.of(context).loginToEnte,
       trailing: Container(
         width: 40,
         height: 40,
@@ -286,28 +286,28 @@ class _SettingsBody extends StatelessWidget {
     return MenuGroupComponent(
       items: [
         _buildMenuItem(
-          title: AppLocalizations.of(context).machineLearning,
+          title: StringsLocalizations.of(context).machineLearning,
           icon: HugeIcons.strokeRoundedMagicWand01,
           onTap: () async {
             await routeToPage(context, const MachineLearningSettingsPage());
           },
         ),
         _buildMenuItem(
-          title: AppLocalizations.of(context).memories,
+          title: StringsLocalizations.of(context).memories,
           icon: HugeIcons.strokeRoundedSparkles,
           onTap: () async {
             await routeToPage(context, const MemoriesSettingsScreen());
           },
         ),
         _buildMenuItem(
-          title: AppLocalizations.of(context).notifications,
+          title: StringsLocalizations.of(context).notifications,
           icon: HugeIcons.strokeRoundedNotification01,
           onTap: () async {
             await routeToPage(context, const NotificationSettingsScreen());
           },
         ),
         _buildMenuItem(
-          title: AppLocalizations.of(context).widgets,
+          title: StringsLocalizations.of(context).widgets,
           icon: HugeIcons.strokeRoundedAlignBoxBottomRight,
           onTap: () async {
             await routeToPage(context, const WidgetSettingsScreen());
@@ -322,7 +322,7 @@ class _SettingsBody extends StatelessWidget {
     return MenuGroupComponent(
       items: [
         _buildMenuItem(
-          title: AppLocalizations.of(context).legacy,
+          title: StringsLocalizations.of(context).legacy,
           icon: HugeIcons.strokeRoundedFavourite,
           showOnlyLoadingState: true,
           onTap: () async {
@@ -331,7 +331,7 @@ class _SettingsBody extends StatelessWidget {
                 await LocalAuthenticationService.instance
                     .requestLocalAuthentication(
                       context,
-                      AppLocalizations.of(context).authToManageLegacy,
+                      StringsLocalizations.of(context).authToManageLegacy,
                     );
             if (hasAuthenticated) {
               if (!context.mounted) return;
@@ -346,7 +346,7 @@ class _SettingsBody extends StatelessWidget {
           },
         ),
         _buildMenuItem(
-          title: AppLocalizations.of(context).family,
+          title: StringsLocalizations.of(context).family,
           icon: HugeIcons.strokeRoundedUserMultiple,
           showOnlyLoadingState: true,
           shouldSurfaceExecutionStates: true,
@@ -374,7 +374,7 @@ class _SettingsBody extends StatelessWidget {
           },
         ),
         _buildMenuItem(
-          title: AppLocalizations.of(context).referrals,
+          title: StringsLocalizations.of(context).referrals,
           icon: HugeIcons.strokeRoundedTicketStar,
           onTap: () async {
             await routeToPage(context, const ReferralScreen());
@@ -388,7 +388,7 @@ class _SettingsBody extends StatelessWidget {
     return MenuGroupComponent(
       items: [
         _buildMenuItem(
-          title: AppLocalizations.of(context).freeUpSpace,
+          title: StringsLocalizations.of(context).freeUpSpace,
           icon: HugeIcons.strokeRoundedRocket01,
           showOnlyLoadingState: true,
           onTap: () async {
@@ -396,35 +396,35 @@ class _SettingsBody extends StatelessWidget {
           },
         ),
         _buildMenuItem(
-          title: AppLocalizations.of(context).machineLearning,
+          title: StringsLocalizations.of(context).machineLearning,
           icon: HugeIcons.strokeRoundedMagicWand01,
           onTap: () async {
             await routeToPage(context, const MachineLearningSettingsPage());
           },
         ),
         _buildMenuItem(
-          title: AppLocalizations.of(context).memories,
+          title: StringsLocalizations.of(context).memories,
           icon: HugeIcons.strokeRoundedSparkles,
           onTap: () async {
             await routeToPage(context, const MemoriesSettingsScreen());
           },
         ),
         _buildMenuItem(
-          title: AppLocalizations.of(context).notifications,
+          title: StringsLocalizations.of(context).notifications,
           icon: HugeIcons.strokeRoundedNotification01,
           onTap: () async {
             await routeToPage(context, const NotificationSettingsScreen());
           },
         ),
         _buildMenuItem(
-          title: AppLocalizations.of(context).widgets,
+          title: StringsLocalizations.of(context).widgets,
           icon: HugeIcons.strokeRoundedAlignBoxBottomRight,
           onTap: () async {
             await routeToPage(context, const WidgetSettingsScreen());
           },
         ),
         _buildMenuItem(
-          title: AppLocalizations.of(context).videoStreaming,
+          title: StringsLocalizations.of(context).videoStreaming,
           icon: HugeIcons.strokeRoundedVideoCameraAi,
           onTap: () async {
             await routeToPage(context, const VideoStreamingSettingsPage());
@@ -432,7 +432,7 @@ class _SettingsBody extends StatelessWidget {
         ),
         if (flagService.enableMultiCast)
           _buildMenuItem(
-            title: AppLocalizations.of(context).castSessions,
+            title: StringsLocalizations.of(context).castSessions,
             icon: HugeIcons.strokeRoundedTvSmart,
             onTap: () async {
               await routeToPage(context, const CastSettingsPage());
@@ -445,7 +445,7 @@ class _SettingsBody extends StatelessWidget {
 
   SettingsItem _buildMapsMenuItem(BuildContext context) {
     return _buildMenuItem(
-      title: AppLocalizations.of(context).maps,
+      title: StringsLocalizations.of(context).maps,
       icon: HugeIcons.strokeRoundedMaping,
       trailing: ToggleSwitchComponent.async(
         value: () => mapEnabled,
@@ -457,7 +457,7 @@ class _SettingsBody extends StatelessWidget {
             if (context.mounted) {
               showShortToast(
                 context,
-                AppLocalizations.of(context).somethingWentWrong,
+                StringsLocalizations.of(context).somethingWentWrong,
               );
             }
             rethrow;
@@ -471,7 +471,7 @@ class _SettingsBody extends StatelessWidget {
     return MenuGroupComponent(
       items: [
         _buildMenuItem(
-          title: AppLocalizations.of(context).merchandise,
+          title: StringsLocalizations.of(context).merchandise,
           icon: HugeIcons.strokeRoundedTShirt,
           onTap: () async {
             await launchUrlString(
@@ -481,7 +481,7 @@ class _SettingsBody extends StatelessWidget {
           },
         ),
         _buildMenuItem(
-          title: AppLocalizations.of(context).rateUs,
+          title: StringsLocalizations.of(context).rateUs,
           icon: HugeIcons.strokeRoundedStar,
           onTap: () async {
             final rateUrl = updateService.getRateDetails().item2;
@@ -494,7 +494,7 @@ class _SettingsBody extends StatelessWidget {
 
   Widget _buildLogoutCard(BuildContext context) {
     return _buildMenuItem(
-      title: AppLocalizations.of(context).logout,
+      title: StringsLocalizations.of(context).logout,
       icon: HugeIcons.strokeRoundedLogout05,
       isDestructive: true,
       onTap: () async {
@@ -506,10 +506,10 @@ class _SettingsBody extends StatelessWidget {
   void _onLogoutTapped(BuildContext context) {
     showChoiceActionSheet(
       context,
-      title: AppLocalizations.of(context).warning,
-      body: AppLocalizations.of(context).areYouSureYouWantToLogout,
+      title: StringsLocalizations.of(context).warning,
+      body: StringsLocalizations.of(context).areYouSureYouWantToLogout,
       illustration: Image.asset("assets/warning-grey.png"),
-      firstButtonLabel: AppLocalizations.of(context).yes,
+      firstButtonLabel: StringsLocalizations.of(context).yes,
       isCritical: true,
       firstButtonOnTap: () async {
         await UserService.instance.logout(context);
@@ -521,7 +521,7 @@ class _SettingsBody extends StatelessWidget {
     await showVerifyIdentitySheet(
       context,
       self: true,
-      title: AppLocalizations.of(context).verifyIDLabel,
+      title: StringsLocalizations.of(context).verifyIDLabel,
     );
   }
 }

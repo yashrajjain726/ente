@@ -2,10 +2,10 @@ import "dart:io";
 
 import "package:ente_accounts/services/user_service.dart";
 import "package:ente_components/ente_components.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/foundation.dart";
 import "package:flutter/material.dart";
 import "package:hugeicons/hugeicons.dart";
-import "package:locker/l10n/l10n.dart";
 import "package:locker/ui/settings/components/settings_item.dart";
 import "package:locker/ui/settings/pages/about_page.dart";
 import "package:locker/ui/settings/pages/account_settings_page.dart";
@@ -24,7 +24,7 @@ class SettingsWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = context.l10n;
+    final l10n = context.strings;
     const itemSpacing = SizedBox(height: 8);
 
     final List<Widget> contents = [];
@@ -123,12 +123,12 @@ class SettingsWidget extends StatelessWidget {
     final shouldLogout = await showBottomSheetComponent<bool>(
       context: context,
       builder: (sheetContext) => BottomSheetComponent(
-        title: context.l10n.warning,
-        message: context.l10n.areYouSureYouWantToLogout,
+        title: context.strings.warning,
+        message: context.strings.areYouSureYouWantToLogout,
         illustration: LockerBottomSheetIllustration.warningGrey,
         actions: [
           ButtonComponent(
-            label: context.l10n.yesLogout,
+            label: context.strings.yesLogout,
             variant: ButtonComponentVariant.critical,
             shouldSurfaceExecutionStates: false,
             onTap: () {

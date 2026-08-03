@@ -2,10 +2,10 @@ import 'dart:async';
 
 import 'package:email_validator/email_validator.dart';
 import "package:ente_components/ente_components.dart";
+import "package:ente_strings/ente_strings.dart";
 import 'package:flutter/material.dart';
 import 'package:password_strength/password_strength.dart';
 import 'package:photos/core/configuration.dart';
-import "package:photos/generated/l10n.dart";
 import "package:photos/service_locator.dart";
 import 'package:photos/services/account/user_service.dart';
 import "package:photos/ui/account/login_page.dart";
@@ -100,7 +100,7 @@ class _EmailEntryPageState extends State<EmailEntryPage> {
         title: DeveloperSettingsTapArea(
           behavior: HitTestBehavior.translucent,
           child: Text(
-            AppLocalizations.of(context).createAccountTitle,
+            StringsLocalizations.of(context).createAccountTitle,
             style: TextStyles.large.copyWith(color: colors.textBase),
           ),
         ),
@@ -111,7 +111,7 @@ class _EmailEntryPageState extends State<EmailEntryPage> {
         padding: const EdgeInsets.symmetric(horizontal: 16),
         child: ButtonComponent(
           key: const ValueKey("createAccountButton"),
-          label: AppLocalizations.of(context).createAccountTitle,
+          label: StringsLocalizations.of(context).createAccountTitle,
           isDisabled: !_isFormValid(),
           onTap: _isFormValid() ? _submitCreateAccount : null,
         ),
@@ -128,10 +128,10 @@ class _EmailEntryPageState extends State<EmailEntryPage> {
 
     if (_password != null && _password!.isNotEmpty && _showPasswordStrength) {
       if (_passwordStrength > kStrongPasswordStrengthThreshold) {
-        passwordMessage = AppLocalizations.of(context).strongPassword;
+        passwordMessage = StringsLocalizations.of(context).strongPassword;
         passwordMessageType = TextInputComponentMessageType.success;
       } else if (_passwordStrength <= kMildPasswordStrengthThreshold) {
-        passwordMessage = AppLocalizations.of(context).weakStrength;
+        passwordMessage = StringsLocalizations.of(context).weakStrength;
         passwordMessageType = TextInputComponentMessageType.alert;
       }
     }
@@ -145,10 +145,12 @@ class _EmailEntryPageState extends State<EmailEntryPage> {
         _password!.isNotEmpty &&
         _showConfirmPasswordValidation) {
       if (_passwordsMatch) {
-        confirmPasswordMessage = AppLocalizations.of(context).passwordsMatch;
+        confirmPasswordMessage = StringsLocalizations.of(
+          context,
+        ).passwordsMatch;
         confirmPasswordMessageType = TextInputComponentMessageType.success;
       } else {
-        confirmPasswordMessage = AppLocalizations.of(
+        confirmPasswordMessage = StringsLocalizations.of(
           context,
         ).passwordsDontMatch;
         confirmPasswordMessageType = TextInputComponentMessageType.error;
@@ -166,8 +168,8 @@ class _EmailEntryPageState extends State<EmailEntryPage> {
                 children: [
                   const SizedBox(height: 24),
                   TextInputComponent(
-                    label: AppLocalizations.of(context).email,
-                    hintText: AppLocalizations.of(context).email,
+                    label: StringsLocalizations.of(context).email,
+                    hintText: StringsLocalizations.of(context).email,
                     controller: _emailController,
                     keyboardType: TextInputType.emailAddress,
                     autofillHints: const [AutofillHints.email],
@@ -175,7 +177,7 @@ class _EmailEntryPageState extends State<EmailEntryPage> {
                     isRequired: true,
                     onChanged: _onEmailChanged,
                     message: _showEmailValidation && !_emailIsValid
-                        ? AppLocalizations.of(context).invalidEmailAddress
+                        ? StringsLocalizations.of(context).invalidEmailAddress
                         : null,
                     messageType: _showEmailValidation && !_emailIsValid
                         ? TextInputComponentMessageType.alert
@@ -183,8 +185,8 @@ class _EmailEntryPageState extends State<EmailEntryPage> {
                   ),
                   const SizedBox(height: 24),
                   TextInputComponent(
-                    label: AppLocalizations.of(context).password,
-                    hintText: AppLocalizations.of(context).password,
+                    label: StringsLocalizations.of(context).password,
+                    hintText: StringsLocalizations.of(context).password,
                     controller: _passwordController1,
                     isPasswordInput: true,
                     isRequired: true,
@@ -221,8 +223,8 @@ class _EmailEntryPageState extends State<EmailEntryPage> {
                   ),
                   const SizedBox(height: 24),
                   TextInputComponent(
-                    label: AppLocalizations.of(context).confirmPassword,
-                    hintText: AppLocalizations.of(context).confirmPassword,
+                    label: StringsLocalizations.of(context).confirmPassword,
+                    hintText: StringsLocalizations.of(context).confirmPassword,
                     controller: _passwordController2,
                     isPasswordInput: true,
                     isRequired: true,
@@ -259,7 +261,7 @@ class _EmailEntryPageState extends State<EmailEntryPage> {
                   if (_showReferralSourceField) ...[
                     const SizedBox(height: 24),
                     TextInputComponent(
-                      label: AppLocalizations.of(context).hearUsWhereTitle,
+                      label: StringsLocalizations.of(context).hearUsWhereTitle,
                       autocorrect: false,
                       shouldUnfocusOnClearOrSubmit: true,
                       onSubmit: _isFormValid()
@@ -353,12 +355,12 @@ class _EmailEntryPageState extends State<EmailEntryPage> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Text(
-              AppLocalizations.of(context).alreadyHaveAnAccount,
+              StringsLocalizations.of(context).alreadyHaveAnAccount,
               style: TextStyles.body.copyWith(color: colors.textLight),
             ),
             const SizedBox(width: 4),
             ButtonComponent(
-              label: AppLocalizations.of(context).logInLabel,
+              label: StringsLocalizations.of(context).logInLabel,
               variant: ButtonComponentVariant.link,
               size: ButtonComponentSize.small,
               shouldSurfaceExecutionStates: false,
@@ -426,7 +428,7 @@ class _EmailEntryPageState extends State<EmailEntryPage> {
           const SizedBox(width: 8),
           Expanded(
             child: StyledText(
-              text: AppLocalizations.of(context).signUpTerms,
+              text: StringsLocalizations.of(context).signUpTerms,
               style: TextStyles.mini.copyWith(color: colors.textLight),
               tags: {
                 'u-terms': StyledTextActionTag(
@@ -435,7 +437,9 @@ class _EmailEntryPageState extends State<EmailEntryPage> {
                         MaterialPageRoute(
                           builder: (BuildContext context) {
                             return WebPage(
-                              AppLocalizations.of(context).termsOfServicesTitle,
+                              StringsLocalizations.of(
+                                context,
+                              ).termsOfServicesTitle,
                               "https://ente.com/terms",
                             );
                           },
@@ -452,7 +456,9 @@ class _EmailEntryPageState extends State<EmailEntryPage> {
                         MaterialPageRoute(
                           builder: (BuildContext context) {
                             return WebPage(
-                              AppLocalizations.of(context).privacyPolicyTitle,
+                              StringsLocalizations.of(
+                                context,
+                              ).privacyPolicyTitle,
                               "https://ente.com/privacy",
                             );
                           },

@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import "package:ente_strings/ente_strings.dart";
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
@@ -7,7 +8,6 @@ import 'package:logging/logging.dart';
 import "package:photos/core/constants.dart";
 import 'package:photos/ente_theme_data.dart';
 import 'package:photos/gateways/billing/models/subscription.dart';
-import "package:photos/generated/l10n.dart";
 import "package:photos/service_locator.dart";
 import 'package:photos/services/account/billing_service.dart';
 import 'package:photos/services/account/user_service.dart';
@@ -62,7 +62,9 @@ class _PaymentWebPageState extends State<PaymentWebPage> {
         }
       },
       child: Scaffold(
-        appBar: AppBar(title: Text(AppLocalizations.of(context).subscription)),
+        appBar: AppBar(
+          title: Text(StringsLocalizations.of(context).subscription),
+        ),
         body: Column(
           children: <Widget>[
             (progress != 1.0)
@@ -144,18 +146,18 @@ class _PaymentWebPageState extends State<PaymentWebPage> {
       useRootNavigator: false,
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(AppLocalizations.of(context).areYouSureYouWantToExit),
+        title: Text(StringsLocalizations.of(context).areYouSureYouWantToExit),
         actions: <Widget>[
           TextButton(
             child: Text(
-              AppLocalizations.of(context).yes,
+              StringsLocalizations.of(context).yes,
               style: const TextStyle(color: Colors.redAccent),
             ),
             onPressed: () => Navigator.of(context).pop(true),
           ),
           TextButton(
             child: Text(
-              AppLocalizations.of(context).no,
+              StringsLocalizations.of(context).no,
               style: TextStyle(
                 color: Theme.of(context).colorScheme.greenAlternative,
               ),
@@ -200,11 +202,11 @@ class _PaymentWebPageState extends State<PaymentWebPage> {
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
-        title: Text(AppLocalizations.of(context).paymentFailed),
-        content: Text(AppLocalizations.of(context).paymentFailedMessage),
+        title: Text(StringsLocalizations.of(context).paymentFailed),
+        content: Text(StringsLocalizations.of(context).paymentFailedMessage),
         actions: <Widget>[
           TextButton(
-            child: Text(AppLocalizations.of(context).contactSupport),
+            child: Text(StringsLocalizations.of(context).contactSupport),
             onPressed: () => Navigator.of(context).pop(true),
           ),
         ],
@@ -230,19 +232,21 @@ class _PaymentWebPageState extends State<PaymentWebPage> {
       );
       if (!mounted) return;
       final content = widget.actionType == 'buy'
-          ? AppLocalizations.of(context).yourPurchaseWasSuccessful
-          : AppLocalizations.of(context).yourSubscriptionWasUpdatedSuccessfully;
+          ? StringsLocalizations.of(context).yourPurchaseWasSuccessful
+          : StringsLocalizations.of(
+              context,
+            ).yourSubscriptionWasUpdatedSuccessfully;
       if (!mounted) return;
       await _showExitPageDialog(
-        title: AppLocalizations.of(context).thankYou,
+        title: StringsLocalizations.of(context).thankYou,
         content: content,
       );
     } catch (error) {
       _logger.severe(error);
       if (!mounted) return;
       await _showExitPageDialog(
-        title: AppLocalizations.of(context).failedToVerifyPaymentStatus,
-        content: AppLocalizations.of(
+        title: StringsLocalizations.of(context).failedToVerifyPaymentStatus,
+        content: StringsLocalizations.of(
           context,
         ).pleaseWaitForSometimeBeforeRetrying,
       );
@@ -262,7 +266,7 @@ class _PaymentWebPageState extends State<PaymentWebPage> {
         actions: <Widget>[
           TextButton(
             child: Text(
-              AppLocalizations.of(context).ok,
+              StringsLocalizations.of(context).ok,
               style: TextStyle(
                 color: Theme.of(context).colorScheme.greenAlternative,
               ),

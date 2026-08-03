@@ -3,7 +3,6 @@ import 'dart:math';
 
 import 'package:confetti/confetti.dart';
 import "package:dio/dio.dart";
-import 'package:ente_auth/l10n/l10n.dart';
 import 'package:ente_auth/ui/common/loading_widget.dart';
 import 'package:ente_auth/ui/components/action_sheet_widget.dart';
 import 'package:ente_auth/ui/components/buttons/button_widget.dart';
@@ -15,6 +14,7 @@ import 'package:ente_auth/utils/email_util.dart';
 import 'package:ente_auth/utils/platform_util.dart';
 import 'package:ente_base/typedefs.dart';
 import 'package:ente_components/ente_components.dart';
+import 'package:ente_strings/ente_strings.dart';
 import 'package:ente_ui/components/progress_dialog.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -41,7 +41,7 @@ Future<ButtonResult?> showErrorDialog(
       if (showContactSupport)
         ButtonWidget(
           buttonType: ButtonType.primary,
-          labelText: context.l10n.contactSupport,
+          labelText: context.strings.contactSupport,
           isInAlert: true,
           buttonAction: ButtonAction.first,
           onTap: () async {
@@ -64,7 +64,7 @@ Future<ButtonResult?> showErrorDialogForException({
   bool isDismissible = true,
   String apiErrorPrefix = "It looks like something went wrong.",
 }) async {
-  String errorMessage = context.l10n.tempErrorContactSupportIfPersists;
+  String errorMessage = context.strings.tempErrorContactSupportIfPersists;
   if (exception is DioException &&
       exception.response != null &&
       exception.response!.data["code"] != null) {
@@ -73,7 +73,7 @@ Future<ButtonResult?> showErrorDialogForException({
   }
   return showDialogWidget(
     context: context,
-    title: context.l10n.error,
+    title: context.strings.error,
     icon: Icons.error_outline_outlined,
     body: errorMessage,
     isDismissible: isDismissible,
@@ -101,9 +101,9 @@ String parseErrorForUI(
       final DioException dioError = error;
       if (dioError.type == DioExceptionType.unknown) {
         if (dioError.error.toString().contains('Failed host lookup')) {
-          return context.l10n.networkHostLookUpErr;
+          return context.strings.networkHostLookUpErr;
         } else if (dioError.error.toString().contains('SocketException')) {
-          return context.l10n.networkConnectionRefusedErr;
+          return context.strings.networkConnectionRefusedErr;
         }
       }
     }
@@ -149,7 +149,7 @@ Future<ButtonResult?> showGenericErrorDialog({
 }) async {
   String errorBody = parseErrorForUI(
     context,
-    context.l10n.itLooksLikeSomethingWentWrongPleaseRetryAfterSome,
+    context.strings.itLooksLikeSomethingWentWrongPleaseRetryAfterSome,
     error: error,
   );
   bool isWindowCertError = false;
@@ -163,14 +163,14 @@ Future<ButtonResult?> showGenericErrorDialog({
 
   return showDialogWidget(
     context: context,
-    title: context.l10n.error,
+    title: context.strings.error,
     icon: Icons.error_outline_outlined,
     body: errorBody,
     isDismissible: isDismissible,
     buttons: [
       ButtonWidget(
         buttonType: ButtonType.primary,
-        labelText: context.l10n.ok,
+        labelText: context.strings.ok,
         buttonAction: ButtonAction.first,
         isInAlert: true,
       ),
@@ -188,12 +188,12 @@ Future<ButtonResult?> showGenericErrorDialog({
         ),
       ButtonWidget(
         buttonType: ButtonType.secondary,
-        labelText: context.l10n.contactSupport,
+        labelText: context.strings.contactSupport,
         buttonAction: ButtonAction.second,
         onTap: () async {
           await sendLogs(
             context,
-            context.l10n.contactSupport,
+            context.strings.contactSupport,
             postShare: () {},
           );
         },

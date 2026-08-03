@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:ente_auth/l10n/l10n.dart';
 import 'package:ente_auth/models/code.dart';
 import 'package:ente_auth/onboarding/model/tag_enums.dart';
 import 'package:ente_auth/onboarding/view/common/tag_chip.dart';
@@ -11,6 +10,7 @@ import 'package:ente_auth/ui/components/horizontal_scroll_area.dart';
 import 'package:ente_auth/ui/utils/icon_utils.dart';
 import 'package:ente_auth/utils/dialog_util.dart';
 import 'package:ente_components/ente_components.dart';
+import 'package:ente_strings/ente_strings.dart';
 import 'package:flutter/material.dart';
 
 class AddTagSheet extends StatefulWidget {
@@ -88,8 +88,8 @@ class _AddTagSheetState extends State<AddTagSheet> {
     String? newTag;
     await showTextInputDialog(
       context,
-      title: context.l10n.createNewTag,
-      submitButtonLabel: context.l10n.create,
+      title: context.strings.createNewTag,
+      submitButtonLabel: context.strings.create,
       useRootNavigator: true,
       onSubmit: (value) async => newTag = value.trim(),
     );
@@ -112,8 +112,8 @@ class _AddTagSheetState extends State<AddTagSheet> {
     return Semantics(
       identifier: 'auth_add_tag_sheet',
       child: BottomSheetComponent(
-        title: '${widget.selectedCodes.length} ${context.l10n.selected}',
-        closeTooltip: context.l10n.close,
+        title: '${widget.selectedCodes.length} ${context.strings.selected}',
+        closeTooltip: context.strings.close,
         content: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           mainAxisSize: MainAxisSize.min,
@@ -169,7 +169,7 @@ class _AddTagSheetState extends State<AddTagSheet> {
             ),
             const SizedBox(height: Spacing.xl),
             Text(
-              context.l10n.tags,
+              context.strings.tags,
               style: TextStyles.bodyBold.copyWith(color: colors.textBase),
             ),
             const SizedBox(height: Spacing.md),
@@ -206,7 +206,7 @@ class _AddTagSheetState extends State<AddTagSheet> {
                             );
                           }),
                           TagChip(
-                            label: context.l10n.addNew,
+                            label: context.strings.addNew,
                             iconData: Icons.add,
                             state: TagChipState.unselected,
                             onTap: _showCreateTagDialog,
@@ -218,7 +218,7 @@ class _AddTagSheetState extends State<AddTagSheet> {
           ],
         ),
         actions: [
-          ButtonComponent(label: context.l10n.done, onTap: _onDonePressed),
+          ButtonComponent(label: context.strings.done, onTap: _onDonePressed),
         ],
       ),
     );

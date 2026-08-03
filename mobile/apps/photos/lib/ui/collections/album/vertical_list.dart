@@ -2,6 +2,7 @@ import "dart:async";
 
 import "package:ente_components/ente_components.dart";
 import 'package:ente_pure_utils/ente_pure_utils.dart';
+import "package:ente_strings/ente_strings.dart";
 import 'package:flutter/material.dart';
 import "package:flutter/services.dart";
 import 'package:logging/logging.dart';
@@ -9,7 +10,6 @@ import 'package:photos/core/configuration.dart';
 import "package:photos/core/event_bus.dart";
 import "package:photos/events/create_new_album_event.dart";
 import "package:photos/events/tab_changed_event.dart";
-import "package:photos/generated/l10n.dart";
 import 'package:photos/models/collection/collection.dart';
 import 'package:photos/models/collection/collection_items.dart';
 import 'package:photos/models/selected_files.dart';
@@ -134,7 +134,7 @@ class _AlbumVerticalListWidgetState extends State<AlbumVerticalListWidget> {
         if (hasRecentCollections && adjustedIndex == 0) {
           return _buildSectionHeader(
             context,
-            AppLocalizations.of(context).recent,
+            StringsLocalizations.of(context).recent,
           );
         }
 
@@ -243,7 +243,7 @@ class _AlbumVerticalListWidgetState extends State<AlbumVerticalListWidget> {
       if (!context.mounted) return;
       showShortToast(
         context,
-        AppLocalizations.of(
+        StringsLocalizations.of(
           context,
         ).addedSuccessfullyTo(albumName: item.displayName),
       );
@@ -255,7 +255,7 @@ class _AlbumVerticalListWidgetState extends State<AlbumVerticalListWidget> {
   }
 
   Future<bool> _showAddToSharedAlbumSheet(BuildContext context) async {
-    final l10n = AppLocalizations.of(context);
+    final l10n = StringsLocalizations.of(context);
     final result = await showBottomSheetComponent<bool>(
       context: context,
       builder: (sheetContext) => BottomSheetComponent(
@@ -313,9 +313,9 @@ class _AlbumVerticalListWidgetState extends State<AlbumVerticalListWidget> {
     if (filesCount > 0) {
       final result = await showTextInputDialog(
         context,
-        title: AppLocalizations.of(context).albumTitle,
-        submitButtonLabel: AppLocalizations.of(context).ok,
-        hintText: AppLocalizations.of(context).enterAlbumName,
+        title: StringsLocalizations.of(context).albumTitle,
+        submitButtonLabel: StringsLocalizations.of(context).ok,
+        hintText: StringsLocalizations.of(context).enterAlbumName,
         onSubmit: (name) async {
           return await _nameAlbum(context, name);
         },
@@ -330,7 +330,10 @@ class _AlbumVerticalListWidgetState extends State<AlbumVerticalListWidget> {
       }
     } else {
       Navigator.pop(context);
-      showToast(context, AppLocalizations.of(context).createAlbumActionHint);
+      showToast(
+        context,
+        StringsLocalizations.of(context).createAlbumActionHint,
+      );
       Bus.instance.fire(
         TabChangedEvent(0, TabChangedEventSource.collectionsPage),
       );
@@ -409,7 +412,7 @@ class _AlbumVerticalListWidgetState extends State<AlbumVerticalListWidget> {
 
       if (widget.actionType == CollectionActionType.addFiles) {
         if (!context.mounted) return;
-        toastMessage = AppLocalizations.of(
+        toastMessage = StringsLocalizations.of(
           context,
         ).addedSuccessfullyTo(albumName: item.displayName);
         shouldNavigateToCollection = true;
@@ -417,21 +420,21 @@ class _AlbumVerticalListWidgetState extends State<AlbumVerticalListWidget> {
           widget.actionType == CollectionActionType.restoreFiles ||
           widget.actionType == CollectionActionType.unHide) {
         if (!context.mounted) return;
-        toastMessage = AppLocalizations.of(
+        toastMessage = StringsLocalizations.of(
           context,
         ).movedSuccessfullyTo(albumName: item.displayName);
         shouldNavigateToCollection = true;
       } else if (widget.actionType ==
           CollectionActionType.moveToHiddenCollection) {
         if (!context.mounted) return;
-        toastMessage = AppLocalizations.of(
+        toastMessage = StringsLocalizations.of(
           context,
         ).movedSuccessfullyTo(albumName: item.displayName);
         shouldNavigateToCollection = true;
         hasVerifiedLock = true;
       } else if (widget.actionType == CollectionActionType.addToHiddenAlbum) {
         if (!context.mounted) return;
-        toastMessage = AppLocalizations.of(
+        toastMessage = StringsLocalizations.of(
           context,
         ).addedSuccessfullyTo(albumName: item.displayName);
         shouldNavigateToCollection = true;
@@ -535,9 +538,9 @@ class _AlbumVerticalListWidgetState extends State<AlbumVerticalListWidget> {
     late final String message;
     if (widget.actionType == CollectionActionType.moveFiles ||
         widget.actionType == CollectionActionType.moveToHiddenCollection) {
-      message = AppLocalizations.of(context).movingFilesToAlbum;
+      message = StringsLocalizations.of(context).movingFilesToAlbum;
     } else {
-      message = AppLocalizations.of(context).unhidingFilesToAlbum;
+      message = StringsLocalizations.of(context).unhidingFilesToAlbum;
     }
 
     final dialog = createProgressDialog(context, message, isDismissible: true);
@@ -562,7 +565,7 @@ class _AlbumVerticalListWidgetState extends State<AlbumVerticalListWidget> {
       // ignore: unawaited_futures
       showErrorDialog(
         context,
-        AppLocalizations.of(context).oops,
+        StringsLocalizations.of(context).oops,
         e.message as String?,
       );
       return false;
@@ -581,7 +584,7 @@ class _AlbumVerticalListWidgetState extends State<AlbumVerticalListWidget> {
   ) async {
     final dialog = createProgressDialog(
       context,
-      AppLocalizations.of(context).restoringFiles,
+      StringsLocalizations.of(context).restoringFiles,
       isDismissible: true,
     );
     await dialog.show();
@@ -601,7 +604,7 @@ class _AlbumVerticalListWidgetState extends State<AlbumVerticalListWidget> {
       // ignore: unawaited_futures
       showErrorDialog(
         context,
-        AppLocalizations.of(context).oops,
+        StringsLocalizations.of(context).oops,
         e.message as String?,
       );
       return false;

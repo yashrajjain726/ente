@@ -1,8 +1,8 @@
 import "package:dotted_border/dotted_border.dart";
 import "package:ente_components/ente_components.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:hugeicons/hugeicons.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/models/user_details.dart";
 import "package:photos/ui/growth/change_referral_code_sheet.dart";
 import "package:photos/utils/dialog_util.dart";
@@ -78,8 +78,8 @@ class ReferralCodeWidget extends StatelessWidget {
                       .email;
                   showInfoDialog(
                     context,
-                    title: AppLocalizations.of(context).error,
-                    body: AppLocalizations.of(context)
+                    title: StringsLocalizations.of(context).error,
+                    body: StringsLocalizations.of(context)
                         .onlyFamilyAdminCanChangeCode(
                           familyAdminEmail: familyAdmin,
                         ),

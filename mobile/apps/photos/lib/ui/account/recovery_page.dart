@@ -1,7 +1,7 @@
 import "package:ente_components/ente_components.dart";
+import "package:ente_strings/ente_strings.dart";
 import 'package:flutter/material.dart';
 import 'package:photos/core/configuration.dart';
-import "package:photos/generated/l10n.dart";
 import 'package:photos/ui/account/password_entry_page.dart';
 import "package:photos/ui/components/alert_bottom_sheet.dart";
 import 'package:photos/ui/notification/toast.dart';
@@ -43,7 +43,7 @@ class _RecoveryPageState extends State<RecoveryPage> {
           },
         ),
         title: Text(
-          AppLocalizations.of(context).recoverAccount,
+          StringsLocalizations.of(context).recoverAccount,
           style: TextStyles.large.copyWith(color: colors.textBase),
         ),
         centerTitle: true,
@@ -53,7 +53,7 @@ class _RecoveryPageState extends State<RecoveryPage> {
         padding: const EdgeInsets.symmetric(horizontal: 16),
         child: ButtonComponent(
           key: const ValueKey("recoveryButton"),
-          label: AppLocalizations.of(context).logInLabel,
+          label: StringsLocalizations.of(context).logInLabel,
           isDisabled: !isFormValid,
           onTap: isFormValid ? _onRecoverPressed : null,
         ),
@@ -69,8 +69,8 @@ class _RecoveryPageState extends State<RecoveryPage> {
         children: [
           const SizedBox(height: 12),
           TextInputComponent(
-            label: AppLocalizations.of(context).recoveryKey,
-            hintText: AppLocalizations.of(context).enterYourRecoveryKey,
+            label: StringsLocalizations.of(context).recoveryKey,
+            hintText: StringsLocalizations.of(context).enterYourRecoveryKey,
             controller: _recoveryKeyController,
             keyboardType: TextInputType.multiline,
             maxLines: null,
@@ -84,7 +84,7 @@ class _RecoveryPageState extends State<RecoveryPage> {
           Align(
             alignment: Alignment.centerRight,
             child: ButtonComponent(
-              label: AppLocalizations.of(context).noRecoveryKey,
+              label: StringsLocalizations.of(context).forgotRecoveryKey,
               variant: ButtonComponentVariant.link,
               size: ButtonComponentSize.small,
               shouldSurfaceExecutionStates: false,
@@ -92,8 +92,8 @@ class _RecoveryPageState extends State<RecoveryPage> {
                 // ignore: unawaited_futures
                 showAlertBottomSheet(
                   context,
-                  title: AppLocalizations.of(context).sorry,
-                  message: AppLocalizations.of(
+                  title: StringsLocalizations.of(context).sorry,
+                  message: StringsLocalizations.of(
                     context,
                   ).noRecoveryKeyNoDecryption,
                   assetPath: 'assets/warning-grey.png',
@@ -110,14 +110,17 @@ class _RecoveryPageState extends State<RecoveryPage> {
     FocusScope.of(context).unfocus();
     final dialog = createProgressDialog(
       context,
-      AppLocalizations.of(context).decrypting,
+      StringsLocalizations.of(context).decrypting,
     );
     await dialog.show();
     try {
       await Configuration.instance.recover(_recoveryKeyController.text.trim());
       await dialog.hide();
       if (!mounted) return;
-      showShortToast(context, AppLocalizations.of(context).recoverySuccessful);
+      showShortToast(
+        context,
+        StringsLocalizations.of(context).recoverySuccessful,
+      );
       if (!mounted) return;
       // ignore: unawaited_futures
       Navigator.of(context).pushReplacement(
@@ -133,7 +136,9 @@ class _RecoveryPageState extends State<RecoveryPage> {
     } catch (e) {
       await dialog.hide();
       if (!mounted) return;
-      String errMessage = AppLocalizations.of(context).incorrectRecoveryKeyBody;
+      String errMessage = StringsLocalizations.of(
+        context,
+      ).incorrectRecoveryKeyBody;
       if (e is AssertionError) {
         errMessage = '$errMessage : ${e.message}';
       }
@@ -141,7 +146,7 @@ class _RecoveryPageState extends State<RecoveryPage> {
       // ignore: unawaited_futures
       showAlertBottomSheet(
         context,
-        title: AppLocalizations.of(context).incorrectRecoveryKeyTitle,
+        title: StringsLocalizations.of(context).incorrectRecoveryKeyTitle,
         message: errMessage,
         assetPath: 'assets/warning-grey.png',
       );

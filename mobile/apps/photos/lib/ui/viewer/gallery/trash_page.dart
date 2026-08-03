@@ -1,10 +1,10 @@
 import 'package:collection/collection.dart' show IterableExtension;
+import "package:ente_strings/ente_strings.dart";
 import 'package:flutter/material.dart';
 import 'package:photos/core/event_bus.dart';
 import 'package:photos/db/trash_db.dart';
 import 'package:photos/events/files_updated_event.dart';
 import 'package:photos/events/force_reload_trash_page_event.dart';
-import "package:photos/generated/l10n.dart";
 import 'package:photos/models/gallery_type.dart';
 import 'package:photos/models/selected_files.dart';
 import "package:photos/ui/components/empty_state_component.dart";
@@ -31,9 +31,9 @@ class TrashPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final appBar = GalleryAppBarWidget.sliverConfig(
       appBarType,
-      AppLocalizations.of(context).trash,
+      StringsLocalizations.of(context).trash,
       _selectedFiles,
-      subtitle: AppLocalizations.of(
+      subtitle: StringsLocalizations.of(
         context,
       ).itemsShowTheNumberOfDaysRemainingBeforePermanentDeletion,
     );
@@ -61,7 +61,9 @@ class TrashPage extends StatelessWidget {
       initialFiles: null,
       emptyState: EmptyStateComponent(
         assetPath: "assets/empty_state_trash.png",
-        title: AppLocalizations.of(context).deletedItemsStayHereForThirtyDays,
+        title: StringsLocalizations.of(
+          context,
+        ).deletedItemsStayHereForThirtyDays,
       ),
     );
 

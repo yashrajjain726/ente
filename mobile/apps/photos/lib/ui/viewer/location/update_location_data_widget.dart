@@ -1,10 +1,10 @@
 import "dart:async";
 
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:flutter_map/flutter_map.dart";
 import "package:latlong2/latlong.dart";
 import "package:logging/logging.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/models/file/file.dart";
 import "package:photos/models/location/location.dart";
 import "package:photos/service_locator.dart";
@@ -151,7 +151,7 @@ class _UpdateLocationDataWidgetState extends State<UpdateLocationDataWidget> {
                   if (selectedLocation.value == null) {
                     showShortToast(
                       context,
-                      AppLocalizations.of(context).selectALocationFirst,
+                      StringsLocalizations.of(context).selectALocationFirst,
                     );
                     return;
                   }
@@ -251,11 +251,13 @@ class _UpdateLocationInfoState extends State<UpdateLocationInfo> {
           ? CrossFadeState.showFirst
           : CrossFadeState.showSecond,
       firstChild: Text(
-        AppLocalizations.of(context).selectALocation,
+        StringsLocalizations.of(context).selectALocation,
         style: getEnteTextTheme(context).mini,
       ),
       secondChild: Text(
-        AppLocalizations.of(context).editsToLocationWillOnlyBeSeenWithinEnte,
+        StringsLocalizations.of(
+          context,
+        ).editsToLocationWillOnlyBeSeenWithinEnte,
         style: getEnteTextTheme(context).mini,
       ),
       layoutBuilder: (topChild, topChildKey, bottomChild, bottomChildKey) {

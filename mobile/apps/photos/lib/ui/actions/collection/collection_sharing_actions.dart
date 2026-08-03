@@ -2,13 +2,13 @@ import "dart:async";
 
 import 'package:ente_components/ente_components.dart';
 import 'package:ente_pure_utils/ente_pure_utils.dart' hide isValidEmail;
+import "package:ente_strings/ente_strings.dart";
 import 'package:flutter/material.dart';
 import 'package:logging/logging.dart';
 import 'package:photos/core/configuration.dart';
 import "package:photos/core/errors.dart";
 import 'package:photos/db/files_db.dart';
 import 'package:photos/gateways/collections/models/create_request.dart';
-import "package:photos/generated/l10n.dart";
 import "package:photos/models/api/collection/user.dart";
 import 'package:photos/models/button_result.dart';
 import 'package:photos/models/collection/collection.dart';
@@ -73,7 +73,7 @@ class CollectionActions {
           shouldStickToDarkTheme: true,
           buttonAction: ButtonAction.first,
           shouldSurfaceExecutionStates: true,
-          labelText: AppLocalizations.of(context).yesRemove,
+          labelText: StringsLocalizations.of(context).yesRemove,
           onTap: () async {
             // for quickLink collection, we need to trash the collection
             if (collection.isQuickLinkCollection() && !collection.hasSharees) {
@@ -88,13 +88,13 @@ class CollectionActions {
           buttonAction: ButtonAction.cancel,
           isInAlert: true,
           shouldStickToDarkTheme: true,
-          labelText: AppLocalizations.of(context).cancel,
+          labelText: StringsLocalizations.of(context).cancel,
         ),
       ],
-      title: AppLocalizations.of(context).removePublicLink,
+      title: StringsLocalizations.of(context).removePublicLink,
       body:
           //'This will remove the public link for accessing "${collection.name}".',
-          AppLocalizations.of(
+          StringsLocalizations.of(
             context,
           ).disableLinkMessage(albumName: collection.displayName),
     );
@@ -182,7 +182,7 @@ class CollectionActions {
           shouldStickToDarkTheme: true,
           buttonAction: ButtonAction.first,
           shouldSurfaceExecutionStates: true,
-          labelText: AppLocalizations.of(context).yesRemove,
+          labelText: StringsLocalizations.of(context).yesRemove,
           onTap: () async {
             final newSharees = await CollectionsService.instance.unshare(
               collection.id,
@@ -196,13 +196,13 @@ class CollectionActions {
           buttonAction: ButtonAction.cancel,
           isInAlert: true,
           shouldStickToDarkTheme: true,
-          labelText: AppLocalizations.of(context).cancel,
+          labelText: StringsLocalizations.of(context).cancel,
         ),
       ],
-      title: AppLocalizations.of(context).removeWithQuestionMark,
-      body: AppLocalizations.of(
+      title: StringsLocalizations.of(context).removeWithQuestionMark,
+      body: StringsLocalizations.of(
         context,
-      ).removeParticipantBody(userEmail: resolveDisplayName(user)),
+      ).removeAlbumParticipantBody(userEmail: resolveDisplayName(user)),
     );
     if (actionResult?.action != null) {
       if (actionResult!.action == ButtonAction.error) {
@@ -227,7 +227,7 @@ class CollectionActions {
     if (showProgress) {
       dialog = createProgressDialog(
         context,
-        AppLocalizations.of(context).sharing,
+        StringsLocalizations.of(context).sharing,
         isDismissible: true,
       );
       await dialog.show();
@@ -265,15 +265,15 @@ class CollectionActions {
     if (!isValidEmail(email)) {
       await showErrorDialog(
         context,
-        AppLocalizations.of(context).invalidEmailAddress,
-        AppLocalizations.of(context).enterValidEmail,
+        StringsLocalizations.of(context).invalidEmailAddress,
+        StringsLocalizations.of(context).enterValidEmail,
       );
       return false;
     } else if (email.trim() == Configuration.instance.getEmail()) {
       await showErrorDialog(
         context,
-        AppLocalizations.of(context).oops,
-        AppLocalizations.of(context).youCannotShareWithYourself,
+        StringsLocalizations.of(context).oops,
+        StringsLocalizations.of(context).youCannotShareWithYourself,
       );
       return false;
     }
@@ -283,7 +283,7 @@ class CollectionActions {
     if (showProgress) {
       dialog = createProgressDialog(
         context,
-        AppLocalizations.of(context).sharing,
+        StringsLocalizations.of(context).sharing,
         isDismissible: true,
       );
       await dialog.show();
@@ -306,20 +306,24 @@ class CollectionActions {
       if (!context.mounted) return false;
       await showDialogWidget(
         context: context,
-        title: AppLocalizations.of(context).inviteToEnte,
+        title: StringsLocalizations.of(context).inviteToEnte,
         icon: Icons.info_outline,
-        body: AppLocalizations.of(context).emailNoEnteAccount(email: email),
+        body: StringsLocalizations.of(
+          context,
+        ).emailNoEnteAccountPhotos(email: email),
         isDismissible: true,
         buttons: [
           ButtonWidget(
             buttonType: ButtonType.neutral,
             icon: Icons.adaptive.share,
-            labelText: AppLocalizations.of(context).sendInvite,
+            labelText: StringsLocalizations.of(context).sendInvite,
             isInAlert: true,
             onTap: () async {
               unawaited(
                 shareText(
-                  AppLocalizations.of(context).shareTextRecommendUsingEnte,
+                  StringsLocalizations.of(
+                    context,
+                  ).shareTextRecommendUsingEnteForPhotos,
                 ),
               );
             },
@@ -359,8 +363,8 @@ class CollectionActions {
   ) async {
     return _showDeleteCollectionConfirmationSheet(
       context: context,
-      title: AppLocalizations.of(context).deleteMultipleAlbumsQuestion,
-      message: AppLocalizations.of(
+      title: StringsLocalizations.of(context).deleteMultipleAlbumsQuestion,
+      message: StringsLocalizations.of(
         context,
       ).deleteMultipleAlbumDialog(count: collections.length),
       keepPhotos: () async {
@@ -407,8 +411,8 @@ class CollectionActions {
     if (!bContext.mounted) return false;
     return _showDeleteCollectionConfirmationSheet(
       context: bContext,
-      title: AppLocalizations.of(bContext).deleteAlbumQuestion,
-      message: AppLocalizations.of(bContext).deleteAlbumDialog,
+      title: StringsLocalizations.of(bContext).deleteAlbumQuestion,
+      message: StringsLocalizations.of(bContext).deleteAlbumDialog,
       keepPhotos: () async {
         try {
           await trashCollectionKeepingPhotos(collection);
@@ -435,7 +439,7 @@ class CollectionActions {
     required Future<void> Function() keepPhotos,
     required Future<void> Function() deletePhotos,
   }) async {
-    final l10n = AppLocalizations.of(context);
+    final l10n = StringsLocalizations.of(context);
     final actionResult = await showBottomSheetComponent<ButtonResult>(
       context: context,
       builder: (sheetContext) {
@@ -562,9 +566,9 @@ class CollectionActions {
     final actionResult = await showChoiceActionSheet(
       context,
       isCritical: true,
-      title: AppLocalizations.of(context).deleteSharedAlbum,
-      firstButtonLabel: AppLocalizations.of(context).deleteAlbum,
-      body: AppLocalizations.of(context).deleteSharedAlbumDialogBody,
+      title: StringsLocalizations.of(context).deleteSharedAlbum,
+      firstButtonLabel: StringsLocalizations.of(context).deleteAlbum,
+      body: StringsLocalizations.of(context).deleteSharedAlbumDialogBody,
     );
     return actionResult?.action != null &&
         actionResult!.action == ButtonAction.first;
@@ -635,7 +639,7 @@ class CollectionActions {
       if (context != null && context.mounted) {
         showShortToast(
           context,
-          AppLocalizations.of(context).canOnlyRemoveFilesOwnedByYou,
+          StringsLocalizations.of(context).canOnlyRemoveFilesOwnedByYou,
         );
       }
       return;
@@ -779,8 +783,8 @@ class CollectionActions {
 
   Future<void> _showUnSupportedAlert(BuildContext context) async {
     final AlertDialog alert = AlertDialog(
-      title: Text(AppLocalizations.of(context).sorry),
-      content: Text(AppLocalizations.of(context).subscribeToEnableSharing),
+      title: Text(StringsLocalizations.of(context).sorry),
+      content: Text(StringsLocalizations.of(context).subscribeToEnableSharing),
       actions: [
         ButtonWidget(
           buttonType: ButtonType.primary,
@@ -788,7 +792,7 @@ class CollectionActions {
           shouldStickToDarkTheme: false,
           buttonAction: ButtonAction.first,
           shouldSurfaceExecutionStates: true,
-          labelText: AppLocalizations.of(context).subscribe,
+          labelText: StringsLocalizations.of(context).subscribe,
           onTap: () async {
             // for quickLink collection, we need to trash the collection
             Navigator.of(context)
@@ -809,7 +813,7 @@ class CollectionActions {
             buttonAction: ButtonAction.cancel,
             isInAlert: true,
             shouldStickToDarkTheme: false,
-            labelText: AppLocalizations.of(context).ok,
+            labelText: StringsLocalizations.of(context).ok,
           ),
         ),
       ],

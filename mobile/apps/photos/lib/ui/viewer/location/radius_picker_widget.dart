@@ -1,7 +1,7 @@
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:flutter/services.dart";
 import "package:logging/logging.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/states/location_state.dart";
 import "package:photos/theme/colors.dart";
 import "package:photos/theme/ente_theme.dart";
@@ -92,7 +92,7 @@ class _RadiusPickerWidgetState extends State<RadiusPickerWidget> {
                 Expanded(
                   flex: 5,
                   child: Text(
-                    AppLocalizations.of(context).kiloMeterUnit,
+                    StringsLocalizations.of(context).kiloMeterUnit,
                     style: textTheme.miniMuted,
                   ),
                 ),
@@ -110,7 +110,7 @@ class _RadiusPickerWidgetState extends State<RadiusPickerWidget> {
               children: [
                 const SizedBox(height: 4),
                 Text(
-                  AppLocalizations.of(context).radius,
+                  StringsLocalizations.of(context).radius,
                   style: textTheme.body,
                 ),
                 const SizedBox(height: 16),
@@ -179,7 +179,7 @@ class _RadiusPickerWidgetState extends State<RadiusPickerWidget> {
   Future<void> _customRadiusOnTap() async {
     final result = await showTextInputDialog(
       context,
-      title: AppLocalizations.of(context).setRadius,
+      title: StringsLocalizations.of(context).setRadius,
       onSubmit: (customRadius) async {
         final radius = double.tryParse(customRadius);
         if (radius != null) {
@@ -194,10 +194,10 @@ class _RadiusPickerWidgetState extends State<RadiusPickerWidget> {
           throw Exception("Radius is null");
         }
       },
-      submitButtonLabel: AppLocalizations.of(context).setLabel,
+      submitButtonLabel: StringsLocalizations.of(context).setLabel,
       textInputFormatter: [NumberWithDecimalInputFormatter(maxValue: 10000)],
       textInputType: const TextInputType.numberWithOptions(decimal: true),
-      message: AppLocalizations.of(context).distanceInKMUnit,
+      message: StringsLocalizations.of(context).distanceInKMUnit,
       alignMessage: Alignment.centerRight,
     );
     if (result is Exception) {

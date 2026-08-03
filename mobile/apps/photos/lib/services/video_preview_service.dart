@@ -6,6 +6,7 @@ import "dart:io";
 import "package:collection/collection.dart";
 import "package:dio/dio.dart";
 import "package:encrypt/encrypt.dart" as enc;
+import "package:ente_strings/ente_strings.dart";
 import "package:ffmpeg_kit_flutter/ffmpeg_kit.dart";
 import "package:ffmpeg_kit_flutter/return_code.dart";
 import "package:flutter/foundation.dart";
@@ -23,7 +24,6 @@ import "package:photos/events/sync_status_update_event.dart";
 import "package:photos/events/video_preview_state_changed_event.dart";
 import "package:photos/events/video_streaming_changed.dart";
 import "package:photos/gateways/files/file_data_gateway.dart";
-import "package:photos/generated/intl/app_localizations.dart";
 import "package:photos/models/base/id.dart";
 import "package:photos/models/ffmpeg/ffprobe_props.dart";
 import "package:photos/models/file/extensions/file_props.dart";
@@ -415,7 +415,7 @@ class VideoPreviewService {
           if (ctx != null && ctx.mounted) {
             showShortToast(
               ctx,
-              AppLocalizations.of(ctx).videoPreviewAlreadyExists,
+              StringsLocalizations.of(ctx).videoPreviewAlreadyExists,
             );
           }
           removeFile = true;

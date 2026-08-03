@@ -1,7 +1,7 @@
 import "package:ente_components/ente_components.dart";
 import "package:ente_pure_utils/ente_pure_utils.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/models/collection/collection.dart";
 import "package:photos/ui/collections/album/smart_album_people.dart";
 import "package:photos/ui/viewer/gallery/hooks/add_photos_sheet.dart";
@@ -26,7 +26,7 @@ class EmptyAlbumState extends StatelessWidget {
               Image.asset("assets/albums-widget-static.png", height: 160),
               const SizedBox(height: 16),
               Text(
-                AppLocalizations.of(
+                StringsLocalizations.of(
                   context,
                 ).startWithAddingPhotosOrFamiliarFaces,
                 style: TextStyles.display2.copyWith(color: colors.textBase),
@@ -43,7 +43,7 @@ class EmptyAlbumState extends StatelessWidget {
             children: [
               ButtonComponent(
                 variant: ButtonComponentVariant.primary,
-                label: AppLocalizations.of(context).addPhotos,
+                label: StringsLocalizations.of(context).addPhotos,
                 shouldSurfaceExecutionStates: false,
                 onTap: () async {
                   try {
@@ -57,7 +57,7 @@ class EmptyAlbumState extends StatelessWidget {
               const SizedBox(height: 12),
               ButtonComponent(
                 variant: ButtonComponentVariant.neutral,
-                label: AppLocalizations.of(context).autoAddPeople,
+                label: StringsLocalizations.of(context).autoAddPeople,
                 shouldSurfaceExecutionStates: false,
                 onTap: () async {
                   await routeToPage(

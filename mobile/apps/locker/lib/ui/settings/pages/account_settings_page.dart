@@ -6,12 +6,12 @@ import "package:ente_accounts/pages/password_entry_page.dart";
 import "package:ente_components/ente_components.dart";
 import "package:ente_crypto_api/ente_crypto_api.dart";
 import "package:ente_lock_screen/local_authentication_service.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:ente_strings/extensions.dart";
 import "package:ente_ui/utils/dialog_util.dart";
 import "package:ente_utils/email_util.dart";
 import "package:flutter/material.dart";
 import "package:hugeicons/hugeicons.dart";
-import "package:locker/l10n/l10n.dart";
 import "package:locker/services/configuration.dart";
 import "package:locker/ui/components/recovery_key_sheet.dart";
 import "package:locker/ui/pages/home_page.dart";
@@ -23,7 +23,7 @@ class AccountSettingsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = context.l10n;
+    final l10n = context.strings;
 
     return SettingsPageScaffold(
       title: l10n.account,
@@ -60,7 +60,7 @@ class AccountSettingsPage extends StatelessWidget {
   }
 
   Future<void> _onChangeEmailTapped(BuildContext context) async {
-    final l10n = context.l10n;
+    final l10n = context.strings;
     final hasAuthenticated = await LocalAuthenticationService.instance
         .requestLocalAuthentication(context, l10n.authToChangeYourEmail);
     if (!context.mounted || !hasAuthenticated) {
@@ -71,7 +71,7 @@ class AccountSettingsPage extends StatelessWidget {
   }
 
   Future<void> _onRecoveryKeyTapped(BuildContext context) async {
-    final l10n = context.l10n;
+    final l10n = context.strings;
     final hasAuthenticated = await LocalAuthenticationService.instance
         .requestLocalAuthentication(context, l10n.authToViewYourRecoveryKey);
     if (!context.mounted || !hasAuthenticated) {
@@ -104,7 +104,7 @@ class AccountSettingsPage extends StatelessWidget {
   }
 
   Future<void> _onChangePasswordTapped(BuildContext context) async {
-    final l10n = context.l10n;
+    final l10n = context.strings;
     final hasAuthenticated = await LocalAuthenticationService.instance
         .requestLocalAuthentication(context, l10n.authToChangeYourPassword);
     if (!context.mounted || !hasAuthenticated) {
@@ -125,7 +125,7 @@ class AccountSettingsPage extends StatelessWidget {
   }
 
   Future<void> _onDeleteAccountTapped(BuildContext context) async {
-    final l10n = context.l10n;
+    final l10n = context.strings;
     final hasAuthenticated = await LocalAuthenticationService.instance
         .requestLocalAuthentication(
           context,

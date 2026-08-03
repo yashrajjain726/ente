@@ -1,7 +1,7 @@
 import 'package:clipboard/clipboard.dart';
-import 'package:ente_auth/l10n/l10n.dart';
 import 'package:ente_auth/utils/toast_util.dart';
 import 'package:ente_components/ente_components.dart';
+import 'package:ente_strings/ente_strings.dart';
 import 'package:flutter/material.dart';
 import 'package:hugeicons/hugeicons.dart';
 
@@ -17,8 +17,8 @@ Future<void> showNotesDialog(BuildContext context, String note) async {
       return Semantics(
         identifier: 'auth_notes_sheet',
         child: BottomSheetComponent(
-          title: sheetContext.l10n.notes,
-          closeTooltip: sheetContext.l10n.close,
+          title: sheetContext.strings.notes,
+          closeTooltip: sheetContext.strings.close,
           content: Container(
             width: double.infinity,
             constraints: BoxConstraints(
@@ -70,7 +70,7 @@ Future<void> showNotesDialog(BuildContext context, String note) async {
                 if (!sheetContext.mounted) return;
                 Navigator.of(sheetContext).pop();
                 if (!context.mounted) return;
-                showToast(context, context.l10n.copiedToClipboard);
+                showToast(context, context.strings.copiedToClipboard);
               },
             ),
           ],

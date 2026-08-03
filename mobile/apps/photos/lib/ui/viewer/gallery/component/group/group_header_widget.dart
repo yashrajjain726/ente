@@ -1,10 +1,10 @@
 import "package:ente_components/ente_components.dart" as components;
 import "package:ente_components/theme/text_styles.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:flutter/services.dart";
 import "package:flutter_animate/flutter_animate.dart";
 import "package:photos/core/constants.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/models/file/dummy_file.dart";
 import "package:photos/models/file/file.dart";
 import "package:photos/models/selected_files.dart";
@@ -100,11 +100,14 @@ class _GroupHeaderWidgetState extends State<GroupHeaderWidget> {
               child: Text(
                 widget.title,
                 style:
-                    (widget.title == AppLocalizations.of(context).dayToday ||
-                        widget.title == AppLocalizations.of(context).thisWeek ||
+                    (widget.title ==
+                            StringsLocalizations.of(context).dayToday ||
                         widget.title ==
-                            AppLocalizations.of(context).thisMonth ||
-                        widget.title == AppLocalizations.of(context).thisYear)
+                            StringsLocalizations.of(context).thisWeek ||
+                        widget.title ==
+                            StringsLocalizations.of(context).thisMonth ||
+                        widget.title ==
+                            StringsLocalizations.of(context).thisYear)
                     ? textStyle
                     : textStyle.copyWith(color: colorScheme.textMuted),
                 maxLines: 1,

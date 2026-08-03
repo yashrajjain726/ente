@@ -1,11 +1,11 @@
 import 'dart:io';
 
 import 'package:backup_exclusion/backup_exclusion.dart';
-import 'package:ente_auth/l10n/l10n.dart';
 import 'package:ente_auth/models/code.dart';
 import 'package:ente_auth/ui/settings/data/import/google_auth_qr_parser.dart';
 import 'package:ente_auth/utils/dialog_util.dart';
 import 'package:ente_qr/ente_qr.dart';
+import 'package:ente_strings/ente_strings.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:logging/logging.dart';
@@ -149,7 +149,7 @@ Future<GalleryImportResult?> pickCodeFromImage(
   Logger? logger,
   bool pickFromFiles = false,
 }) async {
-  final l10n = context.l10n;
+  final l10n = context.strings;
 
   try {
     if (!context.mounted) return null;
@@ -187,7 +187,7 @@ Future<GalleryImportResult?> pickCodeFromImage(
           if (!context.mounted) return null;
           await showErrorDialog(
             context,
-            l10n.errorInvalidQRCode,
+            l10n.invalidQRCode,
             l10n.errorInvalidQRCodeBody,
             showContactSupport: false,
           );

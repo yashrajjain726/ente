@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:ente_auth/events/codes_updated_event.dart';
-import "package:ente_auth/l10n/l10n.dart";
 import 'package:ente_auth/models/all_icon_data.dart';
 import 'package:ente_auth/models/code.dart';
 import 'package:ente_auth/models/code_display.dart';
@@ -17,6 +16,7 @@ import 'package:ente_auth/utils/toast_util.dart';
 import 'package:ente_auth/utils/totp_util.dart';
 import 'package:ente_components/ente_components.dart';
 import 'package:ente_events/event_bus.dart';
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import 'package:flutter/services.dart';
 import 'package:logging/logging.dart';
@@ -99,7 +99,10 @@ class _SetupEnterSecretKeyPageState extends State<SetupEnterSecretKeyPage> {
         _notesController.selection = TextSelection.fromPosition(
           TextPosition(offset: _notesController.text.length),
         );
-        showToast(context, context.l10n.notesLengthLimit(_notesLimit));
+        showToast(
+          context,
+          context.strings.notesLengthLimit(count: _notesLimit),
+        );
       }
     });
 
@@ -143,7 +146,7 @@ class _SetupEnterSecretKeyPageState extends State<SetupEnterSecretKeyPage> {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = context.l10n;
+    final l10n = context.strings;
     return AuthSettingsPageScaffold(
       title: l10n.importAccountPageTitle,
       children: [
@@ -232,7 +235,7 @@ class _SetupEnterSecretKeyPageState extends State<SetupEnterSecretKeyPage> {
                   Semantics(
                     identifier: 'auth_manual_save',
                     child: ButtonComponent(
-                      label: l10n.saveAction,
+                      label: l10n.save,
                       onTap: _validateAndSave,
                     ),
                   ),
@@ -252,7 +255,7 @@ class _SetupEnterSecretKeyPageState extends State<SetupEnterSecretKeyPage> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          context.l10n.tags,
+          context.strings.tags,
           style: TextStyles.bodyBold.copyWith(color: colors.textBase),
         ),
         const SizedBox(height: Spacing.sm),
@@ -270,10 +273,10 @@ class _SetupEnterSecretKeyPageState extends State<SetupEnterSecretKeyPage> {
               ),
             Semantics(
               button: true,
-              label: context.l10n.addTag,
+              label: context.strings.addTag,
               identifier: 'auth_manual_add_tag',
               child: TagChipComponent(
-                label: context.l10n.addTag,
+                label: context.strings.addTag,
                 leading: const Icon(Icons.add, size: IconSizes.small),
                 onTap: _createTag,
               ),
@@ -295,9 +298,9 @@ class _SetupEnterSecretKeyPageState extends State<SetupEnterSecretKeyPage> {
   Future<void> _createTag() async {
     await showTextInputDialog(
       context,
-      title: context.l10n.createNewTag,
-      label: context.l10n.tag,
-      submitButtonLabel: context.l10n.create,
+      title: context.strings.createNewTag,
+      label: context.strings.tag,
+      submitButtonLabel: context.strings.create,
       maxLength: 100,
       onSubmit: (value) async {
         final tag = value.trim();
@@ -318,12 +321,12 @@ class _SetupEnterSecretKeyPageState extends State<SetupEnterSecretKeyPage> {
           children: [
             Semantics(
               button: true,
-              label: context.l10n.advanced,
+              label: context.strings.advanced,
               identifier: 'auth_manual_advanced',
               child: MenuGroupComponent(
                 items: [
                   MenuComponent(
-                    title: context.l10n.advanced,
+                    title: context.strings.advanced,
                     trailing: Icon(
                       isExpanded
                           ? Icons.keyboard_arrow_up
@@ -352,10 +355,10 @@ class _SetupEnterSecretKeyPageState extends State<SetupEnterSecretKeyPage> {
                             items: [
                               Semantics(
                                 button: true,
-                                label: context.l10n.algorithm,
+                                label: context.strings.algorithm,
                                 identifier: 'auth_manual_algorithm',
                                 child: MenuComponent(
-                                  title: context.l10n.algorithm,
+                                  title: context.strings.algorithm,
                                   subtitle: _algorithm.name.toUpperCase(),
                                   trailing: const Icon(
                                     Icons.chevron_right_outlined,
@@ -365,10 +368,10 @@ class _SetupEnterSecretKeyPageState extends State<SetupEnterSecretKeyPage> {
                               ),
                               Semantics(
                                 button: true,
-                                label: context.l10n.type,
+                                label: context.strings.type,
                                 identifier: 'auth_manual_type',
                                 child: MenuComponent(
-                                  title: context.l10n.type,
+                                  title: context.strings.type,
                                   subtitle: _type.name.toUpperCase(),
                                   trailing: const Icon(
                                     Icons.chevron_right_outlined,
@@ -388,7 +391,7 @@ class _SetupEnterSecretKeyPageState extends State<SetupEnterSecretKeyPage> {
                                   identifier: 'auth_manual_period',
                                   child: TextInputComponent(
                                     controller: _periodController,
-                                    label: context.l10n.period,
+                                    label: context.strings.period,
                                     keyboardType: TextInputType.number,
                                     inputFormatters: [
                                       FilteringTextInputFormatter.digitsOnly,
@@ -403,7 +406,7 @@ class _SetupEnterSecretKeyPageState extends State<SetupEnterSecretKeyPage> {
                                   identifier: 'auth_manual_digits',
                                   child: TextInputComponent(
                                     controller: _digitsController,
-                                    label: context.l10n.digits,
+                                    label: context.strings.digits,
                                     keyboardType: TextInputType.number,
                                     inputFormatters: [
                                       FilteringTextInputFormatter.digitsOnly,
@@ -425,7 +428,7 @@ class _SetupEnterSecretKeyPageState extends State<SetupEnterSecretKeyPage> {
 
   Future<void> _selectAlgorithm() async {
     final selected = await _showOptionPicker<Algorithm>(
-      title: context.l10n.algorithm,
+      title: context.strings.algorithm,
       values: Algorithm.values,
       selected: _algorithm,
       labelFor: (value) => value.name.toUpperCase(),
@@ -435,7 +438,7 @@ class _SetupEnterSecretKeyPageState extends State<SetupEnterSecretKeyPage> {
 
   Future<void> _selectType() async {
     final selected = await _showOptionPicker<Type>(
-      title: context.l10n.type,
+      title: context.strings.type,
       values: Type.values,
       selected: _type,
       labelFor: (value) => value.name.toUpperCase(),
@@ -453,7 +456,7 @@ class _SetupEnterSecretKeyPageState extends State<SetupEnterSecretKeyPage> {
       context: context,
       builder: (sheetContext) => BottomSheetComponent(
         title: title,
-        closeTooltip: sheetContext.l10n.close,
+        closeTooltip: sheetContext.strings.close,
         content: MenuGroupComponent(
           showDividers: true,
           items: [
@@ -501,7 +504,7 @@ class _SetupEnterSecretKeyPageState extends State<SetupEnterSecretKeyPage> {
         period == null) {
       final String message;
       if (_secretController.text.trim().isEmpty) {
-        message = context.l10n.secretCanNotBeEmpty;
+        message = context.strings.secretCanNotBeEmpty;
       } else if (_digitsController.text.isEmpty) {
         message = 'Digits cannot be empty';
       } else if (digits == null) {
@@ -511,7 +514,7 @@ class _SetupEnterSecretKeyPageState extends State<SetupEnterSecretKeyPage> {
       } else if (period == null) {
         message = 'Period is not an integer';
       } else {
-        message = context.l10n.bothIssuerAndAccountCanNotBeEmpty;
+        message = context.strings.bothIssuerAndAccountCanNotBeEmpty;
       }
       _showIncorrectDetailsDialog(context, message: message);
       return;
@@ -552,11 +555,11 @@ class _SetupEnterSecretKeyPageState extends State<SetupEnterSecretKeyPage> {
       if (widget.code != null && widget.code!.secret != secret) {
         ButtonResult? result = await showChoiceActionSheet(
           context,
-          title: context.l10n.warning,
-          body: context.l10n.confirmUpdatingkey,
-          firstButtonLabel: context.l10n.yes,
+          title: context.strings.warning,
+          body: context.strings.confirmUpdatingkey,
+          firstButtonLabel: context.strings.yes,
           secondButtonAction: ButtonAction.cancel,
-          secondButtonLabel: context.l10n.cancel,
+          secondButtonLabel: context.strings.cancel,
         );
         if (result == null) return;
         if (result.action != ButtonAction.first) {
@@ -599,8 +602,8 @@ class _SetupEnterSecretKeyPageState extends State<SetupEnterSecretKeyPage> {
   void _showIncorrectDetailsDialog(BuildContext context, {String? message}) {
     showErrorDialog(
       context,
-      context.l10n.incorrectDetails,
-      message ?? context.l10n.pleaseVerifyDetails,
+      context.strings.incorrectDetails,
+      message ?? context.strings.pleaseVerifyDetails,
     );
   }
 

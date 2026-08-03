@@ -4,11 +4,11 @@ import "package:ente_components/ente_components.dart";
 import 'package:ente_crypto/ente_crypto.dart';
 import 'package:ente_lock_screen/local_authentication_service.dart';
 import 'package:ente_pure_utils/ente_pure_utils.dart';
+import "package:ente_strings/ente_strings.dart";
 import 'package:flutter/material.dart';
 import 'package:logging/logging.dart';
 import 'package:photos/core/event_bus.dart';
 import 'package:photos/events/notification_event.dart';
-import "package:photos/generated/l10n.dart";
 import "package:photos/service_locator.dart";
 import 'package:photos/services/account/user_service.dart';
 import 'package:photos/ui/account/recovery_key_page.dart';
@@ -36,7 +36,7 @@ class _VerifyRecoveryPageState extends State<VerifyRecoveryPage> {
   void _verifyRecoveryKey() async {
     final dialog = createProgressDialog(
       context,
-      AppLocalizations.of(context).verifyingRecoveryKey,
+      StringsLocalizations.of(context).verifyingRecoveryKey,
     );
     await dialog.show();
     try {
@@ -55,8 +55,8 @@ class _VerifyRecoveryPageState extends State<VerifyRecoveryPage> {
             if (!mounted) return;
             await showAlertBottomSheet(
               context,
-              title: AppLocalizations.of(context).noInternetConnection,
-              message: AppLocalizations.of(
+              title: StringsLocalizations.of(context).noInternetConnection,
+              message: StringsLocalizations.of(
                 context,
               ).pleaseCheckYourInternetConnectionAndTryAgain,
               assetPath: 'assets/warning-grey.png',
@@ -72,8 +72,8 @@ class _VerifyRecoveryPageState extends State<VerifyRecoveryPage> {
         if (!mounted) return;
         await showAlertBottomSheet(
           context,
-          title: AppLocalizations.of(context).recoveryKeyVerified,
-          message: AppLocalizations.of(context).recoveryKeySuccessBody,
+          title: StringsLocalizations.of(context).recoveryKeyVerified,
+          message: StringsLocalizations.of(context).recoveryKeySuccessBody,
           assetPath: 'assets/warning-grey.png',
         );
         if (!mounted) return;
@@ -85,14 +85,16 @@ class _VerifyRecoveryPageState extends State<VerifyRecoveryPage> {
       _logger.severe("failed to verify recovery key", e, s);
       await dialog.hide();
       if (!mounted) return;
-      final String errMessage = AppLocalizations.of(context).invalidRecoveryKey;
+      final String errMessage = StringsLocalizations.of(
+        context,
+      ).invalidRecoveryKey;
       if (!mounted) return;
       final result = await showChoiceDialog(
         context,
-        title: AppLocalizations.of(context).invalidKey,
+        title: StringsLocalizations.of(context).invalidKey,
         body: errMessage,
-        firstButtonLabel: AppLocalizations.of(context).tryAgain,
-        secondButtonLabel: AppLocalizations.of(context).viewRecoveryKey,
+        firstButtonLabel: StringsLocalizations.of(context).tryAgain,
+        secondButtonLabel: StringsLocalizations.of(context).viewRecoveryKey,
         secondButtonAction: ButtonAction.second,
       );
       if (result?.action == ButtonAction.second) {
@@ -120,7 +122,7 @@ class _VerifyRecoveryPageState extends State<VerifyRecoveryPage> {
           context,
           RecoveryKeyPage(
             recoveryKey,
-            AppLocalizations.of(context).ok,
+            StringsLocalizations.of(context).ok,
             isOnboarding: false,
             onDone: () {
               Navigator.of(context).pop();
@@ -168,14 +170,16 @@ class _VerifyRecoveryPageState extends State<VerifyRecoveryPage> {
                       SizedBox(
                         width: double.infinity,
                         child: Text(
-                          AppLocalizations.of(context).confirmRecoveryKey,
+                          StringsLocalizations.of(context).confirmRecoveryKey,
                           style: TextStyles.h1.copyWith(color: colors.textBase),
                           textAlign: TextAlign.left,
                         ),
                       ),
                       const SizedBox(height: 18),
                       Text(
-                        AppLocalizations.of(context).recoveryKeyVerifyReason,
+                        StringsLocalizations.of(
+                          context,
+                        ).recoveryKeyVerifyReason,
                         style: TextStyles.mini.copyWith(
                           color: colors.textLight,
                         ),
@@ -183,7 +187,7 @@ class _VerifyRecoveryPageState extends State<VerifyRecoveryPage> {
                       const SizedBox(height: 12),
                       TextInputComponent(
                         controller: _recoveryKey,
-                        hintText: AppLocalizations.of(
+                        hintText: StringsLocalizations.of(
                           context,
                         ).enterYourRecoveryKey,
                         autocorrect: false,
@@ -205,7 +209,7 @@ class _VerifyRecoveryPageState extends State<VerifyRecoveryPage> {
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
                               ButtonComponent(
-                                label: AppLocalizations.of(context).confirm,
+                                label: StringsLocalizations.of(context).confirm,
                                 onTap: _verifyRecoveryKey,
                               ),
                               const SizedBox(height: 8),

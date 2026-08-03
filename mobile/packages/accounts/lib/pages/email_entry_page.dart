@@ -395,7 +395,7 @@ class _EmailEntryPageState extends State<EmailEntryPage> {
                             padding: const EdgeInsets.symmetric(vertical: 8),
                             child: Text(
                               context.strings.passwordStrength(
-                                passwordStrengthText,
+                                passwordStrengthValue: passwordStrengthText,
                               ),
                               style: TextStyle(
                                 color: passwordStrengthColor,
@@ -408,7 +408,7 @@ class _EmailEntryPageState extends State<EmailEntryPage> {
                         if (_showReferralSourceField) const SizedBox(height: 8),
                         if (_showReferralSourceField)
                           Text(
-                            context.strings.hearUsWhereTitle,
+                            context.strings.hearUsWhereOptionalTitle,
                             style: textTheme.bodyBold.copyWith(
                               color: colorScheme.textBase,
                             ),

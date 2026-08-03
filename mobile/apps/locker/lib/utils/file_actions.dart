@@ -1,9 +1,9 @@
+import "package:ente_strings/ente_strings.dart";
 import "package:ente_ui/components/buttons/button_widget.dart";
 import "package:ente_ui/utils/dialog_util.dart";
 import "package:ente_ui/utils/toast_util.dart";
 import "package:flutter/material.dart";
 import "package:locker/core/errors.dart";
-import "package:locker/l10n/l10n.dart";
 import "package:locker/models/info/info_item.dart";
 import "package:locker/services/collections/collections_service.dart";
 import "package:locker/services/favorites_service.dart";
@@ -79,7 +79,7 @@ class FileActions {
     final dialog = context.mounted
         ? createProgressDialog(
             context,
-            context.l10n.pleaseWait,
+            context.strings.pleaseWait,
             isDismissible: false,
           )
         : null;
@@ -101,7 +101,7 @@ class FileActions {
           }
           showToast(
             context,
-            context.l10n.failedToUpdateFile('Metadata update failed'),
+            context.strings.failedToUpdateFile(error: 'Metadata update failed'),
           );
           return;
         }
@@ -195,7 +195,7 @@ class FileActions {
         return;
       }
 
-      showToast(context, context.l10n.fileUpdatedSuccessfully);
+      showToast(context, context.strings.fileUpdatedSuccessfully);
     } catch (e) {
       await dialog?.hide();
       _logger.severe('Failed to update file collections: $e');
@@ -248,7 +248,7 @@ class FileActions {
   static Future<void> shareFileLink(BuildContext context, EnteFile file) async {
     final dialog = createProgressDialog(
       context,
-      context.l10n.creatingShareLink,
+      context.strings.creatingLink,
       isDismissible: false,
     );
 
@@ -288,9 +288,9 @@ class FileActions {
   }) async {
     final confirmation = await showDeleteConfirmationSheet(
       context,
-      title: context.l10n.areYouSure,
-      body: context.l10n.deleteMultipleFilesDialogBody(1),
-      deleteButtonLabel: context.l10n.yesDeleteFiles(1),
+      title: context.strings.areYouSure,
+      body: context.strings.deleteMultipleFilesDialogBody(count: 1),
+      deleteButtonLabel: context.strings.yesDeleteFiles(count: 1),
       illustration: LockerBottomSheetIllustration.fileDelete,
     );
 
@@ -301,7 +301,7 @@ class FileActions {
     final dialog = context.mounted
         ? createProgressDialog(
             context,
-            context.l10n.deletingFile,
+            context.strings.deletingFile,
             isDismissible: false,
           )
         : null;
@@ -318,7 +318,7 @@ class FileActions {
       await dialog?.hide();
 
       if (context.mounted) {
-        showToast(context, context.l10n.fileDeletedSuccessfully);
+        showToast(context, context.strings.fileDeletedSuccessfully);
       }
 
       onSuccess?.call();
@@ -343,9 +343,9 @@ class FileActions {
 
     final confirmation = await showDeleteConfirmationSheet(
       context,
-      title: context.l10n.areYouSure,
-      body: context.l10n.deleteMultipleFilesDialogBody(files.length),
-      deleteButtonLabel: context.l10n.yesDeleteFiles(files.length),
+      title: context.strings.areYouSure,
+      body: context.strings.deleteMultipleFilesDialogBody(count: files.length),
+      deleteButtonLabel: context.strings.yesDeleteFiles(count: files.length),
       illustration: LockerBottomSheetIllustration.fileDelete,
     );
 
@@ -356,7 +356,7 @@ class FileActions {
     final dialog = context.mounted
         ? createProgressDialog(
             context,
-            context.l10n.deletingFile,
+            context.strings.deletingFile,
             isDismissible: false,
           )
         : null;
@@ -383,7 +383,7 @@ class FileActions {
       await dialog?.hide();
 
       if (context.mounted) {
-        showToast(context, context.l10n.fileDeletedSuccessfully);
+        showToast(context, context.strings.fileDeletedSuccessfully);
       }
 
       onSuccess?.call();
@@ -413,8 +413,8 @@ class FileActions {
     final dialog = createProgressDialog(
       context,
       isCurrentlyImportant
-          ? context.l10n.removingFromImportant
-          : context.l10n.markingAsImportant,
+          ? context.strings.removingFromImportant
+          : context.strings.markingAsImportant,
       isDismissible: false,
     );
 
@@ -433,8 +433,8 @@ class FileActions {
         showToast(
           context,
           !isCurrentlyImportant
-              ? context.l10n.fileMarkedAsImportant
-              : context.l10n.fileRemovedFromImportant,
+              ? context.strings.fileMarkedAsImportant
+              : context.strings.fileRemovedFromImportant,
         );
       }
 
@@ -457,7 +457,7 @@ class FileActions {
   }) async {
     final dialog = createProgressDialog(
       context,
-      context.l10n.markingAsImportant,
+      context.strings.markingAsImportant,
       isDismissible: false,
     );
 
@@ -471,7 +471,7 @@ class FileActions {
       if (filesToMark.isEmpty) {
         await dialog.hide();
         if (context.mounted) {
-          showToast(context, context.l10n.allFilesAlreadyMarkedAsImportant);
+          showToast(context, context.strings.allFilesAlreadyMarkedAsImportant);
         }
         return;
       }
@@ -483,7 +483,7 @@ class FileActions {
       if (context.mounted) {
         showToast(
           context,
-          context.l10n.filesMarkedAsImportant(filesToMark.length),
+          context.strings.filesMarkedAsImportant(count: filesToMark.length),
         );
       }
 

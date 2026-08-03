@@ -1,10 +1,9 @@
 import "package:ente_components/ente_components.dart";
 import "package:ente_pure_utils/ente_pure_utils.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/foundation.dart";
 import 'package:flutter/material.dart';
 import "package:flutter_svg/flutter_svg.dart";
-import "package:photos/generated/l10n.dart";
-import "package:photos/l10n/l10n.dart";
 import "package:photos/service_locator.dart";
 import "package:photos/services/home_widget_service.dart";
 import "package:photos/services/memory_home_widget_service.dart";
@@ -102,10 +101,10 @@ class _MemoriesWidgetSettingsState extends State<MemoriesWidgetSettings> {
     return Scaffold(
       backgroundColor: colorScheme.backgroundColour,
       body: AppBarComponent(
-        title: AppLocalizations.of(context).memories,
+        title: StringsLocalizations.of(context).memories,
         subtitle: hasInstalledAny
-            ? AppLocalizations.of(context).memoriesWidgetDesc
-            : context.l10n.addMemoriesWidgetPrompt,
+            ? StringsLocalizations.of(context).memoriesWidgetDesc
+            : context.strings.addMemoriesWidgetPrompt,
         slivers: <Widget>[
           if (!hasInstalledAny)
             SliverToBoxAdapter(
@@ -138,7 +137,9 @@ class _MemoriesWidgetSettingsState extends State<MemoriesWidgetSettings> {
                       const SizedBox(height: 18),
                       if (kDebugMode) ...[
                         MenuComponent(
-                          title: AppLocalizations.of(context).showTextOnWidget,
+                          title: StringsLocalizations.of(
+                            context,
+                          ).showTextOnWidget,
                           trailing: ToggleSwitchComponent(
                             selected: _showText,
                             onChanged: (showText) async {
@@ -161,7 +162,7 @@ class _MemoriesWidgetSettingsState extends State<MemoriesWidgetSettings> {
                       MenuGroupComponent(
                         items: [
                           MenuComponent(
-                            title: AppLocalizations.of(
+                            title: StringsLocalizations.of(
                               context,
                             ).pastYearsMemories,
                             leading: SvgPicture.asset(
@@ -182,7 +183,7 @@ class _MemoriesWidgetSettingsState extends State<MemoriesWidgetSettings> {
                             ),
                           ),
                           MenuComponent(
-                            title: AppLocalizations.of(
+                            title: StringsLocalizations.of(
                               context,
                             ).onThisDayMemories,
                             leading: SvgPicture.asset(
@@ -204,7 +205,9 @@ class _MemoriesWidgetSettingsState extends State<MemoriesWidgetSettings> {
                           ),
                           if (isMLEnabled)
                             MenuComponent(
-                              title: AppLocalizations.of(context).smartMemories,
+                              title: StringsLocalizations.of(
+                                context,
+                              ).smartMemories,
                               leading: SvgPicture.asset(
                                 "assets/icons/smart-memory-icon.svg",
                                 colorFilter: ColorFilter.mode(

@@ -1,7 +1,7 @@
 import 'package:ente_components/ente_components.dart' as components;
+import "package:ente_strings/ente_strings.dart";
 import 'package:flutter/material.dart';
 import 'package:photos/core/configuration.dart';
-import "package:photos/generated/l10n.dart";
 import 'package:photos/models/selected_files.dart';
 
 class ActionBarWidget extends StatefulWidget {
@@ -60,11 +60,13 @@ class _ActionBarWidgetState extends State<ActionBarWidget> {
                   return Text(
                     _selectedOwnedFilesNotifier.value !=
                             _selectedFilesNotifier.value
-                        ? AppLocalizations.of(context).selectedPhotosWithYours(
+                        ? StringsLocalizations.of(
+                            context,
+                          ).selectedPhotosWithYours(
                             count: _selectedFilesNotifier.value,
                             yourCount: _selectedOwnedFilesNotifier.value,
                           )
-                        : AppLocalizations.of(
+                        : StringsLocalizations.of(
                             context,
                           ).selectedPhotos(count: _selectedFilesNotifier.value),
                     style: miniStyle,
@@ -84,7 +86,7 @@ class _ActionBarWidgetState extends State<ActionBarWidget> {
                   child: Align(
                     alignment: Alignment.centerRight,
                     child: Text(
-                      AppLocalizations.of(context).cancel,
+                      StringsLocalizations.of(context).cancel,
                       style: miniStyle,
                     ),
                   ),

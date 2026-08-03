@@ -3,7 +3,7 @@ import "package:flutter/material.dart";
 import "package:flutter/services.dart";
 import "package:flutter_test/flutter_test.dart";
 import "package:photos/ente_theme_data.dart";
-import "package:photos/generated/l10n.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:photos/models/button_result.dart";
 import "package:photos/ui/components/buttons/button_widget.dart";
 import "package:photos/ui/components/dialog_widget.dart";
@@ -541,8 +541,8 @@ Future<void> _pumpLauncher(
   await tester.pumpWidget(
     MaterialApp(
       theme: darkThemeData,
-      localizationsDelegates: AppLocalizations.localizationsDelegates,
-      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: StringsLocalizations.localizationsDelegates,
+      supportedLocales: StringsLocalizations.supportedLocales,
       home: Scaffold(
         body: Builder(
           builder: (context) {

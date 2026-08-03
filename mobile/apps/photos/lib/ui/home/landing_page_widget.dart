@@ -3,12 +3,12 @@ import "dart:math";
 
 import "package:ente_components/ente_components.dart";
 import "package:ente_pure_utils/ente_pure_utils.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/foundation.dart";
 import 'package:flutter/material.dart';
 import "package:photos/app.dart";
 import 'package:photos/core/configuration.dart';
-import "package:photos/generated/l10n.dart";
-import "package:photos/l10n/l10n.dart";
+import "package:photos/locale.dart";
 import "package:photos/service_locator.dart";
 import "package:photos/theme/ente_theme.dart";
 import 'package:photos/ui/account/email_entry_page.dart';
@@ -89,7 +89,7 @@ class _LandingPageWidgetState extends State<LandingPageWidget> {
                                     _buildOnboardingAnimation(),
 
                                     Text(
-                                      AppLocalizations.of(
+                                      StringsLocalizations.of(
                                         context,
                                       ).onboardingTitle,
                                       textAlign: TextAlign.center,
@@ -115,7 +115,7 @@ class _LandingPageWidgetState extends State<LandingPageWidget> {
                                         horizontal: 32,
                                       ),
                                       child: Text(
-                                        AppLocalizations.of(
+                                        StringsLocalizations.of(
                                           context,
                                         ).onboardingDesc,
                                         textAlign: TextAlign.center,
@@ -136,7 +136,9 @@ class _LandingPageWidgetState extends State<LandingPageWidget> {
                       ),
                       ButtonComponent(
                         variant: ButtonComponentVariant.neutral,
-                        label: AppLocalizations.of(context).createAnEnteAccount,
+                        label: StringsLocalizations.of(
+                          context,
+                        ).createAnEnteAccount,
                         onTap: _navigateToSignUpPage,
                         shouldSurfaceExecutionStates: false,
                       ),
@@ -144,7 +146,7 @@ class _LandingPageWidgetState extends State<LandingPageWidget> {
                         const SizedBox(height: 12),
                         ButtonComponent(
                           variant: ButtonComponentVariant.secondary,
-                          label: AppLocalizations.of(
+                          label: StringsLocalizations.of(
                             context,
                           ).continueWithoutAccount,
                           onTap: _navigateWithoutAccount,
@@ -155,7 +157,9 @@ class _LandingPageWidgetState extends State<LandingPageWidget> {
                       TextButton(
                         onPressed: _navigateToSignInPage,
                         child: Text(
-                          AppLocalizations.of(context).loginToExistingAccount,
+                          StringsLocalizations.of(
+                            context,
+                          ).loginToExistingAccount,
                           style: textTheme.body.copyWith(
                             decoration: TextDecoration.underline,
                             decorationColor: Colors.white,
@@ -214,7 +218,7 @@ class _LandingPageWidgetState extends State<LandingPageWidget> {
               await setLocale(locale);
               if (!mounted) return;
               EnteApp.setLocale(context, locale);
-              unawaited(AppLocalizations.delegate.load(locale));
+              unawaited(StringsLocalizations.delegate.load(locale));
             }, locale),
           ).then((value) {
             if (!mounted) return;
@@ -290,13 +294,13 @@ class _LandingPageWidgetState extends State<LandingPageWidget> {
     if (autoLogout) {
       final result = await showDialogWidget(
         context: context,
-        title: AppLocalizations.of(context).pleaseLoginAgain,
-        body: AppLocalizations.of(context).autoLogoutMessage,
+        title: StringsLocalizations.of(context).pleaseLoginAgain,
+        body: StringsLocalizations.of(context).autoLogoutMessage,
         buttons: [
           ButtonWidget(
             buttonType: ButtonType.neutral,
             buttonAction: ButtonAction.first,
-            labelText: AppLocalizations.of(context).ok,
+            labelText: StringsLocalizations.of(context).ok,
             isInAlert: true,
           ),
         ],

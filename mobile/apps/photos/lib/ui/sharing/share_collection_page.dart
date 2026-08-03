@@ -3,10 +3,10 @@ import 'dart:async';
 import 'package:collection/collection.dart';
 import 'package:ente_components/ente_components.dart';
 import 'package:ente_pure_utils/ente_pure_utils.dart';
+import 'package:ente_strings/ente_strings.dart';
 import 'package:flutter/material.dart';
 import 'package:hugeicons/hugeicons.dart';
 import 'package:photos/core/configuration.dart';
-import 'package:photos/generated/l10n.dart';
 import 'package:photos/models/api/collection/user.dart';
 import 'package:photos/models/collection/collection.dart';
 import 'package:photos/services/collections_service.dart';
@@ -103,7 +103,7 @@ class _ShareCollectionPageState extends State<ShareCollectionPage> {
     final bool canManageParticipants = isOwner;
     final children = <Widget>[
       ShareSectionTitle(
-        AppLocalizations.of(
+        StringsLocalizations.of(
           context,
         ).shareWithPeopleSectionTitle(numberOfPeople: _sharees.length),
       ),
@@ -114,7 +114,7 @@ class _ShareCollectionPageState extends State<ShareCollectionPage> {
       children.addAll([
         if (_sharees.isNotEmpty) const SizedBox(height: Spacing.sm),
         ShareMenuItem(
-          title: AppLocalizations.of(context).addAdmin,
+          title: StringsLocalizations.of(context).addAdmin,
           icon: HugeIcons.strokeRoundedCrown,
           showChevron: true,
           onTap: () async {
@@ -130,7 +130,7 @@ class _ShareCollectionPageState extends State<ShareCollectionPage> {
         ),
         const SizedBox(height: Spacing.sm),
         ShareMenuItem(
-          title: AppLocalizations.of(context).addCollaborator,
+          title: StringsLocalizations.of(context).addCollaborator,
           icon: HugeIcons.strokeRoundedUserGroup,
           showChevron: true,
           onTap: () async {
@@ -149,7 +149,7 @@ class _ShareCollectionPageState extends State<ShareCollectionPage> {
         ),
         const SizedBox(height: Spacing.sm),
         ShareMenuItem(
-          title: AppLocalizations.of(context).addViewer,
+          title: StringsLocalizations.of(context).addViewer,
           icon: HugeIcons.strokeRoundedView,
           showChevron: true,
           onTap: () async {
@@ -165,7 +165,7 @@ class _ShareCollectionPageState extends State<ShareCollectionPage> {
         ),
         if (_sharees.isEmpty && !hasUrl)
           ShareSectionDescription(
-            AppLocalizations.of(context).sharedAlbumSectionDescription,
+            StringsLocalizations.of(context).sharedAlbumSectionDescription,
           ),
       ]);
     }
@@ -175,8 +175,8 @@ class _ShareCollectionPageState extends State<ShareCollectionPage> {
         const SizedBox(height: Spacing.xxl),
         ShareSectionTitle(
           hasUrl
-              ? AppLocalizations.of(context).publicLinkEnabled
-              : AppLocalizations.of(context).shareALink,
+              ? StringsLocalizations.of(context).publicLinkEnabled
+              : StringsLocalizations.of(context).shareALink,
         ),
       ]);
       if (hasUrl) {
@@ -186,7 +186,7 @@ class _ShareCollectionPageState extends State<ShareCollectionPage> {
             sendLinkButtonKey: sendLinkButtonKey,
             additionalItems: [
               ShareMenuItem(
-                title: AppLocalizations.of(context).manageLink,
+                title: StringsLocalizations.of(context).manageLink,
                 icon: HugeIcons.strokeRoundedSetting07,
                 showChevron: true,
                 onTap: () async {
@@ -206,8 +206,8 @@ class _ShareCollectionPageState extends State<ShareCollectionPage> {
       } else {
         children.addAll([
           ShareMenuItem(
-            title: AppLocalizations.of(context).createPublicLink,
-            subtitle: AppLocalizations.of(context).shareWithNonenteUsers,
+            title: StringsLocalizations.of(context).createPublicLink,
+            subtitle: StringsLocalizations.of(context).shareWithNonenteUsers,
             icon: HugeIcons.strokeRoundedLink04,
             showChevron: true,
             showOnlyLoadingState: true,
@@ -222,10 +222,12 @@ class _ShareCollectionPageState extends State<ShareCollectionPage> {
             },
           ),
           const SizedBox(height: Spacing.xxl),
-          ShareSectionTitle(AppLocalizations.of(context).collectPhotos),
+          ShareSectionTitle(StringsLocalizations.of(context).collectPhotos),
           ShareMenuItem(
-            title: AppLocalizations.of(context).createCollaborativeLink,
-            subtitle: AppLocalizations.of(context).collabLinkSectionDescription,
+            title: StringsLocalizations.of(context).createCollaborativeLink,
+            subtitle: StringsLocalizations.of(
+              context,
+            ).collabLinkSectionDescription,
             icon: HugeIcons.strokeRoundedUserGroup,
             showChevron: true,
             showOnlyLoadingState: true,
@@ -281,8 +283,8 @@ class EmailItemWidget extends StatelessWidget {
       final limit = total > 2 ? 1 : 2;
 
       return ShareMenuItem(
-        title: AppLocalizations.of(context).manageParticipants,
-        subtitle: AppLocalizations.of(
+        title: StringsLocalizations.of(context).manageParticipants,
+        subtitle: StringsLocalizations.of(
           context,
         ).albumParticipantsCount(count: sharees.length + 1),
         leading: SizedBox(

@@ -2,6 +2,7 @@ import "dart:async";
 import "dart:io";
 
 import "package:ente_pure_utils/ente_pure_utils.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:logging/logging.dart";
 import "package:native_video_player/native_video_player.dart";
@@ -15,7 +16,6 @@ import "package:photos/events/seekbar_triggered_event.dart";
 import "package:photos/events/stream_switched_event.dart";
 import "package:photos/events/use_media_kit_for_video.dart";
 import "package:photos/events/video_mute_changed_event.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/models/file/extensions/file_props.dart";
 import "package:photos/models/file/file.dart";
 import "package:photos/models/preview/playlist_data.dart";
@@ -624,7 +624,7 @@ class _VideoWidgetNativeState extends State<VideoWidgetNative>
               if (mounted) {
                 showShortToast(
                   context,
-                  AppLocalizations.of(context).decryptingVideo,
+                  StringsLocalizations.of(context).decryptingVideo,
                 );
               }
             }
@@ -639,8 +639,8 @@ class _VideoWidgetNativeState extends State<VideoWidgetNative>
           if (!mounted) return;
           showErrorDialog(
             context,
-            AppLocalizations.of(context).error,
-            AppLocalizations.of(context).failedToDownloadVideo,
+            StringsLocalizations.of(context).error,
+            StringsLocalizations.of(context).failedToDownloadVideo,
           );
         });
   }

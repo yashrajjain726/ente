@@ -1,11 +1,11 @@
 import "dart:typed_data";
 
 import "package:collection/collection.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:logging/logging.dart";
 import "package:photos/db/files_db.dart";
 import "package:photos/db/ml/db.dart";
-import "package:photos/l10n/l10n.dart";
 import "package:photos/models/memory_lane/memory_lane_models.dart";
 import "package:photos/models/ml/face/face.dart";
 import "package:photos/models/ml/face/person.dart";
@@ -350,7 +350,7 @@ class _MemoryLaneBannerSectionState extends State<MemoryLaneBannerSection> {
       return const SizedBox.shrink();
     }
     return MemoryLaneBanner(
-      title: context.l10n.facesTimelineBannerTitle,
+      title: context.strings.facesTimelineBannerTitle,
       onTap: widget.onTap!,
       thumbnail: _thumbnail,
     );
