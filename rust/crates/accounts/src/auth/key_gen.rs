@@ -3,7 +3,8 @@
 use ente_core::b64;
 use ente_core::crypto::{self, Key, SecretString, SecretVec, argon, kdf, secretbox};
 
-use super::{KeyAttributes, KeyGenResult, PrivateKeyAttributes, Result};
+use super::{KeyAttributes, KeyGenResult, PrivateKeyAttributes};
+use crate::error::Result;
 
 /// Key derivation strength for password-based key generation.
 #[derive(Debug, Clone, Copy, Default)]

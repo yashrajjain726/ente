@@ -586,10 +586,7 @@ fn new_accounts_client(endpoint: &str, app: App) -> Result<AccountsClient> {
 }
 
 fn is_retryable_password_error(error: &ente_accounts::Error) -> bool {
-    matches!(
-        error,
-        ente_accounts::Error::AuthenticationFailed(message) if message == "Incorrect password"
-    ) || error.is_http_status(&[401])
+    matches!(error, ente_accounts::Error::IncorrectPassword) || error.is_http_status(&[401])
 }
 
 fn can_open_automatically(url: &str) -> bool {

@@ -155,49 +155,6 @@ pub struct SrpAttributes {
     pub is_email_mfa_enabled: bool,
 }
 
-/// Error types for auth operations.
-#[derive(Debug, thiserror::Error)]
-pub enum Error {
-    /// Password verification failed.
-    #[error("Incorrect password")]
-    IncorrectPassword,
-
-    /// Recovery key verification failed.
-    #[error("Incorrect recovery key")]
-    IncorrectRecoveryKey,
-
-    /// Key attributes are invalid or corrupted.
-    #[error("Invalid key attributes")]
-    InvalidKeyAttributes,
-
-    /// The device could not derive a sensitive key with the required policy.
-    #[error("Failed to derive key (insufficient memory)")]
-    InsufficientMemory,
-
-    /// A required field is missing from the key attributes.
-    #[error("Missing required field: {0}")]
-    MissingField(&'static str),
-
-    /// Underlying cryptographic operation failed.
-    #[error("Crypto error: {0}")]
-    Crypto(#[from] ente_core::crypto::Error),
-
-    /// Failed to decode base64 or hex data.
-    #[error("Decode error: {0}")]
-    Decode(String),
-
-    /// Invalid key format or length.
-    #[error("Invalid key: {0}")]
-    InvalidKey(String),
-
-    /// SRP protocol error.
-    #[error("SRP error: {0}")]
-    Srp(String),
-}
-
-/// Result type for auth operations.
-pub type Result<T> = std::result::Result<T, Error>;
-
 #[cfg(test)]
 mod tests {
     use super::*;

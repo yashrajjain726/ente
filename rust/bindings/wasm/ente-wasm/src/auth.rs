@@ -27,20 +27,29 @@ impl AuthError {
     }
 }
 
-impl From<auth::Error> for AuthError {
-    fn from(e: auth::Error) -> Self {
-        use auth::Error as E;
+impl From<ente_accounts::Error> for AuthError {
+    fn from(e: ente_accounts::Error) -> Self {
+        use ente_accounts::Error as E;
 
         let code = match &e {
+            E::Http(_) => "http",
+            E::Serialization(_) => "serialization",
+            E::Crypto(_) => "crypto",
+            E::Decode(_) => "decode",
             E::IncorrectPassword => "incorrect_password",
             E::IncorrectRecoveryKey => "incorrect_recovery_key",
             E::InvalidKeyAttributes => "invalid_key_attributes",
             E::InsufficientMemory => "insufficient_memory",
             E::MissingField(_) => "missing_field",
-            E::Crypto(_) => "crypto",
-            E::Decode(_) => "decode",
             E::InvalidKey(_) => "invalid_key",
             E::Srp(_) => "srp",
+            E::InvalidInput(_) => "invalid_input",
+            E::RateLimited => "rate_limited",
+            E::SecondFactorSessionExpired => "second_factor_session_expired",
+            E::MissingKeyAttributes => "missing_key_attributes",
+            E::AccountAlreadyExists => "account_already_exists",
+            E::Protocol(_) => "protocol",
+            E::Ui(_) => "ui",
         }
         .to_string();
 
@@ -359,9 +368,9 @@ impl SrpSession {
         login_key_b64: &str,
     ) -> Result<SrpSession, AuthError> {
         let srp_salt = b64::decode(srp_salt_b64)
-            .map_err(|e| auth::Error::Decode(format!("srp_salt: {}", e)))?;
+            .map_err(|e| ente_accounts::Error::Decode(format!("srp_salt: {}", e)))?;
         let login_key = b64::decode(login_key_b64)
-            .map_err(|e| auth::Error::Decode(format!("login_key: {}", e)))?;
+            .map_err(|e| ente_accounts::Error::Decode(format!("login_key: {}", e)))?;
 
         let inner = auth::SrpSession::new(srp_user_id, &srp_salt, &login_key)?;
         Ok(Self { inner })
@@ -374,16 +383,16 @@ impl SrpSession {
 
     /// Compute the client proof M1 from the server's public value B (base64).
     pub fn compute_m1(&mut self, srp_b_b64: &str) -> Result<String, AuthError> {
-        let srp_b =
-            b64::decode(srp_b_b64).map_err(|e| auth::Error::Decode(format!("srpB: {}", e)))?;
+        let srp_b = b64::decode(srp_b_b64)
+            .map_err(|e| ente_accounts::Error::Decode(format!("srpB: {}", e)))?;
         let m1 = self.inner.compute_m1(&srp_b)?;
         Ok(b64::encode(&m1))
     }
 
     /// Verify the server proof M2 (base64).
     pub fn verify_m2(&self, srp_m2_b64: &str) -> Result<(), AuthError> {
-        let srp_m2 =
-            b64::decode(srp_m2_b64).map_err(|e| auth::Error::Decode(format!("srpM2: {}", e)))?;
+        let srp_m2 = b64::decode(srp_m2_b64)
+            .map_err(|e| ente_accounts::Error::Decode(format!("srpM2: {}", e)))?;
         self.inner.verify_m2(&srp_m2)?;
         Ok(())
     }

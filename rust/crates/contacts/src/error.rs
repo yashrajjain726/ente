@@ -1,4 +1,3 @@
-use ente_accounts::auth;
 use ente_core::{b64, crypto, http};
 use thiserror::Error;
 
@@ -14,7 +13,7 @@ pub enum ContactsError {
     Base64Decode(#[from] b64::DecodeError),
 
     #[error(transparent)]
-    Auth(#[from] auth::Error),
+    Accounts(#[from] ente_accounts::Error),
 
     #[error("invalid input: {0}")]
     InvalidInput(String),
@@ -54,7 +53,7 @@ impl ContactsError {
             ContactsError::Http(_) => ErrorKind::Http,
             ContactsError::Crypto(_) => ErrorKind::Crypto,
             ContactsError::Base64Decode(_) => ErrorKind::Crypto,
-            ContactsError::Auth(_) => ErrorKind::Auth,
+            ContactsError::Accounts(_) => ErrorKind::Auth,
             ContactsError::InvalidInput(_) => ErrorKind::InvalidInput,
             ContactsError::MissingEncryptedData => ErrorKind::MissingEncryptedData,
             ContactsError::MissingEncryptedKey => ErrorKind::MissingEncryptedKey,

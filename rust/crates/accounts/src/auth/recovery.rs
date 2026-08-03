@@ -5,7 +5,8 @@ use bip39::{Language, Mnemonic};
 use ente_core::b64;
 use ente_core::crypto::{self, SecretVec, secretbox};
 
-use super::{Error, KeyAttributes, Result};
+use super::KeyAttributes;
+use crate::error::{Error, Result};
 
 /// Get the recovery key from stored encrypted form.
 pub fn get_recovery_key(master_key: &[u8], attributes: &KeyAttributes) -> Result<String> {
