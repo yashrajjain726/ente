@@ -49,8 +49,8 @@ import { useBaseContext } from "ente-base/context";
 import { basename } from "ente-base/file-name";
 import type { PublicAlbumsCredentials } from "ente-base/http";
 import log from "ente-base/log";
+import { UploadProgressV2 } from "ente-gallery/components/upload-progress-v2/UploadProgressV2";
 import { CanvasReadbackBlockedDialog } from "ente-gallery/components/upload/CanvasReadbackBlockedDialog";
-import { UploadProgress } from "ente-gallery/components/UploadProgress";
 import { useFileInput } from "ente-gallery/components/utils/use-file-input";
 import { hasReliableCanvasReadback } from "ente-gallery/utils/upload/canvas-integrity";
 import type { Collection } from "ente-media/collection";
@@ -465,7 +465,7 @@ export const Upload: React.FC<UploadProps> = ({
                 }
                 onSelect={handleUploadTypeSelect}
             />
-            <UploadProgress
+            <UploadProgressV2
                 open={uploadProgressView}
                 onClose={closeUploadProgress}
                 percentComplete={percentComplete}
