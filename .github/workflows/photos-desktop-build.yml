@@ -162,6 +162,9 @@ jobs:
                   if [ "${RUNNER_OS}" = "macOS" ]; then
                       export CSC_LINK="${MAC_OS_CERTIFICATE}"
                       export CSC_KEY_PASSWORD="${MAC_OS_CERTIFICATE_PASSWORD}"
+                  elif [ "${RUNNER_OS}" = "Linux" ]; then
+                      export TARGET_CC=clang
+                      export TARGET_CXX=clang++
                   fi
 
                   platform=${{ startsWith(matrix.os, 'macos') && 'mac' || startsWith(matrix.os, 'windows') && 'windows' || 'linux' }}
