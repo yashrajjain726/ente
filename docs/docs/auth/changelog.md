@@ -7,6 +7,17 @@ description: Release notes of recent updates to Ente Auth
 
 A short summary list of changes to the Ente Auth mobile and desktop apps. For a more descriptive list with screenshots and blog post links, see the [news](https://ente.com/news).
 
+## v4.4.25 - Aug 2026
+
+- Refreshed design for settings, setup, imports, and code management
+- Added support for importing backups from OTP Auth
+- Fixed incomplete multi-part imports from Google Authenticator
+- Added clearer error handling for malformed imports
+- Improved the account deletion flow with clearer impact details
+- Fixed HTML export printing in Firefox
+- Improved desktop navigation and dialog behavior
+- Added icons and aliases for more services
+
 ## v4.4.24 - Jul 2026
 
 - Added a way to view and delete Auth codes that could not be parsed.
