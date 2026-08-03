@@ -2,7 +2,6 @@ import 'dart:io';
 
 import "package:ente_components/ente_components.dart";
 import 'package:ente_strings/ente_strings.dart';
-import "package:ente_ui/components/title_bar_title_widget.dart";
 import 'package:flutter/material.dart';
 import "package:hugeicons/hugeicons.dart";
 import 'package:locker/services/collections/models/collection.dart';
@@ -104,7 +103,14 @@ class _FileUploadScreenState extends State<FileUploadScreen> {
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      TitleBarTitleWidget(title: context.strings.uploadFiles),
+                      Text(
+                        context.strings.uploadFiles,
+                        style: TextStyles.display2.copyWith(
+                          color: colors.textBase,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
+                      ),
                       Text(
                         context.strings.filesSelected(count: _files.length),
                         style: TextStyles.body.copyWith(
@@ -173,8 +179,13 @@ class _FileUploadScreenState extends State<FileUploadScreen> {
                         ),
                         const SizedBox(height: 24),
                       ],
-                      TitleBarTitleWidget(
-                        title: context.strings.collectionLabel,
+                      Text(
+                        context.strings.collectionLabel,
+                        style: TextStyles.display2.copyWith(
+                          color: colors.textBase,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
                       ),
                       const SizedBox(height: 16),
                       CollectionSelectionWidget(

@@ -2,6 +2,7 @@ import "dart:async";
 
 import "package:collection/collection.dart";
 import "package:ente_base/models/key_attributes.dart";
+import "package:ente_components/ente_components.dart";
 import "package:ente_configuration/base_configuration.dart";
 import "package:ente_legacy/components/gradient_button.dart";
 import "package:ente_legacy/models/emergency_models.dart";
@@ -10,7 +11,6 @@ import "package:ente_legacy/services/emergency_service.dart";
 import "package:ente_pure_utils/ente_pure_utils.dart";
 import "package:ente_strings/ente_strings.dart";
 import "package:ente_ui/components/alert_bottom_sheet.dart";
-import "package:ente_ui/components/title_bar_title_widget.dart";
 import "package:ente_ui/theme/ente_theme.dart";
 import "package:ente_ui/utils/dialog_util.dart";
 import "package:flutter/material.dart";
@@ -77,6 +77,7 @@ class _OtherContactPageState extends State<OtherContactPage> {
     }
     final colorScheme = getEnteColorScheme(context);
     final textTheme = getEnteTextTheme(context);
+    final componentColors = context.componentColors;
     return Scaffold(
       appBar: AppBar(
         toolbarHeight: 48,
@@ -93,7 +94,14 @@ class _OtherContactPageState extends State<OtherContactPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            TitleBarTitleWidget(title: context.strings.recoverAccount),
+            Text(
+              context.strings.recoverAccount,
+              style: TextStyles.display2.copyWith(
+                color: componentColors.textBase,
+              ),
+              overflow: TextOverflow.ellipsis,
+              maxLines: 1,
+            ),
             Text(accountEmail, style: textTheme.smallMuted),
             const SizedBox(height: 12),
             // Description text based on recovery state
