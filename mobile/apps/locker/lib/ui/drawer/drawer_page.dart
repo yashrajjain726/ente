@@ -3,7 +3,6 @@ import "package:ente_sharing/verify_identity_dialog.dart";
 import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:hugeicons/hugeicons.dart";
-import "package:locker/l10n/l10n.dart";
 import "package:locker/services/configuration.dart";
 import "package:locker/ui/components/legacy_collections_trash_widget.dart";
 import "package:locker/ui/components/usage_card_widget.dart";
@@ -53,7 +52,7 @@ class DrawerPage extends StatelessWidget {
         final email = emailNotifier.value ?? "";
         final title = hasLoggedIn && email.isNotEmpty
             ? email
-            : context.l10n.settings;
+            : context.strings.settings;
 
         return AppBarComponent(
           title: title,

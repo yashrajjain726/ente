@@ -4,10 +4,10 @@ import "dart:io";
 import "package:camera/camera.dart";
 import "package:ente_components/ente_components.dart";
 import "package:ente_pure_utils/ente_pure_utils.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:hugeicons/hugeicons.dart";
 import "package:permission_handler/permission_handler.dart";
-import "package:photos/l10n/l10n.dart";
 import "package:photos/models/collection/collection.dart";
 import "package:photos/models/rituals/ritual_models.dart";
 import "package:photos/service_locator.dart";
@@ -25,7 +25,7 @@ void openRitualCamera(BuildContext context, Ritual ritual) {
   final albumId = ritual.albumId;
   if (albumId == null) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(context.l10n.ritualSetAlbumToLaunchCamera)),
+      SnackBar(content: Text(context.strings.ritualSetAlbumToLaunchCamera)),
     );
     return;
   }
@@ -443,7 +443,7 @@ class _RitualCameraPageState extends State<RitualCameraPage>
       _scrollThumbsToIndex(_captures.length - 1, animate: true);
     } catch (_) {
       if (!mounted) return;
-      showShortToast(context, context.l10n.ritualCaptureError);
+      showShortToast(context, context.strings.ritualCaptureError);
     } finally {
       if (mounted) {
         setState(() {
@@ -458,7 +458,7 @@ class _RitualCameraPageState extends State<RitualCameraPage>
       if (mounted) {
         showShortToast(
           context,
-          context.l10n.ritualPhotoLimit(maxPhotos: _maxCaptures),
+          context.strings.ritualPhotoLimit(maxPhotos: _maxCaptures),
         );
       }
       return;
@@ -481,14 +481,14 @@ class _RitualCameraPageState extends State<RitualCameraPage>
 
   Future<void> _onAccept() async {
     if (_captures.isEmpty) {
-      showShortToast(context, context.l10n.ritualCaptureAtLeastOne);
+      showShortToast(context, context.strings.ritualCaptureAtLeastOne);
       return;
     }
     if (widget.albumId == null) {
       if (!mounted) return;
       final navContext = context;
       ScaffoldMessenger.of(navContext).showSnackBar(
-        SnackBar(content: Text(navContext.l10n.ritualAlbumMissing)),
+        SnackBar(content: Text(navContext.strings.ritualAlbumMissing)),
       );
       await _pausePreview();
       if (!mounted) return;
@@ -525,8 +525,8 @@ class _RitualCameraPageState extends State<RitualCameraPage>
       showShortToast(
         context,
         _album == null
-            ? context.l10n.ritualAddedToAlbum
-            : context.l10n.ritualAddedToAlbumWithName(
+            ? context.strings.ritualAddedToAlbum
+            : context.strings.ritualAddedToAlbumWithName(
                 albumName: _album!.displayName,
               ),
       );
@@ -538,7 +538,7 @@ class _RitualCameraPageState extends State<RitualCameraPage>
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              context.l10n.ritualAddToAlbumFailure(error: e.toString()),
+              context.strings.ritualAddToAlbumFailure(error: e.toString()),
             ),
           ),
         );
@@ -725,7 +725,7 @@ class _RitualCameraPageState extends State<RitualCameraPage>
   Widget _buildTopBar(EnteTextTheme textTheme) {
     final String title = _ritual?.title.trim().isNotEmpty == true
         ? _ritual!.title.trim()
-        : context.l10n.ritualDefaultCameraTitle;
+        : context.strings.ritualDefaultCameraTitle;
     final String icon = _ritual?.icon.isNotEmpty == true ? _ritual!.icon : "📸";
     return Container(
       color: Colors.black,
@@ -900,7 +900,7 @@ class _RitualCameraPageState extends State<RitualCameraPage>
         color: Colors.black,
         child: Center(
           child: Text(
-            context.l10n.ritualNoPhotosYet,
+            context.strings.ritualNoPhotosYet,
             style: const TextStyle(color: Colors.white70),
           ),
         ),
@@ -1039,7 +1039,7 @@ class _RitualCameraPageState extends State<RitualCameraPage>
                           const Icon(Icons.check_circle_outline),
                           const SizedBox(width: 8),
                           Text(
-                            context.l10n.addToAlbum,
+                            context.strings.addToAlbum,
                             style: textTheme.bodyBold.copyWith(
                               color: Colors.black,
                             ),
@@ -1135,18 +1135,19 @@ class _RitualCameraPageState extends State<RitualCameraPage>
   Widget _buildCameraIssue() {
     final issue = _cameraIssue!;
     final message = switch (issue) {
-      _CameraIssue.permissionDenied => context.l10n.cameraPermissionRequired,
+      _CameraIssue.permissionDenied => context.strings.cameraPermissionRequired,
       _CameraIssue.permissionSettingsRequired =>
-        context.l10n.cameraPermissionSettings,
+        context.strings.cameraPermissionSettings,
       _CameraIssue.permissionRestricted =>
-        context.l10n.cameraPermissionRestricted,
-      _CameraIssue.unavailable => context.l10n.ritualCameraNotFound,
-      _CameraIssue.initializationFailed => context.l10n.ritualCameraStartError,
+        context.strings.cameraPermissionRestricted,
+      _CameraIssue.unavailable => context.strings.ritualCameraNotFound,
+      _CameraIssue.initializationFailed =>
+        context.strings.ritualCameraStartError,
     };
     final primaryLabel = switch (issue) {
-      _CameraIssue.permissionDenied => context.l10n.grantAccess,
-      _CameraIssue.permissionSettingsRequired => context.l10n.openSettings,
-      _CameraIssue.initializationFailed => context.l10n.tryAgain,
+      _CameraIssue.permissionDenied => context.strings.grantAccess,
+      _CameraIssue.permissionSettingsRequired => context.strings.openSettings,
+      _CameraIssue.initializationFailed => context.strings.tryAgain,
       _CameraIssue.permissionRestricted || _CameraIssue.unavailable => null,
     };
     final primaryAction = switch (issue) {
@@ -1185,7 +1186,7 @@ class _RitualCameraPageState extends State<RitualCameraPage>
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  context.l10n.camera,
+                  context.strings.camera,
                   style: darkTextTheme.largeBold,
                   textAlign: TextAlign.center,
                 ),
@@ -1212,7 +1213,7 @@ class _RitualCameraPageState extends State<RitualCameraPage>
                   const SizedBox(height: 12),
                 ],
                 ButtonComponent(
-                  label: context.l10n.ritualBackToList,
+                  label: context.strings.ritualBackToList,
                   variant: ButtonComponentVariant.link,
                   shouldSurfaceExecutionStates: false,
                   onTap: () async {

@@ -1,7 +1,7 @@
 import "package:ente_components/ente_components.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:hugeicons/hugeicons.dart";
-import "package:locker/l10n/l10n.dart";
 import "package:locker/services/collections/models/collection.dart";
 import "package:locker/services/collections/models/collection_view_type.dart";
 import "package:locker/services/configuration.dart";
@@ -42,7 +42,7 @@ class CollectionPopupMenuWidget extends StatelessWidget {
       options.add(
         EntePopupMenuOption(
           value: 'edit',
-          label: context.l10n.edit,
+          label: context.strings.edit,
           leadingWidget: HugeIcon(
             icon: HugeIcons.strokeRoundedEdit02,
             color: colors.textBase,
@@ -53,7 +53,7 @@ class CollectionPopupMenuWidget extends StatelessWidget {
       options.add(
         EntePopupMenuOption(
           value: 'delete',
-          label: context.l10n.delete,
+          label: context.strings.delete,
           labelColor: colors.warning,
           leadingWidget: HugeIcon(
             icon: HugeIcons.strokeRoundedDelete01,
@@ -69,7 +69,7 @@ class CollectionPopupMenuWidget extends StatelessWidget {
       options.add(
         EntePopupMenuOption(
           value: 'leave_collection',
-          label: context.l10n.leaveCollection,
+          label: context.strings.leaveCollection,
           labelColor: colors.warning,
           leadingWidget: HugeIcon(
             icon: HugeIcons.strokeRoundedLogout02,

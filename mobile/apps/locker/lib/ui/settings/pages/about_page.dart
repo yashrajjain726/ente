@@ -1,8 +1,8 @@
+import "package:ente_strings/ente_strings.dart";
 import "package:ente_ui/utils/toast_util.dart";
 import "package:ente_utils/platform_util.dart";
 import "package:flutter/material.dart";
 import "package:hugeicons/hugeicons.dart";
-import "package:locker/l10n/l10n.dart";
 import "package:locker/services/update_service.dart";
 import "package:locker/ui/settings/components/settings_item.dart";
 import "package:locker/ui/settings/components/settings_page_scaffold.dart";
@@ -14,7 +14,7 @@ class AboutPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = context.l10n;
+    final l10n = context.strings;
 
     return SettingsPageScaffold(
       title: l10n.about,
@@ -64,12 +64,12 @@ class AboutPage extends StatelessWidget {
   }
 
   Future<void> _onBlogTapped(BuildContext context) async {
-    final l10n = context.l10n;
+    final l10n = context.strings;
     await PlatformUtil.openWebView(context, l10n.blog, "https://ente.com/blog");
   }
 
   Future<void> _onPrivacyTapped(BuildContext context) async {
-    final l10n = context.l10n;
+    final l10n = context.strings;
     await PlatformUtil.openWebView(
       context,
       l10n.privacy,
@@ -78,7 +78,7 @@ class AboutPage extends StatelessWidget {
   }
 
   Future<void> _onTermsTapped(BuildContext context) async {
-    final l10n = context.l10n;
+    final l10n = context.strings;
     await PlatformUtil.openWebView(
       context,
       l10n.termsOfServicesTitle,
@@ -87,7 +87,7 @@ class AboutPage extends StatelessWidget {
   }
 
   Future<void> _onCheckForUpdatesTapped(BuildContext context) async {
-    final l10n = context.l10n;
+    final l10n = context.strings;
     final shouldUpdate = await UpdateService.instance.shouldUpdate();
     final latestVersion = UpdateService.instance.getLatestVersionInfo();
     if (!context.mounted) {

@@ -1,7 +1,7 @@
 import "package:ente_components/ente_components.dart";
+import "package:ente_strings/ente_strings.dart";
 import 'package:flutter/material.dart';
 import "package:hugeicons/hugeicons.dart";
-import "package:photos/generated/l10n.dart";
 import "package:pro_image_editor/pro_image_editor.dart";
 
 class ImageEditorAppBar extends StatelessWidget implements PreferredSizeWidget {
@@ -43,17 +43,14 @@ class ImageEditorAppBar extends StatelessWidget implements PreferredSizeWidget {
             onPressed: () {
               enableUndo ? close() : Navigator.of(context).pop();
             },
-            child: Text(
-              AppLocalizations.of(context).cancel,
-              style: actionTextStyle,
-            ),
+            child: Text(context.strings.cancel, style: actionTextStyle),
           ),
           if (undo != null && redo != null)
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
                 IconButton(
-                  tooltip: AppLocalizations.of(context).undo,
+                  tooltip: context.strings.undo,
                   onPressed: () {
                     undo != null ? undo!() : null;
                   },
@@ -64,7 +61,7 @@ class ImageEditorAppBar extends StatelessWidget implements PreferredSizeWidget {
                 ),
                 const SizedBox(width: 12),
                 IconButton(
-                  tooltip: AppLocalizations.of(context).redo,
+                  tooltip: context.strings.redo,
                   onPressed: () {
                     redo != null ? redo!() : null;
                   },
@@ -83,9 +80,7 @@ class ImageEditorAppBar extends StatelessWidget implements PreferredSizeWidget {
               key: ValueKey(isMainEditor ? 'save_copy' : 'done'),
               onPressed: done,
               child: Text(
-                isMainEditor
-                    ? AppLocalizations.of(context).saveCopy
-                    : AppLocalizations.of(context).done,
+                isMainEditor ? context.strings.saveCopy : context.strings.done,
                 style: actionTextStyle.copyWith(
                   color: isMainEditor
                       ? (enableUndo ? colors.primary : colors.textLight)

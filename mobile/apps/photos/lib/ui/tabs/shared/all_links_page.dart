@@ -2,10 +2,10 @@ import "dart:async";
 
 import "package:ente_components/ente_components.dart";
 import "package:ente_pure_utils/ente_pure_utils.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:flutter/services.dart";
 import "package:hugeicons/hugeicons.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/models/api/memory_share/memory_share.dart";
 import "package:photos/models/button_result.dart";
 import "package:photos/models/collection/collection.dart";
@@ -91,20 +91,20 @@ class _AllLinksPageState extends State<AllLinksPage> {
     if (!_hasSelection) {
       await showErrorDialog(
         context,
-        AppLocalizations.of(context).deleteLinkQuestion,
-        AppLocalizations.of(context).pleaseSelectQuickLinksToRemove,
+        context.strings.deleteLinkQuestion,
+        context.strings.pleaseSelectQuickLinksToRemove,
       );
       return;
     }
     final result = await showAlertBottomSheet<ButtonResult>(
       context,
-      title: AppLocalizations.of(context).removePublicLinks,
-      message: AppLocalizations.of(context).deleteMemoryLinkMessage,
+      title: context.strings.removePublicLinks,
+      message: context.strings.deleteMemoryLinkMessage,
       assetPath: "assets/warning-grey.png",
       buttons: [
         ButtonWidgetV2(
           buttonType: ButtonTypeV2.critical,
-          labelText: AppLocalizations.of(context).remove,
+          labelText: context.strings.remove,
           isInAlert: true,
           buttonAction: ButtonAction.first,
           onTap: _deleteSelectedLinks,
@@ -144,7 +144,7 @@ class _AllLinksPageState extends State<AllLinksPage> {
   Future<void> _openMemoryLink(MemoryShare share) async {
     final title =
         MemoryShareService.instance.getMemoryShareTitle(share) ??
-        AppLocalizations.of(context).memoryLink;
+        context.strings.memoryLink;
     final deleted = await showMemoryLinkDetailsSheet(
       context,
       shareUrl: share.url,
@@ -167,8 +167,8 @@ class _AllLinksPageState extends State<AllLinksPage> {
     return Scaffold(
       backgroundColor: colors.backgroundBase,
       body: AppBarComponent(
-        title: AppLocalizations.of(context).links,
-        subtitle: AppLocalizations.of(context).itemCount(count: linksCount),
+        title: context.strings.links,
+        subtitle: context.strings.itemCount(count: linksCount),
         physics: const BouncingScrollPhysics(),
         actions: [
           AnimatedSwitcher(
@@ -224,7 +224,7 @@ class _AllLinksPageState extends State<AllLinksPage> {
                   final share = item as MemoryShare;
                   final title =
                       MemoryShareService.instance.getMemoryShareTitle(share) ??
-                      AppLocalizations.of(context).memoryLink;
+                      context.strings.memoryLink;
                   return MemoryLinkAlbumItem(
                     title: title,
                     fileCount: share.fileCount,
@@ -250,7 +250,7 @@ class _AllLinksPageState extends State<AllLinksPage> {
               hasScrollBody: false,
               child: EmptyStateComponent(
                 assetPath: "assets/empty_state_links.png",
-                title: AppLocalizations.of(context).activeLinksWillShowUpHere,
+                title: context.strings.activeLinksWillShowUpHere,
               ),
             ),
         ],

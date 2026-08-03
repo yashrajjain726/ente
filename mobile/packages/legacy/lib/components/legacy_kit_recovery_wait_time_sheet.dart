@@ -7,9 +7,9 @@ String formatLegacyKitNoticePeriod(BuildContext context, int hours) {
     return context.strings.immediate;
   }
   if (hours % 24 == 0) {
-    return context.strings.nDays(hours ~/ 24);
+    return context.strings.nDays(count: hours ~/ 24);
   }
-  return context.strings.nHours(hours);
+  return context.strings.nHours(count: hours);
 }
 
 Future<int?> showLegacyKitRecoveryWaitTimeSheet(

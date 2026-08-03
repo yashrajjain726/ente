@@ -1,5 +1,5 @@
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/widgets.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/theme/ente_theme.dart";
 
 class CollageLayoutHeading extends StatelessWidget {
@@ -12,7 +12,7 @@ class CollageLayoutHeading extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.fromLTRB(8, 20, 0, 4),
         child: Text(
-          AppLocalizations.of(context).collageLayout,
+          context.strings.collageLayout,
           style: TextStyle(color: getEnteColorScheme(context).textBase),
         ),
       ),

@@ -1,12 +1,11 @@
 import "dart:async";
 
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:logging/logging.dart";
 import "package:photos/core/configuration.dart";
 import "package:photos/core/event_bus.dart";
 import "package:photos/events/people_changed_event.dart";
-import "package:photos/generated/l10n.dart";
-import "package:photos/l10n/l10n.dart";
 import "package:photos/models/ml/face/person.dart";
 import "package:photos/models/typedefs.dart";
 import "package:photos/services/machine_learning/face_ml/person/person_service.dart";
@@ -58,7 +57,7 @@ class _ReassignMeSelectionPageState extends State<ReassignMeSelectionPage> {
     const gridPadding = 16.0;
     return Scaffold(
       appBar: AppBar(
-        title: Text(context.l10n.selectYourFace),
+        title: Text(context.strings.selectYourFace),
         centerTitle: false,
       ),
       body: FutureBuilder<List<PersonEntity>>(
@@ -74,9 +73,7 @@ class _ReassignMeSelectionPageState extends State<ReassignMeSelectionPage> {
             );
             return const Center(child: Icon(Icons.error_outline_rounded));
           } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return Center(
-              child: Text(AppLocalizations.of(context).noResultsFound + '.'),
-            );
+            return Center(child: Text(context.strings.noResultsFound + '.'));
           } else {
             final results = snapshot.data!;
             final screenWidth = MediaQuery.of(context).size.width;
@@ -109,7 +106,7 @@ class _ReassignMeSelectionPageState extends State<ReassignMeSelectionPage> {
                   onTap: () async {
                     final dialog = createProgressDialog(
                       context,
-                      context.l10n.reassigningLoading,
+                      context.strings.reassigningLoading,
                     );
                     unawaited(dialog.show());
                     try {
@@ -120,7 +117,7 @@ class _ReassignMeSelectionPageState extends State<ReassignMeSelectionPage> {
                       if (!context.mounted) return;
                       showToast(
                         context,
-                        context.l10n.reassignedToName(
+                        context.strings.reassignedToName(
                           name: results[index].data.name,
                         ),
                       );

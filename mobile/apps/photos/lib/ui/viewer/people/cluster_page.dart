@@ -1,6 +1,7 @@
 import "dart:async";
 
 import "package:ente_pure_utils/ente_pure_utils.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/foundation.dart";
 import "package:flutter/material.dart";
 import "package:photos/core/configuration.dart";
@@ -9,7 +10,6 @@ import "package:photos/events/app_mode_changed_event.dart";
 import "package:photos/events/files_updated_event.dart";
 import "package:photos/events/local_photos_updated_event.dart";
 import "package:photos/events/people_changed_event.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/models/file/file.dart";
 import "package:photos/models/file_load_result.dart";
 import "package:photos/models/gallery_type.dart";
@@ -195,8 +195,8 @@ class _ClusterPageState extends State<ClusterPage> {
                 ? const NameFaceBanner()
                 : SavePersonBanner(
                     faceWidget: PersonFaceWidget(clusterID: widget.clusterID),
-                    text: AppLocalizations.of(context).savePerson,
-                    subText: AppLocalizations.of(context).findThemQuickly,
+                    text: context.strings.savePerson,
+                    subText: context.strings.findThemQuickly,
                     onTap: _handleSavePerson,
                   )
           : null,

@@ -1,7 +1,7 @@
 import 'package:ente_components/ente_components.dart';
 import 'package:ente_pure_utils/ente_pure_utils.dart';
+import 'package:ente_strings/ente_strings.dart';
 import 'package:flutter/material.dart';
-import 'package:photos/generated/l10n.dart';
 import 'package:photos/models/device_collection.dart';
 import "package:photos/service_locator.dart";
 import "package:photos/ui/components/collection_share_badge.dart";
@@ -57,7 +57,7 @@ class DeviceFolderListItem extends StatelessWidget {
         style: TextStyles.body.copyWith(color: componentColors.textBase),
       ),
       subtitle: Text(
-        AppLocalizations.of(context).itemCount(count: deviceCollection.count),
+        context.strings.itemCount(count: deviceCollection.count),
         maxLines: 1,
         softWrap: false,
         overflow: TextOverflow.ellipsis,

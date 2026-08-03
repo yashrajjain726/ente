@@ -1,11 +1,11 @@
 import "dart:convert";
 import "dart:typed_data";
 
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:logging/logging.dart";
 import "package:photos/db/ml/db.dart";
 import "package:photos/db/offline_files_db.dart";
-import "package:photos/generated/intl/app_localizations.dart";
 import "package:photos/models/file/file.dart";
 import "package:photos/models/ml/face/box.dart";
 import "package:photos/models/ml/face/detection.dart";
@@ -178,10 +178,7 @@ class _PetsItemWidgetState extends State<PetsItemWidget> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            AppLocalizations.of(context).discover_pets,
-            style: textTheme.small,
-          ),
+          Text(context.strings.discover_pets, style: textTheme.small),
           const SizedBox(height: 10),
           Padding(
             padding: const EdgeInsets.only(right: 12.0),
@@ -206,7 +203,7 @@ class _PetsItemWidgetState extends State<PetsItemWidget> {
     double thumbnailWidth,
     EnteTextTheme textTheme,
   ) {
-    final l10n = AppLocalizations.of(context);
+    final l10n = context.strings;
     final speciesLabel = info.species == 0 ? l10n.dog : l10n.cat;
 
     return SizedBox(

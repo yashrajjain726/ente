@@ -1,7 +1,7 @@
 import 'package:ente_components/ente_components.dart';
+import "package:ente_strings/ente_strings.dart";
 import 'package:flutter/material.dart';
 import "package:locker/core/constants.dart";
-import "package:locker/l10n/l10n.dart";
 import "package:locker/services/collections/collections_api_client.dart";
 import "package:locker/services/collections/models/collection.dart";
 import "package:locker/utils/error_sheet.dart";
@@ -15,7 +15,7 @@ class DeviceLimitPickerPage extends StatelessWidget {
     return Scaffold(
       backgroundColor: context.componentColors.backgroundBase,
       body: AppBarComponent(
-        title: context.l10n.linkDeviceLimit,
+        title: context.strings.linkDeviceLimit,
         slivers: [
           SliverPadding(
             padding: const EdgeInsets.fromLTRB(
@@ -69,7 +69,7 @@ class _ItemsWidgetState extends State<ItemsWidget> {
   Widget _menuItemForPicker(int deviceLimit) {
     return MenuComponent(
       key: ValueKey(deviceLimit),
-      title: deviceLimit == 0 ? context.l10n.noDeviceLimit : "$deviceLimit",
+      title: deviceLimit == 0 ? context.strings.noDeviceLimit : "$deviceLimit",
       trailing: currentDeviceLimit == deviceLimit
           ? Icon(Icons.check, color: context.componentColors.primary)
           : null,

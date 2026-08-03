@@ -4,12 +4,12 @@ import "dart:collection";
 
 import "package:collection/collection.dart";
 import "package:ente_components/ente_components.dart";
+import "package:ente_strings/ente_strings.dart";
 import 'package:flutter/material.dart';
 import "package:hugeicons/hugeicons.dart";
 import "package:photos/core/event_bus.dart";
 import "package:photos/events/backup_updated_event.dart";
 import "package:photos/events/file_uploaded_event.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/models/backup/backup_item.dart";
 import "package:photos/models/backup/backup_item_status.dart";
 import "package:photos/models/file/extensions/file_props.dart";
@@ -108,7 +108,7 @@ class _BackupStatusScreenState extends State<BackupStatusScreen> {
     return Scaffold(
       backgroundColor: context.componentColors.backgroundBase,
       body: AppBarComponent(
-        title: AppLocalizations.of(context).backupStatus,
+        title: context.strings.backupStatus,
         slivers: [
           if (allItems.isEmpty)
             const SliverFillRemaining(
@@ -159,7 +159,7 @@ class _EmptyBackupStatus extends StatelessWidget {
           ),
           const SizedBox(height: Spacing.lg),
           Text(
-            AppLocalizations.of(context).backupStatusDescription,
+            context.strings.backupStatusDescription,
             textAlign: TextAlign.center,
             style: TextStyles.large.copyWith(color: colors.textLight),
           ),

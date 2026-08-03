@@ -10,7 +10,6 @@ import 'package:ente_accounts/pages/password_reentry_page.dart';
 import 'package:ente_auth/app/view/app.dart';
 import 'package:ente_auth/core/configuration.dart';
 import 'package:ente_auth/events/trigger_logout_event.dart';
-import 'package:ente_auth/l10n/l10n.dart';
 import 'package:ente_auth/locale.dart';
 import 'package:ente_auth/theme/colors.dart';
 import 'package:ente_auth/theme/ente_theme.dart';
@@ -27,6 +26,7 @@ import 'package:ente_auth/utils/navigation_util.dart';
 import 'package:ente_auth/utils/toast_util.dart';
 import 'package:ente_components/ente_components.dart';
 import 'package:ente_events/event_bus.dart';
+import 'package:ente_strings/ente_strings.dart';
 import 'package:ente_ui/components/alert_bottom_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -83,7 +83,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
   @override
   Widget build(BuildContext context) {
     debugPrint("Building OnboardingPage");
-    final l10n = context.l10n;
+    final l10n = context.strings;
     final textTheme = getEnteTextTheme(context);
 
     return Scaffold(
@@ -207,14 +207,14 @@ class _OnboardingPageState extends State<OnboardingPage> {
       _developerModeTapCount = 0;
       await showAlertBottomSheet(
         context,
-        title: context.l10n.developerSettings,
-        message: context.l10n.developerSettingsWarning,
+        title: context.strings.developerSettings,
+        message: context.strings.developerSettingsWarning,
         assetPath: 'assets/warning-grey.png',
         isDismissible: false,
         showCloseButton: false,
         buttons: [
           ButtonComponent(
-            label: context.l10n.yes,
+            label: context.strings.yes,
             onTap: () async {
               Navigator.of(context).pop();
               await Navigator.of(context).push(
@@ -259,10 +259,10 @@ class _OnboardingPageState extends State<OnboardingPage> {
       if (!mounted) return;
       result = await showChoiceActionSheet(
         context,
-        title: context.l10n.warning,
-        body: context.l10n.offlineModeWarning,
-        secondButtonLabel: context.l10n.cancel,
-        firstButtonLabel: context.l10n.ok,
+        title: context.strings.warning,
+        body: context.strings.offlineModeWarning,
+        secondButtonLabel: context.strings.cancel,
+        firstButtonLabel: context.strings.ok,
       );
     }
     if (hasOptedBefore ||
@@ -337,7 +337,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
   }
 
   Widget _buildFeatureSlider(BuildContext context) {
-    final l10n = context.l10n;
+    final l10n = context.strings;
     final features = [
       ("assets/onboarding-1.png", l10n.featureBackupCodes),
       ("assets/onboarding-2.png", l10n.featureSearchEtc),

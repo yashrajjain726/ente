@@ -3,6 +3,7 @@ import "dart:convert";
 import "dart:io";
 
 import "package:ente_pure_utils/ente_pure_utils.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/foundation.dart";
 import "package:flutter/services.dart";
 import "package:flutter/widgets.dart";
@@ -13,8 +14,6 @@ import "package:photos/db/offline_files_db.dart";
 import "package:photos/events/file_uploaded_event.dart";
 import "package:photos/events/magic_cache_updated_event.dart";
 import "package:photos/events/tab_changed_event.dart";
-import "package:photos/generated/l10n.dart";
-import "package:photos/l10n/l10n.dart";
 import "package:photos/models/file/extensions/file_props.dart";
 import "package:photos/models/file/file.dart";
 import "package:photos/models/ml/discover/prompt.dart";
@@ -79,10 +78,10 @@ class MagicCache {
 }
 
 String getLocalizedTitle(BuildContext context, String title) {
-  return getLocalizedTitleForL10n(context.l10n, title);
+  return getLocalizedTitleForL10n(context.strings, title);
 }
 
-String getLocalizedTitleForL10n(AppLocalizations l10n, String title) {
+String getLocalizedTitleForL10n(StringsLocalizations l10n, String title) {
   switch (title) {
     case 'Identity':
       return l10n.discover_identity;

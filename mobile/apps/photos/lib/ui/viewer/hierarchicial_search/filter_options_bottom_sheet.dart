@@ -1,6 +1,6 @@
 import "package:ente_components/ente_components.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/models/search/hierarchical/hierarchical_search_filter.dart";
 import "package:photos/theme/ente_theme.dart";
 import "package:photos/ui/viewer/gallery/state/search_filter_data_provider.dart";
@@ -31,7 +31,7 @@ class _FilterOptionsBottomSheetState extends State<FilterOptionsBottomSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
+    final l10n = context.strings;
     final filterGroups = _filterGroups(context);
 
     return BottomSheetComponent(
@@ -103,7 +103,7 @@ class _FilterOptionsBottomSheetState extends State<FilterOptionsBottomSheet> {
   }
 
   List<_FilterGroup> _filterGroups(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
+    final l10n = context.strings;
     final peopleFilters = _peopleFilters;
     final groups = [
       _FilterGroup(

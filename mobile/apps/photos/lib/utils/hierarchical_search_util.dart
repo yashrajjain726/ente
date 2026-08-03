@@ -1,10 +1,10 @@
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:logging/logging.dart";
 import "package:photos/core/configuration.dart";
 import "package:photos/core/constants.dart";
 import "package:photos/db/files_db.dart";
 import "package:photos/db/ml/db.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/models/file/extensions/file_props.dart";
 import "package:photos/models/file/file.dart";
 import "package:photos/models/file/file_type.dart";
@@ -187,7 +187,10 @@ Future<void> curateFilters(
   BuildContext context,
 ) async {
   try {
-    final l10n = Localizations.of<AppLocalizations>(context, AppLocalizations);
+    final l10n = Localizations.of<StringsLocalizations>(
+      context,
+      StringsLocalizations,
+    );
     if (l10n == null) {
       Logger("HierarchicalSearchUtil").warning(
         "Skipping filter curation because localizations are unavailable",
@@ -223,7 +226,7 @@ Future<void> curateFilters(
 
 List<OnlyThemFilter> getOnlyThemFilter(
   SearchFilterDataProvider searchFilterDataProvider,
-  AppLocalizations l10n,
+  StringsLocalizations l10n,
 ) {
   if (searchFilterDataProvider.initialGalleryFilter is FaceFilter &&
       searchFilterDataProvider.appliedFilters.isEmpty) {
@@ -288,7 +291,7 @@ Future<List<AlbumFilter>> _curateAlbumFilters(List<EnteFile> files) async {
 
 List<FileTypeFilter> _curateFileTypeFilters(
   List<EnteFile> files,
-  AppLocalizations l10n,
+  StringsLocalizations l10n,
 ) {
   final fileTypeFilters = <FileTypeFilter>[];
   int photosCount = 0;
@@ -556,7 +559,7 @@ Future<List<FaceFilter>> curateFaceFilters(List<EnteFile> files) async {
 
 Future<List<MagicFilter>> curateMagicFilters(
   List<EnteFile> files,
-  AppLocalizations l10n,
+  StringsLocalizations l10n,
 ) async {
   final magicFilters = <MagicFilter>[];
 

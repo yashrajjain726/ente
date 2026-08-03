@@ -1,9 +1,9 @@
 import "package:ente_components/ente_components.dart";
+import "package:ente_strings/ente_strings.dart";
 import 'package:flutter/material.dart';
 import "package:hugeicons/hugeicons.dart";
 import "package:photos/core/event_bus.dart";
 import "package:photos/events/file_caption_updated_event.dart";
-import "package:photos/generated/l10n.dart";
 import 'package:photos/models/file/file.dart';
 import "package:photos/ui/notification/toast.dart";
 import 'package:photos/utils/magic_util.dart';
@@ -37,9 +37,7 @@ class _FileCaptionWidgetState extends State<FileCaptionWidget> {
   final _textController = TextEditingController();
   final _focusNode = FocusNode();
   String? editedCaption;
-  late String defaultHintText = AppLocalizations.of(
-    context,
-  ).fileInfoAddDescHint;
+  late String defaultHintText = context.strings.fileInfoAddDescHint;
 
   @override
   void initState() {
@@ -82,7 +80,7 @@ class _FileCaptionWidgetState extends State<FileCaptionWidget> {
         const SizedBox(width: Spacing.sm),
         IconButtonComponent(
           variant: IconButtonComponentVariant.green,
-          tooltip: AppLocalizations.of(context).done,
+          tooltip: context.strings.done,
           icon: const HugeIcon(icon: HugeIcons.strokeRoundedTick02),
           onTap: _hasPendingCaptionEdit ? onDoneTap : null,
         ),
@@ -123,7 +121,7 @@ class _FileCaptionWidgetState extends State<FileCaptionWidget> {
       }
       return true;
     } else {
-      showShortToast(context, AppLocalizations.of(context).somethingWentWrong);
+      showShortToast(context, context.strings.somethingWentWrong);
       return false;
     }
   }

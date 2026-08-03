@@ -7,12 +7,11 @@ import 'package:ente_components/ente_components.dart' as components;
 import 'package:ente_events/event_bus.dart';
 import 'package:ente_events/models/signed_in_event.dart';
 import 'package:ente_events/models/signed_out_event.dart';
-import 'package:ente_strings/l10n/strings_localizations.dart';
+import 'package:ente_strings/ente_strings.dart';
 import 'package:ente_ui/utils/window_listener_service.dart';
 import "package:flutter/material.dart";
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:locker/core/locale.dart';
-import 'package:locker/l10n/l10n.dart';
 import 'package:locker/services/collections/collections_service.dart';
 import 'package:locker/services/configuration.dart';
 import 'package:locker/services/contacts_display_service.dart';
@@ -171,7 +170,6 @@ class _AppState extends State<App>
           supportedLocales: appSupportedLocales,
           localeListResolutionCallback: localResolutionCallBack,
           localizationsDelegates: const [
-            AppLocalizations.delegate,
             StringsLocalizations.delegate,
             GlobalMaterialLocalizations.delegate,
             GlobalCupertinoLocalizations.delegate,

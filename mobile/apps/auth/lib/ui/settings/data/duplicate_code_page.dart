@@ -1,10 +1,10 @@
-import 'package:ente_auth/l10n/l10n.dart';
 import 'package:ente_auth/services/deduplication_service.dart';
 import 'package:ente_auth/store/code_store.dart';
 import 'package:ente_auth/ui/code_widget.dart';
 import 'package:ente_auth/utils/dialog_util.dart';
 import 'package:ente_components/ente_components.dart';
 import 'package:ente_lock_screen/local_authentication_service.dart';
+import 'package:ente_strings/ente_strings.dart';
 import 'package:flutter/material.dart';
 import 'package:logging/logging.dart';
 
@@ -37,7 +37,7 @@ class _DuplicateCodePageState extends State<DuplicateCodePage> {
       child: Scaffold(
         backgroundColor: colors.backgroundBase,
         body: AppBarComponent(
-          title: context.l10n.deduplicateCodes,
+          title: context.strings.deduplicateCodes,
           slivers: [
             SliverSafeArea(
               top: false,
@@ -50,7 +50,7 @@ class _DuplicateCodePageState extends State<DuplicateCodePage> {
   }
 
   List<Widget> _buildChildren(BuildContext context) {
-    final l10n = context.l10n;
+    final l10n = context.strings;
     final allSelected = selectedGroups.length == _duplicateCodes.length;
     final children = <Widget>[
       Padding(
@@ -166,7 +166,7 @@ class _DuplicateCodePageState extends State<DuplicateCodePage> {
     final isAuthSuccessful = await LocalAuthenticationService.instance
         .requestLocalAuthentication(
           context,
-          context.l10n.deleteCodeAuthMessage,
+          context.strings.deleteCodeAuthMessage,
         );
     if (!isAuthSuccessful || !mounted) return;
 
@@ -175,12 +175,14 @@ class _DuplicateCodePageState extends State<DuplicateCodePage> {
       builder: (sheetContext) => Semantics(
         identifier: 'auth_duplicate_confirm_sheet',
         child: BottomSheetComponent(
-          title: sheetContext.l10n.deleteDuplicates,
-          message: sheetContext.l10n.moveMultipleToTrashMessage(itemCount),
-          closeTooltip: sheetContext.l10n.close,
+          title: sheetContext.strings.deleteDuplicates,
+          message: sheetContext.strings.moveMultipleToTrashMessage(
+            count: itemCount,
+          ),
+          closeTooltip: sheetContext.strings.close,
           actions: [
             ButtonComponent(
-              label: sheetContext.l10n.trash,
+              label: sheetContext.strings.trash,
               variant: ButtonComponentVariant.critical,
               onTap: () async {
                 final didTrash = await _trashSelectedDuplicates();

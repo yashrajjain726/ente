@@ -1,6 +1,6 @@
 import "package:ente_components/ente_components.dart";
+import "package:ente_strings/ente_strings.dart";
 import 'package:flutter/material.dart';
-import "package:photos/generated/l10n.dart";
 import "package:photos/models/account/two_factor.dart";
 import 'package:photos/services/account/user_service.dart';
 import "package:photos/ui/components/alert_bottom_sheet.dart";
@@ -53,7 +53,7 @@ class _TwoFactorRecoveryPageState extends State<TwoFactorRecoveryPage> {
           },
         ),
         title: Text(
-          AppLocalizations.of(context).recoverAccount,
+          context.strings.recoverAccount,
           style: TextStyles.large.copyWith(color: colors.textBase),
         ),
         centerTitle: true,
@@ -63,7 +63,7 @@ class _TwoFactorRecoveryPageState extends State<TwoFactorRecoveryPage> {
         padding: const EdgeInsets.symmetric(horizontal: 16),
         child: ButtonComponent(
           key: const ValueKey("recover2FAButton"),
-          label: AppLocalizations.of(context).recover,
+          label: context.strings.recover,
           isDisabled: !isFormValid,
           onTap: isFormValid
               ? () async {
@@ -92,8 +92,8 @@ class _TwoFactorRecoveryPageState extends State<TwoFactorRecoveryPage> {
           children: [
             const SizedBox(height: 24),
             TextInputComponent(
-              label: AppLocalizations.of(context).recoveryKey,
-              hintText: AppLocalizations.of(context).enterYourRecoveryKey,
+              label: context.strings.recoveryKey,
+              hintText: context.strings.enterYourRecoveryKey,
               controller: _recoveryKeyController,
               autocorrect: false,
               keyboardType: TextInputType.multiline,
@@ -114,7 +114,7 @@ class _TwoFactorRecoveryPageState extends State<TwoFactorRecoveryPage> {
             Align(
               alignment: Alignment.centerRight,
               child: ButtonComponent(
-                label: AppLocalizations.of(context).noRecoveryKey,
+                label: context.strings.forgotRecoveryKey,
                 variant: ButtonComponentVariant.link,
                 size: ButtonComponentSize.small,
                 shouldSurfaceExecutionStates: false,
@@ -122,10 +122,10 @@ class _TwoFactorRecoveryPageState extends State<TwoFactorRecoveryPage> {
                   // ignore: unawaited_futures
                   showAlertBottomSheet(
                     context,
-                    title: AppLocalizations.of(context).contactSupport,
-                    message: AppLocalizations.of(
-                      context,
-                    ).dropSupportEmail(supportEmail: "support@ente.com"),
+                    title: context.strings.contactSupport,
+                    message: context.strings.dropSupportEmail(
+                      supportEmail: "support@ente.com",
+                    ),
                     assetPath: 'assets/warning-grey.png',
                   );
                 },

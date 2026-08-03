@@ -1,9 +1,9 @@
-import 'package:ente_auth/l10n/l10n.dart';
 import 'package:ente_auth/ui/settings/data/import_page.dart';
 import 'package:ente_auth/utils/navigation_util.dart' as auth_nav;
 import 'package:ente_auth/utils/platform_util.dart';
 import 'package:ente_components/ente_components.dart';
 import 'package:ente_pure_utils/ente_pure_utils.dart';
+import 'package:ente_strings/ente_strings.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
@@ -21,7 +21,7 @@ class HomeEmptyStateWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = context.l10n;
+    final l10n = context.strings;
     final colors = context.componentColors;
     final isDarkTheme = Theme.of(context).brightness == Brightness.dark;
     final bgSvgPath = isDarkTheme
@@ -101,7 +101,7 @@ class HomeEmptyStateWidget extends StatelessWidget {
                               button: true,
                               identifier: 'auth_empty_scan',
                               child: ButtonComponent(
-                                label: l10n.importScanQrCode,
+                                label: l10n.scanAQrCode,
                                 onTap: onScanTap,
                               ),
                             ),

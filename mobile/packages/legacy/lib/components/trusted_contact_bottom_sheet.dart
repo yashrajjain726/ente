@@ -58,8 +58,8 @@ class _TrustedContactSheetState extends State<TrustedContactSheet> {
     final email = widget.contact.emergencyContact.email;
 
     final String description = isPending
-        ? context.strings.trustedContactInvitePending(email)
-        : context.strings.trustedContactAccepted(email);
+        ? context.strings.trustedContactInvitePending(email: email)
+        : context.strings.trustedContactAccepted(email: email);
 
     final String label = isPending
         ? context.strings.revokeInvite

@@ -184,7 +184,7 @@ class _OTTVerificationPageState extends State<OTTVerificationPage> {
               Image.asset('assets/upload_file.png'),
               const SizedBox(height: 24),
               Text(
-                context.strings.weHaveSentCode(widget.email),
+                context.strings.weHaveSentCode(email: widget.email),
                 style: textTheme.body.copyWith(color: colorScheme.textBase),
                 textAlign: TextAlign.center,
               ),

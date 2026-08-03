@@ -1,9 +1,9 @@
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/widgets.dart";
 import "package:photos/core/configuration.dart";
 import "package:photos/core/constants.dart";
 import "package:photos/db/device_files_db.dart";
 import "package:photos/db/files_db.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/models/device_collection.dart";
 import "package:photos/models/file/file.dart";
 import "package:photos/models/ignored_upload_reason.dart";
@@ -60,7 +60,7 @@ String ignoredUploadReasonBucketLabel(
   BuildContext context,
   IgnoredUploadReasonBucket bucket,
 ) {
-  final l10n = AppLocalizations.of(context);
+  final l10n = context.strings;
   return switch (bucket) {
     IgnoredUploadReasonBucket.iCloudUnavailable => l10n.iCloudUnavailable,
     IgnoredUploadReasonBucket.deletedFromEnte => l10n.deletedFromEnte,

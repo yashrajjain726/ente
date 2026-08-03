@@ -1,6 +1,6 @@
 import 'package:ente_components/ente_components.dart';
+import 'package:ente_strings/ente_strings.dart';
 import 'package:flutter/material.dart';
-import 'package:locker/l10n/l10n.dart';
 import 'package:locker/models/info/info_item.dart';
 import 'package:locker/ui/pages/base_info_page.dart';
 
@@ -53,10 +53,10 @@ class _EmergencyContactPageState
   }
 
   @override
-  String get pageTitle => context.l10n.emergencyContact;
+  String get pageTitle => context.strings.emergencyContact;
 
   @override
-  String get submitButtonText => context.l10n.saveRecord;
+  String get submitButtonText => context.strings.save;
 
   @override
   InfoType get infoType => InfoType.emergencyContact;
@@ -82,8 +82,8 @@ class _EmergencyContactPageState
   List<Widget> buildFormFields() {
     return [
       TextInputComponent(
-        label: context.l10n.contactName,
-        hintText: context.l10n.contactNameHint,
+        label: context.strings.contactName,
+        hintText: context.strings.contactNameHint,
         controller: _nameController,
         isRequired: true,
         textCapitalization: TextCapitalization.sentences,
@@ -92,8 +92,8 @@ class _EmergencyContactPageState
       ),
       const SizedBox(height: 24),
       TextInputComponent(
-        label: context.l10n.contactDetails,
-        hintText: context.l10n.contactDetailsHint,
+        label: context.strings.contactDetails,
+        hintText: context.strings.contactDetailsHint,
         controller: _contactDetailsController,
         isRequired: true,
         textInputAction: TextInputAction.next,
@@ -101,8 +101,8 @@ class _EmergencyContactPageState
       ),
       const SizedBox(height: 24),
       TextInputComponent(
-        label: context.l10n.contactNotes,
-        hintText: context.l10n.contactNotesHint,
+        label: context.strings.contactNotes,
+        hintText: context.strings.contactNotesHint,
         controller: _notesController,
         keyboardType: TextInputType.multiline,
         minLines: 3,
@@ -117,18 +117,18 @@ class _EmergencyContactPageState
   List<Widget> buildViewFields() {
     return [
       buildViewField(
-        label: context.l10n.contactName,
+        label: context.strings.contactName,
         value: _nameController.text,
       ),
       const SizedBox(height: 24),
       buildViewField(
-        label: context.l10n.contactDetails,
+        label: context.strings.contactDetails,
         value: _contactDetailsController.text,
       ),
       if (_notesController.text.trim().isNotEmpty) ...[
         const SizedBox(height: 24),
         buildViewField(
-          label: context.l10n.contactNotes,
+          label: context.strings.contactNotes,
           value: _notesController.text,
           maxLines: 3,
         ),

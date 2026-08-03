@@ -1,8 +1,8 @@
 import 'package:ente_components/ente_components.dart';
 import 'package:ente_icons/ente_icons.dart';
 import "package:ente_pure_utils/ente_pure_utils.dart";
+import "package:ente_strings/ente_strings.dart";
 import 'package:flutter/material.dart';
-import "package:photos/generated/l10n.dart";
 import "package:photos/models/api/collection/user.dart";
 import "package:photos/models/file/file.dart";
 import 'package:photos/models/file/trash_file.dart';
@@ -171,7 +171,7 @@ class TrashedFileOverlayText extends StatelessWidget {
         ((file.deleteBy - DateTime.now().microsecondsSinceEpoch) /
                 Duration.microsecondsPerDay)
             .ceil();
-    final text = AppLocalizations.of(context).trashDaysLeft(count: daysLeft);
+    final text = context.strings.trashDaysLeft(count: daysLeft);
     return FileOverlayText(text);
   }
 }

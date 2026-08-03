@@ -4,6 +4,7 @@ import "dart:typed_data";
 
 import "package:dio/dio.dart";
 import "package:ente_crypto/ente_crypto.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/cupertino.dart";
 import "package:logging/logging.dart";
 import "package:photos/core/configuration.dart";
@@ -12,7 +13,6 @@ import "package:photos/gateways/emergency/emergency_gateway.dart";
 import "package:photos/gateways/users/models/key_attributes.dart";
 import "package:photos/gateways/users/models/set_keys_request.dart";
 import "package:photos/gateways/users/models/srp.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/service_locator.dart";
 import "package:photos/services/account/user_service.dart";
 import "package:photos/ui/common/user_dialogs.dart";
@@ -50,8 +50,8 @@ class EmergencyContactService {
       if (context == null || !context.mounted) return false;
       await showAlertBottomSheet(
         context,
-        title: AppLocalizations.of(context).letsTryThatAgain,
-        message: AppLocalizations.of(context).enterValidEmail,
+        title: context.strings.letsTryThatAgain,
+        message: context.strings.enterValidEmail,
         assetPath: "assets/warning-grey.png",
       );
       return false;
@@ -59,8 +59,8 @@ class EmergencyContactService {
       if (context == null || !context.mounted) return false;
       await showAlertBottomSheet(
         context,
-        title: AppLocalizations.of(context).oops,
-        message: AppLocalizations.of(context).youCannotShareWithYourself,
+        title: context.strings.oops,
+        message: context.strings.youCannotShareWithYourself,
         assetPath: "assets/warning-grey.png",
       );
       return false;

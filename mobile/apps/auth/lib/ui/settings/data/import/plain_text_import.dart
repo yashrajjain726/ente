@@ -1,8 +1,8 @@
-import 'package:ente_auth/l10n/l10n.dart';
 import 'package:ente_auth/ui/settings/data/import/import_file_cleanup.dart';
 import 'package:ente_auth/ui/settings/data/import/import_flow.dart';
 import 'package:ente_auth/ui/settings/data/import/plain_text_import_parser.dart';
 import 'package:ente_components/ente_components.dart';
+import 'package:ente_strings/ente_strings.dart';
 import 'package:flutter/material.dart';
 import 'package:logging/logging.dart';
 
@@ -11,7 +11,7 @@ class PlainTextImport extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = context.l10n;
+    final l10n = context.strings;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -52,7 +52,7 @@ class PlainTextImport extends StatelessWidget {
 }
 
 Future<void> showImportInstructionDialog(BuildContext context) async {
-  final l10n = context.l10n;
+  final l10n = context.strings;
   await showFileImportInstruction(
     context: context,
     title: l10n.importCodes,
@@ -68,7 +68,7 @@ Future<void> _pickImportFile(BuildContext context) async {
     context: context,
     logger: Logger('PlainTextImport'),
     logMessage: 'Failed to import plain-text codes',
-    errorMessage: (context, _) => context.l10n.importFailureDesc,
+    errorMessage: (context, _) => context.strings.importFailureDesc,
     process: (path, _) async {
       final contents = await readPickedImportFileAsString(path);
       return saveImportedCodes(parsePlainTextImport(contents));

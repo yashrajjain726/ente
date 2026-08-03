@@ -1,9 +1,9 @@
 import "dart:async";
 
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:flutter/services.dart";
 import "package:logging/logging.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/models/file/file.dart";
 import "package:photos/services/favorites_service.dart";
 import "package:photos/ui/notification/toast.dart";
@@ -128,10 +128,7 @@ class _FavoriteWidgetState extends State<FavoriteWidget> {
         _logger.severe("Failed to add file to favorites", e, s);
         hasError = true;
         if (!mounted) return;
-        showToast(
-          context,
-          AppLocalizations.of(context).sorryCouldNotAddToFavorites,
-        );
+        showToast(context, context.strings.sorryCouldNotAddToFavorites);
         _stateMachine?.trigger("Stroke")?.fire();
       }
     } else {
@@ -147,10 +144,7 @@ class _FavoriteWidgetState extends State<FavoriteWidget> {
         _logger.severe("Failed to remove file from favorites", e, s);
         hasError = true;
         if (!mounted) return;
-        showToast(
-          context,
-          AppLocalizations.of(context).sorryCouldNotRemoveFromFavorites,
-        );
+        showToast(context, context.strings.sorryCouldNotRemoveFromFavorites);
         _stateMachine?.trigger("Filled")?.fire();
       }
     }

@@ -1,6 +1,6 @@
 import 'package:ente_components/ente_components.dart';
+import "package:ente_strings/ente_strings.dart";
 import 'package:flutter/material.dart';
-import "package:locker/l10n/l10n.dart";
 import "package:locker/services/collections/collections_api_client.dart";
 import "package:locker/services/collections/models/collection.dart";
 import "package:locker/ui/viewer/date/date_time_picker.dart";
@@ -16,7 +16,7 @@ class LinkExpiryPickerPage extends StatelessWidget {
     return Scaffold(
       backgroundColor: context.componentColors.backgroundBase,
       body: AppBarComponent(
-        title: context.l10n.linkExpiry,
+        title: context.strings.linkExpiry,
         slivers: [
           SliverPadding(
             padding: const EdgeInsets.fromLTRB(
@@ -44,14 +44,20 @@ class ItemsWidget extends StatefulWidget {
 class _ItemsWidgetState extends State<ItemsWidget> {
   // index, title, milliseconds in future post which link should expire (when >0)
   late final List<Tuple2<String, int>> _expiryOptions = [
-    Tuple2(context.l10n.never, 0),
-    Tuple2(context.l10n.after1Hour, const Duration(hours: 1).inMicroseconds),
-    Tuple2(context.l10n.after1Day, const Duration(days: 1).inMicroseconds),
-    Tuple2(context.l10n.after1Week, const Duration(days: 7).inMicroseconds),
+    Tuple2(context.strings.never, 0),
+    Tuple2(context.strings.after1Hour, const Duration(hours: 1).inMicroseconds),
+    Tuple2(context.strings.after1Day, const Duration(days: 1).inMicroseconds),
+    Tuple2(context.strings.after1Week, const Duration(days: 7).inMicroseconds),
     // todo: make this time calculation perfect
-    Tuple2(context.l10n.after1Month, const Duration(days: 30).inMicroseconds),
-    Tuple2(context.l10n.after1Year, const Duration(days: 365).inMicroseconds),
-    Tuple2(context.l10n.custom, -1),
+    Tuple2(
+      context.strings.after1Month,
+      const Duration(days: 30).inMicroseconds,
+    ),
+    Tuple2(
+      context.strings.after1Year,
+      const Duration(days: 365).inMicroseconds,
+    ),
+    Tuple2(context.strings.custom, -1),
   ];
 
   @override

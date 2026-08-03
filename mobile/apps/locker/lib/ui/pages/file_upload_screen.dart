@@ -1,10 +1,10 @@
 import 'dart:io';
 
 import "package:ente_components/ente_components.dart";
+import 'package:ente_strings/ente_strings.dart';
 import "package:ente_ui/components/title_bar_title_widget.dart";
 import 'package:flutter/material.dart';
 import "package:hugeicons/hugeicons.dart";
-import 'package:locker/l10n/l10n.dart';
 import 'package:locker/services/collections/models/collection.dart';
 import 'package:locker/services/configuration.dart';
 import 'package:locker/ui/components/collection_selection_widget.dart';
@@ -104,9 +104,9 @@ class _FileUploadScreenState extends State<FileUploadScreen> {
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      TitleBarTitleWidget(title: context.l10n.uploadFiles),
+                      TitleBarTitleWidget(title: context.strings.uploadFiles),
                       Text(
-                        context.l10n.filesSelected(_files.length),
+                        context.strings.filesSelected(count: _files.length),
                         style: TextStyles.body.copyWith(
                           color: colors.textLight,
                         ),
@@ -173,7 +173,9 @@ class _FileUploadScreenState extends State<FileUploadScreen> {
                         ),
                         const SizedBox(height: 24),
                       ],
-                      TitleBarTitleWidget(title: context.l10n.collectionLabel),
+                      TitleBarTitleWidget(
+                        title: context.strings.collectionLabel,
+                      ),
                       const SizedBox(height: 16),
                       CollectionSelectionWidget(
                         collections: _availableCollections,
@@ -189,7 +191,7 @@ class _FileUploadScreenState extends State<FileUploadScreen> {
               const SizedBox(height: 12),
               SafeArea(
                 child: ButtonComponent(
-                  label: context.l10n.save,
+                  label: context.strings.save,
                   onTap: () async {
                     final selectedCollections = _availableCollections
                         .where((c) => _selectedCollectionIds.contains(c.id))

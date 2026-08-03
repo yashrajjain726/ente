@@ -1,9 +1,9 @@
 import 'package:ente_events/event_bus.dart';
+import 'package:ente_strings/ente_strings.dart';
 import 'package:ente_ui/utils/dialog_util.dart';
 import 'package:ente_ui/utils/toast_util.dart';
 import 'package:flutter/material.dart';
 import 'package:locker/events/collections_updated_event.dart';
-import 'package:locker/l10n/l10n.dart';
 import 'package:locker/services/configuration.dart';
 import 'package:locker/services/db/locker_db.dart';
 import 'package:locker/services/files/download/file_downloader.dart';
@@ -70,7 +70,9 @@ class OfflineFilesService {
     }
 
     final total = eligibleFiles.length;
-    final savingOffline = context.mounted ? context.l10n.savingOffline : null;
+    final savingOffline = context.mounted
+        ? context.strings.savingOffline
+        : null;
     final dialog = savingOffline == null
         ? null
         : createProgressDialog(
@@ -147,14 +149,23 @@ class OfflineFilesService {
     }
 
     if (failureCount == 0) {
-      showToast(context, context.l10n.filesAvailableOffline(successCount));
+      showToast(
+        context,
+        context.strings.filesAvailableOffline(count: successCount),
+      );
     } else if (successCount > 0) {
       showToast(
         context,
-        context.l10n.filesAvailableOfflinePartial(successCount, failureCount),
+        context.strings.filesAvailableOfflinePartial(
+          failureCount: failureCount,
+          successCount: successCount,
+        ),
       );
     } else {
-      showToast(context, context.l10n.failedToSaveFilesOffline(failureCount));
+      showToast(
+        context,
+        context.strings.failedToSaveFilesOffline(count: failureCount),
+      );
     }
 
     return successCount > 0;
@@ -199,7 +210,10 @@ class OfflineFilesService {
       return changedCount > 0;
     }
 
-    showToast(context, context.l10n.filesRemovedFromOffline(changedCount));
+    showToast(
+      context,
+      context.strings.filesRemovedFromOffline(count: changedCount),
+    );
     return true;
   }
 

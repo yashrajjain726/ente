@@ -1,8 +1,8 @@
 import "package:ente_components/ente_components.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:ente_ui/components/buttons/button_widget.dart";
 import "package:ente_ui/components/buttons/models/button_result.dart";
 import "package:flutter/material.dart";
-import "package:locker/l10n/l10n.dart";
 
 class DeleteConfirmationResult {
   final ButtonResult buttonResult;
@@ -85,7 +85,7 @@ class _DeleteConfirmationSheetState extends State<DeleteConfirmationSheet> {
                     });
                   },
                 ),
-                label: context.l10n.deleteCollectionFromEverywhere,
+                label: context.strings.deleteCollectionFromEverywhere,
                 onTap: () {
                   setState(() {
                     _deleteFromAllCollections = !_deleteFromAllCollections;

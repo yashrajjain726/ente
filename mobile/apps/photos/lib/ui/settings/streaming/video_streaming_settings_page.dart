@@ -1,12 +1,11 @@
 import "dart:async";
 
 import "package:ente_components/ente_components.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:hugeicons/hugeicons.dart";
 import "package:photos/core/event_bus.dart";
 import "package:photos/events/video_preview_state_changed_event.dart";
-import "package:photos/generated/l10n.dart";
-import "package:photos/l10n/l10n.dart";
 import "package:photos/models/preview/preview_item_status.dart";
 import "package:photos/services/video_preview_service.dart";
 import "package:photos/ui/common/loading_widget.dart";
@@ -38,7 +37,7 @@ class _VideoStreamingSettingsPageState
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
+    final l10n = context.strings;
     final hasEnabled = VideoPreviewService.instance.isVideoStreamingEnabled;
     final children = hasEnabled
         ? _enabledChildren(context)
@@ -57,7 +56,7 @@ class _VideoStreamingSettingsPageState
                   children: [
                     const SizedBox(height: 12),
                     ButtonComponent(
-                      label: context.l10n.enable,
+                      label: context.strings.enable,
                       onTap: () async {
                         await toggleVideoStreaming();
                       },
@@ -73,7 +72,7 @@ class _VideoStreamingSettingsPageState
 
   List<Widget> _enabledChildren(BuildContext context) {
     final colors = context.componentColors;
-    final l10n = AppLocalizations.of(context);
+    final l10n = context.strings;
     return [
       Text.rich(
         TextSpan(
@@ -119,7 +118,7 @@ class _VideoStreamingSettingsPageState
 
   List<Widget> _disabledChildren(BuildContext context) {
     final colors = context.componentColors;
-    final l10n = AppLocalizations.of(context);
+    final l10n = context.strings;
     return [
       const SizedBox(height: 80),
       Image.asset("assets/enable-streaming-static.png", height: 160),
@@ -163,7 +162,7 @@ class _VideoStreamingSettingsPageState
         .push(
           MaterialPageRoute(
             builder: (BuildContext context) {
-              return WebPage(AppLocalizations.of(context).help, helpUrl);
+              return WebPage(context.strings.help, helpUrl);
             },
           ),
         )
@@ -234,7 +233,7 @@ class VideoStreamingStatusWidgetState
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               MenuComponent(
-                title: AppLocalizations.of(context).processed,
+                title: context.strings.processed,
                 leading: _streamingMenuIcon(
                   context,
                   HugeIcons.strokeRoundedClock01,
@@ -251,7 +250,7 @@ class VideoStreamingStatusWidgetState
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: Text(
-                  AppLocalizations.of(context).videoStreamingNote,
+                  context.strings.videoStreamingNote,
                   style: TextStyles.body.copyWith(color: colors.textLight),
                 ),
               ),

@@ -1,4 +1,3 @@
-import 'package:ente_auth/l10n/l10n.dart';
 import 'package:ente_auth/services/update_service.dart';
 import 'package:ente_auth/ui/settings/app_update_dialog.dart';
 import 'package:ente_auth/ui/settings/components/auth_settings_item.dart';
@@ -7,6 +6,7 @@ import 'package:ente_auth/utils/dialog_util.dart';
 import 'package:ente_auth/utils/platform_util.dart';
 import 'package:ente_auth/utils/toast_util.dart';
 import 'package:ente_components/ente_components.dart';
+import 'package:ente_strings/ente_strings.dart';
 import 'package:flutter/material.dart';
 import 'package:hugeicons/hugeicons.dart';
 
@@ -15,7 +15,7 @@ class AboutSettingsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = context.l10n;
+    final l10n = context.strings;
     return AuthSettingsPageScaffold(
       title: l10n.about,
       children: [
@@ -69,7 +69,7 @@ class AboutSettingsPage extends StatelessWidget {
   }
 
   Future<void> _checkForUpdates(BuildContext context) async {
-    final dialog = createProgressDialog(context, context.l10n.checking);
+    final dialog = createProgressDialog(context, context.strings.checking);
     await dialog.show();
     final shouldUpdate = await UpdateService.instance.shouldUpdate();
     await dialog.hide();
@@ -83,6 +83,6 @@ class AboutSettingsPage extends StatelessWidget {
       );
       return;
     }
-    showShortToast(context, context.l10n.youAreOnTheLatestVersion);
+    showShortToast(context, context.strings.youAreOnTheLatestVersion);
   }
 }

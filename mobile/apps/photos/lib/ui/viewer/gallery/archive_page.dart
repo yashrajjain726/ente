@@ -2,13 +2,13 @@ import "dart:async";
 
 import 'package:collection/collection.dart' show IterableExtension;
 import "package:ente_pure_utils/ente_pure_utils.dart";
+import "package:ente_strings/ente_strings.dart";
 import 'package:flutter/material.dart';
 import 'package:photos/core/configuration.dart';
 import 'package:photos/core/event_bus.dart';
 import 'package:photos/db/files_db.dart';
 import "package:photos/events/collection_updated_event.dart";
 import 'package:photos/events/files_updated_event.dart';
-import "package:photos/generated/l10n.dart";
 import "package:photos/models/collection/collection.dart";
 import 'package:photos/models/gallery_type.dart';
 import "package:photos/models/metadata/common_keys.dart";
@@ -83,7 +83,7 @@ class _ArchivePageState extends State<ArchivePage> {
         .getHiddenCollectionIds();
     final appBar = GalleryAppBarWidget.sliverConfig(
       widget.appBarType,
-      AppLocalizations.of(context).archive,
+      context.strings.archive,
       _selectedFiles,
     );
     final gallery = Gallery(
@@ -127,7 +127,7 @@ class _ArchivePageState extends State<ArchivePage> {
       emptyState: _archivedCollections.isEmpty
           ? EmptyStateComponent(
               assetPath: "assets/empty_state_archive.png",
-              title: AppLocalizations.of(context).archivedItemsWillShowUpHere,
+              title: context.strings.archivedItemsWillShowUpHere,
             )
           : const SizedBox.shrink(),
       header: AlbumHorizontalList(
@@ -139,9 +139,7 @@ class _ArchivePageState extends State<ArchivePage> {
               CollectionListPage(
                 _archivedCollections,
                 sectionType: UISectionType.archivedCollections,
-                appTitle: Text(
-                  AppLocalizations.of(context).archiveCollectionName,
-                ),
+                appTitle: Text(context.strings.archiveCollectionName),
                 tag: "archived",
               ),
             );

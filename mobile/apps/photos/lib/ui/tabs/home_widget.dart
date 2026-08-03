@@ -6,6 +6,7 @@ import "package:app_links/app_links.dart";
 import "package:ente_components/ente_components.dart";
 import "package:ente_crypto/ente_crypto.dart";
 import "package:ente_pure_utils/ente_pure_utils.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:flutter/scheduler.dart";
 import "package:flutter/services.dart";
@@ -30,8 +31,6 @@ import "package:photos/events/sync_status_update_event.dart";
 import "package:photos/events/tab_changed_event.dart";
 import "package:photos/events/trigger_logout_event.dart";
 import "package:photos/events/user_logged_out_event.dart";
-import "package:photos/generated/l10n.dart";
-import "package:photos/l10n/l10n.dart";
 import "package:photos/models/collection/collection.dart";
 import "package:photos/models/collection/collection_items.dart";
 import "package:photos/models/file/file.dart";
@@ -404,16 +403,16 @@ class _HomeWidgetState extends State<HomeWidget> {
       if (!publicUrl.enableDownload) {
         await showErrorDialog(
           context,
-          context.l10n.canNotOpenTitle,
-          context.l10n.canNotOpenBody,
+          context.strings.canNotOpenTitle,
+          context.strings.canNotOpenBody,
         );
         return;
       }
       if (publicUrl.passwordEnabled) {
         await showTextInputDialog(
           context,
-          title: AppLocalizations.of(context).enterPassword,
-          submitButtonLabel: AppLocalizations.of(context).ok,
+          title: context.strings.enterPassword,
+          submitButtonLabel: context.strings.ok,
           alwaysShowSuccessState: false,
           popnavAfterSubmission: false,
           onSubmit: (String text) async {
@@ -514,12 +513,12 @@ class _HomeWidgetState extends State<HomeWidget> {
 
   Future<void> _autoLogoutAlert() async {
     final AlertDialog alert = AlertDialog(
-      title: Text(AppLocalizations.of(context).sessionExpired),
-      content: Text(AppLocalizations.of(context).pleaseLoginAgain),
+      title: Text(context.strings.sessionExpired),
+      content: Text(context.strings.pleaseLoginAgain),
       actions: [
         TextButton(
           child: Text(
-            AppLocalizations.of(context).ok,
+            context.strings.ok,
             style: TextStyle(
               color: Theme.of(context).colorScheme.greenAlternative,
             ),
@@ -529,7 +528,7 @@ class _HomeWidgetState extends State<HomeWidget> {
             Navigator.of(context).popUntil((route) => route.isFirst);
             final dialog = createProgressDialog(
               context,
-              AppLocalizations.of(context).loggingOut,
+              context.strings.loggingOut,
             );
             await dialog.show();
             await Configuration.instance.logout();
@@ -627,7 +626,7 @@ class _HomeWidgetState extends State<HomeWidget> {
               actions: [
                 const SizedBox(height: 24),
                 ButtonWidget(
-                  labelText: AppLocalizations.of(context).openFile,
+                  labelText: context.strings.openFile,
                   buttonType: ButtonType.primary,
                   onTap: () async {
                     Navigator.of(context).pop(true);
@@ -636,7 +635,7 @@ class _HomeWidgetState extends State<HomeWidget> {
                 const SizedBox(height: 12),
                 ButtonWidget(
                   buttonType: ButtonType.secondary,
-                  labelText: AppLocalizations.of(context).backupFile,
+                  labelText: context.strings.backupFile,
                   onTap: () async {
                     Navigator.of(context).pop(false);
                   },

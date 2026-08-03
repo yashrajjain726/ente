@@ -10,10 +10,10 @@ import "package:ente_crypto_api/ente_crypto_api.dart";
 import "package:ente_lock_screen/local_authentication_service.dart";
 import "package:ente_lock_screen/lock_screen_settings.dart";
 import "package:ente_lock_screen/ui/lock_screen_options.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:ente_utils/email_util.dart";
 import "package:flutter/material.dart";
 import "package:hugeicons/hugeicons.dart";
-import "package:locker/l10n/l10n.dart";
 import "package:locker/services/configuration.dart";
 import "package:locker/ui/settings/components/settings_item.dart";
 import "package:locker/ui/settings/components/settings_page_scaffold.dart";
@@ -40,7 +40,7 @@ class _SecuritySettingsPageState extends State<SecuritySettingsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = context.l10n;
+    final l10n = context.strings;
 
     return SettingsPageScaffold(
       title: l10n.security,
@@ -61,7 +61,7 @@ class _SecuritySettingsPageState extends State<SecuritySettingsPage> {
   }
 
   Widget _buildEmailVerificationItem(BuildContext context) {
-    final l10n = context.l10n;
+    final l10n = context.strings;
 
     return SettingsItem(
       title: l10n.emailVerificationToggle,
@@ -78,7 +78,7 @@ class _SecuritySettingsPageState extends State<SecuritySettingsPage> {
     final hasAuthenticated = await LocalAuthenticationService.instance
         .requestLocalAuthentication(
           context,
-          context.l10n.authToChangeEmailVerificationSetting,
+          context.strings.authToChangeEmailVerificationSetting,
         );
     if (!hasAuthenticated) {
       return;
@@ -88,7 +88,7 @@ class _SecuritySettingsPageState extends State<SecuritySettingsPage> {
   }
 
   Widget _buildPasskeyItem(BuildContext context) {
-    final l10n = context.l10n;
+    final l10n = context.strings;
     return SettingsItem(
       title: l10n.passkey,
       icon: HugeIcons.strokeRoundedFingerAccess,
@@ -98,7 +98,7 @@ class _SecuritySettingsPageState extends State<SecuritySettingsPage> {
   }
 
   Widget _buildActiveSessionsItem(BuildContext context) {
-    final l10n = context.l10n;
+    final l10n = context.strings;
     return SettingsItem(
       title: l10n.viewActiveSessions,
       icon: HugeIcons.strokeRoundedSmartPhone01,
@@ -125,7 +125,7 @@ class _SecuritySettingsPageState extends State<SecuritySettingsPage> {
   }
 
   Widget _buildAppLockItem(BuildContext context) {
-    final l10n = context.l10n;
+    final l10n = context.strings;
     return SettingsItem(
       title: l10n.appLock,
       icon: HugeIcons.strokeRoundedSquareLock02,
@@ -135,7 +135,7 @@ class _SecuritySettingsPageState extends State<SecuritySettingsPage> {
   }
 
   Future<void> _onAppLockTapped(BuildContext context) async {
-    final l10n = context.l10n;
+    final l10n = context.strings;
     final isDeviceSupported = await LockScreenSettings.instance
         .isDeviceSupported();
     if (!context.mounted) {
@@ -166,7 +166,7 @@ class _SecuritySettingsPageState extends State<SecuritySettingsPage> {
           illustration: LockerBottomSheetIllustration.warningGrey,
           actions: [
             ButtonComponent(
-              label: context.l10n.contactSupport,
+              label: context.strings.contactSupport,
               onTap: () async {
                 await sendLogs(context, "support@ente.com", postShare: () {});
                 if (sheetContext.mounted) {
@@ -182,7 +182,7 @@ class _SecuritySettingsPageState extends State<SecuritySettingsPage> {
 
   Future<void> _onPasskeyClick(BuildContext buildContext) async {
     try {
-      final reason = buildContext.l10n.authToViewPasskey;
+      final reason = buildContext.strings.authToViewPasskeyGeneric;
       final hasAuthenticated = await LocalAuthenticationService.instance
           .requestLocalAuthentication(
             buildContext,
@@ -217,7 +217,7 @@ class _SecuritySettingsPageState extends State<SecuritySettingsPage> {
       await showErrorBottomSheetComponent<void>(
         context: buildContext,
         message: e.toString(),
-        title: buildContext.l10n.somethingWentWrong,
+        title: buildContext.strings.somethingWentWrong,
       );
     }
   }
@@ -258,7 +258,7 @@ class _SecuritySettingsPageState extends State<SecuritySettingsPage> {
       await showErrorBottomSheetComponent<void>(
         context: context,
         message: e.toString(),
-        title: context.l10n.somethingWentWrong,
+        title: context.strings.somethingWentWrong,
       );
     }
   }

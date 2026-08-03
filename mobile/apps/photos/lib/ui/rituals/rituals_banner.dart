@@ -4,9 +4,9 @@ import "dart:math" as math;
 import "package:ente_components/theme/text_styles.dart";
 import "package:ente_icons/ente_icons.dart";
 import "package:ente_pure_utils/ente_pure_utils.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:hugeicons/hugeicons.dart";
-import "package:photos/l10n/l10n.dart";
 import "package:photos/models/rituals/ritual_models.dart";
 import "package:photos/service_locator.dart";
 import "package:photos/theme/ente_theme.dart";
@@ -190,7 +190,7 @@ class _RitualsHeader extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(
-              context.l10n.ritualsTitle,
+              context.strings.ritualsTitle,
               style: TextStyles.display3.copyWith(color: colorScheme.textBase),
             ),
             if (showChevron)
@@ -259,7 +259,7 @@ class _RitualSummaryCard extends StatelessWidget {
                     Expanded(
                       child: Text(
                         ritual.title.isEmpty
-                            ? context.l10n.ritualUntitled
+                            ? context.strings.ritualUntitled
                             : ritual.title,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -276,7 +276,7 @@ class _RitualSummaryCard extends StatelessWidget {
                     const Spacer(),
                     _RitualCameraButton(
                       onTap: () => openRitualCamera(context, ritual),
-                      tooltip: context.l10n.ritualOpenCameraTooltip,
+                      tooltip: context.strings.ritualOpenCameraTooltip,
                     ),
                   ],
                 ),

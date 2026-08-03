@@ -1,9 +1,9 @@
 import "package:ente_components/ente_components.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:flutter/services.dart";
 import "package:hugeicons/hugeicons.dart";
 import "package:photos/core/constants.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/ui/notification/toast.dart";
 import "package:photos/utils/email_util.dart";
 
@@ -19,7 +19,7 @@ Future<void> showNoMailAppSheet(
   await showBottomSheetComponent<void>(
     context: context,
     builder: (_) => BottomSheetComponent(
-      title: AppLocalizations.of(context).noEmailAppFound,
+      title: context.strings.noEmailAppFound,
       content: NoMailAppSheet(
         toEmail: toEmail,
         subject: subject,
@@ -54,7 +54,7 @@ class NoMailAppSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
+    final l10n = context.strings;
     final copyFields = <_CopyFieldData>[
       _CopyFieldData(label: l10n.subject, value: subject),
       _CopyFieldData(label: l10n.message, value: message),
@@ -136,7 +136,7 @@ class NoMailAppSheet extends StatelessWidget {
     );
   }
 
-  String _buildCopyAllPayload(AppLocalizations l10n) {
+  String _buildCopyAllPayload(StringsLocalizations l10n) {
     final shouldIncludeLogsInCopyAll =
         logsFilePath == null &&
         logsLabel != null &&

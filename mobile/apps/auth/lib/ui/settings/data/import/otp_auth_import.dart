@@ -1,9 +1,9 @@
-import 'package:ente_auth/l10n/l10n.dart';
 import 'package:ente_auth/models/code.dart';
 import 'package:ente_auth/ui/settings/data/import/import_file_cleanup.dart';
 import 'package:ente_auth/ui/settings/data/import/import_flow.dart';
 import 'package:ente_auth/ui/settings/data/import/otp_auth_import_parser.dart';
 import 'package:ente_auth/utils/dialog_util.dart';
+import 'package:ente_strings/ente_strings.dart';
 import 'package:ente_ui/components/progress_dialog.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
@@ -13,12 +13,12 @@ import 'package:logging/logging.dart';
 final _logger = Logger('OtpAuthImport');
 
 Future<void> showOtpAuthImportInstruction(BuildContext context) async {
-  final l10n = context.l10n;
+  final l10n = context.strings;
   await showFileImportInstruction(
     context: context,
     title: 'OTP Auth',
     body: l10n.importOtpAuthGuide,
-    actionLabel: l10n.importSelectAppExport('OTP Auth'),
+    actionLabel: l10n.importSelectAppExport(appName: 'OTP Auth'),
     semanticsIdentifier: 'auth_import_instruction_otp_auth',
     onImport: () => _pickOtpAuthFile(context),
   );
@@ -27,7 +27,7 @@ Future<void> showOtpAuthImportInstruction(BuildContext context) async {
 Future<void> _pickOtpAuthFile(BuildContext context) async {
   await pickAndProcessImportFile(
     context: context,
-    dialogTitle: context.l10n.importSelectAppExport('OTP Auth'),
+    dialogTitle: context.strings.importSelectAppExport(appName: 'OTP Auth'),
     type: FileType.custom,
     allowedExtensions: ['otpauthdb', 'otpauthdp', 'otpauth'],
     showProgressBeforeProcessing: false,
@@ -45,7 +45,7 @@ Future<int?> _processOtpAuthFile(
 ) async {
   final fileBytes = await readPickedImportFileAsBytes(path);
   if (!context.mounted) return null;
-  final l10n = context.l10n;
+  final l10n = context.strings;
   while (true) {
     if (!context.mounted) return null;
     final password = await promptForImportPassword(

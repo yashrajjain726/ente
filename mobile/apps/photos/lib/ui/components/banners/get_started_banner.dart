@@ -1,9 +1,9 @@
 import "dart:math" as math;
 
 import "package:ente_components/ente_components.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:hugeicons/hugeicons.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/service_locator.dart";
 import "package:photos/ui/account/email_entry_page.dart";
 
@@ -39,7 +39,7 @@ class _GetStartedBannerState extends State<GetStartedBanner> {
       return const SizedBox.shrink();
     }
 
-    final l10n = AppLocalizations.of(context);
+    final l10n = context.strings;
     final colors = context.componentColors;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final ctaColor = isDark ? colors.primary : colors.primaryDark;

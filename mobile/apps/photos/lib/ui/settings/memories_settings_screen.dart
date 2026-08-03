@@ -1,10 +1,10 @@
 import "dart:async";
 
 import "package:ente_components/ente_components.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:photos/core/event_bus.dart";
 import "package:photos/events/memories_changed_event.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/service_locator.dart";
 import "package:photos/services/memory_home_widget_service.dart";
 import "package:photos/ui/settings/components/settings_page_scaffold.dart";
@@ -19,7 +19,7 @@ class MemoriesSettingsScreen extends StatefulWidget {
 class _MemoriesSettingsScreenState extends State<MemoriesSettingsScreen> {
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
+    final l10n = context.strings;
 
     return SettingsPageScaffold(
       title: l10n.memories,

@@ -6,7 +6,7 @@ import 'package:flutter/rendering.dart' show ScrollDirection;
 import 'package:flutter/semantics.dart' show SemanticsAction, SemanticsFlag;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:photos/ente_theme_data.dart';
-import 'package:photos/generated/l10n.dart';
+import 'package:ente_strings/ente_strings.dart';
 import 'package:photos/models/collection/collection.dart';
 import 'package:photos/ui/sharing/library_sharing/library_sharing_controller.dart';
 import 'package:photos/ui/sharing/library_sharing/library_sharing_page.dart';
@@ -512,8 +512,8 @@ void main() {
 Widget _app(Widget home) {
   return MaterialApp(
     theme: lightThemeData,
-    localizationsDelegates: AppLocalizations.localizationsDelegates,
-    supportedLocales: AppLocalizations.supportedLocales,
+    localizationsDelegates: StringsLocalizations.localizationsDelegates,
+    supportedLocales: StringsLocalizations.supportedLocales,
     home: home,
   );
 }

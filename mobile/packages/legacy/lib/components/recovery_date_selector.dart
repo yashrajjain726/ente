@@ -32,7 +32,9 @@ class RecoveryDateSelector extends StatelessWidget {
           borderRadius: BorderRadius.circular(14),
         ),
         child: Text(
-          days == 0 ? context.strings.immediate : context.strings.nDays(days),
+          days == 0
+              ? context.strings.immediate
+              : context.strings.nDays(count: days),
           style: textTheme.bodyBold.copyWith(
             color: isSelected ? Colors.white : colorScheme.primary700,
           ),

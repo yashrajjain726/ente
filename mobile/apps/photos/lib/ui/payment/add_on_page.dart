@@ -2,10 +2,10 @@ import "package:ente_components/components/app_bar_component.dart";
 import "package:ente_components/theme/text_styles.dart";
 import "package:ente_components/theme/theme.dart";
 import "package:ente_pure_utils/ente_pure_utils.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:intl/intl.dart";
 import "package:photos/gateways/storage_bonus/models/bonus.dart";
-import "package:photos/generated/l10n.dart";
 
 class AddOnPage extends StatelessWidget {
   final BonusData bonusData;
@@ -31,8 +31,8 @@ class AddOnPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       body: AppBarComponent(
-        title: AppLocalizations.of(context).addOns,
-        subtitle: AppLocalizations.of(context).addOnPageSubtitle,
+        title: context.strings.addOns,
+        subtitle: context.strings.addOnPageSubtitle,
         slivers: <Widget>[
           SliverPadding(
             padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 16),
@@ -83,7 +83,7 @@ class AddOnViewSection extends StatelessWidget {
             ),
             if (bonus.validTill != 0)
               Text(
-                AppLocalizations.of(context).validTill(
+                context.strings.validTill(
                   endDate:
                       DateFormat.yMMMd(
                             Localizations.localeOf(context).languageCode,

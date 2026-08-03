@@ -3,6 +3,7 @@ import 'dart:io';
 import "dart:math";
 
 import "package:ente_pure_utils/ente_pure_utils.dart";
+import "package:ente_strings/ente_strings.dart";
 import 'package:flutter/material.dart';
 import "package:logging/logging.dart";
 import 'package:native_video_editor/native_video_editor.dart';
@@ -12,7 +13,6 @@ import "package:photos/core/event_bus.dart";
 import "package:photos/db/files_db.dart";
 import "package:photos/ente_theme_data.dart";
 import "package:photos/events/local_photos_updated_event.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/models/file/file.dart";
 import "package:photos/models/location/location.dart";
 import "package:photos/module/metadata/local_file.dart";
@@ -155,7 +155,7 @@ class _VideoEditorPageState extends State<VideoEditorPage> {
                 if (isExporting) return;
                 replacePage(context, DetailPage(widget.detailPageConfig));
               },
-              primaryActionLabel: AppLocalizations.of(context).saveCopy,
+              primaryActionLabel: context.strings.saveCopy,
               onPrimaryAction: exportVideo,
               isPrimaryEnabled: isReady && !isExporting,
             ),
@@ -236,7 +236,7 @@ class _VideoEditorPageState extends State<VideoEditorPage> {
                           VideoEditorMainActions(
                             children: [
                               VideoEditorBottomAction(
-                                label: AppLocalizations.of(context).trim,
+                                label: context.strings.trim,
                                 svgPath:
                                     "assets/video-editor/video-editor-trim-action.svg",
                                 onPressed: () => _openSubEditor(
@@ -245,7 +245,7 @@ class _VideoEditorPageState extends State<VideoEditorPage> {
                               ),
                               const SizedBox(width: 24),
                               VideoEditorBottomAction(
-                                label: AppLocalizations.of(context).crop,
+                                label: context.strings.crop,
                                 svgPath:
                                     "assets/video-editor/video-editor-crop-action.svg",
                                 onPressed: () => _openSubEditor(
@@ -254,7 +254,7 @@ class _VideoEditorPageState extends State<VideoEditorPage> {
                               ),
                               const SizedBox(width: 24),
                               VideoEditorBottomAction(
-                                label: AppLocalizations.of(context).rotate,
+                                label: context.strings.rotate,
                                 svgPath:
                                     "assets/video-editor/video-editor-rotate-action.svg",
                                 onPressed: () => _openSubEditor(
@@ -286,7 +286,7 @@ class _VideoEditorPageState extends State<VideoEditorPage> {
 
     final dialogKey = GlobalKey<LinearProgressDialogState>();
     final dialog = LinearProgressDialog(
-      AppLocalizations.of(context).savingEdits,
+      context.strings.savingEdits,
       key: dialogKey,
     );
 
@@ -315,7 +315,7 @@ class _VideoEditorPageState extends State<VideoEditorPage> {
       }
 
       if (!mounted) return;
-      showShortToast(context, AppLocalizations.of(context).somethingWentWrong);
+      showShortToast(context, context.strings.somethingWentWrong);
     }
   }
 
@@ -596,7 +596,7 @@ class _VideoEditorPageState extends State<VideoEditorPage> {
         SyncService.instance.sync().ignore();
 
         if (!mounted) return;
-        showShortToast(context, AppLocalizations.of(context).editsSaved);
+        showShortToast(context, context.strings.editsSaved);
         final files = List<EnteFile>.of(widget.detailPageConfig.files);
 
         // the index could be -1 if the files fetched doesn't contain the newly

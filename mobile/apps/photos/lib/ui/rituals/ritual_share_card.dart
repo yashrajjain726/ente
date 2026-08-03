@@ -1,6 +1,6 @@
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:flutter_svg/flutter_svg.dart";
-import "package:photos/l10n/l10n.dart";
 import "package:photos/models/rituals/ritual_models.dart";
 
 const String _duckyShareArtAsset = "assets/rituals/ritual_ducky_share.svg";
@@ -30,7 +30,7 @@ class RitualShareCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final title = ritual.title.isEmpty
-        ? context.l10n.ritualUntitled
+        ? context.strings.ritualUntitled
         : ritual.title;
     final streak = progress?.currentStreak ?? 0;
 

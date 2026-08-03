@@ -1,11 +1,11 @@
 import "dart:async";
 
 import "package:ente_components/ente_components.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:hugeicons/hugeicons.dart";
 import "package:photos/core/event_bus.dart";
 import "package:photos/events/notification_event.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/service_locator.dart";
 import "package:photos/services/machine_learning/ml_indexing_isolate.dart";
 import "package:photos/services/machine_learning/ml_model_assets.dart";
@@ -86,11 +86,11 @@ class _MachineLearningSettingsPageState
     final colors = context.componentColors;
 
     return SettingsPageScaffold(
-      title: AppLocalizations.of(context).machineLearning,
+      title: context.strings.machineLearning,
       onTitleTap: _handleEnabledTitleTap,
       children: [
         Text(
-          AppLocalizations.of(context).mlIndexingDescription,
+          context.strings.mlIndexingDescription,
           textAlign: TextAlign.left,
           style: TextStyles.mini.copyWith(color: colors.textLight),
         ),
@@ -103,7 +103,7 @@ class _MachineLearningSettingsPageState
 
   Widget _buildDisabledMLScreen(BuildContext context) {
     return SettingsPageScaffold(
-      title: AppLocalizations.of(context).mlConsent,
+      title: context.strings.mlConsent,
       children: [
         _buildDisabledMLDescription(context),
         const SizedBox(height: 20),
@@ -118,7 +118,7 @@ class _MachineLearningSettingsPageState
         _buildDisabledConsentAckRow(context),
         const SizedBox(height: 20),
         ButtonComponent(
-          label: AppLocalizations.of(context).mlConsent,
+          label: context.strings.mlConsent,
           isDisabled: !_hasAcknowledgedMLConsent,
           onTap: () async {
             if (!_hasAcknowledgedMLConsent) return;
@@ -127,7 +127,7 @@ class _MachineLearningSettingsPageState
         ),
         const SizedBox(height: 12),
         ButtonComponent(
-          label: AppLocalizations.of(context).cancel,
+          label: context.strings.cancel,
           variant: ButtonComponentVariant.secondary,
           onTap: () async {
             await _handleDisabledScreenExit();
@@ -208,7 +208,7 @@ class _MachineLearningSettingsPageState
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          AppLocalizations.of(context).mlConsentDescription,
+          context.strings.mlConsentDescription,
           textAlign: TextAlign.left,
           style: TextStyles.mini.copyWith(color: colors.textLight),
         ),
@@ -216,7 +216,7 @@ class _MachineLearningSettingsPageState
         GestureDetector(
           onTap: () async => _openMLPrivacyPolicy(context),
           child: Text(
-            AppLocalizations.of(context).mlConsentPrivacy,
+            context.strings.mlConsentPrivacy,
             textAlign: TextAlign.left,
             style: TextStyles.mini.copyWith(
               color: colors.textLight,
@@ -253,7 +253,7 @@ class _MachineLearningSettingsPageState
           const SizedBox(width: 10),
           Expanded(
             child: Text(
-              AppLocalizations.of(context).mlConsentConfirmation,
+              context.strings.mlConsentConfirmation,
               style: TextStyles.mini.copyWith(color: colors.textLight),
             ),
           ),
@@ -267,7 +267,7 @@ class _MachineLearningSettingsPageState
       MaterialPageRoute(
         builder: (BuildContext context) {
           return WebPage(
-            AppLocalizations.of(context).privacyPolicyTitle,
+            context.strings.privacyPolicyTitle,
             "https://ente.com/privacy",
           );
         },
@@ -283,7 +283,7 @@ class _MachineLearningSettingsPageState
     return Column(
       children: [
         MenuComponent(
-          title: AppLocalizations.of(context).enabled,
+          title: context.strings.enabled,
           leading: const HugeIcon(
             icon: HugeIcons.strokeRoundedToggleOn,
             size: IconSizes.small,
@@ -297,7 +297,7 @@ class _MachineLearningSettingsPageState
         ),
         const SizedBox(height: 8),
         MenuComponent(
-          title: AppLocalizations.of(context).localIndexing,
+          title: context.strings.localIndexing,
           leading: const HugeIcon(
             icon: HugeIcons.strokeRoundedCpu,
             size: IconSizes.small,
@@ -397,7 +397,7 @@ class _ModelLoadingStateState extends State<ModelLoadingState> {
           child: Align(
             alignment: Alignment.centerLeft,
             child: Text(
-              AppLocalizations.of(context).status.toUpperCase(),
+              context.strings.status.toUpperCase(),
               style: TextStyles.mini.copyWith(color: colors.textLight),
             ),
           ),
@@ -413,10 +413,10 @@ class _ModelLoadingStateState extends State<ModelLoadingState> {
                 MLModelDownloadService.instance.triggerModelsDownload(
                   onlyIndexingModels: false,
                 );
-                title = AppLocalizations.of(context).checkingModels;
+                title = context.strings.checkingModels;
                 leadingIcon = HugeIcons.strokeRoundedCloudDownload;
               } else {
-                title = AppLocalizations.of(context).waitingForWifi;
+                title = context.strings.waitingForWifi;
                 leadingIcon = HugeIcons.strokeRoundedWifi02;
               }
             }
@@ -491,7 +491,7 @@ class MLStatusWidgetState extends State<MLStatusWidget> {
           child: Align(
             alignment: Alignment.centerLeft,
             child: Text(
-              AppLocalizations.of(context).status.toUpperCase(),
+              context.strings.status.toUpperCase(),
               style: TextStyles.mini.copyWith(color: colors.textLight),
             ),
           ),
@@ -508,7 +508,7 @@ class MLStatusWidgetState extends State<MLStatusWidget> {
 
               if (!_isDeviceHealthy && pendingFiles > 0) {
                 return Text(
-                  AppLocalizations.of(context).indexingPausedStatusDescription,
+                  context.strings.indexingPausedStatusDescription,
                   style: TextStyles.mini.copyWith(color: colors.textLight),
                 );
               }
@@ -517,7 +517,7 @@ class MLStatusWidgetState extends State<MLStatusWidget> {
                 children: [
                   MenuComponent(
                     key: ValueKey("pending_items_$pendingFiles"),
-                    title: AppLocalizations.of(context).processed,
+                    title: context.strings.processed,
                     leading: const HugeIcon(
                       icon: HugeIcons.strokeRoundedClock01,
                       size: IconSizes.small,
@@ -535,13 +535,13 @@ class MLStatusWidgetState extends State<MLStatusWidget> {
                     Padding(
                       padding: const EdgeInsets.only(top: 8),
                       child: MenuComponent(
-                        title: AppLocalizations.of(context).clusteringProgress,
+                        title: context.strings.clusteringProgress,
                         leading: const HugeIcon(
                           icon: HugeIcons.strokeRoundedSparkles,
                           size: IconSizes.small,
                         ),
                         trailing: Text(
-                          AppLocalizations.of(context).currentlyRunning,
+                          context.strings.currentlyRunning,
                           style: TextStyles.mini.copyWith(
                             color: colors.textLight,
                           ),
@@ -552,7 +552,7 @@ class MLStatusWidgetState extends State<MLStatusWidget> {
                     Padding(
                       padding: const EdgeInsets.only(top: 8),
                       child: MenuComponent(
-                        title: AppLocalizations.of(context).waitingForWifi,
+                        title: context.strings.waitingForWifi,
                         leading: const HugeIcon(
                           icon: HugeIcons.strokeRoundedWifi02,
                           size: IconSizes.small,

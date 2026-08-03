@@ -1,6 +1,7 @@
 import "dart:async";
 import "dart:io";
 
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/gestures.dart";
 import "package:flutter/material.dart";
 import "package:flutter/rendering.dart";
@@ -18,7 +19,6 @@ import "package:mobile_ocr/mobile_ocr.dart"
         ZoomedInteractionPolicy;
 import "package:photos/core/event_bus.dart";
 import "package:photos/events/reset_zoom_of_photo_view_event.dart";
-import "package:photos/l10n/l10n.dart";
 import "package:photos/models/file/extensions/file_props.dart";
 import "package:photos/models/file/file.dart";
 import "package:photos/models/file/file_type.dart";
@@ -865,7 +865,7 @@ class _InlineTextDetectionState extends State<InlineTextDetection> {
     double uiScale = 1.0,
     Offset uiOffset = Offset.zero,
   }) {
-    final l10n = context.l10n;
+    final l10n = context.strings;
     return ListenableBuilder(
       listenable: _detectorController,
       builder: (context, child) {
@@ -915,7 +915,7 @@ class _InlineTextDetectionState extends State<InlineTextDetection> {
           processingOverlayMessage: l10n.ocrProcessingOverlayMessage,
           selectionHint: l10n.ocrSelectionHint,
           noTextDetected: l10n.ocrNoTextDetected,
-          retryButtonLabel: l10n.ocrRetryButtonLabel,
+          retryButtonLabel: l10n.retry,
           modelsNetworkRequiredError: l10n.ocrModelsNetworkRequiredError,
           modelsPrepareFailed: l10n.ocrModelsPrepareFailed,
           imageNotFoundError: l10n.ocrImageNotFoundError,

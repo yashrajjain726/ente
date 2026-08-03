@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:ente_auth/core/configuration.dart';
-import 'package:ente_auth/l10n/l10n.dart';
 import 'package:ente_auth/models/export/ente.dart';
 import 'package:ente_auth/store/code_store.dart';
 import 'package:ente_auth/ui/components/buttons/button_widget.dart';
@@ -14,6 +13,7 @@ import 'package:ente_auth/utils/share_utils.dart' as auth_share;
 import 'package:ente_auth/utils/toast_util.dart';
 import 'package:ente_crypto_api/ente_crypto_api.dart';
 import 'package:ente_lock_screen/local_authentication_service.dart';
+import 'package:ente_strings/ente_strings.dart';
 import 'package:ente_utils/ente_utils.dart';
 import 'package:file_saver/file_saver.dart';
 import 'package:flutter/material.dart';
@@ -23,27 +23,27 @@ import 'package:share_plus/share_plus.dart';
 Future<void> handleExportClick(BuildContext context) async {
   final result = await showDialogWidget(
     context: context,
-    title: context.l10n.selectExportFormat,
-    body: context.l10n.exportDialogDesc,
+    title: context.strings.selectExportFormat,
+    body: context.strings.exportDialogDesc,
     alwaysShowCloseButton: true,
     buttons: [
       ButtonWidget(
         buttonType: ButtonType.primary,
-        labelText: context.l10n.encrypted,
+        labelText: context.strings.encrypted,
         isInAlert: true,
         buttonSize: ButtonSize.large,
         buttonAction: ButtonAction.first,
       ),
       ButtonWidget(
         buttonType: ButtonType.secondary,
-        labelText: context.l10n.plainText,
+        labelText: context.strings.plainText,
         buttonSize: ButtonSize.large,
         isInAlert: true,
         buttonAction: ButtonAction.second,
       ),
       ButtonWidget(
         buttonType: ButtonType.secondary,
-        labelText: context.l10n.plainHTML,
+        labelText: context.strings.plainHTML,
         buttonSize: ButtonSize.large,
         isInAlert: true,
         buttonAction: ButtonAction.third,
@@ -66,7 +66,7 @@ Future<void> _requestForEncryptionPassword(
   BuildContext context, {
   String? password,
 }) async {
-  final l10n = context.l10n;
+  final l10n = context.strings;
   await showTextInputDialog(
     context,
     title: l10n.passwordToEncryptExport,
@@ -130,11 +130,11 @@ Future<void> _requestForEncryptionPassword(
 Future<void> _showExportWarningDialog(BuildContext context, String type) async {
   final result = await showChoiceActionSheet(
     context,
-    title: context.l10n.warning,
-    body: context.l10n.exportWarningDesc,
+    title: context.strings.warning,
+    body: context.strings.exportWarningDesc,
     isCritical: true,
-    secondButtonLabel: context.l10n.cancel,
-    firstButtonLabel: context.l10n.iUnderStand,
+    secondButtonLabel: context.strings.cancel,
+    firstButtonLabel: context.strings.iUnderStand,
   );
 
   if (result?.action == ButtonAction.first) {
@@ -161,7 +161,7 @@ Future<void> _exportCodes(
   String formattedDate = DateFormat('yyyyMMdd-HHmmss').format(now);
   String exportFileName = 'ente-auth-codes-$exportType-$formattedDate';
   final hasAuthenticated = await LocalAuthenticationService.instance
-      .requestLocalAuthentication(context, context.l10n.authToExportCodes);
+      .requestLocalAuthentication(context, context.strings.authToExportCodes);
   if (!hasAuthenticated) {
     return;
   }
@@ -170,7 +170,7 @@ Future<void> _exportCodes(
     if (!context.mounted) return;
     await auth_share.shareDialog(
       context,
-      context.l10n.exportCodes,
+      context.strings.exportCodes,
       saveAction: () async {
         await FileSaverUtil.saveFile(
           exportFileName,

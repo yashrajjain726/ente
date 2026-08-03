@@ -1,62 +1,76 @@
 {
-  "ok": "ശരി",
-  "@ok": {
-    "description": "Generic OK button label"
-  },
+  "@@locale": "ml",
+  "account": "അക്കൗണ്ട്",
+  "albumOwner": "ഉടമ",
+  "blog": "ബ്ലോഗ്",
+  "calculating": "കണക്കുകൂട്ടുന്നു...",
   "cancel": "റദ്ദാക്കുക",
-  "@cancel": {
-    "description": "Cancel button label"
-  },
-  "email": "ഇമെയിൽ",
-  "@email": {
-    "description": "Email field label"
-  },
-  "verify": "പരിശോധിക്കുക",
-  "@verify": {
-    "description": "Verify button label"
-  },
-  "verifyPassword": "പാസ്‌വേഡ് സ്ഥിരീകരിക്കുക",
-  "@verifyPassword": {
-    "description": "Verify password button label"
-  },
-  "incorrectPasswordTitle": "തെറ്റായ പാസ്‌വേഡ്",
-  "@incorrectPasswordTitle": {
-    "description": "Title for incorrect password error"
-  },
-  "createNewAccount": "പുതിയ അക്കൗണ്ട് സൃഷ്ടിക്കുക",
-  "@createNewAccount": {
-    "description": "Create new account button label"
-  },
-  "confirmPassword": "പാസ്വേഡ് സ്ഥിരീകരിക്കുക",
-  "@confirmPassword": {
-    "description": "Confirm password field label"
-  },
-  "welcomeBack": "വീണ്ടും സ്വാഗതം!",
-  "@welcomeBack": {
-    "description": "Welcome back message"
-  },
   "changeEmail": "ഇമെയിൽ മാറ്റുക",
-  "@changeEmail": {
-    "description": "Change email button label"
-  },
-  "verifyEmail": "ഇമെയിൽ സ്ഥിരീകരിക്കുക",
-  "@verifyEmail": {
-    "description": "Verify email title"
-  },
-  "twoFactorAuthTitle": "ടു-ഫാക്ടർ ആധികാരികത",
-  "@twoFactorAuthTitle": {
-    "description": "Two-factor authentication title"
-  },
-  "enterCodeHint": "നിങ്ങളുടെ ഓതന്റിക്കേറ്റർ ആപ്പിൽ നിന്നുള്ള 6 അക്ക കോഡ് നൽകുക",
-  "@enterCodeHint": {
-    "description": "Hint for entering 2FA code"
-  },
+  "changePassword": "പാസ്സ്‌വേർഡ് മാറ്റുക",
+  "close": "അടക്കുക",
+  "confirm": "നിജപ്പെടുത്തുക",
+  "continueLabel": "തുടരൂ",
+  "count": "എണ്ണം",
+  "createAccount": "അക്കൗണ്ട് തുറക്കുക",
+  "custom": "ഇഷ്‌ടാനുസൃതം",
+  "darkTheme": "ഇരുണ്ട",
+  "deleteAccount": "അക്കൗണ്ട് ഉപേക്ഷിക്കു",
+  "doThisLater": "പിന്നീട് ചെയ്യുക",
+  "email": "ഇമെയിൽ",
   "emailAlreadyRegistered": "ഇമെയിൽ ഇതിനകം രജിസ്റ്റർ ചെയ്തിട്ടുണ്ട്.",
-  "@emailAlreadyRegistered": {
-    "description": "Error message when email is already registered"
-  },
+  "emailHint": "നിങ്ങളുടെ ഇമെയിൽ വിലാസം നൽകുക",
   "emailNotRegistered": "ഇമെയിൽ രജിസ്റ്റർ ചെയ്തിട്ടില്ല.",
-  "@emailNotRegistered": {
-    "description": "Error message when email is not registered"
-  }
+  "emailVerificationToggle": "ഇമെയിൽ ദൃഢീകരണം",
+  "enterCodeHint": "നിങ്ങളുടെ ഓതന്റിക്കേറ്റർ ആപ്പിൽ നിന്നുള്ള 6 അക്ക കോഡ് നൽകുക",
+  "enterValidEmail": "സാധുവായ ഒരു ഇമെയിൽ നൽകുക.",
+  "enterYourNewEmailAddress": "നിങ്ങളുടെ ഇമെയിൽ വിലാസം നൽകുക",
+  "faqs": "പതിവുചോദ്യങ്ങൾ",
+  "favorite": "പ്രിയപ്പെട്ടവ",
+  "forgotPassword": "സങ്കേതക്കുറി മറന്നുപോയി",
+  "general": "പൊതുവായവ",
+  "hide": "മറയ്ക്കുക",
+  "howItWorks": "പ്രവർത്തന രീതി",
+  "ignore": "അവഗണിക്കുക",
+  "invalidEmailAddress": "അസാധുവായ ഇമെയിൽ വിലാസം",
+  "ok": "ശരി",
+  "language": "ഭാഷ",
+  "lightTheme": "തെളിഞ",
+  "linkExpired": "കാലഹരണപ്പെട്ടു",
+  "moderateStrength": "ഇടത്തരം",
+  "monthly": "പ്രതിമാസം",
+  "name": "പേര്",
+  "noDeviceLimit": "ഒന്നുമില്ല",
+  "nothingToSeeHere": "ഇവിടൊന്നും കാണ്മാനില്ല",
+  "oops": "അയ്യോ",
+  "password": "സങ്കേതക്കുറി",
+  "pleaseTryAgain": "ദയവായി വീണ്ടും ശ്രമിക്കുക",
+  "privacy": "സ്വകാര്യത",
+  "privacyPolicyTitle": "സ്വകാര്യതാനയം",
+  "recover": "വീണ്ടെടുക്കുക",
+  "recoverySuccessful": "വീണ്ടെടുക്കൽ വിജയകരം!",
+  "recreatePasswordTitle": "സങ്കേതക്കുറി പുനസൃഷ്ടിക്കുക",
+  "retry": "പുനശ്രമിക്കുക",
+  "scan": "സ്കാൻ ചെയ്യുക",
+  "scanACode": "കോഡ് സ്കാൻ ചെയ്യുക",
+  "security": "സുരക്ഷ",
+  "send": "അയക്കുക",
+  "setupComplete": "സജ്ജീകരണം പൂർത്തിയായി",
+  "share": "പങ്കിടുക",
+  "somethingWentWrongMessage": "എന്തോ കുഴപ്പമുണ്ടായി, ദയവായി വീണ്ടും ശ്രമിക്കുക",
+  "somethingWentWrongPleaseTryAgain": "എന്തോ കുഴപ്പം സംഭവിച്ചു, ദയവായി വീണ്ടും ശ്രമിക്കുക",
+  "sorry": "ക്ഷമിക്കുക",
+  "sortAlbumsBy": "ഇപ്രകാരം അടുക്കുക",
+  "strongStrength": "ശക്തം",
+  "success": "സഫലം",
+  "support": "പിന്തുണ",
+  "termsOfServicesTitle": "നിബന്ധനകൾ",
+  "thankYou": "നന്ദി",
+  "thisDevice": "ഈ ഉപകരണം",
+  "twoFactorAuthTitle": "ടു-ഫാക്ടർ ആധികാരികത",
+  "unlock": "അൺലോക്ക്",
+  "verifyEmail": "ഇമെയിൽ സ്ഥിരീകരിക്കുക",
+  "verifyPassword": "പാസ്‌വേഡ് സ്ഥിരീകരിക്കുക",
+  "weakStrength": "ദുർബലം",
+  "yearly": "പ്രതിവർഷം",
+  "yes": "അതെ"
 }

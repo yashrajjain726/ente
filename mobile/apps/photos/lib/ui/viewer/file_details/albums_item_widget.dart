@@ -1,12 +1,12 @@
 import "package:ente_components/ente_components.dart";
 import "package:ente_pure_utils/ente_pure_utils.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:hugeicons/hugeicons.dart";
 import "package:logging/logging.dart";
 import "package:photos/core/event_bus.dart";
 import "package:photos/db/files_db.dart";
 import "package:photos/events/pause_video_event.dart";
-import "package:photos/generated/l10n.dart";
 import 'package:photos/models/collection/collection_items.dart';
 import 'package:photos/models/file/file.dart';
 import "package:photos/models/selected_files.dart";
@@ -39,7 +39,7 @@ class AlbumsItemWidget extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(AppLocalizations.of(context).albums, style: TextStyles.h2),
+        Text(context.strings.albums, style: TextStyles.h2),
         const SizedBox(height: Spacing.lg),
         FutureBuilder<List<Widget>>(
           future: chipsFuture,
@@ -89,9 +89,7 @@ class AlbumsItemWidget extends StatelessWidget {
         final c = CollectionsService.instance.getCollectionByID(collectionID)!;
         chips.add(
           FilterChipComponent(
-            label: c.isHidden()
-                ? AppLocalizations.of(context).hidden
-                : c.displayName,
+            label: c.isHidden() ? context.strings.hidden : c.displayName,
             onChanged: (_) {
               if (c.isHidden()) {
                 return;

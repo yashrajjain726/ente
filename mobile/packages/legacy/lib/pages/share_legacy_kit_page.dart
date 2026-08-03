@@ -853,7 +853,9 @@ class _RecoveryBannerState extends State<_RecoveryBanner> {
           ),
           const SizedBox(height: 6),
           Text(
-            context.strings.legacyKitRecoveryAttemptMessage(availableAt),
+            context.strings.legacyKitRecoveryAttemptMessage(
+              availableAt: availableAt,
+            ),
             style: TextStyles.mini.copyWith(color: colors.textLight),
           ),
           const SizedBox(height: Spacing.md),

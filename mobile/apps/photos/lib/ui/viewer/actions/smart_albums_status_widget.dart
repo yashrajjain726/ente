@@ -1,10 +1,10 @@
 import "dart:async";
 
+import "package:ente_strings/ente_strings.dart";
 import 'package:flutter/material.dart';
 import "package:flutter_spinkit/flutter_spinkit.dart";
 import "package:photos/core/event_bus.dart";
 import "package:photos/events/smart_album_syncing_event.dart";
-import "package:photos/generated/l10n.dart";
 import 'package:photos/models/collection/collection.dart';
 import "package:photos/service_locator.dart";
 import "package:photos/theme/ente_theme.dart";
@@ -97,8 +97,8 @@ class _SmartAlbumsStatusWidgetState extends State<SmartAlbumsStatusWidget>
                 const SizedBox(width: 8),
                 Text(
                   (_syncingCollection?.$2 ?? true)
-                      ? AppLocalizations.of(context).addingPhotos
-                      : AppLocalizations.of(context).gettingReady,
+                      ? context.strings.addingPhotos
+                      : context.strings.gettingReady,
                   style: textTheme.small.copyWith(color: Colors.white),
                 ),
               ],

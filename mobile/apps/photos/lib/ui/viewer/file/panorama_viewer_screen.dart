@@ -3,10 +3,10 @@ import "dart:io";
 import "dart:ui" as ui;
 
 import "package:ente_panorama_viewer/ente_panorama_viewer.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:flutter/services.dart";
 import "package:logging/logging.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/src/rust/api/motion_photo_api.dart";
 import "package:photos/ui/viewer/file/panorama_view_data.dart";
 
@@ -190,7 +190,7 @@ class _PanoramaViewerScreenState extends State<PanoramaViewerScreen> {
             child: Align(
               alignment: Alignment.bottomRight,
               child: Tooltip(
-                message: AppLocalizations.of(context).panorama,
+                message: context.strings.panorama,
                 child: Padding(
                   padding: const EdgeInsets.only(
                     top: 12,

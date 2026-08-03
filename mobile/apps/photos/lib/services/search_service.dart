@@ -2,6 +2,7 @@ import "dart:async";
 import "dart:math";
 
 import 'package:ente_pure_utils/ente_pure_utils.dart';
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:hugeicons/hugeicons.dart";
 import 'package:logging/logging.dart';
@@ -18,7 +19,6 @@ import "package:photos/db/ml/db.dart";
 import "package:photos/db/offline_files_db.dart";
 import 'package:photos/events/local_photos_updated_event.dart';
 import "package:photos/extensions/user_extension.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/models/api/collection/user.dart";
 import 'package:photos/models/collection/collection.dart';
 import 'package:photos/models/collection/collection_items.dart';
@@ -928,9 +928,9 @@ class SearchService {
     final Map<LocalEntity<LocationTag>, List<EnteFile>> result = {};
     final normalizedQuery = query.toLowerCase();
     if (!context.mounted) return const [];
-    final noLocationName = AppLocalizations.of(context).noLocation;
+    final noLocationName = context.strings.noLocation;
     if (!context.mounted) return const [];
-    final noLocationTagName = AppLocalizations.of(context).noLocationTag;
+    final noLocationTagName = context.strings.noLocationTag;
     final normalizedNoLocationName = noLocationName.toLowerCase();
     final normalizedNoLocationTagName = noLocationTagName.toLowerCase();
     final disambiguationPrefixLength = min(

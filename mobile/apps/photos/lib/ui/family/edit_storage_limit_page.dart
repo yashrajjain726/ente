@@ -1,8 +1,8 @@
 import 'dart:math' as math;
 
 import 'package:ente_pure_utils/ente_pure_utils.dart';
+import 'package:ente_strings/ente_strings.dart';
 import 'package:flutter/material.dart';
-import 'package:photos/generated/l10n.dart';
 import 'package:photos/models/user_details.dart';
 import 'package:photos/services/family_service.dart';
 import 'package:photos/theme/ente_theme.dart';
@@ -80,7 +80,7 @@ class _EditStorageLimitPageState extends State<EditStorageLimitPage> {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
+    final l10n = context.strings;
     final colorScheme = getEnteColorScheme(context);
     final textTheme = getEnteTextTheme(context);
 

@@ -3,9 +3,9 @@ import "dart:io";
 
 import "package:ente_components/ente_components.dart";
 import "package:ente_pure_utils/ente_pure_utils.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/foundation.dart" show kDebugMode;
 import "package:flutter/material.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/models/duplicate_files.dart";
 import "package:photos/models/freeable_space_info.dart";
 import "package:photos/service_locator.dart";
@@ -39,7 +39,7 @@ class _FreeUpSpaceOptionsScreenState extends State<FreeUpSpaceOptionsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
+    final l10n = context.strings;
 
     return SettingsPageScaffold(
       title: l10n.freeUpSpace,
@@ -148,8 +148,8 @@ class _FreeUpSpaceOptionsScreenState extends State<FreeUpSpaceOptionsScreen> {
       unawaited(
         showErrorDialog(
           context,
-          AppLocalizations.of(context).allClear,
-          AppLocalizations.of(context).noDeviceThatCanBeDeleted,
+          context.strings.allClear,
+          context.strings.noDeviceThatCanBeDeleted,
         ),
       );
     } else {
@@ -176,8 +176,8 @@ class _FreeUpSpaceOptionsScreenState extends State<FreeUpSpaceOptionsScreen> {
       unawaited(
         showErrorDialog(
           context,
-          AppLocalizations.of(context).noDuplicates,
-          AppLocalizations.of(context).youveNoDuplicateFilesThatCanBeCleared,
+          context.strings.noDuplicates,
+          context.strings.youveNoDuplicateFilesThatCanBeCleared,
         ),
       );
     } else {
@@ -208,8 +208,8 @@ class _FreeUpSpaceOptionsScreenState extends State<FreeUpSpaceOptionsScreen> {
       unawaited(
         showErrorDialog(
           context,
-          AppLocalizations.of(context).noDeleteSuggestion,
-          AppLocalizations.of(context).youHaveNoFileSuggestedForDeletion,
+          context.strings.noDeleteSuggestion,
+          context.strings.youHaveNoFileSuggestedForDeletion,
         ),
       );
     } else {
@@ -225,22 +225,19 @@ class _FreeUpSpaceOptionsScreenState extends State<FreeUpSpaceOptionsScreen> {
       );
       showChoiceDialog(
         context,
-        title: AppLocalizations.of(context).success,
-        body: AppLocalizations.of(
-          context,
-        ).youHaveSuccessfullyFreedUp(storageSaved: formatBytes(status.size)),
-        firstButtonLabel: AppLocalizations.of(context).rateUs,
+        title: context.strings.success,
+        body: context.strings.youHaveSuccessfullyFreedUp(
+          storageSaved: formatBytes(status.size),
+        ),
+        firstButtonLabel: context.strings.rateUs,
         firstButtonOnTap: () async {
           await updateService.launchReviewUrl();
         },
         firstButtonType: ButtonType.primary,
-        secondButtonLabel: AppLocalizations.of(context).ok,
+        secondButtonLabel: context.strings.ok,
         secondButtonOnTap: () async {
           if (Platform.isIOS) {
-            showToast(
-              context,
-              AppLocalizations.of(context).remindToEmptyDeviceTrash,
-            );
+            showToast(context, context.strings.remindToEmptyDeviceTrash);
           }
         },
       );
@@ -249,10 +246,10 @@ class _FreeUpSpaceOptionsScreenState extends State<FreeUpSpaceOptionsScreen> {
         context: context,
         isDismissible: true,
         builder: (_) => BottomSheetComponent(
-          title: AppLocalizations.of(context).success,
-          message: AppLocalizations.of(
-            context,
-          ).youHaveSuccessfullyFreedUp(storageSaved: formatBytes(status.size)),
+          title: context.strings.success,
+          message: context.strings.youHaveSuccessfullyFreedUp(
+            storageSaved: formatBytes(status.size),
+          ),
           illustration: Icon(
             Icons.download_done_rounded,
             size: 64,
@@ -260,14 +257,11 @@ class _FreeUpSpaceOptionsScreenState extends State<FreeUpSpaceOptionsScreen> {
           ),
           actions: [
             ButtonComponent(
-              label: AppLocalizations.of(context).ok,
+              label: context.strings.ok,
               variant: ButtonComponentVariant.neutral,
               onTap: () async {
                 if (Platform.isIOS) {
-                  showToast(
-                    context,
-                    AppLocalizations.of(context).remindToEmptyDeviceTrash,
-                  );
+                  showToast(context, context.strings.remindToEmptyDeviceTrash);
                 }
                 Navigator.of(context).pop();
               },
@@ -281,22 +275,19 @@ class _FreeUpSpaceOptionsScreenState extends State<FreeUpSpaceOptionsScreen> {
   void _showDuplicateFilesDeletedDialog(DeduplicationResult result) {
     showChoiceDialog(
       context,
-      title: AppLocalizations.of(context).sparkleSuccess,
-      body: AppLocalizations.of(context).duplicateFileCountWithStorageSaved(
+      title: context.strings.success,
+      body: context.strings.duplicateFileCountWithStorageSaved(
         count: result.count,
         storageSaved: formatBytes(result.size),
       ),
-      firstButtonLabel: AppLocalizations.of(context).rateUs,
+      firstButtonLabel: context.strings.rateUs,
       firstButtonOnTap: () async {
         await updateService.launchReviewUrl();
       },
       firstButtonType: ButtonType.primary,
-      secondButtonLabel: AppLocalizations.of(context).ok,
+      secondButtonLabel: context.strings.ok,
       secondButtonOnTap: () async {
-        showShortToast(
-          context,
-          AppLocalizations.of(context).remindToEmptyEnteTrash,
-        );
+        showShortToast(context, context.strings.remindToEmptyEnteTrash);
       },
     );
   }

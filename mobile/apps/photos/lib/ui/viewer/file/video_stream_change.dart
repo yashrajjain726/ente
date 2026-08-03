@@ -1,9 +1,9 @@
 import "dart:async";
 
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:photos/core/event_bus.dart";
 import "package:photos/events/video_preview_state_changed_event.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/models/file/file.dart";
 import "package:photos/models/preview/preview_item_status.dart";
 import "package:photos/service_locator.dart";
@@ -77,11 +77,11 @@ class _VideoStreamChangeWidgetState extends State<VideoStreamChangeWidget> {
     switch (status) {
       case PreviewItemStatus.inQueue:
       case PreviewItemStatus.retry:
-        return AppLocalizations.of(context).queued;
+        return context.strings.queued;
       case PreviewItemStatus.compressing:
       case PreviewItemStatus.uploading:
       default:
-        return AppLocalizations.of(context).creatingStream;
+        return context.strings.creatingStream;
     }
   }
 
@@ -177,8 +177,8 @@ class _VideoStreamChangeWidgetState extends State<VideoStreamChangeWidget> {
                         const SizedBox(width: 2),
                         Text(
                           widget.isPreviewPlayer
-                              ? AppLocalizations.of(context).playOriginal
-                              : AppLocalizations.of(context).playStream,
+                              ? context.strings.playOriginal
+                              : context.strings.playStream,
                           style: const TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w600,

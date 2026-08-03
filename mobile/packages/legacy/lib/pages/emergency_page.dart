@@ -462,7 +462,7 @@ class _EmergencyPageState extends State<EmergencyPage> {
             subTitle: legacyKits[index].hasActiveRecoverySession
                 ? context.strings.legacyKitRecoveryInProgress
                 : context.strings.createdOn(
-                    _formatKitDate(legacyKits[index].createdAt),
+                    date: _formatKitDate(legacyKits[index].createdAt),
                   ),
             subTitleInNewLine: true,
             textStyle: TextStyles.body.copyWith(color: colorScheme.textBase),
@@ -682,7 +682,7 @@ class _EmergencyPageState extends State<EmergencyPage> {
     final result = await showEmailSheet<String>(
       context,
       email: contact.user.email,
-      message: context.strings.legacyInvite(contact.user.email),
+      message: context.strings.legacyInvite(email: contact.user.email),
       buttons: [
         GradientButton(
           text: context.strings.acceptTrustInvite,
@@ -738,7 +738,9 @@ class _EmergencyPageState extends State<EmergencyPage> {
     final confirmed = await showEmailSheet<bool>(
       context,
       email: emergencyContactEmail,
-      message: context.strings.recoveryWarningBody(emergencyContactEmail),
+      message: context.strings.recoveryWarningBody(
+        email: emergencyContactEmail,
+      ),
       buttons: [
         GradientButton(
           text: context.strings.rejectRecovery,

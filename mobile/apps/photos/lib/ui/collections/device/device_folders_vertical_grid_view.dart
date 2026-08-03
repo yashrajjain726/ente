@@ -3,6 +3,7 @@ import "dart:math";
 
 import "package:ente_components/ente_components.dart";
 import "package:ente_pure_utils/ente_pure_utils.dart";
+import "package:ente_strings/ente_strings.dart";
 import 'package:flutter/material.dart';
 import 'package:logging/logging.dart';
 import 'package:photos/core/event_bus.dart';
@@ -10,7 +11,6 @@ import 'package:photos/db/device_files_db.dart';
 import 'package:photos/db/files_db.dart';
 import 'package:photos/events/backup_folders_updated_event.dart';
 import 'package:photos/events/local_photos_updated_event.dart';
-import "package:photos/generated/l10n.dart";
 import 'package:photos/models/device_collection.dart';
 import "package:photos/service_locator.dart";
 import "package:photos/settings/local_settings.dart";
@@ -214,7 +214,7 @@ class _DeviceFolderVerticalGridViewBodyState
                         : Padding(
                             padding: const EdgeInsets.all(22),
                             child: EmptyState(
-                              text: AppLocalizations.of(context).noResultsFound,
+                              text: context.strings.noResultsFound,
                             ),
                           ),
                   )
@@ -238,9 +238,7 @@ class _DeviceFolderVerticalGridViewBodyState
           return widget.showEmptyState
               ? SliverFillRemaining(
                   child: Center(
-                    child: Text(
-                      AppLocalizations.of(context).failedToLoadAlbums,
-                    ),
+                    child: Text(context.strings.failedToLoadAlbums),
                   ),
                 )
               : const SliverToBoxAdapter(child: SizedBox.shrink());

@@ -1,12 +1,11 @@
 import 'package:email_validator/email_validator.dart';
+import "package:ente_strings/ente_strings.dart";
 import 'package:flutter/material.dart';
 import "package:logging/logging.dart";
 import 'package:photos/core/configuration.dart';
 import "package:photos/emergency/components/recovery_date_selector.dart";
 import "package:photos/emergency/emergency_service.dart";
 import "package:photos/emergency/model.dart";
-import "package:photos/generated/l10n.dart";
-import "package:photos/l10n/l10n.dart";
 import "package:photos/models/api/collection/user.dart";
 import "package:photos/services/account/user_service.dart";
 import 'package:photos/services/collections_service.dart';
@@ -27,7 +26,7 @@ Future<bool?> showAddContactSheet(
 }) {
   return showBaseBottomSheet<bool>(
     context,
-    title: context.l10n.addTrustedContact,
+    title: context.strings.addTrustedContact,
     headerSpacing: 20,
     padding: const EdgeInsets.all(16),
     isKeyboardAware: true,
@@ -79,7 +78,7 @@ class _AddContactSheetState extends State<AddContactSheet> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           TextInputWidgetV2(
-            hintText: AppLocalizations.of(context).enterEmail,
+            hintText: context.strings.enterEmail,
             textEditingController: _textController,
             focusNode: textFieldFocusNode,
             keyboardType: TextInputType.emailAddress,
@@ -96,7 +95,7 @@ class _AddContactSheetState extends State<AddContactSheet> {
           if (suggestedUsers.isNotEmpty) ...[
             const SizedBox(height: 20),
             Text(
-              context.l10n.chooseFromAnExistingContact,
+              context.strings.chooseFromAnExistingContact,
               style: textTheme.bodyMuted,
             ),
             const SizedBox(height: 8),
@@ -155,7 +154,7 @@ class _AddContactSheetState extends State<AddContactSheet> {
             ),
           ],
           const SizedBox(height: 20),
-          Text(context.l10n.chooseARecoveryTime, style: textTheme.bodyMuted),
+          Text(context.strings.chooseARecoveryTime, style: textTheme.bodyMuted),
           const SizedBox(height: 12),
           RecoveryDateSelector(
             selectedDays: _selectedRecoveryDays,
@@ -168,7 +167,7 @@ class _AddContactSheetState extends State<AddContactSheet> {
           const SizedBox(height: 20),
           ButtonWidgetV2(
             buttonType: ButtonTypeV2.primary,
-            labelText: context.l10n.addTrustedContact,
+            labelText: context.strings.addTrustedContact,
             isDisabled: !canAdd,
             onTap: canAdd ? _onAddContactTap : null,
             shouldSurfaceExecutionStates: false,
@@ -178,7 +177,7 @@ class _AddContactSheetState extends State<AddContactSheet> {
             child: ButtonWidgetV2(
               buttonType: ButtonTypeV2.link,
               buttonSize: ButtonSizeV2.small,
-              labelText: AppLocalizations.of(context).verifyIDLabel,
+              labelText: context.strings.verifyIDLabel,
               isDisabled: emailForVerification == null,
               shouldSurfaceExecutionStates: false,
               onTap: emailForVerification == null
@@ -241,8 +240,8 @@ class _AddContactSheetState extends State<AddContactSheet> {
     } else if (failures.isNotEmpty && mounted) {
       await showAlertBottomSheet(
         context,
-        title: AppLocalizations.of(context).error,
-        message: AppLocalizations.of(context).somethingWentWrong,
+        title: context.strings.error,
+        message: context.strings.somethingWentWrong,
         assetPath: "assets/warning-grey.png",
       );
     }
@@ -252,7 +251,7 @@ class _AddContactSheetState extends State<AddContactSheet> {
     List<String> emails,
     int recoveryDays,
   ) {
-    final l10n = AppLocalizations.of(context);
+    final l10n = context.strings;
     final message = emails.length == 1
         ? l10n.confirmAddingTrustedContact(
             email: emails.first,
@@ -283,8 +282,8 @@ class _AddContactSheetState extends State<AddContactSheet> {
     if (!_emailsToAdd.contains(emailToAdd)) {
       await showAlertBottomSheet(
         context,
-        title: AppLocalizations.of(context).invalidEmailAddress,
-        message: AppLocalizations.of(context).enterValidEmail,
+        title: context.strings.invalidEmailAddress,
+        message: context.strings.enterValidEmail,
         assetPath: "assets/warning-grey.png",
       );
       return;

@@ -2,14 +2,13 @@ import "dart:async" show StreamSubscription, unawaited;
 import "dart:math";
 import "dart:typed_data";
 
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/foundation.dart" show kDebugMode;
 import "package:flutter/material.dart";
 import "package:logging/logging.dart";
 import "package:photos/core/event_bus.dart";
 import "package:photos/db/ml/db.dart";
 import "package:photos/events/people_changed_event.dart";
-import "package:photos/generated/l10n.dart";
-import "package:photos/l10n/l10n.dart";
 import "package:photos/models/file/file.dart";
 import "package:photos/models/ml/face/person.dart";
 import 'package:photos/services/machine_learning/face_ml/feedback/cluster_feedback.dart';
@@ -72,7 +71,7 @@ class _PersonClustersState extends State<PersonReviewClusterSuggestion> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(context.l10n.reviewSuggestions),
+        title: Text(context.strings.reviewSuggestions),
         actions: [
           if (pastUserFeedback.isNotEmpty)
             IconButton(
@@ -103,9 +102,9 @@ class _PersonClustersState extends State<PersonReviewClusterSuggestion> {
               _peopleChangedEvent = null;
               return Center(
                 child: Text(
-                  AppLocalizations.of(
-                    context,
-                  ).noSuggestionsForPerson(personName: widget.person.data.name),
+                  context.strings.noSuggestionsForPerson(
+                    personName: widget.person.data.name,
+                  ),
                   style: getEnteTextTheme(context).largeMuted,
                 ),
               );
@@ -203,7 +202,7 @@ class _PersonClustersState extends State<PersonReviewClusterSuggestion> {
                               child: ButtonWidget(
                                 buttonType: ButtonType.tertiaryCritical,
                                 icon: Icons.close,
-                                labelText: context.l10n.no,
+                                labelText: context.strings.no,
                                 buttonSize: ButtonSize.large,
                                 onTap: () async => {
                                   await _handleUserClusterChoice(
@@ -218,7 +217,7 @@ class _PersonClustersState extends State<PersonReviewClusterSuggestion> {
                             Expanded(
                               child: ButtonWidget(
                                 buttonType: ButtonType.primary,
-                                labelText: context.l10n.yes,
+                                labelText: context.strings.yes,
                                 buttonSize: ButtonSize.large,
                                 onTap: () async => {
                                   await _handleUserClusterChoice(
@@ -241,7 +240,7 @@ class _PersonClustersState extends State<PersonReviewClusterSuggestion> {
                               horizontal: 32,
                             ),
                             child: Text(
-                              AppLocalizations.of(context).saveAsAnotherPerson,
+                              context.strings.saveAsAnotherPerson,
                               style: getEnteTextTheme(context).mini.copyWith(
                                 color: getEnteColorScheme(context).textMuted,
                                 decoration: TextDecoration.underline,
@@ -446,7 +445,7 @@ class _PersonClustersState extends State<PersonReviewClusterSuggestion> {
           );
         } else if (snapshot.hasError) {
           // log the error
-          return Center(child: Text(AppLocalizations.of(context).error));
+          return Center(child: Text(context.strings.error));
         } else {
           canGiveFeedback = false;
           return const Center(child: CircularProgressIndicator());

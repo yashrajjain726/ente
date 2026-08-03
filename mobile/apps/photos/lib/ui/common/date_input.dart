@@ -2,7 +2,7 @@ import "package:ente_components/ente_components.dart";
 import "package:flutter/material.dart";
 import "package:hugeicons/hugeicons.dart";
 import "package:intl/intl.dart";
-import "package:photos/l10n/l10n.dart";
+import "package:photos/locale.dart";
 
 class DatePickerField extends StatefulWidget {
   const DatePickerField({

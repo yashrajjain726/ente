@@ -1,7 +1,7 @@
 import 'package:ente_components/ente_components.dart';
+import 'package:ente_strings/ente_strings.dart';
 import 'package:flutter/material.dart';
 import 'package:hugeicons/hugeicons.dart';
-import 'package:photos/generated/l10n.dart';
 import 'package:photos/models/collection/collection.dart';
 import 'package:photos/services/library_sharing_service.dart';
 
@@ -122,7 +122,7 @@ String librarySharingRoleLabel(
   BuildContext context,
   CollectionParticipantRole role,
 ) {
-  final l10n = AppLocalizations.of(context);
+  final l10n = context.strings;
   return switch (role) {
     CollectionParticipantRole.admin => l10n.admin,
     CollectionParticipantRole.collaborator => l10n.collaborator,

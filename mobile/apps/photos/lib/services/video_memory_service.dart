@@ -2,13 +2,13 @@ import "dart:async";
 import "dart:io";
 import "dart:typed_data";
 
+import "package:ente_strings/ente_strings.dart";
 import "package:ffmpeg_kit_flutter/ffmpeg_kit.dart";
 import "package:ffmpeg_kit_flutter/return_code.dart";
 import "package:flutter/cupertino.dart";
 import "package:image/image.dart" as img;
 import "package:logging/logging.dart";
 import "package:path_provider/path_provider.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/models/file/file.dart";
 import "package:photos/models/file/file_type.dart";
 import "package:photos/module/download/file.dart";
@@ -121,9 +121,7 @@ Future<void> _executeFFmpegProcess({
           if (!context.mounted) return;
           showToast(
             context,
-            AppLocalizations.of(
-              context,
-            ).videoExportSuccess(path: _generateOutputPath()),
+            context.strings.videoExportSuccess(path: _generateOutputPath()),
           );
         } else {
           _logger.warning(
@@ -132,7 +130,7 @@ Future<void> _executeFFmpegProcess({
           _completeOperation(completer, onComplete);
           await FFmpegKit.cancel();
           if (!context.mounted) return;
-          showToast(context, AppLocalizations.of(context).videoExportFailed);
+          showToast(context, context.strings.videoExportFailed);
         }
       },
       (log) {

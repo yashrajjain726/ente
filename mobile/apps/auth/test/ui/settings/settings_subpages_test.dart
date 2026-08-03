@@ -1,7 +1,7 @@
-import 'package:ente_auth/l10n/l10n.dart';
 import 'package:ente_auth/ui/settings/data/local_backup_settings_page.dart';
 import 'package:ente_auth/ui/settings/language_picker.dart';
 import 'package:ente_components/ente_components.dart';
+import 'package:ente_strings/ente_strings.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -77,8 +77,8 @@ Future<void> _pumpPage(WidgetTester tester, Widget page) {
   return tester.pumpWidget(
     MaterialApp(
       theme: ComponentTheme.lightTheme(app: ComponentApp.auth),
-      localizationsDelegates: AppLocalizations.localizationsDelegates,
-      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: StringsLocalizations.localizationsDelegates,
+      supportedLocales: StringsLocalizations.supportedLocales,
       home: page,
     ),
   );

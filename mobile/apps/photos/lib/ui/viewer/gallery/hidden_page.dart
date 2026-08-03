@@ -2,6 +2,7 @@ import "dart:async";
 
 import "package:collection/collection.dart";
 import "package:ente_pure_utils/ente_pure_utils.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:photos/core/configuration.dart";
 import "package:photos/core/event_bus.dart";
@@ -9,7 +10,6 @@ import "package:photos/db/files_db.dart";
 import "package:photos/events/album_sort_order_change_event.dart";
 import "package:photos/events/collection_updated_event.dart";
 import "package:photos/events/files_updated_event.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/models/collection/collection.dart";
 import "package:photos/models/gallery_type.dart";
 import "package:photos/models/selected_files.dart";
@@ -131,7 +131,7 @@ class _HiddenPageState extends State<HiddenPage> {
     }
     final appBar = GalleryAppBarWidget.sliverConfig(
       widget.appBarType,
-      AppLocalizations.of(context).hidden,
+      context.strings.hidden,
       _selectedFiles,
     );
     final gallery = Gallery(
@@ -173,7 +173,7 @@ class _HiddenPageState extends State<HiddenPage> {
       emptyState: _hiddenCollectionsExcludingDefault.isEmpty
           ? EmptyStateComponent(
               assetPath: "assets/empty_state_hidden.png",
-              title: AppLocalizations.of(context).hiddenItemsWillShowUpHere,
+              title: context.strings.hiddenItemsWillShowUpHere,
             )
           : const SizedBox.shrink(),
       header: Column(
@@ -219,7 +219,7 @@ class _HiddenPageState extends State<HiddenPage> {
                 CollectionListPage(
                   _hiddenCollectionsExcludingDefault,
                   sectionType: UISectionType.hiddenCollections,
-                  appTitle: Text(AppLocalizations.of(context).hidden),
+                  appTitle: Text(context.strings.hidden),
                   tag: "hidden",
                 ),
               );

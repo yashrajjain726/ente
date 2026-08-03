@@ -3,9 +3,9 @@ import "dart:async";
 import "package:ente_components/ente_components.dart";
 import "package:ente_icons/ente_icons.dart";
 import "package:ente_pure_utils/ente_pure_utils.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:hugeicons/hugeicons.dart";
-import "package:photos/l10n/l10n.dart";
 import "package:photos/models/rituals/ritual_models.dart";
 import "package:photos/service_locator.dart";
 import "package:photos/theme/ente_theme.dart";
@@ -26,7 +26,7 @@ class AllRitualsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = context.l10n;
+    final l10n = context.strings;
     final ritualsEnabled = flagService.ritualsFlag;
     if (!ritualsEnabled) {
       return Scaffold(
@@ -200,7 +200,7 @@ class _RitualOverviewCard extends StatelessWidget {
                 Expanded(
                   child: Text(
                     ritual.title.isEmpty
-                        ? context.l10n.ritualUntitled
+                        ? context.strings.ritualUntitled
                         : ritual.title,
                     style: textTheme.bodyBold,
                     maxLines: 1,
@@ -382,7 +382,7 @@ class _RitualActionsSheet extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               ListTile(
-                title: Text(context.l10n.edit, style: textTheme.body),
+                title: Text(context.strings.edit, style: textTheme.body),
                 leading: HugeIcon(
                   icon: HugeIcons.strokeRoundedPencilEdit01,
                   color: colorScheme.textBase,
@@ -397,7 +397,7 @@ class _RitualActionsSheet extends StatelessWidget {
               ),
               ListTile(
                 title: Text(
-                  context.l10n.delete,
+                  context.strings.delete,
                   style: textTheme.body.copyWith(color: Colors.red),
                 ),
                 leading: const HugeIcon(

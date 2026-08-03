@@ -1,12 +1,12 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:ente_auth/l10n/l10n.dart';
 import 'package:ente_auth/theme/ente_theme.dart';
 import 'package:ente_auth/ui/components/scanner_camera_view.dart';
 import 'package:ente_auth/ui/settings/data/import/google_auth_import.dart';
 import 'package:ente_auth/utils/toast_util.dart';
 import 'package:ente_qr_scanner/ente_qr_scanner.dart';
+import 'package:ente_strings/ente_strings.dart';
 import 'package:flutter/material.dart';
 
 class ScannerGoogleAuthPage extends StatefulWidget {
@@ -35,7 +35,7 @@ class ScannerGoogleAuthPageState extends State<ScannerGoogleAuthPage> {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = context.l10n;
+    final l10n = context.strings;
     return Scaffold(
       appBar: AppBar(title: Text(l10n.scan)),
       body: Column(
@@ -69,7 +69,7 @@ class ScannerGoogleAuthPageState extends State<ScannerGoogleAuthPage> {
 
     if (!qrCode.startsWith(kGoogleAuthExportPrefix)) {
       if (mounted) {
-        showToastAboveBottomControls(context, context.l10n.invalidQRCode);
+        showToastAboveBottomControls(context, context.strings.invalidQRCode);
       }
       return;
     }
@@ -104,7 +104,7 @@ class ScannerGoogleAuthPageState extends State<ScannerGoogleAuthPage> {
       return;
     }
     Navigator.of(context).pop();
-    showToastAboveBottomControls(context, "${context.l10n.error} $error");
+    showToastAboveBottomControls(context, "${context.strings.error} $error");
   }
 
   void _cancelScanSubscription() {

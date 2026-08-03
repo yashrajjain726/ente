@@ -51,7 +51,7 @@ class EmergencyContactService {
         await showAlertBottomSheet(
           context,
           title: context.strings.letsTryThatAgain,
-          message: context.strings.enterValidEmail,
+          message: context.strings.enterValidEmailDetailed,
           assetPath: "assets/warning-blue.png",
         );
       }
@@ -62,7 +62,7 @@ class EmergencyContactService {
         await showAlertBottomSheet(
           context,
           title: context.strings.oops,
-          message: context.strings.youCannotShareWithYourself,
+          message: context.strings.youCannotAddYourselfAsLegacyContact,
           assetPath: "assets/warning-blue.png",
         );
       }

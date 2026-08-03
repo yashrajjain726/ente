@@ -1,9 +1,9 @@
 import "package:ente_components/ente_components.dart";
 import "package:ente_pure_utils/ente_pure_utils.dart";
+import "package:ente_strings/ente_strings.dart";
 import 'package:flutter/material.dart';
 import "package:hugeicons/hugeicons.dart";
 import 'package:photos/core/errors.dart';
-import "package:photos/generated/l10n.dart";
 import 'package:photos/ui/payment/subscription.dart';
 import "package:photos/ui/settings/backup/free_space_options.dart";
 import 'package:photos/utils/email_util.dart';
@@ -20,8 +20,8 @@ class HeaderErrorWidget extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 6),
         child: BannerComponent(
           leadingIcon: HugeIcons.strokeRoundedInformationCircle,
-          title: AppLocalizations.of(context).subscribe,
-          subtitle: AppLocalizations.of(context).yourSubscriptionHasExpired,
+          title: context.strings.subscribe,
+          subtitle: context.strings.yourSubscriptionHasExpired,
           state: BannerComponentState.failure,
           onTap: () async {
             await routeToPage(
@@ -37,8 +37,8 @@ class HeaderErrorWidget extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 6),
         child: BannerComponent(
           leadingIcon: HugeIcons.strokeRoundedDatabase,
-          title: AppLocalizations.of(context).upgrade,
-          subtitle: AppLocalizations.of(context).storageLimitExceeded,
+          title: context.strings.upgrade,
+          subtitle: context.strings.storageLimitExceeded,
           state: BannerComponentState.failure,
           onTap: () async {
             await routeToPage(
@@ -54,10 +54,8 @@ class HeaderErrorWidget extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 6),
         child: BannerComponent(
           leadingIcon: HugeIcons.strokeRoundedAlertCircle,
-          title: AppLocalizations.of(context).freeUpDeviceSpace,
-          subtitle: AppLocalizations.of(
-            context,
-          ).backupPausedFreeUpDeviceStorage,
+          title: context.strings.freeUpDeviceSpace,
+          subtitle: context.strings.backupPausedFreeUpDeviceStorage,
           state: BannerComponentState.failure,
           onTap: () async {
             await routeToPage(
@@ -73,15 +71,15 @@ class HeaderErrorWidget extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 6),
         child: BannerComponent(
           leadingIcon: HugeIcons.strokeRoundedAlertCircle,
-          title: AppLocalizations.of(context).backupFailed,
-          subtitle: AppLocalizations.of(context).couldNotBackUpTryLater,
+          title: context.strings.backupFailed,
+          subtitle: context.strings.couldNotBackUpTryLater,
           state: BannerComponentState.failure,
           onTap: () {
             sendLogs(
               context,
-              AppLocalizations.of(context).raiseTicket,
+              context.strings.raiseTicket,
               "support@ente.com",
-              subject: AppLocalizations.of(context).backupFailed,
+              subject: context.strings.backupFailed,
             );
           },
         ),

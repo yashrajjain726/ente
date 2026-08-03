@@ -6,6 +6,7 @@ import 'package:collection/collection.dart';
 import 'package:dio/dio.dart';
 import 'package:ente_crypto/ente_crypto.dart';
 import 'package:ente_pure_utils/ente_pure_utils.dart';
+import "package:ente_strings/ente_strings.dart";
 import "package:fast_base58/fast_base58.dart";
 import 'package:flutter/foundation.dart';
 import "package:flutter/material.dart";
@@ -29,7 +30,6 @@ import 'package:photos/gateways/collections/models/collection_file_item.dart';
 import 'package:photos/gateways/collections/models/create_request.dart';
 import "package:photos/gateways/collections/models/metadata.dart";
 import "package:photos/gateways/collections/models/public_url.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/models/api/collection/user.dart";
 import 'package:photos/models/collection/action.dart';
 import 'package:photos/models/collection/collection.dart';
@@ -1593,10 +1593,8 @@ class CollectionsService {
       if (!context.mounted) return null;
       await showInfoDialog(
         context,
-        title: AppLocalizations.of(context).linkExpired,
-        body: AppLocalizations.of(
-          context,
-        ).theLinkYouAreTryingToAccessHasExpired,
+        title: context.strings.linkExpired,
+        body: context.strings.theLinkYouAreTryingToAccessHasExpired,
       );
       return null;
     } on PublicCollectionDeviceLimitExceededException catch (e, s) {
@@ -1604,8 +1602,8 @@ class CollectionsService {
       if (!context.mounted) return null;
       await showErrorDialog(
         context,
-        AppLocalizations.of(context).canNotOpenTitle,
-        AppLocalizations.of(context).linkRequestLimitExceeded,
+        context.strings.canNotOpenTitle,
+        context.strings.linkRequestLimitExceeded,
       );
       return null;
     } on PublicCollectionRateLimitedException catch (e, s) {
@@ -1613,8 +1611,8 @@ class CollectionsService {
       if (!context.mounted) return null;
       await showErrorDialog(
         context,
-        AppLocalizations.of(context).canNotOpenTitle,
-        AppLocalizations.of(context).linkRequestLimitExceeded,
+        context.strings.canNotOpenTitle,
+        context.strings.linkRequestLimitExceeded,
       );
       return null;
     } on PublicCollectionInfoUnauthorizedException catch (e, s) {
@@ -1622,8 +1620,8 @@ class CollectionsService {
       if (!context.mounted) return null;
       await showErrorDialog(
         context,
-        AppLocalizations.of(context).canNotOpenTitle,
-        AppLocalizations.of(context).canNotOpenBody,
+        context.strings.canNotOpenTitle,
+        context.strings.canNotOpenBody,
       );
       return null;
     } catch (e, s) {
@@ -1658,8 +1656,8 @@ class CollectionsService {
       if (!context.mounted) return false;
       await showErrorDialog(
         context,
-        AppLocalizations.of(context).incorrectPasswordTitle,
-        AppLocalizations.of(context).pleaseTryAgain,
+        context.strings.incorrectPasswordTitle,
+        context.strings.pleaseTryAgain,
       );
       return false;
     }

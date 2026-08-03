@@ -1,12 +1,12 @@
 import "dart:async";
 
+import "package:ente_strings/ente_strings.dart";
 import 'package:flutter/cupertino.dart';
 import "package:photo_manager/photo_manager.dart";
 import "package:photos/core/configuration.dart";
 import "package:photos/core/event_bus.dart";
 import "package:photos/db/files_db.dart";
 import "package:photos/events/collection_updated_event.dart";
-import "package:photos/generated/l10n.dart";
 import 'package:photos/models/collection/collection.dart';
 import 'package:photos/models/file/file.dart';
 import 'package:photos/models/selected_files.dart';
@@ -38,7 +38,7 @@ extension CollectionFileActions on CollectionActions {
       context: context,
       buttons: [
         ButtonWidget(
-          labelText: AppLocalizations.of(context).remove,
+          labelText: context.strings.remove,
           buttonType: removingOthersFile
               ? ButtonType.critical
               : ButtonType.neutral,
@@ -60,7 +60,7 @@ extension CollectionFileActions on CollectionActions {
           },
         ),
         ButtonWidget(
-          labelText: AppLocalizations.of(context).cancel,
+          labelText: context.strings.cancel,
           buttonType: ButtonType.secondary,
           buttonSize: ButtonSize.large,
           buttonAction: ButtonAction.second,
@@ -68,10 +68,10 @@ extension CollectionFileActions on CollectionActions {
           isInAlert: true,
         ),
       ],
-      title: AppLocalizations.of(context).removeFromAlbumTitle,
+      title: context.strings.removeFromAlbumTitle,
       body: removingOthersFile
-          ? AppLocalizations.of(context).removeShareItemsWarning
-          : AppLocalizations.of(context).itemsWillBeRemovedFromAlbum,
+          ? context.strings.removeShareItemsWarning
+          : context.strings.itemsWillBeRemovedFromAlbum,
       actionSheetType: ActionSheetType.defaultActionSheet,
     );
     if (actionResult?.action != null &&
@@ -95,7 +95,7 @@ extension CollectionFileActions on CollectionActions {
     final ProgressDialog? dialog = showProgressDialog
         ? createProgressDialog(
             context,
-            AppLocalizations.of(context).uploadingFilesToAlbum,
+            context.strings.uploadingFilesToAlbum,
             isDismissible: true,
           )
         : null;
@@ -202,7 +202,7 @@ extension CollectionFileActions on CollectionActions {
     ProgressDialog? dialog = showProgressDialog
         ? createProgressDialog(
             context,
-            AppLocalizations.of(context).uploadingFilesToAlbum,
+            context.strings.uploadingFilesToAlbum,
             isDismissible: true,
           )
         : null;
@@ -254,7 +254,7 @@ extension CollectionFileActions on CollectionActions {
             if (!context.mounted) return false;
             dialog = createProgressDialog(
               context,
-              AppLocalizations.of(context).uploadingFilesToAlbum,
+              context.strings.uploadingFilesToAlbum,
               isDismissible: true,
             );
             await dialog.show();
@@ -314,8 +314,8 @@ extension CollectionFileActions on CollectionActions {
     final ProgressDialog dialog = createProgressDialog(
       context,
       markAsFavorite
-          ? AppLocalizations.of(context).addingToFavorites
-          : AppLocalizations.of(context).removingFromFavorites,
+          ? context.strings.addingToFavorites
+          : context.strings.removingFromFavorites,
     );
     await dialog.show();
 
@@ -333,8 +333,8 @@ extension CollectionFileActions on CollectionActions {
       showShortToast(
         context,
         markAsFavorite
-            ? AppLocalizations.of(context).sorryCouldNotAddToFavorites
-            : AppLocalizations.of(context).sorryCouldNotRemoveFromFavorites,
+            ? context.strings.sorryCouldNotAddToFavorites
+            : context.strings.sorryCouldNotRemoveFromFavorites,
       );
     } finally {
       await dialog.hide();

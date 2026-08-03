@@ -1,9 +1,9 @@
 import "package:ente_pure_utils/ente_pure_utils.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:flutter_image_compress/flutter_image_compress.dart";
 import "package:logging/logging.dart";
 import "package:photo_manager/photo_manager.dart";
-import "package:photos/generated/l10n.dart";
 import 'package:photos/models/file/file.dart';
 import "package:photos/module/metadata/local_file.dart";
 import "package:photos/services/sync/sync_service.dart";
@@ -83,7 +83,7 @@ class _CollageCreatorPageState extends State<CollageCreatorPage> {
       final newFile = fileFromAsset("ente Collages", newAsset);
       SyncService.instance.sync().ignore();
       if (!mounted) return;
-      showShortToast(context, AppLocalizations.of(context).collageSaved);
+      showShortToast(context, context.strings.collageSaved);
       replacePage(
         context,
         DetailPage(DetailPageConfiguration([newFile], 0, "collage")),
@@ -92,7 +92,7 @@ class _CollageCreatorPageState extends State<CollageCreatorPage> {
     } catch (e, s) {
       _logger.severe("Failed to create collage", e, s);
       if (!mounted) return;
-      showShortToast(context, AppLocalizations.of(context).somethingWentWrong);
+      showShortToast(context, context.strings.somethingWentWrong);
     } finally {
       if (mounted) {
         setState(() {

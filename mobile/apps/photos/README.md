@@ -63,12 +63,11 @@ After updating Flutter dependencies, run `pod install` from `ios/` on macOS and 
 
 ## 📝 Localization
 
-This project uses Flutter's built-in localization system configured via `l10n.yaml`.
+Mobile apps share Flutter's localization package in `mobile/packages/strings`.
 
-- Localization files are auto-generated when you run `flutter pub get`
-- The base localization file is `lib/l10n/intl_en.arb`
-- Generated code appears in `lib/generated/intl/`
-- To manually regenerate: `flutter gen-l10n`
+- The base localization file is `mobile/packages/strings/lib/l10n/arb/strings_en.arb`
+- Generated code appears in `mobile/packages/strings/lib/l10n/`
+- To manually regenerate, run `flutter gen-l10n` from `mobile/packages/strings`
 
 See [docs/translations.md](docs/translations.md) for contributing translations.
 

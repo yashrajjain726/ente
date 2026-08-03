@@ -3,10 +3,10 @@ import 'dart:math';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
-import 'package:ente_auth/l10n/l10n.dart';
 import 'package:ente_auth/theme/colors.dart';
 import 'package:ente_auth/theme/ente_theme.dart';
 import 'package:ente_components/ente_components.dart' hide textBaseLight;
+import 'package:ente_strings/ente_strings.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -90,7 +90,7 @@ class _AuthQrDialogState extends State<AuthQrDialog> {
       identifier: 'auth_qr_sheet',
       child: BottomSheetComponent(
         title: widget.dialogTitle,
-        closeTooltip: context.l10n.close,
+        closeTooltip: context.strings.close,
         content: ConstrainedBox(
           constraints: BoxConstraints(
             maxHeight: MediaQuery.sizeOf(context).height * 0.62,

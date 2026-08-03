@@ -1,4 +1,5 @@
 import "package:ente_components/ente_components.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:ente_ui/components/buttons/button_widget.dart";
 import "package:ente_ui/components/buttons/models/button_result.dart";
 import "package:ente_ui/utils/dialog_util.dart";
@@ -7,7 +8,6 @@ import "package:ente_utils/share_utils.dart";
 import "package:flutter/material.dart";
 import "package:flutter/services.dart";
 import "package:hugeicons/hugeicons.dart";
-import "package:locker/l10n/l10n.dart";
 import "package:locker/services/files/links/links_service.dart";
 import "package:locker/services/files/sync/models/file.dart";
 import "package:locker/utils/bottom_sheet_illustration.dart";
@@ -48,7 +48,7 @@ class _ShareLinkSheetState extends State<ShareLinkSheet> {
   @override
   Widget build(BuildContext context) {
     final colors = context.componentColors;
-    final l10n = context.l10n;
+    final l10n = context.strings;
 
     return BottomSheetComponent(
       title: l10n.share,
@@ -129,12 +129,12 @@ class _ShareLinkSheetState extends State<ShareLinkSheet> {
   }
 
   Future<void> _deleteShareLink(BuildContext context) async {
-    final l10n = context.l10n;
+    final l10n = context.strings;
 
     final result = await showBottomSheetComponent<ButtonResult>(
       context: context,
       builder: (_) => BottomSheetComponent(
-        title: l10n.deleteShareLinkDialogTitle,
+        title: l10n.deleteLinkQuestion,
         message: l10n.deleteShareLinkConfirmation,
         illustration: LockerBottomSheetIllustration.fileDelete,
         actions: [
@@ -161,7 +161,7 @@ class _ShareLinkSheetState extends State<ShareLinkSheet> {
         await dialog.hide();
 
         if (context.mounted) {
-          showToast(context, l10n.shareLinkDeletedSuccessfully);
+          showToast(context, l10n.linkDeletedSuccessfully);
         }
       } catch (e) {
         await dialog.hide();

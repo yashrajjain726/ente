@@ -1,9 +1,9 @@
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:modal_bottom_sheet/modal_bottom_sheet.dart";
 import "package:photos/core/event_bus.dart";
 import "package:photos/db/files_db.dart";
 import "package:photos/events/collection_updated_event.dart";
-import "package:photos/generated/l10n.dart";
 import 'package:photos/models/collection/collection.dart';
 import "package:photos/models/file_load_result.dart";
 import "package:photos/models/selected_files.dart";
@@ -62,7 +62,7 @@ class PickCoverPhotoWidget extends StatelessWidget {
                 children: [
                   BottomOfTitleBarWidget(
                     title: TitleBarTitleWidget(
-                      title: AppLocalizations.of(context).selectCoverPhoto,
+                      title: context.strings.selectCoverPhoto,
                     ),
                     caption: collection.displayName,
                     showCloseButton: true,
@@ -145,9 +145,7 @@ class PickCoverPhotoWidget extends StatelessWidget {
                                   key: ValueKey(value),
                                   isDisabled: !value,
                                   buttonType: ButtonType.neutral,
-                                  labelText: AppLocalizations.of(
-                                    context,
-                                  ).useSelectedPhoto,
+                                  labelText: context.strings.useSelectedPhoto,
                                   onTap: () async {
                                     final selectedFile =
                                         selectedFiles.files.first;
@@ -165,8 +163,8 @@ class PickCoverPhotoWidget extends StatelessWidget {
                             buttonType: ButtonType.secondary,
                             buttonAction: ButtonAction.cancel,
                             labelText: collection.hasCover
-                                ? AppLocalizations.of(context).resetToDefault
-                                : AppLocalizations.of(context).cancel,
+                                ? context.strings.resetToDefault
+                                : context.strings.cancel,
                             icon: collection.hasCover
                                 ? Icons.restore_outlined
                                 : null,

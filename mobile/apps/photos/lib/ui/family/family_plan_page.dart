@@ -6,6 +6,7 @@ import 'package:collection/collection.dart';
 import 'package:ente_components/ente_components.dart';
 import 'package:ente_contacts/contacts.dart' as contacts;
 import 'package:ente_pure_utils/ente_pure_utils.dart';
+import 'package:ente_strings/ente_strings.dart';
 import 'package:flutter/material.dart';
 import 'package:hugeicons/hugeicons.dart';
 import 'package:photos/core/event_bus.dart';
@@ -14,7 +15,6 @@ import 'package:photos/events/contacts_changed_event.dart';
 import 'package:photos/events/people_changed_event.dart';
 import 'package:photos/gateways/billing/models/billing_plan.dart';
 import 'package:photos/gateways/billing/models/subscription.dart';
-import 'package:photos/generated/l10n.dart';
 import 'package:photos/models/library_sharing/library_sharing_recipient.dart';
 import 'package:photos/models/user_details.dart';
 import 'package:photos/service_locator.dart';
@@ -165,7 +165,7 @@ class _FamilyPlanPageState extends State<FamilyPlanPage> {
         : _buildPaidAdvert(context);
 
     return FamilyPageScaffold(
-      title: _showsDashboard ? AppLocalizations.of(context).family : null,
+      title: _showsDashboard ? context.strings.family : null,
       actions: _showsDashboard ? [_buildDashboardOverflow(context)] : const [],
       scrollable: _showsDashboard,
       child: content,
@@ -173,7 +173,7 @@ class _FamilyPlanPageState extends State<FamilyPlanPage> {
   }
 
   Widget _buildFreeAdvert(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
+    final l10n = context.strings;
     return _buildAdvert(
       context,
       illustrationAsset: _advertIllustrationAsset,
@@ -208,7 +208,7 @@ class _FamilyPlanPageState extends State<FamilyPlanPage> {
   }
 
   Widget _buildPaidAdvert(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
+    final l10n = context.strings;
     return _buildAdvert(
       context,
       illustrationAsset: _advertIllustrationAsset,
@@ -421,7 +421,7 @@ class _FamilyPlanPageState extends State<FamilyPlanPage> {
   }
 
   Widget _buildDashboardOverflow(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
+    final l10n = context.strings;
     final action = _isFamilyAdmin
         ? _FamilyDashboardOverflowAction.closePlan
         : _FamilyDashboardOverflowAction.leavePlan;
@@ -503,7 +503,7 @@ class _FamilyPlanPageState extends State<FamilyPlanPage> {
     if (result?.invitesSent ?? false) {
       showToast(
         context,
-        AppLocalizations.of(context).invitesSentCount(count: result!.sentCount),
+        context.strings.invitesSentCount(count: result!.sentCount),
       );
     }
   }
@@ -538,7 +538,7 @@ class _FamilyPlanPageState extends State<FamilyPlanPage> {
             userID: member.userID,
             email: member.email,
           )?[PersonService.kPersonIDKey];
-    final l10n = AppLocalizations.of(context);
+    final l10n = context.strings;
     await showBottomSheetComponent<void>(
       context: context,
       builder: (sheetContext) => BottomSheetComponent(
@@ -570,7 +570,7 @@ class _FamilyPlanPageState extends State<FamilyPlanPage> {
     required String displayName,
     required String? linkedPersonId,
     required FamilyMemberAction action,
-    required AppLocalizations l10n,
+    required StringsLocalizations l10n,
   }) {
     final actionLabel = switch (action) {
       FamilyMemberAction.saveContact => l10n.saveContact,
@@ -819,7 +819,7 @@ class _FamilyPlanPageState extends State<FamilyPlanPage> {
       await FamilyService.instance.resendInvite(member);
       await _refreshUserDetails();
       if (mounted) {
-        showToast(context, AppLocalizations.of(context).inviteResent);
+        showToast(context, context.strings.inviteResent);
       }
     } catch (error) {
       if (mounted) {
@@ -831,11 +831,9 @@ class _FamilyPlanPageState extends State<FamilyPlanPage> {
   Future<void> _confirmRemoveMember(FamilyMember member) async {
     final confirmed = await showFamilyConfirmationSheet(
       context,
-      title: AppLocalizations.of(context).removeMemberConfirmTitle,
-      body: AppLocalizations.of(
-        context,
-      ).removeMemberConfirmBody(email: member.email),
-      actionLabel: AppLocalizations.of(context).remove,
+      title: context.strings.removeMemberConfirmTitle,
+      body: context.strings.removeMemberConfirmBody(email: member.email),
+      actionLabel: context.strings.remove,
     );
     if (!confirmed || !mounted) {
       return;
@@ -854,11 +852,9 @@ class _FamilyPlanPageState extends State<FamilyPlanPage> {
   Future<void> _confirmRevokeInvite(FamilyMember member) async {
     final confirmed = await showFamilyConfirmationSheet(
       context,
-      title: AppLocalizations.of(context).revokeInviteConfirmTitle,
-      body: AppLocalizations.of(
-        context,
-      ).revokeInviteConfirmBody(email: member.email),
-      actionLabel: AppLocalizations.of(context).revoke,
+      title: context.strings.revokeInviteConfirmTitle,
+      body: context.strings.revokeInviteConfirmBody(email: member.email),
+      actionLabel: context.strings.revoke,
     );
     if (!confirmed || !mounted) {
       return;
@@ -877,9 +873,9 @@ class _FamilyPlanPageState extends State<FamilyPlanPage> {
   Future<void> _confirmCloseFamily() async {
     final confirmed = await showFamilyConfirmationSheet(
       context,
-      title: AppLocalizations.of(context).closeFamilyConfirmTitle,
-      body: AppLocalizations.of(context).closeFamilyConfirmBody,
-      actionLabel: AppLocalizations.of(context).closeFamilyPlan,
+      title: context.strings.closeFamilyConfirmTitle,
+      body: context.strings.closeFamilyConfirmBody,
+      actionLabel: context.strings.closeFamilyPlan,
     );
     if (!confirmed || !mounted) {
       return;
@@ -898,9 +894,9 @@ class _FamilyPlanPageState extends State<FamilyPlanPage> {
   Future<void> _confirmLeaveFamily() async {
     final confirmed = await showFamilyConfirmationSheet(
       context,
-      title: AppLocalizations.of(context).leaveFamily,
-      body: AppLocalizations.of(context).areYouSureThatYouWantToLeaveTheFamily,
-      actionLabel: AppLocalizations.of(context).leave,
+      title: context.strings.leaveFamily,
+      body: context.strings.areYouSureThatYouWantToLeaveTheFamily,
+      actionLabel: context.strings.leave,
     );
     if (!confirmed || !mounted) {
       return;

@@ -1,6 +1,6 @@
+import "package:ente_strings/ente_strings.dart";
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
-import "package:photos/generated/l10n.dart";
 import "package:photos/theme/ente_theme.dart";
 
 class AppVersionWidget extends StatefulWidget {
@@ -49,9 +49,7 @@ class _AppVersionWidgetState extends State<AppVersionWidget> {
               padding: const EdgeInsets.symmetric(vertical: 20),
               child: Center(
                 child: Text(
-                  AppLocalizations.of(
-                    context,
-                  ).appVersion(versionValue: snapshot.data!),
+                  context.strings.appVersion(versionValue: snapshot.data!),
                   style: textTheme.smallMuted,
                 ),
               ),

@@ -2,11 +2,11 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'package:ente_crypto/ente_crypto.dart';
+import 'package:ente_strings/ente_strings.dart';
 import 'package:flutter/material.dart';
 import 'package:logging/logging.dart';
 import 'package:photos/core/configuration.dart';
 import 'package:photos/db/files_db.dart';
-import 'package:photos/generated/l10n.dart';
 import 'package:photos/models/file/extensions/file_props.dart';
 import 'package:photos/models/file/file.dart';
 import "package:photos/models/metadata/file_magic.dart";
@@ -106,7 +106,7 @@ class DiffFetcher {
       if (context.mounted) {
         await showErrorDialog(
           context,
-          AppLocalizations.of(context).somethingWentWrong,
+          context.strings.somethingWentWrong,
           e.toString(),
         );
       }

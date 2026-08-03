@@ -1,8 +1,8 @@
 import "package:ente_components/ente_components.dart";
 import "package:ente_pure_utils/ente_pure_utils.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:hugeicons/hugeicons.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/ui/settings/search/settings_search_item.dart";
 import "package:photos/ui/settings/search/settings_search_registry.dart";
 
@@ -48,7 +48,7 @@ class _SettingsSearchPageState extends State<SettingsSearchPage> {
       if (query.isEmpty || _allItems == null) {
         _filteredItems = [];
       } else {
-        final l10n = AppLocalizations.of(context);
+        final l10n = context.strings;
         final sectionOrder = <String, int>{};
         for (var i = 0; i < _allItems!.length; i++) {
           final item = _allItems![i];
@@ -158,7 +158,7 @@ class _SettingsSearchPageState extends State<SettingsSearchPage> {
       child: TextInputComponent(
         controller: _searchController,
         focusNode: _searchFocusNode,
-        hintText: AppLocalizations.of(context).searchSettings,
+        hintText: context.strings.searchSettings,
         onChanged: _onSearchChanged,
         prefix: HugeIcon(
           icon: HugeIcons.strokeRoundedSearch01,
@@ -192,7 +192,7 @@ class _SettingsSearchPageState extends State<SettingsSearchPage> {
         children: [
           const SizedBox(height: 8),
           Text(
-            AppLocalizations.of(context).suggestions,
+            context.strings.suggestions,
             style: TextStyles.large.copyWith(
               color: context.componentColors.textBase,
             ),
@@ -221,7 +221,7 @@ class _SettingsSearchPageState extends State<SettingsSearchPage> {
         child: Padding(
           padding: const EdgeInsets.all(32),
           child: Text(
-            AppLocalizations.of(context).noResultsFound,
+            context.strings.noResultsFound,
             style: TextStyles.body.copyWith(
               color: context.componentColors.textLight,
             ),

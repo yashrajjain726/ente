@@ -6,12 +6,12 @@ import "package:ente_sharing/extensions/user_extension.dart";
 import "package:ente_sharing/models/user.dart";
 import "package:ente_sharing/user_avator_widget.dart";
 import "package:ente_sharing/verify_identity_dialog.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:ente_ui/components/captioned_text_widget_v2.dart";
 import "package:ente_ui/components/divider_widget.dart";
 import "package:ente_ui/components/menu_item_widget_v2.dart";
 import "package:flutter/material.dart";
 import "package:intl/intl.dart";
-import "package:locker/l10n/l10n.dart";
 import "package:locker/services/collections/collections_service.dart";
 import "package:locker/services/collections/models/collection.dart";
 import "package:locker/services/configuration.dart";
@@ -79,7 +79,7 @@ class _AddEmailSheetState extends State<AddEmailSheet> {
   @override
   Widget build(BuildContext context) {
     return BottomSheetComponent(
-      title: context.l10n.addNewEmail,
+      title: context.strings.addNewEmail,
       isKeyboardAware: true,
       content: ValueListenableBuilder<int>(
         valueListenable: ContactsDisplayService.instance.changes,
@@ -109,7 +109,7 @@ class _AddEmailSheetState extends State<AddEmailSheet> {
     return TextInputComponent(
       controller: _textController,
       focusNode: _textFieldFocusNode,
-      hintText: context.l10n.enterNameOrEmailToShareWith,
+      hintText: context.strings.enterNameOrEmailToShareWith,
       keyboardType: TextInputType.emailAddress,
       autofillHints: const [AutofillHints.email],
       autocorrect: false,
@@ -147,7 +147,7 @@ class _AddEmailSheetState extends State<AddEmailSheet> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          context.l10n.chooseFromAnExistingContact,
+          context.strings.chooseFromAnExistingContact,
           style: TextStyles.body.copyWith(color: colors.textLight),
         ),
         const SizedBox(height: 8),
@@ -337,8 +337,8 @@ class _AddEmailSheetState extends State<AddEmailSheet> {
     final bool canShare =
         _emailIsValid && (!_shareLater || _isScheduledDateTimeValid());
     final buttonText = _shareLater
-        ? context.l10n.scheduleShare
-        : context.l10n.share;
+        ? context.strings.scheduleShare
+        : context.strings.share;
     return ButtonComponent(
       label: buttonText,
       onTap: canShare ? _onShareTap : null,

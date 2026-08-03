@@ -3,6 +3,7 @@ import "dart:math" as math;
 import "dart:ui" as ui;
 
 import "package:collection/collection.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:flutter/services.dart";
 import "package:intl/intl.dart";
@@ -10,7 +11,6 @@ import "package:logging/logging.dart";
 import "package:photos/db/files_db.dart";
 import "package:photos/db/ml/db.dart";
 import "package:photos/ente_theme_data.dart";
-import "package:photos/l10n/l10n.dart";
 import "package:photos/models/file/file.dart";
 import "package:photos/models/memory_lane/memory_lane_models.dart";
 import "package:photos/models/ml/face/face.dart";
@@ -593,7 +593,7 @@ class _MemoryLanePageState extends State<MemoryLanePage>
   @override
   Widget build(BuildContext context) {
     if (!_featureEnabled) {
-      final l10n = context.l10n;
+      final l10n = context.strings;
       final colorScheme = getEnteColorScheme(context);
       final textTheme = getEnteTextTheme(context);
       return Scaffold(
@@ -611,7 +611,7 @@ class _MemoryLanePageState extends State<MemoryLanePage>
       data: darkThemeData,
       child: Builder(
         builder: (context) {
-          final l10n = context.l10n;
+          final l10n = context.strings;
           final title = l10n.facesTimelineAppBarTitle;
           final colorScheme = getEnteColorScheme(context);
           final textTheme = getEnteTextTheme(context);
@@ -886,7 +886,7 @@ class _MemoryLanePageState extends State<MemoryLanePage>
   Widget _buildCaption(BuildContext context) {
     final colorScheme = getEnteColorScheme(context);
     final textTheme = getEnteTextTheme(context);
-    final l10n = context.l10n;
+    final l10n = context.strings;
     final captionType = _currentCaptionType;
     final isPlaying = _isPlaying;
     final bool isDark = Theme.of(context).brightness == Brightness.dark;
@@ -1111,7 +1111,7 @@ class _MemoryLanePageState extends State<MemoryLanePage>
   Future<(String, int)?> _getOrCreateMemoryLaneLinkData(
     BuildContext context,
   ) async {
-    final l10n = context.l10n;
+    final l10n = context.strings;
     final dialog = createProgressDialog(context, l10n.creatingLink);
     await dialog.show();
     try {

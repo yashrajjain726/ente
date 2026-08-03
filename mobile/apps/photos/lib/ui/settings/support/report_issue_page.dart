@@ -1,10 +1,10 @@
 import "package:ente_components/ente_components.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:flutter/services.dart";
 import "package:hugeicons/hugeicons.dart";
 import "package:logging/logging.dart";
 import "package:photos/core/constants.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/ui/notification/toast.dart";
 import "package:photos/ui/settings/components/settings_page_scaffold.dart";
 import "package:photos/ui/settings/support/no_mail_app_sheet.dart";
@@ -33,7 +33,7 @@ class _ReportIssuePageState extends State<ReportIssuePage> {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
+    final l10n = context.strings;
     final colors = context.componentColors;
     final subjectHasText = _subjectController.text.isNotEmpty;
     final descriptionHasText = _descriptionController.text.isNotEmpty;
@@ -107,7 +107,7 @@ class _ReportIssuePageState extends State<ReportIssuePage> {
   Future<void> _copyToClipboard(String text) async {
     await Clipboard.setData(ClipboardData(text: text));
     if (mounted) {
-      showShortToast(context, AppLocalizations.of(context).copied);
+      showShortToast(context, context.strings.copied);
     }
   }
 
@@ -115,7 +115,7 @@ class _ReportIssuePageState extends State<ReportIssuePage> {
     if (_isSending) {
       return;
     }
-    final l10n = AppLocalizations.of(context);
+    final l10n = context.strings;
     final subject = _subjectController.text.trim();
     final description = _descriptionController.text.trim();
     if (subject.isEmpty) {

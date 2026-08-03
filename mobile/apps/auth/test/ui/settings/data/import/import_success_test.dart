@@ -1,16 +1,16 @@
-import 'package:ente_auth/l10n/l10n.dart';
 import 'package:ente_auth/ui/settings/data/import/import_success.dart';
+import 'package:ente_strings/ente_strings.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  testWidgets('Ok closes import success dialog without popping Home', (
+  testWidgets('OK closes import success dialog without popping Home', (
     tester,
   ) async {
     await tester.pumpWidget(
       const MaterialApp(
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
-        supportedLocales: AppLocalizations.supportedLocales,
+        localizationsDelegates: StringsLocalizations.localizationsDelegates,
+        supportedLocales: StringsLocalizations.supportedLocales,
         home: _OnboardingShell(),
       ),
     );
@@ -26,10 +26,10 @@ void main() {
     await tester.pump(const Duration(seconds: 2));
 
     expect(find.text('Auth home'), findsOneWidget);
-    expect(find.text('Ok'), findsOneWidget);
+    expect(find.text('OK'), findsOneWidget);
 
     final okButton = find.ancestor(
-      of: find.text('Ok'),
+      of: find.text('OK'),
       matching: find.byType(GestureDetector),
     );
     expect(okButton, findsOneWidget);
@@ -39,7 +39,7 @@ void main() {
 
     expect(find.text('Auth home'), findsOneWidget);
     expect(find.text('Use without backups'), findsNothing);
-    expect(find.text('Ok'), findsNothing);
+    expect(find.text('OK'), findsNothing);
   });
 }
 

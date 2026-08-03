@@ -2,11 +2,11 @@ import "dart:math";
 
 import "package:ente_components/ente_components.dart";
 import 'package:ente_pure_utils/ente_pure_utils.dart';
+import "package:ente_strings/ente_strings.dart";
 import "package:figma_squircle/figma_squircle.dart";
 import 'package:flutter/material.dart';
 import 'package:hugeicons/hugeicons.dart';
 import "package:photos/core/configuration.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/models/api/collection/user.dart";
 import 'package:photos/models/collection/collection.dart';
 import 'package:photos/models/collection/collection_items.dart';
@@ -286,9 +286,9 @@ class AlbumRowItemWidget extends StatelessWidget {
                               .getCachedFileCount(c);
                         }
                         if (cachedCount != null && cachedCount > 0) {
-                          final String textCount = AppLocalizations.of(
-                            context,
-                          ).itemCount(count: cachedCount);
+                          final String textCount = context.strings.itemCount(
+                            count: cachedCount,
+                          );
                           return Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [

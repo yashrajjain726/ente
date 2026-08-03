@@ -3,10 +3,10 @@ import "dart:async";
 import "package:collection/collection.dart";
 import "package:ente_components/theme/text_styles.dart" as component;
 import "package:ente_icons/ente_icons.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/foundation.dart";
 import "package:flutter/material.dart";
 import "package:logging/logging.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/models/api/collection/user.dart";
 import "package:photos/models/collection/collection.dart";
 import "package:photos/models/file/file.dart";
@@ -330,7 +330,7 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
 
   void _showFailedToUpdateLikeToast() {
     if (flagService.internalUser || kDebugMode) {
-      showShortToast(context, AppLocalizations.of(context).failedToUpdateLike);
+      showShortToast(context, context.strings.failedToUpdateLike);
     }
   }
 
@@ -467,7 +467,7 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Tooltip(
-                message: AppLocalizations.of(context).like,
+                message: context.strings.like,
                 child: GestureDetector(
                   onLongPress: _showLikes,
                   child: SizedBox.square(
@@ -490,7 +490,7 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
               ),
               const SizedBox(height: 10),
               Tooltip(
-                message: AppLocalizations.of(context).comments,
+                message: context.strings.comments,
                 child: SizedBox.square(
                   dimension: _socialControlsSize,
                   child: IconButton(

@@ -4,7 +4,6 @@ import 'package:ente_account_deletion/account_deletion.dart';
 import 'package:ente_accounts/pages/change_email_dialog.dart';
 import 'package:ente_accounts/pages/password_entry_page.dart';
 import 'package:ente_auth/core/configuration.dart';
-import 'package:ente_auth/l10n/l10n.dart';
 import 'package:ente_auth/ui/components/recovery_key_sheet.dart';
 import 'package:ente_auth/ui/home_page.dart';
 import 'package:ente_auth/ui/settings/components/auth_settings_item.dart';
@@ -13,6 +12,7 @@ import 'package:ente_auth/utils/dialog_util.dart';
 import 'package:ente_components/ente_components.dart';
 import 'package:ente_crypto_api/ente_crypto_api.dart';
 import 'package:ente_lock_screen/local_authentication_service.dart';
+import 'package:ente_strings/ente_strings.dart';
 import 'package:flutter/material.dart';
 import 'package:hugeicons/hugeicons.dart';
 
@@ -21,7 +21,7 @@ class AccountSettingsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = context.l10n;
+    final l10n = context.strings;
     return AuthSettingsPageScaffold(
       title: l10n.account,
       children: [
@@ -57,7 +57,7 @@ class AccountSettingsPage extends StatelessWidget {
     final authenticated = await LocalAuthenticationService.instance
         .requestLocalAuthentication(
           context,
-          context.l10n.authToChangeYourEmail,
+          context.strings.authToChangeYourEmail,
         );
     if (authenticated && context.mounted) {
       await showChangeEmailDialog(context);
@@ -68,7 +68,7 @@ class AccountSettingsPage extends StatelessWidget {
     final authenticated = await LocalAuthenticationService.instance
         .requestLocalAuthentication(
           context,
-          context.l10n.authToChangeYourPassword,
+          context.strings.authToChangeYourPassword,
         );
     if (!authenticated || !context.mounted) return;
     await Navigator.of(context).push<void>(
@@ -86,7 +86,7 @@ class AccountSettingsPage extends StatelessWidget {
     final authenticated = await LocalAuthenticationService.instance
         .requestLocalAuthentication(
           context,
-          context.l10n.authToViewYourRecoveryKey,
+          context.strings.authToViewYourRecoveryKey,
         );
     if (!authenticated || !context.mounted) return;
     try {
@@ -104,7 +104,7 @@ class AccountSettingsPage extends StatelessWidget {
     final authenticated = await LocalAuthenticationService.instance
         .requestLocalAuthentication(
           context,
-          context.l10n.authToInitiateAccountDeletion,
+          context.strings.authToInitiateAccountDeletion,
         );
     if (!authenticated || !context.mounted) return;
     final deleted = await Navigator.of(

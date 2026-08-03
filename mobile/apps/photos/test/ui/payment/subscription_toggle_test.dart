@@ -3,7 +3,7 @@ import "package:ente_components/theme/theme.dart" show ComponentTheme;
 import "package:flutter/material.dart";
 import "package:flutter_test/flutter_test.dart";
 import "package:photos/ente_theme_data.dart";
-import "package:photos/generated/intl/app_localizations.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:photos/theme/text_style.dart" as ente_text;
 import "package:photos/ui/payment/subscription_common_widgets.dart";
 
@@ -91,8 +91,8 @@ void main() {
 Widget _buildTestApp(Widget child, {ThemeData? theme}) {
   return MaterialApp(
     theme: theme ?? darkThemeData,
-    localizationsDelegates: AppLocalizations.localizationsDelegates,
-    supportedLocales: AppLocalizations.supportedLocales,
+    localizationsDelegates: StringsLocalizations.localizationsDelegates,
+    supportedLocales: StringsLocalizations.supportedLocales,
     home: Scaffold(body: SizedBox(width: 320, child: child)),
   );
 }

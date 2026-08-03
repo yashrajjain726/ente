@@ -3,12 +3,12 @@ import "dart:io";
 import "package:adaptive_theme/adaptive_theme.dart";
 import "package:ente_components/ente_components.dart";
 import "package:ente_pure_utils/ente_pure_utils.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/foundation.dart";
 import "package:flutter/material.dart";
 import "package:hugeicons/hugeicons.dart";
 import "package:photos/app.dart";
-import "package:photos/generated/l10n.dart";
-import "package:photos/l10n/l10n.dart";
+import "package:photos/locale.dart";
 import "package:photos/ui/settings/app_icon_selection_screen.dart";
 import "package:photos/ui/settings/components/settings_item.dart";
 import "package:photos/ui/settings/components/settings_page_scaffold.dart";
@@ -38,7 +38,7 @@ class _AppearanceSettingsPageState extends State<AppearanceSettingsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
+    final l10n = context.strings;
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
     return SettingsPageScaffold(
@@ -55,7 +55,7 @@ class _AppearanceSettingsPageState extends State<AppearanceSettingsPage> {
           const SizedBox(height: 8),
         ],
         SettingsItem(
-          title: context.l10n.appIcon,
+          title: context.strings.appIcon,
           icon: HugeIcons.strokeRoundedImage02,
           onTap: () async {
             await routeToPage(context, const AppIconSelectionScreen());
@@ -123,25 +123,25 @@ class _ThemePickerSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BottomSheetComponent(
-      title: AppLocalizations.of(context).theme,
+      title: context.strings.theme,
       showCloseButton: false,
       content: MenuGroupComponent(
         items: [
           _themeOption(
             context,
-            title: AppLocalizations.of(context).lightTheme,
+            title: context.strings.lightTheme,
             isSelected: currentThemeMode == AdaptiveThemeMode.light,
             onTap: () => _selectTheme(context, AdaptiveThemeMode.light),
           ),
           _themeOption(
             context,
-            title: AppLocalizations.of(context).darkTheme,
+            title: context.strings.darkTheme,
             isSelected: currentThemeMode == AdaptiveThemeMode.dark,
             onTap: () => _selectTheme(context, AdaptiveThemeMode.dark),
           ),
           _themeOption(
             context,
-            title: AppLocalizations.of(context).systemTheme,
+            title: context.strings.systemTheme,
             isSelected: currentThemeMode == AdaptiveThemeMode.system,
             onTap: () => _selectTheme(context, AdaptiveThemeMode.system),
           ),

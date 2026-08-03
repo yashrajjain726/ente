@@ -1,6 +1,7 @@
 import "dart:async";
 
 import "package:ente_pure_utils/ente_pure_utils.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:logging/logging.dart";
 import "package:photos/core/configuration.dart";
@@ -8,8 +9,6 @@ import "package:photos/core/event_bus.dart";
 import "package:photos/events/collection_meta_event.dart";
 import "package:photos/events/collection_updated_event.dart";
 import "package:photos/events/files_updated_event.dart";
-import "package:photos/generated/l10n.dart";
-import "package:photos/l10n/l10n.dart";
 import "package:photos/models/collection/collection_items.dart";
 import "package:photos/models/file/file.dart";
 import "package:photos/models/file_load_result.dart";
@@ -72,15 +71,15 @@ class _SharedPublicCollectionPageState
   Future<void> _showJoinDialog() async {
     final result = await showChoiceDialog(
       context,
-      title: context.l10n.joinAlbum,
-      body: context.l10n.joinAlbumConfirmationDialogBody,
-      firstButtonLabel: context.l10n.join,
+      title: context.strings.joinAlbum,
+      body: context.strings.joinAlbumConfirmationDialogBody,
+      firstButtonLabel: context.strings.join,
     );
     if (result != null && result.action == ButtonAction.first) {
       if (!mounted) return;
       final dialog = createProgressDialog(
         context,
-        context.l10n.pleaseWait,
+        context.strings.pleaseWait,
         isDismissible: true,
       );
       await dialog.show();
@@ -176,15 +175,15 @@ class _SharedPublicCollectionPageState
               padding: const EdgeInsets.all(8.0),
               child: EndToEndBanner(
                 leadingIcon: Icons.people_outlined,
-                title: context.l10n.joinAlbum,
+                title: context.strings.joinAlbum,
                 caption: widget.c.collection.isCollectEnabledForPublicLink()
-                    ? context.l10n.joinAlbumSubtext
-                    : context.l10n.joinAlbumSubtextViewer,
+                    ? context.strings.joinAlbumSubtext
+                    : context.strings.joinAlbumSubtextViewer,
                 trailingWidget: ButtonWidget(
                   buttonType: ButtonType.primary,
                   buttonSize: ButtonSize.small,
                   icon: null,
-                  labelText: context.l10n.join,
+                  labelText: context.strings.join,
                   shouldSurfaceExecutionStates: false,
                   onTap: _joinAlbum,
                 ),
@@ -219,15 +218,15 @@ class _SharedPublicCollectionPageState
   Future<void> _joinAlbum() async {
     final result = await showChoiceDialog(
       context,
-      title: context.l10n.joinAlbum,
-      body: context.l10n.joinAlbumConfirmationDialogBody,
-      firstButtonLabel: context.l10n.join,
+      title: context.strings.joinAlbum,
+      body: context.strings.joinAlbumConfirmationDialogBody,
+      firstButtonLabel: context.strings.join,
     );
     if (result != null && result.action == ButtonAction.first) {
       if (!mounted) return;
       final dialog = createProgressDialog(
         context,
-        AppLocalizations.of(context).pleaseWait,
+        context.strings.pleaseWait,
         isDismissible: true,
       );
       await dialog.show();
@@ -252,7 +251,7 @@ class _SharedPublicCollectionPageState
         logger.severe("Failed to join collection", e, s);
         await dialog.hide();
         if (!mounted) return;
-        showToast(context, AppLocalizations.of(context).somethingWentWrong);
+        showToast(context, context.strings.somethingWentWrong);
       }
     }
   }

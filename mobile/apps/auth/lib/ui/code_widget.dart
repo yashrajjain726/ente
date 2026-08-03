@@ -6,7 +6,6 @@ import 'package:clipboard/clipboard.dart';
 import 'package:ente_auth/core/configuration.dart';
 import 'package:ente_auth/ente_theme_data.dart';
 import 'package:ente_auth/events/multi_select_action_requested_event.dart';
-import 'package:ente_auth/l10n/l10n.dart';
 import 'package:ente_auth/models/code.dart';
 import 'package:ente_auth/onboarding/view/setup_enter_secret_key_page.dart';
 import 'package:ente_auth/services/local_backup_service.dart';
@@ -28,6 +27,7 @@ import 'package:ente_components/ente_components.dart';
 import 'package:ente_events/event_bus.dart';
 import 'package:ente_lock_screen/local_authentication_service.dart';
 import 'package:ente_pure_utils/ente_pure_utils.dart';
+import 'package:ente_strings/ente_strings.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_context_menu/flutter_context_menu.dart';
@@ -132,11 +132,14 @@ class _CodeWidgetState extends State<CodeWidget> {
       }
       _isInitialized = true;
     }
-    final l10n = context.l10n;
+    final l10n = context.strings;
     // Cache the localized error label for use in timer callbacks
     _errorText = l10n.error;
 
-    Widget getCardContents(AppLocalizations l10n, {required bool isSelected}) {
+    Widget getCardContents(
+      StringsLocalizations l10n, {
+      required bool isSelected,
+    }) {
       final colorScheme = getEnteColorScheme(context);
       final isSelectionActive =
           CodeDisplayStore.instance.isSelectionModeActive.value;
@@ -220,7 +223,7 @@ class _CodeWidgetState extends State<CodeWidget> {
       );
     }
 
-    Widget clippedCard(AppLocalizations l10n) {
+    Widget clippedCard(StringsLocalizations l10n) {
       final colorScheme = getEnteColorScheme(context);
 
       return ValueListenableBuilder<Set<String>>(
@@ -238,7 +241,7 @@ class _CodeWidgetState extends State<CodeWidget> {
                   CopyNextIntent: CallbackAction<CopyNextIntent>(
                     onInvoke: (intent) {
                       if (!widget.code.type.isTOTPCompatible) {
-                        showToast(context, context.l10n.notSupportedForHOTP);
+                        showToast(context, context.strings.notSupportedForHOTP);
                         return null;
                       }
                       _copyNextToClipboard();
@@ -387,7 +390,7 @@ class _CodeWidgetState extends State<CodeWidget> {
     );
   }
 
-  Widget _getBottomRow(AppLocalizations l10n) {
+  Widget _getBottomRow(StringsLocalizations l10n) {
     return Container(
       padding: const EdgeInsets.only(left: 16, right: 16),
       child: Row(
@@ -587,7 +590,7 @@ class _CodeWidgetState extends State<CodeWidget> {
 
   List<ContextMenuEntry> _buildContextMenuEntries(
     BuildContext context,
-    AppLocalizations l10n,
+    StringsLocalizations l10n,
     Set<String> selectedIds,
   ) {
     if (!widget.enableDesktopContextActions) {
@@ -602,7 +605,7 @@ class _CodeWidgetState extends State<CodeWidget> {
     return _buildSingleSelectionMenu(l10n);
   }
 
-  List<ContextMenuEntry> _buildSingleSelectionMenu(AppLocalizations l10n) {
+  List<ContextMenuEntry> _buildSingleSelectionMenu(StringsLocalizations l10n) {
     final entries = <ContextMenuEntry>[];
 
     _addNonTrashedMenuItems(entries, l10n);
@@ -616,7 +619,7 @@ class _CodeWidgetState extends State<CodeWidget> {
   /// Adds menu items for non-trashed codes (share, QR, tag, notes, pin).
   void _addNonTrashedMenuItems(
     List<ContextMenuEntry> entries,
-    AppLocalizations l10n,
+    StringsLocalizations l10n,
   ) {
     if (widget.code.isTrashed) return;
 
@@ -675,7 +678,7 @@ class _CodeWidgetState extends State<CodeWidget> {
   /// Adds edit menu item for non-trashed codes or restore for trashed codes.
   void _addEditOrRestoreMenuItem(
     List<ContextMenuEntry> entries,
-    AppLocalizations l10n,
+    StringsLocalizations l10n,
   ) {
     if (!widget.code.isTrashed) {
       entries.add(
@@ -699,7 +702,7 @@ class _CodeWidgetState extends State<CodeWidget> {
   /// Adds delete (forever) or trash menu item based on code state.
   void _addDeleteOrTrashMenuItem(
     List<ContextMenuEntry> entries,
-    AppLocalizations l10n,
+    StringsLocalizations l10n,
   ) {
     entries.add(
       MenuItem(
@@ -714,7 +717,7 @@ class _CodeWidgetState extends State<CodeWidget> {
   }
 
   List<ContextMenuEntry>? _buildMultiSelectionContextMenu(
-    AppLocalizations l10n,
+    StringsLocalizations l10n,
     Set<String> selectedIds,
   ) {
     if (selectedIds.length <= 1 ||
@@ -744,7 +747,7 @@ class _CodeWidgetState extends State<CodeWidget> {
   /// Adds menu items for multi-selected trashed codes (restore, delete).
   void _addTrashedMultiSelectMenuItems(
     List<ContextMenuEntry> entries,
-    AppLocalizations l10n,
+    StringsLocalizations l10n,
   ) {
     entries.add(
       MenuItem(
@@ -765,7 +768,7 @@ class _CodeWidgetState extends State<CodeWidget> {
   /// Adds pin/unpin menu items based on selection pin state.
   void _addPinMenuItems(
     List<ContextMenuEntry> entries,
-    AppLocalizations l10n,
+    StringsLocalizations l10n,
     List<Code> selectedCodes,
   ) {
     final bool allPinned = selectedCodes.every((code) => code.isPinned);
@@ -803,7 +806,7 @@ class _CodeWidgetState extends State<CodeWidget> {
   /// Adds tag and trash menu items for multi-selection.
   void _addTagAndTrashMenuItems(
     List<ContextMenuEntry> entries,
-    AppLocalizations l10n,
+    StringsLocalizations l10n,
   ) {
     entries.add(
       MenuItem(
@@ -850,7 +853,7 @@ class _CodeWidgetState extends State<CodeWidget> {
   void _copyCurrentOTPToClipboard() {
     _copyToClipboard(
       _getCurrentOTP(),
-      confirmationMessage: context.l10n.copiedToClipboard,
+      confirmationMessage: context.strings.copiedToClipboard,
     );
     _updateCodeMetadata().ignore();
   }
@@ -858,7 +861,7 @@ class _CodeWidgetState extends State<CodeWidget> {
   void _copyNextToClipboard() {
     _copyToClipboard(
       _getNextTotp(),
-      confirmationMessage: context.l10n.copiedNextToClipboard,
+      confirmationMessage: context.strings.copiedNextToClipboard,
     );
     _updateCodeMetadata().ignore();
   }
@@ -921,7 +924,10 @@ class _CodeWidgetState extends State<CodeWidget> {
       Navigator.of(context).pop();
     }
     bool isAuthSuccessful = await LocalAuthenticationService.instance
-        .requestLocalAuthentication(context, context.l10n.editCodeAuthMessage);
+        .requestLocalAuthentication(
+          context,
+          context.strings.editCodeAuthMessage,
+        );
     if (!isAuthSuccessful) {
       return;
     }
@@ -943,7 +949,7 @@ class _CodeWidgetState extends State<CodeWidget> {
       Navigator.of(context).pop();
     }
     bool isAuthSuccessful = await LocalAuthenticationService.instance
-        .requestLocalAuthentication(context, context.l10n.showQRAuthMessage);
+        .requestLocalAuthentication(context, context.strings.showQRAuthMessage);
     if (!isAuthSuccessful) {
       return;
     }
@@ -964,8 +970,8 @@ class _CodeWidgetState extends State<CodeWidget> {
           subtitle: widget.code.account,
           shareFileName: 'ente_auth_qr_${widget.code.account}.png',
           shareText: 'QR code for ${widget.code.account}',
-          dialogTitle: dialogContext.l10n.qrCode,
-          shareButtonText: dialogContext.l10n.share,
+          dialogTitle: dialogContext.strings.qrCode,
+          shareButtonText: dialogContext.strings.share,
         );
       },
     );
@@ -979,7 +985,10 @@ class _CodeWidgetState extends State<CodeWidget> {
       Navigator.of(context).pop();
     }
     bool isAuthSuccessful = await LocalAuthenticationService.instance
-        .requestLocalAuthentication(context, context.l10n.authenticateGeneric);
+        .requestLocalAuthentication(
+          context,
+          context.strings.authenticateGeneric,
+        );
     if (!isAuthSuccessful) {
       return;
     }
@@ -1003,8 +1012,8 @@ class _CodeWidgetState extends State<CodeWidget> {
         showToast(
           context,
           !currentlyPinned
-              ? context.l10n.pinnedCodeMessage(widget.code.issuer)
-              : context.l10n.unpinnedCodeMessage(widget.code.issuer),
+              ? context.strings.pinnedCodeMessage(code: widget.code.issuer)
+              : context.strings.unpinnedCodeMessage(code: widget.code.issuer),
         );
       }),
     );
@@ -1021,14 +1030,14 @@ class _CodeWidgetState extends State<CodeWidget> {
     bool isAuthSuccessful = await LocalAuthenticationService.instance
         .requestLocalAuthentication(
           context,
-          context.l10n.deleteCodeAuthMessage,
+          context.strings.deleteCodeAuthMessage,
         );
     if (!isAuthSuccessful) {
       return;
     }
     if (!mounted) return;
     FocusScope.of(context).requestFocus();
-    final l10n = context.l10n;
+    final l10n = context.strings;
     if (!mounted) return;
     await showChoiceActionSheet(
       context,
@@ -1060,14 +1069,14 @@ class _CodeWidgetState extends State<CodeWidget> {
     bool isAuthSuccessful = await LocalAuthenticationService.instance
         .requestLocalAuthentication(
           context,
-          context.l10n.deleteCodeAuthMessage,
+          context.strings.deleteCodeAuthMessage,
         );
     if (!isAuthSuccessful) {
       return;
     }
     if (!mounted) return;
     FocusScope.of(context).requestFocus();
-    final l10n = context.l10n;
+    final l10n = context.strings;
     final String issuerAccount = widget.code.account.isNotEmpty
         ? '${widget.code.issuer} (${widget.code.account})'
         : widget.code.issuer;
@@ -1075,7 +1084,7 @@ class _CodeWidgetState extends State<CodeWidget> {
     await showChoiceActionSheet(
       context,
       title: l10n.trashCode,
-      body: l10n.trashCodeMessage(issuerAccount),
+      body: l10n.trashCodeMessage(account: issuerAccount),
       firstButtonLabel: l10n.trash,
       isCritical: true,
       firstButtonOnTap: () async {

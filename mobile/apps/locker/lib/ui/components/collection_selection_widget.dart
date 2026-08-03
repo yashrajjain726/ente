@@ -1,8 +1,8 @@
 import 'package:dotted_border/dotted_border.dart';
 import "package:ente_components/ente_components.dart";
+import 'package:ente_strings/ente_strings.dart';
 import 'package:flutter/material.dart';
 import 'package:locker/extensions/collection_extension.dart';
-import 'package:locker/l10n/l10n.dart';
 import 'package:locker/services/collections/models/collection.dart';
 import 'package:locker/services/configuration.dart';
 import 'package:locker/utils/collection_actions.dart';
@@ -102,7 +102,7 @@ class _CollectionSelectionWidgetState extends State<CollectionSelectionWidget> {
     if (containsUncategorized) {
       chips.add(
         TagChipComponent(
-          label: context.l10n.uncategorized,
+          label: context.strings.uncategorized,
           state:
               widget.selectedCollectionIds.contains(
                 _uncategorizedCollection?.id ?? -1,
@@ -120,7 +120,7 @@ class _CollectionSelectionWidgetState extends State<CollectionSelectionWidget> {
 
     for (final collection in _availableCollections) {
       final collectionName =
-          collection.displayName ?? context.l10n.unnamedCollection;
+          collection.displayName ?? context.strings.unnamedCollection;
       chips.add(
         TagChipComponent(
           label: collectionName,
@@ -187,7 +187,7 @@ class _CollectionSelectionWidgetState extends State<CollectionSelectionWidget> {
               Icon(Icons.add_rounded, size: 18, color: colors.textLight),
               const SizedBox(width: 6),
               Text(
-                context.l10n.collectionLabel,
+                context.strings.collectionLabel,
                 style: TextStyles.body.copyWith(color: colors.textLight),
               ),
             ],

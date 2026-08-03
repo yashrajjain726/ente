@@ -1,11 +1,11 @@
 import 'package:ente_auth/ente_theme_data.dart';
-import 'package:ente_auth/l10n/l10n.dart';
 import 'package:ente_auth/models/code.dart';
 import 'package:ente_auth/theme/ente_theme.dart';
 import 'package:ente_auth/ui/common/gradient_button.dart';
 import 'package:ente_auth/ui/linear_progress_widget.dart';
 import 'package:ente_auth/ui/tools/debug/raw_codes_viewer.dart';
 import 'package:ente_auth/utils/email_util.dart';
+import 'package:ente_strings/ente_strings.dart';
 import 'package:flutter/material.dart';
 
 class CodeErrorWidget extends StatelessWidget {
@@ -51,7 +51,7 @@ class CodeErrorWidget extends StatelessWidget {
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  context.l10n.error,
+                  context.strings.error,
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w600,
@@ -64,7 +64,7 @@ class CodeErrorWidget extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8.0),
               child: Text(
-                context.l10n.somethingWentWrongParsingCode(errors.length),
+                context.strings.somethingWentWrongParsingCode(x: errors.length),
                 style: const TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
@@ -80,7 +80,7 @@ class CodeErrorWidget extends StatelessWidget {
                     width: 102,
                     height: 28,
                     child: GradientButton(
-                      text: context.l10n.viewRawCodes,
+                      text: context.strings.viewRawCodes,
                       fontSize: 10,
                       onTap: () async {
                         await showDialog(
@@ -101,7 +101,7 @@ class CodeErrorWidget extends StatelessWidget {
                     width: 102,
                     height: 28,
                     child: GradientButton(
-                      text: context.l10n.contactSupport,
+                      text: context.strings.contactSupport,
                       fontSize: 10,
                       onTap: () async {
                         await sendEmail(context, to: "support@ente.com");

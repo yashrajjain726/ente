@@ -2,6 +2,7 @@ import "dart:async";
 
 import "package:ente_components/ente_components.dart";
 import 'package:ente_pure_utils/ente_pure_utils.dart';
+import "package:ente_strings/ente_strings.dart";
 import 'package:flutter/material.dart';
 import "package:flutter/services.dart";
 import 'package:logging/logging.dart';
@@ -9,7 +10,6 @@ import 'package:photos/core/configuration.dart';
 import "package:photos/core/event_bus.dart";
 import "package:photos/events/create_new_album_event.dart";
 import "package:photos/events/tab_changed_event.dart";
-import "package:photos/generated/l10n.dart";
 import 'package:photos/models/collection/collection.dart';
 import 'package:photos/models/collection/collection_items.dart';
 import 'package:photos/models/selected_files.dart';
@@ -132,10 +132,7 @@ class _AlbumVerticalListWidgetState extends State<AlbumVerticalListWidget> {
 
         // Recent header
         if (hasRecentCollections && adjustedIndex == 0) {
-          return _buildSectionHeader(
-            context,
-            AppLocalizations.of(context).recent,
-          );
+          return _buildSectionHeader(context, context.strings.recent);
         }
 
         // Recent collections
@@ -243,9 +240,7 @@ class _AlbumVerticalListWidgetState extends State<AlbumVerticalListWidget> {
       if (!context.mounted) return;
       showShortToast(
         context,
-        AppLocalizations.of(
-          context,
-        ).addedSuccessfullyTo(albumName: item.displayName),
+        context.strings.addedSuccessfullyTo(albumName: item.displayName),
       );
       if (!context.mounted) return;
       Navigator.pop(context);
@@ -255,7 +250,7 @@ class _AlbumVerticalListWidgetState extends State<AlbumVerticalListWidget> {
   }
 
   Future<bool> _showAddToSharedAlbumSheet(BuildContext context) async {
-    final l10n = AppLocalizations.of(context);
+    final l10n = context.strings;
     final result = await showBottomSheetComponent<bool>(
       context: context,
       builder: (sheetContext) => BottomSheetComponent(
@@ -313,9 +308,9 @@ class _AlbumVerticalListWidgetState extends State<AlbumVerticalListWidget> {
     if (filesCount > 0) {
       final result = await showTextInputDialog(
         context,
-        title: AppLocalizations.of(context).albumTitle,
-        submitButtonLabel: AppLocalizations.of(context).ok,
-        hintText: AppLocalizations.of(context).enterAlbumName,
+        title: context.strings.albumTitle,
+        submitButtonLabel: context.strings.ok,
+        hintText: context.strings.enterAlbumName,
         onSubmit: (name) async {
           return await _nameAlbum(context, name);
         },
@@ -330,7 +325,7 @@ class _AlbumVerticalListWidgetState extends State<AlbumVerticalListWidget> {
       }
     } else {
       Navigator.pop(context);
-      showToast(context, AppLocalizations.of(context).createAlbumActionHint);
+      showToast(context, context.strings.createAlbumActionHint);
       Bus.instance.fire(
         TabChangedEvent(0, TabChangedEventSource.collectionsPage),
       );
@@ -409,31 +404,31 @@ class _AlbumVerticalListWidgetState extends State<AlbumVerticalListWidget> {
 
       if (widget.actionType == CollectionActionType.addFiles) {
         if (!context.mounted) return;
-        toastMessage = AppLocalizations.of(
-          context,
-        ).addedSuccessfullyTo(albumName: item.displayName);
+        toastMessage = context.strings.addedSuccessfullyTo(
+          albumName: item.displayName,
+        );
         shouldNavigateToCollection = true;
       } else if (widget.actionType == CollectionActionType.moveFiles ||
           widget.actionType == CollectionActionType.restoreFiles ||
           widget.actionType == CollectionActionType.unHide) {
         if (!context.mounted) return;
-        toastMessage = AppLocalizations.of(
-          context,
-        ).movedSuccessfullyTo(albumName: item.displayName);
+        toastMessage = context.strings.movedSuccessfullyTo(
+          albumName: item.displayName,
+        );
         shouldNavigateToCollection = true;
       } else if (widget.actionType ==
           CollectionActionType.moveToHiddenCollection) {
         if (!context.mounted) return;
-        toastMessage = AppLocalizations.of(
-          context,
-        ).movedSuccessfullyTo(albumName: item.displayName);
+        toastMessage = context.strings.movedSuccessfullyTo(
+          albumName: item.displayName,
+        );
         shouldNavigateToCollection = true;
         hasVerifiedLock = true;
       } else if (widget.actionType == CollectionActionType.addToHiddenAlbum) {
         if (!context.mounted) return;
-        toastMessage = AppLocalizations.of(
-          context,
-        ).addedSuccessfullyTo(albumName: item.displayName);
+        toastMessage = context.strings.addedSuccessfullyTo(
+          albumName: item.displayName,
+        );
         shouldNavigateToCollection = true;
         hasVerifiedLock = true;
       } else {
@@ -535,9 +530,9 @@ class _AlbumVerticalListWidgetState extends State<AlbumVerticalListWidget> {
     late final String message;
     if (widget.actionType == CollectionActionType.moveFiles ||
         widget.actionType == CollectionActionType.moveToHiddenCollection) {
-      message = AppLocalizations.of(context).movingFilesToAlbum;
+      message = context.strings.movingFilesToAlbum;
     } else {
-      message = AppLocalizations.of(context).unhidingFilesToAlbum;
+      message = context.strings.unhidingFilesToAlbum;
     }
 
     final dialog = createProgressDialog(context, message, isDismissible: true);
@@ -560,11 +555,7 @@ class _AlbumVerticalListWidgetState extends State<AlbumVerticalListWidget> {
       await dialog.hide();
       if (!context.mounted) return false;
       // ignore: unawaited_futures
-      showErrorDialog(
-        context,
-        AppLocalizations.of(context).oops,
-        e.message as String?,
-      );
+      showErrorDialog(context, context.strings.oops, e.message as String?);
       return false;
     } catch (e, s) {
       _logger.severe("Could not move to album", e, s);
@@ -581,7 +572,7 @@ class _AlbumVerticalListWidgetState extends State<AlbumVerticalListWidget> {
   ) async {
     final dialog = createProgressDialog(
       context,
-      AppLocalizations.of(context).restoringFiles,
+      context.strings.restoringFiles,
       isDismissible: true,
     );
     await dialog.show();
@@ -599,11 +590,7 @@ class _AlbumVerticalListWidgetState extends State<AlbumVerticalListWidget> {
       await dialog.hide();
       if (!context.mounted) return false;
       // ignore: unawaited_futures
-      showErrorDialog(
-        context,
-        AppLocalizations.of(context).oops,
-        e.message as String?,
-      );
+      showErrorDialog(context, context.strings.oops, e.message as String?);
       return false;
     } catch (e, s) {
       _logger.severe("Could not move to album", e, s);

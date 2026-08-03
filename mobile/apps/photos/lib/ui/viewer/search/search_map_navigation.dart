@@ -1,7 +1,7 @@
 import "dart:async";
 
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/service_locator.dart";
 import "package:photos/services/search_service.dart";
 import "package:photos/ui/map/map_screen.dart";
@@ -18,7 +18,7 @@ Future<void> openSearchMap(BuildContext context) async {
       if (!context.mounted) {
         return;
       }
-      showShortToast(context, AppLocalizations.of(context).somethingWentWrong);
+      showShortToast(context, context.strings.somethingWentWrong);
       return;
     }
   }
