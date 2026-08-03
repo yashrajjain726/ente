@@ -195,7 +195,7 @@ struct EnteMemoryWidgetEntryView: View {
                             )
                     }
                 } else if let uiImage = UIImage(named: "MemoriesWidgetDefault") {
-                    VStack(spacing: 8) {
+                    VStack(spacing: 4) {
                         Spacer()
                         Image(uiImage: uiImage)
                             .resizable()
@@ -203,8 +203,15 @@ struct EnteMemoryWidgetEntryView: View {
                             .aspectRatio(contentMode: .fit)
                             .padding(8)
 
-                        Text("Go to Settings -> Widgets to customise the widget")
-                            .font(.custom("Inter", size: 12, relativeTo: .caption))
+                        Text("Memories")
+                            .font(.custom("Inter", size: 14, relativeTo: .caption))
+                            .bold()
+                            .foregroundStyle(.white)
+                            .multilineTextAlignment(.center)
+                            .backwardWidgetAccentable(true)
+
+                        Text("Click to customise")
+                            .font(.custom("Inter", size: 12, relativeTo: .caption2))
                             .foregroundStyle(.white)  // Tint-aware color
                             .multilineTextAlignment(.center)
                             .padding(.bottom, 12)
@@ -221,8 +228,9 @@ struct EnteMemoryWidgetEntryView: View {
             .edgesIgnoringSafeArea(.all)
             .widgetURL(
                 URL(
-                    string:
-                        "memorywidget://message?generatedId=\(entry.generatedId != nil ? String(entry.generatedId!) : "nan")&homeWidget"
+                    string: entry.generatedId != nil
+                        ? "memorywidget://message?generatedId=\(entry.generatedId!)&homeWidget"
+                        : "memorywidget://configure?homeWidget"
                 )
             )
         }

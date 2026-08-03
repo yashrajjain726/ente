@@ -124,6 +124,10 @@ class EntePeopleWidgetProvider : HomeWidgetProvider() {
                                                                 View.GONE
                                                         )
                                                         setViewVisibility(
+                                                                R.id.widget_placeholder_title,
+                                                                View.GONE
+                                                        )
+                                                        setViewVisibility(
                                                                 R.id.widget_placeholder_text,
                                                                 View.GONE
                                                         )
@@ -142,10 +146,15 @@ class EntePeopleWidgetProvider : HomeWidgetProvider() {
                                                         )
                                                 } else {
                                                         // Open App on Widget Click
+                                                        val deepLinkUri =
+                                                                Uri.parse(
+                                                                        "peoplewidget://configure?homeWidget"
+                                                                )
                                                         val pendingIntent =
                                                                 HomeWidgetLaunchIntent.getActivity(
                                                                         context,
-                                                                        MainActivity::class.java
+                                                                        MainActivity::class.java,
+                                                                        deepLinkUri
                                                                 )
                                                         setOnClickPendingIntent(
                                                                 R.id.widget_container,
@@ -174,6 +183,10 @@ class EntePeopleWidgetProvider : HomeWidgetProvider() {
                                                         )
                                                         setViewVisibility(
                                                                 R.id.widget_placeholder,
+                                                                View.VISIBLE
+                                                        )
+                                                        setViewVisibility(
+                                                                R.id.widget_placeholder_title,
                                                                 View.VISIBLE
                                                         )
                                                         setViewVisibility(
