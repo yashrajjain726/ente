@@ -443,6 +443,8 @@ Future<LocalDeletionResult> deleteLocalFilesAfterRemovingAlreadyDeletedIDs(
       );
       return const LocalDeletionResult(status: LocalDeletionStatus.failed);
     }
+    // Restricted gallery access can make an existing asset appear missing, so
+    // only use failed lookups as evidence of stale IDs with full access.
     if (permissionState != PermissionState.authorized) {
       _logger.warning(
         "Skipping stale-ID recovery because gallery permission is "
