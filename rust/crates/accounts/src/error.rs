@@ -1,51 +1,71 @@
-//! Shared error types for account flows.
-
 use ente_core::{b64, crypto, http};
 use thiserror::Error;
 
-use crate::auth;
-
-/// Result alias for the shared account crate.
 pub type Result<T> = std::result::Result<T, Error>;
 
-/// Errors emitted by the shared account crate.
 #[derive(Error, Debug)]
 pub enum Error {
-    /// HTTP/transport or server error.
     #[error(transparent)]
     Http(#[from] http::Error),
 
-    /// Serialization/deserialization error.
     #[error("Serialization error: {0}")]
     Serialization(#[from] serde_json::Error),
 
-    /// Wrapped cryptographic error.
-    #[error("Crypto error: {0}")]
-    Crypto(String),
+    #[error(transparent)]
+    Crypto(#[from] crypto::Error),
 
-    /// Account/authentication failure.
-    #[error("Authentication failed: {0}")]
-    AuthenticationFailed(String),
+    #[error("Decode error: {0}")]
+    Decode(String),
 
-    /// Invalid input.
-    #[error("Invalid input: {0}")]
-    InvalidInput(String),
+    #[error("Incorrect password")]
+    IncorrectPassword,
 
-    /// SRP-specific failure.
+    #[error("Incorrect recovery key")]
+    IncorrectRecoveryKey,
+
+    #[error("Invalid key attributes")]
+    InvalidKeyAttributes,
+
+    #[error("Failed to derive key (insufficient memory)")]
+    InsufficientMemory,
+
+    #[error("Missing required field: {0}")]
+    MissingField(&'static str),
+
+    #[error("Invalid key: {0}")]
+    InvalidKey(String),
+
     #[error("SRP error: {0}")]
     Srp(String),
 
-    /// Base64 decode error.
-    #[error("Base64 decode error: {0}")]
-    Base64Decode(#[from] b64::DecodeError),
+    #[error("Invalid input: {0}")]
+    InvalidInput(String),
 
-    /// Fallback catch-all.
+    #[error("Too many incorrect email verification attempts. Please wait and request a new code.")]
+    EmailVerificationRateLimited,
+
+    #[error("Too many incorrect TOTP attempts. Please restart login.")]
+    TotpRateLimited,
+
+    #[error("Second factor session expired. Please restart login.")]
+    SecondFactorSessionExpired,
+
+    #[error("Account key attributes are not available")]
+    MissingKeyAttributes,
+
+    #[error(
+        "Email already has server-side key state; use the existing account or recover the incomplete signup instead of creating a new account."
+    )]
+    AccountAlreadyExists,
+
     #[error("{0}")]
-    Generic(String),
+    Protocol(String),
+
+    #[error(transparent)]
+    Ui(Box<dyn std::error::Error + Send + Sync>),
 }
 
 impl Error {
-    /// Return the HTTP status code if the error came from the API.
     pub fn status_code(&self) -> Option<u16> {
         match self {
             Error::Http(error) => error.status_code(),
@@ -53,37 +73,14 @@ impl Error {
         }
     }
 
-    /// Convenience helper for matching one of several HTTP status codes.
     pub fn is_http_status(&self, statuses: &[u16]) -> bool {
         self.status_code()
             .is_some_and(|status| statuses.contains(&status))
     }
 }
 
-impl From<crypto::Error> for Error {
-    fn from(err: crypto::Error) -> Self {
-        match err {
-            crypto::Error::Io(source) => Error::Generic(source.to_string()),
-            other => Error::Crypto(other.to_string()),
-        }
-    }
-}
-
-impl From<auth::Error> for Error {
-    fn from(err: auth::Error) -> Self {
-        use auth::Error as E;
-        match err {
-            E::IncorrectPassword => Error::AuthenticationFailed("Incorrect password".to_string()),
-            E::IncorrectRecoveryKey => {
-                Error::AuthenticationFailed("Incorrect recovery key".to_string())
-            }
-            E::InvalidKeyAttributes => Error::Crypto(err.to_string()),
-            E::InsufficientMemory => Error::Crypto(err.to_string()),
-            E::MissingField(field) => Error::Crypto(format!("Missing field: {field}")),
-            E::Crypto(source) => source.into(),
-            E::Decode(msg) => Error::Crypto(msg),
-            E::InvalidKey(msg) => Error::Crypto(msg),
-            E::Srp(msg) => Error::Srp(msg),
-        }
+impl From<b64::DecodeError> for Error {
+    fn from(err: b64::DecodeError) -> Self {
+        Error::Decode(err.to_string())
     }
 }

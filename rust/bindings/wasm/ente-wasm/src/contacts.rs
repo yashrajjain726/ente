@@ -1,5 +1,3 @@
-//! WASM bindings for contacts sync and attachment reads.
-
 use ente_accounts::auth::KeyAttributes;
 use ente_contacts::{
     ContactsCtx, LegacyContactState, OpenContactsCtxInput, RootKeySource, WrappedRootContactKey,
@@ -43,8 +41,8 @@ impl From<ContactsError> for JsValue {
     }
 }
 
-impl From<ente_contacts::ContactsError> for ContactsError {
-    fn from(e: ente_contacts::ContactsError) -> Self {
+impl From<ente_contacts::Error> for ContactsError {
+    fn from(e: ente_contacts::Error) -> Self {
         use ente_contacts::ErrorKind as K;
         let message = ente_core::error::chain(&e);
         match e.kind() {
@@ -122,7 +120,6 @@ impl From<ente_contacts::ContactRecord> for ContactRecordJs {
     }
 }
 
-/// Open contacts context for web.
 #[wasm_bindgen]
 pub async fn contacts_open_ctx(input: JsValue) -> Result<JsValue, ContactsError> {
     let input: OpenContactsCtxJsInput = swb::from_value(input)?;
@@ -168,7 +165,6 @@ pub async fn contacts_open_ctx(input: JsValue) -> Result<JsValue, ContactsError>
     Ok(output.into())
 }
 
-/// Handle to an open contacts context.
 #[wasm_bindgen]
 pub struct ContactsCtxHandle {
     inner: ContactsCtx,
@@ -176,17 +172,14 @@ pub struct ContactsCtxHandle {
 
 #[wasm_bindgen]
 impl ContactsCtxHandle {
-    /// Update auth token without rebuilding the contacts context.
     pub fn update_auth_token(&self, auth_token: String) {
         self.inner.update_auth_token(auth_token);
     }
 
-    /// Return the wrapped root key currently held by this context, if resolved.
     pub fn current_wrapped_root_contact_key(&self) -> Result<JsValue, ContactsError> {
         swb::to_value(&self.inner.current_wrapped_root_contact_key()).map_err(Into::into)
     }
 
-    /// Pull a diff page of contacts.
     pub async fn get_diff(&self, since_time: i64, limit: u16) -> Result<JsValue, ContactsError> {
         let diff: Vec<ContactRecordJs> = self
             .inner
@@ -198,7 +191,6 @@ impl ContactsCtxHandle {
         swb::to_value(&diff).map_err(Into::into)
     }
 
-    /// Fetch and decrypt the profile picture bytes for a contact.
     pub async fn get_profile_picture(&self, contact_id: &str) -> Result<Vec<u8>, ContactsError> {
         self.inner
             .get_profile_picture(contact_id)
@@ -206,26 +198,22 @@ impl ContactsCtxHandle {
             .map_err(Into::into)
     }
 
-    /// Fetch legacy/emergency contact info for the current user.
     pub async fn legacy_get_info(&self) -> Result<JsValue, ContactsError> {
         let info = self.inner.legacy_info().await?;
         swb::to_value(&info).map_err(Into::into)
     }
 
-    /// Lookup a user's public key by email for legacy verify/add flows.
     pub async fn legacy_public_key(&self, email: String) -> Result<JsValue, ContactsError> {
         let public_key = self.inner.legacy_public_key(&email).await?;
         swb::to_value(&public_key).map_err(Into::into)
     }
 
-    /// Generate the mnemonic-style verification ID for a public key.
     pub fn legacy_verification_id(&self, public_key_b64: String) -> Result<String, ContactsError> {
         self.inner
             .legacy_verification_id(&public_key_b64)
             .map_err(Into::into)
     }
 
-    /// Add a trusted legacy contact after sealing the current user's recovery key in Rust.
     pub async fn legacy_add_contact(
         &self,
         email: String,
@@ -239,7 +227,6 @@ impl ContactsCtxHandle {
             .map_err(Into::into)
     }
 
-    /// Update a legacy contact relationship state.
     pub async fn legacy_update_contact(
         &self,
         user_id: i64,
@@ -253,7 +240,6 @@ impl ContactsCtxHandle {
             .map_err(Into::into)
     }
 
-    /// Update the notice period for an existing trusted contact.
     pub async fn legacy_update_recovery_notice(
         &self,
         emergency_contact_id: i64,
@@ -265,7 +251,6 @@ impl ContactsCtxHandle {
             .map_err(Into::into)
     }
 
-    /// Start a recovery flow as the trusted contact.
     pub async fn legacy_start_recovery(
         &self,
         user_id: i64,
@@ -277,7 +262,6 @@ impl ContactsCtxHandle {
             .map_err(Into::into)
     }
 
-    /// Stop a recovery flow as the trusted contact.
     pub async fn legacy_stop_recovery(
         &self,
         recovery_id: String,
@@ -290,7 +274,6 @@ impl ContactsCtxHandle {
             .map_err(Into::into)
     }
 
-    /// Reject a recovery flow as the account owner.
     pub async fn legacy_reject_recovery(
         &self,
         recovery_id: String,
@@ -303,7 +286,6 @@ impl ContactsCtxHandle {
             .map_err(Into::into)
     }
 
-    /// Approve a recovery flow as the account owner.
     pub async fn legacy_approve_recovery(
         &self,
         recovery_id: String,
@@ -316,7 +298,6 @@ impl ContactsCtxHandle {
             .map_err(Into::into)
     }
 
-    /// Fetch and decrypt the recovery payload for a ready session.
     pub async fn legacy_recovery_bundle(
         &self,
         recovery_id: String,
@@ -334,7 +315,6 @@ impl ContactsCtxHandle {
         .map_err(Into::into)
     }
 
-    /// Complete the legacy password reset flow fully in Rust.
     pub async fn legacy_change_password(
         &self,
         recovery_id: String,

@@ -10,7 +10,7 @@ use srp::ClientG4096;
 use subtle::ConstantTimeEq;
 use zeroize::Zeroize;
 
-use super::{Error, Result};
+use crate::error::{Error, Result};
 
 /// SRP session for password-based authentication.
 ///

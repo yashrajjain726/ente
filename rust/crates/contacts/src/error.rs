@@ -1,9 +1,8 @@
-use ente_accounts::auth;
 use ente_core::{b64, crypto, http};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
-pub enum ContactsError {
+pub enum Error {
     #[error(transparent)]
     Http(#[from] http::Error),
 
@@ -14,7 +13,7 @@ pub enum ContactsError {
     Base64Decode(#[from] b64::DecodeError),
 
     #[error(transparent)]
-    Auth(#[from] auth::Error),
+    Accounts(#[from] ente_accounts::Error),
 
     #[error("invalid input: {0}")]
     InvalidInput(String),
@@ -46,30 +45,29 @@ pub enum ErrorKind {
     ActiveRecoverySession,
 }
 
-impl ContactsError {
+impl Error {
     pub fn kind(&self) -> ErrorKind {
         match self {
-            ContactsError::Http(http::Error::Network(_)) => ErrorKind::Network,
-            ContactsError::Http(http::Error::Parse(_)) => ErrorKind::Parse,
-            ContactsError::Http(_) => ErrorKind::Http,
-            ContactsError::Crypto(_) => ErrorKind::Crypto,
-            ContactsError::Base64Decode(_) => ErrorKind::Crypto,
-            ContactsError::Auth(_) => ErrorKind::Auth,
-            ContactsError::InvalidInput(_) => ErrorKind::InvalidInput,
-            ContactsError::MissingEncryptedData => ErrorKind::MissingEncryptedData,
-            ContactsError::MissingEncryptedKey => ErrorKind::MissingEncryptedKey,
-            ContactsError::ProfilePictureNotFound => ErrorKind::ProfilePictureNotFound,
-            ContactsError::ActiveRecoverySession => ErrorKind::ActiveRecoverySession,
+            Error::Http(http::Error::Network(_)) => ErrorKind::Network,
+            Error::Http(http::Error::Parse(_)) => ErrorKind::Parse,
+            Error::Http(_) => ErrorKind::Http,
+            Error::Crypto(_) => ErrorKind::Crypto,
+            Error::Base64Decode(_) => ErrorKind::Crypto,
+            Error::Accounts(_) => ErrorKind::Auth,
+            Error::InvalidInput(_) => ErrorKind::InvalidInput,
+            Error::MissingEncryptedData => ErrorKind::MissingEncryptedData,
+            Error::MissingEncryptedKey => ErrorKind::MissingEncryptedKey,
+            Error::ProfilePictureNotFound => ErrorKind::ProfilePictureNotFound,
+            Error::ActiveRecoverySession => ErrorKind::ActiveRecoverySession,
         }
     }
 
-    /// The HTTP status, when the server answered with one.
     pub fn status(&self) -> Option<u16> {
         match self {
-            ContactsError::Http(error) => error.status_code(),
+            Error::Http(error) => error.status_code(),
             _ => None,
         }
     }
 }
 
-pub type Result<T> = std::result::Result<T, ContactsError>;
+pub type Result<T> = std::result::Result<T, Error>;

@@ -364,15 +364,10 @@ where
                 .get_session_validity()
                 .await?
                 .key_attributes
-                .ok_or_else(|| {
-                    Error::AuthenticationFailed(
-                        "Account keys are not available for two-factor setup".into(),
-                    )
-                })?
+                .ok_or(Error::MissingKeyAttributes)?
         };
 
-        let recovery_key =
-            get_recovery_key(&params.master_key, &key_attributes).map_err(Error::from)?;
+        let recovery_key = get_recovery_key(&params.master_key, &key_attributes)?;
 
         let secret = self.client.setup_two_factor().await?;
         self.ui
@@ -453,7 +448,7 @@ where
             mismatches.push("opsLimit");
         }
         if !mismatches.is_empty() {
-            return Err(Error::AuthenticationFailed(format!(
+            return Err(Error::Protocol(format!(
                 "Remote SRP attributes mismatched after password change: {}",
                 mismatches.join(", ")
             )));
@@ -557,11 +552,11 @@ where
             &crypto::Nonce::try_from_slice(&nonce)?,
             &crypto::Key::try_from_slice(&recovery_key)?,
         )
-        .map_err(|_| Error::AuthenticationFailed("Incorrect recovery key".into()))?;
+        .map_err(|_| Error::IncorrectRecoveryKey)?;
         let request = RemoveTwoFactorRequest {
             session_id: session_id.to_string(),
             secret: String::from_utf8(secret)
-                .map_err(|e| Error::Crypto(format!("invalid recovery secret: {e}")))?,
+                .map_err(|e| Error::Protocol(format!("invalid recovery secret: {e}")))?,
             two_factor_type,
         };
         self.client.remove_two_factor(&request).await
@@ -623,7 +618,7 @@ where
         let key_attributes = auth_response
             .key_attributes
             .clone()
-            .ok_or_else(|| Error::AuthenticationFailed("No key attributes".into()))?;
+            .ok_or(Error::MissingKeyAttributes)?;
         let secrets = decrypt_auth_response(&auth_response, &key_attributes, kek)?;
         let public_key = b64::decode(&key_attributes.public_key)?;
         let recovery_key = get_recovery_key(&secrets.master_key, &key_attributes).ok();
@@ -669,7 +664,7 @@ where
         key_derivation_strength: KeyDerivationStrength,
     ) -> Result<AuthenticatedAccount> {
         let token = verification.token.clone().ok_or_else(|| {
-            Error::AuthenticationFailed("Signup verification did not return a session token".into())
+            Error::Protocol("Signup verification did not return a session token".into())
         })?;
 
         self.client.set_auth_token(Some(token.clone()));
@@ -681,9 +676,7 @@ where
             || session_validity.has_set_keys
             || session_validity.key_attributes.is_some()
         {
-            return Err(Error::AuthenticationFailed(
-                "Email already has server-side key state; use the existing account or recover the incomplete signup instead of creating a new account.".into(),
-            ));
+            return Err(Error::AccountAlreadyExists);
         }
 
         let key_gen_result = generate_keys_with_strength(&password, key_derivation_strength)?;
@@ -743,9 +736,7 @@ where
                     resent = false;
                 }
                 Err(error) if error.is_http_status(&[429]) => {
-                    return Err(Error::AuthenticationFailed(
-                        "Too many incorrect email verification attempts. Please wait and request a new code.".into(),
-                    ));
+                    return Err(Error::EmailVerificationRateLimited);
                 }
                 Err(error) if error.is_http_status(&[410]) => {
                     self.client
@@ -780,7 +771,7 @@ where
     async fn verify_totp(&mut self, auth_response: &AuthResponse) -> Result<AuthResponse> {
         let session_id = auth_response
             .get_two_factor_session_id()
-            .ok_or_else(|| Error::AuthenticationFailed("No 2FA session ID".into()))?;
+            .ok_or_else(|| Error::Protocol("No 2FA session ID".into()))?;
 
         loop {
             let code = self.ui.read_totp_code(TotpPurpose::Login)?;
@@ -791,14 +782,10 @@ where
                         .report_retryable_error("Incorrect TOTP code. Try again.")?;
                 }
                 Err(error) if error.is_http_status(&[429]) => {
-                    return Err(Error::AuthenticationFailed(
-                        "Too many incorrect TOTP attempts. Please restart login.".into(),
-                    ));
+                    return Err(Error::TotpRateLimited);
                 }
                 Err(error) if error.is_http_status(&[404, 410]) => {
-                    return Err(Error::AuthenticationFailed(
-                        "TOTP session expired. Please restart login.".into(),
-                    ));
+                    return Err(Error::SecondFactorSessionExpired);
                 }
                 Err(error) => return Err(error),
             }
@@ -810,7 +797,7 @@ where
             .passkey_session_id
             .as_ref()
             .filter(|session_id| !session_id.is_empty())
-            .ok_or_else(|| Error::AuthenticationFailed("No passkey session ID".into()))?;
+            .ok_or_else(|| Error::Protocol("No passkey session ID".into()))?;
 
         let accounts_url = auth_response
             .accounts_url
@@ -833,9 +820,7 @@ where
                 Ok(result) => return Ok(result),
                 Err(error) if error.is_http_status(&[400]) => {}
                 Err(error) if error.is_http_status(&[404, 410]) => {
-                    return Err(Error::AuthenticationFailed(
-                        "Passkey session expired. Please restart login.".into(),
-                    ));
+                    return Err(Error::SecondFactorSessionExpired);
                 }
                 Err(error) => return Err(error),
             }
@@ -871,7 +856,7 @@ where
             .complete_srp_setup(&response.setup_id, &srp_m1)
             .await?;
         let srp_m2 = b64::decode(&complete.srp_m2)?;
-        srp_session.verify_m2(&srp_m2).map_err(Error::from)?;
+        srp_session.verify_m2(&srp_m2)?;
         Ok(())
     }
 
@@ -913,7 +898,7 @@ where
             .await?;
 
         let srp_m2 = b64::decode(&response.srp_m2)?;
-        srp_session.verify_m2(&srp_m2).map_err(Error::from)?;
+        srp_session.verify_m2(&srp_m2)?;
         Ok(response)
     }
 }
@@ -957,7 +942,7 @@ fn pad_left(data: &[u8], len: usize) -> Vec<u8> {
 fn decode_plain_token(token: &str) -> Result<SecretVec> {
     let bytes = b64::decode_url_safe(token)
         .or_else(|_| b64::decode(token))
-        .map_err(|e| Error::Crypto(format!("token: {e}")))?;
+        .map_err(|e| Error::Decode(format!("token: {e}")))?;
     Ok(SecretVec::new(bytes))
 }
 
@@ -967,7 +952,7 @@ fn decrypt_auth_response(
     kek: &[u8],
 ) -> Result<DecryptedSecrets> {
     if let Some(encrypted_token) = auth_response.encrypted_token.as_deref() {
-        auth::decrypt_secrets(kek, key_attributes, encrypted_token).map_err(Error::from)
+        auth::decrypt_secrets(kek, key_attributes, encrypted_token)
     } else if let Some(token) = auth_response.token.as_deref() {
         let (master_key, secret_key) = auth::decrypt_keys_only(kek, key_attributes)?;
         Ok(DecryptedSecrets {
@@ -976,7 +961,7 @@ fn decrypt_auth_response(
             token: decode_plain_token(token)?,
         })
     } else {
-        Err(Error::AuthenticationFailed("No token in response".into()))
+        Err(Error::Protocol("No token in response".into()))
     }
 }
 
@@ -1006,7 +991,7 @@ fn validate_remote_srp_attributes(
     }
 
     if !mismatches.is_empty() {
-        return Err(Error::AuthenticationFailed(format!(
+        return Err(Error::Protocol(format!(
             "Remote SRP attributes mismatched after signup: {}",
             mismatches.join(", ")
         )));
@@ -1021,7 +1006,7 @@ fn encrypt_two_factor_secret(
     code: &str,
 ) -> Result<EnableTwoFactorRequest> {
     let recovery_key =
-        hex::decode(recovery_key_hex).map_err(|e| Error::Crypto(format!("recovery_key: {e}")))?;
+        hex::decode(recovery_key_hex).map_err(|e| Error::Decode(format!("recovery_key: {e}")))?;
     let encrypted = secretbox::encrypt(
         secret_code.as_bytes(),
         &crypto::Key::try_from_slice(&recovery_key)?,
@@ -1372,12 +1357,7 @@ mod tests {
             .unwrap_err();
 
         match error {
-            Error::AuthenticationFailed(message) => {
-                assert_eq!(
-                    message,
-                    "Too many incorrect email verification attempts. Please wait and request a new code."
-                );
-            }
+            Error::EmailVerificationRateLimited => {}
             other => panic!("unexpected error: {other:?}"),
         }
         assert!(ui.retryable_errors.is_empty());
@@ -1461,9 +1441,7 @@ mod tests {
             .unwrap_err();
 
         match error {
-            Error::AuthenticationFailed(message) => {
-                assert_eq!(message, "TOTP session expired. Please restart login.");
-            }
+            Error::SecondFactorSessionExpired => {}
             other => panic!("unexpected error: {other:?}"),
         }
 
@@ -1547,12 +1525,7 @@ mod tests {
             .unwrap_err();
 
         match error {
-            Error::AuthenticationFailed(message) => {
-                assert_eq!(
-                    message,
-                    "Too many incorrect TOTP attempts. Please restart login."
-                );
-            }
+            Error::TotpRateLimited => {}
             other => panic!("unexpected error: {other:?}"),
         }
         assert!(ui.retryable_errors.is_empty());
@@ -1742,9 +1715,7 @@ mod tests {
             .unwrap_err();
 
         match error {
-            Error::AuthenticationFailed(message) => {
-                assert_eq!(message, "Passkey session expired. Please restart login.");
-            }
+            Error::SecondFactorSessionExpired => {}
             other => panic!("unexpected error: {other:?}"),
         }
         assert!(ui.passkey_presented);

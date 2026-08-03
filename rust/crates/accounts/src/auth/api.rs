@@ -10,7 +10,8 @@ use ente_core::crypto::{self, Salt, SecretVec, argon, kdf, sealed, secretbox};
 use sha2::Sha256;
 use srp::ClientG4096;
 
-use super::{Error, KeyAttributes, Result, SrpAttributes};
+use super::{KeyAttributes, SrpAttributes};
+use crate::error::{Error, Result};
 
 /// Credentials derived from password for SRP authentication.
 pub struct SrpCredentials {
