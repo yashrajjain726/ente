@@ -68,7 +68,7 @@ impl Museum {
 
         let result = (|| {
             let object_store = ObjectStore::start()?;
-            server::write_config(&museum_config_file, &object_store.endpoint())?;
+            server::write_config(&museum_config_file)?;
             let postgres = postgres::start()?;
             let server = server::start(
                 &server_dir,
@@ -77,6 +77,7 @@ impl Museum {
                 museum_port,
                 &museum_bin,
                 &postgres,
+                &object_store.endpoint(),
             )?;
             Ok((postgres, object_store, server))
         })();
