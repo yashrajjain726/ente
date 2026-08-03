@@ -64,7 +64,7 @@ export const CustomHead: React.FC<React.PropsWithChildren<CustomHeadProps>> = ({
 export const CustomHeadAlbumsStatic: React.FC = () => (
     <Head>
         <AlbumsFontPreloads />
-        <title>{albumsPreviewTitle}</title>
+        <title>Ente Photos</title>
         <link rel="icon" href="/images/favicon.png" type="image/png" />
         <meta name="description" content={albumsPreviewDescription} />
         <meta property="og:type" content="website" />
