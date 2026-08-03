@@ -539,10 +539,10 @@ You can also try opening photos.ente.com in an incognito or private window to ru
 
 - **In progress**: Files currently being prepared or uploaded.
 - **Completed**: Files uploaded successfully.
-- **Skipped**: Files not uploaded, with reason filters such as **Already on Ente** and **Hidden file**.
+- **Skipped**: Files not uploaded. While the upload is active, you can filter them by reasons such as **Already on Ente** and **Hidden file**.
 - **Failed**: Files whose upload attempt failed.
 
-After the upload finishes, click **Review items**, open **Failed**, and review the filenames and error status. Click **Retry failed uploads** to try those files again. Skipped items are not retryable failures; open their reason filter to understand why they were skipped.
+After the upload finishes, click **Review items**, open **Failed**, and review the filenames and error status. Click **Retry failed uploads** to try those files again. Skipped items are not retryable failures; review the reason shown beside each filename to understand why it was skipped.
 
 ![Failed upload details with the retry button](../migration/from-local-hard-disk/failed-upload-review.webp)
 
