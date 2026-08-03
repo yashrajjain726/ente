@@ -59,12 +59,6 @@ export_languages:
 files:
   - source: /lib/l10n/arb/strings_en.arb
     translation: /lib/l10n/arb/strings_%two_letters_code%.arb
-    excluded_target_languages:
-      - af
-      - kn
-      - ms-BN
-      - te
-      - uz
     languages_mapping:
       two_letters_code:
         ckb: ckb
