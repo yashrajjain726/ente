@@ -105,9 +105,7 @@ class _AddLocationSheetState extends State<AddLocationSheet> {
           Padding(
             padding: const EdgeInsets.only(bottom: 16),
             child: BottomOfTitleBarWidget(
-              title: TitleBarTitleWidget(
-                title: StringsLocalizations.of(context).addLocation,
-              ),
+              title: TitleBarTitleWidget(title: context.strings.addLocation),
             ),
           ),
           Expanded(
@@ -126,9 +124,7 @@ class _AddLocationSheetState extends State<AddLocationSheet> {
                           children: [
                             Expanded(
                               child: TextInputWidget(
-                                hintText: StringsLocalizations.of(
-                                  context,
-                                ).locationName,
+                                hintText: context.strings.locationName,
                                 focusNode: _focusNode,
                                 submitNotifier: _submitNotifer,
                                 cancelNotifier: _cancelNotifier,
@@ -152,9 +148,8 @@ class _AddLocationSheetState extends State<AddLocationSheet> {
                                     key: ValueKey(value),
                                     buttonType: ButtonType.secondary,
                                     buttonSize: ButtonSize.small,
-                                    labelText: StringsLocalizations.of(
-                                      context,
-                                    ).addLocationButton,
+                                    labelText:
+                                        context.strings.addLocationButton,
                                     isDisabled: value,
                                     onTap: () async {
                                       _focusNode.unfocus();
@@ -171,9 +166,7 @@ class _AddLocationSheetState extends State<AddLocationSheet> {
                         if (widget.name.isEmpty) const SizedBox(height: 16),
                         if (widget.name.isEmpty)
                           Text(
-                            StringsLocalizations.of(
-                              context,
-                            ).locationTagFeatureDescription,
+                            context.strings.locationTagFeatureDescription,
                             style: textTheme.smallMuted,
                           ),
                       ],
@@ -204,7 +197,7 @@ class _AddLocationSheetState extends State<AddLocationSheet> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  StringsLocalizations.of(context).memoryCount(
+                                  context.strings.memoryCount(
                                     count: value,
                                     formattedCount: NumberFormat().format(
                                       value,
@@ -216,9 +209,7 @@ class _AddLocationSheetState extends State<AddLocationSheet> {
                                   Padding(
                                     padding: const EdgeInsets.only(top: 2),
                                     child: Text(
-                                      StringsLocalizations.of(
-                                        context,
-                                      ).galleryMemoryLimitInfo,
+                                      context.strings.galleryMemoryLimitInfo,
                                       style: textTheme.miniMuted,
                                     ),
                                   ),

@@ -30,7 +30,7 @@ class _FreeSpacePageState extends State<FreeSpacePage> {
     return Scaffold(
       backgroundColor: context.componentColors.backgroundBase,
       body: AppBarComponent(
-        title: StringsLocalizations.of(context).freeUpDeviceSpace,
+        title: context.strings.freeUpDeviceSpace,
         backgroundColor: context.componentColors.backgroundBase,
         slivers: [
           SliverSafeArea(
@@ -53,7 +53,7 @@ class _FreeSpacePageState extends State<FreeSpacePage> {
     final count = status.localIDs.length;
     final formattedCount = NumberFormat().format(count);
     final formattedSize = formatBytes(status.size);
-    final l10n = StringsLocalizations.of(context);
+    final l10n = context.strings;
     final colors = context.componentColors;
 
     return Padding(
@@ -124,7 +124,7 @@ class _FreeSpacePageState extends State<FreeSpacePage> {
       Navigator.of(context).pop(true);
     } else {
       if (!mounted) return;
-      showToast(context, StringsLocalizations.of(context).couldNotFreeUpSpace);
+      showToast(context, context.strings.couldNotFreeUpSpace);
     }
   }
 
@@ -132,7 +132,7 @@ class _FreeSpacePageState extends State<FreeSpacePage> {
     BuildContext context,
     FreeableSpaceInfo status,
   ) async {
-    final l10n = StringsLocalizations.of(context);
+    final l10n = context.strings;
     await showBottomSheetComponent(
       context: context,
       builder: (_) => BottomSheetComponent(

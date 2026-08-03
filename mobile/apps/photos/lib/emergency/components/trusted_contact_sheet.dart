@@ -55,7 +55,7 @@ class _TrustedContactSheetState extends State<TrustedContactSheet> {
   Widget build(BuildContext context) {
     final colorScheme = getEnteColorScheme(context);
     final textTheme = getEnteTextTheme(context);
-    final l10n = StringsLocalizations.of(context);
+    final l10n = context.strings;
 
     final isPending = widget.contact.isPendingInvite();
     final email = widget.contact.emergencyContact.email;

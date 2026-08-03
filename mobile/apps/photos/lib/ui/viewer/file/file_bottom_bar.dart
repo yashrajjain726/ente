@@ -118,7 +118,7 @@ class FileBottomBarState extends State<FileBottomBar> {
       if (isOwnedByUser) {
         children.add(
           Tooltip(
-            message: StringsLocalizations.of(context).delete,
+            message: context.strings.delete,
             child: Padding(
               padding: const EdgeInsets.only(top: 12),
               child: IconButton(
@@ -149,7 +149,7 @@ class FileBottomBarState extends State<FileBottomBar> {
 
       children.add(
         Tooltip(
-          message: StringsLocalizations.of(context).share,
+          message: context.strings.share,
           child: Padding(
             padding: const EdgeInsets.only(top: 12),
             child: IconButton(
@@ -171,7 +171,7 @@ class FileBottomBarState extends State<FileBottomBar> {
       if (widget.file.isUploaded && !isFileHidden) {
         children.add(
           Tooltip(
-            message: StringsLocalizations.of(context).addToAlbum,
+            message: context.strings.addToAlbum,
             child: Padding(
               padding: const EdgeInsets.only(top: 12),
               child: IconButton(
@@ -248,7 +248,7 @@ class FileBottomBarState extends State<FileBottomBar> {
   void _addTrashOptions(List<Widget> children) {
     children.add(
       Tooltip(
-        message: StringsLocalizations.of(context).restore,
+        message: context.strings.restore,
         child: Padding(
           padding: const EdgeInsets.only(top: 12),
           child: IconButton(
@@ -269,7 +269,7 @@ class FileBottomBarState extends State<FileBottomBar> {
 
     children.add(
       Tooltip(
-        message: StringsLocalizations.of(context).delete,
+        message: context.strings.delete,
         child: Padding(
           padding: const EdgeInsets.only(top: 12),
           child: IconButton(
@@ -293,7 +293,7 @@ class FileBottomBarState extends State<FileBottomBar> {
 
   Widget _buildSuggestDeleteButton(Collection collection) {
     return Tooltip(
-      message: StringsLocalizations.of(context).suggestDeletion,
+      message: context.strings.suggestDeletion,
       child: Padding(
         padding: const EdgeInsets.only(top: 12),
         child: IconButton(

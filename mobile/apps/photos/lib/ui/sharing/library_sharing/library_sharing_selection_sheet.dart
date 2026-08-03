@@ -45,7 +45,7 @@ class LibrarySharingSelectionSheet extends StatelessWidget {
                 ? LibrarySharingStrings.shareAlbumCount(
                     controller.selectedCount,
                   )
-                : StringsLocalizations.of(context).save,
+                : context.strings.save,
             density: ButtonComponentDensity.compact,
             isDisabled: !controller.canApply,
             onTap: onApply,
@@ -83,7 +83,7 @@ class LibrarySharingSelectionSheet extends StatelessWidget {
   }
 
   Widget _summary(BuildContext context) {
-    final l10n = StringsLocalizations.of(context);
+    final l10n = context.strings;
     final selectableAlbumCount = controller.selectableAlbumCount;
     final allSelected =
         selectableAlbumCount > 0 &&

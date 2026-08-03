@@ -31,8 +31,8 @@ class AddOnPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       body: AppBarComponent(
-        title: StringsLocalizations.of(context).addOns,
-        subtitle: StringsLocalizations.of(context).addOnPageSubtitle,
+        title: context.strings.addOns,
+        subtitle: context.strings.addOnPageSubtitle,
         slivers: <Widget>[
           SliverPadding(
             padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 16),
@@ -83,7 +83,7 @@ class AddOnViewSection extends StatelessWidget {
             ),
             if (bonus.validTill != 0)
               Text(
-                StringsLocalizations.of(context).validTill(
+                context.strings.validTill(
                   endDate:
                       DateFormat.yMMMd(
                             Localizations.localeOf(context).languageCode,

@@ -14,7 +14,7 @@ class ReceivedEmptyState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.componentColors;
-    final strings = StringsLocalizations.of(context);
+    final strings = context.strings;
     final bottomPadding = 64 + MediaQuery.paddingOf(context).bottom + 32;
     final features = [
       strings.albumsReceivedEmptyFeatureSharedByOthers,

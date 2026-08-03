@@ -47,7 +47,7 @@ class _PairWithAutoSheetState extends State<_PairWithAutoSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = StringsLocalizations.of(context);
+    final l10n = context.strings;
     final textStyles = getEnteTextTheme(context);
     final body = Platform.isIOS
         ? "${l10n.autoCastDialogBody}\n\n${l10n.autoCastiOSPermission}"
@@ -166,7 +166,7 @@ class _PairWithAutoSheetState extends State<_PairWithAutoSheet> {
   }
 
   Future<void> _confirmStopCasting(Object device) async {
-    final l10n = StringsLocalizations.of(context);
+    final l10n = context.strings;
     await showBottomSheetComponent<void>(
       context: context,
       builder: (sheetContext) => BottomSheetComponent(
@@ -201,7 +201,7 @@ class _PairWithAutoSheetState extends State<_PairWithAutoSheet> {
   }
 
   Future<void> _handleError(Object error, StackTrace stackTrace) async {
-    final l10n = StringsLocalizations.of(context);
+    final l10n = context.strings;
     _logger.severe("Failed to pair automatically", error, stackTrace);
     if (error is CastIPMismatchException) {
       await showErrorDialog(

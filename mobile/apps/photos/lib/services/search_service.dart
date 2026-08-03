@@ -928,9 +928,9 @@ class SearchService {
     final Map<LocalEntity<LocationTag>, List<EnteFile>> result = {};
     final normalizedQuery = query.toLowerCase();
     if (!context.mounted) return const [];
-    final noLocationName = StringsLocalizations.of(context).noLocation;
+    final noLocationName = context.strings.noLocation;
     if (!context.mounted) return const [];
-    final noLocationTagName = StringsLocalizations.of(context).noLocationTag;
+    final noLocationTagName = context.strings.noLocationTag;
     final normalizedNoLocationName = noLocationName.toLowerCase();
     final normalizedNoLocationTagName = noLocationTagName.toLowerCase();
     final disambiguationPrefixLength = min(

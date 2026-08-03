@@ -470,25 +470,17 @@ class _PersonGallerySuggestionState extends State<PersonGallerySuggestion>
                             text: TextSpan(
                               style: textTheme.body,
                               children: [
-                                TextSpan(
-                                  text: StringsLocalizations.of(
-                                    context,
-                                  ).areThey,
-                                ),
+                                TextSpan(text: context.strings.areThey),
                                 TextSpan(
                                   text: relevantPerson.data.name,
                                   style: textTheme.bodyBold,
                                 ),
-                                TextSpan(
-                                  text: StringsLocalizations.of(
-                                    context,
-                                  ).questionmark,
-                                ),
+                                TextSpan(text: context.strings.questionmark),
                               ],
                             ),
                           )
                         : Text(
-                            StringsLocalizations.of(context).sameperson,
+                            context.strings.sameperson,
                             style: textTheme.body,
                             textAlign: TextAlign.center,
                           ),
@@ -527,7 +519,7 @@ class _PersonGallerySuggestionState extends State<PersonGallerySuggestion>
                                   ),
                                   const SizedBox(width: 8),
                                   Text(
-                                    StringsLocalizations.of(context).no,
+                                    context.strings.no,
                                     style:
                                         (personPage
                                                 ? textTheme.bodyBold
@@ -566,7 +558,7 @@ class _PersonGallerySuggestionState extends State<PersonGallerySuggestion>
                                   ),
                                   const SizedBox(width: 8),
                                   Text(
-                                    StringsLocalizations.of(context).yes,
+                                    context.strings.yes,
                                     style:
                                         (personPage
                                                 ? textTheme.bodyBold
@@ -593,9 +585,7 @@ class _PersonGallerySuggestionState extends State<PersonGallerySuggestion>
                             horizontal: 32,
                           ),
                           child: Text(
-                            StringsLocalizations.of(
-                              context,
-                            ).saveAsAnotherPerson,
+                            context.strings.saveAsAnotherPerson,
                             style: textTheme.mini.copyWith(
                               color: colorScheme.textMuted,
                               decoration: TextDecoration.underline,

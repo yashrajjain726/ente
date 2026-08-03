@@ -34,7 +34,7 @@ class _GallerySettingsScreenState extends State<GallerySettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = StringsLocalizations.of(context);
+    final l10n = context.strings;
 
     return SettingsPageScaffold(
       title: l10n.gallery,
@@ -84,7 +84,7 @@ class _GallerySettingsScreenState extends State<GallerySettingsScreen> {
   }
 
   Future<void> _showPhotoGridSizeSheet(BuildContext context) async {
-    final l10n = StringsLocalizations.of(context);
+    final l10n = context.strings;
     await showBottomSheetComponent<void>(
       context: context,
       builder: (sheetContext) => BottomSheetComponent(
@@ -129,7 +129,7 @@ class _GallerySettingsScreenState extends State<GallerySettingsScreen> {
   }
 
   Future<void> _showGroupTypeSheet(BuildContext context) async {
-    final l10n = StringsLocalizations.of(context);
+    final l10n = context.strings;
     final currentGroupType = localSettings.getGalleryGroupType();
     await showBottomSheetComponent<void>(
       context: context,

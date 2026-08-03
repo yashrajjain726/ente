@@ -83,7 +83,7 @@ class _ArchivePageState extends State<ArchivePage> {
         .getHiddenCollectionIds();
     final appBar = GalleryAppBarWidget.sliverConfig(
       widget.appBarType,
-      StringsLocalizations.of(context).archive,
+      context.strings.archive,
       _selectedFiles,
     );
     final gallery = Gallery(
@@ -127,9 +127,7 @@ class _ArchivePageState extends State<ArchivePage> {
       emptyState: _archivedCollections.isEmpty
           ? EmptyStateComponent(
               assetPath: "assets/empty_state_archive.png",
-              title: StringsLocalizations.of(
-                context,
-              ).archivedItemsWillShowUpHere,
+              title: context.strings.archivedItemsWillShowUpHere,
             )
           : const SizedBox.shrink(),
       header: AlbumHorizontalList(
@@ -141,9 +139,7 @@ class _ArchivePageState extends State<ArchivePage> {
               CollectionListPage(
                 _archivedCollections,
                 sectionType: UISectionType.archivedCollections,
-                appTitle: Text(
-                  StringsLocalizations.of(context).archiveCollectionName,
-                ),
+                appTitle: Text(context.strings.archiveCollectionName),
                 tag: "archived",
               ),
             );

@@ -622,10 +622,7 @@ class _VideoWidgetNativeState extends State<VideoWidgetNative>
             _progressNotifier.value = count / (widget.file.fileSize ?? total);
             if (_progressNotifier.value == 1) {
               if (mounted) {
-                showShortToast(
-                  context,
-                  StringsLocalizations.of(context).decryptingVideo,
-                );
+                showShortToast(context, context.strings.decryptingVideo);
               }
             }
           },
@@ -639,8 +636,8 @@ class _VideoWidgetNativeState extends State<VideoWidgetNative>
           if (!mounted) return;
           showErrorDialog(
             context,
-            StringsLocalizations.of(context).error,
-            StringsLocalizations.of(context).failedToDownloadVideo,
+            context.strings.error,
+            context.strings.failedToDownloadVideo,
           );
         });
   }

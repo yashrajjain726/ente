@@ -77,7 +77,7 @@ class _InviteMembersPageState extends State<InviteMembersPage> {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = StringsLocalizations.of(context);
+    final l10n = context.strings;
     final textTheme = getEnteTextTheme(context);
 
     return FamilyPageScaffold(
@@ -125,7 +125,7 @@ class _InviteMembersPageState extends State<InviteMembersPage> {
   Widget _buildInputRow(BuildContext context) {
     final colorScheme = getEnteColorScheme(context);
     final textTheme = getEnteTextTheme(context);
-    final l10n = StringsLocalizations.of(context);
+    final l10n = context.strings;
     final hasError = _errorMessage != null;
 
     return Row(
@@ -243,7 +243,7 @@ class _InviteMembersPageState extends State<InviteMembersPage> {
       return;
     }
 
-    final l10n = StringsLocalizations.of(context);
+    final l10n = context.strings;
     final email = _emailController.text.trim().toLowerCase();
     if (!_canAddMore) {
       setState(() => _errorMessage = l10n.inviteLimitReached);
@@ -364,12 +364,8 @@ class _InviteMembersPageState extends State<InviteMembersPage> {
         showToast(
           context,
           failedEmails.length == 1
-              ? StringsLocalizations.of(
-                  context,
-                ).failedToInvite(email: failedEmails.first)
-              : StringsLocalizations.of(
-                  context,
-                ).failedToInviteCount(count: failedEmails.length),
+              ? context.strings.failedToInvite(email: failedEmails.first)
+              : context.strings.failedToInviteCount(count: failedEmails.length),
         );
       }
       throw const _HandledInviteActionException();
@@ -386,7 +382,7 @@ class _InviteMembersPageState extends State<InviteMembersPage> {
   }
 
   Future<void> _showInviteToEnteSheet(String email) {
-    final l10n = StringsLocalizations.of(context);
+    final l10n = context.strings;
     return showBaseBottomSheet<void>(
       context,
       title: l10n.inviteToEnte,

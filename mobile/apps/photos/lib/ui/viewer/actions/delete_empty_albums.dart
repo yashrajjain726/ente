@@ -43,7 +43,7 @@ class _DeleteEmptyAlbumsState extends State<DeleteEmptyAlbums> {
         child: Padding(
           padding: widget.padding,
           child: Text(
-            StringsLocalizations.of(context).deleteEmptyAlbums,
+            context.strings.deleteEmptyAlbums,
             style: TextStyles.body.copyWith(
               color: colors.textLight,
               decoration: TextDecoration.underline,
@@ -56,7 +56,7 @@ class _DeleteEmptyAlbumsState extends State<DeleteEmptyAlbums> {
   }
 
   Future<void> _confirmAndDeleteEmptyAlbums() async {
-    final l10n = StringsLocalizations.of(context);
+    final l10n = context.strings;
     await showBottomSheetComponent<void>(
       context: context,
       isDismissible: true,
@@ -126,7 +126,7 @@ class _DeleteEmptyAlbumsState extends State<DeleteEmptyAlbums> {
           '0',
         );
 
-        _deleteProgress.value = StringsLocalizations.of(context).deleteProgress(
+        _deleteProgress.value = context.strings.deleteProgress(
           currentlyDeleting: currentlyDeleting,
           totalCount: totalCount,
         );

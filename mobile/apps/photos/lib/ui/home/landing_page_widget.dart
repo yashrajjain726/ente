@@ -89,9 +89,7 @@ class _LandingPageWidgetState extends State<LandingPageWidget> {
                                     _buildOnboardingAnimation(),
 
                                     Text(
-                                      StringsLocalizations.of(
-                                        context,
-                                      ).onboardingTitle,
+                                      context.strings.onboardingTitle,
                                       textAlign: TextAlign.center,
                                       textScaler: TextScaler.noScaling,
                                       style: TextStyle(
@@ -115,9 +113,7 @@ class _LandingPageWidgetState extends State<LandingPageWidget> {
                                         horizontal: 32,
                                       ),
                                       child: Text(
-                                        StringsLocalizations.of(
-                                          context,
-                                        ).onboardingDesc,
+                                        context.strings.onboardingDesc,
                                         textAlign: TextAlign.center,
                                         style: textTheme.body.copyWith(
                                           color: colorScheme.greenLight,
@@ -136,9 +132,7 @@ class _LandingPageWidgetState extends State<LandingPageWidget> {
                       ),
                       ButtonComponent(
                         variant: ButtonComponentVariant.neutral,
-                        label: StringsLocalizations.of(
-                          context,
-                        ).createAnEnteAccount,
+                        label: context.strings.createAnEnteAccount,
                         onTap: _navigateToSignUpPage,
                         shouldSurfaceExecutionStates: false,
                       ),
@@ -146,9 +140,7 @@ class _LandingPageWidgetState extends State<LandingPageWidget> {
                         const SizedBox(height: 12),
                         ButtonComponent(
                           variant: ButtonComponentVariant.secondary,
-                          label: StringsLocalizations.of(
-                            context,
-                          ).continueWithoutAccount,
+                          label: context.strings.continueWithoutAccount,
                           onTap: _navigateWithoutAccount,
                           shouldSurfaceExecutionStates: false,
                         ),
@@ -157,9 +149,7 @@ class _LandingPageWidgetState extends State<LandingPageWidget> {
                       TextButton(
                         onPressed: _navigateToSignInPage,
                         child: Text(
-                          StringsLocalizations.of(
-                            context,
-                          ).loginToExistingAccount,
+                          context.strings.loginToExistingAccount,
                           style: textTheme.body.copyWith(
                             decoration: TextDecoration.underline,
                             decorationColor: Colors.white,
@@ -294,13 +284,13 @@ class _LandingPageWidgetState extends State<LandingPageWidget> {
     if (autoLogout) {
       final result = await showDialogWidget(
         context: context,
-        title: StringsLocalizations.of(context).pleaseLoginAgain,
-        body: StringsLocalizations.of(context).autoLogoutMessage,
+        title: context.strings.pleaseLoginAgain,
+        body: context.strings.autoLogoutMessage,
         buttons: [
           ButtonWidget(
             buttonType: ButtonType.neutral,
             buttonAction: ButtonAction.first,
-            labelText: StringsLocalizations.of(context).ok,
+            labelText: context.strings.ok,
             isInAlert: true,
           ),
         ],

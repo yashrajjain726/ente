@@ -39,14 +39,14 @@ class _ManageIndividualParticipantState
     final resolvedName = resolveDisplayName(widget.user);
     bool isConvertToViewSuccess = false;
     return ShareScaffold(
-      title: StringsLocalizations.of(context).manage,
+      title: context.strings.manage,
       subtitle: resolvedName,
       children: [
-        ShareSectionTitle(StringsLocalizations.of(context).addedAs),
+        ShareSectionTitle(context.strings.addedAs),
         ShareMenuGroup(
           items: [
             ShareMenuItem(
-              title: StringsLocalizations.of(context).admin,
+              title: context.strings.admin,
               icon: HugeIcons.strokeRoundedCrown,
               trailing: isAdmin ? shareCheck(context) : null,
               onTap: isAdmin
@@ -67,7 +67,7 @@ class _ManageIndividualParticipantState
                     },
             ),
             ShareMenuItem(
-              title: StringsLocalizations.of(context).collaborator,
+              title: context.strings.collaborator,
               icon: HugeIcons.strokeRoundedUserGroup,
               trailing: isCollaborator ? shareCheck(context) : null,
               onTap: isCollaborator
@@ -89,7 +89,7 @@ class _ManageIndividualParticipantState
                     },
             ),
             ShareMenuItem(
-              title: StringsLocalizations.of(context).viewer,
+              title: context.strings.viewer,
               icon: HugeIcons.strokeRoundedView,
               trailing: isViewer ? shareCheck(context) : null,
               showOnlyLoadingState: true,
@@ -98,13 +98,9 @@ class _ManageIndividualParticipantState
                   : () async {
                       final actionResult = await showChoiceActionSheet(
                         context,
-                        title: StringsLocalizations.of(
-                          context,
-                        ).changePermissionsQuestion,
-                        firstButtonLabel: StringsLocalizations.of(
-                          context,
-                        ).yesConvertToViewer,
-                        body: StringsLocalizations.of(context)
+                        title: context.strings.changePermissionsQuestion,
+                        firstButtonLabel: context.strings.yesConvertToViewer,
+                        body: context.strings
                             .cannotAddMorePhotosAfterBecomingViewer(
                               user: resolvedName,
                             ),
@@ -141,16 +137,14 @@ class _ManageIndividualParticipantState
           ],
         ),
         ShareSectionDescription(
-          StringsLocalizations.of(
-            context,
-          ).adminsAndCollaboratorsCanAddPhotosDescription,
+          context.strings.adminsAndCollaboratorsCanAddPhotosDescription,
         ),
         const SizedBox(height: Spacing.xxl),
-        ShareSectionTitle(StringsLocalizations.of(context).removeParticipant),
+        ShareSectionTitle(context.strings.removeParticipant),
         ShareMenuGroup(
           items: [
             ShareMenuItem(
-              title: StringsLocalizations.of(context).remove,
+              title: context.strings.remove,
               leading: const Icon(Icons.not_interested_outlined),
               isDestructive: true,
               onTap: () async {

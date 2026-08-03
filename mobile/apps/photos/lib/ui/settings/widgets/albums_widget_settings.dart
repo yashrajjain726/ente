@@ -96,7 +96,7 @@ class _AlbumsWidgetSettingsState extends State<AlbumsWidgetSettings> {
                 listenable: _selectedAlbums,
                 builder: (context, _) {
                   return ButtonComponent(
-                    label: StringsLocalizations.of(context).save,
+                    label: context.strings.save,
                     shouldSurfaceExecutionStates: false,
                     onTap: _selectedAlbums.albums.isNotEmpty
                         ? () async {
@@ -119,9 +119,9 @@ class _AlbumsWidgetSettingsState extends State<AlbumsWidgetSettings> {
         interactive: true,
         controller: _scrollController,
         child: AppBarComponent(
-          title: StringsLocalizations.of(context).albums,
+          title: context.strings.albums,
           subtitle: hasInstalledAny
-              ? StringsLocalizations.of(context).albumsWidgetDesc
+              ? context.strings.albumsWidgetDesc
               : context.strings.addAlbumWidgetPrompt,
           controller: _scrollController,
           slivers: <Widget>[
@@ -150,7 +150,7 @@ class _AlbumsWidgetSettingsState extends State<AlbumsWidgetSettings> {
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(16, 18, 16, 8),
                     child: MenuComponent(
-                      title: StringsLocalizations.of(context).showTextOnWidget,
+                      title: context.strings.showTextOnWidget,
                       trailing: ToggleSwitchComponent(
                         selected: _showText,
                         onChanged: (showText) async {

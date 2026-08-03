@@ -690,9 +690,7 @@ class _PeopleSectionAllWidgetState extends State<PeopleSectionAllWidget> {
             slivers.add(
               SliverFillRemaining(
                 child: Center(
-                  child: Text(
-                    StringsLocalizations.of(context).noResultsFound + '.',
-                  ),
+                  child: Text(context.strings.noResultsFound + '.'),
                 ),
               ),
             );
@@ -978,7 +976,7 @@ class _PeopleSectionAllWidgetState extends State<PeopleSectionAllWidget> {
     return TextInputComponent(
       controller: _searchController,
       focusNode: _searchFocusNode,
-      hintText: StringsLocalizations.of(context).search,
+      hintText: context.strings.search,
       autofocus: true,
       shouldUnfocusOnClearOrSubmit: true,
       prefix: HugeIcon(
@@ -1006,7 +1004,7 @@ class _PeopleSectionAllWidgetState extends State<PeopleSectionAllWidget> {
       shouldSurfaceExecutionStates: false,
       icon: const HugeIcon(icon: HugeIcons.strokeRoundedFilterHorizontal),
       onTapDown: (details) async {
-        final l10n = StringsLocalizations.of(context);
+        final l10n = context.strings;
         const sortKeys = PeopleSortKey.values;
         final PeopleSortKey? selectedKey = await showMenu<PeopleSortKey>(
           color: colorScheme.backgroundElevated,
@@ -1214,8 +1212,8 @@ class _PeopleSectionAllWidgetState extends State<PeopleSectionAllWidget> {
             children: [
               Text(
                 _showingAllFaces
-                    ? StringsLocalizations.of(context).showLessFaces
-                    : StringsLocalizations.of(context).showMoreFaces,
+                    ? context.strings.showLessFaces
+                    : context.strings.showMoreFaces,
                 style: getEnteTextTheme(
                   context,
                 ).small.copyWith(color: Theme.of(context).colorScheme.primary),

@@ -62,7 +62,7 @@ class PickCoverPhotoWidget extends StatelessWidget {
                 children: [
                   BottomOfTitleBarWidget(
                     title: TitleBarTitleWidget(
-                      title: StringsLocalizations.of(context).selectCoverPhoto,
+                      title: context.strings.selectCoverPhoto,
                     ),
                     caption: collection.displayName,
                     showCloseButton: true,
@@ -145,9 +145,7 @@ class PickCoverPhotoWidget extends StatelessWidget {
                                   key: ValueKey(value),
                                   isDisabled: !value,
                                   buttonType: ButtonType.neutral,
-                                  labelText: StringsLocalizations.of(
-                                    context,
-                                  ).useSelectedPhoto,
+                                  labelText: context.strings.useSelectedPhoto,
                                   onTap: () async {
                                     final selectedFile =
                                         selectedFiles.files.first;
@@ -165,10 +163,8 @@ class PickCoverPhotoWidget extends StatelessWidget {
                             buttonType: ButtonType.secondary,
                             buttonAction: ButtonAction.cancel,
                             labelText: collection.hasCover
-                                ? StringsLocalizations.of(
-                                    context,
-                                  ).resetToDefault
-                                : StringsLocalizations.of(context).cancel,
+                                ? context.strings.resetToDefault
+                                : context.strings.cancel,
                             icon: collection.hasCover
                                 ? Icons.restore_outlined
                                 : null,

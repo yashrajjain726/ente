@@ -139,7 +139,7 @@ class _AppBarWidgetState extends State<ClusterAppBar> {
     final List<EntePopupMenuOption<ClusterPopupAction>> items = [
       EntePopupMenuOption(
         value: ClusterPopupAction.ignore,
-        label: StringsLocalizations.of(context).ignorePerson,
+        label: context.strings.ignorePerson,
         leadingWidget: galleryAppBarMenuIcon(
           HugeIcons.strokeRoundedUserBlock01,
           iconColor,
@@ -147,7 +147,7 @@ class _AppBarWidgetState extends State<ClusterAppBar> {
       ),
       EntePopupMenuOption(
         value: ClusterPopupAction.breakupCluster,
-        label: StringsLocalizations.of(context).mixedGrouping,
+        label: context.strings.mixedGrouping,
         leadingWidget: galleryAppBarMenuIcon(
           HugeIcons.strokeRoundedUserMultiple,
           iconColor,
@@ -166,7 +166,7 @@ class _AppBarWidgetState extends State<ClusterAppBar> {
 
     actions.add(
       galleryAppBarPopupMenuAction<ClusterPopupAction>(
-        tooltip: StringsLocalizations.of(context).more,
+        tooltip: context.strings.more,
         icon: const HugeIcon(icon: HugeIcons.strokeRoundedMoreVertical),
         optionsBuilder: () => items,
         onSelected: (ClusterPopupAction value) async {
@@ -187,11 +187,9 @@ class _AppBarWidgetState extends State<ClusterAppBar> {
   Future<void> _onIgnoredClusterClicked(BuildContext context) async {
     final result = await showChoiceDialog(
       context,
-      title: StringsLocalizations.of(
-        context,
-      ).areYouSureYouWantToIgnoreThisPerson,
-      body: StringsLocalizations.of(context).thePersonGroupsWillNotBeDisplayed,
-      firstButtonLabel: StringsLocalizations.of(context).confirm,
+      title: context.strings.areYouSureYouWantToIgnoreThisPerson,
+      body: context.strings.thePersonGroupsWillNotBeDisplayed,
+      firstButtonLabel: context.strings.confirm,
       firstButtonOnTap: () async {
         try {
           await ClusterFeedbackService.instance.ignoreCluster(widget.clusterID);
@@ -216,11 +214,9 @@ class _AppBarWidgetState extends State<ClusterAppBar> {
     String biggestClusterID = '';
     await showChoiceDialog(
       context,
-      title: StringsLocalizations.of(context).doesGroupContainMultiplePeople,
-      body: StringsLocalizations.of(
-        context,
-      ).automaticallyAnalyzeAndSplitGrouping,
-      firstButtonLabel: StringsLocalizations.of(context).confirm,
+      title: context.strings.doesGroupContainMultiplePeople,
+      body: context.strings.automaticallyAnalyzeAndSplitGrouping,
+      firstButtonLabel: context.strings.confirm,
       firstButtonOnTap: () async {
         try {
           final breakupResult = await ClusterFeedbackService.instance
@@ -313,10 +309,8 @@ class _AppBarWidgetState extends State<ClusterAppBar> {
     if (!context.mounted) return;
     await Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (context) => ClusterBreakupPage(
-          newClusterIDToFiles,
-          StringsLocalizations.of(context).analysis,
-        ),
+        builder: (context) =>
+            ClusterBreakupPage(newClusterIDToFiles, context.strings.analysis),
       ),
     );
   }

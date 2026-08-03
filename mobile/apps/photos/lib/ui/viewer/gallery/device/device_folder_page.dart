@@ -63,7 +63,7 @@ class _DeviceFolderPageState extends State<DeviceFolderPage> {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = StringsLocalizations.of(context);
+    final l10n = context.strings;
     final appBar = GalleryAppBarWidget.sliverConfig(
       GalleryType.localFolder,
       widget.deviceCollection.name,

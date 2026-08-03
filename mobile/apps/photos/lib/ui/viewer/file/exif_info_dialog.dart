@@ -16,7 +16,7 @@ class ExifInfoDialog extends StatelessWidget {
       title: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(StringsLocalizations.of(context).exif, style: textTheme.h3Bold),
+          Text(context.strings.exif, style: textTheme.h3Bold),
           Text(file.title!, style: textTheme.smallMuted),
         ],
       ),
@@ -26,10 +26,7 @@ class ExifInfoDialog extends StatelessWidget {
       ),
       actions: [
         TextButton(
-          child: Text(
-            StringsLocalizations.of(context).close,
-            style: textTheme.body,
-          ),
+          child: Text(context.strings.close, style: textTheme.body),
           onPressed: () {
             Navigator.of(context).pop('dialog');
           },
@@ -48,7 +45,7 @@ class ExifInfoDialog extends StatelessWidget {
               .map((entry) => "${entry.key}: ${entry.value}")
               .join("\n");
           if (data.isEmpty) {
-            data = StringsLocalizations.of(context).noExifData;
+            data = context.strings.noExifData;
           }
           return Container(
             padding: const EdgeInsets.all(2),

@@ -296,7 +296,7 @@ class _SelectAllButtonState extends State<SelectAllButton> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                StringsLocalizations.of(context).selectAllShort,
+                context.strings.selectAllShort,
                 style: components.TextStyles.mini.copyWith(
                   color: colors.textBase,
                 ),

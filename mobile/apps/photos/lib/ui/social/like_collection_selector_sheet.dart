@@ -140,10 +140,7 @@ class _LikeCollectionSelectorSheetState
       if (mounted) {
         setState(() => state.isLiked = previousState);
         if (flagService.internalUser || kDebugMode) {
-          showShortToast(
-            context,
-            StringsLocalizations.of(context).failedToUpdateLike,
-          );
+          showShortToast(context, context.strings.failedToUpdateLike);
         }
       }
     }
@@ -196,9 +193,7 @@ class _LikeCollectionSelectorSheetState
       });
       showShortToast(
         context,
-        StringsLocalizations.of(
-          context,
-        ).failedToLikeAlbums(count: failed.length),
+        context.strings.failedToLikeAlbums(count: failed.length),
       );
       // Don't close sheet - let user retry
       return;
@@ -311,7 +306,7 @@ class _LikeCollectionSelectorSheetState
   }
 
   Widget _buildErrorState() {
-    final l10n = StringsLocalizations.of(context);
+    final l10n = context.strings;
     final textTheme = getEnteTextTheme(context);
 
     return Padding(
@@ -338,7 +333,7 @@ class _AlbumsHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = StringsLocalizations.of(context);
+    final l10n = context.strings;
     final textTheme = getEnteTextTheme(context);
     final colorScheme = getEnteColorScheme(context);
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
@@ -386,7 +381,7 @@ class _TitleSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = StringsLocalizations.of(context);
+    final l10n = context.strings;
     final textTheme = getEnteTextTheme(context);
     final colorScheme = getEnteColorScheme(context);
 

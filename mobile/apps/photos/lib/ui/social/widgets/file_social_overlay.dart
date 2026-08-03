@@ -330,10 +330,7 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
 
   void _showFailedToUpdateLikeToast() {
     if (flagService.internalUser || kDebugMode) {
-      showShortToast(
-        context,
-        StringsLocalizations.of(context).failedToUpdateLike,
-      );
+      showShortToast(context, context.strings.failedToUpdateLike);
     }
   }
 
@@ -470,7 +467,7 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Tooltip(
-                message: StringsLocalizations.of(context).like,
+                message: context.strings.like,
                 child: GestureDetector(
                   onLongPress: _showLikes,
                   child: SizedBox.square(
@@ -493,7 +490,7 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
               ),
               const SizedBox(height: 10),
               Tooltip(
-                message: StringsLocalizations.of(context).comments,
+                message: context.strings.comments,
                 child: SizedBox.square(
                   dimension: _socialControlsSize,
                   child: IconButton(

@@ -71,7 +71,7 @@ class _PeopleWidgetSettingsState extends State<PeopleWidgetSettings> {
                       : _selectedPeople.personIds.isNotEmpty;
 
                   return ButtonComponent(
-                    label: StringsLocalizations.of(context).save,
+                    label: context.strings.save,
                     shouldSurfaceExecutionStates: false,
                     isDisabled: !areIdsChanged,
                     onTap: areIdsChanged
@@ -91,9 +91,9 @@ class _PeopleWidgetSettingsState extends State<PeopleWidgetSettings> {
             )
           : null,
       body: AppBarComponent(
-        title: StringsLocalizations.of(context).people,
+        title: context.strings.people,
         subtitle: hasInstalledAny
-            ? StringsLocalizations.of(context).peopleWidgetDesc
+            ? context.strings.peopleWidgetDesc
             : context.strings.addPeopleWidgetPrompt,
         slivers: <Widget>[
           if (!hasInstalledAny)
@@ -118,7 +118,7 @@ class _PeopleWidgetSettingsState extends State<PeopleWidgetSettings> {
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(16, 18, 16, 8),
                   child: MenuComponent(
-                    title: StringsLocalizations.of(context).showTextOnWidget,
+                    title: context.strings.showTextOnWidget,
                     trailing: ToggleSwitchComponent(
                       selected: _showText,
                       onChanged: (showText) async {

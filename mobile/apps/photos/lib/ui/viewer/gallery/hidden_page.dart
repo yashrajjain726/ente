@@ -131,7 +131,7 @@ class _HiddenPageState extends State<HiddenPage> {
     }
     final appBar = GalleryAppBarWidget.sliverConfig(
       widget.appBarType,
-      StringsLocalizations.of(context).hidden,
+      context.strings.hidden,
       _selectedFiles,
     );
     final gallery = Gallery(
@@ -173,7 +173,7 @@ class _HiddenPageState extends State<HiddenPage> {
       emptyState: _hiddenCollectionsExcludingDefault.isEmpty
           ? EmptyStateComponent(
               assetPath: "assets/empty_state_hidden.png",
-              title: StringsLocalizations.of(context).hiddenItemsWillShowUpHere,
+              title: context.strings.hiddenItemsWillShowUpHere,
             )
           : const SizedBox.shrink(),
       header: Column(
@@ -219,7 +219,7 @@ class _HiddenPageState extends State<HiddenPage> {
                 CollectionListPage(
                   _hiddenCollectionsExcludingDefault,
                   sectionType: UISectionType.hiddenCollections,
-                  appTitle: Text(StringsLocalizations.of(context).hidden),
+                  appTitle: Text(context.strings.hidden),
                   tag: "hidden",
                 ),
               );

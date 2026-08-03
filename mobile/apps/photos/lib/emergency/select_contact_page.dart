@@ -78,7 +78,7 @@ class _AddContactSheetState extends State<AddContactSheet> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           TextInputWidgetV2(
-            hintText: StringsLocalizations.of(context).enterEmail,
+            hintText: context.strings.enterEmail,
             textEditingController: _textController,
             focusNode: textFieldFocusNode,
             keyboardType: TextInputType.emailAddress,
@@ -177,7 +177,7 @@ class _AddContactSheetState extends State<AddContactSheet> {
             child: ButtonWidgetV2(
               buttonType: ButtonTypeV2.link,
               buttonSize: ButtonSizeV2.small,
-              labelText: StringsLocalizations.of(context).verifyIDLabel,
+              labelText: context.strings.verifyIDLabel,
               isDisabled: emailForVerification == null,
               shouldSurfaceExecutionStates: false,
               onTap: emailForVerification == null
@@ -240,8 +240,8 @@ class _AddContactSheetState extends State<AddContactSheet> {
     } else if (failures.isNotEmpty && mounted) {
       await showAlertBottomSheet(
         context,
-        title: StringsLocalizations.of(context).error,
-        message: StringsLocalizations.of(context).somethingWentWrong,
+        title: context.strings.error,
+        message: context.strings.somethingWentWrong,
         assetPath: "assets/warning-grey.png",
       );
     }
@@ -251,7 +251,7 @@ class _AddContactSheetState extends State<AddContactSheet> {
     List<String> emails,
     int recoveryDays,
   ) {
-    final l10n = StringsLocalizations.of(context);
+    final l10n = context.strings;
     final message = emails.length == 1
         ? l10n.confirmAddingTrustedContact(
             email: emails.first,
@@ -282,8 +282,8 @@ class _AddContactSheetState extends State<AddContactSheet> {
     if (!_emailsToAdd.contains(emailToAdd)) {
       await showAlertBottomSheet(
         context,
-        title: StringsLocalizations.of(context).invalidEmailAddress,
-        message: StringsLocalizations.of(context).enterValidEmail,
+        title: context.strings.invalidEmailAddress,
+        message: context.strings.enterValidEmail,
         assetPath: "assets/warning-grey.png",
       );
       return;

@@ -26,10 +26,7 @@ class _SessionsPageState extends State<SessionsPage> {
   void initState() {
     _fetchActiveSessions().onError((error, stackTrace) {
       if (!mounted) return;
-      showToast(
-        context,
-        StringsLocalizations.of(context).failedToFetchActiveSessions,
-      );
+      showToast(context, context.strings.failedToFetchActiveSessions);
     });
     super.initState();
   }
@@ -37,7 +34,7 @@ class _SessionsPageState extends State<SessionsPage> {
   @override
   Widget build(BuildContext context) {
     return SettingsPageScaffold(
-      title: StringsLocalizations.of(context).activeSessions,
+      title: context.strings.activeSessions,
       padding: EdgeInsets.zero,
       children: _getBodyChildren(context),
     );
@@ -109,10 +106,7 @@ class _SessionsPageState extends State<SessionsPage> {
   }
 
   Future<void> _terminateSession(Session session) async {
-    final dialog = createProgressDialog(
-      context,
-      StringsLocalizations.of(context).pleaseWait,
-    );
+    final dialog = createProgressDialog(context, context.strings.pleaseWait);
     await dialog.show();
     try {
       await UserService.instance.terminateSession(session.token);
@@ -125,10 +119,8 @@ class _SessionsPageState extends State<SessionsPage> {
       // ignore: unawaited_futures
       showErrorBottomSheetComponent<void>(
         context: context,
-        title: StringsLocalizations.of(context).oops,
-        message: StringsLocalizations.of(
-          context,
-        ).somethingWentWrongPleaseTryAgain,
+        title: context.strings.oops,
+        message: context.strings.somethingWentWrongPleaseTryAgain,
         illustration: Image.asset("assets/warning-grey.png"),
       );
     }
@@ -150,7 +142,7 @@ class _SessionsPageState extends State<SessionsPage> {
   }
 
   void _showSessionTerminationDialog(Session session) {
-    final l10n = StringsLocalizations.of(context);
+    final l10n = context.strings;
     final isLoggingOutFromThisDevice =
         session.token == Configuration.instance.getToken();
     final displayedUserAgent = session.ua.length > 256
@@ -191,7 +183,7 @@ class _SessionsPageState extends State<SessionsPage> {
     final colors = context.componentColors;
     if (session.token == Configuration.instance.getToken()) {
       return Text(
-        StringsLocalizations.of(context).thisDevice,
+        context.strings.thisDevice,
         style: TextStyles.bodyBold.copyWith(color: colors.primary),
       );
     }

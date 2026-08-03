@@ -28,7 +28,7 @@ class _OfflineSettingsBannerState extends State<OfflineSettingsBanner> {
     }
 
     final textTheme = getEnteTextTheme(context);
-    final l10n = StringsLocalizations.of(context);
+    final l10n = context.strings;
     final titleStyle = textTheme.largeBold.copyWith(
       fontFamily: "Nunito",
       fontWeight: FontWeight.w800,

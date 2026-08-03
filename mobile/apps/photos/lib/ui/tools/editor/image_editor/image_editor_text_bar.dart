@@ -71,7 +71,7 @@ class _ImageEditorTextBarState extends State<ImageEditorTextBar>
       children: [
         CircularIconButton(
           hugeIcon: HugeIcons.strokeRoundedTextColor,
-          label: StringsLocalizations.of(context).color,
+          label: context.strings.color,
           isSelected: selectedActionIndex == 0,
           onTap: () {
             _selectAction(0);
@@ -79,7 +79,7 @@ class _ImageEditorTextBarState extends State<ImageEditorTextBar>
         ),
         CircularIconButton(
           hugeIcon: HugeIcons.strokeRoundedTextFont,
-          label: StringsLocalizations.of(context).font,
+          label: context.strings.font,
           isSelected: selectedActionIndex == 1,
           onTap: () {
             _selectAction(1);
@@ -87,7 +87,7 @@ class _ImageEditorTextBarState extends State<ImageEditorTextBar>
         ),
         CircularIconButton(
           hugeIcon: HugeIcons.strokeRoundedTextSquare,
-          label: StringsLocalizations.of(context).background,
+          label: context.strings.background,
           isSelected: selectedActionIndex == 2,
           onTap: () {
             setState(() {
@@ -97,7 +97,7 @@ class _ImageEditorTextBarState extends State<ImageEditorTextBar>
         ),
         CircularIconButton(
           hugeIcon: HugeIcons.strokeRoundedTextAlignLeft,
-          label: StringsLocalizations.of(context).align,
+          label: context.strings.align,
           isSelected: selectedActionIndex == 3,
           onTap: () {
             setState(() {

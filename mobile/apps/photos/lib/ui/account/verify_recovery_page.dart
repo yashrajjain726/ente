@@ -36,7 +36,7 @@ class _VerifyRecoveryPageState extends State<VerifyRecoveryPage> {
   void _verifyRecoveryKey() async {
     final dialog = createProgressDialog(
       context,
-      StringsLocalizations.of(context).verifyingRecoveryKey,
+      context.strings.verifyingRecoveryKey,
     );
     await dialog.show();
     try {
@@ -55,10 +55,9 @@ class _VerifyRecoveryPageState extends State<VerifyRecoveryPage> {
             if (!mounted) return;
             await showAlertBottomSheet(
               context,
-              title: StringsLocalizations.of(context).noInternetConnection,
-              message: StringsLocalizations.of(
-                context,
-              ).pleaseCheckYourInternetConnectionAndTryAgain,
+              title: context.strings.noInternetConnection,
+              message:
+                  context.strings.pleaseCheckYourInternetConnectionAndTryAgain,
               assetPath: 'assets/warning-grey.png',
             );
           } else {
@@ -72,8 +71,8 @@ class _VerifyRecoveryPageState extends State<VerifyRecoveryPage> {
         if (!mounted) return;
         await showAlertBottomSheet(
           context,
-          title: StringsLocalizations.of(context).recoveryKeyVerified,
-          message: StringsLocalizations.of(context).recoveryKeySuccessBody,
+          title: context.strings.recoveryKeyVerified,
+          message: context.strings.recoveryKeySuccessBody,
           assetPath: 'assets/warning-grey.png',
         );
         if (!mounted) return;
@@ -85,16 +84,14 @@ class _VerifyRecoveryPageState extends State<VerifyRecoveryPage> {
       _logger.severe("failed to verify recovery key", e, s);
       await dialog.hide();
       if (!mounted) return;
-      final String errMessage = StringsLocalizations.of(
-        context,
-      ).invalidRecoveryKey;
+      final String errMessage = context.strings.invalidRecoveryKey;
       if (!mounted) return;
       final result = await showChoiceDialog(
         context,
-        title: StringsLocalizations.of(context).invalidKey,
+        title: context.strings.invalidKey,
         body: errMessage,
-        firstButtonLabel: StringsLocalizations.of(context).tryAgain,
-        secondButtonLabel: StringsLocalizations.of(context).viewRecoveryKey,
+        firstButtonLabel: context.strings.tryAgain,
+        secondButtonLabel: context.strings.viewRecoveryKey,
         secondButtonAction: ButtonAction.second,
       );
       if (result?.action == ButtonAction.second) {
@@ -122,7 +119,7 @@ class _VerifyRecoveryPageState extends State<VerifyRecoveryPage> {
           context,
           RecoveryKeyPage(
             recoveryKey,
-            StringsLocalizations.of(context).ok,
+            context.strings.ok,
             isOnboarding: false,
             onDone: () {
               Navigator.of(context).pop();
@@ -170,16 +167,14 @@ class _VerifyRecoveryPageState extends State<VerifyRecoveryPage> {
                       SizedBox(
                         width: double.infinity,
                         child: Text(
-                          StringsLocalizations.of(context).confirmRecoveryKey,
+                          context.strings.confirmRecoveryKey,
                           style: TextStyles.h1.copyWith(color: colors.textBase),
                           textAlign: TextAlign.left,
                         ),
                       ),
                       const SizedBox(height: 18),
                       Text(
-                        StringsLocalizations.of(
-                          context,
-                        ).recoveryKeyVerifyReason,
+                        context.strings.recoveryKeyVerifyReason,
                         style: TextStyles.mini.copyWith(
                           color: colors.textLight,
                         ),
@@ -187,9 +182,7 @@ class _VerifyRecoveryPageState extends State<VerifyRecoveryPage> {
                       const SizedBox(height: 12),
                       TextInputComponent(
                         controller: _recoveryKey,
-                        hintText: StringsLocalizations.of(
-                          context,
-                        ).enterYourRecoveryKey,
+                        hintText: context.strings.enterYourRecoveryKey,
                         autocorrect: false,
                         keyboardType: TextInputType.multiline,
                         minLines: 4,
@@ -209,7 +202,7 @@ class _VerifyRecoveryPageState extends State<VerifyRecoveryPage> {
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
                               ButtonComponent(
-                                label: StringsLocalizations.of(context).confirm,
+                                label: context.strings.confirm,
                                 onTap: _verifyRecoveryKey,
                               ),
                               const SizedBox(height: 8),

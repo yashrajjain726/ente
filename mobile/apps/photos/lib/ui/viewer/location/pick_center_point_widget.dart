@@ -65,11 +65,9 @@ class PickCenterPointWidget extends StatelessWidget {
                 children: [
                   BottomOfTitleBarWidget(
                     title: TitleBarTitleWidget(
-                      title: StringsLocalizations.of(context).pickCenterPoint,
+                      title: context.strings.pickCenterPoint,
                     ),
-                    caption:
-                        locationTagName ??
-                        StringsLocalizations.of(context).newLocation,
+                    caption: locationTagName ?? context.strings.newLocation,
                     showCloseButton: true,
                   ),
                   Expanded(
@@ -107,7 +105,7 @@ class PickCenterPointWidget extends StatelessWidget {
                         header: Padding(
                           padding: const EdgeInsets.all(10),
                           child: NotificationTipWidget(
-                            StringsLocalizations.of(context).locationPickerTip,
+                            context.strings.locationPickerTip,
                           ),
                         ),
                         disablePinnedGroupHeader: true,
@@ -144,9 +142,7 @@ class PickCenterPointWidget extends StatelessWidget {
                               key: ValueKey(value),
                               isDisabled: !value,
                               buttonType: ButtonType.neutral,
-                              labelText: StringsLocalizations.of(
-                                context,
-                              ).useSelectedPhoto,
+                              labelText: context.strings.useSelectedPhoto,
                               onTap: () async {
                                 final selectedLocation =
                                     selectedFiles.files.first.location;

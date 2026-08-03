@@ -20,7 +20,7 @@ class CleanupHiddenFromDeviceWidget extends StatelessWidget {
       child: Column(
         children: [
           MenuComponent(
-            title: StringsLocalizations.of(context).deleteHiddenFilesFromDevice,
+            title: context.strings.deleteHiddenFilesFromDevice,
             leading: const Icon(Icons.phone_android_outlined),
             trailing: const Icon(Icons.chevron_right),
             onTap: () async {
@@ -33,9 +33,7 @@ class CleanupHiddenFromDeviceWidget extends StatelessWidget {
             },
           ),
           MenuSectionDescriptionWidget(
-            content: StringsLocalizations.of(
-              context,
-            ).deleteHiddenFilesFromDeviceDescription,
+            content: context.strings.deleteHiddenFilesFromDeviceDescription,
           ),
         ],
       ),

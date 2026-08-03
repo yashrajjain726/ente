@@ -73,7 +73,7 @@ class _ContactPhotoAdjustPageState extends State<ContactPhotoAdjustPage> {
                         TextButton(
                           onPressed: () => Navigator.of(context).pop(),
                           child: Text(
-                            StringsLocalizations.of(context).cancel,
+                            context.strings.cancel,
                             style: actionTextStyle,
                           ),
                         ),
@@ -88,7 +88,7 @@ class _ContactPhotoAdjustPageState extends State<ContactPhotoAdjustPage> {
                                   await editor.done();
                                 },
                           child: Text(
-                            StringsLocalizations.of(context).useSelectedPhoto,
+                            context.strings.useSelectedPhoto,
                             style: actionTextStyle.copyWith(
                               color: _isReturningBytes
                                   ? colors.textLight

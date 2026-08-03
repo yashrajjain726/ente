@@ -106,7 +106,7 @@ class _CommentLikesBottomSheetState extends State<CommentLikesBottomSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = StringsLocalizations.of(context);
+    final l10n = context.strings;
     final colorScheme = getEnteColorScheme(context);
     final textTheme = getEnteTextTheme(context);
     final mediaQuery = MediaQuery.of(context);

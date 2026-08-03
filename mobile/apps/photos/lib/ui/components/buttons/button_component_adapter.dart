@@ -122,7 +122,7 @@ Exception _toException(Object error) {
 }
 
 int sheetCancelButtonIndex(BuildContext context, List<ButtonWidget> buttons) {
-  final cancelLabels = {StringsLocalizations.of(context).cancel, 'Cancel'};
+  final cancelLabels = {context.strings.cancel, 'Cancel'};
   return buttons.indexWhere(
     (button) =>
         button.isInAlert &&

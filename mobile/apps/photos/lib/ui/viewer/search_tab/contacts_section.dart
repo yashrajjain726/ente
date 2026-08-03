@@ -279,7 +279,7 @@ class ContactCTA extends StatelessWidget {
             ),
             const SizedBox(height: 10),
             Text(
-              StringsLocalizations.of(context).invite,
+              context.strings.invite,
               style: TextStyles.mini.copyWith(color: colorScheme.textMuted),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,

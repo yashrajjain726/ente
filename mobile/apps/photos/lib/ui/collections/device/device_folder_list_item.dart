@@ -57,9 +57,7 @@ class DeviceFolderListItem extends StatelessWidget {
         style: TextStyles.body.copyWith(color: componentColors.textBase),
       ),
       subtitle: Text(
-        StringsLocalizations.of(
-          context,
-        ).itemCount(count: deviceCollection.count),
+        context.strings.itemCount(count: deviceCollection.count),
         maxLines: 1,
         softWrap: false,
         overflow: TextOverflow.ellipsis,

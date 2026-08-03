@@ -35,7 +35,7 @@ class WidgetSettingsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = StringsLocalizations.of(context);
+    final l10n = context.strings;
 
     return SettingsPageScaffold(
       title: l10n.widgets,

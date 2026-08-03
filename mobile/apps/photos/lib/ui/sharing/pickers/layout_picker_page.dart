@@ -18,11 +18,11 @@ class LayoutPickerPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ShareScaffold(
-      title: StringsLocalizations.of(context).albumLayout,
+      title: context.strings.albumLayout,
       actions: [
         IconButtonComponent(
           variant: IconButtonComponentVariant.primary,
-          tooltip: StringsLocalizations.of(context).preview,
+          tooltip: context.strings.preview,
           shouldSurfaceExecutionStates: false,
           icon: const HugeIcon(icon: HugeIcons.strokeRoundedView),
           onTap: () async {
@@ -41,11 +41,7 @@ class LayoutPickerPage extends StatelessWidget {
       );
       await routeToPage(
         context,
-        WebPage(
-          StringsLocalizations.of(context).preview,
-          publicUrl,
-          canOpenInBrowser: false,
-        ),
+        WebPage(context.strings.preview, publicUrl, canOpenInBrowser: false),
       );
     } catch (e) {
       if (!context.mounted) return;
@@ -65,9 +61,9 @@ class ItemsWidget extends StatefulWidget {
 class _ItemsWidgetState extends State<ItemsWidget> {
   late String currentLayout;
   late final List<Tuple2<String, String>> _layoutOptions = [
-    Tuple2(StringsLocalizations.of(context).layoutMasonry, "masonry"),
-    Tuple2(StringsLocalizations.of(context).layoutTrip, "trip"),
-    Tuple2(StringsLocalizations.of(context).layoutGrouped, "grouped"),
+    Tuple2(context.strings.layoutMasonry, "masonry"),
+    Tuple2(context.strings.layoutTrip, "trip"),
+    Tuple2(context.strings.layoutGrouped, "grouped"),
   ];
 
   @override
@@ -91,9 +87,7 @@ class _ItemsWidgetState extends State<ItemsWidget> {
       children: [
         ShareMenuGroup(items: items),
         if (currentLayout == "trip")
-          ShareSectionDescription(
-            StringsLocalizations.of(context).mapsPrivacyNotice,
-          ),
+          ShareSectionDescription(context.strings.mapsPrivacyNotice),
       ],
     );
   }

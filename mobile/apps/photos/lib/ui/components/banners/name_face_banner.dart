@@ -51,7 +51,7 @@ class _NameFaceBannerState extends State<NameFaceBanner> {
 
     final colorScheme = getEnteColorScheme(context);
     final textTheme = getEnteTextTheme(context);
-    final l10n = StringsLocalizations.of(context);
+    final l10n = context.strings;
 
     return Padding(
       padding: const EdgeInsets.all(12),

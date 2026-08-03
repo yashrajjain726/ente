@@ -67,7 +67,7 @@ class _PairWithCodeSheetState extends State<_PairWithCodeSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = StringsLocalizations.of(context);
+    final l10n = context.strings;
     final logger = Logger("PairWithCodeSheet");
     final textStyles = getEnteTextTheme(context);
     return BottomSheetComponent(

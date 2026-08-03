@@ -195,8 +195,8 @@ class _ClusterPageState extends State<ClusterPage> {
                 ? const NameFaceBanner()
                 : SavePersonBanner(
                     faceWidget: PersonFaceWidget(clusterID: widget.clusterID),
-                    text: StringsLocalizations.of(context).savePerson,
-                    subText: StringsLocalizations.of(context).findThemQuickly,
+                    text: context.strings.savePerson,
+                    subText: context.strings.findThemQuickly,
                     onTap: _handleSavePerson,
                   )
           : null,

@@ -39,7 +39,7 @@ class AlbumsItemWidget extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(StringsLocalizations.of(context).albums, style: TextStyles.h2),
+        Text(context.strings.albums, style: TextStyles.h2),
         const SizedBox(height: Spacing.lg),
         FutureBuilder<List<Widget>>(
           future: chipsFuture,
@@ -89,9 +89,7 @@ class AlbumsItemWidget extends StatelessWidget {
         final c = CollectionsService.instance.getCollectionByID(collectionID)!;
         chips.add(
           FilterChipComponent(
-            label: c.isHidden()
-                ? StringsLocalizations.of(context).hidden
-                : c.displayName,
+            label: c.isHidden() ? context.strings.hidden : c.displayName,
             onChanged: (_) {
               if (c.isHidden()) {
                 return;

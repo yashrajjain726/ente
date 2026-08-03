@@ -243,7 +243,7 @@ class _MergeClustersToPersonPageState extends State<MergeClustersToPersonPage> {
         builder: (context, snapshot) {
           final slivers = <Widget>[
             SearchableAppBar(
-              title: Text(StringsLocalizations.of(context).addToPerson),
+              title: Text(context.strings.addToPerson),
               onSearch: _updateSearchQuery,
               onSearchClosed: _clearSearchQuery,
               centerTitle: false,
@@ -289,9 +289,7 @@ class _MergeClustersToPersonPageState extends State<MergeClustersToPersonPage> {
           if (results.isEmpty && !_showNewPersonTile) {
             slivers.add(
               SliverFillRemaining(
-                child: Center(
-                  child: Text(StringsLocalizations.of(context).noResultsFound),
-                ),
+                child: Center(child: Text(context.strings.noResultsFound)),
               ),
             );
             return CustomScrollView(slivers: slivers);
@@ -367,7 +365,7 @@ class _MergeClustersToPersonPageState extends State<MergeClustersToPersonPage> {
       ),
       child: GestureDetector(
         onTapDown: (TapDownDetails details) async {
-          final l10n = StringsLocalizations.of(context);
+          final l10n = context.strings;
           final sortKeys = _canUseSimilaritySort
               ? _MergeSortKey.values
               : _MergeSortKey.values
@@ -697,7 +695,7 @@ class _AddNewPersonGridTile extends StatelessWidget {
             child: Padding(
               padding: EdgeInsets.only(top: labelTopPadding),
               child: Text(
-                StringsLocalizations.of(context).addPerson,
+                context.strings.addPerson,
                 maxLines: 1,
                 textAlign: TextAlign.center,
                 overflow: TextOverflow.ellipsis,

@@ -91,20 +91,20 @@ class _AllLinksPageState extends State<AllLinksPage> {
     if (!_hasSelection) {
       await showErrorDialog(
         context,
-        StringsLocalizations.of(context).deleteLinkQuestion,
-        StringsLocalizations.of(context).pleaseSelectQuickLinksToRemove,
+        context.strings.deleteLinkQuestion,
+        context.strings.pleaseSelectQuickLinksToRemove,
       );
       return;
     }
     final result = await showAlertBottomSheet<ButtonResult>(
       context,
-      title: StringsLocalizations.of(context).removePublicLinks,
-      message: StringsLocalizations.of(context).deleteMemoryLinkMessage,
+      title: context.strings.removePublicLinks,
+      message: context.strings.deleteMemoryLinkMessage,
       assetPath: "assets/warning-grey.png",
       buttons: [
         ButtonWidgetV2(
           buttonType: ButtonTypeV2.critical,
-          labelText: StringsLocalizations.of(context).remove,
+          labelText: context.strings.remove,
           isInAlert: true,
           buttonAction: ButtonAction.first,
           onTap: _deleteSelectedLinks,
@@ -144,7 +144,7 @@ class _AllLinksPageState extends State<AllLinksPage> {
   Future<void> _openMemoryLink(MemoryShare share) async {
     final title =
         MemoryShareService.instance.getMemoryShareTitle(share) ??
-        StringsLocalizations.of(context).memoryLink;
+        context.strings.memoryLink;
     final deleted = await showMemoryLinkDetailsSheet(
       context,
       shareUrl: share.url,
@@ -167,8 +167,8 @@ class _AllLinksPageState extends State<AllLinksPage> {
     return Scaffold(
       backgroundColor: colors.backgroundBase,
       body: AppBarComponent(
-        title: StringsLocalizations.of(context).links,
-        subtitle: StringsLocalizations.of(context).itemCount(count: linksCount),
+        title: context.strings.links,
+        subtitle: context.strings.itemCount(count: linksCount),
         physics: const BouncingScrollPhysics(),
         actions: [
           AnimatedSwitcher(
@@ -224,7 +224,7 @@ class _AllLinksPageState extends State<AllLinksPage> {
                   final share = item as MemoryShare;
                   final title =
                       MemoryShareService.instance.getMemoryShareTitle(share) ??
-                      StringsLocalizations.of(context).memoryLink;
+                      context.strings.memoryLink;
                   return MemoryLinkAlbumItem(
                     title: title,
                     fileCount: share.fileCount,
@@ -250,9 +250,7 @@ class _AllLinksPageState extends State<AllLinksPage> {
               hasScrollBody: false,
               child: EmptyStateComponent(
                 assetPath: "assets/empty_state_links.png",
-                title: StringsLocalizations.of(
-                  context,
-                ).activeLinksWillShowUpHere,
+                title: context.strings.activeLinksWillShowUpHere,
               ),
             ),
         ],

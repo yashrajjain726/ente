@@ -59,7 +59,7 @@ class _RecoveryKeyPageState extends State<RecoveryKeyPage> {
         elevation: 0,
         scrolledUnderElevation: 0,
         title: Text(
-          widget.title ?? StringsLocalizations.of(context).recoveryKey,
+          widget.title ?? context.strings.recoveryKey,
           style: TextStyles.large.copyWith(color: colors.textBase),
         ),
         centerTitle: true,
@@ -100,19 +100,14 @@ class _RecoveryKeyPageState extends State<RecoveryKeyPage> {
                 ),
                 const SizedBox(height: 24),
                 Text(
-                  widget.text ??
-                      StringsLocalizations.of(
-                        context,
-                      ).recoveryKeyOnForgotPassword,
+                  widget.text ?? context.strings.recoveryKeyOnForgotPassword,
                   textAlign: TextAlign.center,
                   style: TextStyles.body.copyWith(color: colors.textBase),
                 ),
                 const SizedBox(height: 20),
                 Text(
                   widget.subText ??
-                      StringsLocalizations.of(
-                        context,
-                      ).recoveryKeySaveShortDescription,
+                      context.strings.recoveryKeySaveShortDescription,
                   textAlign: TextAlign.center,
                   style: TextStyles.body.copyWith(color: colors.textLight),
                 ),
@@ -147,9 +142,7 @@ class _RecoveryKeyPageState extends State<RecoveryKeyPage> {
                               if (!mounted) return;
                               showShortToast(
                                 context,
-                                StringsLocalizations.of(
-                                  context,
-                                ).recoveryKeyCopiedToClipboard,
+                                context.strings.recoveryKeyCopiedToClipboard,
                               );
                             },
                             child: HugeIcon(
@@ -166,7 +159,7 @@ class _RecoveryKeyPageState extends State<RecoveryKeyPage> {
                         child: ButtonComponent(
                           variant: ButtonComponentVariant.secondary,
                           shouldSurfaceExecutionStates: false,
-                          label: StringsLocalizations.of(context).shareKey,
+                          label: context.strings.shareKey,
                           onTap: () async {
                             unawaited(_shareRecoveryKey(recoveryKey));
                           },

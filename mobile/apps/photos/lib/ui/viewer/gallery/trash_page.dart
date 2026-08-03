@@ -31,11 +31,11 @@ class TrashPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final appBar = GalleryAppBarWidget.sliverConfig(
       appBarType,
-      StringsLocalizations.of(context).trash,
+      context.strings.trash,
       _selectedFiles,
-      subtitle: StringsLocalizations.of(
-        context,
-      ).itemsShowTheNumberOfDaysRemainingBeforePermanentDeletion,
+      subtitle: context
+          .strings
+          .itemsShowTheNumberOfDaysRemainingBeforePermanentDeletion,
     );
 
     final gallery = Gallery(
@@ -61,9 +61,7 @@ class TrashPage extends StatelessWidget {
       initialFiles: null,
       emptyState: EmptyStateComponent(
         assetPath: "assets/empty_state_trash.png",
-        title: StringsLocalizations.of(
-          context,
-        ).deletedItemsStayHereForThirtyDays,
+        title: context.strings.deletedItemsStayHereForThirtyDays,
       ),
     );
 

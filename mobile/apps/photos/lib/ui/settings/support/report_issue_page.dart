@@ -33,7 +33,7 @@ class _ReportIssuePageState extends State<ReportIssuePage> {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = StringsLocalizations.of(context);
+    final l10n = context.strings;
     final colors = context.componentColors;
     final subjectHasText = _subjectController.text.isNotEmpty;
     final descriptionHasText = _descriptionController.text.isNotEmpty;
@@ -107,7 +107,7 @@ class _ReportIssuePageState extends State<ReportIssuePage> {
   Future<void> _copyToClipboard(String text) async {
     await Clipboard.setData(ClipboardData(text: text));
     if (mounted) {
-      showShortToast(context, StringsLocalizations.of(context).copied);
+      showShortToast(context, context.strings.copied);
     }
   }
 
@@ -115,7 +115,7 @@ class _ReportIssuePageState extends State<ReportIssuePage> {
     if (_isSending) {
       return;
     }
-    final l10n = StringsLocalizations.of(context);
+    final l10n = context.strings;
     final subject = _subjectController.text.trim();
     final description = _descriptionController.text.trim();
     if (subject.isEmpty) {

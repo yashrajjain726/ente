@@ -68,10 +68,7 @@ class _LocationTagsWidgetState extends State<LocationTagsWidget> {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(
-          title ?? StringsLocalizations.of(context).location,
-          style: TextStyles.h2,
-        ),
+        Text(title ?? context.strings.location, style: TextStyles.h2),
         const SizedBox(height: Spacing.lg),
         FutureBuilder<List<Widget>>(
           future: locationTagChips,
@@ -111,13 +108,13 @@ class _LocationTagsWidgetState extends State<LocationTagsWidget> {
     if (locationTags.isEmpty) {
       if (mounted) {
         setState(() {
-          title = StringsLocalizations.of(context).location;
+          title = context.strings.location;
         });
       }
       if (!mounted) return const [];
       return [
         FilterChipComponent(
-          label: StringsLocalizations.of(context).addLocation,
+          label: context.strings.addLocation,
           onChanged: (_) =>
               showAddLocationSheet(context, widget.file.location!),
         ),
@@ -125,7 +122,7 @@ class _LocationTagsWidgetState extends State<LocationTagsWidget> {
     } else {
       if (mounted) {
         setState(() {
-          title = StringsLocalizations.of(context).location;
+          title = context.strings.location;
         });
       }
       final result = locationTags
@@ -308,17 +305,13 @@ class _InfoMapState extends State<InfoMap> {
                                         if (!context.mounted) return;
                                         showShortToast(
                                           context,
-                                          StringsLocalizations.of(
-                                            context,
-                                          ).somethingWentWrong,
+                                          context.strings.somethingWentWrong,
                                         );
                                       }
                                     },
                                     child: Center(
                                       child: Text(
-                                        StringsLocalizations.of(
-                                          context,
-                                        ).enableMaps,
+                                        context.strings.enableMaps,
                                         style: getEnteTextTheme(context).small,
                                       ),
                                     ),

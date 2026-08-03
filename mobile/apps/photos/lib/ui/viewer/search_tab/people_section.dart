@@ -323,7 +323,7 @@ class PersonSearchExample extends StatelessWidget {
                             child: Padding(
                               padding: const EdgeInsets.only(top: 6, bottom: 0),
                               child: Text(
-                                StringsLocalizations.of(context).addName,
+                                context.strings.addName,
                                 maxLines: 1,
                                 textAlign: TextAlign.center,
                                 overflow: TextOverflow.ellipsis,

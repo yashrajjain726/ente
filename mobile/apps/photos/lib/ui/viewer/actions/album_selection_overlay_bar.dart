@@ -142,7 +142,7 @@ class _SelectAllAlbumsButtonState extends State<SelectAllAlbumsButton> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                StringsLocalizations.of(context).selectAllShort,
+                context.strings.selectAllShort,
                 style: components.TextStyles.mini.copyWith(
                   color: colors.textBase,
                 ),

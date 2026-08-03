@@ -413,10 +413,7 @@ class VideoPreviewService {
         final isRecreateOperation = await _isRecreateOperation(enteFile);
         if (!isRecreateOperation && await getPlaylist(enteFile) != null) {
           if (ctx != null && ctx.mounted) {
-            showShortToast(
-              ctx,
-              StringsLocalizations.of(ctx).videoPreviewAlreadyExists,
-            );
+            showShortToast(ctx, ctx.strings.videoPreviewAlreadyExists);
           }
           removeFile = true;
           return;

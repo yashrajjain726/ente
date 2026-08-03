@@ -69,7 +69,7 @@ class _DeduplicatePageState extends State<DeduplicatePage> {
     return Scaffold(
       appBar: AppBar(
         elevation: 0,
-        title: Text(StringsLocalizations.of(context).deduplicateFiles),
+        title: Text(context.strings.deduplicateFiles),
         actions: _duplicates.isNotEmpty ? [_getSortMenu()] : null,
       ),
       body: _getBody(),
@@ -146,10 +146,10 @@ class _DeduplicatePageState extends State<DeduplicatePage> {
       String text = key.toString();
       switch (key) {
         case SortKey.count:
-          text = StringsLocalizations.of(context).count;
+          text = context.strings.count;
           break;
         case SortKey.size:
-          text = StringsLocalizations.of(context).totalSize;
+          text = context.strings.totalSize;
           break;
       }
       return Text(text, style: textTheme.miniBold);
@@ -225,7 +225,7 @@ class _DeduplicatePageState extends State<DeduplicatePage> {
                       width: double.infinity,
                       child: ButtonWidget(
                         labelText:
-                            "${StringsLocalizations.of(context).deleteItemCount(count: fileCount)} (${formatBytes(totalSize)})",
+                            "${context.strings.deleteItemCount(count: fileCount)} (${formatBytes(totalSize)})",
                         buttonType: ButtonType.critical,
                         onTap: () async {
                           try {
@@ -245,7 +245,7 @@ class _DeduplicatePageState extends State<DeduplicatePage> {
                     SizedBox(
                       width: double.infinity,
                       child: ButtonWidget(
-                        labelText: StringsLocalizations.of(context).unselectAll,
+                        labelText: context.strings.unselectAll,
                         buttonType: ButtonType.secondary,
                         onTap: () async {
                           setState(() {
@@ -336,7 +336,7 @@ class _DeduplicatePageState extends State<DeduplicatePage> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  StringsLocalizations.of(context).duplicateItemsGroup(
+                  context.strings.duplicateItemsGroup(
                     count: duplicates.files.length,
                     formattedSize: formatBytes(duplicates.size),
                   ),

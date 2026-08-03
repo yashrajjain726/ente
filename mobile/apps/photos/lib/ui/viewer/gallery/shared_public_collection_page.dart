@@ -226,7 +226,7 @@ class _SharedPublicCollectionPageState
       if (!mounted) return;
       final dialog = createProgressDialog(
         context,
-        StringsLocalizations.of(context).pleaseWait,
+        context.strings.pleaseWait,
         isDismissible: true,
       );
       await dialog.show();
@@ -251,7 +251,7 @@ class _SharedPublicCollectionPageState
         logger.severe("Failed to join collection", e, s);
         await dialog.hide();
         if (!mounted) return;
-        showToast(context, StringsLocalizations.of(context).somethingWentWrong);
+        showToast(context, context.strings.somethingWentWrong);
       }
     }
   }

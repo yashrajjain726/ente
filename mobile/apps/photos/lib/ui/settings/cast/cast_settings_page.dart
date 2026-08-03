@@ -21,7 +21,7 @@ class CastSettingsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = StringsLocalizations.of(context);
+    final l10n = context.strings;
     final textTheme = getEnteTextTheme(context);
     return SettingsPageScaffold(
       title: l10n.castSessions,
@@ -82,7 +82,7 @@ class _CastSessionsListState extends State<CastSessionsList> {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = StringsLocalizations.of(context);
+    final l10n = context.strings;
     final colors = context.componentColors;
     final logger = Logger("CastSessionsList");
     return FutureBuilder(
@@ -127,7 +127,7 @@ class _CastSessionsListState extends State<CastSessionsList> {
   }
 
   Future<void> _revokeSession(CastInfo session, Logger logger) async {
-    final l10n = StringsLocalizations.of(context);
+    final l10n = context.strings;
     await showBottomSheetComponent<void>(
       context: context,
       builder: (sheetContext) => BottomSheetComponent(

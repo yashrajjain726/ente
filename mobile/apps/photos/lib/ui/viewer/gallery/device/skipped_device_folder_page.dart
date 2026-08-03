@@ -93,7 +93,7 @@ class _SkippedDeviceFolderPageState extends State<SkippedDeviceFolderPage> {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = StringsLocalizations.of(context);
+    final l10n = context.strings;
     final appBar = GalleryAppBarWidget.sliverConfig(
       GalleryType.localFolder,
       l10n.skippedFiles,
@@ -339,13 +339,13 @@ class _ResetIgnoredFilesSection extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          StringsLocalizations.of(context).resetIgnoredFilesDescription,
+          context.strings.resetIgnoredFilesDescription,
           style: textTheme.smallMuted,
         ),
         const SizedBox(height: 12),
         ButtonComponent(
           variant: ButtonComponentVariant.secondary,
-          label: StringsLocalizations.of(context).resetIgnoredFiles,
+          label: context.strings.resetIgnoredFiles,
           onTap: onResetIgnoredFiles,
         ),
       ],

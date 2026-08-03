@@ -28,15 +28,15 @@ extension GroupTypeExtension on GroupType {
   String getLocalizedName(BuildContext context) {
     switch (this) {
       case GroupType.day:
-        return StringsLocalizations.of(context).groupByDay;
+        return context.strings.groupByDay;
       case GroupType.week:
-        return StringsLocalizations.of(context).groupByWeek;
+        return context.strings.groupByWeek;
       case GroupType.month:
-        return StringsLocalizations.of(context).groupByMonth;
+        return context.strings.groupByMonth;
       case GroupType.size:
         return "Size";
       case GroupType.year:
-        return StringsLocalizations.of(context).groupByYear;
+        return context.strings.groupByYear;
       case GroupType.none:
         return "None";
     }
@@ -193,9 +193,9 @@ extension GroupTypeExtension on GroupType {
     final now = DateTime.now();
     if (date.year == now.year && date.month == now.month) {
       if (date.day == now.day) {
-        return StringsLocalizations.of(context).dayToday;
+        return context.strings.dayToday;
       } else if (date.day == now.day - 1) {
-        return StringsLocalizations.of(context).dayYesterday;
+        return context.strings.dayYesterday;
       }
     }
     if (date.year != DateTime.now().year) {
@@ -220,7 +220,7 @@ extension GroupTypeExtension on GroupType {
     if (startOfWeek.year == nowStartOfWeek.year &&
         startOfWeek.month == nowStartOfWeek.month &&
         startOfWeek.day == nowStartOfWeek.day) {
-      return StringsLocalizations.of(context).thisWeek;
+      return context.strings.thisWeek;
     }
 
     // Check if it's the previous week
@@ -228,7 +228,7 @@ extension GroupTypeExtension on GroupType {
     if (startOfWeek.year == lastWeekStart.year &&
         startOfWeek.month == lastWeekStart.month &&
         startOfWeek.day == lastWeekStart.day) {
-      return StringsLocalizations.of(context).lastWeek;
+      return context.strings.lastWeek;
     }
 
     // Return formatted week range
@@ -241,7 +241,7 @@ extension GroupTypeExtension on GroupType {
     final now = DateTime.now();
 
     if (date.year == now.year && date.month == now.month) {
-      return StringsLocalizations.of(context).thisMonth;
+      return context.strings.thisMonth;
     }
 
     return DateFormat.yMMM(
@@ -254,7 +254,7 @@ extension GroupTypeExtension on GroupType {
     final now = DateTime.now();
 
     if (date.year == now.year) {
-      return StringsLocalizations.of(context).thisYear;
+      return context.strings.thisYear;
     }
 
     return DateFormat.y(

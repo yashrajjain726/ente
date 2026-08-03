@@ -19,7 +19,7 @@ Future<void> showNoMailAppSheet(
   await showBottomSheetComponent<void>(
     context: context,
     builder: (_) => BottomSheetComponent(
-      title: StringsLocalizations.of(context).noEmailAppFound,
+      title: context.strings.noEmailAppFound,
       content: NoMailAppSheet(
         toEmail: toEmail,
         subject: subject,
@@ -54,7 +54,7 @@ class NoMailAppSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = StringsLocalizations.of(context);
+    final l10n = context.strings;
     final copyFields = <_CopyFieldData>[
       _CopyFieldData(label: l10n.subject, value: subject),
       _CopyFieldData(label: l10n.message, value: message),

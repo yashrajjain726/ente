@@ -129,7 +129,7 @@ class _SimilarImagesPageState extends State<SimilarImagesPage>
     return Scaffold(
       appBar: AppBar(
         elevation: 0,
-        title: Text(StringsLocalizations.of(context).similarImages),
+        title: Text(context.strings.similarImages),
         actions: _pageState == SimilarImagesPageState.results
             ? [_getSortMenu()]
             : null,
@@ -188,7 +188,7 @@ class _SimilarImagesPageState extends State<SimilarImagesPage>
                       ),
                       const SizedBox(width: 8),
                       Text(
-                        StringsLocalizations.of(context).deletingDash,
+                        context.strings.deletingDash,
                         style: textTheme.small.copyWith(color: Colors.white),
                       ),
                       Text(
@@ -230,7 +230,7 @@ class _SimilarImagesPageState extends State<SimilarImagesPage>
           ),
           const SizedBox(height: 32),
           Text(
-            StringsLocalizations.of(context).findSimilarImages,
+            context.strings.findSimilarImages,
             style: textTheme.h3Bold,
             textAlign: TextAlign.center,
           ),
@@ -304,7 +304,7 @@ class _SimilarImagesPageState extends State<SimilarImagesPage>
           ),
           const SizedBox(height: 32),
           ButtonWidget(
-            labelText: StringsLocalizations.of(context).findSimilarImages,
+            labelText: context.strings.findSimilarImages,
             buttonType: ButtonType.primary,
             onTap: () async {
               await _findSimilarImages();
@@ -333,13 +333,10 @@ class _SimilarImagesPageState extends State<SimilarImagesPage>
               color: colorScheme.primary500,
             ),
             const SizedBox(height: 16),
-            Text(
-              StringsLocalizations.of(context).noSimilarImagesFound,
-              style: textTheme.h3Bold,
-            ),
+            Text(context.strings.noSimilarImagesFound, style: textTheme.h3Bold),
             const SizedBox(height: 8),
             Text(
-              StringsLocalizations.of(context).yourPhotosLookUnique,
+              context.strings.yourPhotosLookUnique,
               style: textTheme.bodyMuted,
             ),
           ],
@@ -364,7 +361,7 @@ class _SimilarImagesPageState extends State<SimilarImagesPage>
                         ),
                         const SizedBox(height: 16),
                         Text(
-                          StringsLocalizations.of(context).nothingToTidyUpHere,
+                          context.strings.nothingToTidyUpHere,
                           textAlign: TextAlign.center,
                           style: textTheme.bodyMuted,
                         ),
@@ -406,21 +403,21 @@ class _SimilarImagesPageState extends State<SimilarImagesPage>
         children: [
           _buildTabButton(
             TabFilter.close,
-            StringsLocalizations.of(context).closeBy,
+            context.strings.closeBy,
             colorScheme,
             textTheme,
           ),
           const SizedBox(width: crossAxisSpacing),
           _buildTabButton(
             TabFilter.similar,
-            StringsLocalizations.of(context).similar,
+            context.strings.similar,
             colorScheme,
             textTheme,
           ),
           const SizedBox(width: crossAxisSpacing),
           _buildTabButton(
             TabFilter.related,
-            StringsLocalizations.of(context).related,
+            context.strings.related,
             colorScheme,
             textTheme,
           ),
@@ -541,13 +538,12 @@ class _SimilarImagesPageState extends State<SimilarImagesPage>
                             SizedBox(
                               width: double.infinity,
                               child: ButtonWidget(
-                                labelText: StringsLocalizations.of(context)
-                                    .deletePhotosWithSize(
-                                      count: NumberFormat().format(
-                                        selectedFilteredFiles.length,
-                                      ),
-                                      size: formatBytes(totalSize),
-                                    ),
+                                labelText: context.strings.deletePhotosWithSize(
+                                  count: NumberFormat().format(
+                                    selectedFilteredFiles.length,
+                                  ),
+                                  size: formatBytes(totalSize),
+                                ),
                                 buttonType: ButtonType.critical,
                                 shouldSurfaceExecutionStates: false,
                                 shouldShowSuccessConfirmation: false,
@@ -569,8 +565,8 @@ class _SimilarImagesPageState extends State<SimilarImagesPage>
                   width: double.infinity,
                   child: ButtonWidget(
                     labelText: allFilteredSelected
-                        ? StringsLocalizations.of(context).unselectAll
-                        : StringsLocalizations.of(context).selectAll,
+                        ? context.strings.unselectAll
+                        : context.strings.selectAll,
                     buttonType: ButtonType.secondary,
                     shouldSurfaceExecutionStates: false,
                     shouldShowSuccessConfirmation: false,
@@ -748,9 +744,9 @@ class _SimilarImagesPageState extends State<SimilarImagesPage>
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                StringsLocalizations.of(
-                      context,
-                    ).similarImagesCount(count: similarFiles.files.length) +
+                context.strings.similarImagesCount(
+                      count: similarFiles.files.length,
+                    ) +
                     (kDebugMode
                         ? " (I: d: ${similarFiles.furthestDistance.toStringAsFixed(3)})"
                         : ""),
@@ -945,9 +941,7 @@ class _SimilarImagesPageState extends State<SimilarImagesPage>
             Icon(Icons.delete_outline, size: 12, color: colorScheme.warning500),
             const SizedBox(width: 4),
             Text(
-              StringsLocalizations.of(
-                context,
-              ).deleteWithCount(count: files.length),
+              context.strings.deleteWithCount(count: files.length),
               style: textTheme.smallBold.copyWith(
                 color: colorScheme.warning500,
               ),
@@ -968,9 +962,9 @@ class _SimilarImagesPageState extends State<SimilarImagesPage>
     if (showDialog) {
       final _ = await showChoiceActionSheet(
         context,
-        title: StringsLocalizations.of(context).deleteFiles,
-        body: StringsLocalizations.of(context).areYouSureDeleteFiles,
-        firstButtonLabel: StringsLocalizations.of(context).delete,
+        title: context.strings.deleteFiles,
+        body: context.strings.areYouSureDeleteFiles,
+        firstButtonLabel: context.strings.delete,
         isCritical: true,
         firstButtonOnTap: () async {
           try {
@@ -1187,15 +1181,15 @@ class _SimilarImagesPageState extends State<SimilarImagesPage>
               SvgPicture.asset("assets/ducky_cleaning_static.svg", height: 160),
               const SizedBox(height: 16),
               Text(
-                StringsLocalizations.of(context).hoorayyyy,
+                context.strings.hoorayyyy,
                 style: textTheme.h2Bold.copyWith(color: colorScheme.primary500),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 8),
               Text(
-                StringsLocalizations.of(
-                  context,
-                ).cleanedUpSimilarImages(size: formatBytes(totalSize)),
+                context.strings.cleanedUpSimilarImages(
+                  size: formatBytes(totalSize),
+                ),
                 style: textTheme.body,
                 textAlign: TextAlign.center,
               ),
@@ -1203,7 +1197,7 @@ class _SimilarImagesPageState extends State<SimilarImagesPage>
               SizedBox(
                 width: double.infinity,
                 child: ButtonWidget(
-                  labelText: StringsLocalizations.of(context).done,
+                  labelText: context.strings.done,
                   buttonType: ButtonType.primary,
                   onTap: () async => Navigator.of(context).pop(),
                 ),
@@ -1223,13 +1217,13 @@ class _SimilarImagesPageState extends State<SimilarImagesPage>
       String text;
       switch (key) {
         case SortKey.size:
-          text = StringsLocalizations.of(context).totalSize;
+          text = context.strings.totalSize;
           break;
         case SortKey.recent:
-          text = StringsLocalizations.of(context).recent;
+          text = context.strings.recent;
           break;
         case SortKey.count:
-          text = StringsLocalizations.of(context).count;
+          text = context.strings.count;
           break;
       }
       return Text(text, style: textTheme.miniBold);
@@ -1322,11 +1316,11 @@ class _LoadingScreenState extends State<_LoadingScreen> {
     final textTheme = getEnteTextTheme(context);
 
     _loadingTexts = [
-      StringsLocalizations.of(context).analyzingPhotosLocally,
-      StringsLocalizations.of(context).lookingForVisualSimilarities,
-      StringsLocalizations.of(context).comparingImageDetails,
-      StringsLocalizations.of(context).findingSimilarImages,
-      StringsLocalizations.of(context).almostDone,
+      context.strings.analyzingPhotosLocally,
+      context.strings.lookingForVisualSimilarities,
+      context.strings.comparingImageDetails,
+      context.strings.findingSimilarImages,
+      context.strings.almostDone,
     ];
 
     return Center(

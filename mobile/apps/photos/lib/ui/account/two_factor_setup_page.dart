@@ -77,10 +77,7 @@ class _TwoFactorSetupPageState extends State<TwoFactorSetupPage>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        elevation: 0,
-        title: Text(StringsLocalizations.of(context).twofactorSetup),
-      ),
+      appBar: AppBar(elevation: 0, title: Text(context.strings.twofactorSetup)),
       body: _getBody(),
     );
   }
@@ -100,8 +97,8 @@ class _TwoFactorSetupPageState extends State<TwoFactorSetupPage>
                     labelColor: Theme.of(context).colorScheme.greenAlternative,
                     unselectedLabelColor: Colors.grey,
                     tabs: [
-                      Tab(text: StringsLocalizations.of(context).enterCode),
-                      Tab(text: StringsLocalizations.of(context).scanCode),
+                      Tab(text: context.strings.enterCode),
+                      Tab(text: context.strings.scanCode),
                     ],
                     controller: _tabController,
                     indicatorSize: TabBarIndicatorSize.tab,
@@ -133,19 +130,14 @@ class _TwoFactorSetupPageState extends State<TwoFactorSetupPage>
       onTap: () async {
         await Clipboard.setData(ClipboardData(text: widget.secretCode));
         if (!mounted) return;
-        showShortToast(
-          context,
-          StringsLocalizations.of(context).codeCopiedToClipboard,
-        );
+        showShortToast(context, context.strings.codeCopiedToClipboard);
       },
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           const Padding(padding: EdgeInsets.all(12)),
           Text(
-            StringsLocalizations.of(
-              context,
-            ).copypasteThisCodentoYourAuthenticatorApp,
+            context.strings.copypasteThisCodentoYourAuthenticatorApp,
             style: const TextStyle(height: 1.4, fontSize: 16),
             textAlign: TextAlign.center,
           ),
@@ -169,7 +161,7 @@ class _TwoFactorSetupPageState extends State<TwoFactorSetupPage>
           ),
           const Padding(padding: EdgeInsets.all(6)),
           Text(
-            StringsLocalizations.of(context).tapToCopy,
+            context.strings.tapToCopy,
             style: TextStyle(color: textColor.withValues(alpha: 0.5)),
           ),
         ],
@@ -183,9 +175,7 @@ class _TwoFactorSetupPageState extends State<TwoFactorSetupPage>
         children: [
           const Padding(padding: EdgeInsets.all(12)),
           Text(
-            StringsLocalizations.of(
-              context,
-            ).scanThisBarcodeWithnyourAuthenticatorApp,
+            context.strings.scanThisBarcodeWithnyourAuthenticatorApp,
             style: const TextStyle(height: 1.4, fontSize: 16),
             textAlign: TextAlign.center,
           ),
@@ -201,9 +191,7 @@ class _TwoFactorSetupPageState extends State<TwoFactorSetupPage>
       children: [
         const Padding(padding: EdgeInsets.all(12)),
         Text(
-          StringsLocalizations.of(
-            context,
-          ).enterThe6digitCodeFromnyourAuthenticatorApp,
+          context.strings.enterThe6digitCodeFromnyourAuthenticatorApp,
           style: const TextStyle(height: 1.4, fontSize: 16),
           textAlign: TextAlign.center,
         ),
@@ -247,7 +235,7 @@ class _TwoFactorSetupPageState extends State<TwoFactorSetupPage>
                   await _enableTwoFactor(_code);
                 }
               : null,
-          child: Text(StringsLocalizations.of(context).confirm),
+          child: Text(context.strings.confirm),
         ),
         const Padding(padding: EdgeInsets.only(bottom: 24)),
       ],
@@ -273,16 +261,12 @@ class _TwoFactorSetupPageState extends State<TwoFactorSetupPage>
       context,
       RecoveryKeyPage(
         recoveryKey,
-        StringsLocalizations.of(context).ok,
+        context.strings.ok,
         isOnboarding: false,
         onDone: () {},
-        title: StringsLocalizations.of(context).setupComplete,
-        text: StringsLocalizations.of(
-          context,
-        ).saveYourRecoveryKeyIfYouHaventAlready,
-        subText: StringsLocalizations.of(
-          context,
-        ).thisCanBeUsedToRecoverYourAccountIfYou,
+        title: context.strings.setupComplete,
+        text: context.strings.saveYourRecoveryKeyIfYouHaventAlready,
+        subText: context.strings.thisCanBeUsedToRecoverYourAccountIfYou,
       ),
     );
   }

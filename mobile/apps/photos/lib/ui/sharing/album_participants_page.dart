@@ -114,19 +114,19 @@ class _AlbumParticipantsPageState extends State<AlbumParticipantsPage> {
 
     final children = <Widget>[
       if (shouldShowPublicLink) ...[
-        ShareSectionTitle(StringsLocalizations.of(context).publicLinkEnabled),
+        ShareSectionTitle(context.strings.publicLinkEnabled),
         PublicLinkEnabledActionsWidget(
           collection: _collection,
           sendLinkButtonKey: _sendLinkButtonKey,
         ),
         const SizedBox(height: Spacing.xxl),
       ],
-      ShareSectionTitle(StringsLocalizations.of(context).albumOwner),
+      ShareSectionTitle(context.strings.albumOwner),
       ShareMenuGroup(
         items: [
           ShareMenuItem(
             title: isOwner
-                ? StringsLocalizations.of(context).you
+                ? context.strings.you
                 : _nameIfAvailableElseEmail(owner),
             leading: UserAvatarWidget(owner, currentUserID: currentUserID),
             isDisabled: true,
@@ -135,37 +135,37 @@ class _AlbumParticipantsPageState extends State<AlbumParticipantsPage> {
       ),
       ..._participantSection(
         context,
-        title: StringsLocalizations.of(context).admins,
+        title: context.strings.admins,
         users: admins,
         currentUserID: currentUserID,
         canManageParticipants: canManageParticipants,
         addTitle: admins.isNotEmpty
-            ? StringsLocalizations.of(context).addMoreAdmins
-            : StringsLocalizations.of(context).addAdmin,
+            ? context.strings.addMoreAdmins
+            : context.strings.addAdmin,
         addActions: const [ActionTypesToShow.addAdmin],
         addIcon: HugeIcons.strokeRoundedCrown,
       ),
       ..._participantSection(
         context,
-        title: StringsLocalizations.of(context).collaborator,
+        title: context.strings.collaborator,
         users: collaborators,
         currentUserID: currentUserID,
         canManageParticipants: canManageParticipants,
         addTitle: collaborators.isNotEmpty
-            ? StringsLocalizations.of(context).addMore
-            : StringsLocalizations.of(context).addCollaborator,
+            ? context.strings.addMore
+            : context.strings.addCollaborator,
         addActions: const [ActionTypesToShow.addCollaborator],
         addIcon: HugeIcons.strokeRoundedUserGroup,
       ),
       ..._participantSection(
         context,
-        title: StringsLocalizations.of(context).viewer,
+        title: context.strings.viewer,
         users: viewers,
         currentUserID: currentUserID,
         canManageParticipants: canManageParticipants,
         addTitle: viewers.isNotEmpty
-            ? StringsLocalizations.of(context).addMore
-            : StringsLocalizations.of(context).addViewer,
+            ? context.strings.addMore
+            : context.strings.addViewer,
         addActions: const [ActionTypesToShow.addViewer],
         addIcon: HugeIcons.strokeRoundedView,
       ),
@@ -174,9 +174,7 @@ class _AlbumParticipantsPageState extends State<AlbumParticipantsPage> {
 
     return ShareScaffold(
       title: _collection.displayName,
-      subtitle: StringsLocalizations.of(
-        context,
-      ).albumParticipantsCount(count: participants),
+      subtitle: context.strings.albumParticipantsCount(count: participants),
       children: children,
     );
   }
@@ -199,7 +197,7 @@ class _AlbumParticipantsPageState extends State<AlbumParticipantsPage> {
       for (final user in users)
         ShareMenuItem(
           title: user.id == currentUserID
-              ? StringsLocalizations.of(context).you
+              ? context.strings.you
               : _nameIfAvailableElseEmail(user),
           leading: UserAvatarWidget(
             user,

@@ -71,7 +71,7 @@ class _BackupHeaderWidgetState extends State<BackupHeaderWidget> {
   }
 
   Widget _buildBackupRow(BuildContext context) {
-    final l10n = StringsLocalizations.of(context);
+    final l10n = context.strings;
     return MenuItemWidgetNew(
       title: l10n.backup,
       subText: l10n.autoUploadFromThisDeviceFolder,
@@ -88,7 +88,7 @@ class _BackupHeaderWidgetState extends State<BackupHeaderWidget> {
   }
 
   Widget _buildSkippedFilesRow(BuildContext context) {
-    final l10n = StringsLocalizations.of(context);
+    final l10n = context.strings;
     return FutureBuilder<Set<IgnoredUploadReasonBucket>>(
       future: _ignoredUploadBuckets,
       builder: (context, snapshot) {

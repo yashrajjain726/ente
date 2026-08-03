@@ -83,7 +83,7 @@ class _CollageCreatorPageState extends State<CollageCreatorPage> {
       final newFile = fileFromAsset("ente Collages", newAsset);
       SyncService.instance.sync().ignore();
       if (!mounted) return;
-      showShortToast(context, StringsLocalizations.of(context).collageSaved);
+      showShortToast(context, context.strings.collageSaved);
       replacePage(
         context,
         DetailPage(DetailPageConfiguration([newFile], 0, "collage")),
@@ -92,10 +92,7 @@ class _CollageCreatorPageState extends State<CollageCreatorPage> {
     } catch (e, s) {
       _logger.severe("Failed to create collage", e, s);
       if (!mounted) return;
-      showShortToast(
-        context,
-        StringsLocalizations.of(context).somethingWentWrong,
-      );
+      showShortToast(context, context.strings.somethingWentWrong);
     } finally {
       if (mounted) {
         setState(() {

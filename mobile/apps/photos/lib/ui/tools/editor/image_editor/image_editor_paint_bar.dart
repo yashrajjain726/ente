@@ -60,7 +60,7 @@ class _ImageEditorPaintBarState extends State<ImageEditorPaintBar>
               Padding(
                 padding: const EdgeInsets.only(left: 20.0),
                 child: Text(
-                  StringsLocalizations.of(context).brushColor,
+                  context.strings.brushColor,
                   style: TextStyles.large.copyWith(color: colors.textBase),
                 ),
               ),

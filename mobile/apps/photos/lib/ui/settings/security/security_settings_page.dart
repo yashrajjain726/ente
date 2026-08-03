@@ -60,7 +60,7 @@ class _SecuritySettingsPageState extends State<SecuritySettingsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = StringsLocalizations.of(context);
+    final l10n = context.strings;
     final showAccountSecurity =
         _config.hasConfiguredAccount() && !isLocalGalleryMode;
 
@@ -146,9 +146,7 @@ class _SecuritySettingsPageState extends State<SecuritySettingsPage> {
     final hasAuthenticated = await LocalAuthenticationService.instance
         .requestLocalAuthentication(
           context,
-          StringsLocalizations.of(
-            context,
-          ).authToConfigureTwofactorAuthentication,
+          context.strings.authToConfigureTwofactorAuthentication,
         );
     final isTwoFactorEnabled = UserService.instance.hasEnabledTwoFactor();
     if (hasAuthenticated) {
@@ -164,7 +162,7 @@ class _SecuritySettingsPageState extends State<SecuritySettingsPage> {
   }
 
   Future<void> _disableTwoFactor() async {
-    final l10n = StringsLocalizations.of(context);
+    final l10n = context.strings;
     await showBottomSheetComponent<void>(
       context: context,
       builder: (sheetContext) => BottomSheetComponent(
@@ -191,7 +189,7 @@ class _SecuritySettingsPageState extends State<SecuritySettingsPage> {
     final hasAuthenticated = await LocalAuthenticationService.instance
         .requestLocalAuthentication(
           context,
-          StringsLocalizations.of(context).authToChangeEmailVerificationSetting,
+          context.strings.authToChangeEmailVerificationSetting,
         );
     final isEmailMFAEnabled = UserService.instance.hasEmailMFAEnabled();
     if (hasAuthenticated) {
@@ -221,16 +219,13 @@ class _SecuritySettingsPageState extends State<SecuritySettingsPage> {
       await UserService.instance.updateEmailMFA(isEnabled);
     } catch (e) {
       if (!mounted) return;
-      showToast(context, StringsLocalizations.of(context).somethingWentWrong);
+      showToast(context, context.strings.somethingWentWrong);
     }
   }
 
   Future<void> _onPasskeyTap(BuildContext context) async {
     final hasAuthenticated = await LocalAuthenticationService.instance
-        .requestLocalAuthentication(
-          context,
-          StringsLocalizations.of(context).authToViewPasskey,
-        );
+        .requestLocalAuthentication(context, context.strings.authToViewPasskey);
     if (hasAuthenticated && mounted && context.mounted) {
       await _handlePasskeyClick(context);
     }
@@ -268,7 +263,7 @@ class _SecuritySettingsPageState extends State<SecuritySettingsPage> {
       if (!context.mounted) return;
       final bool result = await requestAuthentication(
         context,
-        StringsLocalizations.of(context).authToChangeLockscreenSetting,
+        context.strings.authToChangeLockscreenSetting,
       );
       if (result) {
         if (!context.mounted) return;
@@ -284,10 +279,8 @@ class _SecuritySettingsPageState extends State<SecuritySettingsPage> {
       if (!context.mounted) return;
       await showErrorDialog(
         context,
-        StringsLocalizations.of(context).noSystemLockFound,
-        StringsLocalizations.of(
-          context,
-        ).toEnableAppLockPleaseSetupDevicePasscodeOrScreen,
+        context.strings.noSystemLockFound,
+        context.strings.toEnableAppLockPleaseSetupDevicePasscodeOrScreen,
       );
     }
   }
@@ -296,7 +289,7 @@ class _SecuritySettingsPageState extends State<SecuritySettingsPage> {
     final hasAuthenticated = await LocalAuthenticationService.instance
         .requestLocalAuthentication(
           context,
-          StringsLocalizations.of(context).authToViewYourActiveSessions,
+          context.strings.authToViewYourActiveSessions,
         );
     if (hasAuthenticated) {
       if (!context.mounted) return;

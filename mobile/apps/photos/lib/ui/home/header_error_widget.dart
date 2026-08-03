@@ -20,8 +20,8 @@ class HeaderErrorWidget extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 6),
         child: BannerComponent(
           leadingIcon: HugeIcons.strokeRoundedInformationCircle,
-          title: StringsLocalizations.of(context).subscribe,
-          subtitle: StringsLocalizations.of(context).yourSubscriptionHasExpired,
+          title: context.strings.subscribe,
+          subtitle: context.strings.yourSubscriptionHasExpired,
           state: BannerComponentState.failure,
           onTap: () async {
             await routeToPage(
@@ -37,8 +37,8 @@ class HeaderErrorWidget extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 6),
         child: BannerComponent(
           leadingIcon: HugeIcons.strokeRoundedDatabase,
-          title: StringsLocalizations.of(context).upgrade,
-          subtitle: StringsLocalizations.of(context).storageLimitExceeded,
+          title: context.strings.upgrade,
+          subtitle: context.strings.storageLimitExceeded,
           state: BannerComponentState.failure,
           onTap: () async {
             await routeToPage(
@@ -54,10 +54,8 @@ class HeaderErrorWidget extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 6),
         child: BannerComponent(
           leadingIcon: HugeIcons.strokeRoundedAlertCircle,
-          title: StringsLocalizations.of(context).freeUpDeviceSpace,
-          subtitle: StringsLocalizations.of(
-            context,
-          ).backupPausedFreeUpDeviceStorage,
+          title: context.strings.freeUpDeviceSpace,
+          subtitle: context.strings.backupPausedFreeUpDeviceStorage,
           state: BannerComponentState.failure,
           onTap: () async {
             await routeToPage(
@@ -73,15 +71,15 @@ class HeaderErrorWidget extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 6),
         child: BannerComponent(
           leadingIcon: HugeIcons.strokeRoundedAlertCircle,
-          title: StringsLocalizations.of(context).backupFailed,
-          subtitle: StringsLocalizations.of(context).couldNotBackUpTryLater,
+          title: context.strings.backupFailed,
+          subtitle: context.strings.couldNotBackUpTryLater,
           state: BannerComponentState.failure,
           onTap: () {
             sendLogs(
               context,
-              StringsLocalizations.of(context).raiseTicket,
+              context.strings.raiseTicket,
               "support@ente.com",
-              subject: StringsLocalizations.of(context).backupFailed,
+              subject: context.strings.backupFailed,
             );
           },
         ),

@@ -128,10 +128,7 @@ class _FavoriteWidgetState extends State<FavoriteWidget> {
         _logger.severe("Failed to add file to favorites", e, s);
         hasError = true;
         if (!mounted) return;
-        showToast(
-          context,
-          StringsLocalizations.of(context).sorryCouldNotAddToFavorites,
-        );
+        showToast(context, context.strings.sorryCouldNotAddToFavorites);
         _stateMachine?.trigger("Stroke")?.fire();
       }
     } else {
@@ -147,10 +144,7 @@ class _FavoriteWidgetState extends State<FavoriteWidget> {
         _logger.severe("Failed to remove file from favorites", e, s);
         hasError = true;
         if (!mounted) return;
-        showToast(
-          context,
-          StringsLocalizations.of(context).sorryCouldNotRemoveFromFavorites,
-        );
+        showToast(context, context.strings.sorryCouldNotRemoveFromFavorites);
         _stateMachine?.trigger("Filled")?.fire();
       }
     }

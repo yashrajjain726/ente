@@ -62,9 +62,7 @@ class _PaymentWebPageState extends State<PaymentWebPage> {
         }
       },
       child: Scaffold(
-        appBar: AppBar(
-          title: Text(StringsLocalizations.of(context).subscription),
-        ),
+        appBar: AppBar(title: Text(context.strings.subscription)),
         body: Column(
           children: <Widget>[
             (progress != 1.0)
@@ -146,18 +144,18 @@ class _PaymentWebPageState extends State<PaymentWebPage> {
       useRootNavigator: false,
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(StringsLocalizations.of(context).areYouSureYouWantToExit),
+        title: Text(context.strings.areYouSureYouWantToExit),
         actions: <Widget>[
           TextButton(
             child: Text(
-              StringsLocalizations.of(context).yes,
+              context.strings.yes,
               style: const TextStyle(color: Colors.redAccent),
             ),
             onPressed: () => Navigator.of(context).pop(true),
           ),
           TextButton(
             child: Text(
-              StringsLocalizations.of(context).no,
+              context.strings.no,
               style: TextStyle(
                 color: Theme.of(context).colorScheme.greenAlternative,
               ),
@@ -202,11 +200,11 @@ class _PaymentWebPageState extends State<PaymentWebPage> {
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
-        title: Text(StringsLocalizations.of(context).paymentFailed),
-        content: Text(StringsLocalizations.of(context).paymentFailedMessage),
+        title: Text(context.strings.paymentFailed),
+        content: Text(context.strings.paymentFailedMessage),
         actions: <Widget>[
           TextButton(
-            child: Text(StringsLocalizations.of(context).contactSupport),
+            child: Text(context.strings.contactSupport),
             onPressed: () => Navigator.of(context).pop(true),
           ),
         ],
@@ -232,23 +230,19 @@ class _PaymentWebPageState extends State<PaymentWebPage> {
       );
       if (!mounted) return;
       final content = widget.actionType == 'buy'
-          ? StringsLocalizations.of(context).yourPurchaseWasSuccessful
-          : StringsLocalizations.of(
-              context,
-            ).yourSubscriptionWasUpdatedSuccessfully;
+          ? context.strings.yourPurchaseWasSuccessful
+          : context.strings.yourSubscriptionWasUpdatedSuccessfully;
       if (!mounted) return;
       await _showExitPageDialog(
-        title: StringsLocalizations.of(context).thankYou,
+        title: context.strings.thankYou,
         content: content,
       );
     } catch (error) {
       _logger.severe(error);
       if (!mounted) return;
       await _showExitPageDialog(
-        title: StringsLocalizations.of(context).failedToVerifyPaymentStatus,
-        content: StringsLocalizations.of(
-          context,
-        ).pleaseWaitForSometimeBeforeRetrying,
+        title: context.strings.failedToVerifyPaymentStatus,
+        content: context.strings.pleaseWaitForSometimeBeforeRetrying,
       );
     }
   }
@@ -266,7 +260,7 @@ class _PaymentWebPageState extends State<PaymentWebPage> {
         actions: <Widget>[
           TextButton(
             child: Text(
-              StringsLocalizations.of(context).ok,
+              context.strings.ok,
               style: TextStyle(
                 color: Theme.of(context).colorScheme.greenAlternative,
               ),

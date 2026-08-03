@@ -77,11 +77,11 @@ class _VideoStreamChangeWidgetState extends State<VideoStreamChangeWidget> {
     switch (status) {
       case PreviewItemStatus.inQueue:
       case PreviewItemStatus.retry:
-        return StringsLocalizations.of(context).queued;
+        return context.strings.queued;
       case PreviewItemStatus.compressing:
       case PreviewItemStatus.uploading:
       default:
-        return StringsLocalizations.of(context).creatingStream;
+        return context.strings.creatingStream;
     }
   }
 
@@ -177,8 +177,8 @@ class _VideoStreamChangeWidgetState extends State<VideoStreamChangeWidget> {
                         const SizedBox(width: 2),
                         Text(
                           widget.isPreviewPlayer
-                              ? StringsLocalizations.of(context).playOriginal
-                              : StringsLocalizations.of(context).playStream,
+                              ? context.strings.playOriginal
+                              : context.strings.playStream,
                           style: const TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w600,

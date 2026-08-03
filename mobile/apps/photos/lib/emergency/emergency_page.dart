@@ -52,10 +52,7 @@ class _EmergencyPageState extends State<EmergencyPage> {
       }
     } catch (e) {
       if (!mounted) return;
-      showShortToast(
-        context,
-        StringsLocalizations.of(context).somethingWentWrong,
-      );
+      showShortToast(context, context.strings.somethingWentWrong);
     }
   }
 
@@ -443,10 +440,7 @@ class _EmergencyPageState extends State<EmergencyPage> {
     } catch (e) {
       if (mounted) {
         if (!context.mounted) return;
-        showShortToast(
-          context,
-          StringsLocalizations.of(context).somethingWentWrong,
-        );
+        showShortToast(context, context.strings.somethingWentWrong);
       }
     }
   }
@@ -458,19 +452,17 @@ class _EmergencyPageState extends State<EmergencyPage> {
     final result = await showEmailActionSheet<String>(
       context,
       email: contact.user.email,
-      message: StringsLocalizations.of(
-        context,
-      ).legacyInvite(email: contact.user.email),
+      message: context.strings.legacyInvite(email: contact.user.email),
       buttons: [
         ButtonWidgetV2(
           buttonType: ButtonTypeV2.primary,
-          labelText: StringsLocalizations.of(context).acceptTrustInvite,
+          labelText: context.strings.acceptTrustInvite,
           shouldSurfaceExecutionStates: false,
           onTap: () async => Navigator.of(context).pop("accept"),
         ),
         ButtonWidgetV2(
           buttonType: ButtonTypeV2.tertiaryCritical,
-          labelText: StringsLocalizations.of(context).declineTrustInvite,
+          labelText: context.strings.declineTrustInvite,
           shouldSurfaceExecutionStates: false,
           onTap: () async => Navigator.of(context).pop("decline"),
         ),

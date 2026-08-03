@@ -32,7 +32,7 @@ class HelpSupportPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = StringsLocalizations.of(context);
+    final l10n = context.strings;
 
     return SettingsPageScaffold(
       title: l10n.helpAndSupport,
@@ -185,10 +185,7 @@ class HelpSupportPage extends StatelessWidget {
   Future<void> _viewLogs(BuildContext context) async {
     final logFile = SuperLogging.logFile;
     if (logFile == null) {
-      showShortToast(
-        context,
-        StringsLocalizations.of(context).somethingWentWrong,
-      );
+      showShortToast(context, context.strings.somethingWentWrong);
       return;
     }
     await Navigator.of(
@@ -204,10 +201,7 @@ class HelpSupportPage extends StatelessWidget {
     } catch (e, s) {
       _logger.severe("Failed to export logs", e, s);
       if (context.mounted) {
-        showShortToast(
-          context,
-          StringsLocalizations.of(context).somethingWentWrong,
-        );
+        showShortToast(context, context.strings.somethingWentWrong);
       }
     }
   }

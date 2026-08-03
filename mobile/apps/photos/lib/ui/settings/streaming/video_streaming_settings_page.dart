@@ -37,7 +37,7 @@ class _VideoStreamingSettingsPageState
 
   @override
   Widget build(BuildContext context) {
-    final l10n = StringsLocalizations.of(context);
+    final l10n = context.strings;
     final hasEnabled = VideoPreviewService.instance.isVideoStreamingEnabled;
     final children = hasEnabled
         ? _enabledChildren(context)
@@ -72,7 +72,7 @@ class _VideoStreamingSettingsPageState
 
   List<Widget> _enabledChildren(BuildContext context) {
     final colors = context.componentColors;
-    final l10n = StringsLocalizations.of(context);
+    final l10n = context.strings;
     return [
       Text.rich(
         TextSpan(
@@ -118,7 +118,7 @@ class _VideoStreamingSettingsPageState
 
   List<Widget> _disabledChildren(BuildContext context) {
     final colors = context.componentColors;
-    final l10n = StringsLocalizations.of(context);
+    final l10n = context.strings;
     return [
       const SizedBox(height: 80),
       Image.asset("assets/enable-streaming-static.png", height: 160),
@@ -162,7 +162,7 @@ class _VideoStreamingSettingsPageState
         .push(
           MaterialPageRoute(
             builder: (BuildContext context) {
-              return WebPage(StringsLocalizations.of(context).help, helpUrl);
+              return WebPage(context.strings.help, helpUrl);
             },
           ),
         )
@@ -233,7 +233,7 @@ class VideoStreamingStatusWidgetState
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               MenuComponent(
-                title: StringsLocalizations.of(context).processed,
+                title: context.strings.processed,
                 leading: _streamingMenuIcon(
                   context,
                   HugeIcons.strokeRoundedClock01,
@@ -250,7 +250,7 @@ class VideoStreamingStatusWidgetState
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: Text(
-                  StringsLocalizations.of(context).videoStreamingNote,
+                  context.strings.videoStreamingNote,
                   style: TextStyles.body.copyWith(color: colors.textLight),
                 ),
               ),

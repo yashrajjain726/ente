@@ -14,7 +14,7 @@ Future<bool?> showChangeReferralCodeSheet(
   return showBottomSheetComponent<bool>(
     context: context,
     builder: (_) => BottomSheetComponent(
-      title: StringsLocalizations.of(context).changeYourReferralCode,
+      title: context.strings.changeYourReferralCode,
       isKeyboardAware: true,
       content: _ChangeReferralCodeContent(
         currentCode: currentCode,
@@ -90,15 +90,11 @@ class _ChangeReferralCodeContentState
       if (e is DioException) {
         if (e.response?.statusCode == 400) {
           setState(() {
-            _errorMessage = StringsLocalizations.of(
-              context,
-            ).unavailableReferralCode;
+            _errorMessage = context.strings.unavailableReferralCode;
           });
         } else if (e.response?.statusCode == 429) {
           setState(() {
-            _errorMessage = StringsLocalizations.of(
-              context,
-            ).codeChangeLimitReached;
+            _errorMessage = context.strings.codeChangeLimitReached;
           });
         } else {
           if (mounted) {
@@ -121,7 +117,7 @@ class _ChangeReferralCodeContentState
 
   @override
   Widget build(BuildContext context) {
-    final l10n = StringsLocalizations.of(context);
+    final l10n = context.strings;
 
     return Column(
       mainAxisSize: MainAxisSize.min,

@@ -140,7 +140,7 @@ class _MLProgressBannerState extends State<MLProgressBanner> {
 
     final colorScheme = getEnteColorScheme(context);
     final textTheme = getEnteTextTheme(context);
-    final l10n = StringsLocalizations.of(context);
+    final l10n = context.strings;
     final format = NumberFormat();
     final progress = total > 0 ? status.indexedItems.toDouble() / total : 0.0;
     final showModelDownloadPhase = _shouldShowModelDownloadPhase(status);

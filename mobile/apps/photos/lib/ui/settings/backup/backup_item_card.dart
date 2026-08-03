@@ -142,16 +142,12 @@ class _BackupItemCardState extends State<BackupItemCard> {
                       context: context,
                       isDismissible: true,
                       builder: (_) => BottomSheetComponent(
-                        title: StringsLocalizations.of(context).backupFailed,
-                        message: StringsLocalizations.of(
-                          context,
-                        ).sorryBackupFailedDesc,
+                        title: context.strings.backupFailed,
+                        message: context.strings.sorryBackupFailedDesc,
                         illustration: Image.asset("assets/warning-grey.png"),
                         actions: [
                           ButtonComponent(
-                            label: StringsLocalizations.of(
-                              context,
-                            ).contactSupport,
+                            label: context.strings.contactSupport,
                             onTap: () async {
                               _logger.warning(
                                 "Backup failed for ${widget.item.file.displayName}",
@@ -159,7 +155,7 @@ class _BackupItemCardState extends State<BackupItemCard> {
                               );
                               await sendLogs(
                                 context,
-                                StringsLocalizations.of(context).contactSupport,
+                                context.strings.contactSupport,
                                 "support@ente.com",
                                 postShare: () {},
                               );
@@ -169,7 +165,7 @@ class _BackupItemCardState extends State<BackupItemCard> {
                             },
                           ),
                           ButtonComponent(
-                            label: StringsLocalizations.of(context).ok,
+                            label: context.strings.ok,
                             variant: ButtonComponentVariant.secondary,
                             onTap: () async {
                               Navigator.of(context).pop();

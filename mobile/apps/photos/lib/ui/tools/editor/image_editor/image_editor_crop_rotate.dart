@@ -111,7 +111,7 @@ class _ImageEditorCropRotateBarState extends State<ImageEditorCropRotateBar>
                 children: [
                   CircularIconButton(
                     hugeIcon: HugeIcons.strokeRoundedRotateCrop,
-                    label: StringsLocalizations.of(context).rotate,
+                    label: context.strings.rotate,
                     onTap: () {
                       widget.editor.rotate();
                     },
@@ -119,7 +119,7 @@ class _ImageEditorCropRotateBarState extends State<ImageEditorCropRotateBar>
                   const SizedBox(width: 6),
                   CircularIconButton(
                     hugeIcon: HugeIcons.strokeRoundedFlipLeft,
-                    label: StringsLocalizations.of(context).flip,
+                    label: context.strings.flip,
                     onTap: () {
                       widget.editor.flip();
                     },

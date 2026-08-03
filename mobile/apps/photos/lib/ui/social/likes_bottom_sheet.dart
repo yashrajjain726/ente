@@ -286,7 +286,7 @@ class _LikesHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = StringsLocalizations.of(context);
+    final l10n = context.strings;
     final textTheme = getEnteTextTheme(context);
 
     return Padding(
@@ -322,7 +322,7 @@ class _EmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = StringsLocalizations.of(context);
+    final l10n = context.strings;
     final textTheme = getEnteTextTheme(context);
 
     return Padding(
@@ -341,7 +341,7 @@ class _ErrorState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = StringsLocalizations.of(context);
+    final l10n = context.strings;
     final textTheme = getEnteTextTheme(context);
 
     return Padding(
@@ -391,7 +391,7 @@ class _LikesList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = StringsLocalizations.of(context);
+    final l10n = context.strings;
 
     return ListView.builder(
       shrinkWrap: likes.length <= _shrinkWrapThreshold,

@@ -73,11 +73,7 @@ class _ReassignMeSelectionPageState extends State<ReassignMeSelectionPage> {
             );
             return const Center(child: Icon(Icons.error_outline_rounded));
           } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return Center(
-              child: Text(
-                StringsLocalizations.of(context).noResultsFound + '.',
-              ),
-            );
+            return Center(child: Text(context.strings.noResultsFound + '.'));
           } else {
             final results = snapshot.data!;
             final screenWidth = MediaQuery.of(context).size.width;

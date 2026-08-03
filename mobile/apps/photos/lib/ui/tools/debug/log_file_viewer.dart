@@ -34,10 +34,7 @@ class _LogFileViewerState extends State<LogFileViewer> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        elevation: 0,
-        title: Text(StringsLocalizations.of(context).todaysLogs),
-      ),
+      appBar: AppBar(elevation: 0, title: Text(context.strings.todaysLogs)),
       body: FutureBuilder<List<String>>(
         future: _logsFuture,
         builder: (context, snapshot) {

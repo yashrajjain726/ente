@@ -122,7 +122,7 @@ String librarySharingRoleLabel(
   BuildContext context,
   CollectionParticipantRole role,
 ) {
-  final l10n = StringsLocalizations.of(context);
+  final l10n = context.strings;
   return switch (role) {
     CollectionParticipantRole.admin => l10n.admin,
     CollectionParticipantRole.collaborator => l10n.collaborator,

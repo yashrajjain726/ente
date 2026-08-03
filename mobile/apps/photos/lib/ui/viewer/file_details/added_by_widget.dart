@@ -48,9 +48,7 @@ class AddedByWidget extends StatelessWidget {
           const SizedBox(width: Spacing.sm),
           Flexible(
             child: Text(
-              StringsLocalizations.of(
-                context,
-              ).addedBy(emailOrName: identity.label),
+              context.strings.addedBy(emailOrName: identity.label),
               style: TextStyles.mini.copyWith(color: colors.textLighter),
               overflow: TextOverflow.ellipsis,
             ),

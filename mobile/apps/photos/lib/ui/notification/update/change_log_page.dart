@@ -26,7 +26,7 @@ class _ChangeLogPageState extends State<ChangeLogPage> {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = StringsLocalizations.of(context);
+    final l10n = context.strings;
     final colors = context.componentColors;
     final isLocalGallery = isLocalGalleryMode;
     return BottomSheetComponent(

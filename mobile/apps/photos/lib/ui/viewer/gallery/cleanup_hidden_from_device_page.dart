@@ -62,7 +62,7 @@ class _CleanupHiddenFromDevicePageState
     final deleteAllButtonHeight = 40.0 + max(bottomPadding, 6.0) + 12.0;
     final appBar = GalleryAppBarWidget.sliverConfig(
       GalleryType.cleanupHiddenFromDevice,
-      StringsLocalizations.of(context).deleteOnDeviceFiles,
+      context.strings.deleteOnDeviceFiles,
       _selectedFiles,
     );
 
@@ -78,9 +78,7 @@ class _CleanupHiddenFromDevicePageState
       tagPrefix: "cleanup_hidden_from_device",
       selectedFiles: _selectedFiles,
       enableFileGrouping: false,
-      emptyState: EmptyState(
-        text: StringsLocalizations.of(context).noHiddenFilesOnDevice,
-      ),
+      emptyState: EmptyState(text: context.strings.noHiddenFilesOnDevice),
     );
 
     return GalleryBoundariesProvider(
@@ -145,7 +143,7 @@ class _CleanupHiddenFromDevicePageState
                       horizontal: 16,
                     ),
                     child: Text(
-                      StringsLocalizations.of(context).deleteAll,
+                      context.strings.deleteAll,
                       style: Theme.of(context).textTheme.titleSmall!.copyWith(
                         color: const Color.fromRGBO(255, 101, 101, 1),
                       ),
@@ -165,7 +163,7 @@ class _CleanupHiddenFromDevicePageState
     if (allFiles.isEmpty) return;
 
     if (!mounted) return;
-    final l10n = StringsLocalizations.of(context);
+    final l10n = context.strings;
     if (!mounted) return;
     final actionResult = await showActionSheet(
       context: context,

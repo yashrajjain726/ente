@@ -64,7 +64,7 @@ class _RecoverOthersAccountState extends State<RecoverOthersAccount> {
   Widget build(BuildContext context) {
     final colorScheme = getEnteColorScheme(context);
     final textTheme = getEnteTextTheme(context);
-    final title = StringsLocalizations.of(context).resetPasswordTitle;
+    final title = context.strings.resetPasswordTitle;
     final isFormValid = _passwordsMatch && _isPasswordValid;
 
     return Scaffold(
@@ -111,10 +111,10 @@ class _RecoverOthersAccountState extends State<RecoverOthersAccount> {
 
     if (_passwordInInputBox.isNotEmpty && _showPasswordStrength) {
       if (_passwordStrength > kStrongPasswordStrengthThreshold) {
-        passwordMessage = StringsLocalizations.of(context).strongPassword;
+        passwordMessage = context.strings.strongPassword;
         passwordMessageType = TextInputMessageType.success;
       } else if (_passwordStrength <= kMildPasswordStrengthThreshold) {
-        passwordMessage = StringsLocalizations.of(context).weakStrength;
+        passwordMessage = context.strings.weakStrength;
         passwordMessageType = TextInputMessageType.alert;
       }
     }
@@ -126,14 +126,10 @@ class _RecoverOthersAccountState extends State<RecoverOthersAccount> {
     if (_passwordInInputConfirmationBox.isNotEmpty &&
         _passwordInInputBox.isNotEmpty) {
       if (_passwordsMatch) {
-        confirmPasswordMessage = StringsLocalizations.of(
-          context,
-        ).passwordsMatch;
+        confirmPasswordMessage = context.strings.passwordsMatch;
         confirmPasswordMessageType = TextInputMessageType.success;
       } else {
-        confirmPasswordMessage = StringsLocalizations.of(
-          context,
-        ).passwordsDontMatch;
+        confirmPasswordMessage = context.strings.passwordsDontMatch;
         confirmPasswordMessageType = TextInputMessageType.error;
       }
     }
@@ -162,8 +158,8 @@ class _RecoverOthersAccountState extends State<RecoverOthersAccount> {
                 ),
               ),
               TextInputWidgetV2(
-                label: StringsLocalizations.of(context).password,
-                hintText: StringsLocalizations.of(context).password,
+                label: context.strings.password,
+                hintText: context.strings.password,
                 textEditingController: _passwordController1,
                 isPasswordInput: true,
                 isRequired: true,
@@ -199,8 +195,8 @@ class _RecoverOthersAccountState extends State<RecoverOthersAccount> {
               ),
               const SizedBox(height: 16),
               TextInputWidgetV2(
-                label: StringsLocalizations.of(context).confirmPassword,
-                hintText: StringsLocalizations.of(context).confirmPassword,
+                label: context.strings.confirmPassword,
+                hintText: context.strings.confirmPassword,
                 textEditingController: _passwordController2,
                 isPasswordInput: true,
                 isRequired: true,
@@ -231,7 +227,7 @@ class _RecoverOthersAccountState extends State<RecoverOthersAccount> {
   Future<void> _updatePassword() async {
     final dialog = createProgressDialog(
       context,
-      StringsLocalizations.of(context).generatingEncryptionKeys,
+      context.strings.generatingEncryptionKeys,
     );
     await dialog.show();
     try {
@@ -285,10 +281,7 @@ class _RecoverOthersAccountState extends State<RecoverOthersAccount> {
       );
       await dialog.hide();
       if (!mounted) return;
-      showShortToast(
-        context,
-        StringsLocalizations.of(context).passwordChangedSuccessfully,
-      );
+      showShortToast(context, context.strings.passwordChangedSuccessfully);
       if (!mounted) return;
       Navigator.of(context).pop();
     } catch (e, s) {

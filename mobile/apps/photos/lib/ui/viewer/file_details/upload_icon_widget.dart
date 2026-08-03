@@ -104,17 +104,17 @@ class _UpdateIconWidgetState extends State<UploadIconWidget> {
           if (isIgnored && (kDebugMode || ignoreReason != kIgnoreReasonTrash)) {
             showToast(
               context,
-              StringsLocalizations.of(
-                context,
-              ).uploadIsIgnoredDueToIgnorereason(ignoreReason: ignoreReason),
+              context.strings.uploadIsIgnoredDueToIgnorereason(
+                ignoreReason: ignoreReason,
+              ),
             );
           }
           return Tooltip(
             message: isIgnored
-                ? StringsLocalizations.of(
-                    context,
-                  ).tapToUploadIsIgnoredDue(ignoreReason: ignoreReason)
-                : StringsLocalizations.of(context).tapToUpload,
+                ? context.strings.tapToUploadIsIgnoredDue(
+                    ignoreReason: ignoreReason,
+                  )
+                : context.strings.tapToUpload,
             child: IconButton(
               icon: const Icon(Icons.upload_rounded, color: Colors.white),
               onPressed: () async {

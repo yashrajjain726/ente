@@ -60,15 +60,13 @@ class _ActionBarWidgetState extends State<ActionBarWidget> {
                   return Text(
                     _selectedOwnedFilesNotifier.value !=
                             _selectedFilesNotifier.value
-                        ? StringsLocalizations.of(
-                            context,
-                          ).selectedPhotosWithYours(
+                        ? context.strings.selectedPhotosWithYours(
                             count: _selectedFilesNotifier.value,
                             yourCount: _selectedOwnedFilesNotifier.value,
                           )
-                        : StringsLocalizations.of(
-                            context,
-                          ).selectedPhotos(count: _selectedFilesNotifier.value),
+                        : context.strings.selectedPhotos(
+                            count: _selectedFilesNotifier.value,
+                          ),
                     style: miniStyle,
                   );
                 },
@@ -85,10 +83,7 @@ class _ActionBarWidgetState extends State<ActionBarWidget> {
                   },
                   child: Align(
                     alignment: Alignment.centerRight,
-                    child: Text(
-                      StringsLocalizations.of(context).cancel,
-                      style: miniStyle,
-                    ),
+                    child: Text(context.strings.cancel, style: miniStyle),
                   ),
                 ),
               ),

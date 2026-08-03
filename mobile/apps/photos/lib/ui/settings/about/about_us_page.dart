@@ -15,7 +15,7 @@ class AboutUsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = StringsLocalizations.of(context);
+    final l10n = context.strings;
 
     return SettingsPageScaffold(
       title: l10n.about,
@@ -90,10 +90,7 @@ class AboutUsPage extends StatelessWidget {
   }
 
   Future<void> _checkForUpdates(BuildContext context) async {
-    final dialog = createProgressDialog(
-      context,
-      StringsLocalizations.of(context).checking,
-    );
+    final dialog = createProgressDialog(context, context.strings.checking);
     await dialog.show();
     final shouldUpdate = await updateService.shouldUpdate();
     await dialog.hide();
@@ -109,10 +106,7 @@ class AboutUsPage extends StatelessWidget {
       );
     } else {
       if (!context.mounted) return;
-      showShortToast(
-        context,
-        StringsLocalizations.of(context).youAreOnTheLatestVersion,
-      );
+      showShortToast(context, context.strings.youAreOnTheLatestVersion);
     }
   }
 }

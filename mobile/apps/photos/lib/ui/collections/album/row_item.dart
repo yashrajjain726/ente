@@ -286,9 +286,9 @@ class AlbumRowItemWidget extends StatelessWidget {
                               .getCachedFileCount(c);
                         }
                         if (cachedCount != null && cachedCount > 0) {
-                          final String textCount = StringsLocalizations.of(
-                            context,
-                          ).itemCount(count: cachedCount);
+                          final String textCount = context.strings.itemCount(
+                            count: cachedCount,
+                          );
                           return Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [

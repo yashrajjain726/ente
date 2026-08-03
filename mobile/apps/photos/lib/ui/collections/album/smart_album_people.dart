@@ -74,14 +74,14 @@ class _SmartAlbumPeopleState extends State<SmartAlbumPeople> {
                 : _selectedPeople.personIds.isNotEmpty;
             return ButtonComponent(
               variant: ButtonComponentVariant.primary,
-              label: StringsLocalizations.of(context).save,
+              label: context.strings.save,
               shouldSurfaceExecutionStates: false,
               isDisabled: !areIdsChanged,
               onTap: areIdsChanged
                   ? () async {
                       final dialog = createProgressDialog(
                         context,
-                        StringsLocalizations.of(context).pleaseWait,
+                        context.strings.pleaseWait,
                         isDismissible: true,
                       );
 
@@ -191,8 +191,8 @@ class _SmartAlbumPeopleState extends State<SmartAlbumPeople> {
         ),
       ),
       body: AppBarComponent(
-        title: StringsLocalizations.of(context).people,
-        subtitle: StringsLocalizations.of(context).peopleAutoAddDesc,
+        title: context.strings.people,
+        subtitle: context.strings.peopleAutoAddDesc,
         physics: const BouncingScrollPhysics(),
         slivers: <Widget>[
           SliverFillRemaining(
@@ -211,10 +211,10 @@ Future<bool> removeFilesDialog(BuildContext context) async {
   final completer = Completer<bool>();
   await showActionSheet(
     context: context,
-    body: StringsLocalizations.of(context).shouldRemoveFilesSmartAlbumsDesc,
+    body: context.strings.shouldRemoveFilesSmartAlbumsDesc,
     buttons: [
       ButtonWidget(
-        labelText: StringsLocalizations.of(context).yes,
+        labelText: context.strings.yes,
         buttonType: ButtonType.neutral,
         buttonSize: ButtonSize.large,
         shouldStickToDarkTheme: true,
@@ -226,7 +226,7 @@ Future<bool> removeFilesDialog(BuildContext context) async {
         },
       ),
       ButtonWidget(
-        labelText: StringsLocalizations.of(context).no,
+        labelText: context.strings.no,
         buttonType: ButtonType.secondary,
         buttonSize: ButtonSize.large,
         shouldStickToDarkTheme: true,

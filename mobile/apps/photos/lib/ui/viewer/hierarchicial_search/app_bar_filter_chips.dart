@@ -142,7 +142,7 @@ class _AppBarFilterChipsState extends State<AppBarFilterChips> {
             ),
             variant: IconButtonComponentVariant.primary,
             shouldSurfaceExecutionStates: false,
-            tooltip: StringsLocalizations.of(context).filter,
+            tooltip: context.strings.filter,
             onTap: () => showBottomSheetComponent(
               context: context,
               builder: (_) =>

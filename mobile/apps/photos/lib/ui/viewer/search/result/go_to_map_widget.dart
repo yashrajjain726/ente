@@ -30,7 +30,7 @@ class GoToMap extends StatelessWidget {
             ),
             const SizedBox(height: 10),
             Text(
-              StringsLocalizations.of(context).yourMap,
+              context.strings.yourMap,
               maxLines: 2,
               textAlign: TextAlign.center,
               overflow: TextOverflow.ellipsis,

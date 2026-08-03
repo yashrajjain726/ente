@@ -159,8 +159,8 @@ class _StorageCardWidgetState extends State<StorageCardWidget> {
         children: [
           Text(
             isMobileScreenSmall
-                ? StringsLocalizations.of(context).usedSpace
-                : StringsLocalizations.of(context).storage,
+                ? context.strings.usedSpace
+                : context.strings.storage,
             style: const TextStyle(
               fontFamily: 'Montserrat',
               fontSize: 11,
@@ -230,7 +230,7 @@ class _StorageCardWidgetState extends State<StorageCardWidget> {
                         ),
                         const SizedBox(width: 4),
                         Text(
-                          StringsLocalizations.of(context).storageBreakupYou,
+                          context.strings.storageBreakupYou,
                           style: const TextStyle(
                             fontFamily: 'Montserrat',
                             fontSize: 9,
@@ -249,7 +249,7 @@ class _StorageCardWidgetState extends State<StorageCardWidget> {
                         ),
                         const SizedBox(width: 4),
                         Text(
-                          StringsLocalizations.of(context).storageBreakupFamily,
+                          context.strings.storageBreakupFamily,
                           style: const TextStyle(
                             fontFamily: 'Montserrat',
                             fontSize: 9,
@@ -261,7 +261,7 @@ class _StorageCardWidgetState extends State<StorageCardWidget> {
                     )
                   : const SizedBox.shrink(),
               Text(
-                StringsLocalizations.of(context).memoryCount(
+                context.strings.memoryCount(
                   count: userDetails.fileCount,
                   formattedCount: NumberFormat().format(userDetails.fileCount),
                 ),

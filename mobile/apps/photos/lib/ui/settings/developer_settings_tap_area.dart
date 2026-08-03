@@ -44,14 +44,14 @@ class _DeveloperSettingsTapAreaState extends State<DeveloperSettingsTapArea> {
 
     await showAlertBottomSheet(
       context,
-      title: StringsLocalizations.of(context).developerSettings,
-      message: StringsLocalizations.of(context).developerSettingsWarning,
+      title: context.strings.developerSettings,
+      message: context.strings.developerSettingsWarning,
       assetPath: "assets/warning-grey.png",
       isDismissible: false,
       buttons: [
         ButtonWidgetV2(
           buttonType: ButtonTypeV2.primary,
-          labelText: StringsLocalizations.of(context).yes,
+          labelText: context.strings.yes,
           onTap: () async {
             Navigator.of(context).pop();
             await Navigator.of(context).push(

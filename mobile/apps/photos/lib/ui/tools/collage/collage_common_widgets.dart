@@ -12,7 +12,7 @@ class CollageLayoutHeading extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.fromLTRB(8, 20, 0, 4),
         child: Text(
-          StringsLocalizations.of(context).collageLayout,
+          context.strings.collageLayout,
           style: TextStyle(color: getEnteColorScheme(context).textBase),
         ),
       ),

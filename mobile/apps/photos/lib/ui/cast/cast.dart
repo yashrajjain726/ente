@@ -16,7 +16,7 @@ import "package:photos/ui/settings/cast/cast_settings_page.dart";
 import "package:photos/utils/dialog_util.dart";
 
 Future<void> showCastSheet(BuildContext context, Collection collection) async {
-  final l10n = StringsLocalizations.of(context);
+  final l10n = context.strings;
   final textStyle = getEnteTextTheme(context);
   final gw = CastGateway(NetworkClient.instance.enteDio);
   final showAutoPair = castService.isSupported;

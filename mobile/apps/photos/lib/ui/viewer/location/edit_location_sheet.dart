@@ -96,9 +96,7 @@ class _EditLocationSheetState extends State<EditLocationSheet> {
           Padding(
             padding: const EdgeInsets.only(bottom: 16),
             child: BottomOfTitleBarWidget(
-              title: TitleBarTitleWidget(
-                title: StringsLocalizations.of(context).editLocation,
-              ),
+              title: TitleBarTitleWidget(title: context.strings.editLocation),
             ),
           ),
           Expanded(
@@ -117,9 +115,7 @@ class _EditLocationSheetState extends State<EditLocationSheet> {
                           children: [
                             Expanded(
                               child: TextInputWidget(
-                                hintText: StringsLocalizations.of(
-                                  context,
-                                ).locationName,
+                                hintText: context.strings.locationName,
                                 focusNode: _focusNode,
                                 submitNotifier: _submitNotifer,
                                 cancelNotifier: _cancelNotifier,
@@ -148,9 +144,7 @@ class _EditLocationSheetState extends State<EditLocationSheet> {
                                     key: ValueKey(value),
                                     buttonType: ButtonType.secondary,
                                     buttonSize: ButtonSize.small,
-                                    labelText: StringsLocalizations.of(
-                                      context,
-                                    ).save,
+                                    labelText: context.strings.save,
                                     isDisabled: value,
                                     onTap: () async {
                                       _focusNode.unfocus();
@@ -195,7 +189,7 @@ class _EditLocationSheetState extends State<EditLocationSheet> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  StringsLocalizations.of(context).memoryCount(
+                                  context.strings.memoryCount(
                                     count: value,
                                     formattedCount: NumberFormat().format(
                                       value,
@@ -207,9 +201,7 @@ class _EditLocationSheetState extends State<EditLocationSheet> {
                                   Padding(
                                     padding: const EdgeInsets.only(top: 2),
                                     child: Text(
-                                      StringsLocalizations.of(
-                                        context,
-                                      ).galleryMemoryLimitInfo,
+                                      context.strings.galleryMemoryLimitInfo,
                                       style: textTheme.miniMuted,
                                     ),
                                   ),

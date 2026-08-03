@@ -167,9 +167,7 @@ class _SearchSectionAllPageState extends State<SearchSectionAllPage> {
             slivers.add(
               SliverFillRemaining(
                 child: Center(
-                  child: Text(
-                    StringsLocalizations.of(context).noResultsFound + '.',
-                  ),
+                  child: Text(context.strings.noResultsFound + '.'),
                 ),
               ),
             );
@@ -360,7 +358,7 @@ class _SearchSectionAllPageState extends State<SearchSectionAllPage> {
     return TextInputComponent(
       controller: _searchController,
       focusNode: _searchFocusNode,
-      hintText: StringsLocalizations.of(context).search,
+      hintText: context.strings.search,
       autofocus: true,
       shouldUnfocusOnClearOrSubmit: true,
       prefix: HugeIcon(

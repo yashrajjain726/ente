@@ -155,7 +155,7 @@ Future<void> _runInForeground(
         lockScreen: LockScreen(
           Configuration.instance,
           authReasonBuilder: (context) =>
-              StringsLocalizations.of(context).authToViewYourMemories,
+              context.strings.authToViewYourMemories,
           onLogout: (context) => UserService.instance.logout(context),
         ),
         enabled:

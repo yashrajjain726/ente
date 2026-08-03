@@ -102,9 +102,9 @@ class _PersonClustersState extends State<PersonReviewClusterSuggestion> {
               _peopleChangedEvent = null;
               return Center(
                 child: Text(
-                  StringsLocalizations.of(
-                    context,
-                  ).noSuggestionsForPerson(personName: widget.person.data.name),
+                  context.strings.noSuggestionsForPerson(
+                    personName: widget.person.data.name,
+                  ),
                   style: getEnteTextTheme(context).largeMuted,
                 ),
               );
@@ -240,9 +240,7 @@ class _PersonClustersState extends State<PersonReviewClusterSuggestion> {
                               horizontal: 32,
                             ),
                             child: Text(
-                              StringsLocalizations.of(
-                                context,
-                              ).saveAsAnotherPerson,
+                              context.strings.saveAsAnotherPerson,
                               style: getEnteTextTheme(context).mini.copyWith(
                                 color: getEnteColorScheme(context).textMuted,
                                 decoration: TextDecoration.underline,
@@ -447,7 +445,7 @@ class _PersonClustersState extends State<PersonReviewClusterSuggestion> {
           );
         } else if (snapshot.hasError) {
           // log the error
-          return Center(child: Text(StringsLocalizations.of(context).error));
+          return Center(child: Text(context.strings.error));
         } else {
           canGiveFeedback = false;
           return const Center(child: CircularProgressIndicator());

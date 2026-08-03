@@ -105,19 +105,13 @@ class _PasskeyPageState extends State<PasskeyPage> {
       if (mounted && link.toLowerCase().startsWith("ente://passkey")) {
         if (Configuration.instance.isLoggedIn()) {
           _logger.info('ignored deeplink: already configured');
-          showToast(
-            context,
-            StringsLocalizations.of(context).accountIsAlreadyConfigured,
-          );
+          showToast(context, context.strings.accountIsAlreadyConfigured);
           return;
         }
         final parsedUri = Uri.parse(link);
         final sessionID = parsedUri.queryParameters['passkeySessionID'];
         if (sessionID != widget.sessionID) {
-          showToast(
-            context,
-            StringsLocalizations.of(context).sessionIdMismatch,
-          );
+          showToast(context, context.strings.sessionIdMismatch);
           _logger.warning('ignored deeplink: sessionID mismatch');
           return;
         }
@@ -169,7 +163,7 @@ class _PasskeyPageState extends State<PasskeyPage> {
           },
         ),
         title: Text(
-          StringsLocalizations.of(context).passkey,
+          context.strings.passkey,
           style: TextStyles.large.copyWith(color: colors.textBase),
         ),
         centerTitle: true,

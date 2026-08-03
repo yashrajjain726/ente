@@ -34,10 +34,7 @@ class VideoEditorAppBar extends StatelessWidget implements PreferredSizeWidget {
         children: [
           TextButton(
             onPressed: onCancel,
-            child: Text(
-              StringsLocalizations.of(context).cancel,
-              style: textTheme.body,
-            ),
+            child: Text(context.strings.cancel, style: textTheme.body),
           ),
           TextButton(
             onPressed: isPrimaryEnabled ? onPrimaryAction : null,

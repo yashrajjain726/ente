@@ -190,7 +190,7 @@ class _Price extends StatelessWidget {
           children: [
             TextSpan(text: price),
             TextSpan(
-              text: "/${StringsLocalizations.of(context).month}",
+              text: "/${context.strings.month}",
               style: textTheme.small.copyWith(color: colorScheme.contentLight),
             ),
           ],
@@ -228,7 +228,7 @@ class _Price extends StatelessWidget {
                 children: [
                   TextSpan(text: price),
                   TextSpan(
-                    text: "/${StringsLocalizations.of(context).yearShort}",
+                    text: "/${context.strings.yearShort}",
                     style: textTheme.small.copyWith(
                       color: colorScheme.contentLight,
                     ),
@@ -239,13 +239,13 @@ class _Price extends StatelessWidget {
             ),
           if (isPlayStore)
             Text(
-              "$currencySymbol$pricePerMonthString / ${StringsLocalizations.of(context).month}",
+              "$currencySymbol$pricePerMonthString / ${context.strings.month}",
               style: textTheme.tiny.copyWith(color: colorScheme.contentLight),
               textAlign: TextAlign.end,
             ),
           if (!isPlayStore)
             Text(
-              "$currencySymbol$pricePerMonthString / ${StringsLocalizations.of(context).month}",
+              "$currencySymbol$pricePerMonthString / ${context.strings.month}",
               style: textTheme.largeBold.copyWith(
                 color: colorScheme.contentDarker,
               ),
@@ -257,9 +257,7 @@ class _Price extends StatelessWidget {
                 style: textTheme.tiny.copyWith(color: colorScheme.contentLight),
                 children: [
                   TextSpan(text: price),
-                  TextSpan(
-                    text: "/${StringsLocalizations.of(context).yearShort}",
-                  ),
+                  TextSpan(text: "/${context.strings.yearShort}"),
                 ],
               ),
               textAlign: TextAlign.end,

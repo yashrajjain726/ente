@@ -137,9 +137,7 @@ class _SearchSuggestionsWidgetState extends State<SearchSuggestionsWidget> {
         Padding(
           padding: const EdgeInsets.fromLTRB(4, 0, 4, 12),
           child: Text(
-            StringsLocalizations.of(
-              context,
-            ).searchResultCount(count: _resultsCount),
+            context.strings.searchResultCount(count: _resultsCount),
             style: textTheme.smallBold.copyWith(color: colorScheme.textMuted),
           ),
         ),
@@ -308,19 +306,19 @@ _SearchResultsSection _sectionForResult(SearchResult result) {
 String _sectionTitle(BuildContext context, _SearchResultsSection section) {
   switch (section) {
     case _SearchResultsSection.people:
-      return StringsLocalizations.of(context).people;
+      return context.strings.people;
     case _SearchResultsSection.shared:
-      return StringsLocalizations.of(context).shared;
+      return context.strings.shared;
     case _SearchResultsSection.albums:
-      return StringsLocalizations.of(context).albums;
+      return context.strings.albums;
     case _SearchResultsSection.magic:
-      return StringsLocalizations.of(context).magic;
+      return context.strings.magic;
     case _SearchResultsSection.files:
-      return StringsLocalizations.of(context).files;
+      return context.strings.files;
     case _SearchResultsSection.locations:
-      return StringsLocalizations.of(context).locations;
+      return context.strings.locations;
     case _SearchResultsSection.moments:
-      return StringsLocalizations.of(context).moments;
+      return context.strings.moments;
   }
 }
 

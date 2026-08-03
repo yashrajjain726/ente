@@ -155,7 +155,7 @@ class _VideoEditorPageState extends State<VideoEditorPage> {
                 if (isExporting) return;
                 replacePage(context, DetailPage(widget.detailPageConfig));
               },
-              primaryActionLabel: StringsLocalizations.of(context).saveCopy,
+              primaryActionLabel: context.strings.saveCopy,
               onPrimaryAction: exportVideo,
               isPrimaryEnabled: isReady && !isExporting,
             ),
@@ -236,7 +236,7 @@ class _VideoEditorPageState extends State<VideoEditorPage> {
                           VideoEditorMainActions(
                             children: [
                               VideoEditorBottomAction(
-                                label: StringsLocalizations.of(context).trim,
+                                label: context.strings.trim,
                                 svgPath:
                                     "assets/video-editor/video-editor-trim-action.svg",
                                 onPressed: () => _openSubEditor(
@@ -245,7 +245,7 @@ class _VideoEditorPageState extends State<VideoEditorPage> {
                               ),
                               const SizedBox(width: 24),
                               VideoEditorBottomAction(
-                                label: StringsLocalizations.of(context).crop,
+                                label: context.strings.crop,
                                 svgPath:
                                     "assets/video-editor/video-editor-crop-action.svg",
                                 onPressed: () => _openSubEditor(
@@ -254,7 +254,7 @@ class _VideoEditorPageState extends State<VideoEditorPage> {
                               ),
                               const SizedBox(width: 24),
                               VideoEditorBottomAction(
-                                label: StringsLocalizations.of(context).rotate,
+                                label: context.strings.rotate,
                                 svgPath:
                                     "assets/video-editor/video-editor-rotate-action.svg",
                                 onPressed: () => _openSubEditor(
@@ -286,7 +286,7 @@ class _VideoEditorPageState extends State<VideoEditorPage> {
 
     final dialogKey = GlobalKey<LinearProgressDialogState>();
     final dialog = LinearProgressDialog(
-      StringsLocalizations.of(context).savingEdits,
+      context.strings.savingEdits,
       key: dialogKey,
     );
 
@@ -315,10 +315,7 @@ class _VideoEditorPageState extends State<VideoEditorPage> {
       }
 
       if (!mounted) return;
-      showShortToast(
-        context,
-        StringsLocalizations.of(context).somethingWentWrong,
-      );
+      showShortToast(context, context.strings.somethingWentWrong);
     }
   }
 
@@ -599,7 +596,7 @@ class _VideoEditorPageState extends State<VideoEditorPage> {
         SyncService.instance.sync().ignore();
 
         if (!mounted) return;
-        showShortToast(context, StringsLocalizations.of(context).editsSaved);
+        showShortToast(context, context.strings.editsSaved);
         final files = List<EnteFile>.of(widget.detailPageConfig.files);
 
         // the index could be -1 if the files fetched doesn't contain the newly

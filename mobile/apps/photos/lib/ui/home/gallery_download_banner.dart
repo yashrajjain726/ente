@@ -135,7 +135,7 @@ class _GalleryDownloadBannerState extends State<GalleryDownloadBanner>
                     onPressed: () {
                       service.dismissCompletionBanner().ignore();
                     },
-                    child: Text(StringsLocalizations.of(context).dismiss),
+                    child: Text(context.strings.dismiss),
                   )
                 else
                   IconButton(
@@ -154,7 +154,7 @@ class _GalleryDownloadBannerState extends State<GalleryDownloadBanner>
   }
 
   String _bannerMessage(BuildContext context) {
-    final l10n = StringsLocalizations.of(context);
+    final l10n = context.strings;
     final service = galleryDownloadQueueService;
 
     if (service.isCompletionBannerVisible) {
@@ -415,7 +415,7 @@ class _TaskStatus extends StatelessWidget {
         );
       case DownloadStatus.pending:
         return Text(
-          "${StringsLocalizations.of(context).queued} • ${formatBytes(task.totalBytes)}",
+          "${context.strings.queued} • ${formatBytes(task.totalBytes)}",
           style: textTheme.miniMuted,
         );
       case DownloadStatus.paused:
@@ -439,7 +439,7 @@ class _TaskStatus extends StatelessWidget {
       return "Unavailable";
     }
     if (error == DownloadManager.applePhotosUnsupportedResourceError) {
-      return StringsLocalizations.of(context).applePhotosUnsupportedResource;
+      return context.strings.applePhotosUnsupportedResource;
     }
     if (error == null || error.isEmpty) {
       return "Download failed";

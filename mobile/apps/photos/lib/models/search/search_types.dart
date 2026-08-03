@@ -64,44 +64,42 @@ extension SectionTypeExtensions on SectionType {
   String sectionTitle(BuildContext context) {
     switch (this) {
       case SectionType.face:
-        return StringsLocalizations.of(context).people;
+        return context.strings.people;
       case SectionType.magic:
-        return StringsLocalizations.of(context).discover;
+        return context.strings.discover;
       case SectionType.wrapped:
         return "Ente Rewind";
       case SectionType.location:
-        return StringsLocalizations.of(context).locations;
+        return context.strings.locations;
       case SectionType.ritual:
-        return StringsLocalizations.of(context).ritualsTitle;
+        return context.strings.ritualsTitle;
       case SectionType.contacts:
-        return StringsLocalizations.of(context).contacts;
+        return context.strings.contacts;
       case SectionType.album:
-        return StringsLocalizations.of(context).albums;
+        return context.strings.albums;
       case SectionType.fileTypesAndExtension:
-        return StringsLocalizations.of(context).fileTypes;
+        return context.strings.fileTypes;
     }
   }
 
   String getEmptyStateText(BuildContext context) {
     switch (this) {
       case SectionType.face:
-        return StringsLocalizations.of(context).searchPersonsEmptySection;
+        return context.strings.searchPersonsEmptySection;
       case SectionType.magic:
-        return StringsLocalizations.of(context).searchDiscoverEmptySection;
+        return context.strings.searchDiscoverEmptySection;
       case SectionType.wrapped:
         return "Check back soon for your 2025 highlights.";
       case SectionType.location:
-        return StringsLocalizations.of(context).searchLocationEmptySection;
+        return context.strings.searchLocationEmptySection;
       case SectionType.ritual:
-        return StringsLocalizations.of(context).ritualSearchEmpty;
+        return context.strings.ritualSearchEmpty;
       case SectionType.contacts:
-        return StringsLocalizations.of(context).searchPeopleEmptySection;
+        return context.strings.searchPeopleEmptySection;
       case SectionType.album:
-        return StringsLocalizations.of(context).searchAlbumsEmptySection;
+        return context.strings.searchAlbumsEmptySection;
       case SectionType.fileTypesAndExtension:
-        return StringsLocalizations.of(
-          context,
-        ).searchFileTypesAndNamesEmptySection;
+        return context.strings.searchFileTypesAndNamesEmptySection;
     }
   }
 
@@ -155,13 +153,13 @@ extension SectionTypeExtensions on SectionType {
       case SectionType.wrapped:
         return "";
       case SectionType.location:
-        return StringsLocalizations.of(context).addNew;
+        return context.strings.addNew;
       case SectionType.ritual:
         return "";
       case SectionType.contacts:
-        return StringsLocalizations.of(context).invite;
+        return context.strings.invite;
       case SectionType.album:
-        return StringsLocalizations.of(context).addNew;
+        return context.strings.addNew;
       case SectionType.fileTypesAndExtension:
         return "";
     }
@@ -192,11 +190,7 @@ extension SectionTypeExtensions on SectionType {
     switch (this) {
       case SectionType.contacts:
         return () async {
-          await shareText(
-            StringsLocalizations.of(
-              context,
-            ).shareTextRecommendUsingEnteForPhotos,
-          );
+          await shareText(context.strings.shareTextRecommendUsingEnteForPhotos);
         };
       case SectionType.location:
         return () async {
@@ -212,9 +206,9 @@ extension SectionTypeExtensions on SectionType {
         return () async {
           final result = await showTextInputDialog(
             context,
-            title: StringsLocalizations.of(context).newAlbum,
-            submitButtonLabel: StringsLocalizations.of(context).create,
-            hintText: StringsLocalizations.of(context).enterAlbumName,
+            title: context.strings.newAlbum,
+            submitButtonLabel: context.strings.create,
+            hintText: context.strings.enterAlbumName,
             alwaysShowSuccessState: false,
             initialValue: "",
             textCapitalization: TextCapitalization.words,

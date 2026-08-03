@@ -100,7 +100,7 @@ class _EmailEntryPageState extends State<EmailEntryPage> {
         title: DeveloperSettingsTapArea(
           behavior: HitTestBehavior.translucent,
           child: Text(
-            StringsLocalizations.of(context).createAccountTitle,
+            context.strings.createAccountTitle,
             style: TextStyles.large.copyWith(color: colors.textBase),
           ),
         ),
@@ -111,7 +111,7 @@ class _EmailEntryPageState extends State<EmailEntryPage> {
         padding: const EdgeInsets.symmetric(horizontal: 16),
         child: ButtonComponent(
           key: const ValueKey("createAccountButton"),
-          label: StringsLocalizations.of(context).createAccountTitle,
+          label: context.strings.createAccountTitle,
           isDisabled: !_isFormValid(),
           onTap: _isFormValid() ? _submitCreateAccount : null,
         ),
@@ -128,10 +128,10 @@ class _EmailEntryPageState extends State<EmailEntryPage> {
 
     if (_password != null && _password!.isNotEmpty && _showPasswordStrength) {
       if (_passwordStrength > kStrongPasswordStrengthThreshold) {
-        passwordMessage = StringsLocalizations.of(context).strongPassword;
+        passwordMessage = context.strings.strongPassword;
         passwordMessageType = TextInputComponentMessageType.success;
       } else if (_passwordStrength <= kMildPasswordStrengthThreshold) {
-        passwordMessage = StringsLocalizations.of(context).weakStrength;
+        passwordMessage = context.strings.weakStrength;
         passwordMessageType = TextInputComponentMessageType.alert;
       }
     }
@@ -145,14 +145,10 @@ class _EmailEntryPageState extends State<EmailEntryPage> {
         _password!.isNotEmpty &&
         _showConfirmPasswordValidation) {
       if (_passwordsMatch) {
-        confirmPasswordMessage = StringsLocalizations.of(
-          context,
-        ).passwordsMatch;
+        confirmPasswordMessage = context.strings.passwordsMatch;
         confirmPasswordMessageType = TextInputComponentMessageType.success;
       } else {
-        confirmPasswordMessage = StringsLocalizations.of(
-          context,
-        ).passwordsDontMatch;
+        confirmPasswordMessage = context.strings.passwordsDontMatch;
         confirmPasswordMessageType = TextInputComponentMessageType.error;
       }
     }
@@ -168,8 +164,8 @@ class _EmailEntryPageState extends State<EmailEntryPage> {
                 children: [
                   const SizedBox(height: 24),
                   TextInputComponent(
-                    label: StringsLocalizations.of(context).email,
-                    hintText: StringsLocalizations.of(context).email,
+                    label: context.strings.email,
+                    hintText: context.strings.email,
                     controller: _emailController,
                     keyboardType: TextInputType.emailAddress,
                     autofillHints: const [AutofillHints.email],
@@ -177,7 +173,7 @@ class _EmailEntryPageState extends State<EmailEntryPage> {
                     isRequired: true,
                     onChanged: _onEmailChanged,
                     message: _showEmailValidation && !_emailIsValid
-                        ? StringsLocalizations.of(context).invalidEmailAddress
+                        ? context.strings.invalidEmailAddress
                         : null,
                     messageType: _showEmailValidation && !_emailIsValid
                         ? TextInputComponentMessageType.alert
@@ -185,8 +181,8 @@ class _EmailEntryPageState extends State<EmailEntryPage> {
                   ),
                   const SizedBox(height: 24),
                   TextInputComponent(
-                    label: StringsLocalizations.of(context).password,
-                    hintText: StringsLocalizations.of(context).password,
+                    label: context.strings.password,
+                    hintText: context.strings.password,
                     controller: _passwordController1,
                     isPasswordInput: true,
                     isRequired: true,
@@ -223,8 +219,8 @@ class _EmailEntryPageState extends State<EmailEntryPage> {
                   ),
                   const SizedBox(height: 24),
                   TextInputComponent(
-                    label: StringsLocalizations.of(context).confirmPassword,
-                    hintText: StringsLocalizations.of(context).confirmPassword,
+                    label: context.strings.confirmPassword,
+                    hintText: context.strings.confirmPassword,
                     controller: _passwordController2,
                     isPasswordInput: true,
                     isRequired: true,
@@ -261,7 +257,7 @@ class _EmailEntryPageState extends State<EmailEntryPage> {
                   if (_showReferralSourceField) ...[
                     const SizedBox(height: 24),
                     TextInputComponent(
-                      label: StringsLocalizations.of(context).hearUsWhereTitle,
+                      label: context.strings.hearUsWhereTitle,
                       autocorrect: false,
                       shouldUnfocusOnClearOrSubmit: true,
                       onSubmit: _isFormValid()
@@ -355,12 +351,12 @@ class _EmailEntryPageState extends State<EmailEntryPage> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Text(
-              StringsLocalizations.of(context).alreadyHaveAnAccount,
+              context.strings.alreadyHaveAnAccount,
               style: TextStyles.body.copyWith(color: colors.textLight),
             ),
             const SizedBox(width: 4),
             ButtonComponent(
-              label: StringsLocalizations.of(context).logInLabel,
+              label: context.strings.logInLabel,
               variant: ButtonComponentVariant.link,
               size: ButtonComponentSize.small,
               shouldSurfaceExecutionStates: false,
@@ -428,7 +424,7 @@ class _EmailEntryPageState extends State<EmailEntryPage> {
           const SizedBox(width: 8),
           Expanded(
             child: StyledText(
-              text: StringsLocalizations.of(context).signUpTerms,
+              text: context.strings.signUpTerms,
               style: TextStyles.mini.copyWith(color: colors.textLight),
               tags: {
                 'u-terms': StyledTextActionTag(
@@ -437,9 +433,7 @@ class _EmailEntryPageState extends State<EmailEntryPage> {
                         MaterialPageRoute(
                           builder: (BuildContext context) {
                             return WebPage(
-                              StringsLocalizations.of(
-                                context,
-                              ).termsOfServicesTitle,
+                              context.strings.termsOfServicesTitle,
                               "https://ente.com/terms",
                             );
                           },
@@ -456,9 +450,7 @@ class _EmailEntryPageState extends State<EmailEntryPage> {
                         MaterialPageRoute(
                           builder: (BuildContext context) {
                             return WebPage(
-                              StringsLocalizations.of(
-                                context,
-                              ).privacyPolicyTitle,
+                              context.strings.privacyPolicyTitle,
                               "https://ente.com/privacy",
                             );
                           },

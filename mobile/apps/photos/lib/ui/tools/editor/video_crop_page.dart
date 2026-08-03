@@ -65,7 +65,7 @@ class _VideoCropPageState extends State<VideoCropPage> {
       backgroundColor: colorScheme.backgroundColour,
       appBar: VideoEditorAppBar(
         onCancel: () => Navigator.pop(context),
-        primaryActionLabel: StringsLocalizations.of(context).done,
+        primaryActionLabel: context.strings.done,
         onPrimaryAction: () {
           widget.controller.applyCacheCrop();
           Navigator.pop(context);

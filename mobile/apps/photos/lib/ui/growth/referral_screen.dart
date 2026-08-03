@@ -44,7 +44,7 @@ class _ReferralScreenState extends State<ReferralScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = StringsLocalizations.of(context);
+    final l10n = context.strings;
     return FutureBuilder<Tuple2<ReferralView, UserDetails>>(
       future: _fetchData(),
       builder: (context, snapshot) {
@@ -138,7 +138,7 @@ class ReferralWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.componentColors;
-    final l10n = StringsLocalizations.of(context);
+    final l10n = context.strings;
     final bool isReferralEnabled = referralView.planInfo.isEnabled;
 
     return Column(
@@ -231,15 +231,13 @@ class ReferralWidget extends StatelessWidget {
       color: colors.textLight,
       height: 2,
     );
-    final step3Text = StringsLocalizations.of(
-      context,
-    ).referralStep3(storageInGB: storageInGB);
+    final step3Text = context.strings.referralStep3(storageInGB: storageInGB);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(StringsLocalizations.of(context).referralStep1, style: mutedStyle),
-        Text(StringsLocalizations.of(context).referralStep2, style: mutedStyle),
+        Text(context.strings.referralStep1, style: mutedStyle),
+        Text(context.strings.referralStep2, style: mutedStyle),
         RichText(
           text: TextSpan(
             style: mutedStyle,

@@ -49,28 +49,28 @@ String _actionName(
   String text = "";
   switch (type) {
     case CollectionActionType.addFiles:
-      text = StringsLocalizations.of(context).addItem(count: fileCount);
+      text = context.strings.addItem(count: fileCount);
       break;
     case CollectionActionType.moveFiles:
-      text = StringsLocalizations.of(context).moveItem(count: fileCount);
+      text = context.strings.moveItem(count: fileCount);
       break;
     case CollectionActionType.restoreFiles:
-      text = StringsLocalizations.of(context).restoreToAlbum;
+      text = context.strings.restoreToAlbum;
       break;
     case CollectionActionType.unHide:
-      text = StringsLocalizations.of(context).unhideToAlbum;
+      text = context.strings.unhideToAlbum;
       break;
     case CollectionActionType.shareCollection:
-      text = StringsLocalizations.of(context).share;
+      text = context.strings.share;
       break;
     case CollectionActionType.addToHiddenAlbum:
-      text = StringsLocalizations.of(context).addToHiddenAlbum;
+      text = context.strings.addToHiddenAlbum;
       break;
     case CollectionActionType.moveToHiddenCollection:
-      text = StringsLocalizations.of(context).moveToHiddenAlbum;
+      text = context.strings.moveToHiddenAlbum;
       break;
     case CollectionActionType.autoAddPeople:
-      text = StringsLocalizations.of(context).autoAddToAlbum;
+      text = context.strings.autoAddToAlbum;
       break;
   }
   return text;
@@ -195,9 +195,7 @@ class _CollectionActionSheetState extends State<CollectionActionSheet> {
                 child: Column(
                   children: [
                     TextInputComponent(
-                      hintText: StringsLocalizations.of(
-                        context,
-                      ).searchByAlbumNameHint,
+                      hintText: context.strings.searchByAlbumNameHint,
                       prefix: HugeIcon(
                         icon: HugeIcons.strokeRoundedSearch01,
                         size: 18,
@@ -232,7 +230,7 @@ class _CollectionActionSheetState extends State<CollectionActionSheet> {
       widgets.add(
         ButtonComponent(
           key: const ValueKey('add_button'),
-          label: StringsLocalizations.of(context).add,
+          label: context.strings.add,
           shouldSurfaceExecutionStates: false,
           dismissModalOnSuccess: true,
           isDisabled: _selectedCollections.isEmpty,
@@ -240,7 +238,7 @@ class _CollectionActionSheetState extends State<CollectionActionSheet> {
             if (widget.selectedPeople != null) {
               final ProgressDialog dialog = createProgressDialog(
                 context,
-                StringsLocalizations.of(context).uploadingFilesToAlbum,
+                context.strings.uploadingFilesToAlbum,
                 isDismissible: true,
               );
               await dialog.show();
@@ -275,9 +273,9 @@ class _CollectionActionSheetState extends State<CollectionActionSheet> {
               if (!mounted) return;
               showShortToast(
                 context,
-                StringsLocalizations.of(
-                  context,
-                ).addedToAlbums(count: _selectedCollections.length),
+                context.strings.addedToAlbums(
+                  count: _selectedCollections.length,
+                ),
               );
               widget.selectedFiles?.clearAll();
             }

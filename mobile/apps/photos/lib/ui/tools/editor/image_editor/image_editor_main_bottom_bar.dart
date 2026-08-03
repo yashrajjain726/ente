@@ -87,35 +87,35 @@ class ImageEditorMainBottomBarState extends State<ImageEditorMainBottomBar>
                       children: <Widget>[
                         CircularIconButton(
                           hugeIcon: HugeIcons.strokeRoundedCrop,
-                          label: StringsLocalizations.of(context).crop,
+                          label: context.strings.crop,
                           onTap: () {
                             widget.editor.openCropRotateEditor();
                           },
                         ),
                         CircularIconButton(
                           hugeIcon: HugeIcons.strokeRoundedFilter,
-                          label: StringsLocalizations.of(context).filter,
+                          label: context.strings.filter,
                           onTap: () {
                             widget.editor.openFilterEditor();
                           },
                         ),
                         CircularIconButton(
                           hugeIcon: HugeIcons.strokeRoundedSlidersHorizontal,
-                          label: StringsLocalizations.of(context).adjust,
+                          label: context.strings.adjust,
                           onTap: () {
                             widget.editor.openTuneEditor();
                           },
                         ),
                         CircularIconButton(
                           hugeIcon: HugeIcons.strokeRoundedPaintBrush01,
-                          label: StringsLocalizations.of(context).draw,
+                          label: context.strings.draw,
                           onTap: () {
                             widget.editor.openPaintEditor();
                           },
                         ),
                         CircularIconButton(
                           hugeIcon: HugeIcons.strokeRoundedSticker,
-                          label: StringsLocalizations.of(context).sticker,
+                          label: context.strings.sticker,
                           onTap: () {
                             widget.editor.openEmojiEditor();
                           },

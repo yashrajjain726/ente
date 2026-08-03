@@ -289,7 +289,7 @@ class _ZoomableLiveImageNewState extends State<ZoomableLiveImageNew>
     if (videoFile != null && videoFile.existsSync()) {
       await _setVideoController(videoFile.path);
     } else if (_enteFile.isLivePhoto) {
-      showShortToast(context, StringsLocalizations.of(context).downloadFailed);
+      showShortToast(context, context.strings.downloadFailed);
     }
     return result.availability;
   }
@@ -298,7 +298,7 @@ class _ZoomableLiveImageNewState extends State<ZoomableLiveImageNew>
     if (_enteFile.isRemoteOnlyFile &&
         !(await isFileCached(_enteFile, liveVideo: true))) {
       if (!mounted) return null;
-      showShortToast(context, StringsLocalizations.of(context).downloading);
+      showShortToast(context, context.strings.downloading);
     }
 
     File? videoFile = await getFile(widget.enteFile, liveVideo: true)
@@ -331,7 +331,7 @@ class _ZoomableLiveImageNewState extends State<ZoomableLiveImageNew>
           null,
         );
       }
-      showShortToast(context, StringsLocalizations.of(context).downloading);
+      showShortToast(context, context.strings.downloading);
     }
 
     final File? imageFile =

@@ -75,7 +75,7 @@ class _LoginPageState extends State<LoginPage> {
         title: DeveloperSettingsTapArea(
           behavior: HitTestBehavior.translucent,
           child: Text(
-            StringsLocalizations.of(context).loginToEnte,
+            context.strings.loginToEnte,
             style: TextStyles.large.copyWith(color: colors.textBase),
           ),
         ),
@@ -86,7 +86,7 @@ class _LoginPageState extends State<LoginPage> {
         padding: const EdgeInsets.symmetric(horizontal: 16),
         child: ButtonComponent(
           key: const ValueKey("logInButton"),
-          label: StringsLocalizations.of(context).continueLabel,
+          label: context.strings.continueLabel,
           isDisabled: !_emailIsValid,
           onTap: _emailIsValid ? _submitLoginEmail : null,
         ),
@@ -106,8 +106,8 @@ class _LoginPageState extends State<LoginPage> {
             const SizedBox(height: 20),
             TextInputComponent(
               key: const ValueKey("emailInputField"),
-              label: StringsLocalizations.of(context).email,
-              hintText: StringsLocalizations.of(context).emailHint,
+              label: context.strings.email,
+              hintText: context.strings.emailHint,
               controller: _emailController,
               keyboardType: TextInputType.emailAddress,
               autofillHints: const [AutofillHints.email],
@@ -118,7 +118,7 @@ class _LoginPageState extends State<LoginPage> {
               onSubmit: (_) => _submitLoginEmail(),
               onChanged: _onEmailChanged,
               message: _showValidationMessage && !_emailIsValid
-                  ? StringsLocalizations.of(context).invalidEmailAddress
+                  ? context.strings.invalidEmailAddress
                   : null,
               messageType: _showValidationMessage && !_emailIsValid
                   ? TextInputComponentMessageType.alert
@@ -142,13 +142,13 @@ class _LoginPageState extends State<LoginPage> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Text(
-              StringsLocalizations.of(context).dontHaveAnAccount,
+              context.strings.dontHaveAnAccount,
               style: TextStyles.body.copyWith(color: colors.textLight),
             ),
             const SizedBox(width: 4),
 
             ButtonComponent(
-              label: StringsLocalizations.of(context).signUp,
+              label: context.strings.signUp,
               variant: ButtonComponentVariant.link,
               size: ButtonComponentSize.small,
               shouldSurfaceExecutionStates: false,

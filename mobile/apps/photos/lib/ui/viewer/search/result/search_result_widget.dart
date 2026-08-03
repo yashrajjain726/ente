@@ -109,7 +109,7 @@ class SearchResultWidget extends StatelessWidget {
   }
 
   String? _resultTypeLabel(BuildContext context, ResultType type) {
-    final localizations = StringsLocalizations.of(context);
+    final localizations = context.strings;
     switch (type) {
       case ResultType.file:
         return localizations.searchResultFileName;

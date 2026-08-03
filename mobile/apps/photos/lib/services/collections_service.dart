@@ -1593,10 +1593,8 @@ class CollectionsService {
       if (!context.mounted) return null;
       await showInfoDialog(
         context,
-        title: StringsLocalizations.of(context).linkExpired,
-        body: StringsLocalizations.of(
-          context,
-        ).theLinkYouAreTryingToAccessHasExpired,
+        title: context.strings.linkExpired,
+        body: context.strings.theLinkYouAreTryingToAccessHasExpired,
       );
       return null;
     } on PublicCollectionDeviceLimitExceededException catch (e, s) {
@@ -1604,8 +1602,8 @@ class CollectionsService {
       if (!context.mounted) return null;
       await showErrorDialog(
         context,
-        StringsLocalizations.of(context).canNotOpenTitle,
-        StringsLocalizations.of(context).linkRequestLimitExceeded,
+        context.strings.canNotOpenTitle,
+        context.strings.linkRequestLimitExceeded,
       );
       return null;
     } on PublicCollectionRateLimitedException catch (e, s) {
@@ -1613,8 +1611,8 @@ class CollectionsService {
       if (!context.mounted) return null;
       await showErrorDialog(
         context,
-        StringsLocalizations.of(context).canNotOpenTitle,
-        StringsLocalizations.of(context).linkRequestLimitExceeded,
+        context.strings.canNotOpenTitle,
+        context.strings.linkRequestLimitExceeded,
       );
       return null;
     } on PublicCollectionInfoUnauthorizedException catch (e, s) {
@@ -1622,8 +1620,8 @@ class CollectionsService {
       if (!context.mounted) return null;
       await showErrorDialog(
         context,
-        StringsLocalizations.of(context).canNotOpenTitle,
-        StringsLocalizations.of(context).canNotOpenBody,
+        context.strings.canNotOpenTitle,
+        context.strings.canNotOpenBody,
       );
       return null;
     } catch (e, s) {
@@ -1658,8 +1656,8 @@ class CollectionsService {
       if (!context.mounted) return false;
       await showErrorDialog(
         context,
-        StringsLocalizations.of(context).incorrectPasswordTitle,
-        StringsLocalizations.of(context).pleaseTryAgain,
+        context.strings.incorrectPasswordTitle,
+        context.strings.pleaseTryAgain,
       );
       return false;
     }

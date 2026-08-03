@@ -92,7 +92,7 @@ Widget getOnEnteSection(BuildContext context) {
   );
 
   return StyledText(
-    text: StringsLocalizations.of(context).onEnte,
+    text: context.strings.onEnte,
     style: style,
     tags: {'branding': StyledTextTag(style: style)},
   );

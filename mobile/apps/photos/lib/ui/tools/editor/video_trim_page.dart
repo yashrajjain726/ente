@@ -30,7 +30,7 @@ class _VideoTrimPageState extends State<VideoTrimPage> {
           widget.controller.updateTrim(minTrim, maxTrim);
           Navigator.pop(context);
         },
-        primaryActionLabel: StringsLocalizations.of(context).done,
+        primaryActionLabel: context.strings.done,
         onPrimaryAction: () {
           Navigator.pop(context);
         },

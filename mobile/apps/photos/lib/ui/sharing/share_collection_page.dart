@@ -103,9 +103,9 @@ class _ShareCollectionPageState extends State<ShareCollectionPage> {
     final bool canManageParticipants = isOwner;
     final children = <Widget>[
       ShareSectionTitle(
-        StringsLocalizations.of(
-          context,
-        ).shareWithPeopleSectionTitle(numberOfPeople: _sharees.length),
+        context.strings.shareWithPeopleSectionTitle(
+          numberOfPeople: _sharees.length,
+        ),
       ),
       EmailItemWidget(_collection, onTap: _navigateToManageUser),
     ];
@@ -114,7 +114,7 @@ class _ShareCollectionPageState extends State<ShareCollectionPage> {
       children.addAll([
         if (_sharees.isNotEmpty) const SizedBox(height: Spacing.sm),
         ShareMenuItem(
-          title: StringsLocalizations.of(context).addAdmin,
+          title: context.strings.addAdmin,
           icon: HugeIcons.strokeRoundedCrown,
           showChevron: true,
           onTap: () async {
@@ -130,7 +130,7 @@ class _ShareCollectionPageState extends State<ShareCollectionPage> {
         ),
         const SizedBox(height: Spacing.sm),
         ShareMenuItem(
-          title: StringsLocalizations.of(context).addCollaborator,
+          title: context.strings.addCollaborator,
           icon: HugeIcons.strokeRoundedUserGroup,
           showChevron: true,
           onTap: () async {
@@ -149,7 +149,7 @@ class _ShareCollectionPageState extends State<ShareCollectionPage> {
         ),
         const SizedBox(height: Spacing.sm),
         ShareMenuItem(
-          title: StringsLocalizations.of(context).addViewer,
+          title: context.strings.addViewer,
           icon: HugeIcons.strokeRoundedView,
           showChevron: true,
           onTap: () async {
@@ -165,7 +165,7 @@ class _ShareCollectionPageState extends State<ShareCollectionPage> {
         ),
         if (_sharees.isEmpty && !hasUrl)
           ShareSectionDescription(
-            StringsLocalizations.of(context).sharedAlbumSectionDescription,
+            context.strings.sharedAlbumSectionDescription,
           ),
       ]);
     }
@@ -175,8 +175,8 @@ class _ShareCollectionPageState extends State<ShareCollectionPage> {
         const SizedBox(height: Spacing.xxl),
         ShareSectionTitle(
           hasUrl
-              ? StringsLocalizations.of(context).publicLinkEnabled
-              : StringsLocalizations.of(context).shareALink,
+              ? context.strings.publicLinkEnabled
+              : context.strings.shareALink,
         ),
       ]);
       if (hasUrl) {
@@ -186,7 +186,7 @@ class _ShareCollectionPageState extends State<ShareCollectionPage> {
             sendLinkButtonKey: sendLinkButtonKey,
             additionalItems: [
               ShareMenuItem(
-                title: StringsLocalizations.of(context).manageLink,
+                title: context.strings.manageLink,
                 icon: HugeIcons.strokeRoundedSetting07,
                 showChevron: true,
                 onTap: () async {
@@ -206,8 +206,8 @@ class _ShareCollectionPageState extends State<ShareCollectionPage> {
       } else {
         children.addAll([
           ShareMenuItem(
-            title: StringsLocalizations.of(context).createPublicLink,
-            subtitle: StringsLocalizations.of(context).shareWithNonenteUsers,
+            title: context.strings.createPublicLink,
+            subtitle: context.strings.shareWithNonenteUsers,
             icon: HugeIcons.strokeRoundedLink04,
             showChevron: true,
             showOnlyLoadingState: true,
@@ -222,12 +222,10 @@ class _ShareCollectionPageState extends State<ShareCollectionPage> {
             },
           ),
           const SizedBox(height: Spacing.xxl),
-          ShareSectionTitle(StringsLocalizations.of(context).collectPhotos),
+          ShareSectionTitle(context.strings.collectPhotos),
           ShareMenuItem(
-            title: StringsLocalizations.of(context).createCollaborativeLink,
-            subtitle: StringsLocalizations.of(
-              context,
-            ).collabLinkSectionDescription,
+            title: context.strings.createCollaborativeLink,
+            subtitle: context.strings.collabLinkSectionDescription,
             icon: HugeIcons.strokeRoundedUserGroup,
             showChevron: true,
             showOnlyLoadingState: true,
@@ -283,10 +281,10 @@ class EmailItemWidget extends StatelessWidget {
       final limit = total > 2 ? 1 : 2;
 
       return ShareMenuItem(
-        title: StringsLocalizations.of(context).manageParticipants,
-        subtitle: StringsLocalizations.of(
-          context,
-        ).albumParticipantsCount(count: sharees.length + 1),
+        title: context.strings.manageParticipants,
+        subtitle: context.strings.albumParticipantsCount(
+          count: sharees.length + 1,
+        ),
         leading: SizedBox(
           height: avatarSize,
           child: AlbumSharesIcons(

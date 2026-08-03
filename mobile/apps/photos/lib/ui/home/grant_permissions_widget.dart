@@ -360,9 +360,7 @@ class _GrantPermissionsWidgetState extends State<GrantPermissionsWidget> {
                         _buildPermissionsAnimation(context),
                         const Flexible(child: SizedBox(height: 22)),
                         Text(
-                          StringsLocalizations.of(
-                            context,
-                          ).grantGalleryPermissionTitle,
+                          context.strings.grantGalleryPermissionTitle,
                           textAlign: .center,
                           textScaler: .noScaling,
                           style: TextStyle(
@@ -381,9 +379,7 @@ class _GrantPermissionsWidgetState extends State<GrantPermissionsWidget> {
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 16),
                           child: Text(
-                            StringsLocalizations.of(
-                              context,
-                            ).grantGalleryPermissionDesc,
+                            context.strings.grantGalleryPermissionDesc,
                             textAlign: TextAlign.center,
                             style: textTheme.body.copyWith(
                               color: colorScheme.textMuted,
@@ -394,9 +390,7 @@ class _GrantPermissionsWidgetState extends State<GrantPermissionsWidget> {
                         const Flexible(child: SizedBox(height: 32)),
                         ButtonWidgetV2(
                           buttonType: ButtonTypeV2.neutral,
-                          labelText: StringsLocalizations.of(
-                            context,
-                          ).grantPermission,
+                          labelText: context.strings.grantPermission,
                           onTap: _onTapOfflineGrantPermission,
                         ),
                         const Flexible(child: SizedBox(height: 20)),
@@ -420,7 +414,7 @@ class _GrantPermissionsWidgetState extends State<GrantPermissionsWidget> {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12),
       child: StyledText(
-        text: StringsLocalizations.of(context).byAgreeing,
+        text: context.strings.byAgreeing,
         textAlign: TextAlign.center,
         style: textTheme.bodyMuted,
         tags: {
@@ -430,7 +424,7 @@ class _GrantPermissionsWidgetState extends State<GrantPermissionsWidget> {
                   MaterialPageRoute(
                     builder: (BuildContext context) {
                       return WebPage(
-                        StringsLocalizations.of(context).termsOfServicesTitle,
+                        context.strings.termsOfServicesTitle,
                         "https://ente.com/terms",
                       );
                     },
@@ -447,7 +441,7 @@ class _GrantPermissionsWidgetState extends State<GrantPermissionsWidget> {
                   MaterialPageRoute(
                     builder: (BuildContext context) {
                       return WebPage(
-                        StringsLocalizations.of(context).privacyPolicyTitle,
+                        context.strings.privacyPolicyTitle,
                         "https://ente.com/privacy",
                       );
                     },

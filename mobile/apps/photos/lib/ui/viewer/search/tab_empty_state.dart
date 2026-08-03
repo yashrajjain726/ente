@@ -19,22 +19,19 @@ class SearchTabEmptyState extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              StringsLocalizations.of(context).searchHint1,
-              style: textStyle.h3Bold,
-            ),
+            Text(context.strings.searchHint1, style: textStyle.h3Bold),
             const SizedBox(height: 24),
-            EmptyStateItemWidget(StringsLocalizations.of(context).searchHint2),
+            EmptyStateItemWidget(context.strings.searchHint2),
             const SizedBox(height: 12),
-            EmptyStateItemWidget(StringsLocalizations.of(context).searchHint3),
+            EmptyStateItemWidget(context.strings.searchHint3),
             const SizedBox(height: 12),
-            EmptyStateItemWidget(StringsLocalizations.of(context).searchHint4),
+            EmptyStateItemWidget(context.strings.searchHint4),
             const SizedBox(height: 12),
-            EmptyStateItemWidget(StringsLocalizations.of(context).searchHint5),
+            EmptyStateItemWidget(context.strings.searchHint5),
             const SizedBox(height: 32),
             ButtonWidget(
               buttonType: ButtonType.trailingIconPrimary,
-              labelText: StringsLocalizations.of(context).addYourPhotosNow,
+              labelText: context.strings.addYourPhotosNow,
               icon: Icons.arrow_forward_outlined,
               onTap: () async {
                 await handleFolderSelectionBackupFlow(context);

@@ -101,9 +101,9 @@ class _MemoriesWidgetSettingsState extends State<MemoriesWidgetSettings> {
     return Scaffold(
       backgroundColor: colorScheme.backgroundColour,
       body: AppBarComponent(
-        title: StringsLocalizations.of(context).memories,
+        title: context.strings.memories,
         subtitle: hasInstalledAny
-            ? StringsLocalizations.of(context).memoriesWidgetDesc
+            ? context.strings.memoriesWidgetDesc
             : context.strings.addMemoriesWidgetPrompt,
         slivers: <Widget>[
           if (!hasInstalledAny)
@@ -137,9 +137,7 @@ class _MemoriesWidgetSettingsState extends State<MemoriesWidgetSettings> {
                       const SizedBox(height: 18),
                       if (kDebugMode) ...[
                         MenuComponent(
-                          title: StringsLocalizations.of(
-                            context,
-                          ).showTextOnWidget,
+                          title: context.strings.showTextOnWidget,
                           trailing: ToggleSwitchComponent(
                             selected: _showText,
                             onChanged: (showText) async {
@@ -162,9 +160,7 @@ class _MemoriesWidgetSettingsState extends State<MemoriesWidgetSettings> {
                       MenuGroupComponent(
                         items: [
                           MenuComponent(
-                            title: StringsLocalizations.of(
-                              context,
-                            ).pastYearsMemories,
+                            title: context.strings.pastYearsMemories,
                             leading: SvgPicture.asset(
                               "assets/icons/past-year-memory-icon.svg",
                               colorFilter: ColorFilter.mode(
@@ -183,9 +179,7 @@ class _MemoriesWidgetSettingsState extends State<MemoriesWidgetSettings> {
                             ),
                           ),
                           MenuComponent(
-                            title: StringsLocalizations.of(
-                              context,
-                            ).onThisDayMemories,
+                            title: context.strings.onThisDayMemories,
                             leading: SvgPicture.asset(
                               "assets/icons/memories-widget-icon.svg",
                               colorFilter: ColorFilter.mode(
@@ -205,9 +199,7 @@ class _MemoriesWidgetSettingsState extends State<MemoriesWidgetSettings> {
                           ),
                           if (isMLEnabled)
                             MenuComponent(
-                              title: StringsLocalizations.of(
-                                context,
-                              ).smartMemories,
+                              title: context.strings.smartMemories,
                               leading: SvgPicture.asset(
                                 "assets/icons/smart-memory-icon.svg",
                                 colorFilter: ColorFilter.mode(

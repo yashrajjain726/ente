@@ -17,7 +17,7 @@ Future<bool?> showApplyCodeSheet(
   return showBottomSheetComponent<bool>(
     context: context,
     builder: (_) => BottomSheetComponent(
-      title: StringsLocalizations.of(context).applyCodeTitle,
+      title: context.strings.applyCodeTitle,
       isKeyboardAware: true,
       content: _ApplyCodeContent(
         referralView: referralView,
@@ -99,18 +99,15 @@ class _ApplyCodeContentState extends State<_ApplyCodeContent> {
     } catch (e) {
       Logger("ApplyCodeSheet").severe("Failed to apply code", e);
       if (mounted) {
-        String errorMessage = StringsLocalizations.of(
-          context,
-        ).failedToApplyCode;
+        String errorMessage = context.strings.failedToApplyCode;
         if (e is DioException &&
             e.response != null &&
             e.response!.data != null) {
           final code = e.response!.data["code"];
           if (code == "INVALID_CODE") {
-            errorMessage = StringsLocalizations.of(context).invalidReferralCode;
+            errorMessage = context.strings.invalidReferralCode;
           } else if (code != null) {
-            errorMessage =
-                "${StringsLocalizations.of(context).failedToApplyCode}: $code";
+            errorMessage = "${context.strings.failedToApplyCode}: $code";
           }
         }
         setState(() {
@@ -122,7 +119,7 @@ class _ApplyCodeContentState extends State<_ApplyCodeContent> {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = StringsLocalizations.of(context);
+    final l10n = context.strings;
 
     return Column(
       mainAxisSize: MainAxisSize.min,

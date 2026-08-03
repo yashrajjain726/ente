@@ -270,7 +270,7 @@ class GoToMapTile extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              StringsLocalizations.of(context).yourMap,
+              context.strings.yourMap,
               style: TextStyles.body.copyWith(color: textTheme.body.color),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,

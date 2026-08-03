@@ -230,10 +230,7 @@ class _CommentBubbleWidgetState extends State<CommentBubbleWidget>
           _isLiked = previousState;
           _optimisticLikeDelta = previousDelta;
         });
-        showShortToast(
-          context,
-          StringsLocalizations.of(context).failedToLikeComment,
-        );
+        showShortToast(context, context.strings.failedToLikeComment);
       }
       return;
     }
@@ -327,10 +324,7 @@ class _CommentBubbleWidgetState extends State<CommentBubbleWidget>
       } catch (e) {
         _logger.severe("Failed to delete comment", e);
         if (mounted) {
-          showShortToast(
-            context,
-            StringsLocalizations.of(context).failedToDeleteComment,
-          );
+          showShortToast(context, context.strings.failedToDeleteComment);
         }
       }
     }
@@ -627,7 +621,7 @@ class _InlineParentQuote extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = StringsLocalizations.of(context);
+    final l10n = context.strings;
     final textTheme = getEnteTextTheme(context);
 
     if (isLoading) {

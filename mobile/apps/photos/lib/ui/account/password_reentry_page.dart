@@ -69,7 +69,7 @@ class _PasswordReentryPageState extends State<PasswordReentryPage> {
           },
         ),
         title: Text(
-          StringsLocalizations.of(context).enterPassword,
+          context.strings.enterPassword,
           style: TextStyles.large.copyWith(color: colors.textBase),
         ),
         centerTitle: true,
@@ -79,7 +79,7 @@ class _PasswordReentryPageState extends State<PasswordReentryPage> {
         padding: const EdgeInsets.symmetric(horizontal: 16),
         child: ButtonComponent(
           key: const ValueKey("verifyPasswordButton"),
-          label: StringsLocalizations.of(context).logInLabel,
+          label: context.strings.logInLabel,
           isDisabled: !isFormValid,
           onTap: isFormValid ? _onVerifyPasswordPressed : null,
         ),
@@ -98,10 +98,7 @@ class _PasswordReentryPageState extends State<PasswordReentryPage> {
 
   Future<void> verifyPassword(String password) async {
     FocusScope.of(context).unfocus();
-    final dialog = createProgressDialog(
-      context,
-      StringsLocalizations.of(context).pleaseWait,
-    );
+    final dialog = createProgressDialog(context, context.strings.pleaseWait);
     await dialog.show();
     try {
       final kek = await Configuration.instance.decryptSecretsAndGetKeyEncKey(
@@ -116,9 +113,9 @@ class _PasswordReentryPageState extends State<PasswordReentryPage> {
       if (!mounted) return;
       final dialogChoice = await showChoiceDialog(
         context,
-        title: StringsLocalizations.of(context).recreatePasswordTitle,
-        body: StringsLocalizations.of(context).recreatePasswordBody,
-        firstButtonLabel: StringsLocalizations.of(context).useRecoveryKey,
+        title: context.strings.recreatePasswordTitle,
+        body: context.strings.recreatePasswordBody,
+        firstButtonLabel: context.strings.useRecoveryKey,
       );
       if (dialogChoice!.action == ButtonAction.first) {
         if (!mounted) return;
@@ -138,16 +135,16 @@ class _PasswordReentryPageState extends State<PasswordReentryPage> {
       if (!mounted) return;
       final dialogChoice = await showChoiceDialog(
         context,
-        title: StringsLocalizations.of(context).incorrectPasswordTitle,
-        body: StringsLocalizations.of(context).pleaseTryAgain,
-        firstButtonLabel: StringsLocalizations.of(context).contactSupport,
-        secondButtonLabel: StringsLocalizations.of(context).ok,
+        title: context.strings.incorrectPasswordTitle,
+        body: context.strings.pleaseTryAgain,
+        firstButtonLabel: context.strings.contactSupport,
+        secondButtonLabel: context.strings.ok,
       );
       if (dialogChoice!.action == ButtonAction.first) {
         if (!mounted) return;
         await sendLogs(
           context,
-          StringsLocalizations.of(context).contactSupport,
+          context.strings.contactSupport,
           "support@ente.com",
           postShare: () {},
         );
@@ -214,9 +211,9 @@ class _PasswordReentryPageState extends State<PasswordReentryPage> {
               ),
               TextInputComponent(
                 key: const ValueKey("passwordInputField"),
-                label: StringsLocalizations.of(context).password,
+                label: context.strings.password,
                 isRequired: true,
-                hintText: StringsLocalizations.of(context).enterYourPassword,
+                hintText: context.strings.enterYourPassword,
                 controller: _passwordController,
                 isPasswordInput: true,
                 autocorrect: false,
@@ -234,12 +231,12 @@ class _PasswordReentryPageState extends State<PasswordReentryPage> {
                 children: [
                   ButtonComponent(
                     variant: ButtonComponentVariant.link,
-                    label: StringsLocalizations.of(context).changeEmail,
+                    label: context.strings.changeEmail,
                     size: ButtonComponentSize.small,
                     onTap: () async {
                       final dialog = createProgressDialog(
                         context,
-                        StringsLocalizations.of(context).pleaseWait,
+                        context.strings.pleaseWait,
                       );
                       await dialog.show();
                       await Configuration.instance.logout();
@@ -250,7 +247,7 @@ class _PasswordReentryPageState extends State<PasswordReentryPage> {
                   ),
                   ButtonComponent(
                     variant: ButtonComponentVariant.link,
-                    label: StringsLocalizations.of(context).forgotPassword,
+                    label: context.strings.forgotPassword,
                     size: ButtonComponentSize.small,
                     onTap: () async {
                       // ignore: unawaited_futures

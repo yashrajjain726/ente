@@ -411,8 +411,8 @@ class _HomeWidgetState extends State<HomeWidget> {
       if (publicUrl.passwordEnabled) {
         await showTextInputDialog(
           context,
-          title: StringsLocalizations.of(context).enterPassword,
-          submitButtonLabel: StringsLocalizations.of(context).ok,
+          title: context.strings.enterPassword,
+          submitButtonLabel: context.strings.ok,
           alwaysShowSuccessState: false,
           popnavAfterSubmission: false,
           onSubmit: (String text) async {
@@ -513,12 +513,12 @@ class _HomeWidgetState extends State<HomeWidget> {
 
   Future<void> _autoLogoutAlert() async {
     final AlertDialog alert = AlertDialog(
-      title: Text(StringsLocalizations.of(context).sessionExpired),
-      content: Text(StringsLocalizations.of(context).pleaseLoginAgain),
+      title: Text(context.strings.sessionExpired),
+      content: Text(context.strings.pleaseLoginAgain),
       actions: [
         TextButton(
           child: Text(
-            StringsLocalizations.of(context).ok,
+            context.strings.ok,
             style: TextStyle(
               color: Theme.of(context).colorScheme.greenAlternative,
             ),
@@ -528,7 +528,7 @@ class _HomeWidgetState extends State<HomeWidget> {
             Navigator.of(context).popUntil((route) => route.isFirst);
             final dialog = createProgressDialog(
               context,
-              StringsLocalizations.of(context).loggingOut,
+              context.strings.loggingOut,
             );
             await dialog.show();
             await Configuration.instance.logout();
@@ -626,7 +626,7 @@ class _HomeWidgetState extends State<HomeWidget> {
               actions: [
                 const SizedBox(height: 24),
                 ButtonWidget(
-                  labelText: StringsLocalizations.of(context).openFile,
+                  labelText: context.strings.openFile,
                   buttonType: ButtonType.primary,
                   onTap: () async {
                     Navigator.of(context).pop(true);
@@ -635,7 +635,7 @@ class _HomeWidgetState extends State<HomeWidget> {
                 const SizedBox(height: 12),
                 ButtonWidget(
                   buttonType: ButtonType.secondary,
-                  labelText: StringsLocalizations.of(context).backupFile,
+                  labelText: context.strings.backupFile,
                   onTap: () async {
                     Navigator.of(context).pop(false);
                   },

@@ -102,7 +102,7 @@ class _LargeFilesPagePageState extends State<LargeFilesPagePage> {
       sortAsyncFn: () => false,
       groupType: GroupType.size,
       initialFiles: null,
-      albumName: StringsLocalizations.of(context).viewLargeFiles,
+      albumName: context.strings.viewLargeFiles,
     );
     return GalleryBoundariesProvider(
       child: GalleryFilesState(
@@ -156,7 +156,7 @@ class _LargeFilesAppBarState extends State<_LargeFilesAppBar>
         elevation: 0,
         centerTitle: false,
         title: Text(
-          StringsLocalizations.of(context).viewLargeFiles,
+          context.strings.viewLargeFiles,
           style: Theme.of(
             context,
           ).textTheme.headlineSmall!.copyWith(fontSize: 16),
@@ -170,20 +170,20 @@ class _LargeFilesAppBarState extends State<_LargeFilesAppBar>
             child: Row(
               children: [
                 _FilterChip(
-                  label: StringsLocalizations.of(context).all,
+                  label: context.strings.all,
                   isSelected: widget.currentFilter == LargeFileFilter.all,
                   onTap: () => widget.onFilterChanged(LargeFileFilter.all),
                 ),
                 const SizedBox(width: 8),
                 _FilterChip(
-                  label: StringsLocalizations.of(context).photos,
+                  label: context.strings.photos,
                   icon: Icons.image,
                   isSelected: widget.currentFilter == LargeFileFilter.photos,
                   onTap: () => widget.onFilterChanged(LargeFileFilter.photos),
                 ),
                 const SizedBox(width: 8),
                 _FilterChip(
-                  label: StringsLocalizations.of(context).videos,
+                  label: context.strings.videos,
                   icon: Icons.videocam,
                   isSelected: widget.currentFilter == LargeFileFilter.videos,
                   onTap: () => widget.onFilterChanged(LargeFileFilter.videos),

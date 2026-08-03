@@ -100,14 +100,10 @@ class _GroupHeaderWidgetState extends State<GroupHeaderWidget> {
               child: Text(
                 widget.title,
                 style:
-                    (widget.title ==
-                            StringsLocalizations.of(context).dayToday ||
-                        widget.title ==
-                            StringsLocalizations.of(context).thisWeek ||
-                        widget.title ==
-                            StringsLocalizations.of(context).thisMonth ||
-                        widget.title ==
-                            StringsLocalizations.of(context).thisYear)
+                    (widget.title == context.strings.dayToday ||
+                        widget.title == context.strings.thisWeek ||
+                        widget.title == context.strings.thisMonth ||
+                        widget.title == context.strings.thisYear)
                     ? textStyle
                     : textStyle.copyWith(color: colorScheme.textMuted),
                 maxLines: 1,

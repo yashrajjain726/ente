@@ -24,7 +24,7 @@ import "package:photos/ui/settings/widget_settings_screen.dart";
 /// Registry that provides all searchable settings items
 class SettingsSearchRegistry {
   static List<SettingsSearchItem> getSearchableItems(BuildContext context) {
-    final l10n = StringsLocalizations.of(context);
+    final l10n = context.strings;
     final hasLoggedIn = Configuration.instance.isLoggedIn();
     final isLocalGallery = isLocalGalleryMode;
     final showThemeControls = Platform.isAndroid || kDebugMode;
@@ -760,7 +760,7 @@ class SettingsSearchRegistry {
     BuildContext context,
     void Function(Widget Function(BuildContext) routeBuilder) onNavigate,
   ) {
-    final l10n = StringsLocalizations.of(context);
+    final l10n = context.strings;
     final hasLoggedIn = Configuration.instance.isLoggedIn();
     final isLocalGallery = isLocalGalleryMode;
 

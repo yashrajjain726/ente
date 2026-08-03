@@ -15,7 +15,7 @@ Future<void> showQrCodeContentSheet(
 }) {
   return showBaseBottomSheet(
     context,
-    title: StringsLocalizations.of(context).qrCode,
+    title: context.strings.qrCode,
     child: Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -38,7 +38,7 @@ class _QrContentEntry extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = getEnteColorScheme(context);
     final textTheme = getEnteTextTheme(context);
-    final l10n = StringsLocalizations.of(context);
+    final l10n = context.strings;
     final uri = Uri.tryParse(content);
     final isUrl =
         uri != null && (uri.scheme == "http" || uri.scheme == "https");

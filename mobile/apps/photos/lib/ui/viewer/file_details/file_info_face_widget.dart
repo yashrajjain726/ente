@@ -161,7 +161,7 @@ class _FileInfoFaceWidgetState extends State<FileInfoFaceWidget> {
           child: Center(
             child: Text(
               widget.person!.data.isIgnored
-                  ? '(' + StringsLocalizations.of(context).ignored + ')'
+                  ? '(' + context.strings.ignored + ')'
                   : widget.person!.data.name.trim(),
               style: TextStyles.body,
               overflow: TextOverflow.ellipsis,
@@ -288,10 +288,7 @@ class _FileInfoFaceWidgetState extends State<FileInfoFaceWidget> {
     }
 
     if (!mounted) return;
-    showShortToast(
-      context,
-      StringsLocalizations.of(context).faceNotClusteredYet,
-    );
+    showShortToast(context, context.strings.faceNotClusteredYet);
     unawaited(MLService.instance.clusterAllImages(force: true));
     return;
   }
@@ -323,11 +320,11 @@ class _FileInfoFaceWidgetState extends State<FileInfoFaceWidget> {
     if (widget.person == null) return;
     final result = await showChoiceActionSheet(
       context,
-      title: StringsLocalizations.of(context).removePersonLabel,
-      body: StringsLocalizations.of(context).areYouSureRemoveThisFaceFromPerson,
-      firstButtonLabel: StringsLocalizations.of(context).remove,
+      title: context.strings.removePersonLabel,
+      body: context.strings.areYouSureRemoveThisFaceFromPerson,
+      firstButtonLabel: context.strings.remove,
       firstButtonType: ButtonType.critical,
-      secondButtonLabel: StringsLocalizations.of(context).cancel,
+      secondButtonLabel: context.strings.cancel,
       isCritical: true,
     );
     if (result?.action == ButtonAction.first) {

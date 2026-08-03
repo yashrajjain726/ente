@@ -576,8 +576,8 @@ class _FeedTextContent extends StatelessWidget {
     // Multiple users: "Username and X others"
     final othersCount = feedItem.additionalActorCount;
     final othersText = othersCount == 1
-        ? StringsLocalizations.of(context).and1Other
-        : StringsLocalizations.of(context).andXOthers(count: othersCount);
+        ? context.strings.and1Other
+        : context.strings.andXOthers(count: othersCount);
 
     return Text.rich(
       TextSpan(
@@ -607,7 +607,7 @@ class _FeedTextContent extends StatelessWidget {
     BuildContext context,
     TextStyle baseStyle,
   ) {
-    final l10n = StringsLocalizations.of(context);
+    final l10n = context.strings;
     final isOwn = feedItem.isOwnedByCurrentUser;
     switch (feedItem.type) {
       case FeedItemType.photoLike:
@@ -655,7 +655,7 @@ class _FeedTextContent extends StatelessWidget {
     BuildContext context,
     TextStyle baseStyle,
   ) {
-    final l10n = StringsLocalizations.of(context);
+    final l10n = context.strings;
     final count = feedItem.sharedFileCount;
     final albumName = feedItem.collectionName ?? l10n.albums;
 

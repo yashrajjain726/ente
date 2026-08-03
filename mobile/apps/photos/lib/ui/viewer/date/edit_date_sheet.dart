@@ -170,7 +170,7 @@ class _EditDateSheetState extends State<EditDateSheet> {
                   const SizedBox(height: 16),
                   ButtonWidget(
                     buttonType: ButtonType.primary,
-                    labelText: StringsLocalizations.of(context).confirm,
+                    labelText: context.strings.confirm,
                     buttonSize: ButtonSize.large,
                     onTap: () async {
                       final newDate = await _editDates(
@@ -186,7 +186,7 @@ class _EditDateSheetState extends State<EditDateSheet> {
                   const SizedBox(height: 8),
                   ButtonWidget(
                     buttonType: ButtonType.neutral,
-                    labelText: StringsLocalizations.of(context).cancel,
+                    labelText: context.strings.cancel,
                     buttonSize: ButtonSize.large,
                     onTap: () async {
                       Navigator.of(context).pop(null);
@@ -270,10 +270,8 @@ class DateAndTimeWidget extends StatelessWidget {
               alignment: Alignment.centerLeft,
               child: Text(
                 selectDate
-                    ? StringsLocalizations.of(
-                        context,
-                      ).selectOneDateAndTimeForAll
-                    : StringsLocalizations.of(context).selectStartOfRange,
+                    ? context.strings.selectOneDateAndTimeForAll
+                    : context.strings.selectStartOfRange,
                 style: TextStyle(color: colorScheme.textBase, fontSize: 16),
               ),
             ),
@@ -283,12 +281,8 @@ class DateAndTimeWidget extends StatelessWidget {
               alignment: Alignment.centerLeft,
               child: Text(
                 selectDate
-                    ? StringsLocalizations.of(
-                        context,
-                      ).thisWillMakeTheDateAndTimeOfAllSelected
-                    : StringsLocalizations.of(
-                        context,
-                      ).allWillShiftRangeBasedOnFirst,
+                    ? context.strings.thisWillMakeTheDateAndTimeOfAllSelected
+                    : context.strings.allWillShiftRangeBasedOnFirst,
                 style: TextStyle(color: colorScheme.textFaint, fontSize: 12),
               ),
             ),
@@ -346,7 +340,7 @@ class DateAndTimeWidget extends StatelessWidget {
             Align(
               alignment: Alignment.centerLeft,
               child: Text(
-                StringsLocalizations.of(context).newRange,
+                context.strings.newRange,
                 style: TextStyle(color: colorScheme.textBase, fontSize: 12),
               ),
             ),
@@ -443,11 +437,11 @@ class SelectDateOrShiftWidget extends StatelessWidget {
                 color: colorScheme.textBase,
               ),
               title: Text(
-                StringsLocalizations.of(context).selectOneDateAndTime,
+                context.strings.selectOneDateAndTime,
                 style: TextStyle(color: colorScheme.textBase, fontSize: 16),
               ),
               subtitle: Text(
-                StringsLocalizations.of(context).moveSelectedPhotosToOneDate,
+                context.strings.moveSelectedPhotosToOneDate,
                 style: TextStyle(color: colorScheme.textFaint, fontSize: 12),
               ),
               trailing: Icon(
@@ -469,13 +463,11 @@ class SelectDateOrShiftWidget extends StatelessWidget {
                 color: colorScheme.textBase,
               ),
               title: Text(
-                StringsLocalizations.of(context).shiftDatesAndTime,
+                context.strings.shiftDatesAndTime,
                 style: TextStyle(color: colorScheme.textBase, fontSize: 16),
               ),
               subtitle: Text(
-                StringsLocalizations.of(
-                  context,
-                ).photosKeepRelativeTimeDifference,
+                context.strings.photosKeepRelativeTimeDifference,
                 style: TextStyle(color: colorScheme.textFaint, fontSize: 12),
               ),
               trailing: Icon(
@@ -533,9 +525,7 @@ class PhotoDateHeaderWidget extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        StringsLocalizations.of(
-                          context,
-                        ).photosCount(count: photoCount),
+                        context.strings.photosCount(count: photoCount),
                         style: TextStyle(
                           color: colorScheme.textBase,
                           fontSize: 18,

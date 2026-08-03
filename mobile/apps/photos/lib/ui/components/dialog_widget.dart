@@ -78,7 +78,7 @@ class LegacyDialogWidget extends StatelessWidget {
           ButtonComponentAdapter(button: button),
       ],
       showCloseButton: cancelButton != null,
-      closeTooltip: StringsLocalizations.of(context).close,
+      closeTooltip: context.strings.close,
       closeResult: cancelButton == null ? null : sheetCloseResult(cancelButton),
       onClose: cancelButton == null
           ? null
@@ -252,7 +252,7 @@ class _LegacyTextInputDialogState extends State<LegacyTextInputDialog> {
       ],
       isKeyboardAware: true,
       showCloseButton: true,
-      closeTooltip: StringsLocalizations.of(context).close,
+      closeTooltip: context.strings.close,
       closeResult: ButtonResult(),
     );
   }

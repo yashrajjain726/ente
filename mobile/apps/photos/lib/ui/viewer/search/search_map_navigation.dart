@@ -18,10 +18,7 @@ Future<void> openSearchMap(BuildContext context) async {
       if (!context.mounted) {
         return;
       }
-      showShortToast(
-        context,
-        StringsLocalizations.of(context).somethingWentWrong,
-      );
+      showShortToast(context, context.strings.somethingWentWrong);
       return;
     }
   }

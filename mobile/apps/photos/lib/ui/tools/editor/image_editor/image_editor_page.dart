@@ -89,7 +89,7 @@ class _ImageEditorPageState extends State<ImageEditorPage> {
   }
 
   Future<void> saveImage(ProImageEditorState editorState) async {
-    final l10n = StringsLocalizations.of(context);
+    final l10n = context.strings;
     final dialog = createProgressDialog(context, l10n.saving);
     await dialog.show();
 
@@ -186,7 +186,7 @@ class _ImageEditorPageState extends State<ImageEditorPage> {
   }
 
   Future<void> _showExitConfirmationDialog(BuildContext context) async {
-    final l10n = StringsLocalizations.of(context);
+    final l10n = context.strings;
     final actionResult = await showActionSheet(
       context: context,
       title: l10n.discardEditsQuestion,

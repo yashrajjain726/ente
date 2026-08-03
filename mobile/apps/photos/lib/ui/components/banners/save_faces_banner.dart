@@ -51,7 +51,7 @@ class _SaveFacesBannerState extends State<SaveFacesBanner> {
 
     final colorScheme = getEnteColorScheme(context);
     final textTheme = getEnteTextTheme(context);
-    final l10n = StringsLocalizations.of(context);
+    final l10n = context.strings;
 
     return Padding(
       padding: const EdgeInsets.all(12),

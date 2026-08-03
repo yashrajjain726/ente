@@ -106,7 +106,7 @@ class FamilyDashboard extends StatelessWidget {
     final activeMembers = visibleMembers
         .where((member) => member.isActive)
         .toList();
-    final l10n = StringsLocalizations.of(context);
+    final l10n = context.strings;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -213,7 +213,7 @@ class _FamilyStorageCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.componentColors;
-    final l10n = StringsLocalizations.of(context);
+    final l10n = context.strings;
     final totalStorage = userDetails.getTotalStorage();
     final totalUsed =
         userDetails.familyData?.getTotalUsage() ?? userDetails.usage;
@@ -387,7 +387,7 @@ class _FamilyMemberRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = StringsLocalizations.of(context);
+    final l10n = context.strings;
     final actions = familyMemberActions(
       isAdmin: isAdminView,
       isCurrentUser: isCurrentUser,
@@ -498,7 +498,7 @@ class _MemberAvatar extends StatelessWidget {
           right: -4,
           bottom: -4,
           child: Semantics(
-            label: StringsLocalizations.of(context).admin,
+            label: context.strings.admin,
             child: ExcludeSemantics(
               child: HugeIcon(
                 icon: HugeIcons.strokeRoundedCrown02,

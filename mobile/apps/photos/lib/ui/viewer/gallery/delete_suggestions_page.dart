@@ -31,7 +31,7 @@ class DeleteSuggestionsPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final appBar = GalleryAppBarWidget.sliverConfig(
       appBarType,
-      StringsLocalizations.of(context).deleteSuggestions,
+      context.strings.deleteSuggestions,
       _selectedFiles,
     );
     final gallery = Gallery(

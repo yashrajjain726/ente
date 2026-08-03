@@ -39,7 +39,7 @@ class _GetStartedBannerState extends State<GetStartedBanner> {
       return const SizedBox.shrink();
     }
 
-    final l10n = StringsLocalizations.of(context);
+    final l10n = context.strings;
     final colors = context.componentColors;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final ctaColor = isDark ? colors.primary : colors.primaryDark;

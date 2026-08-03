@@ -25,7 +25,7 @@ class VideoRotatePage extends StatelessWidget {
           }
           Navigator.pop(context);
         },
-        primaryActionLabel: StringsLocalizations.of(context).done,
+        primaryActionLabel: context.strings.done,
         onPrimaryAction: () {
           Navigator.pop(context);
         },
@@ -61,14 +61,14 @@ class VideoRotatePage extends StatelessWidget {
               VideoEditorMainActions(
                 children: [
                   VideoEditorBottomAction(
-                    label: StringsLocalizations.of(context).left,
+                    label: context.strings.left,
                     onPressed: () =>
                         controller.rotate90Degrees(RotateDirection.left),
                     icon: Icons.rotate_left,
                   ),
                   const SizedBox(width: 24),
                   VideoEditorBottomAction(
-                    label: StringsLocalizations.of(context).right,
+                    label: context.strings.right,
                     onPressed: () =>
                         controller.rotate90Degrees(RotateDirection.right),
                     icon: Icons.rotate_right,

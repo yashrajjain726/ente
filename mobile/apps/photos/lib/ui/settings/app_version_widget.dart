@@ -49,9 +49,7 @@ class _AppVersionWidgetState extends State<AppVersionWidget> {
               padding: const EdgeInsets.symmetric(vertical: 20),
               child: Center(
                 child: Text(
-                  StringsLocalizations.of(
-                    context,
-                  ).appVersion(versionValue: snapshot.data!),
+                  context.strings.appVersion(versionValue: snapshot.data!),
                   style: textTheme.smallMuted,
                 ),
               ),

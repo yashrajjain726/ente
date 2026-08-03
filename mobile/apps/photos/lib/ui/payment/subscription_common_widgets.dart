@@ -36,11 +36,9 @@ class ValidityWidget extends StatelessWidget {
           DateTime.fromMicrosecondsSinceEpoch(currentSubscription!.expiryTime),
         );
 
-    var message = StringsLocalizations.of(context).renewsOn(endDate: endDate);
+    var message = context.strings.renewsOn(endDate: endDate);
     if (currentSubscription!.attributes?.isCancelled ?? false) {
-      message = StringsLocalizations.of(
-        context,
-      ).subWillBeCancelledOn(endDate: endDate);
+      message = context.strings.subWillBeCancelledOn(endDate: endDate);
       if (addOnBonus.isNotEmpty) {
         hideSubValidityView = true;
       }
@@ -84,9 +82,10 @@ class AddOnBonusValidity extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(top: 4, bottom: 4),
       child: Text(
-        StringsLocalizations.of(
-          context,
-        ).addOnValidTill(storageAmount: storage, endDate: endDate),
+        context.strings.addOnValidTill(
+          storageAmount: storage,
+          endDate: endDate,
+        ),
         style: getEnteTextTheme(context).smallFaint,
         textAlign: TextAlign.center,
       ),
@@ -105,7 +104,7 @@ class SubFaqWidget extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       child: MenuItemWidgetNew(
-        title: StringsLocalizations.of(context).faqs,
+        title: context.strings.faqs,
         menuItemColor: colorScheme.fillFaint,
         pressedColor: colorScheme.fillFaintPressed,
         trailingWidget: Icon(
@@ -197,7 +196,7 @@ class _SubscriptionToggleState extends State<SubscriptionToggle> {
                         width: widthOfButton,
                         child: Center(
                           child: Text(
-                            StringsLocalizations.of(context).yearly,
+                            context.strings.yearly,
                             style: textTheme.bodyMuted,
                           ),
                         ),
@@ -214,7 +213,7 @@ class _SubscriptionToggleState extends State<SubscriptionToggle> {
                         width: widthOfButton,
                         child: Center(
                           child: Text(
-                            StringsLocalizations.of(context).monthly,
+                            context.strings.monthly,
                             style: textTheme.bodyMuted,
                           ),
                         ),
@@ -240,8 +239,8 @@ class _SubscriptionToggleState extends State<SubscriptionToggle> {
                       child: Text(
                         key: ValueKey(_isYearly),
                         _isYearly
-                            ? StringsLocalizations.of(context).yearly
-                            : StringsLocalizations.of(context).monthly,
+                            ? context.strings.yearly
+                            : context.strings.monthly,
                         style: textTheme.body,
                       ),
                     ),

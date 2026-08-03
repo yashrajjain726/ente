@@ -74,14 +74,14 @@ class _AlbumSelectionActionWidgetState
         widget.sectionType == UISectionType.outgoingCollections) {
       items.add(
         SelectionActionButton(
-          labelText: StringsLocalizations.of(context).share,
+          labelText: context.strings.share,
           hugeIcon: HugeIcons.strokeRoundedShare03,
           onTap: _shareCollection,
         ),
       );
       items.add(
         SelectionActionButton(
-          labelText: StringsLocalizations.of(context).pin,
+          labelText: context.strings.pin,
           hugeIcon: HugeIcons.strokeRoundedPin,
           onTap: _onPinClick,
           shouldShow: hasUnpinnedAlbum,
@@ -90,7 +90,7 @@ class _AlbumSelectionActionWidgetState
 
       items.add(
         SelectionActionButton(
-          labelText: StringsLocalizations.of(context).unpin,
+          labelText: context.strings.unpin,
           hugeIcon: HugeIcons.strokeRoundedPinOff,
           onTap: _onUnpinClick,
           shouldShow: hasPinnedAlbum,
@@ -99,7 +99,7 @@ class _AlbumSelectionActionWidgetState
 
       items.add(
         SelectionActionButton(
-          labelText: StringsLocalizations.of(context).delete,
+          labelText: context.strings.delete,
           hugeIcon: HugeIcons.strokeRoundedDelete01,
           onTap: _trashCollection,
           isCritical: true,
@@ -107,7 +107,7 @@ class _AlbumSelectionActionWidgetState
       );
       items.add(
         SelectionActionButton(
-          labelText: StringsLocalizations.of(context).hide,
+          labelText: context.strings.hide,
           hugeIcon: HugeIcons.strokeRoundedViewOffSlash,
           onTap: _onHideOrUnHideClick,
         ),
@@ -118,14 +118,14 @@ class _AlbumSelectionActionWidgetState
       // For archived albums: show unarchive and delete
       items.add(
         SelectionActionButton(
-          labelText: StringsLocalizations.of(context).unarchive,
+          labelText: context.strings.unarchive,
           hugeIcon: HugeIcons.strokeRoundedUnarchive03,
           onTap: _archiveClick,
         ),
       );
       items.add(
         SelectionActionButton(
-          labelText: StringsLocalizations.of(context).delete,
+          labelText: context.strings.delete,
           hugeIcon: HugeIcons.strokeRoundedDelete01,
           onTap: _trashCollection,
           isCritical: true,
@@ -135,14 +135,14 @@ class _AlbumSelectionActionWidgetState
       // For hidden albums: show unhide and delete
       items.add(
         SelectionActionButton(
-          labelText: StringsLocalizations.of(context).unhide,
+          labelText: context.strings.unhide,
           hugeIcon: HugeIcons.strokeRoundedView,
           onTap: _onHideOrUnHideClick,
         ),
       );
       items.add(
         SelectionActionButton(
-          labelText: StringsLocalizations.of(context).delete,
+          labelText: context.strings.delete,
           hugeIcon: HugeIcons.strokeRoundedDelete01,
           onTap: _trashCollection,
           isCritical: true,
@@ -151,7 +151,7 @@ class _AlbumSelectionActionWidgetState
     } else {
       items.add(
         SelectionActionButton(
-          labelText: StringsLocalizations.of(context).archive,
+          labelText: context.strings.archive,
           hugeIcon: HugeIcons.strokeRoundedArchive03,
           onTap: _archiveClick,
         ),
@@ -171,7 +171,7 @@ class _AlbumSelectionActionWidgetState
 
         items.add(
           SelectionActionButton(
-            labelText: StringsLocalizations.of(context).pin,
+            labelText: context.strings.pin,
             hugeIcon: HugeIcons.strokeRoundedPin,
             onTap: _onPinClickForSharee,
             shouldShow: hasShareeUnpinnedAlbum,
@@ -180,7 +180,7 @@ class _AlbumSelectionActionWidgetState
 
         items.add(
           SelectionActionButton(
-            labelText: StringsLocalizations.of(context).unpin,
+            labelText: context.strings.unpin,
             hugeIcon: HugeIcons.strokeRoundedPinOff,
             onTap: _onUnpinClickForSharee,
             shouldShow: hasShareePinnedAlbum,
@@ -191,7 +191,7 @@ class _AlbumSelectionActionWidgetState
       // Hide option for incoming collections (uses sharee metadata)
       items.add(
         SelectionActionButton(
-          labelText: StringsLocalizations.of(context).hide,
+          labelText: context.strings.hide,
           hugeIcon: HugeIcons.strokeRoundedViewOffSlash,
           onTap: _onHideOrUnHideClick,
         ),
@@ -199,7 +199,7 @@ class _AlbumSelectionActionWidgetState
 
       items.add(
         SelectionActionButton(
-          labelText: StringsLocalizations.of(context).leaveAlbum,
+          labelText: context.strings.leaveAlbum,
           hugeIcon: HugeIcons.strokeRoundedLogout05,
           onTap: _leaveAlbum,
         ),
@@ -367,9 +367,7 @@ class _AlbumSelectionActionWidgetState
     final isUnhiding = collections.first.isHidden();
     final dialog = createProgressDialog(
       context,
-      isUnhiding
-          ? StringsLocalizations.of(context).unhiding
-          : StringsLocalizations.of(context).hiding,
+      isUnhiding ? context.strings.unhiding : context.strings.hiding,
     );
     await dialog.show();
 
@@ -398,8 +396,8 @@ class _AlbumSelectionActionWidgetState
       showShortToast(
         context,
         isUnhiding
-            ? StringsLocalizations.of(context).successfullyUnhid
-            : StringsLocalizations.of(context).successfullyHid,
+            ? context.strings.successfullyUnhid
+            : context.strings.successfullyHid,
       );
     } catch (e, s) {
       _logger.warning("failed to change visibility", e, s);
@@ -435,9 +433,7 @@ class _AlbumSelectionActionWidgetState
         : collections.first.isArchived();
     final dialog = createProgressDialog(
       context,
-      isUnarchiving
-          ? StringsLocalizations.of(context).unarchiving
-          : StringsLocalizations.of(context).archiving,
+      isUnarchiving ? context.strings.unarchiving : context.strings.archiving,
     );
     await dialog.show();
 
@@ -484,8 +480,8 @@ class _AlbumSelectionActionWidgetState
       showShortToast(
         context,
         isUnarchiving
-            ? StringsLocalizations.of(context).successfullyUnarchived
-            : StringsLocalizations.of(context).successfullyArchived,
+            ? context.strings.successfullyUnarchived
+            : context.strings.successfullyArchived,
       );
     } catch (e, s) {
       _logger.warning("failed to change archive state", e, s);
@@ -514,7 +510,7 @@ class _AlbumSelectionActionWidgetState
           shouldStickToDarkTheme: true,
           buttonAction: ButtonAction.first,
           shouldSurfaceExecutionStates: true,
-          labelText: StringsLocalizations.of(context).leaveAlbum,
+          labelText: context.strings.leaveAlbum,
           onTap: () async {
             for (final collection in widget.selectedAlbums.albums) {
               await CollectionsService.instance.leaveAlbum(collection);
@@ -527,13 +523,11 @@ class _AlbumSelectionActionWidgetState
           buttonAction: ButtonAction.cancel,
           isInAlert: true,
           shouldStickToDarkTheme: true,
-          labelText: StringsLocalizations.of(context).cancel,
+          labelText: context.strings.cancel,
         ),
       ],
-      title: StringsLocalizations.of(context).leaveSharedAlbum,
-      body: StringsLocalizations.of(
-        context,
-      ).photosAddedByYouWillBeRemovedFromTheAlbum,
+      title: context.strings.leaveSharedAlbum,
+      body: context.strings.photosAddedByYouWillBeRemovedFromTheAlbum,
     );
     if (actionResult?.action != null && mounted) {
       if (actionResult!.action == ButtonAction.error) {
@@ -559,7 +553,7 @@ class _AlbumSelectionActionWidgetState
   void _showFavToast() {
     showShortToast(
       context,
-      StringsLocalizations.of(context).actionNotSupportedOnFavouritesAlbum,
+      context.strings.actionNotSupportedOnFavouritesAlbum,
     );
   }
 }

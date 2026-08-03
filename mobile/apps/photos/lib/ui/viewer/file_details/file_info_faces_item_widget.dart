@@ -144,7 +144,7 @@ class _FacesItemWidgetState extends State<FacesItemWidget> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            Text(StringsLocalizations.of(context).people, style: TextStyles.h2),
+            Text(context.strings.people, style: TextStyles.h2),
             _editStateButton(),
           ],
         ),
@@ -298,7 +298,7 @@ class _FacesItemWidgetState extends State<FacesItemWidget> {
   }
 
   Widget _buildNoFacesWidget() {
-    final l10n = StringsLocalizations.of(context);
+    final l10n = context.strings;
     final reason = _errorReason ?? NoFacesReason.noFacesFound;
     final showManualTagOption =
         !isLocalGalleryMode &&
@@ -401,7 +401,7 @@ class _FacesItemWidgetState extends State<FacesItemWidget> {
             child: Row(
               children: [
                 Text(
-                  StringsLocalizations.of(context).otherDetectedFaces,
+                  context.strings.otherDetectedFaces,
                   style: TextStyles.bodyBold,
                 ),
                 const Spacer(),
@@ -451,7 +451,7 @@ class _FacesItemWidgetState extends State<FacesItemWidget> {
             const SizedBox(width: 8),
           ],
           ButtonComponent(
-            label: StringsLocalizations.of(context).done,
+            label: context.strings.done,
             variant: ButtonComponentVariant.link,
             size: ButtonComponentSize.small,
             shouldSurfaceExecutionStates: false,
@@ -516,7 +516,7 @@ class _FacesItemWidgetState extends State<FacesItemWidget> {
     final selectedFaces = _selectedFaceInfos();
     if (selectedFaces.isEmpty) return;
 
-    final l10n = StringsLocalizations.of(context);
+    final l10n = context.strings;
     final multiple = selectedFaces.length > 1;
     final result = await showChoiceActionSheet(
       context,
@@ -801,11 +801,11 @@ class _FacesItemWidgetState extends State<FacesItemWidget> {
   Future<void> _onRemoveManualPerson(PersonEntity person) async {
     final result = await showChoiceActionSheet(
       context,
-      title: StringsLocalizations.of(context).removePersonTag,
-      body: StringsLocalizations.of(context).areYouSureRemoveThisPersonTag,
-      firstButtonLabel: StringsLocalizations.of(context).remove,
+      title: context.strings.removePersonTag,
+      body: context.strings.areYouSureRemoveThisPersonTag,
+      firstButtonLabel: context.strings.remove,
       firstButtonType: ButtonType.critical,
-      secondButtonLabel: StringsLocalizations.of(context).cancel,
+      secondButtonLabel: context.strings.cancel,
       isCritical: true,
     );
     if (result?.action == ButtonAction.first) {
@@ -877,7 +877,7 @@ class _ManualPersonTag extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = getEnteColorScheme(context);
     final displayName = person.data.isIgnored
-        ? '(' + StringsLocalizations.of(context).ignored + ')'
+        ? '(' + context.strings.ignored + ')'
         : person.data.name.trim();
 
     return Semantics(
@@ -962,14 +962,14 @@ enum NoFacesReason {
 String getNoFaceReasonText(BuildContext context, NoFacesReason reason) {
   switch (reason) {
     case NoFacesReason.fileNotUploaded:
-      return StringsLocalizations.of(context).fileNotUploadedYet;
+      return context.strings.fileNotUploadedYet;
     case NoFacesReason.fileNotAnalyzed:
-      return StringsLocalizations.of(context).imageNotAnalyzed;
+      return context.strings.imageNotAnalyzed;
     case NoFacesReason.noFacesFound:
-      return StringsLocalizations.of(context).noFacesFound;
+      return context.strings.noFacesFound;
     case NoFacesReason.faceThumbnailGenerationFailed:
-      return StringsLocalizations.of(context).faceThumbnailGenerationFailed;
+      return context.strings.faceThumbnailGenerationFailed;
     case NoFacesReason.fileAnalysisFailed:
-      return StringsLocalizations.of(context).fileAnalysisFailed;
+      return context.strings.fileAnalysisFailed;
   }
 }

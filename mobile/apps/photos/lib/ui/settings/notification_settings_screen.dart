@@ -55,7 +55,7 @@ class _NotificationSettingsScreenState
 
   @override
   Widget build(BuildContext context) {
-    final l10n = StringsLocalizations.of(context);
+    final l10n = context.strings;
     final service = NotificationService.instance;
     final showOnlyOnThisDay = isLocalGalleryMode;
 

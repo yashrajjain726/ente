@@ -78,11 +78,10 @@ class ReferralCodeWidget extends StatelessWidget {
                       .email;
                   showInfoDialog(
                     context,
-                    title: StringsLocalizations.of(context).error,
-                    body: StringsLocalizations.of(context)
-                        .onlyFamilyAdminCanChangeCode(
-                          familyAdminEmail: familyAdmin,
-                        ),
+                    title: context.strings.error,
+                    body: context.strings.onlyFamilyAdminCanChangeCode(
+                      familyAdminEmail: familyAdmin,
+                    ),
                     icon: Icons.error,
                   );
                 } else {

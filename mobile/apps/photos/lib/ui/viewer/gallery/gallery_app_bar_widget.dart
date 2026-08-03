@@ -288,9 +288,7 @@ class _GalleryAppBarWidgetState extends State<GalleryAppBarWidget> {
         galleryType != GalleryType.quickLink) {
       showToast(
         context,
-        StringsLocalizations.of(
-          context,
-        ).typeOfGallerGallerytypeIsNotSupportedForRename(
+        context.strings.typeOfGallerGallerytypeIsNotSupportedForRename(
           galleryType: "$galleryType",
         ),
       );
@@ -300,12 +298,12 @@ class _GalleryAppBarWidgetState extends State<GalleryAppBarWidget> {
     final result = await showTextInputDialog(
       context,
       title: isQuickLink
-          ? StringsLocalizations.of(context).enterAlbumName
-          : StringsLocalizations.of(context).renameAlbum,
+          ? context.strings.enterAlbumName
+          : context.strings.renameAlbum,
       submitButtonLabel: isQuickLink
-          ? StringsLocalizations.of(context).done
-          : StringsLocalizations.of(context).rename,
-      hintText: StringsLocalizations.of(context).enterAlbumName,
+          ? context.strings.done
+          : context.strings.rename,
+      hintText: context.strings.enterAlbumName,
       alwaysShowSuccessState: true,
       initialValue: widget.collection?.displayName ?? "",
       textCapitalization: TextCapitalization.words,
@@ -348,7 +346,7 @@ class _GalleryAppBarWidgetState extends State<GalleryAppBarWidget> {
           shouldStickToDarkTheme: true,
           buttonAction: ButtonAction.first,
           shouldSurfaceExecutionStates: true,
-          labelText: StringsLocalizations.of(context).leaveAlbum,
+          labelText: context.strings.leaveAlbum,
           onTap: () async {
             await CollectionsService.instance.leaveAlbum(widget.collection!);
           },
@@ -358,13 +356,11 @@ class _GalleryAppBarWidgetState extends State<GalleryAppBarWidget> {
           buttonAction: ButtonAction.cancel,
           isInAlert: true,
           shouldStickToDarkTheme: true,
-          labelText: StringsLocalizations.of(context).cancel,
+          labelText: context.strings.cancel,
         ),
       ],
-      title: StringsLocalizations.of(context).leaveSharedAlbum,
-      body: StringsLocalizations.of(
-        context,
-      ).photosAddedByYouWillBeRemovedFromTheAlbum,
+      title: context.strings.leaveSharedAlbum,
+      body: context.strings.photosAddedByYouWillBeRemovedFromTheAlbum,
     );
     if (actionResult?.action != null && mounted) {
       if (actionResult!.action == ButtonAction.error) {
@@ -385,10 +381,7 @@ class _GalleryAppBarWidgetState extends State<GalleryAppBarWidget> {
   // the space which can be claimed up. This code duplication should be removed
   // whenever we move to the new design for free up space.
   Future<dynamic> _deleteBackedUpFiles(BuildContext context) async {
-    final dialog = createProgressDialog(
-      context,
-      StringsLocalizations.of(context).calculating,
-    );
+    final dialog = createProgressDialog(context, context.strings.calculating);
     await dialog.show();
     FreeableSpaceInfo status;
     try {
@@ -407,10 +400,8 @@ class _GalleryAppBarWidgetState extends State<GalleryAppBarWidget> {
       if (!context.mounted) return null;
       await showErrorDialog(
         context,
-        StringsLocalizations.of(context).allClear,
-        StringsLocalizations.of(
-          context,
-        ).youveNoFilesInThisAlbumThatCanBeDeleted,
+        context.strings.allClear,
+        context.strings.youveNoFilesInThisAlbumThatCanBeDeleted,
       );
     } else {
       if (!context.mounted) return null;
@@ -427,22 +418,19 @@ class _GalleryAppBarWidgetState extends State<GalleryAppBarWidget> {
   void _showSpaceFreedDialog(FreeableSpaceInfo status) {
     showChoiceDialog(
       context,
-      title: StringsLocalizations.of(context).success,
-      body: StringsLocalizations.of(
-        context,
-      ).youHaveSuccessfullyFreedUp(storageSaved: formatBytes(status.size)),
-      firstButtonLabel: StringsLocalizations.of(context).rateUs,
+      title: context.strings.success,
+      body: context.strings.youHaveSuccessfullyFreedUp(
+        storageSaved: formatBytes(status.size),
+      ),
+      firstButtonLabel: context.strings.rateUs,
       firstButtonOnTap: () async {
         await updateService.launchReviewUrl();
       },
       firstButtonType: ButtonType.primary,
-      secondButtonLabel: StringsLocalizations.of(context).ok,
+      secondButtonLabel: context.strings.ok,
       secondButtonOnTap: () async {
         if (Platform.isIOS) {
-          showToast(
-            context,
-            StringsLocalizations.of(context).remindToEmptyDeviceTrash,
-          );
+          showToast(context, context.strings.remindToEmptyDeviceTrash);
         }
       },
     );
@@ -456,7 +444,7 @@ class _GalleryAppBarWidgetState extends State<GalleryAppBarWidget> {
       return actions;
     }
 
-    final strings = StringsLocalizations.of(context);
+    final strings = context.strings;
     final colorScheme = getEnteColorScheme(context);
 
     if (galleryType == GalleryType.magic) {
@@ -637,10 +625,7 @@ class _GalleryAppBarWidgetState extends State<GalleryAppBarWidget> {
           } else if (value == AlbumPopupAction.galleryGuestView) {
             await _onGalleryGuestViewClick();
           } else {
-            showToast(
-              context,
-              StringsLocalizations.of(context).somethingWentWrong,
-            );
+            showToast(context, context.strings.somethingWentWrong);
           }
         },
       ),
@@ -962,9 +947,9 @@ class _GalleryAppBarWidgetState extends State<GalleryAppBarWidget> {
     final actionResult = await showChoiceActionSheet(
       context,
       isCritical: true,
-      title: StringsLocalizations.of(context).cleanUncategorized,
-      firstButtonLabel: StringsLocalizations.of(context).confirm,
-      body: StringsLocalizations.of(context).cleanUncategorizedDescription,
+      title: context.strings.cleanUncategorized,
+      firstButtonLabel: context.strings.confirm,
+      body: context.strings.cleanUncategorizedDescription,
     );
     if (actionResult?.action != null && mounted) {
       if (actionResult!.action == ButtonAction.first) {
@@ -994,10 +979,7 @@ class _GalleryAppBarWidgetState extends State<GalleryAppBarWidget> {
         await setMapEnabled(true);
       } catch (e) {
         if (!mounted) return;
-        showShortToast(
-          context,
-          StringsLocalizations.of(context).somethingWentWrong,
-        );
+        showShortToast(context, context.strings.somethingWentWrong);
         return;
       }
     }
@@ -1029,11 +1011,11 @@ class _GalleryAppBarWidgetState extends State<GalleryAppBarWidget> {
       items: [
         PopupMenuItem(
           value: false,
-          child: Text(StringsLocalizations.of(context).sortNewestFirst),
+          child: Text(context.strings.sortNewestFirst),
         ),
         PopupMenuItem(
           value: true,
-          child: Text(StringsLocalizations.of(context).sortOldestFirst),
+          child: Text(context.strings.sortOldestFirst),
         ),
       ],
     );
@@ -1054,7 +1036,7 @@ class _GalleryAppBarWidgetState extends State<GalleryAppBarWidget> {
     if (isEmptyCollection) {
       final dialog = createProgressDialog(
         context,
-        StringsLocalizations.of(context).pleaseWaitDeletingAlbum,
+        context.strings.pleaseWaitDeletingAlbum,
       );
       await dialog.show();
       try {
@@ -1151,9 +1133,9 @@ class _GalleryAppBarWidgetState extends State<GalleryAppBarWidget> {
 
         final res = await showChoiceDialog(
           context,
-          title: StringsLocalizations.of(context).openAlbumInBrowserTitle,
-          firstButtonLabel: StringsLocalizations.of(context).openAlbumInBrowser,
-          secondButtonLabel: StringsLocalizations.of(context).cancel,
+          title: context.strings.openAlbumInBrowserTitle,
+          firstButtonLabel: context.strings.openAlbumInBrowser,
+          secondButtonLabel: context.strings.cancel,
           firstButtonType: ButtonType.primary,
         );
 
@@ -1226,13 +1208,13 @@ class _GalleryAppBarWidgetState extends State<GalleryAppBarWidget> {
         collectionFiles = filesResult.files;
       } else {
         if (!mounted) return;
-        showToast(context, StringsLocalizations.of(context).somethingWentWrong);
+        showToast(context, context.strings.somethingWentWrong);
         return;
       }
 
       if (collectionFiles.isEmpty) {
         if (!mounted) return;
-        showToast(context, StringsLocalizations.of(context).nothingToSeeHere);
+        showToast(context, context.strings.nothingToSeeHere);
         return;
       }
 
@@ -1255,8 +1237,8 @@ class _GalleryAppBarWidgetState extends State<GalleryAppBarWidget> {
       if (!mounted) return;
       await showErrorDialog(
         context,
-        StringsLocalizations.of(context).noSystemLockFound,
-        StringsLocalizations.of(context).guestViewEnablePreSteps,
+        context.strings.noSystemLockFound,
+        context.strings.guestViewEnablePreSteps,
       );
     }
   }

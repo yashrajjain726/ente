@@ -72,7 +72,7 @@ class PickPersonCoverPhotoWidget extends StatelessWidget {
                 children: [
                   BottomOfTitleBarWidget(
                     title: TitleBarTitleWidget(
-                      title: StringsLocalizations.of(context).selectCoverPhoto,
+                      title: context.strings.selectCoverPhoto,
                     ),
                     caption: personEntity.data.name,
                     showCloseButton: true,
@@ -136,9 +136,7 @@ class PickPersonCoverPhotoWidget extends StatelessWidget {
                               key: ValueKey(value),
                               isDisabled: !value,
                               buttonType: ButtonType.neutral,
-                              labelText: StringsLocalizations.of(
-                                context,
-                              ).useSelectedPhoto,
+                              labelText: context.strings.useSelectedPhoto,
                               onTap: () async {
                                 final selectedFile = selectedFiles.files.first;
                                 final result = await PersonService.instance

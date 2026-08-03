@@ -91,10 +91,7 @@ class _MapScreenState extends State<MapScreen> {
 
     if (tempMarkers.isEmpty) {
       if (!mounted) return;
-      showShortToast(
-        context,
-        StringsLocalizations.of(context).noImagesWithLocation,
-      );
+      showShortToast(context, context.strings.noImagesWithLocation);
       if (!visibleImages.isClosed) {
         visibleImages.sink.add([]);
       }

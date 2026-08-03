@@ -17,7 +17,7 @@ class CleanupHiddenFilesWidget extends StatelessWidget {
       child: Column(
         children: [
           MenuComponent(
-            title: StringsLocalizations.of(context).cleanupHiddenFiles,
+            title: context.strings.cleanupHiddenFiles,
             leading: const Icon(Icons.cleaning_services_outlined),
             shouldSurfaceExecutionStates: true,
             shouldShowSuccessConfirmation: true,
@@ -27,9 +27,7 @@ class CleanupHiddenFilesWidget extends StatelessWidget {
             },
           ),
           MenuSectionDescriptionWidget(
-            content: StringsLocalizations.of(
-              context,
-            ).cleanupHiddenFilesDescription,
+            content: context.strings.cleanupHiddenFilesDescription,
           ),
         ],
       ),

@@ -21,7 +21,7 @@ Future<void> showSingleFileDeleteSheet(
   Function(EnteFile)? onFileRemoved,
   bool isLocalOnlyContext = false,
 }) async {
-  final l10n = StringsLocalizations.of(context);
+  final l10n = context.strings;
   final bool isLocal = file.localID != null;
   final bool isRemote = file.uploadedFileID != null;
   if (isLocalGalleryMode) {

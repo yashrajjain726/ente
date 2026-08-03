@@ -356,9 +356,7 @@ class _BodyState extends State<_Body> {
                             child: Align(
                               alignment: Alignment.center,
                               child: Tooltip(
-                                message: StringsLocalizations.of(
-                                  context,
-                                ).panorama,
+                                message: context.strings.panorama,
                                 child: IconButton(
                                   style: IconButton.styleFrom(
                                     backgroundColor: const Color(0xAA252525),
@@ -555,27 +553,19 @@ class _BodyState extends State<_Body> {
       // ignore: unawaited_futures
       showErrorDialog(
         context,
-        StringsLocalizations.of(context).sorry,
-        StringsLocalizations.of(
-          context,
-        ).weDontSupportEditingPhotosAndAlbumsThatYouDont,
+        context.strings.sorry,
+        context.strings.weDontSupportEditingPhotosAndAlbumsThatYouDont,
       );
       return;
     }
-    final dialog = createProgressDialog(
-      context,
-      StringsLocalizations.of(context).pleaseWait,
-    );
+    final dialog = createProgressDialog(context, context.strings.pleaseWait);
     await dialog.show();
 
     try {
       final ioFile = await getFile(file);
       if (ioFile == null) {
         if (!mounted) return;
-        showShortToast(
-          context,
-          StringsLocalizations.of(context).failedToFetchOriginalForEdit,
-        );
+        showShortToast(context, context.strings.failedToFetchOriginalForEdit);
         await dialog.hide();
         return;
       }

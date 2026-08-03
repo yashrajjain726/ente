@@ -59,7 +59,7 @@ class _ContactPhotoPickerSheetState extends State<_ContactPhotoPickerSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = StringsLocalizations.of(context);
+    final l10n = context.strings;
     final screenHeight = MediaQuery.sizeOf(context).height;
     final sheetHeight = math.min(screenHeight * 0.78, screenHeight - 80);
 

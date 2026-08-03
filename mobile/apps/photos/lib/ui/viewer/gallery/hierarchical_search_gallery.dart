@@ -200,10 +200,8 @@ class _HierarchicalSearchGalleryState extends State<HierarchicalSearchGallery> {
                             clusterID:
                                 _firstUnnamedAppliedFaceFilter!.clusterId,
                           ),
-                          text: StringsLocalizations.of(context).savePerson,
-                          subText: StringsLocalizations.of(
-                            context,
-                          ).findThemQuickly,
+                          text: context.strings.savePerson,
+                          subText: context.strings.findThemQuickly,
                           onTap: _handleSavePerson,
                         )
                       : null,

@@ -23,7 +23,7 @@ class StorageDetailsScreen extends StatefulWidget {
 class _StorageDetailsScreenState extends State<StorageDetailsScreen> {
   @override
   Widget build(BuildContext context) {
-    final l10n = StringsLocalizations.of(context);
+    final l10n = context.strings;
 
     return SettingsPageScaffold(
       title: l10n.referralStats,

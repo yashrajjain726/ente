@@ -22,7 +22,7 @@ class AccountSettingsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = StringsLocalizations.of(context);
+    final l10n = context.strings;
 
     return SettingsPageScaffold(
       title: l10n.account,
@@ -119,7 +119,7 @@ class AccountSettingsPage extends StatelessWidget {
     final hasAuthenticated = await LocalAuthenticationService.instance
         .requestLocalAuthentication(
           context,
-          StringsLocalizations.of(context).authToChangeYourEmail,
+          context.strings.authToChangeYourEmail,
         );
     if (hasAuthenticated) {
       if (!context.mounted) return;
@@ -131,7 +131,7 @@ class AccountSettingsPage extends StatelessWidget {
     final hasAuthenticated = await LocalAuthenticationService.instance
         .requestLocalAuthentication(
           context,
-          StringsLocalizations.of(context).authToChangeYourPassword,
+          context.strings.authToChangeYourPassword,
         );
     if (hasAuthenticated) {
       if (!context.mounted) return;
@@ -151,7 +151,7 @@ class AccountSettingsPage extends StatelessWidget {
     final hasAuthenticated = await LocalAuthenticationService.instance
         .requestLocalAuthentication(
           context,
-          StringsLocalizations.of(context).authToViewYourRecoveryKey,
+          context.strings.authToViewYourRecoveryKey,
         );
     if (hasAuthenticated) {
       String recoveryKey;
@@ -170,7 +170,7 @@ class AccountSettingsPage extends StatelessWidget {
             builder: (BuildContext context) {
               return RecoveryKeyPage(
                 recoveryKey,
-                StringsLocalizations.of(context).ok,
+                context.strings.ok,
                 onDone: () {},
               );
             },
@@ -190,7 +190,7 @@ class AccountSettingsPage extends StatelessWidget {
     final hasAuthenticated = await LocalAuthenticationService.instance
         .requestLocalAuthentication(
           context,
-          StringsLocalizations.of(context).authToInitiateAccountDeletion,
+          context.strings.authToInitiateAccountDeletion,
         );
     if (!context.mounted || !hasAuthenticated) {
       return;

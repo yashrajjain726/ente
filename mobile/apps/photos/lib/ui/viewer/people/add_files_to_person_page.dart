@@ -62,7 +62,7 @@ class AddFilesToPersonPage extends StatefulWidget {
       if (persons.isEmpty) {
         showShortToast(
           context,
-          StringsLocalizations.of(context).pleaseNamePersonInPeopleSectionFirst,
+          context.strings.pleaseNamePersonInPeopleSectionFirst,
         );
       }
       return persons;
@@ -208,7 +208,7 @@ class _AddFilesToPersonPageState extends State<AddFilesToPersonPage> {
         builder: (context, snapshot) {
           final slivers = <Widget>[
             SearchableAppBar(
-              title: Text(StringsLocalizations.of(context).addPerson),
+              title: Text(context.strings.addPerson),
               onSearch: _updateSearchQuery,
               onSearchClosed: _clearSearchQuery,
               centerTitle: false,
@@ -254,9 +254,7 @@ class _AddFilesToPersonPageState extends State<AddFilesToPersonPage> {
           if (results.isEmpty) {
             slivers.add(
               SliverFillRemaining(
-                child: Center(
-                  child: Text(StringsLocalizations.of(context).noResultsFound),
-                ),
+                child: Center(child: Text(context.strings.noResultsFound)),
               ),
             );
             return CustomScrollView(slivers: slivers);
@@ -324,7 +322,7 @@ class _AddFilesToPersonPageState extends State<AddFilesToPersonPage> {
       ),
       child: GestureDetector(
         onTapDown: (TapDownDetails details) async {
-          final l10n = StringsLocalizations.of(context);
+          final l10n = context.strings;
           const sortKeys = PeopleSortKey.values;
           final PeopleSortKey? selectedKey = await showMenu<PeopleSortKey>(
             color: colorScheme.backgroundElevated,
@@ -472,15 +470,12 @@ class _AddFilesToPersonPageState extends State<AddFilesToPersonPage> {
     if (uploadIds.isEmpty) {
       showShortToast(
         context,
-        StringsLocalizations.of(context).onlyUploadedFilesCanBeAddedToPerson,
+        context.strings.onlyUploadedFilesCanBeAddedToPerson,
       );
       return;
     }
 
-    final dialog = createProgressDialog(
-      context,
-      StringsLocalizations.of(context).saving,
-    );
+    final dialog = createProgressDialog(context, context.strings.saving);
     await dialog.show();
     try {
       final result = await PersonService.instance.addManualFileAssignments(

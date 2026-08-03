@@ -156,20 +156,14 @@ class _MapPullUpGalleryState extends State<MapPullUpGallery> {
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   Text(
-                                    StringsLocalizations.of(
-                                      context,
-                                    ).noPhotosFoundHere,
+                                    context.strings.noPhotosFoundHere,
                                     style: textTheme.large,
                                   ),
                                   const SizedBox(height: 4),
                                   Text(
                                     widget.hasLocationData
-                                        ? StringsLocalizations.of(
-                                            context,
-                                          ).zoomOutToSeePhotos
-                                        : StringsLocalizations.of(
-                                            context,
-                                          ).noImagesWithLocation,
+                                        ? context.strings.zoomOutToSeePhotos
+                                        : context.strings.noImagesWithLocation,
                                     style: textTheme.smallFaint,
                                   ),
                                 ],

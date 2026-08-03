@@ -285,11 +285,7 @@ extension HiddenService on CollectionsService {
       await dialog.hide();
       if (!context.mounted) return false;
       unawaited(
-        showErrorDialog(
-          context,
-          StringsLocalizations.of(context).oops,
-          e.message as String,
-        ),
+        showErrorDialog(context, context.strings.oops, e.message as String),
       );
       return false;
     } catch (e, s) {
@@ -549,10 +545,7 @@ extension HiddenService on CollectionsService {
   /// For files whose hidden collection is not owned by the user,
   /// they are moved to the user's default hidden collection.
   Future<void> cleanupHiddenFiles(BuildContext context) async {
-    final dialog = createProgressDialog(
-      context,
-      StringsLocalizations.of(context).pleaseWait,
-    );
+    final dialog = createProgressDialog(context, context.strings.pleaseWait);
     await dialog.show();
 
     try {
@@ -606,7 +599,7 @@ extension HiddenService on CollectionsService {
 
       await dialog.hide();
       if (!context.mounted) return;
-      showShortToast(context, StringsLocalizations.of(context).cleanupComplete);
+      showShortToast(context, context.strings.cleanupComplete);
     } catch (e, s) {
       _logger.severe("Failed to cleanup hidden files", e, s);
       await dialog.hide();

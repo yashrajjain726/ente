@@ -60,7 +60,7 @@ String ignoredUploadReasonBucketLabel(
   BuildContext context,
   IgnoredUploadReasonBucket bucket,
 ) {
-  final l10n = StringsLocalizations.of(context);
+  final l10n = context.strings;
   return switch (bucket) {
     IgnoredUploadReasonBucket.iCloudUnavailable => l10n.iCloudUnavailable,
     IgnoredUploadReasonBucket.deletedFromEnte => l10n.deletedFromEnte,

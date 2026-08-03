@@ -17,7 +17,7 @@ class VideoExifRowItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = StringsLocalizations.of(context);
+    final l10n = context.strings;
     final currentProps = props;
     late final String label;
     late final VoidCallback? onTap;

@@ -89,7 +89,7 @@ class SearchableItemWidget extends StatelessWidget {
           if (snapshot.hasData && snapshot.data! > 0) {
             final noOfMemories = snapshot.data!;
             return Text(
-              StringsLocalizations.of(context).memoryCount(
+              context.strings.memoryCount(
                 count: noOfMemories,
                 formattedCount: NumberFormat().format(noOfMemories),
               ),

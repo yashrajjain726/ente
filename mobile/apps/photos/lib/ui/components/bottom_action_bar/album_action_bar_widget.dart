@@ -46,7 +46,7 @@ class _AlbumActionBarWidgetState extends State<AlbumActionBarWidget> {
                 valueListenable: _selectedAlbumNotifier,
                 builder: (context, value, child) {
                   return Text(
-                    StringsLocalizations.of(context).selectedAlbums(
+                    context.strings.selectedAlbums(
                       count: widget.selectedAlbums?.albums.length ?? 0,
                     ),
                     style: miniStyle,
@@ -65,10 +65,7 @@ class _AlbumActionBarWidgetState extends State<AlbumActionBarWidget> {
                   },
                   child: Align(
                     alignment: Alignment.centerRight,
-                    child: Text(
-                      StringsLocalizations.of(context).cancel,
-                      style: miniStyle,
-                    ),
+                    child: Text(context.strings.cancel, style: miniStyle),
                   ),
                 ),
               ),

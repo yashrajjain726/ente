@@ -91,8 +91,8 @@ class _DateTimePickerWidgetState extends State<DateTimePickerWidget> {
                 alignment: Alignment.centerLeft,
                 child: Text(
                   _showTimePicker
-                      ? StringsLocalizations.of(context).selectTime
-                      : StringsLocalizations.of(context).selectDate,
+                      ? context.strings.selectTime
+                      : context.strings.selectDate,
                   style: TextStyle(color: colorScheme.textBase, fontSize: 16),
                 ),
               ),
@@ -173,8 +173,8 @@ class _DateTimePickerWidgetState extends State<DateTimePickerWidget> {
                     padding: EdgeInsets.zero,
                     child: Text(
                       _showTimePicker
-                          ? StringsLocalizations.of(context).previous
-                          : StringsLocalizations.of(context).cancel,
+                          ? context.strings.previous
+                          : context.strings.cancel,
                       style: TextStyle(
                         color: colorScheme.textBase,
                         fontSize: 14,
@@ -197,8 +197,8 @@ class _DateTimePickerWidgetState extends State<DateTimePickerWidget> {
                     padding: EdgeInsets.zero,
                     child: Text(
                       _showTimePicker
-                          ? StringsLocalizations.of(context).done
-                          : StringsLocalizations.of(context).next,
+                          ? context.strings.done
+                          : context.strings.next,
                       style: TextStyle(
                         color: colorScheme.primary700,
                         fontSize: 14,

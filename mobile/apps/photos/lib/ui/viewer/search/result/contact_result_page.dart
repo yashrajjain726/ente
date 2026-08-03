@@ -438,7 +438,7 @@ class _AlbumsSection extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
             child: Text(
-              StringsLocalizations.of(context).albums,
+              context.strings.albums,
               style: getEnteTextTheme(context).largeBold,
             ),
           ),
@@ -477,7 +477,7 @@ class _UnsavedContactHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = getEnteColorScheme(context);
-    final l10n = StringsLocalizations.of(context);
+    final l10n = context.strings;
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
       child: SizedBox(
@@ -529,7 +529,7 @@ class _UnsavedContactEmptyState extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = getEnteColorScheme(context);
     final textTheme = getEnteTextTheme(context);
-    final l10n = StringsLocalizations.of(context);
+    final l10n = context.strings;
     return Padding(
       padding: const EdgeInsets.fromLTRB(36, 32, 36, 0),
       child: Column(

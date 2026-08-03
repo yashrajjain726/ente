@@ -644,7 +644,7 @@ class _AlbumsTabState extends State<AlbumsTab>
 
   List<EntePopupMenuOption<_AlbumsMenuAction>> _buildAlbumsMenuOptions() {
     final colorScheme = getEnteColorScheme(context);
-    final strings = StringsLocalizations.of(context);
+    final strings = context.strings;
     final isListView = _viewType.value == AlbumViewType.list;
     final showSortActions = !_hasSearchQuery;
     final currentSortKey = _sortKey.value;
@@ -760,7 +760,7 @@ class _AlbumsTabState extends State<AlbumsTab>
     super.build(context);
     final componentColors = context.componentColors;
     final textTheme = getEnteTextTheme(context);
-    final strings = StringsLocalizations.of(context);
+    final strings = context.strings;
     final selectedAlbums = widget.selectedAlbums;
     final localGalleryMode = _isLocalGalleryMode;
     final albumsOptionsButton = Builder(

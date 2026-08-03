@@ -19,7 +19,7 @@ class MemoriesSettingsScreen extends StatefulWidget {
 class _MemoriesSettingsScreenState extends State<MemoriesSettingsScreen> {
   @override
   Widget build(BuildContext context) {
-    final l10n = StringsLocalizations.of(context);
+    final l10n = context.strings;
 
     return SettingsPageScaffold(
       title: l10n.memories,

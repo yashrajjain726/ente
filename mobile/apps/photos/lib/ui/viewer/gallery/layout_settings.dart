@@ -63,7 +63,7 @@ class _GalleryLayoutSettingsState extends State<GalleryLayoutSettings> {
             onTap: () => _applyLayout(GroupType.month, 5),
           ),
           MenuComponent(
-            title: StringsLocalizations.of(context).custom,
+            title: context.strings.custom,
             trailing: Row(
               mainAxisSize: MainAxisSize.min,
               children: [

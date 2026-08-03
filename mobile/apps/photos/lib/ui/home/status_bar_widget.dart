@@ -149,7 +149,7 @@ class _StatusBarWidgetState extends State<StatusBarWidget> {
   }
 
   Widget _mlBanner(BuildContext context) {
-    final l10n = StringsLocalizations.of(context);
+    final l10n = context.strings;
     return _bannerPadding(
       BannerComponent(
         leadingIcon: HugeIcons.strokeRoundedAiBrain01,
@@ -171,7 +171,7 @@ class _StatusBarWidgetState extends State<StatusBarWidget> {
     return _bannerPadding(
       BannerComponent(
         leadingIcon: HugeIcons.strokeRoundedAlertCircle,
-        title: StringsLocalizations.of(context).confirmYourRecoveryKey,
+        title: context.strings.confirmYourRecoveryKey,
         state: BannerComponentState.warning,
         onTap: () async {
           await routeToPage(
@@ -255,29 +255,29 @@ class _SyncStatusWidgetState extends State<SyncStatusWidget> {
 
   String _getRefreshingText(BuildContext context) {
     if (_event == null) {
-      return StringsLocalizations.of(context).loadingGallery;
+      return context.strings.loadingGallery;
     }
     if (_event!.status == SyncStatus.startedFirstGalleryImport ||
         _event!.status == SyncStatus.completedFirstGalleryImport) {
-      return StringsLocalizations.of(context).loadingGallery;
+      return context.strings.loadingGallery;
     }
     if (_event!.status == SyncStatus.applyingRemoteDiff) {
-      return StringsLocalizations.of(context).syncing;
+      return context.strings.syncing;
     }
     if (_event!.status == SyncStatus.preparingForUpload) {
       if (_event!.total == null || _event!.total! <= 0) {
-        return StringsLocalizations.of(context).encryptingBackup;
+        return context.strings.encryptingBackup;
       } else if (_event!.total == 1) {
-        return StringsLocalizations.of(context).uploadingSingleMemory;
+        return context.strings.uploadingSingleMemory;
       } else {
-        return StringsLocalizations.of(context).uploadingMultipleMemories(
+        return context.strings.uploadingMultipleMemories(
           count: NumberFormat().format(_event!.total!),
         );
       }
     }
     if (_event!.status == SyncStatus.inProgress) {
       final format = NumberFormat();
-      return StringsLocalizations.of(context).syncProgress(
+      return context.strings.syncProgress(
         completed: format.format(_event!.completed!),
         total: format.format(_event!.total!),
       );
@@ -290,10 +290,10 @@ class _SyncStatusWidgetState extends State<SyncStatusWidget> {
     }
     if (_event!.status == SyncStatus.completedBackup) {
       if (_event!.wasStopped) {
-        return StringsLocalizations.of(context).syncStopped;
+        return context.strings.syncStopped;
       }
     }
-    return StringsLocalizations.of(context).allMemoriesPreserved;
+    return context.strings.allMemoriesPreserved;
   }
 }
 
@@ -366,9 +366,7 @@ class SyncStatusCompletedWidget extends StatelessWidget {
                 ),
                 Padding(
                   padding: const EdgeInsets.only(left: 12),
-                  child: Text(
-                    StringsLocalizations.of(context).allMemoriesPreserved,
-                  ),
+                  child: Text(context.strings.allMemoriesPreserved),
                 ),
               ],
             ),

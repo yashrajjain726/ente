@@ -35,7 +35,7 @@ class PublicLinkEnabledActionsWidget extends StatelessWidget {
     if (hasExpired) {
       items.add(
         ShareMenuItem(
-          title: StringsLocalizations.of(context).linkHasExpired,
+          title: context.strings.linkHasExpired,
           leading: const Icon(Icons.error_outline_rounded),
           isDestructive: true,
           isDisabled: true,
@@ -46,28 +46,25 @@ class PublicLinkEnabledActionsWidget extends StatelessWidget {
       final GlobalKey effectiveKey = sendLinkButtonKey ?? GlobalKey();
       items.addAll([
         ShareMenuItem(
-          title: StringsLocalizations.of(context).copyLink,
+          title: context.strings.copyLink,
           icon: HugeIcons.strokeRoundedCopy01,
           showOnlyLoadingState: true,
           onTap: () async {
             await Clipboard.setData(ClipboardData(text: url));
             if (!context.mounted) return;
-            showShortToast(
-              context,
-              StringsLocalizations.of(context).linkCopiedToClipboard,
-            );
+            showShortToast(context, context.strings.linkCopiedToClipboard);
           },
         ),
         ShareMenuItem(
           key: effectiveKey,
-          title: StringsLocalizations.of(context).sendLink,
+          title: context.strings.sendLink,
           icon: HugeIcons.strokeRoundedSent,
           onTap: () async {
             await shareAlbumLink(context, url, effectiveKey);
           },
         ),
         ShareMenuItem(
-          title: StringsLocalizations.of(context).sendQrCode,
+          title: context.strings.sendQrCode,
           icon: HugeIcons.strokeRoundedQrCode,
           onTap: () async {
             await showDialog<void>(
@@ -80,8 +77,8 @@ class PublicLinkEnabledActionsWidget extends StatelessWidget {
                   shareFileName: 'ente_qr_${collection.displayName}.png',
                   shareText:
                       'Scan this QR code to view my ${collection.displayName} album on ente',
-                  dialogTitle: StringsLocalizations.of(context).qrCode,
-                  shareButtonText: StringsLocalizations.of(context).share,
+                  dialogTitle: context.strings.qrCode,
+                  shareButtonText: context.strings.share,
                   logoAssetPath: 'assets/qr_logo.png',
                   branding: const QrTextBranding(
                     text: 'ente',

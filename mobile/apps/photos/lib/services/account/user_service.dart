@@ -114,10 +114,7 @@ class UserService {
     bool isResetPasswordScreen = false,
     String? purpose,
   }) async {
-    final dialog = createProgressDialog(
-      context,
-      StringsLocalizations.of(context).pleaseWait,
-    );
+    final dialog = createProgressDialog(context, context.strings.pleaseWait);
     await dialog.show();
     try {
       await _gateway.sendOtt(
@@ -184,8 +181,8 @@ class UserService {
         unawaited(
           showAlertBottomSheet(
             context,
-            title: StringsLocalizations.of(context).oops,
-            message: StringsLocalizations.of(context).thisEmailIsAlreadyInUse,
+            title: context.strings.oops,
+            message: context.strings.thisEmailIsAlreadyInUse,
             assetPath: 'assets/warning-grey.png',
           ),
         );
@@ -383,10 +380,7 @@ class UserService {
     String ott, {
     bool isResettingPasswordScreen = false,
   }) async {
-    final dialog = createProgressDialog(
-      context,
-      StringsLocalizations.of(context).pleaseWait,
-    );
+    final dialog = createProgressDialog(context, context.strings.pleaseWait);
     await dialog.show();
     try {
       final responseData = await _gateway.verifyEmail(
@@ -440,10 +434,8 @@ class UserService {
         if (!context.mounted) return;
         await showAlertBottomSheet(
           context,
-          title: StringsLocalizations.of(context).oops,
-          message: StringsLocalizations.of(
-            context,
-          ).yourVerificationCodeHasExpired,
+          title: context.strings.oops,
+          message: context.strings.yourVerificationCodeHasExpired,
           assetPath: 'assets/warning-grey.png',
         );
         if (!context.mounted) return;
@@ -453,10 +445,8 @@ class UserService {
         // ignore: unawaited_futures
         showAlertBottomSheet(
           context,
-          title: StringsLocalizations.of(context).incorrectCode,
-          message: StringsLocalizations.of(
-            context,
-          ).sorryTheCodeYouveEnteredIsIncorrect,
+          title: context.strings.incorrectCode,
+          message: context.strings.sorryTheCodeYouveEnteredIsIncorrect,
           assetPath: 'assets/warning-grey.png',
         );
       }
@@ -467,10 +457,8 @@ class UserService {
       // ignore: unawaited_futures
       showAlertBottomSheet(
         context,
-        title: StringsLocalizations.of(context).oops,
-        message: StringsLocalizations.of(
-          context,
-        ).verificationFailedPleaseTryAgain,
+        title: context.strings.oops,
+        message: context.strings.verificationFailedPleaseTryAgain,
         assetPath: 'assets/warning-grey.png',
       );
     }
@@ -494,10 +482,7 @@ class UserService {
     String email,
     String ott,
   ) async {
-    final dialog = createProgressDialog(
-      context,
-      StringsLocalizations.of(context).pleaseWait,
-    );
+    final dialog = createProgressDialog(context, context.strings.pleaseWait);
     await dialog.show();
     try {
       await _gateway.changeEmail(email: email, ott: ott);
@@ -506,7 +491,7 @@ class UserService {
       if (context.mounted) {
         showShortToast(
           context,
-          StringsLocalizations.of(context).emailChangedTo(newEmail: email),
+          context.strings.emailChangedTo(newEmail: email),
         );
         Navigator.of(context).popUntil((route) => route.isFirst);
       }
@@ -518,8 +503,8 @@ class UserService {
         // ignore: unawaited_futures
         showAlertBottomSheet(
           context,
-          title: StringsLocalizations.of(context).oops,
-          message: StringsLocalizations.of(context).thisEmailIsAlreadyInUse,
+          title: context.strings.oops,
+          message: context.strings.thisEmailIsAlreadyInUse,
           assetPath: 'assets/warning-grey.png',
         );
       } else {
@@ -527,10 +512,8 @@ class UserService {
         // ignore: unawaited_futures
         showAlertBottomSheet(
           context,
-          title: StringsLocalizations.of(context).incorrectCode,
-          message: StringsLocalizations.of(
-            context,
-          ).authenticationFailedPleaseTryAgain,
+          title: context.strings.incorrectCode,
+          message: context.strings.authenticationFailedPleaseTryAgain,
           assetPath: 'assets/warning-grey.png',
         );
       }
@@ -541,10 +524,8 @@ class UserService {
       // ignore: unawaited_futures
       showAlertBottomSheet(
         context,
-        title: StringsLocalizations.of(context).oops,
-        message: StringsLocalizations.of(
-          context,
-        ).verificationFailedPleaseTryAgain,
+        title: context.strings.oops,
+        message: context.strings.verificationFailedPleaseTryAgain,
         assetPath: 'assets/warning-grey.png',
       );
     }
@@ -785,7 +766,7 @@ class UserService {
   ) async {
     final dialog = createProgressDialog(
       context,
-      StringsLocalizations.of(context).authenticating,
+      context.strings.authenticating,
     );
     await dialog.show();
     try {
@@ -796,10 +777,7 @@ class UserService {
       await _saveConfiguration(responseData);
       await dialog.hide();
       if (context.mounted) {
-        showShortToast(
-          context,
-          StringsLocalizations.of(context).authenticationSuccessful,
-        );
+        showShortToast(context, context.strings.authenticationSuccessful);
         await Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(
             builder: (BuildContext context) {
@@ -814,7 +792,7 @@ class UserService {
       _logger.severe(e);
       if (e.response != null && e.response!.statusCode == 404) {
         if (!context.mounted) return;
-        showToast(context, StringsLocalizations.of(context).sessionExpired);
+        showToast(context, context.strings.sessionExpired);
         if (!context.mounted) return;
         await Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(
@@ -829,10 +807,8 @@ class UserService {
         // ignore: unawaited_futures
         showAlertBottomSheet(
           context,
-          title: StringsLocalizations.of(context).incorrectCode,
-          message: StringsLocalizations.of(
-            context,
-          ).authenticationFailedPleaseTryAgain,
+          title: context.strings.incorrectCode,
+          message: context.strings.authenticationFailedPleaseTryAgain,
           assetPath: 'assets/warning-grey.png',
         );
       }
@@ -843,10 +819,8 @@ class UserService {
       // ignore: unawaited_futures
       showAlertBottomSheet(
         context,
-        title: StringsLocalizations.of(context).oops,
-        message: StringsLocalizations.of(
-          context,
-        ).authenticationFailedPleaseTryAgain,
+        title: context.strings.oops,
+        message: context.strings.authenticationFailedPleaseTryAgain,
         assetPath: 'assets/warning-grey.png',
       );
     }
@@ -857,10 +831,7 @@ class UserService {
     String sessionID,
     TwoFactorType type,
   ) async {
-    final dialog = createProgressDialog(
-      context,
-      StringsLocalizations.of(context).pleaseWait,
-    );
+    final dialog = createProgressDialog(context, context.strings.pleaseWait);
     await dialog.show();
     try {
       _logger.info("recovering two factor");
@@ -890,7 +861,7 @@ class UserService {
       _logger.severe('error while recovery 2fa', e);
       if (e.response != null && e.response!.statusCode == 404) {
         if (!context.mounted) return;
-        showToast(context, StringsLocalizations.of(context).sessionExpired);
+        showToast(context, context.strings.sessionExpired);
         if (!context.mounted) return;
         // ignore: unawaited_futures
         Navigator.of(context).pushAndRemoveUntil(
@@ -906,10 +877,8 @@ class UserService {
         // ignore: unawaited_futures
         showAlertBottomSheet(
           context,
-          title: StringsLocalizations.of(context).oops,
-          message: StringsLocalizations.of(
-            context,
-          ).somethingWentWrongPleaseTryAgain,
+          title: context.strings.oops,
+          message: context.strings.somethingWentWrongPleaseTryAgain,
           assetPath: 'assets/warning-grey.png',
         );
       }
@@ -921,10 +890,8 @@ class UserService {
       // ignore: unawaited_futures
       showAlertBottomSheet(
         context,
-        title: StringsLocalizations.of(context).oops,
-        message: StringsLocalizations.of(
-          context,
-        ).somethingWentWrongPleaseTryAgain,
+        title: context.strings.oops,
+        message: context.strings.somethingWentWrongPleaseTryAgain,
         assetPath: 'assets/warning-grey.png',
       );
     } finally {
@@ -940,10 +907,7 @@ class UserService {
     String encryptedSecret,
     String secretDecryptionNonce,
   ) async {
-    final dialog = createProgressDialog(
-      context,
-      StringsLocalizations.of(context).pleaseWait,
-    );
+    final dialog = createProgressDialog(context, context.strings.pleaseWait);
     await dialog.show();
     String secret;
     try {
@@ -967,10 +931,8 @@ class UserService {
       if (!context.mounted) return;
       await showAlertBottomSheet(
         context,
-        title: StringsLocalizations.of(context).incorrectRecoveryKey,
-        message: StringsLocalizations.of(
-          context,
-        ).theRecoveryKeyYouEnteredIsIncorrect,
+        title: context.strings.incorrectRecoveryKey,
+        message: context.strings.theRecoveryKeyYouEnteredIsIncorrect,
         assetPath: 'assets/warning-grey.png',
       );
       return;
@@ -986,9 +948,7 @@ class UserService {
       if (context.mounted) {
         showShortToast(
           context,
-          StringsLocalizations.of(
-            context,
-          ).twofactorAuthenticationSuccessfullyReset,
+          context.strings.twofactorAuthenticationSuccessfullyReset,
         );
         // ignore: unawaited_futures
         Navigator.of(context).pushAndRemoveUntil(
@@ -1005,7 +965,7 @@ class UserService {
       _logger.severe("error during recovery", e);
       if (e.response != null && e.response!.statusCode == 404) {
         if (!context.mounted) return;
-        showToast(context, StringsLocalizations.of(context).sessionExpired);
+        showToast(context, context.strings.sessionExpired);
         if (!context.mounted) return;
         // ignore: unawaited_futures
         Navigator.of(context).pushAndRemoveUntil(
@@ -1021,10 +981,8 @@ class UserService {
         // ignore: unawaited_futures
         showAlertBottomSheet(
           context,
-          title: StringsLocalizations.of(context).oops,
-          message: StringsLocalizations.of(
-            context,
-          ).somethingWentWrongPleaseTryAgain,
+          title: context.strings.oops,
+          message: context.strings.somethingWentWrongPleaseTryAgain,
           assetPath: 'assets/warning-grey.png',
         );
       }
@@ -1036,10 +994,8 @@ class UserService {
       // ignore: unawaited_futures
       showAlertBottomSheet(
         context,
-        title: StringsLocalizations.of(context).oops,
-        message: StringsLocalizations.of(
-          context,
-        ).somethingWentWrongPleaseTryAgain,
+        title: context.strings.oops,
+        message: context.strings.somethingWentWrongPleaseTryAgain,
         assetPath: 'assets/warning-grey.png',
       );
     } finally {
@@ -1048,10 +1004,7 @@ class UserService {
   }
 
   Future<void> setupTwoFactor(BuildContext context, Completer completer) async {
-    final dialog = createProgressDialog(
-      context,
-      StringsLocalizations.of(context).pleaseWait,
-    );
+    final dialog = createProgressDialog(context, context.strings.pleaseWait);
     await dialog.show();
     try {
       final responseData = await _gateway.setupTwoFactor();
@@ -1089,10 +1042,7 @@ class UserService {
       return false;
     }
     if (!context.mounted) return false;
-    final dialog = createProgressDialog(
-      context,
-      StringsLocalizations.of(context).verifying,
-    );
+    final dialog = createProgressDialog(context, context.strings.verifying);
     await dialog.show();
     final encryptionResult = CryptoUtil.encryptSync(
       CryptoUtil.base642bin(secret),
@@ -1124,10 +1074,8 @@ class UserService {
           // ignore: unawaited_futures
           showAlertBottomSheet(
             context,
-            title: StringsLocalizations.of(context).incorrectCode,
-            message: StringsLocalizations.of(
-              context,
-            ).pleaseVerifyTheCodeYouHaveEntered,
+            title: context.strings.incorrectCode,
+            message: context.strings.pleaseVerifyTheCodeYouHaveEntered,
             assetPath: 'assets/warning-grey.png',
           );
           return false;
@@ -1137,10 +1085,8 @@ class UserService {
       // ignore: unawaited_futures
       showAlertBottomSheet(
         context,
-        title: StringsLocalizations.of(context).somethingWentWrong,
-        message: StringsLocalizations.of(
-          context,
-        ).pleaseContactSupportIfTheProblemPersists,
+        title: context.strings.somethingWentWrong,
+        message: context.strings.pleaseContactSupportIfTheProblemPersists,
         assetPath: 'assets/warning-grey.png',
       );
     }
@@ -1150,7 +1096,7 @@ class UserService {
   Future<void> disableTwoFactor(BuildContext context) async {
     final dialog = createProgressDialog(
       context,
-      StringsLocalizations.of(context).disablingTwofactorAuthentication,
+      context.strings.disablingTwofactorAuthentication,
     );
     await dialog.show();
     try {
@@ -1161,7 +1107,7 @@ class UserService {
       if (!context.mounted) return;
       showShortToast(
         context,
-        StringsLocalizations.of(context).twofactorAuthenticationHasBeenDisabled,
+        context.strings.twofactorAuthenticationHasBeenDisabled,
       );
     } catch (e) {
       await dialog.hide();
@@ -1169,10 +1115,8 @@ class UserService {
       if (!context.mounted) return;
       await showAlertBottomSheet(
         context,
-        title: StringsLocalizations.of(context).somethingWentWrong,
-        message: StringsLocalizations.of(
-          context,
-        ).pleaseContactSupportIfTheProblemPersists,
+        title: context.strings.somethingWentWrong,
+        message: context.strings.pleaseContactSupportIfTheProblemPersists,
         assetPath: 'assets/warning-grey.png',
       );
     }
@@ -1198,10 +1142,7 @@ class UserService {
         .getKeyAttributes()!
         .recoveryKeyEncryptedWithMasterKey;
     if (encryptedRecoveryKey == null || encryptedRecoveryKey.isEmpty) {
-      final dialog = createProgressDialog(
-        context,
-        StringsLocalizations.of(context).pleaseWait,
-      );
+      final dialog = createProgressDialog(context, context.strings.pleaseWait);
       await dialog.show();
       try {
         final keyAttributes = await _config.createNewRecoveryKey();

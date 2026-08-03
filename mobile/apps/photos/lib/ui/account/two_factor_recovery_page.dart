@@ -53,7 +53,7 @@ class _TwoFactorRecoveryPageState extends State<TwoFactorRecoveryPage> {
           },
         ),
         title: Text(
-          StringsLocalizations.of(context).recoverAccount,
+          context.strings.recoverAccount,
           style: TextStyles.large.copyWith(color: colors.textBase),
         ),
         centerTitle: true,
@@ -63,7 +63,7 @@ class _TwoFactorRecoveryPageState extends State<TwoFactorRecoveryPage> {
         padding: const EdgeInsets.symmetric(horizontal: 16),
         child: ButtonComponent(
           key: const ValueKey("recover2FAButton"),
-          label: StringsLocalizations.of(context).recover,
+          label: context.strings.recover,
           isDisabled: !isFormValid,
           onTap: isFormValid
               ? () async {
@@ -92,8 +92,8 @@ class _TwoFactorRecoveryPageState extends State<TwoFactorRecoveryPage> {
           children: [
             const SizedBox(height: 24),
             TextInputComponent(
-              label: StringsLocalizations.of(context).recoveryKey,
-              hintText: StringsLocalizations.of(context).enterYourRecoveryKey,
+              label: context.strings.recoveryKey,
+              hintText: context.strings.enterYourRecoveryKey,
               controller: _recoveryKeyController,
               autocorrect: false,
               keyboardType: TextInputType.multiline,
@@ -114,7 +114,7 @@ class _TwoFactorRecoveryPageState extends State<TwoFactorRecoveryPage> {
             Align(
               alignment: Alignment.centerRight,
               child: ButtonComponent(
-                label: StringsLocalizations.of(context).forgotRecoveryKey,
+                label: context.strings.forgotRecoveryKey,
                 variant: ButtonComponentVariant.link,
                 size: ButtonComponentSize.small,
                 shouldSurfaceExecutionStates: false,
@@ -122,10 +122,10 @@ class _TwoFactorRecoveryPageState extends State<TwoFactorRecoveryPage> {
                   // ignore: unawaited_futures
                   showAlertBottomSheet(
                     context,
-                    title: StringsLocalizations.of(context).contactSupport,
-                    message: StringsLocalizations.of(
-                      context,
-                    ).dropSupportEmail(supportEmail: "support@ente.com"),
+                    title: context.strings.contactSupport,
+                    message: context.strings.dropSupportEmail(
+                      supportEmail: "support@ente.com",
+                    ),
                     assetPath: 'assets/warning-grey.png',
                   );
                 },

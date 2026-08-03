@@ -28,15 +28,12 @@ class CollageAppBar extends StatelessWidget implements PreferredSizeWidget {
         children: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: Text(
-              StringsLocalizations.of(context).cancel,
-              style: textTheme.body,
-            ),
+            child: Text(context.strings.cancel, style: textTheme.body),
           ),
           TextButton(
             onPressed: isSaveEnabled ? onSave : null,
             child: Text(
-              StringsLocalizations.of(context).saveCollage,
+              context.strings.saveCollage,
               style: textTheme.body.copyWith(
                 color: isSaveEnabled
                     ? colorScheme.primary500

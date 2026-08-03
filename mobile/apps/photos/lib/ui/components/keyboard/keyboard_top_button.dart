@@ -36,7 +36,7 @@ class KeyboardTopButton extends StatelessWidget {
               padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
               onPressed: onCancelTap,
               child: Text(
-                cancelText ?? StringsLocalizations.of(context).cancel,
+                cancelText ?? context.strings.cancel,
                 style: enteTheme.smallBold,
               ),
             ),
@@ -44,7 +44,7 @@ class KeyboardTopButton extends StatelessWidget {
               padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
               onPressed: onDoneTap,
               child: Text(
-                doneText ?? StringsLocalizations.of(context).done,
+                doneText ?? context.strings.done,
                 style: enteTheme.smallBold,
               ),
             ),

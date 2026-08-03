@@ -104,7 +104,7 @@ class _PendingSyncInfoScreenState extends State<PendingSyncInfoScreen> {
     return SettingsPageScaffold(
       title: "App Temp",
       children: [
-        MenuSectionTitle(title: StringsLocalizations.of(context).cachedData),
+        MenuSectionTitle(title: context.strings.cachedData),
         MenuGroupComponent(
           items: [
             for (var pathIndex = 0; pathIndex < paths.length; pathIndex++)

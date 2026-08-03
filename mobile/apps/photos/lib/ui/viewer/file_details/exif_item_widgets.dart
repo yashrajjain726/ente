@@ -48,7 +48,7 @@ class AllExifItemWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = StringsLocalizations.of(context);
+    final l10n = context.strings;
     final currentExif = exif;
     late final String label;
     late final VoidCallback? onTap;

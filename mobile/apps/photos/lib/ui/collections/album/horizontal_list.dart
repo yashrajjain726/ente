@@ -71,7 +71,7 @@ class _AlbumHorizontalListState extends State<AlbumHorizontalList> {
       builder: (context, snapshot) {
         if (snapshot.hasError) {
           _logger.severe("failed to fetch albums", snapshot.error);
-          return Text(StringsLocalizations.of(context).somethingWentWrong);
+          return Text(context.strings.somethingWentWrong);
         } else if (snapshot.hasData) {
           if (snapshot.data!.isEmpty) {
             return const SizedBox.shrink();
@@ -94,7 +94,7 @@ class _AlbumHorizontalListState extends State<AlbumHorizontalList> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
-                          StringsLocalizations.of(context).albums,
+                          context.strings.albums,
                           style: getEnteTextTheme(context).large,
                         ),
                         if (widget.onViewAllTapped != null)

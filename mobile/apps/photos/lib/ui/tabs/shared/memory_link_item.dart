@@ -126,9 +126,7 @@ class MemoryLinkAlbumItem extends StatelessWidget {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          StringsLocalizations.of(
-                            context,
-                          ).itemCount(count: fileCount ?? 0),
+                          context.strings.itemCount(count: fileCount ?? 0),
                           style: TextStyles.mini.copyWith(
                             color: colors.textLight,
                           ),

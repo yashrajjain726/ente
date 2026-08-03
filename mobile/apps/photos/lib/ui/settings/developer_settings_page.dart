@@ -48,7 +48,7 @@ class _DeveloperSettingsPageState extends State<DeveloperSettingsPage> {
           },
         ),
         title: Text(
-          StringsLocalizations.of(context).developerSettings,
+          context.strings.developerSettings,
           style: textTheme.largeBold,
         ),
         centerTitle: true,
@@ -61,7 +61,7 @@ class _DeveloperSettingsPageState extends State<DeveloperSettingsPage> {
             children: [
               const SizedBox(height: 20),
               TextInputComponent(
-                label: StringsLocalizations.of(context).serverEndpoint,
+                label: context.strings.serverEndpoint,
                 hintText: endpoint,
                 controller: _urlController,
                 autocorrect: false,
@@ -70,7 +70,7 @@ class _DeveloperSettingsPageState extends State<DeveloperSettingsPage> {
               ),
               const SizedBox(height: 20),
               ButtonComponent(
-                label: StringsLocalizations.of(context).save,
+                label: context.strings.save,
                 onTap: () async {
                   final url = _urlController.text.trim();
                   _logger.info("Entered endpoint: $url");
@@ -92,7 +92,7 @@ class _DeveloperSettingsPageState extends State<DeveloperSettingsPage> {
                       if (!context.mounted) return;
                       showToast(
                         context,
-                        StringsLocalizations.of(context).endpointUpdatedMessage,
+                        context.strings.endpointUpdatedMessage,
                       );
                       if (!context.mounted) return;
                       Navigator.of(context).pop();
@@ -104,11 +104,9 @@ class _DeveloperSettingsPageState extends State<DeveloperSettingsPage> {
                     if (!context.mounted) return;
                     await showAlertBottomSheet(
                       context,
-                      title: StringsLocalizations.of(context).invalidEndpoint,
+                      title: context.strings.invalidEndpoint,
                       message:
-                          StringsLocalizations.of(
-                            context,
-                          ).invalidEndpointMessage +
+                          context.strings.invalidEndpointMessage +
                           "\n" +
                           e.toString(),
                       assetPath: 'assets/warning-grey.png',

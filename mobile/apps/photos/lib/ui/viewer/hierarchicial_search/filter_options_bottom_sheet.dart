@@ -31,7 +31,7 @@ class _FilterOptionsBottomSheetState extends State<FilterOptionsBottomSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = StringsLocalizations.of(context);
+    final l10n = context.strings;
     final filterGroups = _filterGroups(context);
 
     return BottomSheetComponent(
@@ -103,7 +103,7 @@ class _FilterOptionsBottomSheetState extends State<FilterOptionsBottomSheet> {
   }
 
   List<_FilterGroup> _filterGroups(BuildContext context) {
-    final l10n = StringsLocalizations.of(context);
+    final l10n = context.strings;
     final peopleFilters = _peopleFilters;
     final groups = [
       _FilterGroup(

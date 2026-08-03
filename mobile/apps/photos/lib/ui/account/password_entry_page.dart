@@ -76,13 +76,13 @@ class _PasswordEntryPageState extends State<PasswordEntryPage> {
   Widget build(BuildContext context) {
     final colors = context.componentColors;
 
-    String title = StringsLocalizations.of(context).setPasswordTitle;
+    String title = context.strings.setPasswordTitle;
     if (widget.mode == PasswordEntryMode.update) {
-      title = StringsLocalizations.of(context).changePasswordTitle;
+      title = context.strings.changePasswordTitle;
     } else if (widget.mode == PasswordEntryMode.reset) {
-      title = StringsLocalizations.of(context).resetPasswordTitle;
+      title = context.strings.resetPasswordTitle;
     } else if (_volatilePassword != null) {
-      title = StringsLocalizations.of(context).encryptionKeys;
+      title = context.strings.encryptionKeys;
     }
 
     final isFormValid = _passwordsMatch && _isPasswordValid;
@@ -138,13 +138,13 @@ class _PasswordEntryPageState extends State<PasswordEntryPage> {
 
     if (_passwordInInputBox.isNotEmpty && _showPasswordStrength) {
       if (_passwordStrength > kStrongPasswordStrengthThreshold) {
-        passwordMessage = StringsLocalizations.of(context).strongPassword;
+        passwordMessage = context.strings.strongPassword;
         passwordMessageType = TextInputComponentMessageType.success;
       } else if (_passwordStrength > kMildPasswordStrengthThreshold) {
-        passwordMessage = StringsLocalizations.of(context).moderateStrength;
+        passwordMessage = context.strings.moderateStrength;
         passwordMessageType = TextInputComponentMessageType.alert;
       } else {
-        passwordMessage = StringsLocalizations.of(context).weakStrength;
+        passwordMessage = context.strings.weakStrength;
         passwordMessageType = TextInputComponentMessageType.alert;
       }
     }
@@ -157,14 +157,10 @@ class _PasswordEntryPageState extends State<PasswordEntryPage> {
         _passwordInInputBox.isNotEmpty &&
         _showConfirmPasswordValidation) {
       if (_passwordsMatch) {
-        confirmPasswordMessage = StringsLocalizations.of(
-          context,
-        ).passwordsMatch;
+        confirmPasswordMessage = context.strings.passwordsMatch;
         confirmPasswordMessageType = TextInputComponentMessageType.success;
       } else {
-        confirmPasswordMessage = StringsLocalizations.of(
-          context,
-        ).passwordsDontMatch;
+        confirmPasswordMessage = context.strings.passwordsDontMatch;
         confirmPasswordMessageType = TextInputComponentMessageType.error;
       }
     }
@@ -180,15 +176,13 @@ class _PasswordEntryPageState extends State<PasswordEntryPage> {
                 const SizedBox(height: 16),
                 Text(
                   widget.mode == PasswordEntryMode.set
-                      ? StringsLocalizations.of(context).enterPasswordToEncrypt
-                      : StringsLocalizations.of(
-                          context,
-                        ).enterNewPasswordToEncrypt,
+                      ? context.strings.enterPasswordToEncrypt
+                      : context.strings.enterNewPasswordToEncrypt,
                   style: TextStyles.body.copyWith(color: colors.textLight),
                 ),
                 const SizedBox(height: 8),
                 StyledText(
-                  text: StringsLocalizations.of(context).passwordWarning,
+                  text: context.strings.passwordWarning,
                   style: TextStyles.body.copyWith(color: colors.textLight),
                   tags: {
                     'underline': StyledTextTag(
@@ -211,8 +205,8 @@ class _PasswordEntryPageState extends State<PasswordEntryPage> {
                   ),
                 ),
                 TextInputComponent(
-                  label: StringsLocalizations.of(context).password,
-                  hintText: StringsLocalizations.of(context).password,
+                  label: context.strings.password,
+                  hintText: context.strings.password,
                   controller: _passwordController1,
                   isPasswordInput: true,
                   isRequired: true,
@@ -246,8 +240,8 @@ class _PasswordEntryPageState extends State<PasswordEntryPage> {
                 ),
                 const SizedBox(height: 16),
                 TextInputComponent(
-                  label: StringsLocalizations.of(context).confirmPassword,
-                  hintText: StringsLocalizations.of(context).confirmPassword,
+                  label: context.strings.confirmPassword,
+                  hintText: context.strings.confirmPassword,
                   controller: _passwordController2,
                   isPasswordInput: true,
                   isRequired: true,
@@ -288,14 +282,14 @@ class _PasswordEntryPageState extends State<PasswordEntryPage> {
                   alignment: Alignment.centerRight,
                   child: ButtonComponent(
                     variant: ButtonComponentVariant.link,
-                    label: StringsLocalizations.of(context).howItWorks,
+                    label: context.strings.howItWorks,
                     size: ButtonComponentSize.small,
                     onTap: () async {
                       await Navigator.of(context).push(
                         MaterialPageRoute(
                           builder: (BuildContext context) {
                             return WebPage(
-                              StringsLocalizations.of(context).howItWorks,
+                              context.strings.howItWorks,
                               "https://ente.com/architecture",
                             );
                           },
@@ -324,7 +318,7 @@ class _PasswordEntryPageState extends State<PasswordEntryPage> {
     if (!mounted) return;
     final dialog = createProgressDialog(
       context,
-      StringsLocalizations.of(context).generatingEncryptionKeys,
+      context.strings.generatingEncryptionKeys,
     );
     await dialog.show();
     try {
@@ -341,10 +335,7 @@ class _PasswordEntryPageState extends State<PasswordEntryPage> {
         Bus.instance.fire(SubscriptionPurchasedEvent());
       }
       if (!mounted) return;
-      showShortToast(
-        context,
-        StringsLocalizations.of(context).passwordChangedSuccessfully,
-      );
+      showShortToast(context, context.strings.passwordChangedSuccessfully);
       if (!mounted) return;
       Navigator.of(context).pop();
       if (widget.mode == PasswordEntryMode.reset) {
@@ -382,7 +373,7 @@ class _PasswordEntryPageState extends State<PasswordEntryPage> {
   Future<void> _showRecoveryCodeDialog(String password) async {
     final dialog = createProgressDialog(
       context,
-      StringsLocalizations.of(context).generatingEncryptionKeys,
+      context.strings.generatingEncryptionKeys,
     );
     await dialog.show();
     try {
@@ -394,7 +385,7 @@ class _PasswordEntryPageState extends State<PasswordEntryPage> {
       Future<void> onDone() async {
         final dialog = createProgressDialog(
           context,
-          StringsLocalizations.of(context).pleaseWait,
+          context.strings.pleaseWait,
         );
         await dialog.show();
         try {
@@ -426,7 +417,7 @@ class _PasswordEntryPageState extends State<PasswordEntryPage> {
         context,
         RecoveryKeyPage(
           result.privateKeyAttributes.recoveryKey,
-          StringsLocalizations.of(context).continueLabel,
+          context.strings.continueLabel,
           onDone: onDone,
           isOnboarding: true,
         ),
@@ -439,10 +430,10 @@ class _PasswordEntryPageState extends State<PasswordEntryPage> {
         // ignore: unawaited_futures
         showAlertBottomSheet(
           context,
-          title: StringsLocalizations.of(context).insecureDevice,
-          message: StringsLocalizations.of(
-            context,
-          ).sorryWeCouldNotGenerateSecureKeysOnThisDevicennplease,
+          title: context.strings.insecureDevice,
+          message: context
+              .strings
+              .sorryWeCouldNotGenerateSecureKeysOnThisDevicennplease,
           assetPath: 'assets/warning-grey.png',
         );
       } else {

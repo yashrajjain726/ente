@@ -10,25 +10,19 @@ import "package:photos/utils/share_util.dart";
 Future<void> showInviteDialog(BuildContext context, String email) async {
   await showDialogWidget(
     context: context,
-    title: StringsLocalizations.of(context).inviteToEnte,
+    title: context.strings.inviteToEnte,
     icon: Icons.info_outline,
-    body: StringsLocalizations.of(
-      context,
-    ).emailNoEnteAccountPhotos(email: email),
+    body: context.strings.emailNoEnteAccountPhotos(email: email),
     isDismissible: true,
     buttons: [
       ButtonWidget(
         buttonType: ButtonType.neutral,
         icon: Icons.adaptive.share,
-        labelText: StringsLocalizations.of(context).sendInvite,
+        labelText: context.strings.sendInvite,
         isInAlert: true,
         onTap: () async {
           unawaited(
-            shareText(
-              StringsLocalizations.of(
-                context,
-              ).shareTextRecommendUsingEnteForPhotos,
-            ),
+            shareText(context.strings.shareTextRecommendUsingEnteForPhotos),
           );
         },
       ),

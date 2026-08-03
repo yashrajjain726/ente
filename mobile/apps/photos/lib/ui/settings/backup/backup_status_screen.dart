@@ -108,7 +108,7 @@ class _BackupStatusScreenState extends State<BackupStatusScreen> {
     return Scaffold(
       backgroundColor: context.componentColors.backgroundBase,
       body: AppBarComponent(
-        title: StringsLocalizations.of(context).backupStatus,
+        title: context.strings.backupStatus,
         slivers: [
           if (allItems.isEmpty)
             const SliverFillRemaining(
@@ -159,7 +159,7 @@ class _EmptyBackupStatus extends StatelessWidget {
           ),
           const SizedBox(height: Spacing.lg),
           Text(
-            StringsLocalizations.of(context).backupStatusDescription,
+            context.strings.backupStatusDescription,
             textAlign: TextAlign.center,
             style: TextStyles.large.copyWith(color: colors.textLight),
           ),

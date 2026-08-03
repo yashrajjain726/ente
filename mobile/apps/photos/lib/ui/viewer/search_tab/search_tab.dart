@@ -195,7 +195,7 @@ class _SearchHeaderTitle extends StatelessWidget {
         heightFactor: (1 - (progress * 1.35)).clamp(0.0, 1.0),
         child: Opacity(
           opacity: progress < 0.08 ? 1 : 0,
-          child: Text(StringsLocalizations.of(context).search, style: style),
+          child: Text(context.strings.search, style: style),
         ),
       ),
     );
@@ -240,7 +240,7 @@ class _AllSearchSectionsState extends State<AllSearchSections> {
             return Padding(
               padding: const EdgeInsets.only(bottom: 72),
               child: Text(
-                StringsLocalizations.of(context).searchSectionsLengthMismatch(
+                context.strings.searchSectionsLengthMismatch(
                   snapshotLength: sectionResults.length,
                   searchLength: SectionType.values.length,
                 ),
@@ -340,9 +340,7 @@ class _AllSearchSectionsState extends State<AllSearchSections> {
           if (kDebugMode) {
             return Padding(
               padding: const EdgeInsets.only(bottom: 72),
-              child: Text(
-                StringsLocalizations.of(context).error + ': ${snapshot.error}',
-              ),
+              child: Text(context.strings.error + ': ${snapshot.error}'),
             );
           }
           return const Padding(

@@ -89,7 +89,7 @@ class _PreviewPropertiesItemWidgetState
         size: IconSizes.small,
         color: context.componentColors.textLight,
       ),
-      title: StringsLocalizations.of(context).streamDetails,
+      title: context.strings.streamDetails,
       subtitleSection: Future.value(subSectionWidgets),
       useMenuStyle: true,
     );

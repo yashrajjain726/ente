@@ -42,7 +42,7 @@ class _CraftMemoriesState extends State<CraftMemories> {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = StringsLocalizations.of(context);
+    final l10n = context.strings;
     return Padding(
       padding: const EdgeInsets.all(MemoryCoverWidget.gap / 2.0),
       child: SizedBox(

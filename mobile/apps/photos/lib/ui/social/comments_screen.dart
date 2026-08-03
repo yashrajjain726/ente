@@ -751,7 +751,7 @@ class _FileCommentsBottomSheetState extends State<FileCommentsBottomSheet> {
   }
 
   Widget _buildHeader(BuildContext context) {
-    final l10n = StringsLocalizations.of(context);
+    final l10n = context.strings;
     final textTheme = getEnteTextTheme(context);
     return SingleChildScrollView(
       controller: widget.dragController,

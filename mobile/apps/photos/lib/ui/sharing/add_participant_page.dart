@@ -79,9 +79,7 @@ class _AddParticipantPage extends State<AddParticipantPage> {
     final footerDescriptions = [
       if (filterSuggestedUsers.isNotEmpty)
         ShareSectionDescription(
-          StringsLocalizations.of(
-            context,
-          ).longPressAnEmailToVerifyEndToEndEncryption,
+          context.strings.longPressAnEmailToVerifyEndToEndEncryption,
         ),
       ..._roleDescriptionWidgets(),
     ];
@@ -94,13 +92,11 @@ class _AddParticipantPage extends State<AddParticipantPage> {
           padding: const EdgeInsets.symmetric(horizontal: Spacing.lg),
           sliver: SliverList.list(
             children: [
-              ShareSectionTitle(StringsLocalizations.of(context).addANewEmail),
+              ShareSectionTitle(context.strings.addANewEmail),
               _enterEmailField(),
               if (filterSuggestedUsers.isNotEmpty) ...[
                 const SizedBox(height: Spacing.xxl),
-                ShareSectionTitle(
-                  StringsLocalizations.of(context).orPickAnExistingOne,
-                ),
+                ShareSectionTitle(context.strings.orPickAnExistingOne),
               ],
             ],
           ),
@@ -175,13 +171,11 @@ class _AddParticipantPage extends State<AddParticipantPage> {
     return [
       if (widget.actionTypesToShow.contains(ActionTypesToShow.addCollaborator))
         ShareSectionDescription(
-          StringsLocalizations.of(
-            context,
-          ).collaboratorsCanAddPhotosAndVideosToTheSharedAlbum,
+          context.strings.collaboratorsCanAddPhotosAndVideosToTheSharedAlbum,
         ),
       if (widget.actionTypesToShow.contains(ActionTypesToShow.addAdmin))
         ShareSectionDescription(
-          StringsLocalizations.of(context).adminsCanManagePhotosAndParticipants,
+          context.strings.adminsCanManagePhotosAndParticipants,
         ),
     ];
   }
@@ -248,9 +242,9 @@ class _AddParticipantPage extends State<AddParticipantPage> {
               ? ButtonComponentVariant.neutral
               : ButtonComponentVariant.primary,
           size: ButtonComponentSize.large,
-          label: StringsLocalizations.of(
-            context,
-          ).addCollaborators(count: _selectedEmails.length),
+          label: context.strings.addCollaborators(
+            count: _selectedEmails.length,
+          ),
           isDisabled: _selectedEmails.isEmpty,
           onTap: () async {
             final results = <bool>[];
@@ -273,9 +267,9 @@ class _AddParticipantPage extends State<AddParticipantPage> {
             if (!mounted) return;
             showToast(
               context,
-              StringsLocalizations.of(
-                context,
-              ).collaboratorsSuccessfullyAdded(count: noOfSuccessfullAdds),
+              context.strings.collaboratorsSuccessfullyAdded(
+                count: noOfSuccessfullAdds,
+              ),
             );
 
             if (!results.any((e) => e == false) && mounted) {
@@ -290,9 +284,7 @@ class _AddParticipantPage extends State<AddParticipantPage> {
         ButtonComponent(
           variant: ButtonComponentVariant.primary,
           size: ButtonComponentSize.large,
-          label: StringsLocalizations.of(
-            context,
-          ).addViewers(count: _selectedEmails.length),
+          label: context.strings.addViewers(count: _selectedEmails.length),
           isDisabled: _selectedEmails.isEmpty,
           onTap: () async {
             final results = <bool>[];
@@ -315,9 +307,9 @@ class _AddParticipantPage extends State<AddParticipantPage> {
             if (!mounted) return;
             showToast(
               context,
-              StringsLocalizations.of(
-                context,
-              ).viewersSuccessfullyAdded(count: noOfSuccessfullAdds),
+              context.strings.viewersSuccessfullyAdded(
+                count: noOfSuccessfullAdds,
+              ),
             );
 
             if (!results.any((e) => e == false) && mounted) {
@@ -334,9 +326,7 @@ class _AddParticipantPage extends State<AddParticipantPage> {
               ? ButtonComponentVariant.primary
               : ButtonComponentVariant.neutral,
           size: ButtonComponentSize.large,
-          label: StringsLocalizations.of(
-            context,
-          ).addAdmins(count: _selectedEmails.length),
+          label: context.strings.addAdmins(count: _selectedEmails.length),
           isDisabled: _selectedEmails.isEmpty,
           onTap: () async {
             final results = <bool>[];
@@ -359,9 +349,7 @@ class _AddParticipantPage extends State<AddParticipantPage> {
             if (!mounted) return;
             showToast(
               context,
-              StringsLocalizations.of(
-                context,
-              ).adminsSuccessfullyAdded(count: successful),
+              context.strings.adminsSuccessfullyAdded(count: successful),
             );
 
             if (!results.any((e) => e == false) && mounted) {
@@ -393,7 +381,7 @@ class _AddParticipantPage extends State<AddParticipantPage> {
           child: TextInputComponent(
             controller: _textController,
             focusNode: textFieldFocusNode,
-            hintText: StringsLocalizations.of(context).enterAnEmailAddress,
+            hintText: context.strings.enterAnEmailAddress,
             isClearable: true,
             shouldUnfocusOnClearOrSubmit: true,
             autofillHints: const [AutofillHints.email],
@@ -409,7 +397,7 @@ class _AddParticipantPage extends State<AddParticipantPage> {
         const SizedBox(width: Spacing.sm),
         IconButtonComponent(
           variant: IconButtonComponentVariant.green,
-          tooltip: StringsLocalizations.of(context).add,
+          tooltip: context.strings.add,
           icon: const HugeIcon(icon: HugeIcons.strokeRoundedMailAdd01),
           onTap: _emailIsValid ? _addNewEmail : null,
         ),
@@ -486,15 +474,15 @@ class _AddParticipantPage extends State<AddParticipantPage> {
 
   String _getTitle() {
     if (widget.actionTypesToShow.length > 1) {
-      return StringsLocalizations.of(context).addParticipants;
+      return context.strings.addParticipants;
     }
     switch (widget.actionTypesToShow.first) {
       case ActionTypesToShow.addViewer:
-        return StringsLocalizations.of(context).addViewer;
+        return context.strings.addViewer;
       case ActionTypesToShow.addCollaborator:
-        return StringsLocalizations.of(context).addCollaborator;
+        return context.strings.addCollaborator;
       case ActionTypesToShow.addAdmin:
-        return StringsLocalizations.of(context).addAdmin;
+        return context.strings.addAdmin;
     }
   }
 
@@ -504,13 +492,11 @@ class _AddParticipantPage extends State<AddParticipantPage> {
     }
     switch (widget.actionTypesToShow.first) {
       case ActionTypesToShow.addCollaborator:
-        return StringsLocalizations.of(
-          context,
-        ).collaboratorsCanAddPhotosAndVideosToTheSharedAlbum;
+        return context
+            .strings
+            .collaboratorsCanAddPhotosAndVideosToTheSharedAlbum;
       case ActionTypesToShow.addAdmin:
-        return StringsLocalizations.of(
-          context,
-        ).adminsCanManagePhotosAndParticipants;
+        return context.strings.adminsCanManagePhotosAndParticipants;
       case ActionTypesToShow.addViewer:
         return null;
     }

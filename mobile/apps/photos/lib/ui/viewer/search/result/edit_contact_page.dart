@@ -102,7 +102,7 @@ class _EditContactPageState extends State<EditContactPage> {
   @override
   Widget build(BuildContext context) {
     final colors = context.componentColors;
-    final l10n = StringsLocalizations.of(context);
+    final l10n = context.strings;
 
     return PopScope(
       canPop: !_isSaving && !_hasUnsavedChanges,
@@ -454,10 +454,7 @@ class _EditContactPageState extends State<EditContactPage> {
         _isLoadingPhoto = false;
       });
       if (showError) {
-        showShortToast(
-          context,
-          StringsLocalizations.of(context).couldNotLoadSelectedPhoto,
-        );
+        showShortToast(context, context.strings.couldNotLoadSelectedPhoto);
       }
       return;
     }
@@ -497,10 +494,7 @@ class _EditContactPageState extends State<EditContactPage> {
       _isLoadingPhoto = false;
     });
     if (sourceBytes == null) {
-      showShortToast(
-        context,
-        StringsLocalizations.of(context).couldNotLoadSelectedPhoto,
-      );
+      showShortToast(context, context.strings.couldNotLoadSelectedPhoto);
       return;
     }
     final croppedBytes = await routeToPage(
@@ -660,7 +654,7 @@ class _EditContactPageState extends State<EditContactPage> {
   Future<ButtonAction?> _showExitConfirmationDialog(
     BuildContext context,
   ) async {
-    final l10n = StringsLocalizations.of(context);
+    final l10n = context.strings;
     if (_canSave) {
       final actionResult = await showActionSheet(
         context: context,

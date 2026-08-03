@@ -37,9 +37,7 @@ class _FileCaptionWidgetState extends State<FileCaptionWidget> {
   final _textController = TextEditingController();
   final _focusNode = FocusNode();
   String? editedCaption;
-  late String defaultHintText = StringsLocalizations.of(
-    context,
-  ).fileInfoAddDescHint;
+  late String defaultHintText = context.strings.fileInfoAddDescHint;
 
   @override
   void initState() {
@@ -82,7 +80,7 @@ class _FileCaptionWidgetState extends State<FileCaptionWidget> {
         const SizedBox(width: Spacing.sm),
         IconButtonComponent(
           variant: IconButtonComponentVariant.green,
-          tooltip: StringsLocalizations.of(context).done,
+          tooltip: context.strings.done,
           icon: const HugeIcon(icon: HugeIcons.strokeRoundedTick02),
           onTap: _hasPendingCaptionEdit ? onDoneTap : null,
         ),
@@ -123,10 +121,7 @@ class _FileCaptionWidgetState extends State<FileCaptionWidget> {
       }
       return true;
     } else {
-      showShortToast(
-        context,
-        StringsLocalizations.of(context).somethingWentWrong,
-      );
+      showShortToast(context, context.strings.somethingWentWrong);
       return false;
     }
   }

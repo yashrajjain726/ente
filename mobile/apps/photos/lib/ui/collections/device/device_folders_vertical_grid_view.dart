@@ -214,9 +214,7 @@ class _DeviceFolderVerticalGridViewBodyState
                         : Padding(
                             padding: const EdgeInsets.all(22),
                             child: EmptyState(
-                              text: StringsLocalizations.of(
-                                context,
-                              ).noResultsFound,
+                              text: context.strings.noResultsFound,
                             ),
                           ),
                   )
@@ -240,9 +238,7 @@ class _DeviceFolderVerticalGridViewBodyState
           return widget.showEmptyState
               ? SliverFillRemaining(
                   child: Center(
-                    child: Text(
-                      StringsLocalizations.of(context).failedToLoadAlbums,
-                    ),
+                    child: Text(context.strings.failedToLoadAlbums),
                   ),
                 )
               : const SliverToBoxAdapter(child: SizedBox.shrink());

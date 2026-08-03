@@ -106,7 +106,7 @@ class _ContactPersonPickerPageState extends State<ContactPersonPickerPage> {
   @override
   Widget build(BuildContext context) {
     final colors = context.componentColors;
-    final l10n = StringsLocalizations.of(context);
+    final l10n = context.strings;
     final personCandidates =
         widget.candidates
             .whereType<ContactPersonPickerPersonCandidate>()
@@ -170,7 +170,7 @@ class _ContactPersonPickerPageState extends State<ContactPersonPickerPage> {
 
   Widget _buildSearchRow(BuildContext context) {
     final colors = context.componentColors;
-    final l10n = StringsLocalizations.of(context);
+    final l10n = context.strings;
     return Row(
       children: [
         Expanded(
@@ -203,7 +203,7 @@ class _ContactPersonPickerPageState extends State<ContactPersonPickerPage> {
   }
 
   Future<void> _showSortMenu(BuildContext context) async {
-    final l10n = StringsLocalizations.of(context);
+    final l10n = context.strings;
     final selected = await showEntePopupMenu<bool>(
       context: context,
       options: [

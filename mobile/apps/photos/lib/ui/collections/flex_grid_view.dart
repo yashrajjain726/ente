@@ -386,7 +386,7 @@ class _CreateAlbumBottomSheetState extends State<_CreateAlbumBottomSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final strings = StringsLocalizations.of(context);
+    final strings = context.strings;
     return BottomSheetComponent(
       title: strings.newAlbum,
       isKeyboardAware: true,

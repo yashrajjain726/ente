@@ -103,7 +103,7 @@ class _BackupFolderSelectionPageState extends State<BackupFolderSelectionPage> {
   }
 
   Future<void> updateFolderSettings() async {
-    final l10n = StringsLocalizations.of(context);
+    final l10n = context.strings;
     final dialog = createProgressDialog(context, l10n.updatingFolderSelection);
     await dialog.show();
     try {
@@ -145,7 +145,7 @@ class _BackupFolderSelectionPageState extends State<BackupFolderSelectionPage> {
   }
 
   Future<bool> _showOnlyNewBackupWarning(int onlyNewSinceEpoch) async {
-    final l10n = StringsLocalizations.of(context);
+    final l10n = context.strings;
     final date = DateTime.fromMicrosecondsSinceEpoch(onlyNewSinceEpoch);
     final locale = Localizations.localeOf(context).languageCode;
     final formattedDate = DateFormat.yMMMd(locale).format(date);
@@ -198,7 +198,7 @@ class _BackupFolderSelectionPageState extends State<BackupFolderSelectionPage> {
   }
 
   Widget _buildBottomNavigationBar() {
-    final l10n = StringsLocalizations.of(context);
+    final l10n = context.strings;
     final colors = context.componentColors;
     final canSubmit = !(_treatAsOnboarding && _selectedDevicePathIDs.isEmpty);
 
@@ -239,7 +239,7 @@ class _BackupFolderSelectionPageState extends State<BackupFolderSelectionPage> {
   }
 
   Widget _buildScrollableBody() {
-    final l10n = StringsLocalizations.of(context);
+    final l10n = context.strings;
     final colors = context.componentColors;
 
     return AppBarComponent(
@@ -331,7 +331,7 @@ class _BackupFolderSelectionPageState extends State<BackupFolderSelectionPage> {
     double sideOfThumbnail,
   ) {
     final colors = context.componentColors;
-    final l10n = StringsLocalizations.of(context);
+    final l10n = context.strings;
     final isSelected = _selectedDevicePathIDs.contains(deviceCollection.id);
     final importedCount = _pathIDToItemCount?[deviceCollection.id];
     final formattedCount = NumberFormat().format(deviceCollection.count);

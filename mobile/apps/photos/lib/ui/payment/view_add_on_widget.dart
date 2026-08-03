@@ -21,7 +21,7 @@ class ViewAddOnButton extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       child: MenuItemWidgetNew(
-        title: StringsLocalizations.of(context).viewAddOnButton,
+        title: context.strings.viewAddOnButton,
         menuItemColor: colorScheme.fillFaint,
         pressedColor: colorScheme.fillFaintPressed,
         trailingWidget: Icon(

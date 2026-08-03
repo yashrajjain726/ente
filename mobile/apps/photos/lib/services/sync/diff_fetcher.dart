@@ -106,7 +106,7 @@ class DiffFetcher {
       if (context.mounted) {
         await showErrorDialog(
           context,
-          StringsLocalizations.of(context).somethingWentWrong,
+          context.strings.somethingWentWrong,
           e.toString(),
         );
       }

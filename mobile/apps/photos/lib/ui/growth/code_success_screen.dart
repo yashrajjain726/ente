@@ -19,7 +19,7 @@ class CodeSuccessScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.componentColors;
-    final l10n = StringsLocalizations.of(context);
+    final l10n = context.strings;
 
     return SettingsPageScaffold(
       title: l10n.codeAppliedPageTitle,

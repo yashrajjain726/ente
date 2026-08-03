@@ -30,7 +30,7 @@ void main() {
 
       expect(find.byType(MemoryLaneBanner), findsOneWidget);
       final context = tester.element(find.byType(MemoryLaneBanner));
-      final l10n = StringsLocalizations.of(context)!;
+      final l10n = context.strings;
       expect(find.text(l10n.facesTimelineBannerTitle), findsOneWidget);
     });
 

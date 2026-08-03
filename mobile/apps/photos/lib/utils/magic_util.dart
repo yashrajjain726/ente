@@ -32,8 +32,8 @@ Future<void> changeVisibility(
   final dialog = createProgressDialog(
     context,
     newVisibility == archiveVisibility
-        ? StringsLocalizations.of(context).archiving
-        : StringsLocalizations.of(context).unarchiving,
+        ? context.strings.archiving
+        : context.strings.unarchiving,
   );
   await dialog.show();
   try {
@@ -43,8 +43,8 @@ Future<void> changeVisibility(
       showShortToast(
         context,
         newVisibility == archiveVisibility
-            ? StringsLocalizations.of(context).successfullyArchived
-            : StringsLocalizations.of(context).successfullyUnarchived,
+            ? context.strings.successfullyArchived
+            : context.strings.successfullyUnarchived,
       );
     }
   } catch (e, s) {
@@ -124,10 +124,7 @@ Future<void> changeSortOrder(
   } catch (e, s) {
     _logger.severe("failed to update collection visibility", e, s);
     if (context.mounted) {
-      showShortToast(
-        context,
-        StringsLocalizations.of(context).somethingWentWrong,
-      );
+      showShortToast(context, context.strings.somethingWentWrong);
     }
     rethrow;
   }
@@ -147,10 +144,7 @@ Future<void> updateOrder(
   } catch (e, s) {
     _logger.severe("failed to update order", e, s);
     if (context.mounted) {
-      showShortToast(
-        context,
-        StringsLocalizations.of(context).somethingWentWrong,
-      );
+      showShortToast(context, context.strings.somethingWentWrong);
     }
     rethrow;
   }
@@ -173,10 +167,7 @@ Future<void> updateShareeOrder(
   } catch (e, s) {
     _logger.severe("failed to update sharee order", e, s);
     if (context.mounted) {
-      showShortToast(
-        context,
-        StringsLocalizations.of(context).somethingWentWrong,
-      );
+      showShortToast(context, context.strings.somethingWentWrong);
     }
     rethrow;
   }
@@ -206,10 +197,7 @@ Future<void> changeCoverPhoto(
   } catch (e, s) {
     _logger.severe("failed to update cover", e, s);
     if (context.mounted) {
-      showShortToast(
-        context,
-        StringsLocalizations.of(context).somethingWentWrong,
-      );
+      showShortToast(context, context.strings.somethingWentWrong);
     }
     rethrow;
   }
@@ -240,10 +228,7 @@ Future<bool> editTime(
       };
     }
 
-    final dialog = createProgressDialog(
-      context,
-      StringsLocalizations.of(context).pleaseWait,
-    );
+    final dialog = createProgressDialog(context, context.strings.pleaseWait);
     await dialog.show();
     try {
       await FileMagicService.instance.updatePublicMagicMetadata(
@@ -258,7 +243,7 @@ Future<bool> editTime(
       }
       await dialog.hide();
       if (context.mounted) {
-        showShortToast(context, StringsLocalizations.of(context).done);
+        showShortToast(context, context.strings.done);
       }
     } catch (e, s) {
       _logger.severe("failed to update times $fileIdToTimeUpdate", e, s);
@@ -268,10 +253,7 @@ Future<bool> editTime(
     return true;
   } catch (e) {
     if (!context.mounted) return false;
-    showShortToast(
-      context,
-      StringsLocalizations.of(context).somethingWentWrong,
-    );
+    showShortToast(context, context.strings.somethingWentWrong);
     return false;
   }
 }
@@ -282,12 +264,12 @@ Future<void> editFilename(BuildContext context, EnteFile file) async {
   final extName = extension(fileName);
   final result = await showTextInputDialog(
     context,
-    title: StringsLocalizations.of(context).renameFile,
-    submitButtonLabel: StringsLocalizations.of(context).rename,
+    title: context.strings.renameFile,
+    submitButtonLabel: context.strings.rename,
     initialValue: nameWithoutExt,
     message: extName.toUpperCase(),
     alignMessage: Alignment.centerRight,
-    hintText: StringsLocalizations.of(context).enterFileName,
+    hintText: context.strings.enterFileName,
     maxLength: 50,
     alwaysShowSuccessState: true,
     onSubmit: (String text) async {
@@ -345,10 +327,7 @@ Future<void> _updatePublicMetadata(
   }
   ProgressDialog? dialog;
   if (context != null && showProgressDialogs) {
-    dialog = createProgressDialog(
-      context,
-      StringsLocalizations.of(context).pleaseWait,
-    );
+    dialog = createProgressDialog(context, context.strings.pleaseWait);
     await dialog.show();
   }
   try {
@@ -357,7 +336,7 @@ Future<void> _updatePublicMetadata(
     if (context != null) {
       await dialog?.hide();
       if (showDoneToast && context.mounted) {
-        showShortToast(context, StringsLocalizations.of(context).done);
+        showShortToast(context, context.strings.done);
       }
     }
 
@@ -383,13 +362,13 @@ String _visActionProgressDialogText(
 ) {
   switch (action) {
     case _VisibilityAction.archive:
-      return StringsLocalizations.of(context).archiving;
+      return context.strings.archiving;
     case _VisibilityAction.hide:
-      return StringsLocalizations.of(context).hiding;
+      return context.strings.hiding;
     case _VisibilityAction.unarchive:
-      return StringsLocalizations.of(context).unarchiving;
+      return context.strings.unarchiving;
     case _VisibilityAction.unHide:
-      return StringsLocalizations.of(context).unhiding;
+      return context.strings.unhiding;
   }
 }
 
@@ -399,13 +378,13 @@ String _visActionSuccessfulText(
 ) {
   switch (action) {
     case _VisibilityAction.archive:
-      return StringsLocalizations.of(context).successfullyArchived;
+      return context.strings.successfullyArchived;
     case _VisibilityAction.hide:
-      return StringsLocalizations.of(context).successfullyHid;
+      return context.strings.successfullyHid;
     case _VisibilityAction.unarchive:
-      return StringsLocalizations.of(context).successfullyUnarchived;
+      return context.strings.successfullyUnarchived;
     case _VisibilityAction.unHide:
-      return StringsLocalizations.of(context).successfullyUnhid;
+      return context.strings.successfullyUnhid;
   }
 }
 

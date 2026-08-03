@@ -42,7 +42,7 @@ class UnCategorizedPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final appBar = GalleryAppBarWidget.sliverConfig(
       appBarType,
-      StringsLocalizations.of(context).uncategorized,
+      context.strings.uncategorized,
       _selectedFiles,
       collection: collection,
     );
@@ -86,12 +86,10 @@ class UnCategorizedPage extends StatelessWidget {
       selectedFiles: _selectedFiles,
       sortAsyncFn: () => collection.pubMagicMetadata.asc ?? false,
       initialFiles: null,
-      albumName: StringsLocalizations.of(context).uncategorized,
+      albumName: context.strings.uncategorized,
       emptyState: EmptyStateComponent(
         assetPath: "assets/empty-uncategorized.png",
-        title: StringsLocalizations.of(
-          context,
-        ).uncategorizedItemsWillShowUpHere,
+        title: context.strings.uncategorizedItemsWillShowUpHere,
       ),
     );
     return GalleryBoundariesProvider(

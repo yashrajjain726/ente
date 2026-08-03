@@ -158,7 +158,7 @@ class _CollectionListPageState extends State<CollectionListPage> {
 
   List<EntePopupMenuOption<_CollectionListMenuAction>> _buildMenuOptions() {
     final colorScheme = getEnteColorScheme(context);
-    final strings = StringsLocalizations.of(context);
+    final strings = context.strings;
     final currentViewType = albumViewType ?? localSettings.albumViewType();
     final isListView = currentViewType == AlbumViewType.list;
     final currentSortKey = sortKey;

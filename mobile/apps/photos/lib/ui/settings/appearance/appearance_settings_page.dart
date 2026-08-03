@@ -38,7 +38,7 @@ class _AppearanceSettingsPageState extends State<AppearanceSettingsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = StringsLocalizations.of(context);
+    final l10n = context.strings;
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
     return SettingsPageScaffold(
@@ -123,25 +123,25 @@ class _ThemePickerSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BottomSheetComponent(
-      title: StringsLocalizations.of(context).theme,
+      title: context.strings.theme,
       showCloseButton: false,
       content: MenuGroupComponent(
         items: [
           _themeOption(
             context,
-            title: StringsLocalizations.of(context).lightTheme,
+            title: context.strings.lightTheme,
             isSelected: currentThemeMode == AdaptiveThemeMode.light,
             onTap: () => _selectTheme(context, AdaptiveThemeMode.light),
           ),
           _themeOption(
             context,
-            title: StringsLocalizations.of(context).darkTheme,
+            title: context.strings.darkTheme,
             isSelected: currentThemeMode == AdaptiveThemeMode.dark,
             onTap: () => _selectTheme(context, AdaptiveThemeMode.dark),
           ),
           _themeOption(
             context,
-            title: StringsLocalizations.of(context).systemTheme,
+            title: context.strings.systemTheme,
             isSelected: currentThemeMode == AdaptiveThemeMode.system,
             onTap: () => _selectTheme(context, AdaptiveThemeMode.system),
           ),

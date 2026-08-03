@@ -86,9 +86,9 @@ class _PersonClustersPageState extends State<PersonClustersPage> {
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: <Widget>[
                                 Text(
-                                  StringsLocalizations.of(
-                                    context,
-                                  ).photosCount(count: files.length),
+                                  context.strings.photosCount(
+                                    count: files.length,
+                                  ),
                                   style: getEnteTextTheme(context).body,
                                 ),
                                 (index != 0)
@@ -133,7 +133,7 @@ class _PersonClustersPageState extends State<PersonClustersPage> {
             );
           } else if (snapshot.hasError) {
             _logger.warning("Failed to get cluster", snapshot.error);
-            return Center(child: Text(StringsLocalizations.of(context).error));
+            return Center(child: Text(context.strings.error));
           } else {
             return const Center(child: CircularProgressIndicator());
           }
@@ -212,7 +212,7 @@ class _PersonClustersWidgetState extends State<PersonClustersWidget> {
           );
         } else if (snapshot.hasError) {
           _logger.warning("Failed to get cluster", snapshot.error);
-          return Center(child: Text(StringsLocalizations.of(context).error));
+          return Center(child: Text(context.strings.error));
         } else {
           return const Center(child: CircularProgressIndicator());
         }

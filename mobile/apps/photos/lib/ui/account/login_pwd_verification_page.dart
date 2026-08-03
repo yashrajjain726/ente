@@ -70,7 +70,7 @@ class _LoginPasswordVerificationPageState
           },
         ),
         title: Text(
-          StringsLocalizations.of(context).logInLabel,
+          context.strings.logInLabel,
           style: TextStyles.large.copyWith(color: colors.textBase),
         ),
         centerTitle: true,
@@ -80,7 +80,7 @@ class _LoginPasswordVerificationPageState
         padding: const EdgeInsets.symmetric(horizontal: 16),
         child: ButtonComponent(
           key: const ValueKey("verifyPasswordButton"),
-          label: StringsLocalizations.of(context).logInLabel,
+          label: context.strings.logInLabel,
           isDisabled: !_hasPassword,
           onTap: _verifyEnteredPassword,
         ),
@@ -115,8 +115,8 @@ class _LoginPasswordVerificationPageState
           ),
           TextInputComponent(
             key: const ValueKey("passwordInputField"),
-            label: StringsLocalizations.of(context).password,
-            hintText: StringsLocalizations.of(context).enterYourPassword,
+            label: context.strings.password,
+            hintText: context.strings.enterYourPassword,
             controller: _passwordController,
             isPasswordInput: true,
             isRequired: true,
@@ -138,7 +138,7 @@ class _LoginPasswordVerificationPageState
             alignment: Alignment.centerRight,
             child: ButtonComponent(
               variant: ButtonComponentVariant.link,
-              label: StringsLocalizations.of(context).forgotPassword,
+              label: context.strings.forgotPassword,
               size: ButtonComponentSize.small,
               onTap: () async {
                 await UserService.instance.sendOtt(
@@ -157,7 +157,7 @@ class _LoginPasswordVerificationPageState
   Future<void> verifyPassword(BuildContext context, String password) async {
     final dialog = createProgressDialog(
       context,
-      StringsLocalizations.of(context).pleaseWait,
+      context.strings.pleaseWait,
       isDismissible: true,
     );
     await dialog.show();
@@ -176,8 +176,8 @@ class _LoginPasswordVerificationPageState
         if (!context.mounted) return;
         await _showContactSupportDialog(
           context,
-          StringsLocalizations.of(context).incorrectPasswordTitle,
-          StringsLocalizations.of(context).pleaseTryAgain,
+          context.strings.incorrectPasswordTitle,
+          context.strings.pleaseTryAgain,
         );
       } else {
         _logger.severe('API failure during SRP login ${e.type}', e, s);
@@ -187,17 +187,15 @@ class _LoginPasswordVerificationPageState
           if (!context.mounted) return;
           await _showContactSupportDialog(
             context,
-            StringsLocalizations.of(context).noInternetConnection,
-            StringsLocalizations.of(
-              context,
-            ).pleaseCheckYourInternetConnectionAndTryAgain,
+            context.strings.noInternetConnection,
+            context.strings.pleaseCheckYourInternetConnectionAndTryAgain,
           );
         } else {
           if (!context.mounted) return;
           await _showContactSupportDialog(
             context,
-            StringsLocalizations.of(context).somethingWentWrong,
-            StringsLocalizations.of(context).verificationFailedPleaseTryAgain,
+            context.strings.somethingWentWrong,
+            context.strings.verificationFailedPleaseTryAgain,
           );
         }
       }
@@ -219,9 +217,9 @@ class _LoginPasswordVerificationPageState
         if (!context.mounted) return;
         final dialogChoice = await showChoiceDialog(
           context,
-          title: StringsLocalizations.of(context).recreatePasswordTitle,
-          body: StringsLocalizations.of(context).recreatePasswordBody,
-          firstButtonLabel: StringsLocalizations.of(context).useRecoveryKey,
+          title: context.strings.recreatePasswordTitle,
+          body: context.strings.recreatePasswordBody,
+          firstButtonLabel: context.strings.useRecoveryKey,
         );
         if (dialogChoice?.action == ButtonAction.first && context.mounted) {
           await UserService.instance.sendOtt(
@@ -236,8 +234,8 @@ class _LoginPasswordVerificationPageState
         if (!context.mounted) return;
         await _showContactSupportDialog(
           context,
-          StringsLocalizations.of(context).oops,
-          StringsLocalizations.of(context).verificationFailedPleaseTryAgain,
+          context.strings.oops,
+          context.strings.verificationFailedPleaseTryAgain,
         );
       }
     }
@@ -252,13 +250,13 @@ class _LoginPasswordVerificationPageState
       context,
       title: title,
       body: message,
-      firstButtonLabel: StringsLocalizations.of(context).contactSupport,
-      secondButtonLabel: StringsLocalizations.of(context).ok,
+      firstButtonLabel: context.strings.contactSupport,
+      secondButtonLabel: context.strings.ok,
     );
     if (dialogChoice?.action == ButtonAction.first && context.mounted) {
       await sendLogs(
         context,
-        StringsLocalizations.of(context).contactSupport,
+        context.strings.contactSupport,
         "support@ente.com",
         postShare: () {},
       );

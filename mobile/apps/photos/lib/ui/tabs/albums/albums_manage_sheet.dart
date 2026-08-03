@@ -18,7 +18,7 @@ import "package:photos/ui/viewer/gallery/trash_page.dart";
 import "package:photos/ui/viewer/gallery/uncategorized_page.dart";
 
 Future<void> showAlbumsManageSheet(BuildContext context) {
-  final strings = StringsLocalizations.of(context);
+  final strings = context.strings;
   return showBottomSheetComponent<void>(
     context: context,
     builder: (sheetContext) {

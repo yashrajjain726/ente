@@ -155,8 +155,8 @@ Future<void> deleteFilesFromEverywhere(
     );
     if (context.mounted) {
       final message = hasLocalOnlyFiles && deletedIDs.isNotEmpty
-          ? StringsLocalizations.of(context).filesDeleted
-          : StringsLocalizations.of(context).movedToTrash;
+          ? context.strings.filesDeleted
+          : context.strings.movedToTrash;
       showShortToast(context, message);
     }
   }
@@ -170,7 +170,7 @@ Future<void> deleteFilesFromRemoteOnly(
   BuildContext context,
   List<EnteFile> files,
 ) async {
-  final l10n = StringsLocalizations.of(context);
+  final l10n = context.strings;
   files.removeWhere((element) => element.uploadedFileID == null);
   if (files.isEmpty) {
     showToast(context, l10n.selectedFilesAreNotOnEnte);
@@ -271,8 +271,8 @@ Future<List<EnteFile>> deleteFilesOnDeviceOnly(
   }
   if (removedIDs.isNotEmpty && context.mounted) {
     final message = deletedIDs.isNotEmpty
-        ? StringsLocalizations.of(context).filesDeleted
-        : StringsLocalizations.of(context).movedToTrash;
+        ? context.strings.filesDeleted
+        : context.strings.movedToTrash;
     showShortToast(context, message);
   }
   return deletedFiles;
@@ -280,7 +280,7 @@ Future<List<EnteFile>> deleteFilesOnDeviceOnly(
 
 Future<bool> deleteFromTrash(BuildContext context, List<EnteFile> files) async {
   bool didDeletionStart = false;
-  final l10n = StringsLocalizations.of(context);
+  final l10n = context.strings;
   final actionResult = await showBottomSheetComponent<ButtonResult>(
     context: context,
     useRootNavigator: Platform.isIOS,
@@ -341,9 +341,9 @@ Future<bool> deleteFromTrash(BuildContext context, List<EnteFile> files) async {
 Future<bool> emptyTrash(BuildContext context) async {
   final actionResult = await showChoiceActionSheet(
     context,
-    title: StringsLocalizations.of(context).emptyTrashQuestion,
-    body: StringsLocalizations.of(context).permDeleteWarning,
-    firstButtonLabel: StringsLocalizations.of(context).empty,
+    title: context.strings.emptyTrashQuestion,
+    body: context.strings.permDeleteWarning,
+    firstButtonLabel: context.strings.empty,
     isCritical: true,
     firstButtonOnTap: () async {
       try {
@@ -784,7 +784,7 @@ Future<List<String>> _tryDeleteSharedMediaFiles(List<String> localIDs) {
 }
 
 Future<void> showMediaManagementHintSheet(BuildContext context) async {
-  final l10n = StringsLocalizations.of(context);
+  final l10n = context.strings;
   if (!Platform.isAndroid) {
     return;
   }
@@ -853,7 +853,7 @@ Future<void> showDeleteSheet(
   Future<void> Function(BuildContext context, List<EnteFile> files)?
   deleteFromEverywhereOverride,
 }) async {
-  final l10n = StringsLocalizations.of(context);
+  final l10n = context.strings;
   if (selectedFiles.files.length != filesSplit.count) {
     throw AssertionError(
       "Unexpected state, #{selectedFiles.files.length} != "
@@ -1010,7 +1010,7 @@ class _MoreOptionsButtonState extends State<_MoreOptionsButton> {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = StringsLocalizations.of(context);
+    final l10n = context.strings;
     final foreground = context.componentColors.textLight;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
@@ -1107,7 +1107,7 @@ class DeleteConfirmationSheetState extends State<DeleteConfirmationSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = StringsLocalizations.of(context);
+    final l10n = context.strings;
     final title = l10n.deleteItemsQuestion(count: widget.count);
     var body = l10n.selectedFilesSavedOnDeviceOnly;
     if (widget.count == 1 && widget.isLocal && widget.isRemote) {

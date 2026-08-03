@@ -536,7 +536,7 @@ class _SaveOrEditPersonState extends State<SaveOrEditPerson> {
       buttons: [
         ButtonWidget(
           buttonType: ButtonType.neutral,
-          labelText: StringsLocalizations.of(context).save,
+          labelText: context.strings.save,
           isInAlert: true,
           buttonAction: ButtonAction.first,
           shouldStickToDarkTheme: true,
@@ -567,7 +567,7 @@ class _SaveOrEditPersonState extends State<SaveOrEditPerson> {
         ),
         ButtonWidget(
           buttonType: ButtonType.secondary,
-          labelText: StringsLocalizations.of(context).cancel,
+          labelText: context.strings.cancel,
           isInAlert: true,
           buttonAction: ButtonAction.cancel,
           shouldStickToDarkTheme: true,
@@ -629,10 +629,7 @@ class _SaveOrEditPersonState extends State<SaveOrEditPerson> {
       final bool extraPhotosFound = await ClusterFeedbackService.instance
           .checkAndDoAutomaticMerges(personEntity, personClusterID: clusterID);
       if (extraPhotosFound && context.mounted) {
-        showShortToast(
-          context,
-          StringsLocalizations.of(context).extraPhotosFound,
-        );
+        showShortToast(context, context.strings.extraPhotosFound);
       }
       Bus.instance.fire(
         PeopleChangedEvent(
@@ -1010,7 +1007,7 @@ class _MergePersonConfirmationSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = StringsLocalizations.of(context);
+    final l10n = context.strings;
     final textTheme = getEnteTextTheme(context);
 
     return BottomSheetComponent(

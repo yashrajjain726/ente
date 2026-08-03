@@ -337,14 +337,14 @@ class _FileDetailsWidgetState extends State<FileDetailsWidget> {
                 toolbarHeight: 38,
                 titleSpacing: 0,
                 title: Text(
-                  StringsLocalizations.of(context).details,
+                  context.strings.details,
                   style: TextStyles.h2.copyWith(
                     color: context.componentColors.textBase,
                   ),
                 ),
                 actions: [
                   IconButtonComponent(
-                    tooltip: StringsLocalizations.of(context).close,
+                    tooltip: context.strings.close,
                     variant: IconButtonComponentVariant.circular,
                     shouldSurfaceExecutionStates: false,
                     icon: const HugeIcon(

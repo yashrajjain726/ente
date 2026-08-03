@@ -89,9 +89,7 @@ class AlbumListItemWidget extends StatelessWidget {
         builder: (context, snapshot) {
           String countText = "";
           if (snapshot.hasData) {
-            countText = StringsLocalizations.of(
-              context,
-            ).itemCount(count: snapshot.data!);
+            countText = context.strings.itemCount(count: snapshot.data!);
           } else if (snapshot.hasError) {
             Logger("AlbumListItemWidget").severe(
               "Failed to fetch file count of collection",
@@ -102,9 +100,7 @@ class AlbumListItemWidget extends StatelessWidget {
               collection,
             );
             if (cachedCount != null) {
-              countText = StringsLocalizations.of(
-                context,
-              ).itemCount(count: cachedCount);
+              countText = context.strings.itemCount(count: cachedCount);
             }
           }
           return _buildSubtitle(

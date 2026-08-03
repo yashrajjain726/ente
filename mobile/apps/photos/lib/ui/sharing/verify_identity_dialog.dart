@@ -23,7 +23,7 @@ Future<void> showVerifyIdentitySheet(
 }) {
   return showBaseBottomSheet<void>(
     context,
-    title: title ?? StringsLocalizations.of(context).verify,
+    title: title ?? context.strings.verify,
     headerSpacing: 20,
     child: _VerifyIdentitySheetContent(self: self, email: email),
   );
@@ -53,15 +53,11 @@ class _VerifyIdentitySheetContentState
   @override
   Widget build(BuildContext context) {
     final String subTitle = widget.self
-        ? StringsLocalizations.of(context).thisIsYourVerificationId
-        : StringsLocalizations.of(
-            context,
-          ).thisIsPersonVerificationId(email: widget.email);
+        ? context.strings.thisIsYourVerificationId
+        : context.strings.thisIsPersonVerificationId(email: widget.email);
     final String bottomText = widget.self
-        ? StringsLocalizations.of(
-            context,
-          ).someoneSharingAlbumsWithYouShouldSeeTheSameId
-        : StringsLocalizations.of(context).howToViewShareeVerificationID;
+        ? context.strings.someoneSharingAlbumsWithYouShouldSeeTheSameId
+        : context.strings.howToViewShareeVerificationID;
 
     final colorScheme = getEnteColorScheme(context);
     final textStyle = getEnteTextTheme(context);
@@ -76,21 +72,17 @@ class _VerifyIdentitySheetContentState
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  StringsLocalizations.of(
-                    context,
-                  ).emailNoEnteAccountPhotos(email: widget.email),
+                  context.strings.emailNoEnteAccountPhotos(email: widget.email),
                   style: textStyle.small.copyWith(color: colorScheme.textMuted),
                 ),
                 const SizedBox(height: 20),
                 ButtonWidget(
                   buttonType: ButtonType.neutral,
                   icon: Icons.adaptive.share,
-                  labelText: StringsLocalizations.of(context).sendInvite,
+                  labelText: context.strings.sendInvite,
                   onTap: () async {
                     await shareText(
-                      StringsLocalizations.of(
-                        context,
-                      ).shareTextRecommendUsingEnteForPhotos,
+                      context.strings.shareTextRecommendUsingEnteForPhotos,
                     );
                   },
                 ),
@@ -120,7 +112,7 @@ class _VerifyIdentitySheetContentState
             "VerificationID",
           ).severe("failed to end userID", snapshot.error);
           return Text(
-            StringsLocalizations.of(context).somethingWentWrong,
+            context.strings.somethingWentWrong,
             style: textStyle.bodyMuted,
           );
         }
@@ -182,12 +174,10 @@ class _VerifyIdentitySheetContentState
     if (!context.mounted) return;
     await shareText(
       widget.self
-          ? StringsLocalizations.of(
-              context,
-            ).shareMyVerificationID(verificationID: verificationID)
-          : StringsLocalizations.of(
-              context,
-            ).shareTextConfirmOthersVerificationID(
+          ? context.strings.shareMyVerificationID(
+              verificationID: verificationID,
+            )
+          : context.strings.shareTextConfirmOthersVerificationID(
               verificationID: verificationID,
             ),
     );

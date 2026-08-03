@@ -18,7 +18,7 @@ Future<bool?> showMemoryLinkDetailsSheet(
   required int shareId,
   required String title,
 }) {
-  final l10n = StringsLocalizations.of(context);
+  final l10n = context.strings;
   return showBaseBottomSheet<bool>(
     context,
     title: l10n.shareLink,

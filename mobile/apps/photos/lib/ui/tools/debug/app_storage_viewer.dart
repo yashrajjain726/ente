@@ -57,28 +57,25 @@ class _AppStorageViewerState extends State<AppStorageViewer> {
     paths.addAll([
       PathStorageItem.name(
         imageCachePath,
-        StringsLocalizations.of(context).remoteImages,
+        context.strings.remoteImages,
         allowCacheClear: true,
       ),
       PathStorageItem.name(
         videoCachePath,
-        StringsLocalizations.of(context).remoteVideos,
+        context.strings.remoteVideos,
         allowCacheClear: true,
       ),
       PathStorageItem.name(
         cacheDirectory,
-        StringsLocalizations.of(context).remoteThumbnails,
+        context.strings.remoteThumbnails,
         allowCacheClear: true,
       ),
-      PathStorageItem.name(
-        tempDownload,
-        StringsLocalizations.of(context).pendingSync,
-      ),
+      PathStorageItem.name(tempDownload, context.strings.pendingSync),
       PathStorageItem.name(
         Platform.isAndroid
             ? androidGlideCacheDirectory
             : iOSPhotoManagerInAppCacheDirectory,
-        StringsLocalizations.of(context).localGallery,
+        context.strings.localGallery,
         allowCacheClear: true,
       ),
     ]);
@@ -130,7 +127,7 @@ class _AppStorageViewerState extends State<AppStorageViewer> {
     debugPrint("$runtimeType building");
 
     return SettingsPageScaffold(
-      title: StringsLocalizations.of(context).manageDeviceStorage,
+      title: context.strings.manageDeviceStorage,
       children: [
         Padding(
           padding: const EdgeInsets.only(
@@ -141,7 +138,7 @@ class _AppStorageViewerState extends State<AppStorageViewer> {
           child: Align(
             alignment: Alignment.centerLeft,
             child: Text(
-              StringsLocalizations.of(context).cachedData,
+              context.strings.cachedData,
               style: TextStyles.mini.copyWith(
                 color: context.componentColors.textLight,
               ),
@@ -160,7 +157,7 @@ class _AppStorageViewerState extends State<AppStorageViewer> {
         ),
         const SizedBox(height: Spacing.xl),
         ButtonComponent(
-          label: StringsLocalizations.of(context).clearCaches,
+          label: context.strings.clearCaches,
           variant: ButtonComponentVariant.neutral,
           onTap: () async {
             for (var pathItem in paths) {

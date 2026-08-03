@@ -225,7 +225,7 @@ class _PeoplePageState extends State<PeoplePage> {
     }
     if (_shouldShowMemoryCountTitleForIgnoredPerson()) {
       final memoryCount = files?.length ?? 0;
-      return StringsLocalizations.of(context).memoryCount(
+      return context.strings.memoryCount(
         count: memoryCount,
         formattedCount: NumberFormat().format(memoryCount),
       );

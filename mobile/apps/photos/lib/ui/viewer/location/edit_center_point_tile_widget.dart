@@ -36,10 +36,7 @@ class EditCenterPointTileWidget extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.start,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  StringsLocalizations.of(context).centerPoint,
-                  style: textTheme.body,
-                ),
+                Text(context.strings.centerPoint, style: textTheme.body),
                 const SizedBox(height: 4),
                 Text(
                   "${centerPointInDMS![0]}, ${centerPointInDMS[1]}",

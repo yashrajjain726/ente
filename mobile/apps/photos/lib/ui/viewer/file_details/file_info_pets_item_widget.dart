@@ -178,10 +178,7 @@ class _PetsItemWidgetState extends State<PetsItemWidget> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            StringsLocalizations.of(context).discover_pets,
-            style: textTheme.small,
-          ),
+          Text(context.strings.discover_pets, style: textTheme.small),
           const SizedBox(height: 10),
           Padding(
             padding: const EdgeInsets.only(right: 12.0),
@@ -206,7 +203,7 @@ class _PetsItemWidgetState extends State<PetsItemWidget> {
     double thumbnailWidth,
     EnteTextTheme textTheme,
   ) {
-    final l10n = StringsLocalizations.of(context);
+    final l10n = context.strings;
     final speciesLabel = info.species == 0 ? l10n.dog : l10n.cat;
 
     return SizedBox(

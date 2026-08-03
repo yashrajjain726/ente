@@ -24,7 +24,7 @@ class OnlyThemFilterChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return FilterChipComponent(
-      label: StringsLocalizations.of(context).onlyThem,
+      label: context.strings.onlyThem,
       avatar: _OnlyThemFilterThumbnail(faceFilters: faceFilters),
       state: isApplied
           ? FilterChipComponentState.selected

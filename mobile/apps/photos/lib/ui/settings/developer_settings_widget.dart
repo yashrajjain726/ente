@@ -13,9 +13,9 @@ class DeveloperSettingsWidget extends StatelessWidget {
       return Padding(
         padding: const EdgeInsets.only(bottom: 20),
         child: Text(
-          StringsLocalizations.of(
-            context,
-          ).customEndpoint(endpoint: "${endpointURI.host}:${endpointURI.port}"),
+          context.strings.customEndpoint(
+            endpoint: "${endpointURI.host}:${endpointURI.port}",
+          ),
           style: Theme.of(context).textTheme.bodySmall,
         ),
       );

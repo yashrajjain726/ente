@@ -86,11 +86,11 @@ class _MachineLearningSettingsPageState
     final colors = context.componentColors;
 
     return SettingsPageScaffold(
-      title: StringsLocalizations.of(context).machineLearning,
+      title: context.strings.machineLearning,
       onTitleTap: _handleEnabledTitleTap,
       children: [
         Text(
-          StringsLocalizations.of(context).mlIndexingDescription,
+          context.strings.mlIndexingDescription,
           textAlign: TextAlign.left,
           style: TextStyles.mini.copyWith(color: colors.textLight),
         ),
@@ -103,7 +103,7 @@ class _MachineLearningSettingsPageState
 
   Widget _buildDisabledMLScreen(BuildContext context) {
     return SettingsPageScaffold(
-      title: StringsLocalizations.of(context).mlConsent,
+      title: context.strings.mlConsent,
       children: [
         _buildDisabledMLDescription(context),
         const SizedBox(height: 20),
@@ -118,7 +118,7 @@ class _MachineLearningSettingsPageState
         _buildDisabledConsentAckRow(context),
         const SizedBox(height: 20),
         ButtonComponent(
-          label: StringsLocalizations.of(context).mlConsent,
+          label: context.strings.mlConsent,
           isDisabled: !_hasAcknowledgedMLConsent,
           onTap: () async {
             if (!_hasAcknowledgedMLConsent) return;
@@ -127,7 +127,7 @@ class _MachineLearningSettingsPageState
         ),
         const SizedBox(height: 12),
         ButtonComponent(
-          label: StringsLocalizations.of(context).cancel,
+          label: context.strings.cancel,
           variant: ButtonComponentVariant.secondary,
           onTap: () async {
             await _handleDisabledScreenExit();
@@ -208,7 +208,7 @@ class _MachineLearningSettingsPageState
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          StringsLocalizations.of(context).mlConsentDescription,
+          context.strings.mlConsentDescription,
           textAlign: TextAlign.left,
           style: TextStyles.mini.copyWith(color: colors.textLight),
         ),
@@ -216,7 +216,7 @@ class _MachineLearningSettingsPageState
         GestureDetector(
           onTap: () async => _openMLPrivacyPolicy(context),
           child: Text(
-            StringsLocalizations.of(context).mlConsentPrivacy,
+            context.strings.mlConsentPrivacy,
             textAlign: TextAlign.left,
             style: TextStyles.mini.copyWith(
               color: colors.textLight,
@@ -253,7 +253,7 @@ class _MachineLearningSettingsPageState
           const SizedBox(width: 10),
           Expanded(
             child: Text(
-              StringsLocalizations.of(context).mlConsentConfirmation,
+              context.strings.mlConsentConfirmation,
               style: TextStyles.mini.copyWith(color: colors.textLight),
             ),
           ),
@@ -267,7 +267,7 @@ class _MachineLearningSettingsPageState
       MaterialPageRoute(
         builder: (BuildContext context) {
           return WebPage(
-            StringsLocalizations.of(context).privacyPolicyTitle,
+            context.strings.privacyPolicyTitle,
             "https://ente.com/privacy",
           );
         },
@@ -283,7 +283,7 @@ class _MachineLearningSettingsPageState
     return Column(
       children: [
         MenuComponent(
-          title: StringsLocalizations.of(context).enabled,
+          title: context.strings.enabled,
           leading: const HugeIcon(
             icon: HugeIcons.strokeRoundedToggleOn,
             size: IconSizes.small,
@@ -297,7 +297,7 @@ class _MachineLearningSettingsPageState
         ),
         const SizedBox(height: 8),
         MenuComponent(
-          title: StringsLocalizations.of(context).localIndexing,
+          title: context.strings.localIndexing,
           leading: const HugeIcon(
             icon: HugeIcons.strokeRoundedCpu,
             size: IconSizes.small,
@@ -397,7 +397,7 @@ class _ModelLoadingStateState extends State<ModelLoadingState> {
           child: Align(
             alignment: Alignment.centerLeft,
             child: Text(
-              StringsLocalizations.of(context).status.toUpperCase(),
+              context.strings.status.toUpperCase(),
               style: TextStyles.mini.copyWith(color: colors.textLight),
             ),
           ),
@@ -413,10 +413,10 @@ class _ModelLoadingStateState extends State<ModelLoadingState> {
                 MLModelDownloadService.instance.triggerModelsDownload(
                   onlyIndexingModels: false,
                 );
-                title = StringsLocalizations.of(context).checkingModels;
+                title = context.strings.checkingModels;
                 leadingIcon = HugeIcons.strokeRoundedCloudDownload;
               } else {
-                title = StringsLocalizations.of(context).waitingForWifi;
+                title = context.strings.waitingForWifi;
                 leadingIcon = HugeIcons.strokeRoundedWifi02;
               }
             }
@@ -491,7 +491,7 @@ class MLStatusWidgetState extends State<MLStatusWidget> {
           child: Align(
             alignment: Alignment.centerLeft,
             child: Text(
-              StringsLocalizations.of(context).status.toUpperCase(),
+              context.strings.status.toUpperCase(),
               style: TextStyles.mini.copyWith(color: colors.textLight),
             ),
           ),
@@ -508,9 +508,7 @@ class MLStatusWidgetState extends State<MLStatusWidget> {
 
               if (!_isDeviceHealthy && pendingFiles > 0) {
                 return Text(
-                  StringsLocalizations.of(
-                    context,
-                  ).indexingPausedStatusDescription,
+                  context.strings.indexingPausedStatusDescription,
                   style: TextStyles.mini.copyWith(color: colors.textLight),
                 );
               }
@@ -519,7 +517,7 @@ class MLStatusWidgetState extends State<MLStatusWidget> {
                 children: [
                   MenuComponent(
                     key: ValueKey("pending_items_$pendingFiles"),
-                    title: StringsLocalizations.of(context).processed,
+                    title: context.strings.processed,
                     leading: const HugeIcon(
                       icon: HugeIcons.strokeRoundedClock01,
                       size: IconSizes.small,
@@ -537,15 +535,13 @@ class MLStatusWidgetState extends State<MLStatusWidget> {
                     Padding(
                       padding: const EdgeInsets.only(top: 8),
                       child: MenuComponent(
-                        title: StringsLocalizations.of(
-                          context,
-                        ).clusteringProgress,
+                        title: context.strings.clusteringProgress,
                         leading: const HugeIcon(
                           icon: HugeIcons.strokeRoundedSparkles,
                           size: IconSizes.small,
                         ),
                         trailing: Text(
-                          StringsLocalizations.of(context).currentlyRunning,
+                          context.strings.currentlyRunning,
                           style: TextStyles.mini.copyWith(
                             color: colors.textLight,
                           ),
@@ -556,7 +552,7 @@ class MLStatusWidgetState extends State<MLStatusWidget> {
                     Padding(
                       padding: const EdgeInsets.only(top: 8),
                       child: MenuComponent(
-                        title: StringsLocalizations.of(context).waitingForWifi,
+                        title: context.strings.waitingForWifi,
                         leading: const HugeIcon(
                           icon: HugeIcons.strokeRoundedWifi02,
                           size: IconSizes.small,

@@ -50,8 +50,8 @@ class EmergencyContactService {
       if (context == null || !context.mounted) return false;
       await showAlertBottomSheet(
         context,
-        title: StringsLocalizations.of(context).letsTryThatAgain,
-        message: StringsLocalizations.of(context).enterValidEmail,
+        title: context.strings.letsTryThatAgain,
+        message: context.strings.enterValidEmail,
         assetPath: "assets/warning-grey.png",
       );
       return false;
@@ -59,8 +59,8 @@ class EmergencyContactService {
       if (context == null || !context.mounted) return false;
       await showAlertBottomSheet(
         context,
-        title: StringsLocalizations.of(context).oops,
-        message: StringsLocalizations.of(context).youCannotShareWithYourself,
+        title: context.strings.oops,
+        message: context.strings.youCannotShareWithYourself,
         assetPath: "assets/warning-grey.png",
       );
       return false;

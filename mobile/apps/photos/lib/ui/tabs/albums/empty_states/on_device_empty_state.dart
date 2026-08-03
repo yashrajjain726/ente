@@ -30,7 +30,7 @@ class OnDeviceEmptyState extends StatelessWidget {
 
   Widget _buildPermissionState(BuildContext context) {
     final colors = context.componentColors;
-    final strings = StringsLocalizations.of(context);
+    final strings = context.strings;
     final bottomPadding = 64 + MediaQuery.paddingOf(context).bottom + 32;
     final features = [
       strings.albumsOnDevicePermissionFeatureAllowAccessFaceRecognition,
@@ -92,7 +92,7 @@ class OnDeviceEmptyState extends StatelessWidget {
 
   Widget _buildNoFoldersState(BuildContext context) {
     final colors = context.componentColors;
-    final strings = StringsLocalizations.of(context);
+    final strings = context.strings;
     final bottomPadding = 64 + MediaQuery.paddingOf(context).bottom + 32;
 
     return Padding(

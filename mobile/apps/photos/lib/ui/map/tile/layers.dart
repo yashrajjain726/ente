@@ -77,7 +77,7 @@ class OSMTileAttributes extends StatelessWidget {
       iconSize: options.iconSize,
       attributions: [
         TextSourceAttribution(
-          StringsLocalizations.of(context).openstreetmapContributors,
+          context.strings.openstreetmapContributors,
           textStyle: textTheme,
           onTap: () => launchUrlString('https://openstreetmap.org/copyright'),
         ),
@@ -110,7 +110,7 @@ class OSMFranceTileAttributes extends StatelessWidget {
       iconSize: options.iconSize,
       attributions: [
         TextSourceAttribution(
-          StringsLocalizations.of(context).openstreetmapContributors,
+          context.strings.openstreetmapContributors,
           textStyle: textTheme,
           onTap: () => launchUrlString('https://openstreetmap.org/copyright'),
         ),
@@ -120,7 +120,7 @@ class OSMFranceTileAttributes extends StatelessWidget {
           onTap: () => launchUrl(Uri.parse('https://www.hotosm.org/')),
         ),
         TextSourceAttribution(
-          StringsLocalizations.of(context).hostedAtOsmFrance,
+          context.strings.hostedAtOsmFrance,
           textStyle: textTheme,
           onTap: () => launchUrl(Uri.parse('https://www.openstreetmap.fr/')),
         ),

@@ -86,7 +86,7 @@ class _CommentInputWidgetState extends State<CommentInputWidget>
 
   @override
   Widget build(BuildContext context) {
-    final l10n = StringsLocalizations.of(context);
+    final l10n = context.strings;
     final colorScheme = getEnteColorScheme(context);
     final componentColors = context.componentColors;
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;

@@ -121,9 +121,7 @@ Future<void> _executeFFmpegProcess({
           if (!context.mounted) return;
           showToast(
             context,
-            StringsLocalizations.of(
-              context,
-            ).videoExportSuccess(path: _generateOutputPath()),
+            context.strings.videoExportSuccess(path: _generateOutputPath()),
           );
         } else {
           _logger.warning(
@@ -132,10 +130,7 @@ Future<void> _executeFFmpegProcess({
           _completeOperation(completer, onComplete);
           await FFmpegKit.cancel();
           if (!context.mounted) return;
-          showToast(
-            context,
-            StringsLocalizations.of(context).videoExportFailed,
-          );
+          showToast(context, context.strings.videoExportFailed);
         }
       },
       (log) {

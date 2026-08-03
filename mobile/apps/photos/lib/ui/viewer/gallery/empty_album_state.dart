@@ -26,9 +26,7 @@ class EmptyAlbumState extends StatelessWidget {
               Image.asset("assets/albums-widget-static.png", height: 160),
               const SizedBox(height: 16),
               Text(
-                StringsLocalizations.of(
-                  context,
-                ).startWithAddingPhotosOrFamiliarFaces,
+                context.strings.startWithAddingPhotosOrFamiliarFaces,
                 style: TextStyles.display2.copyWith(color: colors.textBase),
                 textAlign: TextAlign.center,
               ),
@@ -43,7 +41,7 @@ class EmptyAlbumState extends StatelessWidget {
             children: [
               ButtonComponent(
                 variant: ButtonComponentVariant.primary,
-                label: StringsLocalizations.of(context).addPhotos,
+                label: context.strings.addPhotos,
                 shouldSurfaceExecutionStates: false,
                 onTap: () async {
                   try {
@@ -57,7 +55,7 @@ class EmptyAlbumState extends StatelessWidget {
               const SizedBox(height: 12),
               ButtonComponent(
                 variant: ButtonComponentVariant.neutral,
-                label: StringsLocalizations.of(context).autoAddPeople,
+                label: context.strings.autoAddPeople,
                 shouldSurfaceExecutionStates: false,
                 onTap: () async {
                   await routeToPage(

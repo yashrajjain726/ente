@@ -30,7 +30,7 @@ Future<bool> showSuggestDeleteSheet({
   required BuildContext context,
   required SuggestDeleteConfirmCallback onConfirm,
 }) async {
-  final l10n = StringsLocalizations.of(context);
+  final l10n = context.strings;
   final actionResult = await showActionSheet(
     context: context,
     title: l10n.suggestDeletion,

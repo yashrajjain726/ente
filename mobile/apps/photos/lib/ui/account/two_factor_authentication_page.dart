@@ -64,7 +64,7 @@ class _TwoFactorAuthenticationPageState
           },
         ),
         title: Text(
-          StringsLocalizations.of(context).twoFAVerification,
+          context.strings.twoFAVerification,
           style: TextStyles.large.copyWith(color: colors.textBase),
         ),
         centerTitle: true,
@@ -108,15 +108,13 @@ class _TwoFactorAuthenticationPageState
           children: [
             const SizedBox(height: 24),
             Text(
-              StringsLocalizations.of(context).twoFAVerification,
+              context.strings.twoFAVerification,
               style: TextStyles.body.copyWith(color: colors.textBase),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 8),
             Text(
-              StringsLocalizations.of(
-                context,
-              ).enterThe6digitCodeFromnyourAuthenticatorApp,
+              context.strings.enterThe6digitCodeFromnyourAuthenticatorApp,
               style: TextStyles.body.copyWith(color: colors.textLight),
               textAlign: TextAlign.center,
             ),
@@ -142,7 +140,7 @@ class _TwoFactorAuthenticationPageState
             ),
             const Spacer(),
             ButtonComponent(
-              label: StringsLocalizations.of(context).verify,
+              label: context.strings.verify,
               isDisabled: _code.length != 6,
               onTap: _code.length == 6
                   ? () => _verifyTwoFactorCode(_code)
@@ -151,7 +149,7 @@ class _TwoFactorAuthenticationPageState
             const SizedBox(height: 16),
             Center(
               child: ButtonComponent(
-                label: StringsLocalizations.of(context).lostDevice,
+                label: context.strings.lostDevice,
                 variant: ButtonComponentVariant.link,
                 size: ButtonComponentSize.small,
                 onTap: () async {

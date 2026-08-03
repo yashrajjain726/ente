@@ -129,9 +129,9 @@ class _LoadingPhotosWidgetState extends State<LoadingPhotosWidget> {
       _importProgressEvent = Bus.instance.on<LocalImportProgressEvent>().listen(
         (event) {
           if (!mounted) return;
-          _loadingMessage = StringsLocalizations.of(
-            context,
-          ).processingImport(folderName: event.folderName);
+          _loadingMessage = context.strings.processingImport(
+            folderName: event.folderName,
+          );
           if (mounted) {
             setState(() {});
           }
@@ -151,7 +151,7 @@ class _LoadingPhotosWidgetState extends State<LoadingPhotosWidget> {
 
   @override
   Widget build(BuildContext context) {
-    _loadingMessage ??= StringsLocalizations.of(context).loadingYourPhotos;
+    _loadingMessage ??= context.strings.loadingYourPhotos;
     _setupLoadingMessages(context);
     final isLightMode = Theme.of(context).brightness == Brightness.light;
     return Scaffold(
@@ -200,7 +200,7 @@ class _LoadingPhotosWidgetState extends State<LoadingPhotosWidget> {
                       mainAxisAlignment: MainAxisAlignment.start,
                       children: [
                         Text(
-                          StringsLocalizations.of(context).didYouKnow,
+                          context.strings.didYouKnow,
                           style: Theme.of(context).textTheme.titleLarge!
                               .copyWith(
                                 color: Theme.of(context).colorScheme.greenText,
@@ -249,25 +249,19 @@ class _LoadingPhotosWidgetState extends State<LoadingPhotosWidget> {
                       onPressed: () {
                         showDialogWidget(
                           context: context,
-                          title: StringsLocalizations.of(context).oops,
+                          title: context.strings.oops,
                           icon: Icons.error_outline_outlined,
-                          body: StringsLocalizations.of(
-                            context,
-                          ).localSyncErrorMessage,
+                          body: context.strings.localSyncErrorMessage,
                           isDismissible: true,
                           buttons: [
                             ButtonWidget(
                               buttonType: ButtonType.primary,
-                              labelText: StringsLocalizations.of(
-                                context,
-                              ).contactSupport,
+                              labelText: context.strings.contactSupport,
                               buttonAction: ButtonAction.second,
                               onTap: () async {
                                 await sendLogs(
                                   context,
-                                  StringsLocalizations.of(
-                                    context,
-                                  ).contactSupport,
+                                  context.strings.contactSupport,
                                   "support@ente.com",
                                   postShare: () {},
                                 );
@@ -286,21 +280,19 @@ class _LoadingPhotosWidgetState extends State<LoadingPhotosWidget> {
   }
 
   void _setupLoadingMessages(BuildContext context) {
-    _messages.add(StringsLocalizations.of(context).loadMessage1);
+    _messages.add(context.strings.loadMessage1);
     _messages.add(
-      StringsLocalizations.of(context).loadMessage2(
+      context.strings.loadMessage2(
         memoriesCountInMillions: _preservedMemoriesCountInMillions,
       ),
     );
-    _messages.add(StringsLocalizations.of(context).loadMessage3);
-    _messages.add(StringsLocalizations.of(context).loadMessage4);
-    _messages.add(StringsLocalizations.of(context).loadMessage5);
-    _messages.add(StringsLocalizations.of(context).loadMessage6);
-    _messages.add(StringsLocalizations.of(context).loadMessage7);
-    _messages.add(
-      StringsLocalizations.of(context).loadMessage8(webUrl: kPhotosWebDomain),
-    );
-    _messages.add(StringsLocalizations.of(context).loadMessage9);
+    _messages.add(context.strings.loadMessage3);
+    _messages.add(context.strings.loadMessage4);
+    _messages.add(context.strings.loadMessage5);
+    _messages.add(context.strings.loadMessage6);
+    _messages.add(context.strings.loadMessage7);
+    _messages.add(context.strings.loadMessage8(webUrl: kPhotosWebDomain));
+    _messages.add(context.strings.loadMessage9);
   }
 
   Widget _getMessage(String text) {
