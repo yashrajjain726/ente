@@ -2,7 +2,6 @@ import 'package:ente_components/ente_components.dart';
 import "package:ente_events/event_bus.dart";
 import "package:ente_icons/ente_icons.dart";
 import "package:ente_strings/ente_strings.dart";
-import "package:ente_ui/components/buttons/button_widget.dart";
 import "package:ente_ui/utils/dialog_util.dart";
 import "package:ente_ui/utils/toast_util.dart";
 import "package:flutter/material.dart";
@@ -768,7 +767,7 @@ class _FileSelectionOverlayBarState extends State<FileSelectionOverlayBar> {
       illustration: LockerBottomSheetIllustration.fileDelete,
     );
 
-    if (confirmation?.buttonResult.action != ButtonAction.first) {
+    if (confirmation == null) {
       return;
     }
 
@@ -921,7 +920,7 @@ class _FileSelectionOverlayBarState extends State<FileSelectionOverlayBar> {
       illustration: LockerBottomSheetIllustration.collectionDelete,
     );
 
-    if (confirmation?.buttonResult.action != ButtonAction.first) {
+    if (confirmation == null) {
       return;
     }
 
