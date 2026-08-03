@@ -60,6 +60,8 @@ const viewerSwipeAxisRatio = 1.5;
 const viewerHeaderAvatarSize = 28;
 const viewerHeaderButtonVisualSize = 28;
 const draftPostExitDurationMs = 320;
+const keyboardInsetThresholdPx = 80;
+const keyboardDismissMaxDurationMs = 500;
 
 interface ViewerViewportSize {
     x: number;
@@ -463,6 +465,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
         currentViewerViewportSize(null),
     );
     const captionInputRef = React.useRef<HTMLTextAreaElement | null>(null);
+    const cancelKeyboardDismissWaitRef = React.useRef<() => void>(undefined);
     const replyInputRef = React.useRef<HTMLTextAreaElement | null>(null);
     const [actionsAnchor, setActionsAnchor] =
         React.useState<HTMLElement | null>(null);
@@ -657,6 +660,67 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
         };
     }, [activePhoto.height, activePhoto.width]);
 
+    const startDraftPostExit = React.useCallback(() => {
+        setIsDraftPostExit(true);
+        onDraftPostExitStart?.();
+    }, [onDraftPostExitStart]);
+
+    const dismissCaptionKeyboard = React.useCallback(
+        (onDismissed: () => void) => {
+            const input = captionInputRef.current;
+            const root = viewerRootRef.current;
+            const viewport = window.visualViewport;
+            const wasFocused = document.activeElement == input;
+
+            input?.blur();
+            if (
+                !wasFocused ||
+                !root ||
+                !viewport ||
+                root.clientHeight - viewport.height < keyboardInsetThresholdPx
+            ) {
+                onDismissed();
+                return;
+            }
+
+            const visibleViewport = viewport;
+            const targetHeight = root.clientHeight;
+            let timeoutID = 0;
+            function cancelWait() {
+                visibleViewport.removeEventListener(
+                    "resize",
+                    handleViewportChange,
+                );
+                visibleViewport.removeEventListener(
+                    "scroll",
+                    handleViewportChange,
+                );
+                window.clearTimeout(timeoutID);
+            }
+            function finish() {
+                cancelWait();
+                cancelKeyboardDismissWaitRef.current = undefined;
+                onDismissed();
+            }
+            function handleViewportChange() {
+                if (
+                    visibleViewport.height >= targetHeight - 1 &&
+                    visibleViewport.offsetTop <= 1
+                ) {
+                    finish();
+                }
+            }
+
+            visibleViewport.addEventListener("resize", handleViewportChange);
+            visibleViewport.addEventListener("scroll", handleViewportChange);
+            timeoutID = window.setTimeout(finish, keyboardDismissMaxDurationMs);
+            cancelKeyboardDismissWaitRef.current = cancelWait;
+        },
+        [],
+    );
+
+    React.useEffect(() => () => cancelKeyboardDismissWaitRef.current?.(), []);
+
     const publishDraftPostWithCaption = React.useCallback(
         (captionToPublish: string, editToPublish: SpaceViewerDraftPostEdit) => {
             if (!onPublishDraftPost || isDeleteExit || isDraftPostExit) return;
@@ -674,8 +738,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
             }
 
             setQueuedDraftPost(undefined);
-            setIsDraftPostExit(true);
-            onDraftPostExitStart?.();
+            dismissCaptionKeyboard(startDraftPostExit);
             void publishPromise.catch((error: unknown) => {
                 log.error("Failed to publish space post", error);
             });
@@ -683,8 +746,9 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
         [
             isDeleteExit,
             isDraftPostExit,
-            onDraftPostExitStart,
+            dismissCaptionKeyboard,
             onPublishDraftPost,
+            startDraftPostExit,
         ],
     );
 
@@ -760,7 +824,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
         sendReply();
     };
 
-    const handleReplyActionPointerDown = (event: React.PointerEvent) => {
+    const handleInputActionPointerDown = (event: React.PointerEvent) => {
         event.preventDefault();
     };
 
@@ -1731,6 +1795,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                             }
                             disabled={isDraftPostPublishDisabled}
                             onClick={publishDraftPost}
+                            onPointerDown={handleInputActionPointerDown}
                             sx={{
                                 alignItems: "center",
                                 bgcolor: "#FFFFFF",
@@ -2091,7 +2156,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                                 }
                                 onPointerDown={
                                     isReplyMode
-                                        ? handleReplyActionPointerDown
+                                        ? handleInputActionPointerDown
                                         : undefined
                                 }
                                 sx={{
