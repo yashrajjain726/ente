@@ -6,6 +6,7 @@ import GoogleIcon from "@mui/icons-material/Google";
 import {
     Box,
     CircularProgress,
+    DialogTitle,
     IconButton,
     Link,
     Stack,
@@ -15,16 +16,21 @@ import { SpacedRow } from "ente-base/components/containers";
 import { FocusVisibleButton } from "ente-base/components/mui/FocusVisibleButton";
 import { t } from "i18next";
 import React from "react";
+import type { UploadTypeSelectorIntent } from "../Upload";
 
-interface DefaultOptionsV2Props {
-    intent: "import" | "upload";
+interface DefaultOptionsV2BaseProps {
     isFileSelectionPending: boolean;
     isFolderSelectionPending: boolean;
     onClose: () => void;
     onSelectFiles: () => void;
-    onSelectGooglePhotos: () => void;
     onSelectFolder: () => void;
 }
+
+type DefaultOptionsV2Props = DefaultOptionsV2BaseProps &
+    (
+        | { intent: UploadTypeSelectorIntent; onSelectGooglePhotos: () => void }
+        | { intent: "collect"; onSelectGooglePhotos?: never }
+    );
 
 export function DefaultOptionsV2({
     intent,
@@ -35,26 +41,42 @@ export function DefaultOptionsV2({
     onSelectGooglePhotos,
     onSelectFolder,
 }: DefaultOptionsV2Props): React.JSX.Element {
+    const usesUploadSpacing = intent == "upload" || intent == "collect";
+
     return (
         <Stack
             data-default-options-v2
             sx={{
-                gap: intent == "upload" ? "20px" : "36px",
+                gap: usesUploadSpacing ? "20px" : "36px",
                 p: "20px",
-                pb: intent == "upload" ? "28px" : "20px",
+                pb: usesUploadSpacing ? "28px" : "20px",
             }}
         >
             <SpacedRow>
-                <Typography
-                    sx={{
-                        fontFamily: "'Outfit Variable', sans-serif",
-                        fontSize: "24px",
-                        fontWeight: 600,
-                        lineHeight: "32px",
-                    }}
-                >
-                    {t(intent == "import" ? "import_library" : "upload")}
-                </Typography>
+                {intent == "collect" ? (
+                    <DialogTitle
+                        sx={{
+                            "&&": { p: 0 },
+                            fontFamily: "'Outfit Variable', sans-serif",
+                            fontSize: "24px",
+                            fontWeight: 600,
+                            lineHeight: "32px",
+                        }}
+                    >
+                        {t("select_photos")}
+                    </DialogTitle>
+                ) : (
+                    <Typography
+                        sx={{
+                            fontFamily: "'Outfit Variable', sans-serif",
+                            fontSize: "24px",
+                            fontWeight: 600,
+                            lineHeight: "32px",
+                        }}
+                    >
+                        {t(intent == "import" ? "import_library" : "upload")}
+                    </Typography>
+                )}
                 <IconButton
                     aria-label={t("close")}
                     onClick={onClose}
@@ -80,6 +102,15 @@ export function DefaultOptionsV2({
                         onSelectFolder,
                     }}
                 />
+            ) : intent == "collect" ? (
+                <CollectOptions
+                    {...{
+                        isFileSelectionPending,
+                        isFolderSelectionPending,
+                        onSelectFiles,
+                        onSelectFolder,
+                    }}
+                />
             ) : (
                 <UploadOptions
                     {...{
@@ -96,9 +127,9 @@ export function DefaultOptionsV2({
 }
 
 type ImportOptionsProps = Pick<
-    DefaultOptionsV2Props,
-    "isFolderSelectionPending" | "onSelectGooglePhotos" | "onSelectFolder"
->;
+    DefaultOptionsV2BaseProps,
+    "isFolderSelectionPending" | "onSelectFolder"
+> & { onSelectGooglePhotos: () => void };
 
 function ImportOptions({
     isFolderSelectionPending,
@@ -139,13 +170,12 @@ function ImportOptions({
 }
 
 type UploadOptionsProps = Pick<
-    DefaultOptionsV2Props,
+    DefaultOptionsV2BaseProps,
     | "isFileSelectionPending"
     | "isFolderSelectionPending"
     | "onSelectFiles"
-    | "onSelectGooglePhotos"
     | "onSelectFolder"
->;
+> & { onSelectGooglePhotos: () => void };
 
 function UploadOptions({
     isFileSelectionPending,
@@ -197,6 +227,55 @@ function UploadOptions({
                     onClick={onSelectGooglePhotos}
                 />
             </ImportSection>
+        </Stack>
+    );
+}
+
+type CollectOptionsProps = Pick<
+    DefaultOptionsV2BaseProps,
+    | "isFileSelectionPending"
+    | "isFolderSelectionPending"
+    | "onSelectFiles"
+    | "onSelectFolder"
+>;
+
+function CollectOptions({
+    isFileSelectionPending,
+    isFolderSelectionPending,
+    onSelectFiles,
+    onSelectFolder,
+}: CollectOptionsProps): React.JSX.Element {
+    return (
+        <Stack sx={{ gap: "16px" }}>
+            <Stack sx={{ gap: "10px" }}>
+                <OptionRowButton
+                    icon={
+                        <HugeiconsIcon
+                            icon={Album02Icon}
+                            size={20}
+                            color="var(--mui-palette-text-muted)"
+                        />
+                    }
+                    label={t("files")}
+                    pending={isFileSelectionPending}
+                    size="large"
+                    onClick={onSelectFiles}
+                />
+                <OptionRowButton
+                    icon={
+                        <HugeiconsIcon
+                            icon={Folder01Icon}
+                            size={20}
+                            color="var(--mui-palette-text-muted)"
+                        />
+                    }
+                    label={t("folder")}
+                    pending={isFolderSelectionPending}
+                    size="large"
+                    onClick={onSelectFolder}
+                />
+            </Stack>
+            <DragAndDropHint size="large" />
         </Stack>
     );
 }
@@ -276,6 +355,7 @@ interface OptionRowButtonProps {
     label: string;
     description?: string;
     pending?: boolean;
+    size?: "medium" | "large";
     onClick: () => void;
 }
 
@@ -284,6 +364,7 @@ function OptionRowButton({
     label,
     description,
     pending,
+    size = "medium",
     onClick,
 }: OptionRowButtonProps): React.JSX.Element {
     return (
@@ -324,9 +405,9 @@ function OptionRowButton({
                 >
                     <Typography
                         sx={{
-                            fontSize: "14px",
+                            fontSize: size == "large" ? "16px" : "14px",
                             fontWeight: 500,
-                            lineHeight: "20px",
+                            lineHeight: size == "large" ? "24px" : "20px",
                         }}
                     >
                         {label}
@@ -357,7 +438,9 @@ function OptionRowButton({
                     {pending ? (
                         <PendingIndicator />
                     ) : (
-                        <ChevronRightIcon sx={{ fontSize: "18px" }} />
+                        <ChevronRightIcon
+                            sx={{ fontSize: size == "large" ? "20px" : "18px" }}
+                        />
                     )}
                 </Box>
             </Stack>
@@ -393,14 +476,20 @@ function ImportHelp(): React.JSX.Element {
     );
 }
 
-function DragAndDropHint(): React.JSX.Element {
+interface DragAndDropHintProps {
+    size?: "medium" | "large";
+}
+
+function DragAndDropHint({
+    size = "medium",
+}: DragAndDropHintProps): React.JSX.Element {
     return (
         <Typography
             sx={{
                 color: "text.faint",
-                fontSize: "12px",
+                fontSize: size == "large" ? "14px" : "12px",
                 fontWeight: 500,
-                lineHeight: "16px",
+                lineHeight: size == "large" ? "20px" : "16px",
                 opacity: 0.7,
                 textAlign: "center",
             }}
