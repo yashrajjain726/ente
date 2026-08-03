@@ -535,13 +535,16 @@ You can also try opening photos.ente.com in an incognito or private window to ru
 
 ### How do I identify which files failed to upload? {#identify-failed-uploads}
 
-**On desktop:** Check the sections within the upload progress bar for:
+**On desktop:** Expand the upload progress card and open one of these sections:
 
-- "Failed Uploads"
-- "Ignored Uploads"
-- "Unsuccessful Uploads"
+- **In progress**: Files currently being prepared or uploaded.
+- **Completed**: Files uploaded successfully.
+- **Skipped**: Files not uploaded. While the upload is active, you can filter them by reasons such as **Already on Ente** and **Hidden file**.
+- **Failed**: Files whose upload attempt failed.
 
-Click on each section to see the specific files and error messages.
+After the upload finishes, click **Review items**, open **Failed**, and review the filenames and error status. Click **Retry failed uploads** to try those files again. Skipped items are not retryable failures; review the reason shown beside each filename to understand why it was skipped.
+
+![Failed upload details with the retry button](../migration/from-local-hard-disk/failed-upload-review.webp)
 
 **On mobile:** Open `Settings > Backup` to see the backup status and any errors.
 
