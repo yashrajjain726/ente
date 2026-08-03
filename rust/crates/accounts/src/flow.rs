@@ -368,7 +368,7 @@ where
         };
 
         let recovery_key =
-            get_recovery_key(&params.master_key, &key_attributes).map_err(Error::from)?;
+            get_recovery_key(&params.master_key, &key_attributes)?;
 
         let secret = self.client.setup_two_factor().await?;
         self.ui
@@ -857,7 +857,7 @@ where
             .complete_srp_setup(&response.setup_id, &srp_m1)
             .await?;
         let srp_m2 = b64::decode(&complete.srp_m2)?;
-        srp_session.verify_m2(&srp_m2).map_err(Error::from)?;
+        srp_session.verify_m2(&srp_m2)?;
         Ok(())
     }
 
@@ -899,7 +899,7 @@ where
             .await?;
 
         let srp_m2 = b64::decode(&response.srp_m2)?;
-        srp_session.verify_m2(&srp_m2).map_err(Error::from)?;
+        srp_session.verify_m2(&srp_m2)?;
         Ok(response)
     }
 }
@@ -953,7 +953,7 @@ fn decrypt_auth_response(
     kek: &[u8],
 ) -> Result<DecryptedSecrets> {
     if let Some(encrypted_token) = auth_response.encrypted_token.as_deref() {
-        auth::decrypt_secrets(kek, key_attributes, encrypted_token).map_err(Error::from)
+        auth::decrypt_secrets(kek, key_attributes, encrypted_token)
     } else if let Some(token) = auth_response.token.as_deref() {
         let (master_key, secret_key) = auth::decrypt_keys_only(kek, key_attributes)?;
         Ok(DecryptedSecrets {
