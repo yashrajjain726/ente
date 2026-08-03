@@ -61,16 +61,6 @@ To build a release APK, [setup your keystore](https://docs.flutter.dev/deploymen
 
 After updating Flutter dependencies, run `pod install` from `ios/` on macOS and commit `ios/Podfile.lock` if it changes.
 
-## 📝 Localization
-
-Mobile apps share Flutter's localization package in `mobile/packages/strings`.
-
-- The base localization file is `mobile/packages/strings/lib/l10n/arb/strings_en.arb`
-- Generated code appears in `mobile/packages/strings/lib/l10n/`
-- To manually regenerate, run `flutter gen-l10n` from `mobile/packages/strings`
-
-See [docs/translations.md](docs/translations.md) for contributing translations.
-
 ## 🏙️ Attributions
 
 City coordinates from [Simple Maps](https://simplemaps.com/data/world-cities)
@@ -79,9 +69,7 @@ City coordinates from [Simple Maps](https://simplemaps.com/data/world-cities)
 
 [![Crowdin](https://badges.crowdin.net/ente-photos-app/localized.svg)](https://crowdin.com/project/ente-photos-app)
 
-If you're interested in helping out with translation, please visit our [Crowdin project](https://crowdin.com/project/ente-photos-app) to get started. Thank you for your support.
-
-If your language is not listed for translation, please [create a GitHub issue](https://github.com/ente/ente/issues/new?title=Request+for+New+Language+Translation&body=Language+name%3A) to have it added.
+If you're interested in helping out with translation, please visit our [Crowdin project](https://crowdin.com/project/ente-photos-app). For more details, see the docs for the [strings package](../../packages/strings/README.md).
 
 ## 💚 Contribute
 
