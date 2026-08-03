@@ -3,7 +3,6 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 /* eslint-disable @typescript-eslint/no-misused-promises */
 /* eslint-disable @typescript-eslint/no-floating-promises */
-import { DefaultOptionsV2 } from "@/components/DefaultOptionsV2";
 import { TakeoutOptionsV2 } from "@/components/TakeoutOptionsV2";
 import { UploadConfirmationDialog } from "@/components/UploadConfirmationDialog";
 import type {
@@ -47,6 +46,7 @@ import type {
 import type { UploadTypeSelectorIntent } from "ente-gallery/components/Upload";
 import { UploadProgressV2 } from "ente-gallery/components/upload-progress-v2/UploadProgressV2";
 import { CanvasReadbackBlockedDialog } from "ente-gallery/components/upload/CanvasReadbackBlockedDialog";
+import { DefaultOptionsV2 } from "ente-gallery/components/upload/DefaultOptionsV2";
 import { useFileInput } from "ente-gallery/components/utils/use-file-input";
 import {
     groupItemsBasedOnParentFolder,
