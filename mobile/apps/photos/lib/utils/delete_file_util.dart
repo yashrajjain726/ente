@@ -411,7 +411,7 @@ Future<LocalDeletionResult> deleteLocalFiles(
     _logger.severe("Could not delete local files", e, s);
     return const LocalDeletionResult(
       status: LocalDeletionStatus.failed,
-      canAttemptRecovery: true,
+      shouldTryNextFallback: true,
     );
   }
 }
@@ -490,7 +490,7 @@ Future<LocalDeletionResult> deleteLocalFilesAfterRemovingAlreadyDeletedIDs(
     _logger.severe("Could not delete local files", e, s);
     return const LocalDeletionResult(
       status: LocalDeletionStatus.failed,
-      canAttemptRecovery: true,
+      shouldTryNextFallback: true,
     );
   } finally {
     await _hideProgressDialog(dialog);
@@ -745,7 +745,7 @@ Future<LocalDeletionResult> _deleteAndCheckpointSharedMediaFiles(
         ? LocalDeletionStatus.completed
         : LocalDeletionStatus.failed,
     deletedIDs: deletedIDs,
-    canAttemptRecovery: deletedIDs.length != requestedIDs.length,
+    shouldTryNextFallback: deletedIDs.length != requestedIDs.length,
   );
 }
 

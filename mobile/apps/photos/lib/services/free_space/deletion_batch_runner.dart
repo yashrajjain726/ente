@@ -9,19 +9,18 @@ enum LocalDeletionStatus { completed, cancelled, failed }
 class LocalDeletionResult {
   final LocalDeletionStatus status;
   final Set<String> deletedIDs;
-  final bool canAttemptRecovery;
+  final bool shouldTryNextFallback;
 
   const LocalDeletionResult({
     required this.status,
     this.deletedIDs = const <String>{},
-    this.canAttemptRecovery = false,
+    this.shouldTryNextFallback = false,
   });
 
   bool get isCompleted => status == LocalDeletionStatus.completed;
   bool get isCancelled => status == LocalDeletionStatus.cancelled;
   bool get isFailed => status == LocalDeletionStatus.failed;
-  bool get shouldAttemptRecovery => isFailed && canAttemptRecovery;
-  bool get isTerminalFailure => isFailed && !canAttemptRecovery;
+  bool get isTerminalFailure => isFailed && !shouldTryNextFallback;
 }
 
 Set<String> retainOriginalDeletionCandidates({
@@ -65,7 +64,7 @@ Future<LocalDeletionResult> executeDeletionBatches({
       return LocalDeletionResult(
         status: LocalDeletionStatus.failed,
         deletedIDs: deletedIDs,
-        canAttemptRecovery: true,
+        shouldTryNextFallback: true,
       );
     }
 
@@ -119,14 +118,15 @@ LocalDeletionResult combineDeletionResults(
     );
   }
   if (sharedMediaResult.isFailed || platformResult.isFailed) {
-    final sharedFailureCanRecover =
-        !sharedMediaResult.isFailed || sharedMediaResult.canAttemptRecovery;
-    final platformFailureCanRecover =
-        !platformResult.isFailed || platformResult.canAttemptRecovery;
+    final sharedFailureAllowsFallback =
+        !sharedMediaResult.isFailed || sharedMediaResult.shouldTryNextFallback;
+    final platformFailureAllowsFallback =
+        !platformResult.isFailed || platformResult.shouldTryNextFallback;
     return LocalDeletionResult(
       status: LocalDeletionStatus.failed,
       deletedIDs: deletedIDs,
-      canAttemptRecovery: sharedFailureCanRecover && platformFailureCanRecover,
+      shouldTryNextFallback:
+          sharedFailureAllowsFallback && platformFailureAllowsFallback,
     );
   }
   return LocalDeletionResult(

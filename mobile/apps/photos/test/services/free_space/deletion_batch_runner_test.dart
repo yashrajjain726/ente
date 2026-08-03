@@ -2,25 +2,19 @@ import "package:flutter_test/flutter_test.dart";
 import "package:photos/services/free_space/deletion_batch_runner.dart";
 
 void main() {
-  test("derives recovery predicates only for failed results", () {
+  test("distinguishes fallback-eligible and terminal failures", () {
     const recoverableFailure = LocalDeletionResult(
       status: LocalDeletionStatus.failed,
-      canAttemptRecovery: true,
+      shouldTryNextFallback: true,
     );
     const terminalFailure = LocalDeletionResult(
       status: LocalDeletionStatus.failed,
     );
-    const completed = LocalDeletionResult(
-      status: LocalDeletionStatus.completed,
-      canAttemptRecovery: true,
-    );
 
-    expect(recoverableFailure.shouldAttemptRecovery, isTrue);
+    expect(recoverableFailure.shouldTryNextFallback, isTrue);
     expect(recoverableFailure.isTerminalFailure, isFalse);
-    expect(terminalFailure.shouldAttemptRecovery, isFalse);
+    expect(terminalFailure.shouldTryNextFallback, isFalse);
     expect(terminalFailure.isTerminalFailure, isTrue);
-    expect(completed.shouldAttemptRecovery, isFalse);
-    expect(completed.isTerminalFailure, isFalse);
   });
 
   test("stops after the first platform exception", () async {
@@ -37,7 +31,7 @@ void main() {
     );
 
     expect(result.status, LocalDeletionStatus.failed);
-    expect(result.canAttemptRecovery, isTrue);
+    expect(result.shouldTryNextFallback, isTrue);
     expect(attemptedBatches, [
       ["1", "2"],
     ]);
@@ -104,7 +98,7 @@ void main() {
     );
 
     expect(result.status, LocalDeletionStatus.failed);
-    expect(result.canAttemptRecovery, isFalse);
+    expect(result.shouldTryNextFallback, isFalse);
     expect(attemptedBatches, [
       ["1", "2"],
     ]);
@@ -151,12 +145,12 @@ void main() {
       const LocalDeletionResult(status: LocalDeletionStatus.completed),
       const LocalDeletionResult(
         status: LocalDeletionStatus.failed,
-        canAttemptRecovery: true,
+        shouldTryNextFallback: true,
       ),
     );
 
     expect(result.status, LocalDeletionStatus.failed);
-    expect(result.canAttemptRecovery, isTrue);
+    expect(result.shouldTryNextFallback, isTrue);
   });
 
   test("retains only originally confirmed, still-freeable candidates", () {

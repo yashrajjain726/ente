@@ -137,7 +137,7 @@ class _FreeSpacePageState extends State<FreeSpacePage> {
       final currentLocalIDList = currentLocalIDs.toList();
       var result = await deleteLocalFiles(context, currentLocalIDList);
 
-      if (result.shouldAttemptRecovery) {
+      if (result.shouldTryNextFallback) {
         if (!mounted) return;
         result = await deleteLocalFilesAfterRemovingAlreadyDeletedIDs(
           context,
@@ -145,7 +145,7 @@ class _FreeSpacePageState extends State<FreeSpacePage> {
         );
       }
 
-      if (result.shouldAttemptRecovery && Platform.isAndroid) {
+      if (result.shouldTryNextFallback && Platform.isAndroid) {
         if (!mounted) return;
         result = await retryFreeUpSpaceAfterRemovingAssetsNonExistingInDisk(
           context,
