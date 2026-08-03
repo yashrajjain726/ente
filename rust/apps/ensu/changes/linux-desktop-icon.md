@@ -1,1 +1,0 @@
-- Fixed the desktop icon on Fedora. Thanks @fosszil!
