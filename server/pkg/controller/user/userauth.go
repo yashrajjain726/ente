@@ -531,7 +531,9 @@ func (c *UserController) AddTokenAndNotify(ctx *gin.Context, userID int64, app e
 		templateData := map[string]interface{}{
 			"Date": t.Now().UTC().Format("02 Jan, 2006 15:04"),
 		}
-		if strings.HasSuffix(emailUtil.NormalizeEmail(user.Email), "@ente.io") {
+		normalizedEmail := emailUtil.NormalizeEmail(user.Email)
+		if strings.HasSuffix(normalizedEmail, "@ente.io") ||
+			strings.HasSuffix(normalizedEmail, "@ente.com") {
 			appDisplayNames := map[ente.App]string{
 				ente.Photos: "Ente Photos",
 				ente.Auth:   "Ente Auth",
