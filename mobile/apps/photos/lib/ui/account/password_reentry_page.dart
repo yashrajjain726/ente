@@ -117,7 +117,7 @@ class _PasswordReentryPageState extends State<PasswordReentryPage> {
         body: context.strings.recreatePasswordBody,
         firstButtonLabel: context.strings.useRecoveryKey,
       );
-      if (dialogChoice!.action == ButtonAction.first) {
+      if (dialogChoice?.action == ButtonAction.first) {
         if (!mounted) return;
         // ignore: unawaited_futures
         Navigator.of(context).push(
@@ -129,8 +129,8 @@ class _PasswordReentryPageState extends State<PasswordReentryPage> {
         );
       }
       return;
-    } catch (e, s) {
-      _logger.severe("Password verification failed", e, s);
+    } catch (e) {
+      _logger.warning("Password verification failed: $e");
       await dialog.hide();
       if (!mounted) return;
       final dialogChoice = await showChoiceDialog(
@@ -140,7 +140,7 @@ class _PasswordReentryPageState extends State<PasswordReentryPage> {
         firstButtonLabel: context.strings.contactSupport,
         secondButtonLabel: context.strings.ok,
       );
-      if (dialogChoice!.action == ButtonAction.first) {
+      if (dialogChoice?.action == ButtonAction.first) {
         if (!mounted) return;
         await sendLogs(
           context,
