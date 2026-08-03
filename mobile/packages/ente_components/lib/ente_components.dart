@@ -1,3 +1,4 @@
+export 'components/android_text_input_autofocus.dart';
 export 'components/app_bar_component.dart';
 export 'components/avatar_component.dart';
 export 'components/banner_component.dart';
@@ -5,6 +6,7 @@ export 'components/bottom_sheet/bottom_sheet_component.dart';
 export 'components/bottom_sheet/error_bottom_sheet_component.dart';
 export 'components/buttons/button_component.dart';
 export 'components/buttons/icon_button_component.dart';
+export 'components/centered_constrained_component.dart';
 export 'components/divider_component.dart';
 export 'components/ente_app_icon.dart';
 export 'components/filter_chip_component.dart';
