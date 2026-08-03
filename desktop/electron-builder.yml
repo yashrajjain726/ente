@@ -42,7 +42,6 @@ mac:
     category: public.app-category.photography
     hardenedRuntime: true
     mergeASARs: false
-    # The Rust N-API addon and the ONNX Runtime library are shipped as separate
-    # per-arch Mach-Os (in both slices of the universal build) instead of fat
-    # binaries; the app picks the one matching the process arch at runtime.
+    # Both macOS build passes contain separate x64 and arm64 binaries. Copy them
+    # into the universal app unchanged; the app selects one at runtime.
     x64ArchFiles: "**/{napi,onnxruntime}/**"

@@ -1,21 +1,3 @@
-/**
- * [Note: ONNX Runtime binaries]
- *
- * The Rust ML addon (see [Note: ML with Rust]) loads ONNX Runtime dynamically
- * at runtime. We use Ente's pinned custom builds — CoreML-enabled on macOS and
- * WebGPU-capable elsewhere — published at
- * https://github.com/ente/ort-packaging/releases
- *
- * This script is the only place that downloads those builds. Postinstall runs
- * it once to acquire both architectures for the host platform. The extracted
- * libraries are kept under `node_modules/.cache/ente-onnxruntime/`, where the
- * development app loads them directly.
- *
- * During packaging, `beforeBuild.js` calls {@link stageONNXRuntime} to copy the
- * already-installed libraries needed by the current target into
- * `build/onnxruntime/`. That step performs no network access.
- */
-
 const crypto = require("node:crypto");
 const fsp = require("node:fs/promises");
 const path = require("node:path");
@@ -23,15 +5,11 @@ const { execFileSync } = require("node:child_process");
 
 const ortVersion = "1.28.0-r1";
 
+// Our packaging enables CoreML on macOS and WebGPU elsewhere.
 const ortReleaseURL = `https://github.com/ente/ort-packaging/releases/download/ort-${ortVersion}`;
 
-/**
- * SHA-256 checksums of the release assets, pinned here so that the library we
- * package cannot change without a corresponding (reviewed) change to this
- * file. When bumping {@link ortVersion}, update these with the values from the
- * release's `.sha256` sidecar files after verifying them against the built
- * archives.
- */
+// When changing ortVersion, verify the archives and update these from the
+// release's .sha256 sidecars.
 const ortAssetSHA256s = {
     "darwin-arm64":
         "de08b6c23398f1d6639c66519b44b06f7cd0f7c44a5ad7bade3c4d8b049c5428",
@@ -66,7 +44,6 @@ const archesForTarget = (platform, arch) =>
 const installDir = (appDir) =>
     path.join(appDir, "node_modules", ".cache", "ente-onnxruntime");
 
-/** Download and extract one pinned ONNX Runtime build, if it is not current. */
 const downloadONNXRuntimeIfNeeded = async (platform, arch, appDir) => {
     const asset = ortAssetName(platform, arch);
     const outDir = path.join(installDir(appDir), arch);
@@ -95,17 +72,12 @@ const downloadONNXRuntimeIfNeeded = async (platform, arch, appDir) => {
     await fsp.mkdir(outDir, { recursive: true });
     const archivePath = path.join(outDir, asset);
     await fsp.writeFile(archivePath, archive);
-    // tar is available on all the platforms we build on (bsdtar on macOS and
-    // Windows, GNU tar on Linux), and handles both .tar.gz and .zip.
+    // Windows ships bsdtar, which also extracts zip archives.
     execFileSync("tar", ["-xf", asset], { cwd: outDir });
     await fsp.rm(archivePath);
     await fsp.writeFile(stampPath, asset);
 };
 
-/**
- * Copy the already-installed ONNX Runtime libraries required by a build target
- * into the resources staging directory. This deliberately never downloads.
- */
 const stageONNXRuntime = async (platform, arch, appDir) => {
     const arches = archesForTarget(platform, arch);
     const sourceRoot = installDir(appDir);
@@ -137,7 +109,6 @@ const stageONNXRuntime = async (platform, arch, appDir) => {
         });
 };
 
-/** Acquire every architecture needed by desktop packaging on this platform. */
 const installONNXRuntime = async (platform, appDir) => {
     for (const arch of ["arm64", "x64"])
         await downloadONNXRuntimeIfNeeded(platform, arch, appDir);
