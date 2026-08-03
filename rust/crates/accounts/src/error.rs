@@ -41,16 +41,21 @@ pub enum Error {
     #[error("Invalid input: {0}")]
     InvalidInput(String),
 
-    #[error("Too many attempts, please wait before retrying")]
-    RateLimited,
+    #[error("Too many incorrect email verification attempts. Please wait and request a new code.")]
+    EmailVerificationRateLimited,
 
-    #[error("Second factor session expired, restart login")]
+    #[error("Too many incorrect TOTP attempts. Please restart login.")]
+    TotpRateLimited,
+
+    #[error("Second factor session expired. Please restart login.")]
     SecondFactorSessionExpired,
 
     #[error("Account key attributes are not available")]
     MissingKeyAttributes,
 
-    #[error("Email already has server-side key state; log in to the existing account instead")]
+    #[error(
+        "Email already has server-side key state; use the existing account or recover the incomplete signup instead of creating a new account."
+    )]
     AccountAlreadyExists,
 
     #[error("{0}")]

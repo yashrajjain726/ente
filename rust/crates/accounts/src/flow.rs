@@ -367,8 +367,7 @@ where
                 .ok_or(Error::MissingKeyAttributes)?
         };
 
-        let recovery_key =
-            get_recovery_key(&params.master_key, &key_attributes)?;
+        let recovery_key = get_recovery_key(&params.master_key, &key_attributes)?;
 
         let secret = self.client.setup_two_factor().await?;
         self.ui
@@ -737,7 +736,7 @@ where
                     resent = false;
                 }
                 Err(error) if error.is_http_status(&[429]) => {
-                    return Err(Error::RateLimited);
+                    return Err(Error::EmailVerificationRateLimited);
                 }
                 Err(error) if error.is_http_status(&[410]) => {
                     self.client
@@ -783,7 +782,7 @@ where
                         .report_retryable_error("Incorrect TOTP code. Try again.")?;
                 }
                 Err(error) if error.is_http_status(&[429]) => {
-                    return Err(Error::RateLimited);
+                    return Err(Error::TotpRateLimited);
                 }
                 Err(error) if error.is_http_status(&[404, 410]) => {
                     return Err(Error::SecondFactorSessionExpired);
@@ -1358,7 +1357,7 @@ mod tests {
             .unwrap_err();
 
         match error {
-            Error::RateLimited => {}
+            Error::EmailVerificationRateLimited => {}
             other => panic!("unexpected error: {other:?}"),
         }
         assert!(ui.retryable_errors.is_empty());
@@ -1526,7 +1525,7 @@ mod tests {
             .unwrap_err();
 
         match error {
-            Error::RateLimited => {}
+            Error::TotpRateLimited => {}
             other => panic!("unexpected error: {other:?}"),
         }
         assert!(ui.retryable_errors.is_empty());
