@@ -47,15 +47,14 @@ npm run dev
 Or create a binary for your platform
 
 ```sh
+npm run postinstall
 npm run build
 ```
-
-That's the gist of it. For more development related documentation, see [docs](docs/README.md).
-
-> [!NOTE]
->
-> If the relevant `package-lock.json` has not changed since your last `npm ci`, you can use `npm install` as a faster incremental alternative. For caveats, see [docs/dev.md](docs/dev.md#npm-ci-npm-install).
 
 > [!NOTE]
 >
 > `npm run dev` will automatically do a `npm run postinstall` if needed. `npm run build` however requires an explicit `npm run postinstall` prior to it.
+
+> [!NOTE]
+>
+> If the relevant `package-lock.json` has not changed since your last `npm ci`, you can use `npm install` as a faster incremental alternative.
