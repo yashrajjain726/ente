@@ -158,6 +158,7 @@ interface SpaceFileViewerProps {
     isDraftPostPreviewPending?: boolean;
     onClose: () => void;
     onDeletePost?: () => Promise<void> | void;
+    onDraftPostExitAnimationStart?: () => void;
     onDraftPostExitStart?: () => void;
     onDraftPostPublished?: () => void;
     onAddFriendForPostAction?: (intent: SpaceInviteIntent) => void;
@@ -360,6 +361,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
     isDraftPostPreviewPending = false,
     onClose,
     onDeletePost,
+    onDraftPostExitAnimationStart,
     onDraftPostExitStart,
     onDraftPostPublished,
     onAddFriendForPostAction,
@@ -741,7 +743,10 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
             setQueuedDraftPost(undefined);
             setDraftPostExitPhase("waiting-for-keyboard");
             onDraftPostExitStart?.();
-            dismissCaptionKeyboard(() => setDraftPostExitPhase("animating"));
+            dismissCaptionKeyboard(() => {
+                setDraftPostExitPhase("animating");
+                onDraftPostExitAnimationStart?.();
+            });
             void publishPromise.catch((error: unknown) => {
                 log.error("Failed to publish space post", error);
             });
@@ -750,6 +755,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
             isDeleteExit,
             isDraftPostExit,
             dismissCaptionKeyboard,
+            onDraftPostExitAnimationStart,
             onDraftPostExitStart,
             onPublishDraftPost,
         ],
