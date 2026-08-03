@@ -5,8 +5,6 @@ export interface UploadStatusStore {
     collectionName?: string;
     filePaths?: string[];
     zipItems?: ZipItem[];
-    /** @deprecated Legacy paths to zip files, now subsumed into zipItems. */
-    zipPaths?: string[];
     preUploadSkippedFiles?: PreUploadSkippedFile[];
     importTakeoutFavorites?: boolean;
     includePartnerSharedFiles?: boolean;
@@ -19,7 +17,6 @@ const uploadStatusSchema: Schema<UploadStatusStore> = {
         type: "array",
         items: { type: "array", items: { type: "string" } },
     },
-    zipPaths: { type: "array", items: { type: "string" } },
     preUploadSkippedFiles: {
         type: "array",
         items: {
