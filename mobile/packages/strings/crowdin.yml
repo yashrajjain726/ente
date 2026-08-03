@@ -11,13 +11,13 @@ export_languages:
   - da
   - de
   - el
-  - es
+  - es-ES
   - et
   - eu
   - fa
   - fi
   - fr
-  - gu
+  - gu-IN
   - he
   - hi
   - hu
@@ -30,11 +30,11 @@ export_languages:
   - ku
   - lt
   - lv
-  - ml
+  - ml-IN
   - ms
   - nb
   - nl
-  - nn
+  - nn-NO
   - "no"
   - or
   - pl
@@ -45,13 +45,13 @@ export_languages:
   - sk
   - sl
   - sr
-  - sv
+  - sv-SE
   - ta
   - th
   - ti
   - tr
   - uk
-  - ur
+  - ur-IN
   - vi
   - zh-CN
   - zh-TW
@@ -60,16 +60,26 @@ files:
   - source: /lib/l10n/arb/strings_en.arb
     translation: /lib/l10n/arb/strings_%two_letters_code%.arb
     excluded_target_languages:
+      - af
+      - kn
       - ms-BN
+      - te
+      - uz
     languages_mapping:
       two_letters_code:
         ckb: ckb
+        es-ES: es
+        gu-IN: gu
         ku: ku
+        ml-IN: ml
         ms: ms
         ms-BN: ms_BN
         nb: nb
+        nn-NO: nn
         "no": "no"
         pt-BR: pt_BR
         pt-PT: pt_PT
+        sv-SE: sv
+        ur-IN: ur
         zh-CN: zh_CN
         zh-TW: zh_TW
