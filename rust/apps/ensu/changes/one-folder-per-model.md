@@ -1,1 +1,0 @@
-- Unified model downloading across Ensu’s native apps using one Rust implementation, with mobile background continuation, per-model folders, and migration of compatible existing downloads.
