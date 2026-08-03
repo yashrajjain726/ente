@@ -1626,7 +1626,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     const { clearBrowserBackState: clearSelectedPhotoHistory } =
         useBrowserBackClose({
             open: Boolean(selectedViewer),
-            onClose: closeSelectedPhoto,
+            onClose: () => {
+                if (!isDraftPostExiting) closeSelectedPhoto();
+            },
             stateKey: "space-feed-viewer",
         });
     const deleteSelectedPost = async () => {
