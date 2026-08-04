@@ -10,6 +10,7 @@ ente-accounts.workspace = true
 ente-contacts.workspace = true
 ente-core.workspace = true
 flutter_rust_bridge.workspace = true
+log.workspace = true
 
 [features]
 default = []

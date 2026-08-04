@@ -11,6 +11,7 @@ members = [
     "bindings/uniffi/ensu",
     "bindings/wasm/ente-wasm",
     "bindings/wasm/core",
+    "bindings/wasm/log",
     "bindings/wasm/space",
     "crates/accounts",
     "crates/assets",
@@ -35,8 +36,10 @@ ente-paste = { path = "crates/paste" }
 ente-photos = { path = "crates/photos" }
 ente-space = { path = "crates/space" }
 ente-test-support = { path = "crates/test-support" }
+ente-wasm-log = { path = "bindings/wasm/log" }
 flutter_rust_bridge = "=2.12.0"
 flutter_rust_bridge_codegen = "=2.12.0"
+log = "0.4.29"
 md-5 = "0.11.0"
 mockito = "1.7.2"
 ort = { version = "=2.0.0-rc.13", default-features = false }

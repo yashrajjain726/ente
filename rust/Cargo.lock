@@ -2565,6 +2565,7 @@ version = "0.0.0"
 dependencies = [
  "ente-core",
  "ente-space",
+ "ente-wasm-log",
  "serde",
  "serde-wasm-bindgen",
  "wasm-bindgen",
@@ -2588,6 +2589,7 @@ dependencies = [
  "ente-accounts",
  "ente-contacts",
  "ente-core",
+ "ente-wasm-log",
  "js-sys",
  "md-5 0.11.0",
  "serde",
@@ -2601,7 +2603,18 @@ name = "ente-wasm-core"
 version = "0.0.0"
 dependencies = [
  "ente-core",
+ "ente-wasm-log",
  "wasm-bindgen",
+]
+
+[[package]]
+name = "ente-wasm-log"
+version = "0.0.0"
+dependencies = [
+ "js-sys",
+ "log",
+ "wasm-bindgen",
+ "web-sys",
 ]
 
 [[package]]
@@ -2633,6 +2646,7 @@ dependencies = [
  "ente-contacts",
  "ente-core",
  "flutter_rust_bridge",
+ "log",
 ]
 
 [[package]]

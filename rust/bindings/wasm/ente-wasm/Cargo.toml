@@ -9,6 +9,7 @@ crate-type = ["cdylib"]
 ente-accounts.workspace = true
 ente-contacts.workspace = true
 ente-core.workspace = true
+ente-wasm-log.workspace = true
 js-sys = "0.3"
 md-5.workspace = true
 serde.workspace = true
