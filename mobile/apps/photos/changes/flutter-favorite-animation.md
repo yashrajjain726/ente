@@ -1,1 +1,0 @@
-- Replaced the favorite animation with Ente's star icon.
