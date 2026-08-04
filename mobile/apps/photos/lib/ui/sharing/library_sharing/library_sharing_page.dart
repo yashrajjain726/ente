@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:ente_components/ente_components.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart' show ScrollDirection;
 import 'package:hugeicons/hugeicons.dart';
 import 'package:photos/models/collection/collection.dart';
 import 'package:photos/models/library_sharing/library_sharing_recipient.dart';
@@ -30,6 +29,8 @@ class LibrarySharingPage extends StatefulWidget {
 }
 
 class _LibrarySharingPageState extends State<LibrarySharingPage> {
+  static const _sheetToggleScrollThreshold = 32.0;
+
   late final LibrarySharingController _controller =
       widget.controller ??
       LibrarySharingController(
@@ -41,6 +42,7 @@ class _LibrarySharingPageState extends State<LibrarySharingPage> {
   final GlobalKey _selectionSheetKey = GlobalKey();
   bool _isSelectionSheetExpanded = true;
   bool _selectionSheetWasVisible = false;
+  double _selectionSheetScrollDistance = 0;
   double? _expandedSelectionSheetHeight;
 
   LibrarySharingRecipient get _recipient => _controller.recipient;
@@ -92,8 +94,8 @@ class _LibrarySharingPageState extends State<LibrarySharingPage> {
     return Stack(
       children: [
         Positioned.fill(
-          child: NotificationListener<UserScrollNotification>(
-            onNotification: _handleUserScroll,
+          child: NotificationListener<ScrollNotification>(
+            onNotification: _handleScroll,
             child: _content(context),
           ),
         ),
@@ -306,19 +308,39 @@ class _LibrarySharingPageState extends State<LibrarySharingPage> {
     _controller.toggleSelection(album);
   }
 
-  bool _handleUserScroll(UserScrollNotification notification) {
+  bool _handleScroll(ScrollNotification notification) {
     if (!_showSelectionSheet ||
         _controller.isMutating ||
+        notification.depth != 0 ||
         notification.metrics.axis != Axis.vertical) {
       return false;
     }
-    switch (notification.direction) {
-      case ScrollDirection.reverse:
-        _setSelectionSheetExpanded(false);
-      case ScrollDirection.forward:
-        _setSelectionSheetExpanded(true);
-      case ScrollDirection.idle:
-        break;
+    if (notification is ScrollEndNotification) {
+      _selectionSheetScrollDistance = 0;
+      return false;
+    }
+    if (notification is! ScrollUpdateNotification ||
+        notification.scrollDelta == null) {
+      return false;
+    }
+
+    final scrollDelta = notification.scrollDelta!;
+    if (scrollDelta == 0) {
+      return false;
+    }
+    if (scrollDelta.sign != _selectionSheetScrollDistance.sign) {
+      _selectionSheetScrollDistance = 0;
+    }
+    _selectionSheetScrollDistance += scrollDelta;
+
+    if (_isSelectionSheetExpanded &&
+        _selectionSheetScrollDistance >= _sheetToggleScrollThreshold) {
+      _selectionSheetScrollDistance = 0;
+      _setSelectionSheetExpanded(false);
+    } else if (!_isSelectionSheetExpanded &&
+        _selectionSheetScrollDistance <= -_sheetToggleScrollThreshold) {
+      _selectionSheetScrollDistance = 0;
+      _setSelectionSheetExpanded(true);
     }
     return false;
   }
@@ -327,6 +349,7 @@ class _LibrarySharingPageState extends State<LibrarySharingPage> {
     final isVisible = _showSelectionSheet;
     if (isVisible && !_selectionSheetWasVisible) {
       _isSelectionSheetExpanded = true;
+      _selectionSheetScrollDistance = 0;
       _expandedSelectionSheetHeight = null;
     }
     _selectionSheetWasVisible = isVisible;

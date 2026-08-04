@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:ente_components/ente_components.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart' show ScrollDirection;
 import 'package:flutter/semantics.dart' show SemanticsAction, SemanticsFlag;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:photos/ente_theme_data.dart';
@@ -388,18 +387,34 @@ void main() {
           find.descendant(of: scrollView, matching: find.byType(Scrollable)),
         )
         .position;
-    UserScrollNotification(
+    ScrollUpdateNotification(
       metrics: scrollPosition,
       context: scrollContext,
-      direction: ScrollDirection.reverse,
+      scrollDelta: 16,
+    ).dispatch(scrollContext);
+    await tester.pumpAndSettle();
+    expect(isExpanded(), isTrue);
+
+    ScrollUpdateNotification(
+      metrics: scrollPosition,
+      context: scrollContext,
+      scrollDelta: 16,
     ).dispatch(scrollContext);
     await tester.pumpAndSettle();
     expect(isExpanded(), isFalse);
 
-    UserScrollNotification(
+    ScrollUpdateNotification(
       metrics: scrollPosition,
       context: scrollContext,
-      direction: ScrollDirection.forward,
+      scrollDelta: -16,
+    ).dispatch(scrollContext);
+    await tester.pumpAndSettle();
+    expect(isExpanded(), isFalse);
+
+    ScrollUpdateNotification(
+      metrics: scrollPosition,
+      context: scrollContext,
+      scrollDelta: -16,
     ).dispatch(scrollContext);
     await tester.pumpAndSettle();
     expect(isExpanded(), isTrue);
