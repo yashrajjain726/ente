@@ -5,9 +5,8 @@ import "package:hugeicons/hugeicons.dart";
 import "package:photos/service_locator.dart";
 import "package:photos/services/notification_service.dart";
 import "package:photos/ui/home/memories/memory_cover_widget.dart";
-import "package:rive/rive.dart" as rive;
 
-class CraftMemories extends StatefulWidget {
+class CraftMemories extends StatelessWidget {
   final double width;
   final double height;
   final VoidCallback? onNotificationsPermissionGranted;
@@ -20,28 +19,6 @@ class CraftMemories extends StatefulWidget {
   });
 
   @override
-  State<CraftMemories> createState() => _CraftMemoriesState();
-}
-
-class _CraftMemoriesState extends State<CraftMemories> {
-  late final rive.FileLoader _riveFileLoader;
-
-  @override
-  void initState() {
-    super.initState();
-    _riveFileLoader = rive.FileLoader.fromAsset(
-      "assets/memories.riv",
-      riveFactory: rive.Factory.rive,
-    );
-  }
-
-  @override
-  void dispose() {
-    _riveFileLoader.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     final l10n = context.strings;
     return Padding(
@@ -49,8 +26,8 @@ class _CraftMemoriesState extends State<CraftMemories> {
         horizontal: MemoryCoverWidget.gap / 2.0,
       ),
       child: SizedBox(
-        width: widget.width,
-        height: widget.height,
+        width: width,
+        height: height,
         child: ClipRRect(
           borderRadius: BorderRadius.circular(18),
           child: Stack(
@@ -61,8 +38,8 @@ class _CraftMemoriesState extends State<CraftMemories> {
                     if (await NotificationService.instance.requestPermissions(
                           context,
                         ) &&
-                        mounted) {
-                      widget.onNotificationsPermissionGranted?.call();
+                        context.mounted) {
+                      onNotificationsPermissionGranted?.call();
                     }
                   },
                   child: Stack(
@@ -73,7 +50,7 @@ class _CraftMemoriesState extends State<CraftMemories> {
                         ),
                       ),
                       Padding(
-                        padding: EdgeInsets.all(widget.width * 0.125),
+                        padding: EdgeInsets.all(width * 0.125),
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.end,
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -86,7 +63,7 @@ class _CraftMemoriesState extends State<CraftMemories> {
                                 package: TextStyles.fontPackage,
                                 color: Colors.white,
                                 fontWeight: FontWeight.w700,
-                                fontSize: widget.width * 0.115,
+                                fontSize: width * 0.115,
                                 height: 1,
                               ),
                             ),
@@ -97,7 +74,7 @@ class _CraftMemoriesState extends State<CraftMemories> {
                                 fontFamily: "Gochi Hand",
                                 package: TextStyles.fontPackage,
                                 color: Colors.white,
-                                fontSize: widget.width * 0.175,
+                                fontSize: width * 0.175,
                                 height: 1,
                               ),
                             ),
@@ -109,8 +86,8 @@ class _CraftMemoriesState extends State<CraftMemories> {
                               ),
                               child: Padding(
                                 padding: EdgeInsets.symmetric(
-                                  horizontal: widget.width * 0.125,
-                                  vertical: widget.width * 0.075,
+                                  horizontal: width * 0.125,
+                                  vertical: width * 0.075,
                                 ),
                                 child: Text(
                                   l10n.notifyMe,
@@ -119,7 +96,7 @@ class _CraftMemoriesState extends State<CraftMemories> {
                                     fontFamily: TextStyles.outfitFontFamily,
                                     package: TextStyles.fontPackage,
                                     color: Colors.white,
-                                    fontSize: widget.width * 0.11,
+                                    fontSize: width * 0.11,
                                     fontWeight: FontWeight.w500,
                                   ),
                                 ),
@@ -133,16 +110,16 @@ class _CraftMemoriesState extends State<CraftMemories> {
                 ),
               ),
               Positioned(
-                right: widget.width * 0.02,
-                top: widget.width * 0.02,
+                right: width * 0.02,
+                top: width * 0.02,
                 child: Tooltip(
                   message: l10n.close,
                   child: GestureDetector(
                     behavior: HitTestBehavior.opaque,
                     onTap: () async {
                       await localSettings.setCraftingMemoriesBannerDismissed();
-                      if (!mounted) return;
-                      widget.onNotificationsPermissionGranted?.call();
+                      if (!context.mounted) return;
+                      onNotificationsPermissionGranted?.call();
                     },
                     child: Padding(
                       padding: const EdgeInsets.all(8),
