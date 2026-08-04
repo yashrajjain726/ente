@@ -18,7 +18,7 @@ import { t } from "i18next";
 import React from "react";
 import type { UploadTypeSelectorIntent } from "../Upload";
 
-interface DefaultOptionsV2BaseProps {
+interface DefaultOptionsBaseProps {
     isFileSelectionPending: boolean;
     isFolderSelectionPending: boolean;
     onClose: () => void;
@@ -26,13 +26,13 @@ interface DefaultOptionsV2BaseProps {
     onSelectFolder: () => void;
 }
 
-type DefaultOptionsV2Props = DefaultOptionsV2BaseProps &
+type DefaultOptionsProps = DefaultOptionsBaseProps &
     (
         | { intent: UploadTypeSelectorIntent; onSelectGooglePhotos: () => void }
         | { intent: "collect"; onSelectGooglePhotos?: never }
     );
 
-export function DefaultOptionsV2({
+export function DefaultOptions({
     intent,
     isFileSelectionPending,
     isFolderSelectionPending,
@@ -40,12 +40,12 @@ export function DefaultOptionsV2({
     onSelectFiles,
     onSelectGooglePhotos,
     onSelectFolder,
-}: DefaultOptionsV2Props): React.JSX.Element {
+}: DefaultOptionsProps): React.JSX.Element {
     const usesUploadSpacing = intent == "upload" || intent == "collect";
 
     return (
         <Stack
-            data-default-options-v2
+            data-default-options
             sx={{
                 gap: usesUploadSpacing ? "20px" : "36px",
                 p: "20px",
@@ -127,7 +127,7 @@ export function DefaultOptionsV2({
 }
 
 type ImportOptionsProps = Pick<
-    DefaultOptionsV2BaseProps,
+    DefaultOptionsBaseProps,
     "isFolderSelectionPending" | "onSelectFolder"
 > & { onSelectGooglePhotos: () => void };
 
@@ -170,7 +170,7 @@ function ImportOptions({
 }
 
 type UploadOptionsProps = Pick<
-    DefaultOptionsV2BaseProps,
+    DefaultOptionsBaseProps,
     | "isFileSelectionPending"
     | "isFolderSelectionPending"
     | "onSelectFiles"
@@ -232,7 +232,7 @@ function UploadOptions({
 }
 
 type CollectOptionsProps = Pick<
-    DefaultOptionsV2BaseProps,
+    DefaultOptionsBaseProps,
     | "isFileSelectionPending"
     | "isFolderSelectionPending"
     | "onSelectFiles"

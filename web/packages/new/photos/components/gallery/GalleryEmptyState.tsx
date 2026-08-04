@@ -10,7 +10,7 @@ import { t } from "i18next";
 import React, { useEffect, useState } from "react";
 import { Trans } from "react-i18next";
 
-interface GalleryEmptyStateV2Props {
+interface GalleryEmptyStateProps {
     /**
      * If `true`, then an upload is already in progress (the empty state will
      * then disable the prompts for uploads).
@@ -41,10 +41,10 @@ const memoriesPreservedSince = (
     nextCount: number,
 ) => Math.max(0, nextCount - (initialCount ?? nextCount));
 
-export function GalleryEmptyStateV2({
+export function GalleryEmptyState({
     isUploadInProgress,
     onUpload,
-}: GalleryEmptyStateV2Props): React.JSX.Element {
+}: GalleryEmptyStateProps): React.JSX.Element {
     const handleImport = () => onUpload("import");
     const handleUpload = () => onUpload("upload");
 

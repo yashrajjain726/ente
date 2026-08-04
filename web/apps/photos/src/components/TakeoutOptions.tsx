@@ -9,21 +9,21 @@ import { FocusVisibleButton } from "ente-base/components/mui/FocusVisibleButton"
 import { t } from "i18next";
 import React from "react";
 
-interface TakeoutOptionsV2Props {
+interface TakeoutOptionsProps {
     onBack: () => void;
     onClose: () => void;
     onSelectFolder: () => void;
     onSelectZips: () => void;
 }
 
-export function TakeoutOptionsV2({
+export function TakeoutOptions({
     onBack,
     onClose,
     onSelectFolder,
     onSelectZips,
-}: TakeoutOptionsV2Props): React.JSX.Element {
+}: TakeoutOptionsProps): React.JSX.Element {
     return (
-        <Stack data-takeout-options-v2 sx={{ gap: "36px", p: "20px" }}>
+        <Stack data-takeout-options sx={{ gap: "36px", p: "20px" }}>
             <Stack
                 direction="row"
                 sx={{ alignItems: "center", justifyContent: "space-between" }}

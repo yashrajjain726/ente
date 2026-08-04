@@ -1,7 +1,7 @@
 import type { PreUploadSkippedFile } from "ente-base/types/ipc";
 import type { UploadPhase } from "ente-gallery/services/upload";
 import { useEffect, useState } from "react";
-import { UploadCompletionV2 } from "../UploadCompletionV2";
+import { UploadCompletion } from "../UploadCompletion";
 import type {
     InProgressUpload,
     SegregatedFinishedUploads,
@@ -30,13 +30,13 @@ interface UploadProgressProps {
 
 const emptyPreUploadSkippedFiles: PreUploadSkippedFile[] = [];
 
-export function UploadProgressV2(props: UploadProgressProps) {
+export function UploadProgress(props: UploadProgressProps) {
     if (!props.open) return null;
 
-    return <UploadProgress {...props} />;
+    return <UploadProgressBody {...props} />;
 }
 
-function UploadProgress({
+function UploadProgressBody({
     onClose,
     uploadCounter,
     uploadPhase,
@@ -93,7 +93,7 @@ function UploadProgress({
 
     if (uploadPhase == "done" && expanded && !summaryMode) {
         return (
-            <UploadCompletionV2
+            <UploadCompletion
                 open
                 onClose={onClose}
                 onReviewFailed={handleReviewFailed}

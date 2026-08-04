@@ -29,7 +29,7 @@ import { useMLStatusSnapshot } from "../utils/use-snapshot";
 import { useWrapAsyncOperation } from "../utils/use-wrap-async";
 import { GalleryItemsHeaderAdapter, GalleryItemsSummary } from "./ListHeader";
 
-export { GalleryEmptyStateV2 } from "./GalleryEmptyStateV2";
+export { GalleryEmptyState } from "./GalleryEmptyState";
 
 /**
  * Options to customize the behaviour of the remote pull that gets triggered on

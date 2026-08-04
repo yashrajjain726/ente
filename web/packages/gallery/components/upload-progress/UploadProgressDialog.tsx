@@ -34,16 +34,16 @@ export function UploadProgressDialog() {
             open
             onClose={handleClose}
             maxWidth={false}
-            aria-labelledby="upload-progress-v2-title"
+            aria-labelledby="upload-progress-title"
             slotProps={{ paper: { sx: uploadProgressDialogPaperSx } }}
         >
             <Box sx={uploadProgressDialogContentSx(isDone)}>
-                <UploadProgressV2Header />
+                <UploadProgressHeader />
                 {isDone ? (
                     <UploadProgressDetails />
                 ) : (
                     <Stack sx={{ gap: 3 }}>
-                        <UploadProgressV2Summary />
+                        <UploadProgressSummary />
                         <UploadProgressDetails />
                     </Stack>
                 )}
@@ -52,7 +52,7 @@ export function UploadProgressDialog() {
     );
 }
 
-function UploadProgressV2Header() {
+function UploadProgressHeader() {
     const { onClose, setExpanded, uploadPhase } = useUploadProgressContext();
     const isDone = uploadPhase == "done";
     const title = t(isDone ? "upload_details" : "file_upload");
@@ -62,7 +62,7 @@ function UploadProgressV2Header() {
     return (
         <Stack direction="row" sx={[headerSx, isDone && quietHeaderSx]}>
             <Typography
-                id="upload-progress-v2-title"
+                id="upload-progress-title"
                 component="h2"
                 sx={uploadTitleSx}
             >
@@ -88,7 +88,7 @@ function UploadProgressV2Header() {
     );
 }
 
-function UploadProgressV2Summary() {
+function UploadProgressSummary() {
     const context = useUploadProgressContext();
     const { uploadPhase, percentComplete } = context;
     const isUploading = uploadPhase == "uploading";
