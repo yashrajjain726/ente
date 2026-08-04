@@ -129,6 +129,8 @@ class LocalSettings {
   static const _kLocalGalleryGetStartedBannerDismissDuration = Duration(
     days: 7,
   );
+  static const _kCraftingMemoriesBannerDismissed =
+      'is_crafting_memories_banner_dismissed';
 
   final SharedPreferences _prefs;
 
@@ -697,5 +699,13 @@ class LocalSettings {
     } else {
       await _prefs.setString(_kDeletePreference, preference._serializedValue);
     }
+  }
+
+  Future<void> setCraftingMemoriesBannerDismissed() async {
+    await _prefs.setBool(_kCraftingMemoriesBannerDismissed, true);
+  }
+
+  Future<bool> getCraftingMemoriesBannerDismissed() async {
+    return _prefs.getBool(_kCraftingMemoriesBannerDismissed) ?? false;
   }
 }

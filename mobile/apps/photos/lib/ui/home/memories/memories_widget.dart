@@ -36,12 +36,12 @@ class _MemoriesWidgetState extends State<MemoriesWidget> {
   int _warmGeneration = 0;
   String? _lastWarmSignature;
   final _videoPrefetcher = MemoryVideoPrefetcher();
-  late Future<bool> _hasNotificationsPermissions;
+  late Future<bool> _showCraftMemories;
 
   @override
   void initState() {
     super.initState();
-    _refreshNotificationsPermissions();
+    _refreshShowCraftMemories();
     _memoriesSettingSubscription = Bus.instance
         .on<MemoriesSettingChanged>()
         .listen((event) {
@@ -65,9 +65,18 @@ class _MemoriesWidgetState extends State<MemoriesWidget> {
     });
   }
 
-  void _refreshNotificationsPermissions() {
-    _hasNotificationsPermissions = NotificationService.instance
+  void _refreshShowCraftMemories() {
+    _showCraftMemories = _getShowCraftMemories();
+  }
+
+  Future<bool> _getShowCraftMemories() async {
+    final hasPermissions = await NotificationService.instance
         .hasGrantedPermissions();
+    if (hasPermissions) return false;
+    final hasDismissed = await localSettings
+        .getCraftingMemoriesBannerDismissed();
+    if (hasDismissed) return false;
+    return true;
   }
 
   @override
@@ -216,9 +225,9 @@ class _MemoriesWidgetState extends State<MemoriesWidget> {
 
   Widget _buildMemories(List<SmartMemory> memories) {
     return FutureBuilder<bool>(
-      future: _hasNotificationsPermissions,
+      future: _showCraftMemories,
       builder: (context, snapshot) {
-        final hasNotificationsPermissions = snapshot.data ?? true;
+        final showCraftMemories = snapshot.data ?? false;
         return SizedBox(
           height: _memoryheight + MemoryCoverWidget.outerStrokeWidth * 2,
           child: ListView.builder(
@@ -229,24 +238,21 @@ class _MemoriesWidgetState extends State<MemoriesWidget> {
               parent: BouncingScrollPhysics(),
             ),
             scrollDirection: Axis.horizontal,
-            itemCount:
-                (hasNotificationsPermissions == false ? 1 : 0) +
-                memories.length,
+            itemCount: (showCraftMemories ? 1 : 0) + memories.length,
             itemBuilder: (context, itemIndex) {
-              if (hasNotificationsPermissions == false && itemIndex == 0) {
+              if (showCraftMemories && itemIndex == 0) {
                 return CraftMemories(
-                  width: _memoryWidth * 0.75,
+                  width: _memoryheight * 0.5,
                   height: _memoryheight,
                   onNotificationsPermissionGranted: () {
                     if (!mounted) return;
                     setState(() {
-                      _refreshNotificationsPermissions();
+                      _refreshShowCraftMemories();
                     });
                   },
                 );
               }
-              final memoryIndex =
-                  itemIndex - (hasNotificationsPermissions == false ? 1 : 0);
+              final memoryIndex = itemIndex - (showCraftMemories ? 1 : 0);
               return MemoryCoverWidget(
                 smartMemory: memories[memoryIndex],
                 allMemories: memories,
