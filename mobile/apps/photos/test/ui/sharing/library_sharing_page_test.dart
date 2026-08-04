@@ -98,7 +98,8 @@ void main() {
     expect(toggle.selected, isFalse);
 
     await tester.tap(find.text('Library sharing'));
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
 
     expect(find.text('Enable library sharing?'), findsOneWidget);
     expect(
@@ -392,14 +393,16 @@ void main() {
       metrics: scrollPosition,
       context: scrollContext,
       scrollDelta: 16,
+      dragDetails: DragUpdateDetails(globalPosition: Offset.zero),
     ).dispatch(scrollContext);
     await tester.pumpAndSettle();
-    expect(isExpanded(), isTrue);
+    expect(isExpanded(), isFalse);
 
     ScrollUpdateNotification(
       metrics: scrollPosition,
       context: scrollContext,
       scrollDelta: 16,
+      dragDetails: DragUpdateDetails(globalPosition: Offset.zero),
     ).dispatch(scrollContext);
     await tester.pumpAndSettle();
     expect(isExpanded(), isFalse);
@@ -408,6 +411,7 @@ void main() {
       metrics: scrollPosition,
       context: scrollContext,
       scrollDelta: -16,
+      dragDetails: DragUpdateDetails(globalPosition: Offset.zero),
     ).dispatch(scrollContext);
     await tester.pumpAndSettle();
     expect(isExpanded(), isFalse);
@@ -416,6 +420,7 @@ void main() {
       metrics: scrollPosition,
       context: scrollContext,
       scrollDelta: -16,
+      dragDetails: DragUpdateDetails(globalPosition: Offset.zero),
     ).dispatch(scrollContext);
     await tester.pumpAndSettle();
     expect(isExpanded(), isTrue);

@@ -255,6 +255,7 @@ class _LibrarySharingPageState extends State<LibrarySharingPage> {
               title: LibrarySharingStrings.librarySharing,
               subtitle: LibrarySharingStrings.shareAllYourAlbums,
               onTap: _toggleLibrarySharing,
+              showOnlyLoadingState: true,
               trailing: IgnorePointer(
                 child: ExcludeSemantics(
                   child: ToggleSwitchComponent(
