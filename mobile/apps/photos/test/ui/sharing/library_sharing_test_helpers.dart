@@ -19,6 +19,7 @@ class FakeLibrarySharingRepository implements LibrarySharingRepository {
   final List<int> sharedIDs = [];
   final List<int> unsharedIDs = [];
   final List<CollectionParticipantRole> sharedRoles = [];
+  final Set<int> automaticSharingBlockedIDs = {};
   Completer<void>? shareGate;
   Completer<List<Collection>>? loadGate;
   Object? loadFailure;
@@ -84,7 +85,7 @@ class FakeLibrarySharingRepository implements LibrarySharingRepository {
       automaticSharingEnabled;
 
   @override
-  Future<Set<int>> enableAutomaticSharing({
+  Future<EnableAutomaticSharingResult> enableAutomaticSharing({
     required LibrarySharingRecipient recipient,
     required CollectionParticipantRole role,
   }) async {
@@ -92,12 +93,16 @@ class FakeLibrarySharingRepository implements LibrarySharingRepository {
       recipient: recipient,
       roles: {
         for (final album in albums)
-          if (librarySharingRoleFor(album, recipient.userID) == null)
+          if (librarySharingRoleFor(album, recipient.userID) == null &&
+              !automaticSharingBlockedIDs.contains(album.id))
             album.id: role,
       },
     );
     automaticSharingEnabled = failures.isEmpty;
-    return failures;
+    return (
+      failedIDs: failures,
+      previouslyUnsharedIDs: automaticSharingBlockedIDs,
+    );
   }
 
   @override

@@ -1,4 +1,5 @@
 import 'package:ente_components/ente_components.dart';
+import 'package:ente_strings/ente_strings.dart';
 import 'package:flutter/material.dart';
 import 'package:photos/models/collection/collection.dart';
 import 'package:photos/ui/collections/album/list_item.dart';
@@ -140,6 +141,11 @@ class _LibrarySharingRoleList extends StatelessWidget {
           itemBuilder: (context, index) {
             final album = albums[index];
             final role = controller.stagedRoleFor(album.id);
+            final canEditRole = album.type != CollectionType.uncategorized;
+            final roleSelector = LibrarySharingRoleSelector(
+              role: role,
+              showChevron: canEditRole,
+            );
             return ThumbnailListItem(
               leading:
                   thumbnailBuilder?.call(context, album) ??
@@ -153,16 +159,20 @@ class _LibrarySharingRoleList extends StatelessWidget {
                   color: context.componentColors.textBase,
                 ),
               ),
-              trailing: IgnorePointer(
-                ignoring: controller.isMutating,
-                child: EntePopupMenuButton<CollectionParticipantRole>(
-                  optionsBuilder: () =>
-                      librarySharingRoleOptions(context, activeRole: role),
-                  onSelected: (role) =>
-                      controller.setRoleForAlbum(album.id, role),
-                  child: LibrarySharingRoleSelector(role: role),
-                ),
-              ),
+              trailing: canEditRole
+                  ? IgnorePointer(
+                      ignoring: controller.isMutating,
+                      child: EntePopupMenuButton<CollectionParticipantRole>(
+                        optionsBuilder: () => librarySharingRoleOptions(
+                          context,
+                          activeRole: role,
+                        ),
+                        onSelected: (role) =>
+                            controller.setRoleForAlbum(album.id, role),
+                        child: roleSelector,
+                      ),
+                    )
+                  : roleSelector,
             );
           },
         ),
@@ -195,6 +205,32 @@ Future<bool> confirmStopLibrarySharing({
             ],
           );
         },
+      ) ??
+      false;
+}
+
+Future<bool> showPreviouslyUnsharedAlbums({
+  required BuildContext context,
+  required int count,
+}) async {
+  return await showBottomSheetComponent<bool>(
+        context: context,
+        builder: (sheetContext) => BottomSheetComponent(
+          title: LibrarySharingStrings.previouslyUnsharedTitle(count),
+          message: LibrarySharingStrings.previouslyUnsharedMessage(count),
+          illustration: Image.asset('assets/warning-red.png'),
+          borderSide: BorderSide(
+            color: sheetContext.componentColors.strokeDark,
+          ),
+          actions: [
+            ButtonComponent(
+              label: sheetContext.strings.review,
+              density: ButtonComponentDensity.compact,
+              shouldSurfaceExecutionStates: false,
+              onTap: () => Navigator.of(sheetContext).pop(true),
+            ),
+          ],
+        ),
       ) ??
       false;
 }

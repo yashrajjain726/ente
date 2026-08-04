@@ -433,6 +433,26 @@ class CollectionsService {
     collections.sort(comparator);
   }
 
+  Future<List<Collection>> orderCollectionsForAlbums(
+    Iterable<Collection> collections,
+  ) async {
+    final sorted = collections.toList();
+    await sortCollectionsByAlbumPreferences(sorted);
+    return [
+      ...sorted.where(
+        (collection) => collection.type == CollectionType.favorites,
+      ),
+      ...sorted.where(
+        (collection) =>
+            collection.type != CollectionType.favorites && collection.isPinned,
+      ),
+      ...sorted.where(
+        (collection) =>
+            collection.type != CollectionType.favorites && !collection.isPinned,
+      ),
+    ];
+  }
+
   Future<Comparator<Collection>> _albumPreferenceComparator({
     AlbumSortKey? sortKey,
     AlbumSortDirection? sortDirection,
@@ -677,33 +697,17 @@ class CollectionsService {
   }
 
   Future<List<Collection>> getCollectionForOnEnteSection() async {
-    final List<Collection> collections = CollectionsService.instance
-        .getCollectionsForUI();
     final bool hasFavorites = FavoritesService.instance.hasFavorites();
-    await sortCollectionsByAlbumPreferences(collections);
-    final List<Collection> favorites = [];
-    final List<Collection> pinned = [];
-    final List<Collection> rest = [];
-    for (final collection in collections) {
-      if (collection.type == CollectionType.uncategorized ||
-          collection.isQuickLinkCollection() ||
-          collection.isHidden() ||
-          collection.isArchived()) {
-        continue;
-      }
-      if (collection.type == CollectionType.favorites) {
-        // Hide fav collection if it's empty
-        if (hasFavorites) {
-          favorites.add(collection);
-        }
-      } else if (collection.isPinned) {
-        pinned.add(collection);
-      } else {
-        rest.add(collection);
-      }
-    }
-
-    return favorites + pinned + rest;
+    return orderCollectionsForAlbums(
+      getCollectionsForUI().where(
+        (collection) =>
+            collection.type != CollectionType.uncategorized &&
+            !collection.isQuickLinkCollection() &&
+            !collection.isHidden() &&
+            !collection.isArchived() &&
+            (collection.type != CollectionType.favorites || hasFavorites),
+      ),
+    );
   }
 
   Future<List<Collection>> getCollectionForWidgetSelection() async {

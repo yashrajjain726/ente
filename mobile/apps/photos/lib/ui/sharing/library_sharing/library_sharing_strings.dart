@@ -21,6 +21,18 @@ abstract final class LibrarySharingStrings {
     'Hidden albums will not be shared. You can stop sharing any album at any time.',
   );
   static String get enable => pendingTranslation('Enable');
+  static String previouslyUnsharedTitle(int count) => switch (count) {
+    1 => pendingTranslation("1 album wasn't shared"),
+    _ => pendingTranslation("$count albums weren't shared"),
+  };
+  static String previouslyUnsharedMessage(int count) => switch (count) {
+    1 => pendingTranslation(
+      "Sharing was stopped for this album earlier, so it wasn't shared again.",
+    ),
+    _ => pendingTranslation(
+      "Sharing was stopped for these albums earlier, so they weren't shared again.",
+    ),
+  };
   static String sharedAlbumCount(int count) => switch (count) {
     0 => pendingTranslation('No albums shared'),
     1 => pendingTranslation('1 album shared'),

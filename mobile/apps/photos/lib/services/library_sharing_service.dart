@@ -30,6 +30,11 @@ const _reconcileEventSources = {
   'collection_visibility_changed',
 };
 
+typedef EnableAutomaticSharingResult = ({
+  Set<int> failedIDs,
+  Set<int> previouslyUnsharedIDs,
+});
+
 CollectionParticipantRole? librarySharingRoleFor(
   Collection collection,
   int userID,
@@ -42,6 +47,13 @@ CollectionParticipantRole? librarySharingRoleFor(
   }
   return null;
 }
+
+CollectionParticipantRole normalizeLibrarySharingRole(
+  Collection collection,
+  CollectionParticipantRole role,
+) => collection.type == CollectionType.uncategorized
+    ? CollectionParticipantRole.viewer
+    : role;
 
 abstract interface class LibrarySharingRepository {
   Future<List<Collection>> getEligibleAlbums();
@@ -58,7 +70,7 @@ abstract interface class LibrarySharingRepository {
 
   Future<bool> isAutomaticSharingEnabled(int recipientUserID);
 
-  Future<Set<int>> enableAutomaticSharing({
+  Future<EnableAutomaticSharingResult> enableAutomaticSharing({
     required LibrarySharingRecipient recipient,
     required CollectionParticipantRole role,
   });
@@ -104,9 +116,17 @@ class LibrarySharingService implements LibrarySharingRepository {
 
   @override
   Future<List<Collection>> getEligibleAlbums() async {
-    final albums = _eligibleAlbums().toList();
-    await _collectionsService.sortCollectionsByAlbumPreferences(albums);
-    return albums;
+    final collections = _eligibleAlbums().toList();
+    return [
+      ...await _collectionsService.orderCollectionsForAlbums(
+        collections.where(
+          (collection) => collection.type != CollectionType.uncategorized,
+        ),
+      ),
+      ...collections.where(
+        (collection) => collection.type == CollectionType.uncategorized,
+      ),
+    ];
   }
 
   @override
@@ -209,20 +229,20 @@ class LibrarySharingService implements LibrarySharingRepository {
   }
 
   @override
-  Future<Set<int>> enableAutomaticSharing({
+  Future<EnableAutomaticSharingResult> enableAutomaticSharing({
     required LibrarySharingRecipient recipient,
     required CollectionParticipantRole role,
   }) async {
-    final failedIDs = await _operationLock.synchronized(
+    final result = await _operationLock.synchronized(
       () => _enableAutomaticSharing(recipient, role),
     );
-    if (failedIDs.isEmpty) {
+    if (result.failedIDs.isEmpty) {
       await reconcile();
     }
-    return failedIDs;
+    return result;
   }
 
-  Future<Set<int>> _enableAutomaticSharing(
+  Future<EnableAutomaticSharingResult> _enableAutomaticSharing(
     LibrarySharingRecipient recipient,
     CollectionParticipantRole role,
   ) async {
@@ -265,7 +285,16 @@ class LibrarySharingService implements LibrarySharingRepository {
       ownerUserID,
       config.copyWith(enabled: failedIDs.isEmpty),
     );
-    return failedIDs;
+    final previouslyUnsharedIDs = collections
+        .where(
+          (collection) =>
+              config.unsharedBefore.contains(collection.id) &&
+              !config.hidden.contains(collection.id) &&
+              librarySharingRoleFor(collection, recipient.userID) == null,
+        )
+        .map((collection) => collection.id)
+        .toSet();
+    return (failedIDs: failedIDs, previouslyUnsharedIDs: previouslyUnsharedIDs);
   }
 
   @override
@@ -381,9 +410,10 @@ class LibrarySharingService implements LibrarySharingRepository {
       if (!config.hidden.contains(collection.id) &&
           !config.unsharedBefore.contains(collection.id) &&
           librarySharingRoleFor(collection, config.recipientUserID) == null)
-        collection.id: collection.type == CollectionType.uncategorized
-            ? CollectionParticipantRole.viewer
-            : config.defaultRole,
+        collection.id: normalizeLibrarySharingRole(
+          collection,
+          config.defaultRole,
+        ),
   };
 
   LibrarySharingLocalConfig _applyAutomaticShareResults(
@@ -463,8 +493,12 @@ class LibrarySharingService implements LibrarySharingRepository {
   }
 
   Iterable<Collection> _eligibleAlbums() => _collectionsService
-      .getCollectionsForUI(includeUncategorized: false)
-      .where(_isShareableAlbum);
+      .getCollectionsForUI(includeUncategorized: true)
+      .where(
+        (collection) =>
+            _isShareableAlbum(collection) ||
+            collection.type == CollectionType.uncategorized,
+      );
 
   Iterable<Collection> _automaticallyShareableOwnedCollections(
     int ownerUserID,
