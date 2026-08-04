@@ -1,5 +1,5 @@
+import { downloadAndSaveFiles } from "@/services/save";
 import type { AddSaveGroup } from "ente-gallery/components/utils/save-groups";
-import { downloadAndSaveFiles } from "ente-gallery/services/save";
 import type { EnteFile } from "ente-media/file";
 import { fileFileName, ItemVisibility } from "ente-media/file-metadata";
 import { FileType } from "ente-media/file-type";

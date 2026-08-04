@@ -7,6 +7,7 @@ import { ReferralSettings } from "@/components/sidebar/ReferralSettings";
 import { SessionsSettings } from "@/components/sidebar/SessionsSettings";
 import { TwoFactorSettings } from "@/components/sidebar/TwoFactorSettings";
 import { downloadAppDialogAttributes } from "@/components/utils/download";
+import exportService from "@/services/export";
 import {
     Delete02Icon,
     Download05Icon,
@@ -93,7 +94,6 @@ import {
     PseudoCollectionID,
     type CollectionSummaries,
 } from "ente-new/photos/services/collection-summary";
-import exportService from "ente-new/photos/services/export";
 import { isMLSupported } from "ente-new/photos/services/ml";
 import { performSidebarAction as performSidebarRegistryAction } from "ente-new/photos/services/search/sidebar-search-registry";
 import type { SidebarActionID } from "ente-new/photos/services/search/types";

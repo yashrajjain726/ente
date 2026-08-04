@@ -1,3 +1,4 @@
+import { downloadAndSaveCollectionFiles } from "@/services/save";
 import {
     CleanIcon,
     Delete02Icon,
@@ -33,7 +34,6 @@ import { SingleInputDialog } from "ente-base/components/SingleInputDialog";
 import { useModalVisibility } from "ente-base/components/utils/modal";
 import { useBaseContext } from "ente-base/context";
 import type { AddSaveGroup } from "ente-gallery/components/utils/save-groups";
-import { downloadAndSaveCollectionFiles } from "ente-gallery/services/save";
 import { uniqueFilesByID } from "ente-gallery/utils/file";
 import {
     CollectionOrder,
