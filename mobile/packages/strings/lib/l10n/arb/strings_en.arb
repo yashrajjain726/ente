@@ -207,6 +207,7 @@
   "after1Month": "After 1 month",
   "after1Week": "After 1 week",
   "after1Year": "After 1 year",
+  "albumDescriptionHint": "Enter a description for this album",
   "albumLayout": "Album layout",
   "albumOwner": "Owner",
   "@albumOwner": {
@@ -1235,6 +1236,7 @@
   "editAutoAddPeople": "Edit auto-add people",
   "editCodeAuthMessage": "Authenticate to edit code",
   "editContact": "Edit contact",
+  "editDetails": "Edit details",
   "editEmailAlreadyLinked": "This email is already linked to {name}.",
   "@editEmailAlreadyLinked": {
     "placeholders": {
@@ -3368,6 +3370,7 @@
     "description": "Label for save button"
   },
   "saveAsAnotherPerson": "Save as another person",
+  "saveChanges": "Save changes",
   "saveChangesBeforeLeavingQuestion": "Save changes before leaving?",
   "saveCode": "Save code",
   "saveCollage": "Save collage",
