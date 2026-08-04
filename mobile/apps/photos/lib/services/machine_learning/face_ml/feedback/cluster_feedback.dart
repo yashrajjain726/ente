@@ -68,6 +68,14 @@ class ClusterFeedbackService<T> {
     lastViewedClusterID = '';
   }
 
+  Future<Set<String>> _getExcludedSuggestionClusterIDs() async {
+    final results = await Future.wait([
+      mlDataDB.getBadFaceSingletonClusterIDs(),
+      mlDataDB.getClustersWithThreeOrMoreNotPersonFeedback(),
+    ]);
+    return results[0].union(results[1]);
+  }
+
   /// Returns a list of cluster suggestions for a person.
   Future<List<ClusterSuggestion>> getSuggestionForPerson(
     PersonEntity person, {
@@ -392,18 +400,23 @@ class ClusterFeedbackService<T> {
       final personToClusterIDsFuture = mlDataDB.getPersonToClusterIDs();
       final personToRejectedSuggestionsFuture = mlDataDB
           .getPersonToRejectedSuggestions();
+      final excludedSuggestionClusterIDsFuture =
+          _getExcludedSuggestionClusterIDs();
       final canUseVectorDbFuture =
           _canUseClusterCentroidVectorDbForSuggestions();
       await Future.wait<Object?>([
         allClusterIdsToCountMapFuture,
         personToClusterIDsFuture,
         personToRejectedSuggestionsFuture,
+        excludedSuggestionClusterIDsFuture,
         canUseVectorDbFuture,
       ], eagerError: false);
       final allClusterIdsToCountMap = await allClusterIdsToCountMapFuture;
       final personToClusterIDs = await personToClusterIDsFuture;
       final personToRejectedSuggestions =
           await personToRejectedSuggestionsFuture;
+      final excludedSuggestionClusterIDs =
+          await excludedSuggestionClusterIDsFuture;
       final canUseVectorDb = await canUseVectorDbFuture;
       if (!canUseVectorDb) {
         _logger.info(
@@ -414,6 +427,7 @@ class ClusterFeedbackService<T> {
           allClusterIdsToCountMap,
           personToClusterIDs,
           personToRejectedSuggestions,
+          excludedSuggestionClusterIDs,
         );
       }
 
@@ -446,9 +460,10 @@ class ClusterFeedbackService<T> {
       for (final clusters in personToClusterIDs.values) {
         assignedClustersToAnyPerson.addAll(clusters);
       }
-      final ignoredClustersForAverages = assignedClustersToAnyPerson.difference(
-        selectedPersonClusters,
-      );
+      final ignoredClustersForAverages = <String>{
+        ...assignedClustersToAnyPerson,
+        ...excludedSuggestionClusterIDs,
+      }.difference(selectedPersonClusters);
 
       final clusterAvg = await _getUpdateClusterAvg(
         allClusterIdsToCountMap,
@@ -513,6 +528,7 @@ class ClusterFeedbackService<T> {
           allClusterIdsToCountMap,
           personToClusterIDs,
           personToRejectedSuggestions,
+          excludedSuggestionClusterIDs,
         );
       }
 
@@ -575,7 +591,8 @@ class ClusterFeedbackService<T> {
         final ignored = <String>{}
           ..addAll(assignedClustersToAnyPerson)
           ..removeAll(entry.value)
-          ..addAll(personToRejectedSuggestions[entry.key] ?? const <String>{});
+          ..addAll(personToRejectedSuggestions[entry.key] ?? const <String>{})
+          ..addAll(excludedSuggestionClusterIDs);
         personIDToIgnoredClusters[entry.key] = ignored;
       }
 
@@ -1104,6 +1121,7 @@ class ClusterFeedbackService<T> {
     Map<String, int> allClusterIdsToCountMap,
     Map<String, Set<String>> personToClusterIDs,
     Map<String, Set<String>> personToRejectedSuggestions,
+    Set<String> excludedSuggestionClusterIDs,
   ) async {
     final personIdToBiggestCluster = <String, String>{};
     final biggestClusterToPersonID = <String, String>{};
@@ -1141,13 +1159,17 @@ class ClusterFeedbackService<T> {
       return [];
     }
     final allPersonClusters = biggestClusterToPersonID.keys.toSet();
-    final allOtherPersonClustersToIgnore = <String>{};
+    final allOtherPersonClustersToIgnore = <String>{
+      ...excludedSuggestionClusterIDs,
+    };
     for (final ignoredClusters in personIdToOtherPersonClusterIDs.values) {
       allOtherPersonClustersToIgnore.addAll(ignoredClusters);
     }
+    final ignoredClustersForAverages = allOtherPersonClustersToIgnore
+        .difference(allPersonClusters);
     final clusterAvg = await _getUpdateClusterAvg(
       allClusterIdsToCountMap,
-      allOtherPersonClustersToIgnore,
+      ignoredClustersForAverages,
       minClusterSize: kMinimumClusterSizeSearchResult,
     );
 
@@ -1526,10 +1548,14 @@ class ClusterFeedbackService<T> {
     // Get all the cluster data
     final allClusterIdsToCountMap = await mlDataDB.clusterIdToFaceCount();
     final ignoredClusters = await mlDataDB.getPersonIgnoredClusters(p.remoteID);
+    ignoredClusters.addAll(await _getExcludedSuggestionClusterIDs());
     final personClusters = await mlDataDB.getPersonClusterIDs(p.remoteID);
     if (personClusters.isEmpty) {
       return [];
     }
+    final ignoredClustersForAverages = ignoredClusters.difference(
+      personClusters,
+    );
     final personFaceIDs = await mlDataDB.getFaceIDsForPerson(p.remoteID);
     final personFileIDs = personFaceIDs.map(getFileIdFromFaceId<int>).toSet();
     w?.log(
@@ -1551,7 +1577,7 @@ class ClusterFeedbackService<T> {
           min(minimumSize, kMinimumClusterSizeSearchResult)) {
         clusterAvgBigClusters = await _getUpdateClusterAvg(
           allClusterIdsToCountMap,
-          ignoredClusters,
+          ignoredClustersForAverages,
           minClusterSize: minimumSize,
         );
         w?.log(

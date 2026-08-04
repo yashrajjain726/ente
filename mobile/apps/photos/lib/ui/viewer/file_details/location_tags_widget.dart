@@ -3,6 +3,7 @@ import "dart:ui";
 
 import "package:ente_components/ente_components.dart";
 import "package:ente_pure_utils/ente_pure_utils.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:flutter_animate/flutter_animate.dart";
 import "package:flutter_map/flutter_map.dart";
@@ -10,7 +11,6 @@ import "package:hugeicons/hugeicons.dart";
 import "package:latlong2/latlong.dart";
 import "package:photos/core/event_bus.dart";
 import "package:photos/events/location_tag_updated_event.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/models/file/file.dart";
 import "package:photos/service_locator.dart";
 import "package:photos/services/search_service.dart";
@@ -68,10 +68,7 @@ class _LocationTagsWidgetState extends State<LocationTagsWidget> {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(
-          title ?? AppLocalizations.of(context).location,
-          style: TextStyles.h2,
-        ),
+        Text(title ?? context.strings.location, style: TextStyles.h2),
         const SizedBox(height: Spacing.lg),
         FutureBuilder<List<Widget>>(
           future: locationTagChips,
@@ -111,13 +108,13 @@ class _LocationTagsWidgetState extends State<LocationTagsWidget> {
     if (locationTags.isEmpty) {
       if (mounted) {
         setState(() {
-          title = AppLocalizations.of(context).location;
+          title = context.strings.location;
         });
       }
       if (!mounted) return const [];
       return [
         FilterChipComponent(
-          label: AppLocalizations.of(context).addLocation,
+          label: context.strings.addLocation,
           onChanged: (_) =>
               showAddLocationSheet(context, widget.file.location!),
         ),
@@ -125,7 +122,7 @@ class _LocationTagsWidgetState extends State<LocationTagsWidget> {
     } else {
       if (mounted) {
         setState(() {
-          title = AppLocalizations.of(context).location;
+          title = context.strings.location;
         });
       }
       final result = locationTags
@@ -308,15 +305,13 @@ class _InfoMapState extends State<InfoMap> {
                                         if (!context.mounted) return;
                                         showShortToast(
                                           context,
-                                          AppLocalizations.of(
-                                            context,
-                                          ).somethingWentWrong,
+                                          context.strings.somethingWentWrong,
                                         );
                                       }
                                     },
                                     child: Center(
                                       child: Text(
-                                        AppLocalizations.of(context).enableMaps,
+                                        context.strings.enableMaps,
                                         style: getEnteTextTheme(context).small,
                                       ),
                                     ),

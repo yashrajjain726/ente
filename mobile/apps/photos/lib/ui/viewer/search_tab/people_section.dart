@@ -2,9 +2,9 @@ import "dart:async";
 
 import "package:ente_components/theme/text_styles.dart";
 import "package:ente_pure_utils/ente_pure_utils.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:photos/events/event.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/models/file/file.dart";
 import "package:photos/models/ml/face/person.dart";
 import "package:photos/models/search/generic_search_result.dart";
@@ -15,6 +15,7 @@ import "package:photos/models/search/search_types.dart";
 import "package:photos/models/selected_people.dart";
 import "package:photos/service_locator.dart" show isLocalGalleryMode;
 import "package:photos/theme/ente_theme.dart";
+import "package:photos/ui/components/collection_share_badge.dart";
 import "package:photos/ui/settings/ml/machine_learning_settings_page.dart";
 import "package:photos/ui/viewer/actions/select_all_status_icon.dart";
 import "package:photos/ui/viewer/file/no_thumbnail_widget.dart";
@@ -184,6 +185,8 @@ class PersonSearchExample extends StatelessWidget {
     final bool isCluster =
         searchResult.type() == ResultType.faces &&
         searchResult.params.containsKey(kClusterParamId);
+    final bool isPinnedPerson =
+        !isCluster && (searchResult.params[kPersonPinned] as bool? ?? false);
 
     return ListenableBuilder(
       listenable: selectedPeople ?? ValueNotifier(false),
@@ -276,6 +279,8 @@ class PersonSearchExample extends StatelessWidget {
                           : null,
                     ),
                   ),
+                  if (isPinnedPerson)
+                    const Positioned(left: 8, bottom: 8, child: PinnedBadge()),
                 ],
               ),
               isCluster
@@ -318,7 +323,7 @@ class PersonSearchExample extends StatelessWidget {
                             child: Padding(
                               padding: const EdgeInsets.only(top: 6, bottom: 0),
                               child: Text(
-                                AppLocalizations.of(context).addName,
+                                context.strings.addName,
                                 maxLines: 1,
                                 textAlign: TextAlign.center,
                                 overflow: TextOverflow.ellipsis,

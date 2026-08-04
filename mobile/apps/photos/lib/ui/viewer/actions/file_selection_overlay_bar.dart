@@ -1,9 +1,9 @@
 import "dart:io";
 
 import "package:ente_components/ente_components.dart" as components;
+import "package:ente_strings/ente_strings.dart";
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import "package:photos/generated/l10n.dart";
 import 'package:photos/models/collection/collection.dart';
 import 'package:photos/models/gallery_type.dart';
 import "package:photos/models/ml/face/person.dart";
@@ -296,7 +296,7 @@ class _SelectAllButtonState extends State<SelectAllButton> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                AppLocalizations.of(context).selectAllShort,
+                context.strings.selectAllShort,
                 style: components.TextStyles.mini.copyWith(
                   color: colors.textBase,
                 ),

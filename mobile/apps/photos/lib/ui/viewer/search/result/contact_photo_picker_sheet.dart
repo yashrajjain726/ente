@@ -1,8 +1,8 @@
 import "dart:math" as math;
 
 import "package:ente_components/ente_components.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/models/file/file.dart";
 import "package:photos/models/file_load_result.dart";
 import "package:photos/models/selected_files.dart";
@@ -59,7 +59,7 @@ class _ContactPhotoPickerSheetState extends State<_ContactPhotoPickerSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
+    final l10n = context.strings;
     final screenHeight = MediaQuery.sizeOf(context).height;
     final sheetHeight = math.min(screenHeight * 0.78, screenHeight - 80);
 

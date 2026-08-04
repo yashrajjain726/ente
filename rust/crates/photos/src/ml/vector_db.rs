@@ -45,10 +45,7 @@ impl VectorDB {
 
         if file_exists {
             println!("Loading index from disk.");
-            // Must use load() instead of view() because:
-            // - view() creates a read-only memory-mapped view (immutable)
-            // - load() loads the index into RAM for read/write operations (mutable)
-            // Using view() causes "Can't add to an immutable index" error
+            // `view` is immutable, but the reloaded index must remain writable.
             db.index
                 .load(file_path)
                 .map_err(|e| format!("Failed to load index from {file_path}: {e}"))?;
@@ -60,7 +57,6 @@ impl VectorDB {
     }
 
     fn save_index(&self) -> Result<(), String> {
-        // Ensure directory exists
         if let Some(parent) = self.path.parent() {
             std::fs::create_dir_all(parent).map_err(|e| {
                 format!(
@@ -70,9 +66,7 @@ impl VectorDB {
             })?;
         }
 
-        // Use atomic write: save to temp file first, then rename
-        // Use a unique temp path per save so concurrent saves can never race
-        // by clobbering the same temporary file.
+        // Unique temp paths prevent concurrent saves from clobbering each other.
         let save_sequence = INDEX_SAVE_TEMP_COUNTER.fetch_add(1, Ordering::Relaxed);
         let temp_path =
             self.path
@@ -81,7 +75,6 @@ impl VectorDB {
             .to_str()
             .ok_or_else(|| format!("Invalid temp path: {}", temp_path.display()))?;
 
-        // Save to temporary file
         self.index.save(temp_path_str).map_err(|e| {
             let _ = std::fs::remove_file(&temp_path);
             format!(
@@ -90,10 +83,7 @@ impl VectorDB {
             )
         })?;
 
-        // Atomic rename - guaranteed atomic on iOS/Android
-        // This will atomically replace the existing file
-        // The rename ensures we never have a partially written file,
-        // even if the app is suspended or crashes
+        // Renaming prevents a suspension or crash from leaving a partial index.
         if let Err(e) = std::fs::rename(&temp_path, &self.path) {
             let _ = std::fs::remove_file(&temp_path);
             return Err(format!(
@@ -368,7 +358,6 @@ impl VectorDB {
         let mut contained_keys = Vec::with_capacity(potential_keys.len());
         let mut actual_query_count = 0;
 
-        // Fill embeddings directly into flat storage using slices
         for key in potential_keys {
             if self.index.contains(*key) {
                 let start_idx = actual_query_count * dimensions;
@@ -388,7 +377,6 @@ impl VectorDB {
         let mut closeby_keys = vec![Vec::with_capacity(max_result_size); actual_query_count];
         let mut distances = vec![Vec::with_capacity(max_result_size); actual_query_count];
 
-        // Search using slices and fill pre-allocated containers
         for i in 0..actual_query_count {
             let start_idx = i * dimensions;
             let end_idx = start_idx + dimensions;
@@ -401,8 +389,6 @@ impl VectorDB {
         Ok((contained_keys, closeby_keys, distances))
     }
 
-    /// Check if a vector with the given key exists in the index.
-    /// `true` if the index contains the vector with the given key, `false` otherwise.
     pub fn contains_vector(&self, key: u64) -> bool {
         self.index.contains(key)
     }

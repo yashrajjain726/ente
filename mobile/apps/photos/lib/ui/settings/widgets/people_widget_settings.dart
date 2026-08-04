@@ -1,10 +1,9 @@
 import "dart:async";
 
 import "package:ente_components/ente_components.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/foundation.dart";
 import 'package:flutter/material.dart';
-import "package:photos/generated/l10n.dart";
-import "package:photos/l10n/l10n.dart";
 import "package:photos/models/selected_people.dart";
 import "package:photos/service_locator.dart";
 import "package:photos/services/home_widget_service.dart";
@@ -72,7 +71,7 @@ class _PeopleWidgetSettingsState extends State<PeopleWidgetSettings> {
                       : _selectedPeople.personIds.isNotEmpty;
 
                   return ButtonComponent(
-                    label: AppLocalizations.of(context).save,
+                    label: context.strings.save,
                     shouldSurfaceExecutionStates: false,
                     isDisabled: !areIdsChanged,
                     onTap: areIdsChanged
@@ -92,10 +91,10 @@ class _PeopleWidgetSettingsState extends State<PeopleWidgetSettings> {
             )
           : null,
       body: AppBarComponent(
-        title: AppLocalizations.of(context).people,
+        title: context.strings.people,
         subtitle: hasInstalledAny
-            ? AppLocalizations.of(context).peopleWidgetDesc
-            : context.l10n.addPeopleWidgetPrompt,
+            ? context.strings.peopleWidgetDesc
+            : context.strings.addPeopleWidgetPrompt,
         slivers: <Widget>[
           if (!hasInstalledAny)
             SliverToBoxAdapter(
@@ -119,7 +118,7 @@ class _PeopleWidgetSettingsState extends State<PeopleWidgetSettings> {
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(16, 18, 16, 8),
                   child: MenuComponent(
-                    title: AppLocalizations.of(context).showTextOnWidget,
+                    title: context.strings.showTextOnWidget,
                     trailing: ToggleSwitchComponent(
                       selected: _showText,
                       onChanged: (showText) async {

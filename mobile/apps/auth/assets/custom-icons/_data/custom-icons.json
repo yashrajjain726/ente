@@ -705,6 +705,14 @@
       ]
     },
     {
+      "title": "DonanımHaber",
+      "slug": "donanimhaber",
+      "altNames": [
+        "Donanım Haber",
+        "Donanim Haber"
+      ]
+    },
+    {
       "title": "Doppler"
     },
     {
@@ -1698,6 +1706,10 @@
       "slug": "oracle_cloud"
     },
     {
+      "title": "Palform",
+      "slug": "palform"
+    },
+    {
       "title": "Pangolin",
       "slug": "pangolin"
     },
@@ -2469,11 +2481,26 @@
         "uscis.gov"
       ]
     },
+      {
+      "title": "UU",
+      "altNames": [
+        "Utrecht University",
+        "Universiteit Utrecht",
+        "uu"
+      ]
+    },
     {
       "title": "Venice AI",
       "slug": "venice_ai",
       "altNames": [
         "Venice.ai"
+      ]
+    },
+    {
+      "title": "VGen",
+      "slug": "vgen",
+      "altNames": [
+        "vgen.co"
       ]
     },
     {

@@ -1,6 +1,6 @@
 import "package:ente_components/ente_components.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/ui/collections/collection_action_sheet.dart";
 import "package:photos/ui/tabs/albums/empty_states/empty_state_feature_row.dart";
 
@@ -16,12 +16,12 @@ class SharedEmptyState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.componentColors;
-    final strings = AppLocalizations.of(context);
+    final strings = context.strings;
     final bottomPadding = 64 + MediaQuery.paddingOf(context).bottom + 32;
     final features = [
       strings.albumsSharedEmptyFeatureShareLovedOnes,
       strings.albumsSharedEmptyFeatureReactAndComment,
-      strings.albumsSharedEmptyFeaturePrivacy,
+      strings.albumsOnEnteEmptyFeaturePrivacy,
     ];
 
     return Align(

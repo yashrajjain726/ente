@@ -1,9 +1,9 @@
 import "package:dio/dio.dart";
 import "package:ente_components/ente_components.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/foundation.dart";
 import 'package:flutter/material.dart';
 import "package:flutter/services.dart";
-import "package:photos/generated/l10n.dart";
 import 'package:photos/models/button_result.dart';
 import 'package:photos/models/typedefs.dart';
 import "package:photos/module/download/manager.dart";
@@ -35,7 +35,7 @@ Future<ButtonResult?> showInfoDialog(
     buttons: [
       ButtonWidget(
         buttonType: ButtonType.secondary,
-        labelText: AppLocalizations.of(context).ok,
+        labelText: context.strings.ok,
         isInAlert: true,
         buttonAction: ButtonAction.first,
       ),
@@ -60,7 +60,7 @@ Future<ButtonResult?> showErrorDialog(
     buttons: [
       ButtonWidget(
         buttonType: ButtonType.secondary,
-        labelText: AppLocalizations.of(context).ok,
+        labelText: context.strings.ok,
         isInAlert: true,
         buttonAction: ButtonAction.first,
       ),
@@ -77,7 +77,7 @@ Future<ButtonResult?> showErrorDialogForException({
   String? message,
 }) async {
   String errorMessage =
-      message ?? AppLocalizations.of(context).tempErrorContactSupportIfPersists;
+      message ?? context.strings.tempErrorContactSupportIfPersists;
   if (exception is DioException &&
       exception.response != null &&
       exception.response!.data["code"] != null) {
@@ -86,14 +86,14 @@ Future<ButtonResult?> showErrorDialogForException({
   }
   return showDialogWidget(
     context: context,
-    title: AppLocalizations.of(context).error,
+    title: context.strings.error,
     icon: Icons.error_outline_outlined,
     body: errorMessage,
     isDismissible: isDismissible,
     buttons: [
       ButtonWidget(
         buttonType: ButtonType.secondary,
-        labelText: AppLocalizations.of(context).ok,
+        labelText: context.strings.ok,
         isInAlert: true,
       ),
     ],
@@ -110,7 +110,7 @@ String parseErrorForUI(
     return genericError;
   }
   if (error.toString() == DownloadManager.applePhotosUnsupportedResourceError) {
-    return AppLocalizations.of(context).applePhotosUnsupportedResource;
+    return context.strings.applePhotosUnsupportedResource;
   }
   if (error is DioException) {
     final DioException dioError = error;
@@ -119,9 +119,9 @@ String parseErrorForUI(
         dioError.type == DioExceptionType.sendTimeout ||
         dioError.type == DioExceptionType.cancel) {
       if (dioError.error.toString().contains('Failed host lookup')) {
-        return AppLocalizations.of(context).networkHostLookUpErr;
+        return context.strings.networkHostLookUpErr;
       } else if (dioError.error.toString().contains('SocketException')) {
-        return AppLocalizations.of(context).networkConnectionRefusedErr;
+        return context.strings.networkConnectionRefusedErr;
       }
     }
   }
@@ -164,33 +164,31 @@ Future<ButtonResult?> showGenericErrorDialog({
 }) async {
   final errorBody = parseErrorForUI(
     context,
-    AppLocalizations.of(
-      context,
-    ).itLooksLikeSomethingWentWrongPleaseRetryAfterSome,
+    context.strings.itLooksLikeSomethingWentWrongPleaseRetryAfterSome,
     error: error,
   );
 
   final ButtonResult? result = await showDialogWidget(
     context: context,
-    title: AppLocalizations.of(context).error,
+    title: context.strings.error,
     icon: Icons.error_outline_outlined,
     body: errorBody,
     isDismissible: isDismissible,
     buttons: [
       ButtonWidget(
         buttonType: ButtonType.primary,
-        labelText: AppLocalizations.of(context).ok,
+        labelText: context.strings.ok,
         buttonAction: ButtonAction.first,
         isInAlert: true,
       ),
       ButtonWidget(
         buttonType: ButtonType.secondary,
-        labelText: AppLocalizations.of(context).contactSupport,
+        labelText: context.strings.contactSupport,
         buttonAction: ButtonAction.second,
         onTap: () async {
           await sendLogs(
             context,
-            AppLocalizations.of(context).contactSupport,
+            context.strings.contactSupport,
             "support@ente.com",
             postShare: () {},
           );
@@ -207,24 +205,22 @@ Future<void> showGenericErrorBottomSheet({
 }) async {
   final errorBody = parseErrorForUI(
     context,
-    AppLocalizations.of(
-      context,
-    ).itLooksLikeSomethingWentWrongPleaseRetryAfterSome,
+    context.strings.itLooksLikeSomethingWentWrongPleaseRetryAfterSome,
     error: error,
   );
   await showAlertBottomSheet(
     context,
-    title: AppLocalizations.of(context).error,
+    title: context.strings.error,
     message: errorBody,
     assetPath: 'assets/warning-grey.png',
     buttons: [
       ButtonWidgetV2(
         buttonType: ButtonTypeV2.secondary,
-        labelText: AppLocalizations.of(context).contactSupport,
+        labelText: context.strings.contactSupport,
         onTap: () async {
           await sendLogs(
             context,
-            AppLocalizations.of(context).contactSupport,
+            context.strings.contactSupport,
             "support@ente.com",
             postShare: () {},
           );

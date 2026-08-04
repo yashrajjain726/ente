@@ -2,6 +2,7 @@ import "dart:async";
 import "dart:typed_data";
 
 import "package:ente_components/ente_components.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:hugeicons/hugeicons.dart";
 import "package:logging/logging.dart";
@@ -9,7 +10,6 @@ import "package:photos/core/event_bus.dart";
 import "package:photos/db/ml/db.dart";
 import "package:photos/db/offline_files_db.dart";
 import "package:photos/events/people_changed_event.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/models/base/id.dart";
 import "package:photos/models/file/file.dart";
 import "package:photos/models/ml/face/face.dart";
@@ -144,7 +144,7 @@ class _FacesItemWidgetState extends State<FacesItemWidget> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            Text(AppLocalizations.of(context).people, style: TextStyles.h2),
+            Text(context.strings.people, style: TextStyles.h2),
             _editStateButton(),
           ],
         ),
@@ -298,7 +298,7 @@ class _FacesItemWidgetState extends State<FacesItemWidget> {
   }
 
   Widget _buildNoFacesWidget() {
-    final l10n = AppLocalizations.of(context);
+    final l10n = context.strings;
     final reason = _errorReason ?? NoFacesReason.noFacesFound;
     final showManualTagOption =
         !isLocalGalleryMode &&
@@ -401,7 +401,7 @@ class _FacesItemWidgetState extends State<FacesItemWidget> {
             child: Row(
               children: [
                 Text(
-                  AppLocalizations.of(context).otherDetectedFaces,
+                  context.strings.otherDetectedFaces,
                   style: TextStyles.bodyBold,
                 ),
                 const Spacer(),
@@ -451,7 +451,7 @@ class _FacesItemWidgetState extends State<FacesItemWidget> {
             const SizedBox(width: 8),
           ],
           ButtonComponent(
-            label: AppLocalizations.of(context).done,
+            label: context.strings.done,
             variant: ButtonComponentVariant.link,
             size: ButtonComponentSize.small,
             shouldSurfaceExecutionStates: false,
@@ -516,7 +516,7 @@ class _FacesItemWidgetState extends State<FacesItemWidget> {
     final selectedFaces = _selectedFaceInfos();
     if (selectedFaces.isEmpty) return;
 
-    final l10n = AppLocalizations.of(context);
+    final l10n = context.strings;
     final multiple = selectedFaces.length > 1;
     final result = await showChoiceActionSheet(
       context,
@@ -608,7 +608,7 @@ class _FacesItemWidgetState extends State<FacesItemWidget> {
   }
 
   String _bulkIgnoreProgressMessage(
-    AppLocalizations l10n,
+    StringsLocalizations l10n,
     int completed,
     int total,
   ) {
@@ -801,11 +801,11 @@ class _FacesItemWidgetState extends State<FacesItemWidget> {
   Future<void> _onRemoveManualPerson(PersonEntity person) async {
     final result = await showChoiceActionSheet(
       context,
-      title: AppLocalizations.of(context).removePersonTag,
-      body: AppLocalizations.of(context).areYouSureRemoveThisPersonTag,
-      firstButtonLabel: AppLocalizations.of(context).remove,
+      title: context.strings.removePersonTag,
+      body: context.strings.areYouSureRemoveThisPersonTag,
+      firstButtonLabel: context.strings.remove,
       firstButtonType: ButtonType.critical,
-      secondButtonLabel: AppLocalizations.of(context).cancel,
+      secondButtonLabel: context.strings.cancel,
       isCritical: true,
     );
     if (result?.action == ButtonAction.first) {
@@ -877,7 +877,7 @@ class _ManualPersonTag extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = getEnteColorScheme(context);
     final displayName = person.data.isIgnored
-        ? '(' + AppLocalizations.of(context).ignored + ')'
+        ? '(' + context.strings.ignored + ')'
         : person.data.name.trim();
 
     return Semantics(
@@ -962,14 +962,14 @@ enum NoFacesReason {
 String getNoFaceReasonText(BuildContext context, NoFacesReason reason) {
   switch (reason) {
     case NoFacesReason.fileNotUploaded:
-      return AppLocalizations.of(context).fileNotUploadedYet;
+      return context.strings.fileNotUploadedYet;
     case NoFacesReason.fileNotAnalyzed:
-      return AppLocalizations.of(context).imageNotAnalyzed;
+      return context.strings.imageNotAnalyzed;
     case NoFacesReason.noFacesFound:
-      return AppLocalizations.of(context).noFacesFound;
+      return context.strings.noFacesFound;
     case NoFacesReason.faceThumbnailGenerationFailed:
-      return AppLocalizations.of(context).faceThumbnailGenerationFailed;
+      return context.strings.faceThumbnailGenerationFailed;
     case NoFacesReason.fileAnalysisFailed:
-      return AppLocalizations.of(context).fileAnalysisFailed;
+      return context.strings.fileAnalysisFailed;
   }
 }

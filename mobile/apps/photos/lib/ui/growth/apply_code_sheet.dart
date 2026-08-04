@@ -1,10 +1,10 @@
 import "package:dio/dio.dart";
 import "package:ente_components/ente_components.dart";
 import "package:ente_pure_utils/ente_pure_utils.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:logging/logging.dart";
 import "package:photos/gateways/storage_bonus/models/storage_bonus.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/models/user_details.dart";
 import "package:photos/service_locator.dart";
 import "package:photos/ui/growth/code_success_screen.dart";
@@ -17,7 +17,7 @@ Future<bool?> showApplyCodeSheet(
   return showBottomSheetComponent<bool>(
     context: context,
     builder: (_) => BottomSheetComponent(
-      title: AppLocalizations.of(context).applyCodeTitle,
+      title: context.strings.applyCodeTitle,
       isKeyboardAware: true,
       content: _ApplyCodeContent(
         referralView: referralView,
@@ -99,16 +99,15 @@ class _ApplyCodeContentState extends State<_ApplyCodeContent> {
     } catch (e) {
       Logger("ApplyCodeSheet").severe("Failed to apply code", e);
       if (mounted) {
-        String errorMessage = AppLocalizations.of(context).failedToApplyCode;
+        String errorMessage = context.strings.failedToApplyCode;
         if (e is DioException &&
             e.response != null &&
             e.response!.data != null) {
           final code = e.response!.data["code"];
           if (code == "INVALID_CODE") {
-            errorMessage = AppLocalizations.of(context).invalidReferralCode;
+            errorMessage = context.strings.invalidReferralCode;
           } else if (code != null) {
-            errorMessage =
-                "${AppLocalizations.of(context).failedToApplyCode}: $code";
+            errorMessage = "${context.strings.failedToApplyCode}: $code";
           }
         }
         setState(() {
@@ -120,7 +119,7 @@ class _ApplyCodeContentState extends State<_ApplyCodeContent> {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
+    final l10n = context.strings;
 
     return Column(
       mainAxisSize: MainAxisSize.min,

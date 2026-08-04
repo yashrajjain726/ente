@@ -1,8 +1,8 @@
 import "package:ente_components/ente_components.dart";
 import "package:ente_pure_utils/ente_pure_utils.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/foundation.dart";
 import "package:flutter/material.dart";
-import "package:photos/l10n/l10n.dart";
 import "package:photos/ui/settings/components/settings_page_scaffold.dart";
 
 class LanguageSelectorPage extends StatelessWidget {
@@ -20,7 +20,7 @@ class LanguageSelectorPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SettingsPageScaffold(
-      title: context.l10n.selectLanguage,
+      title: context.strings.selectLanguage,
       children: [
         ItemsWidget(supportedLocales, onLocaleChanged, currentLocale),
         const SizedBox(height: 12),

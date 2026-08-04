@@ -1,63 +1,35 @@
-//! Golden-output self-tests for accelerated ONNX execution providers.
-//!
-//! GPU drivers and execution providers can produce numerically wrong output
-//! while reporting success (for example, finite garbage from stale pipeline
-//! state, or fp16 overflow). Wrong embeddings would be persisted server-side
-//! and silently poison search and clustering, so before an accelerated
-//! session (WebGPU on Android, CoreML on iOS) is trusted, it must reproduce a
-//! committed golden output for a fixed input within a cosine-distance
-//! threshold. The golden outputs are generated on the CPU execution provider
-//! by `cargo run -p ente-photos --example ml_goldens -- generate`
-//! and committed in `golden_data.rs`. A cheap unit test in `golden_tooling`
-//! keeps the committed entries pinned (by file name and content hash) to the
-//! production models in `infra/ml/test/ml_indexing/assets.json`, so a model
-//! update cannot ship without regenerating the goldens.
-//!
-//! Inputs are deterministic seeded noise (token ids for CLIP text): the
-//! models are pure tensor programs without data-dependent control flow, so
-//! any fixed input exercises the same kernels as a real photo, and a shared
-//! generation function makes device and generator inputs bit-identical.
+//! Accelerated ONNX providers must reproduce CPU-generated golden outputs
+//! because drivers can return plausible but numerically corrupt results while
+//! reporting success. Deterministic inputs exercise the same kernels as real
+//! inputs because these models have no data-dependent control flow.
 
 use crate::ml::golden_data::GOLDEN_ENTRIES;
 
-// All thresholds are deliberately loose (a false rejection silently degrades
-// the device to CPU) and unvalidated against real accelerated hardware;
-// tighten them once field measurements exist. Corrupted output measures ~1.0
-// on the cosine and coordinate metrics, and orders of magnitude higher on
-// the confidence group (its expected norm is tiny).
-
-/// Maximum cosine distance between an accelerated session's embedding output
-/// and the CPU golden. Healthy fp16 divergence is around 1e-3.
+// False rejections fall back to CPU, so these unvalidated thresholds are
+// deliberately loose pending accelerated-hardware measurements. Healthy fp16
+// cosine and coordinate divergence is around 1e-3; corrupt output is around
+// 1.0 or higher.
 pub(crate) const COSINE_DISTANCE_THRESHOLD: f64 = 0.025;
 
-/// Maximum relative L2 error for the detector's non-confidence outputs (box
-/// coordinates, landmarks), whose absolute values are consumed directly.
-/// Well-conditioned: healthy fp16 divergence is around 1e-3.
 pub(crate) const RELATIVE_L2_THRESHOLD: f64 = 0.1;
 
-/// Maximum relative L2 error for the detector's confidence group. All its
-/// values are tiny background sigmoid outputs (samples <= ~2e-3), whose
-/// relative error is roughly the absolute drift of the underlying logit, so
-/// healthy fp16 pipelines can plausibly measure O(0.1..1) here (a full
-/// flush-to-zero is exactly 1.0 and functionally harmless), while defects
-/// that inflate confidences measure >= ~45 against the tiny expected norm.
-/// Deliberately loose within that gap, pending real-hardware measurements.
+// Background confidence samples are <= ~2e-3, making healthy fp16 relative
+// error O(0.1..1); full flush-to-zero is 1.0, while inflated confidences are
+// >= ~45.
 pub(crate) const CONFIDENCE_RELATIVE_L2_THRESHOLD: f64 = 2.0;
 
-/// Reference outputs are compared on a deterministic strided sample capped at
-/// this many elements, so large detector outputs stay small in the committed
-/// golden data. Embedding outputs fit entirely below the cap.
 const MAX_REFERENCE_SAMPLES: usize = 4096;
 
-/// The fixed input for a golden self-test.
 pub enum GoldenInput {
-    /// Uniform [0, 1) noise from [`seeded_noise`], sized to `input_shape`.
-    SeededF32 { seed: u64 },
+    SeededF32 {
+        seed: u64,
+    },
     /// Pre-tokenized CLIP text token ids.
-    I32 { data: &'static [i32] },
+    I32 {
+        data: &'static [i32],
+    },
 }
 
-/// How a model's output is compared against its golden output.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum GoldenMetric {
     /// For embedding outputs, which downstream code consumes via cosine
@@ -80,8 +52,6 @@ impl GoldenMetric {
         }
     }
 
-    /// The loosest accepted distance; separation checks must measure beyond
-    /// this. [`compare_output`] applies the per-group thresholds.
     pub fn threshold(self) -> f64 {
         match self {
             Self::CosineDistance => COSINE_DISTANCE_THRESHOLD,
@@ -90,31 +60,18 @@ impl GoldenMetric {
     }
 }
 
-/// A committed golden record for one model file.
 pub struct GoldenEntry {
-    /// The model's canonical file name; entries are keyed by file name so
-    /// that a model update (which changes the file name) can never silently
-    /// reuse a stale golden: the lookup misses and the accelerated provider
-    /// is denied.
+    /// A changed canonical name fails closed instead of reusing a stale golden.
     pub model_file: &'static str,
-    /// SHA-256 of the model file's contents, copied from the asset lock
-    /// (`infra/ml/test/ml_indexing/assets.json`) at generation time. Not
-    /// checked on device; a cheap unit test in `golden_tooling` compares it
-    /// against the asset lock so that a model content change — even under an
-    /// unchanged file name — fails CI until the goldens are regenerated.
+    /// Checked against the asset lock in CI, not on device.
     pub model_sha256: &'static str,
     pub input: GoldenInput,
     pub input_shape: &'static [i64],
     pub metric: GoldenMetric,
-    /// Length of the model's full first output, used to derive the sample
-    /// stride and to reject outputs of unexpected shape.
     pub output_len: usize,
-    /// Strided sample of the CPU-generated first output.
     pub expected_sample: &'static [f32],
 }
 
-/// Finds the golden entry for a model path. `None` means the model must not
-/// run on an accelerated execution provider.
 pub fn lookup(model_path: &str) -> Option<&'static GoldenEntry> {
     let file_name = std::path::Path::new(model_path).file_name()?.to_str()?;
     GOLDEN_ENTRIES
@@ -122,13 +79,9 @@ pub fn lookup(model_path: &str) -> Option<&'static GoldenEntry> {
         .find(|entry| matches_model_file(file_name, entry.model_file))
 }
 
-/// The app stores downloaded models under URL-derived sanitized names (see
-/// `RemoteAssetsService._urlToFileName` in the photos app): the protocol is
-/// stripped and every character outside `[A-Za-z0-9_]` — including dots —
-/// becomes `_`, e.g. `models_ente_com_yolov5s_face_640_640_static_b1_onnx`.
-/// An entry therefore matches when the sanitized on-disk name equals the
-/// sanitized canonical name, or ends with it at an `_` boundary (the URL host
-/// prefix). Exact canonical names (tests, tooling) also match.
+/// Downloaded model names include a sanitized URL prefix, so canonical names
+/// match at an underscore boundary as well as exactly. This mirrors
+/// `RemoteAssetsService._urlToFileName` in the photos app.
 fn matches_model_file(file_name: &str, model_file: &str) -> bool {
     if file_name == model_file {
         return true;
@@ -154,15 +107,12 @@ fn sanitize_file_name(value: &str) -> String {
         .collect()
 }
 
-/// A golden input materialized for one inference run. Built identically by
-/// the on-device self-test and the golden generator.
 pub enum PreparedGoldenInput {
     F32(Vec<f32>),
     I32(Vec<i32>),
 }
 
 impl PreparedGoldenInput {
-    /// A zero-filled input with the same element type and length.
     pub fn zeroed(&self) -> Self {
         match self {
             Self::F32(data) => Self::F32(vec![0.0; data.len()]),
@@ -171,7 +121,6 @@ impl PreparedGoldenInput {
     }
 }
 
-/// Materializes the entry's fixed input tensor data.
 pub fn prepare_input(entry: &GoldenEntry) -> Result<PreparedGoldenInput, String> {
     let element_count: i64 = entry.input_shape.iter().product();
     let element_count = usize::try_from(element_count)
@@ -210,8 +159,6 @@ pub fn seeded_noise(seed: u64, len: usize) -> Vec<f32> {
         .collect()
 }
 
-/// The deterministic sample of a full output that golden entries store and
-/// self-tests compare against.
 pub fn sample_output(output: &[f32]) -> Vec<f32> {
     let stride = sample_stride(output.len());
     output.iter().copied().step_by(stride).collect()
@@ -221,9 +168,6 @@ fn sample_stride(output_len: usize) -> usize {
     output_len.div_ceil(MAX_REFERENCE_SAMPLES).max(1)
 }
 
-/// Compares a session's full first output against a golden entry using the
-/// entry's metric. Returns the measured distance, or a description of why the
-/// output is rejected.
 pub fn compare_output(entry: &GoldenEntry, output: &[f32]) -> Result<f64, String> {
     let distances = measure_output(entry, output)?;
     match distances {
@@ -251,9 +195,6 @@ pub fn compare_output(entry: &GoldenEntry, output: &[f32]) -> Result<f64, String
     }
 }
 
-/// Measures an output's distance from the committed golden without applying
-/// the acceptance threshold. Useful for checking that a warm-up input's
-/// output is well separated from the golden output.
 pub fn output_distance(entry: &GoldenEntry, output: &[f32]) -> Result<f64, String> {
     Ok(match measure_output(entry, output)? {
         OutputDistances::Cosine(distance) => distance,
@@ -443,8 +384,6 @@ mod tests {
         entry_with_metric(GoldenMetric::CosineDistance, expected_sample, output_len)
     }
 
-    /// Downloaded models are stored under URL-derived sanitized names; the
-    /// canonical name must match both those and its plain form.
     #[test]
     fn matches_canonical_and_app_sanitized_model_file_names() {
         const CANONICAL: &str = "yolov5s_face_640_640_static_b1.onnx";
@@ -462,16 +401,12 @@ mod tests {
             "models_ente_com_mobileclip_s2_image_gelu_opset20_onnx",
             CANONICAL
         ));
-        // A different model whose name merely contains the canonical name
-        // without an underscore boundary must not match.
         assert!(!matches_model_file(
             "models_ente_com_xyolov5s_face_640_640_static_b1_onnx",
             CANONICAL
         ));
     }
 
-    /// No committed entry may match another entry's on-device name, otherwise
-    /// a model could be validated against the wrong golden.
     #[test]
     fn committed_entries_are_unambiguous_for_app_sanitized_names() {
         for entry in GOLDEN_ENTRIES {
@@ -494,7 +429,6 @@ mod tests {
         assert_eq!(first, second);
         assert!(first.iter().all(|value| (0.0..1.0).contains(value)));
         assert_ne!(first, seeded_noise(43, 1000));
-        // Not degenerate: values actually vary.
         assert!(first.iter().any(|value| *value > 0.9));
         assert!(first.iter().any(|value| *value < 0.1));
     }
@@ -574,9 +508,6 @@ mod tests {
         assert!(error.contains("zero vector"), "{error}");
     }
 
-    /// Cosine is scale-invariant by design (embedding consumers normalize),
-    /// so the detector entries must use relative L2, which rejects
-    /// magnitude-corrupted output.
     #[test]
     fn relative_l2_rejects_scale_corrupted_output_that_cosine_accepts() {
         static EXPECTED: [f32; 4] = [0.5, -1.0, 2.0, 0.25];
@@ -625,11 +556,6 @@ mod tests {
         )
     }
 
-    /// Background confidences flushed to zero measure exactly 1.0, below the
-    /// deliberately loose confidence threshold: some fp16 pipelines flush
-    /// subnormals, and a zeroed background score is functionally identical to
-    /// a tiny one. An all-zero *output* is still rejected via the coordinate
-    /// group.
     #[test]
     fn detector_metric_tolerates_fully_flushed_confidences() {
         static EXPECTED: [f32; 32] = [
@@ -667,8 +593,6 @@ mod tests {
         assert!(error.contains("detector confidence"), "{error}");
     }
 
-    /// Coordinate corruption must fail even where the looser confidence
-    /// threshold would accept it.
     #[test]
     fn detector_metric_keeps_the_strict_threshold_for_coordinates() {
         static EXPECTED: [f32; 32] = [
@@ -688,8 +612,6 @@ mod tests {
         assert!(error.contains("remaining"), "{error}");
     }
 
-    /// A confidence-group deviation beyond the coordinate threshold must
-    /// still be accepted (fp16 noise floor).
     #[test]
     fn detector_metric_tolerates_noise_floor_divergence_on_confidences() {
         static EXPECTED: [f32; 32] = [

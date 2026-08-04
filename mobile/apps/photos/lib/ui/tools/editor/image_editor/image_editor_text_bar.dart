@@ -1,7 +1,7 @@
 import "package:ente_components/ente_components.dart";
+import "package:ente_strings/ente_strings.dart";
 import 'package:flutter/material.dart';
 import "package:hugeicons/hugeicons.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/ui/tools/editor/image_editor/circular_icon_button.dart";
 import "package:photos/ui/tools/editor/image_editor/image_editor_color_picker.dart";
 import "package:photos/ui/tools/editor/image_editor/image_editor_configs_mixin.dart";
@@ -71,7 +71,7 @@ class _ImageEditorTextBarState extends State<ImageEditorTextBar>
       children: [
         CircularIconButton(
           hugeIcon: HugeIcons.strokeRoundedTextColor,
-          label: AppLocalizations.of(context).color,
+          label: context.strings.color,
           isSelected: selectedActionIndex == 0,
           onTap: () {
             _selectAction(0);
@@ -79,7 +79,7 @@ class _ImageEditorTextBarState extends State<ImageEditorTextBar>
         ),
         CircularIconButton(
           hugeIcon: HugeIcons.strokeRoundedTextFont,
-          label: AppLocalizations.of(context).font,
+          label: context.strings.font,
           isSelected: selectedActionIndex == 1,
           onTap: () {
             _selectAction(1);
@@ -87,7 +87,7 @@ class _ImageEditorTextBarState extends State<ImageEditorTextBar>
         ),
         CircularIconButton(
           hugeIcon: HugeIcons.strokeRoundedTextSquare,
-          label: AppLocalizations.of(context).background,
+          label: context.strings.background,
           isSelected: selectedActionIndex == 2,
           onTap: () {
             setState(() {
@@ -97,7 +97,7 @@ class _ImageEditorTextBarState extends State<ImageEditorTextBar>
         ),
         CircularIconButton(
           hugeIcon: HugeIcons.strokeRoundedTextAlignLeft,
-          label: AppLocalizations.of(context).align,
+          label: context.strings.align,
           isSelected: selectedActionIndex == 3,
           onTap: () {
             setState(() {

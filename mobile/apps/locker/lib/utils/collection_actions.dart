@@ -5,13 +5,13 @@ import "package:ente_components/ente_components.dart";
 import "package:ente_pure_utils/ente_pure_utils.dart";
 import "package:ente_sharing/components/invite_dialog.dart";
 import "package:ente_sharing/models/user.dart";
+import 'package:ente_strings/ente_strings.dart';
 import "package:ente_ui/components/buttons/button_widget.dart";
 import "package:ente_ui/components/progress_dialog.dart";
 import 'package:ente_ui/utils/dialog_util.dart';
 import "package:ente_ui/utils/toast_util.dart";
 import 'package:flutter/material.dart';
 import "package:locker/core/errors.dart";
-import 'package:locker/l10n/l10n.dart';
 import "package:locker/services/collections/collections_api_client.dart";
 import 'package:locker/services/collections/collections_service.dart';
 import 'package:locker/services/collections/models/collection.dart';
@@ -37,9 +37,9 @@ class CollectionActions {
 
     final result = await showTextInputSheet(
       context,
-      title: context.l10n.newCollection,
-      hintText: context.l10n.enterCollectionName,
-      submitButtonLabel: context.l10n.createCollection,
+      title: context.strings.newCollection,
+      hintText: context.strings.enterCollectionName,
+      submitButtonLabel: context.strings.createCollection,
       onSubmit: (String text) async {
         if (text.trim().isEmpty) {
           return;
@@ -74,7 +74,7 @@ class CollectionActions {
     Collection collection, {
     VoidCallback? onSuccess,
   }) async {
-    final l10n = context.l10n;
+    final l10n = context.strings;
     if (!collection.type.canEdit) {
       showToast(context, l10n.collectionCannotBeEdited);
       return;
@@ -122,13 +122,13 @@ class CollectionActions {
     VoidCallback? onSuccess,
   }) async {
     if (collections.isEmpty) return;
-    final l10n = context.l10n;
+    final l10n = context.strings;
 
     final dialogChoice = await showDeleteConfirmationSheet(
       context,
       title: l10n.areYouSure,
-      body: l10n.deleteMultipleCollectionsDialogBody(collections.length),
-      deleteButtonLabel: l10n.yesDeleteCollections(collections.length),
+      body: l10n.deleteMultipleCollectionsDialogBody(count: collections.length),
+      deleteButtonLabel: l10n.yesDeleteCollections(count: collections.length),
       illustration: LockerBottomSheetIllustration.collectionDelete,
       showDeleteFromAllCollectionsOption: true,
     );
@@ -213,7 +213,10 @@ class CollectionActions {
 
       if (context.mounted) {
         if (deletedCount > 0) {
-          showToast(context, l10n.collectionsDeletedSuccessfully(deletedCount));
+          showToast(
+            context,
+            l10n.collectionsDeletedSuccessfully(count: deletedCount),
+          );
         }
 
         if (isFavoriteCollection) {
@@ -235,7 +238,7 @@ class CollectionActions {
     Collection collection, {
     VoidCallback? onSuccess,
   }) async {
-    final l10n = context.l10n;
+    final l10n = context.strings;
     if (!collection.type.canDelete) {
       showToast(context, l10n.collectionCannotBeDeleted);
       return;
@@ -277,8 +280,8 @@ class CollectionActions {
     final result = await showDeleteConfirmationSheet(
       context,
       title: l10n.areYouSure,
-      body: l10n.deleteCollectionDialogBody(collectionName),
-      deleteButtonLabel: l10n.yesDeleteCollections(1),
+      body: l10n.deleteCollectionDialogBody(collectionName: collectionName),
+      deleteButtonLabel: l10n.yesDeleteCollections(count: 1),
       illustration: LockerBottomSheetIllustration.collectionDelete,
       showDeleteFromAllCollectionsOption: true,
     );
@@ -327,12 +330,12 @@ class CollectionActions {
     final confirmed = await showBottomSheetComponent(
       context: context,
       builder: (_) => BottomSheetComponent(
-        title: context.l10n.leaveCollection,
-        message: context.l10n.filesAddedByYouWillBeRemovedFromTheCollection,
+        title: context.strings.leaveCollection,
+        message: context.strings.filesAddedByYouWillBeRemovedFromTheCollection,
         illustration: LockerBottomSheetIllustration.warningGrey,
         actions: [
           ButtonComponent(
-            label: context.l10n.leaveCollection,
+            label: context.strings.leaveCollection,
             onTap: () => Navigator.of(context).pop(true),
           ),
         ],
@@ -343,7 +346,7 @@ class CollectionActions {
         await CollectionApiClient.instance.leaveCollection(collection);
         onSuccess?.call();
         if (context.mounted) {
-          showToast(context, context.l10n.leaveCollectionSuccessfully);
+          showToast(context, context.strings.leaveCollectionSuccessfully);
         }
       } catch (e) {
         _logger.severe("Failed to leave collection", e);
@@ -362,12 +365,12 @@ class CollectionActions {
     final confirmed = await showBottomSheetComponent(
       context: context,
       builder: (_) => BottomSheetComponent(
-        title: context.l10n.leaveCollection,
-        message: context.l10n.filesAddedByYouWillBeRemovedFromTheCollection,
+        title: context.strings.leaveCollection,
+        message: context.strings.filesAddedByYouWillBeRemovedFromTheCollection,
         illustration: LockerBottomSheetIllustration.warningGrey,
         actions: [
           ButtonComponent(
-            label: context.l10n.leaveCollection,
+            label: context.strings.leaveCollection,
             onTap: () => Navigator.of(context).pop(true),
           ),
         ],
@@ -382,7 +385,9 @@ class CollectionActions {
         if (context.mounted) {
           showToast(
             context,
-            context.l10n.leftCollectionsSuccessfully(collections.length),
+            context.strings.leftCollectionsSuccessfully(
+              count: collections.length,
+            ),
           );
         }
       } catch (e) {
@@ -427,14 +432,14 @@ class CollectionActions {
     final shouldRemove = await showBottomSheetComponent<bool>(
       context: context,
       builder: (_) => BottomSheetComponent(
-        title: context.l10n.removePublicLink,
-        message: context.l10n.removePublicLinkConfirmation(
-          collection.name ?? "this collection",
+        title: context.strings.removePublicLink,
+        message: context.strings.removePublicLinkConfirmation(
+          collectionName: collection.name ?? "this collection",
         ),
         illustration: LockerBottomSheetIllustration.warningGrey,
         actions: [
           ButtonComponent(
-            label: context.l10n.yesRemove,
+            label: context.strings.yesRemove,
             variant: ButtonComponentVariant.critical,
             onTap: () => Navigator.of(context).pop(true),
           ),
@@ -467,7 +472,7 @@ class CollectionActions {
     if (showProgress) {
       dialog = createProgressDialog(
         context,
-        context.l10n.sharing,
+        context.strings.sharing,
         isDismissible: true,
       );
       await dialog.show();
@@ -509,8 +514,8 @@ class CollectionActions {
         await showBottomSheetComponent(
           context: context,
           builder: (_) => BottomSheetComponent(
-            title: context.l10n.invalidEmailAddress,
-            message: context.l10n.enterValidEmail,
+            title: context.strings.invalidEmailAddress,
+            message: context.strings.enterValidEmail,
             illustration: LockerBottomSheetIllustration.warningBlue,
           ),
         );
@@ -521,8 +526,8 @@ class CollectionActions {
         await showBottomSheetComponent(
           context: context,
           builder: (_) => BottomSheetComponent(
-            title: context.l10n.oops,
-            message: context.l10n.youCannotShareWithYourself,
+            title: context.strings.oops,
+            message: context.strings.youCannotShareWithYourself,
             illustration: LockerBottomSheetIllustration.warningBlue,
           ),
         );
@@ -535,7 +540,7 @@ class CollectionActions {
     if (showProgress && context != null && context.mounted) {
       dialog = createProgressDialog(
         context,
-        context.l10n.sharing,
+        context.strings.sharing,
         isDismissible: true,
       );
       await dialog.show();

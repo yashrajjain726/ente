@@ -221,20 +221,24 @@ const ProfileStatsSkeleton: React.FC = () => (
     </Box>
 );
 
-interface PublicProfileAddFriendButtonProps {
-    isAddingFriend: boolean;
-    onAddFriend: () => void;
-    showSpinner: boolean;
+interface PublicProfileActionButtonProps {
+    disabled?: boolean;
+    label: string;
+    onClick: () => void;
+    showSpinner?: boolean;
 }
 
-const PublicProfileAddFriendButton: React.FC<
-    PublicProfileAddFriendButtonProps
-> = ({ isAddingFriend, onAddFriend, showSpinner }) => (
+const PublicProfileActionButton: React.FC<PublicProfileActionButtonProps> = ({
+    disabled = false,
+    label,
+    onClick,
+    showSpinner = false,
+}) => (
     <Box
         component="button"
         type="button"
-        disabled={isAddingFriend}
-        onClick={onAddFriend}
+        disabled={disabled}
+        onClick={onClick}
         sx={{
             alignItems: "center",
             appearance: "none",
@@ -242,7 +246,7 @@ const PublicProfileAddFriendButton: React.FC<
             border: 0,
             borderRadius: "14px",
             color: "#000",
-            cursor: isAddingFriend ? "default" : "pointer",
+            cursor: disabled ? "default" : "pointer",
             display: "flex",
             flexShrink: 0,
             fontFamily: '"Inter Variable", Inter, sans-serif',
@@ -253,14 +257,14 @@ const PublicProfileAddFriendButton: React.FC<
             lineHeight: "18px",
             px: "14px",
             py: "8px",
-            "&:hover": { bgcolor: isAddingFriend ? "#FFF" : "#F4F4F4" },
+            "&:hover": { bgcolor: disabled ? "#FFF" : "#F4F4F4" },
             "&:focus-visible": {
                 outline: `2px solid ${green}`,
                 outlineOffset: 2,
             },
         }}
     >
-        {showSpinner ? <SpaceButtonSpinner /> : "Add Friend"}
+        {showSpinner ? <SpaceButtonSpinner /> : label}
     </Box>
 );
 
@@ -453,6 +457,7 @@ interface ProfileScreenProps {
     onBack?: () => void;
     onAddFriend?: () => void;
     onAddFriendForPostAction?: (intent: SpaceInviteIntent) => void;
+    onCreateSpace?: () => void;
     onCreatePost?: (
         image: DraftSpacePostImage,
         caption: string,
@@ -478,6 +483,7 @@ interface ProfileScreenProps {
     postsCount?: number;
     profile: SetupProfile;
     profileLink?: string;
+    publicNotificationControl?: React.ReactNode;
 }
 
 export const ProfileScreen: React.FC<ProfileScreenProps> = ({
@@ -491,6 +497,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     onBack,
     onAddFriend,
     onAddFriendForPostAction,
+    onCreateSpace,
     onCreatePost,
     onDeletePost,
     onDraftPostPublished,
@@ -509,11 +516,14 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     postsCount,
     profile,
     profileLink,
+    publicNotificationControl,
     showAddingFriendSpinner = isAddingFriend,
     showPostLoadingIndicator,
 }) => {
     const [selectedPost, setSelectedPost] =
         useState<SelectedProfilePost | null>(null);
+    const [isDraftPostExitAnimating, setIsDraftPostExitAnimating] =
+        useState(false);
     const [isDraftPostExiting, setIsDraftPostExiting] = useState(false);
     const [isPostPhotoOpening, setIsPostPhotoOpening] = useState(false);
     const [deletedPostIDs, setDeletedPostIDs] = useState<Set<string>>(
@@ -661,6 +671,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     };
     const closeSelectedPost = () => {
         activeLocalPostObjectUrlRef.current = null;
+        setIsDraftPostExitAnimating(false);
         setIsDraftPostExiting(false);
         setSelectedPost(null);
         revokeLocalPostObjectUrls();
@@ -668,7 +679,9 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     const { clearBrowserBackState: clearSelectedPostHistory } =
         useBrowserBackClose({
             open: Boolean(selectedPost),
-            onClose: closeSelectedPost,
+            onClose: () => {
+                if (!isDraftPostExiting) closeSelectedPost();
+            },
             stateKey: "space-profile-viewer",
         });
     const rememberLoadedPhotoDimensions = (
@@ -996,7 +1009,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             }}
         >
             {selectedPost && (
-                <SpaceViewerFeedBackdrop exiting={isDraftPostExiting} />
+                <SpaceViewerFeedBackdrop exiting={isDraftPostExitAnimating} />
             )}
             <Box
                 sx={{
@@ -1151,13 +1164,21 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                     }}
                                 />
                             </Box>
-                            {onAddFriend && (
-                                <PublicProfileAddFriendButton
-                                    isAddingFriend={isAddingFriend}
-                                    onAddFriend={onAddFriend}
-                                    showSpinner={showAddingFriendSpinner}
-                                />
-                            )}
+                            {isAnonymousPublicProfile
+                                ? onCreateSpace && (
+                                      <PublicProfileActionButton
+                                          label="Create your Space"
+                                          onClick={onCreateSpace}
+                                      />
+                                  )
+                                : onAddFriend && (
+                                      <PublicProfileActionButton
+                                          disabled={isAddingFriend}
+                                          label="Add Friend"
+                                          onClick={onAddFriend}
+                                          showSpinner={showAddingFriendSpinner}
+                                      />
+                                  )}
                         </>
                     ) : (
                         <>
@@ -1674,6 +1695,15 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                 </Box>
                             </Box>
                         )}
+                        {isPublicProfile && publicNotificationControl && (
+                            <Box
+                                sx={{
+                                    display: selectedPost ? "none" : "contents",
+                                }}
+                            >
+                                {publicNotificationControl}
+                            </Box>
+                        )}
                     </Box>
                 </Box>
                 <Box
@@ -1955,6 +1985,9 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                 ? onAddFriendForPostAction
                                 : undefined
                         }
+                        onDraftPostExitAnimationStart={() => {
+                            setIsDraftPostExitAnimating(true);
+                        }}
                         onDraftPostExitStart={() => setIsDraftPostExiting(true)}
                         onDeletePost={
                             isOwnerProfile ? deleteSelectedPost : undefined

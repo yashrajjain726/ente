@@ -1,8 +1,8 @@
 import "package:dio/dio.dart";
 import "package:ente_components/ente_components.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:logging/logging.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/service_locator.dart";
 import "package:photos/utils/dialog_util.dart";
 
@@ -14,7 +14,7 @@ Future<bool?> showChangeReferralCodeSheet(
   return showBottomSheetComponent<bool>(
     context: context,
     builder: (_) => BottomSheetComponent(
-      title: AppLocalizations.of(context).changeYourReferralCode,
+      title: context.strings.changeYourReferralCode,
       isKeyboardAware: true,
       content: _ChangeReferralCodeContent(
         currentCode: currentCode,
@@ -90,13 +90,11 @@ class _ChangeReferralCodeContentState
       if (e is DioException) {
         if (e.response?.statusCode == 400) {
           setState(() {
-            _errorMessage = AppLocalizations.of(
-              context,
-            ).unavailableReferralCode;
+            _errorMessage = context.strings.unavailableReferralCode;
           });
         } else if (e.response?.statusCode == 429) {
           setState(() {
-            _errorMessage = AppLocalizations.of(context).codeChangeLimitReached;
+            _errorMessage = context.strings.codeChangeLimitReached;
           });
         } else {
           if (mounted) {
@@ -119,7 +117,7 @@ class _ChangeReferralCodeContentState
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
+    final l10n = context.strings;
 
     return Column(
       mainAxisSize: MainAxisSize.min,

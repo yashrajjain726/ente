@@ -520,29 +520,6 @@ func (r *FriendsRepository) ListSharesForFriendAndSpace(ctx context.Context, fri
 	return out, stacktrace.Propagate(rows.Err(), "")
 }
 
-func (r *FriendsRepository) ListFriendOwnerIDsForSpace(ctx context.Context, spaceID string) ([]int64, error) {
-	rows, err := r.DB.QueryContext(ctx, `
-		SELECT friend_space.owner_id
-		FROM space_friend_shares s
-		JOIN spaces friend_space ON friend_space.space_id = s.friend_space_id
-		JOIN users friend_owner ON friend_owner.user_id = friend_space.owner_id AND friend_owner.encrypted_email IS NOT NULL
-		WHERE s.space_id = $1
-	`, spaceID)
-	if err != nil {
-		return nil, stacktrace.Propagate(err, "")
-	}
-	defer rows.Close()
-	var out []int64
-	for rows.Next() {
-		var ownerID int64
-		if err := rows.Scan(&ownerID); err != nil {
-			return nil, stacktrace.Propagate(err, "")
-		}
-		out = append(out, ownerID)
-	}
-	return out, stacktrace.Propagate(rows.Err(), "")
-}
-
 func (r *FriendsRepository) ListFriendsForSpace(ctx context.Context, spaceID string) ([]SpaceFriendRecord, error) {
 	query := `
 		SELECT ` + spaceActorSelectColumns("friend_space", "friend_avatar", "friend") + `,

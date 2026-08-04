@@ -2,13 +2,13 @@ import "dart:async";
 
 import 'package:ente_components/ente_components.dart';
 import "package:ente_events/event_bus.dart";
+import 'package:ente_strings/ente_strings.dart';
 import 'package:ente_ui/components/buttons/button_widget.dart';
 import 'package:ente_ui/utils/dialog_util.dart';
 import 'package:ente_ui/utils/toast_util.dart';
 import 'package:flutter/material.dart';
 import "package:hugeicons/hugeicons.dart";
 import "package:locker/events/collections_updated_event.dart";
-import 'package:locker/l10n/l10n.dart';
 import "package:locker/models/selected_files.dart";
 import 'package:locker/services/files/sync/models/file.dart';
 import 'package:locker/services/trash/models/trash_file.dart';
@@ -60,15 +60,15 @@ class _TrashPageState extends State<TrashPage> {
 
   Future<void> _emptyTrash() async {
     if (_trashFiles.isEmpty) {
-      showToast(context, context.l10n.trashIsEmpty);
+      showToast(context, context.strings.trashIsEmpty);
       return;
     }
 
     final result = await showDeleteConfirmationSheet(
       context,
-      title: context.l10n.emptyTrash,
-      body: context.l10n.emptyTrashConfirmation,
-      deleteButtonLabel: context.l10n.emptyTrash,
+      title: context.strings.emptyTrash,
+      body: context.strings.emptyTrashConfirmation,
+      deleteButtonLabel: context.strings.emptyTrash,
       illustration: LockerBottomSheetIllustration.collectionDelete,
     );
 
@@ -80,7 +80,7 @@ class _TrashPageState extends State<TrashPage> {
   Future<void> _performEmptyTrash() async {
     if (_trashFiles.isEmpty) {
       if (mounted) {
-        showToast(context, context.l10n.trashIsEmpty);
+        showToast(context, context.strings.trashIsEmpty);
       }
       return;
     }
@@ -88,7 +88,7 @@ class _TrashPageState extends State<TrashPage> {
     final dialog = mounted
         ? createProgressDialog(
             context,
-            context.l10n.clearingTrash,
+            context.strings.clearingTrash,
             isDismissible: false,
           )
         : null;
@@ -101,7 +101,7 @@ class _TrashPageState extends State<TrashPage> {
       setState(() {
         _trashFiles.clear();
       });
-      showToast(context, context.l10n.trashClearedSuccessfully);
+      showToast(context, context.strings.trashClearedSuccessfully);
       Navigator.of(context).pop();
     } catch (error) {
       await dialog?.hide();
@@ -121,9 +121,9 @@ class _TrashPageState extends State<TrashPage> {
       body: Stack(
         children: [
           AppBarComponent(
-            title: context.l10n.trash,
+            title: context.strings.trash,
             subtitle: hasTrashFiles
-                ? context.l10n.items(_trashFiles.length)
+                ? context.strings.items(count: _trashFiles.length)
                 : null,
             actions: hasTrashFiles
                 ? [
@@ -157,7 +157,7 @@ class _TrashPageState extends State<TrashPage> {
       return [
         SliverFillRemaining(
           hasScrollBody: false,
-          child: _TrashEmptyState(title: context.l10n.yourTrashIsEmpty),
+          child: _TrashEmptyState(title: context.strings.yourTrashIsEmpty),
         ),
       ];
     }

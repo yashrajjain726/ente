@@ -406,6 +406,32 @@ pub struct SpaceLinkProfileResponse {
     pub profile: SpaceProfileResponse,
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct WebPushSubscriptionKeys {
+    pub(crate) p256dh: String,
+    pub(crate) auth: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct WebPushSubscriptionRequest {
+    pub(crate) endpoint: String,
+    pub(crate) keys: WebPushSubscriptionKeys,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct WebPushUnsubscriptionRequest {
+    pub(crate) endpoint: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct WebPushTargetResponse {
+    pub(crate) target_id: String,
+}
+
 #[cfg(test)]
 mod tests {
     use super::{

@@ -135,7 +135,7 @@ class _GoToPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final text = context.strings.goToUrl(url);
+    final text = context.strings.goToUrl(url: url);
     final urlStart = text.indexOf(url);
     final prefix = urlStart <= 0 ? "" : text.substring(0, urlStart);
     final suffix = urlStart < 0 ? "" : text.substring(urlStart + url.length);

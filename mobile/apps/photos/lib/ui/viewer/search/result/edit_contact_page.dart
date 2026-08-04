@@ -4,13 +4,13 @@ import "dart:typed_data";
 import "package:ente_components/ente_components.dart";
 import "package:ente_contacts/contacts.dart" as contacts;
 import "package:ente_pure_utils/ente_pure_utils.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:hugeicons/hugeicons.dart";
 import "package:logging/logging.dart";
 import "package:photos/core/configuration.dart";
 import "package:photos/core/event_bus.dart";
 import "package:photos/events/people_changed_event.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/models/ml/face/person.dart";
 import "package:photos/module/download/thumbnail.dart";
 import "package:photos/services/machine_learning/face_ml/face_filtering/face_filtering_constants.dart";
@@ -102,7 +102,7 @@ class _EditContactPageState extends State<EditContactPage> {
   @override
   Widget build(BuildContext context) {
     final colors = context.componentColors;
-    final l10n = AppLocalizations.of(context);
+    final l10n = context.strings;
 
     return PopScope(
       canPop: !_isSaving && !_hasUnsavedChanges,
@@ -171,7 +171,9 @@ class _EditContactPageState extends State<EditContactPage> {
                                         child: _AvatarActionButton(
                                           size: _editBadgeSize,
                                           isUnlink: _hasLinkedPersonDraft,
-                                          onTap: _hasLinkedPersonDraft
+                                          onTap: _isSaving
+                                              ? null
+                                              : _hasLinkedPersonDraft
                                               ? _draftUnlinkPerson
                                               : _openAvatarEditor,
                                         ),
@@ -380,6 +382,9 @@ class _EditContactPageState extends State<EditContactPage> {
   }
 
   void _draftUnlinkPerson() {
+    if (_isSaving) {
+      return;
+    }
     setState(() {
       _draftLinkedPerson = null;
       _draftUnassignedClusterID = null;
@@ -454,10 +459,7 @@ class _EditContactPageState extends State<EditContactPage> {
         _isLoadingPhoto = false;
       });
       if (showError) {
-        showShortToast(
-          context,
-          AppLocalizations.of(context).couldNotLoadSelectedPhoto,
-        );
+        showShortToast(context, context.strings.couldNotLoadSelectedPhoto);
       }
       return;
     }
@@ -497,10 +499,7 @@ class _EditContactPageState extends State<EditContactPage> {
       _isLoadingPhoto = false;
     });
     if (sourceBytes == null) {
-      showShortToast(
-        context,
-        AppLocalizations.of(context).couldNotLoadSelectedPhoto,
-      );
+      showShortToast(context, context.strings.couldNotLoadSelectedPhoto);
       return;
     }
     final croppedBytes = await routeToPage(
@@ -660,7 +659,7 @@ class _EditContactPageState extends State<EditContactPage> {
   Future<ButtonAction?> _showExitConfirmationDialog(
     BuildContext context,
   ) async {
-    final l10n = AppLocalizations.of(context);
+    final l10n = context.strings;
     if (_canSave) {
       final actionResult = await showActionSheet(
         context: context,
@@ -720,7 +719,7 @@ class _EditContactPageState extends State<EditContactPage> {
 class _AvatarActionButton extends StatelessWidget {
   final double size;
   final bool isUnlink;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   const _AvatarActionButton({
     required this.size,

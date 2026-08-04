@@ -25,21 +25,7 @@ import type {
     UploadItemWithCollection,
 } from "@/public-album/upload/services/upload-manager";
 import { uploadManager } from "@/public-album/upload/services/upload-manager";
-import { Album02Icon, Folder01Icon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
-import ChevronRightIcon from "@mui/icons-material/ChevronRight";
-import {
-    Box,
-    CircularProgress,
-    Dialog,
-    DialogTitle,
-    styled,
-    Typography,
-    type DialogProps,
-} from "@mui/material";
-import { SpacedRow } from "ente-base/components/containers";
-import { DialogCloseIconButton } from "ente-base/components/mui/DialogCloseIconButton";
-import { RowButton } from "ente-base/components/RowButton";
+import { Dialog, type DialogProps } from "@mui/material";
 import { useIsTouchscreen } from "ente-base/components/utils/hooks";
 import {
     useModalVisibility,
@@ -49,8 +35,9 @@ import { useBaseContext } from "ente-base/context";
 import { basename } from "ente-base/file-name";
 import type { PublicAlbumsCredentials } from "ente-base/http";
 import log from "ente-base/log";
+import { UploadProgressV2 } from "ente-gallery/components/upload-progress-v2/UploadProgressV2";
 import { CanvasReadbackBlockedDialog } from "ente-gallery/components/upload/CanvasReadbackBlockedDialog";
-import { UploadProgress } from "ente-gallery/components/UploadProgress";
+import { DefaultOptionsV2 } from "ente-gallery/components/upload/DefaultOptionsV2";
 import { useFileInput } from "ente-gallery/components/utils/use-file-input";
 import { hasReliableCanvasReadback } from "ente-gallery/utils/upload/canvas-integrity";
 import type { Collection } from "ente-media/collection";
@@ -465,7 +452,7 @@ export const Upload: React.FC<UploadProps> = ({
                 }
                 onSelect={handleUploadTypeSelect}
             />
-            <UploadProgress
+            <UploadProgressV2
                 open={uploadProgressView}
                 onClose={closeUploadProgress}
                 percentComplete={percentComplete}
@@ -573,13 +560,16 @@ const UploadTypeSelector: React.FC<UploadTypeSelectorProps> = ({
             slotProps={{
                 paper: {
                     sx: (theme) => ({
-                        maxWidth: "375px",
-                        p: 1,
-                        borderRadius: "28px",
+                        maxWidth: "440px",
+                        p: 0,
+                        borderRadius: "20px",
                         boxShadow: "none",
                         border: "1px solid",
                         borderColor: "stroke.faint",
-                        [theme.breakpoints.down(360)]: { p: 0 },
+                        backgroundColor: "secondary.main",
+                        ...theme.applyStyles("dark", {
+                            backgroundColor: "background.paper",
+                        }),
                     }),
                 },
             }}
@@ -589,76 +579,14 @@ const UploadTypeSelector: React.FC<UploadTypeSelectorProps> = ({
                 },
             }}
         >
-            <UploadOptions {...{ pendingUploadType, onSelect, onClose }} />
+            <DefaultOptionsV2
+                intent="collect"
+                isFileSelectionPending={pendingUploadType == "files"}
+                isFolderSelectionPending={pendingUploadType == "folders"}
+                onSelectFiles={() => onSelect("files")}
+                onSelectFolder={() => onSelect("folders")}
+                onClose={onClose}
+            />
         </Dialog>
     );
 };
-
-type UploadOptionsProps = Pick<
-    UploadTypeSelectorProps,
-    "onClose" | "pendingUploadType" | "onSelect"
->;
-
-const UploadOptions: React.FC<UploadOptionsProps> = ({
-    pendingUploadType,
-    onSelect,
-    onClose,
-}) => (
-    <>
-        <SpacedRow>
-            <DialogTitle variant="h5">{t("select_photos")}</DialogTitle>
-            <DialogCloseIconButton {...{ onClose }} />
-        </SpacedRow>
-        <Box sx={{ p: "12px", pt: "16px" }}>
-            <RoundedButtonStack>
-                <RowButton
-                    startIcon={<HugeiconsIcon icon={Album02Icon} size={20} />}
-                    endIcon={
-                        pendingUploadType == "files" ? (
-                            <PendingIndicator />
-                        ) : (
-                            <ChevronRightIcon />
-                        )
-                    }
-                    label={t("files")}
-                    onClick={() => onSelect("files")}
-                />
-                <RowButton
-                    startIcon={<HugeiconsIcon icon={Folder01Icon} size={20} />}
-                    endIcon={
-                        pendingUploadType == "folders" ? (
-                            <PendingIndicator />
-                        ) : (
-                            <ChevronRightIcon />
-                        )
-                    }
-                    label={t("folder")}
-                    onClick={() => onSelect("folders")}
-                />
-            </RoundedButtonStack>
-            <Typography
-                sx={{
-                    color: "text.muted",
-                    p: "12px",
-                    pt: "24px",
-                    textAlign: "center",
-                }}
-            >
-                {t("drag_and_drop_hint")}
-            </Typography>
-        </Box>
-    </>
-);
-
-const PendingIndicator = () => (
-    <CircularProgress size={18} sx={{ color: "stroke.muted" }} />
-);
-
-const RoundedButtonStack = styled("div")`
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    & > button {
-        border-radius: 16px;
-    }
-`;

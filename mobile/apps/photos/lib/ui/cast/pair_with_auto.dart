@@ -1,11 +1,11 @@
 import "dart:io";
 
 import "package:ente_components/ente_components.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:hugeicons/hugeicons.dart";
 import "package:logging/logging.dart";
 import "package:photos/gateways/cast/cast_gateway.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/models/collection/collection.dart";
 import "package:photos/service_locator.dart";
 import "package:photos/services/auto_cast_service.dart";
@@ -47,7 +47,7 @@ class _PairWithAutoSheetState extends State<_PairWithAutoSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
+    final l10n = context.strings;
     final textStyles = getEnteTextTheme(context);
     final body = Platform.isIOS
         ? "${l10n.autoCastDialogBody}\n\n${l10n.autoCastiOSPermission}"
@@ -166,7 +166,7 @@ class _PairWithAutoSheetState extends State<_PairWithAutoSheet> {
   }
 
   Future<void> _confirmStopCasting(Object device) async {
-    final l10n = AppLocalizations.of(context);
+    final l10n = context.strings;
     await showBottomSheetComponent<void>(
       context: context,
       builder: (sheetContext) => BottomSheetComponent(
@@ -201,7 +201,7 @@ class _PairWithAutoSheetState extends State<_PairWithAutoSheet> {
   }
 
   Future<void> _handleError(Object error, StackTrace stackTrace) async {
-    final l10n = AppLocalizations.of(context);
+    final l10n = context.strings;
     _logger.severe("Failed to pair automatically", error, stackTrace);
     if (error is CastIPMismatchException) {
       await showErrorDialog(

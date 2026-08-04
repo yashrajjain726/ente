@@ -18,7 +18,7 @@ import 'package:ente_logging/logging.dart';
 import 'package:ente_network/network.dart';
 import 'package:ente_pure_utils/ente_pure_utils.dart';
 import 'package:ente_rust/ente_rust.dart';
-import "package:ente_strings/l10n/strings_localizations.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:ente_ui/theme/theme_config.dart";
 import 'package:ente_ui/utils/window_listener_service.dart';
 import "package:flutter/material.dart";
@@ -26,7 +26,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_displaymode/flutter_displaymode.dart';
 import 'package:locker/app.dart';
 import 'package:locker/core/locale.dart';
-import 'package:locker/l10n/app_localizations.dart';
 import 'package:locker/services/collections/collections_api_client.dart';
 import 'package:locker/services/collections/collections_service.dart';
 import 'package:locker/services/configuration.dart';
@@ -135,7 +134,6 @@ Future<void> _runInForeground() async {
         supportedLocales: appSupportedLocales,
         localizationsDelegates: const [
           ...StringsLocalizations.localizationsDelegates,
-          ...AppLocalizations.localizationsDelegates,
         ],
         localeListResolutionCallback: localResolutionCallBack,
       ),

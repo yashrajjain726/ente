@@ -1,11 +1,3 @@
-//! Generation and verification of the committed golden self-test data.
-//!
-//! Regeneration (`render_golden_data`) runs the production models on the CPU
-//! execution provider and is invoked manually via the `ml_goldens` developer
-//! tool's `generate` command.
-//! Verification (`verify_goldens_against_pins`) is metadata-only and runs as
-//! a plain unit test in every CI pass.
-
 use std::collections::BTreeMap;
 use std::path::Path;
 
@@ -15,9 +7,7 @@ use crate::ml::{clip, golden, golden_data::GOLDEN_ENTRIES, onnx};
 
 pub use crate::ml::golden::GoldenMetric;
 
-/// One fixed seed for all noise inputs. Inputs need not differ across models
-/// (each model's input is shaped and consumed independently), and each entry
-/// stores its seed, so the device never depends on this constant.
+/// Each generated entry stores this seed, so devices do not depend on it.
 const GOLDEN_NOISE_SEED: u64 = 0x0060_1DE2_5EED_2026;
 
 const GENERATED_FILE_HEADER: &str = "\
@@ -35,28 +25,18 @@ use crate::ml::golden::{GoldenEntry, GoldenInput, GoldenMetric};
 pub(crate) static GOLDEN_ENTRIES: &[GoldenEntry] = &[
 ";
 
-/// A production model to generate a golden entry for.
 pub struct GoldenModelSpec {
     pub model_path: String,
-    /// SHA-256 of the model file as pinned in the asset lock; embedded into
-    /// the generated entry so that CI can detect a content change without
-    /// re-running inference.
     pub sha256: String,
     pub input: GoldenSpecInput,
-    /// `CosineDistance` for embedding outputs and a relative-L2 variant for
-    /// raw tensor outputs.
     pub metric: GoldenMetric,
 }
 
 pub enum GoldenSpecInput {
-    /// Deterministic noise seeded from the model file name.
     SeededNoise,
-    /// A fixed phrase tokenized with the production CLIP tokenizer.
     ClipText { phrase: String, vocab_path: String },
 }
 
-/// Measured separation between a zero-input warm-up and the committed golden
-/// when both are run consecutively on one CPU session.
 pub struct ZeroGoldenSeparation {
     pub model_file: String,
     pub metric_label: &'static str,
@@ -65,7 +45,6 @@ pub struct ZeroGoldenSeparation {
     pub threshold: f64,
 }
 
-/// Renders the complete contents of `golden_data.rs` for the given models.
 pub fn render_golden_data(models: &[GoldenModelSpec]) -> Result<String, String> {
     let mut source = String::from(GENERATED_FILE_HEADER);
     for spec in models {
@@ -75,8 +54,6 @@ pub fn render_golden_data(models: &[GoldenModelSpec]) -> Result<String, String> 
     Ok(source)
 }
 
-/// Runs the production self-test sequence on CPU and measures whether a
-/// stale zero-input result would be rejected by the committed golden.
 pub fn measure_zero_golden_separation(model_path: &str) -> Result<ZeroGoldenSeparation, String> {
     let model_file = model_file_name(model_path)?;
     let entry = golden::lookup(model_path)
@@ -107,22 +84,12 @@ pub fn measure_zero_golden_separation(model_path: &str) -> Result<ZeroGoldenSepa
     })
 }
 
-/// A production model as pinned in the asset lock
-/// (`infra/ml/test/ml_indexing/assets.json`).
 pub struct PinnedModel {
     pub file_name: String,
     pub sha256: String,
 }
 
-/// Cheaply verifies that the committed goldens correspond exactly to the
-/// pinned production models, by file name and content hash. Returns
-/// human-readable failures; empty means consistent.
-///
-/// Deliberately metadata-only (no model downloads, no inference) so it runs
-/// as a plain unit test in every CI pass. This catches the two realistic
-/// ways goldens go stale — a model update (new file name) and a content
-/// change under an unchanged name — but not numeric drift of the CPU
-/// execution provider itself; the wide on-device thresholds absorb that.
+/// Metadata-only CI guard; it does not detect numeric CPU-provider drift.
 pub fn verify_goldens_against_pins(pins: &[PinnedModel]) -> Vec<String> {
     let mut failures = Vec::new();
 
@@ -265,9 +232,6 @@ mod tests {
     use super::{PinnedModel, verify_goldens_against_pins};
     use crate::ml::golden_data::GOLDEN_ENTRIES;
 
-    /// Loads the pinned production models from the asset lock. Restricted to
-    /// `.onnx` files: other pinned model assets (the CLIP vocabulary) are
-    /// model inputs, not models, and get no golden entries.
     fn pinned_production_models() -> Vec<PinnedModel> {
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../../../infra/ml/test/ml_indexing/assets.json");
@@ -286,10 +250,6 @@ mod tests {
             .collect()
     }
 
-    /// The CI guard against stale goldens: a model update (new file name) or
-    /// a content change under an unchanged name in the asset lock fails this
-    /// test until `golden_data.rs` is regenerated with the `ml_goldens`
-    /// developer tool.
     #[test]
     fn committed_goldens_are_pinned_to_the_production_models() {
         let pins = pinned_production_models();
@@ -315,8 +275,6 @@ mod tests {
             .collect();
         assert!(verify_goldens_against_pins(&matching).is_empty());
 
-        // A pinned model without an entry, a content change under an
-        // unchanged name, and a dropped pin leaving a stale entry.
         let mut pins = matching;
         pins[0].sha256 = "f".repeat(64);
         let stale = pins.pop().unwrap();

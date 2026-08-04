@@ -1,10 +1,10 @@
 import 'dart:io';
 
-import 'package:ente_auth/l10n/l10n.dart';
 import 'package:ente_auth/models/all_icon_data.dart';
 import 'package:ente_auth/services/preference_service.dart';
 import 'package:ente_auth/ui/utils/icon_utils.dart';
 import 'package:ente_components/ente_components.dart';
+import 'package:ente_strings/ente_strings.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -64,7 +64,7 @@ class _CustomIconPageState extends State<CustomIconPage> {
           thumbVisibility: true,
           interactive: true,
           child: AppBarComponent(
-            title: context.l10n.chooseIcon,
+            title: context.strings.chooseIcon,
             controller: _scrollController,
             actions: [
               Padding(
@@ -74,7 +74,7 @@ class _CustomIconPageState extends State<CustomIconPage> {
                   identifier: 'auth_icon_search_toggle',
                   child: IconButtonComponent(
                     variant: IconButtonComponentVariant.unfilled,
-                    tooltip: context.l10n.search,
+                    tooltip: context.strings.search,
                     icon: Icon(
                       _showSearchBox ? Icons.close : Icons.search,
                       size: IconSizes.medium,
@@ -100,7 +100,7 @@ class _CustomIconPageState extends State<CustomIconPage> {
                       child: TextInputComponent(
                         controller: _textController,
                         focusNode: searchBoxFocusNode,
-                        hintText: context.l10n.searchHint,
+                        hintText: context.strings.searchHint,
                         autofocus: _autoFocusSearch,
                         isClearable: true,
                         autocorrect: false,
@@ -123,7 +123,7 @@ class _CustomIconPageState extends State<CustomIconPage> {
                   hasScrollBody: false,
                   child: Center(
                     child: Text(
-                      context.l10n.noResult,
+                      context.strings.noResult,
                       style: TextStyles.body.copyWith(color: colors.textLight),
                     ),
                   ),

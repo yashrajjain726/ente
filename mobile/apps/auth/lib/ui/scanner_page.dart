@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:ente_auth/l10n/l10n.dart';
 import 'package:ente_auth/models/code.dart';
 import 'package:ente_auth/theme/ente_theme.dart';
 import 'package:ente_auth/ui/components/buttons/icon_button_widget.dart';
@@ -11,6 +10,7 @@ import 'package:ente_auth/utils/gallery_import_util.dart';
 import 'package:ente_auth/utils/toast_util.dart';
 import 'package:ente_pure_utils/ente_pure_utils.dart';
 import 'package:ente_qr_scanner/ente_qr_scanner.dart';
+import 'package:ente_strings/ente_strings.dart';
 import 'package:flutter/material.dart';
 import 'package:logging/logging.dart';
 
@@ -62,7 +62,7 @@ class ScannerPageState extends State<ScannerPage> {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = context.l10n;
+    final l10n = context.strings;
     final bool showGalleryImport = PlatformDetector.isMobile();
     final bool showTorch = showGalleryImport && _isFlashOn != null;
     final bool isFlashOn = _isFlashOn == true;
@@ -266,7 +266,7 @@ class ScannerPageState extends State<ScannerPage> {
       );
     } catch (e) {
       if (mounted) {
-        showToastAboveBottomControls(context, context.l10n.invalidQRCode);
+        showToastAboveBottomControls(context, context.strings.invalidQRCode);
       }
     }
   }
@@ -282,7 +282,7 @@ class ScannerPageState extends State<ScannerPage> {
       final codes = parseGoogleAuth(qrCode);
       if (codes.isEmpty) {
         if (mounted) {
-          showToastAboveBottomControls(context, context.l10n.invalidQRCode);
+          showToastAboveBottomControls(context, context.strings.invalidQRCode);
         }
         return;
       }
@@ -298,7 +298,7 @@ class ScannerPageState extends State<ScannerPage> {
     } catch (e, s) {
       _logger.severe("Error importing Google Authenticator QR", e, s);
       if (mounted) {
-        showToastAboveBottomControls(context, context.l10n.invalidQRCode);
+        showToastAboveBottomControls(context, context.strings.invalidQRCode);
       }
     } finally {
       if (shouldResumeCamera && mounted && !_hasCompletedScan) {

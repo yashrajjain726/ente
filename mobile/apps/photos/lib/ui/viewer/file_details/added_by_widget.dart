@@ -1,6 +1,6 @@
 import "package:ente_components/ente_components.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/models/file/extensions/file_props.dart";
 import 'package:photos/models/file/file.dart';
 import "package:photos/services/collections_service.dart";
@@ -48,7 +48,7 @@ class AddedByWidget extends StatelessWidget {
           const SizedBox(width: Spacing.sm),
           Flexible(
             child: Text(
-              AppLocalizations.of(context).addedBy(emailOrName: identity.label),
+              context.strings.addedBy(emailOrName: identity.label),
               style: TextStyles.mini.copyWith(color: colors.textLighter),
               overflow: TextOverflow.ellipsis,
             ),

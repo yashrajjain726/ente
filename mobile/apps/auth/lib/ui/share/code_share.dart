@@ -2,13 +2,13 @@ import 'dart:convert';
 import 'dart:math';
 import 'dart:typed_data';
 
-import 'package:ente_auth/l10n/l10n.dart';
 import 'package:ente_auth/models/code.dart';
 import 'package:ente_auth/utils/dialog_util.dart';
 import 'package:ente_auth/utils/share_utils.dart';
 import 'package:ente_auth/utils/totp_util.dart';
 import 'package:ente_components/ente_components.dart';
 import 'package:ente_crypto_api/ente_crypto_api.dart';
+import 'package:ente_strings/ente_strings.dart';
 import 'package:flutter/material.dart';
 import 'package:logging/logging.dart';
 
@@ -48,14 +48,14 @@ class _ShareCodeDialogState extends State<ShareCodeDialog> {
     return Semantics(
       identifier: 'auth_share_code_sheet',
       child: BottomSheetComponent(
-        title: context.l10n.shareCodes,
-        closeTooltip: context.l10n.close,
+        title: context.strings.shareCodes,
+        closeTooltip: context.strings.close,
         content: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              context.l10n.shareCodesDuration,
+              context.strings.shareCodesDuration,
               style: TextStyles.body.copyWith(color: colors.textLight),
             ),
             const SizedBox(height: Spacing.lg),
@@ -78,7 +78,7 @@ class _ShareCodeDialogState extends State<ShareCodeDialog> {
         ),
         actions: [
           ButtonComponent(
-            label: context.l10n.share,
+            label: context.strings.share,
             onTap: () async {
               try {
                 await shareCode(selectedValue);

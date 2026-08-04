@@ -1,10 +1,10 @@
 import "package:ente_components/ente_components.dart";
 import "package:ente_pure_utils/ente_pure_utils.dart";
+import "package:ente_strings/ente_strings.dart";
 import 'package:flutter/material.dart';
 import 'package:logging/logging.dart';
 import 'package:photos/core/configuration.dart';
 import 'package:photos/gateways/users/models/sessions.dart';
-import "package:photos/generated/l10n.dart";
 import 'package:photos/services/account/user_service.dart';
 import 'package:photos/ui/common/loading_widget.dart';
 import 'package:photos/ui/notification/toast.dart';
@@ -26,10 +26,7 @@ class _SessionsPageState extends State<SessionsPage> {
   void initState() {
     _fetchActiveSessions().onError((error, stackTrace) {
       if (!mounted) return;
-      showToast(
-        context,
-        AppLocalizations.of(context).failedToFetchActiveSessions,
-      );
+      showToast(context, context.strings.failedToFetchActiveSessions);
     });
     super.initState();
   }
@@ -37,7 +34,7 @@ class _SessionsPageState extends State<SessionsPage> {
   @override
   Widget build(BuildContext context) {
     return SettingsPageScaffold(
-      title: AppLocalizations.of(context).activeSessions,
+      title: context.strings.activeSessions,
       padding: EdgeInsets.zero,
       children: _getBodyChildren(context),
     );
@@ -109,10 +106,7 @@ class _SessionsPageState extends State<SessionsPage> {
   }
 
   Future<void> _terminateSession(Session session) async {
-    final dialog = createProgressDialog(
-      context,
-      AppLocalizations.of(context).pleaseWait,
-    );
+    final dialog = createProgressDialog(context, context.strings.pleaseWait);
     await dialog.show();
     try {
       await UserService.instance.terminateSession(session.token);
@@ -125,8 +119,8 @@ class _SessionsPageState extends State<SessionsPage> {
       // ignore: unawaited_futures
       showErrorBottomSheetComponent<void>(
         context: context,
-        title: AppLocalizations.of(context).oops,
-        message: AppLocalizations.of(context).somethingWentWrongPleaseTryAgain,
+        title: context.strings.oops,
+        message: context.strings.somethingWentWrongPleaseTryAgain,
         illustration: Image.asset("assets/warning-grey.png"),
       );
     }
@@ -148,7 +142,7 @@ class _SessionsPageState extends State<SessionsPage> {
   }
 
   void _showSessionTerminationDialog(Session session) {
-    final l10n = AppLocalizations.of(context);
+    final l10n = context.strings;
     final isLoggingOutFromThisDevice =
         session.token == Configuration.instance.getToken();
     final displayedUserAgent = session.ua.length > 256
@@ -189,7 +183,7 @@ class _SessionsPageState extends State<SessionsPage> {
     final colors = context.componentColors;
     if (session.token == Configuration.instance.getToken()) {
       return Text(
-        AppLocalizations.of(context).thisDevice,
+        context.strings.thisDevice,
         style: TextStyles.bodyBold.copyWith(color: colors.primary),
       );
     }

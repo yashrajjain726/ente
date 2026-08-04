@@ -3,6 +3,7 @@ import "dart:convert";
 import "dart:typed_data";
 
 import "package:ente_crypto/ente_crypto.dart";
+import "package:ente_strings/ente_strings.dart";
 import 'package:flutter/material.dart';
 import 'package:logging/logging.dart';
 import 'package:password_strength/password_strength.dart';
@@ -10,7 +11,6 @@ import "package:photos/emergency/emergency_service.dart";
 import "package:photos/emergency/model.dart";
 import "package:photos/gateways/users/models/key_attributes.dart";
 import "package:photos/gateways/users/models/set_keys_request.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/theme/colors.dart";
 import "package:photos/theme/ente_theme.dart";
 import "package:photos/theme/text_style.dart";
@@ -64,7 +64,7 @@ class _RecoverOthersAccountState extends State<RecoverOthersAccount> {
   Widget build(BuildContext context) {
     final colorScheme = getEnteColorScheme(context);
     final textTheme = getEnteTextTheme(context);
-    final title = AppLocalizations.of(context).resetPasswordTitle;
+    final title = context.strings.resetPasswordTitle;
     final isFormValid = _passwordsMatch && _isPasswordValid;
 
     return Scaffold(
@@ -111,10 +111,10 @@ class _RecoverOthersAccountState extends State<RecoverOthersAccount> {
 
     if (_passwordInInputBox.isNotEmpty && _showPasswordStrength) {
       if (_passwordStrength > kStrongPasswordStrengthThreshold) {
-        passwordMessage = AppLocalizations.of(context).strongPassword;
+        passwordMessage = context.strings.strongPassword;
         passwordMessageType = TextInputMessageType.success;
       } else if (_passwordStrength <= kMildPasswordStrengthThreshold) {
-        passwordMessage = AppLocalizations.of(context).weakStrength;
+        passwordMessage = context.strings.weakStrength;
         passwordMessageType = TextInputMessageType.alert;
       }
     }
@@ -126,12 +126,10 @@ class _RecoverOthersAccountState extends State<RecoverOthersAccount> {
     if (_passwordInInputConfirmationBox.isNotEmpty &&
         _passwordInInputBox.isNotEmpty) {
       if (_passwordsMatch) {
-        confirmPasswordMessage = AppLocalizations.of(context).passwordsMatch;
+        confirmPasswordMessage = context.strings.passwordsMatch;
         confirmPasswordMessageType = TextInputMessageType.success;
       } else {
-        confirmPasswordMessage = AppLocalizations.of(
-          context,
-        ).passwordsDontMatch;
+        confirmPasswordMessage = context.strings.passwordsDontMatch;
         confirmPasswordMessageType = TextInputMessageType.error;
       }
     }
@@ -160,8 +158,8 @@ class _RecoverOthersAccountState extends State<RecoverOthersAccount> {
                 ),
               ),
               TextInputWidgetV2(
-                label: AppLocalizations.of(context).password,
-                hintText: AppLocalizations.of(context).password,
+                label: context.strings.password,
+                hintText: context.strings.password,
                 textEditingController: _passwordController1,
                 isPasswordInput: true,
                 isRequired: true,
@@ -197,8 +195,8 @@ class _RecoverOthersAccountState extends State<RecoverOthersAccount> {
               ),
               const SizedBox(height: 16),
               TextInputWidgetV2(
-                label: AppLocalizations.of(context).confirmPassword,
-                hintText: AppLocalizations.of(context).confirmPassword,
+                label: context.strings.confirmPassword,
+                hintText: context.strings.confirmPassword,
                 textEditingController: _passwordController2,
                 isPasswordInput: true,
                 isRequired: true,
@@ -229,7 +227,7 @@ class _RecoverOthersAccountState extends State<RecoverOthersAccount> {
   Future<void> _updatePassword() async {
     final dialog = createProgressDialog(
       context,
-      AppLocalizations.of(context).generatingEncryptionKeys,
+      context.strings.generatingEncryptionKeys,
     );
     await dialog.show();
     try {
@@ -283,10 +281,7 @@ class _RecoverOthersAccountState extends State<RecoverOthersAccount> {
       );
       await dialog.hide();
       if (!mounted) return;
-      showShortToast(
-        context,
-        AppLocalizations.of(context).passwordChangedSuccessfully,
-      );
+      showShortToast(context, context.strings.passwordChangedSuccessfully);
       if (!mounted) return;
       Navigator.of(context).pop();
     } catch (e, s) {

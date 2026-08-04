@@ -1,5 +1,6 @@
 import "dart:async";
 
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/foundation.dart";
 import "package:flutter/material.dart";
 import "package:flutter_animate/flutter_animate.dart";
@@ -8,7 +9,6 @@ import "package:photos/core/event_bus.dart";
 import "package:photos/db/files_db.dart";
 import "package:photos/events/collection_updated_event.dart";
 import "package:photos/events/files_updated_event.dart";
-import "package:photos/generated/l10n.dart";
 import 'package:photos/models/file/file.dart';
 import "package:photos/models/ignored_file.dart";
 import "package:photos/services/collections_service.dart";
@@ -104,17 +104,17 @@ class _UpdateIconWidgetState extends State<UploadIconWidget> {
           if (isIgnored && (kDebugMode || ignoreReason != kIgnoreReasonTrash)) {
             showToast(
               context,
-              AppLocalizations.of(
-                context,
-              ).uploadIsIgnoredDueToIgnorereason(ignoreReason: ignoreReason),
+              context.strings.uploadIsIgnoredDueToIgnorereason(
+                ignoreReason: ignoreReason,
+              ),
             );
           }
           return Tooltip(
             message: isIgnored
-                ? AppLocalizations.of(
-                    context,
-                  ).tapToUploadIsIgnoredDue(ignoreReason: ignoreReason)
-                : AppLocalizations.of(context).tapToUpload,
+                ? context.strings.tapToUploadIsIgnoredDue(
+                    ignoreReason: ignoreReason,
+                  )
+                : context.strings.tapToUpload,
             child: IconButton(
               icon: const Icon(Icons.upload_rounded, color: Colors.white),
               onPressed: () async {

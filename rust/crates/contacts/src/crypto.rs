@@ -3,7 +3,7 @@ use md5::{Digest, Md5};
 use ente_core::b64;
 use ente_core::crypto::{self, blob, secretbox};
 
-use crate::error::{ContactsError, Result};
+use crate::error::{Error, Result};
 use crate::models::{ContactData, WrappedRootContactKey};
 
 pub fn encrypt_root_contact_key(
@@ -78,12 +78,12 @@ pub fn content_md5_base64(bytes: &[u8]) -> String {
 
 pub fn validate_contact_data(data: &ContactData) -> Result<()> {
     if data.contact_user_id <= 0 {
-        return Err(ContactsError::InvalidInput(
+        return Err(Error::InvalidInput(
             "contact_user_id must be greater than 0".to_string(),
         ));
     }
     if data.name.trim().is_empty() {
-        return Err(ContactsError::InvalidInput("name is required".to_string()));
+        return Err(Error::InvalidInput("name is required".to_string()));
     }
     Ok(())
 }

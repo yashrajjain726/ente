@@ -1,11 +1,11 @@
 import "dart:async";
 
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:hugeicons/hugeicons.dart";
 import "package:photos/core/configuration.dart";
 import "package:photos/core/event_bus.dart";
 import "package:photos/events/app_mode_changed_event.dart";
-import "package:photos/generated/intl/app_localizations.dart";
 import "package:photos/service_locator.dart";
 import "package:photos/theme/ente_theme.dart";
 import "package:photos/ui/account/email_entry_page.dart";
@@ -51,7 +51,7 @@ class _NameFaceBannerState extends State<NameFaceBanner> {
 
     final colorScheme = getEnteColorScheme(context);
     final textTheme = getEnteTextTheme(context);
-    final l10n = AppLocalizations.of(context);
+    final l10n = context.strings;
 
     return Padding(
       padding: const EdgeInsets.all(12),

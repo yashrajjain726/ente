@@ -1,7 +1,7 @@
-import 'package:ente_auth/l10n/l10n.dart';
 import 'package:ente_auth/services/update_service.dart';
 import 'package:ente_auth/theme/ente_theme.dart';
 import 'package:ente_pure_utils/ente_pure_utils.dart';
+import 'package:ente_strings/ente_strings.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher_string.dart';
 
@@ -66,7 +66,7 @@ class _AppUpdateDialogState extends State<AppUpdateDialog> {
                   : widget.latestVersionInfo!.url!,
               mode: LaunchMode.externalApplication,
             ),
-            child: Text(context.l10n.downloadUpdate),
+            child: Text(context.strings.downloadUpdate),
           ),
         ),
       ],
@@ -88,8 +88,8 @@ class _AppUpdateDialogState extends State<AppUpdateDialog> {
             const SizedBox(height: 16),
             Text(
               shouldForceUpdate
-                  ? context.l10n.criticalUpdateAvailable
-                  : context.l10n.updateAvailable,
+                  ? context.strings.criticalUpdateAvailable
+                  : context.strings.updateAvailable,
               style: enteTextTheme.h3Bold,
             ),
           ],

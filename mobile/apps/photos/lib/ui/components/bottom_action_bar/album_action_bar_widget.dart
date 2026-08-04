@@ -1,6 +1,6 @@
 import "package:ente_components/ente_components.dart" as components;
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/models/selected_albums.dart";
 
 class AlbumActionBarWidget extends StatefulWidget {
@@ -46,7 +46,7 @@ class _AlbumActionBarWidgetState extends State<AlbumActionBarWidget> {
                 valueListenable: _selectedAlbumNotifier,
                 builder: (context, value, child) {
                   return Text(
-                    AppLocalizations.of(context).selectedAlbums(
+                    context.strings.selectedAlbums(
                       count: widget.selectedAlbums?.albums.length ?? 0,
                     ),
                     style: miniStyle,
@@ -65,10 +65,7 @@ class _AlbumActionBarWidgetState extends State<AlbumActionBarWidget> {
                   },
                   child: Align(
                     alignment: Alignment.centerRight,
-                    child: Text(
-                      AppLocalizations.of(context).cancel,
-                      style: miniStyle,
-                    ),
+                    child: Text(context.strings.cancel, style: miniStyle),
                   ),
                 ),
               ),

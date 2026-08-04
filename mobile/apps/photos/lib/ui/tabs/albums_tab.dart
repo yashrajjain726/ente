@@ -2,6 +2,7 @@ import "dart:async";
 
 import "package:ente_components/ente_components.dart";
 import "package:ente_pure_utils/ente_pure_utils.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:hugeicons/hugeicons.dart";
 import "package:photos/core/configuration.dart";
@@ -15,7 +16,6 @@ import "package:photos/events/favorites_service_init_complete_event.dart";
 import "package:photos/events/local_photos_updated_event.dart";
 import "package:photos/events/tab_changed_event.dart";
 import "package:photos/events/user_logged_out_event.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/models/collection/collection.dart";
 import "package:photos/models/selected_albums.dart";
 import "package:photos/service_locator.dart";
@@ -451,7 +451,7 @@ class _AlbumsTabState extends State<AlbumsTab>
     );
   }
 
-  Widget _buildGlobalSearchEmptyStateSliver(AppLocalizations strings) {
+  Widget _buildGlobalSearchEmptyStateSliver(StringsLocalizations strings) {
     return SliverFillRemaining(
       hasScrollBody: false,
       child: EmptyStateComponent(
@@ -462,7 +462,7 @@ class _AlbumsTabState extends State<AlbumsTab>
     );
   }
 
-  Widget _buildGlobalSearchResultsSliver(AppLocalizations strings) {
+  Widget _buildGlobalSearchResultsSliver(StringsLocalizations strings) {
     if (_isLocalGalleryMode) {
       return SliverMainAxisGroup(
         slivers: [
@@ -546,7 +546,7 @@ class _AlbumsTabState extends State<AlbumsTab>
     );
   }
 
-  Widget _buildContentSliver(AppLocalizations strings) {
+  Widget _buildContentSliver(StringsLocalizations strings) {
     if (_hasSearchQuery) {
       return _buildGlobalSearchResultsSliver(strings);
     }
@@ -644,7 +644,7 @@ class _AlbumsTabState extends State<AlbumsTab>
 
   List<EntePopupMenuOption<_AlbumsMenuAction>> _buildAlbumsMenuOptions() {
     final colorScheme = getEnteColorScheme(context);
-    final strings = AppLocalizations.of(context);
+    final strings = context.strings;
     final isListView = _viewType.value == AlbumViewType.list;
     final showSortActions = !_hasSearchQuery;
     final currentSortKey = _sortKey.value;
@@ -760,7 +760,7 @@ class _AlbumsTabState extends State<AlbumsTab>
     super.build(context);
     final componentColors = context.componentColors;
     final textTheme = getEnteTextTheme(context);
-    final strings = AppLocalizations.of(context);
+    final strings = context.strings;
     final selectedAlbums = widget.selectedAlbums;
     final localGalleryMode = _isLocalGalleryMode;
     final albumsOptionsButton = Builder(

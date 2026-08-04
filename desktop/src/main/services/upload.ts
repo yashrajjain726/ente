@@ -101,42 +101,7 @@ export const pendingUploads = (): PendingUploads | undefined => {
     };
 };
 
-/**
- * [Note: Missing values in electron-store]
- *
- * Suppose we were to create a store like this:
- *
- *     const store = new Store({
- *         schema: {
- *             foo: { type: "string" },
- *             bars: { type: "array", items: { type: "string" } },
- *         },
- *     });
- *
- * If we fetch `store.get("foo")` or `store.get("bars")`, we get `undefined`.
- * But if we try to set these back to `undefined`, say `store.set("foo",
- * someUndefValue)`, we get asked to
- *
- *     TypeError: Use `delete()` to clear values
- *
- * This happens even if we do bulk object updates, e.g. with a JS object that
- * has undefined keys:
- *
- * > TypeError: Setting a value of type `undefined` for key `collectionName` is
- * > not allowed as it's not supported by JSON
- *
- * So what should the TypeScript type for "foo" be?
- *
- * If it is were to not include the possibility of `undefined`, then the type
- * would lie because `store.get("foo")` can indeed be `undefined. But if we were
- * to include the possibility of `undefined`, then trying to `store.set("foo",
- * someUndefValue)` will throw.
- *
- * The approach we take is to rely on false-y values (empty strings and empty
- * arrays) to indicate missing values, and then converting those to `undefined`
- * when reading from the store, and converting `undefined` to the corresponding
- * false-y value when writing.
- */
+// electron-store rejects undefined; empty strings and arrays encode absence.
 export const setPendingUploads = ({
     collectionName,
     filePaths,
@@ -162,7 +127,7 @@ export const markUploadedFile = (
     const existing = uploadStatusStore.get("filePaths") ?? [];
     const updated = existing.filter((p) => p != path && p != associatedPath);
     uploadStatusStore.set("filePaths", updated);
-    // See: [Note: Integral last modified time]
+    // Persist integral mtimes for stable comparisons with remote values.
     return fs.stat(path).then((st) => st.mtime.getTime());
 };
 

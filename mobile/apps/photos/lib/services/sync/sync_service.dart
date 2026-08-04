@@ -114,11 +114,11 @@ class SyncService {
       _logger.warning("Sync requested before init, skipping");
       return false;
     }
-    _syncStopRequested = false;
     if (_existingSync != null) {
       _logger.warning("Sync already in progress, skipping.");
       return _existingSync!.future;
     }
+    _syncStopRequested = false;
     _existingSync = Completer<bool>();
     bool successful = false;
     try {
@@ -149,6 +149,8 @@ class SyncService {
       Bus.instance.fire(
         SyncStatusUpdate(SyncStatus.error, error: StorageLimitExceededError()),
       );
+    } on DeviceStorageFullError catch (e) {
+      Bus.instance.fire(SyncStatusUpdate(SyncStatus.error, error: e));
     } on UnauthorizedError {
       _logger.info("Logging user out");
       Bus.instance.fire(TriggerLogoutEvent());

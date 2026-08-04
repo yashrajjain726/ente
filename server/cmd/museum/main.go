@@ -606,9 +606,11 @@ func main() {
 	storageAPI.POST("/files/upload-url", fileHandler.GetUploadURLV2)
 	storageAPI.POST("/files/multipart-upload-url", fileHandler.GetMultipartUploadURLV2)
 	storageAPI.GET("/files/download/:fileID", fileHandler.Get)
-	storageAPI.GET("/files/download/v2/:fileID", fileHandler.GetV2)
+	storageAPI.GET("/files/download/v2/:fileID", fileHandler.GetURL)
+	storageAPI.GET("/files/download/v3/:fileID", fileHandler.GetURLV3)
 	storageAPI.GET("/files/preview/:fileID", fileHandler.GetThumbnail)
-	storageAPI.GET("/files/preview/v2/:fileID", fileHandler.GetThumbnailV2)
+	storageAPI.GET("/files/preview/v2/:fileID", fileHandler.GetThumbnailURL)
+	storageAPI.GET("/files/thumbnail/v3/:fileID", fileHandler.GetThumbnailURLV3)
 
 	storageAPI.POST("/files/share-url", fileHandler.ShareUrl)
 	storageAPI.GET("/files/share-url", fileHandler.GetUrls)
@@ -749,11 +751,13 @@ func main() {
 	storageAPI.GET("/collections/v2", collectionHandler.GetV2)
 	storageAPI.GET("/collections/v3", collectionHandler.GetWithLimit)
 	storageAPI.POST("/collections/share", collectionHandler.Share)
+	storageAPI.POST("/collections/share/bulk", collectionHandler.BulkShare)
 	storageAPI.POST("/collections/join-link", collectionHandler.JoinLink)
 	storageAPI.POST("/collections/share-url", collectionHandler.ShareURL)
 	storageAPI.PUT("/collections/share-url", collectionHandler.UpdateShareURL)
 	storageAPI.DELETE("/collections/share-url/:collectionID", collectionHandler.UnShareURL)
 	storageAPI.POST("/collections/unshare", collectionHandler.UnShare)
+	storageAPI.POST("/collections/unshare/bulk", collectionHandler.BulkUnShare)
 	storageAPI.POST("/collections/leave/:collectionID", collectionHandler.Leave)
 	storageAPI.POST("/collections/add-files", collectionHandler.AddFiles)
 	storageAPI.POST("/collections/move-files", collectionHandler.MoveFiles)
@@ -989,7 +993,17 @@ func main() {
 	userEntityHandler := &api.UserEntityHandler{Controller: userEntityController}
 	spaceRepos := spacerepo.NewModule(db, s3Config)
 	userController.SpaceAccessResetter = spaceRepos
-	spaceModule := spacecontroller.NewModule(spaceRepos, userAuthRepo, spacecontroller.NewSpaceEmailSender(userRepo))
+	spaceWebPushConfig := spacecontroller.NewSpaceWebPushConfig(
+		viper.GetString("space.webPush.publicKey"),
+		viper.GetString("space.webPush.privateKey"),
+		viper.GetString("space.webPush.subscriber"),
+	)
+	spaceModule := spacecontroller.NewModule(
+		spaceRepos,
+		userAuthRepo,
+		spacecontroller.NewSpaceWebPushSender(spaceRepos.WebPush, spaceWebPushConfig),
+		spaceWebPushConfig,
+	)
 	spaceModule.Posts.AbuseNotifier = discordController
 	spaceDripController := spacecontroller.NewSpaceDripController(spaceRepos, userRepo, notificationHistoryRepo, lockController)
 	spaceModule.UserTokens = userController

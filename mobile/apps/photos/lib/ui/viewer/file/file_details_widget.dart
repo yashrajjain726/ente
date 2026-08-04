@@ -3,6 +3,7 @@ import "dart:developer";
 import "dart:io";
 
 import "package:ente_components/ente_components.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:exif_reader/exif_reader.dart";
 import "package:flutter/foundation.dart";
 import "package:flutter/material.dart";
@@ -12,7 +13,6 @@ import "package:photos/core/configuration.dart";
 import "package:photos/core/event_bus.dart";
 import "package:photos/core/user_config.dart";
 import "package:photos/events/people_changed_event.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/models/ffmpeg/ffprobe_props.dart";
 import "package:photos/models/file/extensions/file_props.dart";
 import 'package:photos/models/file/file.dart';
@@ -337,14 +337,14 @@ class _FileDetailsWidgetState extends State<FileDetailsWidget> {
                 toolbarHeight: 38,
                 titleSpacing: 0,
                 title: Text(
-                  AppLocalizations.of(context).details,
+                  context.strings.details,
                   style: TextStyles.h2.copyWith(
                     color: context.componentColors.textBase,
                   ),
                 ),
                 actions: [
                   IconButtonComponent(
-                    tooltip: AppLocalizations.of(context).close,
+                    tooltip: context.strings.close,
                     variant: IconButtonComponentVariant.circular,
                     shouldSurfaceExecutionStates: false,
                     icon: const HugeIcon(

@@ -1,8 +1,8 @@
-import 'package:ente_auth/l10n/l10n.dart';
 import 'package:ente_auth/ui/settings/data/import/import_file_cleanup.dart';
 import 'package:ente_auth/ui/settings/data/import/import_flow.dart';
 import 'package:ente_auth/ui/settings/data/import/proton_import_parser.dart';
 import 'package:ente_auth/utils/dialog_util.dart';
+import 'package:ente_strings/ente_strings.dart';
 import 'package:ente_ui/components/progress_dialog.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
@@ -10,7 +10,7 @@ import 'package:flutter/material.dart';
 import 'package:logging/logging.dart';
 
 Future<void> showProtonImportInstruction(BuildContext context) async {
-  final l10n = context.l10n;
+  final l10n = context.strings;
   await showFileImportInstruction(
     context: context,
     title: "Proton Authenticator",
@@ -24,7 +24,7 @@ Future<void> showProtonImportInstruction(BuildContext context) async {
 Future<void> _pickProtonJsonFile(BuildContext context) async {
   await pickAndProcessImportFile(
     context: context,
-    dialogTitle: context.l10n.importSelectJsonFile,
+    dialogTitle: context.strings.importSelectJsonFile,
     showProgressBeforeProcessing: false,
     logger: Logger('ProtonImport'),
     logMessage: 'Exception while processing Proton import',
@@ -49,8 +49,8 @@ Future<int?> _processProtonExportFile(
     if (!context.mounted) return null;
     await showErrorDialog(
       context,
-      context.l10n.invalidProtonExportTitle,
-      context.l10n.invalidProtonExportMessage,
+      context.strings.invalidProtonExportTitle,
+      context.strings.invalidProtonExportMessage,
     );
     return null;
   }
@@ -61,7 +61,7 @@ Future<int?> _processProtonExportFile(
       if (!context.mounted) return null;
       final password = await promptForImportPassword(
         context,
-        title: context.l10n.passwordForDecryptingExport,
+        title: context.strings.passwordForDecryptingExport,
       );
       if (password == null) {
         return null;
@@ -79,8 +79,8 @@ Future<int?> _processProtonExportFile(
             if (!context.mounted) return null;
             await showErrorDialog(
               context,
-              context.l10n.incorrectPasswordTitle,
-              context.l10n.pleaseCheckPasswordAndTryAgain,
+              context.strings.incorrectPasswordTitle,
+              context.strings.pleaseCheckPasswordAndTryAgain,
             );
             continue;
           case 'ok':

@@ -3,13 +3,13 @@ import 'dart:math';
 
 import "package:ente_components/ente_components.dart";
 import "package:ente_pure_utils/ente_pure_utils.dart";
+import "package:ente_strings/ente_strings.dart";
 import 'package:flutter/material.dart';
 import "package:flutter/services.dart";
 import "package:logging/logging.dart";
 import "package:photos/core/configuration.dart";
 import "package:photos/core/event_bus.dart";
 import "package:photos/events/clear_album_selections_event.dart";
-import "package:photos/generated/l10n.dart";
 import 'package:photos/models/collection/collection.dart';
 import "package:photos/models/collection/collection_items.dart";
 import "package:photos/models/selected_albums.dart";
@@ -386,7 +386,7 @@ class _CreateAlbumBottomSheetState extends State<_CreateAlbumBottomSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final strings = AppLocalizations.of(context);
+    final strings = context.strings;
     return BottomSheetComponent(
       title: strings.newAlbum,
       isKeyboardAware: true,

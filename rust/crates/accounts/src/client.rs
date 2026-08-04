@@ -39,7 +39,7 @@ fn require_srp_m2(auth_response: &AuthResponse) -> Result<&str> {
         .srp_m2
         .as_deref()
         .filter(|srp_m2| !srp_m2.is_empty())
-        .ok_or_else(|| Error::AuthenticationFailed("Missing server proof".to_string()))
+        .ok_or_else(|| Error::Srp("Missing server proof".to_string()))
 }
 
 /// Shared account client built on `ente_core::http::Api`.
@@ -123,9 +123,9 @@ impl AccountsClient {
 
         let srp_m2 = require_srp_m2(&auth_response)?;
         let server_proof = b64::decode(srp_m2)?;
-        srp_session.verify_m2(&server_proof).map_err(|_| {
-            Error::AuthenticationFailed("Server proof verification failed".to_string())
-        })?;
+        srp_session
+            .verify_m2(&server_proof)
+            .map_err(|_| Error::Srp("Server proof verification failed".to_string()))?;
 
         Ok((auth_response, creds.kek))
     }

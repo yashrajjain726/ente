@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import "package:ente_pure_utils/ente_pure_utils.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/foundation.dart";
 import 'package:flutter/material.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
@@ -12,7 +13,6 @@ import 'package:photos/core/event_bus.dart';
 import 'package:photos/events/subscription_purchased_event.dart';
 import 'package:photos/gateways/billing/models/billing_plan.dart';
 import 'package:photos/gateways/billing/models/subscription.dart';
-import "package:photos/generated/l10n.dart";
 import 'package:photos/models/user_details.dart';
 import "package:photos/service_locator.dart";
 import 'package:photos/services/account/user_service.dart';
@@ -79,7 +79,7 @@ class _StoreSubscriptionPageState extends State<StoreSubscriptionPage> {
       purchases,
     ) async {
       if (!mounted) return;
-      final l10n = AppLocalizations.of(context);
+      final l10n = context.strings;
       if (!_dialog.isShowing()) {
         await _dialog.show();
       }
@@ -203,7 +203,7 @@ class _StoreSubscriptionPageState extends State<StoreSubscriptionPage> {
     }
     _dialog = createProgressDialog(
       context,
-      AppLocalizations.of(context).pleaseWait,
+      context.strings.pleaseWait,
       isDismissible: true,
     );
     return Scaffold(
@@ -220,8 +220,8 @@ class _StoreSubscriptionPageState extends State<StoreSubscriptionPage> {
         ),
         title: Text(
           widget.isOnboarding
-              ? AppLocalizations.of(context).chooseYourPlan
-              : "${AppLocalizations.of(context).subscription}${kDebugMode ? ' Store' : ''}",
+              ? context.strings.chooseYourPlan
+              : "${context.strings.subscription}${kDebugMode ? ' Store' : ''}",
           style: textTheme.largeBold,
         ),
         centerTitle: true,
@@ -239,7 +239,7 @@ class _StoreSubscriptionPageState extends State<StoreSubscriptionPage> {
                   padding: const EdgeInsets.fromLTRB(24, 12, 24, 12),
                   child: ButtonWidgetV2(
                     buttonType: ButtonTypeV2.primary,
-                    labelText: AppLocalizations.of(context).continueLabel,
+                    labelText: context.strings.continueLabel,
                     isDisabled: _selectedProductID == null,
                     onTap: _selectedProductID == null
                         ? null
@@ -367,9 +367,7 @@ class _StoreSubscriptionPageState extends State<StoreSubscriptionPage> {
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 20),
             child: Text(
-              AppLocalizations.of(
-                context,
-              ).visitWebToManage(webUrl: kPhotosWebDomain),
+              context.strings.visitWebToManage(webUrl: kPhotosWebDomain),
               style: getEnteTextTheme(
                 context,
               ).small.copyWith(color: colorScheme.textMuted),
@@ -381,7 +379,7 @@ class _StoreSubscriptionPageState extends State<StoreSubscriptionPage> {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
             child: MenuItemWidgetNew(
-              title: AppLocalizations.of(context).managePaymentMethod,
+              title: context.strings.managePaymentMethod,
               menuItemColor: colorScheme.fillFaint,
               pressedColor: colorScheme.fillFaintPressed,
               trailingWidget: Icon(
@@ -405,8 +403,8 @@ class _StoreSubscriptionPageState extends State<StoreSubscriptionPage> {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
           child: MenuItemWidgetNew(
             title: _isFreePlanUser()
-                ? AppLocalizations.of(context).family
-                : AppLocalizations.of(context).manageFamily,
+                ? context.strings.family
+                : context.strings.manageFamily,
             menuItemColor: colorScheme.fillFaint,
             pressedColor: colorScheme.fillFaintPressed,
             trailingWidget: Icon(
@@ -467,8 +465,8 @@ class _StoreSubscriptionPageState extends State<StoreSubscriptionPage> {
     } else if (paymentProvider == stripe) {
       showErrorDialog(
         context,
-        AppLocalizations.of(context).sorry,
-        AppLocalizations.of(context).visitWebToManage(webUrl: kPhotosWebDomain),
+        context.strings.sorry,
+        context.strings.visitWebToManage(webUrl: kPhotosWebDomain),
       );
     } else {
       final String capitalizedWord = paymentProvider.isNotEmpty
@@ -476,10 +474,8 @@ class _StoreSubscriptionPageState extends State<StoreSubscriptionPage> {
           : '';
       showErrorDialog(
         context,
-        AppLocalizations.of(context).sorry,
-        AppLocalizations.of(
-          context,
-        ).contactToManageSubscription(provider: capitalizedWord),
+        context.strings.sorry,
+        context.strings.contactToManageSubscription(provider: capitalizedWord),
       );
     }
   }
@@ -530,10 +526,8 @@ class _StoreSubscriptionPageState extends State<StoreSubscriptionPage> {
             // ignore: unawaited_futures
             showErrorDialog(
               context,
-              AppLocalizations.of(context).sorry,
-              AppLocalizations.of(
-                context,
-              ).visitWebToManage(webUrl: kPhotosWebDomain),
+              context.strings.sorry,
+              context.strings.visitWebToManage(webUrl: kPhotosWebDomain),
             );
           },
           child: SubscriptionPlanWidget(
@@ -568,7 +562,7 @@ class _StoreSubscriptionPageState extends State<StoreSubscriptionPage> {
           child: SubscriptionPlanWidget(
             storage: _freePlan.storage,
             price: "",
-            period: AppLocalizations.of(context).freeTrial,
+            period: context.strings.freeTrial,
             isActive: widget.isOnboarding
                 ? _selectedProductID == freeProductID
                 : _isFreePlanUser(),
@@ -607,8 +601,8 @@ class _StoreSubscriptionPageState extends State<StoreSubscriptionPage> {
               // ignore: unawaited_futures
               showErrorDialog(
                 context,
-                AppLocalizations.of(context).sorry,
-                AppLocalizations.of(context).youCannotDowngradeToThisPlan,
+                context.strings.sorry,
+                context.strings.youCannotDowngradeToThisPlan,
               );
               return;
             }
@@ -638,10 +632,8 @@ class _StoreSubscriptionPageState extends State<StoreSubscriptionPage> {
               // ignore: unawaited_futures
               showErrorDialog(
                 context,
-                AppLocalizations.of(context).couldNotUpdateSubscription,
-                AppLocalizations.of(
-                  context,
-                ).pleaseContactSupportAndWeWillBeHappyToHelp,
+                context.strings.couldNotUpdateSubscription,
+                context.strings.pleaseContactSupportAndWeWillBeHappyToHelp,
               );
               return;
             } else {
@@ -735,8 +727,8 @@ class _StoreSubscriptionPageState extends State<StoreSubscriptionPage> {
     if (_isActiveStripeSubscriber) {
       await showErrorDialog(
         context,
-        AppLocalizations.of(context).sorry,
-        AppLocalizations.of(context).visitWebToManage(webUrl: kPhotosWebDomain),
+        context.strings.sorry,
+        context.strings.visitWebToManage(webUrl: kPhotosWebDomain),
       );
       return;
     }
@@ -759,8 +751,8 @@ class _StoreSubscriptionPageState extends State<StoreSubscriptionPage> {
       );
       await showErrorDialog(
         context,
-        AppLocalizations.of(context).sorry,
-        AppLocalizations.of(context).youCannotDowngradeToThisPlan,
+        context.strings.sorry,
+        context.strings.youCannotDowngradeToThisPlan,
       );
       return;
     }
@@ -787,8 +779,8 @@ class _StoreSubscriptionPageState extends State<StoreSubscriptionPage> {
       if (!mounted) return;
       await showErrorDialog(
         context,
-        AppLocalizations.of(context).couldNotUpdateSubscription,
-        AppLocalizations.of(context).pleaseContactSupportAndWeWillBeHappyToHelp,
+        context.strings.couldNotUpdateSubscription,
+        context.strings.pleaseContactSupportAndWeWillBeHappyToHelp,
       );
       return;
     }

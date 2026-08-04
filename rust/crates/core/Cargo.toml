@@ -16,7 +16,7 @@ getrandom = { version = "0.2", features = ["js"] }
 log = "0.4"
 md-5.workspace = true
 rand_core = { version = "0.6", features = ["getrandom"] }
-reqwest = { version = "0.12", default-features = false, features = ["http2", "charset", "system-proxy", "json", "rustls-tls-native-roots", "rustls-tls-webpki-roots"] }
+reqwest = { workspace = true, features = ["http2", "charset", "system-proxy", "json", "rustls-tls-native-roots", "rustls-tls-webpki-roots"] }
 salsa20 = "0.10"
 serde.workspace = true
 serde_json.workspace = true
@@ -27,7 +27,7 @@ xsalsa20poly1305 = "0.9"
 zeroize.workspace = true
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-reqwest = { version = "0.12", default-features = false, features = ["stream"] }
+reqwest = { workspace = true, features = ["stream"] }
 bytes = "1.11.1"
 futures-core = "0.3.32"
 tokio = { version = "1", features = ["time"] }

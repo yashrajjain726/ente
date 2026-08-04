@@ -1,10 +1,10 @@
 import "package:ente_components/ente_components.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:photos/core/constants.dart";
 import "package:photos/core/event_bus.dart";
 import "package:photos/events/force_reload_home_gallery_event.dart";
 import "package:photos/events/hide_shared_items_from_home_gallery_event.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/service_locator.dart";
 import "package:photos/ui/settings/components/settings_item.dart";
 import "package:photos/ui/settings/components/settings_page_scaffold.dart";
@@ -34,7 +34,7 @@ class _GallerySettingsScreenState extends State<GallerySettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
+    final l10n = context.strings;
 
     return SettingsPageScaffold(
       title: l10n.gallery,
@@ -84,7 +84,7 @@ class _GallerySettingsScreenState extends State<GallerySettingsScreen> {
   }
 
   Future<void> _showPhotoGridSizeSheet(BuildContext context) async {
-    final l10n = AppLocalizations.of(context);
+    final l10n = context.strings;
     await showBottomSheetComponent<void>(
       context: context,
       builder: (sheetContext) => BottomSheetComponent(
@@ -129,7 +129,7 @@ class _GallerySettingsScreenState extends State<GallerySettingsScreen> {
   }
 
   Future<void> _showGroupTypeSheet(BuildContext context) async {
-    final l10n = AppLocalizations.of(context);
+    final l10n = context.strings;
     final currentGroupType = localSettings.getGalleryGroupType();
     await showBottomSheetComponent<void>(
       context: context,

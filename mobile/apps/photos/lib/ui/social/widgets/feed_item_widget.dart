@@ -1,7 +1,7 @@
 import "package:ente_icons/ente_icons.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:photos/db/files_db.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/models/api/collection/user.dart";
 import "package:photos/models/file/file.dart";
 import "package:photos/models/social/feed_item.dart";
@@ -576,8 +576,8 @@ class _FeedTextContent extends StatelessWidget {
     // Multiple users: "Username and X others"
     final othersCount = feedItem.additionalActorCount;
     final othersText = othersCount == 1
-        ? AppLocalizations.of(context).and1Other
-        : AppLocalizations.of(context).andXOthers(count: othersCount);
+        ? context.strings.and1Other
+        : context.strings.andXOthers(count: othersCount);
 
     return Text.rich(
       TextSpan(
@@ -607,7 +607,7 @@ class _FeedTextContent extends StatelessWidget {
     BuildContext context,
     TextStyle baseStyle,
   ) {
-    final l10n = AppLocalizations.of(context);
+    final l10n = context.strings;
     final isOwn = feedItem.isOwnedByCurrentUser;
     switch (feedItem.type) {
       case FeedItemType.photoLike:
@@ -655,7 +655,7 @@ class _FeedTextContent extends StatelessWidget {
     BuildContext context,
     TextStyle baseStyle,
   ) {
-    final l10n = AppLocalizations.of(context);
+    final l10n = context.strings;
     final count = feedItem.sharedFileCount;
     final albumName = feedItem.collectionName ?? l10n.albums;
 

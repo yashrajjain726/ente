@@ -1,10 +1,10 @@
 import 'dart:io';
 
-import 'package:ente_auth/l10n/l10n.dart';
 import 'package:ente_auth/ui/components/buttons/button_component_adapter.dart';
 import 'package:ente_auth/ui/components/buttons/button_widget.dart';
 import 'package:ente_auth/ui/components/models/button_result.dart';
 import 'package:ente_components/ente_components.dart';
+import 'package:ente_strings/ente_strings.dart';
 import 'package:flutter/material.dart';
 import 'package:modal_bottom_sheet/modal_bottom_sheet.dart';
 
@@ -100,7 +100,7 @@ class ActionSheetWidget extends StatelessWidget {
           : null,
       actions: buttons.actions,
       showCloseButton: buttons.showCloseButton,
-      closeTooltip: context.l10n.close,
+      closeTooltip: context.strings.close,
       closeResult: buttons.closeResult,
       onClose: buttons.onClose(context),
       actionsTopSpacing: hasContent ? Spacing.lg : 0,

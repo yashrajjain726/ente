@@ -40,7 +40,6 @@ import type {
     CollectionSummary,
 } from "ente-new/photos/services/collection-summary";
 import { usePhotosAppContext } from "ente-new/photos/types/context";
-import { enableV2 } from "ente-new/photos/utils/feature-flags";
 import { t } from "i18next";
 import memoize from "memoize-one";
 import React, { useEffect, useMemo, useRef, useState } from "react";
@@ -173,7 +172,7 @@ export const AllAlbums: React.FC<AllAlbums> = ({
             </AllAlbumsDialog>
             <SingleInputDialog
                 {...albumNameInputVisibilityProps}
-                variant={enableV2 ? "v2" : "default"}
+                variant="v2"
                 title={t("new_album")}
                 label={t("album_name")}
                 submitButtonTitle={t("create")}

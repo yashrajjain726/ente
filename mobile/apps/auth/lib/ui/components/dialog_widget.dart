@@ -1,11 +1,11 @@
 import 'dart:async';
 
-import 'package:ente_auth/l10n/l10n.dart';
 import 'package:ente_auth/ui/components/buttons/button_component_adapter.dart';
 import 'package:ente_auth/ui/components/buttons/button_widget.dart';
 import 'package:ente_auth/ui/components/models/button_result.dart';
 import 'package:ente_base/typedefs.dart';
 import 'package:ente_components/ente_components.dart';
+import 'package:ente_strings/ente_strings.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -68,7 +68,7 @@ class DialogWidget extends StatelessWidget {
       content: hasBody ? _DialogBody(body!) : null,
       actions: sheetButtons.actions,
       showCloseButton: alwaysShowCloseButton || sheetButtons.showCloseButton,
-      closeTooltip: context.l10n.close,
+      closeTooltip: context.strings.close,
       closeResult: sheetButtons.closeResult,
       onClose: sheetButtons.onClose(context),
       actionsTopSpacing: hasContent ? Spacing.xl : 0,
@@ -209,7 +209,7 @@ class _TextInputDialogState extends State<TextInputDialog> {
       ],
       isKeyboardAware: true,
       showCloseButton: true,
-      closeTooltip: context.l10n.close,
+      closeTooltip: context.strings.close,
       closeResult: ButtonResult(),
     );
   }

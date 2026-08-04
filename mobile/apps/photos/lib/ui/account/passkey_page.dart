@@ -4,12 +4,11 @@ import 'dart:convert';
 import "package:app_links/app_links.dart";
 import "package:ente_components/ente_components.dart";
 import "package:ente_pure_utils/ente_pure_utils.dart";
+import "package:ente_strings/ente_strings.dart";
 import 'package:flutter/material.dart';
 import 'package:logging/logging.dart';
 import 'package:photos/core/configuration.dart';
 import "package:photos/core/errors.dart";
-import "package:photos/generated/l10n.dart";
-import "package:photos/l10n/l10n.dart";
 import "package:photos/models/account/two_factor.dart";
 import 'package:photos/services/account/user_service.dart';
 import "package:photos/ui/account/two_factor_authentication_page.dart";
@@ -69,14 +68,14 @@ class _PasskeyPageState extends State<PasskeyPage> {
       );
     } on PassKeySessionNotVerifiedError {
       if (!mounted) return;
-      showToast(context, context.l10n.passKeyPendingVerification);
+      showToast(context, context.strings.passKeyPendingVerification);
       return;
     } on PassKeySessionExpiredError {
       if (!mounted) return;
       await showAlertBottomSheet(
         context,
-        title: context.l10n.loginSessionExpired,
-        message: context.l10n.loginSessionExpiredDetails,
+        title: context.strings.loginSessionExpired,
+        message: context.strings.loginSessionExpiredDetails,
         assetPath: 'assets/warning-grey.png',
       );
       if (!mounted) return;
@@ -106,16 +105,13 @@ class _PasskeyPageState extends State<PasskeyPage> {
       if (mounted && link.toLowerCase().startsWith("ente://passkey")) {
         if (Configuration.instance.isLoggedIn()) {
           _logger.info('ignored deeplink: already configured');
-          showToast(
-            context,
-            AppLocalizations.of(context).accountIsAlreadyConfigured,
-          );
+          showToast(context, context.strings.accountIsAlreadyConfigured);
           return;
         }
         final parsedUri = Uri.parse(link);
         final sessionID = parsedUri.queryParameters['passkeySessionID'];
         if (sessionID != widget.sessionID) {
-          showToast(context, AppLocalizations.of(context).sessionIdMismatch);
+          showToast(context, context.strings.sessionIdMismatch);
           _logger.warning('ignored deeplink: sessionID mismatch');
           return;
         }
@@ -167,7 +163,7 @@ class _PasskeyPageState extends State<PasskeyPage> {
           },
         ),
         title: Text(
-          AppLocalizations.of(context).passkey,
+          context.strings.passkey,
           style: TextStyles.large.copyWith(color: colors.textBase),
         ),
         centerTitle: true,
@@ -185,18 +181,18 @@ class _PasskeyPageState extends State<PasskeyPage> {
           children: [
             const Spacer(),
             Text(
-              context.l10n.waitingForVerification,
+              context.strings.waitingForVerification,
               style: TextStyles.body.copyWith(color: colors.textLight),
               textAlign: TextAlign.center,
             ),
             const Spacer(),
             ButtonComponent(
-              label: context.l10n.tryAgain,
+              label: context.strings.tryAgain,
               onTap: () => launchPasskey(),
             ),
             const SizedBox(height: 16),
             ButtonComponent(
-              label: context.l10n.checkStatus,
+              label: context.strings.checkStatus,
               variant: ButtonComponentVariant.secondary,
               shouldSurfaceExecutionStates: true,
               onTap: () async {
@@ -215,7 +211,7 @@ class _PasskeyPageState extends State<PasskeyPage> {
             if (widget.totp2FASessionID.isNotEmpty) ...[
               const SizedBox(height: 16),
               ButtonComponent(
-                label: context.l10n.loginWithTOTP,
+                label: context.strings.loginWithTOTP,
                 variant: ButtonComponentVariant.link,
                 size: ButtonComponentSize.small,
                 onTap: () async {
@@ -229,7 +225,7 @@ class _PasskeyPageState extends State<PasskeyPage> {
             ],
             const SizedBox(height: 12),
             ButtonComponent(
-              label: context.l10n.recoverAccount,
+              label: context.strings.recoverAccount,
               variant: ButtonComponentVariant.link,
               size: ButtonComponentSize.small,
               onTap: () async {

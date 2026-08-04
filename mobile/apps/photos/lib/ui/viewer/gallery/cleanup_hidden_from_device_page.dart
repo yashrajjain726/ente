@@ -1,11 +1,11 @@
 import "dart:math";
 import "dart:ui";
 
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:photos/core/event_bus.dart";
 import "package:photos/events/files_updated_event.dart";
 import "package:photos/events/local_photos_updated_event.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/models/file_load_result.dart";
 import "package:photos/models/gallery_type.dart";
 import "package:photos/models/selected_files.dart";
@@ -62,7 +62,7 @@ class _CleanupHiddenFromDevicePageState
     final deleteAllButtonHeight = 40.0 + max(bottomPadding, 6.0) + 12.0;
     final appBar = GalleryAppBarWidget.sliverConfig(
       GalleryType.cleanupHiddenFromDevice,
-      AppLocalizations.of(context).deleteOnDeviceFiles,
+      context.strings.deleteOnDeviceFiles,
       _selectedFiles,
     );
 
@@ -78,9 +78,7 @@ class _CleanupHiddenFromDevicePageState
       tagPrefix: "cleanup_hidden_from_device",
       selectedFiles: _selectedFiles,
       enableFileGrouping: false,
-      emptyState: EmptyState(
-        text: AppLocalizations.of(context).noHiddenFilesOnDevice,
-      ),
+      emptyState: EmptyState(text: context.strings.noHiddenFilesOnDevice),
     );
 
     return GalleryBoundariesProvider(
@@ -145,7 +143,7 @@ class _CleanupHiddenFromDevicePageState
                       horizontal: 16,
                     ),
                     child: Text(
-                      AppLocalizations.of(context).deleteAll,
+                      context.strings.deleteAll,
                       style: Theme.of(context).textTheme.titleSmall!.copyWith(
                         color: const Color.fromRGBO(255, 101, 101, 1),
                       ),
@@ -165,7 +163,7 @@ class _CleanupHiddenFromDevicePageState
     if (allFiles.isEmpty) return;
 
     if (!mounted) return;
-    final l10n = AppLocalizations.of(context);
+    final l10n = context.strings;
     if (!mounted) return;
     final actionResult = await showActionSheet(
       context: context,

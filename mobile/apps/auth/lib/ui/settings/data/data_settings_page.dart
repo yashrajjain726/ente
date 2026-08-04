@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:ente_auth/l10n/l10n.dart';
 import 'package:ente_auth/services/deduplication_service.dart';
 import 'package:ente_auth/services/flagservice.dart';
 import 'package:ente_auth/ui/settings/components/auth_settings_item.dart';
@@ -12,6 +11,7 @@ import 'package:ente_auth/ui/settings/data/import_page.dart';
 import 'package:ente_auth/ui/settings/data/local_backup_settings_page.dart';
 import 'package:ente_auth/utils/dialog_util.dart';
 import 'package:ente_components/ente_components.dart';
+import 'package:ente_strings/ente_strings.dart';
 import 'package:flutter/material.dart';
 import 'package:hugeicons/hugeicons.dart';
 
@@ -20,7 +20,7 @@ class DataSettingsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = context.l10n;
+    final l10n = context.strings;
     return AuthSettingsPageScaffold(
       title: l10n.data,
       children: [
@@ -66,7 +66,7 @@ class DataSettingsPage extends StatelessWidget {
   }
 
   Future<void> _openDuplicateCodes(BuildContext context) async {
-    final l10n = context.l10n;
+    final l10n = context.strings;
     final duplicateCodes = await DeduplicationService.instance
         .getDuplicateCodes();
     if (!context.mounted) return;

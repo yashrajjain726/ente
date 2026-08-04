@@ -39,8 +39,7 @@ const textBase = "#000000";
 const textSecondary = "#777777";
 const lightSurface = "#F2F2F2";
 const lightSurfaceHover = "#E8E8E8";
-const composerSurface = "#FFFFFF";
-const composerBorder = "#DEDEDE";
+const composerSurface = lightSurface;
 const outgoingBubble = "#0DAF35";
 const incomingBubble = lightSurface;
 const outgoingMessageText = "#FFFFFF";
@@ -2356,7 +2355,6 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                             >
                                                 <MenuList
                                                     autoFocus
-                                                    autoFocusItem
                                                     onKeyDown={
                                                         handleMessageActionsKeyDown
                                                     }
@@ -2539,7 +2537,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                             value={messageText}
                                             sx={{
                                                 bgcolor: composerSurface,
-                                                border: `1px solid ${composerBorder}`,
+                                                border: 0,
                                                 borderRadius: "24px",
                                                 boxSizing: "border-box",
                                                 color: textBase,
@@ -2562,9 +2560,6 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                                 "&::placeholder": {
                                                     color: textSecondary,
                                                 },
-                                                "&:focus": {
-                                                    borderColor: green,
-                                                },
                                             }}
                                         />
                                         <Box
@@ -2580,12 +2575,12 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                                 alignItems: "center",
                                                 bgcolor: canSend
                                                     ? green
-                                                    : lightSurfaceHover,
+                                                    : lightSurface,
                                                 border: 0,
                                                 borderRadius: "50%",
                                                 color: canSend
                                                     ? "#FFFFFF"
-                                                    : textSecondary,
+                                                    : "#BDBDBD",
                                                 cursor: canSend
                                                     ? "pointer"
                                                     : "default",
@@ -2593,10 +2588,9 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                                 flexShrink: 0,
                                                 height: composerHeight,
                                                 justifyContent: "center",
-                                                opacity: canSend ? 1 : 0.42,
                                                 p: 0,
                                                 transition:
-                                                    "background-color 180ms ease, color 180ms ease, opacity 180ms ease, transform 120ms ease",
+                                                    "background-color 180ms ease, color 180ms ease, transform 120ms ease",
                                                 width: composerHeight,
                                                 "&:active": {
                                                     transform: canSend
@@ -2610,7 +2604,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                                 "&:hover": {
                                                     bgcolor: canSend
                                                         ? "#07AE22"
-                                                        : lightSurfaceHover,
+                                                        : lightSurface,
                                                 },
                                             }}
                                         >

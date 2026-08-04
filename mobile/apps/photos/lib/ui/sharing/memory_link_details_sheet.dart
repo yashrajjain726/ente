@@ -1,9 +1,9 @@
 import "dart:async";
 
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:flutter/services.dart";
 import "package:hugeicons/hugeicons.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/services/memory_share_service.dart";
 import "package:photos/theme/ente_theme.dart";
 import "package:photos/ui/components/alert_bottom_sheet.dart";
@@ -18,7 +18,7 @@ Future<bool?> showMemoryLinkDetailsSheet(
   required int shareId,
   required String title,
 }) {
-  final l10n = AppLocalizations.of(context);
+  final l10n = context.strings;
   return showBaseBottomSheet<bool>(
     context,
     title: l10n.shareLink,

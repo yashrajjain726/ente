@@ -1,5 +1,5 @@
+import "package:ente_strings/ente_strings.dart";
 import 'package:flutter/material.dart';
-import "package:photos/generated/l10n.dart";
 import "package:photos/theme/ente_theme.dart";
 import "package:photos/ui/tools/editor/video_editor/video_editor_app_bar.dart";
 import "package:photos/ui/tools/editor/video_editor/video_editor_bottom_action.dart";
@@ -25,7 +25,7 @@ class VideoRotatePage extends StatelessWidget {
           }
           Navigator.pop(context);
         },
-        primaryActionLabel: AppLocalizations.of(context).done,
+        primaryActionLabel: context.strings.done,
         onPrimaryAction: () {
           Navigator.pop(context);
         },
@@ -61,14 +61,14 @@ class VideoRotatePage extends StatelessWidget {
               VideoEditorMainActions(
                 children: [
                   VideoEditorBottomAction(
-                    label: AppLocalizations.of(context).left,
+                    label: context.strings.left,
                     onPressed: () =>
                         controller.rotate90Degrees(RotateDirection.left),
                     icon: Icons.rotate_left,
                   ),
                   const SizedBox(width: 24),
                   VideoEditorBottomAction(
-                    label: AppLocalizations.of(context).right,
+                    label: context.strings.right,
                     onPressed: () =>
                         controller.rotate90Degrees(RotateDirection.right),
                     icon: Icons.rotate_right,

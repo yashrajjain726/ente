@@ -2,13 +2,13 @@ import "dart:async";
 
 import "package:ente_components/theme/text_styles.dart";
 import "package:ente_pure_utils/ente_pure_utils.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:logging/logging.dart";
 import "package:photos/core/configuration.dart";
 import "package:photos/core/event_bus.dart";
 import "package:photos/db/files_db.dart";
 import "package:photos/events/tab_changed_event.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/models/collection/collection_items.dart";
 import "package:photos/models/file/file.dart";
 import "package:photos/models/social/feed_data_provider.dart";
@@ -564,7 +564,7 @@ class _FeedScreenState extends State<FeedScreen> {
               )
             : null,
         title: Text(
-          AppLocalizations.of(context).feed,
+          context.strings.feed,
           style: widget.showBackButton
               ? TextStyles.display3.copyWith(color: textTheme.h4Bold.color)
               : TextStyles.display1.copyWith(color: textTheme.h4Bold.color),

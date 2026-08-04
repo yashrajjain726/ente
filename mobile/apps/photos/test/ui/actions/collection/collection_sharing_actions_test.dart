@@ -2,7 +2,7 @@ import "package:ente_components/ente_components.dart";
 import "package:flutter/material.dart";
 import "package:flutter_test/flutter_test.dart";
 import "package:photos/ente_theme_data.dart";
-import "package:photos/generated/l10n.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:photos/models/api/collection/user.dart";
 import "package:photos/models/collection/collection.dart";
 import "package:photos/services/collections_service.dart";
@@ -17,8 +17,8 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           theme: lightThemeData,
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
-          supportedLocales: AppLocalizations.supportedLocales,
+          localizationsDelegates: StringsLocalizations.localizationsDelegates,
+          supportedLocales: StringsLocalizations.supportedLocales,
           home: Scaffold(
             body: Builder(
               builder: (context) {

@@ -1,9 +1,9 @@
 import "package:ente_accounts/models/user_details.dart";
 import 'package:ente_components/ente_components.dart';
+import "package:ente_strings/ente_strings.dart";
 import "package:ente_ui/components/loading_widget.dart";
 import "package:flutter/material.dart";
 import "package:intl/intl.dart";
-import "package:locker/l10n/l10n.dart";
 import "package:locker/services/configuration.dart";
 import "package:locker/states/user_details_state.dart";
 
@@ -123,7 +123,7 @@ class _UsageContent extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         Text(
-          context.l10n.itemsStored,
+          context.strings.itemsStored,
           style: TextStyles.large.copyWith(color: cardTextMuted),
         ),
         const SizedBox(height: 4),
@@ -142,7 +142,7 @@ class _UsageContent extends StatelessWidget {
               children: [
                 TextSpan(text: formattedUsed),
                 TextSpan(
-                  text: " ${context.l10n.of_} ",
+                  text: " ${context.strings.of_} ",
                   style: TextStyles.h1.copyWith(color: cardTextMuted),
                 ),
                 TextSpan(text: formattedMax),
@@ -204,7 +204,7 @@ class _UsageContent extends StatelessWidget {
               ),
               const SizedBox(width: 4),
               Text(
-                context.l10n.usageYou,
+                context.strings.usageYou,
                 style: TextStyles.mini.copyWith(color: cardText),
               ),
               const SizedBox(width: 16),
@@ -218,7 +218,7 @@ class _UsageContent extends StatelessWidget {
               ),
               const SizedBox(width: 4),
               Text(
-                context.l10n.usageFamily,
+                context.strings.usageFamily,
                 style: TextStyles.mini.copyWith(color: cardText),
               ),
             ],

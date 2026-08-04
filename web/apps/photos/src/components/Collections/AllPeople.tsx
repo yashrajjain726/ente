@@ -659,9 +659,10 @@ const AllPeopleContent: React.FC<AllPeopleContentProps> = ({
         <DialogContent
             sx={{
                 "&&": { padding: 0 },
-                height: hasSearchQuery
-                    ? "80svh"
-                    : `min(80svh, ${listContentHeight}px)`,
+                height:
+                    hasSearchQuery || items.length === 0
+                        ? "80svh"
+                        : `min(80svh, ${listContentHeight}px)`,
                 display: "flex",
                 flexDirection: "column",
             }}

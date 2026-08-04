@@ -1,6 +1,6 @@
+import "package:ente_strings/ente_strings.dart";
 import 'package:flutter/material.dart';
 import "package:photos/ente_theme_data.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/theme/ente_theme.dart";
 
 class VideoEditorAppBar extends StatelessWidget implements PreferredSizeWidget {
@@ -34,10 +34,7 @@ class VideoEditorAppBar extends StatelessWidget implements PreferredSizeWidget {
         children: [
           TextButton(
             onPressed: onCancel,
-            child: Text(
-              AppLocalizations.of(context).cancel,
-              style: textTheme.body,
-            ),
+            child: Text(context.strings.cancel, style: textTheme.body),
           ),
           TextButton(
             onPressed: isPrimaryEnabled ? onPrimaryAction : null,

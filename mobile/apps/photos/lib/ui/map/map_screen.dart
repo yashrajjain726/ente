@@ -3,12 +3,12 @@ import "dart:isolate";
 
 import "package:collection/collection.dart";
 import "package:computer/computer.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/foundation.dart";
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import "package:latlong2/latlong.dart";
 import "package:logging/logging.dart";
-import "package:photos/generated/l10n.dart";
 import 'package:photos/models/file/file.dart';
 import "package:photos/models/location/location.dart";
 import "package:photos/theme/ente_theme.dart";
@@ -91,10 +91,7 @@ class _MapScreenState extends State<MapScreen> {
 
     if (tempMarkers.isEmpty) {
       if (!mounted) return;
-      showShortToast(
-        context,
-        AppLocalizations.of(context).noImagesWithLocation,
-      );
+      showShortToast(context, context.strings.noImagesWithLocation);
       if (!visibleImages.isClosed) {
         visibleImages.sink.add([]);
       }

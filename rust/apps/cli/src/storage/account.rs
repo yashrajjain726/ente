@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use crate::{
     Result,
     models::account::{Account, AccountSecrets, App},

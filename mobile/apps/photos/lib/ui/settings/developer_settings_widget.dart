@@ -1,5 +1,5 @@
+import "package:ente_strings/ente_strings.dart";
 import 'package:flutter/material.dart';
-import "package:photos/generated/l10n.dart";
 import "package:photos/service_locator.dart";
 
 class DeveloperSettingsWidget extends StatelessWidget {
@@ -13,9 +13,9 @@ class DeveloperSettingsWidget extends StatelessWidget {
       return Padding(
         padding: const EdgeInsets.only(bottom: 20),
         child: Text(
-          AppLocalizations.of(
-            context,
-          ).customEndpoint(endpoint: "${endpointURI.host}:${endpointURI.port}"),
+          context.strings.customEndpoint(
+            endpoint: "${endpointURI.host}:${endpointURI.port}",
+          ),
           style: Theme.of(context).textTheme.bodySmall,
         ),
       );

@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:ente_auth/ente_theme_data.dart';
-import 'package:ente_auth/l10n/l10n.dart';
 import 'package:ente_auth/models/code.dart';
 import 'package:ente_auth/services/local_backup_service.dart';
 import 'package:ente_auth/store/code_store.dart';
@@ -10,6 +9,7 @@ import 'package:ente_auth/ui/components/buttons/button_widget.dart';
 import 'package:ente_auth/utils/dialog_util.dart';
 import 'package:ente_auth/utils/platform_util.dart';
 import 'package:ente_lock_screen/local_authentication_service.dart';
+import 'package:ente_strings/ente_strings.dart';
 import 'package:flutter/material.dart';
 import 'package:logging/logging.dart';
 
@@ -35,14 +35,14 @@ class _RawCodesViewerState extends State<RawCodesViewer> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(elevation: 0, title: Text(context.l10n.rawCodeData)),
+      appBar: AppBar(elevation: 0, title: Text(context.strings.rawCodeData)),
       body: _getBody(),
     );
   }
 
   Widget _getBody() {
     if (_errors.isEmpty) {
-      return Center(child: Text(context.l10n.noResult));
+      return Center(child: Text(context.strings.noResult));
     }
 
     return ListView.separated(
@@ -63,7 +63,7 @@ class _RawCodesViewerState extends State<RawCodesViewer> {
 
   Future<void> _confirmDelete(Code code) async {
     FocusScope.of(context).requestFocus();
-    final l10n = context.l10n;
+    final l10n = context.strings;
     final result = await showChoiceActionSheet(
       context,
       title: l10n.deleteUnparseableCodeTitle,
@@ -130,7 +130,7 @@ class _RawCodeCard extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  '${context.l10n.rawCodeData} ${index + 1}',
+                  '${context.strings.rawCodeData} ${index + 1}',
                   style: const TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
@@ -138,7 +138,7 @@ class _RawCodeCard extends StatelessWidget {
                 ),
               ),
               IconButton(
-                tooltip: context.l10n.delete,
+                tooltip: context.strings.delete,
                 visualDensity: VisualDensity.compact,
                 color: colorScheme.warning700,
                 onPressed: onDelete,
@@ -149,7 +149,7 @@ class _RawCodeCard extends StatelessWidget {
           if (parseError != null && parseError.isNotEmpty) ...[
             const SizedBox(height: 4),
             Text(
-              context.l10n.parsingError,
+              context.strings.parsingError,
               style: TextStyle(
                 color: colorScheme.warning700,
                 fontSize: 12,

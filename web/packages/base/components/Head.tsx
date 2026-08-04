@@ -20,6 +20,10 @@ const AlbumsFontPreloads: React.FC = () => (
     </>
 );
 
+const albumsPreviewTitle = "Photos, shared with you";
+const albumsPreviewDescription = "Tap to view on Ente";
+const albumsPreviewImage = "https://albums.ente.com/images/preview.png";
+
 /**
  * A custom version of "next/head" that sets the title, description, favicon and
  * some other boilerplate <head> tags.
@@ -62,19 +66,20 @@ export const CustomHeadAlbumsStatic: React.FC = () => (
         <AlbumsFontPreloads />
         <title>Ente Photos</title>
         <link rel="icon" href="/images/favicon.png" type="image/png" />
-        <meta
-            name="description"
-            content="Safely store and share your best moments"
-        />
-        <meta
-            property="og:image"
-            content="https://albums.ente.com/images/preview.jpg"
-        />
-        {/* Twitter wants its own thing. */}
-        <meta
-            name="twitter:image"
-            content="https://albums.ente.com/images/preview.jpg"
-        />
+        <meta name="description" content={albumsPreviewDescription} />
+        <meta property="og:type" content="website" />
+        <meta property="og:title" content={albumsPreviewTitle} />
+        <meta property="og:description" content={albumsPreviewDescription} />
+        <meta property="og:image" content={albumsPreviewImage} />
+        <meta property="og:image:type" content="image/png" />
+        <meta property="og:image:width" content="1200" />
+        <meta property="og:image:height" content="630" />
+        <meta property="og:image:alt" content="Take a look!" />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content={albumsPreviewTitle} />
+        <meta name="twitter:description" content={albumsPreviewDescription} />
+        <meta name="twitter:image" content={albumsPreviewImage} />
+        <meta name="twitter:image:alt" content="Take a look!" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta name="referrer" content="strict-origin-when-cross-origin" />
     </Head>

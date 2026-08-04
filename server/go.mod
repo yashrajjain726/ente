@@ -5,6 +5,7 @@ go 1.26.0
 toolchain go1.26.5
 
 require (
+	github.com/SherClockHolmes/webpush-go v1.4.0
 	github.com/TwiN/go-away v1.6.13
 	github.com/avct/uasurfer v0.0.0-20191028135549-26b5daa857f1
 	github.com/awa/go-iap v1.3.16

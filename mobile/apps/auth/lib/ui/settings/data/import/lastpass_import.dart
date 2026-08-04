@@ -1,15 +1,15 @@
 import 'dart:convert';
 
-import 'package:ente_auth/l10n/l10n.dart';
 import 'package:ente_auth/models/code.dart';
 import 'package:ente_auth/ui/settings/data/import/import_file_cleanup.dart';
 import 'package:ente_auth/ui/settings/data/import/import_flow.dart';
+import 'package:ente_strings/ente_strings.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:logging/logging.dart';
 
 Future<void> showLastpassImportInstruction(BuildContext context) async {
-  final l10n = context.l10n;
+  final l10n = context.strings;
   await showFileImportInstruction(
     context: context,
     title: "LastPass Authenticator",

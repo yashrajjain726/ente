@@ -1,12 +1,12 @@
 import "dart:async";
 
 import "package:ente_components/ente_components.dart";
+import "package:ente_strings/ente_strings.dart";
 import 'package:flutter/material.dart';
 import "package:hugeicons/hugeicons.dart";
 import "package:photos/core/event_bus.dart";
 import "package:photos/events/album_sort_order_change_event.dart";
 import "package:photos/events/collection_updated_event.dart";
-import "package:photos/generated/l10n.dart";
 import 'package:photos/models/collection/collection.dart';
 import 'package:photos/models/collection/collection_items.dart';
 import "package:photos/models/selected_albums.dart";
@@ -158,7 +158,7 @@ class _CollectionListPageState extends State<CollectionListPage> {
 
   List<EntePopupMenuOption<_CollectionListMenuAction>> _buildMenuOptions() {
     final colorScheme = getEnteColorScheme(context);
-    final strings = AppLocalizations.of(context);
+    final strings = context.strings;
     final currentViewType = albumViewType ?? localSettings.albumViewType();
     final isListView = currentViewType == AlbumViewType.list;
     final currentSortKey = sortKey;

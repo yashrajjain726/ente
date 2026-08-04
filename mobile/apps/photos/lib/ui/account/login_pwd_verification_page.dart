@@ -1,12 +1,12 @@
 import "package:dio/dio.dart";
 import "package:ente_components/ente_components.dart";
 import "package:ente_crypto/ente_crypto.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/foundation.dart";
 import 'package:flutter/material.dart';
 import "package:logging/logging.dart";
 import 'package:photos/core/configuration.dart';
 import "package:photos/gateways/users/models/srp.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/services/account/user_service.dart";
 import "package:photos/ui/components/buttons/button_widget.dart"
     show ButtonAction;
@@ -70,7 +70,7 @@ class _LoginPasswordVerificationPageState
           },
         ),
         title: Text(
-          AppLocalizations.of(context).logInLabel,
+          context.strings.logInLabel,
           style: TextStyles.large.copyWith(color: colors.textBase),
         ),
         centerTitle: true,
@@ -80,7 +80,7 @@ class _LoginPasswordVerificationPageState
         padding: const EdgeInsets.symmetric(horizontal: 16),
         child: ButtonComponent(
           key: const ValueKey("verifyPasswordButton"),
-          label: AppLocalizations.of(context).logInLabel,
+          label: context.strings.logInLabel,
           isDisabled: !_hasPassword,
           onTap: _verifyEnteredPassword,
         ),
@@ -115,8 +115,8 @@ class _LoginPasswordVerificationPageState
           ),
           TextInputComponent(
             key: const ValueKey("passwordInputField"),
-            label: AppLocalizations.of(context).password,
-            hintText: AppLocalizations.of(context).enterYourPassword,
+            label: context.strings.password,
+            hintText: context.strings.enterYourPassword,
             controller: _passwordController,
             isPasswordInput: true,
             isRequired: true,
@@ -138,7 +138,7 @@ class _LoginPasswordVerificationPageState
             alignment: Alignment.centerRight,
             child: ButtonComponent(
               variant: ButtonComponentVariant.link,
-              label: AppLocalizations.of(context).forgotPassword,
+              label: context.strings.forgotPassword,
               size: ButtonComponentSize.small,
               onTap: () async {
                 await UserService.instance.sendOtt(
@@ -157,7 +157,7 @@ class _LoginPasswordVerificationPageState
   Future<void> verifyPassword(BuildContext context, String password) async {
     final dialog = createProgressDialog(
       context,
-      AppLocalizations.of(context).pleaseWait,
+      context.strings.pleaseWait,
       isDismissible: true,
     );
     await dialog.show();
@@ -176,8 +176,8 @@ class _LoginPasswordVerificationPageState
         if (!context.mounted) return;
         await _showContactSupportDialog(
           context,
-          AppLocalizations.of(context).incorrectPasswordTitle,
-          AppLocalizations.of(context).pleaseTryAgain,
+          context.strings.incorrectPasswordTitle,
+          context.strings.pleaseTryAgain,
         );
       } else {
         _logger.severe('API failure during SRP login ${e.type}', e, s);
@@ -187,17 +187,15 @@ class _LoginPasswordVerificationPageState
           if (!context.mounted) return;
           await _showContactSupportDialog(
             context,
-            AppLocalizations.of(context).noInternetConnection,
-            AppLocalizations.of(
-              context,
-            ).pleaseCheckYourInternetConnectionAndTryAgain,
+            context.strings.noInternetConnection,
+            context.strings.pleaseCheckYourInternetConnectionAndTryAgain,
           );
         } else {
           if (!context.mounted) return;
           await _showContactSupportDialog(
             context,
-            AppLocalizations.of(context).somethingWentWrong,
-            AppLocalizations.of(context).verificationFailedPleaseTryAgain,
+            context.strings.somethingWentWrong,
+            context.strings.verificationFailedPleaseTryAgain,
           );
         }
       }
@@ -219,9 +217,9 @@ class _LoginPasswordVerificationPageState
         if (!context.mounted) return;
         final dialogChoice = await showChoiceDialog(
           context,
-          title: AppLocalizations.of(context).recreatePasswordTitle,
-          body: AppLocalizations.of(context).recreatePasswordBody,
-          firstButtonLabel: AppLocalizations.of(context).useRecoveryKey,
+          title: context.strings.recreatePasswordTitle,
+          body: context.strings.recreatePasswordBody,
+          firstButtonLabel: context.strings.useRecoveryKey,
         );
         if (dialogChoice?.action == ButtonAction.first && context.mounted) {
           await UserService.instance.sendOtt(
@@ -236,8 +234,8 @@ class _LoginPasswordVerificationPageState
         if (!context.mounted) return;
         await _showContactSupportDialog(
           context,
-          AppLocalizations.of(context).oops,
-          AppLocalizations.of(context).verificationFailedPleaseTryAgain,
+          context.strings.oops,
+          context.strings.verificationFailedPleaseTryAgain,
         );
       }
     }
@@ -252,13 +250,13 @@ class _LoginPasswordVerificationPageState
       context,
       title: title,
       body: message,
-      firstButtonLabel: AppLocalizations.of(context).contactSupport,
-      secondButtonLabel: AppLocalizations.of(context).ok,
+      firstButtonLabel: context.strings.contactSupport,
+      secondButtonLabel: context.strings.ok,
     );
     if (dialogChoice?.action == ButtonAction.first && context.mounted) {
       await sendLogs(
         context,
-        AppLocalizations.of(context).contactSupport,
+        context.strings.contactSupport,
         "support@ente.com",
         postShare: () {},
       );

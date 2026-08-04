@@ -1,4 +1,5 @@
 import { AlbumsAppProviders } from "@/app/providers/AlbumsAppProviders";
+import "@fontsource-variable/outfit";
 import type { AppProps } from "next/app";
 
 import "@/app/styles/fonts.css";

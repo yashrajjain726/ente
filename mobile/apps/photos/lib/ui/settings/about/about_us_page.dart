@@ -1,6 +1,6 @@
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:hugeicons/hugeicons.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/service_locator.dart";
 import "package:photos/ui/common/web_page.dart";
 import "package:photos/ui/notification/toast.dart";
@@ -15,7 +15,7 @@ class AboutUsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
+    final l10n = context.strings;
 
     return SettingsPageScaffold(
       title: l10n.about,
@@ -90,10 +90,7 @@ class AboutUsPage extends StatelessWidget {
   }
 
   Future<void> _checkForUpdates(BuildContext context) async {
-    final dialog = createProgressDialog(
-      context,
-      AppLocalizations.of(context).checking,
-    );
+    final dialog = createProgressDialog(context, context.strings.checking);
     await dialog.show();
     final shouldUpdate = await updateService.shouldUpdate();
     await dialog.hide();
@@ -109,10 +106,7 @@ class AboutUsPage extends StatelessWidget {
       );
     } else {
       if (!context.mounted) return;
-      showShortToast(
-        context,
-        AppLocalizations.of(context).youAreOnTheLatestVersion,
-      );
+      showShortToast(context, context.strings.youAreOnTheLatestVersion);
     }
   }
 }

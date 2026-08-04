@@ -1,10 +1,10 @@
 import "package:ente_components/ente_components.dart";
 import 'package:ente_pure_utils/ente_pure_utils.dart';
+import "package:ente_strings/ente_strings.dart";
 import "package:ente_ui/utils/toast_util.dart";
 import "package:flutter/material.dart";
 import "package:flutter/services.dart";
 import "package:locker/extensions/collection_extension.dart";
-import "package:locker/l10n/l10n.dart";
 import 'package:locker/models/file_type.dart';
 import 'package:locker/models/selected_collections.dart';
 import 'package:locker/models/selected_files.dart';
@@ -218,7 +218,7 @@ class _ItemListViewState extends State<ItemListView> {
             ),
             const SizedBox(height: 16),
             Text(
-              context.l10n.noFilesFound,
+              context.strings.noFilesFound,
               style: TextStyles.body.copyWith(
                 color: context.componentColors.textLight,
               ),
@@ -307,8 +307,8 @@ class FileListViewHelpers {
     return Center(
       child: EmptyStateWidget(
         assetPath: 'assets/empty_state.png',
-        title: context.l10n.searchEmptyTitle,
-        subtitle: context.l10n.searchEmptyDescription,
+        title: context.strings.searchEmptyTitle,
+        subtitle: context.strings.searchEmptyDescription,
         showBorder: false,
       ),
     );
@@ -338,12 +338,14 @@ class FileListViewHelpers {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        context.l10n.searchEverywhereTitle(searchQuery),
+                        context.strings.searchEverywhereTitle(
+                          query: searchQuery,
+                        ),
                         style: TextStyles.large.copyWith(color: colors.primary),
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        context.l10n.searchEverywhereSubtitle,
+                        context.strings.searchEverywhereSubtitle,
                         style: TextStyles.body.copyWith(
                           color: colors.textLight,
                         ),

@@ -3,7 +3,7 @@ import 'dart:io';
 
 import 'package:adaptive_theme/adaptive_theme.dart';
 import "package:ente_pure_utils/ente_pure_utils.dart";
-import "package:ente_strings/l10n/strings_localizations.dart";
+import "package:ente_strings/ente_strings.dart";
 import 'package:flutter/material.dart';
 import 'package:flutter_easyloading/flutter_easyloading.dart';
 import 'package:home_widget/home_widget.dart' as hw;
@@ -14,8 +14,7 @@ import "package:photos/core/event_bus.dart";
 import 'package:photos/ente_theme_data.dart';
 import "package:photos/events/memories_changed_event.dart";
 import "package:photos/events/people_changed_event.dart";
-import "package:photos/generated/l10n.dart";
-import "package:photos/l10n/l10n.dart";
+import "package:photos/locale.dart";
 import "package:photos/service_locator.dart";
 import 'package:photos/services/app_lifecycle_service.dart';
 import "package:photos/services/app_navigation_service.dart";
@@ -232,8 +231,7 @@ class _EnteAppState extends State<EnteApp> with WidgetsBindingObserver {
           supportedLocales: appSupportedLocales,
           localeListResolutionCallback: localResolutionCallBack,
           localizationsDelegates: const [
-            StringsLocalizations.delegate,
-            ...AppLocalizations.localizationsDelegates,
+            ...StringsLocalizations.localizationsDelegates,
           ],
         ),
       ),

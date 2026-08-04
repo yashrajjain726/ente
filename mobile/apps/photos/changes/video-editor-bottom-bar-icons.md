@@ -1,0 +1,1 @@
+- Adjusted SVG icon sizing in the video editor bottom bar for better visiblity. (@r4khul)

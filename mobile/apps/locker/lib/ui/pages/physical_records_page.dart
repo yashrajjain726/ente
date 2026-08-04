@@ -1,6 +1,6 @@
 import 'package:ente_components/ente_components.dart';
+import 'package:ente_strings/ente_strings.dart';
 import 'package:flutter/material.dart';
-import 'package:locker/l10n/l10n.dart';
 import 'package:locker/models/info/info_item.dart';
 import 'package:locker/ui/pages/base_info_page.dart';
 
@@ -55,9 +55,9 @@ class _PhysicalRecordsPageState
   String get pageTitle {
     if (isInEditMode) {
       if (widget.existingFile != null || currentData != null) {
-        return context.l10n.editLocation;
+        return context.strings.editLocation;
       }
-      return context.l10n.physicalRecords;
+      return context.strings.physicalRecords;
     }
 
     final controllerName = _nameController.text.trim();
@@ -70,11 +70,11 @@ class _PhysicalRecordsPageState
       return dataName;
     }
 
-    return context.l10n.physicalRecords;
+    return context.strings.physicalRecords;
   }
 
   @override
-  String get submitButtonText => context.l10n.saveRecord;
+  String get submitButtonText => context.strings.save;
 
   @override
   InfoType get infoType => InfoType.physicalRecord;
@@ -100,8 +100,8 @@ class _PhysicalRecordsPageState
   List<Widget> buildFormFields() {
     return [
       TextInputComponent(
-        label: context.l10n.name,
-        hintText: context.l10n.recordNameHint,
+        label: context.strings.name,
+        hintText: context.strings.recordNameHint,
         controller: _nameController,
         isRequired: true,
         autofocus: true,
@@ -111,8 +111,8 @@ class _PhysicalRecordsPageState
       ),
       const SizedBox(height: 24),
       TextInputComponent(
-        label: context.l10n.recordLocation,
-        hintText: context.l10n.recordLocationHint,
+        label: context.strings.recordLocation,
+        hintText: context.strings.recordLocationHint,
         controller: _locationController,
         isRequired: true,
         textCapitalization: TextCapitalization.sentences,
@@ -121,8 +121,8 @@ class _PhysicalRecordsPageState
       ),
       const SizedBox(height: 24),
       TextInputComponent(
-        label: context.l10n.recordNotes,
-        hintText: context.l10n.recordNotesHint,
+        label: context.strings.recordNotes,
+        hintText: context.strings.recordNotesHint,
         controller: _notesController,
         minLines: 3,
         maxLines: 12,
@@ -137,7 +137,7 @@ class _PhysicalRecordsPageState
   List<Widget> buildViewFields() {
     final fields = <Widget>[
       buildViewField(
-        label: context.l10n.recordLocation,
+        label: context.strings.recordLocation,
         value: _locationController.text,
       ),
     ];
@@ -146,7 +146,7 @@ class _PhysicalRecordsPageState
       fields.addAll([
         const SizedBox(height: 24),
         buildViewField(
-          label: context.l10n.recordNotes,
+          label: context.strings.recordNotes,
           value: _notesController.text,
           maxLines: 6,
         ),

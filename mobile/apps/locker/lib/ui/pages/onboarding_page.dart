@@ -1,16 +1,16 @@
 import 'dart:async';
 
 import 'package:dots_indicator/dots_indicator.dart';
+import 'package:ente_accounts/pages/developer_settings_page.dart';
 import 'package:ente_accounts/pages/email_entry_page.dart';
 import 'package:ente_accounts/pages/login_page.dart';
 import 'package:ente_accounts/pages/password_entry_page.dart';
 import 'package:ente_accounts/pages/password_reentry_page.dart';
 import 'package:ente_components/ente_components.dart';
-import "package:ente_ui/pages/developer_settings_page.dart";
+import 'package:ente_strings/ente_strings.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import "package:flutter_svg/flutter_svg.dart";
-import 'package:locker/l10n/l10n.dart';
 import 'package:locker/services/configuration.dart';
 import 'package:locker/ui/pages/home_page.dart';
 import "package:locker/utils/bottom_sheet_illustration.dart";
@@ -110,7 +110,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
       app: ComponentApp.locker,
     );
     debugPrint("Building OnboardingPage");
-    final l10n = context.l10n;
+    final l10n = context.strings;
     return Scaffold(
       backgroundColor: colors.primary,
       appBar: AppBar(
@@ -239,7 +239,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
   }
 
   Widget _getFeatureSlider(BuildContext context) {
-    final l10n = context.l10n;
+    final l10n = context.strings;
     final features = [
       ("assets/onboarding_lock.png", l10n.featureSaveImportant),
       ("assets/onboarding_file.png", l10n.featurePassAutomatically),

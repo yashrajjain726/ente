@@ -1,7 +1,7 @@
 import "dart:io";
 
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/ui/common/loading_widget.dart";
 
 class LogFileViewer extends StatefulWidget {
@@ -34,10 +34,7 @@ class _LogFileViewerState extends State<LogFileViewer> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        elevation: 0,
-        title: Text(AppLocalizations.of(context).todaysLogs),
-      ),
+      appBar: AppBar(elevation: 0, title: Text(context.strings.todaysLogs)),
       body: FutureBuilder<List<String>>(
         future: _logsFuture,
         builder: (context, snapshot) {

@@ -1,8 +1,8 @@
-import "package:ente_auth/l10n/l10n.dart";
 import "package:ente_auth/onboarding/model/tag_enums.dart";
 import "package:ente_auth/store/code_display_store.dart";
 import "package:ente_auth/theme/ente_theme.dart";
 import 'package:ente_components/ente_components.dart';
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:flutter/services.dart";
 
@@ -116,7 +116,7 @@ class _TagChipState extends State<TagChip> {
                     width: 48,
                     child: Semantics(
                       button: true,
-                      label: context.l10n.editTag,
+                      label: context.strings.editTag,
                       identifier: 'auth_tag_menu',
                       child: GestureDetector(
                         behavior: HitTestBehavior.opaque,
@@ -141,7 +141,7 @@ class _TagChipState extends State<TagChip> {
   }
 
   Future<void> _showTagActions(BuildContext context) async {
-    final l10n = context.l10n;
+    final l10n = context.strings;
     final tag = widget.label;
     final action = await showBottomSheetComponent<_TagAction>(
       context: context,

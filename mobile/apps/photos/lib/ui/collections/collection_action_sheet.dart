@@ -3,13 +3,13 @@ import 'dart:math';
 
 import 'package:collection/collection.dart';
 import "package:ente_components/ente_components.dart";
+import "package:ente_strings/ente_strings.dart";
 import 'package:flutter/material.dart';
 import "package:hugeicons/hugeicons.dart";
 import "package:logging/logging.dart";
 import "package:photos/core/configuration.dart";
 import "package:photos/core/event_bus.dart";
 import "package:photos/events/create_new_album_event.dart";
-import "package:photos/generated/l10n.dart";
 import 'package:photos/models/collection/collection.dart';
 import 'package:photos/models/selected_files.dart';
 import "package:photos/service_locator.dart";
@@ -49,28 +49,28 @@ String _actionName(
   String text = "";
   switch (type) {
     case CollectionActionType.addFiles:
-      text = AppLocalizations.of(context).addItem(count: fileCount);
+      text = context.strings.addItem(count: fileCount);
       break;
     case CollectionActionType.moveFiles:
-      text = AppLocalizations.of(context).moveItem(count: fileCount);
+      text = context.strings.moveItem(count: fileCount);
       break;
     case CollectionActionType.restoreFiles:
-      text = AppLocalizations.of(context).restoreToAlbum;
+      text = context.strings.restoreToAlbum;
       break;
     case CollectionActionType.unHide:
-      text = AppLocalizations.of(context).unhideToAlbum;
+      text = context.strings.unhideToAlbum;
       break;
     case CollectionActionType.shareCollection:
-      text = AppLocalizations.of(context).share;
+      text = context.strings.share;
       break;
     case CollectionActionType.addToHiddenAlbum:
-      text = AppLocalizations.of(context).addToHiddenAlbum;
+      text = context.strings.addToHiddenAlbum;
       break;
     case CollectionActionType.moveToHiddenCollection:
-      text = AppLocalizations.of(context).moveToHiddenAlbum;
+      text = context.strings.moveToHiddenAlbum;
       break;
     case CollectionActionType.autoAddPeople:
-      text = AppLocalizations.of(context).autoAddToAlbum;
+      text = context.strings.autoAddToAlbum;
       break;
   }
   return text;
@@ -195,9 +195,7 @@ class _CollectionActionSheetState extends State<CollectionActionSheet> {
                 child: Column(
                   children: [
                     TextInputComponent(
-                      hintText: AppLocalizations.of(
-                        context,
-                      ).searchByAlbumNameHint,
+                      hintText: context.strings.searchByAlbumNameHint,
                       prefix: HugeIcon(
                         icon: HugeIcons.strokeRoundedSearch01,
                         size: 18,
@@ -232,7 +230,7 @@ class _CollectionActionSheetState extends State<CollectionActionSheet> {
       widgets.add(
         ButtonComponent(
           key: const ValueKey('add_button'),
-          label: AppLocalizations.of(context).add,
+          label: context.strings.add,
           shouldSurfaceExecutionStates: false,
           dismissModalOnSuccess: true,
           isDisabled: _selectedCollections.isEmpty,
@@ -240,7 +238,7 @@ class _CollectionActionSheetState extends State<CollectionActionSheet> {
             if (widget.selectedPeople != null) {
               final ProgressDialog dialog = createProgressDialog(
                 context,
-                AppLocalizations.of(context).uploadingFilesToAlbum,
+                context.strings.uploadingFilesToAlbum,
                 isDismissible: true,
               );
               await dialog.show();
@@ -275,9 +273,9 @@ class _CollectionActionSheetState extends State<CollectionActionSheet> {
               if (!mounted) return;
               showShortToast(
                 context,
-                AppLocalizations.of(
-                  context,
-                ).addedToAlbums(count: _selectedCollections.length),
+                context.strings.addedToAlbums(
+                  count: _selectedCollections.length,
+                ),
               );
               widget.selectedFiles?.clearAll();
             }

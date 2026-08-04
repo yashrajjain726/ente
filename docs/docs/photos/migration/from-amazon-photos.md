@@ -43,7 +43,10 @@ This organization will be reflected in Ente if you choose the "Separate albums" 
 2. Sign in to your Ente account
 3. Drag and drop the downloaded folder(s) into the Ente app
 4. Choose how to organize: single album or separate albums per folder
-5. Let the upload complete
+5. Review the photo, video, and album counts, then start the upload
+6. Expand the progress card if you want to review completed, skipped, or failed files
+
+Learn more about the review, progress, stop, completion, and retry screens in [Import from Local Hard Disk](/photos/migration/from-local-hard-disk).
 
 **Upload features:**
 

@@ -123,7 +123,7 @@ async fn run_contacts_stage(pair: &legacy::LegacyPair) {
     assert!(diff.iter().any(|entry| entry.id == contact.id));
 
     match pair.trusted_ctx.get_contact(&contact.id).await {
-        Err(ente_contacts::ContactsError::Http(http::Error::Http { status: 404, .. })) => {}
+        Err(ente_contacts::Error::Http(http::Error::Http { status: 404, .. })) => {}
         other => panic!("expected trusted account to get 404 for owner contact, got {other:?}"),
     }
 
@@ -275,9 +275,7 @@ async fn run_legacy_reset_stage(endpoint: &str, pair: &mut legacy::LegacyPair) {
         .unwrap();
 
     match auth::login_without_totp(endpoint, &pair.owner.email, &previous_password).await {
-        Err(ente_accounts::Error::AuthenticationFailed(message)) => {
-            assert_eq!(message, "Incorrect password");
-        }
+        Err(ente_accounts::Error::IncorrectPassword) => {}
         Err(error) if error.is_http_status(&[401]) => {}
         other => panic!("expected old password login to fail, got {other:?}"),
     }
@@ -637,9 +635,7 @@ async fn run_legacy_kit_stage(endpoint: &str, owner: &mut legacy_kit::LegacyKitO
         .expect("legacy kit password reset failed");
 
     match auth::login_without_totp(endpoint, &owner.owner.email, &previous_password).await {
-        Err(ente_accounts::Error::AuthenticationFailed(message)) => {
-            assert_eq!(message, "Incorrect password");
-        }
+        Err(ente_accounts::Error::IncorrectPassword) => {}
         Err(error) if error.is_http_status(&[401]) => {}
         other => panic!("expected old legacy kit password login to fail, got {other:?}"),
     }

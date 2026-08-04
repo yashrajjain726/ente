@@ -1,6 +1,6 @@
 import "package:ente_components/ente_components.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
-import "package:photos/generated/l10n.dart";
 import 'package:photos/models/collection/collection.dart';
 import 'package:photos/models/file/file.dart';
 import "package:photos/services/collections_service.dart";
@@ -113,9 +113,7 @@ class QuickLinkAlbumItem extends StatelessWidget {
                         builder: (context, snapshot) {
                           if (snapshot.hasData) {
                             return Text(
-                              AppLocalizations.of(
-                                context,
-                              ).itemCount(count: snapshot.data!),
+                              context.strings.itemCount(count: snapshot.data!),
                               style: TextStyles.mini.copyWith(
                                 color: colors.textLight,
                               ),

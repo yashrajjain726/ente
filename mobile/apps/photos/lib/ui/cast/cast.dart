@@ -1,12 +1,12 @@
 import "dart:async";
 
 import "package:ente_components/ente_components.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/widgets.dart";
 import "package:hugeicons/hugeicons.dart";
 import "package:logging/logging.dart";
 import "package:photos/core/network/network.dart";
 import "package:photos/gateways/cast/cast_gateway.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/models/collection/collection.dart";
 import "package:photos/service_locator.dart";
 import "package:photos/theme/ente_theme.dart";
@@ -16,7 +16,7 @@ import "package:photos/ui/settings/cast/cast_settings_page.dart";
 import "package:photos/utils/dialog_util.dart";
 
 Future<void> showCastSheet(BuildContext context, Collection collection) async {
-  final l10n = AppLocalizations.of(context);
+  final l10n = context.strings;
   final textStyle = getEnteTextTheme(context);
   final gw = CastGateway(NetworkClient.instance.enteDio);
   final showAutoPair = castService.isSupported;

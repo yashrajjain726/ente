@@ -7,6 +7,25 @@ description: Release notes of recent updates to Ente Photos mobile and desktop a
 
 A short summary list of changes to the Ente Photos mobile and desktop apps. For a more descriptive list with screenshots and blog post links, see the [news](https://ente.com/news).
 
+## v1.7.27 (desktop) - Jul 2026
+
+- Added Close button to the download notification toast.
+- Fix ML indexing and search getting stuck when the library contains very large images.
+- Harden IPC boundary between the renderer and main process.
+- Hide archived albums from the main Gallery album bar.
+- Choose whether to import Google Photos favourites into Ente's favourite album.
+- Fix the File Info panel closing after saving caption edits.
+- Manage your family plan directly within the app.
+- Upgrade to MUI v9.
+- Redesigned stop-upload confirmation dialog.
+- Redesigned upload completion dialog.
+- Redesigned upload progress with completed, skipped, and failed file tracking.
+- Review photo, video, and album counts before uploading.
+- Search for people by name in the Add a person dialog.
+- Fix shared file action menus to show only available actions.
+- Show hidden album presence in the File Info panel.
+- Import or skip partner-shared photos during Google Photos Takeout.
+
 ## v1.3.59 (mobile) - Jul 2026
 
 - Comment and react to shared memories.

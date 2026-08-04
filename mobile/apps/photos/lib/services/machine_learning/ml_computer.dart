@@ -8,7 +8,6 @@ import "package:photos/core/errors.dart";
 import "package:photos/models/ml/vector.dart";
 import "package:photos/services/machine_learning/ml_constants.dart";
 import "package:photos/services/machine_learning/ml_model_assets.dart";
-import "package:photos/services/machine_learning/ml_model_download_service.dart";
 import "package:photos/services/machine_learning/semantic_search/query_result.dart";
 import "package:photos/services/machine_learning/webgpu_execution_policy.dart";
 import "package:photos/services/remote_assets_service.dart";
@@ -90,11 +89,7 @@ class MLComputer extends SuperIsolate {
         "clipTextVocabPath": vocabPath,
         "enableWebGpu": enableWebGpu,
       });
-      if (isolateResult is RustCorruptModelCacheDeletedException) {
-        _clipTextModelPath = null;
-        MLModelDownloadService.instance.invalidateModelDownloadCache(
-          includeNonIndexingModels: true,
-        );
+      if (isolateResult is RustCorruptModelException) {
         throw isolateResult;
       }
       final textEmbedding = isolateResult as List<double>;
@@ -106,10 +101,8 @@ class MLComputer extends SuperIsolate {
         s,
       );
       rethrow;
-    } on RustCorruptModelCacheDeletedException catch (e) {
-      _logger.warning(
-        "Deleted corrupt Rust CLIP text model cache at ${e.modelPath}",
-      );
+    } on RustCorruptModelException catch (e) {
+      _logger.severe("Rust ML reported a corrupt model at ${e.modelPath}");
       rethrow;
     } catch (e, s) {
       _logger.severe("Could not run clip text in isolate", e, s);

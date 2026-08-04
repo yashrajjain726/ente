@@ -1,8 +1,8 @@
 import "package:ente_components/ente_components.dart";
+import "package:ente_strings/ente_strings.dart";
 import 'package:flutter/material.dart';
 import "package:flutter_svg/svg.dart";
 import "package:hugeicons/hugeicons.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/ui/tools/editor/image_editor/circular_icon_button.dart";
 import "package:photos/ui/tools/editor/image_editor/image_editor_configs_mixin.dart";
 import "package:photos/ui/tools/editor/image_editor/image_editor_constants.dart";
@@ -111,7 +111,7 @@ class _ImageEditorCropRotateBarState extends State<ImageEditorCropRotateBar>
                 children: [
                   CircularIconButton(
                     hugeIcon: HugeIcons.strokeRoundedRotateCrop,
-                    label: AppLocalizations.of(context).rotate,
+                    label: context.strings.rotate,
                     onTap: () {
                       widget.editor.rotate();
                     },
@@ -119,7 +119,7 @@ class _ImageEditorCropRotateBarState extends State<ImageEditorCropRotateBar>
                   const SizedBox(width: 6),
                   CircularIconButton(
                     hugeIcon: HugeIcons.strokeRoundedFlipLeft,
-                    label: AppLocalizations.of(context).flip,
+                    label: context.strings.flip,
                     onTap: () {
                       widget.editor.flip();
                     },

@@ -5,6 +5,7 @@ import "dart:ui";
 import "package:connectivity_plus/connectivity_plus.dart";
 import "package:ente_components/theme/text_styles.dart" as component;
 import "package:ente_pure_utils/ente_pure_utils.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/foundation.dart" show ValueListenable;
 import "package:flutter/material.dart";
 import "package:flutter/services.dart";
@@ -16,7 +17,6 @@ import "package:photos/events/pause_video_event.dart";
 import "package:photos/events/reset_zoom_of_photo_view_event.dart";
 import "package:photos/events/resume_video_event.dart";
 import "package:photos/events/retry_failed_image_load_event.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/models/file/extensions/file_props.dart";
 import "package:photos/models/file/file.dart";
 import "package:photos/models/file/file_type.dart";
@@ -816,7 +816,7 @@ class BottomIcons extends StatelessWidget {
         .findAncestorStateOfType<_FullScreenMemoryState>();
     final memoryTitle =
         context.findAncestorWidgetOfExactType<FullScreenMemory>()?.title ??
-        AppLocalizations.of(context).memories;
+        context.strings.memories;
 
     return Positioned(
       left: 0,
@@ -833,7 +833,7 @@ class BottomIcons extends StatelessWidget {
           final currentFile = inheritedData.memories[safeIndex].file;
           if (fullScreenState == null) return const SizedBox.shrink();
 
-          final l10n = AppLocalizations.of(context);
+          final l10n = context.strings;
           final isOwner = currentFile.isOwner;
           final collection = currentFile.collectionID == null
               ? null
@@ -1048,7 +1048,7 @@ class _MemoryTopOverlay extends StatelessWidget {
                         SizedBox.square(
                           dimension: 48,
                           child: IconButton(
-                            tooltip: AppLocalizations.of(context).close,
+                            tooltip: context.strings.close,
                             padding: const EdgeInsets.all(8),
                             style: IconButton.styleFrom(
                               minimumSize: const Size.square(48),
@@ -1411,7 +1411,7 @@ Future<void> _shareMemory(
       final title = memoryTitle.trim();
       await shareText(
         formatMemoryShareText(
-          title.isNotEmpty ? title : AppLocalizations.of(context).memories,
+          title.isNotEmpty ? title : context.strings.memories,
           shareLinkData.$1,
         ),
         context: context,
@@ -1428,7 +1428,7 @@ Future<(String, int)?> _getOrCreateMemoryLink(
   String memoryTitle,
 ) async {
   if (memories.isEmpty) return null;
-  final l10n = AppLocalizations.of(context);
+  final l10n = context.strings;
   final dialog = createProgressDialog(context, l10n.creatingLink);
   await dialog.show();
   try {

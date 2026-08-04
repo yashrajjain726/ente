@@ -6,7 +6,7 @@ import 'package:flutter/rendering.dart' show ScrollDirection;
 import 'package:flutter/semantics.dart' show SemanticsAction, SemanticsFlag;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:photos/ente_theme_data.dart';
-import 'package:photos/generated/l10n.dart';
+import 'package:ente_strings/ente_strings.dart';
 import 'package:photos/models/collection/collection.dart';
 import 'package:photos/ui/sharing/library_sharing/library_sharing_controller.dart';
 import 'package:photos/ui/sharing/library_sharing/library_sharing_page.dart';
@@ -75,7 +75,7 @@ void main() {
     expect(find.byType(ToggleSwitchComponent), findsNothing);
   });
 
-  testWidgets('library sharing banner opens the enable preview', (
+  testWidgets('library sharing banner enables and disables automatic sharing', (
     tester,
   ) async {
     final controller = _LayoutTestLibrarySharingController();
@@ -120,7 +120,17 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Enable library sharing?'), findsNothing);
-    expect(find.text('Coming soon'), findsOneWidget);
+    expect(
+      tester
+          .widget<ToggleSwitchComponent>(
+            find.byKey(const ValueKey('library-sharing-toggle')),
+          )
+          .selected,
+      isTrue,
+    );
+
+    await tester.tap(find.text('Library sharing'));
+    await tester.pumpAndSettle();
     expect(
       tester
           .widget<ToggleSwitchComponent>(
@@ -129,7 +139,6 @@ void main() {
           .selected,
       isFalse,
     );
-    await tester.pump(const Duration(seconds: 5));
   });
 
   testWidgets('keeps the library sharing banner while albums are selected', (
@@ -512,8 +521,8 @@ void main() {
 Widget _app(Widget home) {
   return MaterialApp(
     theme: lightThemeData,
-    localizationsDelegates: AppLocalizations.localizationsDelegates,
-    supportedLocales: AppLocalizations.supportedLocales,
+    localizationsDelegates: StringsLocalizations.localizationsDelegates,
+    supportedLocales: StringsLocalizations.supportedLocales,
     home: home,
   );
 }

@@ -1,9 +1,9 @@
 import "package:ente_components/ente_components.dart";
 import "package:ente_pure_utils/ente_pure_utils.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:hugeicons/hugeicons.dart";
 import "package:photos/gateways/storage_bonus/models/storage_bonus.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/models/user_details.dart";
 import "package:photos/service_locator.dart";
 import "package:photos/services/account/user_service.dart";
@@ -44,7 +44,7 @@ class _ReferralScreenState extends State<ReferralScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
+    final l10n = context.strings;
     return FutureBuilder<Tuple2<ReferralView, UserDetails>>(
       future: _fetchData(),
       builder: (context, snapshot) {
@@ -138,7 +138,7 @@ class ReferralWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.componentColors;
-    final l10n = AppLocalizations.of(context);
+    final l10n = context.strings;
     final bool isReferralEnabled = referralView.planInfo.isEnabled;
 
     return Column(
@@ -231,15 +231,13 @@ class ReferralWidget extends StatelessWidget {
       color: colors.textLight,
       height: 2,
     );
-    final step3Text = AppLocalizations.of(
-      context,
-    ).referralStep3(storageInGB: storageInGB);
+    final step3Text = context.strings.referralStep3(storageInGB: storageInGB);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(AppLocalizations.of(context).referralStep1, style: mutedStyle),
-        Text(AppLocalizations.of(context).referralStep2, style: mutedStyle),
+        Text(context.strings.referralStep1, style: mutedStyle),
+        Text(context.strings.referralStep2, style: mutedStyle),
         RichText(
           text: TextSpan(
             style: mutedStyle,

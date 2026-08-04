@@ -12,7 +12,6 @@ use crate::ml::{
     onnx,
 };
 
-/// Log to Android logcat or stderr.
 pub(crate) fn rt_log(msg: &str) {
     #[cfg(target_os = "android")]
     {
@@ -291,9 +290,7 @@ impl MlRuntime {
             // CoreML and WebGPU, making their mixed CPU/GPU execution slower
             // than running the complete model on CPU.
             clip_text: ModelSlot::new(cpu_only, "clip-text"),
-            // Pet models previously had device-specific FP16 driver failures.
-            // Keep them CPU-only until they have been validated on the GPU
-            // execution providers of supported iOS and Android devices.
+            // Pet models stay CPU-only due to device-specific FP16 failures.
             pet_face_detection: ModelSlot::new(cpu_only, "pet-face-detection"),
             pet_face_embedding_dog: ModelSlot::new(cpu_only, "pet-face-embedding-dog"),
             pet_face_embedding_cat: ModelSlot::new(cpu_only, "pet-face-embedding-cat"),
@@ -555,7 +552,13 @@ pub(crate) fn release_runtime() {
 }
 
 fn should_retry_execution_provider_runtime(error: &MlError) -> bool {
-    cfg!(any(target_os = "ios", target_os = "android")) && is_execution_provider_failure(error)
+    cfg!(any(
+        target_os = "ios",
+        target_os = "android",
+        target_os = "linux",
+        target_os = "macos",
+        target_os = "windows"
+    )) && is_execution_provider_failure(error)
 }
 
 fn is_execution_provider_failure(error: &MlError) -> bool {
@@ -732,8 +735,6 @@ mod tests {
     #[test]
     fn model_execution_modes_match_platform_policy() {
         let runtime = MlRuntime::new();
-        // Pet models stay CPU-only on every platform until they are
-        // validated on the GPU execution providers.
         let expected_pet_mode = onnx::ExecutionMode::CpuOnly;
 
         assert_eq!(

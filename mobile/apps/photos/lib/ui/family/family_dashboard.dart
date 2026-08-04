@@ -3,9 +3,9 @@ import 'dart:typed_data';
 import 'package:ente_components/ente_components.dart';
 import 'package:ente_contacts/contacts.dart' as contacts;
 import 'package:ente_pure_utils/ente_pure_utils.dart';
+import 'package:ente_strings/ente_strings.dart';
 import 'package:flutter/material.dart';
 import 'package:hugeicons/hugeicons.dart';
-import 'package:photos/generated/l10n.dart';
 import 'package:photos/models/user_details.dart';
 import 'package:photos/ui/sharing/library_sharing/library_sharing_strings.dart';
 import 'package:photos/ui/viewer/people/person_face_widget.dart';
@@ -106,7 +106,7 @@ class FamilyDashboard extends StatelessWidget {
     final activeMembers = visibleMembers
         .where((member) => member.isActive)
         .toList();
-    final l10n = AppLocalizations.of(context);
+    final l10n = context.strings;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -213,7 +213,7 @@ class _FamilyStorageCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.componentColors;
-    final l10n = AppLocalizations.of(context);
+    final l10n = context.strings;
     final totalStorage = userDetails.getTotalStorage();
     final totalUsed =
         userDetails.familyData?.getTotalUsage() ?? userDetails.usage;
@@ -387,7 +387,7 @@ class _FamilyMemberRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
+    final l10n = context.strings;
     final actions = familyMemberActions(
       isAdmin: isAdminView,
       isCurrentUser: isCurrentUser,
@@ -498,7 +498,7 @@ class _MemberAvatar extends StatelessWidget {
           right: -4,
           bottom: -4,
           child: Semantics(
-            label: AppLocalizations.of(context).admin,
+            label: context.strings.admin,
             child: ExcludeSemantics(
               child: HugeIcon(
                 icon: HugeIcons.strokeRoundedCrown02,

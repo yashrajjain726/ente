@@ -1,6 +1,7 @@
 import 'package:ente_components/ente_components.dart';
 import "package:ente_events/event_bus.dart";
 import "package:ente_icons/ente_icons.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:ente_ui/components/buttons/button_widget.dart";
 import "package:ente_ui/utils/dialog_util.dart";
 import "package:ente_ui/utils/toast_util.dart";
@@ -8,7 +9,6 @@ import "package:flutter/material.dart";
 import "package:flutter_svg/flutter_svg.dart";
 import "package:hugeicons/hugeicons.dart";
 import "package:locker/events/collections_updated_event.dart";
-import "package:locker/l10n/l10n.dart";
 import "package:locker/models/selected_files.dart";
 import "package:locker/services/collections/collections_service.dart";
 import "package:locker/services/collections/models/collection.dart";
@@ -71,7 +71,7 @@ class _FileSelectionOverlayBarState extends State<FileSelectionOverlayBar> {
     if (sharedCount > 0 && mounted) {
       showToast(
         context,
-        context.l10n.actionNotSupportedForSharedFiles(sharedCount),
+        context.strings.actionNotSupportedForSharedFiles(count: sharedCount),
       );
     }
 
@@ -187,8 +187,8 @@ class _FileSelectionOverlayBarState extends State<FileSelectionOverlayBar> {
                                           (file) => selectedSet.contains(file),
                                         );
                                     final buttonText = isAllSelected
-                                        ? context.l10n.deselectAll
-                                        : context.l10n.selectAll;
+                                        ? context.strings.deselectAll
+                                        : context.strings.selectAll;
                                     final iconData = isAllSelected
                                         ? Icons.remove_circle_outline
                                         : Icons.check_circle_outline_outlined;
@@ -238,8 +238,8 @@ class _FileSelectionOverlayBarState extends State<FileSelectionOverlayBar> {
                                   listenable: widget.selectedFiles,
                                   builder: (context, child) {
                                     final count = widget.selectedFiles.count;
-                                    final countText = context.l10n
-                                        .selectedCount(count);
+                                    final countText = context.strings
+                                        .selectedCount(count: count);
 
                                     return InkWell(
                                       onTap: () {
@@ -371,8 +371,8 @@ class _FileSelectionOverlayBarState extends State<FileSelectionOverlayBar> {
             colorFilter: ColorFilter.mode(colors.textBase, BlendMode.srcIn),
           ),
           label: shouldRemoveOffline
-              ? context.l10n.cloudOnly
-              : context.l10n.keepOffline,
+              ? context.strings.cloudOnly
+              : context.strings.keepOffline,
           onTap: () => _toggleOfflineAvailability(
             context,
             files,
@@ -393,8 +393,8 @@ class _FileSelectionOverlayBarState extends State<FileSelectionOverlayBar> {
                   color: colors.textBase,
                 ),
           label: isImportant
-              ? context.l10n.unimportant
-              : context.l10n.important,
+              ? context.strings.unimportant
+              : context.strings.important,
           onTap: () => isSingleSelection
               ? _markImportant(context, file!)
               : _markMultipleImportant(context, files),
@@ -409,7 +409,7 @@ class _FileSelectionOverlayBarState extends State<FileSelectionOverlayBar> {
             icon: HugeIcons.strokeRoundedDelete02,
             color: colors.warning,
           ),
-          label: context.l10n.delete,
+          label: context.strings.delete,
           onTap: () => isSingleSelection
               ? _deleteFile(context, file!)
               : _deleteMultipleFiles(context, files),
@@ -431,7 +431,7 @@ class _FileSelectionOverlayBarState extends State<FileSelectionOverlayBar> {
         children: _buildActionRow([
           SelectionActionButton(
             hugeIcon: const HugeIcon(icon: HugeIcons.strokeRoundedRefresh),
-            label: context.l10n.restore,
+            label: context.strings.restore,
             onTap: () => _restoreFiles(context, files),
           ),
           SelectionActionButton(
@@ -439,7 +439,7 @@ class _FileSelectionOverlayBarState extends State<FileSelectionOverlayBar> {
               icon: HugeIcons.strokeRoundedDelete02,
               color: colors.warning,
             ),
-            label: context.l10n.delete,
+            label: context.strings.delete,
             onTap: () => _deleteFromTrash(context, files),
             isDestructive: true,
           ),
@@ -492,7 +492,7 @@ class _FileSelectionOverlayBarState extends State<FileSelectionOverlayBar> {
       actions.add(
         SelectionActionButton(
           hugeIcon: const HugeIcon(icon: HugeIcons.strokeRoundedPencilEdit02),
-          label: context.l10n.edit,
+          label: context.strings.edit,
           onTap: () => _editFile(context, file!),
         ),
       );
@@ -502,7 +502,7 @@ class _FileSelectionOverlayBarState extends State<FileSelectionOverlayBar> {
       actions.add(
         SelectionActionButton(
           hugeIcon: const HugeIcon(icon: HugeIcons.strokeRoundedNavigation06),
-          label: context.l10n.share,
+          label: context.strings.share,
           onTap: () => _shareFileLink(context, file!),
         ),
       );
@@ -512,7 +512,7 @@ class _FileSelectionOverlayBarState extends State<FileSelectionOverlayBar> {
       actions.add(
         SelectionActionButton(
           hugeIcon: const HugeIcon(icon: HugeIcons.strokeRoundedArrowRight03),
-          label: context.l10n.addTo,
+          label: context.strings.addTo,
           onTap: () => _showAddToDialog(context, files),
         ),
       );
@@ -521,7 +521,7 @@ class _FileSelectionOverlayBarState extends State<FileSelectionOverlayBar> {
     actions.add(
       SelectionActionButton(
         hugeIcon: const HugeIcon(icon: HugeIcons.strokeRoundedDownload01),
-        label: context.l10n.download,
+        label: context.strings.download,
         onTap: () => isSingleSelection
             ? _downloadFile(context, file!)
             : _downloadMultipleFiles(context, files),
@@ -592,7 +592,7 @@ class _FileSelectionOverlayBarState extends State<FileSelectionOverlayBar> {
   Future<void> _shareFileLink(BuildContext context, EnteFile file) async {
     final currentUserID = Configuration.instance.getUserID();
     if (file.ownerID != currentUserID) {
-      showToast(context, context.l10n.shareNotSupportedForSharedFiles);
+      showToast(context, context.strings.shareNotSupportedForSharedFiles);
       return;
     }
     await FileActions.shareFileLink(context, file);
@@ -601,7 +601,7 @@ class _FileSelectionOverlayBarState extends State<FileSelectionOverlayBar> {
   Future<void> _editFile(BuildContext context, EnteFile file) async {
     final currentUserID = Configuration.instance.getUserID();
     if (file.ownerID != currentUserID) {
-      showToast(context, context.l10n.editNotSupportedForSharedFiles);
+      showToast(context, context.strings.editNotSupportedForSharedFiles);
       return;
     }
     await FileActions.editFile(context, file);
@@ -647,7 +647,7 @@ class _FileSelectionOverlayBarState extends State<FileSelectionOverlayBar> {
     final dialog = context.mounted
         ? createProgressDialog(
             context,
-            context.l10n.pleaseWait,
+            context.strings.pleaseWait,
             isDismissible: false,
           )
         : null;
@@ -700,7 +700,7 @@ class _FileSelectionOverlayBarState extends State<FileSelectionOverlayBar> {
           widget.selectedFiles.clearAll();
         }
         if (context.mounted) {
-          showToast(context, context.l10n.noChangesWereMade);
+          showToast(context, context.strings.noChangesWereMade);
         }
         return;
       }
@@ -717,7 +717,7 @@ class _FileSelectionOverlayBarState extends State<FileSelectionOverlayBar> {
         widget.selectedFiles.clearAll();
       }
       if (context.mounted) {
-        showToast(context, context.l10n.fileUpdatedSuccessfully);
+        showToast(context, context.strings.fileUpdatedSuccessfully);
       }
     } catch (e) {
       await dialog?.hide();
@@ -732,7 +732,7 @@ class _FileSelectionOverlayBarState extends State<FileSelectionOverlayBar> {
   Future<void> _deleteFile(BuildContext context, EnteFile file) async {
     final currentUserID = Configuration.instance.getUserID();
     if (file.ownerID != currentUserID) {
-      showToast(context, context.l10n.deleteNotSupportedForSharedFiles);
+      showToast(context, context.strings.deleteNotSupportedForSharedFiles);
       return;
     }
     await FileActions.deleteFile(
@@ -758,9 +758,13 @@ class _FileSelectionOverlayBarState extends State<FileSelectionOverlayBar> {
 
     final confirmation = await showDeleteConfirmationSheet(
       context,
-      title: context.l10n.areYouSure,
-      body: context.l10n.deleteMultipleFilesDialogBody(ownedFiles.length),
-      deleteButtonLabel: context.l10n.yesDeleteFiles(ownedFiles.length),
+      title: context.strings.areYouSure,
+      body: context.strings.deleteMultipleFilesDialogBody(
+        count: ownedFiles.length,
+      ),
+      deleteButtonLabel: context.strings.yesDeleteFiles(
+        count: ownedFiles.length,
+      ),
       illustration: LockerBottomSheetIllustration.fileDelete,
     );
 
@@ -771,7 +775,7 @@ class _FileSelectionOverlayBarState extends State<FileSelectionOverlayBar> {
     final dialog = context.mounted
         ? createProgressDialog(
             context,
-            context.l10n.deletingFile,
+            context.strings.deletingFile,
             isDismissible: false,
           )
         : null;
@@ -794,7 +798,7 @@ class _FileSelectionOverlayBarState extends State<FileSelectionOverlayBar> {
         widget.selectedFiles.clearAll();
       }
       if (context.mounted) {
-        showToast(context, context.l10n.fileDeletedSuccessfully);
+        showToast(context, context.strings.fileDeletedSuccessfully);
       }
     } catch (e, stackTrace) {
       await dialog?.hide();
@@ -814,7 +818,7 @@ class _FileSelectionOverlayBarState extends State<FileSelectionOverlayBar> {
   Future<void> _markImportant(BuildContext context, EnteFile file) async {
     final currentUserID = Configuration.instance.getUserID();
     if (file.ownerID != currentUserID) {
-      showToast(context, context.l10n.importantNotSupportedForSharedFiles);
+      showToast(context, context.strings.importantNotSupportedForSharedFiles);
       return;
     }
     await FileActions.markImportant(
@@ -873,7 +877,7 @@ class _FileSelectionOverlayBarState extends State<FileSelectionOverlayBar> {
     final dialog = context.mounted
         ? createProgressDialog(
             context,
-            context.l10n.restoringFiles,
+            context.strings.restoringItems,
             isDismissible: false,
           )
         : null;
@@ -892,7 +896,7 @@ class _FileSelectionOverlayBarState extends State<FileSelectionOverlayBar> {
       if (context.mounted) {
         showToast(
           context,
-          context.l10n.filesRestoredSuccessfully(files.length),
+          context.strings.filesRestoredSuccessfully(count: files.length),
         );
       }
     } catch (e, stackTrace) {
@@ -911,9 +915,9 @@ class _FileSelectionOverlayBarState extends State<FileSelectionOverlayBar> {
   ) async {
     final confirmation = await showDeleteConfirmationSheet(
       context,
-      title: context.l10n.permanentlyDelete,
-      body: context.l10n.permanentlyDeleteFilesBody(files.length),
-      deleteButtonLabel: context.l10n.yesDelete,
+      title: context.strings.permanentlyDelete,
+      body: context.strings.permanentlyDeleteFilesBody(count: files.length),
+      deleteButtonLabel: context.strings.yesDelete,
       illustration: LockerBottomSheetIllustration.collectionDelete,
     );
 
@@ -924,7 +928,7 @@ class _FileSelectionOverlayBarState extends State<FileSelectionOverlayBar> {
     final dialog = context.mounted
         ? createProgressDialog(
             context,
-            context.l10n.deletingFiles,
+            context.strings.deletingFiles,
             isDismissible: false,
           )
         : null;
@@ -943,7 +947,10 @@ class _FileSelectionOverlayBarState extends State<FileSelectionOverlayBar> {
       }
 
       if (context.mounted) {
-        showToast(context, context.l10n.filesDeletedPermanently(files.length));
+        showToast(
+          context,
+          context.strings.filesDeletedPermanently(count: files.length),
+        );
       }
     } catch (e, stackTrace) {
       await dialog?.hide();

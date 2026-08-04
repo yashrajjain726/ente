@@ -1,8 +1,8 @@
-import 'package:ente_auth/l10n/l10n.dart';
 import 'package:ente_auth/models/code.dart';
 import 'package:ente_auth/services/authenticator_service.dart';
 import 'package:ente_auth/store/code_store.dart';
 import 'package:ente_auth/utils/dialog_util.dart';
+import 'package:ente_strings/ente_strings.dart';
 import 'package:flutter/material.dart';
 
 class CodeDisplayStore {
@@ -128,7 +128,7 @@ class CodeDisplayStore {
 
   Future<void> showDeleteTagDialog(BuildContext context, String tag) async {
     FocusScope.of(context).requestFocus();
-    final l10n = context.l10n;
+    final l10n = context.strings;
 
     await showChoiceActionSheet(
       context,
@@ -166,10 +166,10 @@ class CodeDisplayStore {
   Future<void> showEditDialog(BuildContext context, String tag) async {
     await showTextInputDialog(
       context,
-      title: context.l10n.editTag,
-      label: context.l10n.tag,
+      title: context.strings.editTag,
+      label: context.strings.tag,
       initialValue: tag,
-      submitButtonLabel: context.l10n.saveAction,
+      submitButtonLabel: context.strings.save,
       maxLength: 100,
       onSubmit: (value) async {
         final updatedTag = value.trim();

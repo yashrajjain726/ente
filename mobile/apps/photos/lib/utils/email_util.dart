@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:archive/archive_io.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:email_validator/email_validator.dart';
+import "package:ente_strings/ente_strings.dart";
 import "package:file_saver/file_saver.dart";
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -15,7 +16,6 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:photos/core/configuration.dart';
 import 'package:photos/core/error-reporting/super_logging.dart';
-import "package:photos/generated/l10n.dart";
 import 'package:photos/theme/ente_theme.dart';
 import "package:photos/ui/common/progress_dialog.dart";
 import 'package:photos/ui/components/base_bottom_sheet.dart';
@@ -49,14 +49,14 @@ Future<void> sendLogs(
   // ignore: unawaited_futures
   showDialogWidget(
     context: context,
-    title: AppLocalizations.of(context).reportABug,
+    title: context.strings.reportABug,
     icon: Icons.bug_report_outlined,
-    body: AppLocalizations.of(context).logsDialogBody,
+    body: context.strings.logsDialogBody,
     buttons: [
       ButtonWidget(
         isInAlert: true,
         buttonType: ButtonType.neutral,
-        labelText: AppLocalizations.of(context).reportABug,
+        labelText: context.strings.reportABug,
         buttonAction: ButtonAction.first,
         shouldSurfaceExecutionStates: false,
         onTap: () async {
@@ -70,7 +70,7 @@ Future<void> sendLogs(
       //on pressing this button
       ButtonWidget(
         buttonType: ButtonType.secondary,
-        labelText: AppLocalizations.of(context).viewLogs,
+        labelText: context.strings.viewLogs,
         buttonAction: ButtonAction.second,
         onTap: () async {
           // ignore: unawaited_futures
@@ -87,7 +87,7 @@ Future<void> sendLogs(
       ),
       ButtonWidget(
         buttonType: ButtonType.secondary,
-        labelText: AppLocalizations.of(context).exportLogs,
+        labelText: context.strings.exportLogs,
         buttonAction: ButtonAction.third,
         shouldSurfaceExecutionStates: false,
         onTap: () async {
@@ -99,7 +99,7 @@ Future<void> sendLogs(
       ButtonWidget(
         isInAlert: true,
         buttonType: ButtonType.secondary,
-        labelText: AppLocalizations.of(context).cancel,
+        labelText: context.strings.cancel,
         buttonAction: ButtonAction.cancel,
       ),
     ],
@@ -170,10 +170,7 @@ Future<void> triggerSendLogs(
 Future<String> getZippedLogsFile(BuildContext? context) async {
   late final ProgressDialog dialog;
   if (context != null) {
-    dialog = createProgressDialog(
-      context,
-      AppLocalizations.of(context).preparingLogs,
-    );
+    dialog = createProgressDialog(context, context.strings.preparingLogs);
     await dialog.show();
   }
   final logsPath = (await getApplicationSupportDirectory()).path;
@@ -201,12 +198,12 @@ Future<void> shareLogs(
 ) async {
   final result = await showDialogWidget(
     context: context,
-    title: AppLocalizations.of(context).emailYourLogs,
-    body: AppLocalizations.of(context).pleaseSendTheLogsTo(toEmail: toEmail),
+    title: context.strings.emailYourLogs,
+    body: context.strings.pleaseSendTheLogsTo(toEmail: toEmail),
     buttons: [
       ButtonWidget(
         buttonType: ButtonType.neutral,
-        labelText: AppLocalizations.of(context).copyEmailAddress,
+        labelText: context.strings.copyEmailAddress,
         isInAlert: true,
         buttonAction: ButtonAction.first,
         onTap: () async {
@@ -216,13 +213,13 @@ Future<void> shareLogs(
       ),
       ButtonWidget(
         buttonType: ButtonType.neutral,
-        labelText: AppLocalizations.of(context).exportLogs,
+        labelText: context.strings.exportLogs,
         isInAlert: true,
         buttonAction: ButtonAction.second,
       ),
       ButtonWidget(
         buttonType: ButtonType.secondary,
-        labelText: AppLocalizations.of(context).cancel,
+        labelText: context.strings.cancel,
         isInAlert: true,
         buttonAction: ButtonAction.cancel,
       ),
@@ -340,7 +337,7 @@ Future<bool> sendComposedEmail(
     }
 
     final result = await OpenMailApp.composeNewEmailInMailApp(
-      nativePickerTitle: AppLocalizations.of(context).selectMailApp,
+      nativePickerTitle: context.strings.selectMailApp,
       emailContent: emailContent,
     );
     if (!result.didOpen && !result.canOpen) {
@@ -351,9 +348,7 @@ Future<bool> sendComposedEmail(
       await showCupertinoModalPopup(
         context: context,
         builder: (sheetContext) => CupertinoActionSheet(
-          title: Text(
-            AppLocalizations.of(sheetContext).selectMailApp + " \n $to",
-          ),
+          title: Text(sheetContext.strings.selectMailApp + " \n $to"),
           actions: [
             for (final app in result.options)
               CupertinoActionSheetAction(
@@ -370,7 +365,7 @@ Future<bool> sendComposedEmail(
               ),
           ],
           cancelButton: CupertinoActionSheetAction(
-            child: Text(AppLocalizations.of(sheetContext).cancel),
+            child: Text(sheetContext.strings.cancel),
             onPressed: () {
               Navigator.of(sheetContext).pop();
             },
@@ -442,7 +437,7 @@ Future<void> _showNoMailAppsSheet(BuildContext context, String toEmail) async {
   }
   await showBaseBottomSheet<void>(
     context,
-    title: AppLocalizations.of(context).noEmailAppFound,
+    title: context.strings.noEmailAppFound,
     headerSpacing: 16,
     child: _NoMailAppsSheet(toEmail: toEmail),
   );
@@ -455,7 +450,7 @@ class _NoMailAppsSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
+    final l10n = context.strings;
     final textTheme = getEnteTextTheme(context);
 
     return Column(
@@ -482,7 +477,7 @@ class _NoMailAppsSheet extends StatelessWidget {
 Future<void> _copyEmailAddress(BuildContext context, String toEmail) async {
   await Clipboard.setData(ClipboardData(text: toEmail));
   if (context.mounted) {
-    showShortToast(context, AppLocalizations.of(context).copied);
+    showShortToast(context, context.strings.copied);
   }
 }
 

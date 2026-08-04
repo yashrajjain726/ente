@@ -24,7 +24,6 @@ import "package:ente_ui/components/captioned_text_widget_v2.dart";
 import "package:ente_ui/components/divider_widget.dart";
 import "package:ente_ui/components/loading_widget.dart";
 import "package:ente_ui/components/menu_item_widget_v2.dart";
-import "package:ente_ui/components/menu_section_title.dart";
 import "package:ente_ui/theme/colors.dart";
 import "package:ente_ui/theme/ente_theme.dart";
 import "package:ente_ui/utils/toast_util.dart";
@@ -224,7 +223,6 @@ class _EmergencyPageState extends State<EmergencyPage> {
                               hasSecondaryLegacyContent)) {
                         return _buildSectionTitle(
                           title: context.strings.trustedContacts,
-                          colorScheme: colorScheme,
                           bottom: 12,
                         );
                       } else if (index > 0 && index <= trustedContacts.length) {
@@ -340,7 +338,6 @@ class _EmergencyPageState extends State<EmergencyPage> {
                             const SizedBox(height: 20),
                             _buildSectionTitle(
                               title: context.strings.legacyAccounts,
-                              colorScheme: colorScheme,
                             ),
                           ],
                         );
@@ -430,10 +427,7 @@ class _EmergencyPageState extends State<EmergencyPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildSectionTitle(
-              title: context.strings.legacyKits,
-              colorScheme: colorScheme,
-            ),
+            _buildSectionTitle(title: context.strings.legacyKits),
             if (legacyKits.isEmpty)
               _LegacyKitEmptyCard(onCreate: _createLegacyKit)
             else
@@ -462,7 +456,7 @@ class _EmergencyPageState extends State<EmergencyPage> {
             subTitle: legacyKits[index].hasActiveRecoverySession
                 ? context.strings.legacyKitRecoveryInProgress
                 : context.strings.createdOn(
-                    _formatKitDate(legacyKits[index].createdAt),
+                    date: _formatKitDate(legacyKits[index].createdAt),
                   ),
             subTitleInNewLine: true,
             textStyle: TextStyles.body.copyWith(color: colorScheme.textBase),
@@ -524,15 +518,19 @@ class _EmergencyPageState extends State<EmergencyPage> {
     }
   }
 
-  Widget _buildSectionTitle({
-    required String title,
-    required EnteColorScheme colorScheme,
-    double bottom = 8,
-  }) {
-    return MenuSectionTitle(
-      title: title,
+  Widget _buildSectionTitle({required String title, double bottom = 8}) {
+    return Padding(
       padding: EdgeInsets.only(bottom: bottom),
-      textStyle: TextStyles.display3.copyWith(color: colorScheme.textBase),
+      child: Row(
+        children: [
+          Text(
+            title,
+            style: TextStyles.display3.copyWith(
+              color: context.componentColors.textBase,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -682,7 +680,7 @@ class _EmergencyPageState extends State<EmergencyPage> {
     final result = await showEmailSheet<String>(
       context,
       email: contact.user.email,
-      message: context.strings.legacyInvite(contact.user.email),
+      message: context.strings.legacyInvite(email: contact.user.email),
       buttons: [
         GradientButton(
           text: context.strings.acceptTrustInvite,
@@ -738,7 +736,9 @@ class _EmergencyPageState extends State<EmergencyPage> {
     final confirmed = await showEmailSheet<bool>(
       context,
       email: emergencyContactEmail,
-      message: context.strings.recoveryWarningBody(emergencyContactEmail),
+      message: context.strings.recoveryWarningBody(
+        email: emergencyContactEmail,
+      ),
       buttons: [
         GradientButton(
           text: context.strings.rejectRecovery,

@@ -48,8 +48,6 @@ You can view your 2FA codes at [auth.ente.com](https://auth.ente.com). For addin
 
 To build a release APK, [setup your keystore](https://docs.flutter.dev/deployment/android#create-an-upload-keystore) and run `flutter build apk --release --flavor independent`. For iOS, use `flutter build ios`.
 
-If the code you're working needs to modify user facing strings, see [docs/localization](docs/localization.md).
-
 ### Updating dependencies
 
 After updating Flutter dependencies, run `pod install` from `ios/` on macOS and commit `ios/Podfile.lock` if it changes.
@@ -60,11 +58,9 @@ The architecture that powers end-to-end encrypted storage and sync of your token
 
 ## 🌍 Translate
 
-[![Crowdin](https://badges.crowdin.net/ente-authenticator-app/localized.svg)](https://crowdin.com/project/ente-authenticator-app)
+[![Crowdin](https://badges.crowdin.net/ente-photos-app/localized.svg)](https://crowdin.com/project/ente-photos-app)
 
-If you're interested in helping out with translation, please visit our [Crowdin project](https://crowdin.com/project/ente-authenticator-app) to get started. Thank you for your support.
-
-If your language is not listed for translation, please [create a GitHub issue](https://github.com/ente/ente/issues/new?title=Request+for+New+Language+Translation&body=Language+name%3A) to have it added.
+If you're interested in helping out with translation, please visit our [Crowdin project](https://crowdin.com/project/ente-photos-app). For more details, see the docs for the [strings package](../../packages/strings/README.md).
 
 ## 🧑‍🎨 Icons
 

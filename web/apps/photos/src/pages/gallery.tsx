@@ -79,7 +79,6 @@ import {
 } from "ente-new/photos/components/SelectedFileOptions";
 import { WhatsNew } from "ente-new/photos/components/WhatsNew";
 import {
-    GalleryEmptyState,
     GalleryEmptyStateV2,
     PeopleEmptyState,
     SearchResultsHeader,
@@ -130,7 +129,6 @@ import {
     addManualFileAssignmentsToPerson,
     isMLEnabled,
 } from "ente-new/photos/services/ml";
-import { enableV2 } from "ente-new/photos/utils/feature-flags";
 
 import { uploadManager } from "@/services/upload-manager";
 import watcher from "@/services/watch";
@@ -2218,17 +2216,10 @@ const Page: React.FC = () => {
             !isFirstLoad &&
             !state.collectionFiles.length &&
             activeCollectionID === PseudoCollectionID.all ? (
-                enableV2 ? (
-                    <GalleryEmptyStateV2
-                        isUploadInProgress={uploadManager.isUploadInProgress()}
-                        onUpload={openUploader}
-                    />
-                ) : (
-                    <GalleryEmptyState
-                        isUploadInProgress={uploadManager.isUploadInProgress()}
-                        onUpload={openUploader}
-                    />
-                )
+                <GalleryEmptyStateV2
+                    isUploadInProgress={uploadManager.isUploadInProgress()}
+                    onUpload={openUploader}
+                />
             ) : !isInSearchMode &&
               !isFirstLoad &&
               state.view?.type == "people" &&
@@ -2317,7 +2308,7 @@ const Page: React.FC = () => {
             />
             <SingleInputDialog
                 {...albumNameInputVisibilityProps}
-                variant={enableV2 ? "v2" : "default"}
+                variant="v2"
                 title={t("new_album")}
                 label={t("album_name")}
                 submitButtonTitle={t("create")}

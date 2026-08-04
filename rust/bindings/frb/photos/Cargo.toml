@@ -7,7 +7,7 @@ crate-type = ["cdylib", "staticlib"]
 
 [dependencies]
 ente-image.workspace = true
-ente-photos.workspace = true
+ente-photos = { workspace = true, features = ["usearch"] }
 flutter_rust_bridge.workspace = true
 
 [lints.rust]

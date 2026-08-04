@@ -2,10 +2,10 @@ import "dart:io";
 
 import "package:ente_components/ente_components.dart";
 import 'package:ente_pure_utils/ente_pure_utils.dart';
+import "package:ente_strings/ente_strings.dart";
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:logging/logging.dart';
-import "package:photos/generated/l10n.dart";
 import 'package:photos/models/freeable_space_info.dart';
 import "package:photos/services/files_service.dart";
 import "package:photos/services/free_space/deletion_batch_runner.dart";
@@ -37,7 +37,7 @@ class _FreeSpacePageState extends State<FreeSpacePage> {
     return Scaffold(
       backgroundColor: context.componentColors.backgroundBase,
       body: AppBarComponent(
-        title: AppLocalizations.of(context).freeUpDeviceSpace,
+        title: context.strings.freeUpDeviceSpace,
         backgroundColor: context.componentColors.backgroundBase,
         slivers: [
           SliverSafeArea(
@@ -58,7 +58,7 @@ class _FreeSpacePageState extends State<FreeSpacePage> {
     final count = status.localIDs.length;
     final formattedCount = NumberFormat().format(count);
     final formattedSize = formatBytes(status.size);
-    final l10n = AppLocalizations.of(context);
+    final l10n = context.strings;
     final colors = context.componentColors;
 
     return Padding(
@@ -128,7 +128,7 @@ class _FreeSpacePageState extends State<FreeSpacePage> {
       } catch (e, s) {
         _logger.severe("Could not refresh free-up-space candidates", e, s);
         if (mounted) {
-          showToast(context, AppLocalizations.of(context).couldNotFreeUpSpace);
+          showToast(context, context.strings.couldNotFreeUpSpace);
         }
         return;
       }
@@ -157,7 +157,7 @@ class _FreeSpacePageState extends State<FreeSpacePage> {
       if (result.isCompleted) {
         Navigator.of(context).pop(true);
       } else if (!result.isCancelled) {
-        showToast(context, AppLocalizations.of(context).couldNotFreeUpSpace);
+        showToast(context, context.strings.couldNotFreeUpSpace);
       }
     } finally {
       _isFreeSpaceDeletionInProgress = false;
@@ -171,7 +171,7 @@ class _FreeSpacePageState extends State<FreeSpacePage> {
     BuildContext context,
     FreeableSpaceInfo status,
   ) async {
-    final l10n = AppLocalizations.of(context);
+    final l10n = context.strings;
     await showBottomSheetComponent(
       context: context,
       builder: (_) => BottomSheetComponent(

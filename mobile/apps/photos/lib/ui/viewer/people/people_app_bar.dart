@@ -2,6 +2,7 @@ import 'dart:async';
 
 import "package:ente_components/ente_components.dart";
 import "package:ente_pure_utils/ente_pure_utils.dart";
+import "package:ente_strings/ente_strings.dart";
 import 'package:flutter/material.dart';
 import "package:hugeicons/hugeicons.dart";
 import 'package:logging/logging.dart';
@@ -9,8 +10,6 @@ import 'package:photos/core/configuration.dart';
 import 'package:photos/core/event_bus.dart';
 import "package:photos/events/people_changed_event.dart";
 import 'package:photos/events/subscription_purchased_event.dart';
-import "package:photos/generated/l10n.dart";
-import "package:photos/l10n/l10n.dart";
 import 'package:photos/models/gallery_type.dart';
 import "package:photos/models/ml/face/person.dart";
 import 'package:photos/models/selected_files.dart';
@@ -131,9 +130,9 @@ class _AppBarWidgetState extends State<PeopleAppBar> {
       userID: sourcePerson.data.userID,
     )) {
       if (title == null) {
-        return context.l10n.me;
+        return context.strings.me;
       }
-      return context.l10n.accountOwnerPersonAppbarTitle(title: title);
+      return context.strings.accountOwnerPersonAppbarTitle(title: title);
     }
     return title;
   }
@@ -289,7 +288,7 @@ class _AppBarWidgetState extends State<PeopleAppBar> {
       items.add(
         EntePopupMenuOption(
           value: PeoplePopupAction.memoryLane,
-          label: context.l10n.facesTimelineAppBarTitle,
+          label: context.strings.facesTimelineAppBarTitle,
           leadingWidget: galleryAppBarMenuIcon(
             HugeIcons.strokeRoundedSparkles,
             iconColor,
@@ -302,7 +301,7 @@ class _AppBarWidgetState extends State<PeopleAppBar> {
       items.addAll([
         EntePopupMenuOption(
           value: PeoplePopupAction.rename,
-          label: AppLocalizations.of(context).edit,
+          label: context.strings.edit,
           leadingWidget: galleryAppBarMenuIcon(
             HugeIcons.strokeRoundedPencilEdit01,
             iconColor,
@@ -311,7 +310,7 @@ class _AppBarWidgetState extends State<PeopleAppBar> {
         if (hasAssignedCluster)
           EntePopupMenuOption(
             value: PeoplePopupAction.reviewSuggestions,
-            label: AppLocalizations.of(context).review,
+            label: context.strings.review,
             leadingWidget: galleryAppBarMenuIcon(
               HugeIcons.strokeRoundedSearch01,
               iconColor,
@@ -320,7 +319,7 @@ class _AppBarWidgetState extends State<PeopleAppBar> {
         if (hasAssignedCluster)
           EntePopupMenuOption(
             value: PeoplePopupAction.setCover,
-            label: AppLocalizations.of(context).setCover,
+            label: context.strings.setCover,
             leadingWidget: galleryAppBarMenuIcon(
               HugeIcons.strokeRoundedImage01,
               iconColor,
@@ -328,7 +327,9 @@ class _AppBarWidgetState extends State<PeopleAppBar> {
           ),
         EntePopupMenuOption(
           value: PeoplePopupAction.pinPerson,
-          label: isPinned ? context.l10n.unpinPerson : context.l10n.pinPerson,
+          label: isPinned
+              ? context.strings.unpinPerson
+              : context.strings.pinPerson,
           leadingWidget: galleryAppBarMenuIcon(
             isPinned
                 ? HugeIcons.strokeRoundedPinOff
@@ -339,8 +340,8 @@ class _AppBarWidgetState extends State<PeopleAppBar> {
         EntePopupMenuOption(
           value: PeoplePopupAction.hideFromMemories,
           label: hideFromMemories
-              ? context.l10n.showInMemories
-              : context.l10n.hideFromMemories,
+              ? context.strings.showInMemories
+              : context.strings.hideFromMemories,
           leadingWidget: galleryAppBarMenuIcon(
             hideFromMemories
                 ? HugeIcons.strokeRoundedView
@@ -354,7 +355,7 @@ class _AppBarWidgetState extends State<PeopleAppBar> {
         ))
           EntePopupMenuOption(
             value: PeoplePopupAction.reassignMe,
-            label: context.l10n.reassignMe,
+            label: context.strings.reassignMe,
             leadingWidget: galleryAppBarMenuIcon(
               HugeIcons.strokeRoundedUser,
               iconColor,
@@ -362,7 +363,7 @@ class _AppBarWidgetState extends State<PeopleAppBar> {
           ),
         EntePopupMenuOption(
           value: PeoplePopupAction.ignore,
-          label: AppLocalizations.of(context).ignore,
+          label: context.strings.ignore,
           leadingWidget: galleryAppBarMenuIcon(
             HugeIcons.strokeRoundedUserBlock01,
             iconColor,
@@ -370,7 +371,7 @@ class _AppBarWidgetState extends State<PeopleAppBar> {
         ),
         EntePopupMenuOption(
           value: PeoplePopupAction.removeLabel,
-          label: AppLocalizations.of(context).remove,
+          label: context.strings.remove,
           leadingWidget: galleryAppBarMenuIcon(
             HugeIcons.strokeRoundedDelete01,
             iconColor,
@@ -381,7 +382,7 @@ class _AppBarWidgetState extends State<PeopleAppBar> {
       items.addAll([
         EntePopupMenuOption(
           value: PeoplePopupAction.rename,
-          label: AppLocalizations.of(context).edit,
+          label: context.strings.edit,
           leadingWidget: galleryAppBarMenuIcon(
             HugeIcons.strokeRoundedPencilEdit01,
             iconColor,
@@ -390,7 +391,7 @@ class _AppBarWidgetState extends State<PeopleAppBar> {
         if (hasAssignedCluster)
           EntePopupMenuOption(
             value: PeoplePopupAction.reviewSuggestions,
-            label: AppLocalizations.of(context).review,
+            label: context.strings.review,
             leadingWidget: galleryAppBarMenuIcon(
               HugeIcons.strokeRoundedSearch01,
               iconColor,
@@ -398,7 +399,7 @@ class _AppBarWidgetState extends State<PeopleAppBar> {
           ),
         EntePopupMenuOption(
           value: PeoplePopupAction.unignore,
-          label: AppLocalizations.of(context).showPerson,
+          label: context.strings.showPerson,
           leadingWidget: galleryAppBarMenuIcon(
             HugeIcons.strokeRoundedView,
             iconColor,
@@ -409,7 +410,7 @@ class _AppBarWidgetState extends State<PeopleAppBar> {
 
     actions.add(
       galleryAppBarPopupMenuAction<PeoplePopupAction>(
-        tooltip: AppLocalizations.of(context).more,
+        tooltip: context.strings.more,
         icon: const HugeIcon(icon: HugeIcons.strokeRoundedMoreVertical),
         optionsBuilder: () => items,
         onSelected: (PeoplePopupAction value) async {
@@ -499,9 +500,9 @@ class _AppBarWidgetState extends State<PeopleAppBar> {
   Future<void> _resetPerson(BuildContext context) async {
     await showChoiceDialog(
       context,
-      title: AppLocalizations.of(context).areYouSureYouWantToResetThisPerson,
-      body: AppLocalizations.of(context).allPersonGroupingWillReset,
-      firstButtonLabel: AppLocalizations.of(context).yesResetPerson,
+      title: context.strings.areYouSureYouWantToResetThisPerson,
+      body: context.strings.allPersonGroupingWillReset,
+      firstButtonLabel: context.strings.yesResetPerson,
       firstButtonOnTap: () async {
         try {
           await PersonService.instance.deletePerson(person.remoteID);
@@ -524,9 +525,9 @@ class _AppBarWidgetState extends State<PeopleAppBar> {
   Future<void> _ignorePerson(BuildContext context) async {
     final result = await showChoiceDialog(
       context,
-      title: AppLocalizations.of(context).areYouSureYouWantToIgnoreThisPerson,
-      body: AppLocalizations.of(context).thePersonWillNotBeDisplayed,
-      firstButtonLabel: AppLocalizations.of(context).yesIgnore,
+      title: context.strings.areYouSureYouWantToIgnoreThisPerson,
+      body: context.strings.thePersonWillNotBeDisplayed,
+      firstButtonLabel: context.strings.yesIgnore,
       firstButtonOnTap: () async {
         try {
           final updatedPerson = await PersonService.instance.updateAttributes(
@@ -553,10 +554,7 @@ class _AppBarWidgetState extends State<PeopleAppBar> {
       return;
     }
     if (!context.mounted) return;
-    showShortToast(
-      context,
-      AppLocalizations.of(context).somethingWentWrongPleaseTryAgain,
-    );
+    showShortToast(context, context.strings.somethingWentWrongPleaseTryAgain);
   }
 
   Future<void> _showPerson(BuildContext context) async {
@@ -564,10 +562,9 @@ class _AppBarWidgetState extends State<PeopleAppBar> {
     var shouldCloseDetailPage = false;
     final result = await showChoiceDialog(
       context,
-      title: AppLocalizations.of(
-        context,
-      ).areYouSureYouWantToShowThisPersonInPeopleSectionAgain,
-      firstButtonLabel: AppLocalizations.of(context).yesShowPerson,
+      title:
+          context.strings.areYouSureYouWantToShowThisPersonInPeopleSectionAgain,
+      firstButtonLabel: context.strings.yesShowPerson,
       isDismissible: false,
       firstButtonOnTap: () async {
         try {

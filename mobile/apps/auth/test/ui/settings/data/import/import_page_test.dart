@@ -1,6 +1,6 @@
-import 'package:ente_auth/l10n/l10n.dart';
 import 'package:ente_auth/ui/settings/data/import_page.dart';
 import 'package:ente_components/ente_components.dart';
+import 'package:ente_strings/ente_strings.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -11,8 +11,8 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           theme: ComponentTheme.lightTheme(app: ComponentApp.auth),
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
-          supportedLocales: AppLocalizations.supportedLocales,
+          localizationsDelegates: StringsLocalizations.localizationsDelegates,
+          supportedLocales: StringsLocalizations.supportedLocales,
           home: const ImportCodePage(),
         ),
       );
@@ -20,7 +20,7 @@ void main() {
       expect(find.text('Import codes'), findsOneWidget);
       expect(find.byType(MenuGroupComponent), findsOneWidget);
       expect(find.text('Plain text'), findsOneWidget);
-      expect(find.text('Ente Encrypted export'), findsOneWidget);
+      expect(find.text('Ente encrypted export'), findsOneWidget);
       expect(find.text('OTP Auth'), findsOneWidget);
       expect(
         find.byWidgetPredicate(
@@ -39,8 +39,8 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         theme: ComponentTheme.lightTheme(app: ComponentApp.auth),
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
-        supportedLocales: AppLocalizations.supportedLocales,
+        localizationsDelegates: StringsLocalizations.localizationsDelegates,
+        supportedLocales: StringsLocalizations.supportedLocales,
         home: const ImportCodePage(),
       ),
     );

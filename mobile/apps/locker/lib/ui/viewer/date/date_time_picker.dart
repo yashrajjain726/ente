@@ -1,6 +1,6 @@
 import "package:ente_components/ente_components.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/cupertino.dart";
-import "package:locker/l10n/l10n.dart";
 
 Future<DateTime?> showDatePickerSheet(
   BuildContext context, {
@@ -90,8 +90,8 @@ class _DateTimePickerWidgetState extends State<DateTimePickerWidget> {
               alignment: Alignment.centerLeft,
               child: Text(
                 _showTimePicker
-                    ? context.l10n.selectTime
-                    : context.l10n.selectDate,
+                    ? context.strings.selectTime
+                    : context.strings.selectDate,
                 style: TextStyle(color: colors.textBase, fontSize: 16),
               ),
             ),
@@ -172,8 +172,8 @@ class _DateTimePickerWidgetState extends State<DateTimePickerWidget> {
                   padding: EdgeInsets.zero,
                   child: Text(
                     _showTimePicker
-                        ? context.l10n.previous
-                        : context.l10n.cancel,
+                        ? context.strings.previous
+                        : context.strings.cancel,
                     style: TextStyle(color: colors.textBase, fontSize: 14),
                   ),
                   onPressed: () {
@@ -192,7 +192,9 @@ class _DateTimePickerWidgetState extends State<DateTimePickerWidget> {
                 CupertinoButton(
                   padding: EdgeInsets.zero,
                   child: Text(
-                    _showTimePicker ? context.l10n.done : context.l10n.next,
+                    _showTimePicker
+                        ? context.strings.done
+                        : context.strings.next,
                     style: TextStyle(
                       color: colors.primary,
                       fontSize: 14,

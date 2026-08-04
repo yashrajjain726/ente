@@ -60,6 +60,8 @@ const viewerSwipeAxisRatio = 1.5;
 const viewerHeaderAvatarSize = 28;
 const viewerHeaderButtonVisualSize = 28;
 const draftPostExitDurationMs = 320;
+const keyboardInsetThresholdPx = 80;
+const keyboardDismissMaxDurationMs = 500;
 
 interface ViewerViewportSize {
     x: number;
@@ -148,12 +150,15 @@ interface SpaceViewerDeleteSnapshot {
     photos: SpaceViewerPhoto[];
 }
 
+type DraftPostExitPhase = "idle" | "waiting-for-keyboard" | "animating";
+
 interface SpaceFileViewerProps {
     draftPostPreparationError?: string;
     isDraftPostPreparing?: boolean;
     isDraftPostPreviewPending?: boolean;
     onClose: () => void;
     onDeletePost?: () => Promise<void> | void;
+    onDraftPostExitAnimationStart?: () => void;
     onDraftPostExitStart?: () => void;
     onDraftPostPublished?: () => void;
     onAddFriendForPostAction?: (intent: SpaceInviteIntent) => void;
@@ -302,6 +307,53 @@ const resizeCaptionInput = (
         input.scrollHeight > captionInputMaxHeight ? "auto" : "hidden";
 };
 
+const viewerCaptionTextSx = {
+    color: "#FFFFFF",
+    fontFamily: '"Inter Variable", Inter, sans-serif',
+    fontSize: 14,
+    fontWeight: 650,
+    lineHeight: "21px",
+    textAlign: "center",
+    textWrap: "balance",
+    whiteSpace: "pre-wrap",
+} as const;
+const viewerCaptionBubbleSx = {
+    bgcolor: "rgba(48, 48, 48, 0.86)",
+    borderRadius: "10px",
+    boxDecorationBreak: "clone",
+    px: "8px",
+    py: "2px",
+    WebkitBoxDecorationBreak: "clone",
+} as const;
+
+const SpaceViewerCaption: React.FC<{ caption: string }> = ({ caption }) => {
+    return (
+        <Box
+            component="p"
+            data-space-viewer-chrome="true"
+            title={caption}
+            sx={{
+                ...viewerCaptionTextSx,
+                bottom: "14%",
+                left: "50%",
+                m: 0,
+                maxWidth: "70vw",
+                minWidth: 0,
+                overflowWrap: "break-word",
+                position: "fixed",
+                textShadow: "0 1px 10px rgba(0, 0, 0, 0.74)",
+                transform: "translateX(-50%)",
+                width: "70vw",
+                zIndex: 2,
+            }}
+        >
+            <Box component="span" sx={viewerCaptionBubbleSx}>
+                {caption}
+            </Box>
+        </Box>
+    );
+};
+
 export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
     draftPostPreparationError,
     focusReplyOnOpen = false,
@@ -309,6 +361,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
     isDraftPostPreviewPending = false,
     onClose,
     onDeletePost,
+    onDraftPostExitAnimationStart,
     onDraftPostExitStart,
     onDraftPostPublished,
     onAddFriendForPostAction,
@@ -397,7 +450,10 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
         React.useState<SpaceInviteIntent>("like");
     const [draftPostActionPhase, setDraftPostActionPhase] =
         React.useState<SpaceActionPhase | null>(null);
-    const [isDraftPostExit, setIsDraftPostExit] = React.useState(false);
+    const [draftPostExitPhase, setDraftPostExitPhase] =
+        React.useState<DraftPostExitPhase>("idle");
+    const isDraftPostExit = draftPostExitPhase != "idle";
+    const isDraftPostExitAnimating = draftPostExitPhase == "animating";
     const [isDesktopViewer, setIsDesktopViewer] = React.useState(
         () =>
             typeof window != "undefined" &&
@@ -416,6 +472,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
         currentViewerViewportSize(null),
     );
     const captionInputRef = React.useRef<HTMLTextAreaElement | null>(null);
+    const cancelKeyboardDismissWaitRef = React.useRef<() => void>(undefined);
     const replyInputRef = React.useRef<HTMLTextAreaElement | null>(null);
     const [actionsAnchor, setActionsAnchor] =
         React.useState<HTMLElement | null>(null);
@@ -539,6 +596,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
     }, [caption]);
 
     const closeViewer = () => {
+        if (isDraftPostExit) return;
         if (isCaptionEditing && !isCaptionUpdateActionRunning) {
             cancelCaptionEdit();
             return;
@@ -610,6 +668,62 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
         };
     }, [activePhoto.height, activePhoto.width]);
 
+    const dismissCaptionKeyboard = React.useCallback(
+        (onDismissed: () => void) => {
+            const input = captionInputRef.current;
+            const root = viewerRootRef.current;
+            const viewport = window.visualViewport;
+            const wasFocused = document.activeElement == input;
+
+            input?.blur();
+            if (
+                !wasFocused ||
+                !root ||
+                !viewport ||
+                root.clientHeight - viewport.height < keyboardInsetThresholdPx
+            ) {
+                onDismissed();
+                return;
+            }
+
+            const visibleViewport = viewport;
+            const targetHeight = root.clientHeight;
+            let timeoutID = 0;
+            function cancelWait() {
+                visibleViewport.removeEventListener(
+                    "resize",
+                    handleViewportChange,
+                );
+                visibleViewport.removeEventListener(
+                    "scroll",
+                    handleViewportChange,
+                );
+                window.clearTimeout(timeoutID);
+            }
+            function finish() {
+                cancelWait();
+                cancelKeyboardDismissWaitRef.current = undefined;
+                onDismissed();
+            }
+            function handleViewportChange() {
+                if (
+                    visibleViewport.height >= targetHeight - 1 &&
+                    visibleViewport.offsetTop <= 1
+                ) {
+                    finish();
+                }
+            }
+
+            visibleViewport.addEventListener("resize", handleViewportChange);
+            visibleViewport.addEventListener("scroll", handleViewportChange);
+            timeoutID = window.setTimeout(finish, keyboardDismissMaxDurationMs);
+            cancelKeyboardDismissWaitRef.current = cancelWait;
+        },
+        [],
+    );
+
+    React.useEffect(() => () => cancelKeyboardDismissWaitRef.current?.(), []);
+
     const publishDraftPostWithCaption = React.useCallback(
         (captionToPublish: string, editToPublish: SpaceViewerDraftPostEdit) => {
             if (!onPublishDraftPost || isDeleteExit || isDraftPostExit) return;
@@ -627,8 +741,12 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
             }
 
             setQueuedDraftPost(undefined);
-            setIsDraftPostExit(true);
+            setDraftPostExitPhase("waiting-for-keyboard");
             onDraftPostExitStart?.();
+            dismissCaptionKeyboard(() => {
+                setDraftPostExitPhase("animating");
+                onDraftPostExitAnimationStart?.();
+            });
             void publishPromise.catch((error: unknown) => {
                 log.error("Failed to publish space post", error);
             });
@@ -636,6 +754,8 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
         [
             isDeleteExit,
             isDraftPostExit,
+            dismissCaptionKeyboard,
+            onDraftPostExitAnimationStart,
             onDraftPostExitStart,
             onPublishDraftPost,
         ],
@@ -713,7 +833,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
         sendReply();
     };
 
-    const handleReplyActionPointerDown = (event: React.PointerEvent) => {
+    const handleInputActionPointerDown = (event: React.PointerEvent) => {
         event.preventDefault();
     };
 
@@ -882,10 +1002,10 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
     }, [onClose, onDraftPostPublished]);
 
     React.useEffect(() => {
-        if (!isDraftPostExit) return;
+        if (!isDraftPostExitAnimating) return;
         if (window.matchMedia("(prefers-reduced-motion: reduce)").matches)
             finishDraftPostExit();
-    }, [finishDraftPostExit, isDraftPostExit]);
+    }, [finishDraftPostExit, isDraftPostExitAnimating]);
 
     React.useEffect(() => {
         const root = viewerRootRef.current;
@@ -1131,7 +1251,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
             aria-modal="true"
             onTransitionEnd={(event) => {
                 if (
-                    !isDraftPostExit ||
+                    !isDraftPostExitAnimating ||
                     event.currentTarget != event.target ||
                     event.propertyName != "opacity"
                 )
@@ -1149,7 +1269,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                 isolation: "isolate",
                 maxWidth: "100vw",
                 minHeight: "100svh",
-                opacity: isDraftPostExit ? 0 : 1,
+                opacity: isDraftPostExitAnimating ? 0 : 1,
                 overflow: "hidden",
                 overflowX: "hidden",
                 pointerEvents: isDraftPostExit ? "none" : "auto",
@@ -1684,6 +1804,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                             }
                             disabled={isDraftPostPublishDisabled}
                             onClick={publishDraftPost}
+                            onPointerDown={handleInputActionPointerDown}
                             sx={{
                                 alignItems: "center",
                                 bgcolor: "#FFFFFF",
@@ -1925,46 +2046,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                 </Box>
             )}
             {hasDisplayCaption && !isCaptionEditing && (
-                <Box
-                    component="p"
-                    data-space-viewer-chrome="true"
-                    title={displayCaption}
-                    sx={{
-                        boxSizing: "border-box",
-                        color: textBase,
-                        fontFamily: '"Inter Variable", Inter, sans-serif',
-                        fontSize: 14,
-                        fontWeight: 650,
-                        left: "50%",
-                        lineHeight: "23px",
-                        m: 0,
-                        maxWidth: "90vw",
-                        minWidth: 0,
-                        overflowWrap: "break-word",
-                        position: "fixed",
-                        textAlign: "center",
-                        textShadow: "0 1px 10px rgba(0, 0, 0, 0.74)",
-                        bottom: "14%",
-                        transform: "translateX(-50%)",
-                        whiteSpace: "pre-wrap",
-                        width: "90vw",
-                        zIndex: 2,
-                    }}
-                >
-                    <Box
-                        component="span"
-                        sx={{
-                            bgcolor: "rgba(48, 48, 48, 0.82)",
-                            borderRadius: "10px",
-                            boxDecorationBreak: "clone",
-                            px: "8px",
-                            py: "2px",
-                            WebkitBoxDecorationBreak: "clone",
-                        }}
-                    >
-                        {displayCaption}
-                    </Box>
-                </Box>
+                <SpaceViewerCaption caption={displayCaption} />
             )}
             {showPhotoLikeButton && !isCaptionEditing && (
                 <Box
@@ -2083,7 +2165,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                                 }
                                 onPointerDown={
                                     isReplyMode
-                                        ? handleReplyActionPointerDown
+                                        ? handleInputActionPointerDown
                                         : undefined
                                 }
                                 sx={{

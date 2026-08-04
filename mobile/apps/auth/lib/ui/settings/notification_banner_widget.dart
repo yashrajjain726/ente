@@ -1,10 +1,10 @@
 import 'package:ente_accounts/models/user_details.dart';
 import 'package:ente_accounts/services/user_service.dart';
 import 'package:ente_auth/core/configuration.dart';
-import 'package:ente_auth/l10n/l10n.dart';
 import 'package:ente_auth/services/preference_service.dart';
 import 'package:ente_auth/services/update_service.dart';
 import 'package:ente_auth/ui/components/banner_widget.dart';
+import 'package:ente_strings/ente_strings.dart';
 import 'package:flutter/material.dart';
 
 class NotificationBannerWidget extends StatelessWidget {
@@ -21,9 +21,9 @@ class NotificationBannerWidget extends StatelessWidget {
     final differenceInDays = currentTime
         .difference(DateTime.fromMillisecondsSinceEpoch(appInstallTime))
         .inDays;
-    final l10n = context.l10n;
+    final l10n = context.strings;
     final ratePlace = UpdateService.instance.getRateDetails().item1;
-    final rateSubText = l10n.rateUsOnStore(ratePlace);
+    final rateSubText = l10n.rateUsOnStore(storeName: ratePlace);
 
     if (Configuration.instance.hasConfiguredAccount()) {
       return FutureBuilder<UserDetails>(

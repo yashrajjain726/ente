@@ -1,11 +1,11 @@
 import 'dart:math';
 
+import 'package:ente_strings/ente_strings.dart';
 import 'package:logging/logging.dart';
 import 'package:photos/core/configuration.dart';
 import 'package:photos/db/files_db.dart';
 import 'package:photos/db/social_db.dart';
 import 'package:photos/extensions/user_extension.dart';
-import 'package:photos/generated/l10n.dart';
 import 'package:photos/models/collection/collection.dart';
 import 'package:photos/models/file/extensions/file_props.dart';
 import 'package:photos/models/file/file.dart';
@@ -376,7 +376,7 @@ class SocialNotificationCoordinator {
 
   String _getSocialNotificationBody(
     _SocialActivityCandidate candidate,
-    AppLocalizations s,
+    StringsLocalizations s,
     FileType? fileType,
     bool isOwn,
   ) {
@@ -385,7 +385,7 @@ class SocialNotificationCoordinator {
 
   String _getSocialNotificationDetail(
     _SocialActivityCandidate candidate,
-    AppLocalizations s,
+    StringsLocalizations s,
     FileType? fileType,
     bool isOwn,
   ) {

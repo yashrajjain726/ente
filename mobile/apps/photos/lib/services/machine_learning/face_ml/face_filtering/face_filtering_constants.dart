@@ -17,6 +17,17 @@ const kMinimumQualityFaceScore = 0.80;
 const kMediumQualityFaceScore = 0.85;
 const kHighQualityFaceScore = 0.90;
 
+bool isBadFaceForClustering({
+  required double faceScore,
+  required double blurValue,
+  required bool isSideways,
+}) =>
+    faceScore < kMinimumQualityFaceScore ||
+    blurValue < kLaplacianSoftThreshold ||
+    (blurValue < kLaplacianVerySoftThreshold &&
+        faceScore < kMediumQualityFaceScore) ||
+    isSideways;
+
 /// The minimum cluster size for displaying a cluster in the UI by default
 const kMinimumClusterSizeSearchResult = 10;
 

@@ -682,22 +682,24 @@ const getLatestFileIdFromPoints = (points: MapIndexPoint[]) =>
  * Loads and manages map data including index, files, and thumbnails.
  * Responsibility: Fetch collection files, build/persist spatial index, prefetch thumbnails on demand.
  */
+const emptyMapDataState = (): MapDataState => ({
+    mapCenter: null,
+    mapIndex: null,
+    mapPoints: [],
+    latestFileId: undefined,
+    filesByID: new Map(),
+    thumbByFileID: new Map(),
+    isLoading: false,
+    error: null,
+});
+
 function useMapData(
     open: boolean,
     collectionSummary: CollectionSummary,
     files: EnteFile[],
     onGenericError: (e: unknown) => void,
 ): MapDataResult {
-    const [state, setState] = useState<MapDataState>({
-        mapCenter: null,
-        mapIndex: null,
-        mapPoints: [],
-        latestFileId: undefined,
-        filesByID: new Map(),
-        thumbByFileID: new Map(),
-        isLoading: false,
-        error: null,
-    });
+    const [state, setState] = useState<MapDataState>(emptyMapDataState);
 
     //Ref mirroring the filesByID(state) to prevent the stale closure issue with the queueThumbnailFetch useCallback fn().
     const filesByIDRef = useRef<Map<number, EnteFile>>(new Map());
@@ -715,6 +717,12 @@ function useMapData(
         updationTime: number | null;
         files: EnteFile[];
     } | null>(null);
+    // Survives dialog close (unlike loadedCollectionRef, which is cleared on
+    // close) so we can tell a same-collection background reload apart from a
+    // switch to a different collection.
+    const lastLoadedSummaryIdRef = useRef<number | undefined>(undefined);
+    // Invalidates in-flight loads when a newer load starts or the dialog closes.
+    const loadGenerationRef = useRef(0);
 
     //Syncing the refs with the state for the stale closure prevention.
     useEffect(() => {
@@ -804,6 +812,7 @@ function useMapData(
     useEffect(() => {
         if (!open) {
             loadedCollectionRef.current = null;
+            loadGenerationRef.current += 1;
             pendingThumbsRef.current.clear();
             isThumbnailWorkerRunningRef.current = false;
         }
@@ -818,20 +827,48 @@ function useMapData(
         const currentUpdationTime = collectionSummary.updationTime ?? null;
         const loaded = loadedCollectionRef.current;
 
+        // The files array identity changes on every remote pull (e.g. the
+        // desktop app pulls on each window focus), so compare stable file
+        // revisions to avoid tearing down the map for a no-op reload while
+        // still detecting metadata changes such as edited locations.
+        const sameFiles =
+            loaded?.files === files ||
+            (!!loaded &&
+                loaded.files.length === files.length &&
+                loaded.files.every((file, index) => {
+                    const nextFile = files[index];
+                    return (
+                        file.id === nextFile?.id &&
+                        file.collectionID === nextFile.collectionID &&
+                        file.updationTime === nextFile.updationTime
+                    );
+                }));
+
         //preventing reloading of the data if it's already loaded.
         if (
             loaded?.summaryId === currentSummaryId &&
             loaded.fileCount === currentFileCount &&
             loaded.updationTime === currentUpdationTime &&
-            loaded.files === files
+            sameFiles
         ) {
             return;
         }
 
         const loadMapData = async () => {
+            const generation = ++loadGenerationRef.current;
             //In this ref we are actually setting a new Set() so clearing that before any compute happens.
             pendingThumbsRef.current.clear();
-            setState((prev) => ({ ...prev, isLoading: true, error: null }));
+            // When switching to a different collection, blank the previous
+            // collection's map data so it doesn't flash while the new one
+            // loads; for a same-collection reload, keep it mounted behind the
+            // background refresh.
+            const isNewCollection =
+                lastLoadedSummaryIdRef.current !== currentSummaryId;
+            setState((prev) =>
+                isNewCollection
+                    ? { ...emptyMapDataState(), isLoading: true }
+                    : { ...prev, isLoading: true, error: null },
+            );
 
             try {
                 const uniqueFiles = uniqueFilesByID(files);
@@ -845,6 +882,7 @@ function useMapData(
 
                 const { points, latestFileId } =
                     await buildMapIndexPoints(uniqueFiles);
+                if (generation !== loadGenerationRef.current) return;
 
                 //mapIndex has the SuperCluster Spatial Index
                 const mapIndex = buildMapIndex(points);
@@ -856,16 +894,18 @@ function useMapData(
                     ? [latestPoint.lat, latestPoint.lng]
                     : null;
 
-                setState({
+                setState((prev) => ({
                     filesByID,
                     mapCenter,
                     mapIndex,
                     mapPoints: points,
                     latestFileId,
-                    thumbByFileID: new Map(),
+                    // Keep already-fetched thumbnails; keys are file ids so
+                    // entries for removed files are simply unused.
+                    thumbByFileID: prev.thumbByFileID,
                     isLoading: false,
                     error: null,
-                });
+                }));
 
                 // Mark this collection as loaded
                 loadedCollectionRef.current = {
@@ -874,6 +914,7 @@ function useMapData(
                     updationTime: currentUpdationTime,
                     files,
                 };
+                lastLoadedSummaryIdRef.current = currentSummaryId;
 
                 const coverId = collectionSummary.coverFile?.id ?? latestFileId;
                 if (coverId !== undefined) {
@@ -882,6 +923,7 @@ function useMapData(
 
                 return;
             } catch (e) {
+                if (generation !== loadGenerationRef.current) return;
                 setState((prev) => ({
                     ...prev,
                     isLoading: false,
@@ -890,9 +932,11 @@ function useMapData(
                 onGenericError(e);
             } finally {
                 // Ensure we never leave the dialog stuck in a loading state
-                setState((prev) =>
-                    prev.isLoading ? { ...prev, isLoading: false } : prev,
-                );
+                if (generation === loadGenerationRef.current) {
+                    setState((prev) =>
+                        prev.isLoading ? { ...prev, isLoading: false } : prev,
+                    );
+                }
             }
         };
 
@@ -1648,7 +1692,9 @@ export const CollectionMapDialog: React.FC<CollectionMapDialogProps> = ({
     );
 
     const body = useMemo(() => {
-        if (isLoading) {
+        // Only blank out the layout on the initial load; background reloads
+        // keep the map (and any open file viewer) mounted.
+        if (isLoading && !mapIndex) {
             return (
                 <CenteredBox>
                     <ActivityIndicator size="28px" />

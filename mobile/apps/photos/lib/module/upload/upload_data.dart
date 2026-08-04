@@ -26,6 +26,7 @@ import 'package:photos/module/upload/model/media_upload_data.dart';
 import "package:photos/services/sync/local_sync_service.dart";
 import "package:photos/src/rust/api/motion_photo_api.dart";
 import "package:photos/utils/apple_photos_errors.dart";
+import "package:photos/utils/device_storage_error.dart";
 import "package:photos/utils/image_util.dart";
 
 final _logger = Logger("UploadData");
@@ -224,6 +225,9 @@ Future<Uint8List?> _getThumbnailForUpload(
     }
     return compressThumbnailToSizeLimit(thumbnailData);
   } catch (e) {
+    if (isDeviceStorageFullError(e)) {
+      rethrow;
+    }
     final String errMessage =
         "thumbErr for ${file.fileType}, ${extension(file.displayName)} ${file.tag}";
     _logger.warning(errMessage, e);

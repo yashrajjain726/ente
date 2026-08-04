@@ -44,7 +44,11 @@ To fix this:
 
 ### Can I retry failed uploads?
 
-Yes. You can check the progress/info tab that appears during upload to determine the cause of failed uploads. You can also drag and drop the folder or files again. Ente will automatically ignore already backed up files and try to upload just the rest.
+Yes. When an upload finishes, the completion screen shows the **Completed**, **Skipped**, and **Failed** totals. If any items need attention, select **Review items**, open **Failed**, and click **Retry failed uploads**.
+
+Skipped items are listed separately with a reason and are not presented as retryable failures. For example, partner-shared photos excluded from a Google Takeout import appear under **Skipped** with the reason **Shared by partner**.
+
+You can also select or drag and drop the same folder or files again. Ente skips items already uploaded to the target album and processes the rest. Learn more in [Import from Local Hard Disk](/photos/migration/from-local-hard-disk).
 
 ### Why does my google takeout upload fail?
 
@@ -169,7 +173,7 @@ Each partner should export their own library via [Google Takeout](/photos/migrat
 
 > [!NOTE]
 >
-> Photos only visible to you through Partner Sharing (not saved to your library) are **not** included in your Takeout. Only the partner who originally took those photos will have them in their export. There is also no built-in filter to remove partner-shared photos from a Takeout import - so duplicates may occur if both partners import and then share entire libraries on Ente.
+> Photos only visible to you through Partner Sharing (not saved to your library) are **not** included in your Takeout. Only the partner who originally took those photos will have them in their export. For partner-shared photos that are present in your Takeout, the desktop importer lets you choose whether to import or skip them. Skip them if the original owner is also importing their library and you want to avoid duplicate copies.
 
 #### 2. Set up sharing on Ente
 
@@ -211,7 +215,9 @@ Once this is done, you can reupload your entire Google Takeout folder again usin
 
 ### Is there a way to remove partner sharing photos when importing via Google Takeout?
 
-There is currently no built-in filter to automatically remove partner-shared photos when importing from Google Takeout.
+Yes. When the desktop app detects a Google Takeout import, use the **Partner-shared photos** option in the import confirmation dialog to include or skip them.
+
+This only applies to partner-shared photos that Google included in your Takeout. Photos that were only visible through Partner Sharing and were never saved to your library are not included in your Takeout.
 
 ## Importing from Apple Photos
 

@@ -542,7 +542,10 @@ class UserService {
         await setEmail(email);
         Bus.instance.fire(UserDetailsChangedEvent());
         if (context.mounted) {
-          showShortToast(context, context.strings.emailChangedTo(email));
+          showShortToast(
+            context,
+            context.strings.emailChangedTo(newEmail: email),
+          );
           Navigator.of(context).popUntil((route) => route.isFirst);
         }
         return;

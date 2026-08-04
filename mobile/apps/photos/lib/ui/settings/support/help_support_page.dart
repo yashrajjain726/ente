@@ -1,11 +1,11 @@
 import "package:ente_components/ente_components.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/foundation.dart";
 import "package:flutter/material.dart";
 import "package:hugeicons/hugeicons.dart";
 import "package:logging/logging.dart";
 import "package:photos/core/constants.dart";
 import "package:photos/core/error-reporting/super_logging.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/service_locator.dart";
 import "package:photos/ui/common/web_page.dart";
 import "package:photos/ui/notification/toast.dart";
@@ -32,7 +32,7 @@ class HelpSupportPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
+    final l10n = context.strings;
 
     return SettingsPageScaffold(
       title: l10n.helpAndSupport,
@@ -185,7 +185,7 @@ class HelpSupportPage extends StatelessWidget {
   Future<void> _viewLogs(BuildContext context) async {
     final logFile = SuperLogging.logFile;
     if (logFile == null) {
-      showShortToast(context, AppLocalizations.of(context).somethingWentWrong);
+      showShortToast(context, context.strings.somethingWentWrong);
       return;
     }
     await Navigator.of(
@@ -201,10 +201,7 @@ class HelpSupportPage extends StatelessWidget {
     } catch (e, s) {
       _logger.severe("Failed to export logs", e, s);
       if (context.mounted) {
-        showShortToast(
-          context,
-          AppLocalizations.of(context).somethingWentWrong,
-        );
+        showShortToast(context, context.strings.somethingWentWrong);
       }
     }
   }

@@ -12,7 +12,7 @@ import "package:ente_lock_screen/ui/app_lock.dart";
 import "package:ente_lock_screen/ui/lock_screen.dart";
 import "package:ente_pure_utils/ente_pure_utils.dart";
 import "package:ente_rust/ente_rust.dart";
-import "package:ente_strings/l10n/strings_localizations.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:ente_ui/theme/theme_config.dart" as ente_ui;
 import "package:ffmpeg_kit_flutter/ffmpeg_kit_config.dart";
 import 'package:flutter/foundation.dart';
@@ -36,8 +36,7 @@ import 'package:photos/core/network/network.dart';
 import 'package:photos/db/files_db.dart';
 import "package:photos/db/ml/db.dart";
 import 'package:photos/ente_theme_data.dart';
-import "package:photos/generated/l10n.dart";
-import "package:photos/l10n/l10n.dart";
+import "package:photos/locale.dart";
 import 'package:photos/module/upload/service/file_uploader.dart';
 import 'package:photos/module/upload/service/local_file_update_service.dart';
 import "package:photos/service_locator.dart";
@@ -154,7 +153,7 @@ Future<void> _runInForeground(
         lockScreen: LockScreen(
           Configuration.instance,
           authReasonBuilder: (context) =>
-              AppLocalizations.of(context).authToViewYourMemories,
+              context.strings.authToViewYourMemories,
           onLogout: (context) => UserService.instance.logout(context),
         ),
         enabled:
@@ -164,8 +163,7 @@ Future<void> _runInForeground(
         locale: locale,
         supportedLocales: appSupportedLocales,
         localizationsDelegates: const [
-          StringsLocalizations.delegate,
-          ...AppLocalizations.localizationsDelegates,
+          ...StringsLocalizations.localizationsDelegates,
         ],
         localeListResolutionCallback: localResolutionCallBack,
         lightTheme: lightThemeData,
@@ -491,6 +489,9 @@ Future<void> _init(
     await SyncService.instance.init(preferences);
     _isSyncInitialized = true;
     _logger.info("SyncService init done $tlog");
+    if (!isBackground && flagService.librarySharing) {
+      unawaited(librarySharingService.init());
+    }
 
     if (!isBackground && flagService.internalUser) {
       _logger.info("GalleryDownloadQueueService init $tlog");

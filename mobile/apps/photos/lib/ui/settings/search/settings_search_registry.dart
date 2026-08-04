@@ -1,11 +1,10 @@
 import "dart:io";
 
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/foundation.dart";
 import "package:flutter/material.dart";
 import "package:hugeicons/hugeicons.dart";
 import "package:photos/core/configuration.dart";
-import "package:photos/generated/l10n.dart";
-import "package:photos/l10n/l10n.dart";
 import "package:photos/service_locator.dart";
 import "package:photos/ui/settings/about/about_us_page.dart";
 import "package:photos/ui/settings/account/account_settings_page.dart";
@@ -25,7 +24,7 @@ import "package:photos/ui/settings/widget_settings_screen.dart";
 /// Registry that provides all searchable settings items
 class SettingsSearchRegistry {
   static List<SettingsSearchItem> getSearchableItems(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
+    final l10n = context.strings;
     final hasLoggedIn = Configuration.instance.isLoggedIn();
     final isLocalGallery = isLocalGalleryMode;
     final showThemeControls = Platform.isAndroid || kDebugMode;
@@ -236,7 +235,7 @@ class SettingsSearchRegistry {
         ),
       if (Configuration.instance.hasConfiguredAccount() && !isLocalGallery)
         SettingsSearchItem(
-          title: context.l10n.passkey,
+          title: context.strings.passkey,
           subtitle: l10n.security,
           sectionPath: l10n.security,
           icon: HugeIcons.strokeRoundedFingerAccess,
@@ -570,6 +569,20 @@ class SettingsSearchRegistry {
 
       items.addAll([
         SettingsSearchItem(
+          title: l10n.trash,
+          subtitle: l10n.freeUpSpace,
+          sectionPath: l10n.freeUpSpace,
+          icon: HugeIcons.strokeRoundedDelete01,
+          routeBuilder: (_) => const FreeUpSpaceOptionsScreen(),
+          isSubPage: true,
+          keywords: [
+            "trash",
+            "recently deleted",
+            "restore",
+            "permanently delete",
+          ],
+        ),
+        SettingsSearchItem(
           title: l10n.freeUpDeviceSpace,
           subtitle: l10n.freeUpSpace,
           sectionPath: l10n.freeUpSpace,
@@ -761,7 +774,7 @@ class SettingsSearchRegistry {
     BuildContext context,
     void Function(Widget Function(BuildContext) routeBuilder) onNavigate,
   ) {
-    final l10n = AppLocalizations.of(context);
+    final l10n = context.strings;
     final hasLoggedIn = Configuration.instance.isLoggedIn();
     final isLocalGallery = isLocalGalleryMode;
 

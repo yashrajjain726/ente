@@ -2,11 +2,11 @@ import "dart:convert";
 
 import 'package:bip39/bip39.dart' as bip39;
 import "package:crypto/crypto.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:flutter/services.dart";
 import "package:logging/logging.dart";
 import "package:photos/core/configuration.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/services/account/user_service.dart";
 import "package:photos/theme/ente_theme.dart";
 import "package:photos/ui/common/loading_widget.dart";
@@ -23,7 +23,7 @@ Future<void> showVerifyIdentitySheet(
 }) {
   return showBaseBottomSheet<void>(
     context,
-    title: title ?? AppLocalizations.of(context).verify,
+    title: title ?? context.strings.verify,
     headerSpacing: 20,
     child: _VerifyIdentitySheetContent(self: self, email: email),
   );
@@ -53,15 +53,11 @@ class _VerifyIdentitySheetContentState
   @override
   Widget build(BuildContext context) {
     final String subTitle = widget.self
-        ? AppLocalizations.of(context).thisIsYourVerificationId
-        : AppLocalizations.of(
-            context,
-          ).thisIsPersonVerificationId(email: widget.email);
+        ? context.strings.thisIsYourVerificationId
+        : context.strings.thisIsPersonVerificationId(email: widget.email);
     final String bottomText = widget.self
-        ? AppLocalizations.of(
-            context,
-          ).someoneSharingAlbumsWithYouShouldSeeTheSameId
-        : AppLocalizations.of(context).howToViewShareeVerificationID;
+        ? context.strings.someoneSharingAlbumsWithYouShouldSeeTheSameId
+        : context.strings.howToViewShareeVerificationID;
 
     final colorScheme = getEnteColorScheme(context);
     final textStyle = getEnteTextTheme(context);
@@ -76,19 +72,17 @@ class _VerifyIdentitySheetContentState
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  AppLocalizations.of(
-                    context,
-                  ).emailNoEnteAccount(email: widget.email),
+                  context.strings.emailNoEnteAccountPhotos(email: widget.email),
                   style: textStyle.small.copyWith(color: colorScheme.textMuted),
                 ),
                 const SizedBox(height: 20),
                 ButtonWidget(
                   buttonType: ButtonType.neutral,
                   icon: Icons.adaptive.share,
-                  labelText: AppLocalizations.of(context).sendInvite,
+                  labelText: context.strings.sendInvite,
                   onTap: () async {
                     await shareText(
-                      AppLocalizations.of(context).shareTextRecommendUsingEnte,
+                      context.strings.shareTextRecommendUsingEnteForPhotos,
                     );
                   },
                 ),
@@ -118,7 +112,7 @@ class _VerifyIdentitySheetContentState
             "VerificationID",
           ).severe("failed to end userID", snapshot.error);
           return Text(
-            AppLocalizations.of(context).somethingWentWrong,
+            context.strings.somethingWentWrong,
             style: textStyle.bodyMuted,
           );
         }
@@ -180,10 +174,10 @@ class _VerifyIdentitySheetContentState
     if (!context.mounted) return;
     await shareText(
       widget.self
-          ? AppLocalizations.of(
-              context,
-            ).shareMyVerificationID(verificationID: verificationID)
-          : AppLocalizations.of(context).shareTextConfirmOthersVerificationID(
+          ? context.strings.shareMyVerificationID(
+              verificationID: verificationID,
+            )
+          : context.strings.shareTextConfirmOthersVerificationID(
               verificationID: verificationID,
             ),
     );

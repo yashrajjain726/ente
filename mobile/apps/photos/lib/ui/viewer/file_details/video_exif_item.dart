@@ -1,7 +1,7 @@
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:hugeicons/hugeicons.dart";
 import "package:modal_bottom_sheet/modal_bottom_sheet.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/models/ffmpeg/ffprobe_props.dart";
 import 'package:photos/models/file/file.dart';
 import "package:photos/theme/colors.dart";
@@ -17,7 +17,7 @@ class VideoExifRowItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
+    final l10n = context.strings;
     final currentProps = props;
     late final String label;
     late final VoidCallback? onTap;

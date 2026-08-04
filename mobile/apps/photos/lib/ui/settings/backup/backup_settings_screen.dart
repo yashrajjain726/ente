@@ -2,10 +2,9 @@ import "dart:io";
 
 import "package:ente_components/ente_components.dart";
 import "package:ente_pure_utils/ente_pure_utils.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:photo_manager/photo_manager.dart";
-import "package:photos/generated/l10n.dart";
-import "package:photos/l10n/l10n.dart";
 import "package:photos/service_locator.dart";
 import "package:photos/services/sync/local_sync_service.dart";
 import "package:photos/services/sync/sync_service.dart";
@@ -24,7 +23,7 @@ class BackupSettingsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
+    final l10n = context.strings;
 
     return SettingsPageScaffold(
       title: l10n.backupSettings,
@@ -143,7 +142,7 @@ class _BackupOnlyNewPhotosToggle extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MenuComponent(
-      title: context.l10n.backupOnlyNewPhotos,
+      title: context.strings.backupOnlyNewPhotos,
       trailing: ToggleSwitchComponent.async(
         value: () => backupPreferenceService.isOnlyNewBackupEnabled,
         onChanged: () async {
@@ -188,10 +187,10 @@ class _BackupOnlyNewPhotosToggle extends StatelessWidget {
     }
     await showChoiceDialog(
       context,
-      title: context.l10n.allowPermTitle,
-      body: context.l10n.allowPermBody,
-      firstButtonLabel: context.l10n.openSettings,
-      secondButtonLabel: context.l10n.cancel,
+      title: context.strings.allowPermTitle,
+      body: context.strings.allowPermBody,
+      firstButtonLabel: context.strings.openSettings,
+      secondButtonLabel: context.strings.cancel,
       firstButtonOnTap: () async {
         await PhotoManager.openSetting();
       },
@@ -250,7 +249,7 @@ Future<_FolderPromptAction?> _showOnlyNewBackupFolderPrompt({
   required bool hasAllFoldersSelected,
   required bool allowContinueAnyway,
 }) async {
-  final l10n = context.l10n;
+  final l10n = context.strings;
   final message = hasAllFoldersSelected
       ? l10n.backupOnlyNewPhotosAllFoldersSelected
       : allowContinueAnyway

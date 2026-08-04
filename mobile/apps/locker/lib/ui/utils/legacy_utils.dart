@@ -3,8 +3,8 @@ import "package:ente_legacy/pages/emergency_page.dart";
 import "package:ente_legacy/pages/legacy_kit_intro_page.dart";
 import "package:ente_legacy/services/legacy_kit_service.dart";
 import "package:ente_lock_screen/local_authentication_service.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
-import "package:locker/l10n/l10n.dart";
 import "package:locker/services/configuration.dart";
 import "package:logging/logging.dart";
 
@@ -29,7 +29,7 @@ Future<void> _openLegacy(
 }) async {
   var hasAuthenticatedForLegacyFlow = await _authenticateForLegacyFlow(
     context,
-    context.l10n.authToManageLegacy,
+    context.strings.authToManageLegacy,
   );
   if (!hasAuthenticatedForLegacyFlow || !context.mounted) {
     return;

@@ -1,12 +1,12 @@
 import "dart:async";
 
 import "package:ente_components/ente_components.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:logging/logging.dart";
 import "package:photos/core/event_bus.dart";
 import "package:photos/events/files_updated_event.dart";
 import "package:photos/events/local_photos_updated_event.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/models/device_collection.dart";
 import "package:photos/models/file/file.dart";
 import "package:photos/models/file_load_result.dart";
@@ -93,7 +93,7 @@ class _SkippedDeviceFolderPageState extends State<SkippedDeviceFolderPage> {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
+    final l10n = context.strings;
     final appBar = GalleryAppBarWidget.sliverConfig(
       GalleryType.localFolder,
       l10n.skippedFiles,
@@ -339,13 +339,13 @@ class _ResetIgnoredFilesSection extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          AppLocalizations.of(context).resetIgnoredFilesDescription,
+          context.strings.resetIgnoredFilesDescription,
           style: textTheme.smallMuted,
         ),
         const SizedBox(height: 12),
         ButtonComponent(
           variant: ButtonComponentVariant.secondary,
-          label: AppLocalizations.of(context).resetIgnoredFiles,
+          label: context.strings.resetIgnoredFiles,
           onTap: onResetIgnoredFiles,
         ),
       ],

@@ -10,14 +10,16 @@ use std::{
 
 use half::prelude::{HalfFloatSliceExt, HalfFloatVecExt};
 
-#[cfg(target_os = "ios")]
+#[cfg(target_os = "android")]
+use ort::ep::XNNPACK;
+#[cfg(any(target_os = "ios", target_os = "macos"))]
 use ort::ep::{
     CoreML,
     coreml::{ComputeUnits, ModelFormat, SpecializationStrategy},
 };
-#[cfg(target_os = "android")]
+#[cfg(any(target_os = "android", target_os = "linux", target_os = "windows"))]
 use ort::ep::{
-    WebGPU, XNNPACK,
+    WebGPU,
     webgpu::{DawnBackendType, PreferredLayout},
 };
 #[cfg(target_os = "android")]
@@ -26,13 +28,19 @@ use std::num::NonZeroUsize;
 use crate::ml::error::{MlError, MlResult};
 use crate::ml::events;
 use crate::ml::golden;
-#[cfg(any(target_os = "android", target_os = "ios"))]
+#[cfg(any(
+    target_os = "android",
+    target_os = "ios",
+    target_os = "linux",
+    target_os = "macos",
+    target_os = "windows"
+))]
 use crate::ml::runtime::rt_log;
-#[cfg(target_os = "android")]
+#[cfg(any(target_os = "android", target_os = "linux", target_os = "windows"))]
 use crate::ml::webgpu;
 
-#[cfg(any(target_os = "ios", test))]
-const COREML_CACHE_SCHEMA: &str = "ort-1_27-mlprogram-all-default-v1";
+#[cfg(any(target_os = "ios", target_os = "macos", test))]
+const COREML_CACHE_SCHEMA: &str = "ort-1_28-mlprogram-all-default-v1";
 const COREML_CACHE_COMPLETE_MARKER: &str = ".ente-cache-complete";
 /// The name ONNX Runtime's CoreML EP gives the compiled model it stores
 /// inside each generated MLProgram package directory in the cache
@@ -41,11 +49,9 @@ const COREML_CACHE_COMPILED_MODEL: &str = "compiled_model.mlmodelc";
 /// The weight blob file name inside an ORT-generated `.mlpackage`
 /// (`model_builder.cc` writes `@model_path/weights/weight.bin`).
 const COREML_PACKAGE_WEIGHT_BLOB: &str = "weight.bin";
-#[cfg(target_os = "ios")]
+#[cfg(any(target_os = "ios", target_os = "macos"))]
 const ENABLE_PERSISTENT_COREML_CACHE: bool = true;
 
-/// An f32 model input that can be borrowed by multiple sessions.
-///
 /// The FP16 representation is created lazily and retained so that a shared
 /// preprocessing result only pays the conversion cost once.
 pub(crate) struct PreparedF32Input {
@@ -108,12 +114,8 @@ pub(crate) enum ExecutionMode {
     CpuOnly,
 }
 
-/// The preferred execution provider of the session attempt that succeeded.
-///
-/// Each accelerated session also registers the policy's fallback providers,
-/// but this identifies the provider whose attempt produced the session. The
-/// runtime aggregates it across the sessions used for a result so remotely
-/// stored embeddings can be attributed to the providers that computed them.
+/// Identifies the successful attempt's preferred provider, not its registered
+/// fallback providers, for result attribution.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[allow(dead_code)] // Accelerated variants are constructed only on their target OS.
 pub(crate) enum ExecutionProvider {
@@ -148,7 +150,7 @@ pub(crate) fn build_session(
     for attempt in attempts {
         let execution_provider = attempt.execution_provider;
         if attempt.uses_webgpu {
-            #[cfg(target_os = "android")]
+            #[cfg(any(target_os = "android", target_os = "linux", target_os = "windows"))]
             {
                 match build_webgpu_session_with_canary(model_path, coreml_cache_namespace, attempt)
                 {
@@ -157,8 +159,8 @@ pub(crate) fn build_session(
                 }
                 continue;
             }
-            #[cfg(not(target_os = "android"))]
-            unreachable!("WebGPU provider attempts are only constructed on Android");
+            #[cfg(not(any(target_os = "android", target_os = "linux", target_os = "windows")))]
+            unreachable!("WebGPU provider attempts are not constructed on this platform");
         }
 
         let coreml_cache_dir = attempt.coreml_cache_dir.clone();
@@ -196,21 +198,30 @@ pub(crate) fn build_session(
     )))
 }
 
-/// Builds a session for one provider attempt and, for CoreML attempts, runs
-/// the golden self-test before the session is trusted. A self-test failure is
-/// reported as a session-construction failure, so the caller invalidates the
-/// CoreML cache (a corrupt compiled model would otherwise persist) and falls
-/// through to the next attempt. WebGPU attempts do not take this path; they
-/// are validated inside the crash-canary window.
+/// A CoreML self-test failure is treated as construction failure so the caller
+/// invalidates the possibly corrupt persistent cache. WebGPU validation stays
+/// inside its crash-canary window instead.
 fn build_and_validate_session(model_path: &str, attempt: ProviderAttempt) -> MlResult<Session> {
-    #[cfg(any(target_os = "android", target_os = "ios"))]
+    #[cfg(any(
+        target_os = "android",
+        target_os = "ios",
+        target_os = "linux",
+        target_os = "macos",
+        target_os = "windows"
+    ))]
     let execution_provider = attempt.execution_provider;
 
-    #[cfg_attr(not(target_os = "ios"), allow(unused_mut))]
+    #[cfg_attr(not(any(target_os = "ios", target_os = "macos")), allow(unused_mut))]
     let mut session = match build_session_with_providers(model_path, attempt) {
         Ok(session) => session,
         Err(error) => {
-            #[cfg(any(target_os = "android", target_os = "ios"))]
+            #[cfg(any(
+                target_os = "android",
+                target_os = "ios",
+                target_os = "linux",
+                target_os = "macos",
+                target_os = "windows"
+            ))]
             record_provider_attempt_failure(
                 execution_provider,
                 model_path,
@@ -221,7 +232,7 @@ fn build_and_validate_session(model_path: &str, attempt: ProviderAttempt) -> MlR
         }
     };
 
-    #[cfg(target_os = "ios")]
+    #[cfg(any(target_os = "ios", target_os = "macos"))]
     if execution_provider == ExecutionProvider::CoreMl {
         run_session_self_test(model_path, &mut session, "CoreML")?;
     }
@@ -229,13 +240,9 @@ fn build_and_validate_session(model_path: &str, attempt: ProviderAttempt) -> MlR
     Ok(session)
 }
 
-/// Builds the WebGPU session under the durable crash canary. The canary is
-/// armed before session construction and only disarmed after the session has
-/// passed the golden self-test, so a driver crash anywhere in between is
-/// recorded on disk. Soft failures (including self-test failures) return an
-/// error with the canary left armed (the drop keeps the counted attempt), and
-/// the caller falls through to the next execution provider.
-#[cfg(target_os = "android")]
+/// The durable canary remains armed through construction and self-test, so
+/// crashes and soft failures both count toward quarantine.
+#[cfg(any(target_os = "android", target_os = "linux", target_os = "windows"))]
 fn build_webgpu_session_with_canary(
     model_path: &str,
     model_namespace: &str,
@@ -256,33 +263,26 @@ fn build_webgpu_session_with_canary(
             return Err(error);
         }
     };
-    // The adapter probe touches the Vulkan driver, so it runs inside the
-    // armed canary window: a probe crash is recorded like any other WebGPU
-    // crash.
-    match webgpu::check_adapter() {
-        webgpu::AdapterCheck::Allowed => {}
-        webgpu::AdapterCheck::Denied => {
-            // A completed probe that denies the adapter is a clean policy
-            // decision rather than a failed attempt, so the canary is
-            // disarmed.
-            canary.disarm();
-            return Err(MlError::Ort(
-                "WebGPU skipped: GPU adapter is not on the allowlist".to_string(),
-            ));
-        }
-        webgpu::AdapterCheck::Failed => {
-            // The canary stays armed so the drop records a failed attempt:
-            // a driver whose probe keeps failing quarantines like one that
-            // keeps crashing, and cannot reset the consecutive-failure
-            // counter of genuine crashes.
-            let error = MlError::Ort("WebGPU skipped: Vulkan adapter probe failed".to_string());
-            record_provider_attempt_failure(
-                ExecutionProvider::WebGpu,
-                model_path,
-                "adapter probe",
-                &error,
-            );
-            return Err(error);
+    #[cfg(target_os = "android")]
+    {
+        match webgpu::check_adapter() {
+            webgpu::AdapterCheck::Allowed => {}
+            webgpu::AdapterCheck::Denied => {
+                canary.disarm();
+                return Err(MlError::Ort(
+                    "WebGPU skipped: GPU adapter is not on the allowlist".to_string(),
+                ));
+            }
+            webgpu::AdapterCheck::Failed => {
+                let error = MlError::Ort("WebGPU skipped: Vulkan adapter probe failed".to_string());
+                record_provider_attempt_failure(
+                    ExecutionProvider::WebGpu,
+                    model_path,
+                    "adapter probe",
+                    &error,
+                );
+                return Err(error);
+            }
         }
     }
     let mut session = match build_session_with_providers(model_path, attempt) {
@@ -302,7 +302,13 @@ fn build_webgpu_session_with_canary(
     Ok(session)
 }
 
-#[cfg(any(target_os = "android", target_os = "ios"))]
+#[cfg(any(
+    target_os = "android",
+    target_os = "ios",
+    target_os = "linux",
+    target_os = "macos",
+    target_os = "windows"
+))]
 fn record_provider_attempt_failure(
     provider: ExecutionProvider,
     model_path: &str,
@@ -314,7 +320,14 @@ fn record_provider_attempt_failure(
     }
 }
 
-#[cfg(any(target_os = "android", target_os = "ios", test))]
+#[cfg(any(
+    target_os = "android",
+    target_os = "ios",
+    target_os = "linux",
+    target_os = "macos",
+    target_os = "windows",
+    test
+))]
 fn provider_attempt_failure_message(
     provider: ExecutionProvider,
     model_path: &str,
@@ -333,10 +346,13 @@ fn provider_attempt_failure_message(
     ))
 }
 
-/// Validates a freshly built accelerated session against the model's
-/// committed golden output. An error means the session must not be used; the
-/// caller falls through to the next execution provider attempt.
-#[cfg(any(target_os = "android", target_os = "ios"))]
+#[cfg(any(
+    target_os = "android",
+    target_os = "ios",
+    target_os = "linux",
+    target_os = "macos",
+    target_os = "windows"
+))]
 fn run_session_self_test(
     model_path: &str,
     session: &mut Session,
@@ -344,8 +360,6 @@ fn run_session_self_test(
 ) -> MlResult<()> {
     let model_file = model_file_label(model_path);
     let Some(entry) = golden::lookup(model_path) else {
-        // Attempts are only constructed for models with a golden entry, so
-        // this is a defensive fail-closed path.
         return Err(MlError::Ort(format!(
             "golden self-test entry missing for '{model_file}'"
         )));
@@ -436,9 +450,7 @@ fn model_file_label(model_path: &str) -> &str {
         .unwrap_or(model_path)
 }
 
-/// Runs one golden input through the session and extracts the first output as
-/// f32. Shared with the golden generator so device and generator inference
-/// are identical by construction.
+/// Shared with the generator so its inference path stays identical to devices.
 pub(crate) fn run_golden_tensor(
     session: &mut Session,
     input_shape: &[i64],
@@ -521,7 +533,7 @@ fn provider_attempts(
     }
 }
 
-#[cfg(target_os = "ios")]
+#[cfg(any(target_os = "ios", target_os = "macos"))]
 fn platform_default_attempts(
     model_path: &str,
     coreml_cache_namespace: &str,
@@ -545,7 +557,7 @@ fn platform_default_attempts(
     attempts
 }
 
-#[cfg(target_os = "ios")]
+#[cfg(any(target_os = "ios", target_os = "macos"))]
 fn coreml_provider(
     model_path: &str,
     cache_namespace: &str,
@@ -579,10 +591,8 @@ fn coreml_provider(
     (provider.build().error_on_failure(), prepared_cache_dir)
 }
 
-/// Deletes the entire persistent cache tree while the feature is disabled, so
-/// flipping `ENABLE_PERSISTENT_COREML_CACHE` off in a release actually
-/// returns the disk space instead of stranding the caches forever.
-#[cfg(target_os = "ios")]
+/// Disabling the feature must also reclaim caches created by earlier releases.
+#[cfg(any(target_os = "ios", target_os = "macos"))]
 fn remove_persistent_coreml_cache(model_path: &str) {
     let Some(coreml_root) = coreml_cache_root(Path::new(model_path))
         .parent()
@@ -624,17 +634,41 @@ fn platform_default_attempts(
             execution_provider: ExecutionProvider::WebGpu,
         });
     }
-    // Clean-session fallbacks for provider or driver failures that prevent
-    // the primary session from being constructed at all.
     attempts.push(xnnpack_attempt());
     attempts.push(ProviderAttempt::cpu_only());
     attempts
 }
 
-/// Accelerated execution providers are only allowed for models with a
-/// committed golden self-test entry (fail closed). A miss for a production
-/// model means a model update shipped without regenerating `golden_data.rs`.
-#[cfg(any(target_os = "android", target_os = "ios"))]
+#[cfg(any(target_os = "linux", target_os = "windows"))]
+fn platform_default_attempts(
+    model_path: &str,
+    _coreml_cache_namespace: &str,
+) -> Vec<ProviderAttempt> {
+    let mut attempts = Vec::new();
+    if webgpu::attempt_permitted(model_path) && golden_entry_required(model_path, "WebGPU") {
+        attempts.push(ProviderAttempt {
+            providers: vec![
+                webgpu_provider(),
+                CPU::default().with_arena_allocator(true).build(),
+            ],
+            disable_intra_op_spinning: true,
+            coreml_cache_dir: None,
+            uses_webgpu: true,
+            execution_provider: ExecutionProvider::WebGpu,
+        });
+    }
+    attempts.push(ProviderAttempt::cpu_only());
+    attempts
+}
+
+/// Missing goldens fail closed, usually indicating they were not regenerated after an update.
+#[cfg(any(
+    target_os = "android",
+    target_os = "ios",
+    target_os = "linux",
+    target_os = "macos",
+    target_os = "windows"
+))]
 fn golden_entry_required(model_path: &str, provider_label: &str) -> bool {
     if golden::lookup(model_path).is_some() {
         return true;
@@ -649,16 +683,23 @@ fn golden_entry_required(model_path: &str, provider_label: &str) -> bool {
     false
 }
 
-#[cfg(target_os = "android")]
+#[cfg(any(target_os = "android", target_os = "linux", target_os = "windows"))]
 fn webgpu_provider() -> ExecutionProviderDispatch {
-    WebGPU::default()
-        .with_dawn_backend_type(DawnBackendType::Vulkan)
-        .with_preferred_layout(PreferredLayout::NCHW)
-        .build()
-        .error_on_failure()
+    let provider = WebGPU::default().with_preferred_layout(PreferredLayout::NCHW);
+    #[cfg(any(target_os = "android", target_os = "linux"))]
+    let provider = provider.with_dawn_backend_type(DawnBackendType::Vulkan);
+    #[cfg(target_os = "windows")]
+    let provider = provider.with_dawn_backend_type(DawnBackendType::D3D12);
+    provider.build().error_on_failure()
 }
 
-#[cfg(not(any(target_os = "ios", target_os = "android")))]
+#[cfg(not(any(
+    target_os = "ios",
+    target_os = "android",
+    target_os = "linux",
+    target_os = "macos",
+    target_os = "windows"
+)))]
 fn platform_default_attempts(
     _model_path: &str,
     _coreml_cache_namespace: &str,
@@ -666,7 +707,7 @@ fn platform_default_attempts(
     vec![ProviderAttempt::cpu_only()]
 }
 
-#[cfg(target_os = "ios")]
+#[cfg(any(target_os = "ios", target_os = "macos"))]
 fn prepare_coreml_cache_directory(
     model_path: &str,
     cache_namespace: &str,
@@ -674,7 +715,6 @@ fn prepare_coreml_cache_directory(
     let model_path = Path::new(model_path);
     let schema_root = coreml_cache_root(model_path);
 
-    // Best effort: a prune failure must not cost this load its cache.
     if let Some(coreml_root) = schema_root.parent() {
         match prune_stale_coreml_schema_directories(coreml_root, COREML_CACHE_SCHEMA) {
             Ok(removed) => {
@@ -703,10 +743,8 @@ fn prepare_coreml_cache_directory(
     Ok(cache_dir)
 }
 
-/// A missing completion marker means the process stopped before ONNX Runtime
-/// finished constructing the session. Recreate the directory so ORT cannot
-/// mistake a partial model package for a valid cache hit.
-#[cfg(any(target_os = "ios", test))]
+/// Rebuild unmarked entries so ORT cannot reuse a package interrupted mid-build.
+#[cfg(any(target_os = "ios", target_os = "macos", test))]
 fn prepare_coreml_cache_entry(cache_dir: &Path) -> std::io::Result<()> {
     if cache_dir.exists() && !coreml_cache_complete_marker(cache_dir).is_file() {
         std::fs::remove_dir_all(cache_dir)?;
@@ -714,11 +752,8 @@ fn prepare_coreml_cache_entry(cache_dir: &Path) -> std::io::Result<()> {
     std::fs::create_dir_all(cache_dir)
 }
 
-/// Runs after a session was built successfully from `cache_dir`: trims the
-/// redundant generated-package weights, then marks the entry complete. Trim
-/// failures are reported but do not fail the load; an untrimmed cache is
-/// merely larger. Trimming before marking means a crash mid-trim leaves no
-/// completion marker, so the next load rebuilds the entry from scratch.
+/// Trim before marking complete so a crash mid-trim forces a clean rebuild.
+/// Trim failures only waste disk space and therefore do not fail the load.
 fn finalize_coreml_cache(cache_dir: &Path, model_path: &str) {
     match trim_coreml_cache_weights(cache_dir) {
         Ok(0) => {}
@@ -750,25 +785,14 @@ fn finalize_coreml_cache(cache_dir: &Path, model_path: &str) {
     }
 }
 
-/// Truncates the weight blobs inside every cached generated package that
-/// already contains a compiled model, returning the bytes reclaimed.
-///
-/// On a warm cache hit ONNX Runtime 1.27 only checks that the generated
-/// MLProgram package directory exists and then loads
-/// `compiled_model.mlmodelc` (`model_builder.cc` constructor, `model.mm`
-/// `CompileOrReadCachedModel`), so the package's own weight copy is dead
-/// bytes — roughly half the cache footprint. Packages without a compiled
-/// model are left intact because ONNX Runtime would recompile from them.
-/// Should a future runtime read the package weights again, session
-/// construction fails, the caller invalidates the entry, and the next load
-/// rebuilds it from the ONNX source.
+/// On a warm cache hit ONNX Runtime 1.28 only checks that the generated
+/// package directory and loads `compiled_model.mlmodelc`, making the package's
+/// own weights redundant. Uncompiled packages remain intact; incompatible
+/// future runtimes will fail construction and trigger cache invalidation.
 fn trim_coreml_cache_weights(cache_dir: &Path) -> std::io::Result<u64> {
     let mut reclaimed = 0;
-    // Layout per ORT 1.27: <cache_dir>/<model_hash>/<partition>/model is the
-    // generated MLProgram package. `CompileOrReadCachedModel` strips the last
-    // path component only for the NeuralNetwork format, so for MLProgram the
-    // compiled model is stored INSIDE the package directory:
-    // <partition>/model/compiled_model.mlmodelc.
+    // ORT 1.28 stores the compiled MLProgram inside
+    // <cache_dir>/<model_hash>/<partition>/model/compiled_model.mlmodelc.
     for model_hash_entry in std::fs::read_dir(cache_dir)? {
         let model_hash_entry = model_hash_entry?;
         if !model_hash_entry.file_type()?.is_dir() {
@@ -829,10 +853,8 @@ fn coreml_cache_complete_marker(cache_dir: &Path) -> PathBuf {
     cache_dir.join(COREML_CACHE_COMPLETE_MARKER)
 }
 
-/// Keep generated CoreML artifacts in Library/Caches so iOS can evict them and
-/// exclude them from backups. Model files are stored below Library/Application
-/// Support; fall back to the process temporary directory for unusual layouts.
-#[cfg(any(target_os = "ios", test))]
+/// Use Library/Caches for eviction and backup exclusion, or temp for unusual layouts.
+#[cfg(any(target_os = "ios", target_os = "macos", test))]
 fn coreml_cache_root(model_path: &Path) -> PathBuf {
     let cache_base = model_path
         .ancestors()
@@ -850,7 +872,7 @@ fn coreml_cache_root(model_path: &Path) -> PathBuf {
 /// Include the filename and file metadata in the directory name because ONNX
 /// Runtime's internal CoreML cache key does not necessarily change when only
 /// model weights change.
-#[cfg(any(target_os = "ios", test))]
+#[cfg(any(target_os = "ios", target_os = "macos", test))]
 fn coreml_model_cache_key(model_path: &Path) -> std::io::Result<String> {
     use std::time::UNIX_EPOCH;
 
@@ -873,7 +895,7 @@ fn coreml_model_cache_key(model_path: &Path) -> std::io::Result<String> {
     ))
 }
 
-#[cfg(any(target_os = "ios", test))]
+#[cfg(any(target_os = "ios", target_os = "macos", test))]
 fn sanitize_cache_component(value: &str) -> String {
     value
         .chars()
@@ -887,11 +909,8 @@ fn sanitize_cache_component(value: &str) -> String {
         .collect()
 }
 
-/// Removes cache trees written under superseded `COREML_CACHE_SCHEMA`
-/// versions, returning the names of the removed directories. Without this, a
-/// schema bump (ORT upgrade or CoreML policy change) would orphan the
-/// previous schema's caches — hundreds of MB — forever.
-#[cfg(any(target_os = "ios", test))]
+/// Schema bumps must not orphan the previous version's large cache trees.
+#[cfg(any(target_os = "ios", target_os = "macos", test))]
 fn prune_stale_coreml_schema_directories(
     coreml_root: &Path,
     current_schema: &str,
@@ -913,9 +932,7 @@ fn prune_stale_coreml_schema_directories(
     Ok(removed)
 }
 
-/// Retain exactly one generated cache for each logical model slot. The active
-/// directory is identity-specific so ONNX Runtime cannot reuse stale output.
-#[cfg(any(target_os = "ios", test))]
+#[cfg(any(target_os = "ios", target_os = "macos", test))]
 fn prune_superseded_coreml_cache_directories(
     model_cache_root: &Path,
     current_cache_key: &str,
@@ -988,7 +1005,6 @@ fn ensure_finite_f16(data: &[half::f16]) -> MlResult<()> {
     ))
 }
 
-/// Returns true if the session's first input expects FP16 tensors.
 fn session_expects_f16(session: &Session) -> bool {
     session
         .inputs()
@@ -1000,8 +1016,6 @@ fn session_expects_f16(session: &Session) -> bool {
         .unwrap_or(false)
 }
 
-/// Run inference accepting f32 data and returning f32 results.
-/// Automatically converts inputs/outputs for FP16 models.
 pub(crate) fn run_f32<const N: usize>(
     session: &mut Session,
     input: Vec<f32>,
@@ -1021,7 +1035,6 @@ pub(crate) fn run_f32<const N: usize>(
     }
     let output = &outputs[0];
 
-    // Extract output: try f32 first, fall back to f16 with conversion.
     if let Ok((tensor_shape, tensor_data)) = output.try_extract_tensor::<f32>() {
         let shape = tensor_shape.iter().copied().collect::<Vec<_>>();
         let data = tensor_data.to_vec();
@@ -1037,9 +1050,6 @@ pub(crate) fn run_f32<const N: usize>(
     }
 }
 
-/// Run inference using a reusable input and process the first output in place.
-/// Both f32 and f16 outputs remain borrowed from ONNX Runtime; consumers
-/// convert only the values they inspect.
 pub(crate) fn with_prepared_float_output<const N: usize, T>(
     session: &mut Session,
     input: &PreparedF32Input,
@@ -1171,7 +1181,7 @@ mod tests {
         assert_eq!(
             coreml_cache_root(model),
             Path::new(
-                "/var/mobile/Containers/Data/Application/APP/Library/Caches/ente/ml/coreml/ort-1_27-mlprogram-all-default-v1"
+                "/var/mobile/Containers/Data/Application/APP/Library/Caches/ente/ml/coreml/ort-1_28-mlprogram-all-default-v1"
             )
         );
     }
@@ -1217,8 +1227,8 @@ mod tests {
     #[test]
     fn prunes_stale_schema_directories_keeping_current_and_files() {
         let coreml_root = tempfile::tempdir().unwrap();
-        let stale = coreml_root.path().join("ort-1_26-mlprogram-all-default-v1");
-        let current = coreml_root.path().join("ort-1_27-mlprogram-all-default-v1");
+        let stale = coreml_root.path().join("ort-1_27-mlprogram-all-default-v1");
+        let current = coreml_root.path().join("ort-1_28-mlprogram-all-default-v1");
         std::fs::create_dir(&stale).unwrap();
         std::fs::write(stale.join("cached"), b"stale").unwrap();
         std::fs::create_dir(&current).unwrap();
@@ -1226,11 +1236,11 @@ mod tests {
 
         let removed = prune_stale_coreml_schema_directories(
             coreml_root.path(),
-            "ort-1_27-mlprogram-all-default-v1",
+            "ort-1_28-mlprogram-all-default-v1",
         )
         .unwrap();
 
-        assert_eq!(removed, vec!["ort-1_26-mlprogram-all-default-v1"]);
+        assert_eq!(removed, vec!["ort-1_27-mlprogram-all-default-v1"]);
         assert!(!stale.exists());
         assert!(current.exists());
         assert!(coreml_root.path().join("stray-file").exists());
@@ -1245,12 +1255,6 @@ mod tests {
         assert!(removed.is_empty());
     }
 
-    /// Mirrors the ORT 1.27 MLProgram cache layout: the generated package at
-    /// `<cache_dir>/<model_hash>/<partition>/model/` holds its weights under
-    /// `Data/com.microsoft.OnnxRuntime/weights/weight.bin`, and the compiled
-    /// model is stored INSIDE the package directory as
-    /// `model/compiled_model.mlmodelc` (which keeps its own
-    /// `weights/weight.bin` copy).
     fn write_cache_partition(
         cache_dir: &Path,
         partition: &str,
@@ -1285,13 +1289,9 @@ mod tests {
         assert_eq!(reclaimed, b"weights".len() as u64);
         assert!(compiled_blob.exists());
         assert_eq!(std::fs::metadata(&compiled_blob).unwrap().len(), 0);
-        // The package directory itself must survive: ONNX Runtime checks its
-        // existence to decide the model is cached.
         let package_dir = compiled_blob.ancestors().nth(4).unwrap();
         assert!(package_dir.ends_with("model"));
         assert!(package_dir.is_dir());
-        // The compiled model's own weight copy is what warm loads read; the
-        // trim walk must never descend into the `.mlmodelc` bundle.
         assert_eq!(
             std::fs::read(
                 package_dir

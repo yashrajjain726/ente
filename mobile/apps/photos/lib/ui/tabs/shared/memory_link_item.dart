@@ -1,7 +1,7 @@
 import "package:ente_components/ente_components.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:photos/db/files_db.dart";
-import "package:photos/generated/l10n.dart";
 import 'package:photos/models/file/file.dart';
 import "package:photos/ui/components/collection_share_badge.dart";
 import "package:photos/ui/viewer/file/no_thumbnail_widget.dart";
@@ -126,9 +126,7 @@ class MemoryLinkAlbumItem extends StatelessWidget {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          AppLocalizations.of(
-                            context,
-                          ).itemCount(count: fileCount ?? 0),
+                          context.strings.itemCount(count: fileCount ?? 0),
                           style: TextStyles.mini.copyWith(
                             color: colors.textLight,
                           ),

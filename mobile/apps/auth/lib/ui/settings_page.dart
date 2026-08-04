@@ -2,7 +2,6 @@ import 'dart:io';
 
 import 'package:ente_accounts/services/user_service.dart';
 import 'package:ente_auth/core/configuration.dart';
-import 'package:ente_auth/l10n/l10n.dart';
 import 'package:ente_auth/onboarding/view/onboarding_page.dart';
 import 'package:ente_auth/store/code_store.dart';
 import 'package:ente_auth/ui/components/buttons/button_widget.dart';
@@ -62,7 +61,7 @@ class SettingsPage extends StatelessWidget {
     required bool hasLoggedIn,
     required String? email,
   }) {
-    final l10n = context.l10n;
+    final l10n = context.strings;
     final contents = <Widget>[];
     if (hasLoggedIn) {
       contents.add(
@@ -195,7 +194,7 @@ class SettingsPage extends StatelessWidget {
     return Semantics(
       identifier: 'auth_settings_close',
       child: IconButtonComponent(
-        tooltip: context.l10n.close,
+        tooltip: context.strings.close,
         variant: IconButtonComponentVariant.unfilled,
         shouldSurfaceExecutionStates: false,
         icon: const HugeIcon(icon: HugeIcons.strokeRoundedCancel01),
@@ -215,7 +214,7 @@ class SettingsPage extends StatelessWidget {
   }
 
   Future<void> _showBackupReminder(BuildContext context) async {
-    final l10n = context.l10n;
+    final l10n = context.strings;
     final result = await showChoiceActionSheet(
       context,
       title: l10n.note,
@@ -245,7 +244,7 @@ class SettingsPage extends StatelessWidget {
   }
 
   Future<void> _logout(BuildContext context) {
-    final l10n = context.l10n;
+    final l10n = context.strings;
     return showChoiceActionSheet(
       context,
       title: l10n.logout,

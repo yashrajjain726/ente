@@ -1,6 +1,6 @@
 import "package:ente_components/ente_components.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/models/search/hierarchical/face_filter.dart";
 import "package:photos/ui/viewer/people/person_face_widget.dart";
 
@@ -24,7 +24,7 @@ class OnlyThemFilterChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return FilterChipComponent(
-      label: AppLocalizations.of(context).onlyThem,
+      label: context.strings.onlyThem,
       avatar: _OnlyThemFilterThumbnail(faceFilters: faceFilters),
       state: isApplied
           ? FilterChipComponentState.selected

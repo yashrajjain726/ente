@@ -132,6 +132,21 @@ func (h *CollectionHandler) Share(c *gin.Context) {
 	})
 }
 
+// BulkShare shares up to 100 collections with one user.
+func (h *CollectionHandler) BulkShare(c *gin.Context) {
+	var request ente.BulkCollectionShareRequest
+	if err := handler.BindJSON(c, &request); err != nil {
+		handler.Error(c, stacktrace.Propagate(err, ""))
+		return
+	}
+	results, err := h.Controller.BulkShare(c, request)
+	if err != nil {
+		handler.Error(c, stacktrace.Propagate(err, ""))
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"results": results})
+}
+
 func (h *CollectionHandler) JoinLink(c *gin.Context) {
 	var request ente.JoinCollectionViaLinkRequest
 	if err := handler.BindJSON(c, &request); err != nil {
@@ -211,6 +226,21 @@ func (h *CollectionHandler) UnShare(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"sharees": resp,
 	})
+}
+
+// BulkUnShare revokes one user's access to up to 100 collections.
+func (h *CollectionHandler) BulkUnShare(c *gin.Context) {
+	var request ente.BulkCollectionUnshareRequest
+	if err := handler.BindJSON(c, &request); err != nil {
+		handler.Error(c, stacktrace.Propagate(err, ""))
+		return
+	}
+	results, err := h.Controller.BulkUnShare(c, request)
+	if err != nil {
+		handler.Error(c, stacktrace.Propagate(err, ""))
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"results": results})
 }
 
 // Leave allows user to leave a shared collection, which is not owned by them

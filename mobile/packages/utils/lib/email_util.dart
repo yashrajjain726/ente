@@ -134,7 +134,7 @@ Future<void> shareLogs(
   final result = await showDialogWidget(
     context: context,
     title: context.strings.emailYourLogs,
-    body: context.strings.pleaseSendTheLogsTo(toEmail),
+    body: context.strings.pleaseSendTheLogsTo(toEmail: toEmail),
     buttons: [
       ButtonWidget(
         buttonType: ButtonType.neutral,

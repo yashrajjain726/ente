@@ -1,3 +1,4 @@
+pub mod assets;
 mod clip;
 pub mod error;
 pub mod events;
@@ -12,5 +13,6 @@ mod postprocess;
 mod preprocess;
 pub mod runtime;
 pub mod types;
+#[cfg(feature = "usearch")]
 pub mod vector_db;
 mod webgpu;

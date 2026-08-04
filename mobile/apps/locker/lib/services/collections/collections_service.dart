@@ -7,6 +7,7 @@ import 'package:ente_events/event_bus.dart';
 import 'package:ente_events/models/signed_in_event.dart';
 import "package:ente_events/models/trigger_logout_event.dart";
 import "package:ente_sharing/models/user.dart";
+import 'package:ente_strings/ente_strings.dart';
 import "package:ente_ui/utils/toast_util.dart";
 import "package:fast_base58/fast_base58.dart";
 import "package:flutter/foundation.dart";
@@ -14,7 +15,6 @@ import "package:flutter/material.dart";
 import 'package:locker/core/errors.dart';
 import 'package:locker/events/collections_updated_event.dart';
 import 'package:locker/events/user_details_refresh_event.dart';
-import 'package:locker/l10n/l10n.dart';
 import "package:locker/services/collections/collections_api_client.dart";
 import 'package:locker/services/collections/models/collection.dart';
 import "package:locker/services/collections/models/files_split.dart";
@@ -594,7 +594,7 @@ class CollectionService {
 
     if (!isCollectionOwner && split.ownedByOtherUsers.isNotEmpty) {
       if (context != null && context.mounted) {
-        showShortToast(context, context.l10n.canOnlyRemoveFilesOwnedByYou);
+        showShortToast(context, context.strings.canOnlyRemoveFilesOwnedByYou);
       }
       return;
     }

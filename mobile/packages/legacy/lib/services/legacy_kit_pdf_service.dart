@@ -194,7 +194,7 @@ class LegacyKitPdfService {
               left: 80,
               top: 136,
               child: _greeting(
-                strings.legacyKitSheetGreeting(share.partName),
+                strings.legacyKitSheetGreeting(name: share.partName),
                 assets,
               ),
             ),
@@ -426,7 +426,7 @@ class LegacyKitPdfService {
         _step(
           "3",
           pw.Text(
-            strings.legacyKitSheetStepScan(_sheetsNeededToRecover),
+            strings.legacyKitSheetStepScan(count: _sheetsNeededToRecover),
             style: const pw.TextStyle(color: _black, fontSize: 14),
           ),
         ),
@@ -470,9 +470,9 @@ class LegacyKitPdfService {
         style: const pw.TextStyle(color: _black, fontSize: 14, lineSpacing: 5),
         children: _spansAroundSlot(
           strings.legacyKitSheetStepGetAnother(
-            share.shareIndex,
-            totalSheets,
-            _emphasisSlot,
+            index: share.shareIndex,
+            total: totalSheets,
+            names: _emphasisSlot,
           ),
           _holderNameSpans(otherShares, strings),
         ),
@@ -522,16 +522,18 @@ class LegacyKitPdfService {
     return pw.RichText(
       text: pw.TextSpan(
         style: const pw.TextStyle(color: _black, fontSize: 14),
-        children:
-            _spansAroundSlot(strings.legacyKitSheetStepVisit(_emphasisSlot), [
-              pw.TextSpan(
-                text: displayRecoveryUrl(recoveryUrl),
-                style: pw.TextStyle(
-                  fontWeight: pw.FontWeight.bold,
-                  decoration: pw.TextDecoration.underline,
-                ),
+        children: _spansAroundSlot(
+          strings.legacyKitSheetStepVisit(url: _emphasisSlot),
+          [
+            pw.TextSpan(
+              text: displayRecoveryUrl(recoveryUrl),
+              style: pw.TextStyle(
+                fontWeight: pw.FontWeight.bold,
+                decoration: pw.TextDecoration.underline,
               ),
-            ]),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -542,7 +544,7 @@ class LegacyKitPdfService {
       text: pw.TextSpan(
         style: const pw.TextStyle(color: _black, fontSize: 11.9),
         children: _spansAroundSlot(
-          strings.legacyKitSheetNeedHelp(_emphasisSlot),
+          strings.legacyKitSheetNeedHelp(email: _emphasisSlot),
           const [
             pw.TextSpan(
               text: _supportEmail,

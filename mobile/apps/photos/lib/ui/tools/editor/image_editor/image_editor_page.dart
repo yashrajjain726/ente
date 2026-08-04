@@ -5,6 +5,7 @@ import 'dart:ui' as ui show Image, ImageByteFormat;
 
 import "package:ente_components/ente_components.dart";
 import "package:ente_pure_utils/ente_pure_utils.dart";
+import "package:ente_strings/ente_strings.dart";
 import 'package:flutter/material.dart';
 import "package:flutter/services.dart";
 import "package:flutter_image_compress/flutter_image_compress.dart";
@@ -16,7 +17,6 @@ import "package:photo_manager/photo_manager.dart";
 import "package:photos/core/event_bus.dart";
 import "package:photos/db/files_db.dart";
 import "package:photos/events/local_photos_updated_event.dart";
-import "package:photos/generated/l10n.dart";
 import 'package:photos/models/file/file.dart' as ente;
 import "package:photos/models/location/location.dart";
 import "package:photos/module/metadata/local_file.dart";
@@ -89,7 +89,7 @@ class _ImageEditorPageState extends State<ImageEditorPage> {
   }
 
   Future<void> saveImage(ProImageEditorState editorState) async {
-    final l10n = AppLocalizations.of(context);
+    final l10n = context.strings;
     final dialog = createProgressDialog(context, l10n.saving);
     await dialog.show();
 
@@ -186,7 +186,7 @@ class _ImageEditorPageState extends State<ImageEditorPage> {
   }
 
   Future<void> _showExitConfirmationDialog(BuildContext context) async {
-    final l10n = AppLocalizations.of(context);
+    final l10n = context.strings;
     final actionResult = await showActionSheet(
       context: context,
       title: l10n.discardEditsQuestion,

@@ -19,6 +19,7 @@ pub fn start(
     museum_port: u16,
     museum_bin: &Path,
     db: &Postgres,
+    object_store_endpoint: &str,
 ) -> TestResult<ChildProcess> {
     require_go()?;
     build_museum(server_dir, museum_bin)?;
@@ -27,6 +28,13 @@ pub fn start(
     command
         .current_dir(server_dir)
         .env("ENTE_CREDENTIALS_FILE", config_file)
+        .env("ENTE_S3_ARE_LOCAL_BUCKETS", "true")
+        .env("ENTE_S3_B2_EU_CEN_KEY", "changeme")
+        .env("ENTE_S3_B2_EU_CEN_SECRET", "changeme1234")
+        .env("ENTE_S3_B2_EU_CEN_ENDPOINT", object_store_endpoint)
+        .env("ENTE_S3_B2_EU_CEN_REGION", "eu-central-2")
+        .env("ENTE_S3_B2_EU_CEN_BUCKET", "b2-eu-cen")
+        .env("ENTE_SPACE_ASSETS_PRIMARYBUCKET", "b2-eu-cen")
         .env("ENTE_DB_HOST", db.host())
         .env("ENTE_DB_PORT", db.port().to_string())
         .env("ENTE_DB_NAME", db.database())
@@ -49,26 +57,10 @@ pub fn start(
     Ok(museum)
 }
 
-/// A local `museum.yaml` can clobber anything written here; keys that must
-/// survive that are set via env in [`start`] instead.
-pub fn write_config(path: &Path, object_store_endpoint: &str) -> TestResult {
-    fs::write(
-        path,
-        format!(
-            r#"s3:
-    are_local_buckets: true
-    b2-eu-cen:
-        key: changeme
-        secret: changeme1234
-        endpoint: {object_store_endpoint}
-        region: eu-central-2
-        bucket: b2-eu-cen
-space:
-    assets:
-        primaryBucket: b2-eu-cen
-"#
-        ),
-    )?;
+pub fn write_config(path: &Path) -> TestResult {
+    // Do not add config here: a local museum.yaml would clobber it. Use env
+    // in `start` instead. This empty file masks any local credentials.yaml.
+    fs::write(path, "")?;
     Ok(())
 }
 

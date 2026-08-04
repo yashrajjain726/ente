@@ -1,7 +1,7 @@
 import 'package:ente_components/ente_components.dart';
+import "package:ente_strings/ente_strings.dart";
 import 'package:flutter/material.dart';
 import 'package:hugeicons/hugeicons.dart';
-import "package:photos/generated/l10n.dart";
 import "package:photos/models/api/collection/user.dart";
 import 'package:photos/models/collection/collection.dart';
 import 'package:photos/services/collections_service.dart';
@@ -39,14 +39,14 @@ class _ManageIndividualParticipantState
     final resolvedName = resolveDisplayName(widget.user);
     bool isConvertToViewSuccess = false;
     return ShareScaffold(
-      title: AppLocalizations.of(context).manage,
+      title: context.strings.manage,
       subtitle: resolvedName,
       children: [
-        ShareSectionTitle(AppLocalizations.of(context).addedAs),
+        ShareSectionTitle(context.strings.addedAs),
         ShareMenuGroup(
           items: [
             ShareMenuItem(
-              title: AppLocalizations.of(context).admin,
+              title: context.strings.admin,
               icon: HugeIcons.strokeRoundedCrown,
               trailing: isAdmin ? shareCheck(context) : null,
               onTap: isAdmin
@@ -67,7 +67,7 @@ class _ManageIndividualParticipantState
                     },
             ),
             ShareMenuItem(
-              title: AppLocalizations.of(context).collaborator,
+              title: context.strings.collaborator,
               icon: HugeIcons.strokeRoundedUserGroup,
               trailing: isCollaborator ? shareCheck(context) : null,
               onTap: isCollaborator
@@ -89,7 +89,7 @@ class _ManageIndividualParticipantState
                     },
             ),
             ShareMenuItem(
-              title: AppLocalizations.of(context).viewer,
+              title: context.strings.viewer,
               icon: HugeIcons.strokeRoundedView,
               trailing: isViewer ? shareCheck(context) : null,
               showOnlyLoadingState: true,
@@ -98,11 +98,9 @@ class _ManageIndividualParticipantState
                   : () async {
                       final actionResult = await showChoiceActionSheet(
                         context,
-                        title: AppLocalizations.of(context).changePermissions,
-                        firstButtonLabel: AppLocalizations.of(
-                          context,
-                        ).yesConvertToViewer,
-                        body: AppLocalizations.of(context)
+                        title: context.strings.changePermissionsQuestion,
+                        firstButtonLabel: context.strings.yesConvertToViewer,
+                        body: context.strings
                             .cannotAddMorePhotosAfterBecomingViewer(
                               user: resolvedName,
                             ),
@@ -139,16 +137,14 @@ class _ManageIndividualParticipantState
           ],
         ),
         ShareSectionDescription(
-          AppLocalizations.of(
-            context,
-          ).adminsAndCollaboratorsCanAddPhotosDescription,
+          context.strings.adminsAndCollaboratorsCanAddPhotosDescription,
         ),
         const SizedBox(height: Spacing.xxl),
-        ShareSectionTitle(AppLocalizations.of(context).removeParticipant),
+        ShareSectionTitle(context.strings.removeParticipant),
         ShareMenuGroup(
           items: [
             ShareMenuItem(
-              title: AppLocalizations.of(context).remove,
+              title: context.strings.remove,
               leading: const Icon(Icons.not_interested_outlined),
               isDestructive: true,
               onTap: () async {

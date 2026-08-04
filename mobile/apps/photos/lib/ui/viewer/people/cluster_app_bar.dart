@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import "package:ente_components/ente_components.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/foundation.dart";
 import 'package:flutter/material.dart';
 import "package:hugeicons/hugeicons.dart";
@@ -12,7 +13,6 @@ import 'package:photos/db/ml/base.dart';
 import "package:photos/db/ml/db.dart";
 import "package:photos/events/people_changed_event.dart";
 import 'package:photos/events/subscription_purchased_event.dart';
-import "package:photos/generated/l10n.dart";
 import "package:photos/models/file/file.dart";
 import 'package:photos/models/gallery_type.dart';
 import 'package:photos/models/selected_files.dart';
@@ -139,7 +139,7 @@ class _AppBarWidgetState extends State<ClusterAppBar> {
     final List<EntePopupMenuOption<ClusterPopupAction>> items = [
       EntePopupMenuOption(
         value: ClusterPopupAction.ignore,
-        label: AppLocalizations.of(context).ignorePerson,
+        label: context.strings.ignorePerson,
         leadingWidget: galleryAppBarMenuIcon(
           HugeIcons.strokeRoundedUserBlock01,
           iconColor,
@@ -147,7 +147,7 @@ class _AppBarWidgetState extends State<ClusterAppBar> {
       ),
       EntePopupMenuOption(
         value: ClusterPopupAction.breakupCluster,
-        label: AppLocalizations.of(context).mixedGrouping,
+        label: context.strings.mixedGrouping,
         leadingWidget: galleryAppBarMenuIcon(
           HugeIcons.strokeRoundedUserMultiple,
           iconColor,
@@ -166,7 +166,7 @@ class _AppBarWidgetState extends State<ClusterAppBar> {
 
     actions.add(
       galleryAppBarPopupMenuAction<ClusterPopupAction>(
-        tooltip: AppLocalizations.of(context).more,
+        tooltip: context.strings.more,
         icon: const HugeIcon(icon: HugeIcons.strokeRoundedMoreVertical),
         optionsBuilder: () => items,
         onSelected: (ClusterPopupAction value) async {
@@ -187,9 +187,9 @@ class _AppBarWidgetState extends State<ClusterAppBar> {
   Future<void> _onIgnoredClusterClicked(BuildContext context) async {
     final result = await showChoiceDialog(
       context,
-      title: AppLocalizations.of(context).areYouSureYouWantToIgnoreThisPerson,
-      body: AppLocalizations.of(context).thePersonGroupsWillNotBeDisplayed,
-      firstButtonLabel: AppLocalizations.of(context).confirm,
+      title: context.strings.areYouSureYouWantToIgnoreThisPerson,
+      body: context.strings.thePersonGroupsWillNotBeDisplayed,
+      firstButtonLabel: context.strings.confirm,
       firstButtonOnTap: () async {
         try {
           await ClusterFeedbackService.instance.ignoreCluster(widget.clusterID);
@@ -214,9 +214,9 @@ class _AppBarWidgetState extends State<ClusterAppBar> {
     String biggestClusterID = '';
     await showChoiceDialog(
       context,
-      title: AppLocalizations.of(context).doesGroupContainMultiplePeople,
-      body: AppLocalizations.of(context).automaticallyAnalyzeAndSplitGrouping,
-      firstButtonLabel: AppLocalizations.of(context).confirm,
+      title: context.strings.doesGroupContainMultiplePeople,
+      body: context.strings.automaticallyAnalyzeAndSplitGrouping,
+      firstButtonLabel: context.strings.confirm,
       firstButtonOnTap: () async {
         try {
           final breakupResult = await ClusterFeedbackService.instance
@@ -309,10 +309,8 @@ class _AppBarWidgetState extends State<ClusterAppBar> {
     if (!context.mounted) return;
     await Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (context) => ClusterBreakupPage(
-          newClusterIDToFiles,
-          AppLocalizations.of(context).analysis,
-        ),
+        builder: (context) =>
+            ClusterBreakupPage(newClusterIDToFiles, context.strings.analysis),
       ),
     );
   }

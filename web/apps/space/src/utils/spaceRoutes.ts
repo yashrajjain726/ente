@@ -38,7 +38,6 @@ export const spaceRoutes = {
     profilePhotoFrom: (source?: ProfileImageFlowSource) =>
         routeWithProfileImageFlowSource("/app/profile/photo", source),
     settings: "/app/settings",
-    settingsProfile: "/app/settings/profile",
     settingsProfileName: "/app/settings/profile/name",
     createProfile: (from?: CreateProfileSource) =>
         from == "login" ? "/create-profile?from=login" : "/create-profile",

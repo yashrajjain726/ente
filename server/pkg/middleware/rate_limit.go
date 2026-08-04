@@ -213,7 +213,8 @@ func isSpaceViewerReadURLPath(reqPath string) bool {
 // getLimiter, based on reqPath & reqMethod, return instance of limiter.Limiter which needs to
 // be applied for a request. It returns nil if the request is not rate limited
 func (r *RateLimitMiddleware) getLimiter(reqPath string, reqMethod string) *limiter.Limiter {
-	if strings.HasPrefix(reqPath, "/files/preview/") {
+	if strings.HasPrefix(reqPath, "/files/preview/") ||
+		strings.HasPrefix(reqPath, "/files/thumbnail/") {
 		return r.limit700ReqPerSec
 	}
 	if reqPath == "/space/public/by-slug/:spaceSlug" ||
@@ -226,6 +227,10 @@ func (r *RateLimitMiddleware) getLimiter(reqPath string, reqMethod string) *limi
 	}
 	if reqPath == "/space/public/by-slug/:spaceSlug/link/assets/redirect" {
 		return r.limit500ReqPerMin
+	}
+	if reqPath == "/space/public/by-slug/:spaceSlug/link/push/subscription" &&
+		reqMethod == http.MethodPut {
+		return r.limit10ReqPerMin
 	}
 	if reqPath == "/spaces/:spaceID/uploads/presign" && reqMethod == http.MethodPost {
 		return r.limit10ReqPerMin
@@ -258,8 +263,11 @@ func (r *RateLimitMiddleware) getLimiter(reqPath string, reqMethod string) *limi
 	if isPublicCollectionUploadURLPath(reqPath) {
 		return r.limit250ReqPerMin
 	}
+	if reqPath == "/collections/share/bulk" || reqPath == "/collections/unshare/bulk" {
+		return r.limit60ReqPerMin
+	}
 	if reqPath == "/users/public-key" {
-		return r.limit200ReqPerMin
+		return r.limit60ReqPerMin
 	}
 	if reqPath == "/paste/guard" || reqPath == "/paste/consume" {
 		return r.limit200ReqPerMin

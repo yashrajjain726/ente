@@ -1,4 +1,5 @@
 import "package:ente_components/ente_components.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/foundation.dart";
 import "package:flutter/material.dart";
 import "package:flutter_animate/flutter_animate.dart";
@@ -6,7 +7,7 @@ import "package:hugeicons/hugeicons.dart";
 import "package:photos/core/configuration.dart";
 import "package:photos/core/constants.dart";
 import "package:photos/db/files_db.dart";
-import "package:photos/l10n/l10n.dart";
+import "package:photos/locale.dart";
 import 'package:photos/models/collection/collection.dart';
 import "package:photos/models/selected_files.dart";
 import "package:photos/service_locator.dart";
@@ -87,7 +88,7 @@ class AddPhotosPhotoWidget extends StatelessWidget {
                   children: [
                     Expanded(
                       child: Text(
-                        context.l10n.addMore,
+                        context.strings.addMore,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyles.h2.copyWith(
@@ -97,7 +98,7 @@ class AddPhotosPhotoWidget extends StatelessWidget {
                     ),
                     const SizedBox(width: Spacing.md),
                     IconButtonComponent(
-                      tooltip: context.l10n.close,
+                      tooltip: context.strings.close,
                       variant: IconButtonComponentVariant.circular,
                       shouldSurfaceExecutionStates: false,
                       icon: const HugeIcon(
@@ -140,7 +141,7 @@ class AddPhotosPhotoWidget extends StatelessWidget {
                               key: ValueKey(value),
                               variant: ButtonComponentVariant.primary,
                               isDisabled: !value,
-                              label: context.l10n.addSelected,
+                              label: context.strings.addSelected,
                               onTap: () async {
                                 final selectedFile = selectedFiles.files;
                                 final ca = CollectionActions(
@@ -162,7 +163,7 @@ class AddPhotosPhotoWidget extends StatelessWidget {
                       const SizedBox(height: Spacing.md),
                       ButtonComponent(
                         variant: ButtonComponentVariant.secondary,
-                        label: context.l10n.addFromDevice,
+                        label: context.strings.addFromDevice,
                         onTap: () async {
                           await _onPickFromDeviceClicked(context);
                         },
@@ -212,10 +213,10 @@ class AddPhotosPhotoWidget extends StatelessWidget {
           if (!context.mounted) return;
           await showChoiceDialog(
             context,
-            title: context.l10n.grantPermission,
-            body: context.l10n.pleaseGrantPermissions,
-            firstButtonLabel: context.l10n.ok,
-            secondButtonLabel: context.l10n.cancel,
+            title: context.strings.grantPermission,
+            body: context.strings.pleaseGrantPermissions,
+            firstButtonLabel: context.strings.ok,
+            secondButtonLabel: context.strings.cancel,
             firstButtonOnTap: () async {
               await PhotoManager.openSetting();
             },
@@ -224,8 +225,8 @@ class AddPhotosPhotoWidget extends StatelessWidget {
           if (!context.mounted) return;
           await showErrorDialog(
             context,
-            context.l10n.oops,
-            context.l10n.somethingWentWrong + (kDebugMode ? "\n$e" : ""),
+            context.strings.oops,
+            context.strings.somethingWentWrong + (kDebugMode ? "\n$e" : ""),
           );
         }
       }

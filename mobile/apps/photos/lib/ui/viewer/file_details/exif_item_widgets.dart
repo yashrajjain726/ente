@@ -1,8 +1,8 @@
 import "package:ente_components/ente_components.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:exif_reader/exif_reader.dart";
 import "package:flutter/material.dart";
 import "package:hugeicons/hugeicons.dart";
-import "package:photos/generated/l10n.dart";
 import 'package:photos/models/file/file.dart';
 import "package:photos/theme/colors.dart";
 import "package:photos/theme/ente_theme.dart";
@@ -48,7 +48,7 @@ class AllExifItemWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
+    final l10n = context.strings;
     final currentExif = exif;
     late final String label;
     late final VoidCallback? onTap;

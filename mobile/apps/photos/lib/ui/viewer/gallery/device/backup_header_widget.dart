@@ -1,11 +1,11 @@
 import "dart:async";
 
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:hugeicons/hugeicons.dart";
 import "package:logging/logging.dart";
 import "package:photos/core/event_bus.dart";
 import "package:photos/events/local_photos_updated_event.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/models/device_collection.dart";
 import "package:photos/models/ignored_upload_reason.dart";
 import "package:photos/theme/ente_theme.dart";
@@ -71,7 +71,7 @@ class _BackupHeaderWidgetState extends State<BackupHeaderWidget> {
   }
 
   Widget _buildBackupRow(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
+    final l10n = context.strings;
     return MenuItemWidgetNew(
       title: l10n.backup,
       subText: l10n.autoUploadFromThisDeviceFolder,
@@ -88,7 +88,7 @@ class _BackupHeaderWidgetState extends State<BackupHeaderWidget> {
   }
 
   Widget _buildSkippedFilesRow(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
+    final l10n = context.strings;
     return FutureBuilder<Set<IgnoredUploadReasonBucket>>(
       future: _ignoredUploadBuckets,
       builder: (context, snapshot) {

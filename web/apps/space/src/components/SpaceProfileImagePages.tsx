@@ -39,7 +39,7 @@ const editProfileRouteFor = (
         : spaceRoutes.editProfilePhotoFrom(source);
 
 const savedRouteFor = (source: ProfileImageFlowSource) =>
-    source == "settings" ? spaceRoutes.settingsProfile : spaceRoutes.profile;
+    source == "settings" ? spaceRoutes.settings : spaceRoutes.profile;
 
 export const SpaceProfileImageViewerPage: React.FC<{
     variant: ProfileImageVariant;
