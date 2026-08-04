@@ -1,3 +1,4 @@
+import { avatarBackgroundColor, avatarTextColor } from "@/services/avatar";
 import {
     createFamily,
     inviteFamilyMember,
@@ -38,10 +39,6 @@ import { useBaseContext } from "ente-base/context";
 import { isHTTPErrorWithStatus } from "ente-base/http";
 import { formattedStorageByteSize } from "ente-gallery/utils/units";
 import { useUserDetailsSnapshot } from "ente-new/photos/components/utils/use-snapshot";
-import {
-    avatarBackgroundColor,
-    avatarTextColor,
-} from "ente-new/photos/services/avatar";
 import {
     familyUsage,
     isFamilyAdmin,

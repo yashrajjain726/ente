@@ -9,16 +9,16 @@ import { FocusVisibleButton } from "ente-base/components/mui/FocusVisibleButton"
 import { ShowHidePasswordInputAdornment } from "ente-base/components/mui/PasswordInputAdornment";
 import { useBaseContext } from "ente-base/context";
 import log from "ente-base/log";
-import { t } from "i18next";
-import type { ReactNode } from "react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useAppLockSnapshot } from "ente-new/photos/components/utils/use-snapshot";
 import {
     attemptDeviceLockUnlock,
     attemptUnlock,
     type DeviceLockUnlockResult,
     type UnlockResult,
-} from "../../services/app-lock";
-import { useAppLockSnapshot } from "../utils/use-snapshot";
+} from "ente-new/photos/services/app-lock";
+import { t } from "i18next";
+import type { ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppLockCard } from "./AppLockCard";
 import { CooldownScreen, ErrorMessage } from "./AppLockFeedback";
 import { LockIllustration } from "./AppLockIllustrations";

@@ -4,7 +4,6 @@ import {
 } from "ente-base/electron";
 import log from "ente-base/log";
 import { updateSessionFromElectronSafeStorageIfNeeded } from "ente-base/session";
-import { useEffect, useRef, useState } from "react";
 import {
     appLockSnapshot,
     clearAutoLockBlurSuppression,
@@ -13,7 +12,8 @@ import {
     refreshAppLockStateFromSession,
     shouldSuppressAutoLockOnBlur,
     type AppLockState,
-} from "../../services/app-lock";
+} from "ente-new/photos/services/app-lock";
+import { useEffect, useRef, useState } from "react";
 
 const hydrateSessionFromSafeStorageIfNeeded = async () => {
     try {

@@ -1,3 +1,4 @@
+import { DropdownInput, type DropdownOption } from "@/components/DropdownInput";
 import {
     Checkbox,
     FormControlLabel,
@@ -12,10 +13,6 @@ import { FocusVisibleButton } from "ente-base/components/mui/FocusVisibleButton"
 import { LoadingButton } from "ente-base/components/mui/LoadingButton";
 import type { ModalVisibilityProps } from "ente-base/components/utils/modal";
 import { useBaseContext } from "ente-base/context";
-import {
-    DropdownInput,
-    type DropdownOption,
-} from "ente-new/photos/components/DropdownInput";
 import {
     decryptDeleteAccountChallenge,
     deleteAccount,
