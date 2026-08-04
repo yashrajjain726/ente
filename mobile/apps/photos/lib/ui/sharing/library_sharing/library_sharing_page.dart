@@ -250,8 +250,9 @@ class _LibrarySharingPageState extends State<LibrarySharingPage> {
         albums,
         tag: 'library_sharing_${_recipient.userID}',
         selectionCallbacks: (
+          isSelectionModeActive: _controller.isSelecting,
           isSelected: _controller.isSelected,
-          toggle: _handleAlbumTap,
+          toggle: _toggleAlbumSelection,
         ),
         enableSelectionMode: true,
         gridTopLeftOverlayBuilder: _roleOverlay,
@@ -298,7 +299,7 @@ class _LibrarySharingPageState extends State<LibrarySharingPage> {
     return role == null ? null : LibrarySharingRoleBadge(role: role);
   }
 
-  void _handleAlbumTap(Collection album) {
+  void _toggleAlbumSelection(Collection album) {
     if (_controller.isMutating) {
       return;
     }
