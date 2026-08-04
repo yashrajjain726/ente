@@ -1,5 +1,6 @@
 import "dart:async";
 
+import "package:ente_icons/ente_icons.dart";
 import "package:ente_pure_utils/ente_pure_utils.dart";
 import "package:ente_strings/ente_strings.dart";
 import 'package:flutter/material.dart';
@@ -363,7 +364,7 @@ class _FileSelectionActionsWidgetState
       if (widget.type.showFavoriteOption()) {
         items.add(
           SelectionActionButton(
-            hugeIcon: HugeIcons.strokeRoundedFavourite,
+            iconWidget: const Icon(EnteIcons.favoriteStroke),
             labelText: context.strings.favorite,
             onTap: anyUploadedFiles ? _onFavoriteClick : null,
             shouldShow: ownedFilesCount > 0,
@@ -372,7 +373,7 @@ class _FileSelectionActionsWidgetState
       } else if (widget.type.showUnFavoriteOption()) {
         items.add(
           SelectionActionButton(
-            hugeIcon: HugeIcons.strokeRoundedHeartRemove,
+            iconWidget: const Icon(EnteIcons.favoriteFilled),
             labelText: context.strings.removeFromFavorite,
             onTap: _onUnFavoriteClick,
             shouldShow: ownedFilesCount > 0,

@@ -11,9 +11,17 @@ import { FamilyManagement } from "@/components/FamilyManagement";
 import type { FileListHeaderOrFooter } from "@/components/FileList";
 import { FileListWithViewer } from "@/components/FileListWithViewer";
 import { FixCreationTime } from "@/components/FixCreationTime";
+import { PlanSelector } from "@/components/PlanSelector";
 import { QuickLinkCreatedNotification } from "@/components/QuickLinkCreatedNotification";
 import { Sidebar } from "@/components/Sidebar";
 import { Upload } from "@/components/Upload";
+import { WhatsNew } from "@/components/WhatsNew";
+import {
+    notifyOthersFilesDialogAttributes,
+    notifyUnsupportedSharedFavoritesDialogAttributes,
+} from "@/components/utils/dialog-attributes";
+import { useIsOffline } from "@/components/utils/use-is-offline";
+import { shouldShowWhatsNew } from "@/services/changelog";
 import { Upload01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
@@ -67,7 +75,6 @@ import {
 } from "ente-new/photos/components/CollectionSelector";
 import { EditLocationDialog } from "ente-new/photos/components/EditLocationDialog";
 import { Export } from "ente-new/photos/components/Export";
-import { PlanSelector } from "ente-new/photos/components/PlanSelector";
 import {
     SearchBar,
     type SearchBarProps,
@@ -77,7 +84,6 @@ import {
     type CollectionOp,
     type FileOp,
 } from "ente-new/photos/components/SelectedFileOptions";
-import { WhatsNew } from "ente-new/photos/components/WhatsNew";
 import {
     GalleryEmptyState,
     PeopleEmptyState,
@@ -94,17 +100,11 @@ import {
     type GalleryBarMode,
 } from "ente-new/photos/components/gallery/reducer";
 import {
-    notifyOthersFilesDialogAttributes,
-    notifyUnsupportedSharedFavoritesDialogAttributes,
-} from "ente-new/photos/components/utils/dialog-attributes";
-import { useIsOffline } from "ente-new/photos/components/utils/use-is-offline";
-import {
     usePeopleStateSnapshot,
     useSettingsSnapshot,
     useUserDetailsSnapshot,
 } from "ente-new/photos/components/utils/use-snapshot";
 import { reauthenticateWithAppLock } from "ente-new/photos/services/app-lock";
-import { shouldShowWhatsNew } from "ente-new/photos/services/changelog";
 import {
     addToCollection,
     addToFavoritesCollection,

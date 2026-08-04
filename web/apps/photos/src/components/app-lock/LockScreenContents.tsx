@@ -1,11 +1,11 @@
+import { AppLockCard } from "@/components/app-lock/AppLockCard";
+import { AppLockLogoutConfirmation } from "@/components/app-lock/AppLockFeedback";
+import { AppLockPrompt } from "@/components/app-lock/AppLockPrompt";
 import ErrorOutlinedIcon from "@mui/icons-material/ErrorOutlined";
 import { Box, Modal, Stack, Typography } from "@mui/material";
 import { EnteLogo } from "ente-base/components/EnteLogo";
 import { FocusVisibleButton } from "ente-base/components/mui/FocusVisibleButton";
 import { useBaseContext } from "ente-base/context";
-import { AppLockCard } from "ente-new/photos/components/app-lock/AppLockCard";
-import { AppLockLogoutConfirmation } from "ente-new/photos/components/app-lock/AppLockFeedback";
-import { AppLockPrompt } from "ente-new/photos/components/app-lock/AppLockPrompt";
 import { t } from "i18next";
 import type { CSSProperties, PropsWithChildren } from "react";
 import { useState } from "react";

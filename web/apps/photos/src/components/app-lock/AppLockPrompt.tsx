@@ -1,11 +1,11 @@
 import CloseIcon from "@mui/icons-material/Close";
 import { IconButton } from "@mui/material";
 import { useBaseContext } from "ente-base/context";
+import { useAppLockSnapshot } from "ente-new/photos/components/utils/use-snapshot";
+import { cancelReauthentication } from "ente-new/photos/services/app-lock";
 import { t } from "i18next";
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useState } from "react";
-import { cancelReauthentication } from "../../services/app-lock";
-import { useAppLockSnapshot } from "../utils/use-snapshot";
 import { AppLockLogoutConfirmation } from "./AppLockFeedback";
 import { AppLockUnlockForm } from "./AppLockUnlockForm";
 

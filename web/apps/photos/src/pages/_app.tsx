@@ -1,6 +1,16 @@
+import { AppLockReauthenticationDialog } from "@/components/app-lock/AppLockReauthenticationDialog";
 import { AppLockSetupError } from "@/components/app-lock/LockScreenContents";
+import {
+    updateAvailableForDownloadDialogAttributes,
+    updateReadyToInstallDialogAttributes,
+} from "@/components/utils/download";
+import {
+    useAutoLockWhenBackgrounded,
+    useSetupAppLock,
+} from "@/components/utils/use-app-lock";
 import { useDesktopAppLockRoute } from "@/components/utils/use-app-lock-route";
 import { photosLogout } from "@/services/logout";
+import { runMigrations } from "@/services/migration";
 import "@fontsource-variable/inter";
 import "@fontsource-variable/outfit";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
@@ -37,18 +47,8 @@ import {
     initVideoProcessing,
     isHLSGenerationSupported,
 } from "ente-gallery/services/video";
-import { AppLockReauthenticationDialog } from "ente-new/photos/components/app-lock/AppLockReauthenticationDialog";
-import {
-    updateAvailableForDownloadDialogAttributes,
-    updateReadyToInstallDialogAttributes,
-} from "ente-new/photos/components/utils/download";
-import {
-    useAutoLockWhenBackgrounded,
-    useSetupAppLock,
-} from "ente-new/photos/components/utils/use-app-lock";
 import { useAppLockSnapshot } from "ente-new/photos/components/utils/use-snapshot";
 import { resumeExportsIfNeeded } from "ente-new/photos/services/export";
-import { runMigrations } from "ente-new/photos/services/migration";
 import { initML, isMLSupported } from "ente-new/photos/services/ml";
 import { PhotosAppContext } from "ente-new/photos/types/context";
 import { t } from "i18next";

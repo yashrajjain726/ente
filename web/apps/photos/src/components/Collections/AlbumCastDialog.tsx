@@ -1,3 +1,9 @@
+import {
+    publishCastPayload,
+    revokeAllCastTokens,
+    unknownDeviceCodeErrorMessage,
+} from "@/services/cast";
+import { loadCast } from "@/utils/chromecast-sender";
 import { Link, Stack, Typography } from "@mui/material";
 import { TitledMiniDialog } from "ente-base/components/MiniDialog";
 import { ActivityIndicator } from "ente-base/components/mui/ActivityIndicator";
@@ -11,12 +17,6 @@ import { ut } from "ente-base/i18n";
 import log from "ente-base/log";
 import type { Collection } from "ente-media/collection";
 import { useSettingsSnapshot } from "ente-new/photos/components/utils/use-snapshot";
-import {
-    publishCastPayload,
-    revokeAllCastTokens,
-    unknownDeviceCodeErrorMessage,
-} from "ente-new/photos/services/cast";
-import { loadCast } from "ente-new/photos/utils/chromecast-sender";
 import { t } from "i18next";
 import React, { useCallback, useEffect, useState } from "react";
 import { Trans } from "react-i18next";
