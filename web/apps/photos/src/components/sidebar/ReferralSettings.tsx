@@ -1,3 +1,12 @@
+import {
+    changeReferralCode,
+    claimReferralCode,
+    getReferralView,
+    getStorageBonusDetails,
+    normalizeReferralCode,
+    type ReferralView,
+    type StorageBonusDetails,
+} from "@/services/storage-bonus";
 import CheckCircleOutlinedIcon from "@mui/icons-material/CheckCircleOutlined";
 import EditIcon from "@mui/icons-material/Edit";
 import { Box, Button, IconButton, Stack, Typography } from "@mui/material";
@@ -26,15 +35,6 @@ import {
 import log from "ente-base/log";
 import { bytesInGB } from "ente-gallery/utils/units";
 import { useUserDetailsSnapshot } from "ente-new/photos/components/utils/use-snapshot";
-import {
-    changeReferralCode,
-    claimReferralCode,
-    getReferralView,
-    getStorageBonusDetails,
-    normalizeReferralCode,
-    type ReferralView,
-    type StorageBonusDetails,
-} from "ente-new/photos/services/storage-bonus";
 import {
     familyAdminEmail,
     isPartOfFamily,

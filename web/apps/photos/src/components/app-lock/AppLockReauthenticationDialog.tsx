@@ -3,9 +3,9 @@
  */
 
 import { Box, Modal } from "@mui/material";
+import { useAppLockSnapshot } from "ente-new/photos/components/utils/use-snapshot";
 import { t } from "i18next";
 import type { CSSProperties } from "react";
-import { useAppLockSnapshot } from "../utils/use-snapshot";
 import { AppLockPrompt } from "./AppLockPrompt";
 
 export const AppLockReauthenticationDialog = () => {

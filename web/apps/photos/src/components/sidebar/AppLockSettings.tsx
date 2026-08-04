@@ -18,8 +18,7 @@ import {
 import { errorDialogAttributes } from "ente-base/components/utils/dialog";
 import { useBaseContext } from "ente-base/context";
 import log from "ente-base/log";
-import { t } from "i18next";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import { useAppLockSnapshot } from "ente-new/photos/components/utils/use-snapshot";
 import {
     disableAppLock,
     setAutoLockTime,
@@ -28,8 +27,9 @@ import {
     setupPin,
     shouldShowDeviceLockOption,
     type SetupDeviceLockResult,
-} from "../../services/app-lock";
-import { useAppLockSnapshot } from "../utils/use-snapshot";
+} from "ente-new/photos/services/app-lock";
+import { t } from "i18next";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 
 type DeviceLockEnableOutcome = "success" | "cancelled" | "failed";
 
