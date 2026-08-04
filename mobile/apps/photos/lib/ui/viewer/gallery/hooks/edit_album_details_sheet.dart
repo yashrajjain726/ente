@@ -45,8 +45,15 @@ Future<void> showEditAlbumDetailsSheet({
       initialName: collection.displayName,
       initialDescription: collection.displayDescription ?? "",
       initialCover: initialCover,
-      onSelectCover: () async {
-        final coverID = await showPickCoverPhotoSheet(sheetContext, collection);
+      onSelectCover: (pendingCoverID) async {
+        final hasEffectiveCustomCover = pendingCoverID == null
+            ? collection.hasCover
+            : pendingCoverID != 0;
+        final coverID = await showPickCoverPhotoSheet(
+          sheetContext,
+          collection,
+          hasEffectiveCustomCover: hasEffectiveCustomCover,
+        );
         if (coverID == null) {
           return null;
         }
@@ -77,7 +84,8 @@ class EditAlbumDetailsSheet extends StatefulWidget {
   final String initialName;
   final String initialDescription;
   final Future<EnteFile?> initialCover;
-  final Future<AlbumCoverSelection?> Function() onSelectCover;
+  final Future<AlbumCoverSelection?> Function(int? pendingCoverID)
+  onSelectCover;
   final Future<void> Function(AlbumDetailsUpdate update) onSave;
 
   @override
@@ -221,7 +229,7 @@ class _EditAlbumDetailsSheetState extends State<EditAlbumDetailsSheet> {
   }
 
   Future<void> _selectCover() async {
-    final selection = await widget.onSelectCover();
+    final selection = await widget.onSelectCover(_pendingCoverID);
     if (!mounted || selection == null) {
       return;
     }

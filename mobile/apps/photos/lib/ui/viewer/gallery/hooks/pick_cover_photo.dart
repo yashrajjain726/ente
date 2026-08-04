@@ -14,19 +14,28 @@ import "package:photos/ui/viewer/gallery/state/gallery_files_inherited_widget.da
 
 Future<int?> showPickCoverPhotoSheet(
   BuildContext context,
-  Collection collection,
-) {
+  Collection collection, {
+  required bool hasEffectiveCustomCover,
+}) {
   return showBottomSheetComponent<int>(
     context: context,
-    builder: (_) => PickCoverPhotoWidget(collection),
+    builder: (_) => PickCoverPhotoWidget(
+      collection,
+      hasEffectiveCustomCover: hasEffectiveCustomCover,
+    ),
     enableDrag: true,
   );
 }
 
 class PickCoverPhotoWidget extends StatefulWidget {
   final Collection collection;
+  final bool hasEffectiveCustomCover;
 
-  const PickCoverPhotoWidget(this.collection, {super.key});
+  const PickCoverPhotoWidget(
+    this.collection, {
+    super.key,
+    required this.hasEffectiveCustomCover,
+  });
 
   @override
   State<PickCoverPhotoWidget> createState() => _PickCoverPhotoWidgetState();
@@ -120,7 +129,7 @@ class _PickCoverPhotoWidgetState extends State<PickCoverPhotoWidget> {
                         }
                       : null,
                 ),
-                if (widget.collection.hasCover) ...[
+                if (widget.hasEffectiveCustomCover) ...[
                   const SizedBox(height: Spacing.md),
                   ButtonComponent(
                     variant: ButtonComponentVariant.secondary,
