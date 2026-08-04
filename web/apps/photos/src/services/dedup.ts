@@ -8,8 +8,8 @@ import {
     createCollectionNameByID,
     moveToTrash,
     savedNormalCollections,
-} from "./collection";
-import { savedCollectionFiles } from "./photos-fdb";
+} from "ente-new/photos/services/collection";
+import { savedCollectionFiles } from "ente-new/photos/services/photos-fdb";
 import { pullFiles } from "./pull";
 
 /**

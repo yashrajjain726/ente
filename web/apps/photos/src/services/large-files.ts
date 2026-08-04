@@ -2,8 +2,11 @@ import { ensureLocalUser } from "ente-accounts/services/user";
 import { newID } from "ente-base/id";
 import type { EnteFile } from "ente-media/file";
 import { FileType } from "ente-media/file-type";
-import { moveToTrash, savedNormalCollections } from "./collection";
-import { savedCollectionFiles } from "./photos-fdb";
+import {
+    moveToTrash,
+    savedNormalCollections,
+} from "ente-new/photos/services/collection";
+import { savedCollectionFiles } from "ente-new/photos/services/photos-fdb";
 import { pullFiles } from "./pull";
 
 /**

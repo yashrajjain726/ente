@@ -10,11 +10,15 @@ import {
     movePendingRemovalActionsToUncategorized,
     pullCollectionFiles,
     pullCollections,
-} from "./collection";
-import { isMLSupported, mlSync, pullMLStatus } from "./ml";
-import { searchDataSync } from "./search";
-import { pullSettings } from "./settings";
-import { pullTrash, type TrashItem } from "./trash";
+} from "ente-new/photos/services/collection";
+import {
+    isMLSupported,
+    mlSync,
+    pullMLStatus,
+} from "ente-new/photos/services/ml";
+import { searchDataSync } from "ente-new/photos/services/search";
+import { pullSettings } from "ente-new/photos/services/settings";
+import { pullTrash, type TrashItem } from "ente-new/photos/services/trash";
 
 /**
  * Called during a full remote pull, before doing the files pull.

@@ -7,6 +7,7 @@ import { AlbumAddedNotification } from "@/components/AlbumAddedNotification";
 import { AuthenticateUser } from "@/components/AuthenticateUser";
 import { GalleryBarAndListHeader } from "@/components/Collections/GalleryBarAndListHeader";
 import { PickCoverPhotoDialog } from "@/components/Collections/PickCoverPhotoDialog";
+import { Export } from "@/components/Export";
 import { FamilyManagement } from "@/components/FamilyManagement";
 import type { FileListHeaderOrFooter } from "@/components/FileList";
 import { FileListWithViewer } from "@/components/FileListWithViewer";
@@ -22,6 +23,7 @@ import {
 } from "@/components/utils/dialog-attributes";
 import { useIsOffline } from "@/components/utils/use-is-offline";
 import { shouldShowWhatsNew } from "@/services/changelog";
+import exportService from "@/services/export";
 import { Upload01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
@@ -74,7 +76,6 @@ import {
     type CollectionSelectorAttributes,
 } from "ente-new/photos/components/CollectionSelector";
 import { EditLocationDialog } from "ente-new/photos/components/EditLocationDialog";
-import { Export } from "ente-new/photos/components/Export";
 import {
     SearchBar,
     type SearchBarProps,
@@ -120,7 +121,6 @@ import {
     haveOnlySystemCollections,
     PseudoCollectionID,
 } from "ente-new/photos/services/collection-summary";
-import exportService from "ente-new/photos/services/export";
 import {
     updateFilesLocation,
     updateFilesVisibility,
@@ -130,6 +130,7 @@ import {
     isMLEnabled,
 } from "ente-new/photos/services/ml";
 
+import { postPullFiles, prePullFiles, pullFiles } from "@/services/pull";
 import { uploadManager } from "@/services/upload-manager";
 import watcher from "@/services/watch";
 import {
@@ -146,11 +147,6 @@ import {
     savedCollections,
     savedTrashItems,
 } from "ente-new/photos/services/photos-fdb";
-import {
-    postPullFiles,
-    prePullFiles,
-    pullFiles,
-} from "ente-new/photos/services/pull";
 import {
     filterSearchableFiles,
     updateSearchCollectionsAndFiles,
