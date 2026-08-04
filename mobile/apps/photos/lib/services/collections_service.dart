@@ -768,7 +768,10 @@ class CollectionsService {
     return favorites + pinned + rest;
   }
 
-  User getFileOwner(int userID, int? collectionID) {
+  User resolveUserIdentity(int userID, int? collectionID) {
+    if (userID == _config.getUserID()) {
+      return User(id: userID, email: _config.getEmail()!);
+    }
     if (_cachedUserIdToUser.containsKey(userID)) {
       return _cachedUserIdToUser[userID]!;
     }

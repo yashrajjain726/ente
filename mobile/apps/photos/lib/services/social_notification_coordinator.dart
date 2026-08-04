@@ -367,7 +367,7 @@ class SocialNotificationCoordinator {
         fallback: anonID,
       );
     }
-    final user = _collectionsService.getFileOwner(
+    final user = _collectionsService.resolveUserIdentity(
       userID,
       candidate.collectionID,
     );

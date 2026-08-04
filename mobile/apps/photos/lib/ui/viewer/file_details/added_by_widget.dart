@@ -28,7 +28,7 @@ class AddedByWidget extends StatelessWidget {
       if (file.ownerID == null) {
         return const SizedBox.shrink();
       }
-      final fileOwner = CollectionsService.instance.getFileOwner(
+      final fileOwner = CollectionsService.instance.resolveUserIdentity(
         file.ownerID!,
         file.collectionID,
       );
