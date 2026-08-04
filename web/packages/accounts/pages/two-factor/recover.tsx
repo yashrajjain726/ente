@@ -30,10 +30,6 @@ export interface RecoverPageProps {
     twoFactorType: TwoFactorType;
 }
 
-/**
- * A page where the user can enter their recovery key to reset or bypass their
- * second factor in case they no longer have access to it.
- */
 const Page: React.FC<RecoverPageProps> = ({ twoFactorType }) => {
     const { logout, showMiniDialog, onGenericError } = useBaseContext();
 

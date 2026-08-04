@@ -21,11 +21,6 @@ import {
 } from "../../components/layouts/centered-paper";
 import { unstashRedirect } from "../../services/redirect";
 
-/**
- * A page that allows the user to verify their TOTP based second factor.
- *
- * See: [Note: Login pages]
- */
 const Page: React.FC = () => {
     const { logout } = useBaseContext();
 

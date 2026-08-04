@@ -63,19 +63,6 @@ import { t } from "i18next";
 import { useRouter } from "next/router";
 import { useCallback, useEffect, useState } from "react";
 
-/**
- * A page that allows the user to authenticate using their password.
- *
- * It is shown in two cases:
- *
- * - Initial authentication, when the user is logging in on to a new client.
- *
- * - Subsequent reauthentication, when the user opens the web app in a new tab.
- *   Such a tab won't have the user's master key in session storage, so we ask
- *   the user to reauthenticate using their password.
- *
- * See: [Note: Login pages]
- */
 const Page: React.FC = () => {
     const { logout, showMiniDialog } = useBaseContext();
 
@@ -118,14 +105,13 @@ const Page: React.FC = () => {
                     // Set a flag that causes new interactive key attributes to
                     // be generated.
                     saveIsFirstLogin();
-                    // This should be a rare occurrence, instead of building the
-                    // scaffolding to update all the in-memory state, just
-                    // reload everything.
+                    // This should be rare; instead of updating all the
+                    // in-memory state, just reload the page.
                     window.location.reload();
             }
         } catch (e) {
-            // Ignore errors since we shouldn't be logging the user out for
-            // potentially transient issues.
+            // Ignore errors; a potentially transient issue must not log the
+            // user out.
             log.warn("Ignoring error when determining session validity", e);
         }
     }, [logout, showMiniDialog]);
@@ -179,8 +165,8 @@ const Page: React.FC = () => {
             const kek = await unstashKeyEncryptionKeyFromSession();
             const keyAttributes = savedKeyAttributes();
 
-            // Refreshing an existing tab, or desktop app, or only the token
-            // needs to decrypted and set.
+            // Refreshing an existing tab, or the desktop app: the stashed KEK
+            // decrypts the master key without asking for the password again.
             if (kek && keyAttributes) {
                 const masterKey = await decryptBox(
                     {
@@ -241,8 +227,6 @@ const Page: React.FC = () => {
                         await verifySRP(srpAttributes, kek),
                     );
 
-                // If we had to ask remote for the key attributes, it is the
-                // initial login on this client.
                 saveIsFirstLogin();
 
                 if (passkeySessionID) {
@@ -265,8 +249,6 @@ const Page: React.FC = () => {
                     void router.push("/two-factor/verify");
                     return "redirecting-second-factor";
                 } else {
-                    // In rare cases, if the user hasn't already setup their key
-                    // attributes, we might get the plaintext token from remote.
                     if (token) await saveAuthToken(token);
                     updateSavedLocalUser({
                         id,
@@ -287,12 +269,10 @@ const Page: React.FC = () => {
         useCallback(
             (key, kek, keyAttributes, password) => {
                 void (async () => {
-                    // Currently the page will get reloaded if any of the
-                    // attributes have changed, so we don't need to worry about
-                    // the KEK having been generated using stale credentials.
-                    //
-                    // This await on the promise is here to only ensure we're
-                    // done with the check before we let the user in.
+                    // The page reloads if any attributes changed, so the KEK
+                    // cannot have been generated from stale credentials. The
+                    // await only makes sure the check is done before we let
+                    // the user in.
                     if (sessionValidityCheck) await sessionValidityCheck;
 
                     const updatedKeyAttributes = savedIsFirstLogin()
@@ -323,15 +303,10 @@ const Page: React.FC = () => {
     }
 
     if (passkeyVerificationData) {
-        // We only need to handle this scenario when running in the desktop app
-        // because the web app will navigate to Passkey verification URL.
-        // However, still we add an additional `globalThis.electron` check to
-        // show a spinner. This prevents the VerifyingPasskey component from
-        // being disorientingly shown for a fraction of a second as the redirect
-        // happens on the web app.
-        //
-        // See: [Note: Passkey verification in the desktop app]
-
+        // Only the desktop app needs this UI; the web app is already
+        // navigating to the passkey verification URL. Show a spinner on web
+        // so that the VerifyingPasskey component does not flash before the
+        // redirect completes.
         if (!globalThis.electron) {
             return <LoadingIndicator />;
         }
