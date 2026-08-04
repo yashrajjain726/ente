@@ -107,8 +107,8 @@ class CraftMemories extends StatelessWidget {
                 ),
               ),
               Positioned(
-                right: width * 0.02,
-                top: width * 0.02,
+                right: 0,
+                top: 0,
                 child: Tooltip(
                   message: l10n.close,
                   child: GestureDetector(
@@ -119,9 +119,9 @@ class CraftMemories extends StatelessWidget {
                       onNotificationsPermissionGranted?.call();
                     },
                     child: Padding(
-                      padding: const EdgeInsets.all(8),
+                      padding: EdgeInsets.all(width * 0.08),
                       child: SizedBox.square(
-                        dimension: 20,
+                        dimension: 16,
                         child: DecoratedBox(
                           decoration: const BoxDecoration(
                             color: Color(0x4AFFFFFF),

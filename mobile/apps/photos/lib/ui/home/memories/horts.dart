@@ -1,4 +1,4 @@
-import "package:flutter/widgets.dart";
+import "package:flutter/material.dart";
 
 class PhaseOffset extends Animatable<double> {
   const PhaseOffset(this.offset) : assert(offset >= 0 && offset < 1);
@@ -58,6 +58,19 @@ class _HortsState extends State<Horts> with SingleTickerProviderStateMixin {
               child: ScaleTransition(
                 scale: _scaleAnimation,
                 child: Image.asset("assets/horts0.png", scale: 2),
+              ),
+            ),
+            Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    Colors.transparent,
+                    Colors.black.withValues(alpha: 0.72),
+                  ],
+                  stops: const [0.53663, 0.89955],
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                ),
               ),
             ),
           ],
