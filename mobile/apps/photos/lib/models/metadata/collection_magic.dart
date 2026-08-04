@@ -13,6 +13,7 @@ const muteKey = "mute";
 
 const orderKey = "order";
 
+const albumDescriptionKey = "description";
 const maxAlbumDescriptionLength = 200;
 
 class CollectionMagicMetadata {
@@ -89,7 +90,7 @@ class CollectionPubMagicMetadata {
       result["layout"] = layout!;
     }
     if (description != null) {
-      result["albumDescriptionKey"] = description!;
+      result[albumDescriptionKey] = description!;
     }
     return result;
   }
@@ -105,7 +106,7 @@ class CollectionPubMagicMetadata {
       asc: map["asc"] as bool?,
       coverID: map["coverID"],
       layout: map["layout"] as String? ?? "masonry",
-      description: map["albumDescriptionKey"] as String?,
+      description: map[albumDescriptionKey] as String?,
     );
   }
 }
