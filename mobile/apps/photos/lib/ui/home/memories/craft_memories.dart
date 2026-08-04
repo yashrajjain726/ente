@@ -44,10 +44,8 @@ class CraftMemories extends StatelessWidget {
                   },
                   child: Stack(
                     children: [
-                      const Positioned.fill(
-                        child: DecoratedBox(
-                          decoration: BoxDecoration(color: Colors.greenAccent),
-                        ),
+                      Positioned.fill(
+                        child: Image.asset("assets/memories.jpg", fit: .cover),
                       ),
                       Padding(
                         padding: EdgeInsets.all(width * 0.125),
