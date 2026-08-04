@@ -424,10 +424,22 @@ class _LibrarySharingPageState extends State<LibrarySharingPage> {
   }
 
   Future<void> _enableLibrarySharing(CollectionParticipantRole role) async {
-    await _showFailureIfNeeded(
-      await _controller.enableAutomaticSharing(role),
-      () => _enableLibrarySharing(role),
+    final result = await _controller.enableAutomaticSharing(role);
+    if (result == null || result.failedIDs.isNotEmpty) {
+      await _showFailureIfNeeded(false, () => _enableLibrarySharing(role));
+      return;
+    }
+    final previouslyUnsharedCount = result.previouslyUnsharedIDs.length;
+    if (!mounted || previouslyUnsharedCount == 0) {
+      return;
+    }
+    final review = await showPreviouslyUnsharedAlbums(
+      context: context,
+      count: previouslyUnsharedCount,
     );
+    if (review && mounted) {
+      _controller.enterAddMode();
+    }
   }
 
   Future<void> _showFailureIfNeeded(

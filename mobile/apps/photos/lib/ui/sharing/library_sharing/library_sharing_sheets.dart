@@ -1,4 +1,5 @@
 import 'package:ente_components/ente_components.dart';
+import 'package:ente_strings/ente_strings.dart';
 import 'package:flutter/material.dart';
 import 'package:photos/models/collection/collection.dart';
 import 'package:photos/ui/collections/album/list_item.dart';
@@ -195,6 +196,31 @@ Future<bool> confirmStopLibrarySharing({
             ],
           );
         },
+      ) ??
+      false;
+}
+
+Future<bool> showPreviouslyUnsharedAlbums({
+  required BuildContext context,
+  required int count,
+}) async {
+  return await showBottomSheetComponent<bool>(
+        context: context,
+        builder: (sheetContext) => BottomSheetComponent(
+          title: LibrarySharingStrings.previouslyUnsharedTitle(count),
+          message: LibrarySharingStrings.previouslyUnsharedMessage(count),
+          borderSide: BorderSide(
+            color: sheetContext.componentColors.strokeDark,
+          ),
+          actions: [
+            ButtonComponent(
+              label: sheetContext.strings.review,
+              density: ButtonComponentDensity.compact,
+              shouldSurfaceExecutionStates: false,
+              onTap: () => Navigator.of(sheetContext).pop(true),
+            ),
+          ],
+        ),
       ) ??
       false;
 }

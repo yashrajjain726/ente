@@ -142,6 +142,45 @@ void main() {
     );
   });
 
+  testWidgets('offers to review albums that were previously unshared', (
+    tester,
+  ) async {
+    final repository = FakeLibrarySharingRepository([
+      librarySharingTestAlbum(1),
+      librarySharingTestAlbum(2),
+    ])..automaticSharingBlockedIDs.add(2);
+    final controller = _LayoutTestLibrarySharingController(repository);
+
+    await tester.pumpWidget(
+      _app(
+        LibrarySharingPage(
+          recipient: librarySharingTestRecipient,
+          controller: controller,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Library sharing'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.tap(find.text('Enable'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+
+    expect(find.text("1 album wasn't shared"), findsOneWidget);
+    expect(
+      find.text(
+        "Sharing was stopped for this album earlier, so it wasn't shared again.",
+      ),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.text('Review'));
+    await tester.pumpAndSettle();
+    expect(controller.isAddingAlbums, isTrue);
+    expect(find.text('Share with'), findsOneWidget);
+  });
+
   testWidgets('keeps the library sharing banner while albums are selected', (
     tester,
   ) async {
@@ -548,16 +587,19 @@ Widget _app(Widget home) {
 }
 
 class _LayoutTestLibrarySharingController extends LibrarySharingController {
-  _LayoutTestLibrarySharingController()
-    : super(
-        recipient: librarySharingTestRecipient,
-        repository: FakeLibrarySharingRepository([
-          librarySharingTestAlbum(
-            1,
-            recipientRole: CollectionParticipantRole.viewer,
-          ),
-        ]),
-      );
+  _LayoutTestLibrarySharingController([
+    FakeLibrarySharingRepository? repository,
+  ]) : super(
+         recipient: librarySharingTestRecipient,
+         repository:
+             repository ??
+             FakeLibrarySharingRepository([
+               librarySharingTestAlbum(
+                 1,
+                 recipientRole: CollectionParticipantRole.viewer,
+               ),
+             ]),
+       );
 
   @override
   List<Collection> get visibleAlbums => const [];

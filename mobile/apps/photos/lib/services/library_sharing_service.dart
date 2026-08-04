@@ -30,6 +30,11 @@ const _reconcileEventSources = {
   'collection_visibility_changed',
 };
 
+typedef EnableAutomaticSharingResult = ({
+  Set<int> failedIDs,
+  Set<int> previouslyUnsharedIDs,
+});
+
 CollectionParticipantRole? librarySharingRoleFor(
   Collection collection,
   int userID,
@@ -58,7 +63,7 @@ abstract interface class LibrarySharingRepository {
 
   Future<bool> isAutomaticSharingEnabled(int recipientUserID);
 
-  Future<Set<int>> enableAutomaticSharing({
+  Future<EnableAutomaticSharingResult> enableAutomaticSharing({
     required LibrarySharingRecipient recipient,
     required CollectionParticipantRole role,
   });
@@ -206,20 +211,20 @@ class LibrarySharingService implements LibrarySharingRepository {
   }
 
   @override
-  Future<Set<int>> enableAutomaticSharing({
+  Future<EnableAutomaticSharingResult> enableAutomaticSharing({
     required LibrarySharingRecipient recipient,
     required CollectionParticipantRole role,
   }) async {
-    final failedIDs = await _operationLock.synchronized(
+    final result = await _operationLock.synchronized(
       () => _enableAutomaticSharing(recipient, role),
     );
-    if (failedIDs.isEmpty) {
+    if (result.failedIDs.isEmpty) {
       await reconcile();
     }
-    return failedIDs;
+    return result;
   }
 
-  Future<Set<int>> _enableAutomaticSharing(
+  Future<EnableAutomaticSharingResult> _enableAutomaticSharing(
     LibrarySharingRecipient recipient,
     CollectionParticipantRole role,
   ) async {
@@ -262,7 +267,17 @@ class LibrarySharingService implements LibrarySharingRepository {
       ownerUserID,
       config.copyWith(enabled: failedIDs.isEmpty),
     );
-    return failedIDs;
+    final previouslyUnsharedIDs = collections
+        .where(
+          (collection) =>
+              _isShareableAlbum(collection) &&
+              config.unsharedBefore.contains(collection.id) &&
+              !config.hidden.contains(collection.id) &&
+              librarySharingRoleFor(collection, recipient.userID) == null,
+        )
+        .map((collection) => collection.id)
+        .toSet();
+    return (failedIDs: failedIDs, previouslyUnsharedIDs: previouslyUnsharedIDs);
   }
 
   @override

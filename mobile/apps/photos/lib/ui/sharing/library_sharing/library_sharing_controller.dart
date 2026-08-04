@@ -208,31 +208,33 @@ class LibrarySharingController extends ChangeNotifier {
     );
   }
 
-  Future<bool> enableAutomaticSharing(CollectionParticipantRole role) async {
+  Future<EnableAutomaticSharingResult?> enableAutomaticSharing(
+    CollectionParticipantRole role,
+  ) async {
     if (_isLoading || _isMutating || _isAutomaticSharingEnabled) {
-      return false;
+      return null;
     }
     _beginMutation();
     try {
-      final failedIDs = await _repository.enableAutomaticSharing(
+      final result = await _repository.enableAutomaticSharing(
         recipient: recipient,
         role: role,
       );
       await _reloadAfterMutation();
-      _failedCount = failedIDs.length;
-      _isAutomaticSharingEnabled = failedIDs.isEmpty;
-      if (failedIDs.isEmpty) {
+      _failedCount = result.failedIDs.length;
+      _isAutomaticSharingEnabled = result.failedIDs.isEmpty;
+      if (result.failedIDs.isEmpty) {
         _selectionMode = null;
         _clearSelectionState();
       }
-      return failedIDs.isEmpty;
+      return result;
     } catch (error, stackTrace) {
       _logger.warning(
         'Failed to enable automatic library sharing',
         error,
         stackTrace,
       );
-      return false;
+      return null;
     } finally {
       _isMutating = false;
       _notifyListeners();

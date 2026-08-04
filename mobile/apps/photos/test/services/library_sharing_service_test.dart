@@ -20,24 +20,23 @@ void main() {
       for (var id = 1; id <= 100; id++) librarySharingTestAlbum(id),
       librarySharingTestAlbum(101, type: CollectionType.uncategorized),
     ];
-    final fixture = await _Fixture.create(albums, blockedIDs: {100});
+    final fixture = await _Fixture.create(albums, blockedIDs: {100, 101});
 
-    expect(
-      await fixture.service.enableAutomaticSharing(
-        recipient: librarySharingTestRecipient,
-        role: CollectionParticipantRole.admin,
-      ),
-      isEmpty,
+    final result = await fixture.service.enableAutomaticSharing(
+      recipient: librarySharingTestRecipient,
+      role: CollectionParticipantRole.admin,
     );
 
+    expect(result.failedIDs, isEmpty);
+    expect(result.previouslyUnsharedIDs, {100});
     expect(fixture.collectionsService.shareBatchSizes, [100, 1]);
     expect(
       fixture.collectionsService.sharedRoles[101],
       CollectionParticipantRole.viewer,
     );
     final config = await fixture.readConfig();
-    expect(config.addedAutomatically.length, 100);
-    expect(config.unsharedBefore, {100});
+    expect(config.addedAutomatically.length, 99);
+    expect(config.unsharedBefore, {100, 101});
   });
 
   test('hidden automatic shares remain until explicitly unshared', () async {
