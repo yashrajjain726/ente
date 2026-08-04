@@ -4,6 +4,7 @@ import "package:flutter/material.dart";
 import "package:hugeicons/hugeicons.dart";
 import "package:photos/service_locator.dart";
 import "package:photos/services/notification_service.dart";
+import "package:photos/ui/home/memories/horts.dart";
 import "package:photos/ui/home/memories/memory_cover_widget.dart";
 
 class CraftMemories extends StatelessWidget {
@@ -44,9 +45,7 @@ class CraftMemories extends StatelessWidget {
                   },
                   child: Stack(
                     children: [
-                      Positioned.fill(
-                        child: Image.asset("assets/memories.jpg", fit: .cover),
-                      ),
+                      const Positioned.fill(child: Horts()),
                       Padding(
                         padding: EdgeInsets.all(width * 0.125),
                         child: Column(
