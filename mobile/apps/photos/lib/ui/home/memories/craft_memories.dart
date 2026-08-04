@@ -79,7 +79,7 @@ class CraftMemories extends StatelessWidget {
                             const SizedBox(height: 6),
                             DecoratedBox(
                               decoration: BoxDecoration(
-                                color: Colors.white.withAlpha(128),
+                                color: Colors.white.withAlpha(64),
                                 borderRadius: BorderRadius.circular(14),
                               ),
                               child: Padding(
