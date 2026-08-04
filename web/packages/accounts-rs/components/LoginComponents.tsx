@@ -20,15 +20,6 @@ import {
 } from "./layouts/centered-paper";
 
 interface HeaderCaptionProps {
-    /**
-     * If specified, then a caption to display below the title (which is
-     * expected to be passed as the `children`).
-     *
-     * The components which use the {@link HeaderCaptionProps} that they'll have
-     * the same height irrespective of whether or not the caption is provided.
-     * This allows us to use this component to get a similar look across various
-     * pages in the login flow (some of which have a caption, some which not).
-     */
     caption?: string;
 }
 
@@ -87,13 +78,9 @@ export const AccountsPageFooterWithHost: React.FC<React.PropsWithChildren> = ({
 };
 
 interface VerifyingPasskeyProps {
-    /** ID of the current passkey verification session. */
     passkeySessionID: string;
-    /** The email of the user whose passkey we're verifying. */
     email: string | undefined;
-    /** Called when the user wants to redirect again. */
     onRetry: () => void;
-    /** Perform the (possibly app specific) logout sequence. */
     logout: () => void;
     showMiniDialog: (attrs: MiniDialogAttributes) => void;
 }

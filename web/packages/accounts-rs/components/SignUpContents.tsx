@@ -50,18 +50,10 @@ import {
 
 interface SignUpContentsProps {
     router: NextRouter;
-    /** Called when the user clicks the login option instead.  */
     onLogin: () => void;
-    /** Reactive value of {@link customAPIHost}. */
     host: string | undefined;
 }
 
-/**
- * A contents of the "signup" form.
- *
- * It is used both on the "/signup" page itself, and as a subcomponent of the
- * "/" page where the user can toggle between the signup and login forms inline.
- */
 export const SignUpContents: React.FC<SignUpContentsProps> = ({
     router,
     onLogin,
@@ -71,7 +63,6 @@ export const SignUpContents: React.FC<SignUpContentsProps> = ({
     const [isJoinAlbumContext, setIsJoinAlbumContext] = useState(false);
 
     useEffect(() => {
-        // Check if we're in a join album context
         const joinAlbumContext = sessionStorage.getItem(JOIN_ALBUM_CONTEXT_KEY);
         setIsJoinAlbumContext(!!joinAlbumContext);
     }, []);
@@ -312,8 +303,8 @@ export const SignUpContents: React.FC<SignUpContentsProps> = ({
                     mt: 1,
                     textAlign: "center",
                     color: "text.muted",
-                    // Prevent layout shift by using a minHeight equal to the
-                    // lineHeight of the eventual content that'll be shown.
+                    // The minHeight, equal to the lineHeight of the eventual
+                    // content, prevents layout shift.
                     minHeight: theme.typography.small.lineHeight,
                 })}
             >
