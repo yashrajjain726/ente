@@ -287,23 +287,28 @@ class _LibrarySharingPageState extends State<LibrarySharingPage> {
   }
 
   bool _handleScroll(ScrollNotification notification) {
-    if (!_showSelectionSheet ||
-        _controller.isMutating ||
-        notification.depth != 0 ||
-        notification.metrics.axis != Axis.vertical) {
+    if (notification.depth != 0 || notification.metrics.axis != Axis.vertical) {
       return false;
     }
     if (notification is ScrollEndNotification) {
       _selectionSheetScrollDistance = 0;
       return false;
     }
-    if (notification is! ScrollUpdateNotification ||
+    if (!_showSelectionSheet ||
+        _controller.isMutating ||
+        notification is! ScrollUpdateNotification ||
+        notification.dragDetails == null ||
         notification.scrollDelta == null) {
       return false;
     }
 
     final scrollDelta = notification.scrollDelta!;
     if (scrollDelta == 0) {
+      return false;
+    }
+    if (_isSelectionSheetExpanded && scrollDelta > 0) {
+      _selectionSheetScrollDistance = 0;
+      _setSelectionSheetExpanded(false);
       return false;
     }
     if (scrollDelta.sign != _selectionSheetScrollDistance.sign) {
