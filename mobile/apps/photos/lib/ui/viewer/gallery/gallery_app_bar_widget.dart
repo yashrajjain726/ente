@@ -718,7 +718,7 @@ class _GalleryAppBarWidgetState extends State<GalleryAppBarWidget> {
         _menuOption(
           AlbumPopupAction.editDetails,
           strings.editDetails,
-          galleryAppBarMenuIcon(HugeIcons.strokeRoundedPencilEdit01, iconColor),
+          galleryAppBarMenuIcon(HugeIcons.strokeRoundedEdit03, iconColor),
         ),
       if (galleryType == GalleryType.quickLink)
         _menuOption(
