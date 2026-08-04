@@ -1076,6 +1076,7 @@ class _MovingHeaderTitle extends StatelessWidget {
                     ),
                   );
           return Stack(
+            clipBehavior: Clip.none,
             children: [
               Positioned(
                 left: 0,

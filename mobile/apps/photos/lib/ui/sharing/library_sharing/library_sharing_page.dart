@@ -227,7 +227,7 @@ class _LibrarySharingPageState extends State<LibrarySharingPage> {
         albums,
         tag: 'library_sharing_${_recipient.userID}',
         selectionCallbacks: (
-          isSelectionModeActive: _controller.isSelecting,
+          isSelectionModeActive: _controller.selectsAlbumsOnTap,
           isSelected: _controller.isSelected,
           toggle: _toggleAlbumSelection,
         ),

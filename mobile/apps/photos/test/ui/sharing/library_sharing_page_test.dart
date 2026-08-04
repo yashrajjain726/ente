@@ -1,11 +1,12 @@
 import 'dart:async';
+import 'dart:ui' show Tristate;
 
 import 'package:ente_components/ente_components.dart';
+import 'package:ente_strings/ente_strings.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/semantics.dart' show SemanticsAction, SemanticsFlag;
+import 'package:flutter/semantics.dart' show SemanticsAction;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:photos/ente_theme_data.dart';
-import 'package:ente_strings/ente_strings.dart';
 import 'package:photos/models/collection/collection.dart';
 import 'package:photos/ui/sharing/library_sharing/library_sharing_controller.dart';
 import 'package:photos/ui/sharing/library_sharing/library_sharing_page.dart';
@@ -424,8 +425,7 @@ void main() {
     var semanticsData = tester
         .getSemantics(selectionControls)
         .getSemanticsData();
-    expect(semanticsData.hasFlag(SemanticsFlag.hasExpandedState), isTrue);
-    expect(semanticsData.hasFlag(SemanticsFlag.isExpanded), isTrue);
+    expect(semanticsData.flagsCollection.isExpanded, Tristate.isTrue);
     expect(semanticsData.hasAction(SemanticsAction.collapse), isTrue);
     expect(semanticsData.hasAction(SemanticsAction.expand), isFalse);
 
@@ -437,7 +437,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(isExpanded(), isFalse);
     semanticsData = tester.getSemantics(selectionControls).getSemanticsData();
-    expect(semanticsData.hasFlag(SemanticsFlag.isExpanded), isFalse);
+    expect(semanticsData.flagsCollection.isExpanded, Tristate.isFalse);
     expect(semanticsData.hasAction(SemanticsAction.expand), isTrue);
     expect(semanticsData.hasAction(SemanticsAction.collapse), isFalse);
     semantics.dispose();

@@ -47,6 +47,7 @@ class LibrarySharingController extends ChangeNotifier {
       !_isLoading &&
       _loadError == null &&
       (_selectionMode != null || isFirstTime);
+  bool get selectsAlbumsOnTap => _selectionMode != null || hasSelection;
   bool get hasSelection => _selectedRoles.isNotEmpty;
   int get selectedCount => _selectedRoles.length;
   int get selectedActiveShareCount =>
