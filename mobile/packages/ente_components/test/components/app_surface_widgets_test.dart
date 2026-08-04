@@ -829,6 +829,7 @@ void main() {
   testWidgets(
     'SliverAppBarComponent collapses title content and reserved space',
     (tester) async {
+      const eyebrowText = 'Sharing with a long translated context';
       final scrollController = ScrollController();
       addTearDown(scrollController.dispose);
 
@@ -839,7 +840,7 @@ void main() {
           slivers: [
             const SliverAppBarComponent(
               title: 'Priyadarshini Bandopadhyay',
-              eyebrow: 'Sharing with',
+              eyebrow: eyebrowText,
               subtitle: 'Scroll to collapse',
               onBack: null,
               actions: [Icon(Icons.add)],
@@ -856,7 +857,7 @@ void main() {
         height: 600,
       );
 
-      final eyebrow = find.text('Sharing with');
+      final eyebrow = find.text(eyebrowText);
       final titleFinder = find.text('Priyadarshini Bandopadhyay');
       expect(
         tester.getTopLeft(eyebrow).dy,
@@ -880,6 +881,10 @@ void main() {
       expect(
         tester.getTopLeft(eyebrow).dy,
         closeTo(tester.getTopLeft(titleFinder).dy, 0.5),
+      );
+      expect(
+        tester.getTopRight(eyebrow).dx,
+        lessThanOrEqualTo(tester.getTopLeft(titleFinder).dx),
       );
       expect(tester.getTopLeft(find.text('Item 0')).dy, closeTo(56, 1));
     },

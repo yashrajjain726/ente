@@ -1084,13 +1084,24 @@ class _MovingHeaderTitle extends StatelessWidget {
                       double.infinity,
                     ),
                   );
+          final eyebrowWidth = lerpDouble(
+            constraints.maxWidth,
+            math.max(0, collapsedTitleLeft - _collapsedEyebrowGap),
+            Curves.easeOut.transform(progress),
+          )!;
           return Stack(
             clipBehavior: Clip.none,
             children: [
               Positioned(
                 left: 0,
                 top: 0,
-                child: Text(eyebrow, maxLines: 1, style: eyebrowStyle),
+                width: eyebrowWidth,
+                child: Text(
+                  eyebrow,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: eyebrowStyle,
+                ),
               ),
               Positioned(
                 left: collapsedTitleLeft * Curves.easeOut.transform(progress),
