@@ -92,8 +92,12 @@ export default {
     debug: logDebug,
 };
 
+const rustLogGlobal = globalThis as typeof globalThis & {
+    enteRustLog?: (level: string, target: string, message: string) => void;
+};
+
 export const attachRustLogHook = () => {
-    globalThis.enteRustLog = (level, target, message) => {
+    rustLogGlobal.enteRustLog = (level, target, message) => {
         const m = `[rust] ${target}: ${message}`;
         switch (level) {
             case "ERROR":

@@ -128,7 +128,7 @@ Future<void> _ensureRustInitialized() async {
 
 void _attachRustLogStream() {
   final logger = Logger("rust");
-  attachLogStream(maxLevel: LogLevel.info).listen((entry) {
+  attachLogStream().listen((entry) {
     final message = "[${entry.target}] ${entry.message}";
     switch (entry.level) {
       case LogLevel.error:

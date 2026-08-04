@@ -59,6 +59,7 @@ import 'package:photos/services/sync/local_sync_service.dart';
 import 'package:photos/services/sync/remote_sync_service.dart';
 import "package:photos/services/sync/sync_service.dart";
 import "package:photos/services/video_preview_service.dart";
+import "package:photos/src/rust/api/logs.dart" as photos_rust_logs;
 import "package:photos/src/rust/frb_generated.dart";
 import "package:photos/utils/device_info.dart";
 import "package:photos/utils/email_util.dart";
@@ -566,20 +567,27 @@ Future<void> _ensureRustInitialized({required String via}) async {
 
 void _attachRustLogStream() {
   final logger = Logger("rust");
-  attachLogStream(maxLevel: LogLevel.info).listen((entry) {
-    final message = "[${entry.target}] ${entry.message}";
-    switch (entry.level) {
-      case LogLevel.error:
-        logger.severe(message);
-      case LogLevel.warn:
-        logger.warning(message);
-      case LogLevel.info:
-        logger.info(message);
-      case LogLevel.debug:
-      case LogLevel.trace:
-        logger.fine(message);
-    }
+  attachLogStream().listen((entry) {
+    _logRustEntry(logger, entry.level.name, entry.target, entry.message);
   });
+  photos_rust_logs.attachLogStream().listen((entry) {
+    _logRustEntry(logger, entry.level.name, entry.target, entry.message);
+  });
+}
+
+void _logRustEntry(Logger logger, String level, String target, String body) {
+  final message = "[$target] $body";
+  switch (level) {
+    case "error":
+      logger.severe(message);
+    case "warn":
+      logger.warning(message);
+    case "debug":
+    case "trace":
+      logger.fine(message);
+    default:
+      logger.info(message);
+  }
 }
 
 void logLocalSettings() {
