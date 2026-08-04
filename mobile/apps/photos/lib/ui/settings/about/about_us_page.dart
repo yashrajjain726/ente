@@ -1,3 +1,4 @@
+import "package:ente_components/ente_components.dart";
 import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:hugeicons/hugeicons.dart";
@@ -5,7 +6,6 @@ import "package:photos/service_locator.dart";
 import "package:photos/ui/common/web_page.dart";
 import "package:photos/ui/notification/toast.dart";
 import "package:photos/ui/settings/app_update_dialog.dart";
-import "package:photos/ui/settings/components/settings_item.dart";
 import "package:photos/ui/settings/components/settings_page_scaffold.dart";
 import "package:photos/utils/dialog_util.dart";
 import "package:url_launcher/url_launcher.dart";

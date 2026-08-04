@@ -1,4 +1,3 @@
-import 'package:ente_auth/ui/settings/components/auth_settings_item.dart';
 import 'package:ente_auth/ui/settings/components/auth_settings_page_scaffold.dart';
 import 'package:ente_auth/ui/settings/data/import/import_service.dart';
 import 'package:ente_components/ente_components.dart';
@@ -72,7 +71,7 @@ class ImportCodePage extends StatelessWidget {
           showDividers: true,
           items: [
             for (final type in importOptions)
-              AuthSettingsItem(
+              SettingsItem(
                 title: getTitle(context, type),
                 semanticsIdentifier: 'auth_import_${type.name}',
                 onTap: () => _import(context, type),

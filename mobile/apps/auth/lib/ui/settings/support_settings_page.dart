@@ -1,5 +1,4 @@
 import 'package:ente_auth/core/constants.dart';
-import 'package:ente_auth/ui/settings/components/auth_settings_item.dart';
 import 'package:ente_auth/ui/settings/components/auth_settings_page_scaffold.dart';
 import 'package:ente_auth/utils/email_util.dart';
 import 'package:ente_auth/utils/platform_util.dart';
@@ -19,21 +18,21 @@ class SupportSettingsPage extends StatelessWidget {
     return AuthSettingsPageScaffold(
       title: l10n.support,
       children: [
-        AuthSettingsItem(
+        SettingsItem(
           title: l10n.faq,
           icon: HugeIcons.strokeRoundedHelpCircle,
           showOnlyLoadingState: true,
           onTap: () => _openFaq(),
         ),
         const SizedBox(height: Spacing.sm),
-        AuthSettingsItem(
+        SettingsItem(
           title: l10n.suggestFeatures,
           icon: HugeIcons.strokeRoundedIdea01,
           showOnlyLoadingState: true,
           onTap: _suggestFeatures,
         ),
         const SizedBox(height: Spacing.sm),
-        AuthSettingsItem(
+        SettingsItem(
           title: l10n.reportABug,
           icon: HugeIcons.strokeRoundedBug01,
           showOnlyLoadingState: true,

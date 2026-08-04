@@ -23,7 +23,6 @@ import "package:photos/services/account/user_service.dart";
 import "package:photos/ui/account/request_pwd_verification_page.dart";
 import "package:photos/ui/account/sessions_page.dart";
 import "package:photos/ui/notification/toast.dart";
-import "package:photos/ui/settings/components/settings_item.dart";
 import "package:photos/ui/settings/components/settings_page_scaffold.dart";
 import "package:photos/utils/dialog_util.dart";
 

@@ -10,7 +10,6 @@ import "package:flutter/foundation.dart";
 import "package:flutter/material.dart";
 import "package:hugeicons/hugeicons.dart";
 import "package:locker/core/constants.dart";
-import "package:locker/ui/settings/components/settings_item.dart";
 import "package:locker/ui/settings/components/settings_page_scaffold.dart";
 import "package:url_launcher/url_launcher_string.dart";
 

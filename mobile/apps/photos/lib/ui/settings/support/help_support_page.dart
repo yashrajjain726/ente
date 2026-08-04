@@ -9,7 +9,6 @@ import "package:photos/core/error-reporting/super_logging.dart";
 import "package:photos/service_locator.dart";
 import "package:photos/ui/common/web_page.dart";
 import "package:photos/ui/notification/toast.dart";
-import "package:photos/ui/settings/components/settings_item.dart";
 import "package:photos/ui/settings/components/settings_page_scaffold.dart";
 import "package:photos/ui/settings/support/report_issue_page.dart";
 import "package:photos/ui/tools/debug/log_file_viewer.dart";

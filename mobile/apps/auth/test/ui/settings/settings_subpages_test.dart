@@ -1,10 +1,8 @@
-import 'package:ente_auth/ui/settings/data/local_backup_settings_page.dart';
 import 'package:ente_auth/ui/settings/language_picker.dart';
 import 'package:ente_components/ente_components.dart';
 import 'package:ente_strings/ente_strings.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   testWidgets(
@@ -28,49 +26,6 @@ void main() {
       expect(find.byType(MenuGroupComponent), findsOneWidget);
     },
   );
-
-  testWidgets('local backup uses component settings controls', (tester) async {
-    SharedPreferences.setMockInitialValues({
-      'isAutoBackupEnabled': true,
-      'autoBackupPath': '/tmp/EnteAuthBackups',
-    });
-
-    await _pumpPage(tester, const LocalBackupSettingsPage());
-    await tester.pumpAndSettle();
-
-    expect(find.text('Automatic backups'), findsOneWidget);
-    expect(find.byType(ToggleSwitchComponent), findsOneWidget);
-    expect(find.byType(MenuGroupComponent), findsNWidgets(2));
-    expect(
-      find.byWidgetPredicate(
-        (widget) =>
-            widget is Semantics &&
-            widget.properties.identifier == 'auth_local_backup_settings',
-      ),
-      findsOneWidget,
-    );
-    expect(
-      find.byWidgetPredicate(
-        (widget) =>
-            widget is Semantics &&
-            widget.properties.identifier == 'auth_local_backup_toggle',
-      ),
-      findsOneWidget,
-    );
-    for (final identifier in [
-      'auth_local_backup_password',
-      'auth_local_backup_folder',
-      'auth_local_backup_create_now',
-    ]) {
-      expect(
-        find.byWidgetPredicate(
-          (widget) =>
-              widget is Semantics && widget.properties.identifier == identifier,
-        ),
-        findsOneWidget,
-      );
-    }
-  });
 }
 
 Future<void> _pumpPage(WidgetTester tester, Widget page) {

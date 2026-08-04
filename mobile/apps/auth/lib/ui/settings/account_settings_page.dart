@@ -6,7 +6,6 @@ import 'package:ente_accounts/pages/password_entry_page.dart';
 import 'package:ente_auth/core/configuration.dart';
 import 'package:ente_auth/ui/components/recovery_key_sheet.dart';
 import 'package:ente_auth/ui/home_page.dart';
-import 'package:ente_auth/ui/settings/components/auth_settings_item.dart';
 import 'package:ente_auth/ui/settings/components/auth_settings_page_scaffold.dart';
 import 'package:ente_auth/utils/dialog_util.dart';
 import 'package:ente_components/ente_components.dart';
@@ -25,25 +24,25 @@ class AccountSettingsPage extends StatelessWidget {
     return AuthSettingsPageScaffold(
       title: l10n.account,
       children: [
-        AuthSettingsItem(
+        SettingsItem(
           title: l10n.changeEmail,
           icon: HugeIcons.strokeRoundedMailEdit01,
           onTap: () => _changeEmail(context),
         ),
         const SizedBox(height: Spacing.sm),
-        AuthSettingsItem(
+        SettingsItem(
           title: l10n.changePassword,
           icon: HugeIcons.strokeRoundedLockPassword,
           onTap: () => _changePassword(context),
         ),
         const SizedBox(height: Spacing.sm),
-        AuthSettingsItem(
+        SettingsItem(
           title: l10n.recoveryKey,
           icon: HugeIcons.strokeRoundedKey01,
           onTap: () => _showRecoveryKey(context),
         ),
         const SizedBox(height: Spacing.sm),
-        AuthSettingsItem(
+        SettingsItem(
           title: l10n.deleteAccount,
           icon: HugeIcons.strokeRoundedDelete02,
           isDestructive: true,

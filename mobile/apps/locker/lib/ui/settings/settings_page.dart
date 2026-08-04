@@ -6,7 +6,6 @@ import "package:ente_strings/ente_strings.dart";
 import "package:flutter/foundation.dart";
 import "package:flutter/material.dart";
 import "package:hugeicons/hugeicons.dart";
-import "package:locker/ui/settings/components/settings_item.dart";
 import "package:locker/ui/settings/pages/about_page.dart";
 import "package:locker/ui/settings/pages/account_settings_page.dart";
 import "package:locker/ui/settings/pages/general_settings_page.dart";

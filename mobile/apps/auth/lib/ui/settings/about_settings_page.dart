@@ -1,6 +1,5 @@
 import 'package:ente_auth/services/update_service.dart';
 import 'package:ente_auth/ui/settings/app_update_dialog.dart';
-import 'package:ente_auth/ui/settings/components/auth_settings_item.dart';
 import 'package:ente_auth/ui/settings/components/auth_settings_page_scaffold.dart';
 import 'package:ente_auth/utils/dialog_util.dart';
 import 'package:ente_auth/utils/platform_util.dart';
@@ -19,7 +18,7 @@ class AboutSettingsPage extends StatelessWidget {
     return AuthSettingsPageScaffold(
       title: l10n.about,
       children: [
-        AuthSettingsItem(
+        SettingsItem(
           title: l10n.weAreOpenSource,
           icon: HugeIcons.strokeRoundedGithub,
           showOnlyLoadingState: true,
@@ -27,21 +26,21 @@ class AboutSettingsPage extends StatelessWidget {
               PlatformUtil.openUrlInBrowser('https://github.com/ente/ente'),
         ),
         const SizedBox(height: Spacing.sm),
-        AuthSettingsItem(
+        SettingsItem(
           title: l10n.blog,
           icon: HugeIcons.strokeRoundedPencilEdit01,
           showOnlyLoadingState: true,
           onTap: () => PlatformUtil.openUrlInBrowser('https://ente.com/blog'),
         ),
         const SizedBox(height: Spacing.sm),
-        AuthSettingsItem(
+        SettingsItem(
           title: l10n.merchandise,
           icon: HugeIcons.strokeRoundedShoppingBag01,
           showOnlyLoadingState: true,
           onTap: () => PlatformUtil.openUrlInBrowser('https://shop.ente.com'),
         ),
         const SizedBox(height: Spacing.sm),
-        AuthSettingsItem(
+        SettingsItem(
           title: l10n.privacy,
           icon: HugeIcons.strokeRoundedShield01,
           showOnlyLoadingState: true,
@@ -49,7 +48,7 @@ class AboutSettingsPage extends StatelessWidget {
               PlatformUtil.openUrlInBrowser('https://ente.com/privacy'),
         ),
         const SizedBox(height: Spacing.sm),
-        AuthSettingsItem(
+        SettingsItem(
           title: l10n.termsOfServicesTitle,
           icon: HugeIcons.strokeRoundedFile01,
           showOnlyLoadingState: true,
@@ -57,7 +56,7 @@ class AboutSettingsPage extends StatelessWidget {
         ),
         if (UpdateService.instance.supportsInAppUpdates()) ...[
           const SizedBox(height: Spacing.sm),
-          AuthSettingsItem(
+          SettingsItem(
             title: l10n.checkForUpdates,
             icon: HugeIcons.strokeRoundedDownload04,
             showOnlyLoadingState: true,

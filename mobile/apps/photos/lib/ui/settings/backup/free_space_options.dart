@@ -15,7 +15,6 @@ import "package:photos/services/deduplication_service.dart";
 import "package:photos/services/files_service.dart";
 import "package:photos/ui/components/models/button_type.dart";
 import "package:photos/ui/notification/toast.dart";
-import "package:photos/ui/settings/components/settings_item.dart";
 import "package:photos/ui/settings/components/settings_page_scaffold.dart";
 import "package:photos/ui/tools/debug/app_storage_viewer.dart";
 import "package:photos/ui/tools/deduplicate_page.dart";

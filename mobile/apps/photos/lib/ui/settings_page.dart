@@ -24,7 +24,6 @@ import "package:photos/ui/settings/appearance/appearance_settings_page.dart";
 import "package:photos/ui/settings/backup/backup_settings_page.dart";
 import "package:photos/ui/settings/backup/free_space_options.dart";
 import "package:photos/ui/settings/cast/cast_settings_page.dart";
-import "package:photos/ui/settings/components/settings_item.dart";
 import "package:photos/ui/settings/components/settings_page_scaffold.dart";
 import "package:photos/ui/settings/debug/debug_settings_page.dart";
 import "package:photos/ui/settings/debug/ml_debug_settings_page.dart";
@@ -241,7 +240,6 @@ class _SettingsBody extends StatelessWidget {
     Widget? trailing,
     Future<void> Function()? onTap,
     bool showOnlyLoadingState = false,
-    bool shouldSurfaceExecutionStates = false,
     bool isDestructive = false,
   }) {
     return SettingsItem(
@@ -250,7 +248,6 @@ class _SettingsBody extends StatelessWidget {
       icon: icon,
       trailing: trailing,
       showOnlyLoadingState: showOnlyLoadingState,
-      shouldSurfaceExecutionStates: shouldSurfaceExecutionStates,
       isDestructive: isDestructive,
       onTap: onTap,
     );
@@ -347,7 +344,6 @@ class _SettingsBody extends StatelessWidget {
           title: context.strings.family,
           icon: HugeIcons.strokeRoundedUserMultiple,
           showOnlyLoadingState: true,
-          shouldSurfaceExecutionStates: true,
           onTap: () async {
             late final UserDetails userDetails;
             try {

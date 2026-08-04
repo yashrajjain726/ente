@@ -5,7 +5,6 @@ import 'package:ente_auth/events/icons_changed_event.dart';
 import 'package:ente_auth/locale.dart';
 import 'package:ente_auth/services/preference_service.dart';
 import 'package:ente_auth/ui/settings/app_icon_selection_screen.dart';
-import 'package:ente_auth/ui/settings/components/auth_settings_item.dart';
 import 'package:ente_auth/ui/settings/components/auth_settings_navigation.dart';
 import 'package:ente_auth/ui/settings/components/auth_settings_page_scaffold.dart';
 import 'package:ente_auth/ui/settings/language_picker.dart';
@@ -27,14 +26,14 @@ class GeneralSettingsPage extends StatelessWidget {
     return AuthSettingsPageScaffold(
       title: l10n.general,
       children: [
-        AuthSettingsItem(
+        SettingsItem(
           title: l10n.language,
           icon: HugeIcons.strokeRoundedLanguageSquare,
           onTap: () => _openLanguage(context),
         ),
         if (Platform.isIOS || Platform.isAndroid) ...[
           const SizedBox(height: Spacing.sm),
-          AuthSettingsItem(
+          SettingsItem(
             title: l10n.appIcon,
             icon: HugeIcons.strokeRoundedImage01,
             onTap: () =>
@@ -115,12 +114,12 @@ class GeneralSettingsPage extends StatelessWidget {
     );
   }
 
-  AuthSettingsItem _toggleItem({
+  SettingsItem _toggleItem({
     required String title,
     required ValueGetter<bool> value,
     required Future<void> Function() onChanged,
   }) {
-    return AuthSettingsItem(
+    return SettingsItem(
       title: title,
       showChevron: false,
       trailing: ToggleSwitchComponent.async(value: value, onChanged: onChanged),

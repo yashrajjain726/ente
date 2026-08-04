@@ -1,9 +1,12 @@
-import "dart:async";
+import 'dart:async';
 
-import "package:ente_components/ente_components.dart";
-import "package:flutter/material.dart";
-import "package:flutter_svg/flutter_svg.dart";
-import "package:hugeicons/hugeicons.dart";
+import 'package:ente_components/components/menu_component.dart';
+import 'package:ente_components/theme/colors.dart';
+import 'package:ente_components/theme/icon_sizes.dart';
+import 'package:ente_components/theme/theme.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+import 'package:hugeicons/hugeicons.dart';
 
 class SettingsItem extends StatelessWidget {
   const SettingsItem({
@@ -12,58 +15,54 @@ class SettingsItem extends StatelessWidget {
     this.subtitle,
     this.icon,
     this.svgIconPath,
-    this.leading,
     this.trailing,
     this.onTap,
     this.onDoubleTap,
     this.showChevron = true,
     this.isDestructive = false,
-    this.selected = false,
     this.showOnlyLoadingState = false,
-    this.shouldSurfaceExecutionStates = false,
     this.titleMaxLines = 2,
     this.subtitleMaxLines = 1,
+    this.semanticsIdentifier,
   });
 
   final String title;
   final String? subtitle;
   final List<List<dynamic>>? icon;
   final String? svgIconPath;
-  final Widget? leading;
   final Widget? trailing;
   final FutureOr<void> Function()? onTap;
   final FutureOr<void> Function()? onDoubleTap;
   final bool showChevron;
   final bool isDestructive;
-  final bool selected;
   final bool showOnlyLoadingState;
-  final bool shouldSurfaceExecutionStates;
   final int titleMaxLines;
   final int subtitleMaxLines;
+  final String? semanticsIdentifier;
 
   @override
   Widget build(BuildContext context) {
     final colors = context.componentColors;
-    final effectiveTextColor = isDestructive ? colors.warning : colors.textBase;
-    final effectiveIconColor = isDestructive
-        ? colors.warning
-        : colors.textLight;
+    final textColor = isDestructive ? colors.warning : colors.textBase;
+    final iconColor = isDestructive ? colors.warning : colors.textLight;
 
-    return MenuComponent(
+    final item = MenuComponent(
       title: title,
       subtitle: subtitle,
-      titleColor: effectiveTextColor,
-      iconColor: effectiveIconColor,
-      selected: selected,
-      leading: leading ?? _buildLeading(effectiveIconColor),
+      titleColor: textColor,
+      iconColor: iconColor,
+      leading: _buildLeading(iconColor),
       trailing: trailing ?? (showChevron ? _chevron(colors) : null),
       showOnlyLoadingState: showOnlyLoadingState,
-      shouldSurfaceExecutionStates: shouldSurfaceExecutionStates,
       titleMaxLines: titleMaxLines,
       subtitleMaxLines: subtitleMaxLines,
       onTap: onTap,
       onDoubleTap: onDoubleTap,
     );
+    final identifier = semanticsIdentifier;
+    return identifier == null
+        ? item
+        : Semantics(identifier: identifier, child: item);
   }
 
   Widget? _buildLeading(Color color) {
