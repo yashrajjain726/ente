@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io';
 
 import 'package:adaptive_theme/adaptive_theme.dart';
 import 'package:ente_accounts/services/user_service.dart';
@@ -8,7 +7,6 @@ import 'package:ente_events/event_bus.dart';
 import 'package:ente_events/models/signed_in_event.dart';
 import 'package:ente_events/models/signed_out_event.dart';
 import 'package:ente_strings/ente_strings.dart';
-import 'package:ente_ui/utils/window_listener_service.dart';
 import "package:flutter/material.dart";
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:locker/core/locale.dart';
@@ -20,8 +18,6 @@ import 'package:locker/ui/pages/home_page.dart';
 import 'package:locker/ui/pages/onboarding_page.dart';
 import "package:locker/ui/settings/widgets/app_update_dialog.dart";
 import "package:locker/ui/settings/widgets/change_log_sheet.dart";
-import 'package:tray_manager/tray_manager.dart';
-import 'package:window_manager/window_manager.dart';
 
 class App extends StatefulWidget {
   final Locale? locale;
@@ -38,8 +34,7 @@ class App extends StatefulWidget {
   State<App> createState() => _AppState();
 }
 
-class _AppState extends State<App>
-    with WindowListener, TrayListener, WidgetsBindingObserver {
+class _AppState extends State<App> with WidgetsBindingObserver {
   late StreamSubscription<SignedOutEvent> _signedOutEvent;
   late StreamSubscription<SignedInEvent> _signedInEvent;
   Locale? locale;
@@ -49,18 +44,8 @@ class _AppState extends State<App>
     });
   }
 
-  Future<void> initWindowManager() async {
-    windowManager.addListener(this);
-  }
-
-  Future<void> initTrayManager() async {
-    trayManager.addListener(this);
-  }
-
   @override
   void initState() {
-    initWindowManager();
-    initTrayManager();
     WidgetsBinding.instance.addObserver(this);
 
     if (Configuration.instance.hasConfiguredAccount()) {
@@ -130,10 +115,6 @@ class _AppState extends State<App>
   @override
   void dispose() {
     super.dispose();
-
-    windowManager.removeListener(this);
-    trayManager.removeListener(this);
-
     _signedOutEvent.cancel();
     _signedInEvent.cancel();
   }
@@ -195,46 +176,5 @@ class _AppState extends State<App>
           ? const HomePage()
           : const OnboardingPage(),
     };
-  }
-
-  @override
-  void onWindowResize() {
-    WindowListenerService.instance.onWindowResize().ignore();
-  }
-
-  @override
-  void onTrayIconMouseDown() {
-    if (Platform.isWindows) {
-      windowManager.show();
-    } else {
-      trayManager.popUpContextMenu();
-    }
-  }
-
-  @override
-  void onTrayIconRightMouseDown() {
-    if (Platform.isWindows) {
-      trayManager.popUpContextMenu();
-    } else {
-      windowManager.show();
-    }
-  }
-
-  @override
-  void onTrayIconRightMouseUp() {}
-
-  @override
-  void onTrayMenuItemClick(MenuItem menuItem) {
-    switch (menuItem.key) {
-      case 'hide_window':
-        windowManager.hide();
-        break;
-      case 'show_window':
-        windowManager.show();
-        break;
-      case 'exit_app':
-        windowManager.destroy();
-        break;
-    }
   }
 }
