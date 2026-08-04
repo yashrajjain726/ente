@@ -1,0 +1,1 @@
+- Updated favorite actions to use Ente's star icons.
