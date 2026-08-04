@@ -180,6 +180,26 @@ void main() {
     expect(repository.sharedRoles, [CollectionParticipantRole.viewer]);
   });
 
+  test('keeps uncategorized sharing viewer-only', () async {
+    final repository = FakeLibrarySharingRepository([
+      librarySharingTestAlbum(1),
+      librarySharingTestAlbum(2, type: CollectionType.uncategorized),
+    ]);
+    final controller = LibrarySharingController(
+      recipient: librarySharingTestRecipient,
+      repository: repository,
+    );
+    await controller.load();
+    controller.selectAll();
+    controller.setRoleForSelection(CollectionParticipantRole.admin);
+
+    expect(controller.stagedRoleFor(1), CollectionParticipantRole.admin);
+    expect(controller.stagedRoleFor(2), CollectionParticipantRole.viewer);
+
+    controller.setRoleForAlbum(2, CollectionParticipantRole.collaborator);
+    expect(controller.stagedRoleFor(2), CollectionParticipantRole.viewer);
+  });
+
   test(
     'does not retry successful writes when the local refresh fails',
     () async {

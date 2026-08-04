@@ -141,6 +141,11 @@ class _LibrarySharingRoleList extends StatelessWidget {
           itemBuilder: (context, index) {
             final album = albums[index];
             final role = controller.stagedRoleFor(album.id);
+            final canEditRole = album.type != CollectionType.uncategorized;
+            final roleSelector = LibrarySharingRoleSelector(
+              role: role,
+              showChevron: canEditRole,
+            );
             return ThumbnailListItem(
               leading:
                   thumbnailBuilder?.call(context, album) ??
@@ -154,16 +159,20 @@ class _LibrarySharingRoleList extends StatelessWidget {
                   color: context.componentColors.textBase,
                 ),
               ),
-              trailing: IgnorePointer(
-                ignoring: controller.isMutating,
-                child: EntePopupMenuButton<CollectionParticipantRole>(
-                  optionsBuilder: () =>
-                      librarySharingRoleOptions(context, activeRole: role),
-                  onSelected: (role) =>
-                      controller.setRoleForAlbum(album.id, role),
-                  child: LibrarySharingRoleSelector(role: role),
-                ),
-              ),
+              trailing: canEditRole
+                  ? IgnorePointer(
+                      ignoring: controller.isMutating,
+                      child: EntePopupMenuButton<CollectionParticipantRole>(
+                        optionsBuilder: () => librarySharingRoleOptions(
+                          context,
+                          activeRole: role,
+                        ),
+                        onSelected: (role) =>
+                            controller.setRoleForAlbum(album.id, role),
+                        child: roleSelector,
+                      ),
+                    )
+                  : roleSelector,
             );
           },
         ),
@@ -209,6 +218,7 @@ Future<bool> showPreviouslyUnsharedAlbums({
         builder: (sheetContext) => BottomSheetComponent(
           title: LibrarySharingStrings.previouslyUnsharedTitle(count),
           message: LibrarySharingStrings.previouslyUnsharedMessage(count),
+          illustration: Image.asset('assets/warning-red.png'),
           borderSide: BorderSide(
             color: sheetContext.componentColors.strokeDark,
           ),

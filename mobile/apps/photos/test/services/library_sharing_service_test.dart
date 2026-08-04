@@ -22,13 +22,18 @@ void main() {
     ];
     final fixture = await _Fixture.create(albums, blockedIDs: {100, 101});
 
+    expect(
+      (await fixture.service.getEligibleAlbums()).last.type,
+      CollectionType.uncategorized,
+    );
+
     final result = await fixture.service.enableAutomaticSharing(
       recipient: librarySharingTestRecipient,
       role: CollectionParticipantRole.admin,
     );
 
     expect(result.failedIDs, isEmpty);
-    expect(result.previouslyUnsharedIDs, {100});
+    expect(result.previouslyUnsharedIDs, {100, 101});
     expect(fixture.collectionsService.shareBatchSizes, [100, 1]);
     expect(
       fixture.collectionsService.sharedRoles[101],
@@ -152,6 +157,18 @@ class _FakeCollectionsService extends Mock implements CollectionsService {
   final List<int> shareAttempts = [];
   final List<int> unshareAttempts = [];
   final Map<int, CollectionParticipantRole> sharedRoles = {};
+
+  @override
+  List<Collection> getCollectionsForUI({
+    bool includedShared = false,
+    bool includeCollab = false,
+    bool includeUncategorized = false,
+  }) => albums;
+
+  @override
+  Future<List<Collection>> orderCollectionsForAlbums(
+    Iterable<Collection> collections,
+  ) async => collections.toList().reversed.toList();
 
   @override
   List<Collection> getActiveCollections() => albums;

@@ -65,11 +65,13 @@ class LibrarySharingRoleSelector extends StatelessWidget {
   const LibrarySharingRoleSelector({
     required this.role,
     this.fallbackLabel,
+    this.showChevron = true,
     super.key,
   }) : assert(role != null || fallbackLabel != null);
 
   final CollectionParticipantRole? role;
   final String? fallbackLabel;
+  final bool showChevron;
 
   @override
   Widget build(BuildContext context) {
@@ -99,11 +101,13 @@ class LibrarySharingRoleSelector extends StatelessWidget {
                 : librarySharingRoleLabel(context, role!),
             style: TextStyles.mini.copyWith(color: colors.textBase),
           ),
-          const SizedBox(width: Spacing.sm),
-          const HugeIcon(
-            icon: HugeIcons.strokeRoundedArrowDown01,
-            size: IconSizes.small,
-          ),
+          if (showChevron) ...[
+            const SizedBox(width: Spacing.sm),
+            const HugeIcon(
+              icon: HugeIcons.strokeRoundedArrowDown01,
+              size: IconSizes.small,
+            ),
+          ],
         ],
       ),
     );

@@ -48,6 +48,13 @@ CollectionParticipantRole? librarySharingRoleFor(
   return null;
 }
 
+CollectionParticipantRole normalizeLibrarySharingRole(
+  Collection collection,
+  CollectionParticipantRole role,
+) => collection.type == CollectionType.uncategorized
+    ? CollectionParticipantRole.viewer
+    : role;
+
 abstract interface class LibrarySharingRepository {
   Future<List<Collection>> getEligibleAlbums();
 
@@ -108,8 +115,19 @@ class LibrarySharingService implements LibrarySharingRepository {
   }
 
   @override
-  Future<List<Collection>> getEligibleAlbums() =>
-      _collectionsService.orderCollectionsForAlbums(_eligibleAlbums());
+  Future<List<Collection>> getEligibleAlbums() async {
+    final collections = _eligibleAlbums().toList();
+    return [
+      ...await _collectionsService.orderCollectionsForAlbums(
+        collections.where(
+          (collection) => collection.type != CollectionType.uncategorized,
+        ),
+      ),
+      ...collections.where(
+        (collection) => collection.type == CollectionType.uncategorized,
+      ),
+    ];
+  }
 
   @override
   Future<Set<int>> shareAlbums({
@@ -270,7 +288,6 @@ class LibrarySharingService implements LibrarySharingRepository {
     final previouslyUnsharedIDs = collections
         .where(
           (collection) =>
-              _isShareableAlbum(collection) &&
               config.unsharedBefore.contains(collection.id) &&
               !config.hidden.contains(collection.id) &&
               librarySharingRoleFor(collection, recipient.userID) == null,
@@ -393,9 +410,10 @@ class LibrarySharingService implements LibrarySharingRepository {
       if (!config.hidden.contains(collection.id) &&
           !config.unsharedBefore.contains(collection.id) &&
           librarySharingRoleFor(collection, config.recipientUserID) == null)
-        collection.id: collection.type == CollectionType.uncategorized
-            ? CollectionParticipantRole.viewer
-            : config.defaultRole,
+        collection.id: normalizeLibrarySharingRole(
+          collection,
+          config.defaultRole,
+        ),
   };
 
   LibrarySharingLocalConfig _applyAutomaticShareResults(
@@ -475,8 +493,12 @@ class LibrarySharingService implements LibrarySharingRepository {
   }
 
   Iterable<Collection> _eligibleAlbums() => _collectionsService
-      .getCollectionsForUI(includeUncategorized: false)
-      .where(_isShareableAlbum);
+      .getCollectionsForUI(includeUncategorized: true)
+      .where(
+        (collection) =>
+            _isShareableAlbum(collection) ||
+            collection.type == CollectionType.uncategorized,
+      );
 
   Iterable<Collection> _automaticallyShareableOwnedCollections(
     int ownerUserID,
