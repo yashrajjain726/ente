@@ -40,13 +40,10 @@ const isDeviceLimitExceededResponse = async (response: Response) => {
     }
 };
 
-/**
- * Extract file key from URL hash (similar to extractCollectionKeyFromShareURL)
- */
 export const extractFileKeyFromURL = async (
     url: URL,
 ): Promise<LinkKeyMaterial | null> => {
-    const hashValue = url.hash.slice(1).split("-")[0]; // Remove '#' prefix and take part before hyphen
+    const hashValue = url.hash.slice(1).split("-")[0];
     if (!hashValue) return null;
 
     try {
@@ -56,22 +53,18 @@ export const extractFileKeyFromURL = async (
             return { type: "secret", passphrase: hashValue };
         }
 
-        // Support both base58 and hex encoding for legacy links
+        // Legacy links embed the raw key, base58 encoded (about 44 chars) or
+        // hex encoded (64 chars); the length discriminates between the two.
         if (hashValue.length < 50) {
-            // Base58 encoded - convert to base64
             const decoded = bs58.decode(hashValue);
             return { type: "direct", fileKey: await toB64(decoded) };
         }
-        // Hex encoded - convert to base64
         return { type: "direct", fileKey: await fromHex(hashValue) };
     } catch {
         return null;
     }
 };
 
-/**
- * Fetch file info from the server
- */
 export const fetchFileInfo = async (
     accessToken: string,
     linkDeviceToken?: string,
@@ -97,7 +90,7 @@ export const fetchFileInfo = async (
             try {
                 errorBody = (await response.json()) as { error?: string };
             } catch {
-                // Ignore JSON parsing errors and use generic message
+                // Ignore JSON parse errors and fall back to the generic message.
             }
             if (errorBody?.error === "expired token") {
                 throw new Error("This link has expired.");
@@ -114,9 +107,6 @@ export const fetchFileInfo = async (
     };
 };
 
-/**
- * Decrypt file key from encrypted key and nonce
- */
 const decryptFileKey = async (
     encryptedKey: string,
     keyDecryptionNonce: string,
@@ -129,14 +119,12 @@ const decryptFileKey = async (
         );
         return await toB64(decryptedKeyBytes);
     } catch {
-        // If decryption fails, assume the link key IS the file key
+        // Older links use the link key itself as the file key; fall back to
+        // it when unwrapping fails.
         return linkKey;
     }
 };
 
-/**
- * Decrypt file metadata
- */
 const decryptMetadata = async (
     encryptedData: string,
     decryptionHeader: string,
@@ -153,9 +141,6 @@ const decryptMetadata = async (
     }
 };
 
-/**
- * Decrypt pubMagicMetadata
- */
 const decryptPubMagicMetadata = async (
     data: string,
     header: string,
@@ -195,9 +180,6 @@ const normalizeLockerInfoType = (
     }
 };
 
-/**
- * Parse locker info from pubMagicMetadata
- */
 const parseLockerInfo = (
     rawInfo: string | LockerInfo | undefined,
 ): LockerInfo | undefined => {
@@ -221,9 +203,6 @@ const parseLockerInfo = (
     return { ...parsedInfo, type: normalizeLockerInfoType(parsedInfo.type) };
 };
 
-/**
- * Extract file information from metadata and fallback sources
- */
 const extractFileInfo = (
     metadata: FileMetadata,
     pubMagicMetadata: {
@@ -307,9 +286,6 @@ const resolveFileKey = async (
     return keyMaterial.fileKey;
 };
 
-/**
- * Decrypt file info
- */
 export const decryptFileInfo = async (
     fileLinkInfo: FileLinkInfo,
     keyMaterial: LinkKeyMaterial,
@@ -327,13 +303,11 @@ export const decryptFileInfo = async (
         const fileId = file.id || 0;
         const fileDecryptionHeader = file.file?.decryptionHeader;
 
-        // Extract nested encrypted metadata and decryption header
         const encryptedMetadata =
             file.metadata?.encryptedData || file.encryptedMetadata;
         const metadataDecryptionHeader =
             file.metadata?.decryptionHeader || file.metadataDecryptionHeader;
 
-        // Check if we have the necessary fields for decryption
         if (!encryptedMetadata || !metadataDecryptionHeader) {
             return {
                 id: fileId,
@@ -347,14 +321,12 @@ export const decryptFileInfo = async (
             };
         }
 
-        // Decrypt metadata
         const metadata = await decryptMetadata(
             encryptedMetadata,
             metadataDecryptionHeader,
             fileKey,
         );
 
-        // Try to decrypt pubMagicMetadata if it exists
         let pubMagicMetadata: {
             info?: string | LockerInfo;
             editedName: string;
@@ -367,11 +339,9 @@ export const decryptFileInfo = async (
             );
         }
 
-        // Parse locker info
         const infoObject = parseLockerInfo(pubMagicMetadata?.info);
         const lockerType = infoObject?.type;
 
-        // Extract file info
         const { fileName, fileSize, uploadedTime } = extractFileInfo(
             metadata,
             pubMagicMetadata,
@@ -396,7 +366,6 @@ export const decryptFileInfo = async (
             keyMaterial.type === "secret"
                 ? keyMaterial.passphrase
                 : keyMaterial.fileKey;
-        // Return partial info if decryption fails
         if (!fileLinkInfo.file) {
             return {
                 id: 0,
@@ -424,9 +393,6 @@ export const decryptFileInfo = async (
     }
 };
 
-/**
- * Download and decrypt file
- */
 export const downloadFile = async (
     accessToken: string,
     fileKey: string,
@@ -434,7 +400,6 @@ export const downloadFile = async (
     fileDecryptionHeader?: string,
     fileNonce?: string,
 ): Promise<void> => {
-    // Fetch the encrypted file from the server
     const response = await fetchFileLinkFile(accessToken);
 
     if (!response.ok) {
@@ -444,7 +409,6 @@ export const downloadFile = async (
         throw new Error(`Failed to download file: ${response.statusText}`);
     }
 
-    // Get the response stream
     const body = response.body;
     if (!body) {
         throw new Error("Response body is empty");
@@ -455,26 +419,21 @@ export const downloadFile = async (
     let decryptedData: Uint8Array<ArrayBuffer>;
 
     if (fileDecryptionHeader) {
-        // Modern format: Decrypt the file using the decryption header
         decryptedData = await decryptStreamBytes(
             { encryptedData, decryptionHeader: fileDecryptionHeader },
             fileKey,
         );
     } else if (fileNonce) {
-        // Legacy format: Use box decryption with nonce
         decryptedData = await decryptBoxBytes(
             { encryptedData: await toB64(encryptedData), nonce: fileNonce },
             fileKey,
         );
     } else {
-        // No encryption information, return as is
         decryptedData = encryptedData;
     }
 
-    // Create a blob from the decrypted data
     const blob = new Blob([decryptedData]);
 
-    // Create download link
     const blobUrl = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = blobUrl;
@@ -485,9 +444,6 @@ export const downloadFile = async (
     URL.revokeObjectURL(blobUrl);
 };
 
-/**
- * Format file size to human readable format
- */
 export const formatFileSize = (bytes: number): string => {
     if (bytes === 0) return "0 Bytes";
 

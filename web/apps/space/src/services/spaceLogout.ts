@@ -21,6 +21,5 @@ export const spaceLogout = async () => {
             error,
         );
     }
-    // accountLogout() is used to clear the remaining account state and browser caches
     await accountLogout();
 };

@@ -6,72 +6,36 @@ export interface LockerCollectionPayload {
     name?: string;
 }
 
-/**
- * A collection record stored in the Locker cache. The persisted form keeps only
- * structural metadata plus encrypted fields. Decrypted collection details can
- * be attached transiently in-memory via `payload`, but must never be written to
- * IndexedDB.
- */
 export interface EncryptedCollectionRecord {
-    /** Collection ID. */
     id: number;
-    /** Owner user ID (plaintext — structural metadata only). */
     ownerID: number;
-    /** Encrypted collection key (base64). */
     encryptedKey: string;
-    /** Nonce for key decryption (base64), null for shared collections. */
     keyDecryptionNonce: string | undefined;
-    /** Encrypted collection name (base64). */
     encryptedName: string | undefined;
-    /** Nonce for name decryption (base64). */
     nameDecryptionNonce: string | undefined;
-    /**
-     * Locally encrypted collection payload that mirrors mobile's encrypted
-     * collection payload storage for name and participant metadata.
-     */
     payloadEncryptedData?: string;
-    /** Nonce for local collection payload decryption. */
     payloadDecryptionNonce?: string;
-    /** Version of the local encrypted collection payload. */
     payloadVersion?: number;
-    /** Collection type (structural metadata). */
     type: string;
-    /** Whether this collection is deleted on remote (key still needed for trash restore). */
     isDeleted: boolean;
-    /** Updation time (structural metadata). */
     updationTime: number;
-    /** Transient decrypted collection details kept only in memory. */
+    // Transient decrypted details. These must stay in-memory only and must
+    // never be written to IndexedDB.
     payload?: LockerCollectionPayload;
 }
 
-/**
- * An encrypted file record stored in-memory. All sensitive payloads remain
- * encrypted until explicitly decrypted for display.
- */
 export interface EncryptedFileRecord {
-    /** File ID (structural metadata). */
     id: number;
-    /** Collection this file belongs to (structural metadata). */
     collectionID: number;
-    /** Owner of the file, when provided by remote. */
     ownerID?: number;
-    /** Encrypted file key (base64). */
     encryptedKey: string;
-    /** Nonce for file key decryption (base64). */
     keyDecryptionNonce: string;
-    /** Decryption header for the actual file content blob on S3. */
     fileDecryptionHeader: string;
-    /** Whether the file has a downloadable backing object. */
     hasObject: boolean;
-    /** File size in bytes, when provided by the API. */
     fileSize?: number;
-    /** Encrypted file metadata. */
     metadata: { encryptedData: string; decryptionHeader: string };
-    /** Encrypted private magic metadata, if present. */
     magicMetadata?: { version: number; data: string; header: string };
-    /** Encrypted public magic metadata, if present. */
     pubMagicMetadata?: { version: number; data: string; header: string };
-    /** Updation time (structural metadata). */
     updationTime: number;
 }
 
@@ -80,10 +44,8 @@ export interface LockerEncryptedCache {
     files: Map<number, Map<number, EncryptedFileRecord>>;
 }
 
-/** In-memory cache: collectionID → EncryptedCollectionRecord */
 let encryptedCollections = new Map<number, EncryptedCollectionRecord>();
 
-/** In-memory cache: fileID → (collectionID → EncryptedFileRecord) */
 let encryptedFiles = new Map<number, Map<number, EncryptedFileRecord>>();
 
 export const createEmptyLockerCache = (): LockerEncryptedCache => ({

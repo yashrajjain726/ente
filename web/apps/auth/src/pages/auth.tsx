@@ -199,7 +199,6 @@ const CodeDisplay: React.FC<CodeDisplayProps> = ({ code, timeOffset }) => {
         });
 
     useEffect(() => {
-        // Generate to set the initial otp and nextOTP on component mount.
         regen();
 
         const periodMs = code.period * 1000;
@@ -207,11 +206,7 @@ const CodeDisplay: React.FC<CodeDisplayProps> = ({ code, timeOffset }) => {
             periodMs - ((Date.now() + timeOffset) % periodMs);
 
         let interval: ReturnType<typeof setInterval> | undefined;
-        // Wait until we are at the start of the next code period, and then
-        // start the interval loop.
         setTimeout(() => {
-            // We need to call regen() once before the interval loop to set the
-            // initial otp and nextOTP.
             regen();
             interval = setInterval(regen, periodMs);
         }, timeToNextCode);

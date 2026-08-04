@@ -262,8 +262,8 @@ const fetchPublicCollectionDiff = async (
             }
         }
         hasMore = parsed.hasMore;
-        // Defensive guard: if the server claims more pages but sinceTime did
-        // not advance, stop to avoid spinning on a broken server contract.
+        // Stop when the server claims more pages but sinceTime did not
+        // advance, to avoid looping forever on a broken pagination contract.
         if (hasMore && sinceTime === prevSinceTime) break;
     }
 

@@ -383,7 +383,7 @@ class _LikesList extends StatelessWidget {
       );
     }
 
-    return CollectionsService.instance.getFileOwner(
+    return CollectionsService.instance.resolveUserIdentity(
       reaction.userID,
       selectedCollectionID,
     );

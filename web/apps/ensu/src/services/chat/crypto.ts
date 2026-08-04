@@ -8,7 +8,6 @@ export interface EncryptedChatPayload {
 
 const CHAT_FIELD_PREFIX = "enc:v1";
 
-/** Encrypt a JSON payload for storage using the chat key (base64). */
 export const encryptChatPayload = async (
     payload: unknown,
     chatKeyB64: string,
@@ -25,7 +24,6 @@ export const encryptChatPayload = async (
     };
 };
 
-/** Decrypt a JSON payload using the chat key (base64). */
 export const decryptChatPayload = async (
     { encryptedData, header }: EncryptedChatPayload,
     chatKeyB64: string,
@@ -41,7 +39,6 @@ export const decryptChatPayload = async (
     return JSON.parse(base64ToUtf8(plaintextB64));
 };
 
-/** Encrypt a string for inclusion in plaintext JSON (enc:v1:..:..). */
 export const encryptChatField = async (
     value: string,
     chatKeyB64: string,
@@ -54,7 +51,6 @@ export const encryptChatField = async (
     return `${CHAT_FIELD_PREFIX}:${encrypted.encrypted_data}:${encrypted.decryption_header}`;
 };
 
-/** Decrypt a string field stored as enc:v1:... */
 export const decryptChatField = async (
     value: string,
     chatKeyB64: string,

@@ -340,7 +340,7 @@ const localStorageSourceKey = async (
             }
             return key;
         } catch {
-            // Try the next migration-only key.
+            // Try the next stored key.
         }
     }
     throw new Error("No stored key could decrypt the old local chat store");
@@ -408,7 +408,7 @@ const decryptAttachmentWith = async (
                 key,
             ] as const;
         } catch {
-            // Try the next migration-only key.
+            // Try the next stored key.
         }
     }
     return undefined;
