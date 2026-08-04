@@ -125,63 +125,71 @@ class _EditAlbumDetailsSheetState extends State<EditAlbumDetailsSheet> {
   Widget build(BuildContext context) {
     final strings = context.strings;
 
-    return BottomSheetComponent(
-      title: strings.editDetails,
-      closeTooltip: strings.close,
-      onClose: _onClose,
-      contentSpacing: Spacing.xxl,
-      actionsTopSpacing: Spacing.xxl,
-      isKeyboardAware: true,
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            children: [
-              _AlbumCoverEditor(
-                cover: _cover,
-                onTap: _selectCover,
-                tooltip: strings.setCover,
-              ),
-              const SizedBox(width: Spacing.lg),
-              Expanded(
-                child: TextInputComponent(
-                  key: const ValueKey("album_name_input"),
-                  controller: _nameController,
-                  focusNode: _nameFocusNode,
-                  label: strings.name,
-                  textCapitalization: TextCapitalization.words,
-                  textInputAction: TextInputAction.next,
-                  onChanged: (_) => setState(() {}),
+    return PopScope(
+      canPop: !_hasChanges,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) {
+          _onClose();
+        }
+      },
+      child: BottomSheetComponent(
+        title: strings.editDetails,
+        closeTooltip: strings.close,
+        onClose: _onClose,
+        contentSpacing: Spacing.xxl,
+        actionsTopSpacing: Spacing.xxl,
+        isKeyboardAware: true,
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              children: [
+                _AlbumCoverEditor(
+                  cover: _cover,
+                  onTap: _selectCover,
+                  tooltip: strings.setCover,
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: Spacing.lg),
-          TextInputComponent(
-            key: const ValueKey("album_description_input"),
-            controller: _descriptionController,
-            focusNode: _descriptionFocusNode,
-            label: strings.description,
-            hintText: strings.albumDescriptionHint,
-            maxLength: maxAlbumDescriptionLength,
-            minLines: 5,
-            maxLines: 5,
-            keyboardType: TextInputType.multiline,
-            textInputAction: TextInputAction.newline,
-            textCapitalization: TextCapitalization.sentences,
-            onChanged: (_) => setState(() {}),
+                const SizedBox(width: Spacing.lg),
+                Expanded(
+                  child: TextInputComponent(
+                    key: const ValueKey("album_name_input"),
+                    controller: _nameController,
+                    focusNode: _nameFocusNode,
+                    label: strings.name,
+                    textCapitalization: TextCapitalization.words,
+                    textInputAction: TextInputAction.next,
+                    onChanged: (_) => setState(() {}),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: Spacing.lg),
+            TextInputComponent(
+              key: const ValueKey("album_description_input"),
+              controller: _descriptionController,
+              focusNode: _descriptionFocusNode,
+              label: strings.description,
+              hintText: strings.albumDescriptionHint,
+              maxLength: maxAlbumDescriptionLength,
+              minLines: 5,
+              maxLines: 5,
+              keyboardType: TextInputType.multiline,
+              textInputAction: TextInputAction.newline,
+              textCapitalization: TextCapitalization.sentences,
+              onChanged: (_) => setState(() {}),
+            ),
+          ],
+        ),
+        actions: [
+          ButtonComponent(
+            key: const ValueKey("save_album_details"),
+            label: strings.saveChanges,
+            isDisabled: _isSaveDisabled,
+            dismissModalOnSuccess: true,
+            onTap: _save,
           ),
         ],
       ),
-      actions: [
-        ButtonComponent(
-          key: const ValueKey("save_album_details"),
-          label: strings.saveChanges,
-          isDisabled: _isSaveDisabled,
-          dismissModalOnSuccess: true,
-          onTap: _save,
-        ),
-      ],
     );
   }
 
