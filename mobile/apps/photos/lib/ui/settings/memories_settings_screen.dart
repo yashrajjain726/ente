@@ -7,7 +7,6 @@ import "package:photos/core/event_bus.dart";
 import "package:photos/events/memories_changed_event.dart";
 import "package:photos/service_locator.dart";
 import "package:photos/services/memory_home_widget_service.dart";
-import "package:photos/ui/settings/components/settings_page_scaffold.dart";
 
 class MemoriesSettingsScreen extends StatefulWidget {
   const MemoriesSettingsScreen({super.key});

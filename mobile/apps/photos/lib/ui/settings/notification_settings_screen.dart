@@ -3,7 +3,6 @@ import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:photos/service_locator.dart";
 import "package:photos/services/notification_service.dart";
-import "package:photos/ui/settings/components/settings_page_scaffold.dart";
 
 class NotificationSettingsScreen extends StatefulWidget {
   const NotificationSettingsScreen({super.key});

@@ -10,7 +10,6 @@ import 'package:path_provider/path_provider.dart';
 import 'package:photos/core/cache/video_cache_manager.dart';
 import 'package:photos/core/configuration.dart';
 import "package:photos/service_locator.dart";
-import 'package:photos/ui/settings/components/settings_page_scaffold.dart';
 import 'package:photos/ui/tools/debug/path_storage_viewer.dart';
 
 class AppStorageViewer extends StatefulWidget {

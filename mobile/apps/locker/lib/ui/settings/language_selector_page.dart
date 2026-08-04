@@ -3,7 +3,6 @@ import "package:ente_pure_utils/ente_pure_utils.dart";
 import "package:ente_strings/ente_strings.dart";
 import "package:flutter/foundation.dart";
 import "package:flutter/material.dart";
-import "package:locker/ui/settings/components/settings_page_scaffold.dart";
 
 class LanguageSelectorPage extends StatelessWidget {
   final List<Locale> supportedLocales;

@@ -5,7 +5,6 @@ import "package:ente_utils/platform_util.dart";
 import "package:flutter/material.dart";
 import "package:hugeicons/hugeicons.dart";
 import "package:locker/services/update_service.dart";
-import "package:locker/ui/settings/components/settings_page_scaffold.dart";
 import "package:locker/ui/settings/widgets/app_update_dialog.dart";
 import "package:url_launcher/url_launcher.dart";
 

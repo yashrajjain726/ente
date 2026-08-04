@@ -16,7 +16,6 @@ import "package:photos/services/remote_assets_service.dart";
 import "package:photos/services/wake_lock_service.dart";
 import "package:photos/ui/common/loading_widget.dart";
 import "package:photos/ui/common/web_page.dart";
-import "package:photos/ui/settings/components/settings_page_scaffold.dart";
 import "package:photos/ui/settings/ml/ml_user_dev_screen.dart";
 import "package:photos/utils/ml_util.dart";
 import "package:photos/utils/network_util.dart";

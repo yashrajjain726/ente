@@ -10,7 +10,6 @@ import "package:hugeicons/hugeicons.dart";
 import "package:photos/app.dart";
 import "package:photos/locale.dart";
 import "package:photos/ui/settings/app_icon_selection_screen.dart";
-import "package:photos/ui/settings/components/settings_page_scaffold.dart";
 import "package:photos/ui/settings/gallery_settings_screen.dart";
 import "package:photos/ui/settings/language_picker.dart";
 

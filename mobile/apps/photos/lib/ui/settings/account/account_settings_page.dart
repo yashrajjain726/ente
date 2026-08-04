@@ -13,7 +13,6 @@ import "package:photos/ui/account/change_email_dialog.dart";
 import "package:photos/ui/account/password_entry_page.dart";
 import "package:photos/ui/account/recovery_key_page.dart";
 import "package:photos/ui/payment/subscription.dart";
-import "package:photos/ui/settings/components/settings_page_scaffold.dart";
 import "package:photos/utils/dialog_util.dart";
 import "package:url_launcher/url_launcher_string.dart";
 

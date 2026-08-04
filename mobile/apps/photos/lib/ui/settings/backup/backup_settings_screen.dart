@@ -10,7 +10,6 @@ import "package:photos/services/sync/local_sync_service.dart";
 import "package:photos/services/sync/sync_service.dart";
 import "package:photos/services/wake_lock_service.dart";
 import "package:photos/ui/common/backup_flow_helper.dart";
-import "package:photos/ui/settings/components/settings_page_scaffold.dart";
 import "package:photos/utils/dialog_util.dart";
 
 class BackupSettingsScreen extends StatelessWidget {

@@ -1,5 +1,6 @@
-import "package:ente_components/ente_components.dart";
-import "package:flutter/material.dart";
+import 'package:ente_components/components/app_bar_component.dart';
+import 'package:ente_components/theme/theme.dart';
+import 'package:flutter/material.dart';
 
 class SettingsPageScaffold extends StatelessWidget {
   const SettingsPageScaffold({
@@ -8,7 +9,7 @@ class SettingsPageScaffold extends StatelessWidget {
     required this.children,
     this.subtitle,
     this.actions = const [],
-    this.controller,
+    this.backButton,
     this.onTitleTap,
     this.onTitleDoubleTap,
     this.onTitleLongPress,
@@ -19,8 +20,8 @@ class SettingsPageScaffold extends StatelessWidget {
   final String title;
   final String? subtitle;
   final List<Widget> actions;
+  final Widget? backButton;
   final List<Widget> children;
-  final ScrollController? controller;
   final VoidCallback? onTitleTap;
   final VoidCallback? onTitleDoubleTap;
   final VoidCallback? onTitleLongPress;
@@ -38,7 +39,7 @@ class SettingsPageScaffold extends StatelessWidget {
         title: title,
         subtitle: subtitle,
         actions: actions,
-        controller: controller,
+        backButton: backButton,
         onTitleTap: onTitleTap,
         onTitleDoubleTap: onTitleDoubleTap,
         onTitleLongPress: onTitleLongPress,

@@ -6,7 +6,6 @@ import "package:photos/core/event_bus.dart";
 import "package:photos/events/force_reload_home_gallery_event.dart";
 import "package:photos/events/hide_shared_items_from_home_gallery_event.dart";
 import "package:photos/service_locator.dart";
-import "package:photos/ui/settings/components/settings_page_scaffold.dart";
 import "package:photos/ui/viewer/gallery/component/group/type.dart";
 
 class GallerySettingsScreen extends StatefulWidget {

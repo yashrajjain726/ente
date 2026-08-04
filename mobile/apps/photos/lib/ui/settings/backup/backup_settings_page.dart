@@ -6,7 +6,6 @@ import "package:hugeicons/hugeicons.dart";
 import "package:photos/ui/common/backup_flow_helper.dart";
 import "package:photos/ui/settings/backup/backup_settings_screen.dart";
 import "package:photos/ui/settings/backup/backup_status_screen.dart";
-import "package:photos/ui/settings/components/settings_page_scaffold.dart";
 
 class BackupSettingsPage extends StatelessWidget {
   const BackupSettingsPage({super.key});

@@ -7,7 +7,6 @@ import "package:hugeicons/hugeicons.dart";
 import "package:photos/gateways/storage_bonus/models/storage_bonus.dart";
 import "package:photos/models/user_details.dart";
 import "package:photos/ui/growth/storage_details_screen.dart";
-import "package:photos/ui/settings/components/settings_page_scaffold.dart";
 import "package:photos/utils/share_util.dart";
 
 class CodeSuccessScreen extends StatelessWidget {

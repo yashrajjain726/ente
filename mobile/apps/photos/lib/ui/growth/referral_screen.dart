@@ -12,7 +12,6 @@ import "package:photos/ui/common/web_page.dart";
 import "package:photos/ui/growth/apply_code_sheet.dart";
 import "package:photos/ui/growth/referral_code_widget.dart";
 import "package:photos/ui/growth/storage_details_screen.dart";
-import "package:photos/ui/settings/components/settings_page_scaffold.dart";
 import "package:photos/utils/share_util.dart";
 import "package:tuple/tuple.dart";
 

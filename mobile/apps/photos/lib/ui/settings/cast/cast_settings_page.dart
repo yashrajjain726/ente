@@ -12,7 +12,6 @@ import "package:photos/service_locator.dart";
 import "package:photos/services/collections_service.dart";
 import "package:photos/theme/ente_theme.dart";
 import "package:photos/ui/common/loading_widget.dart";
-import "package:photos/ui/settings/components/settings_page_scaffold.dart";
 import 'package:timeago/timeago.dart' as timeago;
 
 class CastSettingsPage extends StatelessWidget {

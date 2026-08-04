@@ -8,7 +8,6 @@ import 'package:photos/gateways/users/models/sessions.dart';
 import 'package:photos/services/account/user_service.dart';
 import 'package:photos/ui/common/loading_widget.dart';
 import 'package:photos/ui/notification/toast.dart';
-import "package:photos/ui/settings/components/settings_page_scaffold.dart";
 import 'package:photos/utils/dialog_util.dart';
 
 class SessionsPage extends StatefulWidget {
