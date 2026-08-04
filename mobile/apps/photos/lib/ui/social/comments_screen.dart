@@ -554,7 +554,7 @@ class _FileCommentsBottomSheetState extends State<FileCommentsBottomSheet> {
       comment: comment,
       anonDisplayNames: _anonDisplayNames,
       registeredUserResolver: (userID) => CollectionsService.instance
-          .getFileOwner(userID, _selectedCollectionID),
+          .resolveUserIdentity(userID, _selectedCollectionID),
     );
   }
 

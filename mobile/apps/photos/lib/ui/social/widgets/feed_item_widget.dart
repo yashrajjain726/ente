@@ -481,7 +481,7 @@ class _StackedAvatars extends StatelessWidget {
         );
       } else {
         // Get user from collections service
-        final user = CollectionsService.instance.getFileOwner(
+        final user = CollectionsService.instance.resolveUserIdentity(
           userID,
           feedItem.collectionID,
         );
@@ -709,7 +709,7 @@ class _FeedTextContent extends StatelessWidget {
       return User(id: userID, email: "$anonID@unknown.com", name: displayName);
     }
 
-    return CollectionsService.instance.getFileOwner(
+    return CollectionsService.instance.resolveUserIdentity(
       userID,
       feedItem.collectionID,
     );

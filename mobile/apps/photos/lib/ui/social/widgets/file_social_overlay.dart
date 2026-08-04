@@ -189,7 +189,7 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
           comment: latestComment,
           anonDisplayNames: anonDisplayNames,
           registeredUserResolver: (userID) => CollectionsService.instance
-              .getFileOwner(userID, latestComment.collectionID),
+              .resolveUserIdentity(userID, latestComment.collectionID),
         );
       }
 
