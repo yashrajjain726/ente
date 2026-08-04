@@ -16,7 +16,7 @@ class Horts extends StatefulWidget {
   State<StatefulWidget> createState() => _HortsState();
 }
 
-const int _unit = 1200;
+const int _unit = 1600;
 
 class _HortsState extends State<Horts> with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
