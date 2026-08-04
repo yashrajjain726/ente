@@ -29,7 +29,7 @@ const parseError = async (
         const data = (await response.json()) as { message?: string };
         if (data.message) return data.message;
     } catch {
-        // no-op
+        // Fall back to the generic message below.
     }
     return `Request failed with status ${response.status}`;
 };

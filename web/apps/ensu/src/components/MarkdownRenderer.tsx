@@ -59,8 +59,8 @@ const CodeBlock = ({ children, node: _node, ...rest }: PreProps) => {
         textarea.select();
         try {
             document.execCommand("copy");
-        } catch (_error) {
-            // Ignore copy errors for unsupported environments.
+        } catch {
+            // The legacy copy path has no failure recourse.
         } finally {
             document.body.removeChild(textarea);
         }
@@ -103,7 +103,7 @@ const openExternalUrl = async (url: string) => {
             await openUrl(url);
             return;
         } catch {
-            // Fall back to the browser open path below.
+            // Fall through to window.open.
         }
     }
 

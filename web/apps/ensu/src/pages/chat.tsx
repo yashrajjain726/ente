@@ -979,10 +979,8 @@ const Page: React.FC = () => {
             setMaxTokens(settings.maxTokens);
         };
 
-        // Loads persisted settings and runs the one Rust model migration.
-        // Settings persisted by builds that stored a model URL selection
-        // convert through it once: a URL matching a current preset maps to
-        // its id, anything else becomes the default.
+        // Older builds persisted a model URL selection; llm_migrate_models
+        // converts it to a model id once.
         const loadSettings = async () => {
             let raw = window.localStorage.getItem(MODEL_SETTINGS_STORAGE_KEY);
             if (!raw) {
@@ -1535,7 +1533,6 @@ const Page: React.FC = () => {
 
     const displayMessages = useMemo(() => {
         const base = messageState.path ?? [];
-        // Insert synthetic "Response was interrupted" placeholders for orphaned user messages
         const augmented: ChatMessage[] = [];
         for (let i = 0; i < base.length; i++) {
             const msg = base[i];
@@ -1592,7 +1589,6 @@ const Page: React.FC = () => {
             });
         });
 
-        // Clean up blob URLs for attachments no longer displayed.
         setAttachmentPreviews((prev) => {
             const next = { ...prev };
             Object.keys(next).forEach((id) => {
@@ -1608,8 +1604,6 @@ const Page: React.FC = () => {
             return next;
         });
 
-        // Load previews for persisted image attachments that do not have blob
-        // URLs yet, such as after reopening the app.
         for (const message of displayMessages) {
             for (const attachment of message.attachments ?? []) {
                 if (attachment.kind === "image") {
@@ -1794,7 +1788,7 @@ const Page: React.FC = () => {
                     try {
                         await remove(path);
                     } catch {
-                        // ignore cleanup failures
+                        // Deleting the temporary file is best effort.
                     }
                 }),
             );
@@ -3151,8 +3145,6 @@ const Page: React.FC = () => {
         }, 1800);
     }, [advancedUnlocked]);
 
-    // Hardcoded fallbacks used when Rust defaults are not available (web-only
-    // mode). These must stay in sync with rust/crates/ensu/src/config.rs.
     const fallbackSuggestedModels = useMemo(
         () =>
             isTauriRuntime

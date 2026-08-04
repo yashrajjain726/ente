@@ -178,8 +178,8 @@ export const updateItemCollectionsWithDeps = async (
           )
         : null;
 
-    // Mirror mobile's safer ordering: establish explicit new memberships
-    // before we remove or auto-move any existing ones.
+    // Add the new memberships before removing existing ones so the file
+    // always retains at least one collection membership.
     if (collectionIDsToAdd.length > 0) {
         if (!sourceFileKeyForAdd) {
             throw new Error(`File ${fileID} has no source collection`);
@@ -224,11 +224,8 @@ export const updateItemCollectionsWithDeps = async (
     }
 };
 
-/**
- * Rehomes or detaches every file from the collection before the caller
- * deletes the collection record itself. This helper intentionally does not
- * issue the final collection delete request.
- */
+// This helper only rehomes or detaches the collection's files; the caller is
+// responsible for issuing the final collection delete request.
 export const deleteCollectionKeepingFilesWithDeps = async (
     collection: LockerCollection,
     context: CollectionMutationContext,

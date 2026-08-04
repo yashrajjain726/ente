@@ -48,14 +48,6 @@ const bytesToBase64 = (bytes: ByteSequence) => btoa(byteStringFromBytes(bytes));
 
 const base64ToBytes = (value: string) => bytesFromByteString(atob(value));
 
-/**
- * Encodes an RGBA image to a ThumbHash. RGB should not be premultiplied by A.
- *
- * @param w The width of the input image. Must be <=100px.
- * @param h The height of the input image. Must be <=100px.
- * @param rgba The pixels in the input image, row-by-row. Must have w*h*4 elements.
- * @returns The ThumbHash as a Uint8Array.
- */
 export function rgbaToThumbHash(w: number, h: number, rgba: RGBABytes) {
     if (w > 100 || h > 100) throw new Error(`${w}x${h} doesn't fit in 100x100`);
     const { PI, abs, cos, max, round } = Math;
@@ -172,12 +164,6 @@ export function rgbaToThumbHash(w: number, h: number, rgba: RGBABytes) {
     return new Uint8Array(hash);
 }
 
-/**
- * Decodes a ThumbHash to an RGBA image. RGB is not premultiplied by A.
- *
- * @param hash The bytes of the ThumbHash.
- * @returns The width, height, and pixels of the rendered placeholder image.
- */
 export function thumbHashToRGBA(hash: Uint8Array) {
     const { PI, cos, max, min, round } = Math;
 
@@ -276,12 +262,6 @@ export function thumbHashToRGBA(hash: Uint8Array) {
     return { w, h, rgba };
 }
 
-/**
- * Extracts the approximate aspect ratio of the original image.
- *
- * @param hash The bytes of the ThumbHash.
- * @returns The approximate aspect ratio, width / height.
- */
 export function thumbHashToApproximateAspectRatio(hash: Uint8Array) {
     const header = hash[3]!;
     const hasAlpha = hash[2]! & 0x80;
@@ -291,14 +271,6 @@ export function thumbHashToApproximateAspectRatio(hash: Uint8Array) {
     return lx / ly;
 }
 
-/**
- * Encodes an RGBA image to a PNG data URL. RGB should not be premultiplied by A.
- *
- * @param w The width of the input image. Must be <=100px.
- * @param h The height of the input image. Must be <=100px.
- * @param rgba The pixels in the input image, row-by-row. Must have w*h*4 elements.
- * @returns A data URL containing a PNG for the input image.
- */
 export function rgbaToDataURL(w: number, h: number, rgba: RGBABytes) {
     const row = w * 4 + 1;
     const idat = 6 + h * (5 + row);
@@ -413,12 +385,6 @@ export function rgbaToDataURL(w: number, h: number, rgba: RGBABytes) {
     return `data:image/png;base64,${bytesToBase64(bytes)}`;
 }
 
-/**
- * Decodes a ThumbHash to a PNG data URL.
- *
- * @param hash The bytes of the ThumbHash.
- * @returns A data URL containing a PNG for the rendered ThumbHash.
- */
 export function thumbHashToDataURL(hash: Uint8Array) {
     const image = thumbHashToRGBA(hash);
     return rgbaToDataURL(image.w, image.h, image.rgba);
