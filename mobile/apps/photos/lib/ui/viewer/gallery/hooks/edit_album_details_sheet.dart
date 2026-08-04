@@ -45,15 +45,8 @@ Future<void> showEditAlbumDetailsSheet({
       initialName: collection.displayName,
       initialDescription: collection.displayDescription ?? "",
       initialCover: initialCover,
-      onSelectCover: (pendingCoverID) async {
-        final hasCustomCover = pendingCoverID == null
-            ? collection.hasCover
-            : pendingCoverID != 0;
-        final coverID = await showPickCoverPhotoSheet(
-          sheetContext,
-          collection,
-          canResetToDefault: hasCustomCover,
-        );
+      onSelectCover: () async {
+        final coverID = await showPickCoverPhotoSheet(sheetContext, collection);
         if (coverID == null) {
           return null;
         }
@@ -84,8 +77,7 @@ class EditAlbumDetailsSheet extends StatefulWidget {
   final String initialName;
   final String initialDescription;
   final Future<EnteFile?> initialCover;
-  final Future<AlbumCoverSelection?> Function(int? pendingCoverID)
-  onSelectCover;
+  final Future<AlbumCoverSelection?> Function() onSelectCover;
   final Future<void> Function(AlbumDetailsUpdate update) onSave;
 
   @override
@@ -193,7 +185,7 @@ class _EditAlbumDetailsSheetState extends State<EditAlbumDetailsSheet> {
   }
 
   Future<void> _selectCover() async {
-    final selection = await widget.onSelectCover(_pendingCoverID);
+    final selection = await widget.onSelectCover();
     if (!mounted || selection == null) {
       return;
     }
@@ -266,8 +258,8 @@ class _AlbumCoverEditor extends StatelessWidget {
             ),
           ),
           Positioned(
-            right: -8,
-            bottom: -8,
+            right: -12,
+            bottom: -12,
             child: Semantics(
               button: true,
               label: tooltip,
@@ -293,7 +285,7 @@ class _AlbumCoverEditor extends StatelessWidget {
                         ),
                         child: const Center(
                           child: HugeIcon(
-                            icon: HugeIcons.strokeRoundedPencilEdit01,
+                            icon: HugeIcons.strokeRoundedEdit03,
                             color: Colors.white,
                             size: IconSizes.tiny,
                           ),
