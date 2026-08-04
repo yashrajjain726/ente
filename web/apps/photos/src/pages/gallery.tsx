@@ -79,7 +79,7 @@ import {
 } from "ente-new/photos/components/SelectedFileOptions";
 import { WhatsNew } from "ente-new/photos/components/WhatsNew";
 import {
-    GalleryEmptyStateV2,
+    GalleryEmptyState,
     PeopleEmptyState,
     SearchResultsHeader,
     type RemotePullOpts,
@@ -2216,7 +2216,7 @@ const Page: React.FC = () => {
             !isFirstLoad &&
             !state.collectionFiles.length &&
             activeCollectionID === PseudoCollectionID.all ? (
-                <GalleryEmptyStateV2
+                <GalleryEmptyState
                     isUploadInProgress={uploadManager.isUploadInProgress()}
                     onUpload={openUploader}
                 />

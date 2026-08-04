@@ -18,7 +18,7 @@ import {
     type SegregatedFinishedUploads,
 } from "./uploadProgressStats";
 
-export function UploadCompletionV2({
+export function UploadCompletion({
     open,
     onClose,
     onReviewFailed,
@@ -50,7 +50,7 @@ export function UploadCompletionV2({
             open
             onClose={handleClose}
             maxWidth={false}
-            aria-labelledby="upload-completion-v2-title"
+            aria-labelledby="upload-completion-title"
             slotProps={{ paper: { sx: completionDialogPaperSx } }}
         >
             <Stack sx={completionDialogContentSx}>
@@ -72,7 +72,7 @@ export function UploadCompletionV2({
                     />
                     <Stack sx={{ gap: "6px", alignItems: "center" }}>
                         <Typography
-                            id="upload-completion-v2-title"
+                            id="upload-completion-title"
                             component="h2"
                             sx={completionTitleSx}
                         >

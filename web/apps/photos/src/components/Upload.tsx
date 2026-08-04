@@ -3,7 +3,7 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 /* eslint-disable @typescript-eslint/no-misused-promises */
 /* eslint-disable @typescript-eslint/no-floating-promises */
-import { TakeoutOptionsV2 } from "@/components/TakeoutOptionsV2";
+import { TakeoutOptions } from "@/components/TakeoutOptions";
 import { UploadConfirmationDialog } from "@/components/UploadConfirmationDialog";
 import type {
     InProgressUpload,
@@ -44,9 +44,9 @@ import type {
     ZipItem,
 } from "ente-base/types/ipc";
 import type { UploadTypeSelectorIntent } from "ente-gallery/components/Upload";
-import { UploadProgressV2 } from "ente-gallery/components/upload-progress-v2/UploadProgressV2";
+import { UploadProgress } from "ente-gallery/components/upload-progress/UploadProgress";
 import { CanvasReadbackBlockedDialog } from "ente-gallery/components/upload/CanvasReadbackBlockedDialog";
-import { DefaultOptionsV2 } from "ente-gallery/components/upload/DefaultOptionsV2";
+import { DefaultOptions } from "ente-gallery/components/upload/DefaultOptions";
 import { useFileInput } from "ente-gallery/components/utils/use-file-input";
 import {
     groupItemsBasedOnParentFolder,
@@ -1399,7 +1399,7 @@ export const Upload: React.FC<UploadProps> = ({
                 }
                 onSelect={handleUploadTypeSelect}
             />
-            <UploadProgressV2
+            <UploadProgress
                 open={uploadProgressView}
                 onClose={closeUploadProgress}
                 percentComplete={percentComplete}
@@ -1774,7 +1774,7 @@ const UploadTypeSelector: React.FC<UploadTypeSelectorProps> = ({
                         boxShadow: "none",
                         border: "1px solid",
                         borderColor: "stroke.faint",
-                        "&:has([data-default-options-v2], [data-takeout-options-v2])":
+                        "&:has([data-default-options], [data-takeout-options])":
                             {
                                 maxWidth: "621px",
                                 p: 0,
@@ -1848,14 +1848,14 @@ const UploadOptions: React.FC<UploadOptionsProps> = ({
     const handleSelectFolder = () => handleSelect("folders");
 
     return showTakeoutOptions ? (
-        <TakeoutOptionsV2
+        <TakeoutOptions
             onBack={handleTakeoutClose}
             onSelectFolder={handleSelectFolder}
             onSelectZips={handleSelectGooglePhotos}
             {...{ onClose }}
         />
     ) : (
-        <DefaultOptionsV2
+        <DefaultOptions
             intent={intent}
             isFileSelectionPending={pendingUploadType == "files"}
             isFolderSelectionPending={pendingUploadType == "folders"}
