@@ -39,12 +39,6 @@ import {
     type NewPasswordFormProps,
 } from "../components/NewPasswordForm";
 
-/**
- * A page that allows the user to generate key attributes if needed, and shows
- * them their recovery key if they just signed up.
- *
- * See: [Note: Login pages]
- */
 const Page: React.FC = () => {
     const { logout, showMiniDialog } = useBaseContext();
 

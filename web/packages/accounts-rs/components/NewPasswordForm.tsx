@@ -10,41 +10,14 @@ import { Trans } from "react-i18next";
 import { PasswordStrengthHint } from "./PasswordStrength";
 
 export interface NewPasswordFormProps {
-    /**
-     * The email of the user whose password we are setting.
-     *
-     * This is used to show a hidden input field of type email (and the provided
-     * value) to aid password managers to detect and save the new password,
-     * associating it with the user's email.
-     */
     userEmail: string;
-    /**
-     * The title of the form's submit button.
-     */
     submitButtonTitle: string;
-    /**
-     * Submission handler. A callback invoked when the submit button is pressed.
-     *
-     * @param password The new password entered by the user. The form will first
-     * check that both of the passwords entered by the user match, and that the
-     * password is not too weak.
-     *
-     * @param setPasswordsFieldError A function that can be called to show an
-     * error message below the password fields.
-     */
     onSubmit: (
         password: string,
         setPasswordsFieldError: (message: string) => void,
     ) => Promise<void>;
 }
 
-/**
- * A form showing two password input fields, a password strength indicator, and
- * a submit button.
- *
- * This form can be used both for the initial setup of the password, and for
- * later changing it.
- */
 export const NewPasswordForm: React.FC<NewPasswordFormProps> = ({
     userEmail,
     submitButtonTitle,
@@ -93,6 +66,8 @@ export const NewPasswordForm: React.FC<NewPasswordFormProps> = ({
                 {t("pick_password_hint")}
             </Typography>
 
+            {/* This hidden email input helps password managers associate the
+                new password with the user's email. */}
             <Input
                 sx={{ display: "none" }}
                 name="email"
@@ -129,7 +104,6 @@ export const NewPasswordForm: React.FC<NewPasswordFormProps> = ({
                 value={formik.values.confirmPassword}
                 onChange={formik.handleChange}
                 error={!!formik.errors.confirmPassword}
-                // See: [Note: Use space as default TextField helperText]
                 helperText={formik.errors.confirmPassword ?? " "}
                 disabled={formik.isSubmitting}
                 fullWidth

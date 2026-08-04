@@ -6,11 +6,6 @@ import { customAPIHost } from "ente-base/origins";
 import { useRouter } from "next/router";
 import React, { useCallback, useEffect, useState } from "react";
 
-/**
- * A page that allows the user to signup for a new Ente account.
- *
- * See: [Note: Login pages]
- */
 const Page: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [host, setHost] = useState<string | undefined>(undefined);
