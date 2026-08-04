@@ -126,8 +126,9 @@ class _LibrarySharingPageState extends State<LibrarySharingPage> {
   Widget _content(BuildContext context) {
     return AppBarComponent(
       title: _recipient.label,
-      titleBuilderHeight: _titleBuilderHeight(context),
-      titleBuilder: _titleBuilder,
+      eyebrow: _controller.isAddingAlbums
+          ? LibrarySharingStrings.shareWith
+          : LibrarySharingStrings.sharingWith,
       controller: _scrollController,
       onBack: () => Navigator.of(context).maybePop(),
       actions: [
@@ -149,30 +150,6 @@ class _LibrarySharingPageState extends State<LibrarySharingPage> {
 
   bool get _showSelectionSheet =>
       _controller.isSelecting && _controller.hasSelection;
-
-  Widget _titleBuilder(BuildContext context, HeaderAppBarTitleState state) {
-    final colors = context.componentColors;
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          _controller.isAddingAlbums
-              ? LibrarySharingStrings.shareWith
-              : LibrarySharingStrings.sharingWith,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: _librarySharingEyebrowStyle.copyWith(color: colors.textLight),
-        ),
-        Text(
-          _recipient.label,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: state.textStyle.copyWith(color: colors.textBase),
-        ),
-      ],
-    );
-  }
 
   List<Widget> _slivers(BuildContext context) {
     if (_controller.isLoading) {
@@ -393,17 +370,6 @@ class _LibrarySharingPageState extends State<LibrarySharingPage> {
     });
   }
 
-  double _titleBuilderHeight(BuildContext context) {
-    final textScaler = MediaQuery.textScalerOf(context);
-    return _scaledLineHeight(textScaler, _librarySharingEyebrowStyle) +
-        _scaledLineHeight(textScaler, TextStyles.display2);
-  }
-
-  double _scaledLineHeight(TextScaler textScaler, TextStyle style) {
-    final fontSize = style.fontSize ?? 14;
-    return textScaler.scale(fontSize) * (style.height ?? 1);
-  }
-
   Future<void> _applySelection() async {
     await _showFailureIfNeeded(
       await _controller.applySelection(),
@@ -475,13 +441,6 @@ class _LibrarySharingPageState extends State<LibrarySharingPage> {
 /// Positions the 250px empty state group at the reference screen's y=287.
 /// Source: https://www.figma.com/design/BuBNPPytxlVnqfmCUW0mgz/Ente-Visual-Design?node-id=17186-38829&m=dev
 const double _fullLibraryEmptyStateTopPadding = 131;
-
-/// The reference uses an Outfit Semibold 16/32 eyebrow above Display 2.
-/// Source: https://www.figma.com/design/BuBNPPytxlVnqfmCUW0mgz/Ente-Visual-Design?node-id=15782-102259&m=dev
-final TextStyle _librarySharingEyebrowStyle = TextStyles.display2.copyWith(
-  fontSize: 16,
-  height: 2,
-);
 
 // Prevents the final grid row from jumping under the sheet before measurement.
 const double _estimatedExpandedSelectionSheetHeight = 320;

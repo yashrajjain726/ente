@@ -826,7 +826,7 @@ void main() {
   });
 
   testWidgets(
-    'SliverAppBarComponent collapse progress matches reserved space',
+    'SliverAppBarComponent collapses title content and reserved space',
     (tester) async {
       final scrollController = ScrollController();
       addTearDown(scrollController.dispose);
@@ -837,7 +837,8 @@ void main() {
           controller: scrollController,
           slivers: [
             const SliverAppBarComponent(
-              title: 'Menu items',
+              title: 'Priyadarshini Bandopadhyay',
+              eyebrow: 'Sharing with',
               subtitle: 'Scroll to collapse',
               onBack: null,
               actions: [Icon(Icons.add)],
@@ -854,19 +855,31 @@ void main() {
         height: 600,
       );
 
+      final eyebrow = find.text('Sharing with');
+      final titleFinder = find.text('Priyadarshini Bandopadhyay');
+      expect(
+        tester.getTopLeft(eyebrow).dy,
+        lessThan(tester.getTopLeft(titleFinder).dy),
+      );
+
       scrollController.jumpTo(48);
       await tester.pump();
 
-      final title = tester.widget<Text>(find.text('Menu items'));
+      final title = tester.widget<Text>(titleFinder);
       expect(title.style?.fontSize, greaterThan(16));
       expect(title.style?.fontFamily, TextStyles.display2.fontFamily);
 
-      scrollController.jumpTo(74);
+      scrollController.jumpTo(104);
       await tester.pump();
 
-      final collapsedTitle = tester.widget<Text>(find.text('Menu items'));
+      final collapsedTitle = tester.widget<Text>(titleFinder);
       expect(collapsedTitle.style?.fontSize, closeTo(20, 0.01));
       expect(collapsedTitle.style?.fontFamily, TextStyles.display3.fontFamily);
+      expect(collapsedTitle.overflow, TextOverflow.ellipsis);
+      expect(
+        tester.getTopLeft(eyebrow).dy,
+        closeTo(tester.getTopLeft(titleFinder).dy, 0.5),
+      );
       expect(tester.getTopLeft(find.text('Item 0')).dy, closeTo(56, 1));
     },
   );
