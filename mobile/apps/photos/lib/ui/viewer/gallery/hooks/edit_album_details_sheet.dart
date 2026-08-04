@@ -128,6 +128,7 @@ class _EditAlbumDetailsSheetState extends State<EditAlbumDetailsSheet> {
     return BottomSheetComponent(
       title: strings.editDetails,
       closeTooltip: strings.close,
+      onClose: _onClose,
       contentSpacing: Spacing.xxl,
       actionsTopSpacing: Spacing.xxl,
       isKeyboardAware: true,
@@ -182,6 +183,33 @@ class _EditAlbumDetailsSheetState extends State<EditAlbumDetailsSheet> {
         ),
       ],
     );
+  }
+
+  void _onClose() {
+    if (!_hasChanges) {
+      return;
+    }
+    FocusScope.of(context).unfocus();
+    showBottomSheetComponent<bool>(
+      context: context,
+      builder: (_) => BottomSheetComponent(
+        title: context.strings.unsavedNoteChangesTitle,
+        message: context.strings.albumEditsWillNotBeSaved,
+        illustration: Image.asset("assets/warning-red.png"),
+        actions: [
+          ButtonComponent(
+            label: context.strings.discardChanges,
+            variant: ButtonComponentVariant.critical,
+            onTap: () => Navigator.of(context).pop(true),
+          ),
+        ],
+      ),
+    ).then((shouldDiscard) {
+      if (!mounted || shouldDiscard != true) {
+        return;
+      }
+      Navigator.of(context).pop();
+    });
   }
 
   Future<void> _selectCover() async {

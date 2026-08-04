@@ -208,6 +208,7 @@
   "after1Week": "After 1 week",
   "after1Year": "After 1 year",
   "albumDescriptionHint": "Enter a description for this album",
+  "albumEditsWillNotBeSaved": "Your edits to this album won't be saved.",
   "albumLayout": "Album layout",
   "albumOwner": "Owner",
   "@albumOwner": {
