@@ -203,6 +203,36 @@ Future<void> changeCoverPhoto(
   }
 }
 
+Future<void> changeAlbumDescription(
+  BuildContext context,
+  Collection collection,
+  String description,
+) async {
+  final normalizedDescription = description.trim();
+  if (normalizedDescription.length > maxAlbumDescriptionLength) {
+    throw ArgumentError.value(
+      description,
+      "description",
+      "Album descriptions cannot exceed $maxAlbumDescriptionLength characters",
+    );
+  }
+
+  try {
+    await CollectionsService.instance.updatePublicMagicMetadata(collection, {
+      "albumDescriptionKey": normalizedDescription,
+    });
+    Bus.instance.fire(
+      CollectionUpdatedEvent(collection.id, <EnteFile>[], "description_change"),
+    );
+  } catch (e, s) {
+    _logger.severe("failed to update album description", e, s);
+    if (context.mounted) {
+      showShortToast(context, context.strings.somethingWentWrong);
+    }
+    rethrow;
+  }
+}
+
 Future<bool> editTime(
   BuildContext context,
   Map<EnteFile, int> filesToEditedTimes,
