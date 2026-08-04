@@ -209,17 +209,16 @@ Future<void> changeAlbumDescription(
   String description,
 ) async {
   final normalizedDescription = description.trim();
-  if (normalizedDescription.length > maxAlbumDescriptionLength) {
-    throw ArgumentError.value(
-      description,
-      "description",
-      "Album descriptions cannot exceed $maxAlbumDescriptionLength characters",
-    );
-  }
-
   try {
+    if (normalizedDescription.characters.length > maxAlbumDescriptionLength) {
+      throw ArgumentError.value(
+        description,
+        "description",
+        "Album descriptions cannot exceed $maxAlbumDescriptionLength characters",
+      );
+    }
     await CollectionsService.instance.updatePublicMagicMetadata(collection, {
-      "albumDescriptionKey": normalizedDescription,
+      albumDescriptionKey: normalizedDescription,
     });
     Bus.instance.fire(
       CollectionUpdatedEvent(collection.id, <EnteFile>[], "description_change"),

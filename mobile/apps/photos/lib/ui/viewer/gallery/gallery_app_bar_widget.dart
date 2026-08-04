@@ -311,7 +311,14 @@ class _GalleryAppBarWidgetState extends State<GalleryAppBarWidget> {
       onSave: (update) async {
         try {
           if (update.name != collection.displayName.trim()) {
-            await CollectionsService.instance.rename(collection, update.name);
+            try {
+              await CollectionsService.instance.rename(collection, update.name);
+            } catch (_) {
+              if (context.mounted) {
+                showShortToast(context, context.strings.somethingWentWrong);
+              }
+              rethrow;
+            }
             _appBarTitle = update.name;
           }
           if (update.description != (collection.displayDescription ?? "")) {
