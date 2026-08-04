@@ -383,21 +383,9 @@ extension GalleryAppBarExtn on GalleryType {
     return false;
   }
 
-  bool canRename() {
-    if (this == GalleryType.ownedCollection ||
-        this == GalleryType.quickLink ||
-        this == GalleryType.hiddenOwnedCollection) {
-      return true;
-    }
-    return false;
-  }
-
-  bool canSetCover() {
-    if (this == GalleryType.ownedCollection ||
-        this == GalleryType.hiddenOwnedCollection) {
-      return true;
-    }
-    return false;
+  bool canEditDetails() {
+    return this == GalleryType.ownedCollection ||
+        this == GalleryType.hiddenOwnedCollection;
   }
 
   bool canArchive() {
