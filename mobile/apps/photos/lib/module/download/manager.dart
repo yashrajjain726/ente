@@ -4,6 +4,7 @@ import "dart:io";
 import "package:dio/dio.dart";
 import "package:logging/logging.dart";
 import "package:photos/core/configuration.dart";
+import "package:photos/core/network/network.dart";
 
 import "package:photos/module/download/file_url.dart";
 import "package:photos/module/download/task.dart";
@@ -218,7 +219,7 @@ class DownloadManager {
           _logger.info('Download cancelled for ${task.filename}');
           break;
         }
-        downloadUrl ??= await _resolveDownloadRedirect(task.id, cancelToken);
+        downloadUrl ??= await _resolveDownloadUrl(task.id, cancelToken);
         await _downloadChunk(
           task,
           basePath,
@@ -361,12 +362,23 @@ class DownloadManager {
     _updateTask(task);
   }
 
-  Future<String> _resolveDownloadRedirect(
+  Future<String> _resolveDownloadUrl(
     int fileID,
     CancelToken cancelToken,
   ) async {
+    final signedUrl = await FileUrl.tryGetV3Url(
+      NetworkClient.instance.enteDio,
+      fileID,
+      FileUrlType.directDownload,
+      headers: {"X-Auth-Token": Configuration.instance.getToken()},
+      cancelToken: cancelToken,
+    );
+    if (signedUrl != null) {
+      return signedUrl;
+    }
+
     final response = await _dio.get<void>(
-      FileUrl.getUrl(fileID, FileUrlType.directDownload),
+      FileUrl.getLegacyUrl(fileID, FileUrlType.directDownload),
       options: Options(
         followRedirects: false,
         receiveDataWhenStatusError: false,
