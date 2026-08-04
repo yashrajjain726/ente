@@ -9,6 +9,7 @@ import {
     useSetupAppLock,
 } from "@/components/utils/use-app-lock";
 import { useDesktopAppLockRoute } from "@/components/utils/use-app-lock-route";
+import { resumeExportsIfNeeded } from "@/services/export";
 import { photosLogout } from "@/services/logout";
 import { runMigrations } from "@/services/migration";
 import "@fontsource-variable/inter";
@@ -48,7 +49,6 @@ import {
     isHLSGenerationSupported,
 } from "ente-gallery/services/video";
 import { useAppLockSnapshot } from "ente-new/photos/components/utils/use-snapshot";
-import { resumeExportsIfNeeded } from "ente-new/photos/services/export";
 import { initML, isMLSupported } from "ente-new/photos/services/ml";
 import { PhotosAppContext } from "ente-new/photos/types/context";
 import { t } from "i18next";

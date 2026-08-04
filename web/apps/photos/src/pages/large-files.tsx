@@ -1,3 +1,11 @@
+import {
+    deleteSelectedLargeFiles,
+    findLargeFiles,
+    largeFilesInitialState,
+    largeFilesReducer,
+    type LargeFileFilter,
+    type LargeFileItem,
+} from "@/services/large-files";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import ImageIcon from "@mui/icons-material/Image";
 import VideocamIcon from "@mui/icons-material/Videocam";
@@ -27,14 +35,6 @@ import {
     computeThumbnailGridLayoutParams,
     type ThumbnailGridLayoutParams,
 } from "ente-new/photos/components/utils/thumbnail-grid-layout";
-import {
-    deleteSelectedLargeFiles,
-    findLargeFiles,
-    largeFilesInitialState,
-    largeFilesReducer,
-    type LargeFileFilter,
-    type LargeFileItem,
-} from "ente-new/photos/services/large-files";
 import { t } from "i18next";
 import { useRouter } from "next/router";
 import React, {

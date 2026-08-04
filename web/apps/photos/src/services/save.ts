@@ -1,23 +1,20 @@
+import { safeDirectoryName, safeFileName } from "@/utils/native-fs";
 import { assertionFailed } from "ente-base/assert";
 import { suppressMainWindowBlurForTrustedPrompt } from "ente-base/electron";
 import { joinPath } from "ente-base/file-name";
 import log from "ente-base/log";
 import type { Electron } from "ente-base/types/ipc";
+import type {
+    AddSaveGroup,
+    UpdateSaveGroup,
+} from "ente-gallery/components/utils/save-groups";
 import { downloadManager } from "ente-gallery/services/download";
+import { downloadAndSaveFilesWeb } from "ente-gallery/services/save-core";
 import { writeStream } from "ente-gallery/utils/native-stream";
 import type { EnteFile } from "ente-media/file";
 import { fileFileName } from "ente-media/file-metadata";
 import { FileType } from "ente-media/file-type";
 import { decodeLivePhoto } from "ente-media/live-photo";
-import {
-    safeDirectoryName,
-    safeFileName,
-} from "ente-new/photos/utils/native-fs";
-import type {
-    AddSaveGroup,
-    UpdateSaveGroup,
-} from "../components/utils/save-groups";
-import { downloadAndSaveFilesWeb } from "./save-core";
 
 /**
  * Save the given {@link files} to the user's device.

@@ -5,6 +5,7 @@
 /* eslint-disable @typescript-eslint/ban-ts-comment */
 /* eslint-disable @typescript-eslint/no-unnecessary-condition */
 /* eslint-disable @typescript-eslint/no-floating-promises */
+import { safeDirectoryName, safeFileName } from "@/utils/native-fs";
 import {
     ensureElectron,
     suppressMainWindowBlurForTrustedPrompt,
@@ -31,14 +32,13 @@ import {
     createCollectionNameByID,
 } from "ente-new/photos/services/collection";
 import {
-    safeDirectoryName,
-    safeFileName,
-} from "ente-new/photos/utils/native-fs";
+    savedCollectionFiles,
+    savedCollections,
+} from "ente-new/photos/services/photos-fdb";
 import { PromiseQueue } from "ente-utils/promise";
 import { nullToUndefined } from "ente-utils/transform";
 import i18n from "i18next";
 import { z } from "zod";
-import { savedCollectionFiles, savedCollections } from "./photos-fdb";
 
 // TODO: Audit the uses of these constants
 export const CustomError = {
