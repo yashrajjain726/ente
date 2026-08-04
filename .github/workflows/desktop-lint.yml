@@ -42,11 +42,6 @@ jobs:
                   shared-key: photos-desktop-ensu-android
                   save-if: false
 
-            # tsc typechecks against the generated rust-bindings/index.d.ts.
-            # This generates only the declarations (via cargo check); it does
-            # not build the addon.
-            - name: Generate N-API rust bindings
-              working-directory: rust
-              run: cargo codegen napi
+            - run: npm run codegen:napi
 
             - run: npm run lint
