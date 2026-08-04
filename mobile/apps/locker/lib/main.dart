@@ -120,9 +120,28 @@ Future<void> _ensureRustInitialized() async {
   try {
     await initFuture;
     _isRustInitialized = true;
+    _attachRustLogStream();
   } finally {
     _rustInitFuture = null;
   }
+}
+
+void _attachRustLogStream() {
+  final logger = Logger("rust");
+  attachLogStream(maxLevel: LogLevel.info).listen((entry) {
+    final message = "[${entry.target}] ${entry.message}";
+    switch (entry.level) {
+      case LogLevel.error:
+        logger.severe(message);
+      case LogLevel.warn:
+        logger.warning(message);
+      case LogLevel.info:
+        logger.info(message);
+      case LogLevel.debug:
+      case LogLevel.trace:
+        logger.fine(message);
+    }
+  });
 }
 
 ThemeMode _themeMode(AdaptiveThemeMode? savedThemeMode) {

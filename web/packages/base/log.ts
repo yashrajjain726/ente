@@ -91,3 +91,23 @@ export default {
     info: logInfo,
     debug: logDebug,
 };
+
+export const attachRustLogHook = () => {
+    globalThis.enteRustLog = (level, target, message) => {
+        const m = `[rust] ${target}: ${message}`;
+        switch (level) {
+            case "ERROR":
+                logError(m);
+                break;
+            case "WARN":
+                logWarn(m);
+                break;
+            case "DEBUG":
+            case "TRACE":
+                logDebug(() => m);
+                break;
+            default:
+                logInfo(m);
+        }
+    };
+};
