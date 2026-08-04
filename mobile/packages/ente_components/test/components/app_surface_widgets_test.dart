@@ -772,7 +772,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('SliverAppBarComponent preserves tap-only title callbacks', (
+  testWidgets('SliverAppBarComponent preserves title callbacks with eyebrow', (
     tester,
   ) async {
     var tapped = false;
@@ -783,6 +783,7 @@ void main() {
         slivers: [
           SliverAppBarComponent(
             title: 'Tap me',
+            eyebrow: 'Context',
             onTitleTap: () => tapped = true,
             actions: const [Icon(Icons.search)],
           ),

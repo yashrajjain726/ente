@@ -975,11 +975,20 @@ class _MovingHeaderTitle extends StatelessWidget {
 
     final eyebrowText = eyebrow;
     if (eyebrowText != null) {
+      final child = _buildEyebrowTitle(context, eyebrowText, textStyle);
       return Positioned(
         left: left,
         right: right,
         top: top,
-        child: _buildEyebrowTitle(context, eyebrowText, textStyle),
+        child: onTap == null && onDoubleTap == null && onLongPress == null
+            ? child
+            : GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: onTap,
+                onDoubleTap: onDoubleTap,
+                onLongPress: onLongPress,
+                child: child,
+              ),
       );
     }
 
