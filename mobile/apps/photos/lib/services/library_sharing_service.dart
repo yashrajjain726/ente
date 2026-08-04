@@ -103,11 +103,8 @@ class LibrarySharingService implements LibrarySharingRepository {
   }
 
   @override
-  Future<List<Collection>> getEligibleAlbums() async {
-    final albums = _eligibleAlbums().toList();
-    await _collectionsService.sortCollectionsByAlbumPreferences(albums);
-    return albums;
-  }
+  Future<List<Collection>> getEligibleAlbums() =>
+      _collectionsService.orderCollectionsForAlbums(_eligibleAlbums());
 
   @override
   Future<Set<int>> shareAlbums({
