@@ -42,8 +42,8 @@ class _HortsState extends State<Horts> with SingleTickerProviderStateMixin {
 
   @override
   void dispose() {
-    super.dispose();
     _controller.dispose();
+    super.dispose();
   }
 
   @override
