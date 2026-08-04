@@ -14,25 +14,13 @@ import React, { useDeferredValue, useEffect, useState } from "react";
 const contentMaxWidth = 560;
 
 interface LockerNavbarProps {
-    /** Called when the user taps the hamburger menu icon. */
     onOpenSidebar: () => void;
-    /** True when the mobile drawer trigger should be shown. */
     showMenuButton: boolean;
-    /** Sticky top offset to account for any pinned content above the navbar. */
     stickyTop?: number;
-    /** Current value of the Locker search query. */
     searchTerm: string;
-    /** Update callback for the Locker search query. */
     onSearchTermChange: (value: string) => void;
 }
 
-/**
- * Top navigation bar for the Locker web app.
- *
- * Blue gradient header matching the Figma design, with the Locker branding
- * centered. The blue gradient continues into the search bar area rendered by
- * ItemList below.
- */
 export const LockerNavbar: React.FC<LockerNavbarProps> = ({
     onOpenSidebar,
     showMenuButton,
@@ -47,7 +35,6 @@ export const LockerNavbar: React.FC<LockerNavbarProps> = ({
         onSearchTermChange(deferredSearchTerm);
     }, [deferredSearchTerm, onSearchTermChange]);
 
-    // Sync local state when parent resets searchTerm (e.g. navigation).
     useEffect(() => {
         setLocalSearchTerm(searchTerm);
     }, [searchTerm]);

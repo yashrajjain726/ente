@@ -65,7 +65,6 @@ export const useFileShare = (): UseFileShareResult => {
     useEffect(() => {
         const loadFileInfo = async () => {
             try {
-                // Extract token from pathname (e.g., /4MzPEanZK8)
                 const token = window.location.pathname.slice(1);
 
                 if (!token) {
@@ -107,7 +106,6 @@ export const useFileShare = (): UseFileShareResult => {
                     keyMaterial,
                 );
 
-                // Check if decryption failed (invalid key)
                 if (
                     decryptedInfo.fileName === "Unknown file" ||
                     decryptedInfo.fileName === "Encrypted file" ||

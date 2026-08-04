@@ -45,18 +45,13 @@ const Page: React.FC = () => {
     const onSignUp = useCallback(() => void router.push("/signup"), [router]);
 
     const handleBackgroundClick: React.MouseEventHandler = (event) => {
-        // Don't allow this when running on (e.g.) auth.ente.com.
         if (!shouldAllowChangingAPIOrigin()) return;
 
-        // Only count clicks directly on the background
         if (event.target !== event.currentTarget) return;
 
-        // Ignore clicks when the dialog is already open.
         if (showDevSettings) return;
 
-        // Otherwise increase the tap count,
         setTapCount(tapCount + 1);
-        // And show the dev settings dialog when it reaches 7.
         if (tapCount + 1 == 7) {
             setTapCount(0);
             setShowDevSettings(true);
@@ -110,10 +105,6 @@ const Page: React.FC = () => {
 
 export default Page;
 
-/**
- * Disable the ability to set the custom server when we're running on our own
- * production deployment.
- */
 const shouldAllowChangingAPIOrigin = () => {
     const hostname = new URL(window.location.origin).hostname;
     return !(

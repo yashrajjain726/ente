@@ -25,36 +25,28 @@ import { t } from "i18next";
 import React, { useCallback, useEffect, useState } from "react";
 
 const Page = () => {
-    /**
-     * The state of our component as we go through the passkey authentication
-     * flow.
-     *
-     * To avoid confusion with useState, we call it status instead. */
     type Status =
-        | "loading" /* Can happen multiple times in the flow */
-        | "webAuthnNotSupported" /* Unrecoverable error */
-        | "unknownRedirect" /* Unrecoverable error */
-        | "sessionAlreadyClaimed" /* Unrecoverable error */
-        | "unrecoverableFailure" /* Unrecoverable error - generic */
-        | "failedDuringSignChallenge" /* Recoverable error in signChallenge */
-        | "failed" /* Recoverable error otherwise */
-        | "lockerRegistrationDisabled" /* Locker only for Photos paid users */
-        | "lockerRolloutLimitReached" /* Locker beta seats exhausted */
-        | "needUserFocus" /* See docs for `Continuation` */
-        | "waitingForUser" /* ...to authenticate with their passkey */
-        | "redirectingWeb" /* Redirect back to the requesting app (HTTP) */
-        | "redirectingApp"; /* Other redirects (mobile / desktop redirect) */
+        | "loading"
+        | "webAuthnNotSupported"
+        | "unknownRedirect"
+        | "sessionAlreadyClaimed"
+        | "unrecoverableFailure"
+        | "failedDuringSignChallenge"
+        | "failed"
+        | "lockerRegistrationDisabled"
+        | "lockerRolloutLimitReached"
+        | "needUserFocus"
+        | "waitingForUser"
+        | "redirectingWeb"
+        | "redirectingApp";
 
     const [status, setStatus] = useState<Status>("loading");
 
-    /**
-     * Safari keeps on saying "NotAllowedError: The document is not focused"
-     * even though it just opened the page and brought it to the front.
-     *
-     * Because of their incompetence, we need to break our entire flow into two
-     * parts, and stash away a lot of state when we're in the "needUserFocus"
-     * state.
-     */
+    // Safari can reject the WebAuthn call with "NotAllowedError: The document
+    // is not focused" even when it has just opened the page and brought it to
+    // the front. So the flow is split into two phases: the state phase 2 needs
+    // is stashed in this continuation, and phase 2 runs again after an
+    // explicit user click (the "needUserFocus" status).
     interface Continuation {
         redirectURL: URL;
         clientPackage: string;
@@ -65,18 +57,10 @@ const Page = () => {
         Continuation | undefined
     >();
 
-    // Safari throws  sometimes
-    // (no reason, just to show their incompetence). The retry doesn't seem to
-    // help mostly, but cargo cult anyway.
-
-    // The URL we're redirecting to on success.
-    //
-    // This will only be set when status is "redirecting*".
     const [successRedirectURL, setSuccessRedirectURL] = useState<
         URL | undefined
     >();
 
-    /** Phase 1 of {@link authenticate}. */
     const authenticateBegin = useCallback(async () => {
         if (!isWebAuthnSupported()) {
             setStatus("webAuthnNotSupported");
@@ -85,20 +69,14 @@ const Page = () => {
 
         const searchParams = new URLSearchParams(window.location.search);
 
-        // Extract redirect from the query params.
         const redirect = nullToUndefined(searchParams.get("redirect"));
         const redirectURL = parseRedirectURLParam(redirect);
-
-        // Ensure that redirectURL is valid/whitelisted, otherwise show an
-        // invalid "login" URL error to the user.
         if (!redirectURL) {
             log.error(`Redirect '${redirect}' is not whitelisted`);
             setStatus("unknownRedirect");
             return;
         }
 
-        // The server needs to know the app on whose behalf we're trying to
-        // authenticate.
         const clientPackage = nullToUndefined(
             searchParams.get("clientPackage"),
         );
@@ -109,7 +87,6 @@ const Page = () => {
 
         setStatus("loading");
 
-        // Extract passkeySessionID from the query params.
         const passkeySessionID = nullToUndefined(
             searchParams.get("passkeySessionID"),
         );
@@ -135,10 +112,6 @@ const Page = () => {
         return { redirectURL, passkeySessionID, clientPackage, beginResponse };
     }, []);
 
-    /**
-     * Phase 2 of {@link authenticate}, separated by a potential user
-     * interaction.
-     */
     const authenticateContinue = useCallback(async (cont: Continuation) => {
         const { redirectURL, passkeySessionID, clientPackage, beginResponse } =
             cont;
@@ -201,7 +174,6 @@ const Page = () => {
         );
     }, []);
 
-    /** (re)start the authentication flow */
     const authenticate = useCallback(async () => {
         const cont = await authenticateBegin();
         if (cont) {
@@ -225,15 +197,7 @@ const Page = () => {
     const handleRecover = (() => {
         const searchParams = new URLSearchParams(window.location.search);
         const recover = nullToUndefined(searchParams.get("recover"));
-        if (!recover) {
-            // [Note: Conditional passkey recover option on accounts]
-            //
-            // Only show the recover option if the calling app provided us with
-            // the "recover" query parameter. For example, the mobile app does
-            // not pass it since it already shows a recovery option within the
-            // waiting screen that it shows.
-            return undefined;
-        }
+        if (!recover) return undefined;
 
         const recoverURL = parseRedirectURLParam(recover);
         if (!recoverURL) return undefined;
@@ -313,7 +277,6 @@ const Page = () => {
 
 export default Page;
 
-// Not 100% accurate, but good enough for our purposes.
 const isHTTP = (url: URL) => url.protocol.startsWith("http");
 
 const redirectToURL = (url: URL) => {
@@ -392,14 +355,9 @@ const ContentPaper = styled(Paper)(({ theme }) => ({
 }));
 
 interface VerifyProps {
-    /** Called when the user presses the "Verify" button. */
     onVerify: () => void;
 }
 
-/**
- * Gain focus for the current page by requesting the user to explicitly click a
- * button. For more details, see the documentation for `Continuation`.
- */
 const Verify: React.FC<VerifyProps> = ({ onVerify }) => (
     <ContentPaper>
         <KeyIcon color="secondary" fontSize="large" />
@@ -416,23 +374,8 @@ const Verify: React.FC<VerifyProps> = ({ onVerify }) => (
 );
 
 interface RetriableFailedProps {
-    /**
-     * Set this attribute to indicate that this failure occurred during the
-     * actual passkey verification (`navigator.credentials.get`).
-     *
-     * We customize the error message for such cases to give a hint to the user
-     * that they can try on their other devices too.
-     */
     duringSignChallenge?: boolean;
-    /** Callback invoked when the user presses the try again button. */
     onRetry: () => void;
-    /**
-     * Callback invoked when the user presses the button to recover their second
-     * factor, e.g. if they cannot login using it.
-     *
-     * This is optional. See [Note: Conditional passkey recover option on
-     * accounts].
-     */
     onRecover: (() => void) | undefined;
 }
 
@@ -509,7 +452,6 @@ const RedirectingWeb: React.FC = () => (
 );
 
 interface RedirectingAppProps {
-    /** Called when the user presses the button to redirect again */
     onRetry: () => void;
 }
 

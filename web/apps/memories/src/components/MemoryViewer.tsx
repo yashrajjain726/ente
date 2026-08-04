@@ -1,10 +1,3 @@
-/**
- * Share-style public memory viewer.
- * This file contains the full-screen viewer used for standard public memory
- * shares, including header progress, media transitions, playback controls, and
- * share-specific layout. It is rendered by `pages/index.tsx` for the `"share"`
- * variant.
- */
 import { keyframes } from "@emotion/react";
 import { styled, Typography } from "@mui/material";
 import log from "ente-base/log";
@@ -77,10 +70,6 @@ interface SharedMemoryHeaderProps {
     isVideo: boolean;
 }
 
-/**
- * Share-viewer header with the memory title and segmented autoplay progress.
- * Used only by `MemoryViewer` for its desktop and mobile layouts.
- */
 function SharedMemoryHeader({
     title,
     date,
@@ -114,10 +103,6 @@ function SharedMemoryHeader({
     );
 }
 
-/**
- * Primary viewer for normal public memory shares.
- * Used by `pages/index.tsx` when `viewerVariant` resolves to `"share"`.
- */
 export function MemoryViewer({
     files,
     currentIndex,

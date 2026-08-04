@@ -26,12 +26,10 @@ export default function App({ Component, pageProps }: AppProps) {
         logStartupBanner();
     }, []);
 
-    // Simplified - no complex dialogs needed for embed
     const isRouteChangeInProgress = useIsRouteChangeInProgress();
 
     const { showLoadingBar, hideLoadingBar } = useLoadingBar();
 
-    // Show loading bar on route changes
     useEffect(() => {
         if (isRouteChangeInProgress) {
             showLoadingBar();
@@ -40,13 +38,9 @@ export default function App({ Component, pageProps }: AppProps) {
         }
     }, [isRouteChangeInProgress, showLoadingBar, hideLoadingBar]);
 
-    const showMiniDialog = useCallback(() => {
-        // Simplified for embed - no complex dialogs needed
-    }, []);
+    const showMiniDialog = useCallback(() => undefined, []);
 
-    const logout = useCallback(() => {
-        // No logout functionality needed for embed
-    }, []);
+    const logout = useCallback(() => undefined, []);
 
     const baseContext = useMemo(
         () => deriveBaseContext({ logout, showMiniDialog }),
@@ -57,13 +51,9 @@ export default function App({ Component, pageProps }: AppProps) {
         () => ({
             showLoadingBar,
             hideLoadingBar,
-            showNotification: () => {
-                // No notifications in embed
-            },
+            showNotification: () => undefined,
             watchFolderView: false,
-            setWatchFolderView: () => {
-                // No watch folder in embed
-            },
+            setWatchFolderView: () => undefined,
         }),
         [showLoadingBar, hideLoadingBar],
     );

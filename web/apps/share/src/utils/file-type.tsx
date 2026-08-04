@@ -27,10 +27,6 @@ interface LockerFileIconOptions {
     size?: number;
 }
 
-/**
- * Extract the file extension from a filename
- * Returns lowercase extension without the dot, or empty string if no extension
- */
 const getFileExtension = (fileName: string): string => {
     const lastDot = fileName.lastIndexOf(".");
     if (lastDot === -1 || lastDot === fileName.length - 1) {
@@ -39,9 +35,6 @@ const getFileExtension = (fileName: string): string => {
     return fileName.slice(lastDot + 1).toLowerCase();
 };
 
-/**
- * Check if file extension is an image
- */
 const isImageExtension = (extension: string): boolean => {
     const imageExtensions = [
         "jpg",
@@ -60,9 +53,6 @@ const isImageExtension = (extension: string): boolean => {
     return imageExtensions.includes(extension);
 };
 
-/**
- * Check if file extension is a video
- */
 const isVideoExtension = (extension: string): boolean => {
     const videoExtensions = [
         "mp4",
@@ -82,9 +72,6 @@ const isVideoExtension = (extension: string): boolean => {
     return videoExtensions.includes(extension);
 };
 
-/**
- * Check if file extension is a document/text file
- */
 const isDocumentExtension = (extension: string): boolean => {
     const documentExtensions = [
         "pdf",
@@ -105,16 +92,12 @@ const isDocumentExtension = (extension: string): boolean => {
     return documentExtensions.includes(extension);
 };
 
-/**
- * Get icon based on locker info type (first priority) or file extension (fallback)
- */
 export const getLockerFileIcon = (
     fileName: string,
     options: LockerFileIconOptions = {},
 ): LockerIconInfo => {
     const { lockerType, size = 42 } = options;
 
-    // First priority: Check locker info type
     if (lockerType) {
         switch (lockerType as LockerInfoType) {
             case LockerInfoType.Note:
@@ -167,7 +150,6 @@ export const getLockerFileIcon = (
         }
     }
 
-    // Second priority: Detect based on file extension
     const extension = getFileExtension(fileName);
 
     if (isImageExtension(extension)) {
@@ -201,7 +183,6 @@ export const getLockerFileIcon = (
         };
     }
 
-    // Default: Generic file icon
     return {
         icon: <HugeiconsIcon icon={File02Icon} size={size} color="#757575" />,
         backgroundColor: "#FAFAFA",

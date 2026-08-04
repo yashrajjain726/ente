@@ -127,9 +127,7 @@ export const EmbedFileListWithViewer: React.FC<
                     showFullscreenButton={true}
                     enableComment={false}
                     onTriggerRemotePull={handleTriggerRemotePull}
-                    onVisualFeedback={() => {
-                        // Visual feedback requested
-                    }}
+                    onVisualFeedback={() => undefined}
                 />
             )}
         </Container>
