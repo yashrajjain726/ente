@@ -4,6 +4,7 @@ import "package:ente_accounts/services/user_service.dart";
 import "package:ente_components/ente_components.dart";
 import "package:ente_strings/ente_strings.dart";
 import "package:ente_ui/components/settings/app_engagement_section.dart";
+import "package:ente_ui/components/settings/social_icons_row.dart";
 import "package:flutter/foundation.dart";
 import "package:flutter/material.dart";
 import "package:hugeicons/hugeicons.dart";
@@ -15,7 +16,6 @@ import "package:locker/ui/settings/pages/security_settings_page.dart";
 import "package:locker/ui/settings/pages/support_page.dart";
 import "package:locker/ui/settings/pages/theme_settings_page.dart";
 import "package:locker/ui/settings/widgets/app_version_widget.dart";
-import "package:locker/ui/settings/widgets/social_icons_row.dart";
 import "package:locker/utils/bottom_sheet_illustration.dart";
 
 class SettingsWidget extends StatelessWidget {
