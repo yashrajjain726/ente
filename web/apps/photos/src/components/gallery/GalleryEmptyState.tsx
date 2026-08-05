@@ -141,7 +141,7 @@ export function GalleryEmptyState({
                             fontWeight: 600,
                         }}
                     >
-                        {t("gallery_empty_state_v2_subtitle")}
+                        {t("gallery_empty_state_subtitle")}
                     </Typography>
                 </Stack>
 
