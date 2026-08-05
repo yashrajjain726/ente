@@ -23,7 +23,7 @@ import {
 } from "ente-accounts/services/accounts-db";
 import { isDesktop, staticAppTitle } from "ente-base/app";
 import { CenteredRow } from "ente-base/components/containers";
-import { CustomHead } from "ente-base/components/Head";
+import { CustomHeadPhotos } from "ente-base/components/Head";
 import {
     LoadingIndicator,
     TranslucentLoadingOverlay,
@@ -60,9 +60,6 @@ import "ente-gallery/styles/photoswipe.css";
 import "../styles/global.css";
 
 type PhotosAppProps = AppProps<Record<string, unknown>>;
-
-const photosDescription = "Store and share your photos with absolute privacy.";
-const photosPreviewImage = "https://photos.ente.com/images/preview.png";
 
 type MainContentProps = Pick<PhotosAppProps, "Component" | "pageProps"> & {
     isChangingRoute: boolean;
@@ -168,19 +165,7 @@ const App: React.FC<PhotosAppProps> = ({ Component, pageProps }) => {
 
     return (
         <ThemeProvider theme={photosTheme}>
-            <CustomHead title={title} description={photosDescription}>
-                <meta property="og:type" content="website" />
-                <meta property="og:title" content={title} />
-                <meta property="og:description" content={photosDescription} />
-                <meta property="og:image" content={photosPreviewImage} />
-                <meta property="og:image:type" content="image/png" />
-                <meta property="og:image:width" content="1200" />
-                <meta property="og:image:height" content="630" />
-                <meta name="twitter:card" content="summary_large_image" />
-                <meta name="twitter:title" content={title} />
-                <meta name="twitter:description" content={photosDescription} />
-                <meta name="twitter:image" content={photosPreviewImage} />
-            </CustomHead>
+            <CustomHeadPhotos {...{ title }} />
             <CssBaseline enableColorScheme />
 
             <ThemedLoadingBar ref={loadingBarRef} />
