@@ -60,7 +60,7 @@ class UserService {
   static const kIsEmailMFAEnabled = "is_email_mfa_enabled";
 
   final SRP6GroupParameters kDefaultSrpGroup = SRP6StandardGroups.rfc5054_4096;
-  final _publicKeyCache = TimedCache<Object, String>(
+  final _publicKeyCache = TimedCache<String, String>(
     duration: const Duration(seconds: 10),
   );
 
@@ -208,23 +208,14 @@ class UserService {
 
   // getPublicKey returns null value if email id is not
   // associated with another ente account
-  Future<String?> getPublicKey(String email) =>
-      _getPublicKey(email, () => _gateway.getPublicKey(email));
-
-  Future<String?> getPublicKeyByUserID(int userID) =>
-      _getPublicKey(userID, () => _gateway.getPublicKeyByUserID(userID));
-
-  Future<String?> _getPublicKey(
-    Object cacheKey,
-    Future<String?> Function() fetch,
-  ) async {
-    final String? cachedPubKey = _publicKeyCache.get(cacheKey);
+  Future<String?> getPublicKey(String email) async {
+    final String? cachedPubKey = _publicKeyCache.get(email);
     if (cachedPubKey != null) {
       return cachedPubKey;
     }
-    final publicKey = await fetch();
+    final publicKey = await _gateway.getPublicKey(email);
     if (publicKey != null) {
-      _publicKeyCache.set(cacheKey, publicKey);
+      _publicKeyCache.set(email, publicKey);
     }
     return publicKey;
   }

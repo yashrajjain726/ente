@@ -83,6 +83,7 @@ class CollectionShareGateway {
 
   Future<List<CollectionShareResult>> shareBulk({
     required int recipientUserID,
+    required String recipientEmail,
     required CollectionShareSource source,
     required List<BulkCollectionShareItem> collections,
   }) async {
@@ -90,6 +91,7 @@ class CollectionShareGateway {
       "/collections/share/bulk",
       data: {
         "recipientUserID": recipientUserID,
+        "recipientEmail": recipientEmail,
         "source": source.name,
         "collections": collections.map((item) => item.toJson()).toList(),
       },

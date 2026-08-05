@@ -905,6 +905,7 @@ class CollectionsService {
     try {
       final results = await collectionShareGateway.shareBulk(
         recipientUserID: recipientUserID,
+        recipientEmail: recipientEmail,
         source: source,
         collections: items,
       );
@@ -919,6 +920,13 @@ class CollectionsService {
     } on DioException catch (e) {
       if (e.response?.statusCode == 402) {
         throw SharingNotPermittedForFreeAccountsError();
+      }
+      if (e.response?.data?['code'] == 'RECIPIENT_IDENTITY_MISMATCH') {
+        throw RecipientIdentityMismatchError();
+      }
+      if (e.response?.data?['code'] ==
+          'AUTOMATIC_SHARE_RECIPIENT_NOT_ELIGIBLE') {
+        throw AutomaticShareRecipientNotEligibleError();
       }
       rethrow;
     }
