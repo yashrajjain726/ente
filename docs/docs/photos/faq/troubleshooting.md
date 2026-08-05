@@ -606,6 +606,26 @@ Machine learning features (face recognition and magic search) require downloadin
 
 Learn more in [Search and Discovery FAQ](/photos/faq/search-and-discovery#ml-offline).
 
+### Why does my phone overheat while using the app? {#phone-overheating}
+
+Overheating usually happens when Ente works through a large historical backup at the same time as local ML indexing, which together can keep the CPU busy for a sustained stretch. Once the backup queue clears and indexing catches up, the app falls back to normal incremental syncs and the heating should stop.
+
+**Steps to take:**
+
+1. Plug in your iPhone, remove the case if you use one, connect to WiFi, and leave Ente open in the foreground.
+2. Disable auto-lock.
+3. Close all other apps before starting.
+4. If the phone still overheats, turn off ML and video streaming: `Settings > Machine learning` and `Settings > Video streaming`.
+5. Let it run overnight, then re-enable ML and video streaming once the upload completes.
+
+> [!NOTE]
+>
+> iOS can still throttle, suspend, or terminate apps under heat pressure even with auto-lock disabled - that setting only keeps the screen from sleeping while the app is active, not the app from being suspended by the system. This can slow uploads considerably.
+>
+> If iCloud Photos "Optimize iPhone Storage" is enabled, originals may need to download from iCloud first, which can also slow or stall uploads.
+>
+> If overheating continues, [send us your logs](#sharing-logs) so we can take a closer look.
+
 ### What are the minimum device requirements for Ente apps? {#minimum-requirements}
 
 Ente needs at least **2 GB of RAM** to run reliably. On devices below that, including most Android Go phones, basic operations like backup, export, and indexing may crash or stall.

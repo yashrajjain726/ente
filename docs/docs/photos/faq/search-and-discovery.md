@@ -342,6 +342,17 @@ The fastest way through a large cluster list is to name the people who appear mo
 
 Local indexing lets your device do the ML work itself — downloading photos, running the models, and building the indexes locally. If you turn it off, the device skips that work and pulls in indexes already built by another of your devices (such as desktop). This is useful for phones with limited RAM.
 
+### Why do mobile and desktop show different Machine Learning percentages even though both are in sync? {#ml-percentage-mismatch-across-platforms}
+
+This can happen for a couple of reasons:
+
+- **Unstable network connection**: Switch between WiFi and mobile data, then force-quit and reopen the app. This resolves most mismatches.
+- **Files desktop can't process**: RAW images and a few other formats return an empty state on desktop, so it skips them and still shows 100%. If local indexing is off on mobile, your phone keeps counting those files and doesn't reach 100%.
+
+**Solution:**
+
+Open `Settings > Machine learning` on mobile and enable local indexing. This lets your phone index the files itself instead of relying on indexes from a device that skipped them.
+
 ## Magic Search
 
 ### What is magic search? {#what-is-magic-search}
