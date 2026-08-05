@@ -62,7 +62,7 @@ class SupportPage extends StatelessWidget {
             onTap: () => _viewLogs(context),
           ),
         ],
-        _SupportLink(
+        SettingsLink(
           label: context.strings.exportLogs,
           onTap: () => _exportLogs(context),
         ),
@@ -115,7 +115,7 @@ class SupportPage extends StatelessWidget {
           icon: HugeIcons.strokeRoundedWrench01,
           faqUrl: _troubleshootingFaqUrl,
         ),
-        _SupportLink(
+        SettingsLink(
           label: l10n.viewAllHelpTopics,
           onTap: () => _openHelpPage(context, title: l10n.helpAndSupport),
         ),
@@ -200,40 +200,5 @@ class SupportPage extends StatelessWidget {
         showShortToast(context, context.strings.somethingWentWrong);
       }
     }
-  }
-}
-
-class _SupportLink extends StatelessWidget {
-  final String label;
-  final Future<void> Function() onTap;
-
-  const _SupportLink({required this.label, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.componentColors;
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              label,
-              style: TextStyles.bodyBold.copyWith(color: colors.primary),
-            ),
-            const SizedBox(width: 4),
-            HugeIcon(
-              icon: HugeIcons.strokeRoundedArrowRight01,
-              color: colors.primary,
-              size: 16,
-              strokeWidth: 1.6,
-            ),
-          ],
-        ),
-      ),
-    );
   }
 }
