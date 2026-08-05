@@ -2487,6 +2487,22 @@ class MLDataDB with SqlDbBase implements IMLDataDB<int> {
   }
 
   @override
+  Future<Set<int>> getFullyIndexedFileIds({required bool includePets}) async {
+    final db = await asyncDB;
+    String query =
+        'SELECT $fileIDColumn FROM $facesTable WHERE $mlVersionColumn >= $faceMlVersion '
+        'INTERSECT '
+        'SELECT $fileIDColumn FROM $clipTable WHERE $mlVersionColumn >= $clipMlVersion';
+    if (includePets) {
+      query +=
+          ' INTERSECT '
+          'SELECT $fileIDColumn FROM $petFacesTable WHERE $mlVersionColumn >= $petMlVersion';
+    }
+    final List<Map<String, dynamic>> maps = await db.getAll(query);
+    return {for (final map in maps) map[fileIDColumn] as int};
+  }
+
+  @override
   Future<void> deletePetDataForFiles(List<int> fileIDs) async {
     if (fileIDs.isEmpty) return;
     final db = await asyncDB;
