@@ -13,10 +13,6 @@ import type { ModalVisibilityProps } from "ente-base/components/utils/modal";
 import { t } from "i18next";
 import React, { useRef, useState } from "react";
 
-// =============================================================================
-// Icons
-// =============================================================================
-
 const LikeIllustration: React.FC = () => (
     <svg
         width="126"
@@ -156,24 +152,11 @@ const CommentIllustration: React.FC = () => (
 );
 
 export interface AddNameModalProps extends ModalVisibilityProps {
-    /**
-     * Called when user submits their name.
-     */
     onSubmit: (name: string) => void;
-    /**
-     * The type of action being performed (like or comment).
-     * Defaults to 'like'.
-     */
     actionType?: "like" | "comment";
-    /**
-     * Called after the modal's exit animation completes.
-     */
     onExited?: () => void;
 }
 
-/**
- * Modal dialog for adding a name when liking or commenting on a photo anonymously.
- */
 export const AddNameModal: React.FC<AddNameModalProps> = ({
     open,
     onClose,
@@ -289,10 +272,6 @@ export const AddNameModal: React.FC<AddNameModalProps> = ({
         </StyledDialog>
     );
 };
-
-// =============================================================================
-// Styled Components
-// =============================================================================
 
 const StyledDialog = styled(Dialog)(({ theme }) => ({
     "& .MuiDialog-paper": {
