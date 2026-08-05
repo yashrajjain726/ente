@@ -13,6 +13,7 @@ import 'package:logging/logging.dart';
 import 'package:photos/core/configuration.dart';
 import 'package:photos/core/errors.dart';
 import "package:photos/core/event_bus.dart";
+import "package:photos/events/file_caption_updated_event.dart";
 import "package:photos/events/guest_view_event.dart";
 import "package:photos/models/file/extensions/file_props.dart";
 import 'package:photos/models/file/file.dart';
@@ -24,6 +25,9 @@ import "package:photos/module/download/thumbnail.dart";
 import "package:photos/service_locator.dart";
 import "package:photos/services/collections_service.dart";
 import "package:photos/states/detail_page_state.dart";
+import "package:photos/theme/colors.dart";
+import "package:photos/theme/ente_theme.dart";
+import "package:photos/ui/actions/file/file_actions.dart";
 import "package:photos/ui/common/fast_scroll_physics.dart";
 import 'package:photos/ui/notification/toast.dart';
 import "package:photos/ui/social/widgets/file_social_overlay.dart";
@@ -41,6 +45,10 @@ import 'package:photos/utils/dialog_util.dart';
 
 const _socialRightInset = 24.0;
 const _socialBottomBarClearance = 130.0;
+const _galleryBottomBarHeight = 60.0;
+const _galleryCaptionGap = 12.0;
+const _galleryCaptionLineHeight = 16.0;
+const _galleryCaptionScrimTopPadding = 12.0;
 
 enum DetailPageMode { minimalistic, full }
 
@@ -158,6 +166,8 @@ class _BodyState extends State<_Body> {
   bool isGuestView = false;
   bool swipeLocked = false;
   late final StreamSubscription<GuestViewEvent> _guestViewEventSubscription;
+  late final StreamSubscription<FileCaptionUpdatedEvent>
+  _captionUpdatedSubscription;
   QrCodeDetectionHelper? _qrHelper;
   final Map<String, File> _renderedFiles = {};
 
@@ -180,6 +190,13 @@ class _BodyState extends State<_Body> {
         swipeLocked = event.swipeLocked;
       });
     });
+    _captionUpdatedSubscription = Bus.instance
+        .on<FileCaptionUpdatedEvent>()
+        .listen((event) {
+          if (event.fileGeneratedID == _selectedFile?.generatedID) {
+            setState(() {});
+          }
+        });
     if (flagService.qrFeatureEnabled &&
         widget.config.mode != DetailPageMode.minimalistic) {
       _qrHelper = QrCodeDetectionHelper();
@@ -202,6 +219,7 @@ class _BodyState extends State<_Body> {
   @override
   void dispose() {
     _guestViewEventSubscription.cancel();
+    _captionUpdatedSubscription.cancel();
     _pageController.dispose();
     _selectedIndexNotifier.dispose();
     _qrHelper?.dispose();
@@ -294,17 +312,28 @@ class _BodyState extends State<_Body> {
               ),
               ValueListenableBuilder(
                 builder: (BuildContext context, int selectedIndex, _) {
-                  return widget.config.mode == DetailPageMode.minimalistic
-                      ? const SizedBox()
-                      : FileBottomBar(
-                          _files![selectedIndex],
+                  final file = _files![selectedIndex];
+                  final fullScreenNotifier = InheritedDetailPageState.of(
+                    context,
+                  ).enableFullScreenNotifier;
+                  return Stack(
+                    children: [
+                      _GalleryBottomOverlay(
+                        file: file,
+                        mode: widget.config.mode,
+                        isGuestView: isGuestView,
+                        enableFullScreenNotifier: fullScreenNotifier,
+                      ),
+                      if (widget.config.mode != DetailPageMode.minimalistic)
+                        FileBottomBar(
+                          file,
                           onFileRemoved: _onFileRemoved,
                           userID: Configuration.instance.getUserID(),
-                          enableFullScreenNotifier: InheritedDetailPageState.of(
-                            context,
-                          ).enableFullScreenNotifier,
+                          enableFullScreenNotifier: fullScreenNotifier,
                           isLocalOnlyContext: widget.config.isLocalOnlyContext,
-                        );
+                        ),
+                    ],
+                  );
                 },
                 valueListenable: _selectedIndexNotifier,
               ),
@@ -649,6 +678,105 @@ class _BodyState extends State<_Body> {
       return null;
     }
     return files[index];
+  }
+}
+
+class _GalleryBottomOverlay extends StatelessWidget {
+  final EnteFile file;
+  final DetailPageMode mode;
+  final bool isGuestView;
+  final ValueListenable<bool> enableFullScreenNotifier;
+
+  const _GalleryBottomOverlay({
+    required this.file,
+    required this.mode,
+    required this.isGuestView,
+    required this.enableFullScreenNotifier,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final supportsCaption =
+        file.fileType == FileType.image || file.fileType == FileType.livePhoto;
+    final caption = supportsCaption ? file.caption : null;
+    final captionText = caption == null || caption.isEmpty
+        ? null
+        : '"$caption"';
+    final hasBottomBar = mode != DetailPageMode.minimalistic && !isGuestView;
+    if (captionText == null && !hasBottomBar) {
+      return const SizedBox.shrink();
+    }
+
+    final safePadding = MediaQuery.paddingOf(context);
+    return ValueListenableBuilder<bool>(
+      valueListenable: enableFullScreenNotifier,
+      builder: (context, isFullScreen, _) {
+        return IgnorePointer(
+          ignoring: isFullScreen,
+          child: AnimatedOpacity(
+            opacity: isFullScreen ? 0 : 1,
+            duration: const Duration(milliseconds: 200),
+            child: Stack(
+              children: [
+                Align(
+                  alignment: Alignment.bottomCenter,
+                  child: IgnorePointer(
+                    child: SizedBox(
+                      width: double.infinity,
+                      height:
+                          safePadding.bottom +
+                          _galleryBottomBarHeight +
+                          (captionText == null
+                              ? 0
+                              : _galleryCaptionGap +
+                                    _galleryCaptionLineHeight +
+                                    _galleryCaptionScrimTopPadding),
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              Colors.transparent,
+                              Colors.black.withValues(alpha: 0.6),
+                              Colors.black.withValues(alpha: 0.72),
+                            ],
+                            stops: const [0, 0.8, 1],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                if (captionText != null)
+                  Positioned(
+                    left: safePadding.left + 16,
+                    right: safePadding.right + 16,
+                    bottom:
+                        safePadding.bottom +
+                        _galleryBottomBarHeight +
+                        _galleryCaptionGap,
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: GestureDetector(
+                        onTap: () => showDetailsSheet(context, file),
+                        child: Text(
+                          captionText,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: getEnteTextTheme(context).mini.copyWith(
+                            color: textBaseDark.withValues(alpha: 0.8),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 }
 

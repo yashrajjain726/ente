@@ -1,0 +1,1 @@
+- Added captions to photo and video memories.

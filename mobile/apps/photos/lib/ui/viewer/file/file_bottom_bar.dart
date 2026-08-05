@@ -206,27 +206,13 @@ class FileBottomBarState extends State<FileBottomBar> {
             curve: Curves.easeInOut,
             child: Align(
               alignment: Alignment.bottomCenter,
-              child: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Colors.transparent,
-                      Colors.black.withValues(alpha: 0.6),
-                      Colors.black.withValues(alpha: 0.72),
-                    ],
-                    stops: const [0, 0.8, 1],
-                  ),
-                ),
-                child: SafeArea(
-                  top: false,
-                  left: false,
-                  right: false,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceAround,
-                    children: children,
-                  ),
+              child: SafeArea(
+                top: false,
+                left: false,
+                right: false,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: children,
                 ),
               ),
             ),

@@ -1,0 +1,1 @@
+- Refreshed photo and live photo captions in the gallery viewer for a cleaner, more compact presentation.
