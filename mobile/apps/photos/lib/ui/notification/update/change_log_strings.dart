@@ -40,36 +40,36 @@ class ChangeLogStrings {
     'en': ChangeLogStrings(
       entries: [
         ChangeLogEntryStrings(
-          title: 'Comments and reactions in memories',
+          title: 'Faster, sharper face suggestions',
           description:
-              "Talk about shared memories with your loved ones, as you're reliving them.",
+              "The image processing now runs 5-10 times faster! Also, blurry and sideways faces no longer muddy your people groups, and we will remember the faces you've already dismissed.",
+        ),
+        ChangeLogEntryStrings(
+          title: 'Panoramas, reborn',
+          description:
+              'Rebuilt from the ground up. Panoramas open faster, move smoothly, and no longer come up blank.',
+        ),
+        ChangeLogEntryStrings(
+          title: "Backups that don't get stuck",
+          description:
+              "If your device runs out of room mid-backup, Ente now tells you and picks up where it left off once you've freed some space.",
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Share memories, your way',
+          title: 'Casting, simplified',
           description:
-              'Choose exactly which photos and videos go into a memory before you share.',
+              'Screens are easier to find on Android and pair automatically on iOS. No extra setup.',
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Photo viewer, polished',
+          title: 'Mute, remembered',
           description:
-              'The photo viewer and info sheet have been redesigned. Cleaner, nicer, easier to read.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Text in photos, sharper',
-          description:
-              'Copying text from photos is now faster and more reliable. Long press to start selecting.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Smarter caching',
-          description:
-              'Your photos stay quick to open while taking up less space on your device.',
+              'Silence a video once and it stays that way for the next one.',
         ),
         ChangeLogEntryStrings(
           title: 'and more!',
           description:
-              'Faster and more reliable backups, smoother gallery browsing, better thumbnail loading and download reliability, improved text detection in photos, better avatar colors, fixes for crashes during background work, and lots of smaller polish across the app.',
+              'Clear your Trash straight from Free up space, a smoother and more reliable app lock, favoriting shared photos in memories, Traditional Chinese joins the language list, smoother swiping in the photo viewer, plus fixes for uploading to multiple albums and picking SD card media in other apps.',
           isOnlineOnly: true,
         ),
       ],
@@ -77,36 +77,36 @@ class ChangeLogStrings {
     'ca': ChangeLogStrings(
       entries: [
         ChangeLogEntryStrings(
-          title: 'Comentaris i reaccions als records',
+          title: 'Suggeriments de cares més ràpids i precisos',
           description:
-              'Parla dels records compartits amb les persones que estimes mentre els torneu a viure.',
+              "El processament d'imatges ara és entre 5 i 10 vegades més ràpid! A més, les cares borroses o de costat ja no desordenen els grups de persones, i recordarem les cares que ja hagis descartat.",
+        ),
+        ChangeLogEntryStrings(
+          title: 'Panoràmiques, renovades',
+          description:
+              "Refetes des de zero. Les panoràmiques s'obren més ràpid, es desplacen amb fluïdesa i ja no apareixen en blanc.",
+        ),
+        ChangeLogEntryStrings(
+          title: "Còpies de seguretat que no es queden encallades",
+          description:
+              "Si el dispositiu es queda sense espai durant una còpia de seguretat, Ente t'avisa i reprèn la còpia des d'on s'havia aturat quan hagis alliberat una mica d'espai.",
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Comparteix els records a la teva manera',
+          title: 'Transmissió simplificada',
           description:
-              "Tria exactament quines fotos i vídeos formaran part d'un record abans de compartir-lo.",
+              "Trobar pantalles és més fàcil a Android, i a iOS es vinculen automàticament. Sense cap configuració addicional.",
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Visualitzador de fotos, renovat',
+          title: 'Silenci recordat',
           description:
-              "El visualitzador de fotos i el full d'informació s'han redissenyat. Més nets, agradables i fàcils de llegir.",
-        ),
-        ChangeLogEntryStrings(
-          title: 'Text més nítid a les fotos',
-          description:
-              'Copiar text de les fotos ara és més ràpid i fiable. Mantén premut per començar a seleccionar.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Memòria cau més intel·ligent',
-          description:
-              'Les fotos es continuen obrint ràpidament i ocupen menys espai al dispositiu.',
+              'Silencia un vídeo una vegada i el següent continuarà silenciat.',
         ),
         ChangeLogEntryStrings(
           title: 'i molt més!',
           description:
-              "Còpies de seguretat més ràpides i fiables, navegació més fluida per la galeria, millor càrrega de miniatures i baixades més fiables, detecció de text millorada a les fotos, millors colors d'avatar, correccions d'errors durant les tasques en segon pla i molts petits retocs a tota l'aplicació.",
+              "Buida la Paperera directament des d'Allibera espai, un bloqueig de l'aplicació més fluid i fiable, marca com a favorites les fotos compartides als records, el xinès tradicional s'incorpora a la llista d'idiomes, un desplaçament més fluid al visualitzador de fotos i correccions per pujar contingut a diversos àlbums i seleccionar contingut multimèdia de la targeta SD en altres aplicacions.",
           isOnlineOnly: true,
         ),
       ],
@@ -114,36 +114,36 @@ class ChangeLogStrings {
     'cs': ChangeLogStrings(
       entries: [
         ChangeLogEntryStrings(
-          title: 'Komentáře a reakce ve vzpomínkách',
+          title: 'Rychlejší a přesnější návrhy obličejů',
           description:
-              'Povídejte si o sdílených vzpomínkách se svými blízkými, zatímco je znovu prožíváte.',
+              'Zpracování obrázků je teď 5–10× rychlejší! Rozmazané obličeje a obličeje otočené na bok už navíc nenarušují skupiny osob a zapamatujeme si, které obličeje jste už zamítli.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Panoramata jako znovuzrozená',
+          description:
+              'Přepracovali jsme je od základů. Panoramata se otevírají rychleji, plynule se posouvají a už se nezobrazují prázdná.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Zálohy, které se nezaseknou',
+          description:
+              'Pokud v zařízení během zálohování dojde místo, Ente vás teď upozorní a po uvolnění místa zálohování naváže tam, kde skončilo.',
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Sdílejte vzpomínky po svém',
+          title: 'Jednodušší přenos na obrazovku',
           description:
-              'Před sdílením si přesně vyberte, které fotky a videa budou ve vzpomínce.',
+              'V Androidu se obrazovky snáze vyhledávají a v iOS se párují automaticky. Bez dalšího nastavování.',
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Vyladěný prohlížeč fotek',
+          title: 'Ztlumení, které si pamatujeme',
           description:
-              'Prohlížeč fotek a informační panel jsme přepracovali. Jsou přehlednější, hezčí a lépe se čtou.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Ostřejší text ve fotkách',
-          description:
-              'Kopírování textu z fotek je nyní rychlejší a spolehlivější. Dlouhým stisknutím zahájíte výběr.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Chytřejší ukládání do mezipaměti',
-          description:
-              'Fotky se otevírají rychle a zabírají v zařízení méně místa.',
+              'Jednou video ztlumte a ztlumené zůstane i to následující.',
         ),
         ChangeLogEntryStrings(
           title: 'a ještě víc!',
           description:
-              'Rychlejší a spolehlivější zálohování, plynulejší procházení galerie, lepší načítání náhledů a spolehlivější stahování, lepší rozpoznávání textu ve fotkách, lepší barvy avatarů, opravy pádů během práce na pozadí a spousta dalších drobných vylepšení v celé aplikaci.',
+              'Vyprázdnění Koše přímo z nabídky Uvolnit místo, plynulejší a spolehlivější zámek aplikace, přidávání sdílených fotek ze vzpomínek do oblíbených, tradiční čínština v seznamu jazyků, plynulejší přejíždění v prohlížeči fotek a také opravy nahrávání do více alb a výběru médií z SD karty v jiných aplikacích.',
           isOnlineOnly: true,
         ),
       ],
@@ -151,36 +151,36 @@ class ChangeLogStrings {
     'de': ChangeLogStrings(
       entries: [
         ChangeLogEntryStrings(
-          title: 'Kommentare und Reaktionen in Erinnerungen',
+          title: 'Schnellere, präzisere Gesichtsvorschläge',
           description:
-              'Unterhalte dich mit deinen Liebsten über geteilte Erinnerungen, während ihr sie gemeinsam noch einmal erlebt.',
+              'Die Bildverarbeitung läuft jetzt 5–10-mal schneller! Außerdem bringen unscharfe und seitlich gedrehte Gesichter deine Personengruppen nicht mehr durcheinander, und wir merken uns, welche Gesichter du bereits verworfen hast.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Panoramen, neu erfunden',
+          description:
+              'Von Grund auf neu entwickelt. Panoramen öffnen sich schneller, lassen sich flüssig bewegen und werden nicht mehr leer angezeigt.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Backups, die nicht stecken bleiben',
+          description:
+              'Wenn auf deinem Gerät während eines Backups der Speicherplatz ausgeht, sagt Ente dir jetzt Bescheid und macht dort weiter, wo es aufgehört hat, sobald du etwas Speicherplatz freigegeben hast.',
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Erinnerungen teilen, wie du möchtest',
+          title: 'Casting, ganz einfach',
           description:
-              'Wähle vor dem Teilen genau aus, welche Fotos und Videos in einer Erinnerung enthalten sind.',
+              'Auf Android lassen sich Bildschirme leichter finden, auf iOS werden sie automatisch gekoppelt. Keine zusätzliche Einrichtung.',
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Fotoanzeige, jetzt noch besser',
+          title: 'Stummschaltung, gespeichert',
           description:
-              'Die Fotoanzeige und das Infoblatt wurden neu gestaltet. Aufgeräumter, schöner und leichter zu lesen.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Text in Fotos, klarer',
-          description:
-              'Das Kopieren von Text aus Fotos ist jetzt schneller und zuverlässiger. Halte zum Auswählen länger gedrückt.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Intelligenteres Caching',
-          description:
-              'Deine Fotos lassen sich weiterhin schnell öffnen und belegen dabei weniger Speicherplatz auf deinem Gerät.',
+              'Schalte ein Video einmal stumm, und auch das nächste bleibt stumm.',
         ),
         ChangeLogEntryStrings(
           title: 'und vieles mehr!',
           description:
-              'Schnellere und zuverlässigere Backups, flüssigeres Durchsuchen der Galerie, besseres Laden von Miniaturansichten und zuverlässigere Downloads, verbesserte Texterkennung in Fotos, bessere Avatarfarben, Korrekturen für Abstürze bei Hintergrundaufgaben und viele kleinere Verbesserungen in der gesamten App.',
+              'Leere deinen Papierkorb direkt über Speicherplatz freigeben, nutze eine flüssigere und zuverlässigere App-Sperre, markiere geteilte Fotos in Erinnerungen als Favoriten, wähle traditionelles Chinesisch aus der Sprachliste, wische flüssiger durch die Fotoanzeige und profitiere von Fehlerbehebungen beim Hochladen in mehrere Alben und beim Auswählen von Medien auf SD-Karten in anderen Apps.',
           isOnlineOnly: true,
         ),
       ],
@@ -188,36 +188,36 @@ class ChangeLogStrings {
     'es': ChangeLogStrings(
       entries: [
         ChangeLogEntryStrings(
-          title: 'Comentarios y reacciones en los recuerdos',
+          title: 'Sugerencias de rostros más rápidas y precisas',
           description:
-              'Habla sobre los recuerdos compartidos con tus seres queridos mientras los revives.',
+              '¡El procesamiento de imágenes ahora es entre 5 y 10 veces más rápido! Además, los rostros borrosos o girados de lado ya no enturbian tus grupos de personas, y recordaremos los rostros que ya hayas descartado.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Panorámicas, renacidas',
+          description:
+              'Reconstruidas desde cero. Las panorámicas se abren más rápido, se mueven con fluidez y ya no aparecen en blanco.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Copias de seguridad que no se atascan',
+          description:
+              'Si tu dispositivo se queda sin espacio durante una copia de seguridad, Ente te avisa y la reanuda desde donde se quedó en cuanto hayas liberado algo de espacio.',
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Comparte recuerdos a tu manera',
+          title: 'Transmisión simplificada',
           description:
-              'Elige exactamente qué fotos y vídeos incluir en un recuerdo antes de compartirlo.',
+              'En Android, las pantallas son más fáciles de encontrar y, en iOS, se vinculan automáticamente. Sin configuración adicional.',
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Visor de fotos, renovado',
+          title: 'Silencio que se recuerda',
           description:
-              'Se han rediseñado el visor de fotos y la hoja de información. Más limpios, agradables y fáciles de leer.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Texto más nítido en las fotos',
-          description:
-              'Copiar texto de las fotos ahora es más rápido y fiable. Mantén pulsado para empezar a seleccionar.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Caché más inteligente',
-          description:
-              'Tus fotos siguen abriéndose rápidamente y ocupan menos espacio en el dispositivo.',
+              'Silencia un vídeo una vez y el siguiente también permanecerá en silencio.',
         ),
         ChangeLogEntryStrings(
           title: '¡y mucho más!',
           description:
-              'Copias de seguridad más rápidas y fiables, navegación más fluida por la galería, mejor carga de miniaturas y descargas más fiables, detección de texto mejorada en las fotos, mejores colores de avatar, correcciones de fallos durante tareas en segundo plano y muchos pequeños retoques en toda la app.',
+              'Vacía la Papelera directamente desde Liberar espacio, disfruta de un bloqueo de aplicación más fluido y fiable, marca como favoritas las fotos compartidas en los recuerdos, encuentra el chino tradicional en la lista de idiomas, desliza con más fluidez en el visor de fotos y aprovecha las correcciones para subir contenido a varios álbumes y elegir archivos multimedia de la tarjeta SD en otras aplicaciones.',
           isOnlineOnly: true,
         ),
       ],
@@ -225,36 +225,36 @@ class ChangeLogStrings {
     'fr': ChangeLogStrings(
       entries: [
         ChangeLogEntryStrings(
-          title: 'Commentaires et réactions dans les souvenirs',
+          title: 'Des suggestions de visages plus rapides et plus précises',
           description:
-              'Discutez des souvenirs partagés avec vos proches tout en les revivant.',
+              'Le traitement d’image est désormais 5 à 10 fois plus rapide ! De plus, les visages flous ou inclinés ne perturbent plus vos groupes de personnes, et nous mémoriserons les visages que vous avez déjà ignorés.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Panoramas, nouvelle génération',
+          description:
+              'Entièrement reconstruits. Les panoramas s’ouvrent plus vite, se déplacent en toute fluidité et ne s’affichent plus vides.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Des sauvegardes qui ne restent pas bloquées',
+          description:
+              'Si votre appareil manque d’espace en cours de sauvegarde, Ente vous prévient désormais et reprend là où elle s’était arrêtée dès que vous avez libéré de l’espace.',
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Partagez vos souvenirs à votre façon',
+          title: 'Diffusion simplifiée',
           description:
-              'Choisissez précisément les photos et vidéos à inclure dans un souvenir avant de le partager.',
+              'Les écrans sont plus faciles à trouver sous Android et s’associent automatiquement sous iOS. Aucune configuration supplémentaire.',
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Visionneuse de photos peaufinée',
+          title: 'Le mode silencieux, mémorisé',
           description:
-              'La visionneuse de photos et la fiche d’informations ont été repensées. Plus claires, plus agréables et plus faciles à lire.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Texte plus net dans les photos',
-          description:
-              'La copie de texte depuis les photos est désormais plus rapide et plus fiable. Appuyez longuement pour commencer la sélection.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Mise en cache plus intelligente',
-          description:
-              'Vos photos restent rapides à ouvrir tout en occupant moins d’espace sur votre appareil.',
+              'Coupez le son d’une vidéo une fois, et la suivante restera également muette.',
         ),
         ChangeLogEntryStrings(
           title: 'et bien plus encore !',
           description:
-              'Des sauvegardes plus rapides et plus fiables, une navigation plus fluide dans la galerie, un meilleur chargement des miniatures et des téléchargements plus fiables, une meilleure détection du texte dans les photos, de meilleures couleurs d’avatar, des correctifs pour les plantages pendant les tâches en arrière-plan et de nombreuses petites améliorations dans toute l’app.',
+              'Videz votre Corbeille directement depuis Libérer de l’espace, profitez d’un verrouillage de l’application plus fluide et plus fiable, ajoutez aux favoris les photos partagées dans les souvenirs, retrouvez le chinois traditionnel dans la liste des langues, parcourez la visionneuse de photos plus facilement et profitez de correctifs pour l’envoi vers plusieurs albums et la sélection de médias de la carte SD dans d’autres applications.',
           isOnlineOnly: true,
         ),
       ],
@@ -262,36 +262,36 @@ class ChangeLogStrings {
     'it': ChangeLogStrings(
       entries: [
         ChangeLogEntryStrings(
-          title: 'Commenti e reazioni nei ricordi',
+          title: 'Suggerimenti di volti più rapidi e precisi',
           description:
-              'Parla dei ricordi condivisi con le persone che ami mentre li rivivi.',
+              'L’elaborazione delle immagini ora è da 5 a 10 volte più veloce! Inoltre, i volti sfocati o ruotati di lato non confondono più i tuoi gruppi di persone e ricorderemo i volti che hai già ignorato.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Panoramiche, rinate',
+          description:
+              'Ricostruite da zero. Le panoramiche si aprono più velocemente, si muovono con fluidità e non appaiono più vuote.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Backup che non si bloccano',
+          description:
+              'Se il dispositivo esaurisce lo spazio durante un backup, Ente ora ti avvisa e riprende da dove si era interrotto non appena avrai liberato un po’ di spazio.',
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Condividi i ricordi a modo tuo',
+          title: 'Trasmissione su schermo, semplificata',
           description:
-              'Scegli esattamente quali foto e video inserire in un ricordo prima di condividerlo.',
+              'Su Android è più facile trovare gli schermi, mentre su iOS si abbinano automaticamente. Nessuna configurazione aggiuntiva.',
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Visualizzatore di foto perfezionato',
+          title: 'Il silenzioso resta attivo',
           description:
-              'Il visualizzatore di foto e la scheda delle informazioni sono stati riprogettati. Più ordinati, gradevoli e facili da leggere.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Testo nelle foto più nitido',
-          description:
-              'Copiare il testo dalle foto ora è più veloce e affidabile. Tieni premuto per iniziare la selezione.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Cache più intelligente',
-          description:
-              'Le tue foto restano rapide da aprire e occupano meno spazio sul dispositivo.',
+              'Disattiva l’audio di un video una volta e resterà disattivato anche per il successivo.',
         ),
         ChangeLogEntryStrings(
           title: 'e molto altro!',
           description:
-              'Backup più veloci e affidabili, navigazione più fluida nella galleria, caricamento migliore delle miniature e download più affidabili, rilevamento del testo nelle foto migliorato, colori degli avatar migliori, correzioni per gli arresti anomali durante le attività in background e tanti piccoli miglioramenti in tutta l’app.',
+              'Svuota il Cestino direttamente da Libera spazio, usa un blocco app più fluido e affidabile, aggiungi ai preferiti le foto condivise nei ricordi, trova il cinese tradizionale nell’elenco delle lingue, scorri più fluidamente nel visualizzatore di foto e approfitta delle correzioni per il caricamento in più album e la selezione dei contenuti della scheda SD in altre app.',
           isOnlineOnly: true,
         ),
       ],
@@ -299,31 +299,33 @@ class ChangeLogStrings {
     'ja': ChangeLogStrings(
       entries: [
         ChangeLogEntryStrings(
-          title: '思い出でのコメントとリアクション',
-          description: '大切な人と共有した思い出を振り返りながら、会話を楽しめます。',
-          isOnlineOnly: true,
-        ),
-        ChangeLogEntryStrings(
-          title: '思い出を自分らしく共有',
-          description: '共有する前に、思い出に含める写真や動画を自由に選べます。',
-          isOnlineOnly: true,
-        ),
-        ChangeLogEntryStrings(
-          title: '写真ビューアーをさらに使いやすく',
-          description: '写真ビューアーと情報シートを再設計しました。よりすっきり、美しく、読みやすくなりました。',
-        ),
-        ChangeLogEntryStrings(
-          title: '写真内のテキストをより鮮明に',
-          description: '写真からのテキストコピーが、より高速で確実になりました。長押しして選択を開始できます。',
-        ),
-        ChangeLogEntryStrings(
-          title: 'よりスマートなキャッシュ',
-          description: '写真をすばやく開ける快適さはそのままに、デバイスの使用容量を抑えます。',
-        ),
-        ChangeLogEntryStrings(
-          title: 'さらに多くの改善！',
+          title: 'より速く、より正確な顔の候補',
           description:
-              'バックアップの高速化と信頼性向上、ギャラリー閲覧のなめらかさ向上、サムネイル読み込みとダウンロードの信頼性向上、写真内のテキスト検出の改善、アバターの色の改善、バックグラウンド処理中のクラッシュ修正など、アプリ全体に多くの細かな改善を加えました。',
+              '画像処理が5～10倍高速になりました！さらに、ぼやけた顔や横向きの顔が人物グループに混ざらなくなり、すでに除外した顔も記憶されます。',
+        ),
+        ChangeLogEntryStrings(
+          title: 'パノラマを一新',
+          description: 'ゼロから作り直しました。パノラマがより速く開き、滑らかに動作し、真っ白に表示されることもなくなりました。',
+        ),
+        ChangeLogEntryStrings(
+          title: '止まらないバックアップ',
+          description:
+              'バックアップ中に端末の空き容量が不足すると、Enteがお知らせし、空き容量を確保した後に中断したところから再開します。',
+          isOnlineOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'キャストをシンプルに',
+          description: 'Androidでは画面を見つけやすくなり、iOSでは自動でペアリングされます。追加の設定は必要ありません。',
+          isOnlineOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'ミュート設定を記憶',
+          description: '一度動画をミュートにすると、次の動画でもミュートのままになります。',
+        ),
+        ChangeLogEntryStrings(
+          title: 'ほかにも！',
+          description:
+              '「スペースを解放する」から直接ゴミ箱を空にできるようになったほか、よりスムーズで信頼性の高いアプリロック、思い出内の共有写真のお気に入り登録、繁体字中国語の言語リストへの追加、写真ビューアでのより滑らかなスワイプ、複数のアルバムへのアップロードや他のアプリでのSDカード内メディアの選択に関する修正を行いました。',
           isOnlineOnly: true,
         ),
       ],
@@ -331,36 +333,36 @@ class ChangeLogStrings {
     'nl': ChangeLogStrings(
       entries: [
         ChangeLogEntryStrings(
-          title: 'Opmerkingen en reacties in herinneringen',
+          title: 'Snellere, scherpere gezichtssuggesties',
           description:
-              'Praat met je dierbaren over gedeelde herinneringen terwijl jullie ze opnieuw beleven.',
+              'De beeldverwerking is nu 5–10 keer zo snel! Bovendien vertroebelen onscherpe en gedraaide gezichten je persoonsgroepen niet meer en onthouden we welke gezichten je al hebt afgewezen.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Panorama’s, herboren',
+          description:
+              'Helemaal opnieuw opgebouwd. Panorama’s openen sneller, bewegen soepel en worden niet meer blanco weergegeven.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Back-ups die niet vastlopen',
+          description:
+              'Als de opslagruimte op je apparaat tijdens een back-up opraakt, laat Ente je dat nu weten en gaat de back-up verder waar die was gebleven zodra je wat ruimte hebt vrijgemaakt.',
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Deel herinneringen op jouw manier',
+          title: 'Casten, vereenvoudigd',
           description:
-              "Kies precies welke foto's en video's in een herinnering komen voordat je deze deelt.",
+              'Schermen zijn gemakkelijker te vinden op Android en worden automatisch gekoppeld op iOS. Geen extra configuratie.',
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Fotoviewer, verfijnd',
+          title: 'Dempen, onthouden',
           description:
-              'De fotoviewer en het informatieblad zijn opnieuw ontworpen. Rustiger, mooier en makkelijker te lezen.',
+              'Demp een video één keer en ook de volgende blijft gedempt.',
         ),
         ChangeLogEntryStrings(
-          title: "Tekst in foto's, scherper",
+          title: 'en nog veel meer!',
           description:
-              "Tekst uit foto's kopiëren is nu sneller en betrouwbaarder. Houd ingedrukt om te beginnen met selecteren.",
-        ),
-        ChangeLogEntryStrings(
-          title: 'Slimmere caching',
-          description:
-              "Je foto's blijven snel openen en nemen minder ruimte in op je apparaat.",
-        ),
-        ChangeLogEntryStrings(
-          title: 'en meer!',
-          description:
-              "Snellere en betrouwbaardere back-ups, soepeler bladeren door de galerij, beter laden van miniaturen en betrouwbaardere downloads, verbeterde tekstherkenning in foto's, betere avatarkleuren, oplossingen voor crashes tijdens achtergrondtaken en veel kleinere verbeteringen in de hele app.",
+              'Leeg je Prullenbak rechtstreeks vanuit Ruimte vrijmaken, gebruik een soepelere en betrouwbaardere app-vergrendeling, voeg gedeelde foto’s in herinneringen toe aan je favorieten, kies Traditioneel Chinees in de talenlijst, veeg soepeler door de fotoviewer en profiteer van oplossingen voor uploaden naar meerdere albums en het kiezen van media op een SD-kaart in andere apps.',
           isOnlineOnly: true,
         ),
       ],
@@ -368,36 +370,36 @@ class ChangeLogStrings {
     'no': ChangeLogStrings(
       entries: [
         ChangeLogEntryStrings(
-          title: 'Kommentarer og reaksjoner i minner',
+          title: 'Raskere og skarpere ansiktsforslag',
           description:
-              'Snakk om delte minner med dem du er glad i, mens dere opplever dem på nytt.',
+              'Bildebehandlingen er nå 5–10 ganger raskere! I tillegg vil ikke uskarpe og sidelengs ansikter lenger rote til persongruppene dine, og vi husker ansiktene du allerede har avvist.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Panoramaer, gjenfødt',
+          description:
+              'Bygget opp helt fra bunnen av. Panoramaer åpnes raskere, beveger seg jevnt og vises ikke lenger tomme.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Sikkerhetskopier som ikke setter seg fast',
+          description:
+              'Hvis enheten din går tom for lagringsplass under sikkerhetskopiering, sier Ente fra og fortsetter der den slapp så snart du har frigjort litt plass.',
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Del minner på din måte',
+          title: 'Enklere casting',
           description:
-              'Velg nøyaktig hvilke bilder og videoer som skal være med i et minne før du deler det.',
+              'Det er enklere å finne skjermer på Android, og på iOS sammenkobles de automatisk. Ingen ekstra oppsett.',
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'En mer polert bildevisning',
+          title: 'Demping, husket',
           description:
-              'Bildevisningen og informasjonsarket har fått ny design. Renere, finere og enklere å lese.',
+              'Demp en video én gang, så forblir også den neste dempet.',
         ),
         ChangeLogEntryStrings(
-          title: 'Skarpere tekst i bilder',
+          title: 'og mye mer!',
           description:
-              'Kopiering av tekst fra bilder er nå raskere og mer pålitelig. Trykk og hold for å begynne å velge.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Smartere hurtigbufring',
-          description:
-              'Bildene dine åpnes fortsatt raskt, samtidig som de tar mindre plass på enheten.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'og mer!',
-          description:
-              'Raskere og mer pålitelige sikkerhetskopier, jevnere galleriblaing, bedre innlasting av miniatyrbilder og mer pålitelige nedlastinger, forbedret tekstgjenkjenning i bilder, bedre avatarfarger, rettelser for krasj under bakgrunnsarbeid og mange små forbedringer i hele appen.',
+              'Tøm Papirkurv direkte fra Frigjør lagringsplass, bruk en jevnere og mer pålitelig applås, merk delte bilder i minner som favoritter, finn tradisjonell kinesisk i språklisten, sveip jevnere i bildevisningen, og få rettelser for opplasting til flere album og valg av medier fra SD-kort i andre apper.',
           isOnlineOnly: true,
         ),
       ],
@@ -405,36 +407,36 @@ class ChangeLogStrings {
     'pl': ChangeLogStrings(
       entries: [
         ChangeLogEntryStrings(
-          title: 'Komentarze i reakcje we wspomnieniach',
+          title: 'Szybsze i trafniejsze sugestie twarzy',
           description:
-              'Rozmawiaj z bliskimi o udostępnionych wspomnieniach, przeżywając je ponownie.',
+              'Przetwarzanie obrazów jest teraz 5–10 razy szybsze! Ponadto rozmazane i obrócone bokiem twarze nie zaburzają już grup osób, a twarze, które zostały już odrzucone, zostaną zapamiętane.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Panoramy od nowa',
+          description:
+              'Przebudowane od podstaw. Panoramy otwierają się szybciej, przesuwają płynnie i nie wyświetlają się już jako puste.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Kopie zapasowe, które się nie zacinają',
+          description:
+              'Jeśli podczas tworzenia kopii zapasowej na urządzeniu zabraknie miejsca, Ente teraz Cię o tym poinformuje i po zwolnieniu miejsca wznowi pracę od momentu, w którym została przerwana.',
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Udostępniaj wspomnienia po swojemu',
+          title: 'Prostsze przesyłanie na ekran',
           description:
-              'Przed udostępnieniem wybierz dokładnie, które zdjęcia i filmy znajdą się we wspomnieniu.',
+              'W Androidzie ekrany łatwiej znaleźć, a w iOS parują się automatycznie. Bez dodatkowej konfiguracji.',
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Dopracowana przeglądarka zdjęć',
+          title: 'Wyciszenie zapamiętane',
           description:
-              'Przeglądarka zdjęć i panel informacji zostały przeprojektowane. Są przejrzystsze, ładniejsze i łatwiejsze do odczytania.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Wyraźniejszy tekst na zdjęciach',
-          description:
-              'Kopiowanie tekstu ze zdjęć jest teraz szybsze i bardziej niezawodne. Naciśnij i przytrzymaj, aby rozpocząć zaznaczanie.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Inteligentniejsze buforowanie',
-          description:
-              'Zdjęcia nadal otwierają się szybko, zajmując mniej miejsca na urządzeniu.',
+              'Wycisz film raz, a następny również pozostanie wyciszony.',
         ),
         ChangeLogEntryStrings(
           title: 'i wiele więcej!',
           description:
-              'Szybsze i bardziej niezawodne kopie zapasowe, płynniejsze przeglądanie galerii, lepsze wczytywanie miniatur i bardziej niezawodne pobieranie, ulepszone wykrywanie tekstu na zdjęciach, lepsze kolory awatarów, poprawki awarii podczas pracy w tle oraz wiele drobnych ulepszeń w całej aplikacji.',
+              'Opróżnianie Kosza bezpośrednio z opcji Zwolnij miejsce, płynniejsza i bardziej niezawodna blokada aplikacji, dodawanie do ulubionych udostępnionych zdjęć ze wspomnień, tradycyjny chiński na liście języków, płynniejsze przesuwanie w przeglądarce zdjęć oraz poprawki przesyłania do wielu albumów i wybierania multimediów z karty SD w innych aplikacjach.',
           isOnlineOnly: true,
         ),
       ],
@@ -442,36 +444,36 @@ class ChangeLogStrings {
     'pt_BR': ChangeLogStrings(
       entries: [
         ChangeLogEntryStrings(
-          title: 'Comentários e reações nas memórias',
+          title: 'Sugestões de rostos mais rápidas e precisas',
           description:
-              'Converse sobre memórias compartilhadas com quem você ama enquanto vocês as revivem.',
+              'O processamento de imagens agora é de 5 a 10 vezes mais rápido! Além disso, rostos desfocados ou de lado não atrapalham mais seus grupos de pessoas, e vamos lembrar quais rostos você já dispensou.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Panoramas, renovados',
+          description:
+              'Reconstruídos do zero. Os panoramas abrem mais rápido, movem-se com fluidez e não aparecem mais em branco.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Backups que não travam',
+          description:
+              'Se o seu dispositivo ficar sem espaço durante um backup, o Ente agora avisa e retoma de onde parou assim que você liberar um pouco de espaço.',
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Compartilhe memórias do seu jeito',
+          title: 'Transmissão simplificada',
           description:
-              'Escolha exatamente quais fotos e vídeos entram em uma memória antes de compartilhá-la.',
+              'No Android, é mais fácil encontrar telas; no iOS, elas são pareadas automaticamente. Sem configuração extra.',
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Visualizador de fotos aprimorado',
+          title: 'O modo mudo fica salvo',
           description:
-              'O visualizador de fotos e a tela de informações foram redesenhados. Mais limpos, bonitos e fáceis de ler.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Texto mais nítido nas fotos',
-          description:
-              'Copiar texto das fotos agora está mais rápido e confiável. Toque e segure para começar a selecionar.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Cache mais inteligente',
-          description:
-              'Suas fotos continuam abrindo rapidamente e ocupam menos espaço no dispositivo.',
+              'Silencie um vídeo uma vez e o próximo também ficará sem som.',
         ),
         ChangeLogEntryStrings(
           title: 'e muito mais!',
           description:
-              'Backups mais rápidos e confiáveis, navegação mais fluida na galeria, melhor carregamento de miniaturas e downloads mais confiáveis, melhor detecção de texto nas fotos, melhores cores de avatar, correções de falhas durante tarefas em segundo plano e muitos pequenos aprimoramentos em todo o app.',
+              'Esvazie a Lixeira direto em Liberar espaço, use um bloqueio do aplicativo mais fluido e confiável, favorite fotos compartilhadas nas memórias, encontre o chinês tradicional na lista de idiomas, deslize com mais fluidez no visualizador de fotos e aproveite as correções para uploads em vários álbuns e para selecionar mídias do cartão SD em outros aplicativos.',
           isOnlineOnly: true,
         ),
       ],
@@ -479,36 +481,36 @@ class ChangeLogStrings {
     'pt_PT': ChangeLogStrings(
       entries: [
         ChangeLogEntryStrings(
-          title: 'Comentários e reações nas memórias',
+          title: 'Sugestões de rostos mais rápidas e precisas',
           description:
-              'Converse sobre memórias partilhadas com quem mais gosta enquanto as revive.',
+              'O processamento de imagens é agora 5 a 10 vezes mais rápido! Além disso, os rostos desfocados ou de lado já não baralham os seus grupos de pessoas, e vamos recordar os rostos que já dispensou.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Panoramas, renascidos',
+          description:
+              'Reconstruídos de raiz. Os panoramas abrem mais depressa, movem-se com fluidez e já não aparecem em branco.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Cópias de segurança que não ficam bloqueadas',
+          description:
+              'Se o seu dispositivo ficar sem espaço durante uma cópia de segurança, o Ente avisa-o agora e retoma a partir de onde parou assim que libertar algum espaço.',
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Partilhe memórias à sua maneira',
+          title: 'Transmissão simplificada',
           description:
-              'Escolha exatamente quais fotografias e vídeos entram numa memória antes de a partilhar.',
+              'No Android, é mais fácil encontrar ecrãs; no iOS, estes são emparelhados automaticamente. Sem configuração adicional.',
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Visualizador de fotografias aperfeiçoado',
+          title: 'Silêncio, memorizado',
           description:
-              'O visualizador de fotografias e a folha de informações foram redesenhados. Mais simples, agradáveis e fáceis de ler.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Texto mais nítido nas fotografias',
-          description:
-              'Copiar texto das fotografias é agora mais rápido e fiável. Toque sem soltar para começar a selecionar.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Armazenamento em cache mais inteligente',
-          description:
-              'As suas fotografias continuam a abrir rapidamente e ocupam menos espaço no dispositivo.',
+              'Silencie um vídeo uma vez e o seguinte também ficará sem som.',
         ),
         ChangeLogEntryStrings(
           title: 'e muito mais!',
           description:
-              'Cópias de segurança mais rápidas e fiáveis, navegação mais fluida na galeria, melhor carregamento de miniaturas e transferências mais fiáveis, melhor deteção de texto nas fotografias, melhores cores de avatar, correções de falhas durante tarefas em segundo plano e muitos pequenos aperfeiçoamentos em toda a aplicação.',
+              'Esvazie a Lixeira diretamente em Libertar espaço, use um bloqueio da aplicação mais fluido e fiável, marque como favoritas as fotografias partilhadas nas memórias, encontre o chinês tradicional na lista de idiomas, deslize mais suavemente no visualizador de fotografias e aproveite as correções nos envios para vários álbuns e na seleção de conteúdos do cartão SD noutras aplicações.',
           isOnlineOnly: true,
         ),
       ],
@@ -516,36 +518,36 @@ class ChangeLogStrings {
     'ro': ChangeLogStrings(
       entries: [
         ChangeLogEntryStrings(
-          title: 'Comentarii și reacții în amintiri',
+          title: 'Sugestii de fețe mai rapide și mai precise',
           description:
-              'Vorbește despre amintirile partajate cu cei dragi, în timp ce le retrăiți.',
+              'Procesarea imaginilor este acum de 5–10 ori mai rapidă! În plus, fețele neclare sau întoarse într-o parte nu vă mai încurcă grupurile de persoane, iar noi vom reține fețele pe care le-ați respins deja.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Panorame, renăscute',
+          description:
+              'Reconstruite de la zero. Panoramele se deschid mai repede, se mișcă fluid și nu mai apar goale.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Copii de siguranță care nu se blochează',
+          description:
+              'Dacă dispozitivul rămâne fără spațiu în timpul unei copii de siguranță, Ente vă anunță acum și reia de unde a rămas după ce eliberați puțin spațiu.',
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Partajează amintirile în felul tău',
+          title: 'Transmitere simplificată',
           description:
-              'Alege exact ce fotografii și videoclipuri intră într-o amintire înainte de a o partaja.',
+              'Ecranele sunt mai ușor de găsit pe Android și se asociază automat pe iOS. Fără configurare suplimentară.',
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Vizualizator de fotografii îmbunătățit',
+          title: 'Sunet dezactivat, setare reținută',
           description:
-              'Vizualizatorul de fotografii și panoul de informații au fost reproiectate. Mai clare, mai plăcute și mai ușor de citit.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Text mai clar în fotografii',
-          description:
-              'Copierea textului din fotografii este acum mai rapidă și mai fiabilă. Apasă lung pentru a începe selectarea.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Stocare în cache mai inteligentă',
-          description:
-              'Fotografiile se deschid în continuare rapid și ocupă mai puțin spațiu pe dispozitiv.',
+              'Dezactivați sunetul unui videoclip o dată, iar următorul va rămâne și el fără sunet.',
         ),
         ChangeLogEntryStrings(
           title: 'și multe altele!',
           description:
-              'Copii de siguranță mai rapide și mai fiabile, navigare mai fluidă în galerie, încărcare mai bună a miniaturilor și descărcări mai fiabile, detectare îmbunătățită a textului din fotografii, culori mai bune pentru avatare, remedieri pentru blocări în timpul activităților din fundal și multe mici îmbunătățiri în întreaga aplicație.',
+              'Goliți Coșul de gunoi direct din Eliberați spațiu, folosiți o blocare a aplicației mai fluidă și mai fiabilă, adăugați la favorite fotografiile partajate din amintiri, găsiți chineza tradițională în lista de limbi, glisați mai fluid în vizualizatorul de fotografii și beneficiați de remedieri pentru încărcarea în mai multe albume și selectarea conținutului media de pe cardul SD în alte aplicații.',
           isOnlineOnly: true,
         ),
       ],
@@ -553,36 +555,36 @@ class ChangeLogStrings {
     'ru': ChangeLogStrings(
       entries: [
         ChangeLogEntryStrings(
-          title: 'Комментарии и реакции в воспоминаниях',
+          title: 'Более быстрые и точные подсказки лиц',
           description:
-              'Обсуждайте общие воспоминания с близкими, заново переживая их вместе.',
+              'Обработка изображений теперь работает в 5–10 раз быстрее! Кроме того, размытые и повёрнутые набок лица больше не вносят путаницу в группы людей, а мы запомним лица, которые вы уже отклонили.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Панорамы, рождённые заново',
+          description:
+              'Полностью переработаны. Панорамы открываются быстрее, плавно перемещаются и больше не отображаются пустыми.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Резервные копии, которые не застревают',
+          description:
+              'Если во время резервного копирования на устройстве закончится место, Ente теперь сообщит об этом и продолжит с места остановки, как только вы освободите немного места.',
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Делитесь воспоминаниями по-своему',
+          title: 'Трансляция стала проще',
           description:
-              'Перед публикацией выберите, какие именно фото и видео войдут в воспоминание.',
+              'На Android экраны теперь проще находить, а на iOS они подключаются автоматически. Никакой дополнительной настройки.',
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Обновлённый просмотр фото',
+          title: 'Отключение звука запоминается',
           description:
-              'Мы переработали просмотр фото и панель сведений. Они стали чище, приятнее и удобнее для чтения.',
+              'Отключите звук у одного видео — и следующее тоже останется без звука.',
         ),
         ChangeLogEntryStrings(
-          title: 'Более чёткий текст на фото',
+          title: 'и многое другое!',
           description:
-              'Копировать текст с фотографий теперь быстрее и надёжнее. Нажмите и удерживайте, чтобы начать выделение.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Умнее кэширование',
-          description:
-              'Фотографии по-прежнему быстро открываются, занимая меньше места на устройстве.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'и не только!',
-          description:
-              'Более быстрое и надёжное резервное копирование, плавный просмотр галереи, улучшенная загрузка миниатюр и надёжность скачивания, более точное распознавание текста на фото, улучшенные цвета аватаров, исправления сбоев во время фоновой работы и множество небольших улучшений во всём приложении.',
+              'Очищайте Корзину прямо из раздела Освободить место, пользуйтесь более плавной и надёжной блокировкой приложения, добавляйте в избранное общие фотографии из воспоминаний, выбирайте традиционный китайский в списке языков, плавнее листайте фотографии в средстве просмотра и получайте исправления загрузки в несколько альбомов и выбора медиафайлов с SD-карты в других приложениях.',
           isOnlineOnly: true,
         ),
       ],
@@ -590,36 +592,36 @@ class ChangeLogStrings {
     'tr': ChangeLogStrings(
       entries: [
         ChangeLogEntryStrings(
-          title: 'Anılarda yorumlar ve tepkiler',
+          title: 'Daha hızlı, daha isabetli yüz önerileri',
           description:
-              'Paylaşılan anıları yeniden yaşarken sevdiklerinizle onlar hakkında konuşun.',
+              'Görüntü işleme artık 5–10 kat daha hızlı! Ayrıca bulanık ve yana dönük yüzler artık kişi gruplarınızı karıştırmıyor ve daha önce reddettiğiniz yüzleri hatırlıyoruz.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Panoramalar yeniden doğdu',
+          description:
+              'Baştan sona yeniden geliştirildi. Panoramalar daha hızlı açılıyor, akıcı hareket ediyor ve artık boş görünmüyor.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Takılıp kalmayan yedeklemeler',
+          description:
+              'Yedekleme sırasında cihazınızda yer kalmazsa Ente artık sizi bilgilendiriyor ve biraz alan açtıktan sonra kaldığı yerden devam ediyor.',
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Anıları istediğiniz gibi paylaşın',
+          title: 'Ekrana yansıtmak artık daha kolay',
           description:
-              'Paylaşmadan önce bir anıya hangi fotoğraf ve videoların ekleneceğini tam olarak seçin.',
+              'Android’de ekranları bulmak daha kolay; iOS’ta ise otomatik olarak eşleştiriliyorlar. Ek kurulum gerekmiyor.',
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Daha şık fotoğraf görüntüleyici',
+          title: 'Sessiz ayarı hatırlanıyor',
           description:
-              'Fotoğraf görüntüleyici ve bilgi sayfası yeniden tasarlandı. Daha sade, güzel ve okunması kolay.',
+              'Bir videonun sesini bir kez kapatın; sonraki video da sessiz kalsın.',
         ),
         ChangeLogEntryStrings(
-          title: 'Fotoğraflardaki metin artık daha net',
+          title: 've dahası!',
           description:
-              'Fotoğraflardan metin kopyalamak artık daha hızlı ve güvenilir. Seçmeye başlamak için basılı tutun.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Daha akıllı önbellekleme',
-          description:
-              'Fotoğraflarınız hızlı açılmaya devam ederken cihazınızda daha az yer kaplar.',
-        ),
-        ChangeLogEntryStrings(
-          title: 've daha fazlası!',
-          description:
-              'Daha hızlı ve güvenilir yedeklemeler, daha akıcı galeri gezintisi, daha iyi küçük resim yükleme ve indirme güvenilirliği, fotoğraflarda geliştirilmiş metin algılama, daha iyi avatar renkleri, arka plan çalışmaları sırasında oluşan çökmeler için düzeltmeler ve uygulama genelinde birçok küçük iyileştirme.',
+              'Çöp kutunuzu doğrudan Boş alan bölümünden temizleme, daha akıcı ve güvenilir bir uygulama kilidi, anılardaki paylaşılan fotoğrafları favorilere ekleme, dil listesine eklenen Geleneksel Çince, fotoğraf görüntüleyicide daha akıcı kaydırma, ayrıca birden fazla albüme yükleme ve diğer uygulamalarda SD kart medyası seçmeyle ilgili düzeltmeler.',
           isOnlineOnly: true,
         ),
       ],
@@ -627,36 +629,36 @@ class ChangeLogStrings {
     'uk': ChangeLogStrings(
       entries: [
         ChangeLogEntryStrings(
-          title: 'Коментарі та реакції у спогадах',
+          title: 'Швидші й точніші пропозиції облич',
           description:
-              'Обговорюйте спільні спогади з близькими, переживаючи їх знову.',
+              'Обробка зображень тепер працює в 5–10 разів швидше! Крім того, розмиті й повернуті набік обличчя більше не вносять плутанину у ваші групи людей, а ми запам’ятаємо обличчя, які ви вже відхилили.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Панорами, народжені наново',
+          description:
+              'Повністю перебудовані. Панорами відкриваються швидше, рухаються плавно й більше не відображаються порожніми.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Резервні копії, які не застрягають',
+          description:
+              'Якщо під час резервного копіювання на пристрої закінчиться місце, Ente тепер повідомить про це й продовжить із місця зупинки, щойно ви звільните трохи простору.',
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Діліться спогадами по-своєму',
+          title: 'Трансляція стала простішою',
           description:
-              'Перед публікацією виберіть, які саме фото й відео увійдуть до спогаду.',
+              'На Android екрани тепер легше знайти, а на iOS вони з’єднуються автоматично. Жодних додаткових налаштувань.',
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Оновлений переглядач фото',
+          title: 'Вимкнення звуку запам’ятовується',
           description:
-              'Ми оновили переглядач фото та інформаційну панель. Вони стали охайнішими, приємнішими й легшими для читання.',
+              'Вимкніть звук одного відео — і наступне теж залишиться без звуку.',
         ),
         ChangeLogEntryStrings(
-          title: 'Чіткіший текст на фото',
+          title: 'і багато іншого!',
           description:
-              'Копіювати текст із фотографій тепер швидше й надійніше. Натисніть і утримуйте, щоб почати виділення.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Розумніше кешування',
-          description:
-              'Фотографії, як і раніше, відкриваються швидко, займаючи менше місця на пристрої.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'і не тільки!',
-          description:
-              'Швидше та надійніше резервне копіювання, плавніший перегляд галереї, краще завантаження мініатюр і надійніше завантаження файлів, покращене розпізнавання тексту на фото, кращі кольори аватарів, виправлення збоїв під час фонової роботи та багато невеликих покращень у всьому застосунку.',
+              'Очищайте Смітник безпосередньо з розділу Звільнити місце, користуйтеся плавнішим і надійнішим блокуванням застосунку, додавайте до улюбленого спільні фотографії зі спогадів, вибирайте традиційну китайську в списку мов, плавніше гортайте у вікні перегляду фотографій, а також отримайте виправлення завантаження до кількох альбомів і вибору медіафайлів із SD-картки в інших застосунках.',
           isOnlineOnly: true,
         ),
       ],
@@ -664,36 +666,36 @@ class ChangeLogStrings {
     'vi': ChangeLogStrings(
       entries: [
         ChangeLogEntryStrings(
-          title: 'Bình luận và cảm xúc trong kỷ niệm',
+          title: 'Gợi ý khuôn mặt nhanh hơn, chính xác hơn',
           description:
-              'Trò chuyện về những kỷ niệm đã chia sẻ với người thân yêu khi cùng nhau sống lại những khoảnh khắc ấy.',
+              'Khả năng xử lý hình ảnh giờ nhanh gấp 5–10 lần! Ngoài ra, các khuôn mặt bị mờ hoặc nghiêng ngang sẽ không còn làm lẫn lộn các nhóm người, và Ente sẽ ghi nhớ những khuôn mặt bạn đã loại bỏ.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Ảnh toàn cảnh, tái sinh',
+          description:
+              'Được xây dựng lại từ đầu. Ảnh toàn cảnh mở nhanh hơn, chuyển động mượt mà và không còn hiển thị trống.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Sao lưu không còn mắc kẹt',
+          description:
+              'Nếu thiết bị hết dung lượng giữa chừng khi sao lưu, Ente giờ sẽ thông báo và tiếp tục từ chỗ đã dừng sau khi bạn giải phóng được một ít dung lượng.',
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Chia sẻ kỷ niệm theo cách của bạn',
+          title: 'Truyền màn hình, đơn giản hơn',
           description:
-              'Chọn chính xác ảnh và video sẽ có trong một kỷ niệm trước khi chia sẻ.',
+              'Trên Android, bạn có thể tìm màn hình dễ dàng hơn; trên iOS, màn hình được tự động ghép đôi. Không cần thiết lập thêm.',
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Trình xem ảnh được trau chuốt',
+          title: 'Ghi nhớ chế độ tắt tiếng',
           description:
-              'Trình xem ảnh và bảng thông tin đã được thiết kế lại. Gọn gàng, đẹp mắt và dễ đọc hơn.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Văn bản trong ảnh rõ nét hơn',
-          description:
-              'Sao chép văn bản từ ảnh giờ nhanh hơn và đáng tin cậy hơn. Nhấn giữ để bắt đầu chọn.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Bộ nhớ đệm thông minh hơn',
-          description:
-              'Ảnh vẫn mở nhanh trong khi chiếm ít dung lượng hơn trên thiết bị.',
+              'Tắt tiếng một video một lần và video tiếp theo cũng sẽ tiếp tục tắt tiếng.',
         ),
         ChangeLogEntryStrings(
           title: 'và nhiều hơn nữa!',
           description:
-              'Sao lưu nhanh và đáng tin cậy hơn, duyệt thư viện mượt mà hơn, tải hình thu nhỏ tốt hơn và tải xuống đáng tin cậy hơn, cải thiện khả năng phát hiện văn bản trong ảnh, màu hình đại diện đẹp hơn, sửa lỗi treo ứng dụng khi chạy tác vụ nền cùng nhiều cải tiến nhỏ khác trong toàn bộ ứng dụng.',
+              'Xóa sạch Thùng rác ngay trong Giải phóng dung lượng, sử dụng khóa ứng dụng mượt mà và đáng tin cậy hơn, thêm ảnh được chia sẻ trong kỷ niệm vào mục yêu thích, chọn tiếng Trung phồn thể trong danh sách ngôn ngữ, vuốt mượt mà hơn trong trình xem ảnh, cùng các bản sửa lỗi khi tải lên nhiều album và chọn nội dung trên thẻ SD trong các ứng dụng khác.',
           isOnlineOnly: true,
         ),
       ],
@@ -701,31 +703,31 @@ class ChangeLogStrings {
     'zh_CN': ChangeLogStrings(
       entries: [
         ChangeLogEntryStrings(
-          title: '回忆中的评论和回应',
-          description: '与亲友一起重温共享回忆，边看边聊。',
+          title: '更快、更精准的人脸建议',
+          description: '图像处理速度现在提升了 5–10 倍！此外，模糊和侧转的人脸不再干扰人物分组，我们还会记住你已经忽略的人脸。',
+        ),
+        ChangeLogEntryStrings(
+          title: '全景照片，焕然新生',
+          description: '从头重构。全景照片打开更快、移动更流畅，也不会再显示为空白。',
+        ),
+        ChangeLogEntryStrings(
+          title: '不再卡住的备份',
+          description: '如果设备在备份过程中空间不足，Ente 现在会提醒你，并在你释放一些空间后从中断处继续。',
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: '按你的方式分享回忆',
-          description: '分享前，精确选择要加入回忆的照片和视频。',
+          title: '投屏，更简单',
+          description: '在 Android 上更容易找到屏幕，在 iOS 上则会自动配对。无需额外设置。',
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: '更精致的照片查看器',
-          description: '照片查看器和信息面板已重新设计。界面更简洁、更美观，也更易读。',
-        ),
-        ChangeLogEntryStrings(
-          title: '照片中的文字更清晰',
-          description: '现在，从照片中复制文字更快、更可靠。长按即可开始选择。',
-        ),
-        ChangeLogEntryStrings(
-          title: '更智能的缓存',
-          description: '照片依然能快速打开，同时占用更少的设备空间。',
+          title: '静音设置，自动记住',
+          description: '将一个视频静音后，下一个视频也会保持静音。',
         ),
         ChangeLogEntryStrings(
           title: '还有更多！',
           description:
-              '备份更快、更可靠，浏览图库更流畅，缩略图加载更好，下载更可靠，照片文字检测更准确，头像颜色更协调，修复后台任务期间的崩溃问题，以及贯穿整个应用的众多细节优化。',
+              '可直接从“释放空间”清空回收站，应用锁更流畅可靠，可在回忆中收藏共享照片，语言列表新增繁体中文，照片查看器滑动更流畅，以及修复了上传到多个相册和在其他应用中选取 SD 卡媒体的问题。',
           isOnlineOnly: true,
         ),
       ],

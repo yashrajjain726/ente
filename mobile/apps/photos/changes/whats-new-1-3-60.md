@@ -1,0 +1,1 @@
+- Updated What's new for Ente Photos 1.3.60.
