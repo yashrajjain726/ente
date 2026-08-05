@@ -9,6 +9,7 @@ members = [
     "bindings/napi/photos",
     "bindings/uniffi/cast",
     "bindings/uniffi/ensu",
+    "bindings/uniffi/log",
     "bindings/wasm/ente-wasm",
     "bindings/wasm/core",
     "bindings/wasm/log",
@@ -36,6 +37,7 @@ ente-paste = { path = "crates/paste" }
 ente-photos = { path = "crates/photos" }
 ente-space = { path = "crates/space" }
 ente-test-support = { path = "crates/test-support" }
+ente-uniffi-log = { path = "bindings/uniffi/log" }
 ente-wasm-log = { path = "bindings/wasm/log" }
 flutter_rust_bridge = "=2.12.0"
 flutter_rust_bridge_codegen = "=2.12.0"

@@ -8,6 +8,6 @@ crate-type = ["staticlib", "cdylib"]
 
 [dependencies]
 ente-core.workspace = true
-log.workspace = true
+ente-uniffi-log.workspace = true
 thiserror.workspace = true
 uniffi.workspace = true

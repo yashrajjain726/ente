@@ -2360,7 +2360,7 @@ name = "ente-cast-uniffi"
 version = "0.0.0"
 dependencies = [
  "ente-core",
- "log",
+ "ente-uniffi-log",
  "thiserror 2.0.18",
  "uniffi",
 ]
@@ -2447,7 +2447,7 @@ version = "0.0.0"
 dependencies = [
  "ente-assets",
  "ente-ensu",
- "log",
+ "ente-uniffi-log",
  "thiserror 2.0.18",
  "uniffi",
  "uuid",
@@ -2583,6 +2583,13 @@ dependencies = [
  "postgresql_embedded",
  "tokio",
  "uuid",
+]
+
+[[package]]
+name = "ente-uniffi-log"
+version = "0.0.0"
+dependencies = [
+ "log",
 ]
 
 [[package]]
