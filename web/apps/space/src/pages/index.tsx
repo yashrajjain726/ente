@@ -7,11 +7,7 @@ import { SpacePublicProfileNotificationControl } from "components/SpacePublicPro
 import { SpaceRouteFallback } from "components/SpaceRouteFallback";
 import log from "ente-base/log";
 import React, { useEffect, useMemo, useState } from "react";
-import {
-    OnboardingScreen,
-    addFriendOnboardingTitle,
-    onboardingGreen,
-} from "screens/OnboardingScreen";
+import { OnboardingScreen, onboardingGreen } from "screens/OnboardingScreen";
 import { ProfileScreen, profileBackground } from "screens/ProfileScreen";
 import {
     loadCurrentSpaceRelationship,
@@ -56,6 +52,14 @@ type AuthenticatedProfileRouteStatus = "idle" | "loading" | "complete";
 interface PageProps {
     invitePreview?: boolean;
 }
+
+const addFriendOnboardingTitle = (username: string) => (
+    <>
+        {`See @${username}'s`}
+        <br />
+        everyday moments
+    </>
+);
 
 const addFriendPostActionOnboardingTitle = (
     username: string,
