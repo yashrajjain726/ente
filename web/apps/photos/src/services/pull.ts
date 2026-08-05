@@ -20,91 +20,18 @@ import { searchDataSync } from "ente-new/photos/services/search";
 import { pullSettings } from "ente-new/photos/services/settings";
 import { pullTrash, type TrashItem } from "ente-new/photos/services/trash";
 
-/**
- * Called during a full remote pull, before doing the files pull.
- *
- * [Note: Remote pull]
- *
- * There are two types of remote pulls we perform:
- *
- * - A "files" pull: Updating our local state with the latest collections,
- *   collection files, and trash from remote.
- *
- * - A "full" pull, which includes the files pull, and more.
- *
- * The full pull is performed by the gallery page, in the following sequence:
- *
- * 1. {@link prePullFiles}
- * 2. {@link pullFiles}
- * 3. {@link postPullFiles}.
- *
- * The full pull is performed in the following cases:
- *
- * - On the gallery page load (for both web and desktop).
- * - Every 5 minutes thereafter (while the user is on the gallery page).
- * - Each time the desktop app gains focus.
- * - When the file viewer is closed after performing some operation.
- *
- * In some other cases, where we know that only specific collection or file
- * state needs to be pulled, step 2 ({@link pullFiles}) is performed
- * independently. For example, after deduping files, or updating the metadata of
- * a file. See also: [Note: Full remote pull vs files pull]
- */
 export const prePullFiles = async () => {
     await Promise.all([pullSettings(), isMLSupported && pullMLStatus()]);
 };
 
 interface PullFilesOpts {
-    /**
-     * Called when the saved collections were replaced by the given
-     * {@link collections}.
-     *
-     * Can be called multiple times during a pull, as each batch of changes is
-     * received and processed.
-     */
     onSetCollections: (collections: Collection[]) => void;
-    /**
-     * Called when saved collection files were replaced by the given
-     * {@link collectionFiles}.
-     *
-     * Can be called multiple times during a pull, as each batch of changes is
-     * received and processed.
-     */
     onSetCollectionFiles: (collectionFiles: EnteFile[]) => void;
-    /**
-     * Called when saved trashed items were replaced by the given
-     * {@link trashItems}.
-     *
-     * Can be called multiple times during a pull, as each batch of changes is
-     * received and processed.
-     */
     onSetTrashedItems: (trashItems: TrashItem[]) => void;
-    /**
-     * Called if one or more files were updated during the pull.
-     *
-     * Will be called at most once per pull.
-     */
     onDidUpdateCollectionFiles: () => void;
 }
 
-/**
- * Pull the latest collections, collections files and trash items from remote,
- * updating our local database and also calling the provided callbacks.
- *
- * This is a subset of a full remote pull, independently exposed for use at
- * times when we only want to pull the file related information (e.g. we just
- * made some API request that modified collections or files, and so now want to
- * update our local changes to match remote).
- *
- * See also: [Note: Remote pull]
- *
- * It is not robust to have multiple of these executing in parallel, and caller
- * should have some mechanism to serialize invocations.
- *
- * @param opts various callbacks that are used by gallery to update its local
- * state in tandem with the pull. The callbacks are optional since we might not
- * have local state to update, as is the case when this is invoked post dedup.
- */
+// Do not run pullFiles concurrently.
 export const pullFiles = async (opts?: PullFilesOpts) => {
     const collections = await pullCollections();
     opts?.onSetCollections(collections);
@@ -117,9 +44,7 @@ export const pullFiles = async (opts?: PullFilesOpts) => {
         opts?.onSetTrashedItems,
         videoPrunePermanentlyDeletedFileIDsIfNeeded,
     );
-    // After trash sync, fetch pending removal actions and move affected files
-    // to the uncategorized collection.
-    // Wrapped in try-catch since self-hosted servers may not have this endpoint.
+    // Older self-hosted servers may not expose pending removal actions.
     try {
         await movePendingRemovalActionsToUncategorized(collections);
     } catch (e) {
@@ -138,14 +63,8 @@ export const pullFiles = async (opts?: PullFilesOpts) => {
     }
 };
 
-/**
- * Called during a full remote pull, after doing the files pull.
- *
- * See: [Note: Remote pull]
- */
 export const postPullFiles = async (source?: string) => {
     await Promise.all([searchDataSync(), videoProcessingSyncIfNeeded()]);
-    // ML sync might take a very long time for initial indexing, so don't wait
-    // for it to finish.
+    // Initial indexing can be long; do not block the remote pull.
     void mlSync(source ? `remote-pull:${source}` : "remote-pull");
 };

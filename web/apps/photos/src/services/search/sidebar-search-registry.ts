@@ -345,7 +345,7 @@ export const performSidebarAction = async (
             return (
                 ctx
                     .onShowCollectionSummary(ctx.pseudoIDs.hidden, true)
-                    // See: [Note: Workarounds for unactionable ARIA warnings]
+                    // Let focus settle before closing to avoid aria-hidden warnings.
                     .then(() => wait(10))
                     .then(() => ctx.onClose())
             );

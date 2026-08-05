@@ -48,67 +48,19 @@ import {
 import type { GalleryBarMode } from "./reducer";
 
 export interface GalleryBarImplProps {
-    /**
-     * What are we displaying currently.
-     */
     mode: GalleryBarMode;
-    /**
-     * Called when the user selects to a different mode than the current one.
-     */
     onChangeMode: (mode: GalleryBarMode) => void;
-    /**
-     * Massaged data about the collections that should be shown in the bar.
-     */
     collectionSummaries: CollectionSummary[];
-    /**
-     * The ID of the currently active collection (if any).
-     *
-     * Required if mode is not "people".
-     */
     activeCollectionID: number | undefined;
-    /**
-     * Called when the user selects a new collection in the bar.
-     *
-     * This callback is passed the id of the selected collection.
-     */
     onSelectCollectionID: (collectionID: number) => void;
-    /**
-     * Called when the user selects the option to show a modal with all the
-     * albums.
-     */
     onShowAllAlbums: () => void;
-    /**
-     * Called when the user selects the option to show a modal with all the
-     * people.
-     */
     onShowAllPeople: () => void;
-    /**
-     * The scheme that should be used for sorting the collections in the bar.
-     */
     collectionsSortBy: CollectionsSortBy;
-    /**
-     * Called when the user changes the sorting scheme.
-     */
     onChangeCollectionsSortBy: (by: CollectionsSortBy) => void;
-    /**
-     * The scheme that should be used for sorting the people.
-     */
     peopleSortBy: PeopleSortBy;
-    /**
-     * Called when the user changes the people sorting scheme.
-     */
     onChangePeopleSortBy: (by: PeopleSortBy) => void;
-    /**
-     * The list of people that should be shown in the bar.
-     */
     people: Person[];
-    /**
-     * The currently selected person, if any.
-     */
     activePerson: Person | undefined;
-    /**
-     * Called when the selection should be moved to a new person in the bar.
-     */
     onSelectPerson: (personID: string) => void;
 }
 
@@ -146,19 +98,8 @@ export const GalleryBarImpl: React.FC<GalleryBarImplProps> = ({
         setCanScrollRight(scrollLeft + clientWidth < scrollWidth);
     }, []);
 
-    // Maintain a ref to the list container with a combo of a callback and a
-    // regular ref.
-    //
-    // Using just a regular ref doesn't work - it is initially null, so
-    // updateScrollState is a no-op. Subsequently, react-window sets it to the
-    // correct element, but updateScrollState doesn't run, unless we add
-    // listContainerRef.current as a dependency. But that is just hacky.
-    //
-    // So instead we use a "callback ref", where we both act on the latest
-    // value, and also save it in a regular ref so that we can subsequently use
-    // it if the scroll position changes because of other, non-DOM, reasons
-    // (e.g. if the list of collections changes).
-
+    // react-window supplies the DOM node after the first render.
+    // The callback ref initializes listeners; the regular ref handles later changes.
     const listContainerCallbackRef = useCallback<
         (ref: HTMLDivElement | null) => void
     >(
@@ -166,16 +107,12 @@ export const GalleryBarImpl: React.FC<GalleryBarImplProps> = ({
             listContainerRef.current = ref;
             if (!ref) return undefined;
 
-            // Listen for scrolls and resize.
             ref.addEventListener("scroll", updateScrollState);
             const observer = new ResizeObserver(updateScrollState);
             observer.observe(ref);
 
-            // Call handler right away so that state gets updated for the
-            // initial size.
             updateScrollState();
 
-            // Remove listeners on cleanup.
             return () => {
                 ref.removeEventListener("scroll", updateScrollState);
                 observer.unobserve(ref);
@@ -193,7 +130,6 @@ export const GalleryBarImpl: React.FC<GalleryBarImplProps> = ({
 
     useEffect(() => {
         if (!listRef.current) return;
-        // Scroll the active item into view.
         let i = -1;
         switch (mode) {
             case "albums":
@@ -290,7 +226,6 @@ export const GalleryBarImpl: React.FC<GalleryBarImplProps> = ({
 
     return (
         <BarWrapper
-            // Hide the bottom border when showing the empty state for people.
             style={
                 {
                     "--et-bar-bottom-border-color":
@@ -360,7 +295,6 @@ export const Row2 = styled("div")`
 const ModeIndicator: React.FC<
     Pick<GalleryBarImplProps, "mode" | "onChangeMode">
 > = ({ mode, onChangeMode }) => {
-    // Mode switcher is not shown in section-specific album views.
     if (mode == "hidden-albums") {
         return <Typography>{t("hidden_albums")}</Typography>;
     }
@@ -368,9 +302,6 @@ const ModeIndicator: React.FC<
         return <Typography>{t("section_archive")}</Typography>;
     }
 
-    // Show the static mode indicator with only the "Albums" title if ML is not
-    // supported on this client (web), since there are no other sections to
-    // switch to in such a case.
     if (!isMLSupported) {
         return <Typography>{t("albums")}</Typography>;
     }
@@ -573,13 +504,10 @@ interface CollectionBarCardIconProps {
 const CollectionBarCardIcon: React.FC<CollectionBarCardIconProps> = ({
     attributes,
 }) => (
-    // In the rarest of cases up to 4 of these can be true at once: a pinned
-    // album that is shared both with people and via a public link, and is also
-    // archived. The container is sized so that all 4 still fit on the tile.
+    // A collection can show all four status icons at once.
     <CollectionBarCardIcon_>
         {attributes.has("userFavorites") && <StarIcon fontSize="small" />}
         {(attributes.has("pinned") || attributes.has("shareePinned")) && (
-            // Need && to override the 20px set in the container.
             <HugeiconsIcon icon={PinIcon} size={18} />
         )}
         {attributes.has("shared") && !attributes.has("sharedOnlyViaLink") && (
