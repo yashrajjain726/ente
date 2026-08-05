@@ -123,7 +123,7 @@ impl<'a> ApiMethods<'a> {
     async fn get_signed_file_url(&self, file_id: i64) -> Result<String> {
         let api = self.client.api();
         let response: GetFileUrlResponse = http::retry(|| async {
-            api.get(&format!("/files/download/v2/{file_id}"))
+            api.get(&format!("/files/download/v3/{file_id}"))
                 .send()
                 .await?
                 .error_for_code()
@@ -138,7 +138,7 @@ impl<'a> ApiMethods<'a> {
     async fn get_signed_thumbnail_url(&self, file_id: i64) -> Result<String> {
         let api = self.client.api();
         let response: GetThumbnailUrlResponse = http::retry(|| async {
-            api.get(&format!("/files/preview/v2/{file_id}"))
+            api.get(&format!("/files/thumbnail/v3/{file_id}"))
                 .send()
                 .await?
                 .error_for_code()
@@ -227,7 +227,7 @@ mod tests {
         let mut server = Server::new_async().await;
         let signed_url = format!("{}/object", server.url());
         let url_mock = server
-            .mock("GET", "/files/download/v2/12345")
+            .mock("GET", "/files/download/v3/12345")
             .match_header("x-auth-token", "token")
             .match_header("x-client-package", "io.ente.locker")
             .with_body(format!(r#"{{"url":"{signed_url}"}}"#))
