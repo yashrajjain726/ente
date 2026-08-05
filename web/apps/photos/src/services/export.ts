@@ -70,7 +70,7 @@ export interface ExportProgress {
     total: number;
 }
 
-export interface ExportSettings {
+interface ExportSettings {
     folder?: string;
     continuousExport?: boolean;
 }
@@ -80,13 +80,13 @@ const ExportSettings = z.object({
     continuousExport: z.boolean().nullish().transform(nullToUndefined),
 });
 
-export const savedExportSettings = () => {
+const savedExportSettings = () => {
     const jsonString = localStorage.getItem("export");
     const json = jsonString ? JSON.parse(jsonString) : undefined;
     return json ? ExportSettings.parse(json) : undefined;
 };
 
-export const saveExportSettings = (exportSettings: ExportSettings) => {
+const saveExportSettings = (exportSettings: ExportSettings) => {
     localStorage.setItem("export", JSON.stringify(exportSettings));
 };
 
@@ -94,7 +94,7 @@ type CollectionExportNames = Record<number, string>;
 
 type FileExportNames = Record<string, string>;
 
-export interface ExportRecord {
+interface ExportRecord {
     version: number;
     stage: ExportStage;
     lastAttemptTimestamp: number;
@@ -102,7 +102,7 @@ export interface ExportRecord {
     fileExportNames: FileExportNames;
 }
 
-export const NULL_EXPORT_RECORD: ExportRecord = {
+const NULL_EXPORT_RECORD: ExportRecord = {
     version: 5,
     stage: ExportStage.init,
     // @ts-ignore
@@ -1483,7 +1483,7 @@ const getLivePhotoExportName = (
     videoExportName: string,
 ) => JSON.stringify({ image: imageExportName, video: videoExportName });
 
-export const isLivePhotoExportName = (exportName: string) => {
+const isLivePhotoExportName = (exportName: string) => {
     try {
         JSON.parse(exportName);
         return true;

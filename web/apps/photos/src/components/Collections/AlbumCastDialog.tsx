@@ -36,7 +36,7 @@ export const AlbumCastDialog: React.FC<AlbumCastDialogProps> = ({
 
 // MUI preserves a dialog child's state while hidden.
 // Keep contents separate so each open starts fresh and reruns effects.
-export const AlbumCastDialogContents: React.FC<AlbumCastDialogProps> = ({
+const AlbumCastDialogContents: React.FC<AlbumCastDialogProps> = ({
     open,
     onClose,
     collection,

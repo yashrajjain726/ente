@@ -48,9 +48,9 @@ import { indexNewUpload } from "ente-new/photos/services/ml";
 import { wait } from "ente-utils/promise";
 import watcher from "./watch";
 
-export type FileID = number;
+type FileID = number;
 
-export type PercentageUploaded = number;
+type PercentageUploaded = number;
 export type UploadFileNames = Map<FileID, string>;
 
 export interface UploadCounter {
@@ -64,15 +64,15 @@ export interface InProgressUpload {
 }
 
 // The UI groups addedSymlink with uploaded.
-export type FinishedUploadType = Exclude<UploadResult["type"], "addedSymlink">;
+type FinishedUploadType = Exclude<UploadResult["type"], "addedSymlink">;
 
-export type InProgressUploads = Map<FileID, PercentageUploaded>;
+type InProgressUploads = Map<FileID, PercentageUploaded>;
 
-export type FinishedUploads = Map<FileID, FinishedUploadType>;
+type FinishedUploads = Map<FileID, FinishedUploadType>;
 
 export type SegregatedFinishedUploads = Map<FinishedUploadType, FileID[]>;
 
-export interface UploadBatchItemResult {
+interface UploadBatchItemResult {
     localID: number;
     requestedCollectionID: number;
     result: UploadResult;
@@ -134,7 +134,7 @@ const successfulFileFromUploadResult = (
     }
 };
 
-export interface ProgressUpdater {
+interface ProgressUpdater {
     setPercentComplete: React.Dispatch<React.SetStateAction<number>>;
     setUploadCounter: React.Dispatch<React.SetStateAction<UploadCounter>>;
     setUploadPhase: (phase: UploadPhase) => void;

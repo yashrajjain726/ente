@@ -8,7 +8,7 @@ import type {
 import { wait } from "ente-utils/promise";
 import { t } from "i18next";
 
-export interface SidebarAction {
+interface SidebarAction {
     id: SidebarActionID;
     label: string;
     path: string[];
@@ -16,7 +16,7 @@ export interface SidebarAction {
     available?: () => boolean;
 }
 
-export interface SidebarActionContext {
+interface SidebarActionContext {
     // top-level sidebar controls
     onClose: () => void;
     onShowCollectionSummary: (

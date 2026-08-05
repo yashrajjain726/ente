@@ -117,7 +117,7 @@ interface SubscriptionCardContentOverlayProps {
     userDetails: UserDetails;
 }
 
-export const SubscriptionCardContentOverlay: React.FC<
+const SubscriptionCardContentOverlay: React.FC<
     SubscriptionCardContentOverlayProps
 > = ({ userDetails }) => {
     const inFamily = isPartOfFamilyWithOtherMembers(userDetails);
