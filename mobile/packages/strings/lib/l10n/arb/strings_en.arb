@@ -210,6 +210,7 @@
   "albumDescriptionHint": "Enter a description for this album",
   "albumEditsWillNotBeSaved": "Your edits to this album won't be saved.",
   "albumLayout": "Album layout",
+  "albumName": "Album name",
   "albumOwner": "Owner",
   "@albumOwner": {
     "description": "Role of the album owner"

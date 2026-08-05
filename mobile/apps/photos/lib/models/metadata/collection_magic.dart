@@ -13,7 +13,7 @@ const muteKey = "mute";
 
 const orderKey = "order";
 
-const albumDescriptionKey = "description";
+const albumDescriptionKey = "caption";
 const maxAlbumDescriptionLength = 200;
 
 class CollectionMagicMetadata {

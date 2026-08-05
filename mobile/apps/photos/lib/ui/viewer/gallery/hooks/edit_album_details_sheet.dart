@@ -163,7 +163,7 @@ class _EditAlbumDetailsSheetState extends State<EditAlbumDetailsSheet> {
                     key: const ValueKey("album_name_input"),
                     controller: _nameController,
                     focusNode: _nameFocusNode,
-                    label: strings.name,
+                    label: strings.albumName,
                     textCapitalization: TextCapitalization.words,
                     textInputAction: TextInputAction.next,
                     onChanged: (_) => setState(() {}),
