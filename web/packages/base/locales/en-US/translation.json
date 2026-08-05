@@ -103,7 +103,7 @@
     "import_partner_shared_photos_hint": "Import photos that were shared by your partner on Google Photos",
     "start_import": "Start import",
     "start_upload": "Start upload",
-    "gallery_empty_state_v2_subtitle": "Store and share your memories with full privacy",
+    "gallery_empty_state_subtitle": "Store and share your memories with full privacy",
     "upload_existing_library": "Upload your existing library",
     "memories_secured_since_arrival_one": "{{count, number}} memory secured since you came here",
     "memories_secured_since_arrival": "{{count, number}} memories secured since you came here",
