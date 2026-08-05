@@ -732,6 +732,39 @@ class ChangeLogStrings {
         ),
       ],
     ),
+    'zh_TW': ChangeLogStrings(
+      entries: [
+        ChangeLogEntryStrings(
+          title: '更快、更精準的臉孔建議',
+          description:
+              '影像處理速度現在快了 5–10 倍！此外，模糊或橫向的臉孔不再干擾您的人物分組，而且我們會記住您已忽略的臉孔。',
+        ),
+        ChangeLogEntryStrings(
+          title: '全景照片，煥然一新',
+          description: '從頭徹底重建。全景照片開啟速度更快、移動更流暢，也不再顯示空白。',
+        ),
+        ChangeLogEntryStrings(
+          title: '不再卡住的備份',
+          description: '如果您的裝置在備份途中耗盡儲存空間，Ente 現在會通知您；釋放一些空間後，備份將從中斷處繼續。',
+          isOnlineOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: '投放，更簡單',
+          description: '在 Android 上更容易找到螢幕，iOS 上則會自動配對。無需額外設定。',
+          isOnlineOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: '記住靜音設定',
+          description: '將一部影片設為靜音後，下一部也會維持靜音。',
+        ),
+        ChangeLogEntryStrings(
+          title: '還有更多！',
+          description:
+              '可直接從「釋放空間」清空垃圾桶、App 鎖定更流暢可靠、在回憶中將共享照片加入最愛、繁體中文加入語言清單、照片檢視器滑動更流暢，並修正上傳至多個相簿和在其他 App 中選取 SD 卡媒體的問題。',
+          isOnlineOnly: true,
+        ),
+      ],
+    ),
   };
 }
 
