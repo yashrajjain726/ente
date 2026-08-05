@@ -27,6 +27,7 @@ class UpdateService {
   }
 
   Future<bool> shouldUpdate() async {
+    _latestVersion = null;
     if (!supportsInAppUpdates()) {
       return false;
     }

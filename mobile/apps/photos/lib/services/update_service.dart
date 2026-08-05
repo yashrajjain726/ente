@@ -67,6 +67,7 @@ class UpdateService {
   }
 
   Future<bool> shouldUpdate() async {
+    _latestVersion = null;
     if (!isIndependent()) {
       return false;
     }
