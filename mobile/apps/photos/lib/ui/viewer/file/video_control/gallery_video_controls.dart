@@ -86,17 +86,23 @@ class GalleryVideoControlScrim extends StatelessWidget {
 
 class GalleryVideoProgressRow extends StatelessWidget {
   final Widget seekBar;
-  final String duration;
+  final String elapsedTime;
+  final String totalTime;
 
   const GalleryVideoProgressRow({
     required this.seekBar,
-    required this.duration,
+    required this.elapsedTime,
+    required this.totalTime,
     super.key,
   });
 
   @override
   Widget build(BuildContext context) {
     final safePadding = MediaQuery.paddingOf(context);
+    final timeStyle = getEnteTextTheme(context).tiny.copyWith(
+      color: textBaseDark.withValues(alpha: 0.85),
+      fontFeatures: const [FontFeature.tabularFigures()],
+    );
     return Padding(
       padding: EdgeInsets.only(
         left: safePadding.left + 16,
@@ -110,12 +116,7 @@ class GalleryVideoProgressRow extends StatelessWidget {
             const SizedBox(width: 16),
             Transform.translate(
               offset: const Offset(0, -1),
-              child: Text(
-                duration,
-                style: getEnteTextTheme(
-                  context,
-                ).mini.copyWith(color: textBaseDark.withValues(alpha: 0.85)),
-              ),
+              child: Text('$elapsedTime / $totalTime', style: timeStyle),
             ),
             const SizedBox(width: 8),
             const VideoMuteButton(),

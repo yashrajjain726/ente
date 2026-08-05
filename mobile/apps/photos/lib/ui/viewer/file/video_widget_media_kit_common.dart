@@ -180,7 +180,7 @@ class _VideoWidgetState extends State<VideoWidget> {
                               top: false,
                               left: false,
                               right: false,
-                              child: SeekBarAndDuration(
+                              child: _MediaKitVideoProgressControls(
                                 controller: widget.controller,
                                 isSeekingNotifier: _isSeekingNotifier,
                               ),
@@ -300,49 +300,24 @@ class _PlayPauseButtonState extends State<PlayPauseButtonMediaKit> {
   }
 }
 
-class SeekBarAndDuration extends StatelessWidget {
+class _MediaKitVideoProgressControls extends StatefulWidget {
   final VideoController controller;
   final ValueNotifier<bool> isSeekingNotifier;
 
-  const SeekBarAndDuration({
-    super.key,
+  const _MediaKitVideoProgressControls({
     required this.controller,
     required this.isSeekingNotifier,
   });
 
   @override
-  Widget build(BuildContext context) {
-    return GalleryVideoProgressRow(
-      seekBar: SeekBar(controller, isSeekingNotifier),
-      duration: _secondsToDuration(controller.player.state.duration.inSeconds),
-    );
-  }
-
-  /// Returns the duration in the format "h:mm:ss" or "m:ss".
-  String _secondsToDuration(int totalSeconds) {
-    final hours = totalSeconds ~/ 3600;
-    final minutes = (totalSeconds % 3600) ~/ 60;
-    final seconds = totalSeconds % 60;
-
-    if (hours > 0) {
-      return '${hours.toString().padLeft(1, '0')}:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
-    } else {
-      return '${minutes.toString().padLeft(1, '0')}:${seconds.toString().padLeft(2, '0')}';
-    }
-  }
+  State<_MediaKitVideoProgressControls> createState() =>
+      _MediaKitVideoProgressControlsState();
 }
 
-class SeekBar extends StatefulWidget {
-  final VideoController controller;
-  final ValueNotifier<bool> isSeekingNotifier;
-  const SeekBar(this.controller, this.isSeekingNotifier, {super.key});
-
-  @override
-  State<SeekBar> createState() => _SeekBarState();
-}
-
-class _SeekBarState extends State<SeekBar> {
+class _MediaKitVideoProgressControlsState
+    extends State<_MediaKitVideoProgressControls> {
   double _sliderValue = 0.0;
+  Duration _elapsedTime = Duration.zero;
   late final StreamSubscription<Duration> _positionStreamSubscription;
   final _debouncer = Debouncer(
     const Duration(milliseconds: 300),
@@ -356,6 +331,7 @@ class _SeekBarState extends State<SeekBar> {
           if (widget.isSeekingNotifier.value) return;
           if (mounted) {
             setState(() {
+              _elapsedTime = event;
               _sliderValue =
                   (event.inMilliseconds /
                           widget
@@ -382,7 +358,7 @@ class _SeekBarState extends State<SeekBar> {
 
   @override
   Widget build(BuildContext context) {
-    return SliderTheme(
+    final seekBar = SliderTheme(
       data: SliderTheme.of(context).copyWith(
         trackHeight: 3.0,
         trackShape: const GalleryVideoSliderTrackShape(),
@@ -410,40 +386,17 @@ class _SeekBarState extends State<SeekBar> {
           if (mounted) {
             setState(() {
               _sliderValue = value;
+              _elapsedTime = _positionAt(value);
             });
           }
 
           _debouncer.run(() async {
-            await widget.controller.player.seek(
-              Duration(
-                milliseconds:
-                    (value *
-                            widget
-                                .controller
-                                .player
-                                .state
-                                .duration
-                                .inMilliseconds)
-                        .round(),
-              ),
-            );
+            await widget.controller.player.seek(_positionAt(value));
           });
         },
         divisions: 4500,
         onChangeEnd: (value) async {
-          await widget.controller.player.seek(
-            Duration(
-              milliseconds:
-                  (value *
-                          widget
-                              .controller
-                              .player
-                              .state
-                              .duration
-                              .inMilliseconds)
-                      .round(),
-            ),
-          );
+          await widget.controller.player.seek(_positionAt(value));
           if (mounted) {
             setState(() {
               widget.isSeekingNotifier.value = false;
@@ -452,6 +405,21 @@ class _SeekBarState extends State<SeekBar> {
         },
         allowedInteraction: SliderInteraction.tapAndSlide,
       ),
+    );
+    return GalleryVideoProgressRow(
+      seekBar: seekBar,
+      elapsedTime: secondsToDuration(_elapsedTime.inSeconds),
+      totalTime: secondsToDuration(
+        widget.controller.player.state.duration.inSeconds,
+      ),
+    );
+  }
+
+  Duration _positionAt(double value) {
+    return Duration(
+      milliseconds:
+          (value * widget.controller.player.state.duration.inMilliseconds)
+              .round(),
     );
   }
 }

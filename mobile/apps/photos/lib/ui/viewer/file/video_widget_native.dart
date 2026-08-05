@@ -425,7 +425,7 @@ class _VideoWidgetNativeState extends State<VideoWidgetNative>
                                     left: false,
                                     right: false,
                                     child: isPlaybackReady
-                                        ? _SeekBarAndDuration(
+                                        ? _VideoProgressControls(
                                             controller: _controller!,
                                             duration: duration,
                                             showControls: _showControls,
@@ -850,13 +850,13 @@ class _VideoWidgetNativeState extends State<VideoWidgetNative>
   }
 }
 
-class _SeekBarAndDuration extends StatelessWidget {
+class _VideoProgressControls extends StatelessWidget {
   final NativeVideoPlayerController controller;
   final String? duration;
   final ValueNotifier<bool> showControls;
   final ValueNotifier<bool> isSeeking;
 
-  const _SeekBarAndDuration({
+  const _VideoProgressControls({
     required this.controller,
     required this.duration,
     required this.showControls,
@@ -874,13 +874,10 @@ class _SeekBarAndDuration extends StatelessWidget {
           opacity: value ? 1 : 0,
           child: IgnorePointer(
             ignoring: !value,
-            child: GalleryVideoProgressRow(
-              seekBar: SeekBar(
-                controller,
-                durationToSeconds(duration),
-                isSeeking,
-              ),
-              duration: duration ?? "0:00",
+            child: NativeVideoProgressControls(
+              controller,
+              durationToSeconds(duration),
+              isSeeking,
             ),
           ),
         );

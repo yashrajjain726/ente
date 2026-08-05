@@ -8,18 +8,28 @@ import "package:photos/events/seekbar_triggered_event.dart";
 import "package:photos/theme/colors.dart";
 import "package:photos/ui/viewer/file/video_control/gallery_video_controls.dart";
 
-class SeekBar extends StatefulWidget {
+class NativeVideoProgressControls extends StatefulWidget {
   final NativeVideoPlayerController controller;
   final int? duration;
   final ValueNotifier<bool> isSeeking;
-  const SeekBar(this.controller, this.duration, this.isSeeking, {super.key});
+
+  const NativeVideoProgressControls(
+    this.controller,
+    this.duration,
+    this.isSeeking, {
+    super.key,
+  });
 
   @override
-  State<SeekBar> createState() => _SeekBarState();
+  State<NativeVideoProgressControls> createState() =>
+      _NativeVideoProgressControlsState();
 }
 
-class _SeekBarState extends State<SeekBar> with SingleTickerProviderStateMixin {
+class _NativeVideoProgressControlsState
+    extends State<NativeVideoProgressControls>
+    with SingleTickerProviderStateMixin {
   late final AnimationController _animationController;
+  int _elapsedMilliseconds = 0;
   final _debouncer = Debouncer(
     const Duration(milliseconds: 100),
     executionInterval: const Duration(milliseconds: 325),
@@ -43,8 +53,8 @@ class _SeekBarState extends State<SeekBar> with SingleTickerProviderStateMixin {
       ) {
         if (!mounted || _animationController.value == event.position) return;
 
+        _elapsedMilliseconds = 0;
         _animationController.value = event.position.toDouble();
-        setState(() {});
       });
     });
 
@@ -67,7 +77,7 @@ class _SeekBarState extends State<SeekBar> with SingleTickerProviderStateMixin {
     return AnimatedBuilder(
       animation: _animationController,
       builder: (_, _) {
-        return SliderTheme(
+        final seekBar = SliderTheme(
           data: SliderTheme.of(context).copyWith(
             trackHeight: 3.0,
             trackShape: const GalleryVideoSliderTrackShape(),
@@ -88,20 +98,25 @@ class _SeekBarState extends State<SeekBar> with SingleTickerProviderStateMixin {
               widget.isSeeking.value = true;
             },
             onChanged: (value) {
-              setState(() {
-                _animationController.value = value;
-              });
+              _elapsedMilliseconds = _positionInMilliseconds(value) ?? 0;
+              _animationController.value = value;
               _seekTo(value);
             },
             divisions: 4500,
             onChangeEnd: (value) {
-              setState(() {
-                _animationController.value = value;
-              });
+              _elapsedMilliseconds = _positionInMilliseconds(value) ?? 0;
+              _animationController.value = value;
               _seekTo(value);
               widget.isSeeking.value = false;
             },
             allowedInteraction: SliderInteraction.tapAndSlide,
+          ),
+        );
+        return GalleryVideoProgressRow(
+          seekBar: seekBar,
+          elapsedTime: secondsToDuration(_elapsedMilliseconds ~/ 1000),
+          totalTime: secondsToDuration(
+            (_effectiveDurationInMilliseconds() ?? 0) ~/ 1000,
           ),
         );
       },
@@ -110,15 +125,9 @@ class _SeekBarState extends State<SeekBar> with SingleTickerProviderStateMixin {
 
   void _seekTo(double value) {
     _debouncer.run(() async {
-      final durationInMilliseconds = _effectiveDurationInMilliseconds();
-      if (durationInMilliseconds == null) {
-        return;
-      }
-      unawaited(
-        widget.controller.seekTo(
-          Duration(milliseconds: (value * durationInMilliseconds).round()),
-        ),
-      );
+      final position = _positionInMilliseconds(value);
+      if (position == null) return;
+      unawaited(widget.controller.seekTo(Duration(milliseconds: position)));
     });
   }
 
@@ -150,6 +159,7 @@ class _SeekBarState extends State<SeekBar> with SingleTickerProviderStateMixin {
         _onPlaybackPositionChanged();
         break;
       case PlaybackEndedEvent():
+        _elapsedMilliseconds = 0;
         _animationController.value = 0;
       default:
     }
@@ -179,6 +189,7 @@ class _SeekBarState extends State<SeekBar> with SingleTickerProviderStateMixin {
       return;
     }
 
+    _elapsedMilliseconds = target;
     final duration = widget.controller.videoInfo?.durationInMilliseconds;
     final double fractionTarget = duration == null || duration <= 0
         ? 0
@@ -204,6 +215,11 @@ class _SeekBarState extends State<SeekBar> with SingleTickerProviderStateMixin {
       return widget.duration! * 1000;
     }
     return null;
+  }
+
+  int? _positionInMilliseconds(double value) {
+    final duration = _effectiveDurationInMilliseconds();
+    return duration == null ? null : (value * duration).round();
   }
 
   double _durationNudge() {
