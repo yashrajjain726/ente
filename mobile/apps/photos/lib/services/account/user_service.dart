@@ -533,11 +533,16 @@ class UserService {
 
   Future<void> setAttributes(KeyGenResult result) async {
     try {
-      await registerOrUpdateSrp(result.loginKey);
       await _gateway.setKeyAttributes(result.keyAttributes);
       await _config.setKey(result.privateKeyAttributes.key);
       await _config.setSecretKey(result.privateKeyAttributes.secretKey);
       await _config.setKeyAttributes(result.keyAttributes);
+      try {
+        await registerOrUpdateSrp(result.loginKey);
+      } catch (_) {
+        // Keys are stored; password reentry after OTT login retries SRP setup.
+        _logger.warning("Continuing signup after SRP setup failure");
+      }
     } catch (e) {
       _logger.severe(e);
       rethrow;
