@@ -134,6 +134,57 @@ void main() {
 
     expect(fixture.collectionsService.shareBatchSizes, [100]);
   });
+
+  test(
+    'refreshes only for ineligible recipients and disables after removal',
+    () async {
+      final albums = [librarySharingTestAlbum(1)];
+      final fixture = await _Fixture.create(
+        albums,
+        activeFamilyMemberUserIDs: {librarySharingTestRecipient.userID},
+      );
+      await fixture.service.enableAutomaticSharing(
+        recipient: librarySharingTestRecipient,
+        role: CollectionParticipantRole.viewer,
+      );
+      albums.addAll([
+        for (var id = 2; id <= 102; id++) librarySharingTestAlbum(id),
+      ]);
+
+      fixture.collectionsService.shareError = StateError('ordinary failure');
+      await fixture.service.reconcile();
+      expect(fixture.userService.userDetailsFetches, 0);
+
+      fixture.collectionsService.shareError =
+          AutomaticShareRecipientNotEligibleError();
+      fixture.userService.refreshedActiveFamilyMemberUserIDs = {
+        librarySharingTestRecipient.userID,
+      };
+      await fixture.service.reconcile();
+      expect(fixture.userService.userDetailsFetches, 1);
+      expect(await fixture.isAutomaticSharingEnabled(), isTrue);
+
+      fixture.userService.userDetailsError = StateError('refresh failed');
+      await fixture.service.reconcile();
+      expect(fixture.userService.userDetailsFetches, 2);
+      expect(await fixture.isAutomaticSharingEnabled(), isTrue);
+
+      fixture.userService.userDetailsError = null;
+      fixture.userService.refreshedActiveFamilyMemberUserIDs = {};
+      await fixture.service.reconcile();
+      expect(fixture.userService.userDetailsFetches, 3);
+      expect(await fixture.isAutomaticSharingEnabled(), isFalse);
+      expect(fixture.collectionsService.shareBatchSizes, [
+        1,
+        100,
+        1,
+        100,
+        100,
+        100,
+      ]);
+      expect(albums.last.sharees, isEmpty);
+    },
+  );
 }
 
 class _Fixture {
@@ -179,6 +230,9 @@ class _Fixture {
 
   Future<LibrarySharingLocalConfig> readConfig() async =>
       (await store.read(1, librarySharingTestRecipient.userID))!;
+
+  Future<bool> isAutomaticSharingEnabled() =>
+      service.isAutomaticSharingEnabled(librarySharingTestRecipient.userID);
 }
 
 class _FakeCollectionsService extends Mock implements CollectionsService {
@@ -186,7 +240,7 @@ class _FakeCollectionsService extends Mock implements CollectionsService {
 
   final List<Collection> albums;
   final Set<int> blockedIDs;
-  final Object? shareError;
+  Object? shareError;
   final List<int> shareBatchSizes = [];
   final List<String> recipientEmails = [];
   final List<int> shareAttempts = [];
@@ -271,6 +325,9 @@ class _FakeUserService extends Mock implements UserService {
   _FakeUserService(this.activeFamilyMemberUserIDs);
 
   Set<int>? activeFamilyMemberUserIDs;
+  Set<int>? refreshedActiveFamilyMemberUserIDs;
+  Object? userDetailsError;
+  int userDetailsFetches = 0;
   final List<String> publicKeyEmails = [];
 
   @override
@@ -291,6 +348,23 @@ class _FakeUserService extends Mock implements UserService {
   UserDetails? getCachedUserDetails() {
     final userIDs = activeFamilyMemberUserIDs;
     return userIDs == null ? null : _FakeUserDetails(userIDs);
+  }
+
+  @override
+  Future<UserDetails> getUserDetailsV2({
+    bool memoryCount = true,
+    bool shouldCache = true,
+  }) async {
+    userDetailsFetches++;
+    if (userDetailsError != null) {
+      throw userDetailsError!;
+    }
+    final userIDs =
+        refreshedActiveFamilyMemberUserIDs ??
+        activeFamilyMemberUserIDs ??
+        const {};
+    activeFamilyMemberUserIDs = userIDs;
+    return _FakeUserDetails(userIDs);
   }
 }
 

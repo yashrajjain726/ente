@@ -924,6 +924,10 @@ class CollectionsService {
       if (e.response?.data?['code'] == 'RECIPIENT_IDENTITY_MISMATCH') {
         throw RecipientIdentityMismatchError();
       }
+      if (e.response?.data?['code'] ==
+          'AUTOMATIC_SHARE_RECIPIENT_NOT_ELIGIBLE') {
+        throw AutomaticShareRecipientNotEligibleError();
+      }
       rethrow;
     }
   }

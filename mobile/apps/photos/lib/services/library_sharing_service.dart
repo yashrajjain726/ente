@@ -12,6 +12,7 @@ import 'package:photos/models/collection/collection.dart';
 import 'package:photos/models/library_sharing/library_sharing_recipient.dart';
 import 'package:photos/models/metadata/collection_magic.dart';
 import 'package:photos/models/metadata/common_keys.dart';
+import 'package:photos/models/user_details.dart';
 import 'package:photos/services/account/user_service.dart';
 import 'package:photos/services/collections_service.dart';
 import 'package:photos/services/library_sharing_local_store.dart';
@@ -345,7 +346,14 @@ class LibrarySharingService implements LibrarySharingRepository {
               !activeFamilyMemberUserIDs.contains(latest.recipientUserID)) {
             await _writeConfig(ownerUserID, latest.copyWith(enabled: false));
           } else {
-            await _reconcileConfig(ownerUserID, latest);
+            try {
+              await _reconcileConfig(ownerUserID, latest);
+            } on AutomaticShareRecipientNotEligibleError {
+              await _refreshFamilyAndHandleIneligibleRecipient(
+                ownerUserID,
+                latest,
+              );
+            }
           }
         });
       } catch (error, stackTrace) {
@@ -462,6 +470,8 @@ class LibrarySharingService implements LibrarySharingRepository {
         );
       } on RecipientIdentityMismatchError {
         rethrow;
+      } on AutomaticShareRecipientNotEligibleError {
+        rethrow;
       } catch (error, stackTrace) {
         _logger.warning('Bulk library share failed', error, stackTrace);
       }
@@ -563,10 +573,38 @@ class LibrarySharingService implements LibrarySharingRepository {
         (throw StateError('No email found for library sharing recipient'));
   }
 
-  Set<int>? _activeFamilyMemberUserIDs() {
+  Future<void> _refreshFamilyAndHandleIneligibleRecipient(
+    int ownerUserID,
+    LibrarySharingLocalConfig config,
+  ) async {
+    UserDetails userDetails;
+    try {
+      userDetails = await _userService.getUserDetailsV2(memoryCount: false);
+    } catch (refreshError, refreshStackTrace) {
+      _logger.warning(
+        'Could not refresh family details after automatic share rejection for '
+        '${config.recipientUserID}',
+        refreshError,
+        refreshStackTrace,
+      );
+      return;
+    }
+    if (_activeFamilyMemberUserIDs(
+      userDetails,
+    )!.contains(config.recipientUserID)) {
+      _logger.warning(
+        'Automatic share rejected for active family member '
+        '${config.recipientUserID}',
+      );
+      return;
+    }
+    await _writeConfig(ownerUserID, config.copyWith(enabled: false));
+  }
+
+  Set<int>? _activeFamilyMemberUserIDs([UserDetails? userDetails]) {
     // Temporary best-effort guard while Library Sharing is family-scoped;
     // cached details can lag membership changes made on another client.
-    final userDetails = _userService.getCachedUserDetails();
+    userDetails ??= _userService.getCachedUserDetails();
     if (userDetails == null) {
       return null;
     }
