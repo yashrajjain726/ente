@@ -38,28 +38,38 @@ class _VideoMuteButtonState extends State<VideoMuteButton> {
 
   @override
   Widget build(BuildContext context) {
-    return IconButton(
-      icon: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 250),
-        transitionBuilder: (Widget child, Animation<double> animation) {
-          return ScaleTransition(scale: animation, child: child);
-        },
-        switchInCurve: Curves.easeInOutQuart,
-        switchOutCurve: Curves.easeInOutQuart,
-        child: HugeIcon(
-          key: ValueKey(_isMuted),
-          icon: _isMuted
-              ? HugeIcons.strokeRoundedVolumeOff
-              : HugeIcons.strokeRoundedVolumeHigh,
-          color: Colors.white,
-          size: 20,
+    return SizedBox(
+      width: 32,
+      height: 16,
+      child: IconButton(
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints(),
+        style: IconButton.styleFrom(
+          minimumSize: Size.zero,
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
         ),
+        icon: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 250),
+          transitionBuilder: (Widget child, Animation<double> animation) {
+            return ScaleTransition(scale: animation, child: child);
+          },
+          switchInCurve: Curves.easeInOutQuart,
+          switchOutCurve: Curves.easeInOutQuart,
+          child: HugeIcon(
+            key: ValueKey(_isMuted),
+            icon: _isMuted
+                ? HugeIcons.strokeRoundedVolumeOff
+                : HugeIcons.strokeRoundedVolumeHigh,
+            color: Colors.white,
+            size: 20,
+          ),
+        ),
+        onPressed: () async {
+          final newValue = !_isMuted;
+          await localSettings.setIsMuted(newValue);
+          Bus.instance.fire(VideoMuteChangedEvent(newValue));
+        },
       ),
-      onPressed: () async {
-        final newValue = !_isMuted;
-        await localSettings.setIsMuted(newValue);
-        Bus.instance.fire(VideoMuteChangedEvent(newValue));
-      },
     );
   }
 }

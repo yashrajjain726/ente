@@ -6,10 +6,8 @@ import "package:media_kit_video/media_kit_video.dart";
 import "package:photos/models/file/file.dart";
 import "package:photos/states/detail_page_state.dart";
 import "package:photos/theme/colors.dart";
-import "package:photos/theme/ente_theme.dart";
-import "package:photos/ui/actions/file/file_actions.dart";
 import "package:photos/ui/common/loading_widget.dart";
-import "package:photos/ui/viewer/file/video_control/mute_button.dart";
+import "package:photos/ui/viewer/file/video_control/gallery_video_controls.dart";
 import "package:photos/ui/viewer/file/video_stream_change.dart";
 import "package:photos/ui/viewer/file/zoomable_video_viewer.dart";
 
@@ -42,7 +40,6 @@ class VideoWidget extends StatefulWidget {
 
 class _VideoWidgetState extends State<VideoWidget> {
   final showControlsNotifier = ValueNotifier<bool>(true);
-  static const double verticalMargin = 64;
   final _hideControlsDebouncer = Debouncer(const Duration(milliseconds: 2000));
   final _isSeekingNotifier = ValueNotifier<bool>(false);
   late final StreamSubscription<bool> _isPlayingStreamSubscription;
@@ -121,6 +118,10 @@ class _VideoWidgetState extends State<VideoWidget> {
               child: Stack(
                 alignment: Alignment.center,
                 children: [
+                  if (!widget.isFromMemories)
+                    GalleryVideoControlScrim(
+                      hasCaption: widget.file.caption?.isNotEmpty ?? false,
+                    ),
                   GestureDetector(
                     behavior: HitTestBehavior.translucent,
                     onTap: widget.isFromMemories
@@ -170,7 +171,7 @@ class _VideoWidgetState extends State<VideoWidget> {
                   widget.isFromMemories
                       ? const SizedBox.shrink()
                       : Positioned(
-                          bottom: verticalMargin,
+                          bottom: kGalleryVideoProgressBottom,
                           right: 0,
                           left: 0,
                           child: IgnorePointer(
@@ -179,27 +180,30 @@ class _VideoWidgetState extends State<VideoWidget> {
                               top: false,
                               left: false,
                               right: false,
-                              child: Padding(
-                                padding: EdgeInsets.only(
-                                  bottom: widget.isFromMemories ? 32 : 0,
-                                ),
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    VideoStreamChangeWidget(
-                                      showControls: value,
-                                      file: widget.file,
-                                      isPreviewPlayer: widget.isPreviewPlayer,
-                                      onStreamChange: widget.onStreamChange,
-                                    ),
-                                    SeekBarAndDuration(
-                                      controller: widget.controller,
-                                      isSeekingNotifier: _isSeekingNotifier,
-                                      file: widget.file,
-                                    ),
-                                  ],
-                                ),
+                              child: SeekBarAndDuration(
+                                controller: widget.controller,
+                                isSeekingNotifier: _isSeekingNotifier,
                               ),
+                            ),
+                          ),
+                        ),
+                  widget.isFromMemories
+                      ? const SizedBox.shrink()
+                      : Positioned(
+                          bottom: galleryVideoStreamControlBottom(
+                            widget.file.caption?.isNotEmpty ?? false,
+                          ),
+                          right: 0,
+                          left: 0,
+                          child: SafeArea(
+                            top: false,
+                            left: false,
+                            right: false,
+                            child: VideoStreamChangeWidget(
+                              showControls: value,
+                              file: widget.file,
+                              isPreviewPlayer: widget.isPreviewPlayer,
+                              onStreamChange: widget.onStreamChange,
                             ),
                           ),
                         ),
@@ -297,83 +301,20 @@ class _PlayPauseButtonState extends State<PlayPauseButtonMediaKit> {
 }
 
 class SeekBarAndDuration extends StatelessWidget {
-  final VideoController? controller;
+  final VideoController controller;
   final ValueNotifier<bool> isSeekingNotifier;
-  final EnteFile file;
 
   const SeekBarAndDuration({
     super.key,
     required this.controller,
     required this.isSeekingNotifier,
-    required this.file,
   });
 
   @override
   Widget build(BuildContext context) {
-    final caption = file.caption;
-    final textStyle = getEnteTextTheme(
-      context,
-    ).mini.copyWith(color: textBaseDark);
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8),
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.black.withValues(alpha: 0.3),
-          borderRadius: const BorderRadius.all(Radius.circular(8)),
-          border: Border.all(color: strokeFaintDark, width: 1),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (caption != null && caption.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(8, 4, 8, 4),
-                child: GestureDetector(
-                  onTap: () => showDetailsSheet(context, file),
-                  child: Row(
-                    children: [
-                      Text('"', style: textStyle),
-                      Flexible(
-                        child: Text(
-                          caption,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: textStyle,
-                        ),
-                      ),
-                      Text('"', style: textStyle),
-                    ],
-                  ),
-                ),
-              ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Row(
-                children: [
-                  StreamBuilder(
-                    stream: controller?.player.stream.position,
-                    builder: (context, snapshot) => Text(
-                      snapshot.data == null
-                          ? "0:00"
-                          : secondsToDuration(snapshot.data!.inSeconds),
-                      style: textStyle,
-                    ),
-                  ),
-                  Expanded(child: SeekBar(controller!, isSeekingNotifier)),
-                  Text(
-                    _secondsToDuration(
-                      controller!.player.state.duration.inSeconds,
-                    ),
-                    style: textStyle,
-                  ),
-                  const SizedBox(width: 8),
-                  const VideoMuteButton(),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
+    return GalleryVideoProgressRow(
+      seekBar: SeekBar(controller, isSeekingNotifier),
+      duration: _secondsToDuration(controller.player.state.duration.inSeconds),
     );
   }
 
@@ -443,11 +384,14 @@ class _SeekBarState extends State<SeekBar> {
   Widget build(BuildContext context) {
     return SliderTheme(
       data: SliderTheme.of(context).copyWith(
-        trackHeight: 1.0,
+        trackHeight: 3.0,
+        trackShape: const GalleryVideoSliderTrackShape(),
+        tickMarkShape: SliderTickMarkShape.noTickMark,
         thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6.0),
         overlayShape: const RoundSliderOverlayShape(overlayRadius: 12.0),
+        padding: EdgeInsets.zero,
         activeTrackColor: backgroundElevatedLight,
-        inactiveTrackColor: fillMutedDark,
+        inactiveTrackColor: textBaseDark.withValues(alpha: 0.3),
         thumbColor: backgroundElevatedLight,
         overlayColor: fillMutedDark,
       ),

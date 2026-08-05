@@ -40,6 +40,7 @@ import "package:photos/ui/viewer/file/inline_text_detection.dart";
 import "package:photos/ui/viewer/file/panorama_viewer_screen.dart";
 import "package:photos/ui/viewer/file/qr_code_detection_helper.dart";
 import "package:photos/ui/viewer/file/qr_code_highlight_overlay.dart";
+import "package:photos/ui/viewer/file/video_control/gallery_video_controls.dart";
 import 'package:photos/ui/viewer/gallery/gallery.dart';
 import 'package:photos/utils/dialog_util.dart';
 
@@ -696,14 +697,13 @@ class _GalleryBottomOverlay extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final supportsCaption =
-        file.fileType == FileType.image || file.fileType == FileType.livePhoto;
-    final caption = supportsCaption ? file.caption : null;
+    final isVideo = file.fileType == FileType.video;
+    final caption = file.caption;
     final captionText = caption == null || caption.isEmpty
         ? null
         : '"$caption"';
     final hasBottomBar = mode != DetailPageMode.minimalistic && !isGuestView;
-    if (captionText == null && !hasBottomBar) {
+    if (captionText == null && (isVideo || !hasBottomBar)) {
       return const SizedBox.shrink();
     }
 
@@ -718,44 +718,48 @@ class _GalleryBottomOverlay extends StatelessWidget {
             duration: const Duration(milliseconds: 200),
             child: Stack(
               children: [
-                Align(
-                  alignment: Alignment.bottomCenter,
-                  child: IgnorePointer(
-                    child: SizedBox(
-                      width: double.infinity,
-                      height:
-                          safePadding.bottom +
-                          _galleryBottomBarHeight +
-                          (captionText == null
-                              ? 0
-                              : _galleryCaptionGap +
-                                    _galleryCaptionLineHeight +
-                                    _galleryCaptionScrimTopPadding),
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topCenter,
-                            end: Alignment.bottomCenter,
-                            colors: [
-                              Colors.transparent,
-                              Colors.black.withValues(alpha: 0.6),
-                              Colors.black.withValues(alpha: 0.72),
-                            ],
-                            stops: const [0, 0.8, 1],
+                if (!isVideo)
+                  Align(
+                    alignment: Alignment.bottomCenter,
+                    child: IgnorePointer(
+                      child: SizedBox(
+                        width: double.infinity,
+                        height:
+                            safePadding.bottom +
+                            _galleryBottomBarHeight +
+                            (captionText == null
+                                ? 0
+                                : _galleryCaptionGap +
+                                      _galleryCaptionLineHeight +
+                                      _galleryCaptionScrimTopPadding),
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: [
+                                Colors.transparent,
+                                Colors.black.withValues(alpha: 0.6),
+                                Colors.black.withValues(alpha: 0.72),
+                              ],
+                              stops: const [0, 0.8, 1],
+                            ),
                           ),
                         ),
                       ),
                     ),
                   ),
-                ),
                 if (captionText != null)
                   Positioned(
                     left: safePadding.left + 16,
                     right: safePadding.right + 16,
                     bottom:
                         safePadding.bottom +
-                        _galleryBottomBarHeight +
-                        _galleryCaptionGap,
+                        (isVideo
+                            ? kGalleryVideoProgressBottom +
+                                  kGalleryVideoProgressHeight +
+                                  kGalleryVideoCaptionGap
+                            : _galleryBottomBarHeight + _galleryCaptionGap),
                     child: Align(
                       alignment: Alignment.centerLeft,
                       child: GestureDetector(

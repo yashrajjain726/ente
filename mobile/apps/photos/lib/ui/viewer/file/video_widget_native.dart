@@ -8,7 +8,6 @@ import "package:logging/logging.dart";
 import "package:native_video_player/native_video_player.dart";
 import "package:photos/core/constants.dart";
 import "package:photos/core/event_bus.dart";
-import "package:photos/events/file_caption_updated_event.dart";
 import "package:photos/events/guest_view_event.dart";
 import "package:photos/events/pause_video_event.dart";
 import "package:photos/events/resume_video_event.dart";
@@ -34,7 +33,7 @@ import "package:photos/ui/notification/toast.dart";
 import "package:photos/ui/viewer/file/native_video_player_controls/play_pause_button.dart";
 import "package:photos/ui/viewer/file/native_video_player_controls/seek_bar.dart";
 import "package:photos/ui/viewer/file/thumbnail_widget.dart";
-import "package:photos/ui/viewer/file/video_control/mute_button.dart";
+import "package:photos/ui/viewer/file/video_control/gallery_video_controls.dart";
 import "package:photos/ui/viewer/file/video_stream_change.dart";
 import "package:photos/ui/viewer/file/zoomable_video_viewer.dart";
 import "package:photos/utils/dialog_util.dart";
@@ -72,7 +71,6 @@ class VideoWidgetNative extends StatefulWidget {
 class _VideoWidgetNativeState extends State<VideoWidgetNative>
     with WidgetsBindingObserver {
   final Logger _logger = Logger("VideoWidgetNative");
-  static const verticalMargin = 64.0;
   final _progressNotifier = ValueNotifier<double?>(null);
   late StreamSubscription<PauseVideoEvent> pauseVideoSubscription;
   late StreamSubscription<ResumeVideoEvent> resumeVideoSubscription;
@@ -92,9 +90,6 @@ class _VideoWidgetNativeState extends State<VideoWidgetNative>
   StreamSubscription<PlaybackEvent>? _subscription;
   StreamSubscription<StreamSwitchedEvent>? _streamSwitchedSubscription;
   StreamSubscription<DownloadTask>? downloadTaskSubscription;
-  late final StreamSubscription<FileCaptionUpdatedEvent>
-  _captionUpdatedSubscription;
-  int position = 0;
   final _transformationController = TransformationController();
   bool _isZooming = false;
 
@@ -149,15 +144,6 @@ class _VideoWidgetNativeState extends State<VideoWidgetNative>
       },
     );
 
-    _captionUpdatedSubscription = Bus.instance
-        .on<FileCaptionUpdatedEvent>()
-        .listen((event) {
-          if (event.fileGeneratedID == widget.file.generatedID) {
-            if (mounted) {
-              setState(() {});
-            }
-          }
-        });
     if (widget.file.isUploaded) {
       downloadTaskSubscription = downloadManager
           .watchDownload(widget.file.uploadedFileID!)
@@ -284,7 +270,6 @@ class _VideoWidgetNativeState extends State<VideoWidgetNative>
     _isSeeking.removeListener(_seekListener);
     _isSeeking.dispose();
     _debouncer.cancelDebounceTimer();
-    _captionUpdatedSubscription.cancel();
     _transformationController.dispose();
     wakeLockService.updateWakeLock(
       enable: false,
@@ -355,6 +340,22 @@ class _VideoWidgetNativeState extends State<VideoWidgetNative>
                               ),
                             ),
                           ),
+                          if (!widget.isFromMemories)
+                            ValueListenableBuilder(
+                              valueListenable: _showControls,
+                              builder: (context, showControls, child) {
+                                return AnimatedOpacity(
+                                  duration: const Duration(milliseconds: 200),
+                                  opacity: showControls ? 1 : 0,
+                                  curve: Curves.easeInOutQuad,
+                                  child: child,
+                                );
+                              },
+                              child: GalleryVideoControlScrim(
+                                hasCaption:
+                                    widget.file.caption?.isNotEmpty ?? false,
+                              ),
+                            ),
                           GestureDetector(
                             behavior: HitTestBehavior.translucent,
                             onTap: widget.isFromMemories
@@ -416,45 +417,46 @@ class _VideoWidgetNativeState extends State<VideoWidgetNative>
                           widget.isFromMemories
                               ? const SizedBox.shrink()
                               : Positioned(
-                                  bottom: verticalMargin,
+                                  bottom: kGalleryVideoProgressBottom,
                                   right: 0,
                                   left: 0,
                                   child: SafeArea(
                                     top: false,
                                     left: false,
                                     right: false,
-                                    child: Padding(
-                                      padding: EdgeInsets.only(
-                                        bottom: widget.isFromMemories ? 32 : 0,
-                                      ),
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.center,
-                                        children: [
-                                          ValueListenableBuilder(
-                                            valueListenable: _showControls,
-                                            builder: (context, value, _) {
-                                              return VideoStreamChangeWidget(
-                                                showControls: value,
-                                                file: widget.file,
-                                                isPreviewPlayer:
-                                                    widget.selectedPreview,
-                                                onStreamChange:
-                                                    widget.onStreamChange,
-                                              );
-                                            },
-                                          ),
-                                          if (isPlaybackReady)
-                                            _SeekBarAndDuration(
-                                              controller: _controller,
-                                              duration: duration,
-                                              showControls: _showControls,
-                                              isSeeking: _isSeeking,
-                                              position: position,
-                                              file: widget.file,
-                                            ),
-                                        ],
-                                      ),
+                                    child: isPlaybackReady
+                                        ? _SeekBarAndDuration(
+                                            controller: _controller!,
+                                            duration: duration,
+                                            showControls: _showControls,
+                                            isSeeking: _isSeeking,
+                                          )
+                                        : const SizedBox.shrink(),
+                                  ),
+                                ),
+                          widget.isFromMemories
+                              ? const SizedBox.shrink()
+                              : Positioned(
+                                  bottom: galleryVideoStreamControlBottom(
+                                    widget.file.caption?.isNotEmpty ?? false,
+                                  ),
+                                  right: 0,
+                                  left: 0,
+                                  child: SafeArea(
+                                    top: false,
+                                    left: false,
+                                    right: false,
+                                    child: ValueListenableBuilder(
+                                      valueListenable: _showControls,
+                                      builder: (context, value, _) {
+                                        return VideoStreamChangeWidget(
+                                          showControls: value,
+                                          file: widget.file,
+                                          isPreviewPlayer:
+                                              widget.selectedPreview,
+                                          onStreamChange: widget.onStreamChange,
+                                        );
+                                      },
                                     ),
                                   ),
                                 ),
@@ -505,12 +507,6 @@ class _VideoWidgetNativeState extends State<VideoWidgetNative>
         _onPlaybackStatusChanged();
       case PlaybackReadyEvent():
         _onPlaybackReady();
-        break;
-      case PlaybackPositionChangedEvent():
-        position = event.positionInMilliseconds;
-        if (mounted) {
-          setState(() {});
-        }
         break;
       case PlaybackEndedEvent():
         _onPlaybackEnded();
@@ -855,28 +851,20 @@ class _VideoWidgetNativeState extends State<VideoWidgetNative>
 }
 
 class _SeekBarAndDuration extends StatelessWidget {
-  final NativeVideoPlayerController? controller;
+  final NativeVideoPlayerController controller;
   final String? duration;
   final ValueNotifier<bool> showControls;
   final ValueNotifier<bool> isSeeking;
-  final int position;
-  final EnteFile file;
 
   const _SeekBarAndDuration({
     required this.controller,
     required this.duration,
     required this.showControls,
     required this.isSeeking,
-    required this.position,
-    required this.file,
   });
 
   @override
   Widget build(BuildContext context) {
-    final caption = file.caption;
-    final textStyle = getEnteTextTheme(
-      context,
-    ).mini.copyWith(color: textBaseDark);
     return ValueListenableBuilder(
       valueListenable: showControls,
       builder: (BuildContext context, bool value, _) {
@@ -886,66 +874,13 @@ class _SeekBarAndDuration extends StatelessWidget {
           opacity: value ? 1 : 0,
           child: IgnorePointer(
             ignoring: !value,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.3),
-                  borderRadius: const BorderRadius.all(Radius.circular(8)),
-                  border: Border.all(color: strokeFaintDark, width: 1),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (caption != null && caption.isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(8, 4, 8, 4),
-                        child: GestureDetector(
-                          onTap: () => showDetailsSheet(context, file),
-                          child: Row(
-                            children: [
-                              Text('"', style: textStyle),
-                              Flexible(
-                                child: Text(
-                                  caption,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: textStyle,
-                                ),
-                              ),
-                              Text('"', style: textStyle),
-                            ],
-                          ),
-                        ),
-                      ),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Row(
-                        children: [
-                          AnimatedSize(
-                            duration: const Duration(seconds: 5),
-                            curve: Curves.easeInOut,
-                            child: Text(
-                              secondsToDuration(position ~/ 1000),
-                              style: textStyle,
-                            ),
-                          ),
-                          Expanded(
-                            child: SeekBar(
-                              controller!,
-                              durationToSeconds(duration),
-                              isSeeking,
-                            ),
-                          ),
-                          Text(duration ?? "0:00", style: textStyle),
-                          const SizedBox(width: 8),
-                          const VideoMuteButton(),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
+            child: GalleryVideoProgressRow(
+              seekBar: SeekBar(
+                controller,
+                durationToSeconds(duration),
+                isSeeking,
               ),
+              duration: duration ?? "0:00",
             ),
           ),
         );

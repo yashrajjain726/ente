@@ -6,6 +6,7 @@ import "package:native_video_player/native_video_player.dart";
 import "package:photos/core/event_bus.dart";
 import "package:photos/events/seekbar_triggered_event.dart";
 import "package:photos/theme/colors.dart";
+import "package:photos/ui/viewer/file/video_control/gallery_video_controls.dart";
 
 class SeekBar extends StatefulWidget {
   final NativeVideoPlayerController controller;
@@ -68,12 +69,14 @@ class _SeekBarState extends State<SeekBar> with SingleTickerProviderStateMixin {
       builder: (_, _) {
         return SliderTheme(
           data: SliderTheme.of(context).copyWith(
-            trackHeight: 1.0,
+            trackHeight: 3.0,
+            trackShape: const GalleryVideoSliderTrackShape(),
             tickMarkShape: SliderTickMarkShape.noTickMark,
             thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6.0),
             overlayShape: const RoundSliderOverlayShape(overlayRadius: 12.0),
+            padding: EdgeInsets.zero,
             activeTrackColor: backgroundElevatedLight,
-            inactiveTrackColor: fillMutedDark,
+            inactiveTrackColor: textBaseDark.withValues(alpha: 0.3),
             thumbColor: backgroundElevatedLight,
             overlayColor: fillMutedDark,
           ),
