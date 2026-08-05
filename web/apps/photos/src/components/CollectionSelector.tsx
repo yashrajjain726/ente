@@ -1,3 +1,4 @@
+import { CollectionsSortOptions } from "@/components/CollectionsSortOptions";
 import AddIcon from "@mui/icons-material/Add";
 import CloseIcon from "@mui/icons-material/Close";
 import FavoriteIcon from "@mui/icons-material/Favorite";
@@ -18,7 +19,6 @@ import {
 } from "@mui/material";
 import type { ModalVisibilityProps } from "ente-base/components/utils/modal";
 import type { Collection } from "ente-media/collection";
-import { CollectionsSortOptions } from "ente-new/photos/components/CollectionsSortOptions";
 import { BaseTileButton, ItemCard } from "ente-new/photos/components/Tiles";
 import {
     canAddToCollection,

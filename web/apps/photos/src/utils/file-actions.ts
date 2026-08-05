@@ -1,4 +1,4 @@
-import type { GalleryBarMode } from "ente-new/photos/components/gallery/reducer";
+import type { GalleryBarMode } from "@/components/gallery/reducer";
 import {
     PseudoCollectionID,
     type CollectionSummary,

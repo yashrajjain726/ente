@@ -1,3 +1,4 @@
+import { useWrapAsyncOperation } from "@/components/utils/use-wrap-async";
 import {
     Box,
     Button,
@@ -17,17 +18,16 @@ import {
     type NestedSidebarDrawerVisibilityProps,
 } from "ente-base/components/mui/SidebarDrawer";
 import { useBaseContext } from "ente-base/context";
+import { useMLStatusSnapshot } from "ente-new/photos/components/utils/use-snapshot";
 import {
     disableML,
     enableML,
     type MLStatus,
 } from "ente-new/photos/services/ml";
+import { openURL } from "ente-new/photos/utils/web";
 import { t } from "i18next";
 import React, { useEffect, useState } from "react";
 import { Trans } from "react-i18next";
-import { openURL } from "../../utils/web";
-import { useMLStatusSnapshot } from "../utils/use-snapshot";
-import { useWrapAsyncOperation } from "../utils/use-wrap-async";
 
 export const MLSettings: React.FC<NestedSidebarDrawerVisibilityProps> = ({
     open,

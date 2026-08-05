@@ -1,3 +1,5 @@
+import { StarBorderIcon } from "@/components/icons/StarIcon";
+import type { FileContextAction } from "@/utils/file-actions";
 import {
     AddSquareIcon,
     ArrowRight02Icon,
@@ -23,8 +25,6 @@ import {
     MenuItem,
     styled,
 } from "@mui/material";
-import { StarBorderIcon } from "ente-new/photos/components/icons/StarIcon";
-import type { FileContextAction } from "ente-new/photos/utils/file-actions";
 import { t } from "i18next";
 import React, { memo, useCallback, useMemo } from "react";
 

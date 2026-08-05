@@ -3,11 +3,13 @@ import { DropdownInput } from "@/components/DropdownInput";
 import { WatchFolder } from "@/components/WatchFolder";
 import { ShapeIcon } from "@/components/icons/ShapeIcon";
 import { AppLockSettings } from "@/components/sidebar/AppLockSettings";
+import { MLSettings } from "@/components/sidebar/MLSettings";
 import { ReferralSettings } from "@/components/sidebar/ReferralSettings";
 import { SessionsSettings } from "@/components/sidebar/SessionsSettings";
 import { TwoFactorSettings } from "@/components/sidebar/TwoFactorSettings";
 import { downloadAppDialogAttributes } from "@/components/utils/download";
 import exportService from "@/services/export";
+import { performSidebarAction as performSidebarRegistryAction } from "@/services/search/sidebar-search-registry";
 import {
     Delete02Icon,
     Download05Icon,
@@ -78,7 +80,6 @@ import {
     isHLSGenerationSupported,
     toggleHLSGeneration,
 } from "ente-gallery/services/video";
-import { MLSettings } from "ente-new/photos/components/sidebar/MLSettings";
 import {
     useAppLockSnapshot,
     useHLSGenerationStatusSnapshot,
@@ -95,7 +96,6 @@ import {
     type CollectionSummaries,
 } from "ente-new/photos/services/collection-summary";
 import { isMLSupported } from "ente-new/photos/services/ml";
-import { performSidebarAction as performSidebarRegistryAction } from "ente-new/photos/services/search/sidebar-search-registry";
 import type { SidebarActionID } from "ente-new/photos/services/search/types";
 import {
     pullSettings,

@@ -1,3 +1,6 @@
+import { sortPeople, type PeopleSortBy } from "@/components/people-sort";
+import { PeopleSortOptions } from "@/components/PeopleSortOptions";
+import { useWrapAsyncOperation } from "@/components/utils/use-wrap-async";
 import {
     ArrowDownDoubleIcon,
     ArrowUpDoubleIcon,
@@ -36,17 +39,11 @@ import { SingleInputDialog } from "ente-base/components/SingleInputDialog";
 import { useBaseContext } from "ente-base/context";
 import { SlideUpTransition } from "ente-new/photos/components/mui/SlideUpTransition";
 import {
-    sortPeople,
-    type PeopleSortBy,
-} from "ente-new/photos/components/people-sort";
-import { PeopleSortOptions } from "ente-new/photos/components/PeopleSortOptions";
-import {
     ItemCard,
     LargeTileButton,
     LargeTileCreateNewButton,
     LargeTileTextOverlay,
 } from "ente-new/photos/components/Tiles";
-import { useWrapAsyncOperation } from "ente-new/photos/components/utils/use-wrap-async";
 import {
     addCGroup,
     addClusterToCGroup,

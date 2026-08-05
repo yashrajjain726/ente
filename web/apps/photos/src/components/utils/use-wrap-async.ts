@@ -1,6 +1,6 @@
 import { useBaseContext } from "ente-base/context";
+import { usePhotosAppContext } from "ente-new/photos/types/context";
 import { useCallback } from "react";
-import { usePhotosAppContext } from "../../types/context";
 
 /**
  * Wrap a function returning a promise in a loading bar and error handler.

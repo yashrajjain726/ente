@@ -1,3 +1,4 @@
+import type { PeopleSortBy } from "@/components/people-sort";
 import { ArrowDown02Icon, ArrowUp02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import SortIcon from "@mui/icons-material/Sort";
@@ -11,7 +12,6 @@ import {
     type PaperProps,
 } from "@mui/material";
 import Menu, { type MenuProps } from "@mui/material/Menu";
-import type { PeopleSortBy } from "ente-new/photos/components/people-sort";
 import { t } from "i18next";
 import React, { useRef, useState } from "react";
 

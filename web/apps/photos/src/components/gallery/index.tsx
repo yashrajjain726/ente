@@ -7,6 +7,8 @@
  * there.
  */
 
+import { EnableML, FaceConsent } from "@/components/sidebar/MLSettings";
+import { useWrapAsyncOperation } from "@/components/utils/use-wrap-async";
 import CheckIcon from "@mui/icons-material/Check";
 import SortIcon from "@mui/icons-material/Sort";
 import {
@@ -20,14 +22,15 @@ import {
 import { CenteredFill, SpacedRow } from "ente-base/components/containers";
 import { OverflowMenuOption } from "ente-base/components/OverflowMenu";
 import { useModalVisibility } from "ente-base/components/utils/modal";
+import {
+    GalleryItemsHeaderAdapter,
+    GalleryItemsSummary,
+} from "ente-new/photos/components/gallery/ListHeader";
+import { useMLStatusSnapshot } from "ente-new/photos/components/utils/use-snapshot";
+import { enableML } from "ente-new/photos/services/ml";
 import type { SearchSuggestion } from "ente-new/photos/services/search/types";
 import { t } from "i18next";
 import React, { useRef, useState } from "react";
-import { enableML } from "../../services/ml";
-import { EnableML, FaceConsent } from "../sidebar/MLSettings";
-import { useMLStatusSnapshot } from "../utils/use-snapshot";
-import { useWrapAsyncOperation } from "../utils/use-wrap-async";
-import { GalleryItemsHeaderAdapter, GalleryItemsSummary } from "./ListHeader";
 
 export { GalleryEmptyState } from "./GalleryEmptyState";
 
