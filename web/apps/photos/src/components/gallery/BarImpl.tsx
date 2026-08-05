@@ -1,7 +1,7 @@
 import { CollectionsSortOptions } from "@/components/CollectionsSortOptions";
 import { StarIcon } from "@/components/icons/StarIcon";
-import type { PeopleSortBy } from "@/components/people-sort";
 import { PeopleSortOptions } from "@/components/PeopleSortOptions";
+import type { PeopleSortBy } from "@/utils/people-sort";
 import { Link05Icon, PinIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import ArchiveIcon from "@mui/icons-material/Archive";

@@ -1,4 +1,4 @@
-import type { PeopleSortBy } from "@/components/people-sort";
+import type { PeopleSortBy } from "@/utils/people-sort";
 import { ArrowDown02Icon, ArrowUp02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import SortIcon from "@mui/icons-material/Sort";
