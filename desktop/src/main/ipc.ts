@@ -1,13 +1,3 @@
-/**
- * @file Listen for IPC events sent/invoked by the renderer process, and route
- * them to their correct handlers.
- *
- * This file is meant as a sibling to `preload.ts`, but this one runs in the
- * context of the main process, and can import other files from `src/`.
- *
- * See [Note: types.ts <-> preload.ts <-> ipc.ts]
- */
-
 import type { FSWatcher } from "chokidar";
 import type { BrowserWindow, IpcMainEvent, IpcMainInvokeEvent } from "electron";
 import { ipcMain, safeStorage } from "electron/main";
@@ -108,14 +98,8 @@ const parsePersistedAppLockConfig = (
 
 const rendererOrigin = "ente://app";
 
-/**
- * Guard against IPC from anything other than our own renderer.
- *
- * The preload script exposes the {@link Electron} object to whatever document
- * is loaded in the main window, including any external page (e.g. the Stripe
- * checkout) the window navigates to. Ensure that the frame invoking us is
- * actually our renderer before running the privileged handler.
- */
+// The preload bridge remains exposed while the window visits Stripe, so every
+// privileged handler must verify that its caller is our renderer.
 const ensureTrustedIPCSender = (
     channel: string,
     event: IpcMainEvent | IpcMainInvokeEvent,
@@ -128,11 +112,6 @@ const ensureTrustedIPCSender = (
     return false;
 };
 
-/**
- * A variant of {@link ipcMain.handle} that ignores requests from untrusted
- * senders. See {@link ensureTrustedIPCSender}.
- */
-// The type parameters preserve each handler's specific argument types.
 // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters
 const handle = <A extends unknown[], R>(
     channel: string,
@@ -144,10 +123,6 @@ const handle = <A extends unknown[], R>(
         return handler(event, ...args);
     });
 
-/**
- * A variant of {@link ipcMain.on} that ignores requests from untrusted senders.
- * See {@link ensureTrustedIPCSender}.
- */
 // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters
 const on = <A extends unknown[]>(
     channel: string,
@@ -157,36 +132,13 @@ const on = <A extends unknown[]>(
         if (ensureTrustedIPCSender(channel, event)) handler(event, ...args);
     });
 
-/**
- * Listen for IPC events sent/invoked by the renderer process, and route them to
- * their correct handlers.
- */
 export const attachIPCHandlers = () => {
-    // Notes:
-    //
-    // The first parameter of the handler passed to `ipcMain.handle` is the
-    // `event`, and is usually ignored. The rest of the parameters are the
-    // arguments passed to `ipcRenderer.invoke`.
-    //
-    // [Note: Catching exception during .send/.on]
-    //
-    // While we can use ipcRenderer.send/ipcMain.on for one-way communication,
-    // that has the disadvantage that any exceptions thrown in the processing of
-    // the handler are not sent back to the renderer. So we use the
-    // ipcRenderer.invoke/ipcMain.handle 2-way pattern even for things that are
-    // conceptually one way. An exception (pun intended) to this is logToDisk,
-    // which is a primitive, frequently used, operation and shouldn't throw, so
-    // having its signature by synchronous is a bit convenient.
-
-    // - General
-
     handle("appVersion", () => appVersion());
 
     handle("openDirectory", (_, dirPath: string) => openDirectory(dirPath));
 
     handle("openLogDirectory", () => openLogDirectory());
 
-    // See [Note: Catching exception during .send/.on]
     on("logToDisk", (_, message: string) => logToDisk(message));
 
     handle("selectDirectory", () => selectDirectory());
@@ -223,23 +175,11 @@ export const attachIPCHandlers = () => {
 
     handle("toggleAutoLaunch", () => autoLauncher.toggleAutoLaunch());
 
-    // - Desktop app lock (native device authentication)
-    //
-    // These handlers are the main-process bridge for the desktop app lock flow:
-    // the renderer asks about native auth capability/support, then requests a
-    // native unlock prompt when the user needs to unlock the app.
-
-    // Returns richer capability details (for example, available prompt type)
-    // so the UI can decide which app-lock option to show.
     handle("getNativeDeviceLockCapability", () =>
         getNativeDeviceLockCapability(),
     );
 
-    // Triggers the macOS-native Touch ID prompt and returns the auth result
-    // back to the renderer. Other platforms currently return false.
     handle("promptDeviceLock", (_, reason: string) => promptDeviceLock(reason));
-
-    // - App update
 
     on("updateAndRestart", () => updateAndRestart());
 
@@ -248,8 +188,6 @@ export const attachIPCHandlers = () => {
     );
 
     on("skipAppUpdate", (_, version: string) => skipAppUpdate(version));
-
-    // - FS
 
     handle("fsExists", (_, path: string) => fsExists(path));
 
@@ -278,8 +216,6 @@ export const attachIPCHandlers = () => {
     handle("fsStatMtime", (_, path: string) => fsStatMtime(path));
 
     handle("fsFindFiles", (_, folderPath: string) => fsFindFiles(folderPath));
-
-    // - Conversion
 
     handle("convertToJPEG", (_, imageData: Uint8Array) =>
         convertToJPEG(imageData),
@@ -311,8 +247,6 @@ export const attachIPCHandlers = () => {
             ffmpegDetermineVideoDuration(pathOrZipItem),
     );
 
-    // - Upload
-
     handle("listZipItems", (_, zipPath: string) => listZipItems(zipPath));
 
     handle("pathOrZipItemSize", (_, pathOrZipItem: string | ZipItem) =>
@@ -340,28 +274,13 @@ export const attachIPCHandlers = () => {
     handle("clearPendingUploads", () => clearPendingUploads());
 };
 
-/**
- * A subset of {@link attachIPCHandlers} for functions that need a reference to
- * the main window to do their thing.
- */
 export const attachMainWindowIPCHandlers = (mainWindow: BrowserWindow) => {
-    // - Utility processes
-
     on("triggerCreateUtilityProcess", (_, type: UtilityProcessType) =>
         triggerCreateUtilityProcess(type, mainWindow),
     );
 };
 
-/**
- * Sibling of {@link attachIPCHandlers} that attaches handlers specific to the
- * watch folder functionality.
- *
- * It gets passed a {@link FSWatcher} instance which it can then forward to the
- * actual handlers if they need access to it to do their thing.
- */
 export const attachFSWatchIPCHandlers = (watcher: FSWatcher) => {
-    // - Watch
-
     handle("watchGet", () => watchGet(watcher));
 
     handle(
@@ -387,10 +306,6 @@ export const attachFSWatchIPCHandlers = (watcher: FSWatcher) => {
     );
 };
 
-/**
- * Sibling of {@link attachIPCHandlers} specifically for use with the logout
- * event with needs access to the {@link FSWatcher} instance.
- */
 export const attachLogoutIPCHandler = (watcher: FSWatcher) => {
     handle("logout", () => logout(watcher));
 };

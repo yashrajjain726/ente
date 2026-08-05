@@ -30,12 +30,6 @@ import { t } from "i18next";
 import { useRouter } from "next/router";
 import { useCallback, useEffect, useState } from "react";
 
-/**
- * A page that allows the user to enter their recovery key to recover their
- * master key if they've forgotten their password.
- *
- * See: [Note: Login pages]
- */
 const Page: React.FC = () => {
     const { showMiniDialog } = useBaseContext();
 

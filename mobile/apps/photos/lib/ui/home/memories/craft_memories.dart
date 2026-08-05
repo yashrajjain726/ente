@@ -1,11 +1,12 @@
 import "package:ente_components/ente_components.dart";
 import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
+import "package:hugeicons/hugeicons.dart";
+import "package:photos/service_locator.dart";
 import "package:photos/services/notification_service.dart";
 import "package:photos/ui/home/memories/memory_cover_widget.dart";
-import "package:rive/rive.dart" as rive;
 
-class CraftMemories extends StatefulWidget {
+class CraftMemories extends StatelessWidget {
   final double width;
   final double height;
   final VoidCallback? onNotificationsPermissionGranted;
@@ -18,123 +19,127 @@ class CraftMemories extends StatefulWidget {
   });
 
   @override
-  State<CraftMemories> createState() => _CraftMemoriesState();
-}
-
-class _CraftMemoriesState extends State<CraftMemories> {
-  late final rive.FileLoader _riveFileLoader;
-  bool _isButtonPressed = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _riveFileLoader = rive.FileLoader.fromAsset(
-      "assets/memories.riv",
-      riveFactory: rive.Factory.rive,
-    );
-  }
-
-  @override
-  void dispose() {
-    _riveFileLoader.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     final l10n = context.strings;
     return Padding(
-      padding: const EdgeInsets.all(MemoryCoverWidget.gap / 2.0),
+      padding: const EdgeInsets.symmetric(
+        horizontal: MemoryCoverWidget.gap / 2.0,
+      ),
       child: SizedBox(
-        width: widget.width,
-        height: widget.height,
+        width: width,
+        height: height,
         child: ClipRRect(
           borderRadius: BorderRadius.circular(18),
           child: Stack(
             children: [
               Positioned.fill(
-                child: rive.RiveWidgetBuilder(
-                  fileLoader: _riveFileLoader,
-                  builder: (BuildContext context, rive.RiveState state) {
-                    if (state is rive.RiveLoaded) {
-                      return rive.RiveWidget(
-                        controller: state.controller,
-                        fit: rive.Fit.cover,
-                      );
+                child: GestureDetector(
+                  onTap: () async {
+                    if (await NotificationService.instance.requestPermissions(
+                          context,
+                        ) &&
+                        context.mounted) {
+                      onNotificationsPermissionGranted?.call();
                     }
-                    return const SizedBox.shrink();
                   },
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      l10n.craftingMemoriesFirstHalf,
-                      style: TextStyle(
-                        fontFamily: TextStyles.outfitFontFamily,
-                        package: TextStyles.fontPackage,
-                        color: Colors.white,
-                        fontWeight: FontWeight.w700,
-                        fontSize: widget.width * 0.115,
-                        height: 1,
+                  child: Stack(
+                    children: [
+                      Positioned.fill(
+                        child: Image.asset("assets/memories.jpg", fit: .cover),
                       ),
-                    ),
-                    Text(
-                      l10n.craftingMemoriesSecondHalf,
-                      style: TextStyle(
-                        fontFamily: "Gochi Hand",
-                        package: TextStyles.fontPackage,
-                        color: Colors.white,
-                        fontSize: widget.width * 0.175,
-                        height: 1,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    GestureDetector(
-                      onTap: () async {
-                        if (await NotificationService.instance
-                                .requestPermissions(context) &&
-                            mounted) {
-                          widget.onNotificationsPermissionGranted?.call();
-                        }
-                      },
-                      onTapDown: (_) => setState(() => _isButtonPressed = true),
-                      onTapUp: (_) => setState(() => _isButtonPressed = false),
-                      onTapCancel: () =>
-                          setState(() => _isButtonPressed = false),
-                      child: AnimatedScale(
-                        scale: _isButtonPressed ? 0.98 : 1,
-                        duration: const Duration(milliseconds: 120),
-                        curve: Curves.easeOutCubic,
-                        child: DecoratedBox(
-                          decoration: BoxDecoration(
-                            color: Colors.white.withAlpha(128),
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 8,
-                            ),
-                            child: Text(
-                              l10n.notifyMe,
-                              style: const TextStyle(
+                      Padding(
+                        padding: EdgeInsets.all(width * 0.125),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              l10n.craftingMemoriesFirstHalf,
+                              textScaler: .noScaling,
+                              style: TextStyle(
                                 fontFamily: TextStyles.outfitFontFamily,
                                 package: TextStyles.fontPackage,
                                 color: Colors.white,
-                                fontSize: 11,
-                                fontWeight: FontWeight.w500,
+                                fontWeight: FontWeight.w700,
+                                fontSize: width * 0.115,
+                                height: 1,
                               ),
+                            ),
+                            Text(
+                              l10n.craftingMemoriesSecondHalf,
+                              textScaler: .noScaling,
+                              style: TextStyle(
+                                fontFamily: "Gochi Hand",
+                                package: TextStyles.fontPackage,
+                                color: Colors.white,
+                                fontSize: width * 0.175,
+                                height: 1,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            DecoratedBox(
+                              decoration: BoxDecoration(
+                                color: Colors.white.withAlpha(64),
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                              child: Padding(
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: width * 0.125,
+                                  vertical: width * 0.075,
+                                ),
+                                child: Text(
+                                  l10n.notifyMe,
+                                  textScaler: .noScaling,
+                                  style: TextStyle(
+                                    fontFamily: TextStyles.outfitFontFamily,
+                                    package: TextStyles.fontPackage,
+                                    color: Colors.white,
+                                    fontSize: width * 0.11,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              Positioned(
+                right: width * 0.02,
+                top: width * 0.02,
+                child: Tooltip(
+                  message: l10n.close,
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () async {
+                      await localSettings.setCraftingMemoriesBannerDismissed();
+                      if (!context.mounted) return;
+                      onNotificationsPermissionGranted?.call();
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.all(8),
+                      child: SizedBox.square(
+                        dimension: 20,
+                        child: DecoratedBox(
+                          decoration: const BoxDecoration(
+                            color: Color(0x4AFFFFFF),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Transform.scale(
+                            scale: 0.75,
+                            child: const HugeIcon(
+                              icon: HugeIcons.strokeRoundedCancel01,
+                              color: Colors.white,
+                              strokeWidth: 1.0 / 0.75,
                             ),
                           ),
                         ),
                       ),
                     ),
-                  ],
+                  ),
                 ),
               ),
             ],

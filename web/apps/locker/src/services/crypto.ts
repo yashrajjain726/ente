@@ -1,14 +1,3 @@
-/**
- * @file Crypto functions for the Locker app, backed by the Rust/WASM module.
- *
- * These wrappers provide the same call signatures as `ente-base/crypto` so
- * that `remote.ts` can switch from the JS libsodium implementation to the
- * pure-Rust WASM implementation by changing only the import source.
- *
- * All crypto operations — including chunked file-content decryption — are now
- * handled by the Rust/WASM module.
- */
-
 import { ensureArrayBufferBacked } from "ente-base/bytes";
 import type {
     EncryptedBlob,
@@ -34,16 +23,8 @@ const shouldFallbackToLegacyBlobDecrypt = (error: unknown): boolean => {
     return false;
 };
 
-/**
- * Helper: ensure a {@link BytesOrB64} value is a base64 string.
- *
- * The WASM functions accept base64 strings only, but the existing code
- * sometimes passes base64 strings already. If a `Uint8Array` is received we
- * convert it.
- */
 const toB64String = (v: Uint8Array | string): string => {
     if (typeof v === "string") return v;
-    // Standard base64 encoding (matches libsodium ORIGINAL variant)
     let binary = "";
     for (const byte of v) {
         binary += String.fromCharCode(byte);
@@ -51,9 +32,6 @@ const toB64String = (v: Uint8Array | string): string => {
     return btoa(binary);
 };
 
-/**
- * Convert a base64 string to bytes.
- */
 const fromB64String = (b64: string): Uint8Array<ArrayBuffer> => {
     const binary = atob(b64);
     const bytes = new Uint8Array(binary.length);
@@ -63,10 +41,6 @@ const fromB64String = (b64: string): Uint8Array<ArrayBuffer> => {
     return bytes;
 };
 
-/**
- * Decrypt a secretbox (XSalsa20-Poly1305) and return the plaintext as a
- * base64 string.
- */
 export const decryptBox = async (
     box: EncryptedBox,
     key: Uint8Array | string,
@@ -79,9 +53,6 @@ export const decryptBox = async (
     );
 };
 
-/**
- * Decrypt a secretbox (XSalsa20-Poly1305) and return the plaintext as bytes.
- */
 export const decryptBoxBytes = async (
     box: EncryptedBox,
     key: Uint8Array | string,
@@ -90,10 +61,6 @@ export const decryptBoxBytes = async (
     return fromB64String(b64);
 };
 
-/**
- * Decrypt a blob (single-message SecretStream / XChaCha20-Poly1305), then
- * UTF-8 decode and JSON-parse the result.
- */
 export const decryptMetadataJSON = async (
     blob: EncryptedBlob,
     key: Uint8Array | string,
@@ -122,10 +89,6 @@ export const decryptMetadataJSON = async (
     return JSON.parse(new TextDecoder().decode(fromB64String(plaintextB64)));
 };
 
-/**
- * Open a sealed box (anonymous public-key encryption) and return the
- * plaintext as a base64 string.
- */
 export const boxSealOpen = async (
     encryptedData: string,
     keyPair: KeyPair,
@@ -146,19 +109,6 @@ export const boxSeal = async (
     return wasm.crypto_box_seal(dataB64, publicKeyB64);
 };
 
-/**
- * Decrypt chunked stream data (file content) using the Rust/WASM module.
- *
- * This handles multi-chunk SecretStream data encrypted with 4 MB chunks — the
- * format used for encrypted file content in Ente.
- */
-// ---------------------------------------------------------------------------
-// Encryption helpers (for creating/updating items)
-// ---------------------------------------------------------------------------
-
-/**
- * Generate a random 32-byte key (base64).
- */
 export const generateKey = async (): Promise<string> => {
     const wasm = await loadCryptoReadyEnteWasm();
     return wasm.crypto_generate_key();
@@ -169,10 +119,6 @@ export const md5Base64 = async (data: Uint8Array): Promise<string> => {
     return wasm.crypto_md5_base64(data);
 };
 
-/**
- * Encrypt data using SecretBox (XSalsa20-Poly1305).
- * Returns { encryptedData, nonce } as base64 strings.
- */
 export const encryptBox = async (
     dataB64: string,
     keyB64: string,
@@ -182,10 +128,6 @@ export const encryptBox = async (
     return { encryptedData: result.encrypted_data, nonce: result.nonce };
 };
 
-/**
- * Encrypt data using SecretStream blob (XChaCha20-Poly1305, single message).
- * Returns { encryptedData, decryptionHeader } as base64 strings.
- */
 export const encryptBlob = async (
     dataB64: string,
     keyB64: string,
@@ -198,9 +140,6 @@ export const encryptBlob = async (
     };
 };
 
-/**
- * Convert a UTF-8 string to base64.
- */
 export const stringToB64 = (s: string): string => {
     const encoder = new TextEncoder();
     const bytes = encoder.encode(s);
@@ -208,10 +147,6 @@ export const stringToB64 = (s: string): string => {
 };
 
 export { fromB64String, toB64String };
-
-// ---------------------------------------------------------------------------
-// File encryption helpers (for file upload)
-// ---------------------------------------------------------------------------
 
 export interface StreamEncryptorHandle {
     key: string;
@@ -264,27 +199,13 @@ export const createStreamDecryptor = async (
     };
 };
 
-/** Result of encrypting file content using chunked stream encryption. */
 export interface EncryptedFileResult {
-    /** Encrypted ciphertext as base64. */
     encryptedData: string;
-    /** Decryption header as base64. */
     decryptionHeader: string;
-    /** MD5 hash of the encrypted data as base64. */
     md5Hash: string;
-    /** The generated file encryption key as base64. */
     key: string;
 }
 
-/**
- * Encrypt file data using chunked SecretStream (4 MB chunks) via Rust/WASM.
- *
- * Generates a new random stream key, encrypts the data in 4 MB chunks, and
- * computes the MD5 hash of the ciphertext.
- *
- * @param dataB64 File content as base64.
- * @returns Encrypted data, header, MD5 hash, and generated key — all base64.
- */
 export const encryptFileStream = async (
     dataB64: string,
 ): Promise<EncryptedFileResult> => {
@@ -298,12 +219,6 @@ export const encryptFileStream = async (
     };
 };
 
-/**
- * Encrypt data using chunked SecretStream with an existing key.
- *
- * Same as {@link encryptFileStream} but uses the provided key.
- * Useful for encrypting thumbnails with the same file key.
- */
 export const encryptFileStreamWithKey = async (
     dataB64: string,
     keyB64: string,
@@ -318,14 +233,8 @@ export const encryptFileStreamWithKey = async (
     };
 };
 
-/**
- * Convert a Uint8Array to base64 string.
- */
 export const bytesToB64 = (bytes: Uint8Array): string => toB64String(bytes);
 
-/**
- * Convert a base64 string to Uint8Array.
- */
 export const b64ToBytes = (b64: string): Uint8Array<ArrayBuffer> =>
     fromB64String(b64);
 

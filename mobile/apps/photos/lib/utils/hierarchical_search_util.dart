@@ -377,7 +377,7 @@ List<ContactsFilter> _curateContactsFilter(List<EnteFile> files) {
   }
 
   for (int id in ownerIdToOccurrence.keys) {
-    final user = CollectionsService.instance.getFileOwner(id, null);
+    final user = CollectionsService.instance.resolveUserIdentity(id, null);
     contactsFilters.add(
       ContactsFilter(user: user, occurrence: ownerIdToOccurrence[id]!),
     );

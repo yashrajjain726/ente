@@ -113,9 +113,7 @@ class WasmInference implements InferenceBackend {
         this.wllama = new Wllama(wasmPaths, wllamaConfig);
     }
 
-    async initBackend() {
-        // No-op for WASM backend.
-    }
+    async initBackend() {}
 
     async loadModel(params: LoadModelParams) {
         const modelUrl = ensureUrl(params.modelPath);
@@ -172,9 +170,7 @@ class WasmInference implements InferenceBackend {
         return this.generateCompletion(prompt, request, onEvent);
     }
 
-    async prewarmMultimodalContext() {
-        // Multimodal inference is only available through the native Tauri backend.
-    }
+    async prewarmMultimodalContext() {}
 
     cancel(jobId: number) {
         if (jobId <= 0) {
@@ -487,7 +483,7 @@ class WasmInference implements InferenceBackend {
                     stopTokens.push(first);
                 }
             } catch {
-                // Ignore invalid stop sequences.
+                // Skip stop sequences that fail to tokenize.
             }
         }
 

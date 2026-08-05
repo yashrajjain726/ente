@@ -27,6 +27,7 @@ import 'package:photos/events/force_reload_home_gallery_event.dart';
 import 'package:photos/events/local_photos_updated_event.dart';
 import "package:photos/gateways/collections/collection_share_gateway.dart";
 import 'package:photos/gateways/collections/models/collection_file_item.dart';
+import "package:photos/gateways/collections/models/collection_share.dart";
 import 'package:photos/gateways/collections/models/create_request.dart';
 import "package:photos/gateways/collections/models/metadata.dart";
 import "package:photos/gateways/collections/models/public_url.dart";
@@ -432,6 +433,26 @@ class CollectionsService {
     collections.sort(comparator);
   }
 
+  Future<List<Collection>> orderCollectionsForAlbums(
+    Iterable<Collection> collections,
+  ) async {
+    final sorted = collections.toList();
+    await sortCollectionsByAlbumPreferences(sorted);
+    return [
+      ...sorted.where(
+        (collection) => collection.type == CollectionType.favorites,
+      ),
+      ...sorted.where(
+        (collection) =>
+            collection.type != CollectionType.favorites && collection.isPinned,
+      ),
+      ...sorted.where(
+        (collection) =>
+            collection.type != CollectionType.favorites && !collection.isPinned,
+      ),
+    ];
+  }
+
   Future<Comparator<Collection>> _albumPreferenceComparator({
     AlbumSortKey? sortKey,
     AlbumSortDirection? sortDirection,
@@ -676,33 +697,17 @@ class CollectionsService {
   }
 
   Future<List<Collection>> getCollectionForOnEnteSection() async {
-    final List<Collection> collections = CollectionsService.instance
-        .getCollectionsForUI();
     final bool hasFavorites = FavoritesService.instance.hasFavorites();
-    await sortCollectionsByAlbumPreferences(collections);
-    final List<Collection> favorites = [];
-    final List<Collection> pinned = [];
-    final List<Collection> rest = [];
-    for (final collection in collections) {
-      if (collection.type == CollectionType.uncategorized ||
-          collection.isQuickLinkCollection() ||
-          collection.isHidden() ||
-          collection.isArchived()) {
-        continue;
-      }
-      if (collection.type == CollectionType.favorites) {
-        // Hide fav collection if it's empty
-        if (hasFavorites) {
-          favorites.add(collection);
-        }
-      } else if (collection.isPinned) {
-        pinned.add(collection);
-      } else {
-        rest.add(collection);
-      }
-    }
-
-    return favorites + pinned + rest;
+    return orderCollectionsForAlbums(
+      getCollectionsForUI().where(
+        (collection) =>
+            collection.type != CollectionType.uncategorized &&
+            !collection.isQuickLinkCollection() &&
+            !collection.isHidden() &&
+            !collection.isArchived() &&
+            (collection.type != CollectionType.favorites || hasFavorites),
+      ),
+    );
   }
 
   Future<List<Collection>> getCollectionForWidgetSelection() async {
@@ -767,7 +772,10 @@ class CollectionsService {
     return favorites + pinned + rest;
   }
 
-  User getFileOwner(int userID, int? collectionID) {
+  User resolveUserIdentity(int userID, int? collectionID) {
+    if (userID == _config.getUserID()) {
+      return User(id: userID, email: _config.getEmail()!);
+    }
     if (_cachedUserIdToUser.containsKey(userID)) {
       return _cachedUserIdToUser[userID]!;
     }
@@ -870,6 +878,134 @@ class CollectionsService {
       _logger.severe(e);
       rethrow;
     }
+  }
+
+  Future<Map<int, CollectionShareStatus>> shareBulk({
+    required int recipientUserID,
+    required String recipientEmail,
+    required String publicKey,
+    required Map<int, CollectionParticipantRole> roles,
+    required CollectionShareSource source,
+  }) async {
+    final recipientPublicKey = CryptoUtil.base642bin(publicKey);
+    final items = <BulkCollectionShareItem>[];
+    for (final entry in roles.entries) {
+      final encryptedKey = CryptoUtil.sealSync(
+        getCollectionKey(entry.key),
+        recipientPublicKey,
+      );
+      items.add(
+        BulkCollectionShareItem(
+          collectionID: entry.key,
+          encryptedKey: CryptoUtil.bin2base64(encryptedKey),
+          role: entry.value.toStringVal(),
+        ),
+      );
+    }
+    try {
+      final results = await collectionShareGateway.shareBulk(
+        recipientUserID: recipientUserID,
+        source: source,
+        collections: items,
+      );
+      _cacheBulkShares(
+        results,
+        recipientUserID: recipientUserID,
+        recipientEmail: recipientEmail,
+        roles: roles,
+      );
+      RemoteSyncService.instance.sync(silently: true).ignore();
+      return {for (final result in results) result.collectionID: result.status};
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 402) {
+        throw SharingNotPermittedForFreeAccountsError();
+      }
+      rethrow;
+    }
+  }
+
+  Future<Map<int, CollectionShareStatus>> unshareBulk({
+    required int recipientUserID,
+    required List<int> collectionIDs,
+    required CollectionShareSource source,
+  }) async {
+    final results = await collectionShareGateway.unshareBulk(
+      recipientUserID: recipientUserID,
+      source: source,
+      collectionIDs: collectionIDs,
+    );
+    _cacheBulkUnshares(results, recipientUserID);
+    RemoteSyncService.instance.sync(silently: true).ignore();
+    return {for (final result in results) result.collectionID: result.status};
+  }
+
+  void _cacheBulkShares(
+    List<CollectionShareResult> results, {
+    required int recipientUserID,
+    required String recipientEmail,
+    required Map<int, CollectionParticipantRole> roles,
+  }) {
+    final updates = <Collection>[];
+    for (final result in results) {
+      if (result.status != CollectionShareStatus.shared) {
+        continue;
+      }
+      final collection = _collectionIDToCollections[result.collectionID];
+      final role = roles[result.collectionID];
+      if (collection == null || role == null) {
+        continue;
+      }
+      final sharees =
+          collection.sharees
+              .where((user) => user.id != recipientUserID)
+              .toList()
+            ..add(
+              User(
+                id: recipientUserID,
+                email: recipientEmail,
+                role: role.toStringVal(),
+              ),
+            );
+      updates.add(collection.copyWith(sharees: sharees));
+    }
+    _cacheBulkShareUpdates(updates);
+  }
+
+  void _cacheBulkUnshares(
+    List<CollectionShareResult> results,
+    int recipientUserID,
+  ) {
+    final updates = <Collection>[];
+    for (final result in results) {
+      if (result.status != CollectionShareStatus.unshared &&
+          result.status != CollectionShareStatus.alreadyUnshared &&
+          result.status != CollectionShareStatus.notShared) {
+        continue;
+      }
+      final collection = _collectionIDToCollections[result.collectionID];
+      if (collection == null) {
+        continue;
+      }
+      updates.add(
+        collection.copyWith(
+          sharees: collection.sharees
+              .where((user) => user.id != recipientUserID)
+              .toList(),
+        ),
+      );
+    }
+    _cacheBulkShareUpdates(updates);
+  }
+
+  void _cacheBulkShareUpdates(List<Collection> updates) {
+    if (updates.isEmpty) {
+      return;
+    }
+    for (final collection in updates) {
+      _collectionIDToCollections[collection.id] = collection;
+    }
+    Bus.instance.fire(ContactRelationshipsInvalidatedEvent());
+    unawaited(_db.insert(updates));
   }
 
   Future<void> trashNonEmptyCollection(Collection collection) async {

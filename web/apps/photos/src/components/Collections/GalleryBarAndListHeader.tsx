@@ -7,6 +7,12 @@ import {
     type CollectionShareProps,
 } from "@/components/Collections/CollectionShare";
 import type { FileListHeaderOrFooter } from "@/components/FileList";
+import {
+    GalleryBarImpl,
+    type GalleryBarImplProps,
+} from "@/components/gallery/BarImpl";
+import { PeopleHeader } from "@/components/gallery/PeopleHeader";
+import { sortPeople, type PeopleSortBy } from "@/components/people-sort";
 import { useModalVisibility } from "ente-base/components/utils/modal";
 import {
     isSaveCancelled,
@@ -15,18 +21,9 @@ import {
 } from "ente-gallery/components/utils/save-groups";
 import type { Collection } from "ente-media/collection";
 import {
-    GalleryBarImpl,
-    type GalleryBarImplProps,
-} from "ente-new/photos/components/gallery/BarImpl";
-import {
     GalleryItemsHeaderAdapter,
     GalleryItemsSummary,
 } from "ente-new/photos/components/gallery/ListHeader";
-import { PeopleHeader } from "ente-new/photos/components/gallery/PeopleHeader";
-import {
-    sortPeople,
-    type PeopleSortBy,
-} from "ente-new/photos/components/people-sort";
 import {
     collectionsSortBy,
     haveOnlySystemCollections,

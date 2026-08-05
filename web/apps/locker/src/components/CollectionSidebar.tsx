@@ -22,7 +22,6 @@ import { useBaseContext } from "ente-base/context";
 import { t } from "i18next";
 import React, { useMemo } from "react";
 
-/** Width of the sidebar on desktop. */
 export const SIDEBAR_WIDTH = 280;
 
 interface CollectionSidebarProps {

@@ -36,6 +36,7 @@ class AppBarComponent extends StatefulWidget {
     super.key,
     required this.title,
     required this.slivers,
+    this.eyebrow,
     this.titleBuilder,
     this.titleBuilderHeight,
     this.onTitleTap,
@@ -56,9 +57,12 @@ class AppBarComponent extends StatefulWidget {
     this.controller,
     this.physics,
     this.cacheExtent,
-  });
+  }) : assert(eyebrow == null || titleBuilder == null);
 
   final String title;
+
+  /// Context shown above [title] when expanded and inline when collapsed.
+  final String? eyebrow;
   final HeaderAppBarTitleBuilder? titleBuilder;
 
   /// Vertical space reserved for [titleBuilder] in both header states.
@@ -216,6 +220,7 @@ class _AppBarComponentState extends State<AppBarComponent> {
       subtitle: widget.subtitle,
       expandedHeight: widget.expandedHeight,
       collapsedHeight: widget.collapsedHeight,
+      hasEyebrow: widget.eyebrow != null,
       titleBuilderHeight: widget.titleBuilderHeight,
     );
     _collapseExtent = metrics.collapseExtent;
@@ -233,6 +238,7 @@ class _AppBarComponentState extends State<AppBarComponent> {
         slivers: [
           SliverAppBarComponent(
             title: widget.title,
+            eyebrow: widget.eyebrow,
             titleBuilder: widget.titleBuilder,
             titleBuilderHeight: widget.titleBuilderHeight,
             onTitleTap: widget.onTitleTap,
@@ -289,6 +295,7 @@ class SliverAppBarComponent extends StatelessWidget {
   const SliverAppBarComponent({
     super.key,
     required this.title,
+    this.eyebrow,
     this.titleBuilder,
     this.titleBuilderHeight,
     this.onTitleTap,
@@ -307,9 +314,10 @@ class SliverAppBarComponent extends StatelessWidget {
     this.horizontalPadding = Spacing.lg,
     this.backgroundColor,
     this.showExpandedBackButton = true,
-  });
+  }) : assert(eyebrow == null || titleBuilder == null);
 
   final String title;
+  final String? eyebrow;
   final HeaderAppBarTitleBuilder? titleBuilder;
   final double? titleBuilderHeight;
   final VoidCallback? onTitleTap;
@@ -336,6 +344,7 @@ class SliverAppBarComponent extends StatelessWidget {
   static HeaderAppBarGeometry resolveGeometry(
     BuildContext context, {
     String? subtitle,
+    String? eyebrow,
     double? expandedHeight,
     double collapsedHeight = _defaultCollapsedHeight,
     double? titleBuilderHeight,
@@ -347,6 +356,7 @@ class SliverAppBarComponent extends StatelessWidget {
       subtitle: subtitle,
       expandedHeight: expandedHeight,
       collapsedHeight: collapsedHeight,
+      hasEyebrow: eyebrow != null,
       titleBuilderHeight: titleBuilderHeight,
     );
     final topPadding = MediaQuery.paddingOf(context).top;
@@ -368,6 +378,7 @@ class SliverAppBarComponent extends StatelessWidget {
       subtitle: subtitle,
       expandedHeight: expandedHeight,
       collapsedHeight: collapsedHeight,
+      hasEyebrow: eyebrow != null,
       titleBuilderHeight: titleBuilderHeight,
     );
 
@@ -375,6 +386,7 @@ class SliverAppBarComponent extends StatelessWidget {
       pinned: true,
       delegate: _HeaderAppBarDelegate(
         title: title,
+        eyebrow: eyebrow,
         titleBuilder: titleBuilder,
         titleBuilderHeight: titleBuilderHeight,
         onTitleTap: onTitleTap,
@@ -408,6 +420,7 @@ class SliverAppBarComponent extends StatelessWidget {
 class _HeaderAppBarDelegate extends SliverPersistentHeaderDelegate {
   const _HeaderAppBarDelegate({
     required this.title,
+    required this.eyebrow,
     required this.titleBuilder,
     required this.titleBuilderHeight,
     required this.onTitleTap,
@@ -436,6 +449,7 @@ class _HeaderAppBarDelegate extends SliverPersistentHeaderDelegate {
   });
 
   final String title;
+  final String? eyebrow;
   final HeaderAppBarTitleBuilder? titleBuilder;
   final double? titleBuilderHeight;
   final VoidCallback? onTitleTap;
@@ -482,7 +496,14 @@ class _HeaderAppBarDelegate extends SliverPersistentHeaderDelegate {
     final titleProgress = Curves.easeInOut.transform(progress);
     final visibleCollapsibleBottomHeight =
         collapsibleBottomHeight * (1 - progress);
-    final expandedTitleHeight = titleBuilderHeight ?? expandedTitleLineHeight;
+    final eyebrowLineHeight = eyebrow == null
+        ? 0.0
+        : _scaledLineHeight(
+            MediaQuery.textScalerOf(context),
+            _expandedEyebrowStyle,
+          );
+    final expandedTitleHeight =
+        titleBuilderHeight ?? expandedTitleLineHeight + eyebrowLineHeight;
     final collapsedTitleHeight = titleBuilderHeight ?? collapsedTitleLineHeight;
     final titleLayoutHeight = titleBuilderHeight == null
         ? lerpDouble(expandedTitleHeight, collapsedTitleHeight, titleProgress)!
@@ -566,6 +587,7 @@ class _HeaderAppBarDelegate extends SliverPersistentHeaderDelegate {
                       ),
                     _MovingHeaderTitle(
                       title: title,
+                      eyebrow: eyebrow,
                       titleBuilder: titleBuilder,
                       onTap: onTitleTap,
                       onDoubleTap: onTitleDoubleTap,
@@ -658,6 +680,7 @@ class _HeaderAppBarDelegate extends SliverPersistentHeaderDelegate {
   @override
   bool shouldRebuild(covariant _HeaderAppBarDelegate oldDelegate) {
     return oldDelegate.title != title ||
+        oldDelegate.eyebrow != eyebrow ||
         titleBuilder != null ||
         oldDelegate.titleBuilder != null ||
         oldDelegate.titleBuilderHeight != titleBuilderHeight ||
@@ -815,6 +838,15 @@ const _headerSnapTolerance = 1.0;
 const _headerSnapDuration = Duration(milliseconds: 160);
 const _titleTooltipShowDuration = Duration(seconds: 3);
 
+/// Figma: https://www.figma.com/design/BuBNPPytxlVnqfmCUW0mgz/Ente-Visual-Design?node-id=21089-125212&m=dev
+const _collapsedEyebrowGap = 6.0;
+const _minimumCollapsedTitleWidth = 24.0;
+
+final _expandedEyebrowStyle = TextStyles.display2.copyWith(
+  fontSize: 16,
+  height: 30 / 16,
+);
+
 class HeaderAppBarGeometry {
   const HeaderAppBarGeometry({
     required this.minExtent,
@@ -850,6 +882,7 @@ _HeaderAppBarMetrics _resolveHeaderAppBarMetrics(
   required String? subtitle,
   required double? expandedHeight,
   required double collapsedHeight,
+  required bool hasEyebrow,
   required double? titleBuilderHeight,
 }) {
   final textScaler = MediaQuery.textScalerOf(context);
@@ -861,6 +894,9 @@ _HeaderAppBarMetrics _resolveHeaderAppBarMetrics(
     textScaler,
     TextStyles.display3,
   );
+  final eyebrowLineHeight = hasEyebrow
+      ? _scaledLineHeight(textScaler, _expandedEyebrowStyle)
+      : 0.0;
   final subtitleLineHeight = _scaledLineHeight(textScaler, TextStyles.mini);
   final subtitleHeight = subtitle == null
       ? 0.0
@@ -876,7 +912,7 @@ _HeaderAppBarMetrics _resolveHeaderAppBarMetrics(
     ),
   );
   final expandedTextBlockHeight =
-      (titleBuilderHeight ?? expandedTitleLineHeight) +
+      (titleBuilderHeight ?? expandedTitleLineHeight + eyebrowLineHeight) +
       (subtitle == null ? 0 : _subtitleGap + subtitleHeight);
   final effectiveExpandedHeight = _maxDouble(
     expandedHeight ?? defaultExpandedHeight,
@@ -926,6 +962,7 @@ double _actionsWidth(int actionCount) {
 class _MovingHeaderTitle extends StatelessWidget {
   const _MovingHeaderTitle({
     required this.title,
+    required this.eyebrow,
     required this.titleBuilder,
     required this.onTap,
     required this.onDoubleTap,
@@ -939,6 +976,7 @@ class _MovingHeaderTitle extends StatelessWidget {
   });
 
   final String title;
+  final String? eyebrow;
   final HeaderAppBarTitleBuilder? titleBuilder;
   final VoidCallback? onTap;
   final VoidCallback? onDoubleTap;
@@ -976,6 +1014,25 @@ class _MovingHeaderTitle extends StatelessWidget {
             height: height,
           ),
         ),
+      );
+    }
+
+    final eyebrowText = eyebrow;
+    if (eyebrowText != null) {
+      final child = _buildEyebrowTitle(context, eyebrowText, textStyle);
+      return Positioned(
+        left: left,
+        right: right,
+        top: top,
+        child: onTap == null && onDoubleTap == null && onLongPress == null
+            ? child
+            : GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: onTap,
+                onDoubleTap: onDoubleTap,
+                onLongPress: onLongPress,
+                child: child,
+              ),
       );
     }
 
@@ -1034,6 +1091,79 @@ class _MovingHeaderTitle extends StatelessWidget {
                 style: textStyle,
               ),
             ),
+    );
+  }
+
+  Widget _buildEyebrowTitle(
+    BuildContext context,
+    String eyebrow,
+    TextStyle titleStyle,
+  ) {
+    final eyebrowStyle = TextStyle.lerp(
+      _expandedEyebrowStyle,
+      TextStyles.display3,
+      progress,
+    )!.copyWith(color: context.componentColors.textLight);
+    final expandedEyebrowHeight = _scaledLineHeight(
+      MediaQuery.textScalerOf(context),
+      _expandedEyebrowStyle,
+    );
+
+    return SizedBox(
+      height: height,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final collapsedTitleLeft =
+              (_singleLineTextWidth(
+                        context,
+                        title: eyebrow,
+                        style: eyebrowStyle,
+                        maxWidth: constraints.maxWidth,
+                      ) +
+                      _collapsedEyebrowGap)
+                  .clamp(
+                    0.0,
+                    (constraints.maxWidth - _minimumCollapsedTitleWidth).clamp(
+                      0.0,
+                      double.infinity,
+                    ),
+                  );
+          final eyebrowWidth = lerpDouble(
+            constraints.maxWidth,
+            math.max(0, collapsedTitleLeft - _collapsedEyebrowGap),
+            Curves.easeOut.transform(progress),
+          )!;
+          return Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Positioned(
+                left: 0,
+                top: 0,
+                width: eyebrowWidth,
+                child: Text(
+                  eyebrow,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: eyebrowStyle,
+                ),
+              ),
+              Positioned(
+                left: collapsedTitleLeft * Curves.easeOut.transform(progress),
+                right: 0,
+                top:
+                    expandedEyebrowHeight *
+                    (1 - Curves.easeIn.transform(progress)),
+                child: Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: titleStyle,
+                ),
+              ),
+            ],
+          );
+        },
+      ),
     );
   }
 }

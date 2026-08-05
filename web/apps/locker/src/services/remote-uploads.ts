@@ -20,13 +20,9 @@ import {
     RemoteUploadURLResponseSchema,
 } from "./remote-types";
 
-/**
- * The server requires every file to have a thumbnail. For Locker files we
- * don't need a real one, so we encrypt this tiny placeholder and set the
- * `noThumb` flag in pubMagicMetadata.
- *
- * Generated via PIL: `Image.new('RGB', (1,1), (0,0,0)).save(buf, 'JPEG')`.
- */
+// The server requires every file to have a thumbnail, so Locker uploads this
+// placeholder, a 1x1 black JPEG generated via PIL:
+// `Image.new('RGB', (1,1), (0,0,0)).save(buf, 'JPEG')`.
 const BLACK_THUMBNAIL_B64 =
     "/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////" +
     "2wBDAf//////////////////////////////////////////////////////////////////////////////////////wAARCAABAAEDASIAAhEBAxEB" +
@@ -72,13 +68,6 @@ interface UploadDeps<TCollectionRecord> {
     ) => Promise<void>;
 }
 
-/**
- * Request a presigned upload URL from the server.
- *
- * @param contentLength Size of the encrypted data in bytes.
- * @param contentMd5 MD5 hash of the encrypted data as base64.
- * @returns The S3 object key and presigned upload URL.
- */
 const fetchUploadURL = async (
     contentLength: number,
     contentMd5: string,
@@ -291,9 +280,6 @@ const createAggregateUploadProgressReporter = (
     };
 };
 
-/**
- * Upload a file to Locker with E2E encryption.
- */
 export const uploadLockerFileWithDeps = async <TCollectionRecord>(
     file: File,
     collectionIDs: number[],

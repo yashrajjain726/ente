@@ -1,10 +1,3 @@
-/**
- * Lazy loader for the `ente-wasm` package or Tauri-native bindings.
- *
- * We keep this behind a dynamic import so that the WASM bundle is only loaded
- * when local crypto is needed, while Tauri uses native Rust bindings.
- */
-
 import { isTauriRuntime } from "@/services/tauri-runtime";
 import { loadEnteWasm } from "ente-wasm/load";
 
@@ -96,7 +89,7 @@ const createTauriAdapter = async (): Promise<EnteCryptoAdapter> => {
                         throw toNativeError(parsed.code, parsed.message);
                     }
                 } catch {
-                    // ignore JSON parse failures
+                    // Not a structured native error; use the generic wrapper.
                 }
                 throw toNativeError("native_error", error);
             }
@@ -111,7 +104,7 @@ const createTauriAdapter = async (): Promise<EnteCryptoAdapter> => {
                         throw toNativeError(parsed.code, parsed.message);
                     }
                 } catch {
-                    // ignore JSON parse failures
+                    // Not a structured native error; use the generic wrapper.
                 }
                 throw toNativeError("native_error", error.message);
             }

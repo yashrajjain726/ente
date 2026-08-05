@@ -98,7 +98,7 @@ class _CommentLikesBottomSheetState extends State<CommentLikesBottomSheet> {
       );
     }
 
-    return CollectionsService.instance.getFileOwner(
+    return CollectionsService.instance.resolveUserIdentity(
       reaction.userID,
       widget.collectionID,
     );

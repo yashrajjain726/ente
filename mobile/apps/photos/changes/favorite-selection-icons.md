@@ -1,0 +1,1 @@
+- Made the favorite icon's stroke width consistent with the rest of the icon set.

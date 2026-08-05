@@ -1,17 +1,3 @@
-/**
- * @file ML related tasks. This code runs in a utility process.
- *
- * The ML pipeline itself — image decode, preprocessing, ONNX inference and
- * postprocessing — is implemented by the Rust crate shared with the mobile
- * apps, and reaches us via a Node native addon (see [Note: ML with Rust]).
- * This file loads the addon and forwards requests that arrive from the web
- * layer over our MessagePort. The addon downloads the models through the
- * shared Rust asset store.
- */
-
-// See [Note: Using Electron APIs in UtilityProcess] about what we can and
-// cannot import.
-
 import { expose } from "comlink";
 import path from "node:path";
 import { z } from "zod";
@@ -20,9 +6,7 @@ import { messagePortMainEndpoint } from "../utils/comlink";
 import { wait } from "../utils/common";
 import { fsStatMtime } from "./fs";
 
-// The addon is loaded at runtime from the path the main process gives us, so
-// this import is used only for its types (it resolves to the generated
-// `rust-bindings/index.d.ts`).
+// require(paths.addon) loads this module; the import supplies only its types.
 import type * as MLNativeModule from "../../../rust-bindings";
 import type { MLNativePaths } from "./ml-native";
 
@@ -31,12 +15,10 @@ log.debugString("Started ML utility process");
 process.on("uncaughtException", (e, origin) => log.error(origin, e));
 
 process.parentPort.once("message", (e) => {
-    // Initialize ourselves with the data we got from our parent.
     const { mlNativePaths } = parseInitData(e.data);
     loadMLNative(mlNativePaths);
     if (_native) void warmUpClipTextEncoder(_native);
-    // Expose an instance of `ElectronMLWorker` on the port we got from our
-    // parent.
+
     expose(
         {
             fsStatMtime,
@@ -48,14 +30,8 @@ process.parentPort.once("message", (e) => {
     );
 });
 
-/**
- * We cannot access Electron's {@link app} object within a utility process, so
- * we pass the value of `app.getPath("userData")` during initialization, and it
- * can be subsequently retrieved from here.
- */
 let _userDataPath: string | undefined;
 
-/** Equivalent to app.getPath("userData") */
 const userDataPath = () => _userDataPath!;
 
 const MLWorkerInitData = z.object({
@@ -99,20 +75,12 @@ let _native: MLNative | undefined;
 let _assetStore: MLNativeModule.AssetStore | undefined;
 let _nativeLoadError: string | undefined;
 
-/**
- * Load the Rust ML addon and point it at the ONNX Runtime library.
- *
- * A failure here (e.g. an OS version too old for the ONNX Runtime build) is
- * not fatal to the app: we remember the error, and all subsequent ML requests
- * fail with it, leaving the rest of the app functional.
- */
 const loadMLNative = (paths: MLNativePaths) => {
     try {
         // eslint-disable-next-line @typescript-eslint/no-require-imports
         const native = require(paths.addon) as MLNative;
         native.initOrt(paths.onnxRuntimeLibrary);
-        // Enables the guarded WebGPU path on Linux and Windows. This is a
-        // no-op on macOS, where CoreML remains the preferred provider.
+        // Enables WebGPU where supported; macOS continues to use CoreML.
         native.setMlExecutionConfig(true);
         _assetStore = new native.AssetStore(
             path.join(userDataPath(), "assets"),
@@ -125,10 +93,6 @@ const loadMLNative = (paths: MLNativePaths) => {
     }
 };
 
-/**
- * Return the loaded addon, throwing if it (or the ONNX Runtime library it
- * needs) could not be loaded on this machine.
- */
 const mlNative = () => {
     if (_native) return _native;
     throw new CategorizedMLWorkerError(
@@ -145,10 +109,6 @@ const assetStore = () => {
     );
 };
 
-/**
- * Drain the runtime events (execution provider fallbacks, self-test failures)
- * buffered on the Rust side, writing each to our log at its severity.
- */
 const logMLRuntimeEvents = (native: MLNative) => {
     for (const { severity, message } of native.takeMlRuntimeEvents()) {
         const s = `[ml-rt] ${message}`;
@@ -158,13 +118,6 @@ const logMLRuntimeEvents = (native: MLNative) => {
     }
 };
 
-/**
- * The models needed for the indexing tasks enabled in the given request,
- * mapped to verified on-disk paths.
- *
- * Models for tasks that are not requested are left as empty strings, which
- * the Rust side treats as "not configured".
- */
 const _indexingModelPaths = new Map<
     number,
     Promise<MLNativeModule.ModelPaths>
@@ -190,11 +143,6 @@ const indexingModelPaths = (
     return promise;
 };
 
-/**
- * The model paths key for which the Rust runtime is currently prepared, if
- * any. Re-preparing with the same paths is skipped (the Rust side would
- * anyway no-op, this just avoids the IPC churn).
- */
 let _preparedRuntimeKey: string | undefined;
 
 const ensureMLRuntime = (
@@ -207,10 +155,6 @@ const ensureMLRuntime = (
     _preparedRuntimeKey = key;
 };
 
-/**
- * Release the (pinned) Rust ML runtime sessions. Called by the web layer when
- * indexing goes idle so that we don't hold on to the session memory.
- */
 export const releaseMLRuntime = () => {
     if (!_native) return;
     _native.releaseMlRuntime();
@@ -218,16 +162,9 @@ export const releaseMLRuntime = () => {
     logMLRuntimeEvents(_native);
 };
 
-/**
- * The request the web layer sends us to analyze a single image. Mirrors (a
- * subset of) the addon's own request, except the image source, which we
- * convert to what the addon expects.
- */
 export interface MLWorkerAnalyzeImageRequest {
     fileID: number;
-    /** Path to the image on the local filesystem. */
     path?: string | undefined;
-    /** The encoded image bytes (used when there is no local file). */
     bytes?: Uint8Array | undefined;
     runFaces: boolean;
     runClip: boolean;
@@ -235,10 +172,6 @@ export interface MLWorkerAnalyzeImageRequest {
     generateFaceCrops: boolean;
 }
 
-/**
- * Analyze a single image with the Rust ML pipeline, downloading any needed
- * models first.
- */
 export const analyzeImage = async (
     req: MLWorkerAnalyzeImageRequest,
 ): Promise<MLWorkerAnalyzeImageResponse> => {
@@ -258,9 +191,8 @@ const analyzeImageOrThrow = async (req: MLWorkerAnalyzeImageRequest) => {
     }
 };
 
-// A corrupt on-disk model won't fix itself (models are hash-verified on
-// download), so treat it like an init failure: suspend indexing for the rest
-// of the process lifetime instead of retrying.
+// A corrupt on-disk model will fail every retry, so report an init failure that
+// suspends indexing until restart.
 const categorizeAnalyzeImageError = (e: unknown): MLWorkerAnalyzeImageError => {
     if (e instanceof CategorizedMLWorkerError) {
         return { kind: e.kind, message: e.message };
@@ -309,7 +241,7 @@ const analyzeImageOnce = async (
     });
 };
 
-// Zero-copy view over the transferred bytes.
+// Buffer.from(bytes) would copy the image.
 const uint8ArrayToBuffer = (bytes: Uint8Array) =>
     Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength);
 
@@ -323,13 +255,6 @@ const clipTextModelPaths = () =>
             throw e;
         }));
 
-/**
- * Run a throwaway CLIP text query so that the Rust side builds and caches the
- * text encoder session before the user's first search. Mirrors the mobile
- * app's warm up (see ml_computer.dart).
- *
- * Best effort - on failure, queries build the session on demand as before.
- */
 const warmUpClipTextEncoder = async (native: MLNative) => {
     try {
         const { modelPath, vocabPath } = await clipTextModelPaths();
@@ -345,22 +270,13 @@ const warmUpClipTextEncoder = async (native: MLNative) => {
     }
 };
 
-/**
- * Compute CLIP embeddings for a text snippet, if the model is available.
- *
- * The embedding is computed by the Rust pipeline (which also handles the
- * tokenization). If the model (or the addon itself) is not available yet, we
- * return `undefined` instead of blocking the caller on the download.
- */
 export const computeCLIPTextEmbeddingIfAvailable = async (text: string) => {
     if (!_native) return undefined;
     const native = _native;
 
     const pathsOrSkip = await Promise.race([
         clipTextModelPaths(),
-        // Wait a bit for the models to resolve the first time this code runs
-        // on each app start (when they're already downloaded, resolving them
-        // is quick), but don't block on a download.
+        // Allow an on-disk model to resolve without awaiting a download.
         wait(50).then(() => 1 as const),
     ]);
 

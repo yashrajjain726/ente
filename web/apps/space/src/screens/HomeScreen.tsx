@@ -28,7 +28,6 @@ import { SpaceLoadingSpinner } from "components/SpaceRouteFallback";
 import { SpaceShareInviteButton } from "components/SpaceShareInviteButton";
 import log from "ente-base/log";
 import { useBrowserBackClose } from "hooks/useBrowserBackClose";
-import { useHideOnScrollDirection } from "hooks/useHideOnScrollDirection";
 import React, { useState } from "react";
 import type { SetupProfile } from "screens/SetupProfileScreen";
 import type {
@@ -1518,6 +1517,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 }) => {
     const [selectedViewer, setSelectedViewer] =
         useState<SelectedHomeViewer | null>(null);
+    const [isDraftPostExitAnimating, setIsDraftPostExitAnimating] =
+        useState(false);
     const [isDraftPostExiting, setIsDraftPostExiting] = useState(false);
     const [isInviteSharing, setIsInviteSharing] = useState(false);
     const [isPostPhotoOpening, setIsPostPhotoOpening] = useState(false);
@@ -1528,9 +1529,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         Record<string, string>
     >({});
     const [feedScrollRequest, setFeedScrollRequest] = useState(0);
-    const isHeaderTriggered = useHideOnScrollDirection();
-    const [isHeaderFocused, setIsHeaderFocused] = useState(false);
-    const isHeaderHidden = isHeaderTriggered && !isHeaderFocused;
     const postInputRef = React.useRef<HTMLInputElement | null>(null);
     const feedLoadMoreRef = React.useRef<HTMLDivElement | null>(null);
     const localPostObjectUrlsRef = React.useRef<Set<string>>(new Set());
@@ -1619,6 +1617,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     };
     const closeSelectedPhoto = () => {
         activeLocalPostObjectUrlRef.current = null;
+        setIsDraftPostExitAnimating(false);
         setIsDraftPostExiting(false);
         setSelectedViewer(null);
         revokeLocalPostObjectUrls();
@@ -1980,7 +1979,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             }}
         >
             {selectedViewer && (
-                <SpaceViewerFeedBackdrop exiting={isDraftPostExiting} />
+                <SpaceViewerFeedBackdrop exiting={isDraftPostExitAnimating} />
             )}
             <Box
                 sx={{
@@ -1997,17 +1996,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             >
                 <Box
                     component="header"
-                    onFocusCapture={() => setIsHeaderFocused(true)}
-                    onBlurCapture={(event) => {
-                        const nextFocus = event.relatedTarget;
-                        if (
-                            nextFocus instanceof Node &&
-                            event.currentTarget.contains(nextFocus)
-                        )
-                            return;
-
-                        setIsHeaderFocused(false);
-                    }}
                     sx={{
                         alignItems: "center",
                         background: "transparent",
@@ -2016,17 +2004,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                         gap: "12px",
                         gridTemplateColumns: `${headerSideWidth}px minmax(0, 1fr) ${headerSideWidth}px`,
                         height: headerHeight,
-                        left: "50%",
                         maxWidth: "100%",
                         pb: 2,
-                        position: "fixed",
+                        position: "relative",
                         pt: 1.5,
                         px: 2,
-                        top: 0,
-                        transform: isHeaderHidden
-                            ? "translate(-50%, calc(-100% - 4px))"
-                            : "translate(-50%, 0)",
-                        transition: "transform 180ms ease",
                         width: "100%",
                         zIndex: 4,
                         "&::before": {
@@ -2034,8 +2016,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                             WebkitMaskImage:
                                 "linear-gradient(to bottom, #000 0%, transparent 100%)",
                             backdropFilter: "blur(4px)",
-                            background:
-                                "linear-gradient(to bottom, rgba(245, 245, 247, 0.8), transparent)",
+                            background: `linear-gradient(to bottom, ${homeBackground}, rgba(245, 245, 247, 0.35) 75%, transparent)`,
                             content: '""',
                             height: "calc(100% + 28px)",
                             left: 0,
@@ -2048,9 +2029,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                             zIndex: -1,
                         },
                         "@media (min-width: 600px)": { maxWidth: 390 },
-                        "@media (prefers-reduced-motion: reduce)": {
-                            transition: "none",
-                        },
                     }}
                 >
                     <Box
@@ -2234,7 +2212,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                         )}
                     </Box>
                 </Box>
-                <Box aria-hidden sx={{ height: headerHeight }} />
                 <Box
                     sx={{
                         boxSizing: "border-box",
@@ -2462,6 +2439,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                                   }
                                 : undefined
                         }
+                        onDraftPostExitAnimationStart={() => {
+                            setIsDraftPostExitAnimating(true);
+                        }}
                         onDraftPostExitStart={() => {
                             setIsDraftPostExiting(true);
                         }}

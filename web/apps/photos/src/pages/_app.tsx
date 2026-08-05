@@ -1,6 +1,17 @@
+import { AppLockReauthenticationDialog } from "@/components/app-lock/AppLockReauthenticationDialog";
 import { AppLockSetupError } from "@/components/app-lock/LockScreenContents";
+import {
+    updateAvailableForDownloadDialogAttributes,
+    updateReadyToInstallDialogAttributes,
+} from "@/components/utils/download";
+import {
+    useAutoLockWhenBackgrounded,
+    useSetupAppLock,
+} from "@/components/utils/use-app-lock";
 import { useDesktopAppLockRoute } from "@/components/utils/use-app-lock-route";
+import { resumeExportsIfNeeded } from "@/services/export";
 import { photosLogout } from "@/services/logout";
+import { runMigrations } from "@/services/migration";
 import "@fontsource-variable/inter";
 import "@fontsource-variable/outfit";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
@@ -37,18 +48,7 @@ import {
     initVideoProcessing,
     isHLSGenerationSupported,
 } from "ente-gallery/services/video";
-import { AppLockReauthenticationDialog } from "ente-new/photos/components/app-lock/AppLockReauthenticationDialog";
-import {
-    updateAvailableForDownloadDialogAttributes,
-    updateReadyToInstallDialogAttributes,
-} from "ente-new/photos/components/utils/download";
-import {
-    useAutoLockWhenBackgrounded,
-    useSetupAppLock,
-} from "ente-new/photos/components/utils/use-app-lock";
 import { useAppLockSnapshot } from "ente-new/photos/components/utils/use-snapshot";
-import { resumeExportsIfNeeded } from "ente-new/photos/services/export";
-import { runMigrations } from "ente-new/photos/services/migration";
 import { initML, isMLSupported } from "ente-new/photos/services/ml";
 import { PhotosAppContext } from "ente-new/photos/types/context";
 import { t } from "i18next";
@@ -60,6 +60,9 @@ import "ente-gallery/styles/photoswipe.css";
 import "../styles/global.css";
 
 type PhotosAppProps = AppProps<Record<string, unknown>>;
+
+const photosDescription = "Store and share your photos with absolute privacy.";
+const photosPreviewImage = "https://photos.ente.com/images/preview.png";
 
 type MainContentProps = Pick<PhotosAppProps, "Component" | "pageProps"> & {
     isChangingRoute: boolean;
@@ -165,7 +168,19 @@ const App: React.FC<PhotosAppProps> = ({ Component, pageProps }) => {
 
     return (
         <ThemeProvider theme={photosTheme}>
-            <CustomHead title={title} />
+            <CustomHead title={title} description={photosDescription}>
+                <meta property="og:type" content="website" />
+                <meta property="og:title" content={title} />
+                <meta property="og:description" content={photosDescription} />
+                <meta property="og:image" content={photosPreviewImage} />
+                <meta property="og:image:type" content="image/png" />
+                <meta property="og:image:width" content="1200" />
+                <meta property="og:image:height" content="630" />
+                <meta name="twitter:card" content="summary_large_image" />
+                <meta name="twitter:title" content={title} />
+                <meta name="twitter:description" content={photosDescription} />
+                <meta name="twitter:image" content={photosPreviewImage} />
+            </CustomHead>
             <CssBaseline enableColorScheme />
 
             <ThemedLoadingBar ref={loadingBarRef} />

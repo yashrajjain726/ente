@@ -1,5 +1,5 @@
 import "dart:io" show File, Platform;
-import "dart:math" as math show min, max;
+import "dart:math" as math show min;
 
 import "package:dio/dio.dart";
 import "package:ente_pure_utils/ente_pure_utils.dart";
@@ -98,32 +98,73 @@ class _OnlineMLIndexingCandidates {
   });
 }
 
+/// Counts indexing progress using the same eligibility predicates as the
+/// indexing candidate enumeration below, so the shown number always matches
+/// what the indexer would actually process.
 Future<IndexStatus> getIndexStatus() async {
   try {
-    final MLMode mode = isLocalGalleryMode
-        ? MLMode.localGallery
-        : MLMode.enteGallery;
-    final mlDataDB = mode == MLMode.localGallery
+    final bool localGallery = isLocalGalleryMode;
+    final mlDataDB = localGallery
         ? MLDataDB.localGalleryInstance
         : MLDataDB.instance;
-    final int indexableFiles = await _getIndexableFileCount(mode: mode);
-    final int facesIndexedFiles = await mlDataDB.getFaceIndexedFileCount();
-    final int clipIndexedFiles = await mlDataDB.getClipIndexedFileCount();
-    int indexedFiles = math.min(facesIndexedFiles, clipIndexedFiles);
-    if (flagService.petEnabled &&
+    final bool petActive =
+        flagService.petEnabled &&
         localSettings.petRecognitionEnabled &&
-        localSettings.isMLLocalIndexingEnabled) {
-      final int petIndexedFiles = await mlDataDB.getPetIndexedFileCount();
-      indexedFiles = math.min(indexedFiles, petIndexedFiles);
+        (localGallery || localSettings.isMLLocalIndexingEnabled);
+    final Set<int> indexedFileKeys = await mlDataDB.getFullyIndexedFileIds(
+      includePets: petActive,
+    );
+    final enteFiles = await SearchService.instance.getAllFilesForSearch();
+    final Set<int> seenKeys = {};
+    int total = 0;
+    int indexed = 0;
+    if (localGallery) {
+      final localIds = <String>[];
+      for (final EnteFile enteFile in enteFiles) {
+        if (enteFile.fileType == FileType.other) {
+          continue;
+        }
+        if ((enteFile.localID ?? '').isEmpty ||
+            (enteFile.uploadedFileID != null &&
+                enteFile.uploadedFileID != -1)) {
+          continue;
+        }
+        localIds.add(enteFile.localID!);
+      }
+      final localIdToIntId = await OfflineFilesDB.instance.ensureLocalIntIds(
+        localIds,
+      );
+      for (final localId in localIds) {
+        final localIntId = localIdToIntId[localId];
+        if (localIntId == null || !seenKeys.add(localIntId)) {
+          continue;
+        }
+        total++;
+        if (indexedFileKeys.contains(localIntId)) {
+          indexed++;
+        }
+      }
+    } else {
+      final hiddenFiles = await SearchService.instance.getHiddenFiles();
+      for (final EnteFile enteFile in enteFiles.followedBy(hiddenFiles)) {
+        if (enteFile.skipIndex) {
+          continue;
+        }
+        final id = enteFile.uploadedFileID;
+        if (id == null || id == -1 || !seenKeys.add(id)) {
+          continue;
+        }
+        total++;
+        if (indexedFileKeys.contains(id)) {
+          indexed++;
+        }
+      }
     }
-
-    final showIndexedFiles = math.min(indexedFiles, indexableFiles);
-    final showPendingFiles = math.max(indexableFiles - indexedFiles, 0);
     final hasWifiEnabled = await canUseHighBandwidth();
     _logger.info(
-      "Shown IndexStatus: indexedFiles: $showIndexedFiles, pendingFiles: $showPendingFiles, hasWifiEnabled: $hasWifiEnabled, ifOffline: $isLocalGalleryMode. Real values: indexedFiles: $indexedFiles (faces: $facesIndexedFiles, clip: $clipIndexedFiles), indexableFiles: $indexableFiles",
+      "IndexStatus: $indexed indexed of $total total (localGallery: $localGallery, petActive: $petActive, hasWifiEnabled: $hasWifiEnabled)",
     );
-    return IndexStatus(showIndexedFiles, showPendingFiles, hasWifiEnabled);
+    return IndexStatus(indexed, total - indexed, hasWifiEnabled);
   } catch (e, s) {
     _logger.severe('Error getting ML status', e, s);
     rethrow;
@@ -672,21 +713,6 @@ bool _shouldDiscardRemoteEmbedding(FileDataEntity fileML) {
 
 Future<int> getIndexableFileCount() async {
   return FilesDB.instance.remoteFileCount();
-}
-
-Future<int> _getIndexableFileCount({required MLMode mode}) async {
-  if (mode == MLMode.localGallery) {
-    final files = await SearchService.instance.getAllFilesForSearch();
-    return files
-        .where(
-          (file) =>
-              (file.localID ?? '').isNotEmpty &&
-              (file.uploadedFileID == null || file.uploadedFileID == -1) &&
-              file.fileType != FileType.other,
-        )
-        .length;
-  }
-  return getIndexableFileCount();
 }
 
 Future<String> getImagePathForML(EnteFile enteFile) async {

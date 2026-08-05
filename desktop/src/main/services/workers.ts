@@ -1,8 +1,3 @@
-/**
- * @file This main process code and interface for dealing with the various
- * utility processes that we create.
- */
-
 import type { Endpoint } from "comlink";
 import {
     MessageChannelMain,
@@ -16,93 +11,21 @@ import log, { processUtilityProcessLogMessage } from "../log";
 import { messagePortMainEndpoint } from "../utils/comlink";
 import { mlNativePaths } from "./ml-native";
 
-/**
- * Terminate any existing utility processes if they're running.
- *
- * This function is called during the logout sequence.
- */
 export const terminateUtilityProcesses = () => {
     terminateMLProcessIfRunning();
     terminateFFmpegProcessIfRunning();
 };
 
-/** The active ML utility process, if any. */
 let _utilityProcessML: UtilityProcess | undefined;
 
-/** The active FFmpeg utility process, if any. */
 let _utilityProcessFFmpeg: UtilityProcess | undefined;
 
-/**
- * A promise to a comlink {@link Endpoint} that can be used to communicate with
- * the active ffmpeg utility process (if any).
- */
 let _utilityProcessFFmpegEndpoint: Promise<Endpoint> | undefined;
 
-/**
- * Create a new utility process of the given {@link type}, terminating the older
- * ones (if any).
- *
- * Currently the only type is "ml". The following note explains the reasoning
- * why utility processes were used for the first workload (ML) that was handled
- * this way. Similar reasoning applies to subsequent workloads (ffmpeg) that
- * have been offloaded to utility processes in a slightly different manner to
- * avoid stutter in the UI.
- *
- * [Note: ML IPC]
- *
- * The primary reason for doing ML tasks in the Node.js layer is so that we can
- * use the binary ONNX runtime, which is 10-20x faster than the Wasm one that
- * can be used directly on the web layer.
- *
- * For this to work, the main and renderer process need to communicate with each
- * other. Further, in the web layer the ML indexing runs in a web worker (so as
- * to not get in the way of the main thread). So the communication has 2 hops:
- *
- *     Node.js main <-> Renderer main <-> Renderer web worker
- *
- * This naive way works, but has a problem. The Node.js main process is in the
- * code path for delivering user events to the renderer process. The ML tasks we
- * do take in the order of 100-300 ms (possibly more) for each individual
- * inference. Thus, the Node.js main process is busy for those 100-300 ms, and
- * does not forward events to the renderer, causing the UI to jitter.
- *
- * The solution for this is to spawn an Electron UtilityProcess, which we can
- * think of a regular Node.js child process. This frees up the Node.js main
- * process, and would remove the jitter.
- * https://www.electronjs.org/docs/latest/tutorial/process-model
- *
- * It would seem that this introduces another hop in our IPC
- *
- *     Node.js utility process <-> Node.js main <-> ...
- *
- * but here we can use the special bit about Electron utility processes that
- * separates them from regular Node.js child processes: their support for
- * message ports. https://www.electronjs.org/docs/latest/tutorial/message-ports
- *
- * As a brief summary, a MessagePort is a web feature that allows two contexts
- * to communicate. A pair of message ports is called a message channel. The cool
- * thing about these is that we can pass these ports themselves over IPC.
- *
- * > One caveat here is that the message ports can only be passed using the
- * > `postMessage` APIs, not the usual send/invoke APIs.
- *
- * So we
- *
- * 1. In the utility process create a message channel.
- * 2. Spawn a utility process, and send one port of the pair to it.
- * 3. Send the other port of the pair to the renderer.
- *
- * The renderer will forward that port to the web worker that is coordinating
- * the ML indexing on the web layer. Thereafter, the utility process and web
- * worker can directly talk to each other!
- *
- *     Node.js utility process <-> Renderer web worker
- *
- * The RPC protocol is handled using comlink on both ends. The port itself needs
- * to be relayed using `postMessage`.
- */
+// Native ML runs outside main so inference cannot block UI event delivery. A
+// transferred MessagePort connects the utility process to the renderer worker.
 export const triggerCreateUtilityProcess = (
-    type: UtilityProcessType,
+    _type: UtilityProcessType,
     window: BrowserWindow,
 ) => triggerCreateMLUtilityProcess(window);
 
@@ -115,20 +38,8 @@ const terminateMLProcessIfRunning = () => {
     }
 };
 
-/**
- * Fork a utility process running {@link scriptName}, mirroring its stdout and
- * stderr into our log (prefixed with {@link logTag}), and logging an error if
- * it exits on its own.
- *
- * The usual log flow for utility processes (see `log-worker.ts`) requires
- * their module graph to have loaded. Without this mirroring, a crash during
- * module load (e.g. a missing native library) would be written only to the
- * inherited stderr, which is invisible in packaged apps, and the log file
- * would not contain any trace of it.
- *
- * Callers that deliberately kill the returned process should remove its
- * "exit" listeners first.
- */
+// Pipe stdio because failures before log-worker loads are otherwise invisible
+// in packaged apps.
 const forkWatchedUtilityProcess = (scriptName: string, logTag: string) => {
     const child = utilityProcess.fork(path.join(__dirname, scriptName), [], {
         stdio: "pipe",
@@ -145,7 +56,7 @@ const forkWatchedUtilityProcess = (scriptName: string, logTag: string) => {
     return child;
 };
 
-// Electron tears down utility processes on quit; don't report those exits.
+// Electron tears these down on quit; those exits are not failures.
 app.on("before-quit", () => {
     _utilityProcessML?.removeAllListeners("exit");
     _utilityProcessFFmpeg?.removeAllListeners("exit");
@@ -158,10 +69,9 @@ export const triggerCreateMLUtilityProcess = (window: BrowserWindow) => {
 
     const child = forkWatchedUtilityProcess("ml-worker.js", "[ml-worker]");
     const userDataPath = app.getPath("userData");
-    child.postMessage(
-        /* MLWorkerInitData */ { userDataPath, mlNativePaths: mlNativePaths() },
-        [port1],
-    );
+    child.postMessage({ userDataPath, mlNativePaths: mlNativePaths() }, [
+        port1,
+    ]);
 
     window.webContents.postMessage("utilityProcessPort/ml", undefined, [port2]);
 
@@ -170,29 +80,6 @@ export const triggerCreateMLUtilityProcess = (window: BrowserWindow) => {
     _utilityProcessML = child;
 };
 
-/**
- * Handle messages posted from the utility process.
- *
- * [Note: Using Electron APIs in UtilityProcess]
- *
- * Only a small subset of the Electron APIs are available to a UtilityProcess.
- * As of writing (Jul 2024, Electron 30), only the following are available:
- *
- * - net
- * - systemPreferences
- *
- * In particular, `app` is not available.
- *
- * We structure our code so that it doesn't need anything apart from `net`.
- *
- * For the other cases,
- *
- * -  Additional parameters to the utility process are passed alongwith the
- *    initial message where we provide it the message port.
- *
- * -  When we need to communicate from the utility process to the main process,
- *    we use the `parentPort` in the utility process.
- */
 const handleMessagesFromMLUtilityProcess = (child: UtilityProcess) => {
     child.on("message", (m: unknown) => {
         if (processUtilityProcessLogMessage("[ml-worker]", m)) {
@@ -202,32 +89,8 @@ const handleMessagesFromMLUtilityProcess = (child: UtilityProcess) => {
     });
 };
 
-/**
- * A comlink endpoint that can be used to communicate with the ffmpeg utility
- * process. If there is no ffmpeg utility process, a new one is created on
- * demand.
- *
- * See [Note: ML IPC] for a general outline of why utility processes are needed
- * (tl;dr; to avoid stutter on the UI).
- *
- * In the case of ffmpeg, the IPC flow is a bit different: the utility process
- * is not exposed to the web layer, and is internal to the node layer. The
- * reason for this difference is that we need to create temporary files etc, and
- * doing it a utility process requires access to the `app` module which are not
- * accessible (See: [Note: Using Electron APIs in UtilityProcess]).
- *
- * There could've been possible reasonable workarounds, but the architecture
- * we've adopted of three layers:
- *
- *     Renderer (web) <-> Node.js main <-> Node.js ffmpeg utility process
- *
- * The temporary file creation etc is handled in the Node.js main process, and
- * paths to the files are forwarded to the ffmpeg utility process to act on.
- *
- * @returns an endpoint that can be used to communicate with the utility
- * process. The utility process is expected to expose an object that conforms to
- * the {@link ElectronFFmpegWorkerNode} interface on this endpoint.
- */
+// FFmpeg file setup stays in main because Electron's app API is unavailable in
+// utility processes.
 export const ffmpegUtilityProcessEndpoint = () =>
     (_utilityProcessFFmpegEndpoint ??= createFFmpegUtilityProcessEndpoint());
 
@@ -246,7 +109,6 @@ const createFFmpegUtilityProcessEndpoint = () => {
         throw new Error("FFmpeg utility process is already running");
     }
 
-    // Promise.withResolvers is currently in the node available to us.
     let resolve: ((endpoint: Endpoint) => void) | undefined;
     let reject: ((e: Error) => void) | undefined;
     const promise = new Promise<Endpoint>((res, rej) => {
@@ -260,11 +122,9 @@ const createFFmpegUtilityProcessEndpoint = () => {
         "ffmpeg-worker.js",
         "[ffmpeg-worker]",
     );
-    // Send a handle to the port (one end of the message channel) to the utility
-    // process (alongwith any other init data). The utility process will reply
-    // with an "ack" when it get it.
+
     const appVersion = app.getVersion();
-    child.postMessage(/* FFmpegWorkerInitData */ { appVersion }, [port1]);
+    child.postMessage({ appVersion }, [port1]);
 
     child.on("message", (m: unknown) => {
         if (m && typeof m == "object" && "method" in m) {
@@ -284,16 +144,11 @@ const createFFmpegUtilityProcessEndpoint = () => {
 
     _utilityProcessFFmpeg = child;
 
-    // Recover from crashes: reject the endpoint promise if it is still
-    // pending, and clear the cached values so that the next FFmpeg operation
-    // spawns a new utility process.
     child.on("exit", () => {
         reject?.(new Error("The FFmpeg utility process exited"));
         _utilityProcessFFmpeg = undefined;
         _utilityProcessFFmpegEndpoint = undefined;
     });
 
-    // Resolve with the other end of the message channel (once we get an "ack"
-    // from the utility process).
     return promise;
 };

@@ -220,7 +220,7 @@ class _ThumbnailWidgetState extends State<ThumbnailWidget> {
       }
       if (shouldShowOwnerAvatar) {
         if (!widget.file.isOwner) {
-          final owner = CollectionsService.instance.getFileOwner(
+          final owner = CollectionsService.instance.resolveUserIdentity(
             widget.file.ownerID!,
             widget.file.collectionID,
           );

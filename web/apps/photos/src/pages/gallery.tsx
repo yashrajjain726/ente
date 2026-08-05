@@ -5,15 +5,50 @@
 import type { AddToAlbumPhase } from "@/components/AlbumAddedNotification";
 import { AlbumAddedNotification } from "@/components/AlbumAddedNotification";
 import { AuthenticateUser } from "@/components/AuthenticateUser";
+import {
+    CollectionSelector,
+    type CollectionSelectorAttributes,
+} from "@/components/CollectionSelector";
 import { GalleryBarAndListHeader } from "@/components/Collections/GalleryBarAndListHeader";
 import { PickCoverPhotoDialog } from "@/components/Collections/PickCoverPhotoDialog";
+import { Export } from "@/components/Export";
 import { FamilyManagement } from "@/components/FamilyManagement";
 import type { FileListHeaderOrFooter } from "@/components/FileList";
 import { FileListWithViewer } from "@/components/FileListWithViewer";
 import { FixCreationTime } from "@/components/FixCreationTime";
+import { PlanSelector } from "@/components/PlanSelector";
 import { QuickLinkCreatedNotification } from "@/components/QuickLinkCreatedNotification";
+import { SearchBar, type SearchBarProps } from "@/components/SearchBar";
+import {
+    SelectedFileOptions,
+    type CollectionOp,
+    type FileOp,
+} from "@/components/SelectedFileOptions";
 import { Sidebar } from "@/components/Sidebar";
 import { Upload } from "@/components/Upload";
+import { WhatsNew } from "@/components/WhatsNew";
+import {
+    GalleryEmptyState,
+    PeopleEmptyState,
+    SearchResultsHeader,
+    type RemotePullOpts,
+} from "@/components/gallery";
+import {
+    findCollectionCreatingUncategorizedIfNeeded,
+    performCollectionOp,
+    validateKey,
+} from "@/components/gallery/helpers";
+import {
+    useGalleryReducer,
+    type GalleryBarMode,
+} from "@/components/gallery/reducer";
+import {
+    notifyOthersFilesDialogAttributes,
+    notifyUnsupportedSharedFavoritesDialogAttributes,
+} from "@/components/utils/dialog-attributes";
+import { useIsOffline } from "@/components/utils/use-is-offline";
+import { shouldShowWhatsNew } from "@/services/changelog";
+import exportService from "@/services/export";
 import { Upload01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
@@ -61,50 +96,13 @@ import { CollectionSubType, type Collection } from "ente-media/collection";
 import type { EnteFile } from "ente-media/file";
 import { ItemVisibility, metadataHash } from "ente-media/file-metadata";
 import { AssignPersonDialog } from "ente-new/photos/components/AssignPersonDialog";
-import {
-    CollectionSelector,
-    type CollectionSelectorAttributes,
-} from "ente-new/photos/components/CollectionSelector";
 import { EditLocationDialog } from "ente-new/photos/components/EditLocationDialog";
-import { Export } from "ente-new/photos/components/Export";
-import { PlanSelector } from "ente-new/photos/components/PlanSelector";
-import {
-    SearchBar,
-    type SearchBarProps,
-} from "ente-new/photos/components/SearchBar";
-import {
-    SelectedFileOptions,
-    type CollectionOp,
-    type FileOp,
-} from "ente-new/photos/components/SelectedFileOptions";
-import { WhatsNew } from "ente-new/photos/components/WhatsNew";
-import {
-    GalleryEmptyStateV2,
-    PeopleEmptyState,
-    SearchResultsHeader,
-    type RemotePullOpts,
-} from "ente-new/photos/components/gallery";
-import {
-    findCollectionCreatingUncategorizedIfNeeded,
-    performCollectionOp,
-    validateKey,
-} from "ente-new/photos/components/gallery/helpers";
-import {
-    useGalleryReducer,
-    type GalleryBarMode,
-} from "ente-new/photos/components/gallery/reducer";
-import {
-    notifyOthersFilesDialogAttributes,
-    notifyUnsupportedSharedFavoritesDialogAttributes,
-} from "ente-new/photos/components/utils/dialog-attributes";
-import { useIsOffline } from "ente-new/photos/components/utils/use-is-offline";
 import {
     usePeopleStateSnapshot,
     useSettingsSnapshot,
     useUserDetailsSnapshot,
 } from "ente-new/photos/components/utils/use-snapshot";
 import { reauthenticateWithAppLock } from "ente-new/photos/services/app-lock";
-import { shouldShowWhatsNew } from "ente-new/photos/services/changelog";
 import {
     addToCollection,
     addToFavoritesCollection,
@@ -120,7 +118,6 @@ import {
     haveOnlySystemCollections,
     PseudoCollectionID,
 } from "ente-new/photos/services/collection-summary";
-import exportService from "ente-new/photos/services/export";
 import {
     updateFilesLocation,
     updateFilesVisibility,
@@ -130,6 +127,7 @@ import {
     isMLEnabled,
 } from "ente-new/photos/services/ml";
 
+import { postPullFiles, prePullFiles, pullFiles } from "@/services/pull";
 import { uploadManager } from "@/services/upload-manager";
 import watcher from "@/services/watch";
 import {
@@ -137,6 +135,7 @@ import {
     performFileOp,
     type SelectedState,
 } from "@/utils/file";
+import type { FileContextAction } from "@/utils/file-actions";
 import {
     quickLinkNameForFiles,
     resolveQuickLinkURL,
@@ -146,11 +145,6 @@ import {
     savedCollections,
     savedTrashItems,
 } from "ente-new/photos/services/photos-fdb";
-import {
-    postPullFiles,
-    prePullFiles,
-    pullFiles,
-} from "ente-new/photos/services/pull";
 import {
     filterSearchableFiles,
     updateSearchCollectionsAndFiles,
@@ -166,7 +160,6 @@ import {
     verifyStripeSubscription,
 } from "ente-new/photos/services/user-details";
 import { usePhotosAppContext } from "ente-new/photos/types/context";
-import type { FileContextAction } from "ente-new/photos/utils/file-actions";
 import { PromiseQueue } from "ente-utils/promise";
 import { t } from "i18next";
 import { useRouter, type NextRouter } from "next/router";
@@ -2216,7 +2209,7 @@ const Page: React.FC = () => {
             !isFirstLoad &&
             !state.collectionFiles.length &&
             activeCollectionID === PseudoCollectionID.all ? (
-                <GalleryEmptyStateV2
+                <GalleryEmptyState
                     isUploadInProgress={uploadManager.isUploadInProgress()}
                     onUpload={openUploader}
                 />

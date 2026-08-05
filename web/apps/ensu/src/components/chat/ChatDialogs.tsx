@@ -158,7 +158,7 @@ export const ChatDialogs = memo(
                     await openUrl(url);
                     return;
                 } catch {
-                    // fall through to browser open fallback
+                    // Fall through to window.open.
                 }
             }
 
@@ -170,7 +170,6 @@ export const ChatDialogs = memo(
             }
         };
 
-        // --- Model settings draft state ---
         const [draftContextLength, setDraftContextLength] = React.useState("");
         const [draftMaxTokens, setDraftMaxTokens] = React.useState("");
         const [draftContextError, setDraftContextError] = React.useState<
@@ -185,7 +184,6 @@ export const ChatDialogs = memo(
         const [showBackupComingSoon, setShowBackupComingSoon] =
             React.useState(false);
 
-        // --- System prompt draft state ---
         const [draftSystemPrompt, setDraftSystemPrompt] = React.useState("");
 
         const modelOptions = React.useMemo(
@@ -196,7 +194,6 @@ export const ChatDialogs = memo(
             [defaultModelName, suggestedModels],
         );
 
-        // Initialize model settings draft from parent state when dialog opens
         React.useEffect(() => {
             if (!showModelSettings) return;
             setDraftModelId(
@@ -217,7 +214,8 @@ export const ChatDialogs = memo(
             showModelSettings,
         ]);
 
-        // Initialize system prompt draft from parent state when dialog opens
+        // The draft resyncs only when the dialog opens, hence the deps
+        // suppression below.
         React.useEffect(() => {
             if (!showSystemPromptSettings) return;
             setDraftSystemPrompt(systemPrompt);

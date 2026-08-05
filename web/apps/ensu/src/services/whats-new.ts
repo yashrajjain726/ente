@@ -34,8 +34,7 @@ export const markDesktopWhatsNewSeen = () => {
     try {
         window.localStorage.setItem(storageKey, String(whatsNewVersion));
     } catch {
-        // localStorage can be unavailable in constrained webviews. In that
-        // case, avoid blocking app startup or showing the dialog repeatedly.
+        // localStorage can be unavailable in constrained webviews.
     }
 };
 

@@ -7,6 +7,25 @@ import 'package:photos/ui/sharing/library_sharing/library_sharing_controller.dar
 import 'library_sharing_test_helpers.dart';
 
 void main() {
+  test('first-time tap selection starts after an album is selected', () async {
+    final repository = FakeLibrarySharingRepository([
+      librarySharingTestAlbum(1),
+    ]);
+    final controller = LibrarySharingController(
+      recipient: librarySharingTestRecipient,
+      repository: repository,
+    );
+    await controller.load();
+
+    expect(controller.selectsAlbumsOnTap, isFalse);
+
+    controller.toggleSelection(repository.albums.single);
+    expect(controller.selectsAlbumsOnTap, isTrue);
+
+    controller.clearSelection();
+    expect(controller.selectsAlbumsOnTap, isFalse);
+  });
+
   test('shares a new album and returns to the shared overview', () async {
     final repository = FakeLibrarySharingRepository([
       librarySharingTestAlbum(
@@ -26,7 +45,6 @@ void main() {
     controller.setRoleForSelection(CollectionParticipantRole.collaborator);
 
     expect(await controller.applySelection(), isTrue);
-    expect(repository.publicKeyRequests, 1);
     expect(repository.sharedIDs, [2]);
     expect(controller.activeRoleFor(1), CollectionParticipantRole.viewer);
     expect(controller.activeRoleFor(2), CollectionParticipantRole.collaborator);
@@ -102,11 +120,9 @@ void main() {
     controller.enterAddMode();
     controller.toggleSelection(repository.albums[0]);
 
-    await repository.shareAlbum(
-      collection: repository.albums[0],
-      email: librarySharingTestRecipient.email,
-      publicKey: 'public-key',
-      role: CollectionParticipantRole.viewer,
+    await repository.shareAlbums(
+      recipient: librarySharingTestRecipient,
+      roles: {repository.albums[0].id: CollectionParticipantRole.viewer},
     );
     await controller.load();
 
@@ -162,6 +178,26 @@ void main() {
     gate.complete();
     expect(await apply, isTrue);
     expect(repository.sharedRoles, [CollectionParticipantRole.viewer]);
+  });
+
+  test('keeps uncategorized sharing viewer-only', () async {
+    final repository = FakeLibrarySharingRepository([
+      librarySharingTestAlbum(1),
+      librarySharingTestAlbum(2, type: CollectionType.uncategorized),
+    ]);
+    final controller = LibrarySharingController(
+      recipient: librarySharingTestRecipient,
+      repository: repository,
+    );
+    await controller.load();
+    controller.selectAll();
+    controller.setRoleForSelection(CollectionParticipantRole.admin);
+
+    expect(controller.stagedRoleFor(1), CollectionParticipantRole.admin);
+    expect(controller.stagedRoleFor(2), CollectionParticipantRole.viewer);
+
+    controller.setRoleForAlbum(2, CollectionParticipantRole.collaborator);
+    expect(controller.stagedRoleFor(2), CollectionParticipantRole.viewer);
   });
 
   test(

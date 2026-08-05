@@ -21,9 +21,7 @@ interface PasteQrCodeProps {
     paperBg?: string;
     borderRadius?: string;
     showCenterLock?: boolean;
-    /** When set, shows a floating close control (e.g. to dismiss the QR panel). */
     onClose?: () => void;
-    /** Color mode for close button hover; pass when `onClose` is used. */
     resolvedMode?: PasteResolvedMode;
 }
 

@@ -1,3 +1,4 @@
+import { CollectionMappingChoice } from "@/components/CollectionMappingChoice";
 import watcher from "@/services/watch";
 import AddIcon from "@mui/icons-material/Add";
 import CheckIcon from "@mui/icons-material/Check";
@@ -34,7 +35,6 @@ import {
 } from "ente-base/electron";
 import { basename, dirname } from "ente-base/file-name";
 import type { CollectionMapping, FolderWatch } from "ente-base/types/ipc";
-import { CollectionMappingChoice } from "ente-new/photos/components/CollectionMappingChoice";
 import { t } from "i18next";
 import React, { useEffect, useRef, useState } from "react";
 

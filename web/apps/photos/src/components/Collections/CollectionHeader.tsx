@@ -1,3 +1,6 @@
+import type { RemotePullOpts } from "@/components/gallery";
+import { StarIcon } from "@/components/icons/StarIcon";
+import { downloadAndSaveCollectionFiles } from "@/services/save";
 import {
     CleanIcon,
     Delete02Icon,
@@ -33,7 +36,6 @@ import { SingleInputDialog } from "ente-base/components/SingleInputDialog";
 import { useModalVisibility } from "ente-base/components/utils/modal";
 import { useBaseContext } from "ente-base/context";
 import type { AddSaveGroup } from "ente-gallery/components/utils/save-groups";
-import { downloadAndSaveCollectionFiles } from "ente-gallery/services/save";
 import { uniqueFilesByID } from "ente-gallery/utils/file";
 import {
     CollectionOrder,
@@ -42,12 +44,10 @@ import {
 } from "ente-media/collection";
 import type { EnteFile } from "ente-media/file";
 import { ItemVisibility } from "ente-media/file-metadata";
-import type { RemotePullOpts } from "ente-new/photos/components/gallery";
 import {
     GalleryItemsHeaderAdapter,
     GalleryItemsSummary,
 } from "ente-new/photos/components/gallery/ListHeader";
-import { StarIcon } from "ente-new/photos/components/icons/StarIcon";
 import { useSettingsSnapshot } from "ente-new/photos/components/utils/use-snapshot";
 import {
     cleanUncategorized,

@@ -1,3 +1,4 @@
+import exportService from "@/services/export";
 import {
     accountLogout,
     logoutClearStateAgain,
@@ -10,7 +11,6 @@ import { clearFilesDB } from "ente-gallery/services/files-db";
 import { resetUploadState } from "ente-gallery/services/upload";
 import { resetVideoState } from "ente-gallery/services/video";
 import { logoutAppLock } from "ente-new/photos/services/app-lock";
-import exportService from "ente-new/photos/services/export";
 import { logoutML, terminateMLWorker } from "ente-new/photos/services/ml";
 import { logoutSearch } from "ente-new/photos/services/search";
 import { logoutSettings } from "ente-new/photos/services/settings";

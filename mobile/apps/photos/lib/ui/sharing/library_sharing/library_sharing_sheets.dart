@@ -1,4 +1,5 @@
 import 'package:ente_components/ente_components.dart';
+import 'package:ente_strings/ente_strings.dart';
 import 'package:flutter/material.dart';
 import 'package:photos/models/collection/collection.dart';
 import 'package:photos/ui/collections/album/list_item.dart';
@@ -10,68 +11,64 @@ import 'package:photos/ui/sharing/library_sharing/library_sharing_strings.dart';
 typedef LibrarySharingAlbumThumbnailBuilder =
     Widget Function(BuildContext context, Collection album);
 
-Future<bool> showEnableLibrarySharingSheet({
+Future<CollectionParticipantRole?> showEnableLibrarySharingSheet({
   required BuildContext context,
   required String recipientLabel,
-}) async {
+}) {
   var selectedRole = CollectionParticipantRole.viewer;
-  return await showBottomSheetComponent<bool>(
-        context: context,
-        builder: (sheetContext) => StatefulBuilder(
-          builder: (context, setState) {
-            final colors = context.componentColors;
-            return BottomSheetComponent(
-              title: LibrarySharingStrings.enableLibrarySharing,
-              borderSide: BorderSide(color: colors.strokeDark),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(
-                    LibrarySharingStrings.enableLibrarySharingMessage(
-                      recipientLabel,
+  return showBottomSheetComponent<CollectionParticipantRole>(
+    context: context,
+    builder: (sheetContext) => StatefulBuilder(
+      builder: (context, setState) {
+        final colors = context.componentColors;
+        return BottomSheetComponent(
+          title: LibrarySharingStrings.enableLibrarySharing,
+          borderSide: BorderSide(color: colors.strokeDark),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                LibrarySharingStrings.enableLibrarySharingMessage(
+                  recipientLabel,
+                ),
+                style: TextStyles.body.copyWith(color: colors.textLight),
+              ),
+              const SizedBox(height: Spacing.lg),
+              Text(
+                LibrarySharingStrings.hiddenAlbumsNotShared,
+                style: TextStyles.body.copyWith(color: colors.textLight),
+              ),
+              const SizedBox(height: Spacing.lg),
+              MenuGroupComponent(
+                items: [
+                  EntePopupMenuButton<CollectionParticipantRole>(
+                    optionsBuilder: () => librarySharingRoleOptions(
+                      context,
+                      activeRole: selectedRole,
                     ),
-                    style: TextStyles.body.copyWith(color: colors.textLight),
-                  ),
-                  const SizedBox(height: Spacing.lg),
-                  Text(
-                    LibrarySharingStrings.hiddenAlbumsNotShared,
-                    style: TextStyles.body.copyWith(color: colors.textLight),
-                  ),
-                  const SizedBox(height: Spacing.lg),
-                  MenuGroupComponent(
-                    items: [
-                      EntePopupMenuButton<CollectionParticipantRole>(
-                        optionsBuilder: () => librarySharingRoleOptions(
-                          context,
-                          activeRole: selectedRole,
-                        ),
-                        onSelected: (role) =>
-                            setState(() => selectedRole = role),
-                        child: MenuComponent(
-                          title: LibrarySharingStrings.role,
-                          trailing: LibrarySharingRoleSelector(
-                            role: selectedRole,
-                          ),
-                        ),
-                      ),
-                    ],
+                    onSelected: (role) => setState(() => selectedRole = role),
+                    child: MenuComponent(
+                      title: LibrarySharingStrings.role,
+                      trailing: LibrarySharingRoleSelector(role: selectedRole),
+                    ),
                   ),
                 ],
               ),
-              actions: [
-                ButtonComponent(
-                  label: LibrarySharingStrings.enable,
-                  density: ButtonComponentDensity.compact,
-                  shouldSurfaceExecutionStates: false,
-                  onTap: () => Navigator.of(sheetContext).pop(true),
-                ),
-              ],
-            );
-          },
-        ),
-      ) ??
-      false;
+            ],
+          ),
+          actions: [
+            ButtonComponent(
+              label: LibrarySharingStrings.enable,
+              density: ButtonComponentDensity.compact,
+              shouldSurfaceExecutionStates: false,
+              onTap: () => Navigator.of(sheetContext).pop(selectedRole),
+            ),
+          ],
+        );
+      },
+    ),
+  );
 }
 
 Future<bool?> showLibrarySharingRolesSheet({
@@ -144,6 +141,11 @@ class _LibrarySharingRoleList extends StatelessWidget {
           itemBuilder: (context, index) {
             final album = albums[index];
             final role = controller.stagedRoleFor(album.id);
+            final canEditRole = album.type != CollectionType.uncategorized;
+            final roleSelector = LibrarySharingRoleSelector(
+              role: role,
+              showChevron: canEditRole,
+            );
             return ThumbnailListItem(
               leading:
                   thumbnailBuilder?.call(context, album) ??
@@ -157,16 +159,20 @@ class _LibrarySharingRoleList extends StatelessWidget {
                   color: context.componentColors.textBase,
                 ),
               ),
-              trailing: IgnorePointer(
-                ignoring: controller.isMutating,
-                child: EntePopupMenuButton<CollectionParticipantRole>(
-                  optionsBuilder: () =>
-                      librarySharingRoleOptions(context, activeRole: role),
-                  onSelected: (role) =>
-                      controller.setRoleForAlbum(album.id, role),
-                  child: LibrarySharingRoleSelector(role: role),
-                ),
-              ),
+              trailing: canEditRole
+                  ? IgnorePointer(
+                      ignoring: controller.isMutating,
+                      child: EntePopupMenuButton<CollectionParticipantRole>(
+                        optionsBuilder: () => librarySharingRoleOptions(
+                          context,
+                          activeRole: role,
+                        ),
+                        onSelected: (role) =>
+                            controller.setRoleForAlbum(album.id, role),
+                        child: roleSelector,
+                      ),
+                    )
+                  : roleSelector,
             );
           },
         ),
@@ -199,6 +205,32 @@ Future<bool> confirmStopLibrarySharing({
             ],
           );
         },
+      ) ??
+      false;
+}
+
+Future<bool> showPreviouslyUnsharedAlbums({
+  required BuildContext context,
+  required int count,
+}) async {
+  return await showBottomSheetComponent<bool>(
+        context: context,
+        builder: (sheetContext) => BottomSheetComponent(
+          title: LibrarySharingStrings.previouslyUnsharedTitle(count),
+          message: LibrarySharingStrings.previouslyUnsharedMessage(count),
+          illustration: Image.asset('assets/warning-red.png'),
+          borderSide: BorderSide(
+            color: sheetContext.componentColors.strokeDark,
+          ),
+          actions: [
+            ButtonComponent(
+              label: sheetContext.strings.review,
+              density: ButtonComponentDensity.compact,
+              shouldSurfaceExecutionStates: false,
+              onTap: () => Navigator.of(sheetContext).pop(true),
+            ),
+          ],
+        ),
       ) ??
       false;
 }

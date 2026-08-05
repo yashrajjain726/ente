@@ -9,8 +9,8 @@ export const LegacyKitRecoverySessionSchema = z.object({
     id: z.string(),
     kitID: z.string(),
     status: z.enum(["WAITING", "READY", "BLOCKED", "CANCELLED", "RECOVERED"]),
-    // Matches the existing legacy contact recovery API: remaining microseconds,
-    // not an epoch timestamp.
+    // Despite the name, this is the remaining microseconds, not an epoch
+    // timestamp.
     waitTill: z.number(),
     createdAt: z.number(),
 });

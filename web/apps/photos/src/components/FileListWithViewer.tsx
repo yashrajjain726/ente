@@ -1,4 +1,6 @@
 import { CollectionMapDialog } from "@/components/Collections/CollectionMapDialog";
+import type { RemotePullOpts } from "@/components/gallery";
+import { downloadAndSaveFiles } from "@/services/save";
 import { uploadManager } from "@/services/upload-manager";
 import { IconButton, Tooltip, styled } from "@mui/material";
 import { useColorScheme, useTheme } from "@mui/material/styles";
@@ -12,11 +14,9 @@ import {
     type FileViewerInitialSidebar,
     type FileViewerProps,
 } from "ente-gallery/components/viewer/FileViewer";
-import { downloadAndSaveFiles } from "ente-gallery/services/save";
 import type { Collection } from "ente-media/collection";
 import type { EnteFile } from "ente-media/file";
 import { fileCreationPhotoDate, fileFileName } from "ente-media/file-metadata";
-import type { RemotePullOpts } from "ente-new/photos/components/gallery";
 import { useSettingsSnapshot } from "ente-new/photos/components/utils/use-snapshot";
 import { moveToTrash } from "ente-new/photos/services/collection";
 import type { CollectionSummary } from "ente-new/photos/services/collection-summary";

@@ -152,7 +152,7 @@ To keep things fair, our plans don't increase linearly, and the tiers are such t
 
 In addition, we also offer [family plans](/photos/features/account/family-plans) so that you can gain more value out of a single subscription.
 
-If you need a custom plan, please contact [support@ente.com](mailto:support@ente.com).
+If you have any queries regarding pricing or require a plan above 2TB, please contact [support@ente.com](mailto:support@ente.com).
 
 ### Does my free plan storage stack on top of a paid plan? {#free-storage-stacking}
 

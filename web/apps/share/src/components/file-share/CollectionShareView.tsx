@@ -184,7 +184,6 @@ export const CollectionShareView: React.FC = () => {
                 </Box>
             )}
 
-            {/* Item detail view - uses same component as single-file share */}
             {selectedItem && !loading && !requiresPassword && !error && (
                 <SharedItemDetails
                     itemInfo={selectedItem}
@@ -201,7 +200,6 @@ export const CollectionShareView: React.FC = () => {
                 />
             )}
 
-            {/* Collection list view */}
             {collectionInfo &&
                 !loading &&
                 !selectedItem &&

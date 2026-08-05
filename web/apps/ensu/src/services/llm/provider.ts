@@ -16,8 +16,6 @@ const OVERFLOW_SAFETY_TOKENS = 256;
 const MIN_DESKTOP_DEFAULT_MEMORY_BYTES = 16 * 1024 * 1024 * 1024;
 
 // These fallback values must stay in sync with rust/crates/ensu/src/config.rs.
-// When running inside Tauri, resolveDefaultModelForDevice() overwrites them with
-// values fetched from the Rust config_defaults command.
 export const DEFAULT_MODEL: ModelInfo = {
     id: "lfm-vl-1.6b",
     name: "LFM 2.5 VL 1.6B (Q4_0)",
@@ -301,7 +299,8 @@ export class LlmProvider {
             try {
                 await this.ensureInFlight.promise;
             } catch {
-                // ignore errors from previous load
+                // Wait only for settlement; the failure belongs to the
+                // original caller.
             }
         }
 
@@ -489,9 +488,8 @@ export class LlmProvider {
                 this.defaultModel = DESKTOP_DEFAULT_MODEL;
             }
 
-            // Overlay Rust-authoritative fields (id, name, url, mmprojUrl)
-            // while keeping the web-only display fields (sizeBytes etc.)
-            // as fallbacks.
+            // The Rust config_defaults payload has no size fields, so the web
+            // values above remain as display fallbacks.
             try {
                 const defaults =
                     await invoke<ConfigDefaults>("config_defaults");

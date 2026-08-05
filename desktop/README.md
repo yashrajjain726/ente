@@ -8,54 +8,41 @@ To know more about Ente, see [our main README](../README.md) or visit [ente.com]
 
 ## Building from source
 
-Clone this repository
+1. Install [Node](https://nodejs.org) and [Rust](https://www.rust-lang.org/tools/install).
 
-```sh
-git clone https://github.com/ente/ente
-cd ente
-```
+2. Install the web dependencies:
 
-Install the web dependencies
+    ```sh
+    cd web
+    npm ci
+    ```
 
-```sh
-cd web
-npm ci
-```
+3. Install the desktop dependencies:
 
-Install the desktop dependencies
+    ```sh
+    cd ../desktop
+    npm ci
+    ```
 
-```sh
-cd ../desktop
-npm ci
-npm run postinstall
-```
+4. Run the desktop app:
+
+    ```sh
+    npm run dev
+    ```
+
+In development mode the desktop app supports hot reload for the renderer process.
 
 > [!NOTE]
 >
-> `npm run postinstall` fetches binary dependencies but does not compile the Rust ML addon. `npm run dev` builds an optimized addon automatically. When changing the Rust Photos ML code, regenerate the bindings with:
->
-> ```sh
-> (cd "$(git rev-parse --show-toplevel)/rust" && cargo codegen napi)
-> ```
+> If the relevant `package-lock.json` has not changed since your last `npm ci`, you can use `npm install` as a faster incremental alternative.
 
-Now you can run in development mode (supports hot reload for the renderer process)
+To create a static build for your platform:
 
 ```sh
-npm run dev
-```
-
-Or create a binary for your platform
-
-```sh
+npm run postinstall
 npm run build
 ```
 
-That's the gist of it. For more development related documentation, see [docs](docs/README.md).
-
 > [!NOTE]
 >
-> If the relevant `package-lock.json` has not changed since your last `npm ci`, you can use `npm install` as a faster incremental alternative. For caveats, see [docs/dev.md](docs/dev.md#npm-ci-npm-install).
-
-> [!NOTE]
->
-> `npm run dev` will automatically do a `npm run postinstall` if needed. `npm run build` however requires an explicit `npm run postinstall` prior to it.
+> `npm run build` requires an explicit `npm run postinstall` prior to it (`npm run dev` will do it automatically if needed).

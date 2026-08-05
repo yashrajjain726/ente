@@ -1,15 +1,6 @@
-/**
- * @file In-memory storage adapter for embed app
- *
- * This provides an in-memory storage implementation that mirrors the localForage
- * interface used by public-albums-fdb. It ensures complete isolation between
- * different iframe embeds by avoiding any persistent storage.
- */
-
-/**
- * In-memory storage adapter that mimics the localForage interface.
- * Uses Maps to store data in memory, providing isolation between embeds.
- */
+// Mimics the localForage interface, but deliberately keeps data only in
+// memory, never persisting it, so that each iframe embed stays isolated from
+// other embeds.
 export class InMemoryStorage {
     private storage = new Map<string, unknown>();
 
@@ -32,7 +23,7 @@ export class InMemoryStorage {
     }
 
     ready(): void {
-        // Always ready since it's in-memory
+        // No-op that exists only to satisfy the localForage interface.
     }
 
     keys(): string[] {
@@ -48,11 +39,9 @@ export class InMemoryStorage {
         return keys[index] || null;
     }
 
-    // Config method to match localForage interface (no-op for in-memory)
     config(): void {
-        // No configuration needed for in-memory storage
+        // No-op that exists only to satisfy the localForage interface.
     }
 }
 
-// Create a singleton instance to be used as the storage backend
 export const inMemoryStorage = new InMemoryStorage();

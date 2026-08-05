@@ -1,4 +1,15 @@
+import { DeleteAccount } from "@/components/DeleteAccount";
+import { DropdownInput } from "@/components/DropdownInput";
 import { WatchFolder } from "@/components/WatchFolder";
+import { ShapeIcon } from "@/components/icons/ShapeIcon";
+import { AppLockSettings } from "@/components/sidebar/AppLockSettings";
+import { MLSettings } from "@/components/sidebar/MLSettings";
+import { ReferralSettings } from "@/components/sidebar/ReferralSettings";
+import { SessionsSettings } from "@/components/sidebar/SessionsSettings";
+import { TwoFactorSettings } from "@/components/sidebar/TwoFactorSettings";
+import { downloadAppDialogAttributes } from "@/components/utils/download";
+import exportService from "@/services/export";
+import { performSidebarAction as performSidebarRegistryAction } from "@/services/search/sidebar-search-registry";
 import {
     Delete02Icon,
     Download05Icon,
@@ -69,15 +80,6 @@ import {
     isHLSGenerationSupported,
     toggleHLSGeneration,
 } from "ente-gallery/services/video";
-import { DeleteAccount } from "ente-new/photos/components/DeleteAccount";
-import { DropdownInput } from "ente-new/photos/components/DropdownInput";
-import { ShapeIcon } from "ente-new/photos/components/icons/ShapeIcon";
-import { AppLockSettings } from "ente-new/photos/components/sidebar/AppLockSettings";
-import { MLSettings } from "ente-new/photos/components/sidebar/MLSettings";
-import { ReferralSettings } from "ente-new/photos/components/sidebar/ReferralSettings";
-import { SessionsSettings } from "ente-new/photos/components/sidebar/SessionsSettings";
-import { TwoFactorSettings } from "ente-new/photos/components/sidebar/TwoFactorSettings";
-import { downloadAppDialogAttributes } from "ente-new/photos/components/utils/download";
 import {
     useAppLockSnapshot,
     useHLSGenerationStatusSnapshot,
@@ -93,9 +95,7 @@ import {
     PseudoCollectionID,
     type CollectionSummaries,
 } from "ente-new/photos/services/collection-summary";
-import exportService from "ente-new/photos/services/export";
 import { isMLSupported } from "ente-new/photos/services/ml";
-import { performSidebarAction as performSidebarRegistryAction } from "ente-new/photos/services/search/sidebar-search-registry";
 import type { SidebarActionID } from "ente-new/photos/services/search/types";
 import {
     pullSettings,

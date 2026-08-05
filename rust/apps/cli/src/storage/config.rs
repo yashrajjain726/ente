@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use crate::Result;
 use rusqlite::{Connection, OptionalExtension, params};
 use std::time::{SystemTime, UNIX_EPOCH};
