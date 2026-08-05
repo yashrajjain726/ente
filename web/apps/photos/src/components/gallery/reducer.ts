@@ -51,7 +51,7 @@ export type GalleryBarMode =
     | "archive-albums"
     | "people";
 
-export type GalleryView =
+type GalleryView =
     | {
           type: "albums" | "hidden-albums" | "archive-albums";
           activeCollectionSummaryID: number;
@@ -65,7 +65,7 @@ export type GalleryView =
           activePerson: Person | undefined;
       };
 
-export interface GalleryState {
+interface GalleryState {
     user: LocalUser | undefined;
     familyData: FamilyData | undefined;
 
@@ -122,7 +122,7 @@ export interface GalleryState {
     filteredFiles: EnteFile[];
 }
 
-export type GalleryAction =
+type GalleryAction =
     | {
           type: "mount";
           user: LocalUser;

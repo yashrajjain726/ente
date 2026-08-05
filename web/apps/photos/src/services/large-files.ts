@@ -10,7 +10,7 @@ import { savedCollectionFiles } from "ente-new/photos/services/photos-fdb";
 import { pullFiles } from "./pull";
 
 // Keep the 10 MB threshold aligned with mobile.
-export const MIN_LARGE_FILE_SIZE = 10 * 1024 * 1024;
+const MIN_LARGE_FILE_SIZE = 10 * 1024 * 1024;
 
 export type LargeFileFilter = "all" | "photos" | "videos";
 
@@ -100,9 +100,9 @@ export const deleteSelectedLargeFiles = async (
     return new Set(selectedItems.map((item) => item.id));
 };
 
-export type SortOrder = "desc" | "asc";
+type SortOrder = "desc" | "asc";
 
-export interface LargeFilesState {
+interface LargeFilesState {
     analysisStatus: undefined | "started" | "failed" | "completed";
     largeFiles: LargeFileItem[];
     filter: LargeFileFilter;
@@ -114,7 +114,7 @@ export interface LargeFilesState {
     selectedFileIDs: Set<number>;
 }
 
-export type LargeFilesAction =
+type LargeFilesAction =
     | { type: "analyze" }
     | { type: "analysisFailed" }
     | { type: "analysisCompleted"; largeFiles: LargeFileItem[] }

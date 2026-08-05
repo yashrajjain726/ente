@@ -92,7 +92,7 @@ export interface FileListAnnotatedFile {
 }
 
 // deleteBy is an epoch-microsecond timestamp.
-export type EnteTrashFile = EnteFile & { deleteBy?: number };
+type EnteTrashFile = EnteFile & { deleteBy?: number };
 
 export interface FileListProps {
     height: number;

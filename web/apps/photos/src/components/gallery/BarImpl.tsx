@@ -277,7 +277,7 @@ const BarWrapper = styled("div")`
     margin-block-end: 16px;
 `;
 
-export const Row1 = styled("div")`
+const Row1 = styled("div")`
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -285,7 +285,7 @@ export const Row1 = styled("div")`
     margin-block-end: 12px;
 `;
 
-export const Row2 = styled("div")`
+const Row2 = styled("div")`
     display: flex;
     align-items: flex-start;
     gap: 16px;

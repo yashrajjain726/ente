@@ -61,8 +61,6 @@ export const TwoFactorSettings: React.FC<
     );
 };
 
-export default TwoFactorSettings;
-
 type ContentsProps = Pick<NestedSidebarDrawerVisibilityProps, "onRootClose">;
 
 const SetupDrawerContents: React.FC<ContentsProps> = ({ onRootClose }) => {

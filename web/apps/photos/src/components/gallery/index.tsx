@@ -203,7 +203,7 @@ export const PeopleEmptyState: React.FC = () => {
     }
 };
 
-export const PeopleEmptyStateMessage: React.FC<React.PropsWithChildren> = ({
+const PeopleEmptyStateMessage: React.FC<React.PropsWithChildren> = ({
     children,
 }) => (
     <CenteredFill>
@@ -220,7 +220,7 @@ export const PeopleEmptyStateMessage: React.FC<React.PropsWithChildren> = ({
     </CenteredFill>
 );
 
-export const PeopleEmptyStateDisabled: React.FC = () => {
+const PeopleEmptyStateDisabled: React.FC = () => {
     const [showConsent, setShowConsent] = useState(false);
 
     const handleConsent = useWrapAsyncOperation(async () => {

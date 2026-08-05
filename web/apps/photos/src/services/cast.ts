@@ -21,7 +21,7 @@ export const revokeAllCastTokens = async () =>
  * given device / pairing {@link code} from remote, or `undefined` if there is
  * no public key associated with the given code.
  */
-export const publicKeyForPairingCode = async (code: string) => {
+const publicKeyForPairingCode = async (code: string) => {
     const res = await fetch(await apiURL(`/cast/device-info/${code}`), {
         headers: await authenticatedRequestHeaders(),
     });

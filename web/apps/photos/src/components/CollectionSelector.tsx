@@ -33,7 +33,7 @@ import { includes } from "ente-utils/type-guards";
 import { t } from "i18next";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 
-export type CollectionSelectorAction =
+type CollectionSelectorAction =
     | "upload"
     | "add"
     | "move"
@@ -50,7 +50,7 @@ export interface CollectionSelectorAttributes {
     onCancel?: () => void;
 }
 
-export type CollectionSelectorProps = ModalVisibilityProps & {
+type CollectionSelectorProps = ModalVisibilityProps & {
     onExited?: () => void;
     attributes: CollectionSelectorAttributes | undefined;
     collectionSummaries: CollectionSummaries;
