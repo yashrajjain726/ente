@@ -1,3 +1,7 @@
+import { CollectionsSortOptions } from "@/components/CollectionsSortOptions";
+import { StarIcon } from "@/components/icons/StarIcon";
+import type { PeopleSortBy } from "@/components/people-sort";
+import { PeopleSortOptions } from "@/components/PeopleSortOptions";
 import { Link05Icon, PinIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import ArchiveIcon from "@mui/icons-material/Archive";
@@ -9,10 +13,6 @@ import { Overlay } from "ente-base/components/containers";
 import { FilledIconButton } from "ente-base/components/mui";
 import { Ellipsized2LineTypography } from "ente-base/components/Typography";
 import { useIsSmallWidth } from "ente-base/components/utils/hooks";
-import { CollectionsSortOptions } from "ente-new/photos/components/CollectionsSortOptions";
-import { StarIcon } from "ente-new/photos/components/icons/StarIcon";
-import type { PeopleSortBy } from "ente-new/photos/components/people-sort";
-import { PeopleSortOptions } from "ente-new/photos/components/PeopleSortOptions";
 import {
     BarItemTile,
     ItemCard,
@@ -28,6 +28,7 @@ import type {
     CollectionSummaryAttribute,
     CollectionsSortBy,
 } from "ente-new/photos/services/collection-summary";
+import { isMLSupported } from "ente-new/photos/services/ml";
 import type { Person } from "ente-new/photos/services/ml/people";
 import { t } from "i18next";
 import React, {
@@ -44,7 +45,6 @@ import {
     areEqual,
     type ListChildComponentProps,
 } from "react-window";
-import { isMLSupported } from "../../services/ml";
 import type { GalleryBarMode } from "./reducer";
 
 export interface GalleryBarImplProps {

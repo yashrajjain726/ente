@@ -1,5 +1,15 @@
 import Avatar from "@/components/Avatar";
+import {
+    FileContextMenu,
+    type ContextMenuPosition,
+} from "@/components/FileContextMenu";
+import type { GalleryBarMode } from "@/components/gallery/reducer";
+import { StarIcon } from "@/components/icons/StarIcon";
 import type { SelectedState } from "@/utils/file";
+import {
+    getAvailableFileActions,
+    type FileContextAction,
+} from "@/utils/file-actions";
 import {
     handleSelectCreator,
     handleSelectCreatorMulti,
@@ -19,12 +29,6 @@ import type { EnteFile } from "ente-media/file";
 import { fileDurationString } from "ente-media/file-metadata";
 import { FileType } from "ente-media/file-type";
 import {
-    FileContextMenu,
-    type ContextMenuPosition,
-} from "ente-new/photos/components/FileContextMenu";
-import type { GalleryBarMode } from "ente-new/photos/components/gallery/reducer";
-import { StarIcon } from "ente-new/photos/components/icons/StarIcon";
-import {
     LoadingThumbnail,
     StaticThumbnail,
 } from "ente-new/photos/components/PlaceholderThumbnails";
@@ -38,10 +42,6 @@ import {
     PseudoCollectionID,
     type CollectionSummary,
 } from "ente-new/photos/services/collection-summary";
-import {
-    getAvailableFileActions,
-    type FileContextAction,
-} from "ente-new/photos/utils/file-actions";
 import { batch } from "ente-utils/array";
 import { t } from "i18next";
 import React, {

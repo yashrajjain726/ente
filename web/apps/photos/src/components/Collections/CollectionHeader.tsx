@@ -1,3 +1,5 @@
+import type { RemotePullOpts } from "@/components/gallery";
+import { StarIcon } from "@/components/icons/StarIcon";
 import { downloadAndSaveCollectionFiles } from "@/services/save";
 import {
     CleanIcon,
@@ -42,12 +44,10 @@ import {
 } from "ente-media/collection";
 import type { EnteFile } from "ente-media/file";
 import { ItemVisibility } from "ente-media/file-metadata";
-import type { RemotePullOpts } from "ente-new/photos/components/gallery";
 import {
     GalleryItemsHeaderAdapter,
     GalleryItemsSummary,
 } from "ente-new/photos/components/gallery/ListHeader";
-import { StarIcon } from "ente-new/photos/components/icons/StarIcon";
 import { useSettingsSnapshot } from "ente-new/photos/components/utils/use-snapshot";
 import {
     cleanUncategorized,

@@ -1,3 +1,11 @@
+import type { CollectionSelectorAttributes } from "@/components/CollectionSelector";
+import type { GalleryBarMode } from "@/components/gallery/reducer";
+import { StarBorderIcon } from "@/components/icons/StarIcon";
+import { StarOffIcon } from "@/components/icons/StarOffIcon";
+import {
+    getAvailableFileActions,
+    type FileContextAction,
+} from "@/utils/file-actions";
 import {
     AddSquareIcon,
     ArrowRight02Icon,
@@ -23,15 +31,7 @@ import { SpacedRow } from "ente-base/components/containers";
 import type { ButtonishProps } from "ente-base/components/mui";
 import { useBaseContext } from "ente-base/context";
 import type { Collection } from "ente-media/collection";
-import type { CollectionSelectorAttributes } from "ente-new/photos/components/CollectionSelector";
-import type { GalleryBarMode } from "ente-new/photos/components/gallery/reducer";
-import { StarBorderIcon } from "ente-new/photos/components/icons/StarIcon";
-import { StarOffIcon } from "ente-new/photos/components/icons/StarOffIcon";
 import type { CollectionSummary } from "ente-new/photos/services/collection-summary";
-import {
-    getAvailableFileActions,
-    type FileContextAction,
-} from "ente-new/photos/utils/file-actions";
 import { t } from "i18next";
 
 /**

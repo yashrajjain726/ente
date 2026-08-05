@@ -10,19 +10,19 @@
  * is a needed for fast refresh to work.
  */
 
+import type { CollectionOp } from "@/components/SelectedFileOptions";
 import { getUserRecoveryKey } from "ente-accounts/services/recovery-key";
 import log from "ente-base/log";
 import type { Collection } from "ente-media/collection";
 import type { EnteFile } from "ente-media/file";
-import type { CollectionOp } from "ente-new/photos/components/SelectedFileOptions";
 import {
     addOrCopyToCollection,
+    createUncategorizedCollection,
     moveFromCollection,
     moveToCollection,
     restoreToCollection,
 } from "ente-new/photos/services/collection";
-import { createUncategorizedCollection } from "../../services/collection";
-import { PseudoCollectionID } from "../../services/collection-summary";
+import { PseudoCollectionID } from "ente-new/photos/services/collection-summary";
 
 /**
  * Ensure that the keys in local storage are not malformed by verifying that the

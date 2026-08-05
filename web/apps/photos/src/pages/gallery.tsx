@@ -5,6 +5,10 @@
 import type { AddToAlbumPhase } from "@/components/AlbumAddedNotification";
 import { AlbumAddedNotification } from "@/components/AlbumAddedNotification";
 import { AuthenticateUser } from "@/components/AuthenticateUser";
+import {
+    CollectionSelector,
+    type CollectionSelectorAttributes,
+} from "@/components/CollectionSelector";
 import { GalleryBarAndListHeader } from "@/components/Collections/GalleryBarAndListHeader";
 import { PickCoverPhotoDialog } from "@/components/Collections/PickCoverPhotoDialog";
 import { Export } from "@/components/Export";
@@ -14,9 +18,30 @@ import { FileListWithViewer } from "@/components/FileListWithViewer";
 import { FixCreationTime } from "@/components/FixCreationTime";
 import { PlanSelector } from "@/components/PlanSelector";
 import { QuickLinkCreatedNotification } from "@/components/QuickLinkCreatedNotification";
+import { SearchBar, type SearchBarProps } from "@/components/SearchBar";
+import {
+    SelectedFileOptions,
+    type CollectionOp,
+    type FileOp,
+} from "@/components/SelectedFileOptions";
 import { Sidebar } from "@/components/Sidebar";
 import { Upload } from "@/components/Upload";
 import { WhatsNew } from "@/components/WhatsNew";
+import {
+    GalleryEmptyState,
+    PeopleEmptyState,
+    SearchResultsHeader,
+    type RemotePullOpts,
+} from "@/components/gallery";
+import {
+    findCollectionCreatingUncategorizedIfNeeded,
+    performCollectionOp,
+    validateKey,
+} from "@/components/gallery/helpers";
+import {
+    useGalleryReducer,
+    type GalleryBarMode,
+} from "@/components/gallery/reducer";
 import {
     notifyOthersFilesDialogAttributes,
     notifyUnsupportedSharedFavoritesDialogAttributes,
@@ -71,35 +96,7 @@ import { CollectionSubType, type Collection } from "ente-media/collection";
 import type { EnteFile } from "ente-media/file";
 import { ItemVisibility, metadataHash } from "ente-media/file-metadata";
 import { AssignPersonDialog } from "ente-new/photos/components/AssignPersonDialog";
-import {
-    CollectionSelector,
-    type CollectionSelectorAttributes,
-} from "ente-new/photos/components/CollectionSelector";
 import { EditLocationDialog } from "ente-new/photos/components/EditLocationDialog";
-import {
-    SearchBar,
-    type SearchBarProps,
-} from "ente-new/photos/components/SearchBar";
-import {
-    SelectedFileOptions,
-    type CollectionOp,
-    type FileOp,
-} from "ente-new/photos/components/SelectedFileOptions";
-import {
-    GalleryEmptyState,
-    PeopleEmptyState,
-    SearchResultsHeader,
-    type RemotePullOpts,
-} from "ente-new/photos/components/gallery";
-import {
-    findCollectionCreatingUncategorizedIfNeeded,
-    performCollectionOp,
-    validateKey,
-} from "ente-new/photos/components/gallery/helpers";
-import {
-    useGalleryReducer,
-    type GalleryBarMode,
-} from "ente-new/photos/components/gallery/reducer";
 import {
     usePeopleStateSnapshot,
     useSettingsSnapshot,
@@ -138,6 +135,7 @@ import {
     performFileOp,
     type SelectedState,
 } from "@/utils/file";
+import type { FileContextAction } from "@/utils/file-actions";
 import {
     quickLinkNameForFiles,
     resolveQuickLinkURL,
@@ -162,7 +160,6 @@ import {
     verifyStripeSubscription,
 } from "ente-new/photos/services/user-details";
 import { usePhotosAppContext } from "ente-new/photos/types/context";
-import type { FileContextAction } from "ente-new/photos/utils/file-actions";
 import { PromiseQueue } from "ente-utils/promise";
 import { t } from "i18next";
 import { useRouter, type NextRouter } from "next/router";

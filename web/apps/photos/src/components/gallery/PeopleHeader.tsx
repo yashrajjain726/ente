@@ -1,3 +1,4 @@
+import { useWrapAsyncOperation } from "@/components/utils/use-wrap-async";
 import AddIcon from "@mui/icons-material/Add";
 import CheckIcon from "@mui/icons-material/Check";
 import ClearIcon from "@mui/icons-material/Clear";
@@ -43,6 +44,17 @@ import {
 import { useBaseContext } from "ente-base/context";
 import log from "ente-base/log";
 import {
+    GalleryItemsHeaderAdapter,
+    GalleryItemsSummary,
+} from "ente-new/photos/components/gallery/ListHeader";
+import { SuggestionFaceList } from "ente-new/photos/components/PeopleList";
+import {
+    ItemCard,
+    LargeTileButton,
+    LargeTileCreateNewButton,
+    LargeTileTextOverlay,
+} from "ente-new/photos/components/Tiles";
+import {
     addCGroup,
     addClusterToCGroup,
     applyPersonSuggestionUpdates,
@@ -53,6 +65,7 @@ import {
     suggestionsAndChoicesForPerson,
     unpinCGroup,
 } from "ente-new/photos/services/ml";
+import type { FaceCluster } from "ente-new/photos/services/ml/cluster";
 import type {
     CGroupPerson,
     ClusterPerson,
@@ -63,17 +76,7 @@ import type {
 } from "ente-new/photos/services/ml/people";
 import { t } from "i18next";
 import React, { useEffect, useReducer, useState } from "react";
-import type { FaceCluster } from "../../services/ml/cluster";
-import { SuggestionFaceList } from "../PeopleList";
-import {
-    ItemCard,
-    LargeTileButton,
-    LargeTileCreateNewButton,
-    LargeTileTextOverlay,
-} from "../Tiles";
-import { useWrapAsyncOperation } from "../utils/use-wrap-async";
 import type { GalleryBarImplProps } from "./BarImpl";
-import { GalleryItemsHeaderAdapter, GalleryItemsSummary } from "./ListHeader";
 
 type PeopleHeaderProps = Pick<
     GalleryBarImplProps,

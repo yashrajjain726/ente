@@ -19,28 +19,29 @@ import {
 import type { MagicMetadata } from "ente-media/magic-metadata";
 import {
     createCollectionNameByID,
+    findDefaultHiddenCollectionIDs,
     isArchivedCollection,
+    isDefaultHiddenCollection,
     isHiddenCollection,
 } from "ente-new/photos/services/collection";
-import { sortTrashItems, type TrashItem } from "ente-new/photos/services/trash";
-import { splitByPredicate } from "ente-utils/array";
-import { includes } from "ente-utils/type-guards";
-import { t } from "i18next";
-import React, { useReducer } from "react";
-import {
-    findDefaultHiddenCollectionIDs,
-    isDefaultHiddenCollection,
-} from "../../services/collection";
 import {
     CollectionSummarySortPriority,
     PseudoCollectionID,
     type CollectionSummary,
     type CollectionSummaryAttribute,
     type CollectionSummaryType,
-} from "../../services/collection-summary";
-import type { PeopleState, Person } from "../../services/ml/people";
-import type { SearchSuggestion } from "../../services/search/types";
-import type { FamilyData, UserDetails } from "../../services/user-details";
+} from "ente-new/photos/services/collection-summary";
+import type { PeopleState, Person } from "ente-new/photos/services/ml/people";
+import type { SearchSuggestion } from "ente-new/photos/services/search/types";
+import { sortTrashItems, type TrashItem } from "ente-new/photos/services/trash";
+import type {
+    FamilyData,
+    UserDetails,
+} from "ente-new/photos/services/user-details";
+import { splitByPredicate } from "ente-utils/array";
+import { includes } from "ente-utils/type-guards";
+import { t } from "i18next";
+import React, { useReducer } from "react";
 
 /**
  * Specifies what the bar at the top of the gallery is displaying currently.

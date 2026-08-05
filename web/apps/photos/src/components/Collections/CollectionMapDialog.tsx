@@ -1,3 +1,4 @@
+import type { RemotePullOpts } from "@/components/gallery";
 import type { SelectedState } from "@/utils/file";
 import AddIcon from "@mui/icons-material/Add";
 import CloseIcon from "@mui/icons-material/Close";
@@ -29,7 +30,6 @@ import {
     ItemVisibility,
     metadataHash,
 } from "ente-media/file-metadata";
-import type { RemotePullOpts } from "ente-new/photos/components/gallery";
 import {
     addToFavoritesCollection,
     removeFromFavoritesCollection,

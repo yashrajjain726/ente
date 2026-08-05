@@ -1,4 +1,6 @@
 // TODO: Audit this file.
+import { CollectionsSortOptions } from "@/components/CollectionsSortOptions";
+import { StarIcon } from "@/components/icons/StarIcon";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import CloseIcon from "@mui/icons-material/Close";
 import PushPinIcon from "@mui/icons-material/PushPin";
@@ -22,8 +24,6 @@ import {
 import { FilledIconButton } from "ente-base/components/mui";
 import { SingleInputDialog } from "ente-base/components/SingleInputDialog";
 import { useModalVisibility } from "ente-base/components/utils/modal";
-import { CollectionsSortOptions } from "ente-new/photos/components/CollectionsSortOptions";
-import { StarIcon } from "ente-new/photos/components/icons/StarIcon";
 import { SlideUpTransition } from "ente-new/photos/components/mui/SlideUpTransition";
 import {
     ItemCard,

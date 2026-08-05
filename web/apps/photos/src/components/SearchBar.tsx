@@ -1,3 +1,4 @@
+import { sidebarSearchOptionsForString } from "@/services/search/sidebar-search-registry";
 import { Search01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import CalendarIcon from "@mui/icons-material/CalendarMonth";
@@ -23,7 +24,14 @@ import {
     hlsGenerationStatusSnapshot,
     isHLSGenerationSupported,
 } from "ente-gallery/services/video";
+import { SearchPeopleList } from "ente-new/photos/components/PeopleList";
 import { ItemCard, PreviewItemTile } from "ente-new/photos/components/Tiles";
+import { UnstyledButton } from "ente-new/photos/components/UnstyledButton";
+import {
+    useHLSGenerationStatusSnapshot,
+    useMLStatusSnapshot,
+    usePeopleStateSnapshot,
+} from "ente-new/photos/components/utils/use-snapshot";
 import {
     isMLSupported,
     mlStatusSnapshot,
@@ -45,14 +53,6 @@ import {
     type StylesConfig,
 } from "react-select";
 import AsyncSelect from "react-select/async";
-import { sidebarSearchOptionsForString } from "../services/search/sidebar-search-registry";
-import { SearchPeopleList } from "./PeopleList";
-import { UnstyledButton } from "./UnstyledButton";
-import {
-    useHLSGenerationStatusSnapshot,
-    useMLStatusSnapshot,
-    usePeopleStateSnapshot,
-} from "./utils/use-snapshot";
 
 export interface SearchBarProps {
     /**

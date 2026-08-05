@@ -1,9 +1,12 @@
 import { isDesktop } from "ente-base/app";
 import { isHLSGenerationSupported } from "ente-gallery/services/video";
+import { isMLSupported } from "ente-new/photos/services/ml";
+import type {
+    SearchOption,
+    SidebarActionID,
+} from "ente-new/photos/services/search/types";
 import { wait } from "ente-utils/promise";
 import { t } from "i18next";
-import { isMLSupported } from "../ml";
-import type { SearchOption, SidebarActionID } from "./types";
 
 export interface SidebarAction {
     id: SidebarActionID;

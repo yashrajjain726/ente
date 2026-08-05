@@ -4,6 +4,8 @@
 /* eslint-disable @typescript-eslint/no-misused-promises */
 /* eslint-disable @typescript-eslint/no-floating-promises */
 import { CollectionMappingChoice } from "@/components/CollectionMappingChoice";
+import type { CollectionSelectorAttributes } from "@/components/CollectionSelector";
+import type { RemotePullOpts } from "@/components/gallery";
 import { TakeoutOptions } from "@/components/TakeoutOptions";
 import { UploadConfirmationDialog } from "@/components/UploadConfirmationDialog";
 import { downloadAppDialogAttributes } from "@/components/utils/download";
@@ -71,8 +73,6 @@ import {
 import { hasReliableCanvasReadback } from "ente-gallery/utils/upload/canvas-integrity";
 import { CollectionSubType, type Collection } from "ente-media/collection";
 import type { EnteFile } from "ente-media/file";
-import type { CollectionSelectorAttributes } from "ente-new/photos/components/CollectionSelector";
-import type { RemotePullOpts } from "ente-new/photos/components/gallery";
 import { suppressAutoLockOnBlurForTrustedPrompt } from "ente-new/photos/services/app-lock";
 import {
     addOrCopyToCollection,

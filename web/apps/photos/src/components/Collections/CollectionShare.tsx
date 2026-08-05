@@ -1,6 +1,7 @@
 // TODO: Audit this file
 /* eslint-disable @typescript-eslint/no-unnecessary-condition */
 import Avatar from "@/components/Avatar";
+import type { RemotePullOpts } from "@/components/gallery";
 import { PublicLinkCreated } from "@/components/share/PublicLinkCreated";
 import { avatarTextColor } from "@/services/avatar";
 import AddIcon from "@mui/icons-material/Add";
@@ -60,7 +61,6 @@ import type {
     PublicURL,
 } from "ente-media/collection";
 import { CollectionSubType, type CollectionUser } from "ente-media/collection";
-import type { RemotePullOpts } from "ente-new/photos/components/gallery";
 import { useSettingsSnapshot } from "ente-new/photos/components/utils/use-snapshot";
 import {
     createPublicURL,
