@@ -118,7 +118,7 @@ class GalleryVideoProgressRow extends StatelessWidget {
               offset: const Offset(0, -1),
               child: Text('$elapsedTime / $totalTime', style: timeStyle),
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 7),
             const VideoMuteButton(),
           ],
         ),
