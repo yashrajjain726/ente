@@ -7,6 +7,10 @@ description: Release notes of recent updates to Ensu
 
 A short summary list of changes to the Ensu mobile and desktop apps. For a more descriptive list with screenshots and blog post links, see the [news](https://ente.com/news).
 
+## v0.1.19 - Aug 2026
+
+- Fixed an issue that prevented Gemma models from downloading.
+
 ## v0.1.17 - Jun 2026
 
 - Fixed the desktop app version shown in settings.
