@@ -1,0 +1,1 @@
+- Fixed an issue that prevented Gemma models from downloading.
