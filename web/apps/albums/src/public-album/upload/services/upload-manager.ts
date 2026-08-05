@@ -37,7 +37,6 @@ import { wait } from "ente-utils/promise";
 export type FileID = number;
 
 export type PercentageUploaded = number;
-/* localID => fileName */
 export type UploadFileNames = Map<FileID, string>;
 
 export interface UploadCounter {
@@ -50,10 +49,6 @@ export interface InProgressUpload {
     progress: PercentageUploaded;
 }
 
-/**
- * A variant of {@link UploadResult}'s {@link type} values used when segregating
- * finished uploads in the UI.
- */
 export type FinishedUploadType = UploadResult["type"];
 
 export type InProgressUploads = Map<FileID, PercentageUploaded>;
@@ -76,9 +71,9 @@ export interface ProgressUpdater {
     setHasLivePhotos: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
-/** The number of uploads to process in parallel. */
 const maxConcurrentUploads = 4;
 
+// A retried live photo has livePhotoAssets instead of uploadItem.
 export type UploadItemWithCollection = UploadAsset & {
     localID: number;
     collectionID: number;
@@ -89,12 +84,10 @@ class UIService {
     // @ts-ignore
     private progressUpdater: ProgressUpdater;
 
-    // UPLOAD LEVEL STATES
     private uploadPhase: UploadPhase = "preparing";
     private filenames = new Map<number, string>();
     private hasLivePhoto = false;
 
-    // STAGE LEVEL STATES
     private perFileProgress = 0;
     private filesUploadedCount = 0;
     private totalFilesCount = 0;
@@ -188,7 +181,6 @@ class UIService {
 
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         for (const [_, progress] of this.inProgressUploads) {
-            // filter  negative indicator values during percentComplete calculation
             if (progress < 0) {
                 continue;
             }
@@ -202,13 +194,6 @@ class UIService {
         setFinishedUploads(groupByResult(this.finishedUploads));
     }
 
-    /**
-     * Update the upload progress shown in the UI to {@link percentage} for the
-     * file with the given {@link fileLocalID}.
-     *
-     * @param percentage The upload completion percentage. It should be a value
-     * between 0 and 100 (inclusive).
-     */
     updateUploadProgress(fileLocalID: number, percentage: number) {
         this.inProgressUploads.set(fileLocalID, Math.round(percentage));
         this.updateProgressBarUI();
@@ -244,11 +229,6 @@ class UploadManager {
     private uploadInProgress = false;
     private publicAlbumsCredentials: PublicAlbumsCredentials | undefined;
     private uploaderName: string | undefined;
-    /**
-     * When `true`, then the next call to {@link abortIfCancelled} will throw.
-     *
-     * See: [Note: Upload cancellation].
-     */
     private shouldUploadBeCancelled = false;
 
     private uiService = new UIService();
@@ -282,25 +262,6 @@ class UploadManager {
         this.uiService.setUploadPhase("preparing");
     }
 
-    /**
-     * Upload files
-     *
-     * This method waits for all the files to get uploaded (successfully or
-     * unsuccessfully) before returning.
-     *
-     * It is an error to call this method when there is already an in-progress
-     * upload.
-     *
-     * @param itemsWithCollection The items to upload, each paired with the id
-     * of the collection that they should be uploaded into.
-     *
-     * @param collections The collections to which the files are being uploaded.
-     *
-     * These are not all the user's collections - these are just the collections
-     * mentioned by one or more {@link itemsWithCollection}.
-     *
-     * @returns `true` if at least one file was processed
-     */
     public async uploadItems(
         itemsWithCollection: UploadItemWithCollection[],
         collections: Collection[],
@@ -338,8 +299,6 @@ class UploadManager {
 
                 this.abortIfCancelled();
 
-                // Live photos might've been clustered together, reset the list
-                // of files to reflect that.
                 this.uiService.setFiles(clusteredMediaItems);
 
                 this.uiService.setHasLivePhoto(
@@ -477,7 +436,6 @@ class UploadManager {
         switch (uploadResult.type) {
             case "failed":
             case "blocked":
-                // Retriable error.
                 this.failedItems.push(uploadableItem);
                 break;
 
@@ -496,10 +454,6 @@ class UploadManager {
         this.shouldUploadBeCancelled = true;
     }
 
-    /**
-     * Return the list of failed items from the last upload, along with other
-     * state needed to attempt to reupload them.
-     */
     public failedItemState() {
         return {
             items: [...this.failedItems],
@@ -517,55 +471,16 @@ class UploadManager {
         this.onUploadFile!(file);
     }
 
-    /**
-     * `true` if an upload is currently in-progress.
-     */
     public isUploadInProgress = () => {
         return this.uploadInProgress;
     };
 }
 
-/**
- * Singleton instance of {@link UploadManager}.
- */
 export const uploadManager = new UploadManager();
 
-/**
- * The data operated on by the intermediate stages of the upload.
- *
- * [Note: Intermediate file types during upload]
- *
- * As files progress through stages, they get more and more bits tacked on to
- * them. These types document the journey.
- *
- * - The input is {@link UploadItemWithCollection}. This can either be a new
- *   {@link UploadItemWithCollection}, in which case it'll only have a
- *   {@link localID}, {@link collectionID} and a {@link uploadItem}. Or it could
- *   be a retry, in which case it'll not have a {@link uploadItem} but instead
- *   will have data from a previous stage (concretely, it'll just be a
- *   relabelled {@link ClusteredUploadItem}), like a snake eating its tail.
- *
- * - Immediately we convert it to {@link UploadItemWithCollectionIDAndName}.
- *   This is to mostly systematize what we have, and also attach a
- *   {@link fileName}.
- *
- * - These then get converted to "assets", whereby both parts of a live photo
- *   are combined. This is a {@link ClusteredUploadItem}.
- *
- * - On to the {@link ClusteredUploadItem} we attach the corresponding
- *   {@link collection}, giving us {@link UploadableUploadItem}. This is what
- *   gets queued and then passed to the {@link upload}.
- */
 type UploadItemWithCollectionIDAndName = UploadAsset & {
-    /** A unique ID for the duration of the upload */
     localID: number;
-    /** The ID of the collection to which this file should be uploaded. */
     collectionID: number;
-    /**
-     * The name of the file.
-     *
-     * In case of live photos, this'll be the name of the image part.
-     */
     fileName: string;
 };
 
@@ -602,10 +517,6 @@ const splitMetadataAndMediaItems = (
         ],
     );
 
-/**
- * Go through the given files, combining any sibling image + video assets into a
- * single live photo when appropriate.
- */
 const clusterLivePhotos = async (
     _items: UploadItemWithCollectionIDAndName[],
     parsedMetadataJSONMap: Map<string, ParsedMetadataJSON>,
@@ -652,8 +563,6 @@ const clusterLivePhotos = async (
             });
             index += 2;
         } else {
-            // They may already be a live photo (we might be retrying a
-            // previously failed upload).
             result.push({ ...fa, isLivePhoto: fa.isLivePhoto ?? false });
             index += 1;
         }

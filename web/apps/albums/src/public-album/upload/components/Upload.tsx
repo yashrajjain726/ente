@@ -47,11 +47,6 @@ import { t } from "i18next";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 
 interface RemotePullOpts {
-    /**
-     * Perform the pull without showing a global loading bar.
-     *
-     * Default: `false`.
-     */
     silent?: boolean;
 }
 
@@ -72,13 +67,6 @@ export interface UploadProps {
 type UploadType = "files" | "folders";
 type WebUploadItemAndPath = [File, string];
 
-/**
- * Public album uploader.
- *
- * This is a trimmed copy of the photos app uploader that only keeps the web
- * flow needed by the public albums app: select or drop files/folders, ask for
- * the uploader's name, and upload into the current public collection.
- */
 export const Upload: React.FC<UploadProps> = ({
     publicAlbumsCredentials,
     dragAndDropFiles,
@@ -124,10 +112,6 @@ export const Upload: React.FC<UploadProps> = ({
     const selectedUploadType = useRef<UploadType | undefined>(undefined);
     const currentUploadPromise = useRef<Promise<void> | undefined>(undefined);
 
-    /**
-     * `true` if we've activated one hidden input and are waiting for the
-     * browser to hand the file selection back to us.
-     */
     const [isInputPending, setIsInputPending] = useState(false);
     const [selectedInputFiles, setSelectedInputFiles] = useState<File[]>([]);
 
@@ -497,22 +481,6 @@ const Inputs: React.FC<InputsProps> = ({
     </>
 );
 
-/**
- * Return the relative path or name of a File object selected or
- * drag-and-dropped on the web.
- *
- * There are three cases here:
- *
- * 1. If the user selects individual file(s), then the returned File objects
- *    will only have a `name`.
- *
- * 2. If the user selects directory(ies), then the returned File objects will
- *    have a `webkitRelativePath`. For more details, see [Note:
- *    webkitRelativePath]. In particular, these will POSIX separators.
- *
- * 3. If the user drags-and-drops, then react-dropzone internally converts
- *    `webkitRelativePath` to `path`, but otherwise behaves the same as case 2.
- */
 const pathLikeForWebFile = (file: File): string =>
     firstNonEmpty([
         "path" in file && typeof file.path == "string" ? file.path : undefined,

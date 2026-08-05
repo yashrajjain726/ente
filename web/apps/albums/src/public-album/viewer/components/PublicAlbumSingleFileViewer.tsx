@@ -64,11 +64,6 @@ const inlineFileViewerIconPath = (name: "live" | "vol") =>
 const liveIconPath = inlineFileViewerIconPath("live");
 const volumeIconPath = inlineFileViewerIconPath("vol");
 
-/**
- * A dedicated public-album single-file viewer mode with a bespoke header/menu.
- *
- * This wraps the regular FileViewer but overlays its own controls.
- */
 export const PublicAlbumSingleFileViewer: React.FC<
     PublicAlbumSingleFileViewerProps
 > = ({
@@ -371,7 +366,7 @@ export const PublicAlbumSingleFileViewer: React.FC<
     useEffect(() => {
         if (!needsOriginalPrime) return;
 
-        // Give thumbnail fetch a brief head-start, then warm the original.
+        // Let the thumbnail start before warming the original.
         const prefetchTimer = window.setTimeout(() => {
             void downloadManager
                 .renderableSourceURLs(file)
@@ -906,9 +901,6 @@ const FileViewerStyleButton = styled("button")`
     }
 `;
 
-/**
- * Return an "image/png" blob derived from the given source URL.
- */
 const createImagePNGBlob = async (imageURL: string): Promise<Blob> =>
     new Promise((resolve, reject) => {
         const image = new Image();

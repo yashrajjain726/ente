@@ -22,36 +22,13 @@ import {
 } from "./FileList";
 
 export type FileListWithViewerProps = {
-    /**
-     * The list of files to show.
-     */
     files: EnteFile[];
     enableDownload?: boolean;
-    /**
-     * If set, the file viewer will open to this file index on mount/update.
-     * Set to undefined after the navigation is complete.
-     */
     pendingFileIndex?: number;
-    /**
-     * The sidebar to open when navigating to a file from feed.
-     */
     pendingFileSidebar?: FileViewerInitialSidebar;
-    /**
-     * The comment ID to highlight when navigating from feed.
-     */
     pendingHighlightCommentID?: string;
-    /**
-     * Resolved anonymous display names from the feed for the target album.
-     */
     pendingAnonUserNames?: Map<string, string>;
-    /**
-     * Called after the pending navigation is consumed.
-     */
     onPendingNavigationConsumed?: () => void;
-    /**
-     * A function that can be used to create a UI notification to track the
-     * progress of user-initiated download, and to cancel it if needed.
-     */
     onAddSaveGroup: AddSaveGroup;
 } & Pick<
     FileListProps,
@@ -73,11 +50,6 @@ export type FileListWithViewerProps = {
         | "enableJoin"
     >;
 
-/**
- * A list of files (represented by their thumbnails), along with a file viewer
- * that opens on activating the thumbnail (and also allows the user to navigate
- * through this list of files).
- */
 export const FileListWithViewer: React.FC<FileListWithViewerProps> = ({
     layout,
     header,
@@ -113,7 +85,6 @@ export const FileListWithViewer: React.FC<FileListWithViewerProps> = ({
         Map<string, string> | undefined
     >(undefined);
 
-    // Handle pending navigation from feed item clicks
     useEffect(() => {
         if (pendingFileIndex !== undefined) {
             setCurrentIndex(pendingFileIndex);
@@ -135,7 +106,6 @@ export const FileListWithViewer: React.FC<FileListWithViewerProps> = ({
         onPendingNavigationConsumed,
     ]);
 
-    // Clear initial sidebar state when file viewer closes
     const handleCloseFileViewerInternal = useCallback(() => {
         setInitialSidebar(undefined);
         setHighlightCommentID(undefined);
@@ -228,9 +198,6 @@ const Container = styled("div")`
     width: 100%;
 `;
 
-/**
- * See: [Note: Timeline date string]
- */
 const fileTimelineDateString = (file: EnteFile) => {
     const date = fileCreationPhotoDate(file);
     return isSameDay(date, new Date())
