@@ -137,9 +137,6 @@ void _attachRustLogStream() {
         logger.warning(message);
       case LogLevel.info:
         logger.info(message);
-      case LogLevel.debug:
-      case LogLevel.trace:
-        logger.fine(message);
     }
   });
 }

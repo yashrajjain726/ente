@@ -9,7 +9,7 @@ struct WasmLogger;
 
 impl log::Log for WasmLogger {
     fn enabled(&self, metadata: &log::Metadata) -> bool {
-        metadata.level() <= log::max_level()
+        metadata.level() <= log::Level::Info
     }
 
     fn log(&self, record: &log::Record) {
@@ -39,7 +39,7 @@ impl log::Log for WasmLogger {
                 log::Level::Error => web_sys::console::error_1(&line),
                 log::Level::Warn => web_sys::console::warn_1(&line),
                 log::Level::Info => web_sys::console::info_1(&line),
-                log::Level::Debug | log::Level::Trace => web_sys::console::debug_1(&line),
+                log::Level::Debug | log::Level::Trace => {}
             }
         }
     }
@@ -49,6 +49,6 @@ impl log::Log for WasmLogger {
 
 #[wasm_bindgen(start)]
 fn start() {
-    let _ = log::set_logger(&LOGGER);
+    log::set_logger(&LOGGER).expect("Rust logger already initialized");
     log::set_max_level(log::LevelFilter::Info);
 }

@@ -9,8 +9,33 @@ use tauri::{AppHandle, Manager};
 
 static LOG_PATH: OnceLock<PathBuf> = OnceLock::new();
 static LOG_LOCK: Mutex<()> = Mutex::new(());
+static LOGGER: BackendLogger = BackendLogger;
 
 const LOG_FILE_NAME: &str = "backend.log";
+
+struct BackendLogger;
+
+impl log::Log for BackendLogger {
+    fn enabled(&self, metadata: &log::Metadata) -> bool {
+        metadata.level() <= log::Level::Info
+    }
+
+    fn log(&self, record: &log::Record) {
+        if self.enabled(record.metadata()) {
+            append_line(
+                "Rust",
+                &format!(
+                    "[{}][{}] {}",
+                    record.level(),
+                    record.target(),
+                    record.args()
+                ),
+            );
+        }
+    }
+
+    fn flush(&self) {}
+}
 
 pub fn init_logging(app: &AppHandle) {
     let path = app
@@ -24,6 +49,8 @@ pub fn init_logging(app: &AppHandle) {
     }
 
     let _ = LOG_PATH.set(path.clone());
+    log::set_logger(&LOGGER).expect("Rust logger already initialized");
+    log::set_max_level(log::LevelFilter::Info);
     log(
         "App",
         format!("backend logging initialized path={}", path.display()),

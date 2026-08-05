@@ -106,12 +106,9 @@ export const attachRustLogHook = () => {
             case "WARN":
                 logWarn(m);
                 break;
-            case "DEBUG":
-            case "TRACE":
-                logDebug(() => m);
-                break;
-            default:
+            case "INFO":
                 logInfo(m);
+                break;
         }
     };
 };

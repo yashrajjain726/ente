@@ -2301,6 +2301,7 @@ dependencies = [
  "ente-ensu",
  "keyring",
  "libc",
+ "log",
  "serde",
  "serde_json",
  "tauri",
@@ -2359,6 +2360,7 @@ name = "ente-cast-uniffi"
 version = "0.0.0"
 dependencies = [
  "ente-core",
+ "log",
  "thiserror 2.0.18",
  "uniffi",
 ]

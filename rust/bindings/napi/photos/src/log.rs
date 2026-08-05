@@ -1,5 +1,3 @@
-use std::sync::RwLock;
-
 use napi::bindgen_prelude::{FnArgs, Function};
 use napi::threadsafe_function::{ThreadsafeFunction, ThreadsafeFunctionCallMode};
 use napi::{Error, Status};
@@ -14,21 +12,18 @@ struct LogEntry {
 type LogSink =
     ThreadsafeFunction<LogEntry, (), FnArgs<(String, String, String)>, Status, false, true>;
 
-static LOGGER: NapiLogger = NapiLogger;
-static SINK: RwLock<Option<LogSink>> = RwLock::new(None);
+struct NapiLogger {
+    sink: LogSink,
+}
 
-struct NapiLogger;
-
-impl ::log::Log for NapiLogger {
-    fn enabled(&self, metadata: &::log::Metadata) -> bool {
-        metadata.level() <= ::log::max_level()
+impl log::Log for NapiLogger {
+    fn enabled(&self, metadata: &log::Metadata) -> bool {
+        metadata.level() <= log::Level::Info
     }
 
-    fn log(&self, record: &::log::Record) {
-        if self.enabled(record.metadata())
-            && let Some(sink) = SINK.read().unwrap().as_ref()
-        {
-            sink.call(
+    fn log(&self, record: &log::Record) {
+        if self.enabled(record.metadata()) {
+            self.sink.call(
                 LogEntry {
                     level: record.level().to_string(),
                     target: record.target().to_string(),
@@ -52,9 +47,8 @@ pub fn init_logging(sink: Function<'_, FnArgs<(String, String, String)>, ()>) ->
             let entry = ctx.value;
             Ok(FnArgs::from((entry.level, entry.target, entry.message)))
         })?;
-    ::log::set_logger(&LOGGER)
+    log::set_boxed_logger(Box::new(NapiLogger { sink }))
         .map_err(|_| Error::from_reason("Rust logger already initialized"))?;
-    *SINK.write().unwrap() = Some(sink);
-    ::log::set_max_level(::log::LevelFilter::Info);
+    log::set_max_level(log::LevelFilter::Info);
     Ok(())
 }

@@ -582,10 +582,7 @@ void _logRustEntry(Logger logger, String level, String target, String body) {
       logger.severe(message);
     case "warn":
       logger.warning(message);
-    case "debug":
-    case "trace":
-      logger.fine(message);
-    default:
+    case "info":
       logger.info(message);
   }
 }

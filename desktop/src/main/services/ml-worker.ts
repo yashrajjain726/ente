@@ -103,12 +103,9 @@ const logRustEntry = (level: string, target: string, message: string) => {
         case "WARN":
             log.warn(line);
             break;
-        case "DEBUG":
-        case "TRACE":
-            log.debugString(line);
-            break;
-        default:
+        case "INFO":
             log.info(line);
+            break;
     }
 };
 

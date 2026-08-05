@@ -1,7 +1,8 @@
-// TODO: This entire file, and the apps' attach fns, get replaced by frb's
-// `enable_frb_rust_to_dart_logging!` once frb 2.13 is out.
+// TODO: On FRB 2.13, replace this module and the Dart attachment with
+// `enable_frb_rust_to_dart_logging!(setup_dart_logging_output = false)`.
+// `init_app` must then call `setup_backtrace`, not `setup_default_user_utils`.
 
-use std::sync::RwLock;
+use std::sync::{Once, RwLock};
 
 use crate::frb_generated::StreamSink;
 
@@ -9,20 +10,6 @@ pub enum LogLevel {
     Error,
     Warn,
     Info,
-    Debug,
-    Trace,
-}
-
-impl From<::log::Level> for LogLevel {
-    fn from(level: ::log::Level) -> Self {
-        match level {
-            ::log::Level::Error => LogLevel::Error,
-            ::log::Level::Warn => LogLevel::Warn,
-            ::log::Level::Info => LogLevel::Info,
-            ::log::Level::Debug => LogLevel::Debug,
-            ::log::Level::Trace => LogLevel::Trace,
-        }
-    }
 }
 
 pub struct LogEntry {
@@ -33,21 +20,28 @@ pub struct LogEntry {
 
 static SINK: RwLock<Option<StreamSink<LogEntry>>> = RwLock::new(None);
 static LOGGER: StreamLogger = StreamLogger;
+static LOGGER_INIT: Once = Once::new();
 
 struct StreamLogger;
 
-impl ::log::Log for StreamLogger {
-    fn enabled(&self, metadata: &::log::Metadata) -> bool {
-        metadata.level() <= ::log::max_level()
+impl log::Log for StreamLogger {
+    fn enabled(&self, metadata: &log::Metadata) -> bool {
+        metadata.level() <= log::Level::Info
     }
 
-    fn log(&self, record: &::log::Record) {
+    fn log(&self, record: &log::Record) {
         if !self.enabled(record.metadata()) {
             return;
         }
+        let level = match record.level() {
+            log::Level::Error => LogLevel::Error,
+            log::Level::Warn => LogLevel::Warn,
+            log::Level::Info => LogLevel::Info,
+            log::Level::Debug | log::Level::Trace => return,
+        };
         if let Some(sink) = SINK.read().unwrap().as_ref() {
             let _ = sink.add(LogEntry {
-                level: record.level().into(),
+                level,
                 target: record.target().to_string(),
                 message: record.args().to_string(),
             });
@@ -58,13 +52,14 @@ impl ::log::Log for StreamLogger {
 }
 
 pub(crate) fn install() {
-    if ::log::set_logger(&LOGGER).is_ok() {
-        ::log::set_max_level(::log::LevelFilter::Info);
-    }
+    LOGGER_INIT.call_once(|| {
+        log::set_logger(&LOGGER).expect("Rust logger already initialized");
+        log::set_max_level(log::LevelFilter::Info);
+    });
 }
 
 pub fn attach_log_stream(sink: StreamSink<LogEntry>) {
     *SINK.write().unwrap() = Some(sink);
     // FRB resets the process-wide maximum after this logger is installed.
-    ::log::set_max_level(::log::LevelFilter::Info);
+    log::set_max_level(log::LevelFilter::Info);
 }
