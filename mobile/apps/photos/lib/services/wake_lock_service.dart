@@ -7,6 +7,7 @@ enum WakeLockFor {
   machineLearningSettingsScreen,
   handlingMediaKitEdgeCase,
   rewindViewer,
+  largeBackupStandbyScreen,
 }
 
 /// Use this wrapper to use wakelock. This class makes sure that the wakelock

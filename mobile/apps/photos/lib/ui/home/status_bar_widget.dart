@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import "package:ente_components/ente_components.dart";
 import 'package:ente_pure_utils/ente_pure_utils.dart';
@@ -13,11 +14,14 @@ import 'package:photos/ente_theme_data.dart';
 import 'package:photos/events/christmas_banner_event.dart';
 import 'package:photos/events/notification_event.dart';
 import 'package:photos/events/sync_status_update_event.dart';
+import "package:photos/extensions/logger_extension.dart";
 import "package:photos/service_locator.dart";
+import "package:photos/services/sync/large_backup_session_tracker.dart";
 import 'package:photos/services/sync/sync_service.dart';
 import "package:photos/theme/ente_theme.dart";
 import 'package:photos/ui/account/verify_recovery_page.dart';
 import 'package:photos/ui/components/home_header_widget.dart';
+import "package:photos/ui/home/backup_standby_screen.dart";
 import 'package:photos/ui/home/christmas/christmas_lights_banner.dart';
 import 'package:photos/ui/home/christmas/christmas_utils.dart';
 import 'package:photos/ui/home/header_error_widget.dart';
@@ -47,12 +51,31 @@ class _StatusBarWidgetState extends State<StatusBarWidget> {
       !hasGrantedMLConsent &&
       (isLocalGalleryMode || flagService.hasSyncedAccountFlags()) &&
       !localSettings.hasSeenMLEnablingBanner;
+  final LargeBackupSessionTracker _largeBackupSession =
+      LargeBackupSessionTracker();
   Error? _syncError;
 
   @override
   void initState() {
+    _logger.internalInfo(
+      "Large backup standby enabled=$_isLargeBackupStandbyEnabled, "
+      "platform=${Platform.operatingSystem}, "
+      "threshold=${LargeBackupSessionTracker.minimumFileCount}",
+    );
+    if (_isLargeBackupStandbyEnabled) {
+      final lastSyncStatus = SyncService.instance.getLastSyncStatusEvent();
+      if (lastSyncStatus != null) {
+        _logger.internalInfo(
+          "Restoring large backup state from ${lastSyncStatus.status.name}",
+        );
+        _largeBackupSession.update(lastSyncStatus);
+      }
+    }
     _subscription = Bus.instance.on<SyncStatusUpdate>().listen((event) {
       _logger.info("Received event " + event.status.toString());
+      if (_isLargeBackupStandbyEnabled) {
+        _largeBackupSession.update(event);
+      }
       _isPausedDueToNetwork = event.status == SyncStatus.paused;
       if (event.status == SyncStatus.error) {
         setState(() {
@@ -142,9 +165,52 @@ class _StatusBarWidgetState extends State<StatusBarWidget> {
             ? Divider(height: 8, color: getEnteColorScheme(context).strokeFaint)
             : const SizedBox.shrink(),
         if (_showErrorBanner) HeaderErrorWidget(error: _syncError),
+        if (_shouldShowLargeBackupBanner) _largeBackupBanner(context),
         if (_showMlBanner && !_showErrorBanner) _mlBanner(context),
         if (_showVerificationBanner()) _recoveryKeyBanner(context),
       ],
+    );
+  }
+
+  bool get _isLargeBackupStandbyEnabled => flagService.internalUser;
+
+  bool get _shouldShowLargeBackupBanner =>
+      _isLargeBackupStandbyEnabled &&
+      Platform.isIOS &&
+      !_showErrorBanner &&
+      _largeBackupSession.shouldOfferStandby;
+
+  Widget _largeBackupBanner(BuildContext context) {
+    return _bannerPadding(
+      BannerComponent(
+        key: const ValueKey("large-backup-standby-banner"),
+        leadingIcon: HugeIcons.strokeRoundedMoon02,
+        title: pendingTranslation("Keep the app open"),
+        subtitle: pendingTranslation(
+          "Screen will dim automatically to save battery",
+        ),
+        state: BannerComponentState.success,
+        onTap: () async {
+          if (!_largeBackupSession.shouldOfferStandby) {
+            _logger.internalInfo(
+              "Ignored standby banner tap because backup is no longer active",
+            );
+            return;
+          }
+          _logger.internalInfo(
+            "Opening standby screen with "
+            "remaining=${_largeBackupSession.remainingCount}",
+          );
+          await routeToPage(
+            context,
+            BackupStandbyScreen(
+              initialRemainingCount: _largeBackupSession.remainingCount,
+              isBackupActive: () => _largeBackupSession.shouldOfferStandby,
+            ),
+            forceCustomPageRoute: true,
+          );
+        },
+      ),
     );
   }
 
