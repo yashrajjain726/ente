@@ -9,6 +9,7 @@ crate-type = ["cdylib"]
 # usearch requires a newer GCC than napi-cli provides.
 ente-assets.workspace = true
 ente-photos.workspace = true
+log.workspace = true
 napi = { version = "3", default-features = false, features = ["napi10", "tokio_rt"] }
 napi-derive = "3"
 ort = { workspace = true, features = ["load-dynamic"] }

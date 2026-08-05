@@ -65,4 +65,6 @@ pub(crate) fn install() {
 
 pub fn attach_log_stream(sink: StreamSink<LogEntry>) {
     *SINK.write().unwrap() = Some(sink);
+    // FRB resets the process-wide maximum after this logger is installed.
+    log::set_max_level(log::LevelFilter::Info);
 }

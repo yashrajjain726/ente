@@ -79,6 +79,7 @@ const loadMLNative = (paths: MLNativePaths) => {
     try {
         // eslint-disable-next-line @typescript-eslint/no-require-imports
         const native = require(paths.addon) as MLNative;
+        native.initLogging(logRustEntry);
         native.initOrt(paths.onnxRuntimeLibrary);
         // Enables WebGPU where supported; macOS continues to use CoreML.
         native.setMlExecutionConfig(true);
@@ -90,6 +91,24 @@ const loadMLNative = (paths: MLNativePaths) => {
     } catch (e) {
         _nativeLoadError = e instanceof Error ? e.message : String(e);
         log.error(`Failed to load ML addon at ${paths.addon}`, e);
+    }
+};
+
+const logRustEntry = (level: string, target: string, message: string) => {
+    const line = `[rust][${target}] ${message}`;
+    switch (level) {
+        case "ERROR":
+            log.error(line);
+            break;
+        case "WARN":
+            log.warn(line);
+            break;
+        case "DEBUG":
+        case "TRACE":
+            log.debugString(line);
+            break;
+        default:
+            log.info(line);
     }
 };
 

@@ -2623,6 +2623,7 @@ version = "0.0.0"
 dependencies = [
  "ente-assets",
  "ente-photos",
+ "log",
  "napi",
  "napi-build",
  "napi-derive",
