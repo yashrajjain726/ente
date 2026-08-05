@@ -47,13 +47,8 @@ export const CustomError = {
     EXPORT_FOLDER_DOES_NOT_EXIST: "export folder does not exist",
 };
 
-/** Name of the JSON file in which we keep the state of the export. */
 const exportRecordFileName = "export_status.json";
 
-/**
- * Name of the top level directory which we create underneath the selected
- * directory when the user starts an export to the file system.
- */
 const exportDirectoryName = "Ente Photos";
 
 export const ExportStage = {
@@ -75,46 +70,22 @@ export interface ExportProgress {
     total: number;
 }
 
-/**
- * The export related settings that are persisted to local storage.
- */
 export interface ExportSettings {
-    /**
-     * The parent folder where the "Ente Photos" folder containing the export
-     * will be placed.
-     */
     folder?: string;
-    /**
-     * If `true`, the app will automatically export new or pending files.
-     */
     continuousExport?: boolean;
 }
 
-/**
- * Zod schema for the {@link ExportSettings} TypeScript type.
- */
 const ExportSettings = z.object({
     folder: z.string().nullish().transform(nullToUndefined),
     continuousExport: z.boolean().nullish().transform(nullToUndefined),
 });
 
-/**
- * Return the previously saved export settings, if any, present in local storage.
- *
- * Use {@link saveExportSettings} to update the settings in local storage.
- */
 export const savedExportSettings = () => {
     const jsonString = localStorage.getItem("export");
     const json = jsonString ? JSON.parse(jsonString) : undefined;
     return json ? ExportSettings.parse(json) : undefined;
 };
 
-/**
- * Update the export settings saved in local storage.
- *
- * This is the setter corresponding to {@link savedExportSettings}.
- * @param exportSettings
- */
 export const saveExportSettings = (exportSettings: ExportSettings) => {
     localStorage.setItem("export", JSON.stringify(exportSettings));
 };
@@ -124,11 +95,6 @@ type CollectionExportNames = Record<number, string>;
 type FileExportNames = Record<string, string>;
 
 export interface ExportRecord {
-    /**
-     * The version of the export record.
-     *
-     * Current version: 5
-     */
     version: number;
     stage: ExportStage;
     lastAttemptTimestamp: number;
@@ -146,14 +112,8 @@ export const NULL_EXPORT_RECORD: ExportRecord = {
 };
 
 export interface ExportOpts {
-    /**
-     * If true, perform an additional on-disk check to determine which files
-     * need to be exported.
-     *
-     * This has performance implications for huge libraries, so we only do this:
-     * - For the first export after an app start
-     * - If the user explicitly presses the "Resync" button.
-     */
+    // Huge export folders are expensive to scan.
+    // Scan only at startup or when the user explicitly resyncs.
     resync?: boolean;
 }
 
@@ -283,25 +243,12 @@ class ExportService {
         this.continuousExportEventHandler = null;
     }
 
-    /**
-     * Called when the local database of files changes.
-     */
     onLocalFilesUpdated() {
         if (this.continuousExportEventHandler) {
             this.continuousExportEventHandler();
         }
     }
 
-    /**
-     * Return the list of files that have not yet been exported.
-     *
-     * @param exportRecord The export record containing information about the
-     * export, including files which've been exported. If an export record is
-     * not specified (e.g. if the user has not exported anything yet and we just
-     * wish to show a preview of what will be exported), then the function will
-     * return the list of all files that will be exported if an export were to
-     * happen.
-     */
     pendingFiles = async (exportRecord?: ExportRecord): Promise<EnteFile[]> => {
         return getUnExportedFiles(
             await savedCollectionFiles(),
@@ -656,7 +603,6 @@ class ExportService {
                     );
                     const collectionExportName =
                         collectionIDPathMap.get(collectionID);
-                    // verify that the all exported files from the collection has been removed
                     const collectionExportedFiles = getCollectionExportedFiles(
                         exportRecord,
                         collectionID,
@@ -676,11 +622,9 @@ class ExportService {
                         collectionID,
                     );
                     try {
-                        // delete the collection metadata folder
                         await rmdirIfExists(
                             getMetadataFolderExportPath(collectionExportPath),
                         );
-                        // delete the collection folder
                         await rmdirIfExists(collectionExportPath);
                     } catch (e) {
                         await this.addCollectionExportedRecord(
@@ -1183,17 +1127,11 @@ class ExportService {
         );
     }
 
-    /**
-     * Lazily created, cached instance of the date time formatter that should be
-     * used for formatting the dates added to the metadata file.
-     */
     private metadataDateTimeFormatter() {
         if (this.cachedMetadataDateTimeFormatter)
             return this.cachedMetadataDateTimeFormatter;
 
-        // AFAIK, Google's format is not documented. It also seems to vary with
-        // locale. This is a best attempt at constructing a formatter that
-        // mirrors the format used by the timestamps in the takeout JSON.
+        // Takeout's undocumented timestamp format varies by locale.
         const formatter = new Intl.DateTimeFormat(i18n.language, {
             month: "short",
             day: "numeric",
@@ -1248,10 +1186,6 @@ const exportService = new ExportService();
 
 export default exportService;
 
-/**
- * If there are any in-progress exports, or if continuous exports are enabled,
- * resume them.
- */
 export const resumeExportsIfNeeded = async () => {
     const exportSettings = exportService.getExportSettings();
     if (!(await exportService.exportFolderExists(exportSettings?.folder))) {
@@ -1270,11 +1204,6 @@ export const resumeExportsIfNeeded = async () => {
     }
 };
 
-/**
- * Prompt the user to select a directory and create an export directory in it.
- *
- * If the user cancels the selection, return undefined.
- */
 export const selectAndPrepareExportDirectory = async (): Promise<
     string | undefined
 > => {
@@ -1294,19 +1223,12 @@ const migrateExportRecordIfNeeded = async (
     exportRecord: Partial<ExportRecord>,
 ) => {
     const version = exportRecord.version;
-    // The last migration from versions prior to version 5 of the export record
-    // was added in Sep 2023 (commit 1fe4d0443b29e77a91981d5800d2c4231118cb83)
-    // and released as part of app version 1.6.41:
-    // https://github.com/ente/photos-desktop/releases/tag/v1.6.41.
-    //
-    // There is no traffic from older versions anymore. Still, as an extra
-    // precaution, do not proceed if the migration prior to 5 hasn't run by now.
+    // Pre-v5 records should have migrated by desktop 1.6.41; never export through one.
     if (version === 0 || version === 1 || version === 2) {
         throw new Error(`Unsupported export record version ${version}`);
     }
     if (version === 3 || version === 4) {
-        // The version number in the empty export record was 3 when it should've
-        // been 5. Special case for these by ensuring the record is empty.
+        // Old empty records could still report versions 3 or 4.
         if (Object.entries(exportRecord.collectionExportNames ?? {}).length) {
             throw new Error(`Unsupported export record version ${version}`);
         } else {
@@ -1404,10 +1326,6 @@ const getDeletedExportedCollections = (
     return deletedExportedCollections;
 };
 
-/**
- * Return export record IDs of {@link files} for which there is also exists a
- * file on disk.
- */
 const readOnDiskFileExportRecordIDs = async (
     files: EnteFile[],
     collectionIDFolderNameMap: Map<number, string>,
@@ -1420,15 +1338,7 @@ const readOnDiskFileExportRecordIDs = async (
     const result = new Set<string>();
     if (!(await fs.exists(exportDir))) return result;
 
-    // Both the paths involved are guaranteed to use POSIX separators and thus
-    // can directly be compared.
-    //
-    // - `exportDir` traces its origin to `electron.selectDirectory()`, which
-    //   returns POSIX paths. Down below we use it as the base directory when
-    //   constructing paths for the items to export.
-    //
-    // - `findFiles` is also guaranteed to return POSIX paths.
-    //
+    // selectDirectory and findFiles both return POSIX paths.
     const ls = new Set(await ensureElectron().fs.findFiles(exportDir));
 
     const fileExportNames = exportRecord.fileExportNames ?? {};
@@ -1449,8 +1359,7 @@ const readOnDiskFileExportRecordIDs = async (
         if (ls.has(joinPath(collectionExportPath, exportName))) {
             result.add(recordID);
         } else {
-            // It might be a live photo - these store a JSON string instead of
-            // the file's name as the exportName.
+            // Live-photo export names are JSON, not filenames.
             try {
                 const { image, video } = parseLivePhotoExportName(exportName);
                 if (
@@ -1460,7 +1369,7 @@ const readOnDiskFileExportRecordIDs = async (
                     result.add(recordID);
                 }
             } catch {
-                /* Not an error, the file just might not exist on disk yet */
+                // A missing non-live file reaches here.
             }
         }
     }
@@ -1468,19 +1377,6 @@ const readOnDiskFileExportRecordIDs = async (
     return result;
 };
 
-/**
- * Return the list of files from amongst {@link allFiles} that still need to be
- * exported.
- *
- * @param allFiles The list of files to export.
- *
- * @param exportRecord The export record containing bookkeeping for the export.
- *
- * @paramd diskFileRecordIDs (Optional) The export record IDs of files from
- * amongst {@link allFiles} that already exist on disk. If provided (e.g. when
- * doing a resync), we perform an extra check for on-disk existence instead of
- * relying solely on the export record.
- */
 const getUnExportedFiles = (
     allFiles: EnteFile[],
     exportRecord: ExportRecord | undefined,
@@ -1553,7 +1449,7 @@ const getGoogleLikeMetadataFile = (
             timestamp: `${creationTime}`,
             formatted: dateTimeFormatter.format(creationTime * 1000),
         },
-        // Deprecated, future versions will not write this field.
+        // Deprecated, but still written for export compatibility.
         creationTime: {
             timestamp: `${creationTime}`,
             formatted: dateTimeFormatter.format(creationTime * 1000),
@@ -1573,8 +1469,6 @@ const getGoogleLikeMetadataFile = (
 const getMetadataFolderExportPath = (collectionExportPath: string) =>
     joinPath(collectionExportPath, exportMetadataDirectoryName);
 
-// if filepath is /home/user/Ente/Export/Collection1/1.jpg
-// then metadata path is /home/user/Ente/Export/Collection1/ENTE_METADATA_FOLDER/1.jpg.json
 const getFileMetadataExportPath = (
     collectionExportPath: string,
     fileExportName: string,
@@ -1608,15 +1502,6 @@ const parseLivePhotoExportName = (
 const isExportInProgress = (exportStage: ExportStage) =>
     exportStage > ExportStage.init && exportStage < ExportStage.finished;
 
-/**
- * Move {@link fileName} in {@link collectionName} to the special per-collection
- * file system "Trash" folder we created under the export directory.
- *
- * Also move its associated metadata JSON to Trash.
- *
- * @param exportDir The root directory on the user's file system where we are
- * exporting to.
- * */
 const moveToFSTrash = async (
     exportDir: string,
     collectionName: string,

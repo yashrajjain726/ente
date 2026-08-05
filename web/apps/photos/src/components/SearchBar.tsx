@@ -55,63 +55,16 @@ import {
 import AsyncSelect from "react-select/async";
 
 export interface SearchBarProps {
-    /**
-     * [Note: "Search mode"]
-     *
-     * On mobile sized screens, normally the search input areas is not
-     * displayed. Clicking the search icon enters the "search mode", where we
-     * show the search input area.
-     *
-     * On other screens, the search input is always shown even if we are not in
-     * search mode.
-     *
-     * When we're in search mode,
-     *
-     * 1. Other icons from the navbar are hidden.
-     * 2. Next to the search input there is a cancel button to exit search mode.
-     */
     isInSearchMode: boolean;
-    /**
-     * Invoked when the user wants to enter "search mode".
-     *
-     * This scenario only arises when the search bar is in the mobile device
-     * sized configuration, where the user needs to tap the search icon to enter
-     * the search mode.
-     */
     onShowSearchInput: () => void;
-    /**
-     * Set or clear the selected {@link SearchOption}.
-     */
     onSelectSearchOption: (
         o: SearchOption | undefined,
         options?: { shouldExitSearchMode?: boolean },
     ) => void;
-    /**
-     * Called when the user selects the generic "People" header in the empty
-     * state view.
-     */
     onSelectPeople: () => void;
-    /**
-     * Called when the user selects a person shown in the empty state view.
-     */
     onSelectPerson: (personID: string) => void;
 }
 
-/**
- * The search bar is a styled "select" element that allow the user to type in
- * the attached input field, and shows a list of matching suggestions in a
- * dropdown.
- *
- * When the search input is empty, it shows some general information in the
- * dropdown instead (e.g. the ML indexing status).
- *
- * When the search input is not empty, it shows these {@link SearchSuggestion}s.
- * Alongside each suggestion is shows a count of matching files, and some
- * previews.
- *
- * Selecting one of the these suggestions causes the gallery to shows a filtered
- * list of files that match that suggestion.
- */
 export const SearchBar: React.FC<SearchBarProps> = ({
     isInSearchMode,
     onShowSearchInput,
@@ -131,21 +84,12 @@ export const SearchBar: React.FC<SearchBarProps> = ({
 };
 
 interface MobileSearchAreaProps {
-    /** Called when the user presses the search button. */
     onSearch: () => void;
 }
 
 const MobileSearchArea: React.FC<MobileSearchAreaProps> = ({ onSearch }) => (
     <Stack direction="row" sx={{ alignItems: "center" }}>
-        <EnteLogoBox
-            sx={{
-                // Move to the center.
-                mx: "auto",
-                // Offset on the left by the visual size of the search icon to
-                // make it look visually centered.
-                pl: "24px",
-            }}
-        >
+        <EnteLogoBox sx={{ mx: "auto", pl: "24px" }}>
             <EnteLogo height={15} />
         </EnteLogoBox>
         <IconButton onClick={onSearch}>
@@ -160,18 +104,11 @@ const SearchInput: React.FC<Omit<SearchBarProps, "onShowSearchInput">> = ({
     onSelectPeople,
     onSelectPerson,
 }) => {
-    // A ref to the top level Select.
     const selectRef = useRef<SelectInstance<SearchOption> | null>(null);
-    // Subscribe to people state so that we re-render when people data arrives.
-    // This is needed because shouldShowEmptyState reads peopleStateSnapshot().
+    // Subscribe even though reads happen through peopleStateSnapshot().
     usePeopleStateSnapshot();
-    // The currently selected option.
-    //
-    // We need to use `null` instead of `undefined` to indicate missing values,
-    // because using `undefined` instead moves the Select from being a controlled
-    // component to an uncontrolled component.
+    // undefined makes react-select switch from controlled to uncontrolled.
     const [value, setValue] = useState<SearchOption | null>(null);
-    // The contents of the input field associated with the select.
     const [inputValue, setInputValue] = useState("");
     const [isFocused, setIsFocused] = useState(false);
 
@@ -180,10 +117,8 @@ const SearchInput: React.FC<Omit<SearchBarProps, "onShowSearchInput">> = ({
     const styles = useMemo(() => createSelectStyles(theme), [theme]);
     const components = useMemo(() => ({ Control, Input, Option }), []);
 
-    // Handle ctrl+K keyboard shortcut to focus search
     useEffect(() => {
         const handleKeyDown = (event: KeyboardEvent) => {
-            // Check for ctrl+K (cmd+K on macOS)
             if ((event.metaKey || event.ctrlKey) && event.key === "k") {
                 event.preventDefault();
                 selectRef.current?.focus();
@@ -196,8 +131,6 @@ const SearchInput: React.FC<Omit<SearchBarProps, "onShowSearchInput">> = ({
 
     const handleChange = (value: SearchOption | null) => {
         const type = value?.suggestion.type;
-        // Collection and people suggestions are handled differently - our
-        // caller will switch to the corresponding view, dismissing search.
         if (
             type == "collection" ||
             type == "person" ||
@@ -210,21 +143,11 @@ const SearchInput: React.FC<Omit<SearchBarProps, "onShowSearchInput">> = ({
             setInputValue(value?.suggestion.label ?? "");
         }
 
-        // Let our parent know the selection was changed.
-        // When selecting an option, we should exit search mode if needed.
         onSelectSearchOption(nullToUndefined(value), {
             shouldExitSearchMode: true,
         });
 
-        // The Select has a blurInputOnSelect prop, but that makes the input
-        // field lose focus, not the entire menu (e.g. when pressing twice).
-        //
-        // We anyways need the ref so that we can blur on selecting a person
-        // from the default options. So also use it to blur the entire Select
-        // (including the menu) when the user selects an option.
-        //
-        // Only blur when an actual option was selected, not when clearing
-        // (e.g., via backspace on empty input).
+        // blurInputOnSelect leaves react-select's menu open.
         if (value) selectRef.current?.blur();
     };
 
@@ -232,11 +155,9 @@ const SearchInput: React.FC<Omit<SearchBarProps, "onShowSearchInput">> = ({
         if (actionMeta.action == "input-change") {
             setInputValue(value);
 
-            // If the input is cleared, also clear the selected value.
             if (value === "") {
                 setValue(null);
                 setInputValue("");
-                // Notify parent but don't exit search mode on mobile
                 onSelectSearchOption(undefined, {
                     shouldExitSearchMode: false,
                 });
@@ -245,14 +166,11 @@ const SearchInput: React.FC<Omit<SearchBarProps, "onShowSearchInput">> = ({
     };
 
     const resetSearch = () => {
-        // Dismiss the search menu if it is open.
         selectRef.current?.blur();
 
-        // Clear all our state.
         setValue(null);
         setInputValue("");
 
-        // Let our parent know and exit search mode entirely.
         onSelectSearchOption(undefined, { shouldExitSearchMode: true });
     };
 
@@ -268,9 +186,7 @@ const SearchInput: React.FC<Omit<SearchBarProps, "onShowSearchInput">> = ({
 
     const handleFocus = () => {
         setIsFocused(true);
-        // A workaround to show the suggestions again for the current non-empty
-        // search string if the user focuses back on the input field after
-        // moving focus elsewhere.
+        // Refocusing needs an input nudge to reopen unchanged suggestions.
         if (inputValue) {
             selectRef.current?.onInputChange(inputValue, {
                 action: "set-value",
@@ -353,8 +269,6 @@ const loadOptions = pDebounce(async (input: string) => {
     return [...photoOptions, ...sidebarActions];
 }, 250);
 
-// const loadOptions = pDebounce(searchOptionsForString, 250);
-
 const createSelectStyles = (
     theme: Theme,
 ): StylesConfig<SearchOption, false> => ({
@@ -376,10 +290,7 @@ const createSelectStyles = (
     }),
     menu: (style) => ({
         ...style,
-        // Suppress the default margin at the top.
         marginTop: "1px",
-        // Give an opaque and elevated surface color to the menu to override the
-        // default (transparent).
         backgroundColor: theme.vars.palette.background.elevatedPaper,
     }),
     option: (style, { isFocused }) => ({
@@ -387,7 +298,6 @@ const createSelectStyles = (
         padding: 0,
         backgroundColor: "transparent !important",
         "& :hover": { cursor: "pointer" },
-        // Elevate the focused option further.
         "& .option-contents": isFocused
             ? { backgroundColor: theme.vars.palette.fill.fainter }
             : {},
@@ -399,14 +309,12 @@ const createSelectStyles = (
         whiteSpace: "nowrap",
         overflowX: "hidden",
     }),
-    // Hide some things we don't need.
     dropdownIndicator: (style) => ({ ...style, display: "none" }),
     indicatorSeparator: (style) => ({ ...style, display: "none" }),
     clearIndicator: (style) => ({ ...style, display: "none" }),
 });
 
 const Control = ({ children, ...props }: ControlProps<SearchOption, false>) => {
-    // The shortcut UI element will be shown once the search bar supports searching the settings as well.
     const isMac =
         typeof navigator !== "undefined" &&
         navigator.userAgent.toUpperCase().includes("MAC");
@@ -417,19 +325,10 @@ const Control = ({ children, ...props }: ControlProps<SearchOption, false>) => {
 
     return (
         <SelectComponents.Control {...props}>
-            <Stack
-                direction="row"
-                sx={{
-                    alignItems: "center",
-                    // Fill the entire control (the control uses display flex).
-                    flex: 1,
-                }}
-            >
+            <Stack direction="row" sx={{ alignItems: "center", flex: 1 }}>
                 <Box
                     sx={{
                         display: "inline-flex",
-                        // Match the default padding of the ValueContainer to make
-                        // the icon look properly spaced and aligned.
                         pl: "8px",
                         color: "stroke.muted",
                     }}
@@ -481,34 +380,16 @@ const iconForOption = (option: SearchOption | undefined) => {
     }
 };
 
-/**
- * A custom input for react-select that is always visible.
- *
- * This is a workaround to allow the search string to be always displayed, and
- * editable, even after the user has moved focus away from it.
- */
+// Keep the search text visible after react-select loses focus.
 const Input: React.FC<InputProps<SearchOption, false>> = (props) => (
     <SelectComponents.Input {...props} isHidden={false} />
 );
 
-/**
- * A preflight check for whether or not we should show the EmptyState.
- *
- * react-select seems to only suppress showing anything at all in the menu if we
- * return `null` from the function passed to `noOptionsMessage`. Returning
- * `false`, or returning `null` from the EmptyState itself doesn't work and
- * causes a empty div to be shown instead.
- */
+// noOptionsMessage must return null or react-select leaves an empty menu div.
 const shouldShowEmptyState = (inputValue: string) => {
-    // Don't show empty state if the user has entered search input.
     if (inputValue) return false;
 
-    // Don't show empty state if there is no ML related information AND we're
-    // not processing videos.
-
     if (!isMLSupported && !isHLSGenerationSupported) {
-        // Neither of ML or HLS generation is supported on current client. This
-        // is the code path for web.
         return false;
     }
 
@@ -521,8 +402,6 @@ const shouldShowEmptyState = (inputValue: string) => {
         vpStatus?.enabled && vpStatus.status == "processing";
 
     if (isMLInactive && !isVideoProcessing) {
-        // ML is inactive AND video processing is not happening.
-        // Only show empty state if there are people to display.
         const people = peopleStateSnapshot()?.visiblePeople;
         const hasPeople = people && people.length > 0;
         if (!hasPeople) {
@@ -530,14 +409,9 @@ const shouldShowEmptyState = (inputValue: string) => {
         }
     }
 
-    // Show it otherwise.
     return true;
 };
 
-/**
- * The view shown in the menu area when the user has not typed anything in the
- * search box.
- */
 const EmptyState: React.FC<
     Pick<SearchBarProps, "onSelectPeople" | "onSelectPerson">
 > = ({ onSelectPeople, onSelectPerson }) => {
@@ -550,7 +424,6 @@ const EmptyState: React.FC<
         case undefined:
         case "disabled":
         case "done":
-            // If ML is not running, see if video processing is.
             if (vpStatus?.enabled && vpStatus.status == "processing") {
                 label = t("processing_videos_status");
             }
@@ -569,7 +442,6 @@ const EmptyState: React.FC<
             break;
     }
 
-    // If there's nothing to show (no people and no status label), return empty.
     const hasPeople = people && people.length > 0;
     if (!hasPeople && !label) {
         return <></>;
