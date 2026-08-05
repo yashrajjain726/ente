@@ -13,14 +13,14 @@ pub enum LogLevel {
     Trace,
 }
 
-impl From<log::Level> for LogLevel {
-    fn from(level: log::Level) -> Self {
+impl From<::log::Level> for LogLevel {
+    fn from(level: ::log::Level) -> Self {
         match level {
-            log::Level::Error => LogLevel::Error,
-            log::Level::Warn => LogLevel::Warn,
-            log::Level::Info => LogLevel::Info,
-            log::Level::Debug => LogLevel::Debug,
-            log::Level::Trace => LogLevel::Trace,
+            ::log::Level::Error => LogLevel::Error,
+            ::log::Level::Warn => LogLevel::Warn,
+            ::log::Level::Info => LogLevel::Info,
+            ::log::Level::Debug => LogLevel::Debug,
+            ::log::Level::Trace => LogLevel::Trace,
         }
     }
 }
@@ -36,12 +36,12 @@ static LOGGER: StreamLogger = StreamLogger;
 
 struct StreamLogger;
 
-impl log::Log for StreamLogger {
-    fn enabled(&self, metadata: &log::Metadata) -> bool {
-        metadata.level() <= log::max_level()
+impl ::log::Log for StreamLogger {
+    fn enabled(&self, metadata: &::log::Metadata) -> bool {
+        metadata.level() <= ::log::max_level()
     }
 
-    fn log(&self, record: &log::Record) {
+    fn log(&self, record: &::log::Record) {
         if !self.enabled(record.metadata()) {
             return;
         }
@@ -58,13 +58,13 @@ impl log::Log for StreamLogger {
 }
 
 pub(crate) fn install() {
-    if log::set_logger(&LOGGER).is_ok() {
-        log::set_max_level(log::LevelFilter::Info);
+    if ::log::set_logger(&LOGGER).is_ok() {
+        ::log::set_max_level(::log::LevelFilter::Info);
     }
 }
 
 pub fn attach_log_stream(sink: StreamSink<LogEntry>) {
     *SINK.write().unwrap() = Some(sink);
     // FRB resets the process-wide maximum after this logger is installed.
-    log::set_max_level(log::LevelFilter::Info);
+    ::log::set_max_level(::log::LevelFilter::Info);
 }

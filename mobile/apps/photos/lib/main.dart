@@ -59,7 +59,7 @@ import 'package:photos/services/sync/local_sync_service.dart';
 import 'package:photos/services/sync/remote_sync_service.dart';
 import "package:photos/services/sync/sync_service.dart";
 import "package:photos/services/video_preview_service.dart";
-import "package:photos/src/rust/api/logs.dart" as photos_rust_logs;
+import "package:photos/src/rust/api/log.dart" as photos_rust_log;
 import "package:photos/src/rust/frb_generated.dart";
 import "package:photos/utils/device_info.dart";
 import "package:photos/utils/email_util.dart";
@@ -570,7 +570,7 @@ void _attachRustLogStream() {
   attachLogStream().listen((entry) {
     _logRustEntry(logger, entry.level.name, entry.target, entry.message);
   });
-  photos_rust_logs.attachLogStream().listen((entry) {
+  photos_rust_log.attachLogStream().listen((entry) {
     _logRustEntry(logger, entry.level.name, entry.target, entry.message);
   });
 }

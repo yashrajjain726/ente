@@ -7,6 +7,6 @@
 pub fn init_app() {
     // Install before FRB claims the process logger.
     #[cfg(feature = "flutter")]
-    crate::api::logs::install();
+    crate::api::log::install();
     flutter_rust_bridge::setup_default_user_utils();
 }

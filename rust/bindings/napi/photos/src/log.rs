@@ -19,12 +19,12 @@ static SINK: RwLock<Option<LogSink>> = RwLock::new(None);
 
 struct NapiLogger;
 
-impl log::Log for NapiLogger {
-    fn enabled(&self, metadata: &log::Metadata) -> bool {
-        metadata.level() <= log::max_level()
+impl ::log::Log for NapiLogger {
+    fn enabled(&self, metadata: &::log::Metadata) -> bool {
+        metadata.level() <= ::log::max_level()
     }
 
-    fn log(&self, record: &log::Record) {
+    fn log(&self, record: &::log::Record) {
         if self.enabled(record.metadata())
             && let Some(sink) = SINK.read().unwrap().as_ref()
         {
@@ -52,8 +52,9 @@ pub fn init_logging(sink: Function<'_, FnArgs<(String, String, String)>, ()>) ->
             let entry = ctx.value;
             Ok(FnArgs::from((entry.level, entry.target, entry.message)))
         })?;
-    log::set_logger(&LOGGER).map_err(|_| Error::from_reason("Rust logger already initialized"))?;
+    ::log::set_logger(&LOGGER)
+        .map_err(|_| Error::from_reason("Rust logger already initialized"))?;
     *SINK.write().unwrap() = Some(sink);
-    log::set_max_level(log::LevelFilter::Info);
+    ::log::set_max_level(::log::LevelFilter::Info);
     Ok(())
 }

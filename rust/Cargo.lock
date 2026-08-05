@@ -2445,6 +2445,7 @@ version = "0.0.0"
 dependencies = [
  "ente-assets",
  "ente-ensu",
+ "log",
  "thiserror 2.0.18",
  "uniffi",
  "uuid",
