@@ -1,13 +1,6 @@
 import { useRef, type PointerEvent, type RefObject } from "react";
 import { useUploadProgressContext } from "./context";
 
-/**
- * Returns pointer handlers that move `dragSurfaceRef` from a dedicated drag
- * handle. Expand and close actions remain in `MinimizedUploadProgress`.
- *
- * This file currently only has the functions and the interface which are
- * required for the drag implementation.
- */
 export function useMinimizedUploadDrag(
     dragSurfaceRef: RefObject<HTMLDivElement | null>,
 ) {

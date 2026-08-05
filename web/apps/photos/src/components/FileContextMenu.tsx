@@ -28,26 +28,17 @@ import {
 import { t } from "i18next";
 import React, { memo, useCallback, useMemo } from "react";
 
-/**
- * Position for anchoring the context menu.
- */
 export interface ContextMenuPosition {
     top: number;
     left: number;
 }
 
 interface FileContextMenuProps {
-    /** Whether the menu is open. */
     open: boolean;
-    /** The position to anchor the menu at. */
     anchorPosition: ContextMenuPosition | undefined;
-    /** Callback when the menu should close. */
     onClose: () => void;
-    /** The actions to display in the menu. */
     actions: FileContextAction[];
-    /** Callback when an action is selected. */
     onAction: (action: FileContextAction) => void;
-    /** Number of files currently selected. */
 }
 
 interface ActionConfig {
@@ -88,14 +79,6 @@ const actionConfigs: Record<FileContextAction, ActionConfig> = {
     addPerson: { label: "add_a_person", Icon: hugeIcon(UserAdd02Icon) },
 };
 
-/**
- * Context menu for file operations, displayed on right-click of file
- * thumbnails.
- *
- * This component renders a single Menu instance that is positioned based on
- * mouse coordinates. It should be rendered once at the FileList level, not per
- * thumbnail.
- */
 export const FileContextMenu: React.FC<FileContextMenuProps> = memo(
     ({ open, anchorPosition, onClose, actions, onAction }) => {
         const handleActionClick = useCallback(
@@ -106,7 +89,6 @@ export const FileContextMenu: React.FC<FileContextMenuProps> = memo(
             [onClose, onAction],
         );
 
-        // Separate primary and destructive actions in a single pass
         const [primaryActions, destructiveActions] = useMemo(() => {
             const primary: FileContextAction[] = [];
             const destructive: FileContextAction[] = [];

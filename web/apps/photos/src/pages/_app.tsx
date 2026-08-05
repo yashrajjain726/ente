@@ -96,10 +96,6 @@ const App: React.FC<PhotosAppProps> = ({ Component, pageProps }) => {
         const electron = globalThis.electron;
         if (!electron) return undefined;
 
-        // Attach various listeners for events sent to us by the Node.js layer.
-        // This is for events that we should listen for always, not just when
-        // the user is logged in.
-
         const handleOpenEnteURL = (url: string) => {
             if (url.startsWith("ente://app")) {
                 void router.push(url);
@@ -174,13 +170,6 @@ const App: React.FC<PhotosAppProps> = ({ Component, pageProps }) => {
 
             {isDesktop && <WindowTitlebar>{title}</WindowTitlebar>}
             <BaseContext value={baseContext}>
-                {
-                    // The web and desktop components are rendered separately
-                    // because the desktop currently supports app-lock,
-                    // for which we have certain hooks and components.
-                    // We don't want this to load in the web as well, since there
-                    // is no particular purpose it would serve.
-                }
                 <PhotosAppContext value={appContext}>
                     {!isI18nReady ? (
                         <LoadingIndicator />
@@ -259,12 +248,10 @@ const WindowTitlebar: React.FC<React.PropsWithChildren> = ({ children }) => (
     </WindowTitlebarArea>
 );
 
-// See: [Note: Customize the desktop title bar]
+// Electron uses this as a window drag region.
 const WindowTitlebarArea = styled(CenteredRow)`
     width: 100%;
-    height: env(titlebar-area-height, 30px /* fallback */);
-    /* LoadingIndicator is 100vh, so resist shrinking when shown with it. */
+    height: env(titlebar-area-height, 30px);
     flex-shrink: 0;
-    /* Allow using the titlebar to drag the window. */
     app-region: drag;
 `;

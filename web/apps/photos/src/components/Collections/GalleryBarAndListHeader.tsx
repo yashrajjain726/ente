@@ -52,9 +52,6 @@ type GalleryBarAndListHeaderProps = Omit<
     | "onShowAllAlbums"
     | "onShowAllPeople"
 > & {
-    /**
-     * When `true`, the bar is be hidden altogether.
-     */
     shouldHide: boolean;
     barCollectionSummaries: CollectionSummaries;
     allPeople: Person[];
@@ -86,24 +83,7 @@ type GalleryBarAndListHeaderProps = Omit<
         "user" | "emailByUserID" | "shareSuggestionEmails" | "setBlockingLoad"
     >;
 
-/**
- * The gallery bar, the header for the list items, and state for any associated
- * dialogs that might be triggered by actions on either the bar or the header..
- *
- * This component manages the sticky horizontally scrollable bar shown at the
- * top of the gallery, AND the (non-sticky) header shown below the bar, at the
- * top of the actual list of items.
- *
- * These are disparate views - indeed, the list header is not even a child of
- * this component but is instead proxied via {@link setFileListHeader}. Still,
- * having this intermediate wrapper component allows us to move some of the
- * common concerns shared by both the gallery bar and list header (e.g. some
- * dialogs that can be invoked from both places) into this file instead of
- * cluttering the already big gallery component.
- *
- * TODO: Once the gallery code is better responsibilitied out, consider moving
- * this code back inline into the gallery.
- */
+// TODO: Move this back into the gallery once its responsibilities are split.
 export const GalleryBarAndListHeader: React.FC<
     GalleryBarAndListHeaderProps
 > = ({
@@ -205,8 +185,7 @@ export const GalleryBarAndListHeader: React.FC<
         const collectionSummary = toShowCollectionSummaries.get(
             activeCollectionID!,
         );
-        // Render the full CollectionHeader for pseudo-collections (e.g. trash)
-        // so header actions/menus are available even without a real collection.
+        // Pseudo-collections need header actions despite having no Collection.
         const shouldRenderCollectionHeader =
             mode != "people" &&
             collectionSummary &&
@@ -370,10 +349,6 @@ export const GalleryBarAndListHeader: React.FC<
     );
 };
 
-/**
- * A hook that maintains the collections sort order both as in-memory and local
- * storage state.
- */
 const useCollectionsSortByLocalState = (initialValue: CollectionsSortBy) => {
     const key = "collectionsSortBy";
 

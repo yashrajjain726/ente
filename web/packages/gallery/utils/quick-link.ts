@@ -18,9 +18,7 @@ const shortMonths = [
     "Dec",
 ];
 
-/**
- * Date-range formatting used by quick-link naming (kept in mobile parity).
- */
+// Keep date formatting in sync with mobile.
 export const quickLinkDateRangeForCreationTimes = (
     firstCreationTime: number,
     secondCreationTime: number,

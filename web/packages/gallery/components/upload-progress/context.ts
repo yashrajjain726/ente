@@ -8,18 +8,11 @@ import type {
     UploadFileNames,
 } from "../uploadProgressStats";
 
-/**
- * Coordinates for positioning the draggable minimized upload progress widget.
- */
 export interface DragPosition {
     x: number;
     y: number;
 }
 
-/**
- * This the main prop type facilitating the variour actions
- * which are currently available to the UploadProgress UI
- */
 export interface UploadProgressContextT {
     onClose: () => void;
     uploadCounter: UploadCounter;

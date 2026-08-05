@@ -1,8 +1,5 @@
 import i18n, { t } from "i18next";
 
-/**
- * Return `true` if both the given dates have the same day.
- */
 export const isSameDay = (first: Date, second: Date) =>
     first.getFullYear() === second.getFullYear() &&
     first.getMonth() === second.getMonth() &&
@@ -19,11 +16,6 @@ const translatedRelativeTime = (
         : translated;
 };
 
-/**
- * Format a server timestamp in microseconds using the same thresholds as the
- * comments sidebar: relative labels for recent comments, locale dates for older
- * ones.
- */
 export const formatTimeAgo = (timestampMicros: number): string => {
     const timestampMs = Math.floor(timestampMicros / 1000);
     const now = Date.now();

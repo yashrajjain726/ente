@@ -40,20 +40,15 @@ export const PeopleSortOptions: React.FC<PeopleSortOptionsProps> = ({
     nestedInDialog,
     transparentTriggerButtonBackground,
 }) => {
-    // Tracks the button element the menu is anchored to; its presence also
-    // determines whether the menu is open.
     const [anchorEl, setAnchorEl] = useState<MenuProps["anchorEl"]>();
 
-    // Holds the next sort choice until the menu close transition completes.
+    // Apply sort changes after the menu closes to avoid flicker.
     const pendingSortByRef = useRef<PeopleSortBy | undefined>(undefined);
     const ariaID = "people-sort";
 
-    // Split the current sort into its category and direction for simpler menu logic.
     const activeCategory = getPeopleSortCategory(activeSortBy);
     const activeAscending = isPeopleSortAscending(activeSortBy);
 
-    // Re-selecting the active category flips its direction; choosing a new
-    // category applies that category's default direction.
     const handleCategoryClick = (category: PeopleSortCategory) => {
         let nextSortBy: PeopleSortBy;
         if (category === activeCategory) {
@@ -65,8 +60,6 @@ export const PeopleSortOptions: React.FC<PeopleSortOptionsProps> = ({
         setAnchorEl(undefined);
     };
 
-    // Optionally remove the trigger button background when this control is
-    // rendered inside layouts that already provide their own styling.
     const triggerButtonSxProps: IconButtonProps["sx"] = [
         transparentTriggerButtonBackground
             ? {}
@@ -150,8 +143,6 @@ const PeopleSortCategoryOption: React.FC<PeopleSortCategoryOptionProps> = ({
     label,
     directionLabel,
 }) => {
-    // The selected option has a differnt color and arrow directions
-    // and the below variables are for facilitating that.
     const isSelected = category === activeCategory;
     const arrowIcon = activeAscending ? ArrowUp02Icon : ArrowDown02Icon;
 

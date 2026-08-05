@@ -99,10 +99,6 @@ export interface CollectionHeaderProps extends Pick<
     mapFileSource?: FileListWithViewerProps["mapFileSource"];
     setActiveCollectionID: (collectionID: number) => void;
     isActiveCollectionDownloadInProgress: () => boolean;
-    /**
-     * Called when an operation (e.g. renaming a collection) completes and wants
-     * to perform a full remote pull.
-     */
     onRemotePull: (opts?: RemotePullOpts) => Promise<void>;
     onCollectionShare: () => void;
     onCollectionManageLink: () => void;
@@ -110,17 +106,9 @@ export interface CollectionHeaderProps extends Pick<
     canSetAlbumCover: boolean;
     onSetAlbumCover: () => void;
     hasActiveFileSelection: boolean;
-    /**
-     * A function that can be used to create a UI notification to track the
-     * progress of user-initiated download, and to cancel it if needed.
-     */
     onAddSaveGroup: AddSaveGroup;
 }
 
-/**
- * A header shown at the top of the list of photos in the gallery, when the
- * gallery is showing a collection.
- */
 export const CollectionHeader: React.FC<CollectionHeaderProps> = (props) => {
     const { collectionSummary } = props;
 
@@ -202,11 +190,6 @@ const CollectionHeaderOptions: React.FC<CollectionHeaderProps> = ({
         activeCollection?.magicMetadata?.data.subType ==
         CollectionSubType.quicklink;
 
-    /**
-     * Return a new function by wrapping an async function in an error handler,
-     * showing the global loading bar when the function runs, and syncing with
-     * remote on completion.
-     */
     const wrap = useCallback(
         (f: () => Promise<void>) => {
             const wrapped = async () => {
@@ -488,9 +471,7 @@ const CollectionHeaderOptions: React.FC<CollectionHeaderProps> = ({
     }, [mapEnabled, onGenericError, showMapDialog]);
 
     let menuOptions: React.ReactNode[] = [];
-    // MUI doesn't let us use fragments to pass multiple menu items, so we need
-    // to instead put them in an array. This also necessitates giving each a
-    // unique key.
+    // MUI rejects fragments here, so return keyed arrays.
     switch (collectionSummaryType) {
         case "trash":
             menuOptions = fileCount
@@ -503,7 +484,6 @@ const CollectionHeaderOptions: React.FC<CollectionHeaderProps> = ({
             break;
 
         case "uncategorized":
-            // Quick options (download + clean) are shown instead of a menu
             break;
 
         case "hiddenItems":
@@ -530,7 +510,6 @@ const CollectionHeaderOptions: React.FC<CollectionHeaderProps> = ({
                         {t("map")}
                     </OverflowMenuOption>
                 ),
-                // Pin/Unpin for shared incoming collections
                 collectionSummary.attributes.has("shareePinned") ? (
                     <OverflowMenuOption
                         key="unpin"
@@ -825,7 +804,6 @@ const CollectionHeaderOptions: React.FC<CollectionHeaderProps> = ({
     );
 };
 
-/** Props for a generic option. */
 interface OptionProps {
     onClick: () => void;
 }
@@ -1038,7 +1016,6 @@ const ShareIcon: React.FC = () => (
     </svg>
 );
 
-/** A smaller version of ShareIcon for use in the collection header summary. */
 const SmallShareIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
     <svg
         width="15"

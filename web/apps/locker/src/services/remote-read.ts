@@ -626,9 +626,8 @@ const decryptFileToLockerItem = async (
                     fileKey,
                 )) as Record<string, unknown> | undefined;
             } catch {
-                // Public metadata can be missing or unreadable for some older
-                // files. We still want to surface the file row if basic
-                // metadata decrypts successfully.
+                // Older files may have unreadable public metadata.
+                // Basic metadata is enough to keep the row.
             }
         }
 

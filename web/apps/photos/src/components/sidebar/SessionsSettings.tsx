@@ -91,8 +91,7 @@ const SessionsSettingsContents: React.FC<SessionsSettingsContentsProps> = ({
         } catch (e) {
             log.error("Failed to fetch active sessions", e);
             if (isHTTP401Error(e)) {
-                // Use setTimeout to show the session expired dialog
-                // after the current confirmation dialog closes
+                // Wait for the confirmation dialog to close.
                 setTimeout(() => {
                     showMiniDialog(sessionExpiredDialogAttributes(logout));
                 }, 0);
@@ -138,8 +137,7 @@ const SessionsSettingsContents: React.FC<SessionsSettingsContentsProps> = ({
                             } catch (e) {
                                 log.error("Failed to terminate session", e);
                                 if (isHTTP401Error(e)) {
-                                    // Use setTimeout to show the session expired dialog
-                                    // after the current confirmation dialog closes
+                                    // Wait for the confirmation dialog to close.
                                     setTimeout(() => {
                                         showMiniDialog(
                                             sessionExpiredDialogAttributes(

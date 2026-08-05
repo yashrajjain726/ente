@@ -65,7 +65,6 @@ const Page: React.FC = () => {
     useRedirectIfNeedsCredentials("/large-files");
 
     useEffect(() => {
-        // Track if this effect is still current to prevent race conditions
         let isCurrent = true;
 
         dispatch({ type: "analyze" });
@@ -122,7 +121,6 @@ const Page: React.FC = () => {
         setOpenFileViewer(false);
     }, []);
 
-    // Extract files for the FileViewer.
     const files = useMemo(
         () => state.largeFiles.map((item) => item.file),
         [state.largeFiles],
@@ -136,7 +134,6 @@ const Page: React.FC = () => {
             case "failed":
                 return <LoadFailed />;
             case "completed":
-                // Show empty state only if no files AND no deletion in progress
                 if (
                     state.largeFiles.length === 0 &&
                     state.deleteProgress === undefined
@@ -180,7 +177,7 @@ const Page: React.FC = () => {
                 files={files}
                 initialIndex={currentIndex}
                 onVisualFeedback={() => {
-                    // No-op: Large files viewer is read-only
+                    // The large-files viewer is read-only.
                 }}
             />
         </Stack>
@@ -375,7 +372,7 @@ const LargeFilesGrid: React.FC<LargeFilesGridProps> = ({
 
     const columns = layoutParams.columns;
     const dataRowCount = Math.ceil(largeFiles.length / columns);
-    // Add an extra row for bottom padding (to account for the floating bar)
+    // Reserve a final row for the floating bar.
     const rowCount = dataRowCount + 1;
 
     const itemData: LargeFilesGridItemData = {
@@ -394,7 +391,7 @@ const LargeFilesGrid: React.FC<LargeFilesGridProps> = ({
     const itemKey = (index: number) =>
         index === dataRowCount ? "padding" : `row-${index}`;
 
-    // Key based on width to force re-render when layout changes
+    // react-window must remount when the layout width changes.
     const key = `${width}`;
 
     return (
@@ -429,14 +426,12 @@ const GridRow: React.FC<ListChildComponentProps<LargeFilesGridItemData>> = memo(
             dataRowCount,
         } = data;
 
-        // Padding row at the end - render empty space
         if (rowIndex === dataRowCount) {
             return <div style={style} />;
         }
 
         const columns = layoutParams.columns;
 
-        // Calculate which items are in this row
         const startIndex = rowIndex * columns;
         const endIndex = Math.min(startIndex + columns, largeFiles.length);
         const rowItems = largeFiles.slice(startIndex, endIndex);
@@ -479,7 +474,6 @@ const GridItem: React.FC<GridItemProps> = memo(({ item, onToggle, onOpen }) => {
         onOpenRef.current = onOpen;
     }, [onOpen]);
 
-    // Memoize touch device detection to avoid media query on every render
     const isTouchDevice = useMemo(
         () =>
             typeof window !== "undefined" &&
@@ -487,7 +481,6 @@ const GridItem: React.FC<GridItemProps> = memo(({ item, onToggle, onOpen }) => {
         [],
     );
 
-    // Cleanup timer on unmount to prevent memory leaks
     useEffect(() => {
         return () => {
             if (longPressTimer.current) {
@@ -528,7 +521,6 @@ const GridItem: React.FC<GridItemProps> = memo(({ item, onToggle, onOpen }) => {
     const handleClick = () => {
         if (isLongPress.current) return;
 
-        // On mobile, tap to toggle selection; on desktop, tap to open
         if (isTouchDevice) {
             onToggle();
         } else {
@@ -667,15 +659,12 @@ const DeleteButton: React.FC<DeleteButtonProps> = ({
                 fontSize: { xs: "0.85rem", sm: "0.9rem" },
                 "&.Mui-disabled": isDeleting
                     ? {
-                          // Keep critical color during deletion
                           backgroundColor: "critical.main",
                           color: "critical.contrastText",
                       }
                     : {
-                          // Light mode default
                           backgroundColor: "rgba(0, 0, 0, 0.3)",
                           color: "rgba(0, 0, 0, 0.5)",
-                          // Dark mode override
                           ...theme.applyStyles("dark", {
                               backgroundColor: "rgba(255, 255, 255, 0.3)",
                               color: "rgba(255, 255, 255, 0.5)",
@@ -710,8 +699,6 @@ const DeleteButton: React.FC<DeleteButtonProps> = ({
         </FocusVisibleButton>
     );
 };
-
-// --- Styled Components ---
 
 interface ItemGridProps {
     layoutParams: ThumbnailGridLayoutParams;
@@ -786,6 +773,7 @@ const SizeLabel = styled(Typography)`
     }
 `;
 
+// Safari requires block-level positioned pseudo-elements here.
 const Check = styled("input")(
     ({ theme }) => `
     appearance: none;
@@ -807,19 +795,19 @@ const Check = styled("input")(
 
     &::before {
         content: "";
-        display: block; /* Critical for Safari */
+        display: block;
         width: 19px;
         height: 19px;
         background-color: ${theme.vars.palette.grey[300]};
         border-radius: 50%;
         margin: 6px;
         transition: background-color 0.3s ease, opacity 0.3s ease;
-        position: relative; /* Important for Safari */
+        position: relative;
     }
 
     &::after {
         content: "";
-        display: block; /* Critical for Safari */
+        display: block;
         position: absolute;
         top: 50%;
         left: 50%;
@@ -832,16 +820,13 @@ const Check = styled("input")(
         transform-origin: center;
     }
 
-    /* Default state - hidden */
     visibility: hidden;
 
-    /* Hover state - show with reduced opacity */
     &:hover {
         visibility: visible;
         opacity: 0.7;
     }
 
-    /* Checked state - fully visible and colored */
     &:checked {
         visibility: visible;
         opacity: 1 !important;

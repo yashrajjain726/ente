@@ -22,10 +22,6 @@ import type { ChangeEvent, ReactElement } from "react";
 interface UploadConfirmationDialogProps {
     open: boolean;
     loading: boolean;
-    /**
-     * `true` if the items being uploaded were detected to be a Google Takeout
-     * import (Takeout metadata JSONs were found amongst them).
-     */
     isTakeout: boolean;
     fileCount: number;
     albumCount: number;
@@ -258,7 +254,6 @@ function StatCard({
     );
 }
 
-/* primary/default in the design */
 const green = "#08c225";
 
 const paperSx = (theme: Theme) => ({

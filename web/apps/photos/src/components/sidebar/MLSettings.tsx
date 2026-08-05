@@ -46,7 +46,6 @@ export const MLSettings: React.FC<NestedSidebarDrawerVisibilityProps> = ({
 
     const handleConsent = useWrapAsyncOperation(async () => {
         await enableML();
-        // Close the FaceConsent drawer, come back to ourselves.
         setOpenFaceConsent(false);
     });
 
@@ -92,11 +91,7 @@ const Loading: React.FC = () => {
 };
 
 interface EnableMLProps {
-    /** Called when the user enables ML. */
     onEnable: () => void;
-    /**
-     *  If true, a footnote describing the magic search feature will be shown.
-     */
     showMagicSearchHint?: boolean;
 }
 
@@ -155,9 +150,7 @@ const FaceConsentDrawer: React.FC<FaceConsentDrawerProps> = ({
 };
 
 interface FaceConsentProps {
-    /** Called when the user provides their consent. */
     onConsent: () => void;
-    /** Called when the user cancels out. */
     onCancel: () => void;
 }
 
@@ -223,9 +216,7 @@ export const FaceConsent: React.FC<FaceConsentProps> = ({
 };
 
 interface ManageMLProps {
-    /** The {@link MLStatus}; a non-disabled one. */
     mlStatus: Exclude<MLStatus, { phase: "disabled" }>;
-    /** Called when the user wants to disable ML. */
     onDisableML: () => void;
 }
 
@@ -253,7 +244,6 @@ const ManageML: React.FC<ManageMLProps> = ({ mlStatus, onDisableML }) => {
             break;
     }
 
-    // Show processed as percentages instead of potentially confusing counts.
     const processed = `${nTotalFiles ? Math.round((100 * nSyncedFiles) / nTotalFiles) : 100}%`;
 
     const confirmDisableML = () =>

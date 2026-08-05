@@ -24,14 +24,11 @@ export const useLocationFetching = ({
     const processedPhotoIdsRef = useRef<Set<number>>(new Set());
     const lastFetchedClustersRef = useRef<string>("");
 
-    // Fetch location names for clusters
     useEffect(() => {
-        // Create a stable key for current clusters to prevent duplicate fetches
         const clustersKey = photoClusters
             .map((cluster) => cluster.map((p) => p.fileId).join(","))
             .join("|");
 
-        // Skip if we already fetched for these exact clusters
         if (clustersKey === lastFetchedClustersRef.current) {
             return;
         }
@@ -39,12 +36,10 @@ export const useLocationFetching = ({
         const fetchNames = async () => {
             if (photoClusters.length === 0) return;
 
-            // Get all current photo IDs
             const currentPhotoIds = new Set(
                 photoClusters.flat().map((photo) => photo.fileId),
             );
 
-            // Check if any photos need location fetching
             const needsFetching = photoClusters.some((cluster) =>
                 cluster.some(
                     (photo) => !locationDataRef.current.has(photo.fileId),
@@ -78,7 +73,6 @@ export const useLocationFetching = ({
                     );
                 }
 
-                // Update processed photos set
                 processedPhotoIdsRef.current = currentPhotoIds;
             } finally {
                 setIsLoadingLocations(false);
