@@ -1210,9 +1210,10 @@ class _MemoryViewerOverlays extends StatelessWidget {
         if (safeIndex == null) return const SizedBox.shrink();
         final file = inheritedData.memories[safeIndex].file;
         final caption = file.caption;
-        final captionText = caption == null || caption.isEmpty
-            ? null
-            : '"$caption"';
+        final captionText = caption == null || caption.isEmpty ? null : caption;
+        final captionStyle = component.TextStyles.mini.copyWith(
+          color: Colors.white.withValues(alpha: 0.8),
+        );
         return Stack(
           fit: StackFit.expand,
           children: [
@@ -1289,13 +1290,20 @@ class _MemoryViewerOverlays extends StatelessWidget {
                     onTap: () => fullScreenState._runWithViewerPaused(
                       () => showDetailsSheet(context, file),
                     ),
-                    child: Text(
-                      captionText,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: component.TextStyles.mini.copyWith(
-                        color: Colors.white.withValues(alpha: 0.8),
-                      ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text('"', style: captionStyle),
+                        Flexible(
+                          child: Text(
+                            captionText,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: captionStyle,
+                          ),
+                        ),
+                        Text('"', style: captionStyle),
+                      ],
                     ),
                   ),
                 ),

@@ -699,15 +699,16 @@ class _GalleryBottomOverlay extends StatelessWidget {
   Widget build(BuildContext context) {
     final isVideo = file.fileType == FileType.video;
     final caption = file.caption;
-    final captionText = caption == null || caption.isEmpty
-        ? null
-        : '"$caption"';
+    final captionText = caption == null || caption.isEmpty ? null : caption;
     final hasBottomBar = mode != DetailPageMode.minimalistic && !isGuestView;
     if (captionText == null && (isVideo || !hasBottomBar)) {
       return const SizedBox.shrink();
     }
 
     final safePadding = MediaQuery.paddingOf(context);
+    final captionStyle = getEnteTextTheme(
+      context,
+    ).mini.copyWith(color: textBaseDark.withValues(alpha: 0.8));
     return ValueListenableBuilder<bool>(
       valueListenable: enableFullScreenNotifier,
       builder: (context, isFullScreen, _) {
@@ -764,13 +765,20 @@ class _GalleryBottomOverlay extends StatelessWidget {
                       alignment: Alignment.centerLeft,
                       child: GestureDetector(
                         onTap: () => showDetailsSheet(context, file),
-                        child: Text(
-                          captionText,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: getEnteTextTheme(context).mini.copyWith(
-                            color: textBaseDark.withValues(alpha: 0.8),
-                          ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text('"', style: captionStyle),
+                            Flexible(
+                              child: Text(
+                                captionText,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: captionStyle,
+                              ),
+                            ),
+                            Text('"', style: captionStyle),
+                          ],
                         ),
                       ),
                     ),
