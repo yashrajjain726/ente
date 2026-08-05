@@ -100,10 +100,10 @@ fn gemma_4_e4b_q4km() -> ModelPreset {
     ModelPreset {
         id: "gemma-4-e4b-q4km".to_string(),
         title: "Gemma 4 E4B (Q4_K_M)".to_string(),
-        url: "https://huggingface.co/unsloth/gemma-4-E4B-it-GGUF/resolve/main/gemma-4-E4B-it-Q4_K_M.gguf?download=true".to_string(),
-        sha256: "519b9793ed6ce0ff530f1b7c96e848e08e49e7af4d57bb97f76215963a54146d".to_string(),
+        url: "https://huggingface.co/ente-ai/gemma-4-E4B-it-GGUF/resolve/f0089e04ac8494e513619d18b44c829c6b815440/gemma-4-E4B-it-Q4_K_M.gguf?download=true".to_string(),
+        sha256: "85a896a047553e842f25297ee5b031d64ff30147d9c4af17b1e4b394cd1fab87".to_string(),
         mmproj_url: Some(
-            "https://huggingface.co/unsloth/gemma-4-E4B-it-GGUF/resolve/main/mmproj-F16.gguf"
+            "https://huggingface.co/ente-ai/gemma-4-E4B-it-GGUF/resolve/f0089e04ac8494e513619d18b44c829c6b815440/mmproj-F16.gguf"
                 .to_string(),
         ),
         mmproj_sha256: Some("ddf46c21d7078e95338cfc22306b19b276a29a5ad089023449dd54d4b6170a51".to_string()),
@@ -114,10 +114,10 @@ fn gemma_4_e2b_q4km() -> ModelPreset {
     ModelPreset {
         id: "gemma-4-e2b-q4km".to_string(),
         title: "Gemma 4 E2B (Q4_K_M)".to_string(),
-        url: "https://huggingface.co/unsloth/gemma-4-E2B-it-GGUF/resolve/main/gemma-4-E2B-it-Q4_K_M.gguf?download=true".to_string(),
-        sha256: "9378bc471710229ef165709b62e34bfb62231420ddaf6d729e727305b5b8672d".to_string(),
+        url: "https://huggingface.co/ente-ai/gemma-4-E2B-it-GGUF/resolve/d9f70b02c9a2193b7263daee865dfa93276fd99a/gemma-4-E2B-it-Q4_K_M.gguf?download=true".to_string(),
+        sha256: "740185b21d22ceb83a11c3aa62ad5842ef32c70f6096d756bbee85a1e4ec34b8".to_string(),
         mmproj_url: Some(
-            "https://huggingface.co/unsloth/gemma-4-E2B-it-GGUF/resolve/main/mmproj-F16.gguf"
+            "https://huggingface.co/ente-ai/gemma-4-E2B-it-GGUF/resolve/d9f70b02c9a2193b7263daee865dfa93276fd99a/mmproj-F16.gguf"
                 .to_string(),
         ),
         mmproj_sha256: Some("140be8d7849741f88c50757d529b84373ee8e27052cc2236855b537f4a8215fa".to_string()),
