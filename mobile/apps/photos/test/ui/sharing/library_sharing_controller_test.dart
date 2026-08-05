@@ -7,25 +7,6 @@ import 'package:photos/ui/sharing/library_sharing/library_sharing_controller.dar
 import 'library_sharing_test_helpers.dart';
 
 void main() {
-  test('first-time tap selection starts after an album is selected', () async {
-    final repository = FakeLibrarySharingRepository([
-      librarySharingTestAlbum(1),
-    ]);
-    final controller = LibrarySharingController(
-      recipient: librarySharingTestRecipient,
-      repository: repository,
-    );
-    await controller.load();
-
-    expect(controller.selectsAlbumsOnTap, isFalse);
-
-    controller.toggleSelection(repository.albums.single);
-    expect(controller.selectsAlbumsOnTap, isTrue);
-
-    controller.clearSelection();
-    expect(controller.selectsAlbumsOnTap, isFalse);
-  });
-
   test('shares a new album and returns to the shared overview', () async {
     final repository = FakeLibrarySharingRepository([
       librarySharingTestAlbum(

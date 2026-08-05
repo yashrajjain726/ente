@@ -227,11 +227,10 @@ class _LibrarySharingPageState extends State<LibrarySharingPage> {
         albums,
         tag: 'library_sharing_${_recipient.userID}',
         selectionCallbacks: (
-          isSelectionModeActive: _controller.selectsAlbumsOnTap,
           isSelected: _controller.isSelected,
           toggle: _toggleAlbumSelection,
         ),
-        enableSelectionMode: true,
+        enableSelectionMode: !_controller.isMutating,
         gridTopLeftOverlayBuilder: _roleOverlay,
         topPadding: Spacing.sm,
         bottomPadding: _gridBottomPadding,
