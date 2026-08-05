@@ -1,6 +1,6 @@
 {
     "name": "ensu-desktop",
-    "version": "0.1.19-beta",
+    "version": "0.1.20-beta",
     "private": true,
     "scripts": {
         "build": "tauri build",
