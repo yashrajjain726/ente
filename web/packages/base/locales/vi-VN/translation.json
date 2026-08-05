@@ -103,7 +103,7 @@
     "import_partner_shared_photos_hint": "Nhập ảnh người thân chia sẻ với bạn trên Google Photos",
     "start_import": "Bắt đầu nhập",
     "start_upload": "Bắt đầu tải lên",
-    "gallery_empty_state_v2_subtitle": "Lưu trữ và chia sẻ kỷ niệm riêng tư",
+    "gallery_empty_state_subtitle": "",
     "upload_existing_library": "Tải lên thư viện có sẵn",
     "memories_secured_since_arrival_one": "{{count, number}} kỷ niệm được lưu giữ kể từ khi bạn dùng",
     "memories_secured_since_arrival": "{{count, number}} kỷ niệm được lưu giữ kể từ khi bạn dùng",
