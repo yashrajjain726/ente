@@ -396,7 +396,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(isExpanded(), isFalse);
     expect(find.text('Role'), findsNothing);
-    expect(find.text('Stop sharing'), findsNothing);
+    expect(find.text('Stop sharing'), findsOneWidget);
     expect(find.text('Save'), findsOneWidget);
 
     await tester.drag(selectionSheet, const Offset(0, -100));

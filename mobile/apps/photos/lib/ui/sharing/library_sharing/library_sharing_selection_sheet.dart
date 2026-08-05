@@ -50,7 +50,7 @@ class LibrarySharingSelectionSheet extends StatelessWidget {
             isDisabled: !controller.canApply,
             onTap: onApply,
           ),
-          if (isExpanded && controller.canStopSharing) ...[
+          if (controller.canStopSharing) ...[
             const SizedBox(height: Spacing.md),
             ButtonComponent(
               label: LibrarySharingStrings.stopSharing,
