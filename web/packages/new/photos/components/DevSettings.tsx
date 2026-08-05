@@ -22,21 +22,14 @@ import { z } from "zod";
 import { SlideUpTransition } from "./mui/SlideUpTransition";
 
 interface DevSettingsProps {
-    /** If `true`, then the dialog is shown. */
     open: boolean;
-    /** Called when the dialog wants to be closed. */
     onClose: () => void;
 }
 
-/**
- * A dialog allowing the user to set the API origin that the app connects to.
- * See: [Note: Configuring custom server].
- */
 export const DevSettings: React.FC<DevSettingsProps> = ({ open, onClose }) => {
     const fullScreen = useIsSmallWidth();
 
     const handleDialogClose: ModalProps["onClose"] = (_, reason: string) => {
-        // Don't close on backdrop clicks.
         if (reason != "backdropClick") onClose();
     };
 
@@ -56,14 +49,8 @@ export const DevSettings: React.FC<DevSettingsProps> = ({ open, onClose }) => {
 type ContentsProps = Pick<DevSettingsProps, "onClose">;
 
 const Contents: React.FC<ContentsProps> = (props) => {
-    // We need two nested components.
-    //
-    // - The initialAPIOrigin cannot be in our parent (the top level
-    //   DevSettings) otherwise it gets preserved across dialog reopens instead
-    //   of being read from storage on opening the dialog.
-    //
-    // - The initialAPIOrigin cannot be in our child (Form) because Formik
-    //   doesn't have supported for async initial values.
+    // This boundary reloads the stored origin on every dialog open.
+    // Form stays separate because Formik cannot await initial values.
     const [initialAPIOrigin, setInitialAPIOrigin] = useState<
         string | undefined
     >();
@@ -74,24 +61,19 @@ const Contents: React.FC<ContentsProps> = (props) => {
         [],
     );
 
-    // Even though this is async, this should be instantaneous, we're just
-    // reading the value from the local IndexedDB.
     if (initialAPIOrigin === undefined) return <></>;
 
     return <Form {...{ initialAPIOrigin }} {...props} />;
 };
 
-type FormProps = ContentsProps & {
-    /** The initial value of API origin to prefill in the text input field. */
-    initialAPIOrigin: string;
-};
+type FormProps = ContentsProps & { initialAPIOrigin: string };
 
 const Form: React.FC<FormProps> = ({ initialAPIOrigin, onClose }) => {
     const formik = useFormik({
         initialValues: { apiOrigin: initialAPIOrigin },
         validate: ({ apiOrigin }) => {
             try {
-                // The expression is not unused, it is used to validate the URL.
+                // Constructing the URL performs validation.
                 // eslint-disable-next-line @typescript-eslint/no-unused-expressions
                 apiOrigin && new URL(apiOrigin);
             } catch {
@@ -103,9 +85,6 @@ const Form: React.FC<FormProps> = ({ initialAPIOrigin, onClose }) => {
             try {
                 await updateAPIOrigin(values.apiOrigin);
             } catch (e) {
-                // The person using this functionality is likely a developer and
-                // might be helped more by the original error instead of a
-                // friendlier but less specific message.
                 setErrors({
                     apiOrigin: e instanceof Error ? e.message : String(e),
                 });
@@ -117,9 +96,7 @@ const Form: React.FC<FormProps> = ({ initialAPIOrigin, onClose }) => {
         },
     });
 
-    // Show validation errors only after the form has been submitted once (the
-    // touched state of apiOrigin gets set too early, perhaps because of the
-    // autoFocus).
+    // Auto-focus marks this field touched before submission.
     const hasError =
         formik.submitCount > 0 &&
         formik.touched.apiOrigin &&
@@ -141,11 +118,7 @@ const Form: React.FC<FormProps> = ({ initialAPIOrigin, onClose }) => {
                     onChange={formik.handleChange}
                     onBlur={formik.handleBlur}
                     error={hasError}
-                    helperText={
-                        hasError
-                            ? formik.errors.apiOrigin
-                            : " " /* always show an empty string to prevent a layout shift */
-                    }
+                    helperText={hasError ? formik.errors.apiOrigin : " "}
                     slotProps={{
                         input: {
                             endAdornment: (
@@ -190,18 +163,6 @@ const Form: React.FC<FormProps> = ({ initialAPIOrigin, onClose }) => {
     );
 };
 
-/**
- * Save {@link origin} to local storage after verifying it with a ping.
- *
- * The given {@link origin} will be verifying by making an API call to the
- * `/ping` endpoint. If that succeeds, then it will be saved to local storage,
- * and all subsequent API calls will use it as the {@link apiOrigin}.
- *
- * See: [Note: Configuring custom server].
- *
- * @param origin The new API origin to use. Pass an empty string to clear the
- * previously saved API origin (if any).
- */
 const updateAPIOrigin = async (origin: string) => {
     if (!origin) {
         await removeKV("apiOrigin");

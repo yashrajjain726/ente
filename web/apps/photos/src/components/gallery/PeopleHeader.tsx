@@ -137,9 +137,7 @@ const CGroupPersonHeader: React.FC<CGroupPersonHeaderProps> = ({ person }) => {
             },
         });
 
-    // While technically it is possible for the cgroup not to have a name, logic
-    // wise we shouldn't be ending up here without a name (this state is
-    // expected to be reached only for unignored named persons).
+    // This view only receives unignored, named people.
     const name = cgroup.data.name ?? "";
 
     return (
@@ -302,17 +300,9 @@ const ClusterPersonHeader: React.FC<ClusterPersonHeaderProps> = ({
 
 type AddPersonDialogProps = ModalVisibilityProps &
     Pick<PeopleHeaderProps, "people" | "onSelectPerson"> & {
-        /**
-         * The cluster to add to the selected person (existing or new).
-         */
         cluster: FaceCluster;
     };
 
-/**
- * A dialog allowing the user to select one of the existing named persons they
- * have, or create a new one, and then associate the provided cluster to it,
- * creating or updating a remote "person".
- */
 const AddPersonDialog: React.FC<AddPersonDialogProps> = ({
     open,
     onClose,
@@ -344,19 +334,8 @@ const AddPersonDialog: React.FC<AddPersonDialogProps> = ({
         onSelectPerson(personID);
     };
 
-    // [Note: Calling setState during rendering]
-    //
-    // Calling setState during rendering should be avoided when there are
-    // cleaner alternatives, but it is not completely verboten, and it has
-    // documented semantics:
-    //
-    // > React will discard the currently rendering component's output and
-    // > immediately attempt to render it again with the new state.
-    // >
-    // > https://react.dev/reference/react/useState
-
-    // If we're opened without any existing people that can be selected, jump
-    // directly to the add person dialog.
+    // This render-time update intentionally redirects an empty list to naming.
+    // React discards this render and starts another with the new state.
     if (open && !openNameInput && !cgroupPeople.length) {
         onClose();
         setOpenNameInput(true);
@@ -435,29 +414,12 @@ type SuggestionsDialogProps = ModalVisibilityProps & { person: CGroupPerson };
 
 interface SuggestionsDialogState {
     activity: "fetching" | "saving" | undefined;
-    /**
-     * This is a workaround for the lack of stable identity of the person prop
-     * passed to the dialog (on which we trigger the suggestion computation.)
-     */
+    // Track the ID because the person object has no stable identity.
     personID: string | undefined;
-    /**
-     * True if "fetching" failed.
-     */
     fetchFailed: boolean;
-    /**
-     * True if we should show the previously saved choice view instead of the
-     * new suggestions.
-     */
     showChoices: boolean;
-    /** Fetched choices. */
     choices: SCItem[];
-    /** Fetched suggestions. */
     suggestions: SCItem[];
-    /**
-     * An entry corresponding to each
-     * - saved choice for which the user has changed their mind.
-     * - suggestion that the user has either explicitly assigned or rejected.
-     */
     updates: PersonSuggestionUpdates;
 }
 
@@ -515,27 +477,19 @@ const suggestionsDialogReducer: React.Reducer<
             const updates = new Map(state.updates);
             const { item, value } = action;
             if (item.assigned === undefined && value === undefined) {
-                // If this was a suggestion, prune previous updates since the
-                // use has toggled the item back to its original unset state.
                 updates.delete(item.id);
             } else if (item.assigned !== undefined && value === item.assigned) {
-                // If this is a choice, prune updates which match the choice's
-                // original assigned state.
                 updates.delete(item.id);
             } else {
                 const update = (() => {
                     switch (value) {
                         case true:
-                            // true corresponds to update "assign".
                             return "assign";
                         case false:
-                            // false maps to different updates for suggestions
-                            // vs choices.
                             return item.assigned === undefined
                                 ? "rejectSuggestion"
                                 : "rejectSavedChoice";
                         case undefined:
-                            // undefined means reset.
                             return "reset";
                     }
                 })();
@@ -548,12 +502,8 @@ const suggestionsDialogReducer: React.Reducer<
         case "save":
             return { ...state, activity: "saving" };
         case "close":
-            // Reset the person ID when closing the dialog so that the
-            // suggestions are recomputed the next time the dialog is reopened
-            // (even for the same person).
-            //
-            // We cannot reset the suggestions themselves since they would cause
-            // the dialog to lose its visual state during the closing animation.
+            // Reset the ID so reopening the same person recomputes suggestions.
+            // Keep the lists visible during the closing animation.
             return { ...state, personID: undefined };
     }
 };
@@ -582,9 +532,6 @@ const SuggestionsDialog: React.FC<SuggestionsDialogProps> = ({
     useEffect(() => {
         if (!open) return;
 
-        // Avoid recomputing when the person object changes without its identity
-        // changing. This is a workaround, a better fix would be to fix upstream
-        // to guarantee a stable identity of the person object itself.
         const personID = person.id;
         if (person.id == state.personID) return;
 
@@ -682,7 +629,6 @@ const SuggestionsDialog: React.FC<SuggestionsDialogProps> = ({
                 )}
             </SpacedRow>
             <DialogContent
-                /* Reset scroll position on switching view */
                 key={`${state.showChoices}`}
                 sx={{ display: "flex", "&&&": { pt: 0 } }}
             >
@@ -743,10 +689,6 @@ const SuggestionsDialog: React.FC<SuggestionsDialogProps> = ({
 interface SuggestionOrChoiceListProps {
     items: SCItem[];
     updates: PersonSuggestionUpdates;
-    /**
-     * Callback invoked when the user changes the value associated with the
-     * given suggestion or choice.
-     */
     onUpdateItem: (item: SCItem, value: boolean | undefined) => void;
 }
 
@@ -763,7 +705,7 @@ const SuggestionOrChoiceList: React.FC<SuggestionOrChoiceListProps> = ({
             >
                 <Stack sx={{ gap: "10px" }}>
                     <Typography variant="small" sx={{ color: "text.muted" }}>
-                        {/* Use the face count as as stand-in for the photo count */}
+                        {/* Face count stands in for photo count here. */}
                         {t("photos_count", { count: item.faces.length })}
                     </Typography>
                     <SuggestionFaceList faces={item.previewFaces} />
@@ -791,8 +733,6 @@ const itemValueFromUpdate = (
     item: SCItem,
     updates: PersonSuggestionUpdates,
 ) => {
-    // Use the in-memory state if available. For choices, fallback to their
-    // original state.
     const resolveUpdate = () => {
         switch (updates.get(item.id)) {
             case "assign":
@@ -810,5 +750,4 @@ const itemValueFromUpdate = (
 };
 
 const toItemValue = (v: unknown) =>
-    // This dance is needed for TypeScript to recognize the type.
     v == "yes" ? true : v == "no" ? false : undefined;

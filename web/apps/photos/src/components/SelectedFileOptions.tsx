@@ -34,9 +34,6 @@ import type { Collection } from "ente-media/collection";
 import type { CollectionSummary } from "ente-new/photos/services/collection-summary";
 import { t } from "i18next";
 
-/**
- * Operations on selected files.
- */
 export type FileOp =
     | "sendLink"
     | "download"
@@ -49,137 +46,33 @@ export type FileOp =
     | "trash"
     | "deletePermanently";
 
-/**
- * Operations on selected files that also have an associated collection.
- */
 export type CollectionOp = "add" | "move" | "restore" | "unhide";
 
 interface SelectedFileOptionsProps {
     barMode?: GalleryBarMode;
     isInSearchMode: boolean;
     selectedCollection?: Collection;
-    /**
-     * If {@link collectionSummary} is set and is not a pseudo-collection, then
-     * this will be set to the corresponding {@link Collection}.
-     */
     collection: Collection | undefined;
-    /**
-     * The collection summary in whose context the selection happened.
-     *
-     * This will not be set if we are in the people section, or if we are
-     * showing search results.
-     */
     collectionSummary: CollectionSummary | undefined;
-    /**
-     * The total number of files selected by the user.
-     */
     selectedFileCount: number;
-    /**
-     * The subset of {@link selectedFileCount} that are also owned by the user.
-     */
     selectedOwnFileCount: number;
-    /**
-     * The number of selected files that are currently favorited.
-     */
     selectedFavoriteCount: number;
-    /**
-     * Called when the user clears the selection by pressing the cancel button
-     * on the selection bar.
-     */
     onClearSelection: () => void;
-    /**
-     * Called when the user wants to remove the selected files from the given
-     * {@link collection}.
-     */
     onRemoveFilesFromCollection: (collection: Collection) => void;
-    /**
-     * Callback to open a dialog where the user can choose a collection.
-     *
-     * The reason for opening the dialog and other properties are passed as the
-     * {@link attributes} argument.
-     */
     onOpenCollectionSelector: (
         attributes: CollectionSelectorAttributes,
     ) => void;
-    /**
-     * A function called to obtain a new album creation handler for the provided
-     * {@link op}.
-     *
-     * This function will be passed the operation to be be performed. It will
-     * return a new function G can be used as the {@link onCreateCollection}
-     * attribute for {@link onOpenCollectionSelector}.
-     *
-     * Once the user enters the name and a new album with that name gets
-     * created, the newly created collection will be passed to G.
-     *
-     * @param op The operation that should be performed on the selected files
-     * using the newly created collection.
-     *
-     * @returns A function that can be called with to create a new collection
-     * and then perform {@link op} on successful creation of the new collection.
-     */
     createOnCreateForCollectionOp: (op: CollectionOp) => () => void;
-    /**
-     * A function called to obtain an existing album selection handler for the
-     * provided {@link op}.
-     *
-     * This function will be passed the operation to be be performed. It will
-     * return a new function G can be used as the {@link onSelectCollection}
-     * attribute for {@link onOpenCollectionSelector}.
-     *
-     * Once the user selects a collection, then the selected collection will be
-     * passed to G.
-     *
-     * @param op The operation that should be performed on the selected files,
-     * using the selected collection.
-     *
-     * @returns A function that can be called with a selected collection.
-     */
     createOnSelectForCollectionOp: (
         op: CollectionOp,
     ) => (selectedCollection: Collection) => void;
-    /**
-     * A function called to obtain a handler for the provided {@link op}.
-     *
-     * This function will be passed the file operation to be performed. It will
-     * return a new function G that can be used as a {@link onClick} handler for
-     * the button. Calling G will trigger the operation on the selected files.
-     *
-     * @param op The operation that should be performed on the selected files.
-     * @returns
-     */
     createFileOpHandler: (op: FileOp) => () => void;
-    /**
-     * Callback to show the assign person dialog.
-     *
-     * Similar to {@link onOpenCollectionSelector}, this opens a shared dialog
-     * defined in the parent component where the user can select a person to
-     * associate with the selected files.
-     *
-     * If not set, the "Add Person" option will not be shown.
-     */
     onShowAssignPersonDialog?: () => void;
-
-    /**
-     * Called when the user wants to edit the location of the selected files.
-     *
-     * Only shown when at least one owned file is selected.
-     */
     onEditLocation?: () => void;
-    /**
-     * Called when the user wants to select all files.
-     */
     onSelectAll: () => void;
-    /**
-     * If true, all files in the current view are selected.
-     */
     isAllSelected: boolean;
 }
 
-/**
- * The selection bar shown at the top of the viewport when the user has selected
- * one or more files in the photos app gallery.
- */
 export const SelectedFileOptions: React.FC<SelectedFileOptionsProps> = ({
     barMode,
     isInSearchMode,
@@ -203,14 +96,10 @@ export const SelectedFileOptions: React.FC<SelectedFileOptionsProps> = ({
 
     const handleFavorite = createFileOpHandler("favorite");
     const handleUnfavorite = createFileOpHandler("unfavorite");
-
     const handleFixTime = createFileOpHandler("fixTime");
-
     const handleDownload = createFileOpHandler("download");
     const handleSendLink = createFileOpHandler("sendLink");
-
     const handleArchive = createFileOpHandler("archive");
-
     const handleUnarchive = createFileOpHandler("unarchive");
 
     const handleDelete = () =>

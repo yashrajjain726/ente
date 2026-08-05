@@ -1,6 +1,4 @@
-/**
- * @file [Note: Gallery page logic] Logic and components for the gallery page, split out of pages/gallery.tsx.
- */
+// TODO: Move this code back into gallery.tsx.
 
 import { EnableML, FaceConsent } from "@/components/sidebar/MLSettings";
 import { useWrapAsyncOperation } from "@/components/utils/use-wrap-async";
@@ -29,28 +27,10 @@ import React, { useRef, useState } from "react";
 
 export { GalleryEmptyState } from "./GalleryEmptyState";
 
-/**
- * Options to customize the behaviour of the remote pull that gets triggered on
- * various actions within the gallery and its descendants.
- */
 export interface RemotePullOpts {
-    /**
-     * Perform the pull without showing a global loading bar
-     *
-     * Default: `false`.
-     */
     silent?: boolean;
-    /**
-     * The action that triggered this pull. Used to annotate downstream logs.
-     */
     source?: string;
 }
-/**
- * The context in which a selection was made.
- *
- * This allows us to reset the selection if user moves to a different context
- * and starts a new selection.
- * */
 export type SelectionContext =
     | {
           mode: "albums" | "hidden-albums" | "archive-albums";
@@ -61,17 +41,8 @@ export type SelectionContext =
 interface SearchResultsHeaderProps {
     searchSuggestion: SearchSuggestion;
     fileCount: number;
-    /**
-     * Current sort order.
-     * - `undefined`: No sort selected (keeps original order, e.g. CLIP relevance)
-     * - `true`: Ascending (oldest first)
-     * - `false`: Descending (newest first)
-     */
+    // undefined preserves source order; true is oldest-first; false is newest-first.
     sortAsc: boolean | undefined;
-    /**
-     * Called when the user changes the sort order.
-     * Pass `undefined` to reset to the original order (e.g., CLIP relevance).
-     */
     onSortOrderChange: (asc: boolean | undefined) => void;
 }
 
@@ -141,9 +112,7 @@ interface SearchSortOrderMenuProps {
     onClose: () => void;
     sortButtonRef: React.RefObject<HTMLButtonElement | null>;
     sortAsc: boolean | undefined;
-    /** Whether the current search is a CLIP (magic) search. */
     isClipSearch: boolean;
-    /** Called when the user selects "Most Relevant" (only shown for CLIP searches). */
     onRelevanceClick: () => void;
     onAscClick: () => void;
     onDescClick: () => void;
@@ -242,9 +211,7 @@ export const PeopleEmptyStateMessage: React.FC<React.PropsWithChildren> = ({
             sx={{
                 color: "text.muted",
                 mx: 1,
-                // Approximately compensate for the hidden section bar (86px),
-                // and then add a bit extra padding so that the message appears
-                // visually off the center, towards the top.
+                // Offset the hidden 86px bar and bias the message upward.
                 paddingBlockEnd: "126px",
             }}
         >
@@ -263,8 +230,13 @@ export const PeopleEmptyStateDisabled: React.FC = () => {
     return (
         <Stack sx={{ alignItems: "center", flex: 1, overflow: "auto" }}>
             <Paper
-                // Top margin is to prevent clipping of the shadow.
-                sx={{ maxWidth: "390px", padding: "4px", mt: 1, mb: "2rem" }}
+                sx={{
+                    maxWidth: "390px",
+                    padding: "4px",
+                    // Prevent the card shadow from clipping.
+                    mt: 1,
+                    mb: "2rem",
+                }}
             >
                 {!showConsent ? (
                     <EnableML onEnable={() => setShowConsent(true)} />

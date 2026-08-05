@@ -43,17 +43,11 @@ export const AppLockSettings: React.FC<NestedSidebarDrawerVisibilityProps> = ({
         typeof navigator != "undefined" &&
         navigator.userAgent.toUpperCase().includes("MAC");
 
-    // For the 4-digit PIN setup and confirmation dialog.
     const [pinDialogOpen, setPinDialogOpen] = useState(false);
-    // For the password setup and confirmation dialog.
     const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
-    // Loading/disable flag while async device-lock setup is running.
     const [isSettingDeviceLock, setIsSettingDeviceLock] = useState(false);
-    // Controls whether the Device lock option should be shown after a compatibility check.
     const [showDeviceLockOption, setShowDeviceLockOption] = useState(false);
-    // For the auto-lock duration selection nested drawer.
     const [autoLockOptionsOpen, setAutoLockOptionsOpen] = useState(false);
-    // Cancel flag used to avoid state updates after unmount.
     const isDeviceLockOptionRequestCancelled = useRef(false);
     const { showMiniDialog } = useBaseContext();
 
@@ -93,9 +87,6 @@ export const AppLockSettings: React.FC<NestedSidebarDrawerVisibilityProps> = ({
         }
     }, [open]);
 
-    /**
-     * Close both levels of the nested drawer.
-     */
     const handleRootClose = () => {
         setAutoLockOptionsOpen(false);
         onClose();
@@ -104,14 +95,10 @@ export const AppLockSettings: React.FC<NestedSidebarDrawerVisibilityProps> = ({
 
     const handleSelectDeviceLock =
         useCallback(async (): Promise<DeviceLockEnableOutcome> => {
-            // Ignore repeated clicks while setup is already running.
             if (isSettingDeviceLock) return "failed";
 
-            // Show loading state while native device-lock setup runs.
             setIsSettingDeviceLock(true);
             try {
-                // setupDeviceLock performs capability checks and returns typed
-                // failure reasons when setup is unavailable or not completed.
                 const result = await setupDeviceLock();
                 if (result.status === "success") {
                     return "success";
@@ -161,7 +148,6 @@ export const AppLockSettings: React.FC<NestedSidebarDrawerVisibilityProps> = ({
                 if (outcome !== "failed") return;
             }
 
-            // Fallback when macOS device lock setup is unavailable/failed.
             setPinDialogOpen(true);
         })();
     }, [
@@ -180,12 +166,10 @@ export const AppLockSettings: React.FC<NestedSidebarDrawerVisibilityProps> = ({
         setPasswordDialogOpen(true);
     }, []);
 
-    // Close the PIN setup dialog after a successful setup.
     const handlePinSetupComplete = useCallback(() => {
         setPinDialogOpen(false);
     }, []);
 
-    // Close the password setup dialog after a successful setup.
     const handlePasswordSetupComplete = useCallback(() => {
         setPasswordDialogOpen(false);
     }, []);
@@ -337,8 +321,6 @@ const deviceLockSetupErrorText = (result: SetupDeviceLockResult): string => {
     return t("device_lock_setup_failed");
 };
 
-// -- Auto-lock duration helpers --
-
 const autoLockOptions: { labelKey: string; ms: number }[] = [
     { labelKey: "auto_lock_immediately", ms: 0 },
     { labelKey: "auto_lock_5_seconds", ms: 5_000 },
@@ -353,8 +335,6 @@ const autoLockLabel = (ms: number): string => {
     return t(option?.labelKey ?? "auto_lock_immediately");
 };
 
-// -- PIN Setup Dialog --
-
 interface SetupDialogProps {
     open: boolean;
     onClose: () => void;
@@ -366,32 +346,16 @@ const PinSetupDialog: React.FC<SetupDialogProps> = ({
     onClose,
     onComplete,
 }) => {
-    // For PIN setup, there are two modals: one for initial input and one for confirmation.
     const [step, setStep] = useState<"enter" | "confirm">("enter");
-    // Stores the 4 PIN digits entered by the user
     const [pin, setPin] = useState(["", "", "", ""]);
-    // Stores the 4 PIN digits entered for confirmation
     const [confirmPin, setConfirmPin] = useState(["", "", "", ""]);
-    // Stores error message if PIN confirmation fails
     const [error, setError] = useState("");
 
-    // DOM refs for the 4 PIN inputs in the "enter PIN" step.
-    // We keep these refs so the component can imperatively move focus between
-    // single-character fields (auto-advance on digit entry, move back on
-    // Backspace, and return focus to the first field when switching steps).
     const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
-    // DOM refs for the 4 PIN inputs in the "confirm PIN" step.
     const confirmInputRefs = useRef<(HTMLInputElement | null)[]>([]);
-    // Tracks pending delayed focus so we can cancel stale timers safely.
     const focusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    /**
-     * queueFocus clears any existing timer and schedules a new focus callback
-     * with setTimeout(fn, delay).
-     *
-     * When steps change, inputs are remounted, so an immediate .focus() can
-     * run too early. This helper waits briefly, then focuses the correct field.
-     */
+    // Step changes remount the inputs, so focus must wait for the next render.
     const queueFocus = useCallback((fn: () => void, delay: number) => {
         if (focusTimerRef.current) {
             clearTimeout(focusTimerRef.current);
@@ -399,7 +363,6 @@ const PinSetupDialog: React.FC<SetupDialogProps> = ({
         focusTimerRef.current = setTimeout(fn, delay);
     }, []);
 
-    // Cleanup function to clear the focusTimer when the component unmounts.
     useEffect(() => {
         return () => {
             if (focusTimerRef.current) {
@@ -434,26 +397,18 @@ const PinSetupDialog: React.FC<SetupDialogProps> = ({
         onClose();
     }, [resetState, onClose]);
 
-    // Sanitize input, write a digit, move focus forward, and reset the error.
     const handlePinDigitChange = (
         index: number,
         value: string,
         isConfirm: boolean,
     ) => {
-        // Removes every non-digit character and keeps only the last digit.
         const digit = value.replace(/\D/g, "").slice(-1);
-
-        /**
-         * If the confirmation step is active, update the confirmPin state;
-         * otherwise, update the pin state.
-         */
 
         if (isConfirm) {
             const next = [...confirmPin];
             next[index] = digit;
             setConfirmPin(next);
 
-            // If it's not the last index, advance focus automatically.
             if (digit && index < 3) {
                 confirmInputRefs.current[index + 1]?.focus();
             }
@@ -468,11 +423,6 @@ const PinSetupDialog: React.FC<SetupDialogProps> = ({
         setError("");
     };
 
-    /**
-     * Invoked on keypress. If the key is Backspace, use the active PIN array
-     * and, when the current box is empty and not the first one, move focus to
-     * the previous input.
-     */
     const handlePinKeyDown = (
         index: number,
         e: React.KeyboardEvent,
@@ -487,19 +437,11 @@ const PinSetupDialog: React.FC<SetupDialogProps> = ({
         }
     };
 
-    /**
-     * Invoked when the next button is pressed on the first step,
-     * checks if all digits are present, and proceeds to the confirm step.
-     */
     const handleNext = useCallback(() => {
         if (pin.some((d) => !d)) return;
         setStep("confirm");
     }, [pin]);
 
-    /**
-     * If Back is pressed in the confirmation step, reset the
-     * confirmation array and switch to the entry step.
-     */
     const handleBack = useCallback(() => {
         setStep("enter");
         setConfirmPin(["", "", "", ""]);
@@ -664,8 +606,6 @@ const PinSetupDialog: React.FC<SetupDialogProps> = ({
         </TitledMiniDialog>
     );
 };
-
-// -- Password Setup Dialog --
 
 const PasswordSetupDialog: React.FC<SetupDialogProps> = ({
     open,
@@ -870,8 +810,6 @@ const PasswordSetupDialog: React.FC<SetupDialogProps> = ({
         </TitledMiniDialog>
     );
 };
-
-// -- Auto-lock nested drawer --
 
 interface AutoLockOptionsDrawerProps extends NestedSidebarDrawerVisibilityProps {
     currentValue: number;

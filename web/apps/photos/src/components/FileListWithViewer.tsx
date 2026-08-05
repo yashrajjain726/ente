@@ -33,14 +33,7 @@ import {
 } from "./FileList";
 
 export type FileListWithViewerProps = {
-    /**
-     * The list of files to show.
-     */
     files: EnteFile[];
-    /**
-     * Additional source data for deriving Map View files. Defaults to using
-     * {@link files} directly.
-     */
     mapFileSource?: {
         collectionFiles: EnteFile[];
         favoriteFileIDs: Set<number>;
@@ -51,59 +44,22 @@ export type FileListWithViewerProps = {
     };
     enableDownload?: boolean;
     enableImageEditing?: boolean;
-    /**
-     * Called when the component wants to mark the given files as deleted in the
-     * the in-memory, unsynced, state maintained by the top level gallery.
-     *
-     * For more details, see {@link unsyncedFavoriteUpdates} in the gallery
-     * reducer's documentation.
-     */
     onMarkTempDeleted?: (files: EnteFile[]) => void;
-    /**
-     * Called when the visibility of the file viewer dialog changes.
-     */
     onSetOpenFileViewer?: (open: boolean) => void;
-    /**
-     * Called when an action in the file viewer requires us to perform a full
-     * pull from remote.
-     */
     onRemotePull: (opts?: RemotePullOpts) => Promise<void>;
     activeCollectionSummary?: CollectionSummary;
     activeCollection?: Collection;
-    /**
-     * If set, the file viewer will open to this file index on mount/update.
-     * Set to undefined after the navigation is complete.
-     */
     pendingFileIndex?: number;
-    /**
-     * The sidebar to open when navigating to a file from feed.
-     */
     pendingFileSidebar?: FileViewerInitialSidebar;
-    /**
-     * The comment ID to highlight when navigating from feed.
-     */
     pendingHighlightCommentID?: string;
-    /**
-     * Called after the pending navigation is consumed.
-     */
     onPendingNavigationConsumed?: () => void;
-    /**
-     * A function that can be used to create a UI notification to track the
-     * progress of user-initiated download, and to cancel it if needed.
-     */
     onAddSaveGroup: AddSaveGroup;
 
     onAddFileToCollection?: (
         file: EnteFile,
         sourceCollectionSummaryID?: number,
     ) => void;
-    /**
-     * Called when the list scrolls, providing the current scroll offset.
-     */
     onScroll?: (scrollOffset: number) => void;
-    /**
-     * Called when the visible date at the top of the viewport changes.
-     */
     onVisibleDateChange?: (date: string | undefined) => void;
 } & Pick<
     FileListProps,
@@ -147,11 +103,6 @@ export type FileListWithViewerProps = {
         | "onSelectPerson"
     >;
 
-/**
- * A list of files (represented by their thumbnails), along with a file viewer
- * that opens on activating the thumbnail (and also allows the user to navigate
- * through this list of files).
- */
 export const FileListWithViewer: React.FC<FileListWithViewerProps> = ({
     mode,
     modePlus,
@@ -227,7 +178,6 @@ export const FileListWithViewer: React.FC<FileListWithViewerProps> = ({
             : (colorSchemeMode ?? theme.palette.mode);
     const isDarkMode = resolvedMode === "dark";
 
-    // Handle pending navigation from feed item clicks
     useEffect(() => {
         if (pendingFileIndex !== undefined) {
             setCurrentIndex(pendingFileIndex);
@@ -245,7 +195,6 @@ export const FileListWithViewer: React.FC<FileListWithViewerProps> = ({
         onPendingNavigationConsumed,
     ]);
 
-    // Clear initial sidebar state when file viewer closes
     const handleCloseFileViewerInternal = useCallback(() => {
         setInitialSidebar(undefined);
         setHighlightCommentID(undefined);
@@ -486,9 +435,6 @@ const MapIcon = styled("img")<{ $isDarkMode: boolean }>(
     }),
 );
 
-/**
- * See: [Note: Timeline date string]
- */
 const fileTimelineDateString = (file: EnteFile) => {
     const date = fileCreationPhotoDate(file);
     return isSameDay(date, new Date())

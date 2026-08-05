@@ -139,63 +139,17 @@ import { Trans } from "react-i18next";
 import { SubscriptionCard } from "./SubscriptionCard";
 
 type SidebarProps = ModalVisibilityProps & {
-    /**
-     * Information about non-hidden collections and pseudo-collections.
-     *
-     * These are used to obtain data about the archive, hidden and trash
-     * "section" entries shown within the shortcut section of the sidebar.
-     */
     normalCollectionSummaries: CollectionSummaries;
-    /**
-     * The ID of the collection summary that should be shown when the user
-     * activates the "Uncategorized" section shortcut.
-     */
     uncategorizedCollectionSummaryID: number;
-
-    /**
-     * Option search-triggered sidebar action to perform
-     */
     pendingAction?: SidebarActionID;
-
-    /**
-     * Called after a pending sidebar action has been handled
-     */
     onActionHandled?: (actionID: SidebarActionID) => void;
-    /**
-     * Called when the plan selection modal should be shown.
-     */
     onShowPlanSelector: () => void;
-    /**
-     * Called when the collection summary with the given {@link collectionID}
-     * should be shown.
-     *
-     * @param collectionSummaryID The ID of the {@link CollectionSummary} to
-     * switch to.
-     *
-     * @param isHiddenCollectionSummary If `true`, then any reauthentication as
-     * appropriate before switching to the hidden section of the app is
-     * performed first before showing the collection summary.
-     *
-     * @return A promise that fullfills after any needed reauthentication has
-     * been peformed (The view transition might still be in progress).
-     */
     onShowCollectionSummary: (
         collectionSummaryID: number,
         isHiddenCollectionSummary?: boolean,
     ) => Promise<void>;
-    /**
-     * Called when the export dialog should be shown.
-     */
     onShowExport: () => void;
-    /**
-     * Called when the user should be authenticated again.
-     *
-     * This will be invoked before sensitive actions, and the action will only
-     * proceed if the promise returned by this function is fulfilled.
-     *
-     * On errors or if the user cancels the reauthentication, the promise will
-     * not settle.
-     */
+    // Cancellation or failure deliberately leaves this promise unsettled.
     onAuthenticateUser: () => Promise<void>;
 };
 
@@ -368,12 +322,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
         ],
     );
 
-    // Use refs for callbacks to prevent the effect from re-running when
-    // callback identities change. This is critical because closing the auth
-    // modal causes handleSidebarClose to get a new identity (it depends on
-    // authenticateUserVisibilityProps.open), which cascades to
-    // performSidebarAction, causing this effect to re-run while pendingAction
-    // is still set - reopening the modal.
+    // Closing auth changes these callback identities.
+    // Letting that restart the pending action effect would reopen auth.
     const performSidebarActionRef = useRef(performSidebarAction);
     const onActionHandledRef = useRef(onActionHandled);
     useEffect(() => {
@@ -747,7 +697,7 @@ const ShortcutSection: React.FC<ShortcutSectionProps> = ({
 
     const handleOpenHiddenSection = () =>
         void onShowCollectionSummary(PseudoCollectionID.hiddenItems, true)
-            // See: [Note: Workarounds for unactionable ARIA warnings]
+            // Let focus settle before closing to avoid aria-hidden warnings.
             .then(() => wait(10))
             .then(onCloseSidebar);
 
@@ -1389,17 +1339,8 @@ const LanguageSelector = () => {
         if (newLocale === locale) return;
 
         void setLocaleInUse(newLocale).then(() => {
-            // [Note: Changing locale causes a full reload]
-            //
-            // A full reload is needed because we use the global `t` instance
-            // instead of the useTranslation hook.
-            //
-            // We also rely on this behaviour by caching various formatters in
-            // module static variables that not get updated if the i18n.language
-            // changes unless there is a full reload.
-            //
-            // Mark this as a trusted app-initiated reload so desktop app-lock
-            // setup does not force an immediate lock screen.
+            // Global translations and cached formatters need a full reload.
+            // Trust it so desktop app lock does not immediately lock again.
             if (globalThis.electron) {
                 suppressAppLockRefreshFromSessionForTrustedReload();
             }
@@ -1426,9 +1367,6 @@ const LanguageSelector = () => {
     );
 };
 
-/**
- * Human readable name for each supported locale.
- */
 const localeName = (locale: SupportedLocale) => {
     switch (locale) {
         case "en-US":
@@ -1481,7 +1419,7 @@ const localeName = (locale: SupportedLocale) => {
 const ThemeSelector = () => {
     const { mode, setMode } = useColorScheme();
 
-    // During SSR, mode is always undefined.
+    // MUI color mode is undefined during SSR.
     if (!mode) return null;
 
     return (
@@ -1524,7 +1462,7 @@ const DomainSettings: React.FC<NestedSidebarDrawerVisibilityProps> = ({
     );
 };
 
-// Separate component to reset state on going back.
+// This component boundary resets form state on back navigation.
 const DomainSettingsContents: React.FC = () => {
     const { customDomain, customDomainCNAME } = useSettingsSnapshot();
 

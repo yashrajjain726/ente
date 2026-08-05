@@ -64,9 +64,7 @@ export interface FilePublicMagicMetadataData {
     dateTime?: string;
     // UTC offset of the place where the photo was taken. e.g. "+02:00".
     offsetTime?: string;
-    // Edits to the creationTime metadata field.
     editedTime?: number;
-    // Edits to the title metadata field.
     editedName?: string;
     w?: number;
     h?: number;
@@ -209,29 +207,22 @@ export interface ParsedMetadata {
     cameraModel?: string;
 }
 
-// Photos in the wild frequently have no UTC offset attached to their embedded
-// date/time, and users expect to see the time of the place where the photo was
-// taken (a New Year's Eve photo should show midnight regardless of the
-// viewer's timezone). So dates are kept as local date/time strings and must
-// not be treated as UTC instants, even when an offset is available; the offset
-// is retained only as extra context.
+// Photo dates often have no UTC offset.
+// Keep their wall-clock time local; offset is context, not display time.
 export interface ParsedMetadataDate {
     // A partial ISO 8601 date/time string guaranteed not to have a timezone
     // offset. e.g. "2023-08-23T18:03:00.000".
     dateTime: string;
     // A UTC offset of the form "±HH:mm" or "Z", when available.
     offset: string | undefined;
-    // Epoch microseconds derived from dateTime and offset. When offset is
-    // absent, dateTime is assumed to be in the timezone where this code runs,
-    // which is not always correct (e.g. vacation photos).
+    // Epoch microseconds. Without offset, this uses the current timezone.
     timestamp: number;
 }
 
 export const parseMetadataDate = (
     s: string,
 ): ParsedMetadataDate | undefined => {
-    // Milliseconds to epoch microseconds. Without an offset in s, Date parses
-    // it in the current timezone.
+    // Date uses the current timezone when s has no offset.
     const timestamp = new Date(s).getTime() * 1000;
     if (isNaN(timestamp)) return undefined;
 
@@ -246,18 +237,12 @@ export const parseMetadataDate = (
         sWithoutOffset = s;
     }
 
-    // Browsers parse partial ISO 8601 strings even though that is not
-    // standard. When the offset is absent, they parse date-only forms as UTC
-    // but date-time forms as local time; see
-    // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Date#date_time_string_format
-    // Appending "Z" to strings longer than "yyyy-mm-dd" (10 characters) forces
-    // UTC for both forms, so toISOString below returns the same value back.
+    // Browsers parse date-only forms as UTC but date-time forms as local.
+    // Force date-time forms through UTC so both canonicalize the same way.
     const date = new Date(
         sWithoutOffset + (sWithoutOffset.length <= 10 ? "" : "Z"),
     );
 
-    // toISOString is always UTC with a trailing "Z"; dropping the "Z" gives
-    // the canonical offset-less form.
     const dateTime = dropLast(date.toISOString());
 
     return { dateTime, offset, timestamp };

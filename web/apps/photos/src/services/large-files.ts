@@ -9,55 +9,23 @@ import {
 import { savedCollectionFiles } from "ente-new/photos/services/photos-fdb";
 import { pullFiles } from "./pull";
 
-/**
- * Minimum file size (in bytes) to be considered a "large" file.
- *
- * This matches the mobile implementation: 10 MB.
- */
+// Keep the 10 MB threshold aligned with mobile.
 export const MIN_LARGE_FILE_SIZE = 10 * 1024 * 1024;
 
-/**
- * Filter type for large files.
- */
 export type LargeFileFilter = "all" | "photos" | "videos";
 
-/**
- * A large file as shown in the UI.
- */
 export interface LargeFileItem {
-    /**
-     * A nanoid for this item.
-     *
-     * This can be used as the key when rendering the item in a list.
-     */
     id: string;
-    /**
-     * The underlying file.
-     */
     file: EnteFile;
-    /**
-     * The size of the file in bytes.
-     */
     size: number;
-    /**
-     * `true` if the user has marked this item for deletion.
-     */
     isSelected: boolean;
 }
 
-/**
- * Find files larger than {@link MIN_LARGE_FILE_SIZE} in the user's library.
- *
- * @param filter The type of files to include (all, photos, or videos).
- *
- * @returns An array of {@link LargeFileItem} sorted by file size (descending).
- */
 export const findLargeFiles = async (
     filter: LargeFileFilter,
 ): Promise<LargeFileItem[]> => {
     const userID = ensureLocalUser().id;
 
-    // Get collections owned by the user.
     const normalCollections = await savedNormalCollections();
     const normalOwnedCollections = normalCollections.filter(
         ({ owner }) => owner.id === userID,
@@ -66,29 +34,21 @@ export const findLargeFiles = async (
         normalOwnedCollections.map(({ id }) => id),
     );
 
-    // Get all collection files.
     const collectionFiles = await savedCollectionFiles();
 
-    // Track files we've already added (by file ID) to avoid duplicates
-    // when the same file exists in multiple collections.
     const seenFileIDs = new Set<number>();
     const largeFiles: LargeFileItem[] = [];
 
     for (const file of collectionFiles) {
-        // Skip files not in allowed collections.
         if (!allowedCollectionIDs.has(file.collectionID)) continue;
 
-        // Skip files not owned by the user.
         if (file.ownerID !== userID) continue;
 
-        // Skip files already processed (same file in different collection).
         if (seenFileIDs.has(file.id)) continue;
 
-        // Get file size.
         const size = file.info?.fileSize;
         if (!size || size < MIN_LARGE_FILE_SIZE) continue;
 
-        // Apply filter.
         if (!matchesFilter(file, filter)) continue;
 
         seenFileIDs.add(file.id);
@@ -96,15 +56,11 @@ export const findLargeFiles = async (
         largeFiles.push({ id: newID("lf_"), file, size, isSelected: false });
     }
 
-    // Sort by size descending (largest first).
     largeFiles.sort((a, b) => b.size - a.size);
 
     return largeFiles;
 };
 
-/**
- * Check if a file matches the given filter.
- */
 const matchesFilter = (file: EnteFile, filter: LargeFileFilter): boolean => {
     switch (filter) {
         case "all":
@@ -119,14 +75,6 @@ const matchesFilter = (file: EnteFile, filter: LargeFileFilter): boolean => {
     }
 };
 
-/**
- * Delete selected large files by moving them to trash.
- *
- * @param largeFiles The list of large file items.
- * @param onProgress A function called with progress percentage (0-100).
- *
- * @returns A set of IDs of the items that were deleted.
- */
 export const deleteSelectedLargeFiles = async (
     largeFiles: LargeFileItem[],
     onProgress: (progress: number) => void,
@@ -139,69 +87,33 @@ export const deleteSelectedLargeFiles = async (
     }
 
     let completedSteps = 0;
-    const totalSteps = 2; // trash + sync
+    const totalSteps = 2;
     const tickProgress = () =>
         onProgress((completedSteps++ / totalSteps) * 100);
 
-    // Move files to trash.
     await moveToTrash(filesToTrash);
     tickProgress();
 
-    // Sync local state.
     await pullFiles();
     tickProgress();
 
     return new Set(selectedItems.map((item) => item.id));
 };
 
-/**
- * Sort order for large files list.
- */
 export type SortOrder = "desc" | "asc";
 
-/**
- * State for the large files page.
- */
 export interface LargeFilesState {
-    /** Status of the analysis ("loading") process. */
     analysisStatus: undefined | "started" | "failed" | "completed";
-    /**
-     * List of large files.
-     *
-     * These are sorted by file size based on sortOrder.
-     */
     largeFiles: LargeFileItem[];
-    /**
-     * The current filter for file types.
-     */
     filter: LargeFileFilter;
-    /**
-     * The current sort order (descending = largest first, ascending = smallest first).
-     */
     sortOrder: SortOrder;
-    /**
-     * The number of files currently selected for deletion.
-     */
     selectedCount: number;
-    /**
-     * The total size (in bytes) of files currently selected for deletion.
-     */
     selectedSize: number;
-    /**
-     * If a deletion is in progress, this will indicate its progress
-     * percentage (a number between 0 and 100).
-     */
     deleteProgress: number | undefined;
-    /**
-     * Set of selected file IDs (the underlying EnteFile.id).
-     * Used to persist selection across filter changes.
-     */
+    // Persists selection across filters.
     selectedFileIDs: Set<number>;
 }
 
-/**
- * Actions for the large files reducer.
- */
 export type LargeFilesAction =
     | { type: "analyze" }
     | { type: "analysisFailed" }
@@ -216,9 +128,6 @@ export type LargeFilesAction =
     | { type: "deleteFailed" }
     | { type: "deleteCompleted"; removedIDs: Set<string> };
 
-/**
- * Initial state for the large files reducer.
- */
 export const largeFilesInitialState: LargeFilesState = {
     analysisStatus: undefined,
     largeFiles: [],
@@ -230,9 +139,6 @@ export const largeFilesInitialState: LargeFilesState = {
     selectedFileIDs: new Set(),
 };
 
-/**
- * Reducer for the large files page state.
- */
 export const largeFilesReducer = (
     state: LargeFilesState,
     action: LargeFilesAction,
@@ -243,13 +149,11 @@ export const largeFilesReducer = (
         case "analysisFailed":
             return { ...state, analysisStatus: "failed" };
         case "analysisCompleted": {
-            // Restore selection state from selectedFileIDs
             const selectedFileIDs = state.selectedFileIDs;
             const filesWithSelection = action.largeFiles.map((item) => ({
                 ...item,
                 isSelected: selectedFileIDs.has(item.file.id),
             }));
-            // Sort according to current sort order (findLargeFiles always returns desc)
             const largeFiles = sortedCopyOfLargeFiles(
                 filesWithSelection,
                 state.sortOrder,
@@ -266,15 +170,13 @@ export const largeFilesReducer = (
         }
 
         case "changeFilter": {
-            // No-op if filter hasn't actually changed
             if (action.filter === state.filter) {
                 return state;
             }
-            // Block filter changes during deletion to prevent state corruption
+            // Do not change the visible set during deletion.
             if (state.deleteProgress !== undefined) {
                 return state;
             }
-            // Preserve selectedFileIDs when filter changes
             return {
                 ...largeFilesInitialState,
                 filter: action.filter,
@@ -284,7 +186,7 @@ export const largeFilesReducer = (
         }
 
         case "changeSortOrder": {
-            // Block sort order changes during deletion
+            // Do not change the visible set during deletion.
             if (state.deleteProgress !== undefined) {
                 return state;
             }
@@ -298,17 +200,14 @@ export const largeFilesReducer = (
 
         case "toggleSelection": {
             const index = action.index;
-            // Bounds check to prevent crashes
             if (index < 0 || index >= state.largeFiles.length) {
                 return state;
             }
             const item = state.largeFiles[index]!;
             const newIsSelected = !item.isSelected;
-            // Create new array with immutably updated item
             const largeFiles = state.largeFiles.map((file, i) =>
                 i === index ? { ...file, isSelected: newIsSelected } : file,
             );
-            // Update selectedFileIDs
             const selectedFileIDs = new Set(state.selectedFileIDs);
             if (newIsSelected) {
                 selectedFileIDs.add(item.file.id);
@@ -327,8 +226,6 @@ export const largeFilesReducer = (
         }
 
         case "deselectAll": {
-            // Only deselect currently visible items, preserve selections for
-            // items not in the current filtered view
             const visibleFileIDs = new Set(
                 state.largeFiles.map((item) => item.file.id),
             );
@@ -352,8 +249,6 @@ export const largeFilesReducer = (
         }
 
         case "selectAll": {
-            // Add currently visible items to selection, preserve existing
-            // selections from other filtered views
             const largeFiles = state.largeFiles.map((item) => ({
                 ...item,
                 isSelected: true,
@@ -383,7 +278,6 @@ export const largeFilesReducer = (
             return { ...state, deleteProgress: undefined };
 
         case "deleteCompleted": {
-            // Single pass: filter files and collect removed file IDs
             const largeFiles: LargeFileItem[] = [];
             const removedFileIDs = new Set<number>();
             for (const item of state.largeFiles) {
@@ -393,7 +287,6 @@ export const largeFilesReducer = (
                     largeFiles.push(item);
                 }
             }
-            // Filter selectedFileIDs removing deleted ones
             const selectedFileIDs = new Set<number>();
             for (const id of state.selectedFileIDs) {
                 if (!removedFileIDs.has(id)) {

@@ -25,13 +25,8 @@ export interface DownloadAndSaveFilesWebOpts {
     isHiddenCollectionSummary?: boolean;
 }
 
-/**
- * Download limits optimized for different devices and browsers.
- */
 interface DownloadLimits {
-    /** Number of concurrent file downloads. */
     concurrency: number;
-    /** Maximum size of a ZIP batch in bytes. */
     maxZipSize: number;
 }
 
@@ -51,12 +46,6 @@ const createJSZip = async (): Promise<JSZip> => {
     return new JSZipConstructor();
 };
 
-/**
- * Get download limits for the current device.
- *
- * - Mobile devices: 4 concurrent, 100MB max
- * - Desktop: 8 concurrent, 250MB max
- */
 const getDownloadLimits = (): DownloadLimits => {
     if (cachedLimits) return cachedLimits;
 
@@ -71,8 +60,8 @@ const getDownloadLimits = (): DownloadLimits => {
         (ua.includes("macintosh") && navigator.maxTouchPoints > 1);
 
     cachedLimits = isMobile
-        ? { concurrency: 4, maxZipSize: 100 * 1024 * 1024 } // 100MB
-        : { concurrency: 8, maxZipSize: 250 * 1024 * 1024 }; // 250MB
+        ? { concurrency: 4, maxZipSize: 100 * 1024 * 1024 }
+        : { concurrency: 8, maxZipSize: 250 * 1024 * 1024 };
 
     return cachedLimits;
 };
@@ -105,7 +94,6 @@ export const downloadAndSaveFilesWeb = async ({
 }: DownloadAndSaveFilesWebOpts) => {
     const total = files.length;
     if (!files.length) {
-        // Nothing to download.
         assertionFailed();
         return;
     }
@@ -122,9 +110,7 @@ export const downloadAndSaveFilesWeb = async ({
     const failedFiles: EnteFile[] = [];
     let isDownloading = false;
     let updateSaveGroup: UpdateSaveGroup = () => undefined;
-    // Track the next ZIP batch index across retries so part numbers continue
-    // sequentially (e.g., if initial download creates Parts 1-5 and fails,
-    // retry creates Part 6+ instead of starting over at Part 1).
+    // Retries continue part numbering instead of overwriting earlier ZIPs.
     let nextZipBatchIndex = 1;
 
     const downloadFilesWeb = async (
@@ -133,7 +119,6 @@ export const downloadAndSaveFilesWeb = async ({
     ) => {
         if (!filesToDownload.length || isDownloading) return;
 
-        // Reset counts first if this is a retry, before any other logic
         if (resetFailedCount) {
             updateSaveGroup((g) => ({
                 ...g,
@@ -143,7 +128,6 @@ export const downloadAndSaveFilesWeb = async ({
             failedFiles.length = 0;
         }
 
-        // If already offline, mark all files as failed so retry is available
         if (!navigator.onLine) {
             log.info("Download skipped - network is offline");
             for (const file of filesToDownload) {
@@ -158,13 +142,11 @@ export const downloadAndSaveFilesWeb = async ({
         }
 
         isDownloading = true;
-        // Only clear on first download, not retry (already cleared above)
         if (!resetFailedCount) {
             failedFiles.length = 0;
         }
 
         try {
-            // Single non-live-photo file: download directly without zipping
             const singleFile = filesToDownload[0];
             if (
                 filesToDownload.length === 1 &&
@@ -183,7 +165,6 @@ export const downloadAndSaveFilesWeb = async ({
                     updateSaveGroup((g) => ({ ...g, failed: g.failed + 1 }));
                 }
             } else {
-                // Multiple files or live photo: use ZIP
                 nextZipBatchIndex = await saveAsZip(
                     downloader,
                     filesToDownload,
@@ -234,10 +215,6 @@ export const downloadAndSaveFilesWeb = async ({
     await downloadFilesWeb(files);
 };
 
-/**
- * A helper class to accumulate files into ZIP batches and download them when
- * the batch size limit is reached.
- */
 class ZipBatcher {
     private zipPromise = createJSZip();
     private currentBatchSize = 0;
@@ -266,34 +243,22 @@ class ZipBatcher {
         this.includePartNumber = includePartNumber || startingBatchIndex > 1;
     }
 
-    /**
-     * Get the next batch index that would be used for the next ZIP file.
-     * This is useful for tracking progress across retries.
-     */
     getNextBatchIndex(): number {
         return this.batchIndex;
     }
 
-    /**
-     * Add file data to the current ZIP batch. If adding this file would exceed
-     * the batch size limit, the current batch is downloaded first.
-     */
     async addFile(data: Uint8Array | Blob, fileName: string): Promise<void> {
         const size = data instanceof Blob ? data.size : data.byteLength;
 
-        // If adding this file would exceed the limit and we have files in the
-        // batch, download the current batch first.
         if (
             this.currentBatchSize > 0 &&
             this.currentBatchSize + size > this.maxZipSize
         ) {
             this.includePartNumber = true;
             await this.downloadCurrentBatch();
-            // Notify that we're now preparing a new part
             this.onStateChange?.(false, this.batchIndex);
         }
 
-        // Ensure unique file names within the ZIP
         const uniqueName = this.getUniqueName(fileName);
         this.usedNames.add(uniqueName);
         const zip = await this.zipPromise;
@@ -302,9 +267,6 @@ class ZipBatcher {
         this.currentFileCount++;
     }
 
-    /**
-     * Download any remaining files in the current batch.
-     */
     async flush(): Promise<void> {
         if (this.currentBatchSize > 0) {
             await this.downloadCurrentBatch();
@@ -335,7 +297,6 @@ class ZipBatcher {
             this.onStateChange?.(false, this.batchIndex);
         }
 
-        // Reset for next batch
         this.zipPromise = createJSZip();
         this.currentBatchSize = 0;
         this.currentFileCount = 0;
@@ -343,10 +304,6 @@ class ZipBatcher {
         this.batchIndex++;
     }
 
-    /**
-     * Generate a unique file name within the ZIP by appending a suffix if the
-     * name already exists.
-     */
     private getUniqueName(fileName: string): string {
         if (!this.usedNames.has(fileName)) {
             return fileName;
@@ -366,7 +323,6 @@ class ZipBatcher {
     }
 }
 
-/** Result of downloading and processing a single file for ZIP inclusion. */
 type DownloadedFileData =
     | { type: "regular"; fileName: string; data: Uint8Array }
     | {
@@ -377,9 +333,6 @@ type DownloadedFileData =
           videoData: Uint8Array;
       };
 
-/**
- * Download and process a single file, returning the data ready for ZIP.
- */
 const downloadFileForZip = async (
     downloader: BrowserSaveDownloader,
     file: EnteFile,
@@ -403,21 +356,6 @@ const downloadFileForZip = async (
     }
 };
 
-/**
- * Save multiple files as ZIP archives to the user's download folder.
- *
- * Files are batched into ZIPs using device-specific size limits. If the total
- * exceeds that limit, multiple ZIP files will be downloaded. Downloads are
- * performed concurrently for better performance.
- *
- * @param files The files to download and add to the ZIP.
- * @param baseName The base name for the ZIP file(s).
- * @param onSuccess Callback invoked after each file is successfully added.
- * @param onError Callback invoked when a file fails to download.
- * @param canceller An AbortController to check for cancellation.
- * @param startingBatchIndex The batch index to start from (for retries).
- * @returns The next batch index to use for subsequent ZIPs (useful for retries).
- */
 const saveAsZip = async (
     downloader: BrowserSaveDownloader,
     files: EnteFile[],
@@ -443,15 +381,10 @@ const saveAsZip = async (
         includePartNumber,
     );
 
-    // Set initial part number
     updateSaveGroup((g) => ({ ...g, currentPart: startingBatchIndex }));
 
-    // Queue of files to process
     let fileIndex = 0;
 
-    // Track if we've gone offline to stop processing immediately.
-    // Using an object so the value can be mutated by event handlers and
-    // checked synchronously by the async workers.
     const networkState = { isOffline: !navigator.onLine };
     const handleOffline = () => {
         networkState.isOffline = true;
@@ -462,8 +395,7 @@ const saveAsZip = async (
     window.addEventListener("offline", handleOffline);
     window.addEventListener("online", handleOnline);
 
-    // Mutex for serializing ZIP additions (download is concurrent, but adding
-    // to the ZIP must be serialized to avoid race conditions with batching)
+    // Downloads run concurrently; ZIP mutation must stay serial.
     let zipMutex: Promise<void> = Promise.resolve();
     const withZipLock = async <T>(fn: () => Promise<T>): Promise<T> => {
         const prev = zipMutex;
@@ -477,14 +409,11 @@ const saveAsZip = async (
         }
     };
 
-    // Process a single file: download, then add to ZIP
     const processFile = async (): Promise<boolean> => {
-        // Stop immediately if offline or cancelled
         if (networkState.isOffline || canceller.signal.aborted) {
             return false;
         }
 
-        // Get next file to process
         const currentIndex = fileIndex++;
         if (currentIndex >= files.length) {
             return false;
@@ -492,18 +421,15 @@ const saveAsZip = async (
 
         const file = files[currentIndex]!;
         try {
-            // Check again before starting download (value can change via event handler)
+            // Event handlers can change this between awaits.
             // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
             if (networkState.isOffline) {
-                // Put this file back for retry
                 onError(file, new Error("Network offline"));
                 return false;
             }
 
-            // Download happens concurrently
             const downloadedData = await downloadFileForZip(downloader, file);
 
-            // Adding to ZIP is serialized via mutex
             await withZipLock(async () => {
                 if (downloadedData.type === "livePhoto") {
                     await batcher.addFile(
@@ -523,15 +449,14 @@ const saveAsZip = async (
             });
             onSuccess();
         } catch (e) {
-            // Individual file failed - mark it for retry but continue with others
-            // Only log non-network errors to avoid log spam when offline
+            // Event handlers can change this during the download.
             // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
             if (!networkState.isOffline) {
                 log.error(`Failed to download file ${file.id}, skipping`, e);
             }
             onError(file, e);
 
-            // Only stop all processing if we went offline (not for individual failures)
+            // Event handlers can change this during the download.
             // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
             if (networkState.isOffline) {
                 updateSaveGroup((g) => ({
@@ -540,33 +465,28 @@ const saveAsZip = async (
                 }));
                 return false;
             }
-            // Mark as file error for individual failures
             updateSaveGroup((g) => ({
                 ...g,
                 failureReason: g.failureReason ?? "file_error",
             }));
-            // Continue processing remaining files even if this one failed
         }
 
         return true;
     };
 
-    // Worker that continuously processes files until done
     const worker = async (): Promise<void> => {
         while (await processFile()) {
-            // Continue processing
+            // Continue processing.
         }
     };
 
     try {
-        // Start concurrent workers
         const workers = Array.from(
             { length: Math.min(concurrency, files.length) },
             () => worker(),
         );
         await Promise.all(workers);
 
-        // If we went offline, mark remaining files as failed
         if (networkState.isOffline) {
             updateSaveGroup((g) => ({
                 ...g,
@@ -580,14 +500,12 @@ const saveAsZip = async (
             }
         }
 
-        // Flush whatever we have (even partial) unless cancelled
         if (!canceller.signal.aborted) {
             await batcher.flush();
         }
 
         return batcher.getNextBatchIndex();
     } finally {
-        // Clean up event listeners
         window.removeEventListener("offline", handleOffline);
         window.removeEventListener("online", handleOnline);
     }

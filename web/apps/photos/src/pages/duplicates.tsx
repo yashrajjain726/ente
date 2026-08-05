@@ -139,37 +139,11 @@ export default Page;
 type SortOrder = "prunableCount" | "prunableSize";
 
 interface DedupState {
-    /** Status of the analysis ("loading") process. */
     analysisStatus: undefined | "started" | "failed" | "completed";
-    /**
-     * Groups of duplicates.
-     *
-     * These are groups of files that our algorithm has detected as exact
-     * duplicates, augmented with UI state and various cached properties to make
-     * them more amenable to be directly used by the UI component.
-     *
-     * These are sorted in order of display, reflecting the {@link sortType}
-     * user preference.
-     */
     duplicateGroups: DuplicateGroup[];
-    /**
-     * The attribute to use for sorting {@link duplicateGroups}.
-     */
     sortOrder: SortOrder;
-    /**
-     * The number of files that will be pruned if the user decides to dedup the
-     * current selection.
-     */
     prunableCount: number;
-    /**
-     * The size (in bytes) that can be saved if the user decides to dedup the
-     * current selection.
-     */
     prunableSize: number;
-    /**
-     * If a dedupe is in progress, then this will indicate its progress
-     * percentage (a number between 0 and 100).
-     */
     dedupeProgress: number | undefined;
 }
 
@@ -275,12 +249,6 @@ const dedupReducer: React.Reducer<DedupState, DedupAction> = (
     }
 };
 
-/**
- * Return a copy of the given {@link duplicateGroups}, also sorting them as per
- * the given {@link sortOrder}.
- *
- * Helper method for the reducer.
- */
 const sortedCopyOfDuplicateGroups = (
     duplicateGroups: DuplicateGroup[],
     sortOrder: DedupState["sortOrder"],
@@ -291,7 +259,6 @@ const sortedCopyOfDuplicateGroups = (
             : b.prunableCount - a.prunableCount,
     );
 
-/** Helper method for the reducer. */
 const deducePrunableCountAndSize = (duplicateGroups: DuplicateGroup[]) => {
     const prunableCount = duplicateGroups.reduce(
         (sum, { prunableCount, isSelected }) =>
@@ -307,18 +274,8 @@ const deducePrunableCountAndSize = (duplicateGroups: DuplicateGroup[]) => {
 };
 
 interface NavbarProps {
-    /**
-     * The current sort order.
-     */
     sortOrder: SortOrder;
-    /**
-     * Called when the user changes the sort order using the sort order menu
-     * visible via the navbar.
-     */
     onChangeSortOrder: (sortOrder: SortOrder) => void;
-    /**
-     * Called when the user selects the deselect all option.
-     */
     onDeselectAll: () => void;
 }
 
@@ -339,7 +296,12 @@ const Navbar: React.FC<NavbarProps> = ({
                 borderBottom: `1px solid ${theme.vars.palette.divider}`,
             })}
         >
-            <Box sx={{ minWidth: "100px" /* 2 icons + gap */ }}>
+            <Box
+                sx={{
+                    // Match the two right-side icons and their gap.
+                    minWidth: "100px",
+                }}
+            >
                 <IconButton onClick={router.back}>
                     <ArrowBackIcon />
                 </IconButton>
@@ -450,26 +412,10 @@ const Duplicates: React.FC<DuplicatesProps> = ({
 );
 
 interface DuplicatesListProps {
-    /**
-     * The width (px) that the list should size itself to.
-     */
     width: number;
-    /**
-     * The height (px) that the list should size itself to.
-     */
     height: number;
-    /**
-     * Groups of duplicates. Guaranteed to be non-empty.
-     */
     duplicateGroups: DuplicateGroup[];
-    /**
-     * The current {@link SortOrder} that is being used for sorting {@link duplicateGroups}.
-     */
     sortOrder: SortOrder;
-    /**
-     * Called when the user toggles the selection for the duplicate group at the
-     * given {@link index}.
-     */
     onToggleSelection: (index: number) => void;
 }
 
@@ -493,10 +439,7 @@ const DuplicatesList: React.FC<DuplicatesListProps> = ({
     const itemData = { layoutParams, duplicateGroups, onToggleSelection };
     const itemCount = duplicateGroups.length;
     const itemSize = (index: number) => {
-        // The height of the header is driven by the height of the Checkbox,
-        // which is 42px high, and the divider, which is 1px. The rest of the
-        // height comes from the fixed paddings, margins on the header, the
-        // divider, and on the row itself.
+        // 42px checkbox + 1px divider + the surrounding fixed spacing.
         const fixedHeight = 24 + 42 + 4 + 1 + 20 + 16;
 
         const duplicateGroup = duplicateGroups[index]!;
@@ -510,9 +453,7 @@ const DuplicatesList: React.FC<DuplicatesListProps> = ({
     const itemKey = (index: number, itemData: DuplicatesListItemData) =>
         itemData.duplicateGroups[index]!.id;
 
-    // Derive a key based on aspects whose change should cause the list to be
-    // recreated. This is the easiest way I've found to get react-window to
-    // invalidate `itemSize` values when, say, the width changes.
+    // Remount to invalidate react-window's cached item sizes.
     const key = `${width}-${sortOrder}`;
 
     return (
@@ -534,9 +475,6 @@ const ListItem: React.FC<ListChildComponentProps<DuplicatesListItemData>> =
     memo(({ index, style, data }) => {
         const { layoutParams, duplicateGroups, onToggleSelection } = data;
 
-        // For smaller screens, hide to divider to reduce visual noise. For
-        // larger screens, the divider is helpful in guiding the user's eyes to
-        // the checkbox which is otherwise at the right end of the header.
         const hideDivider = layoutParams.isSmallerLayout;
 
         const duplicateGroup = duplicateGroups[index]!;
@@ -566,7 +504,6 @@ const ListItem: React.FC<ListChildComponentProps<DuplicatesListItemData>> =
                     >
                         {t("duplicate_group_description", { count, itemSize })}
                     </Typography>
-                    {/* The size of this Checkbox is 42px. */}
                     <Checkbox {...{ checked, onChange }} />
                 </SpacedRow>
                 <Divider
@@ -612,12 +549,7 @@ const ItemGrid = styled("div", {
 type DeduplicateButtonProps = Pick<
     DedupState,
     "prunableCount" | "prunableSize" | "dedupeProgress"
-> & {
-    /**
-     * Called when the user presses the button to remove duplicates.
-     */
-    onRemoveDuplicates: () => void;
-};
+> & { onRemoveDuplicates: () => void };
 
 const DeduplicateButton: React.FC<DeduplicateButtonProps> = ({
     prunableCount,
@@ -633,8 +565,7 @@ const DeduplicateButton: React.FC<DeduplicateButtonProps> = ({
         <Stack
             sx={{
                 gap: 1,
-                // Prevent a layout shift by giving a minHeight that is larger
-                // than all expected states.
+                // Reserve space for every button state.
                 minHeight: "45px",
                 justifyContent: "center",
                 flex: 1,
