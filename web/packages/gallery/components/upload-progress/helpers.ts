@@ -121,10 +121,5 @@ export const uploadCountsText = ({
         : uploadStatusText(uploadPhase);
 };
 
-/**
- *
- * @param value The upload percent which has decimal places
- * @returns The value with the decimal places rounded.
- */
 export const normalizePercent = (value: number) =>
     Math.min(100, Math.max(0, Math.round(value || 0)));

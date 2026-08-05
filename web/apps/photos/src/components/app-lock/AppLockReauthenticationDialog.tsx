@@ -1,7 +1,3 @@
-/**
- * @file Reauthentication dialog for app-lock protected actions.
- */
-
 import { Box, Modal } from "@mui/material";
 import { useAppLockSnapshot } from "ente-new/photos/components/utils/use-snapshot";
 import { t } from "i18next";

@@ -53,7 +53,7 @@ export const fetchFile = async (fileID: number, kind: FileKind) => {
         return response;
     }
 
-    // migration : 3 aug 2026
+    // TODO: Remove this legacy endpoint after the v3 migration window.
     const token = await ensureAuthToken();
     return fetch(
         await apiURL(`/files/${legacyFilePath(kind)}/${fileID}`, { token }),

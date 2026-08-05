@@ -5,9 +5,6 @@ import { apiURL } from "ente-base/origins";
 import type { Collection } from "ente-media/collection";
 import { z } from "zod";
 
-/**
- * Revoke all existing outstanding cast tokens for the current user on remote.
- */
 export const revokeAllCastTokens = async () =>
     ensureOk(
         await fetch(await apiURL("/cast/revoke-all-tokens"), {
@@ -16,11 +13,6 @@ export const revokeAllCastTokens = async () =>
         }),
     );
 
-/**
- * Fetch the public key (represented as a base64 string) associated with the
- * given device / pairing {@link code} from remote, or `undefined` if there is
- * no public key associated with the given code.
- */
 const publicKeyForPairingCode = async (code: string) => {
     const res = await fetch(await apiURL(`/cast/device-info/${code}`), {
         headers: await authenticatedRequestHeaders(),
@@ -31,32 +23,18 @@ const publicKeyForPairingCode = async (code: string) => {
         .publicKey;
 };
 
+// AlbumCastDialog matches this exact message.
 export const unknownDeviceCodeErrorMessage = "Unknown device code";
 
-/**
- * Publish encrypted payload for a cast session so that the paired device can
- * obtain the information it needs to cast a collection.
- *
- * If no device was found for the given {@link deviceCode}, then this function
- * will throw an error with the message
- * @param deviceCode The PIN / device code that the user entered to pair with
- * the casting end.
- *
- * @param collection The collection that the user wants to cast.
- */
 export const publishCastPayload = async (
     deviceCode: string,
     collection: Collection,
 ) => {
-    // Find out the public key associated with the given pairing code (if
-    // indeed a device has published one).
     const publicKey = await publicKeyForPairingCode(deviceCode);
     if (!publicKey) throw new Error(unknownDeviceCodeErrorMessage);
 
-    // Generate random id.
     const castToken = newID("cast_");
 
-    // Publish the payload so that the other end can use it.
     const payload = JSON.stringify({
         castToken,
         collectionID: collection.id,

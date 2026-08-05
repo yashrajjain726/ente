@@ -5,15 +5,6 @@ import { logUnhandledErrorsAndRejections } from "ente-base/log-web";
 import { useRouter } from "next/router";
 import { useCallback, useEffect, useState } from "react";
 
-/**
- * A hook that initializes the localization library that we use.
- *
- * This is only meant to be called from the top level `_app.tsx`, as this
- * initialization is intended to happen only once for the lifetime of the app.
- *
- * @returns a boolean which will be set to true when the localized strings have
- * been loaded.
- */
 export const useSetupI18n = () => {
     const [isI18nReady, setIsI18nReady] = useState(false);
 
@@ -25,18 +16,9 @@ export const useSetupI18n = () => {
 };
 
 interface SetupLoggingOptions {
-    /** If true, then the logs will not be saved to local storage. */
     disableDiskLogs?: boolean;
 }
 
-/**
- * A hook that initializes the logging subsystem.
- *
- * This is only meant to be called from the top level `_app.tsx`, as this
- * initialization is intended to happen only once for the lifetime of the app.
- *
- * @param opts Optional {@link SetupLoggingOptions} to customize the setup.
- */
 export const useSetupLogs = (opts?: SetupLoggingOptions) => {
     useEffect(() => {
         if (opts?.disableDiskLogs) disableDiskLogs();
@@ -45,12 +27,6 @@ export const useSetupLogs = (opts?: SetupLoggingOptions) => {
     }, []);
 };
 
-/**
- * A hook that keeps track of whether or not we are in the middle of a Next.js
- * route change.
- *
- * The top level app component uses this to show a loading indicator.
- */
 export const useIsRouteChangeInProgress = () => {
     const router = useRouter();
     const [loading, setLoading] = useState(false);
@@ -79,11 +55,6 @@ export const useIsRouteChangeInProgress = () => {
     return loading;
 };
 
-/**
- * A React hook for simplifying the provisioning of a {@link showNotification}
- * function to inject in app contexts, and of the other props that are needed to
- * be passed to the {@link Notification}.
- */
 export const useNotification = () => {
     const [attributes, setAttributes] = useState<
         NotificationAttributes | undefined

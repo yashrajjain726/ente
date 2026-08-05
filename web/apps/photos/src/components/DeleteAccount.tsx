@@ -25,12 +25,6 @@ import React, { useState } from "react";
 import { Trans } from "react-i18next";
 
 type DeleteAccountProps = ModalVisibilityProps & {
-    /**
-     * Called when the user should be authenticated again.
-     *
-     * Account deletion only proceeds if the promise returned by this function
-     * is fulfilled.
-     */
     onAuthenticateUser: () => Promise<void>;
 };
 
@@ -44,11 +38,7 @@ export const DeleteAccount: React.FC<DeleteAccountProps> = ({
     </TitledMiniDialog>
 );
 
-/**
- * The contents of the {@link DeleteAccount} dialog.
- *
- * See: [Note: MUI dialog state] for why this is a separate component.
- */
+// Keep state in the dialog subtree so closing it resets the form.
 const DeleteAccountDialogContents: React.FC<
     Omit<DeleteAccountProps, "open">
 > = ({ onClose, onAuthenticateUser }) => {
@@ -209,10 +199,7 @@ const DeleteAccountDialogContents: React.FC<
     );
 };
 
-/**
- * All of these must have a corresponding localized string nested under the
- * "delete_reason" key.
- */
+// Each value must have a delete_reason translation.
 const deleteReasons = [
     "missing_feature",
     "behaviour",

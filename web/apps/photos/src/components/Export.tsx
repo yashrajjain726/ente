@@ -56,19 +56,9 @@ import {
 } from "react-window";
 
 type ExportProps = ModalVisibilityProps & {
-    /**
-     * A map from collection IDs to their user visible name.
-     *
-     * It will contain entries for all collections (both normal and hidden).
-     */
     collectionNameByID: Map<number, string>;
 };
 
-/**
- * A dialog that allows the user to view and manage the export of their data.
- *
- * Available only in the desktop app (export requires direct disk access).
- */
 export const Export: React.FC<ExportProps> = ({
     open,
     onClose,
@@ -85,7 +75,6 @@ export const Export: React.FC<ExportProps> = ({
         failed: 0,
         total: 0,
     });
-    // The list of EnteFiles that have not been exported yet.
     const [pendingFiles, setPendingFiles] = useState<EnteFile[]>([]);
     const [lastExportTime, setLastExportTime] = useState(0);
 
@@ -263,7 +252,7 @@ const ExportDirectory: React.FC<ExportDirectoryProps> = ({
                 exportStage === ExportStage.init ? (
                     <ChangeDirectoryOption onClick={onChangeExportDirectory} />
                 ) : (
-                    // Prevent layout shift.
+                    // Preserve the directory row width while its action is hidden.
                     <Box sx={{ width: "16px", height: "48px" }} />
                 )}
             </>
@@ -283,9 +272,7 @@ const DirectoryPath: React.FC<DirectoryPathProps> = ({ path }) => (
     <LinkButton onClick={() => void ensureElectron().openDirectory(path)}>
         <Tooltip title={path}>
             <EllipsizedTypography
-                // Haven't found a way to get the path to ellipsize without
-                // providing a maxWidth. Luckily, this is the context of the
-                // desktop app where this width is should not be too off.
+                // Ellipsis needs a fixed maximum width.
                 sx={{ maxWidth: "262px" }}
             >
                 {path}
@@ -303,14 +290,7 @@ const ChangeDirectoryOption: React.FC<ButtonishProps> = ({ onClick }) => (
 );
 
 interface ContinuousExportProps {
-    /**
-     * If `true`, then continuous export is shown as enabled.
-     */
     enabled: boolean;
-    /**
-     * Called when the user wants to toggle the current value of
-     * {@link enabled}.
-     */
     onToggle: () => void;
 }
 
@@ -559,7 +539,7 @@ const ExportPendingListDialog: React.FC<ExportPendingListDialogProps> = ({
     collectionNameByID,
     pendingFiles,
 }) => {
-    const itemSize = 56; /* px */
+    const itemSize = 56;
     const itemCount = pendingFiles.length;
     const listHeight = Math.min(itemCount * itemSize, 240);
 
@@ -617,14 +597,13 @@ const ExportPendingListItem: React.FC<
                 <Box sx={{ flexShrink: 0 }}>
                     <ItemCard
                         key={file.id}
-                        TileComponent={PreviewItemTile} /* 48 px */
+                        TileComponent={PreviewItemTile}
                         coverFile={file}
                     />
                 </Box>
                 <Stack
                     sx={{
-                        // We need to set overflow hidden on the containing
-                        // stack for the EllipsizedTypography to kick in.
+                        // EllipsizedTypography needs overflow hidden on its container.
                         overflow: "hidden",
                         gap: "2px",
                     }}

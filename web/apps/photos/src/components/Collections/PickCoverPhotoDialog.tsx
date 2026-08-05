@@ -34,9 +34,6 @@ interface PickCoverPhotoDialogProps {
 
 type SubmittingAction = "use-selected-photo" | "reset-to-default";
 
-/**
- * Picker dialog for selecting a single file to use as an album cover.
- */
 export const PickCoverPhotoDialog: React.FC<PickCoverPhotoDialogProps> = ({
     open,
     onClose,

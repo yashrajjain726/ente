@@ -34,7 +34,6 @@ export const useDataProcessing = ({
     setIsLoadingLocations,
     setCoverImageUrl,
 }: UseDataProcessingParams) => {
-    // Process photos data when files change
     useEffect(() => {
         const hasFilesCountChanged = files.length !== filesCountRef.current;
         filesCountRef.current = files.length;
@@ -67,7 +66,6 @@ export const useDataProcessing = ({
         setIsLoadingLocations,
     ]);
 
-    // Load cover image after data loads
     useEffect(() => {
         const loadCover = async () => {
             const coverUrl = await loadCoverImage({

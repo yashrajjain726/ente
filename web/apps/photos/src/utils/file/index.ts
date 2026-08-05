@@ -26,11 +26,7 @@ export interface SelectedState {
     ownCount: number;
     count: number;
     collectionID: number | undefined;
-    /**
-     * The context in which the selection was made. Only set by newer code if
-     * there is an active selection (older code continues to rely on the
-     * {@link collectionID} logic).
-     */
+    // New selection code sets context; legacy callers still use collectionID.
     context: SelectionContext | undefined;
 }
 export type SetSelectedState = React.Dispatch<

@@ -1,11 +1,5 @@
 import { useEffect, useState } from "react";
 
-/**
- * A hook that returns true if the browser is currently offline.
- *
- * This hook returns the (negated) value of the navigator.onLine property, and
- * also monitors for changes.
- */
 export const useIsOffline = () => {
     const [offline, setOffline] = useState(
         typeof window != "undefined" && !window.navigator.onLine,

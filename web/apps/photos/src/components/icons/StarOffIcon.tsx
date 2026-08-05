@@ -1,11 +1,6 @@
 import SvgIcon, { type SvgIconProps } from "@mui/material/SvgIcon";
 import React from "react";
 
-/**
- * Custom star-off icon (unfavorite).
- *
- * This is the app's custom star with a strike-through used to remove favorites.
- */
 export const StarOffIcon: React.FC<SvgIconProps> = (props) => (
     <SvgIcon {...props} viewBox="0 0 21 20">
         <svg

@@ -17,55 +17,29 @@ import { t } from "i18next";
 import React, { useRef, useState } from "react";
 
 interface CollectionsSortOptionsProps {
-    /**
-     * The sorting scheme currently active.
-     */
     activeSortBy: CollectionsSortBy;
-    /**
-     * Change the scheme that should be used.
-     */
     onChangeSortBy: (by: CollectionsSortBy) => void;
-    /**
-     * Set this to true if we're being shown inside a dialog, to further
-     * increase the elevation of the menu.
-     */
     nestedInDialog?: boolean;
-    /**
-     * Set this to true to disable the background for the icon button that
-     * triggers the menu.
-     */
     transparentTriggerButtonBackground?: boolean;
-    /**
-     * Visual treatment for the surface in which the control is rendered.
-     */
     variant?: "default" | "v2";
 }
 
-/** The three sort categories. */
 type SortCategory = "name" | "creation-time" | "updation-time";
 
-/** Extract the category from a CollectionsSortBy value. */
 const getSortCategory = (sortBy: CollectionsSortBy): SortCategory => {
     if (sortBy.startsWith("name")) return "name";
     if (sortBy.startsWith("creation-time")) return "creation-time";
     return "updation-time";
 };
 
-/** Check if the sort is ascending. */
 const isAscending = (sortBy: CollectionsSortBy): boolean =>
     sortBy.endsWith("-asc");
 
-/** Get the CollectionsSortBy value for a category and direction. */
 const getSortBy = (
     category: SortCategory,
     ascending: boolean,
 ): CollectionsSortBy => `${category}-${ascending ? "asc" : "desc"}`;
 
-/**
- * A button that shows an overflow menu allowing the user to choose from amongst
- * the {@link CollectionsSortBy} values that should be used for sorting the
- * lists of collections.
- */
 export const CollectionsSortOptions: React.FC<CollectionsSortOptionsProps> = ({
     activeSortBy,
     onChangeSortBy,
@@ -84,11 +58,10 @@ export const CollectionsSortOptions: React.FC<CollectionsSortOptionsProps> = ({
     const handleCategoryClick = (category: SortCategory) => {
         let nextSortBy: CollectionsSortBy;
         if (category === activeCategory) {
-            // Toggle direction if same category
             nextSortBy = getSortBy(category, !activeAscending);
         } else {
-            // Select new category with default direction
-            const defaultAscending = category === "name"; // Name defaults to A-Z (asc), dates to newest (desc)
+            // Names default to ascending; dates default to newest first.
+            const defaultAscending = category === "name";
             nextSortBy = getSortBy(category, defaultAscending);
         }
         pendingSortByRef.current = nextSortBy;

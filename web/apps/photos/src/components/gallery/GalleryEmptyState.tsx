@@ -11,15 +11,7 @@ import React, { useEffect, useState } from "react";
 import { Trans } from "react-i18next";
 
 interface GalleryEmptyStateProps {
-    /**
-     * If `true`, then an upload is already in progress (the empty state will
-     * then disable the prompts for uploads).
-     */
     isUploadInProgress: boolean;
-    /**
-     * Called when the user selects one of the upload buttons. It is passed the
-     * "intent" of the user.
-     */
     onUpload: (intent: UploadTypeSelectorIntent) => void;
 }
 
@@ -202,8 +194,7 @@ function MemoriesPreservedCount(): React.JSX.Element | null {
                 .catch(() => undefined);
         };
 
-        // The count is a fleet-wide number from Ente's production servers, so
-        // it is only meaningful (and only shown) when connecting to them.
+        // Custom API origins cannot use this production-wide count.
         let intervalID: number | undefined;
         void customAPIOrigin().then((origin) => {
             if (origin || abortController.signal.aborted) return;
@@ -373,10 +364,7 @@ const GalleryEmptyStateButton = styled(FocusVisibleButton)(({ theme }) => ({
     "& .MuiButton-startIcon": { marginRight: 14, "& > svg": { fontSize: 20 } },
 }));
 
-/**
- * Prevent the image from being selected _and_ dragged, since dragging it
- * triggers the our dropdown selector overlay.
- */
+// Draggable images trigger the upload overlay.
 const NonDraggableImage = styled("img")(({ theme }) => ({
     position: "absolute",
     top: -96,

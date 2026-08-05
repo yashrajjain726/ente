@@ -26,8 +26,7 @@ const nativeConvertToJPEG = async (imageBlob: Blob) => {
     const startTime = Date.now();
     const imageData = new Uint8Array(await imageBlob.arrayBuffer());
     const electron = globalThis.electron;
-    // If we're running in a worker, reroute the request back to the main
-    // thread since workers don't have access to window.electron.
+    // Workers route through the main thread because they cannot access electron.
     const jpegData = electron
         ? await electron.convertToJPEG(imageData)
         : await workerBridge!.convertToJPEG(imageData);

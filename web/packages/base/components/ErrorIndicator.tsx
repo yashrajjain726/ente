@@ -3,13 +3,6 @@ import { Stack, Typography } from "@mui/material";
 import { t } from "i18next";
 import type React from "react";
 
-/**
- * An error message indicator, styled to complement {@link ActivityIndicator}.
- *
- * If a child is provided, it is used as the error message to show (after being
- * wrapped in a suitable {@link Typography}). Otherwise the default generic
- * error message is shown.
- */
 export const ActivityErrorIndicator: React.FC<React.PropsWithChildren> = ({
     children,
 }) => (
@@ -21,14 +14,6 @@ export const ActivityErrorIndicator: React.FC<React.PropsWithChildren> = ({
     </Stack>
 );
 
-/**
- * An smaller error message indicator suitable for being shown above or below
- * text fields.
- *
- * If a child is provided, it is used as the error message to show (after being
- * wrapped in a suitable {@link Typography}). Otherwise the default generic
- * error message is shown.
- */
 export const InlineErrorIndicator: React.FC<React.PropsWithChildren> = ({
     children,
 }) => (

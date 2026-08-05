@@ -129,8 +129,6 @@ const createSelectedAndContext = (
             };
         }
     } else if (!selected.context) {
-        // Gallery will specify a mode, but a fresh selection starts off
-        // without a context, so fill it in with the current context.
         selected = {
             ...selected,
             context:
@@ -139,9 +137,7 @@ const createSelectedAndContext = (
                     : { mode, collectionID: activeCollectionID },
         };
     } else {
-        // Both mode and context are defined.
         if (selected.context.mode != mode) {
-            // Clear selection if mode has changed.
             selected = {
                 ownCount: 0,
                 count: 0,
@@ -154,7 +150,6 @@ const createSelectedAndContext = (
         } else {
             if (selected.context.mode == "people") {
                 if (selected.context.personID != activePersonID) {
-                    // Clear selection if person has changed.
                     selected = {
                         ownCount: 0,
                         count: 0,
@@ -167,7 +162,6 @@ const createSelectedAndContext = (
                 }
             } else {
                 if (selected.context.collectionID != activeCollectionID) {
-                    // Clear selection if collection has changed.
                     selected = {
                         ownCount: 0,
                         count: 0,

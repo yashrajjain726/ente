@@ -32,20 +32,10 @@ import { t } from "i18next";
 import React, { useEffect, useState } from "react";
 
 type FixCreationTimeProps = ModalVisibilityProps & {
-    /**
-     * The {@link EnteFile}s whose creation time should be modified.
-     */
     files: EnteFile[];
-    /**
-     * Called after the creation times have been updated, to perform a full
-     * remote pull.
-     */
     onRemotePull: () => Promise<void>;
 };
 
-/**
- * A dialog allowing the user to modify the creation time of selected files.
- */
 export const FixCreationTime: React.FC<FixCreationTimeProps> = ({
     open,
     onClose,
@@ -56,7 +46,6 @@ export const FixCreationTime: React.FC<FixCreationTimeProps> = ({
     const [progress, setProgress] = useState({ completed: 0, total: 0 });
 
     useEffect(() => {
-        // Reset the step whenever the dialog is reopened.
         if (open) setStep(undefined);
     }, [open]);
 
@@ -105,7 +94,6 @@ export const FixCreationTime: React.FC<FixCreationTimeProps> = ({
     );
 };
 
-/** The current state of the fixing process. */
 type Step = "running" | "completed" | "completed-with-errors";
 
 type FixOption =
@@ -117,7 +105,6 @@ type FixOption =
 
 interface FormValues {
     option: FixOption;
-    /* Only valid when {@link option} is "custom-time". */
     customDate: ParsedMetadataDate | undefined;
 }
 
@@ -320,24 +307,6 @@ const updateFiles = async (
     return hadErrors;
 };
 
-/**
- * Update the date associated with a given {@link EnteFile}.
- *
- * This is generally treated as the creation date of the underlying asset
- * (photo, video, live photo) that this file stores.
- *
- * - For images, this function allows us to update this date from the Exif and
- *   other metadata embedded in the file.
- *
- * - For all types of files (including images), this function allows us to
- *   update this date to an explicitly provided value.
- *
- * If an Exif-involving {@link fixOption} is passed for an non-image file, then
- * that file is just skipped over. Similarly, if an Exif-involving
- * {@link fixOption} is provided, but the given underlying image for the given
- * {@link file} does not have a corresponding Exif (or related) value, then that
- * file is skipped.
- */
 const updateFileDate = async (
     file: EnteFile,
     fixOption: FixOption,
