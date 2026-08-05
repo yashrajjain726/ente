@@ -2,6 +2,7 @@ import "dart:async";
 
 import "package:ente_pure_utils/ente_pure_utils.dart";
 import "package:flutter/material.dart";
+import "package:hugeicons/hugeicons.dart";
 import "package:media_kit_video/media_kit_video.dart";
 import "package:photos/models/file/file.dart";
 import "package:photos/states/detail_page_state.dart";
@@ -282,15 +283,15 @@ class _PlayPauseButtonState extends State<PlayPauseButtonMediaKit> {
           switchInCurve: Curves.easeInOutQuart,
           switchOutCurve: Curves.easeInOutQuart,
           child: _isPlaying
-              ? const Icon(
-                  Icons.pause,
+              ? const HugeIcon(
+                  icon: HugeIcons.strokeRoundedPause,
                   size: 32,
                   key: ValueKey("pause"),
                   color: Colors.white,
                 )
-              : const Icon(
-                  Icons.play_arrow,
-                  size: 36,
+              : const HugeIcon(
+                  icon: HugeIcons.strokeRoundedPlay,
+                  size: 32,
                   key: ValueKey("play"),
                   color: Colors.white,
                 ),

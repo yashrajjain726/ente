@@ -2,6 +2,7 @@ import "dart:async";
 
 import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
+import "package:hugeicons/hugeicons.dart";
 import "package:photos/core/event_bus.dart";
 import "package:photos/events/video_preview_state_changed_event.dart";
 import "package:photos/models/file/file.dart";
@@ -9,7 +10,7 @@ import "package:photos/models/preview/preview_item_status.dart";
 import "package:photos/service_locator.dart";
 import "package:photos/services/video_preview_service.dart";
 import "package:photos/theme/colors.dart";
-import "package:photos/theme/ente_theme.dart" show getEnteColorScheme;
+import "package:photos/theme/ente_theme.dart" show getEnteTextTheme;
 
 class VideoStreamChangeWidget extends StatefulWidget {
   const VideoStreamChangeWidget({
@@ -98,13 +99,9 @@ class _VideoStreamChangeWidgetState extends State<VideoStreamChangeWidget> {
           )
         : null;
 
-    final colorScheme = getEnteColorScheme(context);
-
     if (!isPreviewAvailable && !isCurrentlyProcessing) {
       return const SizedBox();
     }
-
-    // If currently processing, show "Creating Stream" with spinner (not clickable)
 
     return IgnorePointer(
       ignoring: !widget._showControls,
@@ -116,83 +113,49 @@ class _VideoStreamChangeWidgetState extends State<VideoStreamChangeWidget> {
           opacity: widget._showControls ? 1 : 0,
           child: Padding(
             padding: const EdgeInsets.only(right: 10, bottom: 4),
-            child: isCurrentlyProcessing
-                ? Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: colorScheme.backdropBase,
-                      borderRadius: const BorderRadius.all(
-                        Radius.circular(200),
-                      ),
-                      border: Border.all(color: strokeFaintDark, width: 1),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        SizedBox(
-                          width: 12,
-                          height: 12,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(
-                              colorScheme.fillBase,
-                            ),
-                          ),
+            child: GestureDetector(
+              onTap: isCurrentlyProcessing ? null : widget.onStreamChange,
+              child: Container(
+                height: 32,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.5),
+                  borderRadius: const BorderRadius.all(Radius.circular(16)),
+                  border: Border.all(color: strokeFaintDark),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (isCurrentlyProcessing)
+                      const SizedBox(
+                        width: 12,
+                        height: 12,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: textBaseDark,
                         ),
-                        const SizedBox(width: 8),
-                        Text(
-                          _getStatusText(context, processingStatus),
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: colorScheme.fillBase,
-                          ),
-                        ),
-                      ],
+                      )
+                    else
+                      const HugeIcon(
+                        icon: HugeIcons.strokeRoundedPlay,
+                        size: 16,
+                        color: textBaseDark,
+                      ),
+                    SizedBox(width: isCurrentlyProcessing ? 8 : 4),
+                    Text(
+                      isCurrentlyProcessing
+                          ? _getStatusText(context, processingStatus)
+                          : widget.isPreviewPlayer
+                          ? context.strings.playOriginal
+                          : context.strings.playStream,
+                      style: getEnteTextTheme(
+                        context,
+                      ).mini.copyWith(color: textBaseDark),
                     ),
-                  )
-                : GestureDetector(
-                    onTap: widget.onStreamChange,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.green,
-                        borderRadius: const BorderRadius.all(
-                          Radius.circular(200),
-                        ),
-                        border: Border.all(color: strokeFaintDark, width: 1),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(
-                            Icons.play_arrow,
-                            size: 16,
-                            color: Colors.white,
-                          ),
-                          const SizedBox(width: 2),
-                          Text(
-                            widget.isPreviewPlayer
-                                ? context.strings.playOriginal
-                                : context.strings.playStream,
-                            style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
+                  ],
+                ),
+              ),
+            ),
           ),
         ),
       ),
