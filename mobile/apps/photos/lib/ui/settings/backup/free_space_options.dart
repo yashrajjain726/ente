@@ -13,6 +13,7 @@ import "package:photos/service_locator.dart";
 import "package:photos/services/collections_service.dart";
 import "package:photos/services/deduplication_service.dart";
 import "package:photos/services/files_service.dart";
+import "package:photos/services/review_service.dart";
 import "package:photos/ui/components/models/button_type.dart";
 import "package:photos/ui/notification/toast.dart";
 import "package:photos/ui/tools/debug/app_storage_viewer.dart";
@@ -237,7 +238,7 @@ class _FreeUpSpaceOptionsScreenState extends State<FreeUpSpaceOptionsScreen> {
         ),
         firstButtonLabel: context.strings.rateUs,
         firstButtonOnTap: () async {
-          await updateService.launchReviewUrl();
+          await ReviewService.launch();
         },
         firstButtonType: ButtonType.primary,
         secondButtonLabel: context.strings.ok,
@@ -288,7 +289,7 @@ class _FreeUpSpaceOptionsScreenState extends State<FreeUpSpaceOptionsScreen> {
       ),
       firstButtonLabel: context.strings.rateUs,
       firstButtonOnTap: () async {
-        await updateService.launchReviewUrl();
+        await ReviewService.launch();
       },
       firstButtonType: ButtonType.primary,
       secondButtonLabel: context.strings.ok,

@@ -10,8 +10,6 @@ import "package:photos/services/language_service.dart";
 import 'package:photos/services/notification_service.dart';
 import 'package:photos/ui/notification/update/change_log_strings.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:tuple/tuple.dart';
-import 'package:url_launcher/url_launcher_string.dart';
 
 enum ChangeLogAction { skip, consumeWithoutShowing, show }
 
@@ -174,43 +172,6 @@ class UpdateService {
       return false;
     }
     return !isIndependentFlavor() && !isFDroidFlavor();
-  }
-
-  // getRateDetails returns details about the place
-  Tuple2<String, String> getRateDetails() {
-    if (isFDroidFlavor() || isIndependentFlavor()) {
-      return const Tuple2(
-        "AlternativeTo",
-        "https://alternativeto.net/software/ente/about/",
-      );
-    }
-    return Platform.isAndroid
-        ? const Tuple2(
-            "Google Play",
-            "https://play.google.com/store/apps/details?id=io.ente.photos",
-          )
-        : const Tuple2(
-            "App Store",
-            "https://apps.apple.com/in/app/ente-photos/id1542026904",
-          );
-  }
-
-  Future<void> launchReviewUrl() async {
-    // TODO: Replace with https://pub.dev/packages/in_app_review
-    final String url = getRateDetails().item2;
-    try {
-      await launchUrlString(url, mode: LaunchMode.externalApplication);
-    } catch (e) {
-      _logger.severe("Failed top open launch url $url", e);
-      // Fall back if we fail to open play-store market app on android
-      if (Platform.isAndroid && url.startsWith("market://")) {
-        launchUrlString(
-          "https://play.google.com/store/apps/details?id=io"
-          ".ente.photos",
-          mode: LaunchMode.externalApplication,
-        ).ignore();
-      }
-    }
   }
 }
 

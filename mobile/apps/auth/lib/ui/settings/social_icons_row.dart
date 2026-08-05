@@ -1,9 +1,6 @@
 import 'dart:io';
 
-import 'package:ente_auth/services/update_service.dart';
 import 'package:ente_components/ente_components.dart';
-import 'package:ente_pure_utils/ente_pure_utils.dart';
-import 'package:ente_strings/ente_strings.dart';
 import 'package:flutter/material.dart';
 import 'package:hugeicons/hugeicons.dart';
 import 'package:url_launcher/url_launcher_string.dart';
@@ -13,40 +10,32 @@ class SocialIconsRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final rateDetails = UpdateService.instance.getRateDetails();
-    final links = <_SocialLink>[
-      if (PlatformDetector.isMobile())
-        _SocialLink(
-          label: context.strings.rateUsOnStore(storeName: rateDetails.item1),
-          identifier: 'auth_settings_rate',
-          icon: HugeIcons.strokeRoundedStar,
-          url: rateDetails.item2,
-        ),
-      const _SocialLink(
+    const links = <_SocialLink>[
+      _SocialLink(
         label: 'Discord',
         identifier: 'auth_settings_social_discord',
         icon: HugeIcons.strokeRoundedDiscord,
         url: 'https://ente.com/discord',
       ),
-      const _SocialLink(
+      _SocialLink(
         label: 'GitHub',
         identifier: 'auth_settings_social_github',
         icon: HugeIcons.strokeRoundedGithub,
         url: 'https://github.com/ente/ente',
       ),
-      const _SocialLink(
+      _SocialLink(
         label: 'X',
         identifier: 'auth_settings_social_x',
         icon: HugeIcons.strokeRoundedNewTwitter,
         url: 'https://twitter.com/enteio',
       ),
-      const _SocialLink(
+      _SocialLink(
         label: 'Mastodon',
         identifier: 'auth_settings_social_mastodon',
         icon: HugeIcons.strokeRoundedMastodon,
         url: 'https://fosstodon.org/@ente',
       ),
-      const _SocialLink(
+      _SocialLink(
         label: 'Reddit',
         identifier: 'auth_settings_social_reddit',
         icon: HugeIcons.strokeRoundedReddit,

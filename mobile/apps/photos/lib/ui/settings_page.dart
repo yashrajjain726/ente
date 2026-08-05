@@ -2,6 +2,7 @@ import "package:ente_components/ente_components.dart";
 import "package:ente_lock_screen/local_authentication_service.dart";
 import "package:ente_pure_utils/ente_pure_utils.dart";
 import "package:ente_strings/ente_strings.dart";
+import "package:ente_ui/components/settings/app_engagement_section.dart";
 import "package:flutter/foundation.dart";
 import "package:flutter/material.dart";
 import "package:hugeicons/hugeicons.dart";
@@ -11,6 +12,7 @@ import "package:photos/emergency/emergency_page.dart";
 import "package:photos/models/user_details.dart";
 import "package:photos/service_locator.dart";
 import "package:photos/services/account/user_service.dart";
+import "package:photos/services/review_service.dart";
 import "package:photos/ui/account/email_entry_page.dart";
 import "package:photos/ui/account/login_page.dart";
 import "package:photos/ui/components/banners/offline_settings_banner.dart";
@@ -38,7 +40,6 @@ import "package:photos/ui/settings/support/help_support_page.dart";
 import "package:photos/ui/settings/widget_settings_screen.dart";
 import "package:photos/ui/sharing/verify_identity_dialog.dart";
 import "package:photos/utils/dialog_util.dart";
-import "package:url_launcher/url_launcher_string.dart";
 
 class SettingsPage extends StatelessWidget {
   final ValueNotifier<String?> emailNotifier;
@@ -149,7 +150,7 @@ class _SettingsBody extends StatelessWidget {
               const SizedBox(height: 8),
             ],
             // Engagement section
-            _buildEngagementCard(context),
+            AppEngagementSection(reviewUrl: ReviewService.url),
             const SizedBox(height: 8),
             // Support section
             _buildMenuItem(
@@ -454,31 +455,6 @@ class _SettingsBody extends StatelessWidget {
           }
         },
       ),
-    );
-  }
-
-  Widget _buildEngagementCard(BuildContext context) {
-    return MenuGroupComponent(
-      items: [
-        _buildMenuItem(
-          title: context.strings.merchandise,
-          icon: HugeIcons.strokeRoundedTShirt,
-          onTap: () async {
-            await launchUrlString(
-              "https://shop.ente.com",
-              mode: LaunchMode.externalApplication,
-            );
-          },
-        ),
-        _buildMenuItem(
-          title: context.strings.rateUs,
-          icon: HugeIcons.strokeRoundedStar,
-          onTap: () async {
-            final rateUrl = updateService.getRateDetails().item2;
-            await launchUrlString(rateUrl);
-          },
-        ),
-      ],
     );
   }
 

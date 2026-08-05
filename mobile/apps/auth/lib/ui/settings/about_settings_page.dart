@@ -34,13 +34,6 @@ class AboutSettingsPage extends StatelessWidget {
         ),
         const SizedBox(height: Spacing.sm),
         SettingsItem(
-          title: l10n.merchandise,
-          icon: HugeIcons.strokeRoundedShoppingBag01,
-          showOnlyLoadingState: true,
-          onTap: () => PlatformUtil.openUrlInBrowser('https://shop.ente.com'),
-        ),
-        const SizedBox(height: Spacing.sm),
-        SettingsItem(
           title: l10n.privacy,
           icon: HugeIcons.strokeRoundedShield01,
           showOnlyLoadingState: true,

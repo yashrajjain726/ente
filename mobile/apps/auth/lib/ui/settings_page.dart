@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:ente_accounts/services/user_service.dart';
 import 'package:ente_auth/core/configuration.dart';
 import 'package:ente_auth/onboarding/view/onboarding_page.dart';
+import 'package:ente_auth/services/review_service.dart';
 import 'package:ente_auth/store/code_store.dart';
 import 'package:ente_auth/ui/components/buttons/button_widget.dart';
 import 'package:ente_auth/ui/settings/about_settings_page.dart';
@@ -24,6 +25,7 @@ import 'package:ente_auth/utils/dialog_util.dart';
 import 'package:ente_components/ente_components.dart';
 import 'package:ente_lock_screen/local_authentication_service.dart';
 import 'package:ente_strings/ente_strings.dart';
+import 'package:ente_ui/components/settings/app_engagement_section.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:hugeicons/hugeicons.dart';
@@ -127,6 +129,8 @@ class SettingsPage extends StatelessWidget {
         semanticsIdentifier: 'auth_settings_general',
         onTap: () => pushAuthSettingsPage(context, const GeneralSettingsPage()),
       ),
+      const SizedBox(height: Spacing.sm),
+      AppEngagementSection(reviewUrl: ReviewService.url),
       const SizedBox(height: Spacing.sm),
       SettingsItem(
         title: l10n.support,
