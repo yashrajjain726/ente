@@ -126,6 +126,19 @@ func (repo *UserRepository) GetFamilyAdminID(userID int64) (*int64, error) {
 	return familyAdminID, nil
 }
 
+func (repo *UserRepository) AreUsersInSameFamily(ctx context.Context, firstUserID, secondUserID int64) (bool, error) {
+	var sameFamily bool
+	err := repo.DB.QueryRowContext(ctx, `SELECT EXISTS(
+		SELECT 1
+		FROM users first_user
+		JOIN users second_user ON first_user.family_admin_id = second_user.family_admin_id
+		WHERE first_user.user_id = $1
+		  AND second_user.user_id = $2
+		  AND first_user.family_admin_id IS NOT NULL
+	)`, firstUserID, secondUserID).Scan(&sameFamily)
+	return sameFamily, stacktrace.Propagate(err, "")
+}
+
 // GetUserByEmailHash returns a user indicated by the emailHash
 func (repo *UserRepository) GetUserByEmailHash(emailHash string) (ente.User, error) {
 	var user ente.User

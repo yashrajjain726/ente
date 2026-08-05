@@ -91,6 +91,58 @@ func TestUserLookupNormalizesAndAlwaysQueriesRepository(t *testing.T) {
 	}
 }
 
+func TestUserLookupVerifiesNormalizedEmailAndExpectedUserID(t *testing.T) {
+	now := time.Unix(1000, 0)
+	repository := &userLookupRepositoryStub{userID: 42}
+	controller := newUserLookupControllerForTest(repository, nil, func() time.Time { return now })
+
+	err := controller.VerifyUserID(1, "  Person@Example.COM ", 42)
+	if err != nil {
+		t.Fatalf("verify returned error: %v", err)
+	}
+	if got := repository.emails[0]; got != "person@example.com" {
+		t.Fatalf("repository email = %q, want normalized email", got)
+	}
+}
+
+func TestUserLookupVerifyReturnsSameErrorForMissingEmailAndMismatchedUserID(t *testing.T) {
+	now := time.Unix(1000, 0)
+	repository := &userLookupRepositoryStub{userID: 42}
+	controller := newUserLookupControllerForTest(repository, nil, func() time.Time { return now })
+
+	mismatchErr := controller.VerifyUserID(1, "person@example.com", 43)
+	if !errors.Is(mismatchErr, ente.ErrRecipientIdentityMismatch) {
+		t.Fatalf("mismatch error = %v, want %v", mismatchErr, ente.ErrRecipientIdentityMismatch)
+	}
+
+	repository.setResult(-1, sql.ErrNoRows)
+	missingErr := controller.VerifyUserID(1, "missing@example.com", 44)
+	if !errors.Is(missingErr, ente.ErrRecipientIdentityMismatch) {
+		t.Fatalf("missing email error = %v, want %v", missingErr, ente.ErrRecipientIdentityMismatch)
+	}
+}
+
+func TestUserLookupVerifyLimitsDistinctIDsForSameEmailAsMissingTargets(t *testing.T) {
+	now := time.Unix(1000, 0)
+	repository := &userLookupRepositoryStub{userID: 42}
+	controller := newUserLookupControllerForTest(repository, nil, func() time.Time { return now })
+
+	for i := 0; i < defaultUserLookupNotFoundMinuteLimit; i++ {
+		err := controller.VerifyUserID(7, "known@example.com", int64(100+i))
+		if !errors.Is(err, ente.ErrRecipientIdentityMismatch) {
+			t.Fatalf("mismatch %d error = %v, want %v", i, err, ente.ErrRecipientIdentityMismatch)
+		}
+	}
+
+	err := controller.VerifyUserID(7, "known@example.com", 999)
+	if !errors.Is(err, ente.ErrTooManyBadRequest) {
+		t.Fatalf("next mismatch error = %v, want %v", err, ente.ErrTooManyBadRequest)
+	}
+	if got := repository.callCount(); got != defaultUserLookupNotFoundMinuteLimit {
+		t.Fatalf("repository calls = %d, want %d", got, defaultUserLookupNotFoundMinuteLimit)
+	}
+}
+
 func TestUserLookupRejectsUnauthenticatedRequesterBeforeRepository(t *testing.T) {
 	now := time.Unix(1000, 0)
 	repository := &userLookupRepositoryStub{}
