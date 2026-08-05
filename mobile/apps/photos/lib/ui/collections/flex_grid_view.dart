@@ -52,7 +52,6 @@ class AlbumGridLayout {
 }
 
 typedef AlbumSelectionCallbacks = ({
-  bool isSelectionModeActive,
   bool Function(Collection) isSelected,
   ValueChanged<Collection> toggle,
 });
@@ -146,7 +145,7 @@ class _CollectionsFlexiGridViewWidgetState
   }
 
   bool get _togglesSelectionOnTap =>
-      (widget.selectionCallbacks?.isSelectionModeActive ?? false) ||
+      widget.selectionCallbacks != null ||
       isAnyAlbumSelected ||
       widget.onlyAllowSelection;
 
@@ -160,7 +159,7 @@ class _CollectionsFlexiGridViewWidgetState
 
   void _handleCollectionLongPress(Collection collection) {
     if (widget.selectionCallbacks != null) {
-      unawaited(_toggleAlbumSelection(collection));
+      unawaited(_navigateToCollectionPage(collection));
       return;
     }
     unawaited(
