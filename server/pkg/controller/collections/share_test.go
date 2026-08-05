@@ -10,6 +10,7 @@ import (
 
 	"github.com/ente/museum/ente"
 	"github.com/ente/museum/internal/testutil"
+	museumcontroller "github.com/ente/museum/pkg/controller"
 	"github.com/ente/museum/pkg/repo"
 	castRepo "github.com/ente/museum/pkg/repo/cast"
 	publicRepo "github.com/ente/museum/pkg/repo/public"
@@ -22,6 +23,10 @@ func (panicUserLookup) LookupUserID(int64, string) (int64, error) {
 	panic("user lookup must not be called while revoking collection access")
 }
 
+func (panicUserLookup) VerifyUserID(int64, string, int64) error {
+	panic("user lookup must not be called while revoking collection access")
+}
+
 type fixedUserLookup struct {
 	userID int64
 }
@@ -30,12 +35,23 @@ func (l fixedUserLookup) LookupUserID(int64, string) (int64, error) {
 	return l.userID, nil
 }
 
+func (fixedUserLookup) VerifyUserID(int64, string, int64) error {
+	return nil
+}
+
 func newShareTestCollectionRepo(db *sql.DB) *repo.CollectionRepository {
 	return &repo.CollectionRepository{
 		DB:                  db,
 		CollectionLinkRepo:  publicRepo.NewCollectionLinkRepository(db, ""),
 		SecretEncryptionKey: testutil.SecretEncryptionKey(),
 	}
+}
+
+func newShareTestUserLookup(db *sql.DB) *museumcontroller.UserLookupController {
+	return museumcontroller.NewUserLookupController(&repo.UserRepository{
+		DB:         db,
+		HashingKey: testutil.HashingKey(),
+	}, nil)
 }
 
 func createShareTestCollection(t *testing.T, collectionRepo *repo.CollectionRepository, ownerID int64) int64 {
@@ -463,6 +479,7 @@ func TestBulkShareAndUnshareReturnPerCollectionStatuses(t *testing.T) {
 	controller := &CollectionController{
 		CollectionRepo: collectionRepo,
 		CastRepo:       &castRepo.Repository{DB: db},
+		UserLookup:     newShareTestUserLookup(db),
 	}
 	ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
 	ctx.Request = httptest.NewRequest("POST", "/collections/share/bulk", nil)
@@ -470,6 +487,7 @@ func TestBulkShareAndUnshareReturnPerCollectionStatuses(t *testing.T) {
 
 	results, err := controller.BulkShare(ctx, ente.BulkCollectionShareRequest{
 		RecipientUserID: shareeID,
+		RecipientEmail:  "sharee@example.com",
 		Source:          ente.AutomaticShare,
 		Collections: []ente.BulkCollectionShareItem{
 			{
@@ -492,6 +510,7 @@ func TestBulkShareAndUnshareReturnPerCollectionStatuses(t *testing.T) {
 		t.Fatalf("bulk share results = %+v", results)
 	}
 
+	controller.UserLookup = panicUserLookup{}
 	unshareResults, err := controller.BulkUnShare(ctx, ente.BulkCollectionUnshareRequest{
 		RecipientUserID: shareeID,
 		Source:          ente.AutomaticShare,
@@ -503,6 +522,43 @@ func TestBulkShareAndUnshareReturnPerCollectionStatuses(t *testing.T) {
 	if unshareResults[0].Status != ente.CollectionUnshared ||
 		unshareResults[1].Status != ente.CollectionNotShared {
 		t.Fatalf("bulk unshare results = %+v", unshareResults)
+	}
+}
+
+func TestBulkShareRejectsRecipientIdentityMismatchBeforeMutation(t *testing.T) {
+	db, collectionRepo, ownerID, shareeID := setupCollectionShareTest(t)
+	collectionID := createShareTestCollection(t, collectionRepo, ownerID)
+	controller := &CollectionController{
+		CollectionRepo: collectionRepo,
+		UserLookup:     newShareTestUserLookup(db),
+	}
+	ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+	ctx.Request = httptest.NewRequest("POST", "/collections/share/bulk", nil)
+	ctx.Request.Header.Set("X-Auth-User-ID", strconv.FormatInt(ownerID, 10))
+
+	_, err := controller.BulkShare(ctx, ente.BulkCollectionShareRequest{
+		RecipientUserID: shareeID + 1,
+		RecipientEmail:  "sharee@example.com",
+		Source:          ente.AutomaticShare,
+		Collections: []ente.BulkCollectionShareItem{{
+			CollectionID: collectionID,
+			EncryptedKey: b64OfLen(sealedCollectionKeyLen),
+			Role:         ente.VIEWER,
+		}},
+	})
+	if !errors.Is(err, ente.ErrRecipientIdentityMismatch) {
+		t.Fatalf("bulk share error = %v, want %v", err, ente.ErrRecipientIdentityMismatch)
+	}
+
+	var shareCount int
+	if err := db.QueryRow(
+		`SELECT count(*) FROM collection_shares WHERE collection_id = $1`,
+		collectionID,
+	).Scan(&shareCount); err != nil {
+		t.Fatal(err)
+	}
+	if shareCount != 0 {
+		t.Fatalf("collection shares after rejected request = %d, want 0", shareCount)
 	}
 }
 

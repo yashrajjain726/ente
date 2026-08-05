@@ -137,6 +137,7 @@ type BulkCollectionShareItem struct {
 
 type BulkCollectionShareRequest struct {
 	RecipientUserID int64                     `json:"recipientUserID" binding:"required"`
+	RecipientEmail  string                    `json:"recipientEmail" binding:"required"`
 	Source          CollectionShareSource     `json:"source" binding:"required"`
 	Collections     []BulkCollectionShareItem `json:"collections" binding:"required"`
 }

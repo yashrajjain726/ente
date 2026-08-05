@@ -202,6 +202,12 @@ var ErrUserNotFound = &ApiError{
 	HttpStatusCode: http.StatusNotFound,
 }
 
+var ErrRecipientIdentityMismatch = &ApiError{
+	Code:           "RECIPIENT_IDENTITY_MISMATCH",
+	Message:        "Recipient identity does not match",
+	HttpStatusCode: http.StatusConflict,
+}
+
 var ErrMaxPasskeysReached = ApiError{
 	Code:           MaxPasskeysReached,
 	Message:        "Max passkeys limit reached",

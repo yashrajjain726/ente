@@ -72,6 +72,13 @@ func (c *CollectionController) BulkShare(
 	if err := validateBulkShareRecipient(fromUserID, req.RecipientUserID); err != nil {
 		return nil, err
 	}
+	if err := c.UserLookup.VerifyUserID(
+		fromUserID,
+		req.RecipientEmail,
+		req.RecipientUserID,
+	); err != nil {
+		return nil, stacktrace.Propagate(err, "")
+	}
 
 	results := make([]ente.BulkCollectionShareResult, 0, len(req.Collections))
 	for _, item := range req.Collections {
