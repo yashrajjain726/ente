@@ -1,13 +1,8 @@
 /**
- * @file code that really belongs to pages/gallery.tsx itself, but it written
- * here in a separate file so that we can write in this package that has
- * TypeScript strict mode enabled.
- *
- * Once the original gallery.tsx is strict mode, this code can be inlined back
- * there.
+ * @file [Note: Gallery page logic] Logic and components for the gallery page, split out of pages/gallery.tsx.
  *
  * Separate from index.tsx so that it can export non-(React-)components, which
- * is a needed for fast refresh to work.
+ * is needed for fast refresh to work.
  */
 
 import type { CollectionOp } from "@/components/SelectedFileOptions";

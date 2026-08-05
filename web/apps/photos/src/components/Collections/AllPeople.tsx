@@ -1,6 +1,6 @@
-import { sortPeople, type PeopleSortBy } from "@/components/people-sort";
 import { PeopleSortOptions } from "@/components/PeopleSortOptions";
 import { useWrapAsyncOperation } from "@/components/utils/use-wrap-async";
+import { sortPeople, type PeopleSortBy } from "@/utils/people-sort";
 import {
     ArrowDownDoubleIcon,
     ArrowUpDoubleIcon,

@@ -12,7 +12,7 @@ import {
     type GalleryBarImplProps,
 } from "@/components/gallery/BarImpl";
 import { PeopleHeader } from "@/components/gallery/PeopleHeader";
-import { sortPeople, type PeopleSortBy } from "@/components/people-sort";
+import { sortPeople, type PeopleSortBy } from "@/utils/people-sort";
 import { useModalVisibility } from "ente-base/components/utils/modal";
 import {
     isSaveCancelled,
