@@ -5,6 +5,8 @@ import "package:photos/ui/viewer/file/video_control/mute_button.dart";
 
 const kGalleryVideoProgressBottom = 64.0;
 const kGalleryVideoProgressHeight = 16.0;
+const kGalleryVideoProgressRowBottom = 56.0;
+const kGalleryVideoProgressRowHeight = 32.0;
 const kGalleryVideoCaptionGap = 6.0;
 const kGalleryVideoCaptionLineHeight = 16.0;
 const kGalleryVideoScrimTopPadding = 12.0;
@@ -101,7 +103,7 @@ class GalleryVideoProgressRow extends StatelessWidget {
         right: safePadding.right + 16,
       ),
       child: SizedBox(
-        height: kGalleryVideoProgressHeight,
+        height: kGalleryVideoProgressRowHeight,
         child: Row(
           children: [
             Expanded(child: seekBar),

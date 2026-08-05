@@ -40,13 +40,14 @@ class _VideoMuteButtonState extends State<VideoMuteButton> {
   Widget build(BuildContext context) {
     return SizedBox(
       width: 32,
-      height: 16,
+      height: 32,
       child: IconButton(
         padding: EdgeInsets.zero,
         constraints: const BoxConstraints(),
         style: IconButton.styleFrom(
           minimumSize: Size.zero,
           tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          overlayColor: Colors.transparent,
         ),
         icon: AnimatedSwitcher(
           duration: const Duration(milliseconds: 250),

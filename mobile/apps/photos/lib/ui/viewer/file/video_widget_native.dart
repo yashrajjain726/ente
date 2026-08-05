@@ -417,7 +417,7 @@ class _VideoWidgetNativeState extends State<VideoWidgetNative>
                           widget.isFromMemories
                               ? const SizedBox.shrink()
                               : Positioned(
-                                  bottom: kGalleryVideoProgressBottom,
+                                  bottom: kGalleryVideoProgressRowBottom,
                                   right: 0,
                                   left: 0,
                                   child: SafeArea(
