@@ -23,6 +23,9 @@ const AlbumsFontPreloads: React.FC = () => (
 const albumsPreviewTitle = "Photos, shared with you";
 const albumsPreviewDescription = "Tap to view on Ente";
 const albumsPreviewImage = "https://albums.ente.com/images/preview.png";
+const photosPreviewDescription =
+    "Store and share your photos with absolute privacy.";
+const photosPreviewImage = "https://photos.ente.com/images/preview.png";
 
 export const CustomHead: React.FC<React.PropsWithChildren<CustomHeadProps>> = ({
     title,
@@ -39,6 +42,31 @@ export const CustomHead: React.FC<React.PropsWithChildren<CustomHeadProps>> = ({
         <meta name="referrer" content="strict-origin-when-cross-origin" />
     </Head>
 );
+
+export const CustomHeadPhotosStatic: React.FC<CustomHeadProps> = ({
+    title,
+}) => (
+    <CustomHead title={title} description={photosPreviewDescription}>
+        <meta property="og:type" content="website" />
+        <meta property="og:title" content={title} />
+        <meta property="og:description" content={photosPreviewDescription} />
+        <meta property="og:image" content={photosPreviewImage} />
+        <meta property="og:image:type" content="image/png" />
+        <meta property="og:image:width" content="1200" />
+        <meta property="og:image:height" content="630" />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content={title} />
+        <meta name="twitter:description" content={photosPreviewDescription} />
+        <meta name="twitter:image" content={photosPreviewImage} />
+    </CustomHead>
+);
+
+export const CustomHeadPhotos: React.FC<CustomHeadProps> = ({ title }) =>
+    isCustomAPIOrigin ? (
+        <CustomHead {...{ title }} />
+    ) : (
+        <CustomHeadPhotosStatic {...{ title }} />
+    );
 
 // Link preview crawlers only see static HTML, and og:image must be absolute.
 export const CustomHeadAlbumsStatic: React.FC = () => (
