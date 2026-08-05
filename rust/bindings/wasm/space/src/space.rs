@@ -104,6 +104,15 @@ struct OpenSpaceLinkCtxJsInput {
     client_version: Option<String>,
 }
 
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct PostPhotoAssetOptionsJsInput {
+    width: Option<i32>,
+    height: Option<i32>,
+    media_type: Option<String>,
+    thumb_hash: Option<String>,
+}
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct CreatedSpaceJs {
@@ -982,18 +991,15 @@ impl SpaceAccountCtxHandle {
     }
 
     /// Create a single-photo post with optional caption.
-    #[allow(clippy::too_many_arguments)]
     #[wasm_bindgen(js_name = createPhotoPost)]
     pub async fn create_photo_post(
         &self,
         space_id: String,
         photo_bytes: Vec<u8>,
         caption: Option<String>,
-        width: Option<i32>,
-        height: Option<i32>,
-        media_type: Option<String>,
-        thumb_hash: Option<String>,
+        photo_options: JsValue,
     ) -> Result<JsValue, WasmSpaceError> {
+        let photo_options: PostPhotoAssetOptionsJsInput = swb::from_value(photo_options)?;
         let post_key = self.inner.generate_post_key();
         let object = self
             .inner
@@ -1002,10 +1008,10 @@ impl SpaceAccountCtxHandle {
                 &post_key,
                 &photo_bytes,
                 PostPhotoAssetOptions {
-                    width,
-                    height,
-                    media_type,
-                    thumb_hash,
+                    width: photo_options.width,
+                    height: photo_options.height,
+                    media_type: photo_options.media_type,
+                    thumb_hash: photo_options.thumb_hash,
                 },
             )
             .await?;
