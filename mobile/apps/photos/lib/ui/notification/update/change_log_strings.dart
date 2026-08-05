@@ -21,11 +21,12 @@ class ChangeLogStrings {
       return null;
     }
 
-    final entries = isLocalGallery
-        ? strings.entries
-              .where((entry) => !entry.isOnlineOnly)
-              .toList(growable: false)
-        : strings.entries;
+    final entries = strings.entries
+        .where(
+          (entry) =>
+              isLocalGallery ? !entry.isOnlineOnly : !entry.isLocalGalleryOnly,
+        )
+        .toList(growable: false);
     return entries.isEmpty ? null : ChangeLogStrings(entries: entries);
   }
 
@@ -40,9 +41,16 @@ class ChangeLogStrings {
     'en': ChangeLogStrings(
       entries: [
         ChangeLogEntryStrings(
+          title: 'Faster photo analysis',
+          description:
+              'Ente’s on-device machine learning now analyzes your photos 5–10 times faster.',
+          isLocalGalleryOnly: true,
+        ),
+        ChangeLogEntryStrings(
           title: 'Faster, sharper face suggestions',
           description:
               "The image processing now runs 5-10 times faster! Also, blurry and sideways faces no longer muddy your people groups, and we will remember the faces you've already dismissed.",
+          isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
           title: 'Panoramas, reborn',
@@ -77,9 +85,16 @@ class ChangeLogStrings {
     'ca': ChangeLogStrings(
       entries: [
         ChangeLogEntryStrings(
+          title: 'Anàlisi de fotos més ràpida',
+          description:
+              "L'aprenentatge automàtic d'Ente ara analitza les teves fotos al dispositiu entre 5 i 10 vegades més ràpid.",
+          isLocalGalleryOnly: true,
+        ),
+        ChangeLogEntryStrings(
           title: 'Suggeriments de cares més ràpids i precisos',
           description:
               "El processament d'imatges ara és entre 5 i 10 vegades més ràpid! A més, les cares borroses o de costat ja no desordenen els grups de persones, i recordarem les cares que ja hagis descartat.",
+          isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
           title: 'Panoràmiques, renovades',
@@ -114,9 +129,16 @@ class ChangeLogStrings {
     'cs': ChangeLogStrings(
       entries: [
         ChangeLogEntryStrings(
+          title: 'Rychlejší analýza fotek',
+          description:
+              'Strojové učení Ente teď analyzuje vaše fotky přímo v zařízení 5–10× rychleji.',
+          isLocalGalleryOnly: true,
+        ),
+        ChangeLogEntryStrings(
           title: 'Rychlejší a přesnější návrhy obličejů',
           description:
               'Zpracování obrázků je teď 5–10× rychlejší! Rozmazané obličeje a obličeje otočené na bok už navíc nenarušují skupiny osob a zapamatujeme si, které obličeje jste už zamítli.',
+          isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
           title: 'Panoramata jako znovuzrozená',
@@ -151,9 +173,16 @@ class ChangeLogStrings {
     'de': ChangeLogStrings(
       entries: [
         ChangeLogEntryStrings(
+          title: 'Schnellere Fotoanalyse',
+          description:
+              'Das maschinelle Lernen von Ente analysiert deine Fotos jetzt direkt auf deinem Gerät 5–10-mal schneller.',
+          isLocalGalleryOnly: true,
+        ),
+        ChangeLogEntryStrings(
           title: 'Schnellere, präzisere Gesichtsvorschläge',
           description:
               'Die Bildverarbeitung läuft jetzt 5–10-mal schneller! Außerdem bringen unscharfe und seitlich gedrehte Gesichter deine Personengruppen nicht mehr durcheinander, und wir merken uns, welche Gesichter du bereits verworfen hast.',
+          isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
           title: 'Panoramen, neu erfunden',
@@ -188,9 +217,16 @@ class ChangeLogStrings {
     'es': ChangeLogStrings(
       entries: [
         ChangeLogEntryStrings(
+          title: 'Análisis de fotos más rápido',
+          description:
+              'El aprendizaje automático de Ente ahora analiza tus fotos en el dispositivo entre 5 y 10 veces más rápido.',
+          isLocalGalleryOnly: true,
+        ),
+        ChangeLogEntryStrings(
           title: 'Sugerencias de rostros más rápidas y precisas',
           description:
               '¡El procesamiento de imágenes ahora es entre 5 y 10 veces más rápido! Además, los rostros borrosos o girados de lado ya no enturbian tus grupos de personas, y recordaremos los rostros que ya hayas descartado.',
+          isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
           title: 'Panorámicas, renacidas',
@@ -225,9 +261,16 @@ class ChangeLogStrings {
     'fr': ChangeLogStrings(
       entries: [
         ChangeLogEntryStrings(
+          title: 'Analyse des photos plus rapide',
+          description:
+              'L’apprentissage automatique d’Ente analyse désormais vos photos sur votre appareil 5 à 10 fois plus vite.',
+          isLocalGalleryOnly: true,
+        ),
+        ChangeLogEntryStrings(
           title: 'Des suggestions de visages plus rapides et plus précises',
           description:
               'Le traitement d’image est désormais 5 à 10 fois plus rapide ! De plus, les visages flous ou inclinés ne perturbent plus vos groupes de personnes, et nous mémoriserons les visages que vous avez déjà ignorés.',
+          isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
           title: 'Panoramas, nouvelle génération',
@@ -262,9 +305,16 @@ class ChangeLogStrings {
     'it': ChangeLogStrings(
       entries: [
         ChangeLogEntryStrings(
+          title: 'Analisi delle foto più veloce',
+          description:
+              'L’apprendimento automatico di Ente ora analizza le tue foto sul dispositivo da 5 a 10 volte più velocemente.',
+          isLocalGalleryOnly: true,
+        ),
+        ChangeLogEntryStrings(
           title: 'Suggerimenti di volti più rapidi e precisi',
           description:
               'L’elaborazione delle immagini ora è da 5 a 10 volte più veloce! Inoltre, i volti sfocati o ruotati di lato non confondono più i tuoi gruppi di persone e ricorderemo i volti che hai già ignorato.',
+          isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
           title: 'Panoramiche, rinate',
@@ -299,9 +349,15 @@ class ChangeLogStrings {
     'ja': ChangeLogStrings(
       entries: [
         ChangeLogEntryStrings(
+          title: '写真解析を高速化',
+          description: 'Enteの機械学習が、デバイス上で写真を5～10倍速く解析できるようになりました。',
+          isLocalGalleryOnly: true,
+        ),
+        ChangeLogEntryStrings(
           title: 'より速く、より正確な顔の候補',
           description:
               '画像処理が5～10倍高速になりました！さらに、ぼやけた顔や横向きの顔が人物グループに混ざらなくなり、すでに除外した顔も記憶されます。',
+          isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
           title: 'パノラマを一新',
@@ -333,9 +389,16 @@ class ChangeLogStrings {
     'nl': ChangeLogStrings(
       entries: [
         ChangeLogEntryStrings(
+          title: 'Snellere fotoanalyse',
+          description:
+              'Ente’s machinelearning analyseert je foto’s nu rechtstreeks op je apparaat, 5–10 keer zo snel.',
+          isLocalGalleryOnly: true,
+        ),
+        ChangeLogEntryStrings(
           title: 'Snellere, scherpere gezichtssuggesties',
           description:
               'De beeldverwerking is nu 5–10 keer zo snel! Bovendien vertroebelen onscherpe en gedraaide gezichten je persoonsgroepen niet meer en onthouden we welke gezichten je al hebt afgewezen.',
+          isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
           title: 'Panorama’s, herboren',
@@ -370,9 +433,16 @@ class ChangeLogStrings {
     'no': ChangeLogStrings(
       entries: [
         ChangeLogEntryStrings(
+          title: 'Raskere bildeanalyse',
+          description:
+              'Entes maskinlæring analyserer nå bildene dine på enheten 5–10 ganger raskere.',
+          isLocalGalleryOnly: true,
+        ),
+        ChangeLogEntryStrings(
           title: 'Raskere og skarpere ansiktsforslag',
           description:
               'Bildebehandlingen er nå 5–10 ganger raskere! I tillegg vil ikke uskarpe og sidelengs ansikter lenger rote til persongruppene dine, og vi husker ansiktene du allerede har avvist.',
+          isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
           title: 'Panoramaer, gjenfødt',
@@ -407,9 +477,16 @@ class ChangeLogStrings {
     'pl': ChangeLogStrings(
       entries: [
         ChangeLogEntryStrings(
+          title: 'Szybsza analiza zdjęć',
+          description:
+              'Uczenie maszynowe Ente analizuje teraz Twoje zdjęcia na urządzeniu 5–10 razy szybciej.',
+          isLocalGalleryOnly: true,
+        ),
+        ChangeLogEntryStrings(
           title: 'Szybsze i trafniejsze sugestie twarzy',
           description:
               'Przetwarzanie obrazów jest teraz 5–10 razy szybsze! Ponadto rozmazane i obrócone bokiem twarze nie zaburzają już grup osób, a twarze, które zostały już odrzucone, zostaną zapamiętane.',
+          isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
           title: 'Panoramy od nowa',
@@ -444,9 +521,16 @@ class ChangeLogStrings {
     'pt_BR': ChangeLogStrings(
       entries: [
         ChangeLogEntryStrings(
+          title: 'Análise de fotos mais rápida',
+          description:
+              'O aprendizado de máquina do Ente agora analisa suas fotos diretamente no dispositivo de 5 a 10 vezes mais rápido.',
+          isLocalGalleryOnly: true,
+        ),
+        ChangeLogEntryStrings(
           title: 'Sugestões de rostos mais rápidas e precisas',
           description:
               'O processamento de imagens agora é de 5 a 10 vezes mais rápido! Além disso, rostos desfocados ou de lado não atrapalham mais seus grupos de pessoas, e vamos lembrar quais rostos você já dispensou.',
+          isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
           title: 'Panoramas, renovados',
@@ -481,9 +565,16 @@ class ChangeLogStrings {
     'pt_PT': ChangeLogStrings(
       entries: [
         ChangeLogEntryStrings(
+          title: 'Análise de fotografias mais rápida',
+          description:
+              'A aprendizagem automática do Ente analisa agora as suas fotografias no dispositivo entre 5 e 10 vezes mais depressa.',
+          isLocalGalleryOnly: true,
+        ),
+        ChangeLogEntryStrings(
           title: 'Sugestões de rostos mais rápidas e precisas',
           description:
               'O processamento de imagens é agora 5 a 10 vezes mais rápido! Além disso, os rostos desfocados ou de lado já não baralham os seus grupos de pessoas, e vamos recordar os rostos que já dispensou.',
+          isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
           title: 'Panoramas, renascidos',
@@ -518,9 +609,16 @@ class ChangeLogStrings {
     'ro': ChangeLogStrings(
       entries: [
         ChangeLogEntryStrings(
+          title: 'Analiză mai rapidă a fotografiilor',
+          description:
+              'Tehnologia Ente de învățare automată vă analizează acum fotografiile direct pe dispozitiv de 5–10 ori mai repede.',
+          isLocalGalleryOnly: true,
+        ),
+        ChangeLogEntryStrings(
           title: 'Sugestii de fețe mai rapide și mai precise',
           description:
               'Procesarea imaginilor este acum de 5–10 ori mai rapidă! În plus, fețele neclare sau întoarse într-o parte nu vă mai încurcă grupurile de persoane, iar noi vom reține fețele pe care le-ați respins deja.',
+          isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
           title: 'Panorame, renăscute',
@@ -555,9 +653,16 @@ class ChangeLogStrings {
     'ru': ChangeLogStrings(
       entries: [
         ChangeLogEntryStrings(
+          title: 'Более быстрый анализ фотографий',
+          description:
+              'Машинное обучение Ente теперь анализирует ваши фотографии на устройстве в 5–10 раз быстрее.',
+          isLocalGalleryOnly: true,
+        ),
+        ChangeLogEntryStrings(
           title: 'Более быстрые и точные подсказки лиц',
           description:
               'Обработка изображений теперь работает в 5–10 раз быстрее! Кроме того, размытые и повёрнутые набок лица больше не вносят путаницу в группы людей, а мы запомним лица, которые вы уже отклонили.',
+          isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
           title: 'Панорамы, рождённые заново',
@@ -592,9 +697,16 @@ class ChangeLogStrings {
     'tr': ChangeLogStrings(
       entries: [
         ChangeLogEntryStrings(
+          title: 'Daha hızlı fotoğraf analizi',
+          description:
+              'Ente’nin cihaz üzerinde çalışan makine öğrenimi artık fotoğraflarınızı 5–10 kat daha hızlı analiz ediyor.',
+          isLocalGalleryOnly: true,
+        ),
+        ChangeLogEntryStrings(
           title: 'Daha hızlı, daha isabetli yüz önerileri',
           description:
               'Görüntü işleme artık 5–10 kat daha hızlı! Ayrıca bulanık ve yana dönük yüzler artık kişi gruplarınızı karıştırmıyor ve daha önce reddettiğiniz yüzleri hatırlıyoruz.',
+          isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
           title: 'Panoramalar yeniden doğdu',
@@ -629,9 +741,16 @@ class ChangeLogStrings {
     'uk': ChangeLogStrings(
       entries: [
         ChangeLogEntryStrings(
+          title: 'Швидший аналіз фотографій',
+          description:
+              'Машинне навчання Ente тепер аналізує ваші фотографії на пристрої в 5–10 разів швидше.',
+          isLocalGalleryOnly: true,
+        ),
+        ChangeLogEntryStrings(
           title: 'Швидші й точніші пропозиції облич',
           description:
               'Обробка зображень тепер працює в 5–10 разів швидше! Крім того, розмиті й повернуті набік обличчя більше не вносять плутанину у ваші групи людей, а ми запам’ятаємо обличчя, які ви вже відхилили.',
+          isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
           title: 'Панорами, народжені наново',
@@ -666,9 +785,16 @@ class ChangeLogStrings {
     'vi': ChangeLogStrings(
       entries: [
         ChangeLogEntryStrings(
+          title: 'Phân tích ảnh nhanh hơn',
+          description:
+              'Công nghệ học máy trên thiết bị của Ente giờ phân tích ảnh của bạn nhanh gấp 5–10 lần.',
+          isLocalGalleryOnly: true,
+        ),
+        ChangeLogEntryStrings(
           title: 'Gợi ý khuôn mặt nhanh hơn, chính xác hơn',
           description:
               'Khả năng xử lý hình ảnh giờ nhanh gấp 5–10 lần! Ngoài ra, các khuôn mặt bị mờ hoặc nghiêng ngang sẽ không còn làm lẫn lộn các nhóm người, và Ente sẽ ghi nhớ những khuôn mặt bạn đã loại bỏ.',
+          isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
           title: 'Ảnh toàn cảnh, tái sinh',
@@ -703,8 +829,14 @@ class ChangeLogStrings {
     'zh_CN': ChangeLogStrings(
       entries: [
         ChangeLogEntryStrings(
+          title: '照片分析更快',
+          description: 'Ente 现在通过设备端机器学习分析你的照片，速度提升了 5–10 倍。',
+          isLocalGalleryOnly: true,
+        ),
+        ChangeLogEntryStrings(
           title: '更快、更精准的人脸建议',
           description: '图像处理速度现在提升了 5–10 倍！此外，模糊和侧转的人脸不再干扰人物分组，我们还会记住你已经忽略的人脸。',
+          isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
           title: '全景照片，焕然新生',
@@ -735,9 +867,15 @@ class ChangeLogStrings {
     'zh_TW': ChangeLogStrings(
       entries: [
         ChangeLogEntryStrings(
+          title: '照片分析更快速',
+          description: 'Ente 的機器學習現在會在裝置上分析您的照片，速度提升 5–10 倍。',
+          isLocalGalleryOnly: true,
+        ),
+        ChangeLogEntryStrings(
           title: '更快、更精準的臉孔建議',
           description:
               '影像處理速度現在快了 5–10 倍！此外，模糊或橫向的臉孔不再干擾您的人物分組，而且我們會記住您已忽略的臉孔。',
+          isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
           title: '全景照片，煥然一新',
@@ -772,10 +910,12 @@ class ChangeLogEntryStrings {
   final String title;
   final String description;
   final bool isOnlineOnly;
+  final bool isLocalGalleryOnly;
 
   const ChangeLogEntryStrings({
     required this.title,
     required this.description,
     this.isOnlineOnly = false,
-  });
+    this.isLocalGalleryOnly = false,
+  }) : assert(!(isOnlineOnly && isLocalGalleryOnly));
 }
