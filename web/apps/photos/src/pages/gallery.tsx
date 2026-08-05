@@ -131,6 +131,7 @@ import { postPullFiles, prePullFiles, pullFiles } from "@/services/pull";
 import { uploadManager } from "@/services/upload-manager";
 import watcher from "@/services/watch";
 import {
+    selectedFavoriteCount as countSelectedFavorites,
     getSelectedFiles,
     performFileOp,
     type SelectedState,
@@ -1459,18 +1460,10 @@ const Page: React.FC = () => {
 
     const selectedCount = selected.count;
     const selectedOwnCount = selected.ownCount;
-    const selectedFavoriteCount = useMemo(() => {
-        if (selected.count == 0) return 0;
-        let count = 0;
-        for (const [key, value] of Object.entries(selected)) {
-            if (typeof value === "boolean" && value) {
-                if (favoriteFileIDs.has(Number(key))) {
-                    count += 1;
-                }
-            }
-        }
-        return count;
-    }, [favoriteFileIDs, selected]);
+    const selectedFavoriteCount = useMemo(
+        () => countSelectedFavorites(selected, favoriteFileIDs),
+        [favoriteFileIDs, selected],
+    );
 
     const handleUpdateCollectionCover = useCallback(
         async (coverID: number) => {
