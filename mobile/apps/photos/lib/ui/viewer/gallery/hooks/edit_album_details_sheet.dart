@@ -332,6 +332,7 @@ class _AlbumCoverEditor extends StatelessWidget {
                             icon: HugeIcons.strokeRoundedEdit03,
                             color: Colors.white,
                             size: IconSizes.tiny,
+                            strokeWidth: 2,
                           ),
                         ),
                       ),
