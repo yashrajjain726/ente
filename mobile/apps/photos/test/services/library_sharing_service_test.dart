@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mockito/mockito.dart';
 import 'package:photos/core/configuration.dart';
+import 'package:photos/core/errors.dart';
 import 'package:photos/gateways/collections/models/collection_share.dart';
 import 'package:photos/models/api/collection/user.dart';
 import 'package:photos/models/collection/collection.dart';
@@ -35,6 +36,13 @@ void main() {
     expect(result.failedIDs, isEmpty);
     expect(result.previouslyUnsharedIDs, {100, 101});
     expect(fixture.collectionsService.shareBatchSizes, [100, 1]);
+    expect(fixture.collectionsService.recipientEmails, [
+      librarySharingTestRecipient.email,
+      librarySharingTestRecipient.email,
+    ]);
+    expect(fixture.userService.publicKeyEmails, [
+      librarySharingTestRecipient.email,
+    ]);
     expect(
       fixture.collectionsService.sharedRoles[101],
       CollectionParticipantRole.viewer,
@@ -106,6 +114,26 @@ void main() {
       expect(albums.last.sharees, isEmpty);
     },
   );
+
+  test('stops bulk sharing on a recipient identity mismatch', () async {
+    final albums = [
+      for (var id = 1; id <= 101; id++) librarySharingTestAlbum(id),
+    ];
+    final fixture = await _Fixture.create(
+      albums,
+      shareError: RecipientIdentityMismatchError(),
+    );
+
+    await expectLater(
+      fixture.service.enableAutomaticSharing(
+        recipient: librarySharingTestRecipient,
+        role: CollectionParticipantRole.viewer,
+      ),
+      throwsA(isA<RecipientIdentityMismatchError>()),
+    );
+
+    expect(fixture.collectionsService.shareBatchSizes, [100]);
+  });
 }
 
 class _Fixture {
@@ -125,10 +153,15 @@ class _Fixture {
     List<Collection> albums, {
     Set<int> blockedIDs = const {},
     Set<int>? activeFamilyMemberUserIDs,
+    Object? shareError,
   }) async {
     SharedPreferences.setMockInitialValues({});
     final preferences = await SharedPreferences.getInstance();
-    final collectionsService = _FakeCollectionsService(albums, blockedIDs);
+    final collectionsService = _FakeCollectionsService(
+      albums,
+      blockedIDs,
+      shareError,
+    );
     final store = LibrarySharingLocalStore(preferences);
     final userService = _FakeUserService(activeFamilyMemberUserIDs);
     return _Fixture(
@@ -149,11 +182,13 @@ class _Fixture {
 }
 
 class _FakeCollectionsService extends Mock implements CollectionsService {
-  _FakeCollectionsService(this.albums, this.blockedIDs);
+  _FakeCollectionsService(this.albums, this.blockedIDs, this.shareError);
 
   final List<Collection> albums;
   final Set<int> blockedIDs;
+  final Object? shareError;
   final List<int> shareBatchSizes = [];
+  final List<String> recipientEmails = [];
   final List<int> shareAttempts = [];
   final List<int> unshareAttempts = [];
   final Map<int, CollectionParticipantRole> sharedRoles = {};
@@ -182,6 +217,10 @@ class _FakeCollectionsService extends Mock implements CollectionsService {
     required CollectionShareSource source,
   }) async {
     shareBatchSizes.add(roles.length);
+    recipientEmails.add(recipientEmail);
+    if (shareError != null) {
+      throw shareError!;
+    }
     shareAttempts.addAll(roles.keys);
     sharedRoles.addAll(roles);
     for (final entry in roles.entries) {
@@ -232,10 +271,13 @@ class _FakeUserService extends Mock implements UserService {
   _FakeUserService(this.activeFamilyMemberUserIDs);
 
   Set<int>? activeFamilyMemberUserIDs;
+  final List<String> publicKeyEmails = [];
 
   @override
-  Future<String?> getPublicKeyByUserID(int userID) async =>
-      userID == librarySharingTestRecipient.userID ? 'public-key' : null;
+  Future<String?> getPublicKey(String email) async {
+    publicKeyEmails.add(email);
+    return email == librarySharingTestRecipient.email ? 'public-key' : null;
+  }
 
   @override
   List<User> getRelevantContacts() => [

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:ente_pure_utils/ente_pure_utils.dart';
 import 'package:logging/logging.dart';
 import 'package:photos/core/configuration.dart';
+import 'package:photos/core/errors.dart';
 import 'package:photos/core/event_bus.dart';
 import 'package:photos/events/collection_updated_event.dart';
 import 'package:photos/events/user_details_changed_event.dart';
@@ -135,7 +136,7 @@ class LibrarySharingService implements LibrarySharingRepository {
     required Map<int, CollectionParticipantRole> roles,
   }) => _operationLock.synchronized(() async {
     final ownerUserID = _currentOwnerUserID();
-    final publicKey = await _requirePublicKey(recipient.userID);
+    final publicKey = await _requirePublicKey(recipient.email);
     final statuses = await _shareInBatches(
       ownerUserID: ownerUserID,
       recipientUserID: recipient.userID,
@@ -250,7 +251,7 @@ class LibrarySharingService implements LibrarySharingRepository {
       throw ArgumentError.value(role, 'role');
     }
     final ownerUserID = _currentOwnerUserID();
-    final publicKey = await _requirePublicKey(recipient.userID);
+    final publicKey = await _requirePublicKey(recipient.email);
     final existing = await _localStore.read(ownerUserID, recipient.userID);
     var config =
         (existing ??
@@ -374,7 +375,7 @@ class LibrarySharingService implements LibrarySharingRepository {
         ownerUserID: ownerUserID,
         recipientUserID: config.recipientUserID,
         recipientEmail: recipientEmail,
-        publicKey: await _requirePublicKey(config.recipientUserID),
+        publicKey: await _requirePublicKey(recipientEmail),
         roles: roles,
         source: CollectionShareSource.automatic,
       );
@@ -459,6 +460,8 @@ class LibrarySharingService implements LibrarySharingRepository {
             source: source,
           ),
         );
+      } on RecipientIdentityMismatchError {
+        rethrow;
       } catch (error, stackTrace) {
         _logger.warning('Bulk library share failed', error, stackTrace);
       }
@@ -541,8 +544,8 @@ class LibrarySharingService implements LibrarySharingRepository {
     await _localStore.write(ownerUserID, config);
   }
 
-  Future<String> _requirePublicKey(int userID) async {
-    final publicKey = await _userService.getPublicKeyByUserID(userID);
+  Future<String> _requirePublicKey(String email) async {
+    final publicKey = await _userService.getPublicKey(email);
     if (publicKey == null || publicKey.isEmpty) {
       throw StateError('No Ente public key found for recipient');
     }
