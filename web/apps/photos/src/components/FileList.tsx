@@ -5,7 +5,10 @@ import {
 } from "@/components/FileContextMenu";
 import type { GalleryBarMode } from "@/components/gallery/reducer";
 import { StarIcon } from "@/components/icons/StarIcon";
-import type { SelectedState } from "@/utils/file";
+import {
+    selectedFavoriteCount as countSelectedFavorites,
+    type SelectedState,
+} from "@/utils/file";
 import {
     getAvailableFileActions,
     type FileContextAction,
@@ -469,18 +472,10 @@ export const FileList: React.FC<FileListProps> = ({
         if (selected.count == 0) setRangeStartIndex(undefined);
     }, [selected]);
 
-    const selectedFavoriteCount = useMemo(() => {
-        if (!favoriteFileIDs || selected.count == 0) return 0;
-        let count = 0;
-        for (const [key, value] of Object.entries(selected)) {
-            if (typeof value === "boolean" && value) {
-                if (favoriteFileIDs.has(Number(key))) {
-                    count += 1;
-                }
-            }
-        }
-        return count;
-    }, [favoriteFileIDs, selected]);
+    const selectedFavoriteCount = useMemo(
+        () => countSelectedFavorites(selected, favoriteFileIDs),
+        [favoriteFileIDs, selected],
+    );
 
     const contextMenuActions = useMemo(() => {
         if (!onContextMenuAction || !contextMenu) return [];

@@ -970,6 +970,22 @@ const deriveArchivedFileIDs = (
             .map((f) => f.id),
     );
 
+const favoriteUpdateFileIDs = (
+    user: LocalUser,
+    collectionFiles: GalleryState["collectionFiles"],
+    update: UnsyncedFavoriteUpdate,
+) =>
+    update.fileHashAndTypeKey
+        ? collectionFiles
+              .filter(
+                  (file) =>
+                      file.ownerID != user.id &&
+                      favoriteFileHashAndTypeKey(file) ==
+                          update.fileHashAndTypeKey,
+              )
+              .map((file) => file.id)
+        : [update.fileID];
+
 const deriveFavoriteFileIDs = (
     user: LocalUser,
     collections: GalleryState["collections"],
@@ -1005,16 +1021,11 @@ const deriveFavoriteFileIDs = (
     }
 
     for (const update of unsyncedFavoriteUpdates.values()) {
-        const updatedFileIDs = update.fileHashAndTypeKey
-            ? collectionFiles
-                  .filter(
-                      (file) =>
-                          file.ownerID != user.id &&
-                          favoriteFileHashAndTypeKey(file) ==
-                              update.fileHashAndTypeKey,
-                  )
-                  .map((file) => file.id)
-            : [update.fileID];
+        const updatedFileIDs = favoriteUpdateFileIDs(
+            user,
+            collectionFiles,
+            update,
+        );
         for (const fileID of updatedFileIDs) {
             if (update.isFavorite) favoriteFileIDs.add(fileID);
             else favoriteFileIDs.delete(fileID);
@@ -1032,16 +1043,11 @@ const preserveUnreflectedFavoriteUpdates = (
 
     // Keep an overlay until a pull reports the same state for every copy.
     for (const [key, update] of unsyncedFavoriteUpdates.entries()) {
-        const updatedFileIDs = update.fileHashAndTypeKey
-            ? collectionFiles
-                  .filter(
-                      (file) =>
-                          file.ownerID != user.id &&
-                          favoriteFileHashAndTypeKey(file) ==
-                              update.fileHashAndTypeKey,
-                  )
-                  .map((file) => file.id)
-            : [update.fileID];
+        const updatedFileIDs = favoriteUpdateFileIDs(
+            user,
+            collectionFiles,
+            update,
+        );
 
         if (
             updatedFileIDs.some(

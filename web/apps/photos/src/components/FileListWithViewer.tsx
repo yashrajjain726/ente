@@ -2,12 +2,11 @@ import { CollectionMapDialog } from "@/components/Collections/CollectionMapDialo
 import type { RemotePullOpts } from "@/components/gallery";
 import { downloadAndSaveFiles } from "@/services/save";
 import { uploadManager } from "@/services/upload-manager";
+import { fileTimelineDateString } from "@/utils/file";
 import { IconButton, Tooltip, styled } from "@mui/material";
 import { useColorScheme, useTheme } from "@mui/material/styles";
 import { useModalVisibility } from "ente-base/components/utils/modal";
 import { useBaseContext } from "ente-base/context";
-import { isSameDay } from "ente-base/date";
-import { formattedDate } from "ente-base/i18n-date";
 import type { AddSaveGroup } from "ente-gallery/components/utils/save-groups";
 import {
     FileViewer,
@@ -16,7 +15,7 @@ import {
 } from "ente-gallery/components/viewer/FileViewer";
 import type { Collection } from "ente-media/collection";
 import type { EnteFile } from "ente-media/file";
-import { fileCreationPhotoDate, fileFileName } from "ente-media/file-metadata";
+import { fileFileName } from "ente-media/file-metadata";
 import { useSettingsSnapshot } from "ente-new/photos/components/utils/use-snapshot";
 import { moveToTrash } from "ente-new/photos/services/collection";
 import type { CollectionSummary } from "ente-new/photos/services/collection-summary";
@@ -434,12 +433,3 @@ const MapIcon = styled("img")<{ $isDarkMode: boolean }>(
             $isDarkMode || theme.palette.mode === "dark" ? "invert(1)" : "none",
     }),
 );
-
-const fileTimelineDateString = (file: EnteFile) => {
-    const date = fileCreationPhotoDate(file);
-    return isSameDay(date, new Date())
-        ? t("today")
-        : isSameDay(date, new Date(Date.now() - 24 * 60 * 60 * 1000))
-          ? t("yesterday")
-          : formattedDate(date);
-};
