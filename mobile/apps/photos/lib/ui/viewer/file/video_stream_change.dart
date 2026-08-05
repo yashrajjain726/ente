@@ -106,60 +106,24 @@ class _VideoStreamChangeWidgetState extends State<VideoStreamChangeWidget> {
 
     // If currently processing, show "Creating Stream" with spinner (not clickable)
 
-    return Align(
-      alignment: Alignment.centerRight,
-      child: AnimatedOpacity(
-        duration: const Duration(milliseconds: 200),
-        curve: Curves.easeInQuad,
-        opacity: widget._showControls ? 1 : 0,
-        child: Padding(
-          padding: const EdgeInsets.only(right: 10, bottom: 4),
-          child: isCurrentlyProcessing
-              ? Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: colorScheme.backdropBase,
-                    borderRadius: const BorderRadius.all(Radius.circular(200)),
-                    border: Border.all(color: strokeFaintDark, width: 1),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      SizedBox(
-                        width: 12,
-                        height: 12,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            colorScheme.fillBase,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        _getStatusText(context, processingStatus),
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: colorScheme.fillBase,
-                        ),
-                      ),
-                    ],
-                  ),
-                )
-              : GestureDetector(
-                  onTap: widget.onStreamChange,
-                  child: Container(
+    return IgnorePointer(
+      ignoring: !widget._showControls,
+      child: Align(
+        alignment: Alignment.centerRight,
+        child: AnimatedOpacity(
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeInQuad,
+          opacity: widget._showControls ? 1 : 0,
+          child: Padding(
+            padding: const EdgeInsets.only(right: 10, bottom: 4),
+            child: isCurrentlyProcessing
+                ? Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 8,
                       vertical: 4,
                     ),
                     decoration: BoxDecoration(
-                      color: Colors.green,
+                      color: colorScheme.backdropBase,
                       borderRadius: const BorderRadius.all(
                         Radius.circular(200),
                       ),
@@ -169,26 +133,67 @@ class _VideoStreamChangeWidgetState extends State<VideoStreamChangeWidget> {
                       mainAxisAlignment: MainAxisAlignment.end,
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(
-                          Icons.play_arrow,
-                          size: 16,
-                          color: Colors.white,
+                        SizedBox(
+                          width: 12,
+                          height: 12,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              colorScheme.fillBase,
+                            ),
+                          ),
                         ),
-                        const SizedBox(width: 2),
+                        const SizedBox(width: 8),
                         Text(
-                          widget.isPreviewPlayer
-                              ? context.strings.playOriginal
-                              : context.strings.playStream,
-                          style: const TextStyle(
+                          _getStatusText(context, processingStatus),
+                          style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
-                            color: Colors.white,
+                            color: colorScheme.fillBase,
                           ),
                         ),
                       ],
                     ),
+                  )
+                : GestureDetector(
+                    onTap: widget.onStreamChange,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.green,
+                        borderRadius: const BorderRadius.all(
+                          Radius.circular(200),
+                        ),
+                        border: Border.all(color: strokeFaintDark, width: 1),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.play_arrow,
+                            size: 16,
+                            color: Colors.white,
+                          ),
+                          const SizedBox(width: 2),
+                          Text(
+                            widget.isPreviewPlayer
+                                ? context.strings.playOriginal
+                                : context.strings.playStream,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
-                ),
+          ),
         ),
       ),
     );
