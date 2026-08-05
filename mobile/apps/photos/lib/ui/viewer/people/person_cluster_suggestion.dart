@@ -198,15 +198,25 @@ class _PersonClustersState extends State<PersonReviewClusterSuggestion> {
                         Row(
                           children: <Widget>[
                             Expanded(
-                              child: ButtonComponent(
-                                variant:
-                                    ButtonComponentVariant.tertiaryCritical,
-                                leading: const Icon(Icons.close),
-                                label: context.strings.no,
-                                onTap: () => _handleUserClusterChoice(
-                                  clusterID,
-                                  false,
-                                  numberOfDifferentSuggestions,
+                              child: DecoratedBox(
+                                decoration: BoxDecoration(
+                                  border: Border.all(
+                                    color: context.componentColors.warning,
+                                  ),
+                                  borderRadius: BorderRadius.circular(
+                                    Radii.button,
+                                  ),
+                                ),
+                                child: ButtonComponent(
+                                  variant:
+                                      ButtonComponentVariant.tertiaryCritical,
+                                  leading: const Icon(Icons.close),
+                                  label: context.strings.no,
+                                  onTap: () => _handleUserClusterChoice(
+                                    clusterID,
+                                    false,
+                                    numberOfDifferentSuggestions,
+                                  ),
                                 ),
                               ),
                             ),
