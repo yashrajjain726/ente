@@ -28,4 +28,5 @@ enum PeopleEventType {
   syncDone,
   saveOrEditPerson,
   addedClusterToPerson,
+  reviewedSuggestion,
 }
