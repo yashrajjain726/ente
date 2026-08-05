@@ -1309,10 +1309,12 @@ export const createCurrentPhotoPost = async ({
             spaceId,
             bytes,
             caption?.trim() || null,
-            normalizedWidth,
-            normalizedHeight,
-            file.type || null,
-            thumbHash || null,
+            {
+                width: normalizedWidth,
+                height: normalizedHeight,
+                mediaType: file.type || null,
+                thumbHash: thumbHash || null,
+            },
         )) as SpacePostResponse;
         const object = firstObject(created);
         if (object) await cacheAccountPostAssetURL(created, object, file);
