@@ -23,13 +23,10 @@ final _logger = Logger("PersonGallerySuggestion");
 class PersonGallerySuggestion extends StatefulWidget {
   final PersonEntity? person;
   final VoidCallback? onClose;
-  final Future<List<ClusterSuggestion>> Function(PersonEntity person)?
-  loadSuggestions;
 
   const PersonGallerySuggestion({
     required this.person,
     this.onClose,
-    this.loadSuggestions,
     super.key,
   });
 
@@ -103,11 +100,8 @@ class _PersonGallerySuggestionState extends State<PersonGallerySuggestion>
     try {
       late final List<ClusterSuggestion> suggestions;
       if (personPage) {
-        suggestions =
-            await (widget.loadSuggestions?.call(relevantPerson) ??
-                ClusterFeedbackService.instance.getSuggestionForPerson(
-                  relevantPerson,
-                ));
+        suggestions = await ClusterFeedbackService.instance
+            .getSuggestionForPerson(relevantPerson);
       } else {
         suggestions = await ClusterFeedbackService.instance
             .getAllLargePersonSuggestions();
