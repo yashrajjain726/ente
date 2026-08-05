@@ -102,6 +102,17 @@ func setupCollectionShareTest(
 	return db, newShareTestCollectionRepo(db), ownerID, shareeID
 }
 
+func setShareTestFamilyAdmin(t *testing.T, db *sql.DB, userID int64, familyAdminID any) {
+	t.Helper()
+	if _, err := db.Exec(
+		`UPDATE users SET family_admin_id = $1 WHERE user_id = $2`,
+		familyAdminID,
+		userID,
+	); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func requireCollectionShareStatus(
 	t *testing.T,
 	status, want ente.CollectionShareStatus,
@@ -468,6 +479,8 @@ func TestUncategorizedCollectionsOnlyAllowViewerShares(t *testing.T) {
 
 func TestBulkShareAndUnshareReturnPerCollectionStatuses(t *testing.T) {
 	db, collectionRepo, ownerID, shareeID := setupCollectionShareTest(t)
+	setShareTestFamilyAdmin(t, db, ownerID, ownerID)
+	setShareTestFamilyAdmin(t, db, shareeID, ownerID)
 	albumID := createShareTestCollection(t, collectionRepo, ownerID)
 	neverSharedID := createShareTestCollection(t, collectionRepo, ownerID)
 	uncategorizedID := createShareTestCollectionOfType(
@@ -479,6 +492,7 @@ func TestBulkShareAndUnshareReturnPerCollectionStatuses(t *testing.T) {
 	controller := &CollectionController{
 		CollectionRepo: collectionRepo,
 		CastRepo:       &castRepo.Repository{DB: db},
+		UserRepo:       &repo.UserRepository{DB: db},
 		UserLookup:     newShareTestUserLookup(db),
 	}
 	ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
@@ -522,6 +536,59 @@ func TestBulkShareAndUnshareReturnPerCollectionStatuses(t *testing.T) {
 	if unshareResults[0].Status != ente.CollectionUnshared ||
 		unshareResults[1].Status != ente.CollectionNotShared {
 		t.Fatalf("bulk unshare results = %+v", unshareResults)
+	}
+}
+
+func TestBulkShareAutomaticRecipientMustBeInSameFamily(t *testing.T) {
+	db, collectionRepo, ownerID, shareeID := setupCollectionShareTest(t)
+	controller := &CollectionController{
+		CollectionRepo: collectionRepo,
+		UserRepo:       &repo.UserRepository{DB: db},
+		UserLookup:     newShareTestUserLookup(db),
+	}
+	ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+	ctx.Request = httptest.NewRequest("POST", "/collections/share/bulk", nil)
+	ctx.Request.Header.Set("X-Auth-User-ID", strconv.FormatInt(ownerID, 10))
+	share := func(collectionID int64, source ente.CollectionShareSource) error {
+		_, err := controller.BulkShare(ctx, ente.BulkCollectionShareRequest{
+			RecipientUserID: shareeID,
+			RecipientEmail:  "sharee@example.com",
+			Source:          source,
+			Collections: []ente.BulkCollectionShareItem{{
+				CollectionID: collectionID,
+				EncryptedKey: b64OfLen(sealedCollectionKeyLen),
+				Role:         ente.VIEWER,
+			}},
+		})
+		return err
+	}
+
+	setShareTestFamilyAdmin(t, db, ownerID, ownerID)
+	setShareTestFamilyAdmin(t, db, shareeID, shareeID)
+	if err := share(createShareTestCollection(t, collectionRepo, ownerID), ente.AutomaticShare); !errors.Is(err, ente.ErrAutomaticShareRecipientNotEligible) {
+		t.Fatalf("unrelated automatic share error = %v, want %v", err, ente.ErrAutomaticShareRecipientNotEligible)
+	}
+
+	setShareTestFamilyAdmin(t, db, shareeID, nil)
+	if err := share(createShareTestCollection(t, collectionRepo, ownerID), ente.AutomaticShare); !errors.Is(err, ente.ErrAutomaticShareRecipientNotEligible) {
+		t.Fatalf("former family member automatic share error = %v, want %v", err, ente.ErrAutomaticShareRecipientNotEligible)
+	}
+
+	var shareCount int
+	if err := db.QueryRow(`SELECT count(*) FROM collection_shares`).Scan(&shareCount); err != nil {
+		t.Fatal(err)
+	}
+	if shareCount != 0 {
+		t.Fatalf("collection shares after rejected requests = %d, want 0", shareCount)
+	}
+
+	if err := share(createShareTestCollection(t, collectionRepo, ownerID), ente.ManualShare); err != nil {
+		t.Fatalf("manual share error = %v", err)
+	}
+
+	setShareTestFamilyAdmin(t, db, shareeID, ownerID)
+	if err := share(createShareTestCollection(t, collectionRepo, ownerID), ente.AutomaticShare); err != nil {
+		t.Fatalf("same-family automatic share error = %v", err)
 	}
 }
 

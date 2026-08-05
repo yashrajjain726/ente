@@ -79,6 +79,19 @@ func (c *CollectionController) BulkShare(
 	); err != nil {
 		return nil, stacktrace.Propagate(err, "")
 	}
+	if req.Source == ente.AutomaticShare {
+		sameFamily, err := c.UserRepo.AreUsersInSameFamily(
+			ctx.Request.Context(),
+			fromUserID,
+			req.RecipientUserID,
+		)
+		if err != nil {
+			return nil, err
+		}
+		if !sameFamily {
+			return nil, stacktrace.Propagate(ente.ErrAutomaticShareRecipientNotEligible, "")
+		}
+	}
 
 	results := make([]ente.BulkCollectionShareResult, 0, len(req.Collections))
 	for _, item := range req.Collections {

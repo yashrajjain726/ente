@@ -208,6 +208,12 @@ var ErrRecipientIdentityMismatch = &ApiError{
 	HttpStatusCode: http.StatusConflict,
 }
 
+var ErrAutomaticShareRecipientNotEligible = &ApiError{
+	Code:           "AUTOMATIC_SHARE_RECIPIENT_NOT_ELIGIBLE",
+	Message:        "Automatic share recipient is not eligible",
+	HttpStatusCode: http.StatusForbidden,
+}
+
 var ErrMaxPasskeysReached = ApiError{
 	Code:           MaxPasskeysReached,
 	Message:        "Max passkeys limit reached",

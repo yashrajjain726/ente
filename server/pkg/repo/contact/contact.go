@@ -10,6 +10,7 @@ import (
 
 	"github.com/ente/museum/ente"
 	contactmodel "github.com/ente/museum/ente/contact"
+	"github.com/ente/museum/pkg/repo"
 	"github.com/ente/museum/pkg/utils/crypto"
 	"github.com/ente/stacktrace"
 	"github.com/lib/pq"
@@ -107,24 +108,11 @@ func (r *Repository) hasActiveEmergencyRelationship(ctx context.Context, actorUs
 }
 
 func (r *Repository) hasSharedActiveFamily(ctx context.Context, actorUserID int64, contactUserID int64) (bool, error) {
-	var exists bool
-	err := r.DB.QueryRowContext(
+	return (&repo.UserRepository{DB: r.DB}).AreUsersInSameFamily(
 		ctx,
-		`SELECT EXISTS(
-			SELECT 1
-			FROM users actor
-			JOIN users contact ON actor.family_admin_id = contact.family_admin_id
-			WHERE actor.user_id = $1
-			  AND contact.user_id = $2
-			  AND actor.family_admin_id IS NOT NULL
-		)`,
 		actorUserID,
 		contactUserID,
-	).Scan(&exists)
-	if err != nil {
-		return false, err
-	}
-	return exists, nil
+	)
 }
 
 func (r *Repository) hasCommonSharedCollection(ctx context.Context, actorUserID int64, contactUserID int64) (bool, error) {
