@@ -5,6 +5,7 @@ members = [
     "apps/codegen",
     "apps/ensu/src-tauri",
     "bindings/frb/ente-rust",
+    "bindings/frb/log",
     "bindings/frb/photos",
     "bindings/napi/photos",
     "bindings/uniffi/cast",
@@ -32,6 +33,7 @@ ente-assets = { path = "crates/assets" }
 ente-contacts = { path = "crates/contacts" }
 ente-core = { path = "crates/core" }
 ente-ensu = { path = "crates/ensu" }
+ente-frb-log = { path = "bindings/frb/log" }
 ente-image = { path = "crates/image" }
 ente-paste = { path = "crates/paste" }
 ente-photos = { path = "crates/photos" }

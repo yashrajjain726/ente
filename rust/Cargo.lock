@@ -2454,6 +2454,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "ente-frb-log"
+version = "0.0.0"
+dependencies = [
+ "flutter_rust_bridge",
+ "log",
+]
+
+[[package]]
 name = "ente-image"
 version = "0.0.0"
 dependencies = [
@@ -2644,10 +2652,10 @@ dependencies = [
 name = "ente_photos_rust"
 version = "0.0.0"
 dependencies = [
+ "ente-frb-log",
  "ente-image",
  "ente-photos",
  "flutter_rust_bridge",
- "log",
 ]
 
 [[package]]
@@ -2657,8 +2665,8 @@ dependencies = [
  "ente-accounts",
  "ente-contacts",
  "ente-core",
+ "ente-frb-log",
  "flutter_rust_bridge",
- "log",
 ]
 
 [[package]]
