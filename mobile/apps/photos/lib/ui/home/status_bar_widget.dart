@@ -12,9 +12,9 @@ import "package:logging/logging.dart";
 import 'package:photos/core/event_bus.dart';
 import 'package:photos/ente_theme_data.dart';
 import 'package:photos/events/christmas_banner_event.dart';
+import "package:photos/events/force_reload_home_gallery_event.dart";
 import 'package:photos/events/notification_event.dart';
 import 'package:photos/events/sync_status_update_event.dart';
-import "package:photos/extensions/logger_extension.dart";
 import "package:photos/service_locator.dart";
 import "package:photos/services/sync/large_backup_session_tracker.dart";
 import 'package:photos/services/sync/sync_service.dart';
@@ -52,30 +52,13 @@ class _StatusBarWidgetState extends State<StatusBarWidget> {
       (isLocalGalleryMode || flagService.hasSyncedAccountFlags()) &&
       !localSettings.hasSeenMLEnablingBanner;
   final LargeBackupSessionTracker _largeBackupSession =
-      LargeBackupSessionTracker();
+      SyncService.instance.largeBackupSessionTracker;
   Error? _syncError;
 
   @override
   void initState() {
-    _logger.internalInfo(
-      "Large backup standby enabled=$_isLargeBackupStandbyEnabled, "
-      "platform=${Platform.operatingSystem}, "
-      "threshold=${LargeBackupSessionTracker.minimumFileCount}",
-    );
-    if (_isLargeBackupStandbyEnabled) {
-      final lastSyncStatus = SyncService.instance.getLastSyncStatusEvent();
-      if (lastSyncStatus != null) {
-        _logger.internalInfo(
-          "Restoring large backup state from ${lastSyncStatus.status.name}",
-        );
-        _largeBackupSession.update(lastSyncStatus);
-      }
-    }
     _subscription = Bus.instance.on<SyncStatusUpdate>().listen((event) {
       _logger.info("Received event " + event.status.toString());
-      if (_isLargeBackupStandbyEnabled) {
-        _largeBackupSession.update(event);
-      }
       _isPausedDueToNetwork = event.status == SyncStatus.paused;
       if (event.status == SyncStatus.error) {
         setState(() {
@@ -128,7 +111,6 @@ class _StatusBarWidgetState extends State<StatusBarWidget> {
     _subscription.cancel();
     _notificationSubscription.cancel();
     _christmasBannerSubscription.cancel();
-    _largeBackupSession.dispose();
     super.dispose();
   }
 
@@ -173,13 +155,15 @@ class _StatusBarWidgetState extends State<StatusBarWidget> {
     );
   }
 
-  bool get _isLargeBackupStandbyEnabled => flagService.internalUser;
+  bool get _isLargeBackupStandbyEnabled =>
+      flagService.largeBackupStandby &&
+      localSettings.isLargeBackupStandbyEnabled;
 
   bool get _shouldShowLargeBackupBanner =>
       _isLargeBackupStandbyEnabled &&
       Platform.isIOS &&
       !_showErrorBanner &&
-      _largeBackupSession.shouldOfferStandby;
+      _largeBackupSession.isActive;
 
   Widget _largeBackupBanner(BuildContext context) {
     return _bannerPadding(
@@ -192,21 +176,23 @@ class _StatusBarWidgetState extends State<StatusBarWidget> {
         ),
         state: BannerComponentState.success,
         onTap: () async {
-          if (!_largeBackupSession.shouldOfferStandby) {
-            _logger.internalInfo(
-              "Ignored standby banner tap because backup is no longer active",
-            );
+          if (_largeBackupSession.isStandbyScreenActive ||
+              !_largeBackupSession.isActive) {
             return;
           }
-          _logger.internalInfo(
-            "Opening standby screen with "
-            "remaining=${_largeBackupSession.remainingCount}",
-          );
-          await routeToPage(
-            context,
-            BackupStandbyScreen(sessionTracker: _largeBackupSession),
-            forceCustomPageRoute: true,
-          );
+          _largeBackupSession.setStandbyScreenActive(true);
+          try {
+            await routeToPage(
+              context,
+              BackupStandbyScreen(sessionTracker: _largeBackupSession),
+              forceCustomPageRoute: true,
+            );
+          } finally {
+            _largeBackupSession.setStandbyScreenActive(false);
+            Bus.instance.fire(
+              ForceReloadHomeGalleryEvent("largeBackupStandbyEnded"),
+            );
+          }
         },
       ),
     );

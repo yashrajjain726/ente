@@ -1,32 +1,27 @@
 import "package:flutter/foundation.dart";
-import "package:logging/logging.dart";
 import "package:photos/events/sync_status_update_event.dart";
-import "package:photos/extensions/logger_extension.dart";
 
-/// Tracks whether the current upload session is large enough to offer the
-/// foreground standby screen.
 class LargeBackupSessionTracker extends ChangeNotifier {
-  static final _logger = Logger("LargeBackupSessionTracker");
-  static const int minimumFileCount = 2;
+  static const int minimumFileCount = 1000;
 
   bool _isEligible = false;
   bool _isUploading = false;
   int _remainingCount = 0;
-  SyncStatus? _lastStatus;
+  bool _isStandbyScreenActive = false;
 
-  // A backup can contain multiple upload batches. The session remains active
-  // while the sync service prepares the next batch, even though the current
-  // batch's remaining count is temporarily zero.
   bool get isActive => _isUploading && _isEligible;
 
   int get remainingCount => _remainingCount;
 
-  SyncStatus? get lastStatus => _lastStatus;
+  bool get isStandbyScreenActive => _isStandbyScreenActive;
+
+  void setStandbyScreenActive(bool value) {
+    _isStandbyScreenActive = value;
+  }
 
   void update(SyncStatusUpdate event) {
     final wasActive = isActive;
     final previousRemainingCount = _remainingCount;
-    _lastStatus = event.status;
 
     switch (event.status) {
       case SyncStatus.preparingForUpload:
@@ -51,16 +46,6 @@ class LargeBackupSessionTracker extends ChangeNotifier {
       case SyncStatus.completedFirstGalleryImport:
       case SyncStatus.applyingRemoteDiff:
         break;
-    }
-
-    if (event.status != SyncStatus.inProgress || _remainingCount == 0) {
-      _logger.internalInfo(
-        "status=${event.status.name}, total=${event.total}, "
-        "completed=${event.completed}, uploading=$_isUploading, "
-        "eligible=$_isEligible, remaining=$_remainingCount, "
-        "active=$isActive, "
-        "threshold=$minimumFileCount",
-      );
     }
 
     if (wasActive != isActive || previousRemainingCount != _remainingCount) {

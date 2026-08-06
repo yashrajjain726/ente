@@ -1,9 +1,11 @@
+import "dart:async";
+
 import "package:ente_components/ente_components.dart";
+import "package:ente_screen_brightness/ente_screen_brightness.dart";
 import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:intl/intl.dart";
 import "package:logging/logging.dart";
-import "package:photos/extensions/logger_extension.dart";
 import "package:photos/service_locator.dart";
 import "package:photos/services/sync/large_backup_session_tracker.dart";
 import "package:photos/services/wake_lock_service.dart";
@@ -20,9 +22,13 @@ class BackupStandbyScreen extends StatefulWidget {
 class _BackupStandbyScreenState extends State<BackupStandbyScreen>
     with WidgetsBindingObserver {
   static final _logger = Logger("BackupStandbyScreen");
+  static const _dimmingDelay = Duration(seconds: 3);
+  static const _dimmedBrightness = 0.15;
 
   late int _remainingCount;
+  Timer? _dimmingTimer;
   bool _isClosing = false;
+  bool _isScreenDimmed = false;
   bool _isWakeLockEnabled = false;
 
   @override
@@ -32,52 +38,41 @@ class _BackupStandbyScreenState extends State<BackupStandbyScreen>
     WidgetsBinding.instance.addObserver(this);
     widget.sessionTracker.addListener(_handleBackupSessionChanged);
     final isBackupActive = widget.sessionTracker.isActive;
-    _logger.internalInfo(
-      "Opened with remaining=$_remainingCount, "
-      "backupActive=$isBackupActive, "
-      "persistentAutoLock="
-      "${wakeLockService.shouldKeepAppAwakeAcrossSessions}",
-    );
     if (isBackupActive) {
       _setWakeLock(enable: true);
+      _scheduleScreenDimming();
     } else {
-      _logger.internalInfo("Closing because backup finished before opening");
-      WidgetsBinding.instance.addPostFrameCallback(
-        (_) => _dismiss(reason: "backupInactiveBeforeOpening"),
-      );
+      WidgetsBinding.instance.addPostFrameCallback((_) => _dismiss());
     }
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     final isBackupActive = widget.sessionTracker.isActive;
-    _logger.internalInfo(
-      "Lifecycle=${state.name}, backupActive=$isBackupActive, "
-      "closing=$_isClosing, wakeLockRequested=$_isWakeLockEnabled",
-    );
     switch (state) {
       case AppLifecycleState.resumed:
         if (!_isClosing && isBackupActive) {
           _setWakeLock(enable: true);
+          _scheduleScreenDimming();
         } else if (!_isClosing) {
-          _dismiss(reason: "backupInactiveOnResume");
+          _dismiss();
         }
         break;
       case AppLifecycleState.inactive:
+        _restoreScreenBrightness(resetText: true);
+        break;
       case AppLifecycleState.paused:
       case AppLifecycleState.hidden:
-      case AppLifecycleState.detached:
         _setWakeLock(enable: false);
+        break;
+      case AppLifecycleState.detached:
         break;
     }
   }
 
   @override
   void dispose() {
-    _logger.internalInfo(
-      "Disposing with remaining=$_remainingCount, "
-      "wakeLockRequested=$_isWakeLockEnabled",
-    );
+    _restoreScreenBrightness();
     _setWakeLock(enable: false);
     widget.sessionTracker.removeListener(_handleBackupSessionChanged);
     WidgetsBinding.instance.removeObserver(this);
@@ -86,27 +81,37 @@ class _BackupStandbyScreenState extends State<BackupStandbyScreen>
 
   @override
   Widget build(BuildContext context) {
+    const colors = ColorTokens.light;
     final formattedCount = NumberFormat().format(_remainingCount);
     final memoryLabel = _remainingCount == 1 ? "memory" : "memories";
+    final statusText = _remainingCount > 0
+        ? pendingTranslation("Preserving $formattedCount $memoryLabel")
+        : pendingTranslation("Checking for more…");
+    final statusColor = colors.specialWhite.withValues(
+      alpha: _isScreenDimmed ? 0.35 : 1,
+    );
+    final instructionColor = colors.textLightest.withValues(
+      alpha: _isScreenDimmed ? 0.50 : 1,
+    );
 
     return GestureDetector(
       key: const ValueKey("large-backup-standby-screen"),
       behavior: HitTestBehavior.opaque,
-      onTap: () => _dismiss(reason: "userTap"),
+      onTap: _dismiss,
       child: Scaffold(
-        backgroundColor: Colors.black,
+        backgroundColor: colors.fillBase,
         body: Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                pendingTranslation("Preserving $formattedCount $memoryLabel"),
-                style: TextStyles.large.copyWith(color: Colors.white),
+                statusText,
+                style: TextStyles.large.copyWith(color: statusColor),
               ),
               const SizedBox(height: 17),
               Text(
-                pendingTranslation("Tap to wake the screen"),
-                style: TextStyles.body.copyWith(color: const Color(0xFFD6D6D6)),
+                pendingTranslation("Tap to return to Ente"),
+                style: TextStyles.body.copyWith(color: instructionColor),
               ),
             ],
           ),
@@ -121,7 +126,7 @@ class _BackupStandbyScreenState extends State<BackupStandbyScreen>
     }
 
     if (!widget.sessionTracker.isActive) {
-      _dismiss(reason: "syncStatus:${widget.sessionTracker.lastStatus?.name}");
+      _dismiss();
       return;
     }
 
@@ -134,25 +139,58 @@ class _BackupStandbyScreenState extends State<BackupStandbyScreen>
     });
   }
 
-  void _dismiss({required String reason}) {
-    if (_isClosing) {
-      _logger.internalInfo("Ignored duplicate dismissal: $reason");
+  void _dismiss() {
+    if (!mounted || _isClosing) {
       return;
     }
-    if (!mounted) {
-      return;
-    }
-    final navigator = Navigator.of(context);
-    if (!navigator.canPop()) {
-      _logger.internalWarning("Could not pop standby screen");
-      return;
-    }
-    _logger.internalInfo(
-      "Dismissing: reason=$reason, remaining=$_remainingCount",
-    );
+    _restoreScreenBrightness();
     _setWakeLock(enable: false);
-    navigator.pop();
+    Navigator.of(context).pop();
     _isClosing = true;
+  }
+
+  void _scheduleScreenDimming() {
+    _restoreScreenBrightness(resetText: true);
+    _dimmingTimer = Timer(_dimmingDelay, () async {
+      _dimmingTimer = null;
+      if (!_canDimScreen) {
+        return;
+      }
+
+      try {
+        final didDim = await EnteScreenBrightness.setBrightness(
+          _dimmedBrightness,
+        );
+        if (didDim && _canDimScreen) {
+          setState(() => _isScreenDimmed = true);
+        }
+      } catch (error, stackTrace) {
+        _logger.warning("Could not dim screen brightness", error, stackTrace);
+      }
+    });
+  }
+
+  bool get _canDimScreen =>
+      mounted &&
+      !_isClosing &&
+      widget.sessionTracker.isActive &&
+      WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed;
+
+  void _restoreScreenBrightness({bool resetText = false}) {
+    _dimmingTimer?.cancel();
+    _dimmingTimer = null;
+    if (resetText && _isScreenDimmed && mounted) {
+      setState(() => _isScreenDimmed = false);
+    }
+    unawaited(
+      EnteScreenBrightness.restore().onError(
+        (error, stackTrace) => _logger.warning(
+          "Could not restore screen brightness",
+          error,
+          stackTrace,
+        ),
+      ),
+    );
   }
 
   void _setWakeLock({required bool enable}) {
@@ -160,11 +198,6 @@ class _BackupStandbyScreenState extends State<BackupStandbyScreen>
       return;
     }
     _isWakeLockEnabled = enable;
-    _logger.internalInfo(
-      "Wake lock request: enable=$enable, "
-      "persistentAutoLock="
-      "${wakeLockService.shouldKeepAppAwakeAcrossSessions}",
-    );
     wakeLockService.updateWakeLock(
       enable: enable,
       wakeLockFor: WakeLockFor.largeBackupStandbyScreen,
