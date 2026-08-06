@@ -252,6 +252,19 @@ class _ImageEditorPageState extends State<ImageEditorPage> {
             ),
           ),
           configs: ProImageEditorConfigs(
+            i18n: I18n(
+              tuneEditor: I18nTuneEditor(
+                brightness: context.strings.imageEditorBrightness,
+                contrast: context.strings.imageEditorContrast,
+                saturation: context.strings.imageEditorSaturation,
+                exposure: context.strings.imageEditorExposure,
+                hue: context.strings.imageEditorHue,
+                temperature: context.strings.imageEditorTemperature,
+                sharpness: context.strings.imageEditorSharpness,
+                fade: context.strings.imageEditorFade,
+                luminance: context.strings.imageEditorLuminance,
+              ),
+            ),
             imageGeneration: const ImageGenerationConfigs(
               jpegQuality: 100,
               enableIsolateGeneration: true,
