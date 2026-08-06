@@ -4,6 +4,7 @@ import { ensureLocalUser } from "ente-accounts/services/user";
 import { isDesktop } from "ente-base/app";
 import { createComlinkCryptoWorker } from "ente-base/crypto";
 import type { CryptoWorker } from "ente-base/crypto/worker";
+import { isDevBuild } from "ente-base/env";
 import { lowercaseExtension, nameAndExtension } from "ente-base/file-name";
 import log from "ente-base/log";
 import { ComlinkWorker } from "ente-base/worker/comlink-worker";
@@ -45,6 +46,7 @@ import { FileType } from "ente-media/file-type";
 import { potentialFileTypeFromExtension } from "ente-media/live-photo";
 import { computeNormalCollectionFilesFromSaved } from "ente-new/photos/services/file";
 import { indexNewUpload } from "ente-new/photos/services/ml";
+import { settingsSnapshot } from "ente-new/photos/services/settings";
 import { wait } from "ente-utils/promise";
 import watcher from "./watch";
 
@@ -533,8 +535,12 @@ class UploadManager {
         options?: UploadItemsOptions,
     ) {
         const uiService = this.uiService;
+        const settings = settingsSnapshot();
         const uploadContext = {
             isCFUploadProxyDisabled: shouldDisableCFUploadProxy(),
+            deferMultipartChecksums:
+                settings.deferredMultipartChecksumsEnabled &&
+                (settings.isInternalUser || isDevBuild),
             skipDuplicateAddToUploadCollection:
                 options?.skipDuplicateAddToUploadCollection,
             includePartnerSharedFiles: options?.includePartnerSharedFiles,

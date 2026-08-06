@@ -79,7 +79,7 @@ export const fetchMultipartUploadURLsWithMetadata = async ({
 }: {
     contentLength: number;
     partLength: number;
-    partMd5s: string[];
+    partMd5s?: string[];
 }) => {
     const headers = new Headers(await authenticatedRequestHeaders());
     headers.set("Content-Type", "application/json");
