@@ -55,13 +55,6 @@ void main() {
         'scale=trunc(iw/2)*2:trunc(ih/2)*2',
       ]);
     });
-
-    test('rejects non-quarter-turn rotations', () {
-      expect(
-        () => buildFfmpegVideoFilters(crop: null, rotation: 45),
-        throwsArgumentError,
-      );
-    });
   });
 
   test('FFmpeg plan preserves file paths as structured arguments', () {

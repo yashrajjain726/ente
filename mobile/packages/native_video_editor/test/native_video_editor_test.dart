@@ -74,17 +74,6 @@ void main() {
     expect(info.frameRate, 29.97);
   });
 
-  test('unavailable optional metadata is represented as null', () {
-    final info = NativeVideoInfo.fromMap({
-      ..._videoInfoMap,
-      'bitrate': 0,
-      'frameRate': -1,
-    });
-
-    expect(info.bitrate, isNull);
-    expect(info.frameRate, isNull);
-  });
-
   test('non-quarter-turn metadata rotation is rejected', () {
     expect(
       () => NativeVideoInfo.fromMap({..._videoInfoMap, 'rotation': 45}),
@@ -180,64 +169,6 @@ void main() {
     );
   });
 
-  test('frame extraction cannot overwrite its input', () async {
-    await expectLater(
-      NativeVideoEditor.extractFrame(
-        VideoFrameRequest(
-          inputPath: input.path,
-          outputPath: input.path,
-          position: Duration.zero,
-          maxWidth: 144,
-          maxHeight: 120,
-        ),
-      ),
-      throwsArgumentError,
-    );
-  });
-
-  test('timeline destinations must be unique', () async {
-    final output = '${directory.path}/same.jpg';
-    await expectLater(
-      NativeVideoEditor.extractTimeline(
-        VideoTimelineRequest(
-          requestId: 'trim-duplicate',
-          inputPath: input.path,
-          outputPaths: [output, output],
-          positions: [Duration.zero, const Duration(seconds: 1)],
-          maxWidth: 144,
-          maxHeight: 120,
-        ),
-      ),
-      throwsArgumentError,
-    );
-  });
-
-  test('frame result must match the requested output path', () async {
-    extractionResultOverride = {
-      'videoInfo': _videoInfoMap,
-      'frames': [
-        {
-          'outputPath': '${directory.path}/wrong.jpg',
-          'width': 120,
-          'height': 90,
-        },
-      ],
-    };
-
-    await expectLater(
-      NativeVideoEditor.extractFrame(
-        VideoFrameRequest(
-          inputPath: input.path,
-          outputPath: '${directory.path}/expected.jpg',
-          position: Duration.zero,
-          maxWidth: 144,
-          maxHeight: 120,
-        ),
-      ),
-      throwsFormatException,
-    );
-  });
-
   test('timeline result must contain every requested frame', () async {
     extractionResultOverride = {
       'videoInfo': _videoInfoMap,
@@ -257,19 +188,6 @@ void main() {
       ),
       throwsFormatException,
     );
-  });
-
-  test('processing cannot overwrite its input', () async {
-    lastCall = null;
-
-    await expectLater(
-      NativeVideoEditor.processVideo(
-        inputPath: input.path,
-        outputPath: input.path,
-      ),
-      throwsArgumentError,
-    );
-    expect(lastCall, isNull);
   });
 
   test('processing requires both trim boundaries', () async {

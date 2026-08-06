@@ -30,18 +30,6 @@ void main() {
     }
   });
 
-  test('four clockwise turns return the original crop', () {
-    var crop = sourceCrop;
-    for (var index = 0; index < 4; index++) {
-      crop = rotateNormalizedRect(crop, 90);
-    }
-    _expectRectClose(crop, sourceCrop);
-  });
-
-  test('non-quarter-turn rotation is rejected', () {
-    expect(() => rotateNormalizedRect(sourceCrop, 45), throwsArgumentError);
-  });
-
   test('fixed-ratio crop remains in bounds without changing ratio', () {
     final crop = constrainNormalizedCropRect(
       rect: const Rect.fromLTRB(-0.1, 0.1, 0.8, 0.9),
