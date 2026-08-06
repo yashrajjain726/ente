@@ -86,6 +86,7 @@ class _ImageEditorTuneBarState extends State<ImageEditorTuneBar>
                     (index) {
                       final item = tuneEditor.tuneAdjustmentList[index];
                       return TuneItem(
+                        id: item.id,
                         icon: item.icon,
                         label: item.label,
                         isSelected: tuneEditor.selectedIndex == index,
@@ -125,6 +126,7 @@ class _ImageEditorTuneBarState extends State<ImageEditorTuneBar>
 }
 
 class TuneItem extends StatelessWidget {
+  final String id;
   final IconData icon;
   final String label;
   final bool isSelected;
@@ -135,6 +137,7 @@ class TuneItem extends StatelessWidget {
 
   const TuneItem({
     super.key,
+    required this.id,
     required this.icon,
     required this.label,
     required this.isSelected,
@@ -147,8 +150,8 @@ class TuneItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.componentColors;
-    final hugeIcon = _hugeIconForLabel(label);
-    final svgPath = _svgPathForLabel(label);
+    final hugeIcon = _hugeIconForID(id);
+    final svgPath = _svgPathForID(id);
     return GestureDetector(
       onTap: onTap,
       child: SizedBox(
@@ -179,8 +182,8 @@ class TuneItem extends StatelessWidget {
     );
   }
 
-  List<List<dynamic>>? _hugeIconForLabel(String label) {
-    return switch (label.toLowerCase()) {
+  List<List<dynamic>>? _hugeIconForID(String id) {
+    return switch (id) {
       "brightness" => HugeIcons.strokeRoundedSun01,
       "contrast" => HugeIcons.strokeRoundedSlidersHorizontal,
       "exposure" => HugeIcons.strokeRoundedCameraLens,
@@ -192,10 +195,9 @@ class TuneItem extends StatelessWidget {
     };
   }
 
-  String? _svgPathForLabel(String label) {
-    return switch (label.toLowerCase()) {
-      "luminance" ||
-      "fade" => "assets/image-editor/image-editor-${label.toLowerCase()}.svg",
+  String? _svgPathForID(String id) {
+    return switch (id) {
+      "luminance" || "fade" => "assets/image-editor/image-editor-$id.svg",
       _ => null,
     };
   }

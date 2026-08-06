@@ -2,9 +2,9 @@ import "dart:math" as math;
 
 import "package:ente_components/theme/text_styles.dart";
 import "package:ente_icons/ente_icons.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:photos/theme/ente_theme.dart";
-import "package:photos/utils/pending_translation.dart";
 
 enum StartNewRitualCardVariant { compact, wide }
 
@@ -37,7 +37,7 @@ class StartNewRitualCard extends StatelessWidget {
   static double compactHeightFor(BuildContext context) {
     final titleHeight = _measuredTextHeight(
       context,
-      text: pendingTranslation("Start new ritual"),
+      text: context.strings.ritualStartNew,
       style: _compactTitleStyle(Colors.black),
       maxWidth: _compactWidth - 24,
     );
@@ -55,10 +55,8 @@ class StartNewRitualCard extends StatelessWidget {
 
     final colorScheme = getEnteColorScheme(context);
     final borderRadius = BorderRadius.circular(_cardRadius);
-    final titleText = pendingTranslation("Start new ritual");
-    final subtitleText = pendingTranslation(
-      "Create a ritual, build streaks, and share your progress.",
-    );
+    final titleText = context.strings.ritualStartNew;
+    final subtitleText = context.strings.ritualStartNewDescription;
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -183,7 +181,7 @@ class _CompactStartNewRitualCard extends StatelessWidget {
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 12),
                       child: Text(
-                        pendingTranslation("Start new ritual"),
+                        context.strings.ritualStartNew,
                         style: _compactTitleStyle(colorScheme.textBase),
                         textAlign: TextAlign.center,
                         textHeightBehavior: _tightTextHeightBehavior,

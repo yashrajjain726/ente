@@ -23,13 +23,13 @@ class GallerySettingsScreen extends StatefulWidget {
 
 class _GallerySettingsScreenState extends State<GallerySettingsScreen> {
   late int _photoGridSize;
-  late String _groupType;
+  late GroupType _groupType;
 
   @override
   void initState() {
     super.initState();
     _photoGridSize = localSettings.getPhotoGridSize();
-    _groupType = localSettings.getGalleryGroupType().name;
+    _groupType = localSettings.getGalleryGroupType();
   }
 
   @override
@@ -47,7 +47,10 @@ class _GallerySettingsScreenState extends State<GallerySettingsScreen> {
         const SizedBox(height: 8),
         SettingsItem(
           title: l10n.groupBy,
-          trailing: _trailingLabel(context, _groupType),
+          trailing: _trailingLabel(
+            context,
+            _groupType.getLocalizedName(context),
+          ),
           onTap: () async => _showGroupTypeSheet(context),
         ),
         if (!widget.fromGalleryLayoutSettingsCTA && !isLocalGalleryMode) ...[
@@ -130,7 +133,6 @@ class _GallerySettingsScreenState extends State<GallerySettingsScreen> {
 
   Future<void> _showGroupTypeSheet(BuildContext context) async {
     final l10n = context.strings;
-    final currentGroupType = localSettings.getGalleryGroupType();
     await showBottomSheetComponent<void>(
       context: context,
       builder: (sheetContext) => BottomSheetComponent(
@@ -139,9 +141,9 @@ class _GallerySettingsScreenState extends State<GallerySettingsScreen> {
           items: [
             for (final groupType in _groupTypes)
               MenuComponent(
-                key: ValueKey(groupType.name),
+                key: ValueKey(groupType),
                 title: groupType.getLocalizedName(sheetContext),
-                trailing: currentGroupType == groupType
+                trailing: _groupType == groupType
                     ? Icon(
                         Icons.check,
                         color: sheetContext.componentColors.primary,
@@ -170,7 +172,7 @@ class _GallerySettingsScreenState extends State<GallerySettingsScreen> {
     await localSettings.setGalleryGroupType(groupType);
     if (mounted) {
       setState(() {
-        _groupType = groupType.name;
+        _groupType = groupType;
       });
     }
     Bus.instance.fire(ForceReloadHomeGalleryEvent("group type changed"));
