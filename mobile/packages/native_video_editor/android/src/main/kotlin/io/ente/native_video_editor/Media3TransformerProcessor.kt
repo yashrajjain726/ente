@@ -1,6 +1,8 @@
 package io.ente.native_video_editor
 
 import android.content.Context
+import android.media.MediaExtractor
+import android.media.MediaFormat
 import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.os.Handler
@@ -8,6 +10,7 @@ import android.os.Looper
 import androidx.media3.common.Effect
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
+import androidx.media3.common.util.ExperimentalApi
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.common.util.Size
 import androidx.media3.effect.Crop
@@ -72,7 +75,12 @@ class Media3TransformerProcessor(private val context: Context) {
         require(crop == null || crop.isPositive) { "Invalid crop rectangle" }
 
         return try {
-            val mediaItem = buildMediaItem(inputFile, trimStartMs, trimEndMs)
+            val clipRange = resolveVideoClipRangeUs(
+                videoDurationUs = getVideoTrackDurationUs(inputFile.path),
+                requestedStartUs = trimStartMs?.times(1_000L),
+                requestedEndUs = trimEndMs?.times(1_000L)
+            )
+            val mediaItem = buildMediaItem(inputFile, clipRange)
             val videoInfo = crop?.let { getVideoInfo(inputFile.path) }
             val effects = buildVideoEffects(videoInfo, crop, rotateDegrees)
             val editedMediaItem = EditedMediaItem.Builder(mediaItem).apply {
@@ -112,21 +120,16 @@ class Media3TransformerProcessor(private val context: Context) {
 
     private fun buildMediaItem(
         inputFile: File,
-        trimStartMs: Long?,
-        trimEndMs: Long?
+        clipRange: VideoClipRangeUs
     ): MediaItem = MediaItem.Builder()
         .setUri(Uri.fromFile(inputFile))
-        .apply {
-            if (trimStartMs != null && trimEndMs != null) {
-                setClippingConfiguration(
-                    MediaItem.ClippingConfiguration.Builder()
-                        .setStartPositionMs(trimStartMs)
-                        .setEndPositionMs(trimEndMs)
-                        .setStartsAtKeyFrame(false)
-                        .build()
-                )
-            }
-        }
+        .setClippingConfiguration(
+            MediaItem.ClippingConfiguration.Builder()
+                .setStartPositionUs(clipRange.startUs)
+                .setEndPositionUs(clipRange.endUs)
+                .setStartsAtKeyFrame(false)
+                .build()
+        )
         .build()
 
     private fun buildVideoEffects(
@@ -185,6 +188,7 @@ class Media3TransformerProcessor(private val context: Context) {
         }
     }
 
+    @androidx.annotation.OptIn(markerClass = [ExperimentalApi::class])
     private suspend fun export(
         composition: Composition,
         outputPath: String,
@@ -264,6 +268,43 @@ class Media3TransformerProcessor(private val context: Context) {
             retriever.release()
         }
     }
+
+    private fun getVideoTrackDurationUs(videoPath: String): Long {
+        val extractor = MediaExtractor()
+        return try {
+            extractor.setDataSource(videoPath)
+            for (index in 0 until extractor.trackCount) {
+                val format = extractor.getTrackFormat(index)
+                val mimeType = format.getString(MediaFormat.KEY_MIME) ?: continue
+                if (mimeType.startsWith("video/")) {
+                    require(format.containsKey(MediaFormat.KEY_DURATION)) {
+                        "Video track duration is unavailable"
+                    }
+                    return format.getLong(MediaFormat.KEY_DURATION).also {
+                        require(it > 0) { "Video track duration is invalid" }
+                    }
+                }
+            }
+            throw IllegalArgumentException("Input has no video track")
+        } finally {
+            extractor.release()
+        }
+    }
+}
+
+internal data class VideoClipRangeUs(val startUs: Long, val endUs: Long)
+
+internal fun resolveVideoClipRangeUs(
+    videoDurationUs: Long,
+    requestedStartUs: Long?,
+    requestedEndUs: Long?
+): VideoClipRangeUs {
+    val startUs = requestedStartUs ?: 0L
+    val endUs = minOf(requestedEndUs ?: videoDurationUs, videoDurationUs)
+    require(startUs < endUs) {
+        "Trim range does not overlap the video track"
+    }
+    return VideoClipRangeUs(startUs, endUs)
 }
 
 private data class CropSpec(
