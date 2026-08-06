@@ -541,6 +541,7 @@ class UploadManager {
             deferMultipartChecksums:
                 settings.deferredMultipartChecksumsEnabled &&
                 (settings.isInternalUser || isDevBuild),
+            isInternalUser: settings.isInternalUser,
             skipDuplicateAddToUploadCollection:
                 options?.skipDuplicateAddToUploadCollection,
             includePartnerSharedFiles: options?.includePartnerSharedFiles,

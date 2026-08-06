@@ -473,6 +473,7 @@ const fileTooLargeErrorMessage = "File too large";
 interface UploadContext {
     isCFUploadProxyDisabled: boolean;
     deferMultipartChecksums: boolean;
+    isInternalUser: boolean;
     skipDuplicateAddToUploadCollection?: boolean;
     includePartnerSharedFiles?: boolean;
     publicAlbumsCredentials?: PublicAlbumsCredentials;
@@ -525,7 +526,8 @@ export const upload = async (
 
         if (fileSize === 0) return { type: "zeroSize" };
 
-        const maxFileSize = 10 * 1024 * 1024 * 1024;
+        const maxFileSize =
+            (uploadContext.isInternalUser ? 20 : 10) * 1024 * 1024 * 1024;
         if (fileSize >= maxFileSize) return { type: "tooLarge" };
 
         abortIfCancelled();
