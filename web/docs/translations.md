@@ -16,11 +16,11 @@ Partial translations are welcome; the apps generally enable a language after rou
 
 2. Use the key in the app code:
 
-   ```ts
-   import { t } from "i18next";
+    ```ts
+    import { t } from "i18next";
 
-   t("new_string_key");
-   ```
+    t("new_string_key");
+    ```
 
 3. Commit the source string and app changes.
 

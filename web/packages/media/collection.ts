@@ -43,13 +43,8 @@ interface CollectionTypeAndOwner {
     owner: { id: number };
 }
 
-// A file must always belong to at least one collection. A client that would
-// otherwise orphan a file (e.g. when deleting the last collection containing
-// it) must instead move the file to the user's "uncategorized" collection,
-// creating that if needed.
-//
-// Shared collections of type "uncategorized" can also be present locally, so
-// the owner check is needed to find the user's own one.
+// Files cannot be orphaned. Their last membership moves to Uncategorized.
+// The owner check excludes a sharee's Uncategorized collection.
 export const findUserUncategorizedCollection = <
     T extends CollectionTypeAndOwner,
 >(
@@ -76,10 +71,7 @@ export interface CollectionUser {
     role?: string;
 }
 
-// Enum-like remote fields (e.g. role) are deliberately kept as plain strings
-// or numbers instead of being validated against a closed enum. Validating
-// would break existing clients when remote adds new cases, and persisted
-// values must remain readable by future clients that understand them.
+// Keep remote enums open-ended so newer values survive older clients.
 export const RemoteCollectionUser = z.looseObject({
     id: z.number(),
     email: z.string().nullish().transform(nullToUndefined),

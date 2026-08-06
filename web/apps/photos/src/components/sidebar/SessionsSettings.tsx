@@ -73,9 +73,9 @@ const SessionsSettingsContents: React.FC<SessionsSettingsContentsProps> = ({
 }) => {
     const { logout, showMiniDialog } = useBaseContext();
 
-    const [sessions, setSessions] = useState<Session[] | undefined>(); // storing and displaying the current active sessions
-    const [currentToken, setCurrentToken] = useState<string | undefined>(); // to check whether isCurrentDevice
-    const [isLoading, setIsLoading] = useState(true); // to show loader on each session termination and inital load
+    const [sessions, setSessions] = useState<Session[] | undefined>();
+    const [currentToken, setCurrentToken] = useState<string | undefined>();
+    const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | undefined>();
 
     const fetchSessions = useCallback(async () => {

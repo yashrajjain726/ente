@@ -174,12 +174,6 @@ const sortFacesNewestOnesFirst = (
     return faces.sort((a, b) => sortTimeForFace(b) - sortTimeForFace(a));
 };
 
-/**
- * Return true if the given face is above the minimum inclusion thresholds, but
- * is otherwise heuristically determined to be possibly spurious face detection.
- *
- * We apply a higher threshold when clustering such faces.
- */
 const isBadFace = (face: Face) =>
     face.blur < 50 ||
     (face.blur < 200 && face.blur < 0.85) ||
