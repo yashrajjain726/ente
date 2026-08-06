@@ -11,7 +11,7 @@ With Ente Cast, you can play a slideshow of your favourite albums on your Google
 
 1. Open Ente on the web or on your mobile device.
 2. Select the album you want to play on your large screen device.
-3. Click "Play album on TV" in the album menu.
+3. Click "Play album on TV"/"Cast album" in the album menu.
 
     On the web, you can find this option in the three dots menu on the right hand side.
 
