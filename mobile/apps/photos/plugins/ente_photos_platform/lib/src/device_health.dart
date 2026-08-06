@@ -260,7 +260,7 @@ class EntePhotosDeviceHealth implements DeviceHealthSource, DeviceMemorySource {
           throw const FormatException('Device health event is not a map');
         }
         return DeviceHealthSnapshot.fromMap(event);
-      }).asBroadcastStream();
+      });
 }
 
 Map<dynamic, dynamic> _requiredMap(Object? value, String name) {

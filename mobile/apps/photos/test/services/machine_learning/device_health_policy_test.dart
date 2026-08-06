@@ -5,148 +5,121 @@ import 'package:photos/services/machine_learning/device_health_policy.dart';
 void main() {
   const policy = DeviceHealthPolicy();
   final now = DateTime(2026, 8, 6, 12);
+  Set<DeviceHealthIssue> issues(DeviceHealthSnapshot snapshot) =>
+      policy.evaluate(snapshot, now: now).issues;
 
   test('accepts fresh healthy Android evidence', () {
-    expect(policy.evaluate(_snapshot(now), now: now).issues, isEmpty);
+    expect(issues(_snapshot(now)), isEmpty);
   });
 
   test('rejects stale and future observations', () {
-    expect(
-      policy
-          .evaluate(
-            _snapshot(now.subtract(const Duration(minutes: 3))),
-            now: now,
-          )
-          .issues,
-      {DeviceHealthIssue.staleObservation},
-    );
-    expect(
-      policy
-          .evaluate(
-            _snapshot(now.add(const Duration(milliseconds: 1))),
-            now: now,
-          )
-          .issues,
-      {DeviceHealthIssue.staleObservation},
-    );
+    for (final observedAt in [
+      now.subtract(const Duration(minutes: 3)),
+      now.add(const Duration(milliseconds: 1)),
+    ]) {
+      expect(issues(_snapshot(observedAt)), {
+        DeviceHealthIssue.staleObservation,
+      });
+    }
   });
 
   test('rejects unavailable or low battery evidence', () {
     expect(
-      policy
-          .evaluate(
-            _snapshot(
-              now,
-              battery: const DeviceBatterySnapshot(
-                status: DeviceSignalStatus.unavailable,
-                errorCode: 'battery_read_failed',
-              ),
-            ),
-            now: now,
-          )
-          .issues,
+      issues(
+        _snapshot(
+          now,
+          battery: const DeviceBatterySnapshot(
+            status: DeviceSignalStatus.unavailable,
+            errorCode: 'battery_read_failed',
+          ),
+        ),
+      ),
       contains(DeviceHealthIssue.batteryUnavailable),
     );
     expect(
-      policy
-          .evaluate(
-            _snapshot(now, battery: _androidBattery(level: 19)),
-            now: now,
-          )
-          .issues,
+      issues(_snapshot(now, battery: _androidBattery(level: 19))),
       contains(DeviceHealthIssue.lowBattery),
     );
   });
 
   test('rejects hot or unknown Android battery evidence', () {
     expect(
-      policy
-          .evaluate(
-            _snapshot(now, battery: _androidBattery(temperature: 42.1)),
-            now: now,
-          )
-          .issues,
+      issues(_snapshot(now, battery: _androidBattery(temperature: 42.1))),
       contains(DeviceHealthIssue.batteryTooHot),
     );
     expect(
-      policy
-          .evaluate(
-            _snapshot(
-              now,
-              battery: _androidBattery(health: DeviceBatteryHealth.unknown),
-            ),
-            now: now,
-          )
-          .issues,
+      issues(
+        _snapshot(
+          now,
+          battery: _androidBattery(health: DeviceBatteryHealth.unknown),
+        ),
+      ),
       contains(DeviceHealthIssue.batteryHealthUnavailable),
     );
   });
 
   test('rejects serious thermal state', () {
     expect(
-      policy
-          .evaluate(
-            _snapshot(
-              now,
-              thermal: const DeviceThermalSnapshot(
-                status: DeviceSignalStatus.available,
-                state: DeviceThermalState.serious,
-              ),
-            ),
-            now: now,
-          )
-          .issues,
+      issues(
+        _snapshot(
+          now,
+          thermal: const DeviceThermalSnapshot(
+            status: DeviceSignalStatus.available,
+            state: DeviceThermalState.serious,
+          ),
+        ),
+      ),
       contains(DeviceHealthIssue.thermalTooHigh),
     );
   });
 
   test('uses Android battery evidence when thermal APIs are unsupported', () {
-    final evaluation = policy.evaluate(
-      _snapshot(
-        now,
-        thermal: const DeviceThermalSnapshot(
-          status: DeviceSignalStatus.unsupported,
+    expect(
+      issues(
+        _snapshot(
+          now,
+          thermal: const DeviceThermalSnapshot(
+            status: DeviceSignalStatus.unsupported,
+          ),
         ),
       ),
-      now: now,
+      isEmpty,
     );
-
-    expect(evaluation.issues, isEmpty);
   });
 
   test('accepts iOS without Android-only battery metrics', () {
-    final evaluation = policy.evaluate(
-      _snapshot(
-        now,
-        platform: DeviceHealthPlatform.ios,
-        battery: const DeviceBatterySnapshot(
-          status: DeviceSignalStatus.available,
-          levelPercent: 80,
+    expect(
+      issues(
+        _snapshot(
+          now,
+          platform: DeviceHealthPlatform.ios,
+          battery: const DeviceBatterySnapshot(
+            status: DeviceSignalStatus.available,
+            levelPercent: 80,
+          ),
         ),
       ),
-      now: now,
+      isEmpty,
     );
-
-    expect(evaluation.issues, isEmpty);
   });
 
   test('does not treat unsupported iOS thermal evidence as healthy', () {
-    final evaluation = policy.evaluate(
-      _snapshot(
-        now,
-        platform: DeviceHealthPlatform.ios,
-        battery: const DeviceBatterySnapshot(
-          status: DeviceSignalStatus.available,
-          levelPercent: 80,
-        ),
-        thermal: const DeviceThermalSnapshot(
-          status: DeviceSignalStatus.unsupported,
+    expect(
+      issues(
+        _snapshot(
+          now,
+          platform: DeviceHealthPlatform.ios,
+          battery: const DeviceBatterySnapshot(
+            status: DeviceSignalStatus.available,
+            levelPercent: 80,
+          ),
+          thermal: const DeviceThermalSnapshot(
+            status: DeviceSignalStatus.unsupported,
+          ),
         ),
       ),
-      now: now,
+      contains(DeviceHealthIssue.thermalUnavailable),
     );
-
-    expect(evaluation.issues, contains(DeviceHealthIssue.thermalUnavailable));
   });
 }
 

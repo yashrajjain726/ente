@@ -15,13 +15,6 @@ void main() {
     expect(snapshot.battery.temperatureCelsius, 31.5);
     expect(snapshot.battery.health, DeviceBatteryHealth.good);
     expect(snapshot.thermal.state, DeviceThermalState.moderate);
-    expect(
-      snapshot.isFreshAt(
-        snapshot.observedAt.add(const Duration(seconds: 30)),
-        const Duration(minutes: 1),
-      ),
-      isTrue,
-    );
   });
 
   test('accepts iOS battery observations without private metrics', () {
@@ -81,23 +74,20 @@ void main() {
     );
   });
 
-  test('future observations are not fresh', () {
-    final snapshot = DeviceHealthSnapshot.fromMap(_snapshotMap());
-    expect(
-      snapshot.isFreshAt(
-        snapshot.observedAt.subtract(const Duration(milliseconds: 1)),
-        const Duration(minutes: 1),
-      ),
-      isFalse,
-    );
-  });
-
-  test('source requests and parses the typed native snapshot', () async {
-    const channel = MethodChannel('device-health-test');
+  test('source requests typed health and memory snapshots', () async {
+    const channel = MethodChannel('device-health-source-test');
+    final methods = <String>[];
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(channel, (call) async {
-          expect(call.method, 'deviceHealth.getSnapshot');
-          return _snapshotMap();
+          methods.add(call.method);
+          return switch (call.method) {
+            'deviceHealth.getSnapshot' => _snapshotMap(),
+            'deviceHealth.getMemorySnapshot' => {
+              'status': 'available',
+              'totalBytes': 8 * 1024 * 1024 * 1024,
+            },
+            _ => throw MissingPluginException(),
+          };
         });
     addTearDown(
       () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
@@ -106,25 +96,14 @@ void main() {
 
     final source = EntePhotosDeviceHealth(methodChannel: channel);
     expect((await source.getSnapshot()).battery.levelPercent, 64);
-  });
-
-  test('source requests and parses physical memory separately', () async {
-    const channel = MethodChannel('device-memory-test');
-    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockMethodCallHandler(channel, (call) async {
-          expect(call.method, 'deviceHealth.getMemorySnapshot');
-          return {'status': 'available', 'totalBytes': 8 * 1024 * 1024 * 1024};
-        });
-    addTearDown(
-      () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-          .setMockMethodCallHandler(channel, null),
-    );
-
-    final source = EntePhotosDeviceHealth(methodChannel: channel);
     expect(
       (await source.getMemorySnapshot()).totalBytes,
       8 * 1024 * 1024 * 1024,
     );
+    expect(methods, [
+      'deviceHealth.getSnapshot',
+      'deviceHealth.getMemorySnapshot',
+    ]);
   });
 }
 
