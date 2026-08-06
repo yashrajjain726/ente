@@ -108,7 +108,7 @@ class _UpdateIconWidgetState extends State<UploadIconWidget> {
           if (isQueuedForUpload && isBeingUploaded) {
             return const SizedBox.square(
               dimension: kMinInteractiveDimension,
-              child: EnteLoadingWidget(color: Colors.white),
+              child: EnteLoadingWidget(color: Colors.white, size: 16),
             );
           }
           if (isIgnored && (kDebugMode || ignoreReason != kIgnoreReasonTrash)) {

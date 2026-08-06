@@ -8,7 +8,7 @@ class EnteLoadingWidget extends StatelessWidget {
   final Alignment alignment;
   const EnteLoadingWidget({
     this.color,
-    this.size = 16,
+    this.size = 14,
     this.padding = 5,
     this.alignment = Alignment.center,
     super.key,
