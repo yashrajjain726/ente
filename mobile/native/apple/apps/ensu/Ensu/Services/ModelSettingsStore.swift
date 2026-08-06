@@ -51,7 +51,6 @@ struct UnsupportedDeviceMemoryError: LocalizedError {
 @MainActor
 final class ModelSettingsStore: ObservableObject {
     static let shared = ModelSettingsStore()
-    static let highRAMThresholdBytes: UInt64 = 16 * 1024 * 1024 * 1024
 
     @Published var modelId: String {
         didSet { persist() }
@@ -94,10 +93,11 @@ final class ModelSettingsStore: ObservableObject {
     }
 
     func currentSelection() -> LlmModelSelection {
-        let defaults = ConfigDefaults.shared
-        let defaultModel = Self.platformDefaultModel
-        let presets = [defaultModel] + defaults.mobileModelPresets
-        let preset = presets.first(where: { $0.id == modelId }) ?? defaultModel
+        let preset = resolveModelSet(
+            surface: .ios,
+            totalMemoryBytes: ProcessInfo.processInfo.physicalMemory,
+            preferredModelId: modelId.isEmpty ? nil : modelId
+        ).effectiveModel
         return LlmModelSelection(
             id: preset.id,
             contextLength: Int(contextLength),
@@ -105,7 +105,7 @@ final class ModelSettingsStore: ObservableObject {
         )
     }
 
-    static var defaultModelName: String { platformDefaultModel.title }
+    static var defaultModelName: String { modelPolicy.defaultModel.title }
     static var defaultSystemPromptBody: String { platformSystemPromptBody }
 
     static func currentSystemPromptBody() -> String {
@@ -118,8 +118,12 @@ final class ModelSettingsStore: ObservableObject {
         return trimmed.isEmpty ? platformSystemPromptBody : trimmed
     }
 
-    private static var platformDefaultModel: ConfigModelPreset {
-        ConfigDefaults.shared.mobileDefaultModel
+    nonisolated static var modelPolicy: ResolvedModelPolicy {
+        resolveModelSet(
+            surface: .ios,
+            totalMemoryBytes: ProcessInfo.processInfo.physicalMemory,
+            preferredModelId: nil
+        ).policy
     }
 
     private static var platformSystemPromptBody: String {

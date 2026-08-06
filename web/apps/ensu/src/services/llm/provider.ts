@@ -64,6 +64,12 @@ interface ConfigDefaults {
     desktopModelPresets: ConfigModelPreset[];
 }
 
+interface ResolvedModelPolicy {
+    defaultModel: ConfigModelPreset;
+    visibleModels: ConfigModelPreset[];
+    allowedPreferredModels: ConfigModelPreset[];
+}
+
 interface TauriLlmModelDownloadProgress {
     percent: number;
     status: string;
@@ -147,6 +153,7 @@ export class LlmProvider {
     private currentContextKey?: string;
     private defaultModel = DEFAULT_MODEL;
     private configDefaults?: ConfigDefaults;
+    private modelPolicy?: ResolvedModelPolicy;
     private useDesktopRustDefaults = false;
 
     private downloadActive = false;
@@ -185,6 +192,12 @@ export class LlmProvider {
     }
 
     public getResolvedModelPresets(): ResolvedModelPreset[] | undefined {
+        const policy = this.modelPolicy;
+        if (policy) {
+            return policy.visibleModels
+                .filter((preset) => preset.id !== policy.defaultModel.id)
+                .map((preset) => ({ id: preset.id, name: preset.title }));
+        }
         if (!this.configDefaults) {
             return undefined;
         }
@@ -513,6 +526,21 @@ export class LlmProvider {
                 );
             }
 
+            try {
+                this.modelPolicy = await invoke<ResolvedModelPolicy>(
+                    "desktop_model_policy",
+                    { totalMemoryBytes: info.totalMemoryBytes },
+                );
+                this.defaultModel = this.modelInfo(
+                    this.modelPolicy.defaultModel,
+                );
+            } catch (policyError) {
+                log.warn(
+                    "Failed to fetch desktop model policy from Rust",
+                    policyError,
+                );
+            }
+
             log.info("LLM default model resolved", {
                 platform,
                 totalMemoryBytes,
@@ -524,16 +552,17 @@ export class LlmProvider {
     }
 
     private resolveTargetModel(settings: ModelSettings): ModelInfo {
+        if (this.modelPolicy) {
+            const preset = settings.modelId
+                ? this.modelPolicy.allowedPreferredModels.find(
+                      (candidate) => candidate.id === settings.modelId,
+                  )
+                : undefined;
+            return preset ? this.modelInfo(preset) : this.defaultModel;
+        }
         const preset = this.resolveConfigPreset(settings.modelId);
         if (preset) {
-            return {
-                id: preset.id,
-                name: preset.title,
-                url: preset.url,
-                sha256: preset.sha256,
-                mmprojUrl: preset.mmprojUrl ?? undefined,
-                mmprojSha256: preset.mmprojSha256 ?? undefined,
-            };
+            return this.modelInfo(preset);
         }
         if (settings.modelId && !this.configDefaults) {
             const fallback = [
@@ -545,6 +574,22 @@ export class LlmProvider {
             }
         }
         return this.defaultModel;
+    }
+
+    private modelInfo(preset: ConfigModelPreset): ModelInfo {
+        const fallback = [
+            DESKTOP_DEFAULT_MODEL,
+            ...FALLBACK_DESKTOP_MODEL_PRESETS,
+        ].find((candidate) => candidate.id === preset.id);
+        return {
+            ...fallback,
+            id: preset.id,
+            name: preset.title,
+            url: preset.url,
+            sha256: preset.sha256,
+            mmprojUrl: preset.mmprojUrl ?? undefined,
+            mmprojSha256: preset.mmprojSha256 ?? undefined,
+        };
     }
 
     private resolveConfigPreset(modelId: string | undefined) {

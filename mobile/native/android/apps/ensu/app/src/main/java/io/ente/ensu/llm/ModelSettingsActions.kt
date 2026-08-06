@@ -4,8 +4,9 @@ import android.system.ErrnoException
 import android.system.OsConstants
 import io.ente.ensu.AppState
 import io.ente.ensu.bindings.AssetDownloadException
-import io.ente.ensu.bindings.ConfigDefaults
 import io.ente.ensu.bindings.LlmException
+import io.ente.ensu.bindings.ModelRuntimeSurface
+import io.ente.ensu.bindings.resolveModelSet
 import io.ente.ensu.device.isChatSupported
 import io.ente.ensu.logging.FileLogRepository
 import io.ente.ensu.logging.LogLevel
@@ -22,8 +23,7 @@ internal class ModelSettingsActions(
     private val state: MutableStateFlow<AppState>,
     private val sessionPreferences: SessionPreferencesDataStore,
     private val llmProvider: LlmProvider,
-    private val logRepository: FileLogRepository,
-    private val configDefaults: ConfigDefaults
+    private val logRepository: FileLogRepository
 ) {
     private var scope: CoroutineScope? = null
     private var modelDownloadJob: Job? = null
@@ -326,9 +326,11 @@ internal class ModelSettingsActions(
     }
 
     fun resolveSelection(settings: ModelSettingsState): LlmModelSelection {
-        val presets = listOf(configDefaults.mobileDefaultModel) + configDefaults.mobileModelPresets
-        val preset = presets.firstOrNull { it.id == settings.modelId }
-            ?: configDefaults.mobileDefaultModel
+        val preset = resolveModelSet(
+            surface = ModelRuntimeSurface.ANDROID,
+            totalMemoryBytes = state.value.chat.deviceCapability.totalMemoryBytes?.toULong(),
+            preferredModelId = settings.modelId.takeIf { it.isNotEmpty() }
+        ).effectiveModel
         val contextLength = settings.contextLength.toIntOrNull()
         val maxTokens = settings.maxTokens.toIntOrNull()?.takeIf { it > 0 }
 
