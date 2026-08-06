@@ -1172,7 +1172,7 @@ func (c *FileController) GetMultipartUploadURLs(ctx context.Context, userID int6
 	return multipartUploadURLs, nil
 }
 
-// GetMultipartUploadURLWithMetadata enforces content length & per-part checksum requirements
+// GetMultipartUploadURLWithMetadata enforces content length and optional per-part checksums.
 func (c *FileController) GetMultipartUploadURLWithMetadata(ctx context.Context, userID int64, req ente.MultipartUploadURLRequest, app ente.App) (ente.MultipartUploadURLs, error) {
 	if req.ContentLength <= 0 {
 		return ente.MultipartUploadURLs{}, stacktrace.Propagate(ente.ErrBadRequest, "contentLength must be greater than 0")
@@ -1180,7 +1180,7 @@ func (c *FileController) GetMultipartUploadURLWithMetadata(ctx context.Context, 
 	if req.ContentLength > MaxFileSize {
 		return ente.MultipartUploadURLs{}, stacktrace.Propagate(ente.ErrBadRequest, "contentLength exceeds max file size %d", MaxFileSize)
 	}
-	if len(req.PartMD5s) == 0 {
+	if req.PartMD5s != nil && len(req.PartMD5s) == 0 {
 		return ente.MultipartUploadURLs{}, stacktrace.Propagate(ente.ErrBadRequest, "partMd5s must not be empty")
 	}
 	if err := validateMultipartPartLength(req.ContentLength, req.PartLength); err != nil {
@@ -1190,16 +1190,19 @@ func (c *FileController) GetMultipartUploadURLWithMetadata(ctx context.Context, 
 	if partCount > maxMultipartPartCount {
 		return ente.MultipartUploadURLs{}, stacktrace.Propagate(ente.ErrBadRequest, "multipart upload cannot exceed %d parts", maxMultipartPartCount)
 	}
-	if len(req.PartMD5s) != partCount {
-		return ente.MultipartUploadURLs{}, stacktrace.Propagate(ente.ErrBadRequest, "partMd5s size (%d) does not match computed part count (%d)", len(req.PartMD5s), partCount)
-	}
-	normalizedChecksums := make([]string, partCount)
-	for i, checksum := range req.PartMD5s {
-		normalized, err := normalizeMD5String(checksum)
-		if err != nil {
-			return ente.MultipartUploadURLs{}, err
+	var normalizedChecksums []string
+	if req.PartMD5s != nil {
+		if len(req.PartMD5s) != partCount {
+			return ente.MultipartUploadURLs{}, stacktrace.Propagate(ente.ErrBadRequest, "partMd5s size (%d) does not match computed part count (%d)", len(req.PartMD5s), partCount)
 		}
-		normalizedChecksums[i] = normalized
+		normalizedChecksums = make([]string, partCount)
+		for i, checksum := range req.PartMD5s {
+			normalized, err := normalizeMD5String(checksum)
+			if err != nil {
+				return ente.MultipartUploadURLs{}, err
+			}
+			normalizedChecksums[i] = normalized
+		}
 	}
 	partLengths := computePartLengths(req.ContentLength, req.PartLength, partCount)
 	if err := c.UsageCtrl.CanUploadFile(ctx, userID, nil, app); err != nil {
@@ -1224,9 +1227,11 @@ func (c *FileController) GetMultipartUploadURLWithMetadata(ctx context.Context, 
 	for i := 0; i < partCount; i++ {
 		partNumber := int64(i + 1)
 		length := partLengths[i]
-		lengthCopy := length
-		checksumCopy := normalizedChecksums[i]
-		url, err := c.getPartURL(*s3Client, objectKey, partNumber, r.UploadId, &lengthCopy, &checksumCopy)
+		var checksum *string
+		if normalizedChecksums != nil {
+			checksum = &normalizedChecksums[i]
+		}
+		url, err := c.getPartURL(*s3Client, objectKey, partNumber, r.UploadId, &length, checksum)
 		if err != nil {
 			return multipartUploadURLs, stacktrace.Propagate(err, "")
 		}
