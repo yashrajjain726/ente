@@ -1,25 +1,17 @@
-import "dart:async";
-
 import "package:ente_components/ente_components.dart";
 import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:intl/intl.dart";
 import "package:logging/logging.dart";
-import "package:photos/core/event_bus.dart";
-import "package:photos/events/sync_status_update_event.dart";
 import "package:photos/extensions/logger_extension.dart";
 import "package:photos/service_locator.dart";
+import "package:photos/services/sync/large_backup_session_tracker.dart";
 import "package:photos/services/wake_lock_service.dart";
 
 class BackupStandbyScreen extends StatefulWidget {
-  const BackupStandbyScreen({
-    required this.initialRemainingCount,
-    required this.isBackupActive,
-    super.key,
-  });
+  const BackupStandbyScreen({required this.sessionTracker, super.key});
 
-  final int initialRemainingCount;
-  final bool Function() isBackupActive;
+  final LargeBackupSessionTracker sessionTracker;
 
   @override
   State<BackupStandbyScreen> createState() => _BackupStandbyScreenState();
@@ -29,7 +21,6 @@ class _BackupStandbyScreenState extends State<BackupStandbyScreen>
     with WidgetsBindingObserver {
   static final _logger = Logger("BackupStandbyScreen");
 
-  late final StreamSubscription<SyncStatusUpdate> _syncSubscription;
   late int _remainingCount;
   bool _isClosing = false;
   bool _isWakeLockEnabled = false;
@@ -37,12 +28,10 @@ class _BackupStandbyScreenState extends State<BackupStandbyScreen>
   @override
   void initState() {
     super.initState();
-    _remainingCount = widget.initialRemainingCount;
+    _remainingCount = widget.sessionTracker.remainingCount;
     WidgetsBinding.instance.addObserver(this);
-    _syncSubscription = Bus.instance.on<SyncStatusUpdate>().listen(
-      _handleSyncStatus,
-    );
-    final isBackupActive = widget.isBackupActive();
+    widget.sessionTracker.addListener(_handleBackupSessionChanged);
+    final isBackupActive = widget.sessionTracker.isActive;
     _logger.internalInfo(
       "Opened with remaining=$_remainingCount, "
       "backupActive=$isBackupActive, "
@@ -53,14 +42,15 @@ class _BackupStandbyScreenState extends State<BackupStandbyScreen>
       _setWakeLock(enable: true);
     } else {
       _logger.internalInfo("Closing because backup finished before opening");
-      _isClosing = true;
-      WidgetsBinding.instance.addPostFrameCallback((_) => _popIfPossible());
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => _dismiss(reason: "backupInactiveBeforeOpening"),
+      );
     }
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    final isBackupActive = widget.isBackupActive();
+    final isBackupActive = widget.sessionTracker.isActive;
     _logger.internalInfo(
       "Lifecycle=${state.name}, backupActive=$isBackupActive, "
       "closing=$_isClosing, wakeLockRequested=$_isWakeLockEnabled",
@@ -89,7 +79,7 @@ class _BackupStandbyScreenState extends State<BackupStandbyScreen>
       "wakeLockRequested=$_isWakeLockEnabled",
     );
     _setWakeLock(enable: false);
-    _syncSubscription.cancel();
+    widget.sessionTracker.removeListener(_handleBackupSessionChanged);
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -125,59 +115,22 @@ class _BackupStandbyScreenState extends State<BackupStandbyScreen>
     );
   }
 
-  void _handleSyncStatus(SyncStatusUpdate event) {
+  void _handleBackupSessionChanged() {
     if (!mounted || _isClosing) {
       return;
     }
 
-    switch (event.status) {
-      case SyncStatus.preparingForUpload:
-        _updateRemainingCount(event.total ?? _remainingCount);
-        _logSyncStatus(event);
-        break;
-      case SyncStatus.inProgress:
-        final total = event.total ?? _remainingCount;
-        final completed = event.completed ?? 0;
-        _updateRemainingCount((total - completed).clamp(0, total));
-        if (_shouldLogProgress(event)) {
-          _logSyncStatus(event);
-        }
-        break;
-      case SyncStatus.paused:
-      case SyncStatus.completedBackup:
-      case SyncStatus.completedFirstGalleryImport:
-      case SyncStatus.error:
-        _logSyncStatus(event);
-        _dismiss(reason: "syncStatus:${event.status.name}");
-        break;
-      case SyncStatus.startedFirstGalleryImport:
-      case SyncStatus.applyingRemoteDiff:
-        _logSyncStatus(event);
-        break;
+    if (!widget.sessionTracker.isActive) {
+      _dismiss(reason: "syncStatus:${widget.sessionTracker.lastStatus?.name}");
+      return;
     }
-  }
 
-  void _logSyncStatus(SyncStatusUpdate event) {
-    _logger.internalInfo(
-      "Sync status=${event.status.name}, total=${event.total}, "
-      "completed=${event.completed}, remaining=$_remainingCount",
-    );
-  }
-
-  bool _shouldLogProgress(SyncStatusUpdate event) {
-    if (event.status != SyncStatus.inProgress) {
-      return true;
-    }
-    final completed = event.completed ?? 0;
-    return completed <= 1 || completed % 100 == 0;
-  }
-
-  void _updateRemainingCount(int count) {
-    if (_remainingCount == count) {
+    final remainingCount = widget.sessionTracker.remainingCount;
+    if (_remainingCount == remainingCount) {
       return;
     }
     setState(() {
-      _remainingCount = count;
+      _remainingCount = remainingCount;
     });
   }
 
@@ -186,24 +139,20 @@ class _BackupStandbyScreenState extends State<BackupStandbyScreen>
       _logger.internalInfo("Ignored duplicate dismissal: $reason");
       return;
     }
-    _logger.internalInfo(
-      "Dismissing: reason=$reason, remaining=$_remainingCount",
-    );
-    _isClosing = true;
-    _setWakeLock(enable: false);
-    _popIfPossible();
-  }
-
-  void _popIfPossible() {
     if (!mounted) {
       return;
     }
     final navigator = Navigator.of(context);
-    if (navigator.canPop()) {
-      navigator.pop();
-    } else {
+    if (!navigator.canPop()) {
       _logger.internalWarning("Could not pop standby screen");
+      return;
     }
+    _logger.internalInfo(
+      "Dismissing: reason=$reason, remaining=$_remainingCount",
+    );
+    _setWakeLock(enable: false);
+    navigator.pop();
+    _isClosing = true;
   }
 
   void _setWakeLock({required bool enable}) {

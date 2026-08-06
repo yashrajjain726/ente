@@ -128,6 +128,7 @@ class _StatusBarWidgetState extends State<StatusBarWidget> {
     _subscription.cancel();
     _notificationSubscription.cancel();
     _christmasBannerSubscription.cancel();
+    _largeBackupSession.dispose();
     super.dispose();
   }
 
@@ -187,7 +188,7 @@ class _StatusBarWidgetState extends State<StatusBarWidget> {
         leadingIcon: HugeIcons.strokeRoundedMoon02,
         title: pendingTranslation("Keep the app open"),
         subtitle: pendingTranslation(
-          "Screen will dim automatically to save battery",
+          "Screen goes black while your backup finishes",
         ),
         state: BannerComponentState.success,
         onTap: () async {
@@ -203,10 +204,7 @@ class _StatusBarWidgetState extends State<StatusBarWidget> {
           );
           await routeToPage(
             context,
-            BackupStandbyScreen(
-              initialRemainingCount: _largeBackupSession.remainingCount,
-              isBackupActive: () => _largeBackupSession.shouldOfferStandby,
-            ),
+            BackupStandbyScreen(sessionTracker: _largeBackupSession),
             forceCustomPageRoute: true,
           );
         },

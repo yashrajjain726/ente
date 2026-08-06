@@ -1,23 +1,32 @@
+import "package:flutter/foundation.dart";
 import "package:logging/logging.dart";
 import "package:photos/events/sync_status_update_event.dart";
 import "package:photos/extensions/logger_extension.dart";
 
 /// Tracks whether the current upload session is large enough to offer the
 /// foreground standby screen.
-class LargeBackupSessionTracker {
+class LargeBackupSessionTracker extends ChangeNotifier {
   static final _logger = Logger("LargeBackupSessionTracker");
   static const int minimumFileCount = 2;
 
   bool _isEligible = false;
   bool _isUploading = false;
   int _remainingCount = 0;
+  SyncStatus? _lastStatus;
 
-  bool get shouldOfferStandby =>
-      _isUploading && _isEligible && _remainingCount > 0;
+  bool get isActive => _isUploading && _isEligible;
+
+  bool get shouldOfferStandby => isActive && _remainingCount > 0;
 
   int get remainingCount => _remainingCount;
 
+  SyncStatus? get lastStatus => _lastStatus;
+
   void update(SyncStatusUpdate event) {
+    final wasActive = isActive;
+    final previousRemainingCount = _remainingCount;
+    _lastStatus = event.status;
+
     switch (event.status) {
       case SyncStatus.preparingForUpload:
         final total = event.total ?? 0;
@@ -26,7 +35,7 @@ class LargeBackupSessionTracker {
         _remainingCount = total;
         break;
       case SyncStatus.inProgress:
-        final total = event.total ?? 0;
+        final total = event.total ?? _remainingCount;
         final completed = event.completed ?? 0;
         _isUploading = total > 0;
         _isEligible = _isEligible || total >= minimumFileCount;
@@ -34,11 +43,11 @@ class LargeBackupSessionTracker {
         break;
       case SyncStatus.paused:
       case SyncStatus.completedBackup:
-      case SyncStatus.completedFirstGalleryImport:
       case SyncStatus.error:
         _reset();
         break;
       case SyncStatus.startedFirstGalleryImport:
+      case SyncStatus.completedFirstGalleryImport:
       case SyncStatus.applyingRemoteDiff:
         break;
     }
@@ -51,6 +60,10 @@ class LargeBackupSessionTracker {
         "offerStandby=$shouldOfferStandby, "
         "threshold=$minimumFileCount",
       );
+    }
+
+    if (wasActive != isActive || previousRemainingCount != _remainingCount) {
+      notifyListeners();
     }
   }
 
