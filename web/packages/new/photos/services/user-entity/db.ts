@@ -43,6 +43,6 @@ export const savedRemoteUserEntityKey = (
 export const saveLatestUpdatedAt = (type: EntityType, value: number) =>
     setKV(latestUpdatedAtKey(type), value);
 
-// Diff checkpoint; resume pulls from this timestamp.
+// This is the last fetched diff timestamp. The next pull resumes from it.
 export const savedLatestUpdatedAt = (type: EntityType) =>
     getKVN(latestUpdatedAtKey(type));

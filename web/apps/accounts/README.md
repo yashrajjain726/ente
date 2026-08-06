@@ -12,8 +12,6 @@ It also includes other cross app account-level like family invitation acceptance
 
 `accounts.ente.io` remains the legacy origin for users who already have Passkeys scoped to the old `ente.io` relying-party ID.
 
-For more details about the Passkey flows, [docs/webauthn-passkeys.md](../../docs/webauthn-passkeys.md).
-
 ## Development
 
 To set this up to work with a locally running museum, modify your local `museum.yaml` to set the relaying party's ID to "localhost" (without any port number).

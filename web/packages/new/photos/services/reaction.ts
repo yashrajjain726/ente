@@ -3,7 +3,8 @@ import { authenticatedRequestHeaders, ensureOk } from "ente-base/http";
 import { apiURL } from "ente-base/origins";
 import { z } from "zod";
 
-// Hide reaction length in ciphertext; emoji names are currently at most ~70 characters.
+// Pad every reaction before encryption so its ciphertext does not reveal its
+// length. Emoji names are currently at most about 70 characters.
 const paddedReactionLength = 100;
 
 const padReaction = (reactionType: string): string =>
