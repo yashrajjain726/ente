@@ -156,7 +156,6 @@ class SyncService {
       Bus.instance.fire(SyncStatusUpdate(SyncStatus.error, error: e));
     } on UnauthorizedError {
       _logger.info("Logging user out");
-      Bus.instance.fire(SyncStatusUpdate(SyncStatus.error));
       Bus.instance.fire(TriggerLogoutEvent());
     } on NoMediaLocationAccessError {
       _logger.severe("Not uploading due to no media location access");

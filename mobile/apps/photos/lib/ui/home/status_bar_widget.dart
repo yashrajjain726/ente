@@ -176,23 +176,18 @@ class _StatusBarWidgetState extends State<StatusBarWidget> {
         ),
         state: BannerComponentState.success,
         onTap: () async {
-          if (_largeBackupSession.isStandbyScreenActive ||
-              !_largeBackupSession.isActive) {
+          if (!_largeBackupSession.isActive) {
             return;
           }
-          _largeBackupSession.setStandbyScreenActive(true);
-          try {
-            await routeToPage(
-              context,
-              BackupStandbyScreen(sessionTracker: _largeBackupSession),
-              forceCustomPageRoute: true,
-            );
-          } finally {
-            _largeBackupSession.setStandbyScreenActive(false);
-            Bus.instance.fire(
-              ForceReloadHomeGalleryEvent("largeBackupStandbyEnded"),
-            );
-          }
+          await Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) =>
+                  BackupStandbyScreen(sessionTracker: _largeBackupSession),
+            ),
+          );
+          Bus.instance.fire(
+            ForceReloadHomeGalleryEvent("largeBackupStandbyEnded"),
+          );
         },
       ),
     );

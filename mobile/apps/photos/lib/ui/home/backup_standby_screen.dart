@@ -34,6 +34,7 @@ class _BackupStandbyScreenState extends State<BackupStandbyScreen>
   @override
   void initState() {
     super.initState();
+    widget.sessionTracker.setStandbyScreenActive(true);
     _remainingCount = widget.sessionTracker.remainingCount;
     WidgetsBinding.instance.addObserver(this);
     widget.sessionTracker.addListener(_handleBackupSessionChanged);
@@ -72,6 +73,7 @@ class _BackupStandbyScreenState extends State<BackupStandbyScreen>
 
   @override
   void dispose() {
+    widget.sessionTracker.setStandbyScreenActive(false);
     _restoreScreenBrightness();
     _setWakeLock(enable: false);
     widget.sessionTracker.removeListener(_handleBackupSessionChanged);
@@ -143,14 +145,20 @@ class _BackupStandbyScreenState extends State<BackupStandbyScreen>
     if (!mounted || _isClosing) {
       return;
     }
+    _isClosing = true;
     _restoreScreenBrightness();
     _setWakeLock(enable: false);
-    Navigator.of(context).pop();
-    _isClosing = true;
+    final route = ModalRoute.of(context)!;
+    final navigator = Navigator.of(context);
+    if (route.isCurrent) {
+      navigator.pop();
+    } else {
+      navigator.removeRoute(route);
+    }
   }
 
   void _scheduleScreenDimming() {
-    _restoreScreenBrightness(resetText: true);
+    _dimmingTimer?.cancel();
     _dimmingTimer = Timer(_dimmingDelay, () async {
       _dimmingTimer = null;
       if (!_canDimScreen) {

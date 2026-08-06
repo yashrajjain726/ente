@@ -1,11 +1,14 @@
 import "package:flutter/foundation.dart";
+import "package:logging/logging.dart";
 import "package:photos/events/sync_status_update_event.dart";
 
 class LargeBackupSessionTracker extends ChangeNotifier {
-  static const int minimumFileCount = 1000;
+  static final _logger = Logger("LargeBackupSessionTracker");
+  static const int minimumFileCount = 500;
 
   bool _isEligible = false;
   bool _isUploading = false;
+  int _batchTotal = 0;
   int _remainingCount = 0;
   bool _isStandbyScreenActive = false;
 
@@ -28,24 +31,33 @@ class LargeBackupSessionTracker extends ChangeNotifier {
         final total = event.total ?? 0;
         _isUploading = total > 0;
         _isEligible = _isEligible || total >= minimumFileCount;
+        _batchTotal = total;
         _remainingCount = total;
         break;
       case SyncStatus.inProgress:
-        final total = event.total ?? _remainingCount;
+        if (_batchTotal == 0) {
+          break;
+        }
         final completed = event.completed ?? 0;
-        _isUploading = total > 0;
-        _isEligible = _isEligible || total >= minimumFileCount;
-        _remainingCount = (total - completed).clamp(0, total);
+        _remainingCount = (_batchTotal - completed).clamp(0, _batchTotal);
         break;
-      case SyncStatus.paused:
       case SyncStatus.completedBackup:
       case SyncStatus.error:
         _reset();
         break;
+      case SyncStatus.paused:
       case SyncStatus.startedFirstGalleryImport:
       case SyncStatus.completedFirstGalleryImport:
       case SyncStatus.applyingRemoteDiff:
         break;
+    }
+
+    if (event.status == SyncStatus.preparingForUpload ||
+        wasActive != isActive) {
+      _logger.info(
+        "status=${event.status.name}, batchTotal=$_batchTotal, "
+        "eligible=$_isEligible, remaining=$_remainingCount, active=$isActive",
+      );
     }
 
     if (wasActive != isActive || previousRemainingCount != _remainingCount) {
@@ -56,6 +68,7 @@ class LargeBackupSessionTracker extends ChangeNotifier {
   void _reset() {
     _isEligible = false;
     _isUploading = false;
+    _batchTotal = 0;
     _remainingCount = 0;
   }
 }
