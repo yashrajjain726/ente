@@ -64,7 +64,7 @@ class _BackupStandbyScreenState extends State<BackupStandbyScreen>
         break;
       case AppLifecycleState.paused:
       case AppLifecycleState.hidden:
-        _setWakeLock(enable: false);
+        _dismiss();
         break;
       case AppLifecycleState.detached:
         break;
