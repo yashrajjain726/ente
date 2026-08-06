@@ -108,6 +108,7 @@ class TimeMemoriesCalculator {
           .toList();
 
       if (significantDays.length >= 3) {
+        final titleDate = DateTime(significantDays.first, month, day);
         final allPhotos = yearGroups.values.expand((x) => x).toList();
         final photoSelection = await SmartMemoriesService._bestSelection(
           allPhotos,
@@ -122,7 +123,7 @@ class TimeMemoriesCalculator {
         historicalMemoryResult.add(
           TimeMemory(
             photoSelection,
-            day: showDate,
+            day: titleDate,
             showDate.subtract(kMemoriesMargin).microsecondsSinceEpoch,
             showDate.add(kDayItself).microsecondsSinceEpoch,
           ),
@@ -322,9 +323,13 @@ class TimeMemoriesCalculator {
   }
 
   static DateTime _nextOccurrence(DateTime currentTime, int month, int day) {
-    DateTime occurrenceIn(int year) => currentTime.isUtc
-        ? DateTime.utc(year, month, day)
-        : DateTime(year, month, day);
+    DateTime occurrenceIn(int year) {
+      final lastDayOfMonth = DateTime.utc(year, month + 1, 0).day;
+      final occurrenceDay = min(day, lastDayOfMonth);
+      return currentTime.isUtc
+          ? DateTime.utc(year, month, occurrenceDay)
+          : DateTime(year, month, occurrenceDay);
+    }
 
     var occurrence = occurrenceIn(currentTime.year);
     if (_calendarDayDifference(currentTime, occurrence) < 0) {
