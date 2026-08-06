@@ -27,6 +27,7 @@ workspace:
   - packages/ente_pure_utils
   - packages/ente_qr
   - packages/ente_qr_scanner
+  - packages/ente_screen_brightness
   - packages/events
   - packages/legacy
   - packages/local_auth_linux
