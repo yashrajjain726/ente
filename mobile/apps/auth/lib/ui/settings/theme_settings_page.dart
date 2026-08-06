@@ -1,5 +1,4 @@
 import 'package:ente_auth/app/view/app.dart';
-import 'package:ente_auth/ui/settings/components/auth_settings_item.dart';
 import 'package:ente_auth/ui/settings/components/auth_settings_page_scaffold.dart';
 import 'package:ente_components/ente_components.dart';
 import 'package:ente_lock_screen/ui/app_lock.dart';
@@ -62,7 +61,7 @@ class _ThemeSettingsPageState extends State<ThemeSettingsPage> {
     required ThemeMode currentMode,
     required Color checkColor,
   }) {
-    return AuthSettingsItem(
+    return SettingsItem(
       title: label,
       icon: icon,
       showChevron: false,

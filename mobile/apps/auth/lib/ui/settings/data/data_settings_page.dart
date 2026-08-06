@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:ente_auth/services/deduplication_service.dart';
 import 'package:ente_auth/services/flagservice.dart';
-import 'package:ente_auth/ui/settings/components/auth_settings_item.dart';
 import 'package:ente_auth/ui/settings/components/auth_settings_navigation.dart';
 import 'package:ente_auth/ui/settings/components/auth_settings_page_scaffold.dart';
 import 'package:ente_auth/ui/settings/data/duplicate_code_page.dart';
@@ -24,20 +23,20 @@ class DataSettingsPage extends StatelessWidget {
     return AuthSettingsPageScaffold(
       title: l10n.data,
       children: [
-        AuthSettingsItem(
+        SettingsItem(
           title: l10n.importCodes,
           icon: HugeIcons.strokeRoundedFileImport,
           onTap: () => _openImportCodes(context),
         ),
         const SizedBox(height: Spacing.sm),
-        AuthSettingsItem(
+        SettingsItem(
           title: l10n.exportCodes,
           icon: HugeIcons.strokeRoundedFileExport,
           showOnlyLoadingState: true,
           onTap: () => handleExportClick(context),
         ),
         const SizedBox(height: Spacing.sm),
-        AuthSettingsItem(
+        SettingsItem(
           title: l10n.duplicateCodes,
           icon: HugeIcons.strokeRoundedCopy01,
           showOnlyLoadingState: true,
@@ -45,7 +44,7 @@ class DataSettingsPage extends StatelessWidget {
         ),
         if (FeatureFlagService.isLocalBackupEnabled()) ...[
           const SizedBox(height: Spacing.sm),
-          AuthSettingsItem(
+          SettingsItem(
             title: l10n.localBackupSidebarTitle,
             icon: HugeIcons.strokeRoundedHardDrive,
             onTap: () =>

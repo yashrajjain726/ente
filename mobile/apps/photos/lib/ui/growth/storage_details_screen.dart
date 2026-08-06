@@ -8,7 +8,6 @@ import "package:photos/gateways/storage_bonus/models/storage_bonus.dart";
 import "package:photos/models/user_details.dart";
 import "package:photos/service_locator.dart";
 import "package:photos/ui/common/loading_widget.dart";
-import "package:photos/ui/settings/components/settings_page_scaffold.dart";
 
 class StorageDetailsScreen extends StatefulWidget {
   final ReferralView referralView;

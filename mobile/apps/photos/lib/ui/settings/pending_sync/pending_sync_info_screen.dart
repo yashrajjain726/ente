@@ -4,7 +4,6 @@ import "package:flutter/material.dart";
 import "package:photos/core/configuration.dart";
 import "package:photos/service_locator.dart";
 import "package:photos/ui/components/menu_section_title.dart";
-import "package:photos/ui/settings/components/settings_page_scaffold.dart";
 import "package:photos/ui/settings/pending_sync/path_info_storage_viewer.dart";
 
 // Preview Video related items -> pv

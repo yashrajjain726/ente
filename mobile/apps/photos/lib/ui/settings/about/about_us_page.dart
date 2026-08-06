@@ -1,14 +1,10 @@
+import "package:ente_components/ente_components.dart";
 import "package:ente_strings/ente_strings.dart";
+import "package:ente_ui/components/settings/about_settings_section.dart";
 import "package:flutter/material.dart";
-import "package:hugeicons/hugeicons.dart";
 import "package:photos/service_locator.dart";
-import "package:photos/ui/common/web_page.dart";
 import "package:photos/ui/notification/toast.dart";
 import "package:photos/ui/settings/app_update_dialog.dart";
-import "package:photos/ui/settings/components/settings_item.dart";
-import "package:photos/ui/settings/components/settings_page_scaffold.dart";
-import "package:photos/utils/dialog_util.dart";
-import "package:url_launcher/url_launcher.dart";
 
 class AboutUsPage extends StatelessWidget {
   const AboutUsPage({super.key});
@@ -20,93 +16,32 @@ class AboutUsPage extends StatelessWidget {
     return SettingsPageScaffold(
       title: l10n.about,
       children: [
-        SettingsItem(
-          title: l10n.weAreOpenSource,
-          icon: HugeIcons.strokeRoundedGithub,
-          showOnlyLoadingState: true,
-          onTap: () async {
-            await launchUrl(Uri.parse("https://github.com/ente/ente"));
-          },
+        AboutSettingsSection(
+          onCheckForUpdates: updateService.isIndependent()
+              ? () => _checkForUpdates(context)
+              : null,
         ),
-        const SizedBox(height: 8),
-        SettingsItem(
-          title: l10n.blog,
-          icon: HugeIcons.strokeRoundedPencilEdit01,
-          showOnlyLoadingState: true,
-          onTap: () async {
-            await Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (BuildContext context) {
-                  return WebPage(l10n.blog, "https://ente.com/blog");
-                },
-              ),
-            );
-          },
-        ),
-        const SizedBox(height: 8),
-        SettingsItem(
-          title: l10n.privacy,
-          icon: HugeIcons.strokeRoundedShield01,
-          showOnlyLoadingState: true,
-          onTap: () async {
-            await Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (BuildContext context) {
-                  return WebPage(l10n.privacy, "https://ente.com/privacy");
-                },
-              ),
-            );
-          },
-        ),
-        const SizedBox(height: 8),
-        SettingsItem(
-          title: l10n.termsOfServicesTitle,
-          icon: HugeIcons.strokeRoundedFile01,
-          showOnlyLoadingState: true,
-          onTap: () async {
-            await Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (BuildContext context) {
-                  return WebPage(
-                    l10n.termsOfServicesTitle,
-                    "https://ente.com/terms",
-                  );
-                },
-              ),
-            );
-          },
-        ),
-        if (updateService.isIndependent()) ...[
-          const SizedBox(height: 8),
-          SettingsItem(
-            title: l10n.checkForUpdates,
-            icon: HugeIcons.strokeRoundedDownload04,
-            showOnlyLoadingState: true,
-            onTap: () async => _checkForUpdates(context),
-          ),
-        ],
       ],
     );
   }
 
   Future<void> _checkForUpdates(BuildContext context) async {
-    final dialog = createProgressDialog(context, context.strings.checking);
-    await dialog.show();
     final shouldUpdate = await updateService.shouldUpdate();
-    await dialog.hide();
-    if (shouldUpdate) {
-      if (!context.mounted) return;
-      await showDialog(
-        useRootNavigator: false,
-        context: context,
-        builder: (BuildContext context) {
-          return AppUpdateDialog(updateService.getLatestVersionInfo());
-        },
-        barrierColor: Colors.black.withValues(alpha: 0.85),
-      );
-    } else {
-      if (!context.mounted) return;
-      showShortToast(context, context.strings.youAreOnTheLatestVersion);
+    final latestVersion = updateService.getLatestVersionInfo();
+    if (!context.mounted) return;
+    if (latestVersion == null) {
+      showShortToast(context, context.strings.unableToCheckForUpdatesRightNow);
+      return;
     }
+    if (!shouldUpdate) {
+      showShortToast(context, context.strings.youAreOnTheLatestVersion);
+      return;
+    }
+    await showDialog(
+      useRootNavigator: false,
+      context: context,
+      builder: (_) => AppUpdateDialog(latestVersion),
+      barrierColor: Colors.black.withValues(alpha: 0.85),
+    );
   }
 }

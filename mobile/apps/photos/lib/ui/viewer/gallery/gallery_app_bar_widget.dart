@@ -27,6 +27,7 @@ import 'package:photos/module/download/gallery.dart';
 import 'package:photos/service_locator.dart';
 import 'package:photos/services/collections_service.dart';
 import "package:photos/services/files_service.dart";
+import "package:photos/services/review_service.dart";
 import "package:photos/states/location_screen_state.dart";
 import "package:photos/theme/ente_theme.dart";
 import 'package:photos/ui/actions/collection/collection_sharing_actions.dart';
@@ -424,7 +425,7 @@ class _GalleryAppBarWidgetState extends State<GalleryAppBarWidget> {
       ),
       firstButtonLabel: context.strings.rateUs,
       firstButtonOnTap: () async {
-        await updateService.launchReviewUrl();
+        await ReviewService.launch();
       },
       firstButtonType: ButtonType.primary,
       secondButtonLabel: context.strings.ok,

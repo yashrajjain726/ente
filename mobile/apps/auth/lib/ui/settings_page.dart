@@ -3,12 +3,11 @@ import 'dart:io';
 import 'package:ente_accounts/services/user_service.dart';
 import 'package:ente_auth/core/configuration.dart';
 import 'package:ente_auth/onboarding/view/onboarding_page.dart';
+import 'package:ente_auth/services/review_service.dart';
 import 'package:ente_auth/store/code_store.dart';
 import 'package:ente_auth/ui/components/buttons/button_widget.dart';
 import 'package:ente_auth/ui/settings/about_settings_page.dart';
 import 'package:ente_auth/ui/settings/account_settings_page.dart';
-import 'package:ente_auth/ui/settings/app_version_widget.dart';
-import 'package:ente_auth/ui/settings/components/auth_settings_item.dart';
 import 'package:ente_auth/ui/settings/components/auth_settings_navigation.dart';
 import 'package:ente_auth/ui/settings/components/auth_settings_page_scaffold.dart';
 import 'package:ente_auth/ui/settings/data/data_settings_page.dart';
@@ -18,13 +17,15 @@ import 'package:ente_auth/ui/settings/general_settings_page.dart';
 import 'package:ente_auth/ui/settings/more_from_ente_section.dart';
 import 'package:ente_auth/ui/settings/notification_banner_widget.dart';
 import 'package:ente_auth/ui/settings/security_settings_page.dart';
-import 'package:ente_auth/ui/settings/social_icons_row.dart';
 import 'package:ente_auth/ui/settings/support_settings_page.dart';
 import 'package:ente_auth/ui/settings/theme_settings_page.dart';
 import 'package:ente_auth/utils/dialog_util.dart';
 import 'package:ente_components/ente_components.dart';
 import 'package:ente_lock_screen/local_authentication_service.dart';
 import 'package:ente_strings/ente_strings.dart';
+import 'package:ente_ui/components/settings/app_engagement_section.dart';
+import 'package:ente_ui/components/settings/app_version_widget.dart';
+import 'package:ente_ui/components/settings/social_icons_row.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:hugeicons/hugeicons.dart';
@@ -65,7 +66,7 @@ class SettingsPage extends StatelessWidget {
     final contents = <Widget>[];
     if (hasLoggedIn) {
       contents.add(
-        AuthSettingsItem(
+        SettingsItem(
           title: l10n.account,
           icon: HugeIcons.strokeRoundedUser,
           semanticsIdentifier: 'auth_settings_account',
@@ -87,14 +88,14 @@ class SettingsPage extends StatelessWidget {
     }
 
     contents.addAll([
-      AuthSettingsItem(
+      SettingsItem(
         title: l10n.data,
         icon: HugeIcons.strokeRoundedDatabase01,
         semanticsIdentifier: 'auth_settings_data',
         onTap: () => _openDataSettings(context),
       ),
       const SizedBox(height: Spacing.sm),
-      AuthSettingsItem(
+      SettingsItem(
         title: l10n.security,
         icon: HugeIcons.strokeRoundedSecurityCheck,
         semanticsIdentifier: 'auth_settings_security',
@@ -109,7 +110,7 @@ class SettingsPage extends StatelessWidget {
         kDebugMode) {
       contents.addAll([
         const SizedBox(height: Spacing.sm),
-        AuthSettingsItem(
+        SettingsItem(
           title: l10n.theme,
           icon: Theme.of(context).brightness == Brightness.light
               ? HugeIcons.strokeRoundedSun03
@@ -122,21 +123,23 @@ class SettingsPage extends StatelessWidget {
 
     contents.addAll([
       const SizedBox(height: Spacing.sm),
-      AuthSettingsItem(
+      SettingsItem(
         title: l10n.general,
         icon: HugeIcons.strokeRoundedSettings01,
         semanticsIdentifier: 'auth_settings_general',
         onTap: () => pushAuthSettingsPage(context, const GeneralSettingsPage()),
       ),
       const SizedBox(height: Spacing.sm),
-      AuthSettingsItem(
+      AppEngagementSection(reviewUrl: ReviewService.url),
+      const SizedBox(height: Spacing.sm),
+      SettingsItem(
         title: l10n.support,
         icon: HugeIcons.strokeRoundedHelpCircle,
         semanticsIdentifier: 'auth_settings_support',
         onTap: () => pushAuthSettingsPage(context, const SupportSettingsPage()),
       ),
       const SizedBox(height: Spacing.sm),
-      AuthSettingsItem(
+      SettingsItem(
         title: l10n.about,
         icon: HugeIcons.strokeRoundedInformationCircle,
         semanticsIdentifier: 'auth_settings_about',
@@ -147,7 +150,7 @@ class SettingsPage extends StatelessWidget {
     if (hasLoggedIn) {
       contents.addAll([
         const SizedBox(height: Spacing.sm),
-        AuthSettingsItem(
+        SettingsItem(
           title: l10n.logout,
           icon: HugeIcons.strokeRoundedLogout05,
           semanticsIdentifier: 'auth_settings_logout',

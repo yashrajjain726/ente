@@ -10,7 +10,6 @@ import "package:photos/models/preview/preview_item_status.dart";
 import "package:photos/services/video_preview_service.dart";
 import "package:photos/ui/common/loading_widget.dart";
 import "package:photos/ui/common/web_page.dart";
-import "package:photos/ui/settings/components/settings_page_scaffold.dart";
 
 const helpUrl =
     "https://ente.com/help/photos/features/utilities/video-streaming#related-faqs";

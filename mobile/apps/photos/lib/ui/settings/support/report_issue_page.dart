@@ -6,7 +6,6 @@ import "package:hugeicons/hugeicons.dart";
 import "package:logging/logging.dart";
 import "package:photos/core/constants.dart";
 import "package:photos/ui/notification/toast.dart";
-import "package:photos/ui/settings/components/settings_page_scaffold.dart";
 import "package:photos/ui/settings/support/no_mail_app_sheet.dart";
 import "package:photos/utils/email_util.dart";
 

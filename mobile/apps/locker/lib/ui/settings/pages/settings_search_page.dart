@@ -9,7 +9,6 @@ import "package:flutter/material.dart";
 import "package:hugeicons/hugeicons.dart";
 import "package:locker/services/configuration.dart";
 import "package:locker/services/update_service.dart";
-import "package:locker/ui/settings/components/settings_item.dart";
 import "package:locker/ui/settings/pages/about_page.dart";
 import "package:locker/ui/settings/pages/account_settings_page.dart";
 import "package:locker/ui/settings/pages/general_settings_page.dart";

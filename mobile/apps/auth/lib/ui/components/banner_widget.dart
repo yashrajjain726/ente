@@ -1,10 +1,10 @@
 import 'package:dotted_border/dotted_border.dart';
-import 'package:ente_auth/services/update_service.dart';
+import 'package:ente_auth/services/review_service.dart';
 import 'package:ente_auth/theme/ente_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:styled_text/tags/styled_text_tag.dart';
 import 'package:styled_text/widgets/styled_text.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:url_launcher/url_launcher_string.dart';
 
 enum BannerType { rateUs, starUs, freeStorage, discount }
 
@@ -31,13 +31,11 @@ class BannerWidget extends StatelessWidget {
     Color dashColor;
     List<BoxShadow>? boxShadow;
     String imagePath;
-    Uri? url;
-    final result = UpdateService.instance.getRateDetails();
-    final String rateUrl = result.item2;
+    String? url;
 
     switch (type) {
       case BannerType.rateUs:
-        url = Uri.parse(rateUrl);
+        url = ReviewService.url;
         imagePath = "assets/rate_us.png";
         dashColor = const Color.fromRGBO(255, 191, 12, 1);
         boxShadow = [
@@ -54,7 +52,7 @@ class BannerWidget extends StatelessWidget {
         break;
 
       case BannerType.starUs:
-        url = Uri.parse("https://github.com/ente/ente");
+        url = "https://github.com/ente/ente";
         imagePath = "assets/star_us.png";
         dashColor = const Color.fromRGBO(233, 233, 233, 1);
         boxShadow = [
@@ -108,9 +106,9 @@ class BannerWidget extends StatelessWidget {
         break;
     }
     return GestureDetector(
-      onTap: () {
-        url != null ? launchUrl(url) : null;
-      },
+      onTap: url == null
+          ? null
+          : () => launchUrlString(url!, mode: LaunchMode.externalApplication),
       child: ClipRRect(
         borderRadius: const BorderRadius.all(Radius.circular(50)),
         child: DottedBorder(

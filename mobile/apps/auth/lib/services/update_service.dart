@@ -9,8 +9,6 @@ import 'package:flutter/services.dart' show appFlavor;
 import 'package:logging/logging.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:tuple/tuple.dart';
-import 'package:url_launcher/url_launcher_string.dart';
 
 class UpdateService {
   UpdateService._privateConstructor();
@@ -29,6 +27,7 @@ class UpdateService {
   }
 
   Future<bool> shouldUpdate() async {
+    _latestVersion = null;
     if (!supportsInAppUpdates()) {
       return false;
     }
@@ -93,47 +92,6 @@ class UpdateService {
       "https://ente.com/release-info/auth-independent.json",
     );
     return LatestVersionInfo.fromMap(response.data["latestVersion"]);
-  }
-
-  // getRateDetails returns details about the place
-  Tuple2<String, String> getRateDetails() {
-    if (Platform.isAndroid) {
-      // Note: in auth, currently we don't have a way to identify if the
-      // app was installed from play store, f-droid or github based on pkg name
-      if (appFlavor == "playstore") {
-        return const Tuple2("Play Store", "market://details?id=io.ente.auth");
-      }
-      return const Tuple2(
-        "AlternativeTo",
-        "https://alternativeto.net/software/ente-authenticator/about/",
-      );
-    }
-    if (Platform.isIOS) {
-      return const Tuple2(
-        "App Store",
-        "https://apps.apple.com/in/app/ente-photos/id6444121398",
-      );
-    }
-    return const Tuple2(
-      "AlternativeTo",
-      "https://alternativeto.net/software/ente-authenticator/about/",
-    );
-  }
-
-  Future<void> launchReviewUrl() async {
-    final String url = getRateDetails().item2;
-    try {
-      await launchUrlString(url, mode: LaunchMode.externalApplication);
-    } catch (e) {
-      _logger.severe("Failed top open launch url $url", e);
-      // Fall back if we fail to open play-store market app on android
-      if (Platform.isAndroid && url.startsWith("market://")) {
-        launchUrlString(
-          "https://play.google.com/store/apps/details?id=io.ente.auth",
-          mode: LaunchMode.externalApplication,
-        ).ignore();
-      }
-    }
   }
 
   bool supportsInAppUpdates() {
