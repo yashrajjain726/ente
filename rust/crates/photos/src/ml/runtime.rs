@@ -632,16 +632,12 @@ mod tests {
     }
 
     #[test]
-    fn runtime_does_not_replay_the_pipeline_after_provider_failure() {
-        let calls = Cell::new(0);
+    fn runtime_accepts_single_use_operation() {
+        let value = String::from("once");
 
-        let result: MlResult<()> = with_runtime(&empty_paths(), |_| {
-            calls.set(calls.get() + 1);
-            Err(MlError::Ort("ExecutionProvider failed".to_string()))
-        });
+        let result = with_runtime(&empty_paths(), move |_| Ok(value));
 
-        assert!(result.is_err());
-        assert_eq!(calls.get(), 1);
+        assert_eq!(result.unwrap(), "once");
     }
 
     #[test]
