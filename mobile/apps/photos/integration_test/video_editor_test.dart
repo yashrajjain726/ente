@@ -20,8 +20,8 @@ import 'package:photos/services/file_magic_service.dart';
 import 'package:photos/ui/tools/editor/native_video_export_service.dart';
 import 'package:photos/ui/tools/editor/video_crop_util.dart';
 import 'package:photos/ui/tools/editor/video_editor/crop_value.dart';
+import 'package:photos/ui/tools/editor/video_editor/ente_video_editor_controller.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:video_editor/video_editor.dart';
 
 /// Trim configuration
 class TrimConfig {
@@ -492,7 +492,7 @@ Future<IterationResult> _processVideoIteration({
   required String description,
   required Logger logger,
 }) async {
-  VideoEditorController? controller;
+  EnteVideoEditorController? controller;
   File? tempOutputFile;
   final failures = <ValidationFailure>[];
   CropCalculation? cropCalc;
@@ -500,7 +500,7 @@ Future<IterationResult> _processVideoIteration({
   try {
     // Step 1: Initialize video editor controller
     logger.info('  → Initializing video editor controller...');
-    controller = VideoEditorController.file(
+    controller = EnteVideoEditorController.file(
       sourceIoFile,
       minDuration: const Duration(
         milliseconds: 100,
@@ -509,7 +509,7 @@ Future<IterationResult> _processVideoIteration({
     await controller.initialize();
 
     final originalDuration = controller.videoDuration;
-    final originalSize = controller.video.value.size;
+    final originalSize = controller.sourceDisplaySize;
     logger.info('  → Controller initialized');
     logger.info(
       '     - Original duration: ${originalDuration.inMilliseconds}ms',
@@ -545,11 +545,7 @@ Future<IterationResult> _processVideoIteration({
           '  → Applying trim from ${trimmedStart.inMilliseconds}ms to ${trimmedEnd.inMilliseconds}ms...',
         );
 
-        final minTrim =
-            trimmedStart.inMilliseconds / originalDuration.inMilliseconds;
-        final maxTrim =
-            trimmedEnd.inMilliseconds / originalDuration.inMilliseconds;
-        controller.updateTrim(minTrim, maxTrim);
+        controller.updateTrim(trimmedStart, trimmedEnd);
 
         expectedDuration = trimmedEnd - trimmedStart;
       }
@@ -586,11 +582,7 @@ Future<IterationResult> _processVideoIteration({
         final aspectRatio = cropValue.getFraction()?.toDouble();
         if (aspectRatio != null) {
           controller.preferredCropAspectRatio = aspectRatio;
-        } else {
-          controller.applyCacheCrop();
         }
-      } else {
-        controller.applyCacheCrop();
       }
 
       // Calculate expected dimensions after crop
@@ -615,20 +607,20 @@ Future<IterationResult> _processVideoIteration({
 
       // Reset rotation to 0 first
       while (controller.rotation != 0) {
-        controller.rotate90Degrees(RotateDirection.left);
+        controller.rotate90Degrees(VideoRotationDirection.left);
       }
 
       // Apply the desired rotation (from video_rotate_page.dart)
       switch (rotateOption) {
         case 90:
-          controller.rotate90Degrees(RotateDirection.right);
+          controller.rotate90Degrees(VideoRotationDirection.right);
           break;
         case 180:
-          controller.rotate90Degrees(RotateDirection.left);
-          controller.rotate90Degrees(RotateDirection.left);
+          controller.rotate90Degrees(VideoRotationDirection.left);
+          controller.rotate90Degrees(VideoRotationDirection.left);
           break;
         case 270:
-          controller.rotate90Degrees(RotateDirection.left);
+          controller.rotate90Degrees(VideoRotationDirection.left);
           break;
       }
 
@@ -649,11 +641,9 @@ Future<IterationResult> _processVideoIteration({
       'export_${DateTime.now().millisecondsSinceEpoch}.mp4',
     );
 
-    // Use original NativeVideoExportService with FFmpeg fallback disabled
     final exportedFile = await NativeVideoExportService.exportVideo(
       controller: controller,
       outputPath: outputPath,
-      allowFfmpegFallback: false, // NO FFmpeg fallback for tests
       onProgress: (progress) {
         // Log progress at 25% intervals
         if ((progress * 100).round() % 25 == 0) {
@@ -733,14 +723,12 @@ Future<IterationResult> _processVideoIteration({
       // Step 8: Validate exported video
       logger.info('  → Validating exported video...');
       try {
-        final videoInfo = await NativeVideoEditor.getVideoInfo(
+        final videoInfo = await NativeVideoEditor.inspectVideo(
           exportedFile.path,
         );
-        final actualDuration = Duration(
-          milliseconds: (videoInfo['duration'] as num?)?.toInt() ?? 0,
-        );
-        final actualWidth = (videoInfo['width'] as num?)?.toInt() ?? 0;
-        final actualHeight = (videoInfo['height'] as num?)?.toInt() ?? 0;
+        final actualDuration = videoInfo.duration;
+        final actualWidth = videoInfo.width;
+        final actualHeight = videoInfo.height;
 
         logger.info(
           '     - Actual duration: ${actualDuration.inMilliseconds}ms',
@@ -875,7 +863,7 @@ Future<IterationResult> _processVideoIteration({
     }
   } finally {
     // Cleanup
-    await controller?.dispose();
+    controller?.dispose();
     if (tempOutputFile != null && tempOutputFile.existsSync()) {
       try {
         tempOutputFile.deleteSync();

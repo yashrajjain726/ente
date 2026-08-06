@@ -11,7 +11,6 @@ import 'package:path/path.dart' as path;
 import "package:photo_manager/photo_manager.dart";
 import "package:photos/core/event_bus.dart";
 import "package:photos/db/files_db.dart";
-import "package:photos/ente_theme_data.dart";
 import "package:photos/events/local_photos_updated_event.dart";
 import "package:photos/models/file/file.dart";
 import "package:photos/models/location/location.dart";
@@ -25,6 +24,8 @@ import "package:photos/ui/tools/editor/export_video_service.dart";
 import "package:photos/ui/tools/editor/native_video_export_service.dart";
 import 'package:photos/ui/tools/editor/video_crop_page.dart';
 import "package:photos/ui/tools/editor/video_crop_util.dart";
+import "package:photos/ui/tools/editor/video_editor/ente_video_editor_controller.dart";
+import "package:photos/ui/tools/editor/video_editor/ente_video_editor_widgets.dart";
 import "package:photos/ui/tools/editor/video_editor/video_editor_app_bar.dart";
 import "package:photos/ui/tools/editor/video_editor/video_editor_bottom_action.dart";
 import "package:photos/ui/tools/editor/video_editor/video_editor_main_actions.dart";
@@ -33,7 +34,6 @@ import "package:photos/ui/tools/editor/video_rotate_page.dart";
 import "package:photos/ui/tools/editor/video_trim_page.dart";
 import "package:photos/ui/viewer/file/detail_page.dart";
 import "package:photos/utils/gallery_save_title.dart";
-import "package:video_editor/video_editor.dart";
 
 class VideoEditorPage extends StatefulWidget {
   const VideoEditorPage({
@@ -55,13 +55,7 @@ class _VideoEditorPageState extends State<VideoEditorPage> {
   final _isExporting = ValueNotifier<bool>(false);
   final _logger = Logger("VideoEditor");
 
-  /// Some videos have a non-zero 'rotation' property in exif which causes the
-  /// video to appear rotated in the video editor preview on Android.
-  /// This variable is used as a workaround to rotate the video back to its
-  /// expected orientation in the viewer.
-  int? _quarterTurnsForRotationCorrection;
-
-  VideoEditorController? _controller;
+  EnteVideoEditorController? _controller;
 
   /// Toggle state for internal users to switch between native and FFmpeg export
   /// Initially set to the flag service value
@@ -74,57 +68,29 @@ class _VideoEditorPageState extends State<VideoEditorPage> {
     // Initialize toggle with flagService value
     _useNativeExport = flagService.useNativeVideoEditor;
 
-    // First determine rotation correction for Android
-    _doRotationCorrectionIfAndroid().then((_) {
-      // Then initialize the controller
-      if (!mounted) return;
-      _controller = VideoEditorController.file(
-        widget.ioFile,
-        minDuration: const Duration(seconds: 1),
-        cropStyle: CropGridStyle(
-          background: Theme.of(context).colorScheme.surface,
-          selectedBoundariesColor:
-              const ColorScheme.dark().videoPlayerPrimaryColor,
-        ),
-        trimStyle: TrimSliderStyle(
-          onTrimmedColor: const ColorScheme.dark().videoPlayerPrimaryColor,
-          onTrimmingColor: const ColorScheme.dark().videoPlayerPrimaryColor,
-          background: Theme.of(context).colorScheme.editorBackgroundColor,
-          positionLineColor: Theme.of(
-            context,
-          ).colorScheme.videoPlayerBorderColor,
-          lineColor: Theme.of(
-            context,
-          ).colorScheme.videoPlayerBorderColor.withValues(alpha: 0.6),
-        ),
-      );
+    _controller = EnteVideoEditorController.file(widget.ioFile);
+    unawaited(_initializeController());
+  }
 
-      _controller!
-          .initialize()
-          .then((_) {
-            // Apply metadata rotation to the video player
-            if (_quarterTurnsForRotationCorrection != null &&
-                _quarterTurnsForRotationCorrection! != 0) {
-              final rotationDegrees = _quarterTurnsForRotationCorrection! * 90;
-              _controller!.video.value = _controller!.video.value.copyWith(
-                rotationCorrection: rotationDegrees,
-              );
-            }
-            setState(() {});
-          })
-          .catchError((error) {
-            // handle minimum duration bigger than video duration error
-            if (!mounted) return;
-            Navigator.pop(context);
-          }, test: (e) => e is VideoMinDurationError);
-    });
+  Future<void> _initializeController() async {
+    try {
+      await _controller!.initialize();
+      if (mounted) setState(() {});
+    } on VideoMinimumDurationError {
+      if (mounted) Navigator.pop(context);
+    } catch (error, stackTrace) {
+      _logger.severe('Failed to initialize video editor', error, stackTrace);
+      if (mounted) {
+        showShortToast(context, context.strings.somethingWentWrong);
+        Navigator.pop(context);
+      }
+    }
   }
 
   @override
-  void dispose() async {
+  void dispose() {
     _isExporting.dispose();
-    _controller?.dispose().ignore();
-    ExportService.dispose().ignore();
+    _controller?.dispose();
     super.dispose();
   }
 
@@ -143,10 +109,7 @@ class _VideoEditorPageState extends State<VideoEditorPage> {
       child: ValueListenableBuilder<bool>(
         valueListenable: _isExporting,
         builder: (context, isExporting, _) {
-          final isReady =
-              _controller != null &&
-              _controller!.initialized &&
-              _quarterTurnsForRotationCorrection != null;
+          final isReady = _controller?.initialized ?? false;
 
           return Scaffold(
             backgroundColor: colorScheme.backgroundColour,
@@ -180,7 +143,7 @@ class _VideoEditorPageState extends State<VideoEditorPage> {
                                   Positioned.fill(
                                     child: Hero(
                                       tag: "video-editor-preview",
-                                      child: CropGridViewer.preview(
+                                      child: EnteVideoPreview(
                                         controller: _controller!,
                                       ),
                                     ),
@@ -324,12 +287,8 @@ class _VideoEditorPageState extends State<VideoEditorPage> {
     required GlobalKey<LinearProgressDialogState> dialogKey,
   }) async {
     if (shouldUseNative) {
-      final tempDir = Directory.systemTemp.createTempSync('ente_video_export');
       try {
-        return await _runNativeExportWithRetry(
-          tempDir: tempDir,
-          dialogKey: dialogKey,
-        );
+        return await _runNativeExportWithRetry(dialogKey: dialogKey);
       } catch (nativeError, stackTrace) {
         if (nativeError is NativeVideoEditorException) {
           _logger.warning(
@@ -363,187 +322,90 @@ class _VideoEditorPageState extends State<VideoEditorPage> {
   }
 
   Future<File> _runNativeExportWithRetry({
-    required Directory tempDir,
     required GlobalKey<LinearProgressDialogState> dialogKey,
-  }) async {
-    const maxAttempts = 2;
-    const retryThreshold = Duration(seconds: 1);
-    Object? lastError;
-    StackTrace? lastStackTrace;
-
-    for (var attempt = 0; attempt < maxAttempts; attempt++) {
-      final outputPath = path.join(
-        tempDir.path,
-        'native_export_${DateTime.now().microsecondsSinceEpoch}_$attempt.mp4',
-      );
-
-      if (attempt > 0 && dialogKey.currentState != null) {
-        dialogKey.currentState!.setProgress(0.0);
-      }
-
-      final startTime = DateTime.now();
-      try {
-        return await NativeVideoExportService.exportVideo(
-          controller: _controller!,
-          outputPath: outputPath,
-          onProgress: (progress) {
-            if (dialogKey.currentState != null) {
-              dialogKey.currentState!.setProgress(progress);
-            }
-          },
-          onError: (e, s) {
-            if (e is NativeVideoEditorException) {
-              _logger.severe(
-                "Error exporting video with native (code=${e.code}, details=${e.details})",
-                e,
-                s,
-              );
-            } else {
-              _logger.severe("Error exporting video with native", e, s);
-            }
-          },
-          allowFfmpegFallback: false,
-        );
-      } catch (error, stackTrace) {
-        lastError = error;
-        lastStackTrace = stackTrace;
-        final elapsed = DateTime.now().difference(startTime);
-
-        if (attempt < maxAttempts - 1) {
-          if (elapsed > retryThreshold) {
-            _logger.info(
-              "Native export attempt ${attempt + 1} failed after ${elapsed.inMilliseconds}ms, skipping retry",
-              error,
-              stackTrace,
-            );
-            break;
-          }
-
-          _logger.info(
-            "Native export attempt ${attempt + 1} failed, retrying with fresh output path",
-            error,
-            stackTrace,
+  }) => _runExportWithRetry(
+    label: 'Native',
+    outputPrefix: 'ente-native-export',
+    dialogKey: dialogKey,
+    export: (outputPath) => NativeVideoExportService.exportVideo(
+      controller: _controller!,
+      outputPath: outputPath,
+      onProgress: (progress) => dialogKey.currentState?.setProgress(progress),
+      onError: (e, s) {
+        if (e is NativeVideoEditorException) {
+          _logger.severe(
+            "Error exporting video with native (code=${e.code}, details=${e.details})",
+            e,
+            s,
           );
-          continue;
+        } else {
+          _logger.severe("Error exporting video with native", e, s);
         }
-
-        rethrow;
-      }
-    }
-
-    if (lastError != null) {
-      Error.throwWithStackTrace(
-        lastError,
-        lastStackTrace ?? StackTrace.current,
-      );
-    }
-    throw Exception("Unknown native export failure");
-  }
+      },
+    ),
+  );
 
   Future<File> _runFfmpegExportWithRetry({
     required GlobalKey<LinearProgressDialogState> dialogKey,
+  }) => _runExportWithRetry(
+    label: 'FFmpeg',
+    outputPrefix: 'ente-ffmpeg-export',
+    dialogKey: dialogKey,
+    export: (outputPath) => ExportService.exportVideo(
+      controller: _controller!,
+      outputPath: outputPath,
+      onProgress: (progress) => dialogKey.currentState?.setProgress(progress),
+      onError: (error, stackTrace) {
+        _logger.severe("Error exporting video with FFmpeg", error, stackTrace);
+      },
+    ),
+  );
+
+  Future<File> _runExportWithRetry({
+    required String label,
+    required String outputPrefix,
+    required GlobalKey<LinearProgressDialogState> dialogKey,
+    required Future<File> Function(String outputPath) export,
   }) async {
-    const maxAttempts = 2;
     const retryThreshold = Duration(seconds: 1);
-    Object? lastError;
-    StackTrace? lastStackTrace;
-
-    for (var attempt = 0; attempt < maxAttempts; attempt++) {
-      if (attempt > 0 && dialogKey.currentState != null) {
-        dialogKey.currentState!.setProgress(0.0);
-      }
-
-      final config = VideoFFmpegVideoEditorConfig(
-        _controller!,
-        format: VideoExportFormat.mp4,
-        commandBuilder: (config, videoPath, outputPath) {
-          final List<String> filters = config.getExportFilters();
-
-          final String startTrimCmd = "-ss ${_controller!.startTrim}";
-          final String toTrimCmd = "-t ${_controller!.trimmedDuration}";
-          final command =
-              '$startTrimCmd -i $videoPath  $toTrimCmd ${config.filtersCmd(filters)} -c:v libx264 -c:a aac $outputPath';
-          return command;
-        },
+    for (var attempt = 0; attempt < 2; attempt++) {
+      if (attempt > 0) dialogKey.currentState?.setProgress(0);
+      final outputPath = path.join(
+        Directory.systemTemp.path,
+        '$outputPrefix-${DateTime.now().microsecondsSinceEpoch}-$attempt.mp4',
       );
-
       final startTime = DateTime.now();
       try {
-        return await _runFfmpegExportAttempt(
-          config: config,
-          dialogKey: dialogKey,
-        );
+        return await export(outputPath);
       } catch (error, stackTrace) {
-        lastError = error;
-        lastStackTrace = stackTrace;
+        await _deleteTemporaryOutput(outputPath);
         final elapsed = DateTime.now().difference(startTime);
-
-        if (attempt < maxAttempts - 1) {
-          if (elapsed > retryThreshold) {
-            _logger.info(
-              "FFmpeg export attempt ${attempt + 1} failed after ${elapsed.inMilliseconds}ms, skipping retry",
-              error,
-              stackTrace,
-            );
-            break;
-          }
-
+        if (attempt == 0 && elapsed <= retryThreshold) {
           _logger.info(
-            "FFmpeg export attempt ${attempt + 1} failed, retrying with fresh output path",
+            "$label export failed quickly; retrying with a fresh output path",
             error,
             stackTrace,
           );
           continue;
         }
-
-        rethrow;
+        if (attempt == 0) {
+          _logger.info(
+            "$label export failed after ${elapsed.inMilliseconds}ms; skipping retry",
+            error,
+            stackTrace,
+          );
+        }
+        Error.throwWithStackTrace(error, stackTrace);
       }
     }
-
-    if (lastError != null) {
-      Error.throwWithStackTrace(
-        lastError,
-        lastStackTrace ?? StackTrace.current,
-      );
-    }
-    throw Exception("Unknown FFmpeg export failure");
-  }
-
-  Future<File> _runFfmpegExportAttempt({
-    required VideoFFmpegVideoEditorConfig config,
-    required GlobalKey<LinearProgressDialogState> dialogKey,
-  }) async {
-    final executeConfig = await config.getExecuteConfig();
-    final completer = Completer<File>();
-
-    await ExportService.runFFmpegCommand(
-      executeConfig,
-      onProgress: (stats) {
-        final progress = config.getFFmpegProgress(stats.getTime().toInt());
-        if (dialogKey.currentState != null) {
-          dialogKey.currentState!.setProgress(progress);
-        }
-      },
-      onError: (e, s) {
-        _logger.severe("Error exporting video with FFmpeg", e, s);
-        if (!completer.isCompleted) {
-          completer.completeError(e, s);
-        }
-      },
-      onCompleted: (file) {
-        if (!completer.isCompleted) {
-          completer.complete(file);
-        }
-      },
-    );
-
-    return completer.future;
+    throw StateError('$label export exhausted its retry attempts');
   }
 
   Future<void> _handleExportCompletion(
     File result,
     GlobalKey<LinearProgressDialogState> dialogKey,
   ) async {
+    var notificationsStopped = false;
     try {
       _isExporting.value = false;
       if (!mounted) {
@@ -560,14 +422,13 @@ class _VideoEditorPageState extends State<VideoEditorPage> {
       //Disabling notifications for assets changing to insert the file into
       //files db before triggering a sync.
       await PhotoManager.stopChangeNotify();
+      notificationsStopped = true;
 
       try {
         final AssetEntity newAsset = await (PhotoManager.editor.saveVideo(
           result,
           title: galleryTitle,
         ));
-
-        result.deleteSync();
 
         final newFile = fileFromAsset(widget.file.deviceFolder ?? '', newAsset);
 
@@ -617,7 +478,7 @@ class _VideoEditorPageState extends State<VideoEditorPage> {
           selectionIndex = originalIndex == -1 ? fallbackIndex : originalIndex;
           files.insert(selectionIndex, newFile);
         }
-        Navigator.of(dialogKey.currentContext!).pop('dialog');
+        _closeProgressDialog(dialogKey);
 
         if (!mounted) return;
         replacePage(
@@ -631,10 +492,35 @@ class _VideoEditorPageState extends State<VideoEditorPage> {
         );
       } catch (e, s) {
         _logger.severe("Error in post-processing", e, s);
-        Navigator.of(dialogKey.currentContext!).pop('dialog');
+        _closeProgressDialog(dialogKey);
+        if (mounted) {
+          showShortToast(context, context.strings.somethingWentWrong);
+        }
       }
     } finally {
-      await PhotoManager.startChangeNotify();
+      await _deleteTemporaryOutput(result.path);
+      if (notificationsStopped) {
+        await PhotoManager.startChangeNotify();
+      }
+    }
+  }
+
+  Future<void> _deleteTemporaryOutput(String outputPath) async {
+    try {
+      await deleteFileSystemEntityIfPresent(File(outputPath));
+    } on FileSystemException catch (error, stackTrace) {
+      _logger.warning(
+        'Failed to delete temporary video output: $outputPath',
+        error,
+        stackTrace,
+      );
+    }
+  }
+
+  void _closeProgressDialog(GlobalKey<LinearProgressDialogState> dialogKey) {
+    final dialogContext = dialogKey.currentContext;
+    if (dialogContext != null) {
+      Navigator.of(dialogContext).pop('dialog');
     }
   }
 
@@ -656,9 +542,6 @@ class _VideoEditorPageState extends State<VideoEditorPage> {
     final endTrimMs = controller.endTrim.inMilliseconds;
     final trimmedDurationMs = controller.trimmedDuration.inMilliseconds;
     final videoDurationMs = controller.videoDuration.inMilliseconds;
-    final minTrim = controller.minTrim;
-    final maxTrim = controller.maxTrim;
-
     String fileSpaceCropSummary;
     try {
       final crop = VideoCropUtil.calculateFileSpaceCrop(controller: controller);
@@ -676,7 +559,7 @@ class _VideoEditorPageState extends State<VideoEditorPage> {
     _logger.info(
       "Export starting (native=$shouldUseNative) rotation=$rotation°, "
       "trim={startMs:$startTrimMs, endMs:$endTrimMs, durationMs:$trimmedDurationMs, "
-      "min:${minTrim.toStringAsFixed(3)}, max:${maxTrim.toStringAsFixed(3)}, "
+      "minMs:0, maxMs:$videoDurationMs, "
       "videoDurationMs:$videoDurationMs} "
       "crop={$cropInfo}",
     );
@@ -684,32 +567,6 @@ class _VideoEditorPageState extends State<VideoEditorPage> {
 
   String _formatOffset(Offset offset) =>
       "(${offset.dx.toStringAsFixed(3)}, ${offset.dy.toStringAsFixed(3)})";
-
-  Future<void> _doRotationCorrectionIfAndroid() async {
-    if (Platform.isAndroid) {
-      try {
-        // Use native method to get video info more efficiently
-        final videoInfo = await NativeVideoEditor.getVideoInfo(
-          widget.ioFile.path,
-        );
-        final rotation = videoInfo['rotation'] as int? ?? 0;
-
-        if (rotation != 0) {
-          _quarterTurnsForRotationCorrection = (rotation / 90).round();
-        } else {
-          _quarterTurnsForRotationCorrection = 0;
-        }
-        setState(() {});
-      } catch (e) {
-        _logger.warning('Failed to get video info, using fallback', e);
-        _quarterTurnsForRotationCorrection = 0;
-        setState(() {});
-      }
-    } else {
-      _quarterTurnsForRotationCorrection = 0;
-      setState(() {});
-    }
-  }
 }
 
 class _VideoEditorSubPageRoute extends PageRouteBuilder<void> {
