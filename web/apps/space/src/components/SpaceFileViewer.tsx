@@ -1125,6 +1125,11 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                     onPhotoIndexChangeRef.current?.(nextIndex);
                 }
             });
+            pswp.on("keydown", (event) => {
+                if (event.originalEvent.target instanceof HTMLTextAreaElement) {
+                    event.preventDefault();
+                }
+            });
             pswp.on("pointerDown", ({ originalEvent }) => {
                 if (isSwipeBlockedRef.current) return;
                 if (
