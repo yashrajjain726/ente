@@ -401,15 +401,15 @@ class _FileDetailsWidgetState extends State<FileDetailsWidget> {
 
   void _generateExifForDetails(Map<String, IfdTag> exif) {
     if (exif["EXIF FocalLength"] != null) {
-      _exifData["focalLength"] =
-          (exif["EXIF FocalLength"]!.values.toList()[0] as Ratio).numerator /
-          (exif["EXIF FocalLength"]!.values.toList()[0] as Ratio).denominator;
+      _exifData["focalLength"] = _formatExifRatio(
+        exif["EXIF FocalLength"]!.values.toList()[0] as Ratio,
+      );
     }
 
     if (exif["EXIF FNumber"] != null) {
-      _exifData["fNumber"] =
-          (exif["EXIF FNumber"]!.values.toList()[0] as Ratio).numerator /
-          (exif["EXIF FNumber"]!.values.toList()[0] as Ratio).denominator;
+      _exifData["fNumber"] = _formatExifRatio(
+        exif["EXIF FNumber"]!.values.toList()[0] as Ratio,
+      );
     }
     final imageWidth = _firstPositiveDimensionTag(exif, const [
       "EXIF ExifImageWidth",
@@ -442,6 +442,14 @@ class _FileDetailsWidgetState extends State<FileDetailsWidget> {
     if (exif["EXIF ISOSpeedRatings"] != null) {
       _exifData['ISO'] = exif["EXIF ISOSpeedRatings"].toString();
     }
+  }
+
+  String _formatExifRatio(Ratio ratio) {
+    if (ratio.denominator == 0) {
+      return ratio.toString();
+    }
+    final value = ratio.numerator / ratio.denominator;
+    return value.toStringAsFixed(2).replaceFirst(RegExp(r"\.?0+$"), "");
   }
 
   /// Formats exposure time from EXIF data into a human-readable string.
