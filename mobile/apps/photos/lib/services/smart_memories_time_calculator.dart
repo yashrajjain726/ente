@@ -69,7 +69,6 @@ class TimeMemoriesCalculator {
       clipPositiveTextVector: clipPositiveTextVector,
     );
 
-    final currentDayMonth = currentTime.month * 100 + currentTime.day;
     final currentWeek = getWeekNumber(currentTime);
     final currentMonth = currentTime.month;
     final currentYear = currentTime.year;
@@ -96,8 +95,11 @@ class TimeMemoriesCalculator {
     }
 
     for (final dayMonth in dayMonthYearGroups.keys) {
-      final dayDiff = dayMonth - currentDayMonth;
-      if (dayDiff < 0 || dayDiff > kMemoriesUpdateFrequency.inDays) continue;
+      final month = dayMonth ~/ 100;
+      final day = dayMonth % 100;
+      final showDate = _nextOccurrence(currentTime, month, day);
+      final dayDiff = _calendarDayDifference(currentTime, showDate);
+      if (dayDiff > kMemoriesUpdateFrequency.inDays) continue;
 
       final yearGroups = dayMonthYearGroups[dayMonth]!;
       final significantDays = yearGroups.entries
@@ -106,11 +108,7 @@ class TimeMemoriesCalculator {
           .toList();
 
       if (significantDays.length >= 3) {
-        final date = DateTime(
-          currentTime.year,
-          dayMonth ~/ 100,
-          dayMonth % 100,
-        );
+        final titleDate = DateTime(significantDays.first, month, day);
         final allPhotos = yearGroups.values.expand((x) => x).toList();
         final photoSelection = await SmartMemoriesService._bestSelection(
           allPhotos,
@@ -125,19 +123,14 @@ class TimeMemoriesCalculator {
         historicalMemoryResult.add(
           TimeMemory(
             photoSelection,
-            day: date,
-            date.subtract(kMemoriesMargin).microsecondsSinceEpoch,
-            date.add(kDayItself).microsecondsSinceEpoch,
+            day: titleDate,
+            showDate.subtract(kMemoriesMargin).microsecondsSinceEpoch,
+            showDate.add(kDayItself).microsecondsSinceEpoch,
           ),
         );
       } else {
         for (final year in significantDays) {
-          final date = DateTime(year, dayMonth ~/ 100, dayMonth % 100);
-          final showDate = DateTime(
-            currentYear,
-            dayMonth ~/ 100,
-            dayMonth % 100,
-          );
+          final date = DateTime(year, month, day);
           final files = yearGroups[year]!;
           final photoSelection = await SmartMemoriesService._bestSelection(
             files,
@@ -152,7 +145,7 @@ class TimeMemoriesCalculator {
             TimeMemory(
               photoSelection,
               day: date,
-              yearsAgo: currentTime.year - date.year,
+              yearsAgo: showDate.year - date.year,
               showDate.subtract(kMemoriesMargin).microsecondsSinceEpoch,
               showDate.add(kDayItself).microsecondsSinceEpoch,
             ),
@@ -327,6 +320,28 @@ class TimeMemoriesCalculator {
     );
 
     return [...recentMemoryResult, ...historicalMemoryResult];
+  }
+
+  static DateTime _nextOccurrence(DateTime currentTime, int month, int day) {
+    DateTime occurrenceIn(int year) {
+      final lastDayOfMonth = DateTime.utc(year, month + 1, 0).day;
+      final occurrenceDay = min(day, lastDayOfMonth);
+      return currentTime.isUtc
+          ? DateTime.utc(year, month, occurrenceDay)
+          : DateTime(year, month, occurrenceDay);
+    }
+
+    var occurrence = occurrenceIn(currentTime.year);
+    if (_calendarDayDifference(currentTime, occurrence) < 0) {
+      occurrence = occurrenceIn(currentTime.year + 1);
+    }
+    return occurrence;
+  }
+
+  static int _calendarDayDifference(DateTime start, DateTime end) {
+    final startDate = DateTime.utc(start.year, start.month, start.day);
+    final endDate = DateTime.utc(end.year, end.month, end.day);
+    return endDate.difference(startDate).inDays;
   }
 
   static Future<void> _maybeAddRecentTimeMemory(
