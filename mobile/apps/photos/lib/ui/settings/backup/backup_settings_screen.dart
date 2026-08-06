@@ -91,6 +91,19 @@ class BackupSettingsScreen extends StatelessWidget {
         ],
         if (Platform.isIOS) ...[
           const SizedBox(height: 24),
+          if (flagService.largeBackupStandby) ...[
+            _toggleItem(
+              context,
+              title: pendingTranslation("(i) Enable large backup standby"),
+              value: () => localSettings.isLargeBackupStandbyEnabled,
+              onChanged: () async {
+                await localSettings.setLargeBackupStandbyEnabled(
+                  !localSettings.isLargeBackupStandbyEnabled,
+                );
+              },
+            ),
+            const SizedBox(height: 8),
+          ],
           _toggleItem(
             context,
             title: l10n.disableAutoLock,
