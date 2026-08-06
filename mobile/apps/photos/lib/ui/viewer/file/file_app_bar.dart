@@ -243,7 +243,10 @@ class FileAppBarState extends State<FileAppBar> {
             behavior: HitTestBehavior.opaque,
             child: const Padding(
               padding: EdgeInsets.all(12.0),
-              child: Icon(Icons.info_outline),
+              child: HugeIcon(
+                icon: HugeIcons.strokeRoundedInformationCircle,
+                color: Colors.white,
+              ),
             ),
           ),
         ),
@@ -278,7 +281,11 @@ class FileAppBarState extends State<FileAppBar> {
       );
     }
     if (!isFileHidden && isFileUploaded && widget.file is! TrashFile) {
-      _actions.add(Center(child: FavoriteWidget(widget.file)));
+      _actions.add(
+        Center(
+          child: FavoriteWidget(widget.file, iconSize: 24, tapTargetSize: 48),
+        ),
+      );
     }
     if (!isFileUploaded && !isLocalGalleryMode) {
       _actions.add(

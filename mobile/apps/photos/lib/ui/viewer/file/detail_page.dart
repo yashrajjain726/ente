@@ -395,7 +395,7 @@ class _BodyState extends State<_Body> {
                                   icon: const Icon(
                                     Icons.threesixty,
                                     color: Colors.white,
-                                    size: 26,
+                                    size: 24,
                                   ),
                                   onPressed: () async {
                                     await openPanoramaViewerPage(
