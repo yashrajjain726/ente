@@ -1,1 +1,0 @@
-- Refresh the file viewer icons for a more consistent appearance.

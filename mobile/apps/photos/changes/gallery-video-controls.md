@@ -1,1 +1,0 @@
-- Refresh the gallery video caption and playback controls.
