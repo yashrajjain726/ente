@@ -21,7 +21,6 @@ type CreateSRPSessionResponse struct {
 	SRPB      string    `json:"srpB" binding:"required"`
 }
 
-// KeyAttributes stores the key related attributes for a user
 type KeyAttributes struct {
 	KEKSalt                  string `json:"kekSalt" binding:"required"`
 	KEKHash                  string `json:"kekHash"`
@@ -42,8 +41,7 @@ type AuthorizationResponse struct {
 	Token              string         `json:"token,omitempty"`
 	TwoFactorSessionID string         `json:"twoFactorSessionID"`
 	PassKeySessionID   string         `json:"passkeySessionID"`
-	// SrpM2 is sent only if the user is logging via SRP
-	// SrpM2 is the SRP M2 value aka the proof that the server has the verifier
+	// SrpM2 proves that the server has the SRP verifier.
 	SrpM2 *string `json:"srpM2,omitempty"`
 }
 

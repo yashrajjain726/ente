@@ -61,7 +61,6 @@ type AlbumFileEntry struct {
 	SyncedLocally bool  `json:"localSync"`
 }
 
-// SortAlbumFileEntry sorts the given entries by isDeleted and then by albumID
 func SortAlbumFileEntry(entries []*AlbumFileEntry) {
 	sort.Slice(entries, func(i, j int) bool {
 		if entries[i].IsDeleted != entries[j].IsDeleted {
@@ -158,7 +157,6 @@ func (r *RemoteFile) GetModificationTime() time.Time {
 
 func (r *RemoteFile) GetLatlong() *export.Location {
 	if r.PublicMetadata != nil {
-		// check if lat and long key exists
 		if lat, ok := r.PublicMetadata["lat"]; ok {
 			if long, ok := r.PublicMetadata["long"]; ok {
 				if lat.(float64) == 0 && long.(float64) == 0 {
