@@ -5,8 +5,6 @@ PODS:
     - Flutter
   - backup_exclusion (1.0.0):
     - Flutter
-  - battery_info (0.0.1):
-    - Flutter
   - camera_avfoundation (0.0.1):
     - Flutter
   - connectivity_plus (0.0.1):
@@ -19,6 +17,8 @@ PODS:
   - ente_cast (0.0.1):
     - Flutter
   - ente_panorama_viewer (0.0.1):
+    - Flutter
+  - ente_photos_platform (0.0.1):
     - Flutter
   - ente_photos_rust (0.0.1):
     - Flutter
@@ -231,10 +231,6 @@ PODS:
     - sqlite3/perf-threadsafe
     - sqlite3/rtree
     - sqlite3/session
-  - system_info_plus (0.0.1):
-    - Flutter
-  - thermal (0.0.1):
-    - Flutter
   - ua_client_hints (1.4.1):
     - Flutter
   - url_launcher_ios (0.0.1):
@@ -251,13 +247,13 @@ DEPENDENCIES:
   - app_links (from `.symlinks/plugins/app_links/ios`)
   - audio_session (from `.symlinks/plugins/audio_session/ios`)
   - backup_exclusion (from `.symlinks/plugins/backup_exclusion/ios`)
-  - battery_info (from `.symlinks/plugins/battery_info/ios`)
   - camera_avfoundation (from `.symlinks/plugins/camera_avfoundation/ios`)
   - connectivity_plus (from `.symlinks/plugins/connectivity_plus/ios`)
   - cupertino_http (from `.symlinks/plugins/cupertino_http/darwin`)
   - device_info_plus (from `.symlinks/plugins/device_info_plus/ios`)
   - ente_cast (from `.symlinks/plugins/ente_cast/ios`)
   - ente_panorama_viewer (from `.symlinks/plugins/ente_panorama_viewer/ios`)
+  - ente_photos_platform (from `.symlinks/plugins/ente_photos_platform/ios`)
   - ente_photos_rust (from `.symlinks/plugins/ente_photos_rust/ios`)
   - ente_qr (from `.symlinks/plugins/ente_qr/ios`)
   - ente_rust (from `.symlinks/plugins/ente_rust/ios`)
@@ -302,8 +298,6 @@ DEPENDENCIES:
   - shared_preferences_foundation (from `.symlinks/plugins/shared_preferences_foundation/darwin`)
   - sqflite_darwin (from `.symlinks/plugins/sqflite_darwin/darwin`)
   - sqlite3_flutter_libs (from `.symlinks/plugins/sqlite3_flutter_libs/darwin`)
-  - system_info_plus (from `.symlinks/plugins/system_info_plus/ios`)
-  - thermal (from `.symlinks/plugins/thermal/ios`)
   - ua_client_hints (from `.symlinks/plugins/ua_client_hints/ios`)
   - url_launcher_ios (from `.symlinks/plugins/url_launcher_ios/ios`)
   - video_player_avfoundation (from `.symlinks/plugins/video_player_avfoundation/darwin`)
@@ -338,8 +332,6 @@ EXTERNAL SOURCES:
     :path: ".symlinks/plugins/audio_session/ios"
   backup_exclusion:
     :path: ".symlinks/plugins/backup_exclusion/ios"
-  battery_info:
-    :path: ".symlinks/plugins/battery_info/ios"
   camera_avfoundation:
     :path: ".symlinks/plugins/camera_avfoundation/ios"
   connectivity_plus:
@@ -352,6 +344,8 @@ EXTERNAL SOURCES:
     :path: ".symlinks/plugins/ente_cast/ios"
   ente_panorama_viewer:
     :path: ".symlinks/plugins/ente_panorama_viewer/ios"
+  ente_photos_platform:
+    :path: ".symlinks/plugins/ente_photos_platform/ios"
   ente_photos_rust:
     :path: ".symlinks/plugins/ente_photos_rust/ios"
   ente_qr:
@@ -440,10 +434,6 @@ EXTERNAL SOURCES:
     :path: ".symlinks/plugins/sqflite_darwin/darwin"
   sqlite3_flutter_libs:
     :path: ".symlinks/plugins/sqlite3_flutter_libs/darwin"
-  system_info_plus:
-    :path: ".symlinks/plugins/system_info_plus/ios"
-  thermal:
-    :path: ".symlinks/plugins/thermal/ios"
   ua_client_hints:
     :path: ".symlinks/plugins/ua_client_hints/ios"
   url_launcher_ios:
@@ -459,13 +449,13 @@ SPEC CHECKSUMS:
   app_links: 3dbc685f76b1693c66a6d9dd1e9ab6f73d97dc0a
   audio_session: 9bb7f6c970f21241b19f5a3658097ae459681ba0
   backup_exclusion: 7aa8535339e746fb217cfdfe8fb8f8a718e4cb0b
-  battery_info: 83f3aae7be2fccefab1d2bf06b8aa96f11c8bcdd
   camera_avfoundation: 5675ca25298b6f81fa0a325188e7df62cc217741
   connectivity_plus: cb623214f4e1f6ef8fe7403d580fdad517d2f7dd
   cupertino_http: 94ac07f5ff090b8effa6c5e2c47871d48ab7c86c
   device_info_plus: 21fcca2080fbcd348be798aa36c3e5ed849eefbe
   ente_cast: a25feb3127397e5fc6aff03a12120916707757d4
   ente_panorama_viewer: 87bb22e7868c3005314f80c05ee0787aa07edcd8
+  ente_photos_platform: 9a5d62b4008563bdfefe6a42cc4297c5c19bf70c
   ente_photos_rust: 2db1f31cbe3f13ef0f52909a52b1f885b880a6ec
   ente_qr: 86beaf5d2644705db9b565b32dd8b82c05fb36af
   ente_rust: d0197ebd5460e8f67576579452b073d698404abe
@@ -527,8 +517,6 @@ SPEC CHECKSUMS:
   sqflite_darwin: 20b2a3a3b70e43edae938624ce550a3cbf66a3d0
   sqlite3: 8d708bc63e9f4ce48f0ad9d6269e478c5ced1d9b
   sqlite3_flutter_libs: d13b8b3003f18f596e542bcb9482d105577eff41
-  system_info_plus: 555ce7047fbbf29154726db942ae785c29211740
-  thermal: d4c48be750d1ddbab36b0e2dcb2471531bc8df41
   ua_client_hints: 92fe0d139619b73ec9fcb46cc7e079a26178f586
   url_launcher_ios: 7a95fa5b60cc718a708b8f2966718e93db0cef1b
   video_player_avfoundation: 33f12ee023e354af9d062d2c366503424a914d10
