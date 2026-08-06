@@ -11,6 +11,7 @@ export interface SaveGroup {
     total: number;
     success: number;
     failed: number;
+    progress?: number;
     canceller: AbortController;
     failureReason?: "network_offline" | "file_error";
     includeZipNumber?: boolean;

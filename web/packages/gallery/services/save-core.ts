@@ -11,9 +11,10 @@ import type {
     AddSaveGroup,
     UpdateSaveGroup,
 } from "../components/utils/save-groups";
+import type { FileDownloadOpts } from "./download-core";
 
 export interface BrowserSaveDownloader {
-    fileBlob(file: EnteFile): Promise<Blob>;
+    fileBlob(file: EnteFile, opts?: FileDownloadOpts): Promise<Blob>;
 }
 
 export interface DownloadAndSaveFilesWebOpts {
@@ -124,6 +125,7 @@ export const downloadAndSaveFilesWeb = async ({
                 ...g,
                 failed: 0,
                 failureReason: undefined,
+                progress: undefined,
             }));
             failedFiles.length = 0;
         }
@@ -154,7 +156,10 @@ export const downloadAndSaveFilesWeb = async ({
                 singleFile.metadata.fileType !== FileType.livePhoto
             ) {
                 try {
-                    const fileBlob = await downloader.fileBlob(singleFile);
+                    const fileBlob = await downloader.fileBlob(singleFile, {
+                        onProgress: (progress) =>
+                            updateSaveGroup((g) => ({ ...g, progress })),
+                    });
                     const fileName = fileFileName(singleFile);
                     const url = URL.createObjectURL(fileBlob);
                     saveAsFileAndRevokeObjectURL(url, fileName);
