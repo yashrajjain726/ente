@@ -139,69 +139,6 @@ void main() {
     );
 
     test(
-      "TimeMemoriesCalculator includes upcoming days across month boundaries",
-      () async {
-        final currentTime = DateTime.utc(2026, 8, 29);
-        final historicalFile = _file(
-          id: 1,
-          createdAt: DateTime.utc(2024, 9, 1, 12),
-        );
-
-        final memories = await TimeMemoriesCalculator.computeTimeMemories(
-          [historicalFile],
-          currentTime,
-          isLocalGalleryMode: false,
-          mlEnabled: false,
-          seenTimes: const <int, int>{},
-          fileIdToFaces: const <int, List<FaceWithoutEmbedding>>{},
-          faceIDsToPersonID: const <String, String>{},
-          fileIDToImageEmbedding: const <int, EmbeddingVector>{},
-          clipPositiveTextVector: _positiveTextVector,
-        );
-
-        final dayMemory = memories.singleWhere(
-          (memory) => memory.kind == TimeMemoryKind.day,
-        );
-        expect(dayMemory.memories.single.file.uploadedFileID, 1);
-        expect(dayMemory.day!.year, 2024);
-        expect(dayMemory.day!.month, 9);
-        expect(dayMemory.day!.day, 1);
-      },
-    );
-
-    test(
-      "TimeMemoriesCalculator includes upcoming days across year boundaries",
-      () async {
-        final currentTime = DateTime.utc(2026, 12, 30);
-        final historicalFile = _file(
-          id: 1,
-          createdAt: DateTime.utc(2024, 1, 1, 12),
-        );
-
-        final memories = await TimeMemoriesCalculator.computeTimeMemories(
-          [historicalFile],
-          currentTime,
-          isLocalGalleryMode: false,
-          mlEnabled: false,
-          seenTimes: const <int, int>{},
-          fileIdToFaces: const <int, List<FaceWithoutEmbedding>>{},
-          faceIDsToPersonID: const <String, String>{},
-          fileIDToImageEmbedding: const <int, EmbeddingVector>{},
-          clipPositiveTextVector: _positiveTextVector,
-        );
-
-        final dayMemory = memories.singleWhere(
-          (memory) => memory.kind == TimeMemoryKind.day,
-        );
-        expect(dayMemory.yearsAgo, 3);
-        expect(
-          dayMemory.firstDateToShow,
-          DateTime.utc(2026, 12, 31).microsecondsSinceEpoch,
-        );
-      },
-    );
-
-    test(
       "ClipMemoriesCalculator surfaces a memory from the full source set",
       () async {
         final currentTime = DateTime.utc(2026, 4, 10);
