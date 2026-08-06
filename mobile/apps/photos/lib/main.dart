@@ -83,6 +83,8 @@ bool _stopHearBeat = false;
 bool _isSyncInitialized = false;
 bool _isRustInitialized = false;
 Future<void>? _rustInitFuture;
+late final LogSinkGuard _enteRustLogSinkGuard;
+late final photos_rust_log.LogSinkGuard _photosRustLogSinkGuard;
 
 enum ForegroundStartupMode { normal, picker }
 
@@ -567,10 +569,12 @@ Future<void> _ensureRustInitialized({required String via}) async {
 
 void _attachRustLogStream() {
   final logger = Logger("rust");
-  attachLogStream().listen((entry) {
+  _enteRustLogSinkGuard = LogSinkGuard();
+  _enteRustLogSinkGuard.attachLogStream().listen((entry) {
     _logRustEntry(logger, entry.level.name, entry.target, entry.message);
   });
-  photos_rust_log.attachLogStream().listen((entry) {
+  _photosRustLogSinkGuard = photos_rust_log.LogSinkGuard();
+  _photosRustLogSinkGuard.attachLogStream().listen((entry) {
     _logRustEntry(logger, entry.level.name, entry.target, entry.message);
   });
 }
