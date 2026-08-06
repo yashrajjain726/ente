@@ -18,8 +18,8 @@ let package = Package(
     targets: [
         .binaryTarget(
             name: "onnxruntime",
-            url: "https://github.com/ente/ort-packaging/releases/download/ort-1.28.0-r1/onnxruntime-coreml-ios-1.28.0-r1.zip",
-            checksum: "a7115a93a403c037692149a0013d30ddb0e33fc6899bb596ba791d5d743fa657"
+            url: "https://github.com/ente/ort-packaging/releases/download/ort-1.28.0-r3/onnxruntime-coreml-ios-1.28.0-r3.zip",
+            checksum: "cb9d2ca4ad1b463c8396882d878787918343da087dfc150cc09f067d0ea92834"
         )
     ]
 )
