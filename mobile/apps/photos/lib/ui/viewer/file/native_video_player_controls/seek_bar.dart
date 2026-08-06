@@ -80,7 +80,7 @@ class _NativeVideoProgressControlsState
         final seekBar = SliderTheme(
           data: SliderTheme.of(context).copyWith(
             trackHeight: 3.0,
-            trackShape: const GalleryVideoSliderTrackShape(),
+            trackShape: const EqualHeightSliderTrackShape(),
             tickMarkShape: SliderTickMarkShape.noTickMark,
             thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6.0),
             overlayShape: const RoundSliderOverlayShape(overlayRadius: 12.0),
@@ -112,7 +112,7 @@ class _NativeVideoProgressControlsState
             allowedInteraction: SliderInteraction.tapAndSlide,
           ),
         );
-        return GalleryVideoProgressRow(
+        return VideoProgressRow(
           seekBar: seekBar,
           elapsedTime: secondsToDuration(_elapsedMilliseconds ~/ 1000),
           totalTime: secondsToDuration(

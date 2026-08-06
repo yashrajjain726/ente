@@ -351,7 +351,7 @@ class _VideoWidgetNativeState extends State<VideoWidgetNative>
                                   child: child,
                                 );
                               },
-                              child: GalleryVideoControlScrim(
+                              child: VideoBottomScrim(
                                 hasCaption:
                                     widget.file.caption?.isNotEmpty ?? false,
                               ),
@@ -417,7 +417,7 @@ class _VideoWidgetNativeState extends State<VideoWidgetNative>
                           widget.isFromMemories
                               ? const SizedBox.shrink()
                               : Positioned(
-                                  bottom: kGalleryVideoProgressRowBottom,
+                                  bottom: kVideoProgressRowBottomInset,
                                   right: 0,
                                   left: 0,
                                   child: SafeArea(
@@ -437,7 +437,7 @@ class _VideoWidgetNativeState extends State<VideoWidgetNative>
                           widget.isFromMemories
                               ? const SizedBox.shrink()
                               : Positioned(
-                                  bottom: galleryVideoStreamControlBottom(
+                                  bottom: videoStreamControlBottomInset(
                                     widget.file.caption?.isNotEmpty ?? false,
                                   ),
                                   right: 0,

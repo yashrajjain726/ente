@@ -120,7 +120,7 @@ class _VideoWidgetState extends State<VideoWidget> {
                 alignment: Alignment.center,
                 children: [
                   if (!widget.isFromMemories)
-                    GalleryVideoControlScrim(
+                    VideoBottomScrim(
                       hasCaption: widget.file.caption?.isNotEmpty ?? false,
                     ),
                   GestureDetector(
@@ -172,7 +172,7 @@ class _VideoWidgetState extends State<VideoWidget> {
                   widget.isFromMemories
                       ? const SizedBox.shrink()
                       : Positioned(
-                          bottom: kGalleryVideoProgressRowBottom,
+                          bottom: kVideoProgressRowBottomInset,
                           right: 0,
                           left: 0,
                           child: IgnorePointer(
@@ -191,7 +191,7 @@ class _VideoWidgetState extends State<VideoWidget> {
                   widget.isFromMemories
                       ? const SizedBox.shrink()
                       : Positioned(
-                          bottom: galleryVideoStreamControlBottom(
+                          bottom: videoStreamControlBottomInset(
                             widget.file.caption?.isNotEmpty ?? false,
                           ),
                           right: 0,
@@ -362,7 +362,7 @@ class _MediaKitVideoProgressControlsState
     final seekBar = SliderTheme(
       data: SliderTheme.of(context).copyWith(
         trackHeight: 3.0,
-        trackShape: const GalleryVideoSliderTrackShape(),
+        trackShape: const EqualHeightSliderTrackShape(),
         tickMarkShape: SliderTickMarkShape.noTickMark,
         thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6.0),
         overlayShape: const RoundSliderOverlayShape(overlayRadius: 12.0),
@@ -407,7 +407,7 @@ class _MediaKitVideoProgressControlsState
         allowedInteraction: SliderInteraction.tapAndSlide,
       ),
     );
-    return GalleryVideoProgressRow(
+    return VideoProgressRow(
       seekBar: seekBar,
       elapsedTime: secondsToDuration(_elapsedTime.inSeconds),
       totalTime: secondsToDuration(

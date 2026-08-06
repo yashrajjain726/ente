@@ -773,7 +773,7 @@ class _FullScreenMemoryState extends State<FullScreenMemory> {
                 );
               },
             ),
-            _MemoryViewerOverlays(
+            _MemoryViewerScrimsAndCaption(
               socialControlsVisible: _socialControlsVisible,
             ),
             ValueListenableBuilder<int>(
@@ -1186,10 +1186,10 @@ class _MemoryDateChevronPainter extends CustomPainter {
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
-class _MemoryViewerOverlays extends StatelessWidget {
+class _MemoryViewerScrimsAndCaption extends StatelessWidget {
   final ValueListenable<bool> socialControlsVisible;
 
-  const _MemoryViewerOverlays({required this.socialControlsVisible});
+  const _MemoryViewerScrimsAndCaption({required this.socialControlsVisible});
 
   @override
   Widget build(BuildContext context) {

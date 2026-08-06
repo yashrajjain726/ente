@@ -320,7 +320,7 @@ class _BodyState extends State<_Body> {
                   ).enableFullScreenNotifier;
                   return Stack(
                     children: [
-                      _GalleryBottomOverlay(
+                      _GalleryFileViewerBottomOverlay(
                         file: file,
                         mode: widget.config.mode,
                         isGuestView: isGuestView,
@@ -687,13 +687,13 @@ class _BodyState extends State<_Body> {
   }
 }
 
-class _GalleryBottomOverlay extends StatelessWidget {
+class _GalleryFileViewerBottomOverlay extends StatelessWidget {
   final EnteFile file;
   final DetailPageMode mode;
   final bool isGuestView;
   final ValueListenable<bool> enableFullScreenNotifier;
 
-  const _GalleryBottomOverlay({
+  const _GalleryFileViewerBottomOverlay({
     required this.file,
     required this.mode,
     required this.isGuestView,
@@ -762,9 +762,9 @@ class _GalleryBottomOverlay extends StatelessWidget {
                     bottom:
                         safePadding.bottom +
                         (isVideo
-                            ? kGalleryVideoProgressBottom +
-                                  kGalleryVideoProgressHeight +
-                                  kGalleryVideoCaptionGap
+                            ? kVideoProgressBottomInset +
+                                  kVideoProgressHeight +
+                                  kVideoCaptionGap
                             : _galleryBottomBarHeight + _galleryCaptionGap),
                     child: Align(
                       alignment: Alignment.centerLeft,

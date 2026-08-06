@@ -3,16 +3,16 @@ import "package:photos/theme/colors.dart";
 import "package:photos/theme/ente_theme.dart";
 import "package:photos/ui/viewer/file/video_control/mute_button.dart";
 
-const kGalleryVideoProgressBottom = 64.0;
-const kGalleryVideoProgressHeight = 16.0;
-const kGalleryVideoProgressRowBottom = 56.0;
-const kGalleryVideoProgressRowHeight = 32.0;
-const kGalleryVideoCaptionGap = 6.0;
-const kGalleryVideoCaptionLineHeight = 16.0;
-const kGalleryVideoScrimTopPadding = 12.0;
+const kVideoProgressBottomInset = 64.0;
+const kVideoProgressHeight = 16.0;
+const kVideoProgressRowBottomInset = 56.0;
+const kVideoProgressRowHeight = 32.0;
+const kVideoCaptionGap = 6.0;
+const kVideoCaptionLineHeight = 16.0;
+const kVideoScrimTopPadding = 12.0;
 
-class GalleryVideoSliderTrackShape extends RoundedRectSliderTrackShape {
-  const GalleryVideoSliderTrackShape();
+class EqualHeightSliderTrackShape extends RoundedRectSliderTrackShape {
+  const EqualHeightSliderTrackShape();
 
   @override
   void paint(
@@ -44,10 +44,10 @@ class GalleryVideoSliderTrackShape extends RoundedRectSliderTrackShape {
   }
 }
 
-class GalleryVideoControlScrim extends StatelessWidget {
+class VideoBottomScrim extends StatelessWidget {
   final bool hasCaption;
 
-  const GalleryVideoControlScrim({required this.hasCaption, super.key});
+  const VideoBottomScrim({required this.hasCaption, super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -58,12 +58,10 @@ class GalleryVideoControlScrim extends StatelessWidget {
           width: double.infinity,
           height:
               MediaQuery.paddingOf(context).bottom +
-              kGalleryVideoProgressBottom +
-              kGalleryVideoProgressHeight +
-              (hasCaption
-                  ? kGalleryVideoCaptionGap + kGalleryVideoCaptionLineHeight
-                  : 0) +
-              kGalleryVideoScrimTopPadding,
+              kVideoProgressBottomInset +
+              kVideoProgressHeight +
+              (hasCaption ? kVideoCaptionGap + kVideoCaptionLineHeight : 0) +
+              kVideoScrimTopPadding,
           child: DecoratedBox(
             decoration: BoxDecoration(
               gradient: LinearGradient(
@@ -84,12 +82,12 @@ class GalleryVideoControlScrim extends StatelessWidget {
   }
 }
 
-class GalleryVideoProgressRow extends StatelessWidget {
+class VideoProgressRow extends StatelessWidget {
   final Widget seekBar;
   final String elapsedTime;
   final String totalTime;
 
-  const GalleryVideoProgressRow({
+  const VideoProgressRow({
     required this.seekBar,
     required this.elapsedTime,
     required this.totalTime,
@@ -109,7 +107,7 @@ class GalleryVideoProgressRow extends StatelessWidget {
         right: safePadding.right + 16,
       ),
       child: SizedBox(
-        height: kGalleryVideoProgressRowHeight,
+        height: kVideoProgressRowHeight,
         child: Row(
           children: [
             Expanded(child: seekBar),
@@ -124,11 +122,9 @@ class GalleryVideoProgressRow extends StatelessWidget {
   }
 }
 
-double galleryVideoStreamControlBottom(bool hasCaption) {
-  return kGalleryVideoProgressBottom +
-      kGalleryVideoProgressHeight +
-      (hasCaption
-          ? kGalleryVideoCaptionGap + kGalleryVideoCaptionLineHeight
-          : 0) +
+double videoStreamControlBottomInset(bool hasCaption) {
+  return kVideoProgressBottomInset +
+      kVideoProgressHeight +
+      (hasCaption ? kVideoCaptionGap + kVideoCaptionLineHeight : 0) +
       8;
 }
