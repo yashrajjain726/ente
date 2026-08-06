@@ -8,7 +8,7 @@ class EnteLoadingWidget extends StatelessWidget {
   final Alignment alignment;
   const EnteLoadingWidget({
     this.color,
-    this.size = 14,
+    this.size = 16,
     this.padding = 5,
     this.alignment = Alignment.center,
     super.key,
@@ -24,7 +24,7 @@ class EnteLoadingWidget extends StatelessWidget {
           size: Size.square(size),
           child: RepaintBoundary(
             child: CircularProgressIndicator(
-              strokeWidth: 2,
+              strokeWidth: 1.5,
               color: color ?? getEnteColorScheme(context).strokeBase,
               strokeCap: StrokeCap.round,
             ),

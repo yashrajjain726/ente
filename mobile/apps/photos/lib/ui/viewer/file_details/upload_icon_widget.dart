@@ -73,20 +73,22 @@ class _UpdateIconWidgetState extends State<UploadIconWidget> {
     }
     if (widget.file.isUploaded || isUploadedNow) {
       if (isUploadedNow) {
-        return Padding(
-          padding: const EdgeInsets.all(8.0),
-          child:
-              const HugeIcon(
-                    icon: HugeIcons.strokeRoundedCloudSavingDone01,
-                    color: Colors.white,
-                  )
-                  .animate()
-                  .fadeIn(duration: 500.ms, curve: Curves.easeInOutCubic)
-                  .fadeOut(
-                    delay: const Duration(seconds: 3),
-                    duration: 500.ms,
-                    curve: Curves.easeInOutCubic,
-                  ),
+        return SizedBox.square(
+          dimension: kMinInteractiveDimension,
+          child: Center(
+            child:
+                const HugeIcon(
+                      icon: HugeIcons.strokeRoundedCloudSavingDone01,
+                      color: Colors.white,
+                    )
+                    .animate()
+                    .fadeIn(duration: 500.ms, curve: Curves.easeInOutCubic)
+                    .fadeOut(
+                      delay: const Duration(seconds: 3),
+                      duration: 500.ms,
+                      curve: Curves.easeInOutCubic,
+                    ),
+          ),
         );
       }
       return const SizedBox.shrink();
@@ -104,7 +106,10 @@ class _UpdateIconWidgetState extends State<UploadIconWidget> {
           final bool isQueuedForUpload =
               !isIgnored && widget.file.collectionID != null;
           if (isQueuedForUpload && isBeingUploaded) {
-            return const EnteLoadingWidget();
+            return const SizedBox.square(
+              dimension: kMinInteractiveDimension,
+              child: EnteLoadingWidget(color: Colors.white),
+            );
           }
           if (isIgnored && (kDebugMode || ignoreReason != kIgnoreReasonTrash)) {
             showToast(
