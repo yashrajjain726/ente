@@ -27,15 +27,16 @@ pub(crate) fn run_pet_face_detection(
     runtime: &MlRuntimeView<'_>,
     input: &YoloInput,
 ) -> MlResult<Vec<PetFaceDetection>> {
-    let mut pet_face_detection = runtime.pet_face_detection_session()?;
-    onnx::with_prepared_float_output(
-        &mut pet_face_detection,
-        &input.tensor,
-        [1, 3, YOLO_INPUT_SIZE as i64, YOLO_INPUT_SIZE as i64],
-        |output_shape, output_data| {
-            postprocess_pet_face_detections(output_shape, output_data, input)
-        },
-    )
+    runtime.with_pet_face_detection_session(|session| {
+        onnx::with_prepared_float_output(
+            session,
+            &input.tensor,
+            [1, 3, YOLO_INPUT_SIZE as i64, YOLO_INPUT_SIZE as i64],
+            |output_shape, output_data| {
+                postprocess_pet_face_detections(output_shape, output_data, input)
+            },
+        )
+    })
 }
 
 fn postprocess_pet_face_detections(
@@ -171,13 +172,14 @@ pub(crate) fn run_pet_body_detection(
     runtime: &MlRuntimeView<'_>,
     input: &YoloInput,
 ) -> MlResult<Vec<PetBodyDetection>> {
-    let mut body_detection = runtime.pet_body_detection_session()?;
-    onnx::with_prepared_float_output(
-        &mut body_detection,
-        &input.tensor,
-        [1, 3, YOLO_INPUT_SIZE as i64, YOLO_INPUT_SIZE as i64],
-        |_output_shape, output_data| postprocess_pet_body_detections(output_data, input),
-    )
+    runtime.with_pet_body_detection_session(|session| {
+        onnx::with_prepared_float_output(
+            session,
+            &input.tensor,
+            [1, 3, YOLO_INPUT_SIZE as i64, YOLO_INPUT_SIZE as i64],
+            |_output_shape, output_data| postprocess_pet_body_detections(output_data, input),
+        )
+    })
 }
 
 fn postprocess_pet_body_detections(

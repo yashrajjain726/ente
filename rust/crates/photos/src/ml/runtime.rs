@@ -1,6 +1,5 @@
 use std::{
     cell::Cell,
-    ops::{Deref, DerefMut},
     sync::{Mutex, MutexGuard},
 };
 
@@ -65,14 +64,9 @@ struct ModelSlot {
     state: Mutex<ModelSlotState>,
 }
 
-pub(crate) struct ModelSessionGuard<'a> {
-    state: MutexGuard<'a, ModelSlotState>,
-}
-
 /// Which accelerated execution providers were behind the sessions used through
-/// a [`MlRuntimeView`]. ORed over every session guard the view hands out, so a
-/// result produced through the view can be attributed to the providers that
-/// actually computed (any part of) it.
+/// a [`MlRuntimeView`]. ORed over successful model executions so a result can be
+/// attributed to the providers that actually computed it.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(crate) struct UsedProviders {
     pub(crate) coreml: bool,
@@ -93,26 +87,6 @@ pub(crate) struct MlRuntimeView<'a> {
     runtime: &'a MlRuntime,
     model_paths: &'a ModelPaths,
     used_providers: Cell<UsedProviders>,
-}
-
-impl Deref for ModelSessionGuard<'_> {
-    type Target = Session;
-
-    fn deref(&self) -> &Self::Target {
-        self.state
-            .session
-            .as_ref()
-            .expect("session must be loaded before creating ModelSessionGuard")
-    }
-}
-
-impl DerefMut for ModelSessionGuard<'_> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        self.state
-            .session
-            .as_mut()
-            .expect("session must be loaded before creating ModelSessionGuard")
-    }
 }
 
 impl ModelSlot {
@@ -169,15 +143,7 @@ impl ModelSlot {
         }
     }
 
-    fn advance_provider_fallback_if_configured(&self, path: &str) -> bool {
-        if path.trim().is_empty() {
-            return false;
-        }
-
-        let mut state = self.lock_state();
-        if state.path != path {
-            return false;
-        }
+    fn advance_provider_fallback_locked(&self, state: &mut ModelSlotState) -> bool {
         let current_mode = state
             .fallback_execution_mode
             .unwrap_or(self.default_execution_mode);
@@ -191,15 +157,66 @@ impl ModelSlot {
         true
     }
 
-    fn session_guard_for(&self, path: &str, error_msg: &str) -> MlResult<ModelSessionGuard<'_>> {
+    fn run<T>(
+        &self,
+        path: &str,
+        error_msg: &str,
+        mut operation: impl FnMut(&mut Session) -> MlResult<T>,
+    ) -> MlResult<(T, onnx::ExecutionProvider)> {
         if path.trim().is_empty() {
             return Err(MlError::InvalidRequest(error_msg.to_string()));
         }
 
-        let mut state = self.lock_state();
-        Self::set_config_locked(&mut state, path);
-        self.ensure_loaded_locked(&mut state, error_msg)?;
-        Ok(ModelSessionGuard { state })
+        loop {
+            let mut state = self.lock_state();
+            Self::set_config_locked(&mut state, path);
+            if let Err(error) = self.ensure_loaded_locked(&mut state, error_msg) {
+                if self.retry_after_provider_failure_locked(&mut state, &error) {
+                    continue;
+                }
+                return Err(error);
+            }
+
+            let execution_provider = state
+                .execution_provider
+                .expect("a loaded session must record its execution provider");
+            let result = operation(
+                state
+                    .session
+                    .as_mut()
+                    .expect("session must be loaded before model execution"),
+            );
+            match result {
+                Ok(value) => return Ok((value, execution_provider)),
+                Err(error) => {
+                    if self.retry_after_provider_failure_locked(&mut state, &error) {
+                        continue;
+                    }
+                    return Err(error);
+                }
+            }
+        }
+    }
+
+    fn retry_after_provider_failure_locked(
+        &self,
+        state: &mut ModelSlotState,
+        error: &MlError,
+    ) -> bool {
+        if !should_retry_execution_provider_runtime(error)
+            || !self.advance_provider_fallback_locked(state)
+        {
+            return false;
+        }
+
+        crate::ml::events::record(
+            crate::ml::events::Severity::Warning,
+            format!(
+                "execution provider failed, retrying model with the next provider fallback: \
+                 {error}"
+            ),
+        );
+        true
     }
 
     fn set_config_locked(state: &mut ModelSlotState, path: &str) {
@@ -250,14 +267,6 @@ impl ModelSlot {
         state.execution_provider = Some(execution_provider);
         state.session = Some(session);
         Ok(())
-    }
-}
-
-impl ModelSessionGuard<'_> {
-    fn execution_provider(&self) -> onnx::ExecutionProvider {
-        self.state
-            .execution_provider
-            .expect("a loaded session must record its execution provider")
     }
 }
 
@@ -356,41 +365,6 @@ impl MlRuntime {
         self.pet_body_embedding_cat.release_residency();
     }
 
-    fn advance_provider_fallbacks_for_requested_models(&self, model_paths: &ModelPaths) -> bool {
-        let mut advanced = false;
-        advanced |= self
-            .face_detection
-            .advance_provider_fallback_if_configured(&model_paths.face_detection);
-        advanced |= self
-            .face_embedding
-            .advance_provider_fallback_if_configured(&model_paths.face_embedding);
-        advanced |= self
-            .clip_image
-            .advance_provider_fallback_if_configured(&model_paths.clip_image);
-        advanced |= self
-            .clip_text
-            .advance_provider_fallback_if_configured(&model_paths.clip_text);
-        advanced |= self
-            .pet_face_detection
-            .advance_provider_fallback_if_configured(&model_paths.pet_face_detection);
-        advanced |= self
-            .pet_face_embedding_dog
-            .advance_provider_fallback_if_configured(&model_paths.pet_face_embedding_dog);
-        advanced |= self
-            .pet_face_embedding_cat
-            .advance_provider_fallback_if_configured(&model_paths.pet_face_embedding_cat);
-        advanced |= self
-            .pet_body_detection
-            .advance_provider_fallback_if_configured(&model_paths.pet_body_detection);
-        advanced |= self
-            .pet_body_embedding_dog
-            .advance_provider_fallback_if_configured(&model_paths.pet_body_embedding_dog);
-        advanced |= self
-            .pet_body_embedding_cat
-            .advance_provider_fallback_if_configured(&model_paths.pet_body_embedding_cat);
-        advanced
-    }
-
     fn view<'a>(&'a self, model_paths: &'a ModelPaths) -> MlRuntimeView<'a> {
         MlRuntimeView {
             runtime: self,
@@ -401,106 +375,143 @@ impl MlRuntime {
 }
 
 impl<'a> MlRuntimeView<'a> {
-    /// The accelerated providers behind every session used through this view
-    /// so far (since creation or the last [`Self::reset_used_providers`]).
+    /// The accelerated providers behind every successful model execution
+    /// through this view so far.
     pub(crate) fn used_providers(&self) -> UsedProviders {
         self.used_providers.get()
     }
 
-    fn reset_used_providers(&self) {
-        self.used_providers.set(UsedProviders::default());
-    }
-
-    fn tracked_session(
+    fn run_tracked<T>(
         &self,
-        slot: &'a ModelSlot,
+        slot: &ModelSlot,
         path: &str,
         error_msg: &str,
-    ) -> MlResult<ModelSessionGuard<'a>> {
-        let guard = slot.session_guard_for(path, error_msg)?;
+        operation: impl FnMut(&mut Session) -> MlResult<T>,
+    ) -> MlResult<T> {
+        let (value, execution_provider) = slot.run(path, error_msg, operation)?;
         let mut used = self.used_providers.get();
-        used.record(guard.execution_provider());
+        used.record(execution_provider);
         self.used_providers.set(used);
-        Ok(guard)
+        Ok(value)
     }
 
-    pub(crate) fn face_detection_session(&self) -> MlResult<ModelSessionGuard<'_>> {
-        self.tracked_session(
+    pub(crate) fn with_face_detection_session<T>(
+        &self,
+        operation: impl FnMut(&mut Session) -> MlResult<T>,
+    ) -> MlResult<T> {
+        self.run_tracked(
             &self.runtime.face_detection,
             &self.model_paths.face_detection,
             "missing model path: faceDetectionModelPath is required when runFaces is true",
+            operation,
         )
     }
 
-    pub(crate) fn face_embedding_session(&self) -> MlResult<ModelSessionGuard<'_>> {
-        self.tracked_session(
+    pub(crate) fn with_face_embedding_session<T>(
+        &self,
+        operation: impl FnMut(&mut Session) -> MlResult<T>,
+    ) -> MlResult<T> {
+        self.run_tracked(
             &self.runtime.face_embedding,
             &self.model_paths.face_embedding,
             "missing model path: faceEmbeddingModelPath is required when runFaces is true",
+            operation,
         )
     }
 
-    pub(crate) fn clip_image_session(&self) -> MlResult<ModelSessionGuard<'_>> {
-        self.tracked_session(
+    pub(crate) fn with_clip_image_session<T>(
+        &self,
+        operation: impl FnMut(&mut Session) -> MlResult<T>,
+    ) -> MlResult<T> {
+        self.run_tracked(
             &self.runtime.clip_image,
             &self.model_paths.clip_image,
             "missing model path: clipImageModelPath is required when runClip is true",
+            operation,
         )
     }
 
-    pub(crate) fn clip_text_session(&self) -> MlResult<ModelSessionGuard<'_>> {
-        self.tracked_session(
+    pub(crate) fn with_clip_text_session<T>(
+        &self,
+        operation: impl FnMut(&mut Session) -> MlResult<T>,
+    ) -> MlResult<T> {
+        self.run_tracked(
             &self.runtime.clip_text,
             &self.model_paths.clip_text,
             "missing model path: clipTextModelPath is required when running clip text",
+            operation,
         )
     }
 
-    pub(crate) fn pet_face_detection_session(&self) -> MlResult<ModelSessionGuard<'_>> {
-        self.tracked_session(
+    pub(crate) fn with_pet_face_detection_session<T>(
+        &self,
+        operation: impl FnMut(&mut Session) -> MlResult<T>,
+    ) -> MlResult<T> {
+        self.run_tracked(
             &self.runtime.pet_face_detection,
             &self.model_paths.pet_face_detection,
             "missing model path: petFaceDetectionModelPath is required when runPets is true",
+            operation,
         )
     }
 
-    pub(crate) fn pet_face_embedding_dog_session(&self) -> MlResult<ModelSessionGuard<'_>> {
-        self.tracked_session(
+    pub(crate) fn with_pet_face_embedding_dog_session<T>(
+        &self,
+        operation: impl FnMut(&mut Session) -> MlResult<T>,
+    ) -> MlResult<T> {
+        self.run_tracked(
             &self.runtime.pet_face_embedding_dog,
             &self.model_paths.pet_face_embedding_dog,
             "missing model path: petFaceEmbeddingDogModelPath is required",
+            operation,
         )
     }
 
-    pub(crate) fn pet_face_embedding_cat_session(&self) -> MlResult<ModelSessionGuard<'_>> {
-        self.tracked_session(
+    pub(crate) fn with_pet_face_embedding_cat_session<T>(
+        &self,
+        operation: impl FnMut(&mut Session) -> MlResult<T>,
+    ) -> MlResult<T> {
+        self.run_tracked(
             &self.runtime.pet_face_embedding_cat,
             &self.model_paths.pet_face_embedding_cat,
             "missing model path: petFaceEmbeddingCatModelPath is required",
+            operation,
         )
     }
 
-    pub(crate) fn pet_body_detection_session(&self) -> MlResult<ModelSessionGuard<'_>> {
-        self.tracked_session(
+    pub(crate) fn with_pet_body_detection_session<T>(
+        &self,
+        operation: impl FnMut(&mut Session) -> MlResult<T>,
+    ) -> MlResult<T> {
+        self.run_tracked(
             &self.runtime.pet_body_detection,
             &self.model_paths.pet_body_detection,
             "missing model path: petBodyDetectionModelPath is required when runPets is true",
+            operation,
         )
     }
 
-    pub(crate) fn pet_body_embedding_dog_session(&self) -> MlResult<ModelSessionGuard<'_>> {
-        self.tracked_session(
+    pub(crate) fn with_pet_body_embedding_dog_session<T>(
+        &self,
+        operation: impl FnMut(&mut Session) -> MlResult<T>,
+    ) -> MlResult<T> {
+        self.run_tracked(
             &self.runtime.pet_body_embedding_dog,
             &self.model_paths.pet_body_embedding_dog,
             "missing model path: petBodyEmbeddingDogModelPath is required",
+            operation,
         )
     }
 
-    pub(crate) fn pet_body_embedding_cat_session(&self) -> MlResult<ModelSessionGuard<'_>> {
-        self.tracked_session(
+    pub(crate) fn with_pet_body_embedding_cat_session<T>(
+        &self,
+        operation: impl FnMut(&mut Session) -> MlResult<T>,
+    ) -> MlResult<T> {
+        self.run_tracked(
             &self.runtime.pet_body_embedding_cat,
             &self.model_paths.pet_body_embedding_cat,
             "missing model path: petBodyEmbeddingCatModelPath is required",
+            operation,
         )
     }
 }
@@ -513,38 +524,14 @@ pub(crate) fn prepare_runtime(model_paths: &ModelPaths) {
     GLOBAL_RUNTIME.prepare_indexing_models(model_paths);
 }
 
-pub(crate) fn with_runtime<F, R>(model_paths: &ModelPaths, func: F) -> MlResult<R>
-where
-    F: for<'a> Fn(&MlRuntimeView<'a>) -> MlResult<R>,
-{
+pub(crate) fn with_runtime<R>(
+    model_paths: &ModelPaths,
+    func: impl FnOnce(&MlRuntimeView<'_>) -> MlResult<R>,
+) -> MlResult<R> {
     ensure_runtime(model_paths);
 
     let runtime_view = GLOBAL_RUNTIME.view(model_paths);
-    let mut result = func(&runtime_view);
-    loop {
-        match result {
-            Ok(value) => return Ok(value),
-            Err(error) => {
-                if !should_retry_execution_provider_runtime(&error)
-                    || !GLOBAL_RUNTIME.advance_provider_fallbacks_for_requested_models(model_paths)
-                {
-                    return Err(error);
-                }
-
-                crate::ml::events::record(
-                    crate::ml::events::Severity::Warning,
-                    format!(
-                        "execution provider failed, retrying with the next provider fallback: \
-                         {error}"
-                    ),
-                );
-                // Drop provider attributions from the failed attempt; only the
-                // retry that produces the returned value should count.
-                runtime_view.reset_used_providers();
-                result = func(&runtime_view);
-            }
-        }
-    }
+    func(&runtime_view)
 }
 
 pub(crate) fn release_runtime() {
@@ -614,6 +601,47 @@ mod tests {
 
         let clip_text = runtime.clip_text.lock_state();
         assert_eq!(clip_text.path, "clip_text.onnx");
+    }
+
+    #[test]
+    fn provider_fallback_advances_only_the_selected_model_slot() {
+        let runtime = MlRuntime::new();
+        let model_paths = ModelPaths {
+            face_detection: "face.onnx".to_string(),
+            clip_image: "clip.onnx".to_string(),
+            ..empty_paths()
+        };
+        runtime.configure_requested_models(&model_paths);
+
+        {
+            let mut face_detection = runtime.face_detection.lock_state();
+            assert!(
+                runtime
+                    .face_detection
+                    .advance_provider_fallback_locked(&mut face_detection)
+            );
+        }
+
+        let face_detection = runtime.face_detection.lock_state();
+        assert_eq!(
+            face_detection.fallback_execution_mode,
+            onnx::ExecutionMode::PlatformDefault.fallback()
+        );
+        let clip_image = runtime.clip_image.lock_state();
+        assert_eq!(clip_image.fallback_execution_mode, None);
+    }
+
+    #[test]
+    fn runtime_does_not_replay_the_pipeline_after_provider_failure() {
+        let calls = Cell::new(0);
+
+        let result: MlResult<()> = with_runtime(&empty_paths(), |_| {
+            calls.set(calls.get() + 1);
+            Err(MlError::Ort("ExecutionProvider failed".to_string()))
+        });
+
+        assert!(result.is_err());
+        assert_eq!(calls.get(), 1);
     }
 
     #[test]
@@ -730,6 +758,23 @@ mod tests {
             Some(onnx::ExecutionMode::CpuOnly)
         );
         assert_eq!(onnx::ExecutionMode::CpuOnly.fallback(), None);
+    }
+
+    #[test]
+    fn model_slot_provider_fallback_is_bounded() {
+        let slot = ModelSlot::new(onnx::ExecutionMode::PlatformDefault, "test-model");
+        let mut state = slot.lock_state();
+        let mut advances = 0;
+
+        while slot.advance_provider_fallback_locked(&mut state) {
+            advances += 1;
+            assert!(advances <= 2);
+        }
+
+        #[cfg(target_os = "android")]
+        assert_eq!(advances, 2);
+        #[cfg(not(target_os = "android"))]
+        assert_eq!(advances, 1);
     }
 
     #[test]

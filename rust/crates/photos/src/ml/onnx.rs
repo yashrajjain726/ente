@@ -1018,15 +1018,16 @@ fn session_expects_f16(session: &Session) -> bool {
 
 pub(crate) fn run_f32<const N: usize>(
     session: &mut Session,
-    input: Vec<f32>,
+    input: &PreparedF32Input,
     input_shape: [i64; N],
 ) -> MlResult<(Vec<i64>, Vec<f32>)> {
     let outputs = if session_expects_f16(session) {
-        let f16_input = Vec::<half::f16>::from_f32_slice(&input);
-        let input_tensor = Tensor::<half::f16>::from_array((input_shape, f16_input))?;
+        let input_tensor =
+            TensorRef::<half::f16>::from_array_view((input_shape, input.f16_data()))?;
         session.run(ort::inputs![input_tensor])?
     } else {
-        let input_tensor = Tensor::<f32>::from_array((input_shape, input))?;
+        let input_tensor =
+            TensorRef::<f32>::from_array_view((input_shape, input.f32_data.as_slice()))?;
         session.run(ort::inputs![input_tensor])?
     };
 
