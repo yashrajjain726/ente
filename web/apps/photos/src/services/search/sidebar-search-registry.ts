@@ -17,7 +17,6 @@ interface SidebarAction {
 }
 
 interface SidebarActionContext {
-    // top-level sidebar controls
     onClose: () => void;
     onShowCollectionSummary: (
         collectionSummaryID: number,
@@ -38,8 +37,6 @@ interface SidebarActionContext {
         hidden: number;
         trash: number;
     };
-
-    // nested drawer hooks
     setPendingAccountAction: (a: SidebarActionID | undefined) => void;
     setPendingPreferencesAction: (a: SidebarActionID | undefined) => void;
     setPendingHelpAction: (a: SidebarActionID | undefined) => void;

@@ -1,23 +1,17 @@
-# Local env files
 .env*.local
 
-# tsc
 *.tsbuildinfo
 
-# Vite
 dist
 
-# Next.js
 .next/
 .next-dev/
 .next-desktop/
 out/
 next-env.d.ts
 
-# Static export outputs
 apps/ensu/next/
 
-# Generated wasm build
 packages/wasm/pkg/
 packages/wasm/space/pkg/
 packages/wasm-core/pkg/

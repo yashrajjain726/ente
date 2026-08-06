@@ -459,17 +459,8 @@ const processQueueItem = async ({
             authToken,
         );
     } catch (e) {
-        // Failures during stream generation on the native side are expected to
-        // happen in two cases:
-        //
-        // 1. There is something specific to this video that doesn't work with
-        //    the current HLS generation pipeline (the ffmpeg invocation).
-        //
-        // 2. The upload of the generated video fails.
-        //
-        // The native side code already retries failures for case 2 (except HTTP
-        // 4xx errors). Thus, usually we should come here only for case 1, and
-        // retrying the same video again will not work either.
+        // Native already retries upload failures other than 4xx responses.
+        // A rejection here normally means this video cannot be converted.
         await markFailedVideoFile(file);
         throw e;
     }

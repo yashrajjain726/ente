@@ -103,12 +103,8 @@ const beginPasskeyRegistration = async (token: string) => {
     return { sessionID, options };
 };
 
-// WebAuthn binary fields (challenges, user ids, credential ids and responses)
-// travel over the wire as unpadded URL-safe base64 strings, the encoding the
-// WebAuthn spec recommends, while the browser APIs produce and expect
-// BufferSource. These two helpers convert in each direction; the force casts
-// are needed because the DOM types say BufferSource where the wire actually
-// carries strings.
+// Browser WebAuthn APIs use binary values. The API sends them as unpadded
+// base64url strings, which the DOM types do not describe; hence the casts.
 
 const serverB64ToBinary = async (b: BufferSource) => {
     const b64String = b as unknown as string;
@@ -154,9 +150,7 @@ const finishPasskeyRegistration = async ({
         headers: accountsAuthenticatedRequestHeaders(token),
         body: JSON.stringify({
             id: credential.id,
-            // rawId is nominally the binary form of id, but id is already its
-            // base64url encoding, which is what the wire wants, so the same
-            // string can be reused.
+            // id is already the base64url form of rawId expected by the API.
             rawId: credential.id,
             type: credential.type,
             response: { attestationObject, clientDataJSON, transports },
@@ -185,9 +179,8 @@ const isAllowedRedirectScheme = (url: URL) =>
     // flow runs inside the app's WebView.
     (url.protocol === "tauri:" && url.hostname === "localhost");
 
-// The redirect host whitelist is an extra safety net, but it would break
-// people who self host Ente, so it is enforced only when the accounts app
-// itself runs on an Ente domain (or localhost).
+// Ente-hosted and local builds restrict redirect hosts.
+// Self-hosted Accounts must accept its own hosts.
 export const isWhitelistedRedirect = (redirectURL: URL) => {
     if (!isAllowedRedirectScheme(redirectURL)) return false;
     if (!shouldRestrictToWhitelistedRedirect()) return true;
@@ -272,13 +265,8 @@ export const beginPasskeyAuthentication = async (
 export const signChallenge = async (
     publicKey: PublicKeyCredentialRequestOptions,
 ) => {
-    // The spec says the transports stored at registration should be passed
-    // back as hints during authentication, but browsers get this wrong in
-    // practice (2024). E.g. Firefox reports only ["usb"] for a Yubikey NFC
-    // security key, and iPhone Safari then refuses to try that key over NFC,
-    // even though transports are meant to be hints, not bindings. As a
-    // workaround, hint every possible transport.
-    // https://www.w3.org/TR/webauthn-3/#dom-publickeycredentialdescriptor-transports
+    // Browsers report incomplete transports, and other browsers may treat
+    // those hints as restrictions. Send every transport as a workaround.
     for (const cred of publicKey.allowCredentials ?? []) {
         cred.transports = [
             ...(cred.transports ?? []),
@@ -332,9 +320,7 @@ export const finishPasskeyAuthentication = async ({
         },
         body: JSON.stringify({
             id: credential.id,
-            // rawId is nominally the binary form of id, but id is already its
-            // base64url encoding, which is what the wire wants, so the same
-            // string can be reused.
+            // id is already the base64url form of rawId expected by the API.
             rawId: credential.id,
             type: credential.type,
             response: {

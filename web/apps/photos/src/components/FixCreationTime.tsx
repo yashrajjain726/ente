@@ -317,8 +317,8 @@ const updateFileDate = async (
     if (fixOption == "custom") {
         newDate = {
             dateTime: customDate!.dateTime,
-            // See [Note: Don't modify offsetTime when editing date via picker]
-            // for why we don't also set the offset here.
+            // The picker reports this computer's offset, not the photo's, so
+            // leave the offset unset.
             offset: undefined,
             timestamp: customDate!.timestamp,
         };

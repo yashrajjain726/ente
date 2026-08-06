@@ -1343,9 +1343,7 @@ export const CollectionMapDialog: React.FC<CollectionMapDialogProps> = ({
         [activeCollection?.id, collectionSummary.id],
     );
 
-    const noOpSetSelected = useCallback(() => {
-        // no-op
-    }, []);
+    const noOpSetSelected = useCallback(() => undefined, []);
 
     const handleMarkTempDeleted = useCallback(
         (files: EnteFile[]) => {
