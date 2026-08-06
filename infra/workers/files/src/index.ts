@@ -53,9 +53,10 @@ const handleGET = async (request: Request) => {
     const url = new URL(request.url);
 
     // Random bots keep trying to pentest causing noise in the logs. If the
-    // request doesn't have a fileID, we can just safely ignore it thereafter.
+    // request doesn't have a valid fileID, we can safely ignore it thereafter.
     const fileID = url.searchParams.get("fileID");
-    if (!fileID) return new Response(null, { status: 400 });
+    if (!fileID || !/^\d+$/.test(fileID))
+        return new Response(null, { status: 400 });
 
     const museumURL = `https://api.ente.com/files/download/v3/${fileID}`;
     const museumRequest = new Request(museumURL, request);

@@ -53,7 +53,8 @@ const handleGET = async (request: Request) => {
     const url = new URL(request.url);
 
     const fileID = url.searchParams.get("fileID");
-    if (!fileID) return new Response(null, { status: 400 });
+    if (!fileID || !/^\d+$/.test(fileID))
+        return new Response(null, { status: 400 });
 
     const museumURL = `https://api.ente.com/files/thumbnail/v3/${fileID}`;
     const museumRequest = new Request(museumURL, request);
