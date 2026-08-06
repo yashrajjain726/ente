@@ -93,19 +93,18 @@ final class ModelSettingsStore: ObservableObject {
     }
 
     func currentSelection() -> LlmModelSelection {
-        let preset = resolveModelSet(
+        let modelId = resolveEffectiveModelId(
             surface: .ios,
             totalMemoryBytes: ProcessInfo.processInfo.physicalMemory,
-            preferredModelId: modelId.isEmpty ? nil : modelId
-        ).effectiveModel
+            preferredModelId: self.modelId.isEmpty ? nil : self.modelId
+        )
         return LlmModelSelection(
-            id: preset.id,
+            id: modelId,
             contextLength: Int(contextLength),
             maxTokens: Int(maxTokens).flatMap { $0 > 0 ? $0 : nil }
         )
     }
 
-    static var defaultModelName: String { modelPolicy.defaultModel.title }
     static var defaultSystemPromptBody: String { platformSystemPromptBody }
 
     static func currentSystemPromptBody() -> String {
@@ -118,13 +117,10 @@ final class ModelSettingsStore: ObservableObject {
         return trimmed.isEmpty ? platformSystemPromptBody : trimmed
     }
 
-    nonisolated static var modelPolicy: ResolvedModelPolicy {
-        resolveModelSet(
-            surface: .ios,
-            totalMemoryBytes: ProcessInfo.processInfo.physicalMemory,
-            preferredModelId: nil
-        ).policy
-    }
+    nonisolated static let modelPolicy = resolveModelPolicy(
+        surface: .ios,
+        totalMemoryBytes: ProcessInfo.processInfo.physicalMemory
+    )
 
     private static var platformSystemPromptBody: String {
         ConfigDefaults.shared.mobileSystemPromptBody

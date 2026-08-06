@@ -6,7 +6,7 @@ import io.ente.ensu.AppState
 import io.ente.ensu.bindings.AssetDownloadException
 import io.ente.ensu.bindings.LlmException
 import io.ente.ensu.bindings.ModelRuntimeSurface
-import io.ente.ensu.bindings.resolveModelSet
+import io.ente.ensu.bindings.resolveEffectiveModelId
 import io.ente.ensu.device.isChatSupported
 import io.ente.ensu.logging.FileLogRepository
 import io.ente.ensu.logging.LogLevel
@@ -326,16 +326,16 @@ internal class ModelSettingsActions(
     }
 
     fun resolveSelection(settings: ModelSettingsState): LlmModelSelection {
-        val preset = resolveModelSet(
+        val modelId = resolveEffectiveModelId(
             surface = ModelRuntimeSurface.ANDROID,
             totalMemoryBytes = state.value.chat.deviceCapability.totalMemoryBytes?.toULong(),
             preferredModelId = settings.modelId.takeIf { it.isNotEmpty() }
-        ).effectiveModel
+        )
         val contextLength = settings.contextLength.toIntOrNull()
         val maxTokens = settings.maxTokens.toIntOrNull()?.takeIf { it > 0 }
 
         return LlmModelSelection(
-            id = preset.id,
+            id = modelId,
             contextLength = contextLength,
             maxTokens = maxTokens
         )

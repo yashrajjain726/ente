@@ -66,7 +66,6 @@ fn main() {
             commands::llm::llm_generate_chat_stream,
             commands::llm::llm_cancel,
             commands::system::system_info,
-            commands::config::config_defaults,
             commands::config::desktop_model_policy,
             commands::llm::llm_model_status,
             commands::llm::llm_migrate_models,

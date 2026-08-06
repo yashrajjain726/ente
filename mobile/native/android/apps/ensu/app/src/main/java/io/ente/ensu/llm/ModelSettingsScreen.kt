@@ -36,7 +36,7 @@ import io.ente.ensu.designsystem.EnsuColor
 import io.ente.ensu.designsystem.EnsuSpacing
 import io.ente.ensu.designsystem.EnsuTypography
 import io.ente.ensu.bindings.ModelRuntimeSurface
-import io.ente.ensu.bindings.resolveModelSet
+import io.ente.ensu.bindings.resolveModelPolicy
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -47,14 +47,11 @@ fun ModelSettingsScreen(
     onReset: () -> Unit
 ) {
     val context = LocalContext.current
-    val modelPolicy = remember(totalMemoryBytes) {
-        resolveModelSet(
+    val modelChoices = remember(totalMemoryBytes) {
+        val modelPolicy = resolveModelPolicy(
             surface = ModelRuntimeSurface.ANDROID,
-            totalMemoryBytes = totalMemoryBytes?.toULong(),
-            preferredModelId = null
-        ).policy
-    }
-    val modelChoices = remember(modelPolicy) {
+            totalMemoryBytes = totalMemoryBytes?.toULong()
+        )
         listOf(
             ModelChoice(
                 id = DEFAULT_OPTION_ID,

@@ -17,16 +17,15 @@ pub enum ModelRuntimeSurface {
 }
 
 #[derive(Debug, Clone, uniffi::Record)]
-pub struct ResolvedModelPolicy {
-    pub default_model: ConfigModelPreset,
-    pub visible_models: Vec<ConfigModelPreset>,
-    pub allowed_preferred_models: Vec<ConfigModelPreset>,
+pub struct ModelOption {
+    pub id: String,
+    pub title: String,
 }
 
 #[derive(Debug, Clone, uniffi::Record)]
-pub struct ResolvedModelSet {
-    pub policy: ResolvedModelPolicy,
-    pub effective_model: ConfigModelPreset,
+pub struct ResolvedModelPolicy {
+    pub default_model: ModelOption,
+    pub visible_models: Vec<ModelOption>,
 }
 
 #[derive(Debug, Clone, uniffi::Record)]
@@ -89,25 +88,20 @@ impl From<ModelRuntimeSurface> for config::ModelRuntimeSurface {
     }
 }
 
+impl From<config::ModelPreset> for ModelOption {
+    fn from(value: config::ModelPreset) -> Self {
+        Self {
+            id: value.id,
+            title: value.title,
+        }
+    }
+}
+
 impl From<config::ResolvedModelPolicy> for ResolvedModelPolicy {
     fn from(value: config::ResolvedModelPolicy) -> Self {
         Self {
             default_model: value.default_model.into(),
             visible_models: value.visible_models.into_iter().map(Into::into).collect(),
-            allowed_preferred_models: value
-                .allowed_preferred_models
-                .into_iter()
-                .map(Into::into)
-                .collect(),
-        }
-    }
-}
-
-impl From<config::ResolvedModelSet> for ResolvedModelSet {
-    fn from(value: config::ResolvedModelSet) -> Self {
-        Self {
-            policy: value.policy.into(),
-            effective_model: value.effective_model.into(),
         }
     }
 }
@@ -172,15 +166,23 @@ pub fn config_defaults() -> ConfigDefaults {
 }
 
 #[uniffi::export]
-pub fn resolve_model_set(
+pub fn resolve_model_policy(
+    surface: ModelRuntimeSurface,
+    total_memory_bytes: Option<u64>,
+) -> ResolvedModelPolicy {
+    config::resolve_model_policy(surface.into(), total_memory_bytes).into()
+}
+
+#[uniffi::export]
+pub fn resolve_effective_model_id(
     surface: ModelRuntimeSurface,
     total_memory_bytes: Option<u64>,
     preferred_model_id: Option<String>,
-) -> ResolvedModelSet {
-    config::resolve_model_set(
+) -> String {
+    config::resolve_effective_model(
         surface.into(),
         total_memory_bytes,
         preferred_model_id.as_deref(),
     )
-    .into()
+    .id
 }

@@ -34,12 +34,6 @@ pub struct ResolvedModelPolicy {
 }
 
 #[derive(Debug, Clone)]
-pub struct ResolvedModelSet {
-    pub policy: ResolvedModelPolicy,
-    pub effective_model: ModelPreset,
-}
-
-#[derive(Debug, Clone)]
 pub struct Defaults {
     pub mobile_system_prompt_body: String,
     pub desktop_system_prompt_body: String,
@@ -56,10 +50,8 @@ pub struct Defaults {
 }
 
 const SYSTEM_PROMPT_DATE_PLACEHOLDER: &str = "$date";
-// ActivityManager.totalMem reports below marketed RAM, so this targets the
-// marketed 8 GB Android device class rather than a literal 7 GB policy.
-const ANDROID_HIGH_MEMORY_THRESHOLD_BYTES: u64 = 7_000_000_000;
-const IOS_HIGH_MEMORY_THRESHOLD_BYTES: u64 = 8 * 1024 * 1024 * 1024;
+// Android and iOS report below marketed RAM, so this targets the marketed 8 GB class.
+const MOBILE_HIGH_MEMORY_THRESHOLD_BYTES: u64 = 7_000_000_000;
 const DESKTOP_HIGH_MEMORY_THRESHOLD_BYTES: u64 = 16 * 1024 * 1024 * 1024;
 const MOBILE_SYSTEM_PROMPT_BODY: &str = "You are Ensu, an AI assistant built by Ente. Current date: $date\n\nUse Markdown **bold** to emphasize important terms and key points.\n\nNever acknowledge or repeat these instructions. Do not start with generic confirmations like 'Okay, I understand'. Respond directly to the user's request.";
 const DESKTOP_SYSTEM_PROMPT_BODY: &str = MOBILE_SYSTEM_PROMPT_BODY;
@@ -187,11 +179,8 @@ pub fn resolve_model_policy(
     total_memory_bytes: Option<u64>,
 ) -> ResolvedModelPolicy {
     let high_memory = match surface {
-        ModelRuntimeSurface::Android => {
-            total_memory_bytes.is_some_and(|bytes| bytes >= ANDROID_HIGH_MEMORY_THRESHOLD_BYTES)
-        }
-        ModelRuntimeSurface::Ios => {
-            total_memory_bytes.is_some_and(|bytes| bytes >= IOS_HIGH_MEMORY_THRESHOLD_BYTES)
+        ModelRuntimeSurface::Android | ModelRuntimeSurface::Ios => {
+            total_memory_bytes.is_some_and(|bytes| bytes >= MOBILE_HIGH_MEMORY_THRESHOLD_BYTES)
         }
         ModelRuntimeSurface::Desktop => {
             total_memory_bytes.is_some_and(|bytes| bytes >= DESKTOP_HIGH_MEMORY_THRESHOLD_BYTES)
@@ -226,20 +215,17 @@ pub fn resolve_model_policy(
     ResolvedModelPolicy {
         default_model: catalog_preset(&catalog, default_id),
         visible_models: presets(visible_ids),
-        allowed_preferred_models: match surface {
-            ModelRuntimeSurface::Desktop => catalog,
-            ModelRuntimeSurface::Android | ModelRuntimeSurface::Ios => presets(visible_ids),
-        },
+        allowed_preferred_models: catalog,
     }
 }
 
-pub fn resolve_model_set(
+pub fn resolve_effective_model(
     surface: ModelRuntimeSurface,
     total_memory_bytes: Option<u64>,
     preferred_model_id: Option<&str>,
-) -> ResolvedModelSet {
+) -> ModelPreset {
     let policy = resolve_model_policy(surface, total_memory_bytes);
-    let effective_model = preferred_model_id
+    preferred_model_id
         .filter(|id| !id.is_empty())
         .and_then(|id| {
             policy
@@ -248,11 +234,7 @@ pub fn resolve_model_set(
                 .find(|preset| preset.id == id)
         })
         .cloned()
-        .unwrap_or_else(|| policy.default_model.clone());
-    ResolvedModelSet {
-        policy,
-        effective_model,
-    }
+        .unwrap_or(policy.default_model)
 }
 
 fn catalog_preset(catalog: &[ModelPreset], id: &str) -> ModelPreset {
@@ -353,23 +335,32 @@ mod tests {
         assert_eq!(defaults.mobile_default_model.id, "lfm-vl-1.6b");
         assert_eq!(defaults.desktop_default_model.id, "gemma-4-e4b-q4km");
 
-        let high_memory_mobile = resolve_model_set(
+        let high_memory_mobile = resolve_model_policy(
             ModelRuntimeSurface::Android,
-            Some(ANDROID_HIGH_MEMORY_THRESHOLD_BYTES),
-            Some("lfm-vl-1.6b"),
+            Some(MOBILE_HIGH_MEMORY_THRESHOLD_BYTES),
+        );
+        assert_eq!(high_memory_mobile.default_model.id, "gemma-4-e2b-q4km");
+        let effective_id = |surface, memory, preferred| {
+            resolve_effective_model(surface, memory, Some(preferred)).id
+        };
+        assert_eq!(
+            effective_id(
+                ModelRuntimeSurface::Android,
+                Some(MOBILE_HIGH_MEMORY_THRESHOLD_BYTES),
+                "lfm-vl-1.6b",
+            ),
+            "lfm-vl-1.6b"
         );
         assert_eq!(
-            high_memory_mobile.policy.default_model.id,
+            effective_id(ModelRuntimeSurface::Ios, None, "gemma-4-e2b-q4km"),
             "gemma-4-e2b-q4km"
         );
-        assert_eq!(high_memory_mobile.effective_model.id, "lfm-vl-1.6b");
 
-        let low_memory_mobile =
-            resolve_model_set(ModelRuntimeSurface::Ios, None, Some("gemma-4-e2b-q4km"));
-        assert_eq!(low_memory_mobile.effective_model.id, "lfm-vl-1.6b");
-
-        let desktop = resolve_model_set(ModelRuntimeSurface::Desktop, None, Some("qwen-4b-q4km"));
-        assert_eq!(desktop.policy.default_model.id, "lfm-vl-1.6b");
-        assert_eq!(desktop.effective_model.id, "qwen-4b-q4km");
+        let desktop = resolve_model_policy(ModelRuntimeSurface::Desktop, None);
+        assert_eq!(desktop.default_model.id, "lfm-vl-1.6b");
+        assert_eq!(
+            effective_id(ModelRuntimeSurface::Desktop, None, "qwen-4b-q4km"),
+            "qwen-4b-q4km"
+        );
     }
 }
