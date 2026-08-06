@@ -1,11 +1,11 @@
 import "package:ente_strings/ente_strings.dart";
+import "package:ente_ui/components/date_time_picker.dart";
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import "package:photos/models/file/file.dart";
 import "package:photos/theme/ente_theme.dart";
 import "package:photos/ui/components/buttons/button_widget.dart";
 import "package:photos/ui/components/models/button_type.dart";
-import "package:photos/ui/viewer/date/date_time_picker.dart";
 import "package:photos/ui/viewer/file/thumbnail_widget.dart";
 import "package:photos/utils/magic_util.dart";
 
@@ -145,19 +145,19 @@ class _EditDateSheetState extends State<EditDateSheet> {
                 },
               ),
             if (selectingDate || selectingTime)
-              DateTimePickerWidget(
-                (DateTime dateTime) {
+              DateTimePicker(
+                initialDateTime: selectedDate,
+                onDateTimeSelected: (dateTime) {
                   selectedDate = dateTime;
                   selectingDate = false;
                   selectingTime = false;
                   setState(() {});
                 },
-                () {
+                onCancel: () {
                   selectingDate = false;
                   selectingTime = false;
                   setState(() {});
                 },
-                selectedDate,
                 maxDateTime: maxDate,
                 startWithTime: selectingTime,
               ),
