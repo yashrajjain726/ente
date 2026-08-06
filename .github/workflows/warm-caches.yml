@@ -1,21 +1,13 @@
 name: "Warm caches"
 
-# Nightly priming of the caches used by the PR lint workflows.
-#
-# A PR run can only restore caches that were saved on the PR's own ref or on
-# main. The lint workflows never run on main, so anything they save is scoped
-# to their own PR and only churns the repository's shared 10 GB cache pool.
-# Instead, this workflow (which runs on main's ref) saves the caches, and the
-# lint workflows restore them without saving (save-if: false).
-#
-# Each job must mirror the commands, features and RUSTFLAGS of the workflow it
-# primes, otherwise the saved cache will not match what that workflow needs.
+# PR workflows cannot save caches that other PRs can restore.
+# This main-only workflow primes shared caches; consumers use save-if: false.
+# Each job must mirror its consumer's commands, features and RUSTFLAGS.
 
 on:
     schedule:
         - cron: "17 18 * * *"
-    # For bootstrapping the caches (dispatch on main, otherwise the caches get
-    # saved against the wrong ref).
+    # Dispatch only on main or caches will be saved against the wrong ref.
     workflow_dispatch:
 
 permissions:
@@ -176,7 +168,6 @@ jobs:
             - run: cargo codegen native
               working-directory: rust
 
-            # Compile the app and tests without running them.
             - name: Build Ensu
               working-directory: mobile/native/apple/apps/ensu
               run: xcodebuild build-for-testing -scheme Ensu -destination 'platform=iOS Simulator,name=iPhone 17'

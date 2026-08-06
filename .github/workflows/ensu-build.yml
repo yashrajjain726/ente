@@ -8,7 +8,7 @@ on:
             - "release/ensu-v*"
     workflow_dispatch:
     schedule:
-        # Run every weekday at ~5:45 AM IST
+        # Weekdays at ~5:45 AM IST
         - cron: "15 0 * * 1-5"
 
 env:
@@ -101,15 +101,11 @@ jobs:
             fail-fast: false
             matrix:
                 platform:
-                    # Tauri docs recommend building Linux release bundles on the
-                    # oldest supported runtime OS with WebKitGTK 4.1, so that
-                    # AppImage/deb/rpm artifacts keep a low glibc baseline.
+                    # Ubuntu 22.04 keeps Linux bundles on a low glibc baseline.
                     - os: ubuntu-22.04
                       rust-target: x86_64-unknown-linux-gnu
                       bundle-targets: appimage,deb,rpm
-                    # A single universal (arm64 + x86_64) build, so that there
-                    # is one dmg that works on all Macs, and existing installs
-                    # of either architecture converge onto it via the updater.
+                    # One universal build lets both architectures share an updater artifact.
                     - os: macos-latest
                       rust-target: universal-apple-darwin
                       bundle-targets: app,dmg
@@ -141,10 +137,7 @@ jobs:
               run: |
                   sudo apt-get update
                   sudo apt-get install -y libwebkit2gtk-4.1-dev libsoup-3.0-dev libssl-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev
-                  # The llama.cpp Vulkan backend needs the Vulkan loader and the
-                  # glslc shader compiler at build time. Ubuntu 22.04 has no
-                  # glslc package, so use the LunarG SDK repository (which
-                  # llama.cpp's own CI also uses).
+                  # Ubuntu 22.04 needs LunarG's repository to provide glslc for llama.cpp.
                   sudo wget -qO /usr/share/keyrings/lunarg.asc https://packages.lunarg.com/lunarg-signing-key-pub.asc
                   echo "deb [signed-by=/usr/share/keyrings/lunarg.asc] https://packages.lunarg.com/vulkan jammy main" | sudo tee /etc/apt/sources.list.d/lunarg-vulkan-jammy.list >/dev/null
                   sudo apt-get update
@@ -331,8 +324,7 @@ jobs:
                   echo "y" | sdkmanager --install "ndk;${{ env.NDK_VERSION }}"
                   echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/${{ env.NDK_VERSION }}" >> $GITHUB_ENV
 
-            # cargo codegen native builds the uniffi library for the host, which
-            # on Linux enables the llama.cpp Vulkan backend.
+            # cargo codegen native enables llama.cpp's Vulkan backend on Linux.
             - name: Install Vulkan build dependencies
               run: |
                   sudo apt-get update

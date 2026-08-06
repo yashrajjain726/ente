@@ -8,7 +8,7 @@ on:
             - "release/locker-v*"
     workflow_dispatch:
     schedule:
-        # Run every weekday at ~4:45 AM IST
+        # Weekdays at ~4:45 AM IST
         - cron: "15 23 * * 0-4"
 
 permissions:

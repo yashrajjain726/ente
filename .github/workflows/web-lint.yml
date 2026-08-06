@@ -1,7 +1,6 @@
 name: "Lint (Web)"
 
 on:
-    # Run on every pull request (open or push to it) that changes web/
     pull_request:
         paths:
             - "web/**"
@@ -17,7 +16,6 @@ on:
 permissions:
     contents: read
 
-# Cancel in-progress lint runs when a new commit is pushed.
 concurrency:
     group: ${{ github.workflow }}-${{ github.ref }}
     cancel-in-progress: true

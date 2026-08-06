@@ -1,7 +1,5 @@
 name: "Dependency review"
 
-# Fail if a dependency added or updated by a PR has a known security advisory.
-
 on:
     pull_request:
         paths:
