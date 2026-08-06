@@ -4,6 +4,7 @@ import "dart:io";
 import "package:ente_strings/ente_strings.dart";
 import "package:flutter/cupertino.dart";
 import "package:flutter/material.dart";
+import "package:flutter_svg/flutter_svg.dart";
 import "package:hugeicons/hugeicons.dart";
 import "package:photos/core/event_bus.dart";
 import "package:photos/events/guest_view_event.dart";
@@ -281,7 +282,11 @@ class FileBottomBarState extends State<FileBottomBar> {
       child: Padding(
         padding: const EdgeInsets.only(top: 12),
         child: IconButton(
-          icon: const Icon(Icons.flag_outlined, color: Colors.white),
+          icon: SvgPicture.asset(
+            "assets/icons/delete-01.svg",
+            width: 24,
+            height: 24,
+          ),
           onPressed: () => _onSuggestDelete(collection),
         ),
       ),

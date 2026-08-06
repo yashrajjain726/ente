@@ -6,6 +6,7 @@ import "package:ente_lock_screen/local_authentication_service.dart";
 import "package:ente_strings/ente_strings.dart";
 import 'package:flutter/material.dart';
 import "package:flutter/services.dart";
+import "package:flutter_svg/flutter_svg.dart";
 import "package:hugeicons/hugeicons.dart";
 import "package:local_auth/local_auth.dart";
 import 'package:logging/logging.dart';
@@ -270,7 +271,12 @@ class FileAppBarState extends State<FileAppBar> {
     if (widget.file.isLiveOrMotionPhoto) {
       _actions.add(
         IconButton(
-          icon: const Icon(Icons.album_outlined),
+          icon: SvgPicture.asset(
+            "assets/icons/live-photo.svg",
+            width: 24,
+            height: 24,
+            colorFilter: const ColorFilter.mode(Colors.white, BlendMode.srcIn),
+          ),
           onPressed: () {
             showShortToast(
               context,

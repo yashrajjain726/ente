@@ -9,6 +9,7 @@ import 'package:extended_image/extended_image.dart';
 import "package:flutter/foundation.dart";
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import "package:flutter_svg/flutter_svg.dart";
 import 'package:logging/logging.dart';
 import 'package:photos/core/configuration.dart';
 import 'package:photos/core/errors.dart';
@@ -392,10 +393,14 @@ class _BodyState extends State<_Body> {
                                     backgroundColor: const Color(0xAA252525),
                                     fixedSize: const Size(44, 44),
                                   ),
-                                  icon: const Icon(
-                                    Icons.threesixty,
-                                    color: Colors.white,
-                                    size: 24,
+                                  icon: SvgPicture.asset(
+                                    "assets/icons/panorama.svg",
+                                    width: 24,
+                                    height: 24,
+                                    colorFilter: const ColorFilter.mode(
+                                      Colors.white,
+                                      BlendMode.srcIn,
+                                    ),
                                   ),
                                   onPressed: () async {
                                     await openPanoramaViewerPage(
