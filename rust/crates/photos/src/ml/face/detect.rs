@@ -14,13 +14,14 @@ pub(crate) fn run_face_detection(
     runtime: &MlRuntimeView<'_>,
     input: &YoloInput,
 ) -> MlResult<Vec<FaceDetection>> {
-    let mut face_detection = runtime.face_detection_session()?;
-    onnx::with_prepared_float_output(
-        &mut face_detection,
-        &input.tensor,
-        [1, 3, YOLO_INPUT_SIZE as i64, YOLO_INPUT_SIZE as i64],
-        |_output_shape, output_data| postprocess_face_detections(output_data, input),
-    )
+    runtime.with_face_detection_session(|session| {
+        onnx::with_prepared_float_output(
+            session,
+            &input.tensor,
+            [1, 3, YOLO_INPUT_SIZE as i64, YOLO_INPUT_SIZE as i64],
+            |_output_shape, output_data| postprocess_face_detections(output_data, input),
+        )
+    })
 }
 
 fn postprocess_face_detections(
