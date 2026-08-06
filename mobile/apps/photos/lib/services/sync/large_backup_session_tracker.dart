@@ -14,9 +14,10 @@ class LargeBackupSessionTracker extends ChangeNotifier {
   int _remainingCount = 0;
   SyncStatus? _lastStatus;
 
+  // A backup can contain multiple upload batches. The session remains active
+  // while the sync service prepares the next batch, even though the current
+  // batch's remaining count is temporarily zero.
   bool get isActive => _isUploading && _isEligible;
-
-  bool get shouldOfferStandby => isActive && _remainingCount > 0;
 
   int get remainingCount => _remainingCount;
 
@@ -52,12 +53,12 @@ class LargeBackupSessionTracker extends ChangeNotifier {
         break;
     }
 
-    if (_shouldLog(event)) {
+    if (event.status != SyncStatus.inProgress || _remainingCount == 0) {
       _logger.internalInfo(
         "status=${event.status.name}, total=${event.total}, "
         "completed=${event.completed}, uploading=$_isUploading, "
         "eligible=$_isEligible, remaining=$_remainingCount, "
-        "offerStandby=$shouldOfferStandby, "
+        "active=$isActive, "
         "threshold=$minimumFileCount",
       );
     }
@@ -65,14 +66,6 @@ class LargeBackupSessionTracker extends ChangeNotifier {
     if (wasActive != isActive || previousRemainingCount != _remainingCount) {
       notifyListeners();
     }
-  }
-
-  bool _shouldLog(SyncStatusUpdate event) {
-    if (event.status != SyncStatus.inProgress) {
-      return true;
-    }
-    final completed = event.completed ?? 0;
-    return completed <= 1 || completed % 100 == 0 || _remainingCount == 0;
   }
 
   void _reset() {
