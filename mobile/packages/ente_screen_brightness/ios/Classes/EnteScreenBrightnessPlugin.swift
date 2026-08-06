@@ -1,11 +1,13 @@
 import Flutter
 import UIKit
 
-public class EnteScreenBrightnessPlugin: NSObject, FlutterPlugin {
+public final class EnteScreenBrightnessPlugin: NSObject, FlutterPlugin, FlutterSceneLifeCycleDelegate {
+    private weak var registrar: FlutterPluginRegistrar?
     private var capturedScreen: UIScreen?
     private var capturedBrightness: CGFloat?
 
-    override init() {
+    private init(registrar: FlutterPluginRegistrar) {
+        self.registrar = registrar
         super.init()
         NotificationCenter.default.addObserver(
             self,
@@ -26,8 +28,9 @@ public class EnteScreenBrightnessPlugin: NSObject, FlutterPlugin {
             name: "io.ente.screen_brightness",
             binaryMessenger: registrar.messenger()
         )
-        let instance = EnteScreenBrightnessPlugin()
+        let instance = EnteScreenBrightnessPlugin(registrar: registrar)
         registrar.addMethodCallDelegate(instance, channel: channel)
+        registrar.addSceneDelegate(instance)
     }
 
     public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
@@ -52,26 +55,34 @@ public class EnteScreenBrightnessPlugin: NSObject, FlutterPlugin {
                 return
             }
 
-            guard UIApplication.shared.applicationState == .active else {
+            guard let screen = activeScreen() else {
                 result(false)
                 return
             }
 
-            guard let screen = activeScreen() else {
-                result(FlutterError(
-                    code: "SCREEN_UNAVAILABLE",
-                    message: "No active iOS screen is available.",
-                    details: nil
-                ))
+            if let capturedScreen, capturedScreen !== screen {
+                result(false)
                 return
             }
 
-            if capturedBrightness == nil {
-                capturedScreen = screen
-                capturedBrightness = screen.brightness
+            let currentBrightness = screen.brightness
+            guard currentBrightness > brightness else {
+                result(false)
+                return
             }
-            screen.brightness = min(screen.brightness, brightness)
-            result(true)
+
+            let startedSession = capturedBrightness == nil
+            if startedSession {
+                capturedScreen = screen
+                capturedBrightness = currentBrightness
+            }
+            screen.brightness = brightness
+            let didDim = screen.brightness < currentBrightness
+            if !didDim && startedSession {
+                capturedScreen = nil
+                capturedBrightness = nil
+            }
+            result(didDim)
 
         case "restoreBrightness":
             restoreCapturedBrightness()
@@ -83,13 +94,24 @@ public class EnteScreenBrightnessPlugin: NSObject, FlutterPlugin {
     }
 
     private func activeScreen() -> UIScreen? {
-        return UIApplication.shared.connectedScenes
-            .compactMap { $0 as? UIWindowScene }
-            .first { $0.activationState == .foregroundActive }?
-            .screen
+        guard let window = registrar?.viewController?.viewIfLoaded?.window else {
+            return nil
+        }
+        if let scene = window.windowScene {
+            return scene.activationState == .foregroundActive ? scene.screen : nil
+        }
+        return UIApplication.shared.applicationState == .active ? window.screen : nil
     }
 
     @objc private func restoreForAppDeactivation(_ notification: Notification) {
+        restoreCapturedBrightness()
+    }
+
+    public func sceneWillResignActive(_ scene: UIScene) {
+        restoreCapturedBrightness()
+    }
+
+    public func sceneDidDisconnect(_ scene: UIScene) {
         restoreCapturedBrightness()
     }
 

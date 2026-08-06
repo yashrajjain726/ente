@@ -4,6 +4,7 @@ description: iOS screen brightness control for Ente Flutter apps
 resolution: workspace
 environment:
   sdk: ">=3.10.0 <4.0.0"
+  flutter: ">=3.38.0"
 
 dependencies:
   flutter:
