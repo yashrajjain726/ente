@@ -29,7 +29,8 @@ const handleGET = async (request: Request) => {
     const url = new URL(request.url);
 
     const fileID = url.searchParams.get("fileID");
-    if (!fileID) return new Response(null, { status: 400 });
+    if (!fileID || !/^\d+$/.test(fileID))
+        return new Response(null, { status: 400 });
 
     const filePath = url.pathname.startsWith("/download")
         ? "download"
