@@ -2,21 +2,8 @@ name: "Deploy (Web)"
 
 on:
     schedule:
-        # [Note: Run workflow every 24 hours]
-        #
-        # Run every weekday at ~8:00 AM IST.
-        #
-        # First field is minute, second is hour of the day. Last is day of week,
-        # 0 being Sunday.
-        #
-        # Add a few minutes of offset to avoid scheduling on exact hourly
-        # boundaries (recommended by GitHub to avoid congestion).
-        #
-        # https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows#schedule
-        # https://crontab.guru/
-        #
+        # Weekdays at ~8:00 AM IST, offset from the hour to avoid congestion.
         - cron: "25 2 * * 1-5"
-    # Also allow manually running the workflow
     workflow_dispatch:
 
 permissions:

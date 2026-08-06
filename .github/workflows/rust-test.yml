@@ -53,7 +53,7 @@ jobs:
                   cache-directories: rust/.cache
 
             - run: cargo test --locked --features museum,ente-photos/ml-assets
-              # GITHUB_TOKEN lifts GitHub API rate limit when fetching
-              # postgresql_embedded binaries.
+              # postgresql_embedded downloads its binaries from GitHub.
+              # GITHUB_TOKEN raises the API rate limit for those downloads.
               env:
                   GITHUB_TOKEN: ${{ github.token }}
