@@ -179,12 +179,12 @@ class _StatusBarWidgetState extends State<StatusBarWidget> {
           if (!_largeBackupSession.isActive) {
             return;
           }
-          await Navigator.of(context).push(
-            MaterialPageRoute<void>(
-              builder: (_) =>
-                  BackupStandbyScreen(sessionTracker: _largeBackupSession),
-            ),
+          final standbyRoute = MaterialPageRoute<void>(
+            builder: (_) =>
+                BackupStandbyScreen(sessionTracker: _largeBackupSession),
           );
+          await Navigator.of(context).push(standbyRoute);
+          await standbyRoute.completed;
           Bus.instance.fire(
             ForceReloadHomeGalleryEvent("largeBackupStandbyEnded"),
           );
