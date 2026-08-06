@@ -1,1 +1,0 @@
-- Allow favoriting shared photos in memories.

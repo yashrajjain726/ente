@@ -1,1 +1,0 @@
-- Updated Locker bottom sheets to use the new component styling.

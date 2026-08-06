@@ -371,21 +371,19 @@ pub async fn chat_db_insert_message_with_uuid(
     state: State<'_, ChatDbState>,
     input: ChatMessageUpsertInput,
 ) -> Result<ChatMessageDto, ApiError> {
-    let message_uuid = parse_uuid(&input.message_uuid)?;
-    let session_uuid = parse_uuid(&input.session_uuid)?;
-    let parent = optional_uuid(&input.parent_message_uuid)?;
-    let sender = normalize_sender(&input.sender)?;
-    let attachments = convert_attachments(input.attachments)?;
+    let message = db::Message {
+        uuid: parse_uuid(&input.message_uuid)?,
+        session_uuid: parse_uuid(&input.session_uuid)?,
+        parent_message_uuid: optional_uuid(&input.parent_message_uuid)?,
+        sender: normalize_sender(&input.sender)?
+            .parse()
+            .map_err(ApiError::from)?,
+        text: input.text,
+        attachments: convert_attachments(input.attachments)?,
+        created_at: input.created_at,
+    };
     with_chat_db_async(&state, move |db| {
-        Ok(ChatMessageDto::from(db.insert_message_with_uuid(
-            message_uuid,
-            session_uuid,
-            sender,
-            &input.text,
-            parent,
-            attachments,
-            input.created_at,
-        )?))
+        Ok(ChatMessageDto::from(db.insert_message_with_uuid(&message)?))
     })
     .await
 }

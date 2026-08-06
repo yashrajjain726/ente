@@ -1142,6 +1142,56 @@ async fn get_space_profile_decrypted_loads_and_decrypts_profile() {
 }
 
 #[tokio::test]
+async fn get_space_profile_decrypted_returns_decryption_error() {
+    let mut server = Server::new_async().await;
+    let space_root_key = generate_key();
+    let ctx = test_account_ctx_with_space_root_key(&server.url(), space_root_key.clone());
+    let space_key = generate_key();
+    let encrypted_profile = b64::encode(
+        &encrypt_secretbox_payload(&generate_key(), b"profile-json").expect("profile wrap"),
+    );
+    let profile = server
+        .mock("GET", "/spaces/space_owner_main/profile")
+        .match_header("x-space-session-token", "space-session-token")
+        .with_status(200)
+        .with_body(
+            json!({
+                "spaceId": "space_owner_main",
+                "spaceSlug": "owner-main",
+                "version": 3,
+                "friends": 2,
+                "encryptedProfile": encrypted_profile,
+                "updatedAt": "2026-04-16T00:00:00Z"
+            })
+            .to_string(),
+        )
+        .create_async()
+        .await;
+    let spaces = server
+        .mock("GET", "/account/space")
+        .match_header("x-space-session-token", "space-session-token")
+        .with_status(200)
+        .with_body(owned_space_response(
+            &space_root_key,
+            &space_key,
+            "space_owner_main",
+            "owner-main",
+            3,
+        ))
+        .create_async()
+        .await;
+
+    let error = ctx
+        .get_space_profile_decrypted("space_owner_main", None, None)
+        .await
+        .expect_err("profile decryption should fail");
+
+    assert!(matches!(error, SpaceError::Crypto(_)));
+    profile.assert_async().await;
+    spaces.assert_async().await;
+}
+
+#[tokio::test]
 async fn space_status_mutations_accept_empty_server_responses() {
     let mut server = Server::new_async().await;
     let ctx = test_account_ctx(&server.url());

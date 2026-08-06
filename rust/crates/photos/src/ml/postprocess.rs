@@ -1,3 +1,5 @@
+pub(crate) const MAX_DETECTIONS_PER_IMAGE: usize = 100;
+
 pub(crate) fn l2_normalize(embedding: &mut [f32], zero_threshold: f32) {
     let mut norm = 0.0f32;
     for value in embedding.iter() {

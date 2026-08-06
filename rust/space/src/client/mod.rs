@@ -585,7 +585,11 @@ impl AccountSpaceCtx {
         for share in shares {
             match self.decrypt_friend_share(space_id, &share).await {
                 Ok(share) => value.push(share),
-                Err(error) if error.is_unavailable_record() => {}
+                Err(
+                    SpaceError::Crypto(_)
+                    | SpaceError::InvalidInput(_)
+                    | SpaceError::MissingFriendSealedSpaceKey,
+                ) => {}
                 Err(error) => return Err(error),
             }
         }

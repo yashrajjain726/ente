@@ -9,15 +9,11 @@ export const parseSpaceProfilePayload = (
 ): SpaceProfilePayload => {
     const trimmed = profile.trim();
     if (!trimmed) return {};
-    try {
-        const parsed: unknown = JSON.parse(trimmed);
-        if (parsed && typeof parsed == "object" && !Array.isArray(parsed)) {
-            return parsed;
-        }
-    } catch {
-        // Fall through to the empty profile.
+    const parsed: unknown = JSON.parse(trimmed);
+    if (!parsed || typeof parsed != "object" || Array.isArray(parsed)) {
+        throw new Error("Space profile payload must be a JSON object");
     }
-    return {};
+    return parsed;
 };
 
 export const spaceProfileTextField = (value: unknown) =>
