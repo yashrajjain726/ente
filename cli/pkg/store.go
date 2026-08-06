@@ -92,7 +92,6 @@ func (c *ClICtrl) DeleteValue(ctx context.Context, store model.PhotosStore, key 
 	})
 }
 
-// GetValue
 func (c *ClICtrl) GetValue(ctx context.Context, store model.PhotosStore, key []byte) ([]byte, error) {
 	var value []byte
 	err := c.DB.View(func(tx *bolt.Tx) error {

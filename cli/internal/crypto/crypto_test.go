@@ -9,7 +9,7 @@ import (
 const (
 	password           = "test_password"
 	kdfSalt            = "vd0dcYMGNLKn/gpT6uTFTw=="
-	memLimit           = 64 * 1024 * 1024 // 64MB
+	memLimit           = 64 * 1024 * 1024
 	opsLimit           = 2
 	cipherText         = "kBXQ2PuX6y/aje5r22H0AehRPh6sQ0ULoeAO"
 	cipherNonce        = "v7wsI+BFZsRMIjDm3rTxPhmi/CaUdkdJ"
