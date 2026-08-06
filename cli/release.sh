@@ -1,8 +1,6 @@
 #!/bin/bash
 
-# shellcheck disable=SC2046
-# shellcheck disable=SC2006
-LATEST_TAG=$(git describe --tags `git rev-list --tags='cli-*' --max-count=1`)
+LATEST_TAG=$(git describe --tags "$(git rev-list --tags='cli-*' --max-count=1)")
 
 if [ -z "$LATEST_TAG" ]; then
     echo "No 'cli-' tag found. Exiting..."
