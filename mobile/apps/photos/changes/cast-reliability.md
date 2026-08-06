@@ -1,1 +1,0 @@
-- Improved Cast device discovery on Android and added automatic Cast pairing on iOS.
