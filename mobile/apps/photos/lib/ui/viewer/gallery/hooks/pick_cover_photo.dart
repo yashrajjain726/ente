@@ -66,7 +66,7 @@ class _PickCoverPhotoWidgetState extends State<PickCoverPhotoWidget> {
     return SizedBox(
       height: MediaQuery.sizeOf(context).height,
       child: BottomSheetComponent(
-        header: _buildHeader(context, l10n),
+        header: const _PickCoverPhotoHeader(),
         showCloseButton: false,
         padding: const EdgeInsets.symmetric(vertical: Spacing.xl),
         content: Expanded(
@@ -150,8 +150,14 @@ class _PickCoverPhotoWidgetState extends State<PickCoverPhotoWidget> {
       ),
     );
   }
+}
 
-  Widget _buildHeader(BuildContext context, StringsLocalizations l10n) {
+class _PickCoverPhotoHeader extends StatelessWidget {
+  const _PickCoverPhotoHeader();
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.strings;
     final colors = context.componentColors;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: Spacing.xl),
