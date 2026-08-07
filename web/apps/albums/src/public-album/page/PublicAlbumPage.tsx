@@ -334,7 +334,6 @@ export default function PublicAlbumPage() {
             }
         };
         main();
-        // TODO:
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 

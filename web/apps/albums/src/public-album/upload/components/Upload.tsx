@@ -1,6 +1,4 @@
-// TODO: Audit this file
 // TODO: Too many null assertions in this file. The types need reworking.
-/* eslint-disable react-hooks/exhaustive-deps */
 import { useAlbumsAppContext } from "@/app/context/albums-app-context";
 import {
     savedPublicCollectionUploaderName,
@@ -169,8 +167,6 @@ export const Upload: React.FC<UploadProps> = ({
                 setInProgressUploads,
                 setFinishedUploads,
                 setUploadPhase,
-                // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-                // @ts-ignore
                 setUploadFilenames: setUploadFileNames,
                 setHasLivePhotos,
             },
@@ -270,6 +266,7 @@ export const Upload: React.FC<UploadProps> = ({
                 onGenericError(e);
             }
         })();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [publicAlbumsCredentials, uploadCollection, webFiles]);
 
     const uploadFilesToExistingCollection = async (

@@ -154,7 +154,6 @@ const PlanSelectorCard: React.FC<PlanSelectorCardProps> = ({
                 setLoading(false);
             }
         })();
-        // TODO
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 

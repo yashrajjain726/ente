@@ -80,9 +80,7 @@ export type UploadItemWithCollection = UploadAsset & {
 };
 
 class UIService {
-    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-ignore
-    private progressUpdater: ProgressUpdater;
+    private progressUpdater!: ProgressUpdater;
 
     private uploadPhase: UploadPhase = "preparing";
     private filenames = new Map<number, string>();
@@ -217,9 +215,8 @@ const groupByResult = (finishedUploads: FinishedUploads) => {
 };
 
 class UploadManager {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     private comlinkCryptoWorkers: ComlinkWorker<typeof CryptoWorker>[] =
-        new Array(maxConcurrentUploads);
+        new Array<ComlinkWorker<typeof CryptoWorker>>(maxConcurrentUploads);
     private parsedMetadataJSONMap = new Map<string, ParsedMetadataJSON>();
     private itemsToBeUploaded: ClusteredUploadItem[] = [];
     private failedItems: ClusteredUploadItem[] = [];
@@ -253,8 +250,8 @@ class UploadManager {
     ) {
         this.itemsToBeUploaded = [];
         this.failedItems = [];
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-        this.parsedMetadataJSONMap = parsedMetadataJSONMap ?? new Map();
+        this.parsedMetadataJSONMap =
+            parsedMetadataJSONMap ?? new Map<string, ParsedMetadataJSON>();
         this.uploaderName = undefined;
         this.shouldUploadBeCancelled = false;
 

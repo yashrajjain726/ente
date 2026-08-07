@@ -96,7 +96,6 @@ export const fetchLocationNames = async ({
             );
             return { cluster, locationInfo };
         } catch {
-            // Return null on error, will be filtered out
             return null;
         }
     });
@@ -104,7 +103,7 @@ export const fetchLocationNames = async ({
     const results = await Promise.all(geocodingPromises);
 
     results.forEach((result) => {
-        if (!result) return; // Skip failed requests
+        if (!result) return;
 
         const { cluster, locationInfo } = result;
         cluster.forEach((photo) => {
