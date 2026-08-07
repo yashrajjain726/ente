@@ -590,7 +590,6 @@ const readLivePhotoDetails = async ({ image, video }: LivePhotoAssets) => {
 const readImageOrVideoDetails = async (uploadItem: UploadItem) => {
     const { stream, fileSize, lastModifiedMs } = readUploadItem(uploadItem);
 
-    // @ts-ignore
     const fileTypeInfo = await detectFileTypeInfoFromChunk(async () => {
         const reader = stream.getReader();
         const chunk = (await reader.read()).value;

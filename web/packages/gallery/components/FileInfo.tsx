@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/ban-ts-comment */
 // TODO: Split this file to deal with the ente-new/photos imports.
 
 import CalendarTodayIcon from "@mui/icons-material/CalendarToday";
@@ -986,12 +985,9 @@ const MapBox: React.FC<MapBoxProps> = ({ location, mapEnabled }) => {
 
         const position: L.LatLngTuple = [location.latitude, location.longitude];
         if (!mapRef.current) {
-            // @ts-ignore
             const map = leaflet.map(mapContainer).setView(position, zoom);
             map.attributionControl.setPrefix(leafletAttributionPrefix);
-            // @ts-ignore
             leaflet.tileLayer(urlTemplate, { attribution }).addTo(map);
-            // @ts-ignore
             markerRef.current = leaflet.marker(position).addTo(map);
             mapRef.current = map;
         } else {
