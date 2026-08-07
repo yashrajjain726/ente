@@ -1111,7 +1111,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
                     aria-hidden
                     sx={{
                         background:
-                            "linear-gradient(180deg, rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0))",
+                            "linear-gradient(180deg, rgba(0, 0, 0, 0.78), rgba(0, 0, 0, 0))",
                         filter: "blur(12px)",
                         height: 100,
                         left: -12,
