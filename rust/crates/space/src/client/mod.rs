@@ -212,7 +212,7 @@ impl AccountSpaceCtx {
             })?;
         let identity = self.decrypt_space_identity(&space)?;
         cache_lock(&self.space_identity_cache, "space identity")?
-            .insert(space.space_id.clone(), identity.clone());
+            .insert(space.space_id, identity.clone());
         Ok(identity)
     }
 

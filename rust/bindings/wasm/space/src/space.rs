@@ -532,13 +532,13 @@ pub async fn space_open_account_ctx(
     let input: OpenAccountSpaceCtxJsInput = swb::from_value(input)?;
     let space_root_key = decode_b64_field(&input.space_root_key_b64)?;
     let ctx = AccountSpaceCtx::open(OpenAccountSpaceCtxInput {
-        base_url: input.base_url.clone(),
+        base_url: input.base_url,
         space_session_token: input.space_session_token,
         space_root_key,
         initial_owned_spaces: input.owned_spaces,
-        user_agent: input.user_agent.clone(),
-        client_package: input.client_package.clone(),
-        client_version: input.client_version.clone(),
+        user_agent: input.user_agent,
+        client_package: input.client_package,
+        client_version: input.client_version,
     })?;
     Ok(SpaceAccountCtxHandle { inner: ctx })
 }
