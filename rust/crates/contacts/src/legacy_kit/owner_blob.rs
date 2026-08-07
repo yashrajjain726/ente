@@ -1,8 +1,9 @@
+use ente_core::b64;
 use ente_core::crypto::{self, secretbox};
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 
 use crate::{
-    ContactsError, Result,
+    Error, Result,
     legacy_kit_models::{LegacyKitMetadata, LegacyKitPart, LegacyKitShare},
 };
 
@@ -49,11 +50,11 @@ pub(super) fn decrypt_owner_blob(
 
 fn encrypt_blob<T: Serialize>(payload: &T, master_key: &[u8], label: &str) -> Result<String> {
     let payload = serde_json::to_vec(payload).map_err(|error| {
-        ContactsError::InvalidInput(format!("failed to encode {label} payload: {error}"))
+        Error::InvalidInput(format!("failed to encode {label} payload: {error}"))
     })?;
     let encrypted =
         secretbox::encrypt_combined(&payload, &crypto::Key::try_from_slice(master_key)?);
-    Ok(crypto::encode_b64(&encrypted))
+    Ok(b64::encode(&encrypted))
 }
 
 fn decrypt_blob<T: DeserializeOwned>(
@@ -61,12 +62,11 @@ fn decrypt_blob<T: DeserializeOwned>(
     master_key: &[u8],
     label: &str,
 ) -> Result<T> {
-    let encrypted_blob = crypto::decode_b64(encrypted_blob_b64)?;
+    let encrypted_blob = b64::decode(encrypted_blob_b64)?;
     let plaintext =
         secretbox::decrypt_combined(&encrypted_blob, &crypto::Key::try_from_slice(master_key)?)?;
-    serde_json::from_slice(&plaintext).map_err(|error| {
-        ContactsError::InvalidInput(format!("failed to decode {label} payload: {error}"))
-    })
+    serde_json::from_slice(&plaintext)
+        .map_err(|error| Error::InvalidInput(format!("failed to decode {label} payload: {error}")))
 }
 
 pub(super) fn metadata_from_owner_blob(owner_blob: &StoredOwnerBlob) -> LegacyKitMetadata {

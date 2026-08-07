@@ -16,10 +16,6 @@ import { useFormik } from "formik";
 import { t } from "i18next";
 import React from "react";
 
-// =============================================================================
-// Sparkle Icons
-// =============================================================================
-
 const SparkleTopRight: React.FC = () => (
     <svg
         width="14"
@@ -68,29 +64,12 @@ const SparkleBottomLeft: React.FC = () => (
     </svg>
 );
 
-// =============================================================================
-// Types
-// =============================================================================
-
 type UploaderNameInputProps = ModalVisibilityProps & {
-    /**
-     * The existing uploader name to prefill.
-     */
     uploaderName: string;
-    /**
-     * Count of the number of files that the uploader is trying to upload.
-     */
     uploadFileCount: number;
-    /**
-     * Callback invoked when the user presses submit after entering a name.
-     */
     onSubmit: (name: string) => void | Promise<void>;
 };
 
-/**
- * A dialog asking the uploader to a public album to provide their name so that
- * other folks can know who uploaded a given photo in the shared album.
- */
 export const UploaderNameInput: React.FC<UploaderNameInputProps> = ({
     open,
     onClose,
@@ -139,12 +118,6 @@ export const UploaderNameInput: React.FC<UploaderNameInputProps> = ({
     );
 };
 
-/**
- * The form that obtains the textual input of the uploader name.
- *
- * It is kept as a separate component so that it gets recreated on prop changes
- * (e.g. uploaderName changes).
- */
 export const UploaderNameInputForm: React.FC<
     Omit<UploaderNameInputProps, "open">
 > = ({ onClose, uploaderName, uploadFileCount, onSubmit }) => {
@@ -203,10 +176,6 @@ export const UploaderNameInputForm: React.FC<
         </FormContainer>
     );
 };
-
-// =============================================================================
-// Styled Components
-// =============================================================================
 
 const StyledDialog = styled(Dialog)(({ theme }) => ({
     "& .MuiDialog-paper": {

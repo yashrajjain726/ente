@@ -1,11 +1,10 @@
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/cupertino.dart";
 import "package:flutter/material.dart";
 import "package:intl/intl.dart";
 import "package:logging/logging.dart";
 import "package:photos/core/event_bus.dart";
 import "package:photos/events/people_changed_event.dart";
-import "package:photos/generated/l10n.dart";
-import "package:photos/l10n/l10n.dart";
 import "package:photos/models/file/file.dart";
 import "package:photos/models/ml/face/person.dart";
 import "package:photos/services/machine_learning/face_ml/person/person_service.dart";
@@ -87,9 +86,9 @@ class _PersonClustersPageState extends State<PersonClustersPage> {
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: <Widget>[
                                 Text(
-                                  AppLocalizations.of(
-                                    context,
-                                  ).photosCount(count: files.length),
+                                  context.strings.photosCount(
+                                    count: files.length,
+                                  ),
                                   style: getEnteTextTheme(context).body,
                                 ),
                                 (index != 0)
@@ -134,7 +133,7 @@ class _PersonClustersPageState extends State<PersonClustersPage> {
             );
           } else if (snapshot.hasError) {
             _logger.warning("Failed to get cluster", snapshot.error);
-            return Center(child: Text(AppLocalizations.of(context).error));
+            return Center(child: Text(context.strings.error));
           } else {
             return const Center(child: CircularProgressIndicator());
           }
@@ -213,7 +212,7 @@ class _PersonClustersWidgetState extends State<PersonClustersWidget> {
           );
         } else if (snapshot.hasError) {
           _logger.warning("Failed to get cluster", snapshot.error);
-          return Center(child: Text(AppLocalizations.of(context).error));
+          return Center(child: Text(context.strings.error));
         } else {
           return const Center(child: CircularProgressIndicator());
         }
@@ -353,7 +352,7 @@ class __ClusterWrapperForGirdState extends State<_ClusterWrapperForGird> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    context.l10n.memoryCount(
+                    context.strings.memoryCount(
                       count: widget.files.length,
                       formattedCount: NumberFormat().format(
                         widget.files.length,

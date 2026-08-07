@@ -1,4 +1,4 @@
-import { type EnteFile } from "ente-media/file";
+import type { EnteFile } from "ente-media/file";
 import { useEffect, useRef } from "react";
 
 import type { JourneyPoint } from "../types";
@@ -22,17 +22,14 @@ export const useThumbnailGeneration = ({
 }: UseThumbnailGenerationParams) => {
     const processedPhotoIdsRef = useRef<Set<number>>(new Set());
 
-    // Generate thumbnails for needed photos with progressive loading
     useEffect(() => {
         const generateThumbs = async () => {
             if (photoClusters.length === 0) return;
 
-            // Get all current photo IDs
             const currentPhotoIds = new Set(
                 photoClusters.flat().map((photo) => photo.fileId),
             );
 
-            // Check if we have photos that need thumbnails
             const photosNeedingThumbnails = photoClusters
                 .flat()
                 .filter(
@@ -61,7 +58,6 @@ export const useThumbnailGeneration = ({
                 );
             }
 
-            // Update processed photos set and mark as generated
             processedPhotoIdsRef.current = new Set([
                 ...processedPhotoIdsRef.current,
                 ...currentPhotoIds,

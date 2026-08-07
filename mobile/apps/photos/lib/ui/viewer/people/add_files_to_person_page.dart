@@ -1,10 +1,10 @@
 import "dart:async";
 
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:logging/logging.dart";
 import "package:photos/core/event_bus.dart";
 import "package:photos/events/people_sort_order_change_event.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/models/file/file.dart";
 import "package:photos/models/search/generic_search_result.dart";
 import "package:photos/models/search/search_constants.dart";
@@ -62,7 +62,7 @@ class AddFilesToPersonPage extends StatefulWidget {
       if (persons.isEmpty) {
         showShortToast(
           context,
-          AppLocalizations.of(context).pleaseNamePersonInPeopleSectionFirst,
+          context.strings.pleaseNamePersonInPeopleSectionFirst,
         );
       }
       return persons;
@@ -208,7 +208,7 @@ class _AddFilesToPersonPageState extends State<AddFilesToPersonPage> {
         builder: (context, snapshot) {
           final slivers = <Widget>[
             SearchableAppBar(
-              title: Text(AppLocalizations.of(context).addPerson),
+              title: Text(context.strings.addPerson),
               onSearch: _updateSearchQuery,
               onSearchClosed: _clearSearchQuery,
               centerTitle: false,
@@ -232,10 +232,7 @@ class _AddFilesToPersonPageState extends State<AddFilesToPersonPage> {
                 child: Center(child: EnteLoadingWidget()),
               ),
             );
-            return CustomScrollView(
-              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-              slivers: slivers,
-            );
+            return CustomScrollView(slivers: slivers);
           } else if (snapshot.hasError) {
             AddFilesToPersonPage._logger.severe(
               "Failed to load persons for manual tagging",
@@ -247,10 +244,7 @@ class _AddFilesToPersonPageState extends State<AddFilesToPersonPage> {
                 child: Center(child: Icon(Icons.error_outline_rounded)),
               ),
             );
-            return CustomScrollView(
-              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-              slivers: slivers,
-            );
+            return CustomScrollView(slivers: slivers);
           }
 
           final persons = snapshot.data ?? [];
@@ -260,15 +254,10 @@ class _AddFilesToPersonPageState extends State<AddFilesToPersonPage> {
           if (results.isEmpty) {
             slivers.add(
               SliverFillRemaining(
-                child: Center(
-                  child: Text(AppLocalizations.of(context).noResultsFound),
-                ),
+                child: Center(child: Text(context.strings.noResultsFound)),
               ),
             );
-            return CustomScrollView(
-              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-              slivers: slivers,
-            );
+            return CustomScrollView(slivers: slivers);
           }
           final screenWidth = MediaQuery.of(context).size.width;
           final estimatedCount = (screenWidth / 100).floor();
@@ -315,10 +304,7 @@ class _AddFilesToPersonPageState extends State<AddFilesToPersonPage> {
               ),
             ),
           );
-          return CustomScrollView(
-            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-            slivers: slivers,
-          );
+          return CustomScrollView(slivers: slivers);
         },
       ),
     );
@@ -336,7 +322,7 @@ class _AddFilesToPersonPageState extends State<AddFilesToPersonPage> {
       ),
       child: GestureDetector(
         onTapDown: (TapDownDetails details) async {
-          final l10n = AppLocalizations.of(context);
+          final l10n = context.strings;
           const sortKeys = PeopleSortKey.values;
           final PeopleSortKey? selectedKey = await showMenu<PeopleSortKey>(
             color: colorScheme.backgroundElevated,
@@ -393,7 +379,7 @@ class _AddFilesToPersonPageState extends State<AddFilesToPersonPage> {
     bool isLast,
     EnteTextTheme textTheme,
     EnteColorScheme colorScheme,
-    AppLocalizations l10n,
+    StringsLocalizations l10n,
   ) {
     String label;
     switch (key) {
@@ -484,15 +470,12 @@ class _AddFilesToPersonPageState extends State<AddFilesToPersonPage> {
     if (uploadIds.isEmpty) {
       showShortToast(
         context,
-        AppLocalizations.of(context).onlyUploadedFilesCanBeAddedToPerson,
+        context.strings.onlyUploadedFilesCanBeAddedToPerson,
       );
       return;
     }
 
-    final dialog = createProgressDialog(
-      context,
-      AppLocalizations.of(context).saving,
-    );
+    final dialog = createProgressDialog(context, context.strings.saving);
     await dialog.show();
     try {
       final result = await PersonService.instance.addManualFileAssignments(

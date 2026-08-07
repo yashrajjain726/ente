@@ -1,6 +1,6 @@
 import "package:ente_components/ente_components.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/ui/common/backup_flow_helper.dart";
 import "package:photos/ui/tabs/albums/empty_states/empty_state_feature_row.dart";
 
@@ -30,7 +30,7 @@ class OnDeviceEmptyState extends StatelessWidget {
 
   Widget _buildPermissionState(BuildContext context) {
     final colors = context.componentColors;
-    final strings = AppLocalizations.of(context);
+    final strings = context.strings;
     final bottomPadding = 64 + MediaQuery.paddingOf(context).bottom + 32;
     final features = [
       strings.albumsOnDevicePermissionFeatureAllowAccessFaceRecognition,
@@ -60,14 +60,7 @@ class OnDeviceEmptyState extends StatelessWidget {
                   Text(
                     strings.allowAccessToYourPhotos,
                     textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontFamily: "Nunito",
-                      fontWeight: FontWeight.w800,
-                      fontSize: 24,
-                      height: 28 / 24,
-                      letterSpacing: 0,
-                      color: colors.textBase,
-                    ),
+                    style: TextStyles.display2.copyWith(color: colors.textBase),
                   ),
                   const SizedBox(height: 24),
                   SizedBox(
@@ -99,7 +92,7 @@ class OnDeviceEmptyState extends StatelessWidget {
 
   Widget _buildNoFoldersState(BuildContext context) {
     final colors = context.componentColors;
-    final strings = AppLocalizations.of(context);
+    final strings = context.strings;
     final bottomPadding = 64 + MediaQuery.paddingOf(context).bottom + 32;
 
     return Padding(

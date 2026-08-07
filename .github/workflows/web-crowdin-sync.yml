@@ -8,24 +8,11 @@ on:
             - "web/packages/base/locales/en-US/translation.json"
             - "web/crowdin.yml"
     schedule:
-        # Run Mondays at ~6:00 AM IST
-        #
-        # [Note: Run workflow on specific days of the week]
-        #
-        # The last (5th) component of the cron syntax denotes the day of the
-        # week, with 0 == SUN and 6 == SAT. So, for example, to run on every TUE
-        # and FRI, this can be set to `2,5`.
-        #
-        # See also: [Note: Run workflow every 24 hours]
+        # Mondays at ~6:00 AM IST
         - cron: "20 0 * * 1"
-    # Also allow manually running the workflow.
     workflow_dispatch:
 
-# "In order to push translations and create pull requests, the Crowdin GitHub
-#  action requires the `GITHUB_TOKEN` to have write permission on the `contents`
-#  and `pull-requests`.
-#
-# - https://github.com/crowdin/github-action?tab=readme-ov-file#permissions
+# Crowdin needs both permissions to commit translations and open its PR.
 permissions:
     contents: write
     pull-requests: write
@@ -36,10 +23,10 @@ jobs:
 
         steps:
             - name: Checkout
-              uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+              uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
             - name: Crowdin's action
-              uses: crowdin/github-action@8868a33591d21088edfc398968173a3b98d51706 # v2.16.2
+              uses: crowdin/github-action@52aa776766211d83d975df51f3b9c53c2f8ba35f # v2.16.3
               with:
                   base_path: "web/"
                   config: "web/crowdin.yml"

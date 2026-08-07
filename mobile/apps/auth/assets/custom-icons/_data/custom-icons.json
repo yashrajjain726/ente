@@ -42,6 +42,10 @@
       "hex": "EB1000"
     },
     {
+      "title": "aero.zip",
+      "slug": "aero_zip"
+    },
+    {
       "title": "Affiliprint",
       "slug": "affiliprint",
       "hex": "0000ff"
@@ -206,6 +210,9 @@
         "Battle net",
         "Blizzard"
       ]
+    },
+    {
+      "title": "Beefree"
     },
     {
       "title": "Belo"
@@ -406,7 +413,8 @@
       "title": "Capcom",
       "slug": "capcom",
       "altNames": [
-        "Capcom Co., Ltd."
+        "Capcom Co., Ltd.",
+        "CAPCOM ID"
       ]
     },
     {
@@ -650,6 +658,11 @@
       ]
     },
     {
+      "title": "Deutsche Post",
+      "slug": "deutschepost",
+      "hex": "ffcc00"
+    },
+    {
       "title": "DigiFinex",
       "altNames": [
         "Digi Finex",
@@ -660,10 +673,25 @@
       "title": "DirectAdmin"
     },
     {
+      "title": "Discogs",
+      "slug": "discogs",
+      "altNames": [
+        "discogs.com"
+      ]
+    },
+    {
       "title": "Discourse"
     },
     {
       "title": "DMarket"
+    },
+    {
+      "title": "Docker",
+      "slug": "docker",
+      "altNames": [
+        "Docker Hub",
+        "hub.docker.com"
+      ]
     },
     {
       "title": "DocuSeal"
@@ -674,6 +702,14 @@
       "altNames": [
         "Domino's",
         "Domino's Pizza"
+      ]
+    },
+    {
+      "title": "DonanımHaber",
+      "slug": "donanimhaber",
+      "altNames": [
+        "Donanım Haber",
+        "Donanim Haber"
       ]
     },
     {
@@ -893,6 +929,13 @@
       "title": "G2A"
     },
     {
+      "title": "Gandi.net",
+      "slug": "gandi_net",
+      "altNames": [
+        "gandi.net"
+      ]
+    },
+    {
       "title": "Garena"
     },
     {
@@ -915,6 +958,9 @@
     },
     {
       "title": "GMX"
+    },
+    {
+      "title": "GoDaddy"
     },
     {
       "title": "GommeHD.net",
@@ -984,6 +1030,9 @@
     },
     {
       "title": "Hornbach"
+    },
+    {
+      "title": "Hover"
     },
     {
       "title": "1984 Hosting",
@@ -1110,6 +1159,13 @@
       "hex": "D3D800"
     },
     {
+      "title": "JetBrains",
+      "slug": "jetbrains",
+      "altNames": [
+        "JetBrains Account"
+      ]
+    },
+    {
       "title": "JetBrains YouTrack",
       "slug": "jetbrains-youtrack",
       "altNames": [
@@ -1121,6 +1177,9 @@
       "altNames": [
         "\u575a\u679c\u4e91"
       ]
+    },
+    {
+      "title": "Jottacloud"
     },
     {
       "title": "JOYclub",
@@ -1299,6 +1358,13 @@
       ]
     },
     {
+      "title": "MacRumors",
+      "slug": "macrumors",
+      "altNames": [
+        "MacRumors Forums"
+      ]
+    },
+    {
       "title": "MailCow",
       "slug": "mailcow",
       "altNames": [
@@ -1424,6 +1490,7 @@
     {
       "title": "Mozilla",
       "slug": "mozilla",
+      "hex": "000000",
       "altNames": [
         "Mozilla Account"
       ]
@@ -1527,7 +1594,7 @@
     },
     {
       "title": "Nintendo",
-      "hex": "E60012",
+      "hex": "000000",
       "altNames": [
         "\u4efb\u5929\u5802",
         "Nintendo Account"
@@ -1565,6 +1632,14 @@
       "slug": "northc"
     },
     {
+      "title": "Norton",
+      "slug": "norton",
+      "altNames": [
+        "NortonLifeLock",
+        "Norton 360"
+      ]
+    },
+    {
       "title": "Notesnook"
     },
     {
@@ -1595,6 +1670,13 @@
       ]
     },
     {
+      "title": "ONEROXE",
+      "hex": "000000",
+      "altNames": [
+        "Arcle"
+      ]
+    },
+    {
       "title": "Online Payment Platform",
       "slug": "online_payment_platform",
       "altNames": [
@@ -1620,8 +1702,19 @@
       "hex": "FFFFFF"
     },
     {
+      "title": "Opera",
+      "slug": "opera",
+      "altNames": [
+        "auth.opera.com"
+      ]
+    },
+    {
       "title": "Oracle Cloud",
       "slug": "oracle_cloud"
+    },
+    {
+      "title": "Palform",
+      "slug": "palform"
     },
     {
       "title": "Pangolin",
@@ -1697,6 +1790,10 @@
       ]
     },
     {
+      "title": "PenFed",
+      "slug": "penfed"
+    },
+    {
       "title": "Perkbox",
       "slug": "perkbox"
     },
@@ -1710,7 +1807,8 @@
     },
     {
       "title": "PSNProfiles",
-      "slug": "psnprofiles"
+      "slug": "psnprofiles",
+      "hex": "000000"
     },
     {
       "title": "Plus Crypto",
@@ -2022,6 +2120,9 @@
       ]
     },
     {
+      "title": "Smouter"
+    },
+    {
       "title": "SMSPool",
       "slug": "sms_pool_net",
       "altNames": [
@@ -2047,7 +2148,9 @@
     {
       "title": "Square Enix",
       "slug": "square_enix",
-      "hex": "ED1C24"
+      "altNames": [
+        "Square Enix ID"
+      ]
     },
     {
       "title": "Standard Notes",
@@ -2274,6 +2377,13 @@
       ]
     },
     {
+      "title": "Truth Social",
+      "slug": "truth_social",
+      "altNames": [
+        "truthsocial.com"
+      ]
+    },
+    {
       "title": "TU Dresden",
       "slug": "tu_dresden",
       "altNames": [
@@ -2281,6 +2391,16 @@
         "Dresden University of Technology"
       ],
       "hex": "00305d"
+    },
+    {
+      "title": "TunnelBear"
+    },
+    {
+      "title": "Tuta",
+      "slug": "tuta",
+      "altNames": [
+        "Tutanota"
+      ]
     },
     {
       "title": "Tweakers"
@@ -2368,6 +2488,28 @@
         "uscis.gov"
       ]
     },
+      {
+      "title": "UU",
+      "altNames": [
+        "Utrecht University",
+        "Universiteit Utrecht",
+        "uu"
+      ]
+    },
+    {
+      "title": "Venice AI",
+      "slug": "venice_ai",
+      "altNames": [
+        "Venice.ai"
+      ]
+    },
+    {
+      "title": "VGen",
+      "slug": "vgen",
+      "altNames": [
+        "vgen.co"
+      ]
+    },
     {
       "title": "VGN",
       "slug": "vgn",
@@ -2409,7 +2551,8 @@
       "title": "Warner Bros.",
       "slug": "warner_bros",
       "altNames": [
-        "Warner Brothers"
+        "Warner Brothers",
+        "WB Games Account"
       ]
     },
     {
@@ -2438,6 +2581,9 @@
     },
     {
       "title": "Wick"
+    },
+    {
+      "title": "Wikimedia"
     },
     {
       "title": "Windscribe"
@@ -2530,6 +2676,10 @@
     },
     {
       "title": "Zoom"
+    },
+    {
+      "title": "ZOOM Platform",
+      "slug": "zoom_platform"
     },
     {
       "title": "DLsite",

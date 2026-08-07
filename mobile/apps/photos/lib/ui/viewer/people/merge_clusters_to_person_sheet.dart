@@ -4,13 +4,13 @@ import "dart:math" show max;
 import "package:collection/collection.dart";
 import "package:dotted_border/dotted_border.dart";
 import "package:ente_pure_utils/ente_pure_utils.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:logging/logging.dart";
 import "package:ml_linalg/linalg.dart" as ml;
 import "package:photos/core/event_bus.dart";
 import "package:photos/db/ml/db.dart";
 import "package:photos/events/people_sort_order_change_event.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/generated/protos/ente/common/vector.pb.dart";
 import "package:photos/models/ml/face/person.dart";
 import "package:photos/models/search/generic_search_result.dart";
@@ -54,6 +54,19 @@ Future<MergePersonSelectionResult?> showMergeClustersToPersonPage(
       seedClusterId: seedClusterId,
     ),
   );
+}
+
+Future<List<GenericSearchResult>> loadMergeablePersons() async {
+  final results = await SearchService.instance.getAllFace(
+    null,
+    minClusterSize: kMinimumClusterSizeAllFaces,
+  );
+  return results
+      .where(
+        (result) =>
+            (result.params[kPersonParamID] as String?)?.isNotEmpty ?? false,
+      )
+      .toList();
 }
 
 class MergeClustersToPersonPage extends StatefulWidget {
@@ -102,26 +115,13 @@ class _MergeClustersToPersonPageState extends State<MergeClustersToPersonPage> {
     _photosSortAscending = settings.peoplePhotosSortAscending;
     _personsFuture = widget.initialPersons != null
         ? Future.value(widget.initialPersons!)
-        : _loadNamedPersons();
+        : loadMergeablePersons();
     if (_canUseSimilaritySort) {
       _personsFuture = _personsFuture.then((persons) async {
         _personToMaxSimilarity = await _calculateSimilarityWithPersons(persons);
         return persons;
       });
     }
-  }
-
-  static Future<List<GenericSearchResult>> _loadNamedPersons() async {
-    final results = await SearchService.instance.getAllFace(
-      null,
-      minClusterSize: kMinimumClusterSizeAllFaces,
-    );
-    return results
-        .where(
-          (result) =>
-              (result.params[kPersonParamID] as String?)?.isNotEmpty ?? false,
-        )
-        .toList();
   }
 
   List<GenericSearchResult> _filterPersons(List<GenericSearchResult> persons) {
@@ -243,7 +243,7 @@ class _MergeClustersToPersonPageState extends State<MergeClustersToPersonPage> {
         builder: (context, snapshot) {
           final slivers = <Widget>[
             SearchableAppBar(
-              title: Text(AppLocalizations.of(context).addToPerson),
+              title: Text(context.strings.addToPerson),
               onSearch: _updateSearchQuery,
               onSearchClosed: _clearSearchQuery,
               centerTitle: false,
@@ -267,10 +267,7 @@ class _MergeClustersToPersonPageState extends State<MergeClustersToPersonPage> {
                 child: Center(child: EnteLoadingWidget()),
               ),
             );
-            return CustomScrollView(
-              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-              slivers: slivers,
-            );
+            return CustomScrollView(slivers: slivers);
           } else if (snapshot.hasError) {
             _logger.severe(
               "Failed to load persons for merge",
@@ -282,10 +279,7 @@ class _MergeClustersToPersonPageState extends State<MergeClustersToPersonPage> {
                 child: Center(child: Icon(Icons.error_outline_rounded)),
               ),
             );
-            return CustomScrollView(
-              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-              slivers: slivers,
-            );
+            return CustomScrollView(slivers: slivers);
           }
 
           final persons = snapshot.data ?? [];
@@ -295,15 +289,10 @@ class _MergeClustersToPersonPageState extends State<MergeClustersToPersonPage> {
           if (results.isEmpty && !_showNewPersonTile) {
             slivers.add(
               SliverFillRemaining(
-                child: Center(
-                  child: Text(AppLocalizations.of(context).noResultsFound),
-                ),
+                child: Center(child: Text(context.strings.noResultsFound)),
               ),
             );
-            return CustomScrollView(
-              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-              slivers: slivers,
-            );
+            return CustomScrollView(slivers: slivers);
           }
           final screenWidth = MediaQuery.of(context).size.width;
           final estimatedCount = (screenWidth / 100).floor();
@@ -358,10 +347,7 @@ class _MergeClustersToPersonPageState extends State<MergeClustersToPersonPage> {
               ),
             ),
           );
-          return CustomScrollView(
-            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-            slivers: slivers,
-          );
+          return CustomScrollView(slivers: slivers);
         },
       ),
     );
@@ -379,7 +365,7 @@ class _MergeClustersToPersonPageState extends State<MergeClustersToPersonPage> {
       ),
       child: GestureDetector(
         onTapDown: (TapDownDetails details) async {
-          final l10n = AppLocalizations.of(context);
+          final l10n = context.strings;
           final sortKeys = _canUseSimilaritySort
               ? _MergeSortKey.values
               : _MergeSortKey.values
@@ -450,7 +436,7 @@ class _MergeClustersToPersonPageState extends State<MergeClustersToPersonPage> {
     bool isLast,
     EnteTextTheme textTheme,
     EnteColorScheme colorScheme,
-    AppLocalizations l10n,
+    StringsLocalizations l10n,
   ) {
     String label;
     late final String detail;
@@ -709,7 +695,7 @@ class _AddNewPersonGridTile extends StatelessWidget {
             child: Padding(
               padding: EdgeInsets.only(top: labelTopPadding),
               child: Text(
-                AppLocalizations.of(context).addPerson,
+                context.strings.addPerson,
                 maxLines: 1,
                 textAlign: TextAlign.center,
                 overflow: TextOverflow.ellipsis,

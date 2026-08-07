@@ -1,21 +1,24 @@
 import 'package:ente_components/ente_components.dart';
 import 'package:ente_icons/ente_icons.dart';
 import "package:ente_pure_utils/ente_pure_utils.dart";
+import "package:ente_strings/ente_strings.dart";
 import 'package:flutter/material.dart';
-import "package:photos/generated/l10n.dart";
 import "package:photos/models/api/collection/user.dart";
 import "package:photos/models/file/file.dart";
 import 'package:photos/models/file/trash_file.dart';
 import 'package:photos/ui/sharing/user_avator_widget.dart';
+import "package:photos/utils/avatar_util.dart";
 
 class ThumbnailPlaceHolder extends StatelessWidget {
-  const ThumbnailPlaceHolder({super.key});
+  final Color? color;
+
+  const ThumbnailPlaceHolder({super.key, this.color});
 
   @override
   Widget build(BuildContext context) {
     return Container(
       alignment: Alignment.center,
-      color: context.componentColors.fillDark,
+      color: color ?? context.componentColors.fillDark,
     );
   }
 }
@@ -134,10 +137,12 @@ class VideoOverlayDuration extends StatelessWidget {
 class OwnerAvatarOverlayIcon extends StatelessWidget {
   final User user;
   final AvatarType type;
+  final AvatarIdentity? fallbackIdentity;
   const OwnerAvatarOverlayIcon(
     this.user, {
     super.key,
     this.type = AvatarType.small,
+    this.fallbackIdentity,
   });
 
   @override
@@ -146,7 +151,12 @@ class OwnerAvatarOverlayIcon extends StatelessWidget {
       alignment: Alignment.topRight,
       child: Padding(
         padding: const EdgeInsets.only(right: 4, top: 4),
-        child: UserAvatarWidget(user, type: type, thumbnailView: true),
+        child: UserAvatarWidget(
+          user,
+          type: type,
+          thumbnailView: true,
+          fallbackIdentity: fallbackIdentity,
+        ),
       ),
     );
   }
@@ -161,7 +171,7 @@ class TrashedFileOverlayText extends StatelessWidget {
         ((file.deleteBy - DateTime.now().microsecondsSinceEpoch) /
                 Duration.microsecondsPerDay)
             .ceil();
-    final text = AppLocalizations.of(context).trashDaysLeft(count: daysLeft);
+    final text = context.strings.trashDaysLeft(count: daysLeft);
     return FileOverlayText(text);
   }
 }

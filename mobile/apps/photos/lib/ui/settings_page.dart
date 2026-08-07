@@ -1,31 +1,31 @@
 import "package:ente_components/ente_components.dart";
+import "package:ente_lock_screen/local_authentication_service.dart";
 import "package:ente_pure_utils/ente_pure_utils.dart";
+import "package:ente_strings/ente_strings.dart";
+import "package:ente_ui/components/settings/app_engagement_section.dart";
+import "package:ente_ui/components/settings/app_version_widget.dart";
+import "package:ente_ui/components/settings/social_icons_row.dart";
 import "package:flutter/foundation.dart";
 import "package:flutter/material.dart";
 import "package:hugeicons/hugeicons.dart";
 import "package:log_viewer/log_viewer.dart";
 import "package:photos/core/configuration.dart";
 import "package:photos/emergency/emergency_page.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/models/user_details.dart";
 import "package:photos/service_locator.dart";
 import "package:photos/services/account/user_service.dart";
-import "package:photos/services/local_authentication_service.dart";
+import "package:photos/services/review_service.dart";
 import "package:photos/ui/account/email_entry_page.dart";
 import "package:photos/ui/account/login_page.dart";
 import "package:photos/ui/components/banners/offline_settings_banner.dart";
-import "package:photos/ui/components/settings/social_icons_row.dart";
 import "package:photos/ui/growth/referral_screen.dart";
 import "package:photos/ui/notification/toast.dart";
 import "package:photos/ui/settings/about/about_us_page.dart";
 import "package:photos/ui/settings/account/account_settings_page.dart";
-import "package:photos/ui/settings/app_version_widget.dart";
 import "package:photos/ui/settings/appearance/appearance_settings_page.dart";
 import "package:photos/ui/settings/backup/backup_settings_page.dart";
 import "package:photos/ui/settings/backup/free_space_options.dart";
 import "package:photos/ui/settings/cast/cast_settings_page.dart";
-import "package:photos/ui/settings/components/settings_item.dart";
-import "package:photos/ui/settings/components/settings_page_scaffold.dart";
 import "package:photos/ui/settings/debug/debug_settings_page.dart";
 import "package:photos/ui/settings/debug/ml_debug_settings_page.dart";
 import "package:photos/ui/settings/inherited_settings_state.dart";
@@ -40,7 +40,6 @@ import "package:photos/ui/settings/support/help_support_page.dart";
 import "package:photos/ui/settings/widget_settings_screen.dart";
 import "package:photos/ui/sharing/verify_identity_dialog.dart";
 import "package:photos/utils/dialog_util.dart";
-import "package:url_launcher/url_launcher_string.dart";
 
 class SettingsPage extends StatelessWidget {
   final ValueNotifier<String?> emailNotifier;
@@ -71,9 +70,7 @@ class _SettingsBody extends StatelessWidget {
       animation: emailNotifier,
       builder: (context, _) {
         final email = hasLoggedIn ? emailNotifier.value ?? "" : "";
-        final title = email.isEmpty
-            ? AppLocalizations.of(context).settings
-            : email;
+        final title = email.isEmpty ? context.strings.settings : email;
 
         return SettingsPageScaffold(
           title: title,
@@ -107,7 +104,7 @@ class _SettingsBody extends StatelessWidget {
               const StorageCardWidget(),
               const SizedBox(height: 16),
               _buildMenuItem(
-                title: AppLocalizations.of(context).account,
+                title: context.strings.account,
                 icon: HugeIcons.strokeRoundedUser,
                 onTap: () async {
                   await routeToPage(context, const AccountSettingsPage());
@@ -115,7 +112,7 @@ class _SettingsBody extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               _buildMenuItem(
-                title: AppLocalizations.of(context).backup,
+                title: context.strings.backup,
                 icon: HugeIcons.strokeRoundedCloudUpload,
                 onTap: () async {
                   await routeToPage(context, const BackupSettingsPage());
@@ -125,7 +122,7 @@ class _SettingsBody extends StatelessWidget {
             ],
             // Privacy and personalization section
             _buildMenuItem(
-              title: AppLocalizations.of(context).security,
+              title: context.strings.security,
               icon: HugeIcons.strokeRoundedSecurityCheck,
               onTap: () async {
                 await routeToPage(context, const SecuritySettingsPage());
@@ -133,7 +130,7 @@ class _SettingsBody extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             _buildMenuItem(
-              title: AppLocalizations.of(context).appearance,
+              title: context.strings.appearance,
               icon: HugeIcons.strokeRoundedPaintBoard,
               onTap: () async {
                 await routeToPage(context, const AppearanceSettingsPage());
@@ -153,11 +150,11 @@ class _SettingsBody extends StatelessWidget {
               const SizedBox(height: 8),
             ],
             // Engagement section
-            _buildEngagementCard(context),
+            AppEngagementSection(reviewUrl: ReviewService.url),
             const SizedBox(height: 8),
             // Support section
             _buildMenuItem(
-              title: AppLocalizations.of(context).helpAndSupport,
+              title: context.strings.helpAndSupport,
               icon: HugeIcons.strokeRoundedHelpCircle,
               onTap: () async {
                 await routeToPage(context, const HelpSupportPage());
@@ -165,7 +162,7 @@ class _SettingsBody extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             _buildMenuItem(
-              title: AppLocalizations.of(context).about,
+              title: context.strings.about,
               icon: HugeIcons.strokeRoundedInformationCircle,
               onTap: () async {
                 await routeToPage(context, const AboutUsPage());
@@ -243,7 +240,6 @@ class _SettingsBody extends StatelessWidget {
     Widget? trailing,
     Future<void> Function()? onTap,
     bool showOnlyLoadingState = false,
-    bool shouldSurfaceExecutionStates = false,
     bool isDestructive = false,
   }) {
     return SettingsItem(
@@ -252,7 +248,6 @@ class _SettingsBody extends StatelessWidget {
       icon: icon,
       trailing: trailing,
       showOnlyLoadingState: showOnlyLoadingState,
-      shouldSurfaceExecutionStates: shouldSurfaceExecutionStates,
       isDestructive: isDestructive,
       onTap: onTap,
     );
@@ -260,9 +255,9 @@ class _SettingsBody extends StatelessWidget {
 
   Widget _buildOfflineLoginCard(BuildContext context, ColorTokens colors) {
     return _buildMenuItem(
-      title: AppLocalizations.of(context).alreadyHaveAnAccount,
+      title: context.strings.alreadyHaveAnAccount,
       icon: HugeIcons.strokeRoundedLogin01,
-      subtitle: AppLocalizations.of(context).loginToEnte,
+      subtitle: context.strings.loginToEnte,
       trailing: Container(
         width: 40,
         height: 40,
@@ -286,28 +281,28 @@ class _SettingsBody extends StatelessWidget {
     return MenuGroupComponent(
       items: [
         _buildMenuItem(
-          title: AppLocalizations.of(context).machineLearning,
+          title: context.strings.machineLearning,
           icon: HugeIcons.strokeRoundedMagicWand01,
           onTap: () async {
             await routeToPage(context, const MachineLearningSettingsPage());
           },
         ),
         _buildMenuItem(
-          title: AppLocalizations.of(context).memories,
+          title: context.strings.memories,
           icon: HugeIcons.strokeRoundedSparkles,
           onTap: () async {
             await routeToPage(context, const MemoriesSettingsScreen());
           },
         ),
         _buildMenuItem(
-          title: AppLocalizations.of(context).notifications,
+          title: context.strings.notifications,
           icon: HugeIcons.strokeRoundedNotification01,
           onTap: () async {
             await routeToPage(context, const NotificationSettingsScreen());
           },
         ),
         _buildMenuItem(
-          title: AppLocalizations.of(context).widgets,
+          title: context.strings.widgets,
           icon: HugeIcons.strokeRoundedAlignBoxBottomRight,
           onTap: () async {
             await routeToPage(context, const WidgetSettingsScreen());
@@ -322,7 +317,7 @@ class _SettingsBody extends StatelessWidget {
     return MenuGroupComponent(
       items: [
         _buildMenuItem(
-          title: AppLocalizations.of(context).legacy,
+          title: context.strings.legacy,
           icon: HugeIcons.strokeRoundedFavourite,
           showOnlyLoadingState: true,
           onTap: () async {
@@ -331,9 +326,10 @@ class _SettingsBody extends StatelessWidget {
                 await LocalAuthenticationService.instance
                     .requestLocalAuthentication(
                       context,
-                      AppLocalizations.of(context).authToManageLegacy,
+                      context.strings.authToManageLegacy,
                     );
             if (hasAuthenticated) {
+              if (!context.mounted) return;
               await Navigator.of(context).push(
                 MaterialPageRoute(
                   builder: (BuildContext context) {
@@ -345,10 +341,9 @@ class _SettingsBody extends StatelessWidget {
           },
         ),
         _buildMenuItem(
-          title: AppLocalizations.of(context).familyPlans,
+          title: context.strings.family,
           icon: HugeIcons.strokeRoundedUserMultiple,
           showOnlyLoadingState: true,
-          shouldSurfaceExecutionStates: true,
           onTap: () async {
             late final UserDetails userDetails;
             try {
@@ -373,7 +368,7 @@ class _SettingsBody extends StatelessWidget {
           },
         ),
         _buildMenuItem(
-          title: AppLocalizations.of(context).referrals,
+          title: context.strings.referrals,
           icon: HugeIcons.strokeRoundedTicketStar,
           onTap: () async {
             await routeToPage(context, const ReferralScreen());
@@ -387,7 +382,7 @@ class _SettingsBody extends StatelessWidget {
     return MenuGroupComponent(
       items: [
         _buildMenuItem(
-          title: AppLocalizations.of(context).freeUpSpace,
+          title: context.strings.freeUpSpace,
           icon: HugeIcons.strokeRoundedRocket01,
           showOnlyLoadingState: true,
           onTap: () async {
@@ -395,35 +390,35 @@ class _SettingsBody extends StatelessWidget {
           },
         ),
         _buildMenuItem(
-          title: AppLocalizations.of(context).machineLearning,
+          title: context.strings.machineLearning,
           icon: HugeIcons.strokeRoundedMagicWand01,
           onTap: () async {
             await routeToPage(context, const MachineLearningSettingsPage());
           },
         ),
         _buildMenuItem(
-          title: AppLocalizations.of(context).memories,
+          title: context.strings.memories,
           icon: HugeIcons.strokeRoundedSparkles,
           onTap: () async {
             await routeToPage(context, const MemoriesSettingsScreen());
           },
         ),
         _buildMenuItem(
-          title: AppLocalizations.of(context).notifications,
+          title: context.strings.notifications,
           icon: HugeIcons.strokeRoundedNotification01,
           onTap: () async {
             await routeToPage(context, const NotificationSettingsScreen());
           },
         ),
         _buildMenuItem(
-          title: AppLocalizations.of(context).widgets,
+          title: context.strings.widgets,
           icon: HugeIcons.strokeRoundedAlignBoxBottomRight,
           onTap: () async {
             await routeToPage(context, const WidgetSettingsScreen());
           },
         ),
         _buildMenuItem(
-          title: AppLocalizations.of(context).videoStreaming,
+          title: context.strings.videoStreaming,
           icon: HugeIcons.strokeRoundedVideoCameraAi,
           onTap: () async {
             await routeToPage(context, const VideoStreamingSettingsPage());
@@ -431,8 +426,8 @@ class _SettingsBody extends StatelessWidget {
         ),
         if (flagService.enableMultiCast)
           _buildMenuItem(
-            title: AppLocalizations.of(context).cast,
-            icon: HugeIcons.strokeRoundedTv02,
+            title: context.strings.castSessions,
+            icon: HugeIcons.strokeRoundedTvSmart,
             onTap: () async {
               await routeToPage(context, const CastSettingsPage());
             },
@@ -444,7 +439,7 @@ class _SettingsBody extends StatelessWidget {
 
   SettingsItem _buildMapsMenuItem(BuildContext context) {
     return _buildMenuItem(
-      title: AppLocalizations.of(context).maps,
+      title: context.strings.maps,
       icon: HugeIcons.strokeRoundedMaping,
       trailing: ToggleSwitchComponent.async(
         value: () => mapEnabled,
@@ -453,10 +448,9 @@ class _SettingsBody extends StatelessWidget {
           try {
             await setMapEnabled(!isEnabled);
           } catch (e) {
-            showShortToast(
-              context,
-              AppLocalizations.of(context).somethingWentWrong,
-            );
+            if (context.mounted) {
+              showShortToast(context, context.strings.somethingWentWrong);
+            }
             rethrow;
           }
         },
@@ -464,34 +458,9 @@ class _SettingsBody extends StatelessWidget {
     );
   }
 
-  Widget _buildEngagementCard(BuildContext context) {
-    return MenuGroupComponent(
-      items: [
-        _buildMenuItem(
-          title: AppLocalizations.of(context).merchandise,
-          icon: HugeIcons.strokeRoundedTShirt,
-          onTap: () async {
-            await launchUrlString(
-              "https://shop.ente.com",
-              mode: LaunchMode.externalApplication,
-            );
-          },
-        ),
-        _buildMenuItem(
-          title: AppLocalizations.of(context).rateUs,
-          icon: HugeIcons.strokeRoundedStar,
-          onTap: () async {
-            final rateUrl = updateService.getRateDetails().item2;
-            await launchUrlString(rateUrl);
-          },
-        ),
-      ],
-    );
-  }
-
   Widget _buildLogoutCard(BuildContext context) {
     return _buildMenuItem(
-      title: AppLocalizations.of(context).logout,
+      title: context.strings.logout,
       icon: HugeIcons.strokeRoundedLogout05,
       isDestructive: true,
       onTap: () async {
@@ -503,10 +472,10 @@ class _SettingsBody extends StatelessWidget {
   void _onLogoutTapped(BuildContext context) {
     showChoiceActionSheet(
       context,
-      title: AppLocalizations.of(context).warning,
-      body: AppLocalizations.of(context).areYouSureYouWantToLogout,
+      title: context.strings.warning,
+      body: context.strings.areYouSureYouWantToLogout,
       illustration: Image.asset("assets/warning-grey.png"),
-      firstButtonLabel: AppLocalizations.of(context).yes,
+      firstButtonLabel: context.strings.yes,
       isCritical: true,
       firstButtonOnTap: () async {
         await UserService.instance.logout(context);
@@ -515,12 +484,10 @@ class _SettingsBody extends StatelessWidget {
   }
 
   Future<void> _showVerifyIdentityDialog(BuildContext context) async {
-    await showDialog(
-      useRootNavigator: false,
-      context: context,
-      builder: (BuildContext context) {
-        return VerifyIdentifyDialog(self: true);
-      },
+    await showVerifyIdentitySheet(
+      context,
+      self: true,
+      title: context.strings.verifyIDLabel,
     );
   }
 }

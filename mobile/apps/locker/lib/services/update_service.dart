@@ -37,10 +37,10 @@ class UpdateService {
   }
 
   Future<bool> shouldUpdate() async {
+    _latestVersion = null;
     if (!_isInitialized || !isIndependent()) {
       return false;
     }
-    _latestVersion = null;
     try {
       _latestVersion = await _getLatestVersionInfo();
       final currentVersionCode = int.tryParse(_packageInfo!.buildNumber) ?? 0;

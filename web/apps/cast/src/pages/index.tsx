@@ -1,5 +1,9 @@
 import { PairingCode } from "@/components/PairingCode";
-import { readCastData, storeCastData } from "@/services/cast-data";
+import {
+    clearCastData,
+    readCastData,
+    storeCastData,
+} from "@/services/cast-data";
 import { getCastPayload, register } from "@/services/pair";
 import { Box, Stack, styled, Typography } from "@mui/material";
 import { EnteLogo } from "ente-base/components/EnteLogo";
@@ -24,6 +28,7 @@ const Page: React.FC = () => {
                 setPairingCode(r.pairingCode);
             });
         } else {
+            clearCastData();
             advertiseOnChromecast(
                 () => pairingCode,
                 () => readCastData()?.collectionID,
@@ -41,18 +46,11 @@ const Page: React.FC = () => {
                     privateKey,
                     pairingCode,
                 });
-                if (!data) {
-                    // No one has connected yet.
-                    return;
-                }
+                if (!data) return;
 
                 storeCastData(data);
                 await router.push("/slideshow");
             } catch (e) {
-                // The pairing code becomes invalid after an hour, which will cause
-                // `getCastData` to fail. There might be other reasons this might
-                // fail too, but in all such cases, it is a reasonable idea to start
-                // again from the beginning.
                 log.warn("Failed to get cast data", e);
                 setPairingCode(undefined);
             }
@@ -83,6 +81,8 @@ const Page: React.FC = () => {
 export default Page;
 
 const Container = styled(Stack)`
+    /* Chrome 92 does not support svh. */
+    height: 100vh;
     height: 100svh;
     justify-content: center;
     align-items: center;

@@ -20,22 +20,10 @@ import { z } from "zod";
 import { AccountsPageTitleWithCaption } from "./LoginComponents";
 
 interface LoginContentsProps {
-    /**
-     * Reactive value of {@link customAPIHost}.
-     */
     host: string | undefined;
-    /**
-     * Called when the user clicks the signup option instead.
-     */
     onSignUp: () => void;
 }
 
-/**
- * A contents of the "login" form.
- *
- * It is used both on the "/login" page, and as the embedded login form on the
- * "/" page where the user can toggle between the signup and login forms inline.
- */
 export const LoginContents: React.FC<LoginContentsProps> = ({
     onSignUp,
     host,
@@ -45,7 +33,6 @@ export const LoginContents: React.FC<LoginContentsProps> = ({
     const isEnsu = appName === "ensu";
 
     useEffect(() => {
-        // Check if we're in a join album context
         const joinAlbumContext = sessionStorage.getItem(JOIN_ALBUM_CONTEXT_KEY);
         setIsJoinAlbumContext(!!joinAlbumContext);
     }, []);
@@ -136,7 +123,6 @@ export const LoginContents: React.FC<LoginContentsProps> = ({
                     margin="normal"
                     disabled={formik.isSubmitting}
                     error={!!formik.errors.email}
-                    // See: [Note: Use space as default TextField helperText]
                     helperText={formik.errors.email ?? " "}
                 />
                 <Input sx={{ display: "none" }} type="password" value="" />
@@ -164,7 +150,7 @@ export const LoginContents: React.FC<LoginContentsProps> = ({
                         variant="mini"
                         sx={{ color: "text.faint", minHeight: "16px" }}
                     >
-                        {host ?? "" /* prevent layout shift with a minHeight */}
+                        {host ?? ""}
                     </Typography>
                 </Stack>
             </AccountsPageFooter>

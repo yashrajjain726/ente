@@ -4,7 +4,7 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 
-	"github.com/ente-io/stacktrace"
+	"github.com/ente/stacktrace"
 )
 
 var ValidCollectionTypes = []string{"album", "folder", "favorites", "uncategorized"}
@@ -43,6 +43,12 @@ func (c *Collection) AllowSharing() bool {
 		return false
 	}
 	return true
+}
+
+// AllowParticipantSharing indicates whether a collection can be shared
+// directly with a participant in the given role.
+func (c *Collection) AllowParticipantSharing(role CollectionParticipantRole) bool {
+	return c != nil && (c.Type != "uncategorized" || role == VIEWER)
 }
 
 // AllowDelete indicates if this particular collection type can be deleted by the user
@@ -98,6 +104,55 @@ type AlterShareRequest struct {
 	Role         *CollectionParticipantRole `json:"role"`
 }
 
+type CollectionShareSource string
+
+const (
+	ManualShare    CollectionShareSource = "manual"
+	AutomaticShare CollectionShareSource = "automatic"
+)
+
+func (s CollectionShareSource) IsValid() bool {
+	return s == ManualShare || s == AutomaticShare
+}
+
+type CollectionShareStatus string
+
+const (
+	CollectionShared               CollectionShareStatus = "shared"
+	CollectionAlreadyShared        CollectionShareStatus = "already_shared"
+	CollectionUnshared             CollectionShareStatus = "unshared"
+	CollectionAlreadyUnshared      CollectionShareStatus = "already_unshared"
+	CollectionNotShared            CollectionShareStatus = "not_shared"
+	CollectionBlockedPriorRemoval  CollectionShareStatus = "blocked_previous_removal"
+	CollectionShareOperationFailed CollectionShareStatus = "failed"
+)
+
+const MaxCollectionShareBatchSize = 100
+
+type BulkCollectionShareItem struct {
+	CollectionID int64                     `json:"collectionID" binding:"required"`
+	EncryptedKey string                    `json:"encryptedKey" binding:"required"`
+	Role         CollectionParticipantRole `json:"role" binding:"required"`
+}
+
+type BulkCollectionShareRequest struct {
+	RecipientUserID int64                     `json:"recipientUserID" binding:"required"`
+	RecipientEmail  string                    `json:"recipientEmail" binding:"required"`
+	Source          CollectionShareSource     `json:"source" binding:"required"`
+	Collections     []BulkCollectionShareItem `json:"collections" binding:"required"`
+}
+
+type BulkCollectionUnshareRequest struct {
+	RecipientUserID int64                 `json:"recipientUserID" binding:"required"`
+	Source          CollectionShareSource `json:"source" binding:"required"`
+	CollectionIDs   []int64               `json:"collectionIDs" binding:"required"`
+}
+
+type BulkCollectionShareResult struct {
+	CollectionID int64                 `json:"collectionID"`
+	Status       CollectionShareStatus `json:"status"`
+}
+
 type JoinCollectionViaLinkRequest struct {
 	CollectionID int64  `json:"collectionID" binding:"required"`
 	EncryptedKey string `json:"encryptedKey" binding:"required"`
@@ -132,16 +187,16 @@ type RemoveFilesRequest struct {
 // If collection owner wants to remove files owned by them, the client should move those files to other collections
 // owned by the collection user. Also, See [Collection Delete Versions] for additional context.
 type RemoveFilesV3Request struct {
-    CollectionID int64 `json:"collectionID" binding:"required"`
-    // OtherFileIDs represents the files which don't belong the user trying to remove files
-    FileIDs []int64 `json:"fileIDs"  binding:"required"`
+	CollectionID int64 `json:"collectionID" binding:"required"`
+	// OtherFileIDs represents the files which don't belong the user trying to remove files
+	FileIDs []int64 `json:"fileIDs"  binding:"required"`
 }
 
 // SuggestDeleteRequest represents a request to suggest deletion of files in a shared collection.
 // Only collection owner or admins can suggest deletion for files owned by others (not the acting user).
 type SuggestDeleteRequest struct {
-    CollectionID int64   `json:"collectionID" binding:"required"`
-    FileIDs      []int64 `json:"fileIDs" binding:"required"`
+	CollectionID int64   `json:"collectionID" binding:"required"`
+	FileIDs      []int64 `json:"fileIDs" binding:"required"`
 }
 
 type RenameRequest struct {

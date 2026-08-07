@@ -4,6 +4,7 @@ import "dart:typed_data";
 
 import "package:dio/dio.dart";
 import "package:ente_crypto/ente_crypto.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/cupertino.dart";
 import "package:logging/logging.dart";
 import "package:photos/core/configuration.dart";
@@ -12,7 +13,6 @@ import "package:photos/gateways/emergency/emergency_gateway.dart";
 import "package:photos/gateways/users/models/key_attributes.dart";
 import "package:photos/gateways/users/models/set_keys_request.dart";
 import "package:photos/gateways/users/models/srp.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/service_locator.dart";
 import "package:photos/services/account/user_service.dart";
 import "package:photos/ui/common/user_dialogs.dart";
@@ -42,29 +42,32 @@ class EmergencyContactService {
       EmergencyContactService._privateConstructor();
 
   Future<bool> addContact(
-    BuildContext context,
+    BuildContext? context,
     String email, {
     int recoveryNoticeInDays = 30,
   }) async {
     if (!isValidEmail(email)) {
+      if (context == null || !context.mounted) return false;
       await showAlertBottomSheet(
         context,
-        title: AppLocalizations.of(context).letsTryThatAgain,
-        message: AppLocalizations.of(context).enterValidEmail,
+        title: context.strings.letsTryThatAgain,
+        message: context.strings.enterValidEmail,
         assetPath: "assets/warning-grey.png",
       );
       return false;
     } else if (email.trim() == Configuration.instance.getEmail()) {
+      if (context == null || !context.mounted) return false;
       await showAlertBottomSheet(
         context,
-        title: AppLocalizations.of(context).oops,
-        message: AppLocalizations.of(context).youCannotShareWithYourself,
+        title: context.strings.oops,
+        message: context.strings.youCannotShareWithYourself,
         assetPath: "assets/warning-grey.png",
       );
       return false;
     }
     final String? publicKey = await _userService.getPublicKey(email);
     if (publicKey == null) {
+      if (context == null || !context.mounted) return false;
       await showInviteDialog(context, email);
       return false;
     }
@@ -232,7 +235,7 @@ class EmergencyContactService {
         srpUserID: username,
         srpSalt: base64Encode(salt),
         srpVerifier: base64Encode(SRP6Util.encodeBigInt(v)),
-        srpA: base64Encode(SRP6Util.encodeBigInt(A!)),
+        srpA: base64Encode(SRP6Util.getPadded(A!, 512)),
         isUpdate: false,
       );
       final setupSRPResponse = await _gateway.initPasswordChange(
@@ -249,7 +252,7 @@ class EmergencyContactService {
       await _gateway.changePassword(
         recoveryID: recoverySessions.id,
         setupID: setupSRPResponse.setupID,
-        srpM1: base64Encode(SRP6Util.encodeBigInt(clientM!)),
+        srpM1: base64Encode(SRP6Util.getPadded(clientM!, 32)),
         updatedKeyAttr: setKeysRequest.toMap(),
       );
     } catch (e, s) {

@@ -44,12 +44,10 @@ const Page: React.FC = () => {
             refreshHost();
             const currentURL = new URL(window.location.href);
 
-            // Store join album context immediately if present in URL
-            // This ensures it survives the authentication flow
+            // Persist join data before authentication redirects discard this URL.
             const joinAlbumParam = currentURL.searchParams.get("joinAlbum");
             if (joinAlbumParam && joinAlbumParam !== "true") {
                 try {
-                    // Format: ?joinAlbum=accessToken&collectionId=123#collectionKeyHash&jwt=<jwtToken>
                     const accessToken = joinAlbumParam;
                     const collectionIdParam =
                         currentURL.searchParams.get("collectionId");
@@ -60,17 +58,14 @@ const Page: React.FC = () => {
                         undefined;
 
                     if (accessToken && collectionKeyHash && collectionIdParam) {
-                        // Import the necessary functions to convert the collection key
                         const { extractCollectionKeyFromShareURL } =
                             await import("ente-gallery/services/share");
 
-                        // Convert the hash to base64 for API calls
                         const tempURL = new URL(window.location.href);
                         tempURL.hash = collectionKeyHash;
                         const collectionKey =
                             await extractCollectionKeyFromShareURL(tempURL);
 
-                        // Create context from URL parameters
                         const context: JoinAlbumContext = {
                             accessToken,
                             collectionKey,
@@ -172,41 +167,24 @@ const Page: React.FC = () => {
 export default Page;
 
 interface TappableContainerProps {
-    /**
-     * Called when the user closes the dialog to set a custom server.
-     *
-     * This is our chance to re-read the value of the custom API origin from
-     * local storage since the user might've changed it.
-     */
     onMaybeChangeHost: () => void;
 }
 
 const TappableContainer: React.FC<
     React.PropsWithChildren<TappableContainerProps>
 > = ({ onMaybeChangeHost, children }) => {
-    // [Note: Configuring custom server]
-    //
-    // Allow the user to tap 7 times anywhere on the onboarding screen to bring
-    // up a page where they can configure the endpoint that the app should
-    // connect to.
-    //
-    // See: https://ente.com/help/self-hosting/installation/post-install/
+    // Seven background taps open self-hosting settings outside Ente production.
     const [tapCount, setTapCount] = useState(0);
     const [showDevSettings, setShowDevSettings] = useState(false);
 
     const handleClick: React.MouseEventHandler = (event) => {
-        // Don't allow this when running on (e.g.) photos.ente.com.
         if (!shouldAllowChangingAPIOrigin()) return;
 
-        // Ignore clicks on buttons when counting up towards 7.
         if (event.target instanceof HTMLButtonElement) return;
 
-        // Ignore clicks when the dialog is already open.
         if (showDevSettings) return;
 
-        // Otherwise increase the tap count,
         setTapCount(tapCount + 1);
-        // And show the dev settings dialog when it reaches 7.
         if (tapCount + 1 == 7) {
             setTapCount(0);
             setShowDevSettings(true);
@@ -238,10 +216,6 @@ const TappableContainer: React.FC<
     );
 };
 
-/**
- * Disable the ability to set the custom server when we're running on our own
- * production deployment.
- */
 const shouldAllowChangingAPIOrigin = () => {
     const hostname = new URL(window.location.origin).hostname;
     return !(
@@ -271,7 +245,6 @@ const SlideshowPanel = styled("div")`
 `;
 
 const Logo_ = styled("div")`
-    /* Bias towards the left for better visual alignment with the slides. */
     padding-inline-end: 1rem;
 
     margin-block-start: 32px;
@@ -337,14 +310,8 @@ const Slideshow: React.FC = () => {
     useEffect(() => {
         const container = containerRef.current!;
         const left = containerRef.current!.offsetWidth * selectedIndex;
-        // Smooth scroll doesn't work with Chrome intermittently. A common
-        // workaround is to wrap the scrollTo in a setTimeout etc, but even that
-        // doesn't help for our particular scenario.
-        //
-        // Ref: https://github.com/facebook/react/issues/23396
-        //
-        // As an alternative, scroll twice (once smoothly, once without) to the
-        // same position so that at least the fallback works on Chrome.
+        // Chrome intermittently ignores the smooth scroll.
+        // Repeat it without animation as a fallback.
         container.scrollTo({ left, behavior: "smooth" });
         setTimeout(() => container.scrollTo({ left }), 500);
     }, [selectedIndex]);
@@ -386,8 +353,6 @@ const Slideshow: React.FC = () => {
 };
 
 const SlidesContainer = styled("div")`
-    /* Override the center align for ourselves so that we don't revert back to
-       our intrinsic width. */
     align-self: stretch;
     display: flex;
     overflow-x: hidden;

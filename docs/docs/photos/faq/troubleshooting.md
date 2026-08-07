@@ -271,13 +271,9 @@ When photos are uploaded on the web app, the most common cause of thumbnails not
 
 **Firefox users:** If you have "block canvas fingerprinting" enabled (`privacy.resistFingerprinting` set to true in `about:config`), Firefox will prevent the app from generating thumbnails.
 
-**Brave users:** Brave Shields can block canvas access and prevent the app from generating thumbnails.
+**Brave users:** Brave Shields can block canvas access and prevent the app from generating thumbnails. To fix this, disable canvas fingerprinting for Ente's domain, or turn off Brave Shields for Ente's domain, or whitelist Ente in any browser extension that blocks canvas access.
 
-**Solution:**
-
-- Disable canvas fingerprinting for Ente's domain, OR
-- Turn off Brave Shields for Ente's domain, OR
-- Check if you're using browser extensions that block canvas access and whitelist Ente
+**Tor Browser users:** When the upload error appears, click the photo icon on the left side of the address bar and choose **Allow** so Ente can generate thumbnails.
 
 > [!IMPORTANT]
 >
@@ -423,6 +419,18 @@ Open device `Settings > Apps > Ente > Storage` and tap "Clear cache" (NOT "Clear
 >
 > This is a known issue being investigated by our team. If none of these solutions work, please contact [support@ente.com](mailto:support@ente.com) with your device model and Android version.
 
+### Why does Android ask me to confirm every photo when I delete from Ente? {#android-media-management-delete}
+
+When Ente deletes a photo or video that also exists in your device gallery, Android shows a system confirmation dialog for each item. This is an Android security measure for third-party apps. It is especially noticeable when using **Free up space**, where you may have to confirm a large number of files one by one.
+
+To stop these repeated prompts, grant Ente the **media management** special access:
+
+**On Android:**
+
+Open device `Settings > Apps > Special app access > Media management apps > Ente Photos` and enable "Allow app to manage media".
+
+Once granted, Ente can delete media that it manages without asking for confirmation each time.
+
 ### Why is the Linux desktop app still showing the old icon after updating? {#linux-icon-update}
 
 You might need to update the icon cache of your Linux desktop environment.
@@ -527,13 +535,16 @@ You can also try opening photos.ente.com in an incognito or private window to ru
 
 ### How do I identify which files failed to upload? {#identify-failed-uploads}
 
-**On desktop:** Check the sections within the upload progress bar for:
+**On desktop:** Expand the upload progress card and open one of these sections:
 
-- "Failed Uploads"
-- "Ignored Uploads"
-- "Unsuccessful Uploads"
+- **In progress**: Files currently being prepared or uploaded.
+- **Completed**: Files uploaded successfully.
+- **Skipped**: Files not uploaded. While the upload is active, you can filter them by reasons such as **Already on Ente** and **Hidden file**.
+- **Failed**: Files whose upload attempt failed.
 
-Click on each section to see the specific files and error messages.
+After the upload finishes, click **Review items**, open **Failed**, and review the filenames and error status. Click **Retry failed uploads** to try those files again. Skipped items are not retryable failures; review the reason shown beside each filename to understand why it was skipped.
+
+![Failed upload details with the retry button](../migration/from-local-hard-disk/failed-upload-review.webp)
 
 **On mobile:** Open `Settings > Backup` to see the backup status and any errors.
 
@@ -546,6 +557,16 @@ If videos aren't playing on photos.ente.com, browser content blockers or ad bloc
 Disable your content blocker or add `photos.ente.com` to your allowlist. Wait 15-20 seconds for changes to take effect before trying again.
 
 **Known issue with AdGuard:** AdGuard's basic filter blocks videos in Ente when using AdGuard Mini on Safari. This has been [reported to AdGuard filter developers](https://github.com/AdguardTeam/AdguardFilters/issues/216424).
+
+### Why do some of my videos stutter or freeze when I play them on iOS? {#ios-video-stutter-playback}
+
+This is an iOS-specific issue: for some videos, Apple Photos rejects the file and doesn't store it on your device, even though Ente backed it up successfully. Since the video isn't fully available locally, playback in the Ente app can stutter or freeze. The video itself is still safely stored in Ente - nothing is lost.
+
+Because this happens at the iOS level, there isn't much the app can do to prevent it directly. The workaround is to enable video streaming on desktop.
+
+As videos are processed, your iPhone automatically uses the streamable version for smooth playback, while your original file stays untouched.
+
+Learn more about [Video streaming](/photos/features/utilities/video-streaming).
 
 ## Performance Issues
 
@@ -584,6 +605,26 @@ Machine learning features (face recognition and magic search) require downloadin
 - Once indexed on one device, the indexes sync to other devices
 
 Learn more in [Search and Discovery FAQ](/photos/faq/search-and-discovery#ml-offline).
+
+### Why does my phone overheat while using the app? {#phone-overheating}
+
+Overheating usually happens when Ente works through a large historical backup at the same time as local ML indexing, which together can keep the CPU busy for a sustained stretch. Once the backup queue clears and indexing catches up, the app falls back to normal incremental syncs and the heating should stop.
+
+**Steps to take:**
+
+1. Plug in your iPhone, remove the case if you use one, connect to WiFi, and leave Ente open in the foreground.
+2. Disable auto-lock.
+3. Close all other apps before starting.
+4. If the phone still overheats, turn off ML and video streaming: `Settings > Machine learning` and `Settings > Video streaming`.
+5. Let it run overnight, then re-enable ML and video streaming once the upload completes.
+
+> [!NOTE]
+>
+> iOS can still throttle, suspend, or terminate apps under heat pressure even with auto-lock disabled - that setting only keeps the screen from sleeping while the app is active, not the app from being suspended by the system. This can slow uploads considerably.
+>
+> If iCloud Photos "Optimize iPhone Storage" is enabled, originals may need to download from iCloud first, which can also slow or stall uploads.
+>
+> If overheating continues, [send us your logs](#sharing-logs) so we can take a closer look.
 
 ### What are the minimum device requirements for Ente apps? {#minimum-requirements}
 
@@ -652,6 +693,6 @@ Open `Settings > Support > Help` to download logs, then email the downloaded log
 1. **Check the FAQ sections** for answers to common questions
 2. **Join our [Discord community](https://ente.com/discord)** for community support
 3. **Email us at [support@ente.com](mailto:support@ente.com)** with details about your issue
-4. **Report bugs on [GitHub](https://github.com/ente-io/ente/issues)** if you've found a technical issue
+4. **Report bugs on [GitHub](https://github.com/ente/ente/issues)** if you've found a technical issue
 
 For security vulnerabilities, please email [security@ente.com](mailto:security@ente.com) directly.

@@ -1,11 +1,10 @@
 import { LazyNotification } from "@/app/lazy/global-ui";
 import { getEnteURL } from "@/public-album/access/utils/external-links";
 import { downloadManager } from "@/public-album/download/services/download-manager";
-import type { AddSaveGroup } from "@/shared/state/save-groups";
 import CheckIcon from "@mui/icons-material/Check";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import DownloadOutlinedIcon from "@mui/icons-material/DownloadOutlined";
-import ErrorOutlineIcon from "@mui/icons-material/ErrorOutline";
+import ErrorOutlinedIcon from "@mui/icons-material/ErrorOutlined";
 import FullscreenOutlinedIcon from "@mui/icons-material/FullscreenOutlined";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
@@ -27,12 +26,13 @@ import { ActivityIndicator } from "ente-base/components/mui/ActivityIndicator";
 import { useBaseContext } from "ente-base/context";
 import type { PublicAlbumsCredentials } from "ente-base/http";
 import log from "ente-base/log";
+import type { AddSaveGroup } from "ente-gallery/components/utils/save-groups";
+import { createPSRegisterElementIconHTML } from "ente-gallery/components/viewer/icons";
 import type { EnteFile } from "ente-media/file";
 import { fileFileName } from "ente-media/file-metadata";
 import { FileType } from "ente-media/file-type";
 import { t } from "i18next";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { createPSRegisterElementIconHTML } from "../lib/icons";
 import { FileViewer } from "./FileViewer";
 
 export interface PublicAlbumSingleFileViewerProps {
@@ -64,11 +64,6 @@ const inlineFileViewerIconPath = (name: "live" | "vol") =>
 const liveIconPath = inlineFileViewerIconPath("live");
 const volumeIconPath = inlineFileViewerIconPath("vol");
 
-/**
- * A dedicated public-album single-file viewer mode with a bespoke header/menu.
- *
- * This wraps the regular FileViewer but overlays its own controls.
- */
 export const PublicAlbumSingleFileViewer: React.FC<
     PublicAlbumSingleFileViewerProps
 > = ({
@@ -371,7 +366,7 @@ export const PublicAlbumSingleFileViewer: React.FC<
     useEffect(() => {
         if (!needsOriginalPrime) return;
 
-        // Give thumbnail fetch a brief head-start, then warm the original.
+        // Let the thumbnail start before warming the original.
         const prefetchTimer = window.setTimeout(() => {
             void downloadManager
                 .renderableSourceURLs(file)
@@ -576,9 +571,9 @@ export const PublicAlbumSingleFileViewer: React.FC<
                     >
                         <Stack
                             direction="row"
-                            justifyContent="space-between"
-                            alignItems="center"
                             sx={{
+                                justifyContent: "space-between",
+                                alignItems: "center",
                                 pointerEvents: topControlsVisible
                                     ? "auto"
                                     : "none",
@@ -586,8 +581,8 @@ export const PublicAlbumSingleFileViewer: React.FC<
                         >
                             <Stack
                                 direction="row"
-                                alignItems="center"
                                 spacing={1.5}
+                                sx={{ alignItems: "center" }}
                             >
                                 <Box
                                     component="a"
@@ -619,7 +614,7 @@ export const PublicAlbumSingleFileViewer: React.FC<
                                             transform: "translateY(1px)",
                                         }}
                                     >
-                                        <ErrorOutlineIcon
+                                        <ErrorOutlinedIcon
                                             aria-hidden="true"
                                             sx={{
                                                 fontSize: 20,
@@ -648,8 +643,8 @@ export const PublicAlbumSingleFileViewer: React.FC<
                                     isLivePhotoFile && (
                                         <Stack
                                             direction="row"
-                                            alignItems="center"
                                             spacing={0.5}
+                                            sx={{ alignItems: "center" }}
                                         >
                                             <FileViewerStyleButton
                                                 onClick={
@@ -707,8 +702,8 @@ export const PublicAlbumSingleFileViewer: React.FC<
                             </Stack>
                             <Stack
                                 direction="row"
-                                alignItems="center"
                                 spacing={1}
+                                sx={{ alignItems: "center" }}
                             >
                                 <Button
                                     variant="contained"
@@ -728,7 +723,7 @@ export const PublicAlbumSingleFileViewer: React.FC<
                                         },
                                     }}
                                 >
-                                    {t("get_ente_photos")}
+                                    {t("join_ente")}
                                 </Button>
                                 <IconButton
                                     onClick={(event) =>
@@ -906,9 +901,6 @@ const FileViewerStyleButton = styled("button")`
     }
 `;
 
-/**
- * Return an "image/png" blob derived from the given source URL.
- */
 const createImagePNGBlob = async (imageURL: string): Promise<Blob> =>
     new Promise((resolve, reject) => {
         const image = new Image();

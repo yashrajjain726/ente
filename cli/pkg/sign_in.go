@@ -3,12 +3,12 @@ package pkg
 import (
 	"context"
 	"fmt"
-	"github.com/ente-io/cli/internal"
-	"github.com/ente-io/cli/internal/api"
-	eCrypto "github.com/ente-io/cli/internal/crypto"
-	"github.com/ente-io/cli/pkg/model"
-	"github.com/ente-io/cli/utils/browser"
-	"github.com/ente-io/cli/utils/encoding"
+	"github.com/ente/cli/internal"
+	"github.com/ente/cli/internal/api"
+	eCrypto "github.com/ente/cli/internal/crypto"
+	"github.com/ente/cli/pkg/model"
+	"github.com/ente/cli/utils/browser"
+	"github.com/ente/cli/utils/encoding"
 	"log"
 
 	"github.com/kong/go-srp"
@@ -16,7 +16,6 @@ import (
 
 func (c *ClICtrl) signInViaPassword(ctx context.Context, srpAttr *api.SRPAttributes) (*api.AuthorizationResponse, []byte, error) {
 	for {
-		// CLI prompt for password
 		password, flowErr := internal.GetSensitiveField("Enter password")
 		if flowErr != nil {
 			return nil, nil, flowErr
@@ -51,9 +50,7 @@ func (c *ClICtrl) signInViaPassword(ctx context.Context, srpAttr *api.SRPAttribu
 	}
 }
 
-// Parameters:
-//   - keyEncKey: key encryption key is derived from user's password. During SRP based login, this key is already derived.
-//     So, we can pass it to avoid asking for password again.
+// SRP login reuses the password-derived key to avoid another password prompt.
 func (c *ClICtrl) decryptAccSecretInfo(
 	_ context.Context,
 	authResp *api.AuthorizationResponse,
@@ -65,7 +62,6 @@ func (c *ClICtrl) decryptAccSecretInfo(
 	var publicKey = encoding.DecodeBase64(authResp.KeyAttributes.PublicKey)
 	for {
 		if keyEncKey == nil {
-			// CLI prompt for password
 			password, flowErr := internal.GetSensitiveField("Enter password")
 			if flowErr != nil {
 				return nil, flowErr
@@ -126,7 +122,6 @@ func (c *ClICtrl) validateTOTP(ctx context.Context, authResp *api.AuthorizationR
 		return authResp, nil
 	}
 	for {
-		// CLI prompt for TOTP
 		totp, flowErr := internal.GetCode("Enter TOTP", 6)
 		if flowErr != nil {
 			return nil, flowErr
@@ -170,7 +165,6 @@ func (c *ClICtrl) validateEmail(ctx context.Context, email string) (*api.Authori
 		return nil, err
 	}
 	for {
-		// CLI prompt for OTP
 		ott, flowErr := internal.GetCode("Enter OTP", 6)
 		if flowErr != nil {
 			return nil, flowErr

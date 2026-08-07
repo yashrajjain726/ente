@@ -10,21 +10,21 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ente-io/museum/pkg/controller/commonbilling"
-	"github.com/ente-io/museum/pkg/controller/discord"
-	"github.com/ente-io/museum/pkg/utils/email"
+	"github.com/ente/museum/pkg/controller/commonbilling"
+	"github.com/ente/museum/pkg/controller/discord"
+	"github.com/ente/museum/pkg/utils/email"
 	"github.com/prometheus/common/log"
 
-	"github.com/ente-io/stacktrace"
+	"github.com/ente/stacktrace"
 	"github.com/gin-contrib/requestid"
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 
 	"github.com/awa/go-iap/appstore"
-	"github.com/ente-io/museum/ente"
-	"github.com/ente-io/museum/pkg/repo"
-	"github.com/ente-io/museum/pkg/repo/remotestore"
+	"github.com/ente/museum/ente"
+	"github.com/ente/museum/pkg/repo"
+	"github.com/ente/museum/pkg/repo/remotestore"
 )
 
 // AppStoreController provides abstractions for handling billing on AppStore
@@ -67,6 +67,12 @@ func NewAppStoreController(
 
 var SubsUpdateNotificationTypes = []string{string(appstore.NotificationTypeDidChangeRenewalStatus), string(appstore.NotificationTypeCancel), string(appstore.NotificationTypeDidRevoke)}
 
+func isEnteSandboxEmail(userEmail string) bool {
+	normalizedEmail := email.NormalizeEmail(userEmail)
+	return strings.HasSuffix(normalizedEmail, "@ente.io") ||
+		strings.HasSuffix(normalizedEmail, "@ente.com")
+}
+
 // validateSandboxRequest checks if the request is from sandbox environment.
 // If sandbox, it sends a Discord alert and returns an error for non-whitelisted users.
 func (c *AppStoreController) validateSandboxRequest(ctx context.Context, environment string, userID int64, sandboxContext string) error {
@@ -83,7 +89,7 @@ func (c *AppStoreController) validateSandboxRequest(ctx context.Context, environ
 	c.DiscordController.NotifyThrottled(fmt.Sprintf("iOS Sandbox %s for user: %s (userID: %d)",
 		sandboxContext, maskedEmail, userID), 10*time.Minute)
 
-	if strings.HasSuffix(email.NormalizeEmail(user.Email), "@ente.io") {
+	if isEnteSandboxEmail(user.Email) {
 		return nil
 	}
 

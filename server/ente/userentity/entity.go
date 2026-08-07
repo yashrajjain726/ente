@@ -2,8 +2,8 @@ package userentity
 
 import (
 	"fmt"
-	"github.com/ente-io/museum/ente"
-	"github.com/ente-io/museum/ente/base"
+	"github.com/ente/museum/ente"
+	"github.com/ente/museum/ente/base"
 	"strings"
 )
 
@@ -22,11 +22,13 @@ const (
 	Memory EntityType = "memory"
 	// Contact is the entity type for the shared contact root key.
 	Contact EntityType = "contact"
+	// Space is the entity type for the space root key.
+	Space EntityType = "space"
 )
 
 func (et EntityType) IsValid() error {
 	switch et {
-	case Location, Person, CGroup, SmartAlbum, Memory, Contact:
+	case Location, Person, CGroup, SmartAlbum, Memory, Contact, Space:
 		return nil
 	}
 	return ente.NewBadRequestWithMessage(fmt.Sprintf("Invalid EntityType: %s", et))

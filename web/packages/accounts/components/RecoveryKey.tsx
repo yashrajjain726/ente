@@ -6,7 +6,7 @@ import {
     Stack,
     Typography,
 } from "@mui/material";
-import { type MiniDialogAttributes } from "ente-base/components/MiniDialog";
+import type { MiniDialogAttributes } from "ente-base/components/MiniDialog";
 import { SpacedRow } from "ente-base/components/containers";
 import { DialogCloseIconButton } from "ente-base/components/mui/DialogCloseIconButton";
 import { FocusVisibleButton } from "ente-base/components/mui/FocusVisibleButton";
@@ -64,12 +64,9 @@ export const RecoveryKey: React.FC<RecoveryKeyProps> = ({
             fullScreen={fullScreen}
             open={open}
             onClose={onClose}
-            // [Note: maxWidth "xs" on MUI dialogs]
-            //
-            // While logically the "xs" breakpoint doesn't make sense as a
-            // maxWidth value (since as a breakpoint it's value is 0), in
-            // practice MUI has hardcoded its value to a reasonable 444px.
-            // https://github.com/mui/material-ui/issues/34646.
+            // MUI hardcodes the dialog maxWidth for "xs" to 444px, even though
+            // the "xs" breakpoint itself is 0.
+            // https://github.com/mui/material-ui/issues/34646
             maxWidth="xs"
             fullWidth
         >

@@ -2,11 +2,11 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'package:ente_crypto/ente_crypto.dart';
+import 'package:ente_strings/ente_strings.dart';
 import 'package:flutter/material.dart';
 import 'package:logging/logging.dart';
 import 'package:photos/core/configuration.dart';
 import 'package:photos/db/files_db.dart';
-import 'package:photos/generated/l10n.dart';
 import 'package:photos/models/file/extensions/file_props.dart';
 import 'package:photos/models/file/file.dart';
 import "package:photos/models/metadata/file_magic.dart";
@@ -103,11 +103,13 @@ class DiffFetcher {
       return sharedFiles;
     } catch (e, s) {
       _logger.severe("Failed to decrypt collection ", e, s);
-      await showErrorDialog(
-        context,
-        AppLocalizations.of(context).somethingWentWrong,
-        e.toString(),
-      );
+      if (context.mounted) {
+        await showErrorDialog(
+          context,
+          context.strings.somethingWentWrong,
+          e.toString(),
+        );
+      }
       rethrow;
     }
   }
@@ -268,8 +270,8 @@ class DiffFetcher {
       incomingMinByUploadID[entry.key] = minIncoming;
     }
 
-    final dbMinByUploadID = await FilesDB.instance
-        .getMinPositiveAddedTimeForUploadedFiles(
+    final dbEarliestByUploadID = await FilesDB.instance
+        .getEarliestPositiveAddedTimeRowsForUploadedFiles(
           incomingMinByUploadID.keys.toSet(),
           currentUserID,
         );
@@ -284,17 +286,26 @@ class DiffFetcher {
       final candidates = entry.value;
       collectCandidatesCount += candidates.length;
       final incomingMin = incomingMinByUploadID[uploadedFileID]!;
-      final dbMin = dbMinByUploadID[uploadedFileID];
+      final dbEarliest = dbEarliestByUploadID[uploadedFileID];
 
-      if (dbMin != null && dbMin <= incomingMin) {
+      if (dbEarliest != null && dbEarliest.addedTime <= incomingMin) {
+        var keptForUploadID = false;
         for (final candidate in candidates) {
-          candidate.file.addedTime = -1;
+          if (dbEarliest.collectionID == collectionID &&
+              !keptForUploadID &&
+              candidate.collectionAddedAt == incomingMin) {
+            candidate.file.addedTime = dbEarliest.addedTime;
+            keptForUploadID = true;
+            keptIncomingCount++;
+          } else {
+            candidate.file.addedTime = -1;
+            suppressedIncomingCount++;
+          }
         }
-        suppressedIncomingCount += candidates.length;
         continue;
       }
 
-      if (dbMin != null && dbMin > incomingMin) {
+      if (dbEarliest != null && dbEarliest.addedTime > incomingMin) {
         uploadsToReset.add(uploadedFileID);
       }
 

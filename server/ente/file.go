@@ -4,7 +4,7 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 
-	"github.com/ente-io/stacktrace"
+	"github.com/ente/stacktrace"
 )
 
 // File represents an encrypted file in the system
@@ -178,7 +178,7 @@ type MultipartUploadURLs struct {
 type MultipartUploadURLRequest struct {
 	ContentLength int64    `json:"contentLength" binding:"required"`
 	PartLength    int64    `json:"partLength" binding:"required"`
-	PartMD5s      []string `json:"partMd5s" binding:"required"`
+	PartMD5s      []string `json:"partMd5s"`
 }
 
 type ObjectType string

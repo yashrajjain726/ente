@@ -5,14 +5,14 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/ente-io/museum/ente"
-	entity "github.com/ente-io/museum/ente/cast"
-	"github.com/ente-io/museum/pkg/controller"
-	"github.com/ente-io/museum/pkg/controller/cast"
-	"github.com/ente-io/museum/pkg/controller/collections"
-	"github.com/ente-io/museum/pkg/utils/auth"
-	"github.com/ente-io/museum/pkg/utils/handler"
-	"github.com/ente-io/stacktrace"
+	"github.com/ente/museum/ente"
+	entity "github.com/ente/museum/ente/cast"
+	"github.com/ente/museum/pkg/controller"
+	"github.com/ente/museum/pkg/controller/cast"
+	"github.com/ente/museum/pkg/controller/collections"
+	"github.com/ente/museum/pkg/utils/auth"
+	"github.com/ente/museum/pkg/utils/handler"
+	"github.com/ente/stacktrace"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
@@ -26,7 +26,7 @@ type CastHandler struct {
 
 func (h *CastHandler) RegisterDevice(c *gin.Context) {
 	var request entity.RegisterDeviceRequest
-	if err := c.ShouldBindJSON(&request); err != nil {
+	if err := handler.BindJSON(c, &request); err != nil {
 		handler.Error(c, stacktrace.Propagate(err, "failed to bind"))
 		return
 	}
@@ -84,16 +84,18 @@ func (h *CastHandler) DeleteDevice(c *gin.Context) {
 
 func (h *CastHandler) InsertCastData(c *gin.Context) {
 	var request entity.CastRequest
-	if err := c.ShouldBindJSON(&request); err != nil {
+	if err := handler.BindJSON(c, &request); err != nil {
 		handler.Error(c, stacktrace.Propagate(err, "failed to bind"))
 		return
 	}
-	err := h.Ctrl.InsertCastData(c, &request)
+	deviceID, err := h.Ctrl.InsertCastData(c, &request)
 	if err != nil {
 		handler.Error(c, stacktrace.Propagate(err, "failed to start cast"))
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{})
+	c.JSON(http.StatusOK, gin.H{
+		"deviceID": deviceID.String(),
+	})
 }
 
 // RevokeAllToken disable all active cast token for a user
@@ -127,6 +129,18 @@ func (h *CastHandler) GetFile(c *gin.Context) {
 // GetThumbnail redirects the request to the file's thumbnail location
 func (h *CastHandler) GetThumbnail(c *gin.Context) {
 	h.getFileForType(c, ente.THUMBNAIL)
+}
+
+// GetFileURLV3 returns the file URL and reserves HTTP 404 for an unavailable endpoint.
+func (h *CastHandler) GetFileURLV3(c *gin.Context) {
+	url, err := h.getFileURL(c, ente.FILE)
+	writeFileURLV3(c, url, err)
+}
+
+// GetThumbnailURLV3 returns the thumbnail URL and reserves HTTP 404 for an unavailable endpoint.
+func (h *CastHandler) GetThumbnailURLV3(c *gin.Context) {
+	url, err := h.getFileURL(c, ente.THUMBNAIL)
+	writeFileURLV3(c, url, err)
 }
 
 // GetCollection redirects the request to the collection location
@@ -164,16 +178,23 @@ func getDeviceCode(c *gin.Context) string {
 }
 
 func (h *CastHandler) getFileForType(c *gin.Context, objectType ente.ObjectType) {
-	fileID, err := strconv.ParseInt(c.Param("fileID"), 10, 64)
-	if err != nil {
-		handler.Error(c, stacktrace.Propagate(ente.ErrBadRequest, ""))
-		return
-	}
-	castCtx := auth.GetCastCtx(c)
-	url, err := h.FileCtrl.GetPublicOrCastFileURL(c, fileID, objectType, castCtx.CollectionID)
+	url, err := h.getFileURL(c, objectType)
 	if err != nil {
 		handler.Error(c, stacktrace.Propagate(err, ""))
 		return
 	}
 	c.Redirect(http.StatusTemporaryRedirect, url)
+}
+
+func (h *CastHandler) getFileURL(c *gin.Context, objectType ente.ObjectType) (string, error) {
+	fileID, err := strconv.ParseInt(c.Param("fileID"), 10, 64)
+	if err != nil {
+		return "", stacktrace.Propagate(ente.ErrBadRequest, "")
+	}
+	castCtx := auth.GetCastCtx(c)
+	url, err := h.FileCtrl.GetPublicOrCastFileURL(c, fileID, objectType, castCtx.CollectionID)
+	if err != nil {
+		return "", stacktrace.Propagate(err, "")
+	}
+	return url, nil
 }

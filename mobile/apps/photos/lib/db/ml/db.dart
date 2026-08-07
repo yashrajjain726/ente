@@ -503,6 +503,43 @@ class MLDataDB with SqlDbBase implements IMLDataDB<int> {
   }
 
   @override
+  Future<Set<String>> getBadFaceSingletonClusterIDs() async {
+    final db = await asyncDB;
+    final rows = await db.getAll('''
+      SELECT fc.$clusterIDColumn, f.$faceScore, f.$faceBlur, f.$isSideways
+      FROM $faceClustersTable fc
+      INNER JOIN $facesTable f
+        ON fc.$faceIDColumn = f.$faceIDColumn
+      GROUP BY fc.$clusterIDColumn
+      HAVING COUNT(*) = 1
+      ''');
+    final badClusterIDs = <String>{};
+    for (final row in rows) {
+      final badFace = isBadFaceForClustering(
+        faceScore: row[faceScore] as double,
+        blurValue: row[faceBlur] as double,
+        isSideways: (row[isSideways] as int) == 1,
+      );
+      if (badFace) {
+        badClusterIDs.add(row[clusterIDColumn] as String);
+      }
+    }
+    return badClusterIDs;
+  }
+
+  @override
+  Future<Set<String>> getClustersWithThreeOrMoreNotPersonFeedback() async {
+    final db = await asyncDB;
+    final rows = await db.getAll('''
+      SELECT $clusterIDColumn
+      FROM $notPersonFeedback
+      GROUP BY $clusterIDColumn
+      HAVING COUNT(*) >= 3
+      ''');
+    return rows.map((row) => row[clusterIDColumn] as String).toSet();
+  }
+
+  @override
   Future<Set<String>> getPersonIgnoredClusters(String personID) async {
     final db = await asyncDB;
     // find out clusterIds that are assigned to other persons using the clusters table
@@ -1284,7 +1321,7 @@ class MLDataDB with SqlDbBase implements IMLDataDB<int> {
     final db = await asyncDB;
     const String query =
         '''
-      SELECT f.$faceIDColumn
+      SELECT COUNT(*) as count
       FROM $facesTable f
       LEFT JOIN $faceClustersTable fc ON f.$faceIDColumn = fc.$faceIDColumn
       WHERE f.$faceScore > $kMinimumQualityFaceScore
@@ -1292,7 +1329,7 @@ class MLDataDB with SqlDbBase implements IMLDataDB<int> {
       AND fc.$faceIDColumn IS NULL
     ''';
     final List<Map<String, dynamic>> maps = await db.getAll(query);
-    return maps.length;
+    return maps.first['count'] as int;
   }
 
   /// WARNING: Only use this method if the person has just been created.
@@ -2447,6 +2484,22 @@ class MLDataDB with SqlDbBase implements IMLDataDB<int> {
       minimumMlVersion,
     ]);
     return maps.first['count'] as int;
+  }
+
+  @override
+  Future<Set<int>> getFullyIndexedFileIds({required bool includePets}) async {
+    final db = await asyncDB;
+    String query =
+        'SELECT $fileIDColumn FROM $facesTable WHERE $mlVersionColumn >= $faceMlVersion '
+        'INTERSECT '
+        'SELECT $fileIDColumn FROM $clipTable WHERE $mlVersionColumn >= $clipMlVersion';
+    if (includePets) {
+      query +=
+          ' INTERSECT '
+          'SELECT $fileIDColumn FROM $petFacesTable WHERE $mlVersionColumn >= $petMlVersion';
+    }
+    final List<Map<String, dynamic>> maps = await db.getAll(query);
+    return {for (final map in maps) map[fileIDColumn] as int};
   }
 
   @override

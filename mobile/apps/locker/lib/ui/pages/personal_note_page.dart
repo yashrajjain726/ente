@@ -1,15 +1,10 @@
-import 'dart:math' as math;
-
-import 'package:ente_ui/components/alert_bottom_sheet.dart';
-import 'package:ente_ui/theme/ente_theme.dart';
-import 'package:ente_ui/utils/toast_util.dart';
+import 'package:ente_components/ente_components.dart';
+import 'package:ente_strings/ente_strings.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:locker/l10n/l10n.dart';
 import 'package:locker/models/info/info_item.dart';
 import 'package:locker/ui/components/collection_selection_widget.dart';
-import 'package:locker/ui/components/gradient_button.dart';
 import 'package:locker/ui/pages/base_info_page.dart';
+import "package:locker/utils/bottom_sheet_illustration.dart";
 
 class PersonalNotePage extends BaseInfoPage<PersonalNoteData> {
   const PersonalNotePage({
@@ -25,31 +20,17 @@ class PersonalNotePage extends BaseInfoPage<PersonalNoteData> {
 
 class _PersonalNotePageState
     extends BaseInfoPageState<PersonalNoteData, PersonalNotePage> {
-  static const double _editorMinWidth = 320.0;
-  static const double _editorMaxWidth = 720.0;
-  static const double _editorWidthFactor = 0.92;
-  static const double _editorMinHeight = 260.0;
-  static const double _editorMaxHeight = 560.0;
-  static const double _editorBorderRadius = 24.0;
-  static const EdgeInsets _editorContentPadding = EdgeInsets.symmetric(
-    horizontal: 28,
-    vertical: 24,
-  );
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _contentController = TextEditingController();
-  final FocusNode _titleFocusNode = FocusNode();
   final FocusNode _contentFocusNode = FocusNode();
-  final ScrollController _contentScrollController = ScrollController();
   bool _isControllerSyncInProgress = false;
+  String _initialTitle = '';
   String _initialContent = '';
 
   @override
   void initState() {
     super.initState();
-    _nameController.addListener(_onTitleChanged);
     _contentController.addListener(_onContentChanged);
-    _titleFocusNode.addListener(_onTitleFocusChanged);
-    _contentFocusNode.addListener(_onContentFocusChanged);
   }
 
   @override
@@ -65,22 +46,17 @@ class _PersonalNotePageState
 
   @override
   void dispose() {
-    _nameController.removeListener(_onTitleChanged);
     _contentController.removeListener(_onContentChanged);
-    _titleFocusNode.removeListener(_onTitleFocusChanged);
-    _contentFocusNode.removeListener(_onContentFocusChanged);
     _nameController.dispose();
     _contentController.dispose();
-    _titleFocusNode.dispose();
     _contentFocusNode.dispose();
-    _contentScrollController.dispose();
     super.dispose();
   }
 
   @override
   String get pageTitle {
     if (isInEditMode) {
-      return context.l10n.editNote;
+      return context.strings.note;
     }
 
     final controllerTitle = _nameController.text.trim();
@@ -93,11 +69,11 @@ class _PersonalNotePageState
       return dataTitle;
     }
 
-    return context.l10n.personalNote;
+    return context.strings.personalNote;
   }
 
   @override
-  String get submitButtonText => context.l10n.saveRecord;
+  String get submitButtonText => context.strings.save;
 
   @override
   InfoType get infoType => InfoType.note;
@@ -107,9 +83,6 @@ class _PersonalNotePageState
     final content = _contentController.text.trim();
     return content.isNotEmpty;
   }
-
-  @override
-  bool get isSaveEnabled => super.isSaveEnabled && validateForm();
 
   @override
   PersonalNoteData createInfoData() {
@@ -145,24 +118,45 @@ class _PersonalNotePageState
 
   @override
   List<Widget> buildViewFields() {
-    return const <Widget>[];
+    if (_contentController.text.trim().isEmpty) {
+      return const <Widget>[];
+    }
+    return [
+      buildViewField(
+        label: context.strings.noteContent,
+        value: _contentController.text,
+        minLines: 12,
+        maxLines: 24,
+      ),
+    ];
   }
 
   @override
-  double get collectionSpacing => 12;
-
-  @override
-  Widget buildEditModeContent(
-    BuildContext context,
-    BoxConstraints constraints,
-  ) {
-    return SingleChildScrollView(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+  Widget buildEditModeContent(BuildContext context) {
+    return SliverPadding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 80),
+      sliver: SliverList.list(
         children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 20),
-            child: _buildEditorSurface(context, constraints, isEditing: true),
+          TextInputComponent(
+            label: context.strings.noteName,
+            hintText: context.strings.noteNameHint,
+            controller: _nameController,
+            textCapitalization: TextCapitalization.sentences,
+            textInputAction: TextInputAction.done,
+            shouldUnfocusOnClearOrSubmit: true,
+          ),
+          const SizedBox(height: 24),
+          TextInputComponent(
+            label: context.strings.noteContent,
+            hintText: context.strings.noteContentHint,
+            controller: _contentController,
+            focusNode: _contentFocusNode,
+            isRequired: true,
+            autofocus: true,
+            keyboardType: TextInputType.multiline,
+            textCapitalization: TextCapitalization.sentences,
+            minLines: 12,
+            maxLines: 12,
           ),
           SizedBox(height: collectionSpacing),
           CollectionSelectionWidget(
@@ -170,181 +164,17 @@ class _PersonalNotePageState
             selectedCollectionIds: selectedCollectionIds,
             onToggleCollection: toggleCollectionSelection,
             onCollectionsUpdated: updateAvailableCollections,
-            title: showCollectionSelectionTitle ? context.l10n.collections : '',
-          ),
-          const SizedBox(height: 80),
-        ],
-      ),
-    );
-  }
-
-  @override
-  Widget buildViewModeContent(
-    BuildContext context,
-    BoxConstraints constraints,
-  ) {
-    return Padding(
-      padding: const EdgeInsets.only(top: 20, bottom: 100),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            child: _buildEditorSurface(context, constraints, isEditing: false),
+            title: showCollectionSelectionTitle
+                ? context.strings.collections
+                : '',
           ),
         ],
       ),
     );
   }
 
-  Widget _buildEditorSurface(
-    BuildContext context,
-    BoxConstraints constraints, {
-    required bool isEditing,
-  }) {
-    final colorScheme = getEnteColorScheme(context);
-    final textTheme = getEnteTextTheme(context);
-    final dimensions = _calculateEditorDimensions(context, constraints);
-    final accentBlue = Color.lerp(
-      colorScheme.primary500,
-      const Color(0xFF3B82F6),
-      0.7,
-    )!;
-
-    _contentFocusNode.canRequestFocus = isEditing;
-    if (!isEditing && _contentFocusNode.hasFocus) {
-      _contentFocusNode.unfocus();
-    }
-    final isEditorFocused = isEditing && _contentFocusNode.hasFocus;
-    final editorFillColor = isEditorFocused
-        ? accentBlue.withValues(alpha: 0.14)
-        : colorScheme.fillFaint;
-
-    final contentPadding = isEditing
-        ? _editorContentPadding
-        : _editorContentPadding + const EdgeInsets.only(bottom: 36);
-
-    return Align(
-      alignment: Alignment.topCenter,
-      child: ConstrainedBox(
-        constraints: BoxConstraints(
-          minWidth: dimensions.width,
-          maxWidth: dimensions.width,
-        ),
-        child: SizedBox(
-          height: dimensions.height,
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 220),
-            curve: Curves.easeOutCubic,
-            decoration: BoxDecoration(
-              color: editorFillColor,
-              borderRadius: BorderRadius.circular(_editorBorderRadius),
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(_editorBorderRadius),
-              child: Material(
-                color: Colors.transparent,
-                child: Stack(
-                  children: [
-                    Scrollbar(
-                      controller: _contentScrollController,
-                      child: Padding(
-                        padding: contentPadding,
-                        child: TextFormField(
-                          controller: _contentController,
-                          focusNode: _contentFocusNode,
-                          scrollController: _contentScrollController,
-                          readOnly: !isEditing,
-                          showCursor: isEditing,
-                          enableInteractiveSelection: true,
-                          validator: isEditing
-                              ? (value) {
-                                  if (value == null || value.trim().isEmpty) {
-                                    return context.l10n.pleaseEnterNoteContent;
-                                  }
-                                  return null;
-                                }
-                              : null,
-                          keyboardType: TextInputType.multiline,
-                          textCapitalization: TextCapitalization.sentences,
-                          autofocus: isEditing,
-                          maxLines: null,
-                          minLines: null,
-                          expands: true,
-                          textAlignVertical: TextAlignVertical.top,
-                          style: textTheme.body.copyWith(height: 1.69),
-                          decoration: InputDecoration.collapsed(
-                            hintText: context.l10n.noteContentHint,
-                            hintStyle: textTheme.body.copyWith(
-                              color: colorScheme.textFaint,
-                              height: 1.69,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    if (!isEditing && _contentController.text.trim().isNotEmpty)
-                      Positioned(
-                        bottom: 24,
-                        right: 24,
-                        child: InkWell(
-                          onTap: _copyContentToClipboard,
-                          borderRadius: BorderRadius.circular(8),
-                          child: Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: colorScheme.fillBase.withValues(
-                                alpha: 0.2,
-                              ),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Icon(
-                              Icons.copy,
-                              size: 16,
-                              color: colorScheme.textMuted,
-                            ),
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
   @override
-  Widget buildAppBarTitle(BuildContext context) {
-    final textTheme = getEnteTextTheme(context);
-    final isEditing = isInEditMode;
-
-    if (!isEditing && _titleFocusNode.hasFocus) {
-      _titleFocusNode.unfocus();
-    }
-    _titleFocusNode.canRequestFocus = isEditing;
-
-    final colorScheme = getEnteColorScheme(context);
-
-    return TextField(
-      controller: _nameController,
-      focusNode: _titleFocusNode,
-      readOnly: !isEditing,
-      showCursor: isEditing,
-      enableInteractiveSelection: true,
-      style: textTheme.h3Bold,
-      decoration: InputDecoration(
-        border: InputBorder.none,
-        isDense: true,
-        contentPadding: EdgeInsets.zero,
-        hintText: context.l10n.noteNameHint,
-        hintStyle: textTheme.h3Bold.copyWith(color: colorScheme.textFaint),
-      ),
-      textCapitalization: TextCapitalization.sentences,
-      maxLines: 1,
-    );
-  }
+  double get viewModeBottomPadding => 100;
 
   void _syncControllers({
     bool triggerSetState = true,
@@ -356,6 +186,7 @@ class _PersonalNotePageState
       _nameController.text = data?.title ?? '';
       _contentController.text = data?.content ?? '';
       if (updateInitial) {
+        _initialTitle = _nameController.text;
         _initialContent = _contentController.text;
       }
     } finally {
@@ -367,77 +198,21 @@ class _PersonalNotePageState
     }
   }
 
-  _EditorDimensions _calculateEditorDimensions(
-    BuildContext context,
-    BoxConstraints constraints,
-  ) {
-    final screenSize = MediaQuery.of(context).size;
-    final availableWidth = constraints.hasBoundedWidth
-        ? constraints.maxWidth
-        : screenSize.width;
-    final availableHeight = constraints.hasBoundedHeight
-        ? constraints.maxHeight
-        : screenSize.height;
-    final width = availableWidth >= _editorMinWidth
-        ? math.min(availableWidth * _editorWidthFactor, _editorMaxWidth)
-        : availableWidth;
-    final constrainedHeight = math.max(
-      _editorMinHeight,
-      math.min(_editorMaxHeight, availableHeight * 0.65),
-    );
-    final height = math.min(availableHeight, constrainedHeight);
-    return _EditorDimensions(width, height);
-  }
-
-  void _onTitleChanged() {
-    if (_isControllerSyncInProgress) {
-      return;
-    }
-    _notifyFormChanged();
-  }
-
   void _onContentChanged() {
     if (_isControllerSyncInProgress) {
       return;
     }
-    _notifyFormChanged();
+    onFieldChanged();
   }
 
-  void _notifyFormChanged() {
-    if (mounted) {
-      setState(() {});
-    }
-  }
-
-  bool get _hasUnsavedContentChanges {
-    return _contentController.text.trim() != _initialContent.trim();
-  }
-
-  void _onTitleFocusChanged() {
-    if (_isControllerSyncInProgress) {
-      return;
-    }
-    _notifyFormChanged();
-  }
-
-  void _onContentFocusChanged() {
-    if (mounted) {
-      setState(() {});
-    }
-  }
-
-  void _copyContentToClipboard() {
-    final contentText = _contentController.text;
-    if (contentText.trim().isEmpty) {
-      return;
-    }
-    Clipboard.setData(ClipboardData(text: contentText));
-    showToast(context, context.l10n.copiedToClipboard(context.l10n.note));
+  bool get _hasUnsavedChanges {
+    return _contentController.text.trim() != _initialContent.trim() ||
+        _nameController.text.trim() != _initialTitle.trim();
   }
 
   @override
   Future<bool> onEditModeBackPressed() async {
-    if (!_hasUnsavedContentChanges) {
+    if (!_hasUnsavedChanges) {
       return true;
     }
 
@@ -451,28 +226,22 @@ class _PersonalNotePageState
   }
 
   Future<bool> _showDiscardChangesDialog() async {
-    final colorScheme = getEnteColorScheme(context);
-    final result = await showAlertBottomSheet<bool>(
-      context,
-      title: context.l10n.unsavedNoteChangesTitle,
-      message: context.l10n.unsavedNoteChangesDescription,
-      assetPath: 'assets/warning-grey.png',
-      buttons: [
-        GradientButton(
-          text: context.l10n.discardChanges,
-          backgroundColor: colorScheme.warning400,
-          onTap: () => Navigator.of(context).pop(true),
-        ),
-      ],
+    final result = await showBottomSheetComponent<bool>(
+      context: context,
+      builder: (_) => BottomSheetComponent(
+        title: context.strings.unsavedNoteChangesTitle,
+        message: context.strings.unsavedNoteChangesDescription,
+        illustration: LockerBottomSheetIllustration.warningGrey,
+        actions: [
+          ButtonComponent(
+            label: context.strings.discardChanges,
+            variant: ButtonComponentVariant.critical,
+            onTap: () => Navigator.of(context).pop(true),
+          ),
+        ],
+      ),
     );
 
     return result ?? false;
   }
-}
-
-class _EditorDimensions {
-  final double width;
-  final double height;
-
-  const _EditorDimensions(this.width, this.height);
 }

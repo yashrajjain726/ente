@@ -4,13 +4,13 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/ente-io/museum/ente"
-	fileData "github.com/ente-io/museum/ente/filedata"
-	"github.com/ente-io/museum/pkg/controller/filedata"
-	"github.com/ente-io/museum/pkg/controller/public"
-	"github.com/ente-io/museum/pkg/utils/auth"
-	"github.com/ente-io/museum/pkg/utils/handler"
-	"github.com/ente-io/stacktrace"
+	"github.com/ente/museum/ente"
+	fileData "github.com/ente/museum/ente/filedata"
+	"github.com/ente/museum/pkg/controller/filedata"
+	"github.com/ente/museum/pkg/controller/public"
+	"github.com/ente/museum/pkg/utils/auth"
+	"github.com/ente/museum/pkg/utils/handler"
+	"github.com/ente/stacktrace"
 	"github.com/gin-gonic/gin"
 )
 
@@ -56,6 +56,18 @@ func (h *PublicMemoryShareHandler) GetThumbnail(c *gin.Context) {
 // GetFile redirects to the file's full location
 func (h *PublicMemoryShareHandler) GetFile(c *gin.Context) {
 	h.getFileForType(c, ente.FILE)
+}
+
+// GetThumbnailURLV3 returns the thumbnail URL and reserves HTTP 404 for an unavailable endpoint.
+func (h *PublicMemoryShareHandler) GetThumbnailURLV3(c *gin.Context) {
+	url, err := h.getFileURL(c, ente.THUMBNAIL)
+	writeFileURLV3(c, url, err)
+}
+
+// GetFileURLV3 returns the file URL and reserves HTTP 404 for an unavailable endpoint.
+func (h *PublicMemoryShareHandler) GetFileURLV3(c *gin.Context) {
+	url, err := h.getFileURL(c, ente.FILE)
+	writeFileURLV3(c, url, err)
 }
 
 // GetFileData returns HLS playlist data for video streaming
@@ -113,19 +125,25 @@ func (h *PublicMemoryShareHandler) GetPreviewURL(c *gin.Context) {
 }
 
 func (h *PublicMemoryShareHandler) getFileForType(c *gin.Context, objType ente.ObjectType) {
+	url, err := h.getFileURL(c, objType)
+	if err != nil {
+		handler.Error(c, stacktrace.Propagate(err, "failed to get file URL"))
+		return
+	}
+	c.Redirect(http.StatusTemporaryRedirect, url)
+}
+
+func (h *PublicMemoryShareHandler) getFileURL(c *gin.Context, objType ente.ObjectType) (string, error) {
 	fileID, err := strconv.ParseInt(c.Param("fileID"), 10, 64)
 	if err != nil {
-		handler.Error(c, stacktrace.Propagate(ente.ErrBadRequest, "invalid file ID"))
-		return
+		return "", stacktrace.Propagate(ente.ErrBadRequest, "invalid file ID")
 	}
 
 	accessCtx := auth.MustGetMemoryShareAccessContext(c)
 
 	url, err := h.PublicCtrl.GetPublicFileURL(c, accessCtx.ShareID, fileID, objType)
 	if err != nil {
-		handler.Error(c, stacktrace.Propagate(err, "failed to get file URL"))
-		return
+		return "", stacktrace.Propagate(err, "")
 	}
-
-	c.Redirect(http.StatusTemporaryRedirect, url)
+	return url, nil
 }

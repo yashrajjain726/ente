@@ -2,11 +2,11 @@ import "dart:math";
 
 import "package:ente_components/ente_components.dart";
 import 'package:ente_pure_utils/ente_pure_utils.dart';
+import "package:ente_strings/ente_strings.dart";
 import "package:figma_squircle/figma_squircle.dart";
 import 'package:flutter/material.dart';
 import 'package:hugeicons/hugeicons.dart';
 import "package:photos/core/configuration.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/models/api/collection/user.dart";
 import 'package:photos/models/collection/collection.dart';
 import 'package:photos/models/collection/collection_items.dart';
@@ -30,11 +30,13 @@ class AlbumRowItemWidget extends StatelessWidget {
   final void Function(Collection)? onTapCallback;
   final void Function(Collection)? onLongPressCallback;
   final SelectedAlbums? selectedAlbums;
+  final bool? isSelected;
+  final Widget? Function(BuildContext, Collection)? topLeftOverlayBuilder;
+  final double titleToSubtitleSpacing;
   static const _cornerRadius = 20.0;
   static const _cornerSmoothing = 0.6;
   static const _overlayPadding = 8.0;
   static const _thumbnailToTextSpacing = 8.0;
-  static const _titleToSubtitleSpacing = 2.0;
   static const _sharePillPadding = EdgeInsets.all(1);
   static const _sharedAvatarStrokeWidth = 1.0;
 
@@ -48,6 +50,9 @@ class AlbumRowItemWidget extends StatelessWidget {
     this.onTapCallback,
     this.onLongPressCallback,
     this.selectedAlbums,
+    this.isSelected,
+    this.topLeftOverlayBuilder,
+    this.titleToSubtitleSpacing = 2,
   });
 
   @override
@@ -59,7 +64,10 @@ class AlbumRowItemWidget extends StatelessWidget {
         "_" +
         c.id.toString();
     final componentColors = context.componentColors;
-    final bool shouldShowSharePill = isOwner && (c.hasSharees || c.hasLink);
+    final externalSelection = isSelected;
+    final bool shouldShowSharePill =
+        topLeftOverlayBuilder == null && isOwner && (c.hasSharees || c.hasLink);
+    final topLeftOverlay = topLeftOverlayBuilder?.call(context, c);
     final Widget? linkIcon = c.hasLink && isOwner
         ? HugeIcon(
             icon: HugeIcons.strokeRoundedLink02,
@@ -71,7 +79,7 @@ class AlbumRowItemWidget extends StatelessWidget {
           )
         : null;
 
-    return GestureDetector(
+    final row = GestureDetector(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
@@ -105,8 +113,10 @@ class AlbumRowItemWidget extends StatelessWidget {
                                   .getCoverCache(c);
                             }
                             if (thumbnail != null) {
-                              final bool isSelected =
-                                  selectedAlbums?.isAlbumSelected(c) ?? false;
+                              final bool isAlbumSelected =
+                                  externalSelection ??
+                                  selectedAlbums?.isAlbumSelected(c) ??
+                                  false;
                               final String heroTag = tagPrefix + thumbnail.tag;
                               final thumbnailWidget = ThumbnailWidget(
                                 thumbnail,
@@ -134,7 +144,7 @@ class AlbumRowItemWidget extends StatelessWidget {
                                     fit: StackFit.expand,
                                     children: [
                                       thumbnailWidget,
-                                      if (isSelected)
+                                      if (isAlbumSelected)
                                         Container(
                                           decoration: BoxDecoration(
                                             color: componentColors.specialScrim
@@ -156,7 +166,13 @@ class AlbumRowItemWidget extends StatelessWidget {
                             }
                           },
                         ),
-                        if (shouldShowSharePill)
+                        if (topLeftOverlay != null)
+                          Positioned(
+                            top: _overlayPadding,
+                            left: _overlayPadding,
+                            child: topLeftOverlay,
+                          )
+                        else if (shouldShowSharePill)
                           Positioned(
                             top: _overlayPadding,
                             left: _overlayPadding,
@@ -182,29 +198,22 @@ class AlbumRowItemWidget extends StatelessWidget {
                         Positioned(
                           top: _overlayPadding,
                           right: _overlayPadding,
-                          child: selectedAlbums == null
-                              ? const SizedBox.shrink()
-                              : Hero(
+                          child: externalSelection != null
+                              ? _selectionBadge(externalSelection)
+                              : selectedAlbums != null
+                              ? Hero(
                                   tag: tagPrefix + "_album_selection",
                                   transitionOnUserGestures: true,
                                   child: ListenableBuilder(
                                     listenable: selectedAlbums!,
                                     builder: (context, _) {
-                                      final bool isSelected = selectedAlbums!
+                                      final isAlbumSelected = selectedAlbums!
                                           .isAlbumSelected(c);
-                                      return AnimatedSwitcher(
-                                        duration: const Duration(
-                                          milliseconds: 200,
-                                        ),
-                                        switchInCurve: Curves.easeOut,
-                                        switchOutCurve: Curves.easeIn,
-                                        child: isSelected
-                                            ? const CollectionSelectedBadge()
-                                            : null,
-                                      );
+                                      return _selectionBadge(isAlbumSelected);
                                     },
                                   ),
-                                ),
+                                )
+                              : const SizedBox.shrink(),
                         ),
                         if (!isOwner)
                           Positioned(
@@ -277,9 +286,9 @@ class AlbumRowItemWidget extends StatelessWidget {
                               .getCachedFileCount(c);
                         }
                         if (cachedCount != null && cachedCount > 0) {
-                          final String textCount = AppLocalizations.of(
-                            context,
-                          ).itemCount(count: cachedCount);
+                          final String textCount = context.strings.itemCount(
+                            count: cachedCount,
+                          );
                           return Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
@@ -292,7 +301,7 @@ class AlbumRowItemWidget extends StatelessWidget {
                                 softWrap: false,
                                 overflow: TextOverflow.ellipsis,
                               ),
-                              const SizedBox(height: _titleToSubtitleSpacing),
+                              SizedBox(height: titleToSubtitleSpacing),
                               Text(
                                 textCount,
                                 style: TextStyles.mini.copyWith(
@@ -336,6 +345,7 @@ class AlbumRowItemWidget extends StatelessWidget {
           return;
         }
         final thumbnail = await CollectionsService.instance.getCover(c);
+        if (!context.mounted) return;
         // ignore: unawaited_futures
         routeToPage(
           context,
@@ -352,6 +362,18 @@ class AlbumRowItemWidget extends StatelessWidget {
         }
       },
     );
+    return externalSelection == null
+        ? row
+        : Semantics(button: true, selected: externalSelection, child: row);
+  }
+
+  Widget _selectionBadge(bool isSelected) {
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 200),
+      switchInCurve: Curves.easeOut,
+      switchOutCurve: Curves.easeIn,
+      child: isSelected ? const CollectionSelectedBadge() : null,
+    );
   }
 
   Widget _buildAlbumStatusChips({required bool isOwner}) {
@@ -361,7 +383,7 @@ class AlbumRowItemWidget extends StatelessWidget {
 
     final chips = <Widget>[
       if (isFavoriteAlbum) const CollectionFavoriteBadge(),
-      if (showPin) const CollectionPinnedBadge(),
+      if (showPin) const PinnedBadge(),
       if (showArchive) const CollectionArchivedBadge(),
     ];
 

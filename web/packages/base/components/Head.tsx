@@ -4,6 +4,8 @@ import { isCustomAPIOrigin } from "../origins";
 
 interface CustomHeadProps {
     title: string;
+    description?: string;
+    viewportContent?: string;
 }
 
 const AlbumsFontPreloads: React.FC = () => (
@@ -18,75 +20,80 @@ const AlbumsFontPreloads: React.FC = () => (
     </>
 );
 
-/**
- * A custom version of "next/head" that sets the title, description, favicon and
- * some other boilerplate <head> tags.
- *
- * This assumes the existence of `public/images/favicon.png`.
- */
+const albumsPreviewTitle = "Photos, shared with you";
+const albumsPreviewDescription = "Tap to view on Ente";
+const albumsPreviewImage = "https://albums.ente.com/images/preview.png";
+const photosPreviewDescription =
+    "Store and share your photos with absolute privacy.";
+const photosPreviewImage = "https://photos.ente.com/images/preview.png";
+
 export const CustomHead: React.FC<React.PropsWithChildren<CustomHeadProps>> = ({
     title,
     children,
+    description = "Ente - end-to-end encrypted cloud with open-source apps",
+    viewportContent = "width=device-width, initial-scale=1",
 }) => (
     <Head>
         {children}
         <title>{title}</title>
         <link rel="icon" href="/images/favicon.png" type="image/png" />
-        <meta
-            name="description"
-            content="Ente - end-to-end encrypted cloud with open-source apps"
-        />
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta name="description" content={description} />
+        <meta name="viewport" content={viewportContent} />
         <meta name="referrer" content="strict-origin-when-cross-origin" />
     </Head>
 );
 
-/**
- * A static SSR-ed variant of {@link CustomHead} for use with the albums app
- * deployed on production Ente instances for link previews.
- *
- * In particular,
- *
- * - Any client side modifications to the document's head will be too late for
- *   use by the link previews, so the contents of this need to part of the
- *   static HTML.
- *
- * - "og:image" needs to be an absolute URL.
- *
- * To avoid getting in the way of self hosters, only inline this into builds
- * that use Ente's production API.
- */
+export const CustomHeadPhotosStatic: React.FC<CustomHeadProps> = ({
+    title,
+}) => (
+    <CustomHead title={title} description={photosPreviewDescription}>
+        <meta property="og:type" content="website" />
+        <meta property="og:title" content={title} />
+        <meta property="og:description" content={photosPreviewDescription} />
+        <meta property="og:image" content={photosPreviewImage} />
+        <meta property="og:image:type" content="image/png" />
+        <meta property="og:image:width" content="1200" />
+        <meta property="og:image:height" content="630" />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content={title} />
+        <meta name="twitter:description" content={photosPreviewDescription} />
+        <meta name="twitter:image" content={photosPreviewImage} />
+    </CustomHead>
+);
+
+export const CustomHeadPhotos: React.FC<CustomHeadProps> = ({ title }) =>
+    isCustomAPIOrigin ? (
+        <CustomHead {...{ title }} />
+    ) : (
+        <CustomHeadPhotosStatic {...{ title }} />
+    );
+
+// Link preview crawlers only see static HTML, and og:image must be absolute.
 export const CustomHeadAlbumsStatic: React.FC = () => (
     <Head>
         <AlbumsFontPreloads />
         <title>Ente Photos</title>
         <link rel="icon" href="/images/favicon.png" type="image/png" />
-        <meta
-            name="description"
-            content="Safely store and share your best moments"
-        />
-        <meta
-            property="og:image"
-            content="https://albums.ente.com/images/preview.jpg"
-        />
-        {/* Twitter wants its own thing. */}
-        <meta
-            name="twitter:image"
-            content="https://albums.ente.com/images/preview.jpg"
-        />
+        <meta name="description" content={albumsPreviewDescription} />
+        <meta property="og:type" content="website" />
+        <meta property="og:title" content={albumsPreviewTitle} />
+        <meta property="og:description" content={albumsPreviewDescription} />
+        <meta property="og:image" content={albumsPreviewImage} />
+        <meta property="og:image:type" content="image/png" />
+        <meta property="og:image:width" content="1200" />
+        <meta property="og:image:height" content="630" />
+        <meta property="og:image:alt" content="Take a look!" />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content={albumsPreviewTitle} />
+        <meta name="twitter:description" content={albumsPreviewDescription} />
+        <meta name="twitter:image" content={albumsPreviewImage} />
+        <meta name="twitter:image:alt" content="Take a look!" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta name="referrer" content="strict-origin-when-cross-origin" />
     </Head>
 );
 
-/**
- * A convenience fan out to conditionally show one of {@link CustomHead} or
- * {@link CustomHeadAlbumsStatic}.
- *
- * Use static production preview tags only when using Ente's production API.
- * Custom API builds should not inline production preview metadata into the
- * static HTML.
- */
+// Custom API builds must not embed Ente production preview metadata.
 export const CustomHeadAlbums: React.FC<CustomHeadProps> = ({ title }) =>
     isCustomAPIOrigin ? (
         <CustomHead {...{ title }}>
@@ -96,13 +103,6 @@ export const CustomHeadAlbums: React.FC<CustomHeadProps> = ({ title }) =>
         <CustomHeadAlbumsStatic />
     );
 
-/**
- * A static SSR-ed variant of {@link CustomHead} for use with the share app
- * (Public Locker) deployed on production Ente instances for link previews.
- *
- * Similar to {@link CustomHeadAlbumsStatic}, this includes Open Graph meta tags
- * with absolute URLs for social media preview images.
- */
 export const CustomHeadShareStatic: React.FC = () => (
     <Head>
         <title>Ente Locker</title>
@@ -124,14 +124,6 @@ export const CustomHeadShareStatic: React.FC = () => (
     </Head>
 );
 
-/**
- * A convenience fan out to conditionally show one of {@link CustomHead} or
- * {@link CustomHeadShareStatic}.
- *
- * Use static production preview tags only when using Ente's production API.
- * Custom API builds should not inline production preview metadata into the
- * static HTML.
- */
 export const CustomHeadShare: React.FC<CustomHeadProps> = ({ title }) =>
     isCustomAPIOrigin ? (
         <CustomHead {...{ title }} />

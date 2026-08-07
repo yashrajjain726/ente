@@ -4,9 +4,11 @@ import "dart:io";
 import "package:dio/dio.dart";
 import "package:logging/logging.dart";
 import "package:photos/core/configuration.dart";
+import "package:photos/core/network/network.dart";
 
 import "package:photos/module/download/file_url.dart";
 import "package:photos/module/download/task.dart";
+import "package:photos/utils/device_storage_error.dart";
 
 class DownloadManager {
   final _logger = Logger('DownloadManager');
@@ -217,7 +219,7 @@ class DownloadManager {
           _logger.info('Download cancelled for ${task.filename}');
           break;
         }
-        downloadUrl ??= await _resolveDownloadRedirect(task.id, cancelToken);
+        downloadUrl ??= await _resolveDownloadUrl(task.id, cancelToken);
         await _downloadChunk(
           task,
           basePath,
@@ -251,10 +253,10 @@ class DownloadManager {
       }
       _logger.warning('Error downloading ${task.filename}', e);
       final isNetworkError = _isNetworkError(e);
-      final isStorageError = _isStorageError(e);
+      final isDeviceStorageFull = isDeviceStorageFullError(e);
       final String errorCode = _getErrorCode(e);
       task = task.copyWith(
-        status: isNetworkError || isStorageError
+        status: isNetworkError || isDeviceStorageFull
             ? DownloadStatus.paused
             : DownloadStatus.error,
         error: errorCode,
@@ -360,12 +362,23 @@ class DownloadManager {
     _updateTask(task);
   }
 
-  Future<String> _resolveDownloadRedirect(
+  Future<String> _resolveDownloadUrl(
     int fileID,
     CancelToken cancelToken,
   ) async {
+    final signedUrl = await FileUrl.tryGetV3Url(
+      NetworkClient.instance.enteDio,
+      fileID,
+      FileUrlType.directDownload,
+      headers: {"X-Auth-Token": Configuration.instance.getToken()},
+      cancelToken: cancelToken,
+    );
+    if (signedUrl != null) {
+      return signedUrl;
+    }
+
     final response = await _dio.get<void>(
-      FileUrl.getUrl(fileID, FileUrlType.directDownload),
+      FileUrl.getLegacyUrl(fileID, FileUrlType.directDownload),
       options: Options(
         followRedirects: false,
         receiveDataWhenStatusError: false,
@@ -482,19 +495,8 @@ class DownloadManager {
     return false;
   }
 
-  bool _isStorageError(Object error) {
-    if (error is FileSystemException) {
-      final code = error.osError?.errorCode;
-      return code == 28 || code == 112;
-    }
-    if (error is DioException && error.error != null) {
-      return _isStorageError(error.error!);
-    }
-    return false;
-  }
-
   String _getErrorCode(Object error) {
-    if (_isStorageError(error)) {
+    if (isDeviceStorageFullError(error)) {
       return notEnoughStorageError;
     }
     if (_isNetworkError(error)) {

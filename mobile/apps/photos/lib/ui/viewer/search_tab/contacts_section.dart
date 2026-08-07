@@ -2,10 +2,10 @@ import "dart:async";
 
 import "package:ente_components/ente_components.dart";
 import "package:ente_pure_utils/ente_pure_utils.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:flutter_svg/flutter_svg.dart";
 import "package:photos/events/event.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/models/search/generic_search_result.dart";
 import "package:photos/models/search/recent_searches.dart";
 import "package:photos/models/search/search_constants.dart";
@@ -101,13 +101,16 @@ class _ContactsSectionState extends State<ContactsSection> {
       streamSubscriptions.add(
         stream.listen((event) async {
           _debouncer.run(() async {
-            _contactSearchResults =
+            final contactSearchResults =
                 (await SectionType.contacts.getData(
                       context,
                       limit: widget.resultLimit + 1,
                     ))
                     as List<GenericSearchResult>;
-            setState(() {});
+            if (!mounted) return;
+            setState(() {
+              _contactSearchResults = contactSearchResults;
+            });
           });
         }),
       );
@@ -147,7 +150,7 @@ class _ContactsSectionState extends State<ContactsSection> {
                 children: [
                   Text(
                     SectionType.contacts.sectionTitle(context),
-                    style: TextStyles.h2.copyWith(color: colors.textBase),
+                    style: TextStyles.display3.copyWith(color: colors.textBase),
                   ),
                   const SizedBox(height: 16),
                   Text(
@@ -197,68 +200,49 @@ class _ContactsSectionState extends State<ContactsSection> {
   }
 }
 
-class ContactRecommendation extends StatefulWidget {
+class ContactRecommendation extends StatelessWidget {
   static const _avatarSize = 62.0;
-  static const _minHeight = 92.0;
 
   final GenericSearchResult contactSearchResult;
   const ContactRecommendation(this.contactSearchResult, {super.key});
 
   @override
-  State<ContactRecommendation> createState() => _ContactRecommendationState();
-}
-
-class _ContactRecommendationState extends State<ContactRecommendation> {
-  @override
   Widget build(BuildContext context) {
     final colors = context.componentColors;
-    final personId =
-        widget.contactSearchResult.params[kPersonParamID] as String?;
-    final contactUserId =
-        widget.contactSearchResult.params[kContactUserId] as int?;
-    final contactEmail =
-        widget.contactSearchResult.params[kContactEmail] as String;
+    final personId = contactSearchResult.params[kPersonParamID] as String?;
+    final contactUserId = contactSearchResult.params[kContactUserId] as int;
+    final contactEmail = contactSearchResult.params[kContactEmail] as String;
+    final displayName = contactSearchResult.hierarchicalSearchFilter.name();
     return GestureDetector(
       onTap: () {
-        RecentSearches().add(widget.contactSearchResult.name());
-        if (widget.contactSearchResult.onResultTap != null) {
-          widget.contactSearchResult.onResultTap!(context);
+        RecentSearches().add(displayName);
+        if (contactSearchResult.onResultTap != null) {
+          contactSearchResult.onResultTap!(context);
         } else {
-          routeToPage(context, ContactResultPage(widget.contactSearchResult));
+          routeToPage(context, ContactResultPage(contactSearchResult));
         }
       },
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(
-          minHeight: ContactRecommendation._minHeight,
-        ),
-        child: SizedBox(
-          width: 92,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              ClipOval(
-                child: SizedBox(
-                  width: ContactRecommendation._avatarSize,
-                  height: ContactRecommendation._avatarSize,
-                  child: ContactAvatarWidget(
-                    contactUserId: contactUserId,
-                    email: contactEmail,
-                    personId: personId,
-                    size: ContactRecommendation._avatarSize,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 10),
-              Text(
-                widget.contactSearchResult.name(),
-                style: TextStyles.mini.copyWith(color: colors.textBase),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
-              ),
-            ],
-          ),
+      child: SizedBox(
+        width: 92,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            ContactAvatarWidget(
+              contactUserId: contactUserId,
+              email: contactEmail,
+              personId: personId,
+              size: ContactRecommendation._avatarSize,
+            ),
+            const SizedBox(height: 10),
+            Text(
+              displayName,
+              style: TextStyles.mini.copyWith(color: colors.textBase),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+            ),
+          ],
         ),
       ),
     );
@@ -295,7 +279,7 @@ class ContactCTA extends StatelessWidget {
             ),
             const SizedBox(height: 10),
             Text(
-              AppLocalizations.of(context).invite,
+              context.strings.invite,
               style: TextStyles.mini.copyWith(color: colorScheme.textMuted),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,

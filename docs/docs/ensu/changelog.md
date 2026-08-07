@@ -7,6 +7,18 @@ description: Release notes of recent updates to Ensu
 
 A short summary list of changes to the Ensu mobile and desktop apps. For a more descriptive list with screenshots and blog post links, see the [news](https://ente.com/news).
 
+## v0.1.19 - Aug 2026
+
+- Fixed an issue that prevented Gemma models from downloading.
+
+## v0.1.18 - Aug 2026
+
+- Ensu Packs on Mobile - Add on knowledge packs for more accurate answers
+- Under the hood improvements for better download management
+- Chat responses are now GPU-accelerated on Linux via Vulkan. Thanks @bjorn!
+- Fixed the desktop icon on Fedora. Thanks @fosszil!
+- Faster replies in ongoing chats with a best-effort KV cache.
+
 ## v0.1.17 - Jun 2026
 
 - Fixed the desktop app version shown in settings.

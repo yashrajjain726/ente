@@ -2,6 +2,7 @@ import 'dart:async';
 
 import "package:ente_components/ente_components.dart";
 import "package:ente_pure_utils/ente_pure_utils.dart";
+import "package:ente_strings/ente_strings.dart";
 import 'package:flutter/material.dart';
 import "package:hugeicons/hugeicons.dart";
 import 'package:logging/logging.dart';
@@ -9,8 +10,6 @@ import 'package:photos/core/configuration.dart';
 import 'package:photos/core/event_bus.dart';
 import "package:photos/events/people_changed_event.dart";
 import 'package:photos/events/subscription_purchased_event.dart';
-import "package:photos/generated/l10n.dart";
-import "package:photos/l10n/l10n.dart";
 import 'package:photos/models/gallery_type.dart';
 import "package:photos/models/ml/face/person.dart";
 import 'package:photos/models/selected_files.dart';
@@ -26,9 +25,10 @@ import "package:photos/ui/viewer/gallery/hooks/pick_person_avatar.dart";
 import "package:photos/ui/viewer/gallery/state/inherited_search_filter_data.dart";
 import "package:photos/ui/viewer/hierarchicial_search/app_bar_filter_chips.dart";
 import "package:photos/ui/viewer/people/person_cluster_suggestion.dart";
-import "package:photos/ui/viewer/people/person_selection_action_widgets.dart";
+import "package:photos/ui/viewer/people/reassign_me_selection_page.dart";
 import "package:photos/ui/viewer/people/save_or_edit_person.dart";
 import "package:photos/utils/dialog_util.dart";
+import "package:photos/utils/person_contact_linking_util.dart";
 
 const kShowUnnamedIgnoredPersonEventSource =
     "_AppBarWidgetState._showPersonUnnamedDelete";
@@ -125,11 +125,14 @@ class _AppBarWidgetState extends State<PeopleAppBar> {
     required PersonEntity sourcePerson,
     required String? title,
   }) {
-    if (sourcePerson.data.email == Configuration.instance.getEmail()) {
+    if (isCurrentUserContactLink(
+      email: sourcePerson.data.email,
+      userID: sourcePerson.data.userID,
+    )) {
       if (title == null) {
-        return context.l10n.me;
+        return context.strings.me;
       }
-      return context.l10n.accountOwnerPersonAppbarTitle(title: title);
+      return context.strings.accountOwnerPersonAppbarTitle(title: title);
     }
     return title;
   }
@@ -164,8 +167,7 @@ class _AppBarWidgetState extends State<PeopleAppBar> {
               if (event.person != null &&
                   event.type == PeopleEventType.saveOrEditPerson &&
                   widget.person.remoteID == event.person!.remoteID &&
-                  (event.source == "linkEmailToPerson" ||
-                      event.source == "reassignMe")) {
+                  event.source == "reassignMe") {
                 person = event.person!;
 
                 _appBarTitle = _resolveAppBarTitle(
@@ -185,7 +187,8 @@ class _AppBarWidgetState extends State<PeopleAppBar> {
     if (oldWidget.title != widget.title ||
         oldWidget.person.remoteID != widget.person.remoteID ||
         oldWidget.person.data.name != widget.person.data.name ||
-        oldWidget.person.data.email != widget.person.data.email) {
+        oldWidget.person.data.email != widget.person.data.email ||
+        oldWidget.person.data.userID != widget.person.data.userID) {
       person = widget.person;
       _appBarTitle = _resolveAppBarTitle(
         sourcePerson: person,
@@ -250,14 +253,14 @@ class _AppBarWidgetState extends State<PeopleAppBar> {
   }
 
   Future<dynamic> _editPerson(BuildContext context) async {
+    final clusterID = person.data.assigned.isEmpty
+        ? null
+        : person.data.assigned.first.id;
     final result = await routeToPage(
       context,
-      SaveOrEditPerson(
-        person.data.assigned.first.id,
-        person: person,
-        isEditing: true,
-      ),
+      SaveOrEditPerson(clusterID, person: person, isEditing: true),
     );
+    if (!mounted) return;
     if (result is PersonEntity) {
       _appBarTitle = result.data.name;
       person = result;
@@ -270,6 +273,7 @@ class _AppBarWidgetState extends State<PeopleAppBar> {
     final bool isIgnored = person.data.isIgnored;
     final bool isPinned = person.data.isPinned;
     final bool hideFromMemories = person.data.hideFromMemories;
+    final bool hasAssignedCluster = person.data.assigned.isNotEmpty;
     final List<Widget> actions = <Widget>[];
     // If the user has selected files, don't show any actions
     if (widget.selectedFiles.files.isNotEmpty ||
@@ -284,7 +288,7 @@ class _AppBarWidgetState extends State<PeopleAppBar> {
       items.add(
         EntePopupMenuOption(
           value: PeoplePopupAction.memoryLane,
-          label: context.l10n.facesTimelineAppBarTitle,
+          label: context.strings.facesTimelineAppBarTitle,
           leadingWidget: galleryAppBarMenuIcon(
             HugeIcons.strokeRoundedSparkles,
             iconColor,
@@ -297,31 +301,35 @@ class _AppBarWidgetState extends State<PeopleAppBar> {
       items.addAll([
         EntePopupMenuOption(
           value: PeoplePopupAction.rename,
-          label: AppLocalizations.of(context).edit,
+          label: context.strings.edit,
           leadingWidget: galleryAppBarMenuIcon(
             HugeIcons.strokeRoundedPencilEdit01,
             iconColor,
           ),
         ),
-        EntePopupMenuOption(
-          value: PeoplePopupAction.reviewSuggestions,
-          label: AppLocalizations.of(context).review,
-          leadingWidget: galleryAppBarMenuIcon(
-            HugeIcons.strokeRoundedSearch01,
-            iconColor,
+        if (hasAssignedCluster)
+          EntePopupMenuOption(
+            value: PeoplePopupAction.reviewSuggestions,
+            label: context.strings.review,
+            leadingWidget: galleryAppBarMenuIcon(
+              HugeIcons.strokeRoundedSearch01,
+              iconColor,
+            ),
           ),
-        ),
-        EntePopupMenuOption(
-          value: PeoplePopupAction.setCover,
-          label: AppLocalizations.of(context).setCover,
-          leadingWidget: galleryAppBarMenuIcon(
-            HugeIcons.strokeRoundedImage01,
-            iconColor,
+        if (hasAssignedCluster)
+          EntePopupMenuOption(
+            value: PeoplePopupAction.setCover,
+            label: context.strings.setCover,
+            leadingWidget: galleryAppBarMenuIcon(
+              HugeIcons.strokeRoundedImage01,
+              iconColor,
+            ),
           ),
-        ),
         EntePopupMenuOption(
           value: PeoplePopupAction.pinPerson,
-          label: isPinned ? context.l10n.unpinPerson : context.l10n.pinPerson,
+          label: isPinned
+              ? context.strings.unpinPerson
+              : context.strings.pinPerson,
           leadingWidget: galleryAppBarMenuIcon(
             isPinned
                 ? HugeIcons.strokeRoundedPinOff
@@ -332,8 +340,8 @@ class _AppBarWidgetState extends State<PeopleAppBar> {
         EntePopupMenuOption(
           value: PeoplePopupAction.hideFromMemories,
           label: hideFromMemories
-              ? context.l10n.showInMemories
-              : context.l10n.hideFromMemories,
+              ? context.strings.showInMemories
+              : context.strings.hideFromMemories,
           leadingWidget: galleryAppBarMenuIcon(
             hideFromMemories
                 ? HugeIcons.strokeRoundedView
@@ -341,11 +349,13 @@ class _AppBarWidgetState extends State<PeopleAppBar> {
             iconColor,
           ),
         ),
-        if (person.data.email != null &&
-            (person.data.email == Configuration.instance.getEmail()))
+        if (isCurrentUserContactLink(
+          email: person.data.email,
+          userID: person.data.userID,
+        ))
           EntePopupMenuOption(
             value: PeoplePopupAction.reassignMe,
-            label: context.l10n.reassignMe,
+            label: context.strings.reassignMe,
             leadingWidget: galleryAppBarMenuIcon(
               HugeIcons.strokeRoundedUser,
               iconColor,
@@ -353,7 +363,7 @@ class _AppBarWidgetState extends State<PeopleAppBar> {
           ),
         EntePopupMenuOption(
           value: PeoplePopupAction.ignore,
-          label: AppLocalizations.of(context).ignore,
+          label: context.strings.ignore,
           leadingWidget: galleryAppBarMenuIcon(
             HugeIcons.strokeRoundedUserBlock01,
             iconColor,
@@ -361,7 +371,7 @@ class _AppBarWidgetState extends State<PeopleAppBar> {
         ),
         EntePopupMenuOption(
           value: PeoplePopupAction.removeLabel,
-          label: AppLocalizations.of(context).remove,
+          label: context.strings.remove,
           leadingWidget: galleryAppBarMenuIcon(
             HugeIcons.strokeRoundedDelete01,
             iconColor,
@@ -372,23 +382,24 @@ class _AppBarWidgetState extends State<PeopleAppBar> {
       items.addAll([
         EntePopupMenuOption(
           value: PeoplePopupAction.rename,
-          label: AppLocalizations.of(context).edit,
+          label: context.strings.edit,
           leadingWidget: galleryAppBarMenuIcon(
             HugeIcons.strokeRoundedPencilEdit01,
             iconColor,
           ),
         ),
-        EntePopupMenuOption(
-          value: PeoplePopupAction.reviewSuggestions,
-          label: AppLocalizations.of(context).review,
-          leadingWidget: galleryAppBarMenuIcon(
-            HugeIcons.strokeRoundedSearch01,
-            iconColor,
+        if (hasAssignedCluster)
+          EntePopupMenuOption(
+            value: PeoplePopupAction.reviewSuggestions,
+            label: context.strings.review,
+            leadingWidget: galleryAppBarMenuIcon(
+              HugeIcons.strokeRoundedSearch01,
+              iconColor,
+            ),
           ),
-        ),
         EntePopupMenuOption(
           value: PeoplePopupAction.unignore,
-          label: AppLocalizations.of(context).showPerson,
+          label: context.strings.showPerson,
           leadingWidget: galleryAppBarMenuIcon(
             HugeIcons.strokeRoundedView,
             iconColor,
@@ -399,7 +410,7 @@ class _AppBarWidgetState extends State<PeopleAppBar> {
 
     actions.add(
       galleryAppBarPopupMenuAction<PeoplePopupAction>(
-        tooltip: AppLocalizations.of(context).more,
+        tooltip: context.strings.more,
         icon: const HugeIcon(icon: HugeIcons.strokeRoundedMoreVertical),
         optionsBuilder: () => items,
         onSelected: (PeoplePopupAction value) async {
@@ -469,9 +480,11 @@ class _AppBarWidgetState extends State<PeopleAppBar> {
         person.remoteID,
         hideFromMemories: shouldHideFromMemories,
       );
-      setState(() {
-        person = updatedPerson;
-      });
+      if (mounted) {
+        setState(() {
+          person = updatedPerson;
+        });
+      }
       Bus.instance.fire(
         PeopleChangedEvent(
           type: PeopleEventType.saveOrEditPerson,
@@ -487,12 +500,13 @@ class _AppBarWidgetState extends State<PeopleAppBar> {
   Future<void> _resetPerson(BuildContext context) async {
     await showChoiceDialog(
       context,
-      title: AppLocalizations.of(context).areYouSureYouWantToResetThisPerson,
-      body: AppLocalizations.of(context).allPersonGroupingWillReset,
-      firstButtonLabel: AppLocalizations.of(context).yesResetPerson,
+      title: context.strings.areYouSureYouWantToResetThisPerson,
+      body: context.strings.allPersonGroupingWillReset,
+      firstButtonLabel: context.strings.yesResetPerson,
       firstButtonOnTap: () async {
         try {
           await PersonService.instance.deletePerson(person.remoteID);
+          if (!context.mounted) return;
           Navigator.of(context).pop();
         } catch (e, s) {
           _logger.severe('Resetting person failed', e, s);
@@ -511,9 +525,9 @@ class _AppBarWidgetState extends State<PeopleAppBar> {
   Future<void> _ignorePerson(BuildContext context) async {
     final result = await showChoiceDialog(
       context,
-      title: AppLocalizations.of(context).areYouSureYouWantToIgnoreThisPerson,
-      body: AppLocalizations.of(context).thePersonWillNotBeDisplayed,
-      firstButtonLabel: AppLocalizations.of(context).yesIgnore,
+      title: context.strings.areYouSureYouWantToIgnoreThisPerson,
+      body: context.strings.thePersonWillNotBeDisplayed,
+      firstButtonLabel: context.strings.yesIgnore,
       firstButtonOnTap: () async {
         try {
           final updatedPerson = await PersonService.instance.updateAttributes(
@@ -539,10 +553,8 @@ class _AppBarWidgetState extends State<PeopleAppBar> {
     if (!mounted || result?.action != ButtonAction.error) {
       return;
     }
-    showShortToast(
-      context,
-      AppLocalizations.of(context).somethingWentWrongPleaseTryAgain,
-    );
+    if (!context.mounted) return;
+    showShortToast(context, context.strings.somethingWentWrongPleaseTryAgain);
   }
 
   Future<void> _showPerson(BuildContext context) async {
@@ -550,10 +562,9 @@ class _AppBarWidgetState extends State<PeopleAppBar> {
     var shouldCloseDetailPage = false;
     final result = await showChoiceDialog(
       context,
-      title: AppLocalizations.of(
-        context,
-      ).areYouSureYouWantToShowThisPersonInPeopleSectionAgain,
-      firstButtonLabel: AppLocalizations.of(context).yesShowPerson,
+      title:
+          context.strings.areYouSureYouWantToShowThisPersonInPeopleSectionAgain,
+      firstButtonLabel: context.strings.yesShowPerson,
       isDismissible: false,
       firstButtonOnTap: () async {
         try {
@@ -596,6 +607,7 @@ class _AppBarWidgetState extends State<PeopleAppBar> {
         !shouldCloseDetailPage) {
       return;
     }
+    if (!context.mounted) return;
     await Navigator.of(context).maybePop();
   }
 
@@ -603,9 +615,6 @@ class _AppBarWidgetState extends State<PeopleAppBar> {
     final result = await showPersonAvatarPhotoSheet(context, person);
     if (result != null) {
       _logger.info('Person avatar updated');
-      setState(() {
-        person = result;
-      });
       Bus.instance.fire(
         PeopleChangedEvent(
           type: PeopleEventType.saveOrEditPerson,
@@ -613,6 +622,10 @@ class _AppBarWidgetState extends State<PeopleAppBar> {
           person: result,
         ),
       );
+      if (!mounted) return;
+      setState(() {
+        person = result;
+      });
     }
   }
 

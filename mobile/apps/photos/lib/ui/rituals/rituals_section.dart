@@ -1,7 +1,7 @@
 import "package:ente_pure_utils/ente_pure_utils.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:hugeicons/hugeicons.dart";
-import "package:photos/l10n/l10n.dart";
 import "package:photos/models/rituals/ritual_models.dart";
 import "package:photos/service_locator.dart";
 import "package:photos/theme/ente_theme.dart";
@@ -36,7 +36,7 @@ class RitualsSection extends StatelessWidget {
             Row(
               children: [
                 Text(
-                  context.l10n.ritualsTitle,
+                  context.strings.ritualsTitle,
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
                 const Spacer(),
@@ -133,11 +133,11 @@ class _CreateRitualCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        context.l10n.ritualCreateYourOwn,
+                        context.strings.ritualCreateYourOwn,
                         style: textTheme.body,
                       ),
                       Text(
-                        context.l10n.ritualGetDailyReminders,
+                        context.strings.ritualGetDailyReminders,
                         style: textTheme.smallMuted,
                       ),
                     ],
@@ -227,14 +227,14 @@ class _RitualCard extends StatelessWidget {
                       children: [
                         Text(
                           ritual.title.isEmpty
-                              ? context.l10n.ritualUntitled
+                              ? context.strings.ritualUntitled
                               : ritual.title,
                           style: textTheme.body,
                           textHeightBehavior: _tightTextHeightBehavior,
                         ),
                         ritual.albumName == null || ritual.albumName!.isEmpty
                             ? Text(
-                                context.l10n.ritualAlbumNotSet,
+                                context.strings.ritualAlbumNotSet,
                                 style: textTheme.smallMuted,
                                 textHeightBehavior: _tightTextHeightBehavior,
                               )
@@ -262,7 +262,7 @@ class _RitualCard extends StatelessWidget {
                       minimumSize: const Size(40, 40),
                     ),
                     onPressed: () => openRitualCamera(context, ritual),
-                    tooltip: context.l10n.ritualOpenCameraTooltip,
+                    tooltip: context.strings.ritualOpenCameraTooltip,
                   ),
                   PopupMenuButton<String>(
                     padding: EdgeInsets.zero,
@@ -313,7 +313,7 @@ class _RitualCard extends StatelessWidget {
                                   ),
                                   const SizedBox(width: 10),
                                   Text(
-                                    context.l10n.edit,
+                                    context.strings.edit,
                                     style: getEnteTextTheme(context).body,
                                   ),
                                 ],
@@ -343,7 +343,7 @@ class _RitualCard extends StatelessWidget {
                               ),
                               const SizedBox(width: 10),
                               Text(
-                                context.l10n.delete,
+                                context.strings.delete,
                                 style: getEnteTextTheme(
                                   context,
                                 ).body.copyWith(color: Colors.red),

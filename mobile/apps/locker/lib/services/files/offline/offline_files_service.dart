@@ -1,9 +1,9 @@
 import 'package:ente_events/event_bus.dart';
+import 'package:ente_strings/ente_strings.dart';
 import 'package:ente_ui/utils/dialog_util.dart';
 import 'package:ente_ui/utils/toast_util.dart';
 import 'package:flutter/material.dart';
 import 'package:locker/events/collections_updated_event.dart';
-import 'package:locker/l10n/l10n.dart';
 import 'package:locker/services/configuration.dart';
 import 'package:locker/services/db/locker_db.dart';
 import 'package:locker/services/files/download/file_downloader.dart';
@@ -64,24 +64,27 @@ class OfflineFilesService {
       'Mark offline requested for ${eligibleFiles.length} eligible files',
     );
 
-    if (eligibleFiles.isEmpty || !context.mounted) {
+    if (eligibleFiles.isEmpty) {
       _logger.fine('No eligible files to mark offline');
       return false;
     }
 
     final total = eligibleFiles.length;
-    final dialog = createProgressDialog(
-      context,
-      total == 1
-          ? context.l10n.savingOffline
-          : '${context.l10n.savingOffline} 0/$total',
-      isDismissible: false,
-    );
+    final savingOffline = context.mounted
+        ? context.strings.savingOffline
+        : null;
+    final dialog = savingOffline == null
+        ? null
+        : createProgressDialog(
+            context,
+            total == 1 ? savingOffline : '$savingOffline 0/$total',
+            isDismissible: false,
+          );
 
     var successCount = 0;
     var failureCount = 0;
 
-    await dialog.show();
+    await dialog?.show();
 
     try {
       for (var index = 0; index < eligibleFiles.length; index++) {
@@ -89,11 +92,13 @@ class OfflineFilesService {
         final fileID = file.uploadedFileID!;
         final currentStep = index + 1;
 
-        dialog.update(
-          message: total == 1
-              ? context.l10n.savingOffline
-              : '${context.l10n.savingOffline} $currentStep/$total',
-        );
+        if (context.mounted && dialog != null) {
+          dialog.update(
+            message: total == 1
+                ? savingOffline
+                : '$savingOffline $currentStep/$total',
+          );
+        }
 
         final alreadyHasOfflineCopy =
             LockerDB.instance.isFileMarkedOffline(file) &&
@@ -125,7 +130,7 @@ class OfflineFilesService {
       }
     } finally {
       try {
-        await dialog.hide();
+        await dialog?.hide();
       } catch (_) {}
     }
 
@@ -144,14 +149,23 @@ class OfflineFilesService {
     }
 
     if (failureCount == 0) {
-      showToast(context, context.l10n.filesAvailableOffline(successCount));
+      showToast(
+        context,
+        context.strings.filesAvailableOffline(count: successCount),
+      );
     } else if (successCount > 0) {
       showToast(
         context,
-        context.l10n.filesAvailableOfflinePartial(successCount, failureCount),
+        context.strings.filesAvailableOfflinePartial(
+          failureCount: failureCount,
+          successCount: successCount,
+        ),
       );
     } else {
-      showToast(context, context.l10n.failedToSaveFilesOffline(failureCount));
+      showToast(
+        context,
+        context.strings.failedToSaveFilesOffline(count: failureCount),
+      );
     }
 
     return successCount > 0;
@@ -196,7 +210,10 @@ class OfflineFilesService {
       return changedCount > 0;
     }
 
-    showToast(context, context.l10n.filesRemovedFromOffline(changedCount));
+    showToast(
+      context,
+      context.strings.filesRemovedFromOffline(count: changedCount),
+    );
     return true;
   }
 

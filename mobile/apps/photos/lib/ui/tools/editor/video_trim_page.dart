@@ -1,5 +1,5 @@
+import "package:ente_strings/ente_strings.dart";
 import 'package:flutter/material.dart';
-import "package:photos/generated/l10n.dart";
 import "package:photos/theme/ente_theme.dart";
 import "package:photos/ui/tools/editor/video_editor/video_editor_app_bar.dart";
 import "package:photos/ui/tools/editor/video_editor/video_editor_player_control.dart";
@@ -30,7 +30,7 @@ class _VideoTrimPageState extends State<VideoTrimPage> {
           widget.controller.updateTrim(minTrim, maxTrim);
           Navigator.pop(context);
         },
-        primaryActionLabel: AppLocalizations.of(context).done,
+        primaryActionLabel: context.strings.done,
         onPrimaryAction: () {
           Navigator.pop(context);
         },

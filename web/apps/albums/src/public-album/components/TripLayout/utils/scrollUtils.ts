@@ -69,7 +69,6 @@ export const handleTimelineScroll = ({
     const clientHeight = timelineContainer.clientHeight;
     const scrollTop = timelineContainer.scrollTop;
 
-    // Calculate scroll progress (0 to 1)
     const isAtBottom = scrollTop + clientHeight >= scrollHeight - 10;
     const maxScrollableDistance = scrollHeight - clientHeight;
     const progress = isAtBottom
@@ -88,16 +87,14 @@ export const handleTimelineScroll = ({
         setScrollProgress(clampedProgress);
     });
 
-    // Calculate current active location index based on scroll progress
-    let currentActiveLocationIndex = -1; // Start with no location selected
+    let currentActiveLocationIndex = -1;
     if (photoClusters.length > 0) {
         if (isMobileOrTablet) {
-            // Mobile: Slower progression - stay on each location longer
+            // Mobile keeps each location active for longer.
             currentActiveLocationIndex = Math.floor(
                 clampedProgress * (photoClusters.length - 0.5),
             );
         } else {
-            // Desktop: Use original logic
             currentActiveLocationIndex = Math.round(
                 clampedProgress * Math.max(0, photoClusters.length - 1),
             );
@@ -105,14 +102,12 @@ export const handleTimelineScroll = ({
     }
     const previousActiveLocationIndex = previousActiveLocationRef.current;
 
-    // Only pan map when active location changes (discrete panning)
     if (
         mapRef?.getContainer() &&
         currentActiveLocationIndex !== previousActiveLocationIndex
     ) {
         previousActiveLocationRef.current = currentActiveLocationIndex;
 
-        // Skip panning if no location is selected (mobile default view)
         if (currentActiveLocationIndex === -1) return;
 
         const clusterCenters = photoClusters.map((cluster) => {
@@ -126,13 +121,11 @@ export const handleTimelineScroll = ({
         const targetCluster = clusterCenters[currentActiveLocationIndex];
         if (!targetCluster) return;
 
-        // Position active location at 20% from right edge
         const [positionedLat, positionedLng] = getLocationPosition(
             targetCluster.lat,
             targetCluster.lng,
         );
 
-        // Check if this is a distant location (>500km from previous)
         let isDistantLocation = false;
         if (
             previousActiveLocationIndex !== -1 &&
@@ -146,22 +139,19 @@ export const handleTimelineScroll = ({
                     targetCluster.lat,
                     targetCluster.lng,
                 );
-                isDistantLocation = distance > 500; // 500km threshold
+                isDistantLocation = distance > 500;
             }
         }
 
-        const targetZoom = isMobileOrTablet ? 8 : 10; // Touch device-aware zoom level
+        const targetZoom = isMobileOrTablet ? 8 : 10;
 
         try {
-            // Super cluster logic disabled - simple zoom transitions
             if (isDistantLocation) {
-                // For distant locations not in super cluster: zoom out → pan → zoom in
+                // Distant jumps zoom out before panning back in.
                 const intermediateZoom = isMobileOrTablet ? 2 : 4;
 
-                // Use event listener for smoother animation chaining with pause
                 const onZoomEnd = () => {
                     mapRef.off("zoomend", onZoomEnd);
-                    // Small pause to let user see the zoomed out view
                     setTimeout(() => {
                         setTargetZoom(targetZoom);
                         mapRef.flyTo(
@@ -184,7 +174,6 @@ export const handleTimelineScroll = ({
                     easeLinearity: 0.2,
                 });
             } else {
-                // For nearby locations not in super cluster: simple pan to target location
                 const currentMapZoom = mapRef.getZoom();
                 if (Math.abs(currentMapZoom - targetZoom) > 0.5) {
                     mapRef.flyTo([positionedLat, positionedLng], targetZoom, {
@@ -234,20 +223,15 @@ export const scrollTimelineToLocation = ({
     const clientHeight = timelineContainer.clientHeight;
     const maxScrollableDistance = scrollHeight - clientHeight;
 
-    // Calculate target progress using the same formula as scroll progress calculation
     let targetProgress;
     if (isMobileOrTablet) {
-        // Mobile: Use inverse of the slower progression formula
-        // If active index = Math.floor(progress * (length - 0.5))
-        // Then progress = (index + 0.5) / (length - 0.5) for accurate inverse
+        // Invert the mobile index formula in handleTimelineScroll.
         targetProgress =
             (locationIndex + 0.5) / Math.max(1, photoClusters.length - 0.5);
     } else {
-        // Desktop: Use original formula
         targetProgress = locationIndex / Math.max(1, photoClusters.length - 1);
     }
 
-    // Clamp progress to valid range
     targetProgress = Math.min(1, Math.max(0, targetProgress));
     const targetScrollTop = targetProgress * maxScrollableDistance;
 
@@ -298,21 +282,17 @@ export const handleMarkerClick = ({
     setScrollProgress(targetProgress);
     setHasUserScrolled(true);
 
-    // Update the previous active location to the target cluster
     previousActiveLocationRef.current = clusterIndex;
 
     if (mapRef?.getContainer()) {
         try {
-            // Super cluster logic disabled - simple fly to target with standard zoom
             const [positionedLat, positionedLng] = getLocationPosition(
                 clusterLat,
                 clusterLng,
             );
             const targetZoomLevel = isMobileOrTablet ? 8 : 10;
-            // Set target zoom before animation
             setTargetZoom(targetZoomLevel);
 
-            // Clear target zoom after animation completes
             const onMoveEnd = () => {
                 mapRef.off("moveend", onMoveEnd);
                 setTargetZoom(null);

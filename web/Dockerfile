@@ -1,8 +1,5 @@
-# Docs - https://github.com/ente-io/ente/blob/main/web/docs/docker.md
-
 FROM node:24 AS builder
 
-# Install Rust for building ente-wasm
 RUN apt-get update && apt-get install -y curl build-essential && rm -rf /var/lib/apt/lists/* && \
     curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable --target wasm32-unknown-unknown
 ENV PATH="/root/.cargo/bin:${PATH}"
@@ -42,6 +39,7 @@ COPY --from=builder /build/web/apps/paste/out /out/paste
 COPY --from=builder /build/web/apps/locker/out /out/locker
 COPY --from=builder /build/web/apps/memories/out /out/memories
 
+# 40-enable-ipv6.sh activates the commented listeners when IPv6 is available.
 COPY <<'EOF' /etc/nginx/conf.d/default.conf
 server {
     listen 3000;
@@ -125,7 +123,6 @@ EOF
 
 RUN chmod +x /docker-entrypoint.d/90-replace-ente-env.sh
 
-# Dynamically enable IPv6 if the container environment supports it
 COPY <<'EOF' /docker-entrypoint.d/40-enable-ipv6.sh
 #!/bin/sh
 if [ -f /proc/net/if_inet6 ]; then

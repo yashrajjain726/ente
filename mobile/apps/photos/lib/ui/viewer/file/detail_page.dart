@@ -1,7 +1,10 @@
 import "dart:async";
+import "dart:io";
 import "dart:math";
 
+import 'package:ente_lock_screen/local_authentication_service.dart';
 import 'package:ente_pure_utils/ente_pure_utils.dart';
+import "package:ente_strings/ente_strings.dart";
 import 'package:extended_image/extended_image.dart';
 import "package:flutter/foundation.dart";
 import 'package:flutter/material.dart';
@@ -11,18 +14,19 @@ import 'package:photos/core/configuration.dart';
 import 'package:photos/core/errors.dart';
 import "package:photos/core/event_bus.dart";
 import "package:photos/events/guest_view_event.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/models/file/extensions/file_props.dart";
 import 'package:photos/models/file/file.dart';
 import "package:photos/models/file/file_type.dart";
 import "package:photos/models/file/trash_file.dart";
 import "package:photos/models/gallery_type.dart";
+import 'package:photos/module/download/file.dart';
+import "package:photos/module/download/thumbnail.dart";
 import "package:photos/service_locator.dart";
 import "package:photos/services/collections_service.dart";
-import "package:photos/services/local_authentication_service.dart";
 import "package:photos/states/detail_page_state.dart";
 import "package:photos/ui/common/fast_scroll_physics.dart";
 import 'package:photos/ui/notification/toast.dart';
+import "package:photos/ui/social/widgets/file_social_overlay.dart";
 import "package:photos/ui/tools/editor/image_editor/image_editor_page.dart";
 import "package:photos/ui/tools/editor/video_editor_page.dart";
 import "package:photos/ui/viewer/file/file_app_bar.dart";
@@ -34,8 +38,9 @@ import "package:photos/ui/viewer/file/qr_code_detection_helper.dart";
 import "package:photos/ui/viewer/file/qr_code_highlight_overlay.dart";
 import 'package:photos/ui/viewer/gallery/gallery.dart';
 import 'package:photos/utils/dialog_util.dart';
-import 'package:photos/utils/file_util.dart';
-import "package:photos/utils/thumbnail_util.dart";
+
+const _socialRightInset = 24.0;
+const _socialBottomBarClearance = 130.0;
 
 enum DetailPageMode { minimalistic, full }
 
@@ -148,19 +153,25 @@ class _BodyState extends State<_Body> {
   List<EnteFile>? _files;
   late PageController _pageController;
   final _selectedIndexNotifier = ValueNotifier(0);
+  final _inlineTextDetectionController = InlineTextDetectionController();
   bool _isFirstOpened = true;
   bool isGuestView = false;
   bool swipeLocked = false;
   late final StreamSubscription<GuestViewEvent> _guestViewEventSubscription;
   QrCodeDetectionHelper? _qrHelper;
+  final Map<String, File> _renderedFiles = {};
 
   @override
   void initState() {
     super.initState();
     _files = widget.config.files;
 
-    _selectedIndexNotifier.value = widget.config.selectedIndex;
-    _pageController = PageController(initialPage: _selectedIndexNotifier.value);
+    final configuredIndex = widget.config.selectedIndex;
+    final selectedIndex = _fileAt(configuredIndex) == null
+        ? -1
+        : configuredIndex;
+    _selectedIndexNotifier.value = selectedIndex;
+    _pageController = PageController(initialPage: max(0, selectedIndex));
     _guestViewEventSubscription = Bus.instance.on<GuestViewEvent>().listen((
       event,
     ) {
@@ -177,8 +188,13 @@ class _BodyState extends State<_Body> {
     // Update shared collection state after first frame
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      _updateSharedCollectionState(_files![_selectedIndexNotifier.value]);
-      _evaluateQrIfEligible(_files![_selectedIndexNotifier.value]);
+      final selectedFile = _selectedFile;
+      if (selectedFile == null) {
+        Navigator.maybePop(context).ignore();
+        return;
+      }
+      _updateSharedCollectionState(selectedFile);
+      _evaluateQrIfEligible(selectedFile);
       widget.config.onPageReady?.call(context);
     });
   }
@@ -200,15 +216,19 @@ class _BodyState extends State<_Body> {
 
   @override
   Widget build(BuildContext context) {
-    try {
-      _files![_selectedIndexNotifier.value];
-    } catch (e) {
-      _logger.severe(e);
-      Navigator.pop(context);
+    final selectedFile = _selectedFile;
+    if (selectedFile == null) {
+      _logger.warning("Closing detail page without a selected file");
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          Navigator.maybePop(context).ignore();
+        }
+      });
+      return const Scaffold(backgroundColor: Colors.black);
     }
     _logger.info(
       "Opening " +
-          _files![_selectedIndexNotifier.value].toString() +
+          selectedFile.toString() +
           ". " +
           (_selectedIndexNotifier.value + 1).toString() +
           " / " +
@@ -254,6 +274,24 @@ class _BodyState extends State<_Body> {
           child: Stack(
             children: [
               _buildPageView(),
+              // Keep viewer controls above OCR so their real hit boxes, rather
+              // than approximated screen insets, decide which gestures they own.
+              ValueListenableBuilder(
+                valueListenable: _selectedIndexNotifier,
+                builder: (BuildContext context, int selectedIndex, _) {
+                  if (widget.config.mode == DetailPageMode.minimalistic) {
+                    return const SizedBox.shrink();
+                  }
+                  if (flagService.ocrOverlayEnabled) {
+                    return InlineTextDetection(
+                      file: _files![selectedIndex],
+                      controller: _inlineTextDetectionController,
+                      isGuestView: isGuestView,
+                    );
+                  }
+                  return const SizedBox.shrink();
+                },
+              ),
               ValueListenableBuilder(
                 builder: (BuildContext context, int selectedIndex, _) {
                   return widget.config.mode == DetailPageMode.minimalistic
@@ -273,19 +311,11 @@ class _BodyState extends State<_Body> {
               ValueListenableBuilder(
                 valueListenable: _selectedIndexNotifier,
                 builder: (BuildContext context, int selectedIndex, _) {
-                  if (widget.config.mode == DetailPageMode.minimalistic) {
-                    return const SizedBox.shrink();
-                  }
-                  if (flagService.ocrOverlayEnabled) {
-                    return InlineTextDetection(
-                      file: _files![selectedIndex],
-                      enableFullScreenNotifier: InheritedDetailPageState.of(
-                        context,
-                      ).enableFullScreenNotifier,
-                      isGuestView: isGuestView,
-                    );
-                  }
-                  return const SizedBox.shrink();
+                  return _GallerySocialOverlay(
+                    file: _files![selectedIndex],
+                    mode: widget.config.mode,
+                    isGuestView: isGuestView,
+                  );
                 },
               ),
               if (_qrHelper != null)
@@ -299,10 +329,11 @@ class _BodyState extends State<_Body> {
                     }
                     return ValueListenableBuilder(
                       valueListenable: _qrHelper!.qrDetectionsNotifier,
-                      builder: (context, detections, _) {
+                      builder: (context, result, _) {
+                        final file = _files![selectedIndex];
                         return QrCodeHighlightOverlay(
-                          detections: detections,
-                          file: _files![selectedIndex],
+                          detections: result?.forFile(file) ?? const [],
+                          file: file,
                         );
                       },
                     );
@@ -325,7 +356,7 @@ class _BodyState extends State<_Body> {
                             child: Align(
                               alignment: Alignment.center,
                               child: Tooltip(
-                                message: AppLocalizations.of(context).panorama,
+                                message: context.strings.panorama,
                                 child: IconButton(
                                   style: IconButton.styleFrom(
                                     backgroundColor: const Color(0xAA252525),
@@ -365,6 +396,7 @@ class _BodyState extends State<_Body> {
       return;
     }
     final fetchedThumbnail = await getThumbnail(file);
+    if (!mounted) return;
     Navigator.of(context)
         .push(
           MaterialPageRoute(
@@ -399,13 +431,27 @@ class _BodyState extends State<_Body> {
           },
           playbackCallback: (shouldEnable, reason) {
             Future.delayed(Duration.zero, () {
+              if (!context.mounted) return;
               InheritedDetailPageState.of(
                 context,
               ).requestFullScreen(shouldEnable: shouldEnable, reason: reason);
             });
           },
           backgroundDecoration: const BoxDecoration(color: Colors.black),
+          onFinalImageLoaded: (localFile) {
+            _renderedFiles[file.tag] = localFile;
+            if (_selectedFile?.tag == file.tag) {
+              _evaluateQrIfEligible(file);
+            }
+          },
           qrDetectionsNotifier: _qrHelper?.qrDetectionsNotifier,
+          onTextSelectionStart:
+              flagService.ocrOverlayEnabled &&
+                  widget.config.mode != DetailPageMode.minimalistic &&
+                  !file.isLiveOrMotionPhoto
+              ? (details) => _inlineTextDetectionController
+                    .startTextSelectionAt(file, details.globalPosition)
+              : null,
         );
         return GestureDetector(
           onTap: () {
@@ -417,6 +463,10 @@ class _BodyState extends State<_Body> {
         );
       },
       onPageChanged: (index) {
+        final file = _fileAt(index);
+        if (file == null) {
+          return;
+        }
         if (_selectedIndexNotifier.value == index) {
           if (kDebugMode) {
             debugPrint("onPageChanged called with same index $index");
@@ -429,8 +479,8 @@ class _BodyState extends State<_Body> {
           _selectedIndexNotifier.value = index;
         }
         Bus.instance.fire(GuestViewEvent(isGuestView, swipeLocked));
-        _updateSharedCollectionState(_files![index]);
-        _evaluateQrIfEligible(_files![index]);
+        _updateSharedCollectionState(file);
+        _evaluateQrIfEligible(file);
       },
       physics: _shouldDisableScroll || swipeLocked
           ? const NeverScrollableScrollPhysics()
@@ -441,8 +491,10 @@ class _BodyState extends State<_Body> {
   }
 
   void _evaluateQrIfEligible(EnteFile file) {
-    if (_qrHelper == null || isGuestView || file is TrashFile) return;
-    _qrHelper!.evaluateFile(file);
+    _qrHelper?.evaluateFile(
+      file,
+      isGuestView || file is TrashFile ? null : _renderedFiles[file.tag],
+    );
   }
 
   bool shouldAutoPlay() {
@@ -463,6 +515,7 @@ class _BodyState extends State<_Body> {
   }
 
   Future<void> _onFileRemoved(EnteFile file) async {
+    if (!mounted || _files == null) return;
     final totalFiles = _files!.length;
     if (totalFiles == 1) {
       // Deleted the only file
@@ -500,31 +553,25 @@ class _BodyState extends State<_Body> {
       // ignore: unawaited_futures
       showErrorDialog(
         context,
-        AppLocalizations.of(context).sorry,
-        AppLocalizations.of(
-          context,
-        ).weDontSupportEditingPhotosAndAlbumsThatYouDont,
+        context.strings.sorry,
+        context.strings.weDontSupportEditingPhotosAndAlbumsThatYouDont,
       );
       return;
     }
-    final dialog = createProgressDialog(
-      context,
-      AppLocalizations.of(context).pleaseWait,
-    );
+    final dialog = createProgressDialog(context, context.strings.pleaseWait);
     await dialog.show();
 
     try {
       final ioFile = await getFile(file);
       if (ioFile == null) {
-        showShortToast(
-          context,
-          AppLocalizations.of(context).failedToFetchOriginalForEdit,
-        );
+        if (!mounted) return;
+        showShortToast(context, context.strings.failedToFetchOriginalForEdit);
         await dialog.hide();
         return;
       }
       if (file.fileType == FileType.video) {
         await dialog.hide();
+        if (!mounted) return;
         replacePage(
           context,
           VideoEditorPage(
@@ -542,8 +589,10 @@ class _BodyState extends State<_Body> {
         ioFile,
         cacheRawData: true,
       );
+      if (!mounted) return;
       await precacheImage(imageProvider, context);
       await dialog.hide();
+      if (!mounted) return;
       replacePage(
         context,
         ImageEditorPage(
@@ -587,8 +636,66 @@ class _BodyState extends State<_Body> {
 
     // Guard: Only update if still showing the same file
     // (user may have swiped to a different file while awaiting)
-    if (_files![_selectedIndexNotifier.value].uploadedFileID == fileID) {
+    if (_selectedFile?.uploadedFileID == fileID) {
       notifier.value = isShared;
     }
+  }
+
+  EnteFile? get _selectedFile => _fileAt(_selectedIndexNotifier.value);
+
+  EnteFile? _fileAt(int index) {
+    final files = _files;
+    if (files == null || index < 0 || index >= files.length) {
+      return null;
+    }
+    return files[index];
+  }
+}
+
+/// Must remain under a [Stack] because this widget builds a [Positioned].
+class _GallerySocialOverlay extends StatelessWidget {
+  final EnteFile file;
+  final DetailPageMode mode;
+  final bool isGuestView;
+
+  const _GallerySocialOverlay({
+    required this.file,
+    required this.mode,
+    required this.isGuestView,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (mode == DetailPageMode.minimalistic ||
+        isGuestView ||
+        file is TrashFile) {
+      return const SizedBox.shrink();
+    }
+
+    final padding = MediaQuery.paddingOf(context);
+    final fullScreenNotifier = InheritedDetailPageState.of(
+      context,
+    ).enableFullScreenNotifier;
+    return Positioned(
+      right: padding.right + _socialRightInset,
+      bottom: padding.bottom + _socialBottomBarClearance,
+      child: ValueListenableBuilder<bool>(
+        valueListenable: fullScreenNotifier,
+        builder: (context, isFullScreen, child) => IgnorePointer(
+          ignoring: isFullScreen,
+          child: AnimatedOpacity(
+            opacity: isFullScreen ? 0 : 1,
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.easeInOut,
+            child: child,
+          ),
+        ),
+        child: FileSocialOverlay(
+          file: file,
+          currentUserID: Configuration.instance.getUserID(),
+          openingCollectionID: file.collectionID,
+        ),
+      ),
+    );
   }
 }

@@ -8,7 +8,7 @@ import { getItemTitle, hasDownloadableObject } from "@/types";
 import { CircleArrowDownLeftIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
-import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
+import DeleteOutlinedIcon from "@mui/icons-material/DeleteOutlined";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
 import RadioButtonUncheckedRoundedIcon from "@mui/icons-material/RadioButtonUncheckedRounded";
@@ -34,21 +34,14 @@ import React, { useCallback, useState } from "react";
 
 interface ItemCardProps {
     item: LockerItem;
-    /** The user's master key, needed for file downloads. */
     masterKey?: string;
     onClick: () => void;
-    /** Whether this card is shown in the trash view. */
     isTrashView?: boolean;
     isIncomingShared?: boolean;
-    /** Called when the user wants to edit this item. */
     onEdit?: (item: LockerItem) => void;
-    /** Called when the user wants to delete (trash) this item. */
     onDelete?: (item: LockerItem) => void;
-    /** Optional hint shown when delete is unavailable for this item. */
     deleteDisabledHint?: string;
-    /** Called when the user wants to permanently delete this item. */
     onPermanentlyDelete?: (items: LockerItem[]) => void;
-    /** Called when the user wants to restore this item from trash. */
     onRestore?: (item: LockerItem) => void;
     onShareLink?: (item: LockerItem) => void;
     selectionMode?: boolean;
@@ -58,10 +51,6 @@ interface ItemCardProps {
     onLongPressSelect?: (item: LockerItem) => void;
 }
 
-/**
- * A file/item row matching the Figma design:
- * Light rounded card background — colored icon (in rounded square) — title — actions
- */
 export const ItemCard: React.FC<ItemCardProps> = React.memo(function ItemCard({
     item,
     masterKey,
@@ -242,7 +231,6 @@ export const ItemCard: React.FC<ItemCardProps> = React.memo(function ItemCard({
                     </Box>
                 )}
 
-                {/* Type icon — colored per type in rounded square */}
                 <Box
                     sx={{
                         position: "relative",
@@ -369,10 +357,6 @@ export const ItemCard: React.FC<ItemCardProps> = React.memo(function ItemCard({
     );
 });
 
-// ---------------------------------------------------------------------------
-// Overflow menu for item actions
-// ---------------------------------------------------------------------------
-
 const ItemOverflowMenu: React.FC<{
     item: LockerItem;
     onEdit?: (item: LockerItem) => void;
@@ -403,7 +387,7 @@ const ItemOverflowMenu: React.FC<{
         )}
         {onDelete ? (
             <OverflowMenuOption
-                startIcon={<DeleteOutlineIcon />}
+                startIcon={<DeleteOutlinedIcon />}
                 color="critical"
                 onClick={() => onDelete(item)}
             >
@@ -412,7 +396,7 @@ const ItemOverflowMenu: React.FC<{
         ) : (
             deleteDisabledHint && (
                 <OverflowMenuOption
-                    startIcon={<DeleteOutlineIcon />}
+                    startIcon={<DeleteOutlinedIcon />}
                     color="critical"
                     disabled
                     onClick={() => undefined}
@@ -423,10 +407,6 @@ const ItemOverflowMenu: React.FC<{
         )}
     </OverflowMenu>
 );
-
-// ---------------------------------------------------------------------------
-// Trash-specific actions
-// ---------------------------------------------------------------------------
 
 const TrashActions: React.FC<{
     item: LockerItem;
@@ -456,16 +436,13 @@ const TrashActions: React.FC<{
                     onClick={() => onPermanentlyDelete([item])}
                     sx={{ color: "critical.main" }}
                 >
-                    <DeleteOutlineIcon sx={{ fontSize: 20 }} />
+                    <DeleteOutlinedIcon sx={{ fontSize: 20 }} />
                 </IconButton>
             </Tooltip>
         )}
     </Stack>
 );
 
-/**
- * Background color for the icon square, per item type.
- */
 const iconBgColor = (item: LockerItem): string => {
     return lockerItemIconConfig(
         item.type,
@@ -473,7 +450,6 @@ const iconBgColor = (item: LockerItem): string => {
     ).backgroundColor;
 };
 
-/** Icon for a LockerItem. */
 const itemIcon = (item: LockerItem) => {
     return lockerItemIcon(item.type, {
         fileName:

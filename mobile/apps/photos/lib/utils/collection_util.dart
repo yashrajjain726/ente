@@ -1,7 +1,7 @@
 import "package:android_intent_plus/android_intent.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:logging/logging.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/service_locator.dart";
 import "package:photos/ui/components/buttons/button_widget.dart";
 import "package:photos/utils/dialog_util.dart";
@@ -16,9 +16,9 @@ Future<void> requestPermissionToOpenLinksInApp(
     final choice = await showChoiceActionSheet(
       isDismissible: false,
       context,
-      title: AppLocalizations.of(context).seePublicAlbumLinksInApp,
-      body: AppLocalizations.of(context).allowAppToOpenSharedAlbumLinks,
-      firstButtonLabel: AppLocalizations.of(context).allow,
+      title: context.strings.seePublicAlbumLinksInApp,
+      body: context.strings.allowAppToOpenSharedAlbumLinks,
+      firstButtonLabel: context.strings.allow,
     );
     if (choice!.action == ButtonAction.first) {
       final AndroidIntent intent;

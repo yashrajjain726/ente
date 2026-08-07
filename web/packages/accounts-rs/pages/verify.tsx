@@ -54,11 +54,6 @@ import { useRouter } from "next/router";
 import { useCallback, useEffect, useState } from "react";
 import { Trans } from "react-i18next";
 
-/**
- * A page that allows the user to verify their email.
- *
- * See: [Note: Login pages]
- */
 const Page: React.FC = () => {
     const { logout, showMiniDialog } = useBaseContext();
 
@@ -107,9 +102,6 @@ const Page: React.FC = () => {
             } = await userVerificationResultAfterResolvingSecondFactorChoice(
                 await verifyEmail(email, ott, cleanedReferral),
             );
-
-            // The following flow is similar to (but not the same) as what
-            // happens after `verifySRP` in the `/credentials` page.
 
             if (passkeySessionID) {
                 updateSavedLocalUser({ passkeySessionID });
@@ -173,15 +165,10 @@ const Page: React.FC = () => {
     }
 
     if (passkeyVerificationData) {
-        // We only need to handle this scenario when running in the desktop app
-        // because the web app will navigate to Passkey verification URL.
-        // However, still we add an additional `globalThis.electron` check to
-        // show a spinner. This prevents the VerifyingPasskey component from
-        // being disorientingly shown for a fraction of a second as the redirect
-        // happens on the web app.
-        //
-        // See: [Note: Passkey verification in the desktop app]
-
+        // Only the desktop app needs this UI; the web app is already
+        // navigating to the passkey verification URL. Show a spinner on web
+        // so that the VerifyingPasskey component does not flash before the
+        // redirect completes.
         if (!globalThis.electron) {
             return <LoadingIndicator />;
         }
@@ -246,12 +233,6 @@ const Page: React.FC = () => {
 
 export default Page;
 
-/**
- * A function called during page load to see if a redirection is required
- *
- * @returns The slug to redirect to, if needed. Otherwise an object containing
- * the saved partial user's email.
- */
 const redirectionIfNeededOrEmail = async () => {
     const user = savedPartialLocalUser();
 
@@ -264,25 +245,13 @@ const redirectionIfNeededOrEmail = async () => {
         return "/credentials";
     }
 
-    // If we're coming here during the recover flow, do not redirect.
     if (stashedRedirect() == "/recover") return { email };
-
-    // The user might have email verification disabled, but after previously
-    // entering their email on the login screen, they might've closed the tab
-    // before proceeding (or opened a us in a new tab at this point).
-    //
-    // In such cases, we'll end up here with an email present.
-    //
-    // To distinguish this scenario from the normal email verification flow, we
-    // can check to see the SRP attributes (the login page would've fetched and
-    // saved them). If they are present and indicate that email verification is
-    // not required, redirect to the password verification page.
 
     const srpAttributes = savedSRPAttributes();
     if (srpAttributes && !srpAttributes.isEmailMFAEnabled) {
-        // Fetch the latest SRP attributes instead of relying on the potentially
-        // stale stored values. This is an infrequent scenario path, so extra
-        // API calls are fine.
+        // Fetch the latest SRP attributes instead of trusting the potentially
+        // stale saved values. This path is infrequent, so the extra API call
+        // is fine.
         const latestSRPAttributes = await getSRPAttributes(email);
         if (latestSRPAttributes && !latestSRPAttributes.isEmailMFAEnabled) {
             return "/credentials";

@@ -1,9 +1,8 @@
+import "package:ente_components/ente_components.dart";
 import "package:ente_pure_utils/ente_pure_utils.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/service_locator.dart";
-import "package:photos/ui/settings/components/settings_item.dart";
-import "package:photos/ui/settings/components/settings_page_scaffold.dart";
 import "package:photos/ui/settings/ml/machine_learning_settings_page.dart";
 import "package:photos/ui/settings/widgets/albums_widget_settings.dart";
 import "package:photos/ui/settings/widgets/memories_widget_settings.dart";
@@ -35,7 +34,7 @@ class WidgetSettingsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
+    final l10n = context.strings;
 
     return SettingsPageScaffold(
       title: l10n.widgets,

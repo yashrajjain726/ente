@@ -1,8 +1,8 @@
 import "dart:async";
 
 import 'package:ente_components/ente_components.dart';
+import "package:ente_strings/ente_strings.dart";
 import 'package:flutter/material.dart';
-import "package:photos/generated/l10n.dart";
 import "package:photos/ui/components/thumbnail_list_item.dart";
 
 class NewAlbumListItemWidget extends StatelessWidget {
@@ -37,7 +37,7 @@ class NewAlbumListItemWidget extends StatelessWidget {
         ),
       ),
       title: Text(
-        AppLocalizations.of(context).createAlbum,
+        context.strings.createAlbum,
         style: TextStyles.body.copyWith(color: colors.textLight),
         maxLines: 1,
         softWrap: false,

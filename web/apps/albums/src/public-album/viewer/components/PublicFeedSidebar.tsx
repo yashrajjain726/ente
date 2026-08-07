@@ -7,7 +7,6 @@ import {
     type PublicFeedReaction,
 } from "@/public-album/social/api/public-reaction";
 import { useBrowserBackClose } from "@/shared/hooks/useBrowserBackClose";
-import { getAvatarColor } from "@/shared/utils/avatar-colors";
 import CloseIcon from "@mui/icons-material/Close";
 import {
     Avatar,
@@ -21,9 +20,10 @@ import {
 } from "@mui/material";
 import { useColorScheme } from "@mui/material/styles";
 import { useInterval } from "ente-base/components/utils/hooks";
-import { type ModalVisibilityProps } from "ente-base/components/utils/modal";
+import type { ModalVisibilityProps } from "ente-base/components/utils/modal";
 import type { PublicAlbumsCredentials } from "ente-base/http";
 import log from "ente-base/log";
+import { getAvatarColor } from "ente-gallery/utils/avatar-colors";
 import type { EnteFile } from "ente-media/file";
 import { FileType } from "ente-media/file-type";
 import { t } from "i18next";
@@ -34,10 +34,6 @@ import React, {
     useRef,
     useState,
 } from "react";
-
-// =============================================================================
-// Icons
-// =============================================================================
 
 const LikedPhotoIcon: React.FC = () => (
     <svg
@@ -128,73 +124,34 @@ const LikedCommentIcon: React.FC<{ heartStroke?: string }> = ({
     </svg>
 );
 
-// =============================================================================
-// Types
-// =============================================================================
-
-/**
- * Information about a feed item click for navigation purposes.
- */
 export interface PublicFeedItemClickInfo {
-    /** The type of feed item. */
     type: PublicFeedItem["type"];
-    /** The file ID to navigate to. */
     fileID: number;
-    /**
-     * The comment ID to highlight (for comment-related items).
-     * For `replied_comment`, this is the reply's comment ID.
-     * For `liked_comment`, this is the target comment ID.
-     */
     commentID?: string;
-    /**
-     * Snapshot of resolved anonymous display names from the feed.
-     * This lets the viewer open with stable names instead of briefly falling
-     * back to anonymous placeholders before its own profile fetch completes.
-     */
+    // Snapshot names so navigation does not flash anonymous placeholders.
     anonUserNames?: Map<string, string>;
 }
 
 export interface PublicFeedSidebarProps extends ModalVisibilityProps {
-    /**
-     * The files in the album, used to display thumbnails and determine file type.
-     */
     files?: EnteFile[];
-    /**
-     * Public album credentials for API access.
-     */
     credentials: PublicAlbumsCredentials;
-    /**
-     * The decrypted collection key (base64 encoded).
-     */
     collectionKey: string;
-    /**
-     * Called when a feed item is clicked for navigation.
-     */
     onItemClick?: (info: PublicFeedItemClickInfo) => void;
-    /**
-     * Called after the drawer finishes its close transition.
-     */
     onExited?: () => void;
 }
 
-/** A user who performed an action in the feed. */
 interface FeedUser {
     userID: number;
     anonUserID?: string;
     userName: string;
-    /** Email/identifier used for avatar color. */
     email: string;
 }
 
-/** Base interface for all feed items. */
 interface BaseFeedItem {
-    /** Unique identifier for this feed item (for React keys). */
     id: string;
-    /** Timestamp of the most recent action in this item. */
     timestamp: number;
 }
 
-/** Someone liked a photo/video (grouped by file). */
 interface LikedFileFeedItem extends BaseFeedItem {
     type: "liked_photo" | "liked_video";
     fileID: number;
@@ -202,29 +159,23 @@ interface LikedFileFeedItem extends BaseFeedItem {
     users: FeedUser[];
 }
 
-/** Someone commented on a photo/video. */
 interface CommentedFileFeedItem extends BaseFeedItem {
     type: "commented_photo" | "commented_video";
     fileID: number;
-    /** The ID of the comment for navigation. */
     commentID: string;
     thumbnailURL?: string;
     user: FeedUser;
 }
 
-/** Someone replied to a comment. */
 interface RepliedCommentFeedItem extends BaseFeedItem {
     type: "replied_comment";
-    /** The parent comment ID. */
     parentCommentID: string;
-    /** The ID of the reply for navigation. */
     replyID: string;
     fileID?: number;
     thumbnailURL?: string;
     user: FeedUser;
 }
 
-/** Someone liked a comment (grouped by comment, includes reply likes). */
 interface LikedCommentFeedItem extends BaseFeedItem {
     type: "liked_comment";
     commentID: string;
@@ -239,21 +190,10 @@ type PublicFeedItem =
     | RepliedCommentFeedItem
     | LikedCommentFeedItem;
 
-/** Thumbnail URL cache for files. */
 type ThumbnailCache = Map<number, string>;
 
-/** File type cache for determining photo vs video. */
 type FileTypeCache = Map<number, number>;
 
-// =============================================================================
-// Utility Functions
-// =============================================================================
-
-/**
- * Get the display name for a user.
- * For anonymous users, uses their entered name from userName.
- * Falls back to "Anonymous" only if userName is empty.
- */
 const getUserDisplayName = (
     userID: number,
     userName: string,
@@ -265,15 +205,6 @@ const getUserDisplayName = (
     return userName;
 };
 
-/**
- * Process feed items from public album data.
- *
- * For public albums, we show ALL actions from everyone:
- * - X liked a photo/video
- * - A liked a comment (includes reply likes)
- * - M commented on a photo/video
- * - C replied to a comment
- */
 const processFeedItems = (
     comments: PublicFeedComment[],
     reactions: PublicFeedReaction[],
@@ -284,7 +215,6 @@ const processFeedItems = (
 ): PublicFeedItem[] => {
     const feedItems: PublicFeedItem[] = [];
 
-    // Build a map from commentID to fileID for looking up comment likes
     const commentFileIDMap = new Map<string, number>();
     for (const c of comments) {
         if (c.fileID) {
@@ -292,7 +222,6 @@ const processFeedItems = (
         }
     }
 
-    // Helper to get display name for a user
     const getUserName = (userID: number, anonUserID?: string): string => {
         if (anonUserID) {
             return (
@@ -303,7 +232,6 @@ const processFeedItems = (
         return maskedEmails.get(userID) ?? t("unknown_user");
     };
 
-    // Helper to get avatar color key
     const getAvatarColorKey = (userID: number, anonUserID?: string): string => {
         if (anonUserID) {
             return anonUserNames.get(anonUserID) ?? anonUserID;
@@ -311,18 +239,15 @@ const processFeedItems = (
         return maskedEmails.get(userID) ?? String(userID);
     };
 
-    // Helper to get thumbnail URL from cache
     const getThumbnailURL = (fileID: number | undefined): string | undefined =>
         fileID ? thumbnailCache.get(fileID) : undefined;
 
-    // Helper to determine if file is video
     const isVideo = (fileID: number | undefined): boolean => {
         if (!fileID) return false;
         const fileType = fileTypeCache.get(fileID);
         return fileType === FileType.video;
     };
 
-    // 1. Process comments - categorize as "commented_photo/video" or "replied_comment"
     for (const c of comments) {
         if (c.isDeleted) continue;
 
@@ -330,7 +255,6 @@ const processFeedItems = (
         const avatarColorKey = getAvatarColorKey(c.userID, c.anonUserID);
 
         if (c.isReply && c.parentCommentID) {
-            // This is a reply to a comment
             feedItems.push({
                 id: `replied_comment_${c.id}`,
                 type: "replied_comment",
@@ -347,7 +271,6 @@ const processFeedItems = (
                 },
             });
         } else if (c.fileID) {
-            // This is a comment on a photo/video
             const fileIsVideo = isVideo(c.fileID);
             feedItems.push({
                 id: `commented_file_${c.id}`,
@@ -366,13 +289,10 @@ const processFeedItems = (
         }
     }
 
-    // 2. Process reactions - group by file or comment
-    // Group file likes by fileID
     const fileLikes = new Map<
         number,
         { users: FeedUser[]; latestTimestamp: number; isVideo: boolean }
     >();
-    // Group comment likes by commentID (includes reply likes)
     const commentLikes = new Map<
         string,
         { users: FeedUser[]; latestTimestamp: number; fileID?: number }
@@ -391,14 +311,12 @@ const processFeedItems = (
         };
 
         if (r.fileID && !r.commentID) {
-            // Reaction on a file (photo/video)
             const fileID = r.fileID;
             const existing = fileLikes.get(fileID);
             if (existing) {
                 existing.users.push(user);
                 if (r.createdAt > existing.latestTimestamp) {
                     existing.latestTimestamp = r.createdAt;
-                    // Move most recent user to front
                     existing.users.pop();
                     existing.users.unshift(user);
                 }
@@ -410,9 +328,7 @@ const processFeedItems = (
                 });
             }
         } else if (r.commentID) {
-            // Reaction on a comment (treat reply likes as comment likes)
             const commentID = r.commentID;
-            // Look up fileID from comment if not present in reaction
             const fileID = r.fileID || commentFileIDMap.get(commentID);
             const existing = commentLikes.get(commentID);
             if (existing) {
@@ -432,7 +348,6 @@ const processFeedItems = (
         }
     }
 
-    // Add grouped file likes to feed
     for (const [fileID, data] of fileLikes) {
         feedItems.push({
             id: `liked_file_${fileID}`,
@@ -444,7 +359,6 @@ const processFeedItems = (
         });
     }
 
-    // Add grouped comment likes to feed (includes reply likes)
     for (const [commentID, data] of commentLikes) {
         feedItems.push({
             id: `liked_comment_${commentID}`,
@@ -457,13 +371,9 @@ const processFeedItems = (
         });
     }
 
-    // Sort by timestamp (newest first)
     return feedItems.sort((a, b) => b.timestamp - a.timestamp);
 };
 
-/**
- * Get the action text for a feed item.
- */
 const getActionText = (item: PublicFeedItem): string => {
     switch (item.type) {
         case "liked_photo":
@@ -481,9 +391,6 @@ const getActionText = (item: PublicFeedItem): string => {
     }
 };
 
-/**
- * Get the users string for display (e.g., "John and 2 others").
- */
 const getUsersDisplayText = (users: FeedUser[]): string => {
     if (users.length === 0) return "";
     const firstName = getUserDisplayName(
@@ -498,9 +405,6 @@ const getUsersDisplayText = (users: FeedUser[]): string => {
     return `${firstName} and ${othersCount} ${othersCount === 1 ? "other" : "others"}`;
 };
 
-/**
- * Get the icon component for a feed item type.
- */
 const getFeedIcon = (
     type: PublicFeedItem["type"],
     heartStroke: string,
@@ -519,18 +423,11 @@ const getFeedIcon = (
     }
 };
 
-// =============================================================================
-// Feed Item Row Component
-// =============================================================================
-
 interface FeedItemRowProps {
     item: PublicFeedItem;
     onClick?: () => void;
 }
 
-/**
- * Get the users array from a feed item.
- */
 const getFeedItemUsers = (item: PublicFeedItem): FeedUser[] => {
     switch (item.type) {
         case "commented_photo":
@@ -544,9 +441,6 @@ const getFeedItemUsers = (item: PublicFeedItem): FeedUser[] => {
     }
 };
 
-/**
- * A single row in the feed showing an action.
- */
 const FeedItemRow: React.FC<FeedItemRowProps> = ({ item, onClick }) => {
     const { mode, systemMode } = useColorScheme();
     const users = getFeedItemUsers(item);
@@ -591,13 +485,6 @@ const FeedItemRow: React.FC<FeedItemRowProps> = ({ item, onClick }) => {
     );
 };
 
-// =============================================================================
-// Main Component
-// =============================================================================
-
-/**
- * Extracts navigation info from a feed item for click handling.
- */
 const getFeedItemClickInfo = (
     item: PublicFeedItem,
     anonUserNames: Map<string, string>,
@@ -633,9 +520,6 @@ const getFeedItemClickInfo = (
     }
 };
 
-/**
- * A sidebar panel for displaying the activity feed for a public album.
- */
 export const PublicFeedSidebar: React.FC<PublicFeedSidebarProps> = ({
     open,
     onClose,
@@ -685,7 +569,6 @@ export const PublicFeedSidebar: React.FC<PublicFeedSidebarProps> = ({
         [],
     );
 
-    // Build file type cache from files
     useEffect(() => {
         if (!open) return;
 
@@ -696,8 +579,7 @@ export const PublicFeedSidebar: React.FC<PublicFeedSidebarProps> = ({
         setFileTypeCache(cache);
     }, [open, files]);
 
-    // Load thumbnails for active feed items in parallel and show each one as
-    // soon as it is ready instead of waiting for the entire batch to finish.
+    // Publish each thumbnail as soon as it loads.
     useEffect(() => {
         if (!open || (comments.length === 0 && reactions.length === 0)) return;
 
@@ -752,10 +634,9 @@ export const PublicFeedSidebar: React.FC<PublicFeedSidebarProps> = ({
         );
     }, [open, comments, reactions, files]);
 
-    // Polling interval for refreshing feed data (5 seconds)
     const FEED_REFRESH_INTERVAL_MS = 5_000;
 
-    // Refresh social data (used for periodic refresh - excludes masked emails)
+    // Masked participant emails are stable enough to fetch only on open.
     const refreshSocialData = useCallback(async () => {
         try {
             const [feedData, anonProfiles] = await Promise.all([
@@ -765,14 +646,11 @@ export const PublicFeedSidebar: React.FC<PublicFeedSidebarProps> = ({
             setComments(feedData.comments);
             setReactions(feedData.reactions);
             setAnonUserNames(anonProfiles);
-            // Note: Masked emails for registered participants are fetched only
-            // on initial load since they rarely change during a session.
         } catch (e) {
             log.error("Failed to refresh public album feed", e);
         }
     }, [credentials, collectionKey]);
 
-    // Initial fetch when sidebar opens (includes masked emails)
     useEffect(() => {
         if (!open) return;
 
@@ -797,7 +675,6 @@ export const PublicFeedSidebar: React.FC<PublicFeedSidebarProps> = ({
         void fetchInitialData().finally(() => setIsLoading(false));
     }, [open, credentials, collectionKey]);
 
-    // Periodic refresh while sidebar is open
     useInterval(
         refreshSocialData,
         open && !isLoading ? FEED_REFRESH_INTERVAL_MS : null,
@@ -880,13 +757,9 @@ export const PublicFeedSidebar: React.FC<PublicFeedSidebarProps> = ({
     );
 };
 
-// =============================================================================
-// Styled Components
-// =============================================================================
-
-// Drawer & Layout
+// Keep the feed above TripLayout controls at z-index 2000.
 const SidebarDrawer = styled(Drawer)(({ theme }) => ({
-    zIndex: 2100, // Above TripLayout nav buttons (z-index: 2000)
+    zIndex: 2100,
     "& .MuiDrawer-paper": {
         width: "23vw",
         minWidth: "520px",
@@ -965,7 +838,6 @@ const ContentContainer = styled(Box)(({ theme }) => ({
     }),
 }));
 
-// Feed Item Components
 const FeedItemContainer = styled(Box)(({ theme }) => ({
     display: "flex",
     alignItems: "flex-start",
@@ -1057,12 +929,12 @@ const ThumbnailImage = styled("img")(() => ({
     flexShrink: 0,
 }));
 
+// The negative margin centers these states below the 56px header offset.
 const LoadingContainer = styled(Box)(() => ({
     display: "flex",
     justifyContent: "center",
     alignItems: "center",
     height: "100%",
-    // Offset for header (marginBottom: 48) + padding diff (32-24=8) = 56, halved
     marginTop: -28,
 }));
 
@@ -1071,7 +943,6 @@ const EmptyStateText = styled(Typography)(({ theme }) => ({
     justifyContent: "center",
     alignItems: "center",
     height: "100%",
-    // Offset for header (marginBottom: 48) + padding diff (32-24=8) = 56, halved
     marginTop: -28,
     color: "#666",
     ...theme.applyStyles("dark", { color: "rgba(255, 255, 255, 0.6)" }),

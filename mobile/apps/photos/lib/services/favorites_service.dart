@@ -82,6 +82,9 @@ class FavoritesService {
 
   void clearCache() {
     _cachedFavoritesCollectionID = null;
+    _cachedFavUploadedIDs.clear();
+    _cachedFavFileHases.clear();
+    _cachedPendingLocalIDs.clear();
   }
 
   bool isFavoriteCache(EnteFile file, {bool checkOnlyAlbum = false}) {
@@ -182,7 +185,7 @@ class FavoritesService {
     } else {
       final Collection? favCollection = await getFavoritesCollection();
       await _collectionActions.moveFilesFromCurrentCollection(
-        context,
+        null,
         favCollection!,
         files,
       );
@@ -217,7 +220,7 @@ class FavoritesService {
         );
       }
       await _collectionActions.moveFilesFromCurrentCollection(
-        context,
+        null,
         favCollection,
         [favFile],
       );

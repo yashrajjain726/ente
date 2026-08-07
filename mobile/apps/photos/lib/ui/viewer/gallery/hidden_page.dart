@@ -2,29 +2,26 @@ import "dart:async";
 
 import "package:collection/collection.dart";
 import "package:ente_pure_utils/ente_pure_utils.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:photos/core/configuration.dart";
-import "package:photos/core/constants.dart";
 import "package:photos/core/event_bus.dart";
 import "package:photos/db/files_db.dart";
 import "package:photos/events/album_sort_order_change_event.dart";
 import "package:photos/events/collection_updated_event.dart";
 import "package:photos/events/files_updated_event.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/models/collection/collection.dart";
 import "package:photos/models/gallery_type.dart";
 import "package:photos/models/selected_files.dart";
-import "package:photos/service_locator.dart";
 import "package:photos/services/collections_service.dart";
 import "package:photos/services/hidden_service.dart";
-import "package:photos/settings/local_settings.dart";
 import "package:photos/ui/collections/album/horizontal_list.dart";
 import "package:photos/ui/collections/collection_list_page.dart";
 import "package:photos/ui/common/loading_widget.dart";
+import "package:photos/ui/components/empty_state_component.dart";
 import "package:photos/ui/viewer/actions/file_selection_overlay_bar.dart";
 import "package:photos/ui/viewer/gallery/cleanup_hidden_files_widget.dart";
 import "package:photos/ui/viewer/gallery/cleanup_hidden_from_device_widget.dart";
-import "package:photos/ui/viewer/gallery/empty_hidden_widget.dart";
 import "package:photos/ui/viewer/gallery/gallery.dart";
 import "package:photos/ui/viewer/gallery/gallery_app_bar_widget.dart";
 import "package:photos/ui/viewer/gallery/state/gallery_boundaries_provider.dart";
@@ -104,7 +101,7 @@ class _HiddenPageState extends State<HiddenPage> {
     final hiddenCollectionsExcludingDefault = hiddenCollections
         .where((c) => c.id != defaultHiddenCollection.id)
         .toList();
-    await _sortCollectionsByCurrentPreferences(
+    await CollectionsService.instance.sortCollectionsByAlbumPreferences(
       hiddenCollectionsExcludingDefault,
     );
     if (!mounted) {
@@ -115,43 +112,6 @@ class _HiddenPageState extends State<HiddenPage> {
         ..clear()
         ..addAll(hiddenCollectionsExcludingDefault);
       _defaultHiddenCollectionId = defaultHiddenCollection.id;
-    });
-  }
-
-  Future<void> _sortCollectionsByCurrentPreferences(
-    List<Collection> collectionsToSort,
-  ) async {
-    if (collectionsToSort.length < 2) {
-      return;
-    }
-    final currentSortKey = localSettings.albumSortKey();
-    final currentSortDirection = localSettings.albumSortDirection();
-
-    Map<int, int>? collectionIDToNewestPhotoTime;
-    if (currentSortKey == AlbumSortKey.newestPhoto) {
-      collectionIDToNewestPhotoTime = await CollectionsService.instance
-          .getCollectionIDToNewestFileTime();
-    }
-
-    collectionsToSort.sort((first, second) {
-      int comparison;
-      if (currentSortKey == AlbumSortKey.albumName) {
-        comparison = compareAsciiLowerCaseNatural(
-          first.displayName,
-          second.displayName,
-        );
-      } else if (currentSortKey == AlbumSortKey.newestPhoto) {
-        comparison =
-            (collectionIDToNewestPhotoTime?[second.id] ?? -1 * intMaxValue)
-                .compareTo(
-                  collectionIDToNewestPhotoTime?[first.id] ?? -1 * intMaxValue,
-                );
-      } else {
-        comparison = second.updationTime.compareTo(first.updationTime);
-      }
-      return currentSortDirection == AlbumSortDirection.ascending
-          ? comparison
-          : -comparison;
     });
   }
 
@@ -171,7 +131,7 @@ class _HiddenPageState extends State<HiddenPage> {
     }
     final appBar = GalleryAppBarWidget.sliverConfig(
       widget.appBarType,
-      AppLocalizations.of(context).hidden,
+      context.strings.hidden,
       _selectedFiles,
     );
     final gallery = Gallery(
@@ -211,7 +171,10 @@ class _HiddenPageState extends State<HiddenPage> {
       selectedFiles: _selectedFiles,
       initialFiles: null,
       emptyState: _hiddenCollectionsExcludingDefault.isEmpty
-          ? const EmptyHiddenWidget()
+          ? EmptyStateComponent(
+              assetPath: "assets/empty_state_hidden.png",
+              title: context.strings.hiddenItemsWillShowUpHere,
+            )
           : const SizedBox.shrink(),
       header: Column(
         children: [
@@ -256,7 +219,7 @@ class _HiddenPageState extends State<HiddenPage> {
                 CollectionListPage(
                   _hiddenCollectionsExcludingDefault,
                   sectionType: UISectionType.hiddenCollections,
-                  appTitle: Text(AppLocalizations.of(context).hidden),
+                  appTitle: Text(context.strings.hidden),
                   tag: "hidden",
                 ),
               );

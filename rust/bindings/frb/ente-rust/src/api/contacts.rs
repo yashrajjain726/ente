@@ -1,110 +1,53 @@
-//! FRB bindings for contacts APIs.
-
 use std::sync::Arc;
 
-use ente_contacts::{
-    AttachmentType as CoreAttachmentType, ContactData as CoreContactData,
-    ContactRecord as CoreContactRecord, ContactsCtx as CoreContactsCtx,
-    ContactsError as CoreContactsError, LegacyKit as CoreLegacyKit,
-    LegacyKitCreateResult as CoreLegacyKitCreateResult, LegacyKitMetadata as CoreLegacyKitMetadata,
-    LegacyKitOwnerRecoverySession, LegacyKitPart as CoreLegacyKitPart, LegacyKitRecoveryInitiator,
-    LegacyKitRecoverySession as CoreLegacyKitRecoverySession,
-    LegacyKitRecoveryStatus as CoreLegacyKitRecoveryStatus, LegacyKitShare as CoreLegacyKitShare,
-    LegacyKitVariant as CoreLegacyKitVariant, OpenContactsCtxInput as CoreOpenContactsCtxInput,
-    RootKeySource as CoreRootKeySource, WrappedRootContactKey as CoreWrappedRootContactKey,
-};
-use ente_core::auth::KeyAttributes as CoreKeyAttributes;
+use ente_contacts::{LegacyKitOwnerRecoverySession, LegacyKitRecoveryInitiator};
 use flutter_rust_bridge::frb;
 
 #[frb]
-/// Contact API errors exposed over Flutter Rust Bridge.
 pub enum ContactsError {
-    /// API HTTP error with status and message.
-    Http {
-        /// Error response body or summary message.
-        message: String,
-        /// HTTP status code returned by the API.
-        status: u16,
-    },
-    /// Network transport error.
-    Network {
-        /// Underlying network error description.
-        message: String,
-    },
-    /// Response or payload parse error.
-    Parse {
-        /// Parse failure description.
-        message: String,
-    },
-    /// Invalid request or base URL error.
-    InvalidUrl {
-        /// Invalid URL description.
-        message: String,
-    },
-    /// Cryptographic operation failed.
-    Crypto {
-        /// Cryptographic error description.
-        message: String,
-    },
-    /// Authentication or recovery crypto operation failed.
-    Auth {
-        /// Authentication error description.
-        message: String,
-    },
-    /// Input validation failed.
-    InvalidInput {
-        /// Validation failure description.
-        message: String,
-    },
-    /// Missing encrypted contact payload on a live contact response.
-    MissingEncryptedData,
-    /// Missing encrypted contact key on a live contact response.
-    MissingEncryptedKey,
-    /// Contact profile picture does not exist.
-    ProfilePictureNotFound,
+    Network { message: String },
+    Http { status: u16, message: String },
+    Parse { message: String },
+    Crypto { message: String },
+    Auth { message: String },
+    InvalidInput { message: String },
+    MissingEncryptedData { message: String },
+    MissingEncryptedKey { message: String },
+    ProfilePictureNotFound { message: String },
+    ActiveRecoverySession { message: String },
 }
 
-impl From<CoreContactsError> for ContactsError {
-    fn from(value: CoreContactsError) -> Self {
-        match value {
-            CoreContactsError::Http(ente_core::http::Error::Http {
-                status, message, ..
-            }) => ContactsError::Http { message, status },
-            CoreContactsError::Http(ente_core::http::Error::Network(message)) => {
-                ContactsError::Network { message }
-            }
-            CoreContactsError::Http(ente_core::http::Error::Parse(message)) => {
-                ContactsError::Parse { message }
-            }
-            CoreContactsError::Http(ente_core::http::Error::InvalidUrl(message)) => {
-                ContactsError::InvalidUrl { message }
-            }
-            CoreContactsError::Crypto(message) => ContactsError::Crypto {
-                message: message.to_string(),
+impl From<ente_contacts::Error> for ContactsError {
+    fn from(e: ente_contacts::Error) -> Self {
+        use ente_contacts::ErrorKind as K;
+        let message = ente_core::error::chain(&e);
+        match e.kind() {
+            K::Network => Self::Network { message },
+            K::Http => Self::Http {
+                status: e.status().unwrap_or_default(),
+                message,
             },
-            CoreContactsError::Auth(message) => ContactsError::Auth {
-                message: message.to_string(),
-            },
-            CoreContactsError::InvalidInput(message) => ContactsError::InvalidInput { message },
-            CoreContactsError::MissingEncryptedData => ContactsError::MissingEncryptedData,
-            CoreContactsError::MissingEncryptedKey => ContactsError::MissingEncryptedKey,
-            CoreContactsError::ProfilePictureNotFound => ContactsError::ProfilePictureNotFound,
+            K::Parse => Self::Parse { message },
+            K::Crypto => Self::Crypto { message },
+            K::Auth => Self::Auth { message },
+            K::InvalidInput => Self::InvalidInput { message },
+            K::MissingEncryptedData => Self::MissingEncryptedData { message },
+            K::MissingEncryptedKey => Self::MissingEncryptedKey { message },
+            K::ProfilePictureNotFound => Self::ProfilePictureNotFound { message },
+            K::ActiveRecoverySession => Self::ActiveRecoverySession { message },
         }
     }
 }
 
 #[frb]
 #[derive(Clone)]
-/// Persistable wrapped root contact key returned from Rust.
 pub struct WrappedRootContactKey {
-    /// Wrapped root contact key bytes encoded as base64.
     pub encrypted_key: String,
-    /// Blob header used to unwrap the root contact key.
     pub header: String,
 }
 
-impl From<CoreWrappedRootContactKey> for WrappedRootContactKey {
-    fn from(value: CoreWrappedRootContactKey) -> Self {
+impl From<ente_contacts::WrappedRootContactKey> for WrappedRootContactKey {
+    fn from(value: ente_contacts::WrappedRootContactKey) -> Self {
         Self {
             encrypted_key: value.encrypted_key,
             header: value.header,
@@ -112,7 +55,7 @@ impl From<CoreWrappedRootContactKey> for WrappedRootContactKey {
     }
 }
 
-impl From<WrappedRootContactKey> for CoreWrappedRootContactKey {
+impl From<WrappedRootContactKey> for ente_contacts::WrappedRootContactKey {
     fn from(value: WrappedRootContactKey) -> Self {
         Self {
             encrypted_key: value.encrypted_key,
@@ -123,38 +66,26 @@ impl From<WrappedRootContactKey> for CoreWrappedRootContactKey {
 
 #[frb]
 #[derive(Clone)]
-/// Account key attributes required to decrypt the owner's recovery key.
 pub struct AccountKeyAttributes {
-    /// Salt for deriving key-encryption-key from password (base64).
     pub kek_salt: String,
-    /// Master key encrypted with KEK (base64).
     pub encrypted_key: String,
-    /// Nonce for master key decryption (base64).
     pub key_decryption_nonce: String,
-    /// X25519 public key (base64).
     pub public_key: String,
-    /// Secret key encrypted with master key (base64).
     pub encrypted_secret_key: String,
-    /// Nonce for secret key decryption (base64).
     pub secret_key_decryption_nonce: String,
-    /// Argon2 memory limit.
-    pub mem_limit: Option<u32>,
-    /// Argon2 ops limit.
-    pub ops_limit: Option<u32>,
-    /// Master key encrypted with recovery key (base64).
+    pub mem_limit: u32,
+    pub ops_limit: u32,
     pub master_key_encrypted_with_recovery_key: Option<String>,
-    /// Nonce for master key decryption with recovery key (base64).
     pub master_key_decryption_nonce: Option<String>,
-    /// Recovery key encrypted with master key (base64).
     pub recovery_key_encrypted_with_master_key: Option<String>,
-    /// Nonce for recovery key decryption (base64).
     pub recovery_key_decryption_nonce: Option<String>,
 }
 
-impl From<AccountKeyAttributes> for CoreKeyAttributes {
+impl From<AccountKeyAttributes> for ente_accounts::auth::KeyAttributes {
     fn from(value: AccountKeyAttributes) -> Self {
         Self {
             kek_salt: value.kek_salt,
+            kek_hash: None,
             encrypted_key: value.encrypted_key,
             key_decryption_nonce: value.key_decryption_nonce,
             public_key: value.public_key,
@@ -172,58 +103,40 @@ impl From<AccountKeyAttributes> for CoreKeyAttributes {
 
 #[frb]
 #[derive(Clone)]
-/// Encrypted contact payload fields managed by the client.
 pub struct ContactData {
-    /// User id of the contact being referenced.
     pub contact_user_id: i64,
-    /// User-chosen display name for the contact.
     pub name: String,
-    /// Optional birthday in `yyyy-MM-dd` format.
-    pub birth_date: Option<String>,
 }
 
-impl From<ContactData> for CoreContactData {
+impl From<ContactData> for ente_contacts::ContactData {
     fn from(value: ContactData) -> Self {
         Self {
             contact_user_id: value.contact_user_id,
             name: value.name,
-            birth_date: value.birth_date,
         }
     }
 }
 
 #[frb]
 #[derive(Clone)]
-/// Fully decoded contact record returned by Rust.
 pub struct ContactRecord {
-    /// Stable contact entity id.
     pub id: String,
-    /// User id of the referenced contact.
     pub contact_user_id: i64,
-    /// Server-resolved mutable email for the referenced user.
     pub email: Option<String>,
-    /// Client-managed display name from the encrypted payload.
     pub name: Option<String>,
-    /// Optional birthday from the encrypted payload.
-    pub birth_date: Option<String>,
-    /// Current profile picture attachment id, if any.
     pub profile_picture_attachment_id: Option<String>,
-    /// Whether this record is a tombstone.
     pub is_deleted: bool,
-    /// Contact creation timestamp in microseconds.
     pub created_at: i64,
-    /// Last update timestamp in microseconds.
     pub updated_at: i64,
 }
 
-impl From<CoreContactRecord> for ContactRecord {
-    fn from(value: CoreContactRecord) -> Self {
+impl From<ente_contacts::ContactRecord> for ContactRecord {
+    fn from(value: ente_contacts::ContactRecord) -> Self {
         Self {
             id: value.id,
             contact_user_id: value.contact_user_id,
             email: value.email,
             name: value.name,
-            birth_date: value.birth_date,
             profile_picture_attachment_id: value.profile_picture_attachment_id,
             is_deleted: value.is_deleted,
             created_at: value.created_at,
@@ -234,66 +147,52 @@ impl From<CoreContactRecord> for ContactRecord {
 
 #[frb]
 #[derive(Clone, Copy)]
-/// Offline legacy kit split variant.
 pub enum LegacyKitVariant {
-    /// Any two of three sheets can recover the account.
     TwoOfThree,
 }
 
-impl From<CoreLegacyKitVariant> for LegacyKitVariant {
-    fn from(value: CoreLegacyKitVariant) -> Self {
+impl From<ente_contacts::LegacyKitVariant> for LegacyKitVariant {
+    fn from(value: ente_contacts::LegacyKitVariant) -> Self {
         match value {
-            CoreLegacyKitVariant::TwoOfThree => Self::TwoOfThree,
+            ente_contacts::LegacyKitVariant::TwoOfThree => Self::TwoOfThree,
         }
     }
 }
 
 #[frb]
 #[derive(Clone, Copy)]
-/// Owner-visible recovery session status for an offline legacy kit.
 pub enum LegacyKitRecoveryStatus {
-    /// Waiting for the selected recovery time.
     Waiting,
-    /// Recovery bundle is available.
     Ready,
-    /// Owner blocked this recovery attempt.
     Blocked,
-    /// Recovery was cancelled.
     Cancelled,
-    /// Recovery completed.
     Recovered,
 }
 
-impl From<CoreLegacyKitRecoveryStatus> for LegacyKitRecoveryStatus {
-    fn from(value: CoreLegacyKitRecoveryStatus) -> Self {
+impl From<ente_contacts::LegacyKitRecoveryStatus> for LegacyKitRecoveryStatus {
+    fn from(value: ente_contacts::LegacyKitRecoveryStatus) -> Self {
         match value {
-            CoreLegacyKitRecoveryStatus::Waiting => Self::Waiting,
-            CoreLegacyKitRecoveryStatus::Ready => Self::Ready,
-            CoreLegacyKitRecoveryStatus::Blocked => Self::Blocked,
-            CoreLegacyKitRecoveryStatus::Cancelled => Self::Cancelled,
-            CoreLegacyKitRecoveryStatus::Recovered => Self::Recovered,
+            ente_contacts::LegacyKitRecoveryStatus::Waiting => Self::Waiting,
+            ente_contacts::LegacyKitRecoveryStatus::Ready => Self::Ready,
+            ente_contacts::LegacyKitRecoveryStatus::Blocked => Self::Blocked,
+            ente_contacts::LegacyKitRecoveryStatus::Cancelled => Self::Cancelled,
+            ente_contacts::LegacyKitRecoveryStatus::Recovered => Self::Recovered,
         }
     }
 }
 
 #[frb]
 #[derive(Clone)]
-/// Owner-visible recovery session for an offline legacy kit.
 pub struct LegacyKitRecoverySession {
-    /// Recovery session id.
     pub id: String,
-    /// Kit id being recovered.
     pub kit_id: String,
-    /// Current recovery status.
     pub status: LegacyKitRecoveryStatus,
-    /// Remaining microseconds until the recovery becomes usable.
     pub wait_till: i64,
-    /// Session creation timestamp.
     pub created_at: i64,
 }
 
-impl From<CoreLegacyKitRecoverySession> for LegacyKitRecoverySession {
-    fn from(value: CoreLegacyKitRecoverySession) -> Self {
+impl From<ente_contacts::LegacyKitRecoverySession> for LegacyKitRecoverySession {
+    fn from(value: ente_contacts::LegacyKitRecoverySession) -> Self {
         Self {
             id: value.id,
             kit_id: value.kit_id,
@@ -306,13 +205,9 @@ impl From<CoreLegacyKitRecoverySession> for LegacyKitRecoverySession {
 
 #[frb]
 #[derive(Clone)]
-/// Owner-facing audit hint for a successful legacy kit recovery open.
 pub struct LegacyKitRecoveryInitiatorHint {
-    /// Client-reported sheet indexes used by the recovery flow.
     pub used_part_indexes: Vec<u8>,
-    /// Server-observed IP address.
     pub ip: String,
-    /// Server-observed user agent.
     pub user_agent: String,
 }
 
@@ -328,11 +223,8 @@ impl From<LegacyKitRecoveryInitiator> for LegacyKitRecoveryInitiatorHint {
 
 #[frb]
 #[derive(Clone)]
-/// Owner-facing recovery session details for a legacy kit.
 pub struct LegacyKitOwnerRecoverySessionDetails {
-    /// Active session, if one exists.
     pub session: Option<LegacyKitRecoverySession>,
-    /// Server-captured audit hints for successful recovery opens.
     pub initiators: Vec<LegacyKitRecoveryInitiatorHint>,
 }
 
@@ -347,16 +239,13 @@ impl From<LegacyKitOwnerRecoverySession> for LegacyKitOwnerRecoverySessionDetail
 
 #[frb]
 #[derive(Clone)]
-/// One named part of an offline legacy kit.
 pub struct LegacyKitPart {
-    /// One-based part index encoded in the recovery sheet.
     pub index: u8,
-    /// Human-readable part holder/storage name.
     pub name: String,
 }
 
-impl From<CoreLegacyKitPart> for LegacyKitPart {
-    fn from(value: CoreLegacyKitPart) -> Self {
+impl From<ente_contacts::LegacyKitPart> for LegacyKitPart {
+    fn from(value: ente_contacts::LegacyKitPart) -> Self {
         Self {
             index: value.index,
             name: value.name,
@@ -366,14 +255,12 @@ impl From<CoreLegacyKitPart> for LegacyKitPart {
 
 #[frb]
 #[derive(Clone)]
-/// Decrypted owner metadata for an offline legacy kit.
 pub struct LegacyKitMetadata {
-    /// Named recovery parts.
     pub parts: Vec<LegacyKitPart>,
 }
 
-impl From<CoreLegacyKitMetadata> for LegacyKitMetadata {
-    fn from(value: CoreLegacyKitMetadata) -> Self {
+impl From<ente_contacts::LegacyKitMetadata> for LegacyKitMetadata {
+    fn from(value: ente_contacts::LegacyKitMetadata) -> Self {
         Self {
             parts: value.parts.into_iter().map(Into::into).collect(),
         }
@@ -382,28 +269,19 @@ impl From<CoreLegacyKitMetadata> for LegacyKitMetadata {
 
 #[frb]
 #[derive(Clone)]
-/// Offline legacy kit record visible to the owner.
 pub struct LegacyKit {
-    /// Stable kit id.
     pub id: String,
-    /// Split variant.
     pub variant: LegacyKitVariant,
-    /// Configured notice period in hours.
     pub notice_period_in_hours: i32,
-    /// Public URL of the legacy recovery web app for this server.
     pub legacy_url: String,
-    /// Decrypted owner metadata.
     pub metadata: LegacyKitMetadata,
-    /// Kit creation timestamp.
     pub created_at: i64,
-    /// Kit update timestamp.
     pub updated_at: i64,
-    /// Active owner-visible recovery session, if any.
     pub active_recovery_session: Option<LegacyKitRecoverySession>,
 }
 
-impl From<CoreLegacyKit> for LegacyKit {
-    fn from(value: CoreLegacyKit) -> Self {
+impl From<ente_contacts::LegacyKit> for LegacyKit {
+    fn from(value: ente_contacts::LegacyKit) -> Self {
         Self {
             id: value.id,
             variant: value.variant.into(),
@@ -419,26 +297,18 @@ impl From<CoreLegacyKit> for LegacyKit {
 
 #[frb]
 #[derive(Clone)]
-/// One offline legacy kit recovery share to encode into a recovery sheet.
 pub struct LegacyKitShare {
-    /// Payload version.
     pub payload_version: u8,
-    /// Split variant.
     pub variant: LegacyKitVariant,
-    /// Kit id.
     pub kit_id: String,
-    /// One-based share index.
     pub share_index: u8,
-    /// Encoded share bytes.
     pub share: String,
-    /// Share checksum.
     pub checksum: String,
-    /// Human-readable part name.
     pub part_name: String,
 }
 
-impl From<CoreLegacyKitShare> for LegacyKitShare {
-    fn from(value: CoreLegacyKitShare) -> Self {
+impl From<ente_contacts::LegacyKitShare> for LegacyKitShare {
+    fn from(value: ente_contacts::LegacyKitShare) -> Self {
         Self {
             payload_version: value.payload_version,
             variant: value.variant.into(),
@@ -453,16 +323,13 @@ impl From<CoreLegacyKitShare> for LegacyKitShare {
 
 #[frb]
 #[derive(Clone)]
-/// Result of creating an offline legacy kit.
 pub struct LegacyKitCreateResult {
-    /// Created kit record.
     pub kit: LegacyKit,
-    /// Recovery shares that must be exported immediately.
     pub shares: Vec<LegacyKitShare>,
 }
 
-impl From<CoreLegacyKitCreateResult> for LegacyKitCreateResult {
-    fn from(value: CoreLegacyKitCreateResult) -> Self {
+impl From<ente_contacts::LegacyKitCreateResult> for LegacyKitCreateResult {
+    fn from(value: ente_contacts::LegacyKitCreateResult) -> Self {
         Self {
             kit: value.kit.into(),
             shares: value.shares.into_iter().map(Into::into).collect(),
@@ -472,84 +339,64 @@ impl From<CoreLegacyKitCreateResult> for LegacyKitCreateResult {
 
 #[frb]
 #[derive(Clone)]
-/// Source used to obtain the root contact key during open.
 pub enum RootKeySource {
-    /// Reused the caller-provided cached wrapped root key.
     Cache,
-    /// Opened without a cached wrapped root key; Rust will resolve it lazily.
     Unresolved,
 }
 
-impl From<CoreRootKeySource> for RootKeySource {
-    fn from(value: CoreRootKeySource) -> Self {
+impl From<ente_contacts::RootKeySource> for RootKeySource {
+    fn from(value: ente_contacts::RootKeySource) -> Self {
         match value {
-            CoreRootKeySource::Cache => RootKeySource::Cache,
-            CoreRootKeySource::Unresolved => RootKeySource::Unresolved,
+            ente_contacts::RootKeySource::Cache => RootKeySource::Cache,
+            ente_contacts::RootKeySource::Unresolved => RootKeySource::Unresolved,
         }
     }
 }
 
 #[frb]
 #[derive(Clone, Copy)]
-/// Attachment types supported by the contacts subsystem.
 pub enum AttachmentType {
-    /// Current contact profile picture.
     ProfilePicture,
 }
 
-impl From<AttachmentType> for CoreAttachmentType {
+impl From<AttachmentType> for ente_contacts::AttachmentType {
     fn from(value: AttachmentType) -> Self {
         match value {
-            AttachmentType::ProfilePicture => CoreAttachmentType::ProfilePicture,
+            AttachmentType::ProfilePicture => ente_contacts::AttachmentType::ProfilePicture,
         }
     }
 }
 
 #[frb]
-/// Input required to open an account-scoped contacts context.
 pub struct OpenContactsCtxInput {
-    /// Base Ente API URL.
     pub base_url: String,
-    /// Auth token for Ente API requests.
     pub auth_token: String,
-    /// Logged-in owner user id.
     pub user_id: i64,
-    /// Logged-in account key used to unwrap or create the root contact key.
     pub master_key: Vec<u8>,
-    /// Optional cached wrapped root key for the current user.
     pub cached_wrapped_root_contact_key: Option<WrappedRootContactKey>,
-    /// Optional user agent to send to Ente API endpoints.
     pub user_agent: Option<String>,
-    /// Optional client package header to send to Ente API endpoints.
     pub client_package: Option<String>,
-    /// Optional client version header to send to Ente API endpoints.
     pub client_version: Option<String>,
 }
 
 #[frb]
-/// Result returned when opening a contacts context.
 pub struct OpenContactsCtxResult {
-    /// Opaque contacts context bound to the current account/session.
     pub ctx: ContactsCtx,
-    /// Current wrapped root key that the caller may persist, if already resolved.
     pub wrapped_root_contact_key: Option<WrappedRootContactKey>,
-    /// State of the root key during open.
     pub root_key_source: RootKeySource,
 }
 
 #[frb(opaque)]
 #[derive(Clone)]
-/// Opaque account-scoped contacts context exposed to Flutter.
 pub struct ContactsCtx {
-    inner: Arc<CoreContactsCtx>,
+    inner: Arc<ente_contacts::ContactsCtx>,
 }
 
 #[frb]
-/// Open a contacts context for the current account.
 pub async fn open_contacts_ctx(
     input: OpenContactsCtxInput,
 ) -> Result<OpenContactsCtxResult, ContactsError> {
-    let opened = CoreContactsCtx::open(CoreOpenContactsCtxInput {
+    let opened = ente_contacts::ContactsCtx::open(ente_contacts::OpenContactsCtxInput {
         base_url: input.base_url,
         auth_token: input.auth_token,
         user_id: input.user_id,
@@ -573,25 +420,21 @@ pub async fn open_contacts_ctx(
 
 impl ContactsCtx {
     #[frb(sync)]
-    /// Return the owner user id for this contacts context.
     pub fn user_id(&self) -> i64 {
         self.inner.user_id()
     }
 
-    /// Replace the auth token used for subsequent API requests.
     pub fn update_auth_token(&self, auth_token: String) {
         self.inner.update_auth_token(auth_token);
     }
 
     #[frb(sync)]
-    /// Return the current wrapped root key for caller-managed persistence, if resolved.
     pub fn current_wrapped_root_contact_key(&self) -> Option<WrappedRootContactKey> {
         self.inner
             .current_wrapped_root_contact_key()
             .map(Into::into)
     }
 
-    /// Create a contact for the referenced user.
     pub async fn create_contact(&self, data: ContactData) -> Result<ContactRecord, ContactsError> {
         self.inner
             .create_contact(&data.into())
@@ -600,7 +443,6 @@ impl ContactsCtx {
             .map_err(Into::into)
     }
 
-    /// Fetch a single contact by id.
     pub async fn get_contact(&self, contact_id: String) -> Result<ContactRecord, ContactsError> {
         self.inner
             .get_contact(&contact_id)
@@ -609,7 +451,6 @@ impl ContactsCtx {
             .map_err(Into::into)
     }
 
-    /// Fetch a contacts diff since the provided timestamp.
     pub async fn get_diff(
         &self,
         since_time: i64,
@@ -622,7 +463,6 @@ impl ContactsCtx {
             .map_err(Into::into)
     }
 
-    /// Update the encrypted payload for an existing contact.
     pub async fn update_contact(
         &self,
         contact_id: String,
@@ -635,7 +475,6 @@ impl ContactsCtx {
             .map_err(Into::into)
     }
 
-    /// Tombstone a contact by id.
     pub async fn delete_contact(&self, contact_id: String) -> Result<(), ContactsError> {
         self.inner
             .delete_contact(&contact_id)
@@ -643,7 +482,6 @@ impl ContactsCtx {
             .map_err(Into::into)
     }
 
-    /// Encrypt and upload a new attachment for the contact.
     pub async fn set_attachment(
         &self,
         contact_id: String,
@@ -657,7 +495,6 @@ impl ContactsCtx {
             .map_err(Into::into)
     }
 
-    /// Download an encrypted attachment by type and attachment id.
     pub async fn get_attachment_encrypted(
         &self,
         attachment_type: AttachmentType,
@@ -669,7 +506,6 @@ impl ContactsCtx {
             .map_err(Into::into)
     }
 
-    /// Remove the current attachment for a contact and type.
     pub async fn delete_attachment(
         &self,
         contact_id: String,
@@ -682,7 +518,6 @@ impl ContactsCtx {
             .map_err(Into::into)
     }
 
-    /// Encrypt and upload a new contact profile picture.
     pub async fn set_profile_picture(
         &self,
         contact_id: String,
@@ -692,7 +527,6 @@ impl ContactsCtx {
             .await
     }
 
-    /// Download and decrypt the current contact profile picture.
     pub async fn get_profile_picture(&self, contact_id: String) -> Result<Vec<u8>, ContactsError> {
         self.inner
             .get_profile_picture(&contact_id)
@@ -700,7 +534,6 @@ impl ContactsCtx {
             .map_err(Into::into)
     }
 
-    /// Remove the current contact profile picture.
     pub async fn delete_profile_picture(
         &self,
         contact_id: String,
@@ -709,7 +542,6 @@ impl ContactsCtx {
             .await
     }
 
-    /// List owner-created offline legacy kits.
     pub async fn legacy_kits(&self) -> Result<Vec<LegacyKit>, ContactsError> {
         self.inner
             .legacy_kits()
@@ -718,7 +550,6 @@ impl ContactsCtx {
             .map_err(Into::into)
     }
 
-    /// Create an offline legacy kit and return the printable recovery shares.
     pub async fn legacy_kit_create(
         &self,
         current_user_key_attrs: AccountKeyAttributes,
@@ -742,7 +573,6 @@ impl ContactsCtx {
             .map_err(Into::into)
     }
 
-    /// Download the printable recovery shares for an existing offline legacy kit.
     pub async fn legacy_kit_download_shares(
         &self,
         kit_id: String,
@@ -754,7 +584,6 @@ impl ContactsCtx {
             .map_err(Into::into)
     }
 
-    /// Fetch owner-visible active recovery session details for a legacy kit.
     pub async fn legacy_kit_recovery_session(
         &self,
         kit_id: String,
@@ -766,7 +595,6 @@ impl ContactsCtx {
             .map_err(Into::into)
     }
 
-    /// Update the recovery wait time for a legacy kit.
     pub async fn legacy_kit_update_recovery_notice(
         &self,
         kit_id: String,
@@ -778,7 +606,6 @@ impl ContactsCtx {
             .map_err(Into::into)
     }
 
-    /// Block the active recovery session for a legacy kit.
     pub async fn legacy_kit_block_recovery(&self, kit_id: String) -> Result<(), ContactsError> {
         self.inner
             .legacy_kit_block_recovery(&kit_id)
@@ -786,7 +613,6 @@ impl ContactsCtx {
             .map_err(Into::into)
     }
 
-    /// Delete an offline legacy kit.
     pub async fn legacy_kit_delete(&self, kit_id: String) -> Result<(), ContactsError> {
         self.inner
             .legacy_kit_delete(&kit_id)

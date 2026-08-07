@@ -5,18 +5,18 @@ import (
 	"net/http"
 	"strconv"
 
-	fileData "github.com/ente-io/museum/ente/filedata"
-	"github.com/ente-io/museum/pkg/controller/collections"
-	"github.com/ente-io/museum/pkg/controller/filedata"
-	"github.com/ente-io/museum/pkg/controller/public"
+	fileData "github.com/ente/museum/ente/filedata"
+	"github.com/ente/museum/pkg/controller/collections"
+	"github.com/ente/museum/pkg/controller/filedata"
+	"github.com/ente/museum/pkg/controller/public"
 
-	"github.com/ente-io/museum/pkg/controller/storagebonus"
+	"github.com/ente/museum/pkg/controller/storagebonus"
 
-	"github.com/ente-io/museum/ente"
-	"github.com/ente-io/museum/pkg/controller"
-	"github.com/ente-io/museum/pkg/utils/auth"
-	"github.com/ente-io/museum/pkg/utils/handler"
-	"github.com/ente-io/stacktrace"
+	"github.com/ente/museum/ente"
+	"github.com/ente/museum/pkg/controller"
+	"github.com/ente/museum/pkg/utils/auth"
+	"github.com/ente/museum/pkg/utils/handler"
+	"github.com/ente/stacktrace"
 	"github.com/gin-gonic/gin"
 )
 
@@ -37,6 +37,18 @@ func (h *PublicCollectionHandler) GetThumbnail(c *gin.Context) {
 // GetFile redirects the request to the file location
 func (h *PublicCollectionHandler) GetFile(c *gin.Context) {
 	h.getFileForType(c, ente.FILE)
+}
+
+// GetThumbnailURLV3 returns the thumbnail URL and reserves HTTP 404 for an unavailable endpoint.
+func (h *PublicCollectionHandler) GetThumbnailURLV3(c *gin.Context) {
+	url, err := h.getFileURL(c, ente.THUMBNAIL)
+	writeFileURLV3(c, url, err)
+}
+
+// GetFileURLV3 returns the file URL and reserves HTTP 404 for an unavailable endpoint.
+func (h *PublicCollectionHandler) GetFileURLV3(c *gin.Context) {
+	url, err := h.getFileURL(c, ente.FILE)
+	writeFileURLV3(c, url, err)
 }
 
 func (h *PublicCollectionHandler) GetPreviewURL(c *gin.Context) {
@@ -122,32 +134,11 @@ func (h *PublicCollectionHandler) GetCollection(c *gin.Context) {
 	c.JSON(http.StatusOK, response)
 }
 
-// GetUploadUrls returns upload Urls where files can be uploaded
-func (h *PublicCollectionHandler) GetUploadUrls(c *gin.Context) {
-	enteApp := auth.GetApp(c)
-
-	collection, err := h.Controller.GetPublicCollection(c, true)
-	if err != nil {
-		handler.Error(c, stacktrace.Propagate(err, ""))
-		return
-	}
-	userID := collection.Owner.ID
-	count, _ := strconv.Atoi(c.Query("count"))
-	urls, err := h.FileCtrl.GetUploadURLs(c, userID, count, enteApp, false)
-	if err != nil {
-		handler.Error(c, stacktrace.Propagate(err, ""))
-		return
-	}
-	c.JSON(http.StatusOK, gin.H{
-		"urls": urls,
-	})
-}
-
 // GetUploadURLV2 returns a single upload URL that enforces checksum + content-length headers
 func (h *PublicCollectionHandler) GetUploadURLV2(c *gin.Context) {
 	enteApp := auth.GetApp(c)
 	var req ente.UploadURLRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := handler.BindJSON(c, &req); err != nil {
 		handler.Error(c, stacktrace.Propagate(err, ""))
 		return
 	}
@@ -164,33 +155,17 @@ func (h *PublicCollectionHandler) GetUploadURLV2(c *gin.Context) {
 	c.JSON(http.StatusOK, url)
 }
 
-// GetMultipartUploadURLs returns upload Urls where files can be uploaded
-func (h *PublicCollectionHandler) GetMultipartUploadURLs(c *gin.Context) {
-	enteApp := auth.GetApp(c)
-
-	collection, err := h.Controller.GetPublicCollection(c, true)
-	if err != nil {
-		handler.Error(c, stacktrace.Propagate(err, ""))
-		return
-	}
-	userID := collection.Owner.ID
-	count, _ := strconv.Atoi(c.Query("count"))
-	urls, err := h.FileCtrl.GetMultipartUploadURLs(c, userID, count, enteApp)
-	if err != nil {
-		handler.Error(c, stacktrace.Propagate(err, ""))
-		return
-	}
-	c.JSON(http.StatusOK, gin.H{
-		"urls": urls,
-	})
-}
-
 // GetMultipartUploadURLV2 returns multipart upload URLs for a single object with enforced metadata
 func (h *PublicCollectionHandler) GetMultipartUploadURLV2(c *gin.Context) {
 	enteApp := auth.GetApp(c)
 	var req ente.MultipartUploadURLRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := handler.BindJSON(c, &req); err != nil {
 		handler.Error(c, stacktrace.Propagate(err, ""))
+		return
+	}
+	// TODO: Remove once deferred multipart checksums are enabled for public uploads.
+	if len(req.PartMD5s) == 0 {
+		handler.Error(c, ente.ErrBadRequest)
 		return
 	}
 	collection, err := h.Controller.GetPublicCollection(c, true)
@@ -209,7 +184,7 @@ func (h *PublicCollectionHandler) GetMultipartUploadURLV2(c *gin.Context) {
 // CreateFile create a new file inside the collection corresponding to the public accessToken
 func (h *PublicCollectionHandler) CreateFile(c *gin.Context) {
 	var file ente.File
-	if err := c.ShouldBindJSON(&file); err != nil {
+	if err := handler.BindJSON(c, &file); err != nil {
 		handler.Error(c, stacktrace.Propagate(err, ""))
 		return
 	}
@@ -232,7 +207,7 @@ func (h *PublicCollectionHandler) CreateFile(c *gin.Context) {
 // VerifyPassword verifies the password for given public access token and return signed jwt token if it's valid
 func (h *PublicCollectionHandler) VerifyPassword(c *gin.Context) {
 	var req ente.VerifyPasswordRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := handler.BindJSON(c, &req); err != nil {
 		handler.Error(c, stacktrace.Propagate(err, ""))
 		return
 	}
@@ -266,16 +241,23 @@ func (h *PublicCollectionHandler) GetDiff(c *gin.Context) {
 }
 
 func (h *PublicCollectionHandler) getFileForType(c *gin.Context, objectType ente.ObjectType) {
-	fileID, err := strconv.ParseInt(c.Param("fileID"), 10, 64)
-	if err != nil {
-		handler.Error(c, stacktrace.Propagate(ente.ErrBadRequest, ""))
-		return
-	}
-	accessContext := auth.MustGetPublicAccessContext(c)
-	url, err := h.FileCtrl.GetPublicOrCastFileURL(c, fileID, objectType, accessContext.CollectionID)
+	url, err := h.getFileURL(c, objectType)
 	if err != nil {
 		handler.Error(c, stacktrace.Propagate(err, ""))
 		return
 	}
 	c.Redirect(http.StatusTemporaryRedirect, url)
+}
+
+func (h *PublicCollectionHandler) getFileURL(c *gin.Context, objectType ente.ObjectType) (string, error) {
+	fileID, err := strconv.ParseInt(c.Param("fileID"), 10, 64)
+	if err != nil {
+		return "", stacktrace.Propagate(ente.ErrBadRequest, "")
+	}
+	accessContext := auth.MustGetPublicAccessContext(c)
+	url, err := h.FileCtrl.GetPublicOrCastFileURL(c, fileID, objectType, accessContext.CollectionID)
+	if err != nil {
+		return "", stacktrace.Propagate(err, "")
+	}
+	return url, nil
 }

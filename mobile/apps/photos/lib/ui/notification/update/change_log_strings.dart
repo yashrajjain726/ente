@@ -1,41 +1,9 @@
 import 'dart:ui';
 
 class ChangeLogStrings {
-  final String title1;
-  final String desc1;
-  final String desc1Item1;
-  final String desc1Item2;
-  final String title2;
-  final String desc2;
-  final String title3;
-  final String desc3;
-  final String title4;
-  final String desc4;
+  final List<ChangeLogEntryStrings> entries;
 
-  const ChangeLogStrings({
-    required this.title1,
-    required this.desc1,
-    this.desc1Item1 = '',
-    this.desc1Item2 = '',
-    this.title2 = '',
-    this.desc2 = '',
-    this.title3 = '',
-    this.desc3 = '',
-    this.title4 = '',
-    this.desc4 = '',
-  });
-
-  bool get hasVisibleEntries =>
-      title1.trim().isNotEmpty ||
-      desc1.trim().isNotEmpty ||
-      desc1Item1.trim().isNotEmpty ||
-      desc1Item2.trim().isNotEmpty ||
-      title2.trim().isNotEmpty ||
-      desc2.trim().isNotEmpty ||
-      title3.trim().isNotEmpty ||
-      desc3.trim().isNotEmpty ||
-      title4.trim().isNotEmpty ||
-      desc4.trim().isNotEmpty;
+  const ChangeLogStrings({required this.entries});
 
   static ChangeLogStrings? maybeForLocale(
     Locale locale, {
@@ -44,16 +12,22 @@ class ChangeLogStrings {
     final key = locale.countryCode != null && locale.countryCode!.isNotEmpty
         ? '${locale.languageCode}_${locale.countryCode}'
         : locale.languageCode;
-    final translations = isLocalGallery ? _offlineTranslations : _translations;
     final strings =
-        translations[key] ??
-        translations[locale.languageCode] ??
-        translations['en'];
+        _translations[key] ??
+        _translations[locale.languageCode] ??
+        _translations['en'];
 
-    if (strings == null || !strings.hasVisibleEntries) {
+    if (strings == null) {
       return null;
     }
-    return strings;
+
+    final entries = strings.entries
+        .where(
+          (entry) =>
+              isLocalGallery ? !entry.isOnlineOnly : !entry.isLocalGalleryOnly,
+        )
+        .toList(growable: false);
+    return entries.isEmpty ? null : ChangeLogStrings(entries: entries);
   }
 
   static bool hasContentForLocale(
@@ -65,292 +39,883 @@ class ChangeLogStrings {
 
   static const Map<String, ChangeLogStrings> _translations = {
     'en': ChangeLogStrings(
-      title1: 'A fresh new look',
-      desc1:
-          "We've given the app a fresh look, with new fonts, colors, spacing, and buttons throughout. Plus, feed gets its own tab in the bottom navigation.",
-      title2: 'Albums, all in one place',
-      desc2:
-          'All your albums (backed up, shared, and on-device) now live on a single page. Search, switch between grid and list view, and order them based on your preferences.',
-      title3: 'A bunch of improvements',
-      desc3:
-          "Photos download much faster, face thumbnail generation is quicker, and the text recognition animation feels smoother. You can also now bulk ignore faces straight from a photo's info panel. Plus a whole lot of squashed bugs.",
+      entries: [
+        ChangeLogEntryStrings(
+          title: 'Faster photo analysis',
+          description:
+              'Ente’s on-device machine learning now analyzes your photos 5–10 times faster.',
+          isLocalGalleryOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Faster, sharper face suggestions',
+          description:
+              "The image processing now runs 5-10 times faster! Also, blurry and sideways faces no longer muddy your people groups, and we will remember the faces you've already dismissed.",
+          isOnlineOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Panoramas, reborn',
+          description:
+              'Rebuilt from the ground up. Panoramas open faster, move smoothly, and no longer come up blank.',
+        ),
+        ChangeLogEntryStrings(
+          title: "Backups that don't get stuck",
+          description:
+              "If your device runs out of room mid-backup, Ente now tells you and picks up where it left off once you've freed some space.",
+          isOnlineOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Casting, simplified',
+          description:
+              'Screens are easier to find on Android and pair automatically on iOS. No extra setup.',
+          isOnlineOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Mute, remembered',
+          description:
+              'Silence a video once and it stays that way for the next one.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'and more!',
+          description:
+              'Clear your Trash straight from Free up space, a smoother and more reliable app lock, favoriting shared photos in memories, Traditional Chinese joins the language list, smoother swiping in the photo viewer, plus fixes for uploading to multiple albums and picking SD card media in other apps.',
+          isOnlineOnly: true,
+        ),
+      ],
+    ),
+    'ca': ChangeLogStrings(
+      entries: [
+        ChangeLogEntryStrings(
+          title: 'Anàlisi de fotos més ràpida',
+          description:
+              "L'aprenentatge automàtic d'Ente ara analitza les teves fotos al dispositiu entre 5 i 10 vegades més ràpid.",
+          isLocalGalleryOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Suggeriments de cares més ràpids i precisos',
+          description:
+              "El processament d'imatges ara és entre 5 i 10 vegades més ràpid! A més, les cares borroses o de costat ja no desordenen els grups de persones, i recordarem les cares que ja hagis descartat.",
+          isOnlineOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Panoràmiques, renovades',
+          description:
+              "Refetes des de zero. Les panoràmiques s'obren més ràpid, es desplacen amb fluïdesa i ja no apareixen en blanc.",
+        ),
+        ChangeLogEntryStrings(
+          title: "Còpies de seguretat que no es queden encallades",
+          description:
+              "Si el dispositiu es queda sense espai durant una còpia de seguretat, Ente t'avisa i reprèn la còpia des d'on s'havia aturat quan hagis alliberat una mica d'espai.",
+          isOnlineOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Transmissió simplificada',
+          description:
+              "Trobar pantalles és més fàcil a Android, i a iOS es vinculen automàticament. Sense cap configuració addicional.",
+          isOnlineOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Silenci recordat',
+          description:
+              'Silencia un vídeo una vegada i el següent continuarà silenciat.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'i molt més!',
+          description:
+              "Buida la Paperera directament des d'Allibera espai, un bloqueig de l'aplicació més fluid i fiable, marca com a favorites les fotos compartides als records, el xinès tradicional s'incorpora a la llista d'idiomes, un desplaçament més fluid al visualitzador de fotos i correccions per pujar contingut a diversos àlbums i seleccionar contingut multimèdia de la targeta SD en altres aplicacions.",
+          isOnlineOnly: true,
+        ),
+      ],
     ),
     'cs': ChangeLogStrings(
-      title1: 'Zcela nový vzhled',
-      desc1:
-          'Dali jsme aplikaci svěží vzhled s novými fonty, barvami, rozestupy a tlačítky napříč celou aplikací. Feed má navíc vlastní kartu ve spodní navigaci.',
-      title2: 'Alba, všechna na jednom místě',
-      desc2:
-          'Všechna vaše alba (zálohovaná, sdílená i v zařízení) teď najdete na jedné stránce. Můžete vyhledávat, přepínat mezi mřížkou a seznamem a řadit je podle svých preferencí.',
-      title3: 'Spousta vylepšení',
-      desc3:
-          'Fotky se stahují mnohem rychleji, generování miniatur obličejů je rychlejší a animace rozpoznávání textu je plynulejší. Nově také můžete hromadně ignorovat obličeje přímo z informačního panelu fotky. A opravili jsme spoustu chyb.',
+      entries: [
+        ChangeLogEntryStrings(
+          title: 'Rychlejší analýza fotek',
+          description:
+              'Strojové učení Ente teď analyzuje vaše fotky přímo v zařízení 5–10× rychleji.',
+          isLocalGalleryOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Rychlejší a přesnější návrhy obličejů',
+          description:
+              'Zpracování obrázků je teď 5–10× rychlejší! Rozmazané obličeje a obličeje otočené na bok už navíc nenarušují skupiny osob a zapamatujeme si, které obličeje jste už zamítli.',
+          isOnlineOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Panoramata jako znovuzrozená',
+          description:
+              'Přepracovali jsme je od základů. Panoramata se otevírají rychleji, plynule se posouvají a už se nezobrazují prázdná.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Zálohy, které se nezaseknou',
+          description:
+              'Pokud v zařízení během zálohování dojde místo, Ente vás teď upozorní a po uvolnění místa zálohování naváže tam, kde skončilo.',
+          isOnlineOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Jednodušší přenos na obrazovku',
+          description:
+              'V Androidu se obrazovky snáze vyhledávají a v iOS se párují automaticky. Bez dalšího nastavování.',
+          isOnlineOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Ztlumení, které si pamatujeme',
+          description:
+              'Jednou video ztlumte a ztlumené zůstane i to následující.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'a ještě víc!',
+          description:
+              'Vyprázdnění Koše přímo z nabídky Uvolnit místo, plynulejší a spolehlivější zámek aplikace, přidávání sdílených fotek ze vzpomínek do oblíbených, tradiční čínština v seznamu jazyků, plynulejší přejíždění v prohlížeči fotek a také opravy nahrávání do více alb a výběru médií z SD karty v jiných aplikacích.',
+          isOnlineOnly: true,
+        ),
+      ],
     ),
     'de': ChangeLogStrings(
-      title1: 'Ein frischer neuer Look',
-      desc1:
-          'Wir haben der App einen frischen Look gegeben, mit neuen Schriften, Farben, Abständen und Buttons überall. Außerdem bekommt der Feed einen eigenen Tab in der unteren Navigation.',
-      title2: 'Alben, alle an einem Ort',
-      desc2:
-          'Alle deine Alben (gesichert, geteilt und auf dem Gerät) befinden sich jetzt auf einer einzigen Seite. Suche, wechsle zwischen Raster- und Listenansicht und sortiere sie nach deinen Vorlieben.',
-      title3: 'Viele Verbesserungen',
-      desc3:
-          'Fotos werden viel schneller heruntergeladen, Gesichtsvorschaubilder werden schneller erstellt und die Texterkennungsanimation wirkt flüssiger. Du kannst jetzt außerdem Gesichter direkt im Infobereich eines Fotos gesammelt ignorieren. Dazu kommen viele behobene Fehler.',
+      entries: [
+        ChangeLogEntryStrings(
+          title: 'Schnellere Fotoanalyse',
+          description:
+              'Das maschinelle Lernen von Ente analysiert deine Fotos jetzt direkt auf deinem Gerät 5–10-mal schneller.',
+          isLocalGalleryOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Schnellere, präzisere Gesichtsvorschläge',
+          description:
+              'Die Bildverarbeitung läuft jetzt 5–10-mal schneller! Außerdem bringen unscharfe und seitlich gedrehte Gesichter deine Personengruppen nicht mehr durcheinander, und wir merken uns, welche Gesichter du bereits verworfen hast.',
+          isOnlineOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Panoramen, neu erfunden',
+          description:
+              'Von Grund auf neu entwickelt. Panoramen öffnen sich schneller, lassen sich flüssig bewegen und werden nicht mehr leer angezeigt.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Backups, die nicht stecken bleiben',
+          description:
+              'Wenn auf deinem Gerät während eines Backups der Speicherplatz ausgeht, sagt Ente dir jetzt Bescheid und macht dort weiter, wo es aufgehört hat, sobald du etwas Speicherplatz freigegeben hast.',
+          isOnlineOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Casting, ganz einfach',
+          description:
+              'Auf Android lassen sich Bildschirme leichter finden, auf iOS werden sie automatisch gekoppelt. Keine zusätzliche Einrichtung.',
+          isOnlineOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Stummschaltung, gespeichert',
+          description:
+              'Schalte ein Video einmal stumm, und auch das nächste bleibt stumm.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'und vieles mehr!',
+          description:
+              'Leere deinen Papierkorb direkt über Speicherplatz freigeben, nutze eine flüssigere und zuverlässigere App-Sperre, markiere geteilte Fotos in Erinnerungen als Favoriten, wähle traditionelles Chinesisch aus der Sprachliste, wische flüssiger durch die Fotoanzeige und profitiere von Fehlerbehebungen beim Hochladen in mehrere Alben und beim Auswählen von Medien auf SD-Karten in anderen Apps.',
+          isOnlineOnly: true,
+        ),
+      ],
     ),
     'es': ChangeLogStrings(
-      title1: 'Un nuevo aspecto renovado',
-      desc1:
-          'Le hemos dado a la app un aspecto renovado, con nuevas fuentes, colores, espaciado y botones en toda la aplicación. Además, el feed ahora tiene su propia pestaña en la navegación inferior.',
-      title2: 'Álbumes, todos en un solo lugar',
-      desc2:
-          'Todos tus álbumes (respaldados, compartidos y del dispositivo) ahora viven en una sola página. Busca, cambia entre vista de cuadrícula y lista, y ordénalos según tus preferencias.',
-      title3: 'Un montón de mejoras',
-      desc3:
-          'Las fotos se descargan mucho más rápido, la generación de miniaturas de rostros es más veloz y la animación de reconocimiento de texto se siente más fluida. También puedes ignorar rostros en bloque directamente desde el panel de información de una foto. Además de muchos errores corregidos.',
+      entries: [
+        ChangeLogEntryStrings(
+          title: 'Análisis de fotos más rápido',
+          description:
+              'El aprendizaje automático de Ente ahora analiza tus fotos en el dispositivo entre 5 y 10 veces más rápido.',
+          isLocalGalleryOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Sugerencias de rostros más rápidas y precisas',
+          description:
+              '¡El procesamiento de imágenes ahora es entre 5 y 10 veces más rápido! Además, los rostros borrosos o girados de lado ya no enturbian tus grupos de personas, y recordaremos los rostros que ya hayas descartado.',
+          isOnlineOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Panorámicas, renacidas',
+          description:
+              'Reconstruidas desde cero. Las panorámicas se abren más rápido, se mueven con fluidez y ya no aparecen en blanco.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Copias de seguridad que no se atascan',
+          description:
+              'Si tu dispositivo se queda sin espacio durante una copia de seguridad, Ente te avisa y la reanuda desde donde se quedó en cuanto hayas liberado algo de espacio.',
+          isOnlineOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Transmisión simplificada',
+          description:
+              'En Android, las pantallas son más fáciles de encontrar y, en iOS, se vinculan automáticamente. Sin configuración adicional.',
+          isOnlineOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Silencio que se recuerda',
+          description:
+              'Silencia un vídeo una vez y el siguiente también permanecerá en silencio.',
+        ),
+        ChangeLogEntryStrings(
+          title: '¡y mucho más!',
+          description:
+              'Vacía la Papelera directamente desde Liberar espacio, disfruta de un bloqueo de aplicación más fluido y fiable, marca como favoritas las fotos compartidas en los recuerdos, encuentra el chino tradicional en la lista de idiomas, desliza con más fluidez en el visor de fotos y aprovecha las correcciones para subir contenido a varios álbumes y elegir archivos multimedia de la tarjeta SD en otras aplicaciones.',
+          isOnlineOnly: true,
+        ),
+      ],
     ),
     'fr': ChangeLogStrings(
-      title1: 'Un tout nouveau style',
-      desc1:
-          "Nous avons donné un nouveau souffle à l'app, avec de nouvelles polices, couleurs, espacements et de nouveaux boutons partout. Le fil dispose aussi de son propre onglet dans la navigation du bas.",
-      title2: 'Tous vos albums au même endroit',
-      desc2:
-          'Tous vos albums (sauvegardés, partagés et présents sur l’appareil) sont maintenant réunis sur une seule page. Recherchez, passez de la grille à la liste, et triez-les selon vos préférences.',
-      title3: 'De nombreuses améliorations',
-      desc3:
-          "Les photos se téléchargent beaucoup plus vite, la génération des vignettes de visages est plus rapide et l'animation de reconnaissance de texte est plus fluide. Vous pouvez aussi ignorer plusieurs visages à la fois directement depuis le panneau d'informations d'une photo. Sans oublier de nombreux bugs corrigés.",
+      entries: [
+        ChangeLogEntryStrings(
+          title: 'Analyse des photos plus rapide',
+          description:
+              'L’apprentissage automatique d’Ente analyse désormais vos photos sur votre appareil 5 à 10 fois plus vite.',
+          isLocalGalleryOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Des suggestions de visages plus rapides et plus précises',
+          description:
+              'Le traitement d’image est désormais 5 à 10 fois plus rapide ! De plus, les visages flous ou inclinés ne perturbent plus vos groupes de personnes, et nous mémoriserons les visages que vous avez déjà ignorés.',
+          isOnlineOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Panoramas, nouvelle génération',
+          description:
+              'Entièrement reconstruits. Les panoramas s’ouvrent plus vite, se déplacent en toute fluidité et ne s’affichent plus vides.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Des sauvegardes qui ne restent pas bloquées',
+          description:
+              'Si votre appareil manque d’espace en cours de sauvegarde, Ente vous prévient désormais et reprend là où elle s’était arrêtée dès que vous avez libéré de l’espace.',
+          isOnlineOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Diffusion simplifiée',
+          description:
+              'Les écrans sont plus faciles à trouver sous Android et s’associent automatiquement sous iOS. Aucune configuration supplémentaire.',
+          isOnlineOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Le mode silencieux, mémorisé',
+          description:
+              'Coupez le son d’une vidéo une fois, et la suivante restera également muette.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'et bien plus encore !',
+          description:
+              'Videz votre Corbeille directement depuis Libérer de l’espace, profitez d’un verrouillage de l’application plus fluide et plus fiable, ajoutez aux favoris les photos partagées dans les souvenirs, retrouvez le chinois traditionnel dans la liste des langues, parcourez la visionneuse de photos plus facilement et profitez de correctifs pour l’envoi vers plusieurs albums et la sélection de médias de la carte SD dans d’autres applications.',
+          isOnlineOnly: true,
+        ),
+      ],
     ),
     'it': ChangeLogStrings(
-      title1: 'Un nuovo look fresco',
-      desc1:
-          "Abbiamo dato all'app un look più fresco, con nuovi font, colori, spaziature e pulsanti in tutta l'esperienza. Inoltre, il feed ha una scheda dedicata nella navigazione inferiore.",
-      title2: 'Album, tutti in un unico posto',
-      desc2:
-          'Tutti i tuoi album (sottoposti a backup, condivisi e sul dispositivo) ora si trovano in un’unica pagina. Cerca, passa dalla vista griglia alla lista e ordinali in base alle tue preferenze.',
-      title3: 'Tanti miglioramenti',
-      desc3:
-          'Le foto si scaricano molto più velocemente, la generazione delle miniature dei volti è più rapida e l’animazione del riconoscimento del testo è più fluida. Ora puoi anche ignorare più volti in blocco direttamente dal pannello informazioni di una foto. E abbiamo risolto molti bug.',
+      entries: [
+        ChangeLogEntryStrings(
+          title: 'Analisi delle foto più veloce',
+          description:
+              'L’apprendimento automatico di Ente ora analizza le tue foto sul dispositivo da 5 a 10 volte più velocemente.',
+          isLocalGalleryOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Suggerimenti di volti più rapidi e precisi',
+          description:
+              'L’elaborazione delle immagini ora è da 5 a 10 volte più veloce! Inoltre, i volti sfocati o ruotati di lato non confondono più i tuoi gruppi di persone e ricorderemo i volti che hai già ignorato.',
+          isOnlineOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Panoramiche, rinate',
+          description:
+              'Ricostruite da zero. Le panoramiche si aprono più velocemente, si muovono con fluidità e non appaiono più vuote.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Backup che non si bloccano',
+          description:
+              'Se il dispositivo esaurisce lo spazio durante un backup, Ente ora ti avvisa e riprende da dove si era interrotto non appena avrai liberato un po’ di spazio.',
+          isOnlineOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Trasmissione su schermo, semplificata',
+          description:
+              'Su Android è più facile trovare gli schermi, mentre su iOS si abbinano automaticamente. Nessuna configurazione aggiuntiva.',
+          isOnlineOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Il silenzioso resta attivo',
+          description:
+              'Disattiva l’audio di un video una volta e resterà disattivato anche per il successivo.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'e molto altro!',
+          description:
+              'Svuota il Cestino direttamente da Libera spazio, usa un blocco app più fluido e affidabile, aggiungi ai preferiti le foto condivise nei ricordi, trova il cinese tradizionale nell’elenco delle lingue, scorri più fluidamente nel visualizzatore di foto e approfitta delle correzioni per il caricamento in più album e la selezione dei contenuti della scheda SD in altre app.',
+          isOnlineOnly: true,
+        ),
+      ],
     ),
     'ja': ChangeLogStrings(
-      title1: '新しくなった見た目',
-      desc1:
-          'アプリ全体のフォント、色、余白、ボタンを見直し、より新鮮な見た目にしました。さらに、フィードが下部ナビゲーションの専用タブになりました。',
-      title2: 'すべてのアルバムを一か所に',
-      desc2:
-          'バックアップ済み、共有中、端末上のすべてのアルバムが1つのページにまとまりました。検索、グリッド表示とリスト表示の切り替え、好みに合わせた並べ替えができます。',
-      title3: 'たくさんの改善',
-      desc3:
-          '写真のダウンロードが大幅に速くなり、顔サムネイルの生成も高速化され、テキスト認識のアニメーションもよりスムーズになりました。写真の情報パネルから複数の顔をまとめて無視できるようにもなりました。その他、多くのバグも修正しています。',
+      entries: [
+        ChangeLogEntryStrings(
+          title: '写真解析を高速化',
+          description: 'Enteの機械学習が、デバイス上で写真を5～10倍速く解析できるようになりました。',
+          isLocalGalleryOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'より速く、より正確な顔の候補',
+          description:
+              '画像処理が5～10倍高速になりました！さらに、ぼやけた顔や横向きの顔が人物グループに混ざらなくなり、すでに除外した顔も記憶されます。',
+          isOnlineOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'パノラマを一新',
+          description: 'ゼロから作り直しました。パノラマがより速く開き、滑らかに動作し、真っ白に表示されることもなくなりました。',
+        ),
+        ChangeLogEntryStrings(
+          title: '止まらないバックアップ',
+          description:
+              'バックアップ中に端末の空き容量が不足すると、Enteがお知らせし、空き容量を確保した後に中断したところから再開します。',
+          isOnlineOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'キャストをシンプルに',
+          description: 'Androidでは画面を見つけやすくなり、iOSでは自動でペアリングされます。追加の設定は必要ありません。',
+          isOnlineOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'ミュート設定を記憶',
+          description: '一度動画をミュートにすると、次の動画でもミュートのままになります。',
+        ),
+        ChangeLogEntryStrings(
+          title: 'ほかにも！',
+          description:
+              '「スペースを解放する」から直接ゴミ箱を空にできるようになったほか、よりスムーズで信頼性の高いアプリロック、思い出内の共有写真のお気に入り登録、繁体字中国語の言語リストへの追加、写真ビューアでのより滑らかなスワイプ、複数のアルバムへのアップロードや他のアプリでのSDカード内メディアの選択に関する修正を行いました。',
+          isOnlineOnly: true,
+        ),
+      ],
     ),
     'nl': ChangeLogStrings(
-      title1: 'Een frisse nieuwe look',
-      desc1:
-          'We hebben de app een frisse look gegeven, met nieuwe lettertypen, kleuren, ruimte en knoppen overal. Bovendien heeft de feed nu een eigen tab in de navigatie onderaan.',
-      title2: 'Albums, allemaal op één plek',
-      desc2:
-          'Al je albums (geback-upt, gedeeld en op je apparaat) staan nu op één pagina. Zoek, wissel tussen raster- en lijstweergave en sorteer ze zoals jij wilt.',
-      title3: 'Een heleboel verbeteringen',
-      desc3:
-          'Foto’s downloaden veel sneller, gezichtminiaturen worden sneller gegenereerd en de animatie voor tekstherkenning voelt vloeiender. Je kunt nu ook meerdere gezichten tegelijk negeren vanuit het infopaneel van een foto. En we hebben heel wat bugs opgelost.',
+      entries: [
+        ChangeLogEntryStrings(
+          title: 'Snellere fotoanalyse',
+          description:
+              'Ente’s machinelearning analyseert je foto’s nu rechtstreeks op je apparaat, 5–10 keer zo snel.',
+          isLocalGalleryOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Snellere, scherpere gezichtssuggesties',
+          description:
+              'De beeldverwerking is nu 5–10 keer zo snel! Bovendien vertroebelen onscherpe en gedraaide gezichten je persoonsgroepen niet meer en onthouden we welke gezichten je al hebt afgewezen.',
+          isOnlineOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Panorama’s, herboren',
+          description:
+              'Helemaal opnieuw opgebouwd. Panorama’s openen sneller, bewegen soepel en worden niet meer blanco weergegeven.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Back-ups die niet vastlopen',
+          description:
+              'Als de opslagruimte op je apparaat tijdens een back-up opraakt, laat Ente je dat nu weten en gaat de back-up verder waar die was gebleven zodra je wat ruimte hebt vrijgemaakt.',
+          isOnlineOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Casten, vereenvoudigd',
+          description:
+              'Schermen zijn gemakkelijker te vinden op Android en worden automatisch gekoppeld op iOS. Geen extra configuratie.',
+          isOnlineOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Dempen, onthouden',
+          description:
+              'Demp een video één keer en ook de volgende blijft gedempt.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'en nog veel meer!',
+          description:
+              'Leeg je Prullenbak rechtstreeks vanuit Ruimte vrijmaken, gebruik een soepelere en betrouwbaardere app-vergrendeling, voeg gedeelde foto’s in herinneringen toe aan je favorieten, kies Traditioneel Chinees in de talenlijst, veeg soepeler door de fotoviewer en profiteer van oplossingen voor uploaden naar meerdere albums en het kiezen van media op een SD-kaart in andere apps.',
+          isOnlineOnly: true,
+        ),
+      ],
     ),
     'no': ChangeLogStrings(
-      title1: 'Et friskt nytt utseende',
-      desc1:
-          'Vi har gitt appen et friskt utseende, med nye skrifter, farger, avstand og knapper overalt. I tillegg får feeden sin egen fane i bunnavigasjonen.',
-      title2: 'Album, samlet på ett sted',
-      desc2:
-          'Alle albumene dine (sikkerhetskopierte, delte og på enheten) finnes nå på én side. Søk, bytt mellom rutenett- og listevisning, og sorter dem slik du foretrekker.',
-      title3: 'Mange forbedringer',
-      desc3:
-          'Bilder lastes ned mye raskere, generering av ansiktsminiatyrer går raskere, og animasjonen for tekstgjenkjenning føles jevnere. Du kan også ignorere flere ansikter samtidig direkte fra infopanelet til et bilde. I tillegg har vi fikset en hel del feil.',
+      entries: [
+        ChangeLogEntryStrings(
+          title: 'Raskere bildeanalyse',
+          description:
+              'Entes maskinlæring analyserer nå bildene dine på enheten 5–10 ganger raskere.',
+          isLocalGalleryOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Raskere og skarpere ansiktsforslag',
+          description:
+              'Bildebehandlingen er nå 5–10 ganger raskere! I tillegg vil ikke uskarpe og sidelengs ansikter lenger rote til persongruppene dine, og vi husker ansiktene du allerede har avvist.',
+          isOnlineOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Panoramaer, gjenfødt',
+          description:
+              'Bygget opp helt fra bunnen av. Panoramaer åpnes raskere, beveger seg jevnt og vises ikke lenger tomme.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Sikkerhetskopier som ikke setter seg fast',
+          description:
+              'Hvis enheten din går tom for lagringsplass under sikkerhetskopiering, sier Ente fra og fortsetter der den slapp så snart du har frigjort litt plass.',
+          isOnlineOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Enklere casting',
+          description:
+              'Det er enklere å finne skjermer på Android, og på iOS sammenkobles de automatisk. Ingen ekstra oppsett.',
+          isOnlineOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Demping, husket',
+          description:
+              'Demp en video én gang, så forblir også den neste dempet.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'og mye mer!',
+          description:
+              'Tøm Papirkurv direkte fra Frigjør lagringsplass, bruk en jevnere og mer pålitelig applås, merk delte bilder i minner som favoritter, finn tradisjonell kinesisk i språklisten, sveip jevnere i bildevisningen, og få rettelser for opplasting til flere album og valg av medier fra SD-kort i andre apper.',
+          isOnlineOnly: true,
+        ),
+      ],
     ),
     'pl': ChangeLogStrings(
-      title1: 'Świeży, nowy wygląd',
-      desc1:
-          'Odświeżyliśmy wygląd aplikacji, wprowadzając nowe fonty, kolory, odstępy i przyciski w całej aplikacji. Dodatkowo feed ma teraz własną kartę w dolnej nawigacji.',
-      title2: 'Albumy w jednym miejscu',
-      desc2:
-          'Wszystkie Twoje albumy (z kopią zapasową, udostępnione i z urządzenia) znajdują się teraz na jednej stronie. Możesz je wyszukiwać, przełączać widok siatki i listy oraz sortować według własnych preferencji.',
-      title3: 'Mnóstwo usprawnień',
-      desc3:
-          'Zdjęcia pobierają się znacznie szybciej, miniatury twarzy generują się szybciej, a animacja rozpoznawania tekstu jest płynniejsza. Możesz też zbiorczo ignorować twarze bezpośrednio z panelu informacji o zdjęciu. Do tego naprawiliśmy wiele błędów.',
+      entries: [
+        ChangeLogEntryStrings(
+          title: 'Szybsza analiza zdjęć',
+          description:
+              'Uczenie maszynowe Ente analizuje teraz Twoje zdjęcia na urządzeniu 5–10 razy szybciej.',
+          isLocalGalleryOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Szybsze i trafniejsze sugestie twarzy',
+          description:
+              'Przetwarzanie obrazów jest teraz 5–10 razy szybsze! Ponadto rozmazane i obrócone bokiem twarze nie zaburzają już grup osób, a twarze, które zostały już odrzucone, zostaną zapamiętane.',
+          isOnlineOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Panoramy od nowa',
+          description:
+              'Przebudowane od podstaw. Panoramy otwierają się szybciej, przesuwają płynnie i nie wyświetlają się już jako puste.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Kopie zapasowe, które się nie zacinają',
+          description:
+              'Jeśli podczas tworzenia kopii zapasowej na urządzeniu zabraknie miejsca, Ente teraz Cię o tym poinformuje i po zwolnieniu miejsca wznowi pracę od momentu, w którym została przerwana.',
+          isOnlineOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Prostsze przesyłanie na ekran',
+          description:
+              'W Androidzie ekrany łatwiej znaleźć, a w iOS parują się automatycznie. Bez dodatkowej konfiguracji.',
+          isOnlineOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Wyciszenie zapamiętane',
+          description:
+              'Wycisz film raz, a następny również pozostanie wyciszony.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'i wiele więcej!',
+          description:
+              'Opróżnianie Kosza bezpośrednio z opcji Zwolnij miejsce, płynniejsza i bardziej niezawodna blokada aplikacji, dodawanie do ulubionych udostępnionych zdjęć ze wspomnień, tradycyjny chiński na liście języków, płynniejsze przesuwanie w przeglądarce zdjęć oraz poprawki przesyłania do wielu albumów i wybierania multimediów z karty SD w innych aplikacjach.',
+          isOnlineOnly: true,
+        ),
+      ],
     ),
     'pt_BR': ChangeLogStrings(
-      title1: 'Um visual renovado',
-      desc1:
-          'Demos ao app um visual renovado, com novas fontes, cores, espaçamentos e botões por toda parte. Além disso, o feed agora tem sua própria aba na navegação inferior.',
-      title2: 'Álbuns, todos em um só lugar',
-      desc2:
-          'Todos os seus álbuns (com backup, compartilhados e no dispositivo) agora ficam em uma única página. Pesquise, alterne entre visualização em grade e lista, e ordene tudo conforme suas preferências.',
-      title3: 'Várias melhorias',
-      desc3:
-          'As fotos baixam muito mais rápido, a geração de miniaturas de rostos ficou mais ágil e a animação de reconhecimento de texto está mais suave. Agora você também pode ignorar rostos em massa diretamente pelo painel de informações de uma foto. E corrigimos muitos bugs.',
+      entries: [
+        ChangeLogEntryStrings(
+          title: 'Análise de fotos mais rápida',
+          description:
+              'O aprendizado de máquina do Ente agora analisa suas fotos diretamente no dispositivo de 5 a 10 vezes mais rápido.',
+          isLocalGalleryOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Sugestões de rostos mais rápidas e precisas',
+          description:
+              'O processamento de imagens agora é de 5 a 10 vezes mais rápido! Além disso, rostos desfocados ou de lado não atrapalham mais seus grupos de pessoas, e vamos lembrar quais rostos você já dispensou.',
+          isOnlineOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Panoramas, renovados',
+          description:
+              'Reconstruídos do zero. Os panoramas abrem mais rápido, movem-se com fluidez e não aparecem mais em branco.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Backups que não travam',
+          description:
+              'Se o seu dispositivo ficar sem espaço durante um backup, o Ente agora avisa e retoma de onde parou assim que você liberar um pouco de espaço.',
+          isOnlineOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Transmissão simplificada',
+          description:
+              'No Android, é mais fácil encontrar telas; no iOS, elas são pareadas automaticamente. Sem configuração extra.',
+          isOnlineOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'O modo mudo fica salvo',
+          description:
+              'Silencie um vídeo uma vez e o próximo também ficará sem som.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'e muito mais!',
+          description:
+              'Esvazie a Lixeira direto em Liberar espaço, use um bloqueio do aplicativo mais fluido e confiável, favorite fotos compartilhadas nas memórias, encontre o chinês tradicional na lista de idiomas, deslize com mais fluidez no visualizador de fotos e aproveite as correções para uploads em vários álbuns e para selecionar mídias do cartão SD em outros aplicativos.',
+          isOnlineOnly: true,
+        ),
+      ],
     ),
     'pt_PT': ChangeLogStrings(
-      title1: 'Um novo visual renovado',
-      desc1:
-          'Demos à app um visual renovado, com novas fontes, cores, espaçamentos e botões em toda a experiência. Além disso, o feed passa a ter o seu próprio separador na navegação inferior.',
-      title2: 'Álbuns, todos num só lugar',
-      desc2:
-          'Todos os seus álbuns (com cópia de segurança, partilhados e no dispositivo) estão agora numa única página. Pesquise, alterne entre grelha e lista, e ordene-os de acordo com as suas preferências.',
-      title3: 'Muitas melhorias',
-      desc3:
-          'As fotografias são descarregadas muito mais depressa, a geração de miniaturas de rostos é mais rápida e a animação de reconhecimento de texto está mais suave. Agora também pode ignorar rostos em massa diretamente a partir do painel de informações de uma fotografia. E corrigimos muitos bugs.',
+      entries: [
+        ChangeLogEntryStrings(
+          title: 'Análise de fotografias mais rápida',
+          description:
+              'A aprendizagem automática do Ente analisa agora as suas fotografias no dispositivo entre 5 e 10 vezes mais depressa.',
+          isLocalGalleryOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Sugestões de rostos mais rápidas e precisas',
+          description:
+              'O processamento de imagens é agora 5 a 10 vezes mais rápido! Além disso, os rostos desfocados ou de lado já não baralham os seus grupos de pessoas, e vamos recordar os rostos que já dispensou.',
+          isOnlineOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Panoramas, renascidos',
+          description:
+              'Reconstruídos de raiz. Os panoramas abrem mais depressa, movem-se com fluidez e já não aparecem em branco.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Cópias de segurança que não ficam bloqueadas',
+          description:
+              'Se o seu dispositivo ficar sem espaço durante uma cópia de segurança, o Ente avisa-o agora e retoma a partir de onde parou assim que libertar algum espaço.',
+          isOnlineOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Transmissão simplificada',
+          description:
+              'No Android, é mais fácil encontrar ecrãs; no iOS, estes são emparelhados automaticamente. Sem configuração adicional.',
+          isOnlineOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Silêncio, memorizado',
+          description:
+              'Silencie um vídeo uma vez e o seguinte também ficará sem som.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'e muito mais!',
+          description:
+              'Esvazie a Lixeira diretamente em Libertar espaço, use um bloqueio da aplicação mais fluido e fiável, marque como favoritas as fotografias partilhadas nas memórias, encontre o chinês tradicional na lista de idiomas, deslize mais suavemente no visualizador de fotografias e aproveite as correções nos envios para vários álbuns e na seleção de conteúdos do cartão SD noutras aplicações.',
+          isOnlineOnly: true,
+        ),
+      ],
     ),
     'ro': ChangeLogStrings(
-      title1: 'Un aspect nou și proaspăt',
-      desc1:
-          'Am oferit aplicației un aspect nou, cu fonturi, culori, spațieri și butoane noi peste tot. În plus, feedul are acum propria filă în navigarea de jos.',
-      title2: 'Albume, toate într-un singur loc',
-      desc2:
-          'Toate albumele tale (cu backup, partajate și de pe dispozitiv) se află acum pe o singură pagină. Caută, comută între vizualizarea grilă și listă și sortează-le după preferințe.',
-      title3: 'O mulțime de îmbunătățiri',
-      desc3:
-          'Fotografiile se descarcă mult mai rapid, generarea miniaturilor pentru fețe este mai rapidă, iar animația de recunoaștere a textului este mai fluidă. Acum poți ignora în bloc fețe direct din panoul de informații al unei fotografii. Plus multe buguri remediate.',
+      entries: [
+        ChangeLogEntryStrings(
+          title: 'Analiză mai rapidă a fotografiilor',
+          description:
+              'Tehnologia Ente de învățare automată vă analizează acum fotografiile direct pe dispozitiv de 5–10 ori mai repede.',
+          isLocalGalleryOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Sugestii de fețe mai rapide și mai precise',
+          description:
+              'Procesarea imaginilor este acum de 5–10 ori mai rapidă! În plus, fețele neclare sau întoarse într-o parte nu vă mai încurcă grupurile de persoane, iar noi vom reține fețele pe care le-ați respins deja.',
+          isOnlineOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Panorame, renăscute',
+          description:
+              'Reconstruite de la zero. Panoramele se deschid mai repede, se mișcă fluid și nu mai apar goale.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Copii de siguranță care nu se blochează',
+          description:
+              'Dacă dispozitivul rămâne fără spațiu în timpul unei copii de siguranță, Ente vă anunță acum și reia de unde a rămas după ce eliberați puțin spațiu.',
+          isOnlineOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Transmitere simplificată',
+          description:
+              'Ecranele sunt mai ușor de găsit pe Android și se asociază automat pe iOS. Fără configurare suplimentară.',
+          isOnlineOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Sunet dezactivat, setare reținută',
+          description:
+              'Dezactivați sunetul unui videoclip o dată, iar următorul va rămâne și el fără sunet.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'și multe altele!',
+          description:
+              'Goliți Coșul de gunoi direct din Eliberați spațiu, folosiți o blocare a aplicației mai fluidă și mai fiabilă, adăugați la favorite fotografiile partajate din amintiri, găsiți chineza tradițională în lista de limbi, glisați mai fluid în vizualizatorul de fotografii și beneficiați de remedieri pentru încărcarea în mai multe albume și selectarea conținutului media de pe cardul SD în alte aplicații.',
+          isOnlineOnly: true,
+        ),
+      ],
     ),
     'ru': ChangeLogStrings(
-      title1: 'Свежий новый вид',
-      desc1:
-          'Мы обновили внешний вид приложения: новые шрифты, цвета, отступы и кнопки по всему интерфейсу. Кроме того, лента получила отдельную вкладку в нижней навигации.',
-      title2: 'Все альбомы в одном месте',
-      desc2:
-          'Все ваши альбомы (с резервной копией, общие и на устройстве) теперь находятся на одной странице. Ищите, переключайтесь между сеткой и списком и сортируйте их как вам удобно.',
-      title3: 'Много улучшений',
-      desc3:
-          'Фотографии скачиваются гораздо быстрее, миниатюры лиц создаются быстрее, а анимация распознавания текста стала плавнее. Теперь также можно массово игнорировать лица прямо из панели информации о фотографии. И, конечно, мы исправили множество ошибок.',
+      entries: [
+        ChangeLogEntryStrings(
+          title: 'Более быстрый анализ фотографий',
+          description:
+              'Машинное обучение Ente теперь анализирует ваши фотографии на устройстве в 5–10 раз быстрее.',
+          isLocalGalleryOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Более быстрые и точные подсказки лиц',
+          description:
+              'Обработка изображений теперь работает в 5–10 раз быстрее! Кроме того, размытые и повёрнутые набок лица больше не вносят путаницу в группы людей, а мы запомним лица, которые вы уже отклонили.',
+          isOnlineOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Панорамы, рождённые заново',
+          description:
+              'Полностью переработаны. Панорамы открываются быстрее, плавно перемещаются и больше не отображаются пустыми.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Резервные копии, которые не застревают',
+          description:
+              'Если во время резервного копирования на устройстве закончится место, Ente теперь сообщит об этом и продолжит с места остановки, как только вы освободите немного места.',
+          isOnlineOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Трансляция стала проще',
+          description:
+              'На Android экраны теперь проще находить, а на iOS они подключаются автоматически. Никакой дополнительной настройки.',
+          isOnlineOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Отключение звука запоминается',
+          description:
+              'Отключите звук у одного видео — и следующее тоже останется без звука.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'и многое другое!',
+          description:
+              'Очищайте Корзину прямо из раздела Освободить место, пользуйтесь более плавной и надёжной блокировкой приложения, добавляйте в избранное общие фотографии из воспоминаний, выбирайте традиционный китайский в списке языков, плавнее листайте фотографии в средстве просмотра и получайте исправления загрузки в несколько альбомов и выбора медиафайлов с SD-карты в других приложениях.',
+          isOnlineOnly: true,
+        ),
+      ],
     ),
     'tr': ChangeLogStrings(
-      title1: 'Yepyeni ve ferah bir görünüm',
-      desc1:
-          'Uygulamaya baştan sona yeni yazı tipleri, renkler, boşluklar ve düğmelerle ferah bir görünüm kazandırdık. Ayrıca akış artık alt gezinti çubuğunda kendi sekmesine sahip.',
-      title2: 'Albümler, hepsi tek yerde',
-      desc2:
-          'Tüm albümleriniz (yedeklenen, paylaşılan ve cihazdaki) artık tek bir sayfada. Arama yapabilir, ızgara ve liste görünümü arasında geçiş yapabilir ve tercihlerinize göre sıralayabilirsiniz.',
-      title3: 'Bir sürü iyileştirme',
-      desc3:
-          'Fotoğraflar çok daha hızlı indiriliyor, yüz küçük resimleri daha hızlı oluşturuluyor ve metin tanıma animasyonu daha akıcı hissettiriyor. Ayrıca artık bir fotoğrafın bilgi panelinden yüzleri toplu olarak yok sayabilirsiniz. Birçok hata da giderildi.',
+      entries: [
+        ChangeLogEntryStrings(
+          title: 'Daha hızlı fotoğraf analizi',
+          description:
+              'Ente’nin cihaz üzerinde çalışan makine öğrenimi artık fotoğraflarınızı 5–10 kat daha hızlı analiz ediyor.',
+          isLocalGalleryOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Daha hızlı, daha isabetli yüz önerileri',
+          description:
+              'Görüntü işleme artık 5–10 kat daha hızlı! Ayrıca bulanık ve yana dönük yüzler artık kişi gruplarınızı karıştırmıyor ve daha önce reddettiğiniz yüzleri hatırlıyoruz.',
+          isOnlineOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Panoramalar yeniden doğdu',
+          description:
+              'Baştan sona yeniden geliştirildi. Panoramalar daha hızlı açılıyor, akıcı hareket ediyor ve artık boş görünmüyor.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Takılıp kalmayan yedeklemeler',
+          description:
+              'Yedekleme sırasında cihazınızda yer kalmazsa Ente artık sizi bilgilendiriyor ve biraz alan açtıktan sonra kaldığı yerden devam ediyor.',
+          isOnlineOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Ekrana yansıtmak artık daha kolay',
+          description:
+              'Android’de ekranları bulmak daha kolay; iOS’ta ise otomatik olarak eşleştiriliyorlar. Ek kurulum gerekmiyor.',
+          isOnlineOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Sessiz ayarı hatırlanıyor',
+          description:
+              'Bir videonun sesini bir kez kapatın; sonraki video da sessiz kalsın.',
+        ),
+        ChangeLogEntryStrings(
+          title: 've dahası!',
+          description:
+              'Çöp kutunuzu doğrudan Boş alan bölümünden temizleme, daha akıcı ve güvenilir bir uygulama kilidi, anılardaki paylaşılan fotoğrafları favorilere ekleme, dil listesine eklenen Geleneksel Çince, fotoğraf görüntüleyicide daha akıcı kaydırma, ayrıca birden fazla albüme yükleme ve diğer uygulamalarda SD kart medyası seçmeyle ilgili düzeltmeler.',
+          isOnlineOnly: true,
+        ),
+      ],
     ),
     'uk': ChangeLogStrings(
-      title1: 'Свіжий новий вигляд',
-      desc1:
-          'Ми оновили вигляд застосунку: нові шрифти, кольори, відступи й кнопки по всьому інтерфейсу. Крім того, стрічка отримала власну вкладку в нижній навігації.',
-      title2: 'Усі альбоми в одному місці',
-      desc2:
-          'Усі ваші альбоми (з резервною копією, спільні та на пристрої) тепер на одній сторінці. Шукайте, перемикайтеся між сіткою та списком і впорядковуйте їх за власними вподобаннями.',
-      title3: 'Багато покращень',
-      desc3:
-          'Фотографії завантажуються значно швидше, мініатюри облич створюються швидше, а анімація розпізнавання тексту стала плавнішою. Тепер також можна масово ігнорувати обличчя прямо з панелі інформації про фото. І ми виправили багато помилок.',
+      entries: [
+        ChangeLogEntryStrings(
+          title: 'Швидший аналіз фотографій',
+          description:
+              'Машинне навчання Ente тепер аналізує ваші фотографії на пристрої в 5–10 разів швидше.',
+          isLocalGalleryOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Швидші й точніші пропозиції облич',
+          description:
+              'Обробка зображень тепер працює в 5–10 разів швидше! Крім того, розмиті й повернуті набік обличчя більше не вносять плутанину у ваші групи людей, а ми запам’ятаємо обличчя, які ви вже відхилили.',
+          isOnlineOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Панорами, народжені наново',
+          description:
+              'Повністю перебудовані. Панорами відкриваються швидше, рухаються плавно й більше не відображаються порожніми.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Резервні копії, які не застрягають',
+          description:
+              'Якщо під час резервного копіювання на пристрої закінчиться місце, Ente тепер повідомить про це й продовжить із місця зупинки, щойно ви звільните трохи простору.',
+          isOnlineOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Трансляція стала простішою',
+          description:
+              'На Android екрани тепер легше знайти, а на iOS вони з’єднуються автоматично. Жодних додаткових налаштувань.',
+          isOnlineOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Вимкнення звуку запам’ятовується',
+          description:
+              'Вимкніть звук одного відео — і наступне теж залишиться без звуку.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'і багато іншого!',
+          description:
+              'Очищайте Смітник безпосередньо з розділу Звільнити місце, користуйтеся плавнішим і надійнішим блокуванням застосунку, додавайте до улюбленого спільні фотографії зі спогадів, вибирайте традиційну китайську в списку мов, плавніше гортайте у вікні перегляду фотографій, а також отримайте виправлення завантаження до кількох альбомів і вибору медіафайлів із SD-картки в інших застосунках.',
+          isOnlineOnly: true,
+        ),
+      ],
     ),
     'vi': ChangeLogStrings(
-      title1: 'Diện mạo mới mẻ',
-      desc1:
-          'Chúng tôi đã làm mới giao diện ứng dụng với phông chữ, màu sắc, khoảng cách và nút mới trên toàn bộ ứng dụng. Ngoài ra, bảng tin giờ có tab riêng ở thanh điều hướng dưới cùng.',
-      title2: 'Tất cả album ở một nơi',
-      desc2:
-          'Tất cả album của bạn (đã sao lưu, được chia sẻ và trên thiết bị) giờ nằm trên một trang duy nhất. Tìm kiếm, chuyển giữa chế độ lưới và danh sách, rồi sắp xếp theo ý bạn.',
-      title3: 'Rất nhiều cải tiến',
-      desc3:
-          'Ảnh tải xuống nhanh hơn nhiều, việc tạo ảnh thu nhỏ khuôn mặt nhanh hơn và hoạt ảnh nhận dạng văn bản mượt hơn. Giờ bạn cũng có thể bỏ qua hàng loạt khuôn mặt ngay từ bảng thông tin của ảnh. Cùng với rất nhiều lỗi đã được sửa.',
+      entries: [
+        ChangeLogEntryStrings(
+          title: 'Phân tích ảnh nhanh hơn',
+          description:
+              'Công nghệ học máy trên thiết bị của Ente giờ phân tích ảnh của bạn nhanh gấp 5–10 lần.',
+          isLocalGalleryOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Gợi ý khuôn mặt nhanh hơn, chính xác hơn',
+          description:
+              'Khả năng xử lý hình ảnh giờ nhanh gấp 5–10 lần! Ngoài ra, các khuôn mặt bị mờ hoặc nghiêng ngang sẽ không còn làm lẫn lộn các nhóm người, và Ente sẽ ghi nhớ những khuôn mặt bạn đã loại bỏ.',
+          isOnlineOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Ảnh toàn cảnh, tái sinh',
+          description:
+              'Được xây dựng lại từ đầu. Ảnh toàn cảnh mở nhanh hơn, chuyển động mượt mà và không còn hiển thị trống.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Sao lưu không còn mắc kẹt',
+          description:
+              'Nếu thiết bị hết dung lượng giữa chừng khi sao lưu, Ente giờ sẽ thông báo và tiếp tục từ chỗ đã dừng sau khi bạn giải phóng được một ít dung lượng.',
+          isOnlineOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Truyền màn hình, đơn giản hơn',
+          description:
+              'Trên Android, bạn có thể tìm màn hình dễ dàng hơn; trên iOS, màn hình được tự động ghép đôi. Không cần thiết lập thêm.',
+          isOnlineOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Ghi nhớ chế độ tắt tiếng',
+          description:
+              'Tắt tiếng một video một lần và video tiếp theo cũng sẽ tiếp tục tắt tiếng.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'và nhiều hơn nữa!',
+          description:
+              'Xóa sạch Thùng rác ngay trong Giải phóng dung lượng, sử dụng khóa ứng dụng mượt mà và đáng tin cậy hơn, thêm ảnh được chia sẻ trong kỷ niệm vào mục yêu thích, chọn tiếng Trung phồn thể trong danh sách ngôn ngữ, vuốt mượt mà hơn trong trình xem ảnh, cùng các bản sửa lỗi khi tải lên nhiều album và chọn nội dung trên thẻ SD trong các ứng dụng khác.',
+          isOnlineOnly: true,
+        ),
+      ],
     ),
     'zh_CN': ChangeLogStrings(
-      title1: '焕然一新的外观',
-      desc1: '我们为应用带来了全新的外观，整体更新了字体、颜色、间距和按钮。另外，动态现在在底部导航中拥有自己的标签页。',
-      title2: '所有相册，集中一处',
-      desc2: '你的所有相册（已备份、已共享和设备上的相册）现在都集中在一个页面。你可以搜索、在网格和列表视图之间切换，并按自己的偏好排序。',
-      title3: '一系列改进',
-      desc3:
-          '照片下载速度大幅提升，人脸缩略图生成更快，文字识别动画也更流畅。现在你还可以直接从照片信息面板批量忽略人脸。此外，我们还修复了大量问题。',
+      entries: [
+        ChangeLogEntryStrings(
+          title: '照片分析更快',
+          description: 'Ente 现在通过设备端机器学习分析你的照片，速度提升了 5–10 倍。',
+          isLocalGalleryOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: '更快、更精准的人脸建议',
+          description: '图像处理速度现在提升了 5–10 倍！此外，模糊和侧转的人脸不再干扰人物分组，我们还会记住你已经忽略的人脸。',
+          isOnlineOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: '全景照片，焕然新生',
+          description: '从头重构。全景照片打开更快、移动更流畅，也不会再显示为空白。',
+        ),
+        ChangeLogEntryStrings(
+          title: '不再卡住的备份',
+          description: '如果设备在备份过程中空间不足，Ente 现在会提醒你，并在你释放一些空间后从中断处继续。',
+          isOnlineOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: '投屏，更简单',
+          description: '在 Android 上更容易找到屏幕，在 iOS 上则会自动配对。无需额外设置。',
+          isOnlineOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: '静音设置，自动记住',
+          description: '将一个视频静音后，下一个视频也会保持静音。',
+        ),
+        ChangeLogEntryStrings(
+          title: '还有更多！',
+          description:
+              '可直接从“释放空间”清空回收站，应用锁更流畅可靠，可在回忆中收藏共享照片，语言列表新增繁体中文，照片查看器滑动更流畅，以及修复了上传到多个相册和在其他应用中选取 SD 卡媒体的问题。',
+          isOnlineOnly: true,
+        ),
+      ],
+    ),
+    'zh_TW': ChangeLogStrings(
+      entries: [
+        ChangeLogEntryStrings(
+          title: '照片分析更快速',
+          description: 'Ente 的機器學習現在會在裝置上分析您的照片，速度提升 5–10 倍。',
+          isLocalGalleryOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: '更快、更精準的臉孔建議',
+          description:
+              '影像處理速度現在快了 5–10 倍！此外，模糊或橫向的臉孔不再干擾您的人物分組，而且我們會記住您已忽略的臉孔。',
+          isOnlineOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: '全景照片，煥然一新',
+          description: '從頭徹底重建。全景照片開啟速度更快、移動更流暢，也不再顯示空白。',
+        ),
+        ChangeLogEntryStrings(
+          title: '不再卡住的備份',
+          description: '如果您的裝置在備份途中耗盡儲存空間，Ente 現在會通知您；釋放一些空間後，備份將從中斷處繼續。',
+          isOnlineOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: '投放，更簡單',
+          description: '在 Android 上更容易找到螢幕，iOS 上則會自動配對。無需額外設定。',
+          isOnlineOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: '記住靜音設定',
+          description: '將一部影片設為靜音後，下一部也會維持靜音。',
+        ),
+        ChangeLogEntryStrings(
+          title: '還有更多！',
+          description:
+              '可直接從「釋放空間」清空垃圾桶、App 鎖定更流暢可靠、在回憶中將共享照片加入最愛、繁體中文加入語言清單、照片檢視器滑動更流暢，並修正上傳至多個相簿和在其他 App 中選取 SD 卡媒體的問題。',
+          isOnlineOnly: true,
+        ),
+      ],
     ),
   };
+}
 
-  static const Map<String, ChangeLogStrings> _offlineTranslations = {
-    'en': ChangeLogStrings(
-      title1: 'A fresh new look',
-      desc1:
-          "We've given the app a fresh look, with new fonts, colors, spacing, and buttons throughout. Albums has also been redesigned for easier browsing.",
-    ),
-    'cs': ChangeLogStrings(
-      title1: 'Zcela nový vzhled',
-      desc1:
-          'Dali jsme aplikaci svěží vzhled s novými fonty, barvami, rozestupy a tlačítky napříč celou aplikací. Alba jsme také přepracovali pro snazší procházení.',
-    ),
-    'de': ChangeLogStrings(
-      title1: 'Ein frischer neuer Look',
-      desc1:
-          'Wir haben der App einen frischen Look gegeben, mit neuen Schriften, Farben, Abständen und Buttons überall. Alben wurden außerdem für einfacheres Stöbern neu gestaltet.',
-    ),
-    'es': ChangeLogStrings(
-      title1: 'Un nuevo aspecto renovado',
-      desc1:
-          'Le hemos dado a la app un aspecto renovado, con nuevas fuentes, colores, espaciado y botones en toda la aplicación. Álbumes también se ha rediseñado para que sea más fácil explorarlos.',
-    ),
-    'fr': ChangeLogStrings(
-      title1: 'Un tout nouveau style',
-      desc1:
-          "Nous avons donné un nouveau souffle à l'app, avec de nouvelles polices, couleurs, espacements et de nouveaux boutons partout. Les albums ont aussi été repensés pour une navigation plus simple.",
-    ),
-    'it': ChangeLogStrings(
-      title1: 'Un nuovo look fresco',
-      desc1:
-          "Abbiamo dato all'app un look più fresco, con nuovi font, colori, spaziature e pulsanti in tutta l'esperienza. Anche Album è stato ridisegnato per una navigazione più semplice.",
-    ),
-    'ja': ChangeLogStrings(
-      title1: '新しくなった見た目',
-      desc1:
-          'アプリ全体のフォント、色、余白、ボタンを見直し、より新鮮な見た目にしました。アルバムもより見つけやすく閲覧しやすいように再設計しました。',
-    ),
-    'nl': ChangeLogStrings(
-      title1: 'Een frisse nieuwe look',
-      desc1:
-          'We hebben de app een frisse look gegeven, met nieuwe lettertypen, kleuren, ruimte en knoppen overal. Albums is ook opnieuw ontworpen zodat je er makkelijker doorheen bladert.',
-    ),
-    'no': ChangeLogStrings(
-      title1: 'Et friskt nytt utseende',
-      desc1:
-          'Vi har gitt appen et friskt utseende, med nye skrifter, farger, avstand og knapper overalt. Album er også redesignet for enklere blaing.',
-    ),
-    'pl': ChangeLogStrings(
-      title1: 'Świeży, nowy wygląd',
-      desc1:
-          'Odświeżyliśmy wygląd aplikacji, wprowadzając nowe fonty, kolory, odstępy i przyciski w całej aplikacji. Albumy zostały też przeprojektowane, aby łatwiej było je przeglądać.',
-    ),
-    'pt_BR': ChangeLogStrings(
-      title1: 'Um visual renovado',
-      desc1:
-          'Demos ao app um visual renovado, com novas fontes, cores, espaçamentos e botões por toda parte. Álbuns também foi redesenhado para facilitar a navegação.',
-    ),
-    'pt_PT': ChangeLogStrings(
-      title1: 'Um novo visual renovado',
-      desc1:
-          'Demos à app um visual renovado, com novas fontes, cores, espaçamentos e botões em toda a experiência. Os álbuns também foram redesenhados para facilitar a navegação.',
-    ),
-    'ro': ChangeLogStrings(
-      title1: 'Un aspect nou și proaspăt',
-      desc1:
-          'Am oferit aplicației un aspect nou, cu fonturi, culori, spațieri și butoane noi peste tot. Albumele au fost și ele redesenate pentru o navigare mai ușoară.',
-    ),
-    'ru': ChangeLogStrings(
-      title1: 'Свежий новый вид',
-      desc1:
-          'Мы обновили внешний вид приложения: новые шрифты, цвета, отступы и кнопки по всему интерфейсу. Альбомы тоже были переработаны, чтобы их было удобнее просматривать.',
-    ),
-    'tr': ChangeLogStrings(
-      title1: 'Yepyeni ve ferah bir görünüm',
-      desc1:
-          'Uygulamaya baştan sona yeni yazı tipleri, renkler, boşluklar ve düğmelerle ferah bir görünüm kazandırdık. Albümler de daha kolay gezinme için yeniden tasarlandı.',
-    ),
-    'uk': ChangeLogStrings(
-      title1: 'Свіжий новий вигляд',
-      desc1:
-          'Ми оновили вигляд застосунку: нові шрифти, кольори, відступи й кнопки по всьому інтерфейсу. Альбоми також перероблено для зручнішого перегляду.',
-    ),
-    'vi': ChangeLogStrings(
-      title1: 'Diện mạo mới mẻ',
-      desc1:
-          'Chúng tôi đã làm mới giao diện ứng dụng với phông chữ, màu sắc, khoảng cách và nút mới trên toàn bộ ứng dụng. Album cũng được thiết kế lại để duyệt dễ hơn.',
-    ),
-    'zh_CN': ChangeLogStrings(
-      title1: '焕然一新的外观',
-      desc1: '我们为应用带来了全新的外观，整体更新了字体、颜色、间距和按钮。相册也经过重新设计，浏览起来更轻松。',
-    ),
-  };
+class ChangeLogEntryStrings {
+  final String title;
+  final String description;
+  final bool isOnlineOnly;
+  final bool isLocalGalleryOnly;
+
+  const ChangeLogEntryStrings({
+    required this.title,
+    required this.description,
+    this.isOnlineOnly = false,
+    this.isLocalGalleryOnly = false,
+  }) : assert(!(isOnlineOnly && isLocalGalleryOnly));
 }

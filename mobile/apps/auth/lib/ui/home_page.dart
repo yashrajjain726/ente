@@ -10,7 +10,6 @@ import 'package:ente_auth/events/codes_updated_event.dart';
 import 'package:ente_auth/events/icons_changed_event.dart';
 import 'package:ente_auth/events/multi_select_action_requested_event.dart';
 import 'package:ente_auth/events/trigger_logout_event.dart';
-import 'package:ente_auth/l10n/l10n.dart';
 import 'package:ente_auth/models/code.dart';
 import 'package:ente_auth/onboarding/model/tag_enums.dart';
 import 'package:ente_auth/onboarding/view/common/tag_chip.dart';
@@ -26,11 +25,13 @@ import 'package:ente_auth/ui/code_error_widget.dart';
 import 'package:ente_auth/ui/code_widget.dart';
 import 'package:ente_auth/ui/common/loading_widget.dart';
 import 'package:ente_auth/ui/components/auth_qr_dialog.dart';
+import 'package:ente_auth/ui/components/auth_selection_action_button.dart';
 import 'package:ente_auth/ui/components/buttons/button_widget.dart';
 import 'package:ente_auth/ui/components/dialog_widget.dart';
 import 'package:ente_auth/ui/components/horizontal_scroll_area.dart';
 import 'package:ente_auth/ui/components/models/button_type.dart';
 import 'package:ente_auth/ui/components/note_dialog.dart';
+import 'package:ente_auth/ui/custom_icon_page.dart';
 import 'package:ente_auth/ui/home/add_tag_sheet.dart';
 import 'package:ente_auth/ui/home/coach_mark_widget.dart';
 import 'package:ente_auth/ui/home/home_empty_state.dart';
@@ -45,17 +46,19 @@ import 'package:ente_auth/ui/settings_page.dart';
 import 'package:ente_auth/ui/share/code_share.dart';
 import 'package:ente_auth/ui/sort_option_menu.dart';
 import 'package:ente_auth/ui/utils/icon_utils.dart';
+import 'package:ente_auth/utils/debug_code_deep_link.dart';
 import 'package:ente_auth/utils/dialog_util.dart';
 import 'package:ente_auth/utils/gallery_import_util.dart';
 import 'package:ente_auth/utils/platform_util.dart';
 import 'package:ente_auth/utils/toast_util.dart';
 import 'package:ente_auth/utils/totp_util.dart';
+import 'package:ente_components/ente_components.dart';
 import 'package:ente_events/event_bus.dart';
 import 'package:ente_lock_screen/local_authentication_service.dart';
 import 'package:ente_lock_screen/lock_screen_settings.dart';
 import 'package:ente_lock_screen/ui/app_lock.dart';
 import 'package:ente_pure_utils/ente_pure_utils.dart';
-import 'package:ente_ui/components/android_text_input_autofocus.dart';
+import 'package:ente_strings/ente_strings.dart';
 import 'package:ente_ui/pages/base_home_page.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -72,6 +75,11 @@ class HomePage extends BaseHomePage {
 
   @override
   State<HomePage> createState() => _HomePageState();
+}
+
+@visibleForTesting
+String addedCodeFocusSearchQuery(Code code) {
+  return code.issuer.trim().isNotEmpty ? code.issuer : code.account;
 }
 
 class _HomePageState extends State<HomePage> {
@@ -130,6 +138,7 @@ class _HomePageState extends State<HomePage> {
     _triggerLogoutEvent = Bus.instance.on<TriggerLogoutEvent>().listen((
       event,
     ) async {
+      if (!mounted) return;
       await autoLogoutAlert(context);
     });
 
@@ -157,9 +166,8 @@ class _HomePageState extends State<HomePage> {
 
     if (selectedCodes.isEmpty) return;
 
-    showModalBottomSheet(
+    showBottomSheetComponent<void>(
       context: context,
-      isScrollControlled: true,
       builder: (_) {
         return AddTagSheet(selectedCodes: selectedCodes);
       },
@@ -211,19 +219,21 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _onDeleteForeverPressed() async {
-    final l10n = context.l10n;
+    final l10n = context.strings;
     final selectedIds = _codeDisplayStore.selectedCodeIds.value;
     if (selectedIds.isEmpty) return;
 
     bool isAuthSuccessful = await LocalAuthenticationService.instance
         .requestLocalAuthentication(
           context,
-          context.l10n.deleteCodeAuthMessage,
+          context.strings.deleteCodeAuthMessage,
         );
 
     if (!isAuthSuccessful) return;
 
+    if (!mounted) return;
     FocusScope.of(context).requestFocus();
+    if (!mounted) return;
     await showChoiceActionSheet(
       context,
       title: l10n.deleteCodeTitle,
@@ -252,32 +262,34 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildTrashSelectActions() {
+    final colors = context.componentColors;
     return Container(
       decoration: BoxDecoration(
-        color: Theme.of(context).brightness == Brightness.light
-            ? const Color(0xFFF7F7F7)
-            : const Color(0xFF1E1E1E),
-        borderRadius: BorderRadius.circular(12),
+        color: colors.fillLight,
+        borderRadius: BorderRadius.circular(Radii.sheet),
       ),
       child: Row(
         children: [
-          _buildClearActionButton(
-            context.l10n.restore,
+          _buildActionButton(
+            context.strings.restore,
             _onRestoreSelectedPressed,
+            semanticsIdentifier: 'auth_selection_restore',
             iconWidget: HugeIcon(
               icon: HugeIcons.strokeRoundedRestoreBin,
               size: 21,
               color: getEnteColorScheme(context).textBase,
             ),
           ),
-          _buildClearActionButton(
-            context.l10n.delete,
+          _buildActionButton(
+            context.strings.delete,
             _onDeleteForeverPressed,
+            semanticsIdentifier: 'auth_selection_delete_forever',
             iconWidget: HugeIcon(
               icon: HugeIcons.strokeRoundedDelete04,
               size: 21,
               color: getEnteColorScheme(context).textBase,
             ),
+            isDestructive: true,
           ),
         ],
       ),
@@ -328,10 +340,15 @@ class _HomePageState extends State<HomePage> {
         if (codesToUpdate.length == 1) {
           showToast(
             context,
-            context.l10n.unpinnedCodeMessage(codesToUpdate.first.issuer),
+            context.strings.unpinnedCodeMessage(
+              code: codesToUpdate.first.issuer,
+            ),
           );
         } else {
-          showToast(context, context.l10n.unpinnedCount(codesToUpdate.length));
+          showToast(
+            context,
+            context.strings.unpinnedCount(count: codesToUpdate.length),
+          );
         }
       } else {
         int pinnedCount = 0;
@@ -347,9 +364,12 @@ class _HomePageState extends State<HomePage> {
 
         if (pinnedCount == 1) {
           final pinnedCode = codesToUpdate.firstWhere((c) => !c.isPinned);
-          showToast(context, context.l10n.pinnedCodeMessage(pinnedCode.issuer));
+          showToast(
+            context,
+            context.strings.pinnedCodeMessage(code: pinnedCode.issuer),
+          );
         } else if (pinnedCount > 0) {
-          showToast(context, context.l10n.pinnedCount(pinnedCount));
+          showToast(context, context.strings.pinnedCount(count: pinnedCount));
         }
       }
 
@@ -392,10 +412,10 @@ class _HomePageState extends State<HomePage> {
         final unpinnedCode = codesToUpdate.firstWhere((c) => c.isPinned);
         showToast(
           context,
-          context.l10n.unpinnedCodeMessage(unpinnedCode.issuer),
+          context.strings.unpinnedCodeMessage(code: unpinnedCode.issuer),
         );
       } else if (unpinnedCount > 0) {
-        showToast(context, context.l10n.unpinnedCount(unpinnedCount));
+        showToast(context, context.strings.unpinnedCount(count: unpinnedCount));
       }
 
       await _saveCodesWithSingleSync(updatedCodes);
@@ -410,18 +430,20 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _onTrashSelectedPressed() async {
-    final l10n = context.l10n;
+    final l10n = context.strings;
     final selectedIds = _codeDisplayStore.selectedCodeIds.value;
     if (selectedIds.isEmpty) return;
 
     bool isAuthSuccessful = await LocalAuthenticationService.instance
         .requestLocalAuthentication(
           context,
-          context.l10n.deleteCodeAuthMessage,
+          context.strings.deleteCodeAuthMessage,
         );
     if (!isAuthSuccessful) return;
 
+    if (!mounted) return;
     FocusScope.of(context).requestFocus();
+    if (!mounted) return;
     await showChoiceActionSheet(
       context,
       title: l10n.trashCode,
@@ -433,9 +455,9 @@ class _HomePageState extends State<HomePage> {
           final issuerAccount = code.account.isNotEmpty
               ? '${code.issuer} (${code.account})'
               : code.issuer;
-          return l10n.trashCodeMessage(issuerAccount);
+          return l10n.trashCodeMessage(account: issuerAccount);
         } else {
-          return l10n.moveMultipleToTrashMessage(selectedIds.length);
+          return l10n.moveMultipleToTrashMessage(count: selectedIds.length);
         }
       })(),
       firstButtonLabel: l10n.trash,
@@ -469,11 +491,15 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _onEditPressed(Code code) async {
     bool isAuthSuccessful = await LocalAuthenticationService.instance
-        .requestLocalAuthentication(context, context.l10n.editCodeAuthMessage);
+        .requestLocalAuthentication(
+          context,
+          context.strings.editCodeAuthMessage,
+        );
     await PlatformUtil.refocusWindows();
     if (!isAuthSuccessful) return;
 
     _codeDisplayStore.clearSelection();
+    if (!mounted) return;
     final Code? updatedCode = await Navigator.of(context).push(
       MaterialPageRoute(
         builder: (BuildContext context) {
@@ -492,81 +518,74 @@ class _HomePageState extends State<HomePage> {
       return;
     }
     bool isAuthSuccessful = await LocalAuthenticationService.instance
-        .requestLocalAuthentication(context, context.l10n.authenticateGeneric);
+        .requestLocalAuthentication(
+          context,
+          context.strings.authenticateGeneric,
+        );
     await PlatformUtil.refocusWindows();
     if (!isAuthSuccessful) return;
 
     _codeDisplayStore.clearSelection();
+    if (!mounted) return;
     showShareDialog(context, code);
   }
 
   Future<void> _onShowQrPressed(Code code) async {
     bool isAuthSuccessful = await LocalAuthenticationService.instance
-        .requestLocalAuthentication(context, context.l10n.showQRAuthMessage);
+        .requestLocalAuthentication(context, context.strings.showQRAuthMessage);
     await PlatformUtil.refocusWindows();
     if (!isAuthSuccessful) return;
 
     _codeDisplayStore.clearSelection();
+    await _showQrSheet(code);
+  }
+
+  Future<void> _showQrSheet(Code code) async {
     final qrData = code.rawData
         .replaceAll('algorithm=Algorithm.', 'algorithm=')
         .replaceAll('algorithm=sha1', 'algorithm=SHA1')
         .replaceAll('algorithm=sha256', 'algorithm=SHA256')
         .replaceAll('algorithm=sha512', 'algorithm=SHA512');
 
-    await showDialog(
+    if (!mounted) return;
+    await showBottomSheetComponent<void>(
       context: context,
-      builder: (BuildContext dialogContext) {
+      useRootNavigator: true,
+      builder: (dialogContext) {
         return AuthQrDialog(
           data: qrData,
           title: code.issuer,
           subtitle: code.account,
           shareFileName: 'ente_auth_qr_${code.account}.png',
           shareText: 'QR code for ${code.account}',
-          dialogTitle: context.l10n.qrCode,
-          shareButtonText: context.l10n.share,
+          dialogTitle: dialogContext.strings.qrCode,
+          shareButtonText: dialogContext.strings.share,
         );
       },
     );
   }
 
-  Widget _buildClearActionButton(
+  Widget _buildActionButton(
     String label,
     VoidCallback onTap, {
     IconData? icon,
     Widget? iconWidget,
+    bool isDestructive = false,
+    String? semanticsIdentifier,
   }) {
-    final colorScheme = getEnteColorScheme(context);
-    final textTheme = getEnteTextTheme(context);
-
     return Expanded(
-      child: InkWell(
+      child: AuthSelectionActionButton(
+        label: label,
         onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        highlightColor: colorScheme.textBase.withValues(alpha: 0.1),
-        splashColor: colorScheme.textBase.withValues(alpha: 0.1),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 12.0),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              iconWidget ?? Icon(icon!, color: colorScheme.textBase, size: 21),
-              const SizedBox(height: 8),
-              Text(
-                label,
-                style: textTheme.small.copyWith(
-                  color: colorScheme.textBase,
-                  fontSize: 11,
-                ),
-              ),
-            ],
-          ),
-        ),
+        icon: iconWidget ?? Icon(icon, size: IconSizes.medium),
+        isDestructive: isDestructive,
+        semanticsIdentifier: semanticsIdentifier,
       ),
     );
   }
 
   Widget _buildSingleSelectActions(Code code) {
-    final colorScheme = getEnteColorScheme(context);
+    final colors = context.componentColors;
     return Column(
       key: const ValueKey('single_select_actions'),
       mainAxisSize: MainAxisSize.min,
@@ -574,7 +593,7 @@ class _HomePageState extends State<HomePage> {
         Row(
           children: [
             _buildActionButton(
-              context.l10n.edit,
+              context.strings.edit,
               () => _onEditPressed(code),
               iconWidget: HugeIcon(
                 icon: HugeIcons.strokeRoundedEdit03,
@@ -585,7 +604,7 @@ class _HomePageState extends State<HomePage> {
             const SizedBox(width: 10),
             if (code.type.canShareCodes) ...[
               _buildActionButton(
-                context.l10n.share,
+                context.strings.share,
                 () => _onSharePressed(code),
                 iconWidget: HugeIcon(
                   icon: HugeIcons.strokeRoundedNavigation03,
@@ -596,7 +615,7 @@ class _HomePageState extends State<HomePage> {
               const SizedBox(width: 10),
             ],
             _buildActionButton(
-              context.l10n.qrCode,
+              context.strings.qrCode,
               () => _onShowQrPressed(code),
               iconWidget: HugeIcon(
                 icon: HugeIcons.strokeRoundedQrCode,
@@ -609,10 +628,8 @@ class _HomePageState extends State<HomePage> {
         const SizedBox(height: 16),
         Container(
           decoration: BoxDecoration(
-            color: Theme.of(context).brightness == Brightness.dark
-                ? colorScheme.backgroundElevated2
-                : const Color(0xFFF7F7F7),
-            borderRadius: BorderRadius.circular(12),
+            color: colors.fillLight,
+            borderRadius: BorderRadius.circular(Radii.sheet),
           ),
           child: Row(
             children: [
@@ -634,10 +651,10 @@ class _HomePageState extends State<HomePage> {
                     (code) => code.isPinned,
                   );
 
-                  return _buildClearActionButton(
+                  return _buildActionButton(
                     allArePinned
-                        ? context.l10n.unpinText
-                        : context.l10n.pinText,
+                        ? context.strings.unpinText
+                        : context.strings.pinText,
                     _onPinSelectedPressed,
                     iconWidget: HugeIcon(
                       icon: allArePinned
@@ -649,23 +666,25 @@ class _HomePageState extends State<HomePage> {
                   );
                 },
               ),
-              _buildClearActionButton(
-                context.l10n.addTag,
+              _buildActionButton(
+                context.strings.addTag,
                 _onAddTagPressed,
+                semanticsIdentifier: 'auth_selection_add_tag',
                 iconWidget: HugeIcon(
                   icon: HugeIcons.strokeRoundedTags,
                   size: 21,
                   color: getEnteColorScheme(context).textBase,
                 ),
               ),
-              _buildClearActionButton(
-                context.l10n.trash,
+              _buildActionButton(
+                context.strings.trash,
                 _onTrashSelectedPressed,
                 iconWidget: HugeIcon(
                   icon: HugeIcons.strokeRoundedDelete02,
                   size: 21,
                   color: getEnteColorScheme(context).textBase,
                 ),
+                isDestructive: true,
               ),
             ],
           ),
@@ -675,14 +694,12 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildMultiSelectActions(Set<String> selectedIds) {
-    final colorScheme = getEnteColorScheme(context);
+    final colors = context.componentColors;
     return Container(
       key: const ValueKey('multi_select_actions'),
       decoration: BoxDecoration(
-        color: Theme.of(context).brightness == Brightness.dark
-            ? colorScheme.backgroundElevated2
-            : const Color(0xFFF7F7F7),
-        borderRadius: BorderRadius.circular(12),
+        color: colors.fillLight,
+        borderRadius: BorderRadius.circular(Radii.sheet),
       ),
       child: ValueListenableBuilder<Set<String>>(
         valueListenable: _codeDisplayStore.selectedCodeIds,
@@ -706,8 +723,8 @@ class _HomePageState extends State<HomePage> {
             // Mixed state: when selection contains both pinned and unpinned codes
             return Row(
               children: [
-                _buildClearActionButton(
-                  context.l10n.pinText,
+                _buildActionButton(
+                  context.strings.pinText,
                   _onPinSelectedPressed,
                   iconWidget: HugeIcon(
                     icon: HugeIcons.strokeRoundedPin,
@@ -715,8 +732,8 @@ class _HomePageState extends State<HomePage> {
                     color: getEnteColorScheme(context).textBase,
                   ),
                 ),
-                _buildClearActionButton(
-                  context.l10n.unpinText,
+                _buildActionButton(
+                  context.strings.unpinText,
                   _onUnpinSelectedPressed,
                   iconWidget: HugeIcon(
                     icon: HugeIcons.strokeRoundedPinOff,
@@ -724,23 +741,25 @@ class _HomePageState extends State<HomePage> {
                     color: getEnteColorScheme(context).textBase,
                   ),
                 ),
-                _buildClearActionButton(
-                  context.l10n.addTag,
+                _buildActionButton(
+                  context.strings.addTag,
                   _onAddTagPressed,
+                  semanticsIdentifier: 'auth_selection_add_tag',
                   iconWidget: HugeIcon(
                     icon: HugeIcons.strokeRoundedTags,
                     size: 21,
                     color: getEnteColorScheme(context).textBase,
                   ),
                 ),
-                _buildClearActionButton(
-                  context.l10n.trash,
+                _buildActionButton(
+                  context.strings.trash,
                   _onTrashSelectedPressed,
                   iconWidget: HugeIcon(
                     icon: HugeIcons.strokeRoundedDelete02,
                     size: 21,
                     color: getEnteColorScheme(context).textBase,
                   ),
+                  isDestructive: true,
                 ),
               ],
             );
@@ -748,8 +767,10 @@ class _HomePageState extends State<HomePage> {
             // When selection contains either only pinned OR only unpinned codes
             return Row(
               children: [
-                _buildClearActionButton(
-                  allArePinned ? context.l10n.unpinText : context.l10n.pinText,
+                _buildActionButton(
+                  allArePinned
+                      ? context.strings.unpinText
+                      : context.strings.pinText,
                   _onPinSelectedPressed,
                   iconWidget: HugeIcon(
                     icon: allArePinned
@@ -759,75 +780,30 @@ class _HomePageState extends State<HomePage> {
                     color: getEnteColorScheme(context).textBase,
                   ),
                 ),
-                _buildClearActionButton(
-                  context.l10n.addTag,
+                _buildActionButton(
+                  context.strings.addTag,
                   _onAddTagPressed,
+                  semanticsIdentifier: 'auth_selection_add_tag',
                   iconWidget: HugeIcon(
                     icon: HugeIcons.strokeRoundedTags,
                     size: 21,
                     color: getEnteColorScheme(context).textBase,
                   ),
                 ),
-                _buildClearActionButton(
-                  context.l10n.trash,
+                _buildActionButton(
+                  context.strings.trash,
                   _onTrashSelectedPressed,
                   iconWidget: HugeIcon(
                     icon: HugeIcons.strokeRoundedDelete02,
                     size: 21,
                     color: getEnteColorScheme(context).textBase,
                   ),
+                  isDestructive: true,
                 ),
               ],
             );
           }
         },
-      ),
-    );
-  }
-
-  Widget _buildActionButton(
-    String label,
-    VoidCallback onTap, {
-    IconData? icon,
-    Widget? iconWidget,
-  }) {
-    final colorScheme = getEnteColorScheme(context);
-    final textTheme = getEnteTextTheme(context);
-
-    return Expanded(
-      child: Container(
-        decoration: BoxDecoration(
-          color: Theme.of(context).brightness == Brightness.dark
-              ? colorScheme.backgroundElevated2
-              : const Color(0xFFF7F7F7),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(12),
-          highlightColor: colorScheme.textBase.withValues(alpha: 0.7),
-          splashColor: colorScheme.textBase.withValues(alpha: 0.7),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 12.0),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                iconWidget ??
-                    Icon(icon!, color: colorScheme.textBase, size: 21),
-                const SizedBox(height: 8),
-                Text(
-                  label,
-                  style: textTheme.small.copyWith(
-                    color: colorScheme.textBase,
-                    fontSize: 11,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ],
-            ),
-          ),
-        ),
       ),
     );
   }
@@ -853,29 +829,10 @@ class _HomePageState extends State<HomePage> {
         } else {
           actionWidget = _buildMultiSelectActions(selectedIds);
         }
-        final double containerHeight;
-        if (selectedIds.isEmpty) {
-          containerHeight = 0.0;
-        } else if (selectedIds.length == 1) {
-          containerHeight = 160.0;
-        } else {
-          containerHeight = 80.0;
-        }
-
-        return AnimatedContainer(
+        return AnimatedSize(
           duration: const Duration(milliseconds: 250),
           curve: Curves.easeInOut,
-          height: containerHeight,
-          child: SingleChildScrollView(
-            physics: const NeverScrollableScrollPhysics(),
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                minHeight: containerHeight,
-                maxHeight: containerHeight,
-              ),
-              child: actionWidget,
-            ),
-          ),
+          child: actionWidget,
         );
       },
     );
@@ -883,195 +840,148 @@ class _HomePageState extends State<HomePage> {
 
   Widget _buildSelectionActionBar() {
     final bottomPadding = MediaQuery.of(context).padding.bottom;
-    final colorScheme = getEnteColorScheme(context);
-    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final colors = context.componentColors;
 
-    return ConstrainedBox(
-      constraints: BoxConstraints(
-        maxHeight: MediaQuery.of(context).size.height * 0.4,
-      ),
-      child: Card(
-        margin: EdgeInsets.zero,
-        shape: RoundedRectangleBorder(
-          borderRadius: const BorderRadius.only(
-            topLeft: Radius.circular(16),
-            topRight: Radius.circular(16),
-          ),
-          side: BorderSide(
-            color: colorScheme.strokeMuted.withValues(alpha: 0.1),
-            width: 1,
-          ),
+    return Semantics(
+      identifier: 'auth_selection_action_bar',
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.4,
         ),
-        shadowColor: isDarkMode
-            ? Colors.black.withValues(alpha: 0.7)
-            : Colors.grey.withValues(alpha: 0.5),
-        elevation: 4,
-        color: isDarkMode
-            ? colorScheme.fillFaint
-            : colorScheme.backgroundElevated2,
-        child: Padding(
-          padding: EdgeInsets.fromLTRB(16, 16, 16, 28 + bottomPadding),
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
-                  children: [
-                    //Select all pill
-                    Material(
-                      shape: StadiumBorder(
-                        side: BorderSide(
-                          color: colorScheme.strokeMuted,
-                          width: 0.5,
+        child: Card(
+          margin: EdgeInsets.zero,
+          shape: RoundedRectangleBorder(
+            borderRadius: const BorderRadius.only(
+              topLeft: Radius.circular(Radii.bottomSheet),
+              topRight: Radius.circular(Radii.bottomSheet),
+            ),
+            side: BorderSide(color: colors.strokeFaint),
+          ),
+          shadowColor: colors.specialScrim.withValues(alpha: 0.35),
+          elevation: 4,
+          color: colors.backgroundBase,
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(
+              Spacing.lg,
+              Spacing.lg,
+              Spacing.lg,
+              Spacing.xl + bottomPadding,
+            ),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    children: [
+                      FilterChipComponent(
+                        label: context.strings.selectAll,
+                        trailing: const HugeIcon(
+                          icon: HugeIcons.strokeRoundedTickDouble02,
+                          size: IconSizes.small,
                         ),
-                      ),
-                      color: colorScheme.backgroundElevated2,
-                      clipBehavior: Clip.antiAlias,
-                      child: InkWell(
-                        onTap: () {
+                        onChanged: (_) {
                           final allVisibleCodeIds = _filteredCodes
-                              .map((c) => c.selectionKey)
+                              .map((code) => code.selectionKey)
                               .toSet();
                           _codeDisplayStore.selectedCodeIds.value =
                               allVisibleCodeIds;
                         },
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12.0,
-                            vertical: 8.0,
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                context.l10n.selectAll,
-                                style: const TextStyle(fontSize: 11),
-                              ),
-                              const SizedBox(width: 6),
-                              const HugeIcon(
-                                icon: HugeIcons.strokeRoundedTickDouble02,
-                                color: Colors.grey,
-                                size: 15,
-                              ),
-                            ],
-                          ),
+                      ),
+                      Expanded(
+                        child: ValueListenableBuilder<Set<String>>(
+                          valueListenable: _codeDisplayStore.selectedCodeIds,
+                          builder: (context, selectedIds, child) {
+                            if (selectedIds.isEmpty) {
+                              return const SizedBox.shrink();
+                            }
+                            final selectedCodes =
+                                _allCodes
+                                    ?.where(
+                                      (code) => selectedIds.contains(
+                                        code.selectionKey,
+                                      ),
+                                    )
+                                    .toList() ??
+                                [];
+                            final codesToShow = selectedCodes.take(3).toList();
+                            return Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                ...codesToShow.map((code) {
+                                  final iconData = code.display.isCustomIcon
+                                      ? code.display.iconID
+                                      : code.issuer;
+                                  return Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: Spacing.xs,
+                                    ),
+                                    child: IconUtils.instance.getIcon(
+                                      context,
+                                      iconData.trim(),
+                                      width: IconSizes.small,
+                                    ),
+                                  );
+                                }),
+                                if (selectedIds.length > 3)
+                                  Padding(
+                                    padding: const EdgeInsets.only(
+                                      left: Spacing.xs,
+                                    ),
+                                    child: Text(
+                                      '+${selectedIds.length - 3}',
+                                      style: TextStyles.mini.copyWith(
+                                        color: colors.textLight,
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            );
+                          },
                         ),
                       ),
-                    ),
-
-                    // Center code logo icon
-                    Expanded(
-                      child: ValueListenableBuilder<Set<String>>(
-                        valueListenable: _codeDisplayStore.selectedCodeIds,
-                        builder: (context, selectedIds, child) {
-                          if (selectedIds.isEmpty) {
-                            return const SizedBox.shrink();
-                          }
-                          final selectedCodes =
-                              _allCodes
-                                  ?.where(
-                                    (c) => selectedIds.contains(c.selectionKey),
-                                  )
-                                  .toList() ??
-                              [];
-                          final codesToShow = selectedCodes.take(3).toList();
-                          return Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              ...codesToShow.map((code) {
-                                final iconData = code.display.isCustomIcon
-                                    ? code.display.iconID
-                                    : code.issuer;
-                                return Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 4.0,
-                                  ),
-                                  child: IconUtils.instance.getIcon(
-                                    context,
-                                    iconData.trim(),
-                                    width: 17,
-                                  ),
-                                );
-                              }),
-                              if (selectedIds.length > 3)
-                                Padding(
-                                  padding: const EdgeInsets.only(left: 4.0),
-                                  child: Text(
-                                    '+${selectedIds.length - 3}',
-                                    style: const TextStyle(),
-                                  ),
-                                ),
-                            ],
-                          );
-                        },
-                      ),
-                    ),
-
-                    // N selected pill
-                    ValueListenableBuilder<Set<String>>(
-                      valueListenable: _codeDisplayStore.selectedCodeIds,
-                      builder: (context, selectedIds, child) {
-                        return Material(
-                          shape: StadiumBorder(
-                            side: BorderSide(
-                              color: colorScheme.strokeMuted,
-                              width: 0.5,
-                            ),
-                          ),
-                          color: colorScheme.backgroundElevated2,
-                          clipBehavior: Clip.antiAlias,
-                          child: InkWell(
-                            onTap: () {
-                              _codeDisplayStore.clearSelection();
-                            },
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12.0,
-                                vertical: 8.0,
+                      Semantics(
+                        identifier: 'auth_selection_count',
+                        child: ValueListenableBuilder<Set<String>>(
+                          valueListenable: _codeDisplayStore.selectedCodeIds,
+                          builder: (context, selectedIds, child) {
+                            return FilterChipComponent(
+                              label: context.strings.selectedCount(
+                                count: selectedIds.length,
                               ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(
-                                    context.l10n.nSelected(selectedIds.length),
-                                    style: const TextStyle(fontSize: 11),
-                                  ),
-                                  const SizedBox(width: 6),
-                                  const Icon(
-                                    Icons.close,
-                                    size: 15,
-                                    color: Colors.grey,
-                                  ),
-                                ],
+                              trailing: const Icon(
+                                Icons.close,
+                                size: IconSizes.small,
                               ),
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ],
-                ),
-                ValueListenableBuilder<Set<String>>(
-                  valueListenable: _codeDisplayStore.selectedCodeIds,
-                  builder: (context, selectedIds, _) {
-                    final Code? code = _getSingleSelectedCodeWithNote(
-                      selectedIds,
-                    );
-                    if (code == null) {
-                      return const SizedBox.shrink();
-                    }
-                    return Padding(
-                      padding: const EdgeInsets.only(top: 12),
-                      child: _buildMultiSelectNotePreview(
-                        note: code.note.trim(),
-                        isDesktop: false,
+                              onChanged: (_) =>
+                                  _codeDisplayStore.clearSelection(),
+                            );
+                          },
+                        ),
                       ),
-                    );
-                  },
-                ),
-                const SizedBox(height: 16),
-                _buildActionButtons(),
-              ],
+                    ],
+                  ),
+                  ValueListenableBuilder<Set<String>>(
+                    valueListenable: _codeDisplayStore.selectedCodeIds,
+                    builder: (context, selectedIds, _) {
+                      final Code? code = _getSingleSelectedCodeWithNote(
+                        selectedIds,
+                      );
+                      if (code == null) {
+                        return const SizedBox.shrink();
+                      }
+                      return Padding(
+                        padding: const EdgeInsets.only(top: Spacing.md),
+                        child: _buildMultiSelectNotePreview(
+                          note: code.note.trim(),
+                          isDesktop: false,
+                        ),
+                      );
+                    },
+                  ),
+                  const SizedBox(height: Spacing.lg),
+                  _buildActionButtons(),
+                ],
+              ),
             ),
           ),
         ),
@@ -1331,7 +1241,8 @@ class _HomePageState extends State<HomePage> {
     _isImportingFromGallery = true;
 
     try {
-      final GalleryImportResult? importResult = await pickCodeFromGallery(
+      if (!mounted) return;
+      final GalleryImportResult? importResult = await pickCodeFromImage(
         context,
         logger: _logger,
       );
@@ -1340,6 +1251,7 @@ class _HomePageState extends State<HomePage> {
       }
       final googleAuthCodes = importResult.googleAuthCodes;
       if (googleAuthCodes != null) {
+        if (!mounted) return;
         final shouldImport = await confirmGoogleAuthImport(
           context,
           googleAuthCodes.length,
@@ -1370,6 +1282,7 @@ class _HomePageState extends State<HomePage> {
     if (importedCodeCount > 0) {
       LocalBackupService.instance.triggerDailyBackupIfNeeded().ignore();
     }
+    if (!mounted) return;
     await importSuccessDialog(context, importedCodeCount);
   }
 
@@ -1424,13 +1337,15 @@ class _HomePageState extends State<HomePage> {
     final bool shouldShowLockScreen = await LockScreenSettings.instance
         .shouldShowLockScreen();
     if (shouldShowLockScreen) {
+      if (!mounted) return;
       // Manual lock: do not auto-prompt Touch ID; wait for user tap
       await AppLock.of(context)!.showManualLockScreen();
     } else {
+      if (!mounted) return;
       await showDialogWidget(
         context: context,
-        title: context.l10n.appLockNotEnabled,
-        body: context.l10n.appLockNotEnabledDescription,
+        title: context.strings.appLockNotEnabled,
+        body: context.strings.appLockNotEnabledDescription,
         isDismissible: true,
         buttons: const [
           ButtonWidget(
@@ -1468,7 +1383,7 @@ class _HomePageState extends State<HomePage> {
     LockScreenSettings.instance.setLightMode(
       getEnteColorScheme(context).isLightTheme,
     );
-    final l10n = context.l10n;
+    final l10n = context.strings;
     isCompactMode = PreferenceService.instance.isCompactMode();
 
     return ValueListenableBuilder<bool>(
@@ -1546,7 +1461,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   PreferredSizeWidget _buildStandardAppBar(
-    AppLocalizations l10n,
+    StringsLocalizations l10n,
     bool isDesktop,
   ) {
     final colorScheme = getEnteColorScheme(context);
@@ -1660,7 +1575,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildDesktopSelectionBottomBar() {
-    final l10n = context.l10n;
+    final l10n = context.strings;
     final visibleIds = _filteredCodes.map((c) => c.selectionKey).toSet();
     final colorScheme = getEnteColorScheme(context);
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
@@ -1773,7 +1688,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _getBody() {
-    final l10n = context.l10n;
+    final l10n = context.strings;
     final crossAxisCount = _calculateGridColumnCount(context);
     _currentGridColumns = crossAxisCount;
     final double keyboardInset = MediaQuery.of(context).viewInsets.bottom;
@@ -1824,36 +1739,44 @@ class _HomePageState extends State<HomePage> {
                     itemCount: itemCount,
                     itemBuilder: (context, index) {
                       if (showAllChip && index == 0) {
-                        return TagChip(
-                          label: l10n.all,
-                          state: selectedTag == "" && _isTrashOpen == false
-                              ? TagChipState.selected
-                              : TagChipState.unselected,
-                          onTap: () {
-                            _codeDisplayStore.clearSelection();
-                            selectedTag = "";
-                            _isTrashOpen = false;
+                        return Semantics(
+                          button: true,
+                          identifier: 'auth_filter_all',
+                          child: TagChip(
+                            label: l10n.all,
+                            state: selectedTag == "" && _isTrashOpen == false
+                                ? TagChipState.selected
+                                : TagChipState.unselected,
+                            onTap: () {
+                              _codeDisplayStore.clearSelection();
+                              selectedTag = "";
+                              _isTrashOpen = false;
 
-                            setState(() {});
-                            _applyFilteringAndRefresh();
-                          },
+                              setState(() {});
+                              _applyFilteringAndRefresh();
+                            },
+                          ),
                         );
                       }
 
                       if (showTrashChip && index == itemCount - 1) {
-                        return TagChip(
-                          label: l10n.trash,
-                          state: _isTrashOpen
-                              ? TagChipState.selected
-                              : TagChipState.unselected,
-                          onTap: () {
-                            _codeDisplayStore.clearSelection();
-                            selectedTag = "";
-                            _isTrashOpen = !_isTrashOpen;
-                            setState(() {});
-                            _applyFilteringAndRefresh();
-                          },
-                          iconData: Icons.delete,
+                        return Semantics(
+                          button: true,
+                          identifier: 'auth_filter_trash',
+                          child: TagChip(
+                            label: l10n.trash,
+                            state: _isTrashOpen
+                                ? TagChipState.selected
+                                : TagChipState.unselected,
+                            onTap: () {
+                              _codeDisplayStore.clearSelection();
+                              selectedTag = "";
+                              _isTrashOpen = !_isTrashOpen;
+                              setState(() {});
+                              _applyFilteringAndRefresh();
+                            },
+                            iconData: Icons.delete,
+                          ),
                         );
                       }
                       final customTagIndex = index - (showAllChip ? 1 : 0);
@@ -2013,8 +1936,10 @@ class _HomePageState extends State<HomePage> {
     // Platform messages may fail, so we use a try/catch PlatformException.
     bool hadInitialLink = false;
     try {
+      if (!mounted) return false;
       final initialLink = await _appLinks.getInitialLinkString();
       if (initialLink != null) {
+        if (!mounted) return false;
         _handleDeeplink(context, initialLink);
         hadInitialLink = true;
       } else {
@@ -2028,6 +1953,7 @@ class _HomePageState extends State<HomePage> {
     if (!kIsWeb && !Platform.isLinux) {
       _deepLinkSubscription = _appLinks.stringLinkStream.listen(
         (link) {
+          if (!mounted) return;
           _handleDeeplink(context, link);
         },
         onError: (err) {
@@ -2048,7 +1974,10 @@ class _HomePageState extends State<HomePage> {
       return;
     }
     final lowerLink = link.toLowerCase();
-    if (mounted && lowerLink.startsWith("enteauth://search")) {
+    final debugCodeLink = parseDebugCodeDeepLink(link);
+    if (mounted && debugCodeLink != null) {
+      _handleDebugCodeLink(debugCodeLink);
+    } else if (mounted && lowerLink.startsWith("enteauth://search")) {
       try {
         final uri = Uri.parse(link);
         final searchQuery = uri.queryParameters['query'];
@@ -2067,15 +1996,46 @@ class _HomePageState extends State<HomePage> {
         return;
       }
       lastScanTime = DateTime.now().millisecondsSinceEpoch;
-      try {
-        final newCode = Code.fromOTPAuthUrl(link);
-        getNextTotp(newCode);
-        CodeStore.instance.addCode(newCode, shouldSync: false);
-        _focusNewCode(newCode);
-      } catch (e, s) {
-        showGenericErrorDialog(context: context, error: e);
-        _logger.severe("error while handling deeplink", e, s);
-      }
+      _addCodeFromDeepLink(link);
+    }
+  }
+
+  void _addCodeFromDeepLink(String link) {
+    try {
+      final newCode = Code.fromOTPAuthUrl(link);
+      getNextTotp(newCode);
+      CodeStore.instance.addCode(newCode, shouldSync: false);
+      _focusNewCode(newCode);
+    } catch (e, s) {
+      showGenericErrorDialog(context: context, error: e);
+      _logger.severe("error while handling deeplink", e, s);
+    }
+  }
+
+  void _handleDebugCodeLink(DebugCodeDeepLink link) {
+    switch (link.action) {
+      case DebugCodeDeepLinkAction.addCode:
+        _addCodeFromDeepLink(link.codeUri);
+        return;
+      case DebugCodeDeepLinkAction.showQr:
+        unawaited(_showQrSheet(Code.fromOTPAuthUrl(link.codeUri)));
+        return;
+      case DebugCodeDeepLinkAction.shareCode:
+        showShareDialog(context, Code.fromOTPAuthUrl(link.codeUri));
+        return;
+      case DebugCodeDeepLinkAction.showIcons:
+        final code = Code.fromOTPAuthUrl(link.codeUri);
+        unawaited(
+          Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => CustomIconPage(
+                currentIcon: code.issuer,
+                allIcons: IconUtils.instance.getAllIcons(),
+              ),
+            ),
+          ),
+        );
+        return;
     }
   }
 
@@ -2083,8 +2043,9 @@ class _HomePageState extends State<HomePage> {
     _showSearchBox = true;
     selectedTag = "";
     _isTrashOpen = false;
-    _textController.text = newCode.account;
-    _searchText = newCode.account;
+    final searchQuery = addedCodeFocusSearchQuery(newCode);
+    _textController.text = searchQuery;
+    _searchText = searchQuery;
     _applyFilteringAndRefresh();
   }
 
@@ -2126,38 +2087,38 @@ class _HomePageState extends State<HomePage> {
     if (!allTrashed) {
       if (isMixedPinned) {
         addButton(
-          context.l10n.pinText,
+          context.strings.pinText,
           Icons.push_pin,
           () => _onPinSelectedPressed(),
         );
         addButton(
-          context.l10n.unpinText,
+          context.strings.unpinText,
           Icons.push_pin,
           () => _onUnpinSelectedPressed(),
           iconWidget: _buildUnpinIcon(context),
         );
       } else if (allPinned) {
         addButton(
-          context.l10n.unpinText,
+          context.strings.unpinText,
           Icons.push_pin,
           () => _onUnpinSelectedPressed(),
           iconWidget: _buildUnpinIcon(context),
         );
       } else {
         addButton(
-          context.l10n.pinText,
+          context.strings.pinText,
           Icons.push_pin,
           () => _onPinSelectedPressed(),
         );
       }
 
       addButton(
-        context.l10n.addTag,
+        context.strings.addTag,
         Icons.local_offer_outlined,
         _onAddTagPressed,
       );
       addButton(
-        context.l10n.trash,
+        context.strings.trash,
         Icons.delete_outline,
         () => _onTrashSelectedPressed(),
       );
@@ -2165,30 +2126,30 @@ class _HomePageState extends State<HomePage> {
       if (singleCode != null) {
         if (singleCode.type.canShareCodes) {
           addButton(
-            context.l10n.share,
+            context.strings.share,
             Icons.adaptive.share_outlined,
             () => _onSharePressed(singleCode),
           );
         }
         addButton(
-          context.l10n.qr,
+          context.strings.qr,
           Icons.qr_code_2_outlined,
           () => _onShowQrPressed(singleCode),
         );
         addButton(
-          context.l10n.edit,
+          context.strings.edit,
           Icons.edit_outlined,
           () => _onEditPressed(singleCode),
         );
       }
     } else {
       addButton(
-        context.l10n.restore,
+        context.strings.restore,
         Icons.restore_outlined,
         () => _onRestoreSelectedPressed(),
       );
       addButton(
-        context.l10n.delete,
+        context.strings.delete,
         Icons.delete_forever_outlined,
         () => _onDeleteForeverPressed(),
       );
@@ -2272,7 +2233,7 @@ class _HomePageState extends State<HomePage> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                context.l10n.selectAll,
+                context.strings.selectAll,
                 style: TextStyle(fontSize: 12, color: textColor),
               ),
               const SizedBox(width: 6),
@@ -2368,7 +2329,7 @@ class _HomePageState extends State<HomePage> {
       spacing: 3,
       childPadding: const EdgeInsets.all(5),
       spaceBetweenChildren: 4,
-      tooltip: context.l10n.addCode,
+      tooltip: context.strings.addCode,
       foregroundColor: Theme.of(context).colorScheme.fabForegroundColor,
       backgroundColor: Theme.of(context).colorScheme.fabBackgroundColor,
       overlayOpacity: 0.5,
@@ -2381,14 +2342,16 @@ class _HomePageState extends State<HomePage> {
             child: const HugeIcon(icon: HugeIcons.strokeRoundedQrCode),
             foregroundColor: Theme.of(context).colorScheme.fabForegroundColor,
             backgroundColor: Theme.of(context).colorScheme.fabBackgroundColor,
-            labelWidget: SpeedDialLabelWidget(context.l10n.scanAQrCode),
+            labelWidget: SpeedDialLabelWidget(context.strings.scanAQrCode),
             onTap: _redirectToScannerPage,
           ),
         SpeedDialChild(
           child: const Icon(Icons.keyboard_alt_outlined),
           foregroundColor: Theme.of(context).colorScheme.fabForegroundColor,
           backgroundColor: Theme.of(context).colorScheme.fabBackgroundColor,
-          labelWidget: SpeedDialLabelWidget(context.l10n.enterDetailsManually),
+          labelWidget: SpeedDialLabelWidget(
+            context.strings.enterDetailsManually,
+          ),
           onTap: _redirectToManualEntryPage,
         ),
         if (isDesktop || PlatformDetector.isMobile())
@@ -2396,7 +2359,9 @@ class _HomePageState extends State<HomePage> {
             child: const HugeIcon(icon: HugeIcons.strokeRoundedAlbum02),
             backgroundColor: Theme.of(context).colorScheme.fabBackgroundColor,
             foregroundColor: Theme.of(context).colorScheme.fabForegroundColor,
-            labelWidget: SpeedDialLabelWidget(context.l10n.importFromGallery),
+            labelWidget: SpeedDialLabelWidget(
+              context.strings.importFromGallery,
+            ),
             onTap: _importFromGalleryNative,
           ),
       ],

@@ -4,13 +4,16 @@ import { ensureLocalUser } from "ente-accounts/services/user";
 import { isDesktop } from "ente-base/app";
 import { createComlinkCryptoWorker } from "ente-base/crypto";
 import type { CryptoWorker } from "ente-base/crypto/worker";
+import { isDevBuild } from "ente-base/env";
 import { lowercaseExtension, nameAndExtension } from "ente-base/file-name";
 import log from "ente-base/log";
 import { ComlinkWorker } from "ente-base/worker/comlink-worker";
 import {
     markUploadedAndObtainProcessableItem,
     shouldDisableCFUploadProxy,
+    uploadPathPrefix,
     type ClusteredUploadItem,
+    type UploadItemAndPath,
     type UploadPhase,
     type UploadResult,
     type UploadableUploadItem,
@@ -33,7 +36,7 @@ import UploadService, {
 } from "ente-gallery/services/upload/upload-service";
 import { processVideoNewUpload } from "ente-gallery/services/video";
 import type { Collection } from "ente-media/collection";
-import { type EnteFile } from "ente-media/file";
+import type { EnteFile } from "ente-media/file";
 import {
     fileCreationTime,
     fileLocation,
@@ -43,13 +46,13 @@ import { FileType } from "ente-media/file-type";
 import { potentialFileTypeFromExtension } from "ente-media/live-photo";
 import { computeNormalCollectionFilesFromSaved } from "ente-new/photos/services/file";
 import { indexNewUpload } from "ente-new/photos/services/ml";
+import { settingsSnapshot } from "ente-new/photos/services/settings";
 import { wait } from "ente-utils/promise";
 import watcher from "./watch";
 
-export type FileID = number;
+type FileID = number;
 
-export type PercentageUploaded = number;
-/* localID => fileName */
+type PercentageUploaded = number;
 export type UploadFileNames = Map<FileID, string>;
 
 export interface UploadCounter {
@@ -62,20 +65,16 @@ export interface InProgressUpload {
     progress: PercentageUploaded;
 }
 
-/**
- * A variant of {@link UploadResult}'s {@link type} values used when segregating
- * finished uploads in the UI. "addedSymlink" is treated as "uploaded",
- * everything else remains as it were.
- */
-export type FinishedUploadType = Exclude<UploadResult["type"], "addedSymlink">;
+// The UI groups addedSymlink with uploaded.
+type FinishedUploadType = Exclude<UploadResult["type"], "addedSymlink">;
 
-export type InProgressUploads = Map<FileID, PercentageUploaded>;
+type InProgressUploads = Map<FileID, PercentageUploaded>;
 
-export type FinishedUploads = Map<FileID, FinishedUploadType>;
+type FinishedUploads = Map<FileID, FinishedUploadType>;
 
 export type SegregatedFinishedUploads = Map<FinishedUploadType, FileID[]>;
 
-export interface UploadBatchItemResult {
+interface UploadBatchItemResult {
     localID: number;
     requestedCollectionID: number;
     result: UploadResult;
@@ -89,6 +88,7 @@ export interface UploadBatchResult {
 
 interface UploadItemsOptions {
     skipDuplicateAddToUploadCollection?: boolean;
+    includePartnerSharedFiles?: boolean;
 }
 
 export const successfulFilesFromUploadBatchResult = (
@@ -106,12 +106,6 @@ export const favoritedFilesFromUploadBatchResult = (
 ): EnteFile[] => {
     const filesByID = new Map<number, EnteFile>();
 
-    /**
-     * Filters items with takeoutFavorited set to true, checks if their final upload
-     * target collection is not hidden, and collects successfully uploaded files
-     * and returns them to be added to the Favorites collection of the user after
-     * de-dupe check by fileID.
-     */
     for (const itemResult of batchResult.itemResults) {
         if (!itemResult.takeoutFavorited) continue;
 
@@ -142,7 +136,7 @@ const successfulFileFromUploadResult = (
     }
 };
 
-export interface ProgressUpdater {
+interface ProgressUpdater {
     setPercentComplete: React.Dispatch<React.SetStateAction<number>>;
     setUploadCounter: React.Dispatch<React.SetStateAction<UploadCounter>>;
     setUploadPhase: (phase: UploadPhase) => void;
@@ -157,7 +151,6 @@ export interface ProgressUpdater {
     setUploadProgressView: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
-/** The number of uploads to process in parallel. */
 const maxConcurrentUploads = 4;
 
 export type UploadItemWithCollection = UploadAsset & {
@@ -170,13 +163,11 @@ class UIService {
     // @ts-ignore
     private progressUpdater: ProgressUpdater;
 
-    // UPLOAD LEVEL STATES
     private uploadPhase: UploadPhase = "preparing";
     private filenames = new Map<number, string>();
     private hasLivePhoto = false;
     private uploadProgressView = false;
 
-    // STAGE LEVEL STATES
     private perFileProgress = 0;
     private filesUploadedCount = 0;
     private totalFilesCount = 0;
@@ -276,7 +267,6 @@ class UIService {
 
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         for (const [_, progress] of this.inProgressUploads) {
-            // filter  negative indicator values during percentComplete calculation
             if (progress < 0) {
                 continue;
             }
@@ -290,13 +280,6 @@ class UIService {
         setFinishedUploads(groupByResult(this.finishedUploads));
     }
 
-    /**
-     * Update the upload progress shown in the UI to {@link percentage} for the
-     * file with the given {@link fileLocalID}.
-     *
-     * @param percentage The upload completion percentage. It should be a value
-     * between 0 and 100 (inclusive).
-     */
     updateUploadProgress(fileLocalID: number, percentage: number) {
         this.inProgressUploads.set(fileLocalID, Math.round(percentage));
         this.updateProgressBarUI();
@@ -332,11 +315,6 @@ class UploadManager {
     private collections = new Map<number, Collection>();
     private uploadInProgress = false;
     private fatalUploadError: Error | undefined;
-    /**
-     * When `true`, then the next call to {@link abortIfCancelled} will throw.
-     *
-     * See: [Note: Upload cancellation].
-     */
     private shouldUploadBeCancelled = false;
 
     private uiService = new UIService();
@@ -382,26 +360,6 @@ class UploadManager {
         this.uiService.setUploadProgressView(false);
     }
 
-    /**
-     * Upload files
-     *
-     * This method waits for all the files to get uploaded (successfully or
-     * unsuccessfully) before returning.
-     *
-     * It is an error to call this method when there is already an in-progress
-     * upload.
-     *
-     * @param itemsWithCollection The items to upload, each paired with the id
-     * of the collection that they should be uploaded into.
-     *
-     * @param collections The collections to which the files are being uploaded.
-     *
-     * These are not all the user's collections - these are just the collections
-     * mentioned by one or more {@link itemsWithCollection}.
-     *
-     * @returns A summary of the completed batch and the per-item upload
-     * results for the files that were attempted.
-     */
     public async uploadItems(
         itemsWithCollection: UploadItemWithCollection[],
         collections: Collection[],
@@ -440,8 +398,6 @@ class UploadManager {
 
                 this.abortIfCancelled();
 
-                // Live photos might've been clustered together, reset the list
-                // of files to reflect that.
                 this.uiService.setFiles(clusteredMediaItems);
 
                 this.uiService.setHasLivePhoto(
@@ -465,24 +421,19 @@ class UploadManager {
             clearInterval(logInterval);
         }
 
+        const partnerSharedCount = this.itemResults.filter(
+            ({ result }) => result.type == "partnerShared",
+        ).length;
+        if (partnerSharedCount) {
+            log.info(`Skipped ${partnerSharedCount} partner shared files`);
+        }
+
         return {
             processedAny: this.uiService.hasFilesInResultList(),
             itemResults: [...this.itemResults],
         };
     }
 
-    /**
-     * Upload a single file to the given collection.
-     *
-     * @param file A web {@link File} object representing the file to upload.
-     *
-     * @param collection The {@link Collection} in which the file should be
-     * added.
-     *
-     * @param sourceEnteFile The {@link EnteFile} from which the file being
-     * uploaded has been derived. This is used to extract and reassociated
-     * relevant metadata to the newly uploaded file.
-     */
     public async uploadFile(
         file: File,
         collection: Collection,
@@ -497,12 +448,8 @@ class UploadManager {
             ? { timestamp, dateTime, offset }
             : undefined;
 
-        // Canvas exports do not retain the original file's embedded metadata, so
-        // preserve the metadata Ente already knows about the source file.
-        //
-        // Preserve the richer creationDate when available so the edited copy
-        // retains the original photo's local capture date/time semantics (and
-        // optional offset), not just the raw UTC timestamp.
+        // Canvas exports lose embedded metadata.
+        // Preserve the source's local capture time and location.
         const externalParsedMetadata = {
             creationDate,
             creationTime: creationDate ? undefined : timestamp,
@@ -588,10 +535,15 @@ class UploadManager {
         options?: UploadItemsOptions,
     ) {
         const uiService = this.uiService;
+        const settings = settingsSnapshot();
         const uploadContext = {
             isCFUploadProxyDisabled: shouldDisableCFUploadProxy(),
+            deferMultipartChecksums:
+                settings.deferredMultipartChecksumsEnabled &&
+                (settings.isInternalUser || isDevBuild),
             skipDuplicateAddToUploadCollection:
                 options?.skipDuplicateAddToUploadCollection,
+            includePartnerSharedFiles: options?.includePartnerSharedFiles,
             abortIfCancelled: this.abortIfCancelled.bind(this),
             updateUploadProgress:
                 uiService.updateUploadProgress.bind(uiService),
@@ -666,7 +618,7 @@ class UploadManager {
             switch (uploadResult.type) {
                 case "failed":
                 case "blocked":
-                    // Retriable error.
+                    // Failed and blocked items can be retried.
                     this.failedItems.push(uploadableItem);
                     break;
 
@@ -704,10 +656,6 @@ class UploadManager {
         this.shouldUploadBeCancelled = true;
     }
 
-    /**
-     * Return the list of failed items from the last upload, along with other
-     * state needed to attempt to reupload them.
-     */
     public failedItemState() {
         return {
             items: [...this.failedItems],
@@ -721,57 +669,17 @@ class UploadManager {
         this.onUploadFile!(file);
     }
 
-    /**
-     * `true` if an upload is currently in-progress (either a bunch of files
-     * directly uploaded by the user, or files being uploaded by the folder
-     * watch functionality).
-     */
     public isUploadInProgress = () => {
         return this.uploadInProgress || watcher.isUploadRunning();
     };
 }
 
-/**
- * Singleton instance of {@link UploadManager}.
- */
 export const uploadManager = new UploadManager();
 
-/**
- * The data operated on by the intermediate stages of the upload.
- *
- * [Note: Intermediate file types during upload]
- *
- * As files progress through stages, they get more and more bits tacked on to
- * them. These types document the journey.
- *
- * - The input is {@link UploadItemWithCollection}. This can either be a new
- *   {@link UploadItemWithCollection}, in which case it'll only have a
- *   {@link localID}, {@link collectionID} and a {@link uploadItem}. Or it could
- *   be a retry, in which case it'll not have a {@link uploadItem} but instead
- *   will have data from a previous stage (concretely, it'll just be a
- *   relabelled {@link ClusteredUploadItem}), like a snake eating its tail.
- *
- * - Immediately we convert it to {@link UploadItemWithCollectionIDAndName}.
- *   This is to mostly systematize what we have, and also attach a
- *   {@link fileName}.
- *
- * - These then get converted to "assets", whereby both parts of a live photo
- *   are combined. This is a {@link ClusteredUploadItem}.
- *
- * - On to the {@link ClusteredUploadItem} we attach the corresponding
- *   {@link collection}, giving us {@link UploadableUploadItem}. This is what
- *   gets queued and then passed to the {@link upload}.
- */
+// Retry items may already be clustered and omit uploadItem.
 type UploadItemWithCollectionIDAndName = UploadAsset & {
-    /** A unique ID for the duration of the upload */
     localID: number;
-    /** The ID of the collection to which this file should be uploaded. */
     collectionID: number;
-    /**
-     * The name of the file.
-     *
-     * In case of live photos, this'll be the name of the image part.
-     */
     fileName: string;
 };
 
@@ -808,10 +716,6 @@ const splitMetadataAndMediaItems = (
         ],
     );
 
-/**
- * Go through the given files, combining any sibling image + video assets into a
- * single live photo when appropriate.
- */
 const clusterLivePhotos = async (
     _items: UploadItemWithCollectionIDAndName[],
     parsedMetadataJSONMap: Map<string, ParsedMetadataJSON>,
@@ -861,8 +765,7 @@ const clusterLivePhotos = async (
             });
             index += 2;
         } else {
-            // They may already be a live photo (we might be retrying a
-            // previously failed upload).
+            // Retry items may already be clustered live photos.
             result.push({ ...fa, isLivePhoto: fa.isLivePhoto ?? false });
             index += 1;
         }
@@ -874,19 +777,50 @@ const clusterLivePhotos = async (
     return result;
 };
 
-/**
- * Add logs if our usage increases some high water mark. This is solely so that
- * we have some indication in the logs if we get a user report of OOM crashes.
- */
+export const uploadableMediaCount = async (
+    itemGroups: UploadItemAndPath[][],
+): Promise<{ count: number; isTakeout: boolean }> => {
+    let localID = 0;
+    const namedItems = itemGroups.flatMap((items, collectionID) =>
+        items.map(([uploadItem, path]) =>
+            makeUploadItemWithCollectionIDAndName({
+                localID: localID++,
+                collectionID,
+                uploadItem,
+                pathPrefix: uploadPathPrefix(path),
+            }),
+        ),
+    );
+    const [metadataItems, mediaItems] = splitMetadataAndMediaItems(namedItems);
+    const parsedMetadataJSONMap = new Map<string, ParsedMetadataJSON>();
+
+    for (const {
+        uploadItem,
+        pathPrefix,
+        collectionID,
+        fileName,
+    } of metadataItems) {
+        const metadataJSON = await tryParseTakeoutMetadataJSON(uploadItem!);
+        if (metadataJSON) {
+            parsedMetadataJSONMap.set(
+                metadataJSONMapKeyForJSON(pathPrefix, collectionID, fileName),
+                metadataJSON,
+            );
+        }
+    }
+
+    return {
+        count: (await clusterLivePhotos(mediaItems, parsedMetadataJSONMap))
+            .length,
+        // Metadata sidecars identify a Takeout import.
+        isTakeout: parsedMetadataJSONMap.size > 0,
+    };
+};
+
 const logAboutMemoryPressureIfNeeded = () => {
     if (!globalThis.electron) return;
 
-    // performance.memory is deprecated in general as a Web standard, and is
-    // also not available in the DOM types provided by TypeScript. However, it
-    // is the method recommended by the Electron team (see the link about the V8
-    // memory cage). The embedded Chromium supports it fine though, we just need
-    // to goad TypeScript to accept the type.
-
+    // Electron recommends this deprecated API, and Chromium still supports it.
     const { memory } = performance as unknown as {
         memory: { totalJSHeapSize: number; jsHeapSizeLimit: number };
     };

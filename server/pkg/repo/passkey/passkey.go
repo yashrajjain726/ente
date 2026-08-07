@@ -9,16 +9,16 @@ import (
 	"strings"
 	"time"
 
-	emailUtil "github.com/ente-io/museum/pkg/utils/email"
-	ente_time "github.com/ente-io/museum/pkg/utils/time"
-	"github.com/ente-io/stacktrace"
+	emailUtil "github.com/ente/museum/pkg/utils/email"
+	ente_time "github.com/ente/museum/pkg/utils/time"
+	"github.com/ente/stacktrace"
 	"github.com/go-webauthn/webauthn/protocol"
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 
-	"github.com/ente-io/museum/ente"
-	"github.com/ente-io/museum/pkg/utils/byteMarshaller"
+	"github.com/ente/museum/ente"
+	"github.com/ente/museum/pkg/utils/byteMarshaller"
 	"github.com/go-webauthn/webauthn/webauthn"
 )
 
@@ -241,8 +241,10 @@ func (r *Repository) CreateBeginRegistrationData(user *ente.User) (options *prot
 	// This is necessary for Android to show third-party password managers (1Password, Bitwarden, etc.)
 	// in the Credential Manager UI during passkey registration. Without this, Android falls back to
 	// the legacy FIDO2 API which only offers Google Password Manager.
-	// This feature is currently enabled only for internal users (@ente.io email addresses).
-	if strings.HasSuffix(emailUtil.NormalizeEmail(user.Email), "@ente.io") {
+	// This feature is currently enabled only for internal users with Ente email addresses.
+	normalizedEmail := emailUtil.NormalizeEmail(user.Email)
+	if strings.HasSuffix(normalizedEmail, "@ente.io") ||
+		strings.HasSuffix(normalizedEmail, "@ente.com") {
 		authSelection := protocol.AuthenticatorSelection{
 			ResidentKey:        protocol.ResidentKeyRequirementRequired,
 			RequireResidentKey: protocol.ResidentKeyRequired(),

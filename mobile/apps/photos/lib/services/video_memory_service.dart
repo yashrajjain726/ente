@@ -2,18 +2,18 @@ import "dart:async";
 import "dart:io";
 import "dart:typed_data";
 
+import "package:ente_strings/ente_strings.dart";
 import "package:ffmpeg_kit_flutter/ffmpeg_kit.dart";
 import "package:ffmpeg_kit_flutter/return_code.dart";
 import "package:flutter/cupertino.dart";
 import "package:image/image.dart" as img;
 import "package:logging/logging.dart";
 import "package:path_provider/path_provider.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/models/file/file.dart";
 import "package:photos/models/file/file_type.dart";
+import "package:photos/module/download/file.dart";
 import "package:photos/ui/notification/toast.dart";
 import "package:photos/utils/dialog_util.dart";
-import "package:photos/utils/file_util.dart";
 
 final _logger = Logger("VideoMemoryService");
 
@@ -29,6 +29,7 @@ Future<void> createSlideshow(BuildContext context, List<EnteFile> files) async {
       await dialog.hide();
     }
 
+    if (!context.mounted) return;
     final command = _buildFFmpegCommand(
       context,
       imageData.paths,
@@ -36,6 +37,7 @@ Future<void> createSlideshow(BuildContext context, List<EnteFile> files) async {
       imageData.widths,
     );
 
+    if (!context.mounted) return;
     await _executeFFmpegProcess(
       context: context,
       command: command,
@@ -116,19 +118,19 @@ Future<void> _executeFFmpegProcess({
             "FFmpeg command executed successfully in $executionTime seconds",
           );
           _completeOperation(completer, onComplete);
+          if (!context.mounted) return;
           showToast(
             context,
-            AppLocalizations.of(
-              context,
-            ).videoExportSuccess(path: _generateOutputPath()),
+            context.strings.videoExportSuccess(path: _generateOutputPath()),
           );
         } else {
           _logger.warning(
             "FFmpeg process failed with return code $returnCode in $executionTime seconds",
           );
-          showToast(context, AppLocalizations.of(context).videoExportFailed);
           _completeOperation(completer, onComplete);
           await FFmpegKit.cancel();
+          if (!context.mounted) return;
+          showToast(context, context.strings.videoExportFailed);
         }
       },
       (log) {

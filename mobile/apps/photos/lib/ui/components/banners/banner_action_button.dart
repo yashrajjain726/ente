@@ -1,5 +1,5 @@
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
-import "package:photos/l10n/l10n.dart";
 import "package:photos/theme/colors.dart";
 import "package:photos/theme/ente_theme.dart";
 
@@ -27,7 +27,7 @@ class BannerActionButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final textTheme = getEnteTextTheme(context);
     final colorScheme = getEnteColorScheme(context);
-    final tagLabel = context.l10n.offlineEnableBackupTagLabel;
+    final tagLabel = context.strings.offlineEnableBackupTagLabel;
     final resolvedBackgroundColor = switch (variant) {
       BannerActionButtonVariant.neutral => fillLight,
       BannerActionButtonVariant.primary => green,

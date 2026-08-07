@@ -202,6 +202,18 @@ var ErrUserNotFound = &ApiError{
 	HttpStatusCode: http.StatusNotFound,
 }
 
+var ErrRecipientIdentityMismatch = &ApiError{
+	Code:           "RECIPIENT_IDENTITY_MISMATCH",
+	Message:        "Recipient identity does not match",
+	HttpStatusCode: http.StatusConflict,
+}
+
+var ErrAutomaticShareRecipientNotEligible = &ApiError{
+	Code:           "AUTOMATIC_SHARE_RECIPIENT_NOT_ELIGIBLE",
+	Message:        "Automatic share recipient is not eligible",
+	HttpStatusCode: http.StatusForbidden,
+}
+
 var ErrMaxPasskeysReached = ApiError{
 	Code:           MaxPasskeysReached,
 	Message:        "Max passkeys limit reached",

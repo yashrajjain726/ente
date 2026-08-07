@@ -45,10 +45,7 @@ impl VectorDB {
 
         if file_exists {
             println!("Loading index from disk.");
-            // Must use load() instead of view() because:
-            // - view() creates a read-only memory-mapped view (immutable)
-            // - load() loads the index into RAM for read/write operations (mutable)
-            // Using view() causes "Can't add to an immutable index" error
+            // `view` is immutable, but the reloaded index must remain writable.
             db.index
                 .load(file_path)
                 .map_err(|e| format!("Failed to load index from {file_path}: {e}"))?;
@@ -60,7 +57,6 @@ impl VectorDB {
     }
 
     fn save_index(&self) -> Result<(), String> {
-        // Ensure directory exists
         if let Some(parent) = self.path.parent() {
             std::fs::create_dir_all(parent).map_err(|e| {
                 format!(
@@ -70,9 +66,7 @@ impl VectorDB {
             })?;
         }
 
-        // Use atomic write: save to temp file first, then rename
-        // Use a unique temp path per save so concurrent saves can never race
-        // by clobbering the same temporary file.
+        // Unique temp paths prevent concurrent saves from clobbering each other.
         let save_sequence = INDEX_SAVE_TEMP_COUNTER.fetch_add(1, Ordering::Relaxed);
         let temp_path =
             self.path
@@ -81,7 +75,6 @@ impl VectorDB {
             .to_str()
             .ok_or_else(|| format!("Invalid temp path: {}", temp_path.display()))?;
 
-        // Save to temporary file
         self.index.save(temp_path_str).map_err(|e| {
             let _ = std::fs::remove_file(&temp_path);
             format!(
@@ -90,10 +83,7 @@ impl VectorDB {
             )
         })?;
 
-        // Atomic rename - guaranteed atomic on iOS/Android
-        // This will atomically replace the existing file
-        // The rename ensures we never have a partially written file,
-        // even if the app is suspended or crashes
+        // Renaming prevents a suspension or crash from leaving a partial index.
         if let Err(e) = std::fs::rename(&temp_path, &self.path) {
             let _ = std::fs::remove_file(&temp_path);
             return Err(format!(
@@ -364,45 +354,27 @@ impl VectorDB {
         exact: bool,
     ) -> Result<BulkSearchByKeyMatch, String> {
         let dimensions = self.index.dimensions();
-        let mut embedding_data = vec![0.0f32; potential_keys.len() * dimensions];
-        let mut contained_keys = Vec::with_capacity(potential_keys.len());
-        let mut actual_query_count = 0;
+        let result_capacity = potential_keys.len().min(self.index.size());
+        let mut contained_keys = Vec::with_capacity(result_capacity);
+        let mut closeby_keys = Vec::with_capacity(result_capacity);
+        let mut distances = Vec::with_capacity(result_capacity);
+        let mut query = vec![0.0f32; dimensions];
 
-        // Fill embeddings directly into flat storage using slices
         for key in potential_keys {
             if self.index.contains(*key) {
-                let start_idx = actual_query_count * dimensions;
-                let end_idx = start_idx + dimensions;
-                let embedding_slice = &mut embedding_data[start_idx..end_idx];
-
                 self.index
-                    .get(*key, embedding_slice)
+                    .get(*key, &mut query)
                     .map_err(|e| format!("Failed to get vector for key {key}: {e}"))?;
+                let (keys_result, distances_result) = self.search_vectors(&query, count, exact)?;
                 contained_keys.push(*key);
-                actual_query_count += 1;
+                closeby_keys.push(keys_result);
+                distances.push(distances_result);
             }
-        }
-        embedding_data.truncate(actual_query_count * dimensions);
-
-        let max_result_size = std::cmp::min(self.index.size(), count);
-        let mut closeby_keys = vec![Vec::with_capacity(max_result_size); actual_query_count];
-        let mut distances = vec![Vec::with_capacity(max_result_size); actual_query_count];
-
-        // Search using slices and fill pre-allocated containers
-        for i in 0..actual_query_count {
-            let start_idx = i * dimensions;
-            let end_idx = start_idx + dimensions;
-            let query_slice = &embedding_data[start_idx..end_idx];
-            let (keys_result, distances_result) = self.search_vectors(query_slice, count, exact)?;
-            closeby_keys[i] = keys_result;
-            distances[i] = distances_result;
         }
 
         Ok((contained_keys, closeby_keys, distances))
     }
 
-    /// Check if a vector with the given key exists in the index.
-    /// `true` if the index contains the vector with the given key, `false` otherwise.
     pub fn contains_vector(&self, key: u64) -> bool {
         self.index.contains(key)
     }
@@ -485,5 +457,31 @@ impl VectorDB {
             expansion_add,
             expansion_search,
         )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::VectorDB;
+
+    #[test]
+    fn bulk_search_keys_preserves_contained_key_order_and_result_alignment() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let index_path = temp_dir.path().join("vectors.usearch");
+        let mut db = VectorDB::new(index_path.to_str().unwrap(), 3).unwrap();
+        db.bulk_add_vectors(vec![2, 4], &[vec![1.0, 0.0, 0.0], vec![0.0, 1.0, 0.0]])
+            .unwrap();
+
+        let potential_keys = vec![9, 4, 2, 8];
+        let (contained_keys, matched_keys, distances) =
+            db.bulk_search_keys(&potential_keys, 2, true).unwrap();
+
+        assert_eq!(contained_keys, vec![4, 2]);
+        assert_eq!(matched_keys.len(), contained_keys.len());
+        assert_eq!(distances.len(), contained_keys.len());
+        assert_eq!(matched_keys[0].first(), Some(&4));
+        assert_eq!(matched_keys[1].first(), Some(&2));
+        assert_eq!(distances[0].first(), Some(&0.0));
+        assert_eq!(distances[1].first(), Some(&0.0));
     }
 }

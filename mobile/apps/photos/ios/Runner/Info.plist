@@ -23,7 +23,7 @@
 		<key>CFBundleSignature</key>
 		<string>????</string>
 		<key>MinimumOSVersion</key>
-		<string>14.0</string>
+		<string>15.1</string>
 		<key>FlutterDeepLinkingEnabled</key>
 		<false/>
 		<key>LSApplicationQueriesSchemes</key>
@@ -94,6 +94,8 @@
 		<string>Please allow access to your camera so that you can take photos within ente</string>
 		<key>NSPhotoLibraryUsageDescription</key>
 		<string>Please allow access to your photos so that ente can encrypt and back them up.</string>
+		<key>NSMotionUsageDescription</key>
+		<string>Ente uses device motion to let you look around panoramic photos.</string>
 		<key>PHPhotoLibraryPreventAutomaticLimitedAccessAlert</key>
 		<true/>
 		<key>UIBackgroundModes</key>

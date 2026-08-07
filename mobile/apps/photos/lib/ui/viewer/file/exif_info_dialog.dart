@@ -1,9 +1,9 @@
+import "package:ente_strings/ente_strings.dart";
 import 'package:flutter/material.dart';
-import "package:photos/generated/l10n.dart";
 import 'package:photos/models/file/file.dart';
+import 'package:photos/module/metadata/exif.dart';
 import "package:photos/theme/ente_theme.dart";
 import 'package:photos/ui/common/loading_widget.dart';
-import 'package:photos/utils/exif_util.dart';
 
 class ExifInfoDialog extends StatelessWidget {
   final EnteFile file;
@@ -16,7 +16,7 @@ class ExifInfoDialog extends StatelessWidget {
       title: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(AppLocalizations.of(context).exif, style: textTheme.h3Bold),
+          Text(context.strings.exif, style: textTheme.h3Bold),
           Text(file.title!, style: textTheme.smallMuted),
         ],
       ),
@@ -26,10 +26,7 @@ class ExifInfoDialog extends StatelessWidget {
       ),
       actions: [
         TextButton(
-          child: Text(
-            AppLocalizations.of(context).close,
-            style: textTheme.body,
-          ),
+          child: Text(context.strings.close, style: textTheme.body),
           onPressed: () {
             Navigator.of(context).pop('dialog');
           },
@@ -48,7 +45,7 @@ class ExifInfoDialog extends StatelessWidget {
               .map((entry) => "${entry.key}: ${entry.value}")
               .join("\n");
           if (data.isEmpty) {
-            data = "no exif data found";
+            data = context.strings.noExifData;
           }
           return Container(
             padding: const EdgeInsets.all(2),

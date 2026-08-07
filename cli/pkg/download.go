@@ -4,10 +4,10 @@ import (
 	"archive/zip"
 	"context"
 	"fmt"
-	"github.com/ente-io/cli/internal/crypto"
-	"github.com/ente-io/cli/pkg/model"
-	"github.com/ente-io/cli/utils"
-	"github.com/ente-io/cli/utils/encoding"
+	"github.com/ente/cli/internal/crypto"
+	"github.com/ente/cli/pkg/model"
+	"github.com/ente/cli/utils"
+	"github.com/ente/cli/utils/encoding"
 	"io"
 	"log"
 	"os"
@@ -22,7 +22,6 @@ func (c *ClICtrl) downloadAndDecrypt(
 ) (*string, error) {
 	dir := c.tempFolder
 	downloadPath := fmt.Sprintf("%s/%d", dir, file.ID)
-	// check if file exists
 	if stat, err := os.Stat(downloadPath); err == nil && stat.Size() == file.Info.FileSize {
 		log.Printf("File already exists %s (%s)", file.GetTitle(), utils.ByteCountDecimal(file.Info.FileSize))
 	} else {

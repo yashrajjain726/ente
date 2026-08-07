@@ -2,6 +2,7 @@ import "dart:async";
 
 import "package:ente_components/ente_components.dart";
 import 'package:ente_pure_utils/ente_pure_utils.dart';
+import "package:ente_strings/ente_strings.dart";
 import 'package:flutter/material.dart';
 import 'package:logging/logging.dart';
 import 'package:password_strength/password_strength.dart';
@@ -10,8 +11,6 @@ import 'package:photos/core/event_bus.dart';
 import 'package:photos/events/account_configured_event.dart';
 import 'package:photos/events/subscription_purchased_event.dart';
 import "package:photos/gateways/users/models/key_gen_result.dart";
-import "package:photos/generated/l10n.dart";
-import "package:photos/l10n/l10n.dart";
 import 'package:photos/services/account/user_service.dart';
 import 'package:photos/ui/account/recovery_key_page.dart';
 import 'package:photos/ui/common/web_page.dart';
@@ -77,13 +76,13 @@ class _PasswordEntryPageState extends State<PasswordEntryPage> {
   Widget build(BuildContext context) {
     final colors = context.componentColors;
 
-    String title = AppLocalizations.of(context).setPasswordTitle;
+    String title = context.strings.setPasswordTitle;
     if (widget.mode == PasswordEntryMode.update) {
-      title = AppLocalizations.of(context).changePasswordTitle;
+      title = context.strings.changePasswordTitle;
     } else if (widget.mode == PasswordEntryMode.reset) {
-      title = AppLocalizations.of(context).resetPasswordTitle;
+      title = context.strings.resetPasswordTitle;
     } else if (_volatilePassword != null) {
-      title = AppLocalizations.of(context).encryptionKeys;
+      title = context.strings.encryptionKeys;
     }
 
     final isFormValid = _passwordsMatch && _isPasswordValid;
@@ -110,18 +109,9 @@ class _PasswordEntryPageState extends State<PasswordEntryPage> {
         ),
         centerTitle: true,
       ),
-      body: _volatilePassword != null ? const SizedBox.shrink() : _getBody(),
-      floatingActionButton: _volatilePassword != null
-          ? null
-          : Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: ButtonComponent(
-                label: title,
-                isDisabled: !isFormValid,
-                onTap: isFormValid ? _submitPassword : null,
-              ),
-            ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+      body: _volatilePassword != null
+          ? const SizedBox.shrink()
+          : _getBody(title: title, isFormValid: isFormValid),
     );
   }
 
@@ -134,10 +124,11 @@ class _PasswordEntryPageState extends State<PasswordEntryPage> {
     } else {
       _updatePassword();
     }
+    if (!mounted) return;
     FocusScope.of(context).unfocus();
   }
 
-  Widget _getBody() {
+  Widget _getBody({required String title, required bool isFormValid}) {
     final colors = context.componentColors;
     final email = Configuration.instance.getEmail();
 
@@ -147,13 +138,13 @@ class _PasswordEntryPageState extends State<PasswordEntryPage> {
 
     if (_passwordInInputBox.isNotEmpty && _showPasswordStrength) {
       if (_passwordStrength > kStrongPasswordStrengthThreshold) {
-        passwordMessage = AppLocalizations.of(context).strongPassword;
+        passwordMessage = context.strings.strongPassword;
         passwordMessageType = TextInputComponentMessageType.success;
       } else if (_passwordStrength > kMildPasswordStrengthThreshold) {
-        passwordMessage = AppLocalizations.of(context).moderateStrength;
+        passwordMessage = context.strings.moderateStrength;
         passwordMessageType = TextInputComponentMessageType.alert;
       } else {
-        passwordMessage = AppLocalizations.of(context).weakStrength;
+        passwordMessage = context.strings.weakStrength;
         passwordMessageType = TextInputComponentMessageType.alert;
       }
     }
@@ -166,146 +157,156 @@ class _PasswordEntryPageState extends State<PasswordEntryPage> {
         _passwordInInputBox.isNotEmpty &&
         _showConfirmPasswordValidation) {
       if (_passwordsMatch) {
-        confirmPasswordMessage = AppLocalizations.of(context).passwordsMatch;
+        confirmPasswordMessage = context.strings.passwordsMatch;
         confirmPasswordMessageType = TextInputComponentMessageType.success;
       } else {
-        confirmPasswordMessage = AppLocalizations.of(
-          context,
-        ).passwordsDontMatch;
+        confirmPasswordMessage = context.strings.passwordsDontMatch;
         confirmPasswordMessageType = TextInputComponentMessageType.error;
       }
     }
 
     return SafeArea(
-      child: AutofillGroup(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SizedBox(height: 16),
-              Text(
-                widget.mode == PasswordEntryMode.set
-                    ? AppLocalizations.of(context).enterPasswordToEncrypt
-                    : AppLocalizations.of(context).enterNewPasswordToEncrypt,
-                style: TextStyles.body.copyWith(color: colors.textLight),
-              ),
-              const SizedBox(height: 8),
-              StyledText(
-                text: AppLocalizations.of(context).passwordWarning,
-                style: TextStyles.body.copyWith(color: colors.textLight),
-                tags: {
-                  'underline': StyledTextTag(
-                    style: TextStyles.body.copyWith(
-                      color: colors.textLight,
-                      decoration: TextDecoration.underline,
-                    ),
-                  ),
-                },
-              ),
-              const SizedBox(height: 24),
-              Visibility(
-                visible: false,
-                child: TextFormField(
-                  autofillHints: const [AutofillHints.email],
-                  autocorrect: false,
-                  keyboardType: TextInputType.emailAddress,
-                  initialValue: email,
-                  textInputAction: TextInputAction.next,
+      child: SingleChildScrollView(
+        child: AutofillGroup(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(height: 16),
+                Text(
+                  widget.mode == PasswordEntryMode.set
+                      ? context.strings.enterPasswordToEncrypt
+                      : context.strings.enterNewPasswordToEncrypt,
+                  style: TextStyles.body.copyWith(color: colors.textLight),
                 ),
-              ),
-              TextInputComponent(
-                label: AppLocalizations.of(context).password,
-                hintText: AppLocalizations.of(context).password,
-                controller: _passwordController1,
-                isPasswordInput: true,
-                isRequired: true,
-                autocorrect: false,
-                autofillHints: const [AutofillHints.newPassword],
-                message: passwordMessage,
-                messageType: passwordMessageType,
-                onChanged: (password) {
-                  _passwordStrengthTimer?.cancel();
-                  setState(() {
-                    _passwordInInputBox = password;
-                    _passwordStrength = estimatePasswordStrength(password);
-                    _isPasswordValid =
-                        _passwordStrength >= kMildPasswordStrengthThreshold;
-                    _passwordsMatch =
-                        _passwordInInputBox == _passwordInInputConfirmationBox;
-                    _showPasswordStrength = false;
-                  });
-                  _passwordStrengthTimer = Timer(
-                    const Duration(seconds: 1),
-                    () {
-                      if (mounted) {
-                        setState(() {
-                          _showPasswordStrength = true;
-                        });
-                      }
-                    },
-                  );
-                },
-              ),
-              const SizedBox(height: 16),
-              TextInputComponent(
-                label: AppLocalizations.of(context).confirmPassword,
-                hintText: AppLocalizations.of(context).confirmPassword,
-                controller: _passwordController2,
-                isPasswordInput: true,
-                isRequired: true,
-                autocorrect: false,
-                autofillHints: const [],
-                finishAutofillContextOnEditingComplete: true,
-                shouldUnfocusOnClearOrSubmit: true,
-                onSubmit: _passwordsMatch && _isPasswordValid
-                    ? (_) => _submitPassword()
-                    : null,
-                message: confirmPasswordMessage,
-                messageType: confirmPasswordMessageType,
-                onChanged: (cnfPassword) {
-                  _confirmPasswordTimer?.cancel();
-                  setState(() {
-                    _passwordInInputConfirmationBox = cnfPassword;
-                    _showConfirmPasswordValidation = false;
-                    if (_passwordInInputBox.isNotEmpty) {
+                const SizedBox(height: 8),
+                StyledText(
+                  text: context.strings.passwordWarning,
+                  style: TextStyles.body.copyWith(color: colors.textLight),
+                  tags: {
+                    'underline': StyledTextTag(
+                      style: TextStyles.body.copyWith(
+                        color: colors.textLight,
+                        decoration: TextDecoration.underline,
+                      ),
+                    ),
+                  },
+                ),
+                const SizedBox(height: 24),
+                Visibility(
+                  visible: false,
+                  child: TextFormField(
+                    autofillHints: const [AutofillHints.email],
+                    autocorrect: false,
+                    keyboardType: TextInputType.emailAddress,
+                    initialValue: email,
+                    textInputAction: TextInputAction.next,
+                  ),
+                ),
+                TextInputComponent(
+                  label: context.strings.password,
+                  hintText: context.strings.password,
+                  controller: _passwordController1,
+                  isPasswordInput: true,
+                  isRequired: true,
+                  autocorrect: false,
+                  autofillHints: const [AutofillHints.newPassword],
+                  message: passwordMessage,
+                  messageType: passwordMessageType,
+                  onChanged: (password) {
+                    _passwordStrengthTimer?.cancel();
+                    setState(() {
+                      _passwordInInputBox = password;
+                      _passwordStrength = estimatePasswordStrength(password);
+                      _isPasswordValid =
+                          _passwordStrength >= kMildPasswordStrengthThreshold;
                       _passwordsMatch =
                           _passwordInInputBox ==
                           _passwordInInputConfirmationBox;
-                    }
-                  });
-                  _confirmPasswordTimer = Timer(const Duration(seconds: 1), () {
-                    if (mounted) {
-                      setState(() {
-                        _showConfirmPasswordValidation = true;
-                      });
-                    }
-                  });
-                },
-              ),
-              const SizedBox(height: 16),
-              Align(
-                alignment: Alignment.centerRight,
-                child: ButtonComponent(
-                  variant: ButtonComponentVariant.link,
-                  label: AppLocalizations.of(context).howItWorks,
-                  size: ButtonComponentSize.small,
-                  onTap: () async {
-                    await Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (BuildContext context) {
-                          return WebPage(
-                            AppLocalizations.of(context).howItWorks,
-                            "https://ente.com/architecture",
-                          );
-                        },
-                      ),
+                      _showPasswordStrength = false;
+                    });
+                    _passwordStrengthTimer = Timer(
+                      const Duration(seconds: 1),
+                      () {
+                        if (mounted) {
+                          setState(() {
+                            _showPasswordStrength = true;
+                          });
+                        }
+                      },
                     );
                   },
                 ),
-              ),
-              const SizedBox(height: 40),
-            ],
+                const SizedBox(height: 16),
+                TextInputComponent(
+                  label: context.strings.confirmPassword,
+                  hintText: context.strings.confirmPassword,
+                  controller: _passwordController2,
+                  isPasswordInput: true,
+                  isRequired: true,
+                  autocorrect: false,
+                  autofillHints: const [],
+                  finishAutofillContextOnEditingComplete: true,
+                  shouldUnfocusOnClearOrSubmit: true,
+                  onSubmit: _passwordsMatch && _isPasswordValid
+                      ? (_) => _submitPassword()
+                      : null,
+                  message: confirmPasswordMessage,
+                  messageType: confirmPasswordMessageType,
+                  onChanged: (cnfPassword) {
+                    _confirmPasswordTimer?.cancel();
+                    setState(() {
+                      _passwordInInputConfirmationBox = cnfPassword;
+                      _showConfirmPasswordValidation = false;
+                      if (_passwordInInputBox.isNotEmpty) {
+                        _passwordsMatch =
+                            _passwordInInputBox ==
+                            _passwordInInputConfirmationBox;
+                      }
+                    });
+                    _confirmPasswordTimer = Timer(
+                      const Duration(seconds: 1),
+                      () {
+                        if (mounted) {
+                          setState(() {
+                            _showConfirmPasswordValidation = true;
+                          });
+                        }
+                      },
+                    );
+                  },
+                ),
+                const SizedBox(height: 16),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: ButtonComponent(
+                    variant: ButtonComponentVariant.link,
+                    label: context.strings.howItWorks,
+                    size: ButtonComponentSize.small,
+                    onTap: () async {
+                      await Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (BuildContext context) {
+                            return WebPage(
+                              context.strings.howItWorks,
+                              "https://ente.com/architecture",
+                            );
+                          },
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(height: 24),
+                ButtonComponent(
+                  label: title,
+                  isDisabled: !isFormValid,
+                  onTap: isFormValid ? _submitPassword : null,
+                ),
+                const SizedBox(height: 40),
+              ],
+            ),
           ),
         ),
       ),
@@ -314,9 +315,10 @@ class _PasswordEntryPageState extends State<PasswordEntryPage> {
 
   void _updatePassword() async {
     final logOutFromOthers = await logOutFromOtherDevices(context);
+    if (!mounted) return;
     final dialog = createProgressDialog(
       context,
-      AppLocalizations.of(context).generatingEncryptionKeys,
+      context.strings.generatingEncryptionKeys,
     );
     await dialog.show();
     try {
@@ -329,18 +331,21 @@ class _PasswordEntryPageState extends State<PasswordEntryPage> {
         logoutOtherDevices: logOutFromOthers,
       );
       await dialog.hide();
-      showShortToast(
-        context,
-        AppLocalizations.of(context).passwordChangedSuccessfully,
-      );
-      Navigator.of(context).pop();
       if (widget.mode == PasswordEntryMode.reset) {
         Bus.instance.fire(SubscriptionPurchasedEvent());
+      }
+      if (!mounted) return;
+      showShortToast(context, context.strings.passwordChangedSuccessfully);
+      if (!mounted) return;
+      Navigator.of(context).pop();
+      if (widget.mode == PasswordEntryMode.reset) {
+        if (!mounted) return;
         Navigator.of(context).popUntil((route) => route.isFirst);
       }
     } catch (e, s) {
       _logger.severe("Failed to change password", e, s);
       await dialog.hide();
+      if (!mounted) return;
       await showGenericErrorBottomSheet(context: context, error: e);
     }
   }
@@ -349,15 +354,15 @@ class _PasswordEntryPageState extends State<PasswordEntryPage> {
     bool logOutFromOther = true;
     await showChoiceDialog(
       context,
-      title: context.l10n.signOutFromOtherDevices,
-      body: context.l10n.signOutOtherBody,
+      title: context.strings.signOutFromOtherDevices,
+      body: context.strings.signOutOtherBody,
       isDismissible: false,
-      firstButtonLabel: context.l10n.signOutOtherDevices,
+      firstButtonLabel: context.strings.signOutOtherDevices,
       firstButtonType: ButtonType.critical,
       firstButtonOnTap: () async {
         logOutFromOther = true;
       },
-      secondButtonLabel: context.l10n.doNotSignOut,
+      secondButtonLabel: context.strings.doNotSignOut,
       secondButtonOnTap: () async {
         logOutFromOther = false;
       },
@@ -368,7 +373,7 @@ class _PasswordEntryPageState extends State<PasswordEntryPage> {
   Future<void> _showRecoveryCodeDialog(String password) async {
     final dialog = createProgressDialog(
       context,
-      AppLocalizations.of(context).generatingEncryptionKeys,
+      context.strings.generatingEncryptionKeys,
     );
     await dialog.show();
     try {
@@ -377,39 +382,42 @@ class _PasswordEntryPageState extends State<PasswordEntryPage> {
       );
       Configuration.instance.resetVolatilePassword();
       await dialog.hide();
-      onDone() async {
+      Future<void> onDone() async {
         final dialog = createProgressDialog(
           context,
-          AppLocalizations.of(context).pleaseWait,
+          context.strings.pleaseWait,
         );
         await dialog.show();
         try {
           await UserService.instance.setAttributes(result);
           await dialog.hide();
           Configuration.instance.resetVolatilePassword();
+          if (mounted) {
+            await Navigator.of(context).pushAndRemoveUntil(
+              MaterialPageRoute(
+                builder: (BuildContext context) {
+                  return getSubscriptionPage(isOnBoarding: true);
+                },
+              ),
+              (route) => route.isFirst,
+            );
+          }
           Bus.instance.fire(AccountConfiguredEvent());
-          // ignore: unawaited_futures
-          Navigator.of(context).pushAndRemoveUntil(
-            MaterialPageRoute(
-              builder: (BuildContext context) {
-                return getSubscriptionPage(isOnBoarding: true);
-              },
-            ),
-            (route) => route.isFirst,
-          );
         } catch (e, s) {
           _logger.severe("Failed to configure account", e, s);
           await dialog.hide();
+          if (!mounted) return;
           await showGenericErrorBottomSheet(context: context, error: e);
         }
       }
 
+      if (!mounted) return;
       // ignore: unawaited_futures
       routeToPage(
         context,
         RecoveryKeyPage(
           result.privateKeyAttributes.recoveryKey,
-          AppLocalizations.of(context).continueLabel,
+          context.strings.continueLabel,
           onDone: onDone,
           isOnboarding: true,
         ),
@@ -417,14 +425,15 @@ class _PasswordEntryPageState extends State<PasswordEntryPage> {
     } catch (e) {
       _logger.severe(e);
       await dialog.hide();
+      if (!mounted) return;
       if (e is UnsupportedError) {
         // ignore: unawaited_futures
         showAlertBottomSheet(
           context,
-          title: AppLocalizations.of(context).insecureDevice,
-          message: AppLocalizations.of(
-            context,
-          ).sorryWeCouldNotGenerateSecureKeysOnThisDevicennplease,
+          title: context.strings.insecureDevice,
+          message: context
+              .strings
+              .sorryWeCouldNotGenerateSecureKeysOnThisDevicennplease,
           assetPath: 'assets/warning-grey.png',
         );
       } else {

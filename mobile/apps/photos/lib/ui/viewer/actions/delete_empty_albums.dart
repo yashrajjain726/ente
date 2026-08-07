@@ -1,9 +1,9 @@
 import "package:ente_components/ente_components.dart";
+import "package:ente_strings/ente_strings.dart";
 import 'package:flutter/material.dart';
 import 'package:photos/core/event_bus.dart';
 import "package:photos/db/files_db.dart";
 import 'package:photos/events/collection_updated_event.dart';
-import "package:photos/generated/l10n.dart";
 import 'package:photos/models/collection/collection.dart';
 import 'package:photos/models/file/file.dart';
 import 'package:photos/services/collections_service.dart';
@@ -43,7 +43,7 @@ class _DeleteEmptyAlbumsState extends State<DeleteEmptyAlbums> {
         child: Padding(
           padding: widget.padding,
           child: Text(
-            AppLocalizations.of(context).deleteEmptyAlbums,
+            context.strings.deleteEmptyAlbums,
             style: TextStyles.body.copyWith(
               color: colors.textLight,
               decoration: TextDecoration.underline,
@@ -56,7 +56,7 @@ class _DeleteEmptyAlbumsState extends State<DeleteEmptyAlbums> {
   }
 
   Future<void> _confirmAndDeleteEmptyAlbums() async {
-    final l10n = AppLocalizations.of(context);
+    final l10n = context.strings;
     await showBottomSheetComponent<void>(
       context: context,
       isDismissible: true,
@@ -126,7 +126,7 @@ class _DeleteEmptyAlbumsState extends State<DeleteEmptyAlbums> {
           '0',
         );
 
-        _deleteProgress.value = AppLocalizations.of(context).deleteProgress(
+        _deleteProgress.value = context.strings.deleteProgress(
           currentlyDeleting: currentlyDeleting,
           totalCount: totalCount,
         );

@@ -1,5 +1,5 @@
+import type { NotificationAttributes } from "ente-base/components/Notification";
 import { apiOrigin } from "ente-base/origins";
-import type { NotificationAttributes } from "ente-new/photos/components/Notification";
 import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
 import {
@@ -65,7 +65,6 @@ export const useFileShare = (): UseFileShareResult => {
     useEffect(() => {
         const loadFileInfo = async () => {
             try {
-                // Extract token from pathname (e.g., /4MzPEanZK8)
                 const token = window.location.pathname.slice(1);
 
                 if (!token) {
@@ -107,7 +106,6 @@ export const useFileShare = (): UseFileShareResult => {
                     keyMaterial,
                 );
 
-                // Check if decryption failed (invalid key)
                 if (
                     decryptedInfo.fileName === "Unknown file" ||
                     decryptedInfo.fileName === "Encrypted file" ||

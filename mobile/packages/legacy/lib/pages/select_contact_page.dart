@@ -337,7 +337,7 @@ class _AddContactSheetState extends State<AddContactSheet> {
     if (confirmed == true) {
       try {
         final success = await EmergencyContactService.instance.addContact(
-          context,
+          mounted ? context : null,
           emailToAdd,
           _selectedRecoveryDays,
         );
@@ -367,7 +367,10 @@ class _AddContactSheetState extends State<AddContactSheet> {
     return showAlertBottomSheet<bool>(
       context,
       title: context.strings.warning,
-      message: context.strings.confirmAddingTrustedContact(email, recoveryDays),
+      message: context.strings.confirmAddingTrustedContact(
+        email: email,
+        numOfDays: recoveryDays,
+      ),
       assetPath: "assets/warning-blue.png",
       buttons: [
         GradientButton(
@@ -384,7 +387,7 @@ class _AddContactSheetState extends State<AddContactSheet> {
       await showAlertBottomSheet(
         context,
         title: context.strings.invalidEmailAddress,
-        message: context.strings.enterValidEmail,
+        message: context.strings.enterValidEmailDetailed,
         assetPath: "assets/warning-blue.png",
       );
       return;

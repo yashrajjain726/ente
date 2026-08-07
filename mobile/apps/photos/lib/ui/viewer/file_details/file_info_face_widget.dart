@@ -1,12 +1,13 @@
 import "dart:async";
 import "dart:typed_data";
 
+import "package:ente_components/ente_components.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/foundation.dart" show kDebugMode;
 import "package:flutter/material.dart";
 import "package:logging/logging.dart";
 import "package:photos/db/ml/db.dart";
 import "package:photos/db/offline_files_db.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/models/base/id.dart";
 import "package:photos/models/file/file.dart";
 import "package:photos/models/ml/face/face.dart";
@@ -22,7 +23,6 @@ import "package:photos/ui/components/buttons/button_widget.dart";
 import "package:photos/ui/components/models/button_type.dart";
 import "package:photos/ui/notification/toast.dart";
 import "package:photos/ui/viewer/people/cluster_page.dart";
-import "package:photos/ui/viewer/people/face_thumbnail_squircle.dart";
 import "package:photos/ui/viewer/people/file_face_widget.dart";
 import "package:photos/ui/viewer/people/people_page.dart";
 import "package:photos/ui/viewer/people/save_or_edit_person.dart";
@@ -93,20 +93,19 @@ class _FileInfoFaceWidgetState extends State<FileInfoFaceWidget> {
               child: Container(
                 height: thumbnailWidth,
                 width: thumbnailWidth,
-                decoration: ShapeDecoration(
-                  shape: faceThumbnailSquircleBorder(
-                    side: thumbnailWidth,
-                    borderSide: widget.highlight || widget.isSelected
-                        ? BorderSide(
-                            color: widget.isSelected
-                                ? getEnteColorScheme(context).primary500
-                                : getEnteColorScheme(context).primary700,
-                            width: 1.0,
-                          )
-                        : BorderSide.none,
-                  ),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(Radii.button),
+                  border: widget.highlight || widget.isSelected
+                      ? Border.all(
+                          color: widget.isSelected
+                              ? getEnteColorScheme(context).primary500
+                              : getEnteColorScheme(context).primary700,
+                          width: 1.0,
+                        )
+                      : null,
                 ),
-                child: FaceThumbnailSquircleClip(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(Radii.button),
                   child: Stack(
                     fit: StackFit.expand,
                     children: [
@@ -162,9 +161,9 @@ class _FileInfoFaceWidgetState extends State<FileInfoFaceWidget> {
           child: Center(
             child: Text(
               widget.person!.data.isIgnored
-                  ? '(' + AppLocalizations.of(context).ignored + ')'
+                  ? '(' + context.strings.ignored + ')'
                   : widget.person!.data.name.trim(),
-              style: Theme.of(context).textTheme.bodySmall,
+              style: TextStyles.body,
               overflow: TextOverflow.ellipsis,
               maxLines: 1,
             ),
@@ -258,6 +257,7 @@ class _FileInfoFaceWidgetState extends State<FileInfoFaceWidget> {
             )
             .toList();
       }
+      if (!mounted) return;
       await Navigator.of(context).push(
         MaterialPageRoute(
           builder: (context) => ClusterPage(
@@ -277,6 +277,7 @@ class _FileInfoFaceWidgetState extends State<FileInfoFaceWidget> {
       // assigning a manual new clusterID so that the user can cluster it manually
       final String clusterID = newClusterID();
       await mlDataDB.updateFaceIdToClusterId({widget.face.faceID: clusterID});
+      if (!mounted) return;
       await Navigator.of(context).push(
         MaterialPageRoute(
           builder: (context) =>
@@ -286,7 +287,8 @@ class _FileInfoFaceWidgetState extends State<FileInfoFaceWidget> {
       return;
     }
 
-    showShortToast(context, AppLocalizations.of(context).faceNotClusteredYet);
+    if (!mounted) return;
+    showShortToast(context, context.strings.faceNotClusteredYet);
     unawaited(MLService.instance.clusterAllImages(force: true));
     return;
   }
@@ -298,6 +300,7 @@ class _FileInfoFaceWidgetState extends State<FileInfoFaceWidget> {
             faceID: widget.face.faceID,
             clusterID: widget.clusterID,
           );
+      if (!mounted) return;
       await Navigator.of(context).push(
         MaterialPageRoute(
           builder: (context) => SaveOrEditPerson(
@@ -317,11 +320,11 @@ class _FileInfoFaceWidgetState extends State<FileInfoFaceWidget> {
     if (widget.person == null) return;
     final result = await showChoiceActionSheet(
       context,
-      title: AppLocalizations.of(context).removePersonLabel,
-      body: AppLocalizations.of(context).areYouSureRemoveThisFaceFromPerson,
-      firstButtonLabel: AppLocalizations.of(context).remove,
+      title: context.strings.removePersonLabel,
+      body: context.strings.areYouSureRemoveThisFaceFromPerson,
+      firstButtonLabel: context.strings.remove,
       firstButtonType: ButtonType.critical,
-      secondButtonLabel: AppLocalizations.of(context).cancel,
+      secondButtonLabel: context.strings.cancel,
       isCritical: true,
     );
     if (result?.action == ButtonAction.first) {

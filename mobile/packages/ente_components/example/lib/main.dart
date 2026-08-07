@@ -220,6 +220,32 @@ class _CatalogHomeState extends State<CatalogHome> {
         previewBuilder: (_) => const _PopupMenuPreview(),
       ),
       CatalogSection(
+        title: 'Banner',
+        icon: HugeIcons.strokeRoundedAlertCircle,
+        components: const [
+          'Failure',
+          'Informative',
+          'Success',
+          'Warning',
+          'Neutral',
+          'Custom leading',
+          'Custom trailing',
+        ],
+        previewBuilder: (_) => const _BannerPreview(),
+      ),
+      CatalogSection(
+        title: 'Toast',
+        icon: HugeIcons.strokeRoundedCheckmarkCircle02,
+        components: const [
+          'States',
+          'Title only',
+          'Custom leading',
+          'Custom trailing',
+          'Short vs long',
+        ],
+        previewBuilder: (_) => const _ToastPreview(),
+      ),
+      CatalogSection(
         title: 'Buttons',
         icon: HugeIcons.strokeRoundedCursorPointer02,
         components: const ['Button', 'Icon button'],
@@ -1118,6 +1144,289 @@ class _TypeSample extends StatelessWidget {
         const SizedBox(height: Spacing.xs),
         Text(detail, style: TextStyles.mini.copyWith(color: colors.textLight)),
       ],
+    );
+  }
+}
+
+const _bannerPreviewSpecs = [
+  _BannerPreviewSpec(
+    state: BannerComponentState.failure,
+    title: 'Failure!',
+    subtitle: 'Some subtext that describes the failure',
+  ),
+  _BannerPreviewSpec(
+    state: BannerComponentState.informative,
+    title: 'Informative!',
+    subtitle: 'Some subtext that describes the info',
+  ),
+  _BannerPreviewSpec(
+    state: BannerComponentState.success,
+    title: 'Success!',
+    subtitle: 'Some subtext that describes the success',
+  ),
+  _BannerPreviewSpec(
+    state: BannerComponentState.warning,
+    title: 'Warning!',
+    subtitle: 'Some subtext that describes the warning',
+  ),
+  _BannerPreviewSpec(
+    state: BannerComponentState.neutral,
+    title: 'Neutral!',
+    subtitle: 'Some subtext that describes the neutral text',
+  ),
+];
+
+class _BannerPreviewSpec {
+  const _BannerPreviewSpec({
+    required this.state,
+    required this.title,
+    required this.subtitle,
+  });
+
+  final BannerComponentState state;
+  final String title;
+  final String subtitle;
+}
+
+class _BannerPreview extends StatelessWidget {
+  const _BannerPreview();
+
+  @override
+  Widget build(BuildContext context) {
+    return _CatalogPreviewList(
+      children: [
+        _CatalogPreviewGroup(
+          title: 'States',
+          child: Column(
+            children: [
+              for (
+                var index = 0;
+                index < _bannerPreviewSpecs.length;
+                index++
+              ) ...[
+                _BannerStatePreview(spec: _bannerPreviewSpecs[index]),
+                if (index != _bannerPreviewSpecs.length - 1)
+                  const SizedBox(height: Spacing.md),
+              ],
+            ],
+          ),
+        ),
+        _CatalogPreviewGroup(
+          title: 'Custom leading',
+          child: BannerComponent(
+            title: 'Syncing backup',
+            subtitle: 'Preparing secure upload',
+            state: BannerComponentState.informative,
+            leadingWidget: const _BannerLoadingLeading(),
+            onTap: () {},
+          ),
+        ),
+        _CatalogPreviewGroup(
+          title: 'Custom trailing',
+          child: BannerComponent(
+            title: 'Dismissible info',
+            subtitle: 'Some subtext with a custom trailing icon',
+            state: BannerComponentState.informative,
+            trailingWidget: const _CatalogHugeIcon(
+              HugeIcons.strokeRoundedCancel01,
+              size: IconSizes.small,
+            ),
+            onTap: () {},
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _BannerLoadingLeading extends StatelessWidget {
+  const _BannerLoadingLeading();
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.componentColors;
+
+    return SizedBox(
+      width: IconSizes.small,
+      height: IconSizes.small,
+      child: CircularProgressIndicator(color: colors.blue, strokeWidth: 2),
+    );
+  }
+}
+
+class _BannerStatePreview extends StatelessWidget {
+  const _BannerStatePreview({required this.spec});
+
+  final _BannerPreviewSpec spec;
+
+  @override
+  Widget build(BuildContext context) {
+    return BannerComponent(
+      title: spec.title,
+      subtitle: spec.subtitle,
+      state: spec.state,
+      onTap: () {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('${spec.title} tapped')));
+      },
+    );
+  }
+}
+
+const _toastStateSpecs = [
+  _ToastStateSpec(
+    state: BannerComponentState.failure,
+    label: 'Failure',
+    title: 'Failure!',
+    subtitle: 'Some subtext that describes the failure',
+  ),
+  _ToastStateSpec(
+    state: BannerComponentState.informative,
+    label: 'Informative',
+    title: 'Informative!',
+    subtitle: 'Some subtext that describes the info',
+  ),
+  _ToastStateSpec(
+    state: BannerComponentState.success,
+    label: 'Success',
+    title: 'Success!',
+    subtitle: 'Some subtext that describes the success',
+  ),
+  _ToastStateSpec(
+    state: BannerComponentState.warning,
+    label: 'Warning',
+    title: 'Warning!',
+    subtitle: 'Some subtext that describes the warning',
+  ),
+  _ToastStateSpec(
+    state: BannerComponentState.neutral,
+    label: 'Neutral',
+    title: 'Neutral!',
+    subtitle: 'Some subtext that describes the neutral text',
+  ),
+];
+
+class _ToastStateSpec {
+  const _ToastStateSpec({
+    required this.state,
+    required this.label,
+    required this.title,
+    required this.subtitle,
+  });
+
+  final BannerComponentState state;
+  final String label;
+  final String title;
+  final String subtitle;
+}
+
+class _ToastPreview extends StatelessWidget {
+  const _ToastPreview();
+
+  @override
+  Widget build(BuildContext context) {
+    return _CatalogPreviewList(
+      children: [
+        _CatalogPreviewGroup(
+          title: 'States (tap to show)',
+          child: Column(
+            children: [
+              for (var index = 0; index < _toastStateSpecs.length; index++) ...[
+                _ToastTriggerButton(
+                  label: 'Show ${_toastStateSpecs[index].label.toLowerCase()}',
+                  onTap: () => showToastComponent(
+                    context,
+                    _toastStateSpecs[index].title,
+                    subtitle: _toastStateSpecs[index].subtitle,
+                    state: _toastStateSpecs[index].state,
+                  ),
+                ),
+                if (index != _toastStateSpecs.length - 1)
+                  const SizedBox(height: Spacing.sm),
+              ],
+            ],
+          ),
+        ),
+        _CatalogPreviewGroup(
+          title: 'Title only',
+          child: _ToastTriggerButton(
+            label: 'Show title-only toast',
+            onTap: () => showToastComponent(context, 'Saved to your library'),
+          ),
+        ),
+        _CatalogPreviewGroup(
+          title: 'Custom leading (spinner)',
+          child: _ToastTriggerButton(
+            label: 'Show custom leading',
+            onTap: () => showToastComponent(
+              context,
+              'Syncing your data',
+              subtitle: 'Preparing secure upload',
+              state: BannerComponentState.informative,
+              leadingWidget: const _BannerLoadingLeading(),
+            ),
+          ),
+        ),
+        _CatalogPreviewGroup(
+          title: 'Custom trailing',
+          child: _ToastTriggerButton(
+            label: 'Show custom trailing',
+            onTap: () => showToastComponent(
+              context,
+              'Item moved to trash',
+              subtitle: 'Tap the icon to undo',
+              state: BannerComponentState.neutral,
+              trailingWidget: const _CatalogHugeIcon(
+                HugeIcons.strokeRoundedDelete02,
+                size: IconSizes.small,
+              ),
+            ),
+          ),
+        ),
+        _CatalogPreviewGroup(
+          title: 'Duration (short vs long)',
+          child: Column(
+            children: [
+              _ToastTriggerButton(
+                label: 'Short (2s)',
+                onTap: () => showToastComponent(
+                  context,
+                  'Short toast (2s)',
+                  state: BannerComponentState.informative,
+                  duration: const Duration(seconds: 2),
+                ),
+              ),
+              const SizedBox(height: Spacing.sm),
+              _ToastTriggerButton(
+                label: 'Long (default 4s)',
+                onTap: () => showToastComponent(
+                  context,
+                  'Long toast (4s)',
+                  state: BannerComponentState.informative,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ToastTriggerButton extends StatelessWidget {
+  const _ToastTriggerButton({required this.label, required this.onTap});
+
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return ButtonComponent(
+      variant: ButtonComponentVariant.secondary,
+      label: label,
+      shouldSurfaceExecutionStates: false,
+      onTap: onTap,
     );
   }
 }

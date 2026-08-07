@@ -1,17 +1,9 @@
-# The only reason we're making a custom CodeQL configuration is because the
-# default setup does not have an option to run daily / weekly instead of per
-# push, which is too slow.
-#
-# In the future, it might become faster. Then just delete this file, and revert
-# to the default configuration.
-#
-# References:
-# https://docs.github.com/en/code-security/code-scanning/creating-an-advanced-setup-for-code-scanning/
+# This custom workflow runs weekly because per-push CodeQL is too slow.
 
 name: "CodeQL"
 
 on:
-    workflow_dispatch: # Allow running manually
+    workflow_dispatch:
     schedule:
         - cron: "22 1 * * 1"
 
@@ -21,9 +13,8 @@ jobs:
         runs-on: 'ubuntu-latest'
         permissions:
             contents: read
-            # Required for all workflows.
             security-events: write
-            # Required to fetch internal or private CodeQL packs.
+            # Fetch private CodeQL packs.
             packages: read
 
         strategy:
@@ -39,7 +30,7 @@ jobs:
 
         steps:
             - name: Checkout
-              uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+              uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
             - name: Initialize CodeQL
               uses: github/codeql-action/init@8aad20d150bbac5944a9f9d289da16a4b0d87c1e # v4.36.2

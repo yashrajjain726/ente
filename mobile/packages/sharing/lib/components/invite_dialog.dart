@@ -30,7 +30,7 @@ class InviteSheet extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         Text(
-          context.strings.emailNoEnteAccount(email),
+          context.strings.emailNoEnteAccount(email: email),
           style: textTheme.small.copyWith(color: colorScheme.textMuted),
           textAlign: TextAlign.center,
         ),

@@ -1,11 +1,11 @@
 import 'dart:math';
 
+import 'package:ente_strings/ente_strings.dart';
 import 'package:logging/logging.dart';
 import 'package:photos/core/configuration.dart';
 import 'package:photos/db/files_db.dart';
 import 'package:photos/db/social_db.dart';
 import 'package:photos/extensions/user_extension.dart';
-import 'package:photos/generated/l10n.dart';
 import 'package:photos/models/collection/collection.dart';
 import 'package:photos/models/file/extensions/file_props.dart';
 import 'package:photos/models/file/file.dart';
@@ -153,9 +153,20 @@ class SocialNotificationCoordinator {
       }
       final group = _notificationGroupForType(candidate.type);
       final fileIDKey = candidate.fileID ?? 0;
-      final key =
-          '${candidate.collectionID}_${candidate.type.index}_${fileIDKey}_${group.index}';
+      final key = candidate.type == FeedItemType.sharedCollection
+          ? 'sharedCollection_${candidate.actorUserID}'
+          : '${candidate.collectionID}_${candidate.type.index}_${fileIDKey}_${group.index}';
       final existing = latestByKey[key];
+      if (existing != null && candidate.type == FeedItemType.sharedCollection) {
+        final count =
+            existing.sharedCollectionCount + candidate.sharedCollectionCount;
+        final latest = candidate.createdAt > existing.createdAt
+            ? candidate
+            : existing;
+        latest.sharedCollectionCount = count;
+        latestByKey[key] = latest;
+        return;
+      }
       if (existing == null || candidate.createdAt > existing.createdAt) {
         latestByKey[key] = candidate;
       }
@@ -279,12 +290,7 @@ class SocialNotificationCoordinator {
           channelID: 'social_activity',
           channelName: 'Ente Feed',
           payload: _buildSocialNotificationPayload(candidate),
-          id: _buildSocialNotificationId(
-            candidate.collectionID,
-            fileID,
-            candidate.type,
-            _notificationGroupForType(candidate.type),
-          ),
+          id: _buildSocialNotificationId(candidate),
         );
         latestSentNotificationTime ??= candidate.createdAt;
       } catch (e, stackTrace) {
@@ -335,17 +341,17 @@ class SocialNotificationCoordinator {
     }
   }
 
-  int _buildSocialNotificationId(
-    int collectionID,
-    int? fileID,
-    FeedItemType type,
-    _SocialNotificationGroup group,
-  ) {
+  int _buildSocialNotificationId(_SocialActivityCandidate candidate) {
     const int base = 0x10000000;
-    int hash = collectionID & 0x7fffffff;
-    hash = ((hash * 31) ^ (fileID ?? 0)) & 0x7fffffff;
-    hash = ((hash * 31) ^ type.index) & 0x7fffffff;
-    hash = ((hash * 31) ^ group.index) & 0x7fffffff;
+    final primaryID = candidate.type == FeedItemType.sharedCollection
+        ? candidate.actorUserID
+        : candidate.collectionID;
+    int hash = primaryID & 0x7fffffff;
+    hash = ((hash * 31) ^ (candidate.fileID ?? 0)) & 0x7fffffff;
+    hash = ((hash * 31) ^ candidate.type.index) & 0x7fffffff;
+    hash =
+        ((hash * 31) ^ _notificationGroupForType(candidate.type).index) &
+        0x7fffffff;
     return base | (hash & 0x0fffffff);
   }
 
@@ -361,7 +367,7 @@ class SocialNotificationCoordinator {
         fallback: anonID,
       );
     }
-    final user = _collectionsService.getFileOwner(
+    final user = _collectionsService.resolveUserIdentity(
       userID,
       candidate.collectionID,
     );
@@ -370,7 +376,7 @@ class SocialNotificationCoordinator {
 
   String _getSocialNotificationBody(
     _SocialActivityCandidate candidate,
-    AppLocalizations s,
+    StringsLocalizations s,
     FileType? fileType,
     bool isOwn,
   ) {
@@ -379,7 +385,7 @@ class SocialNotificationCoordinator {
 
   String _getSocialNotificationDetail(
     _SocialActivityCandidate candidate,
-    AppLocalizations s,
+    StringsLocalizations s,
     FileType? fileType,
     bool isOwn,
   ) {
@@ -406,7 +412,9 @@ class SocialNotificationCoordinator {
         }
         return s.addedNMemoriesTo(count: count, albumName: albumName);
       case FeedItemType.sharedCollection:
-        final albumName = candidate.collectionName ?? s.albums;
+        final albumName = candidate.sharedCollectionCount > 1
+            ? s.albumsCount(count: candidate.sharedCollectionCount)
+            : candidate.collectionName ?? s.albums;
         return s.sharedAlbumWithYou(albumName: albumName);
     }
   }
@@ -541,6 +549,7 @@ class _SocialActivityCandidate {
   final String? actorAnonID;
   final int? parentCommentUserID;
   final int sharedFileCount;
+  int sharedCollectionCount = 1;
   final String? collectionName;
 
   _SocialActivityCandidate({

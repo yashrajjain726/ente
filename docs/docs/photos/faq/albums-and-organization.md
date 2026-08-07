@@ -188,7 +188,7 @@ Not directly, but you can minimize it:
 **On mobile:**
 
 - Open the Albums tab
-- Scroll to the bottom
+- Tap on 'v' icon at the right.
 - Tap on "Uncategorized"
 
 **On web/desktop:**
@@ -274,6 +274,18 @@ Ente intelligently manages symlinks to ensure no album loses all photos from a s
 
 Learn more in the [Storage optimization guide](/photos/features/albums-and-organization/storage-optimization).
 
+### How does Ente decide which photo to keep in a similar photos group? {#similar-photos-selection-criteria}
+
+When you review a similar photos group, Ente auto-selects every file except one for deletion, in this order:
+
+1. **Favorited status**: A photo you've marked Favorite is always kept and never auto-selected for deletion, regardless of size.
+2. **File size**: Among the rest, the largest file is kept. Smaller ones are auto-selected for deletion.
+3. **Filename**: Used only as a tiebreaker when two files are the exact same size.
+
+> [!NOTE]
+>
+> This compares file size only, not resolution or EXIF completeness. These usually line up with size, but not always - a heavily-compressed high-resolution photo can be smaller than a lightly-compressed low-resolution one.
+
 ### Will I lose my photos when freeing up device space? {#free-up-space-safe}
 
 No! Freeing up device space only removes local copies from your device. All photos remain safely stored in Ente's encrypted cloud and can be viewed or re-downloaded anytime.
@@ -333,7 +345,8 @@ If you accidentally deleted photos, you can restore them from Trash within 30 da
 **On mobile:**
 
 - Open the Albums tab
-- Scroll to the bottom and tap "Trash"
+- Tap on 'v' icon at the right.
+- Tap "Trash"
 - Select the photos you want to restore
 - Tap the "Restore" button
 

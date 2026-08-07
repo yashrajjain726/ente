@@ -3,19 +3,19 @@ import "dart:io";
 
 import "package:ente_accounts/services/user_service.dart";
 import "package:ente_components/ente_components.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/foundation.dart";
 import "package:flutter/material.dart";
 import "package:hugeicons/hugeicons.dart";
-import "package:locker/l10n/l10n.dart";
 import "package:locker/services/configuration.dart";
 import "package:locker/services/update_service.dart";
-import "package:locker/ui/settings/components/settings_item.dart";
 import "package:locker/ui/settings/pages/about_page.dart";
 import "package:locker/ui/settings/pages/account_settings_page.dart";
 import "package:locker/ui/settings/pages/general_settings_page.dart";
 import "package:locker/ui/settings/pages/security_settings_page.dart";
 import "package:locker/ui/settings/pages/support_page.dart";
 import "package:locker/ui/settings/pages/theme_settings_page.dart";
+import "package:locker/utils/bottom_sheet_illustration.dart";
 
 class SettingsSearchPage extends StatefulWidget {
   const SettingsSearchPage({super.key});
@@ -55,7 +55,7 @@ class _SettingsSearchPageState extends State<SettingsSearchPage> {
   }
 
   List<_SearchableSetting> _buildSettingsList(BuildContext context) {
-    final l10n = context.l10n;
+    final l10n = context.strings;
     final hasLoggedIn = Configuration.instance.hasConfiguredAccount();
 
     return [
@@ -212,7 +212,7 @@ class _SettingsSearchPageState extends State<SettingsSearchPage> {
   }
 
   List<_SearchableSetting> _getDefaultSuggestions() {
-    final l10n = context.l10n;
+    final l10n = context.strings;
     final hasLoggedIn = Configuration.instance.hasConfiguredAccount();
 
     return _allSettings.where((s) {
@@ -287,12 +287,12 @@ class _SettingsSearchPageState extends State<SettingsSearchPage> {
     final shouldLogout = await showBottomSheetComponent<bool>(
       context: context,
       builder: (sheetContext) => BottomSheetComponent(
-        title: context.l10n.warning,
-        message: context.l10n.areYouSureYouWantToLogout,
-        illustration: Image.asset("assets/warning-grey.png"),
+        title: context.strings.warning,
+        message: context.strings.areYouSureYouWantToLogout,
+        illustration: LockerBottomSheetIllustration.warningGrey,
         actions: [
           ButtonComponent(
-            label: context.l10n.yesLogout,
+            label: context.strings.yesLogout,
             variant: ButtonComponentVariant.critical,
             shouldSurfaceExecutionStates: false,
             onTap: () {
@@ -336,7 +336,7 @@ class _SettingsSearchPageState extends State<SettingsSearchPage> {
       child: TextInputComponent(
         controller: _searchController,
         focusNode: _focusNode,
-        hintText: context.l10n.searchSettings,
+        hintText: context.strings.searchSettings,
         onChanged: _onSearchChanged,
         prefix: HugeIcon(
           icon: HugeIcons.strokeRoundedSearch01,
@@ -379,12 +379,7 @@ class _SettingsSearchPageState extends State<SettingsSearchPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const SizedBox(height: 8),
-          Text(
-            context.l10n.suggestions,
-            style: TextStyles.large.copyWith(
-              color: context.componentColors.textBase,
-            ),
-          ),
+          Text(context.strings.suggestions, style: TextStyles.large),
           const SizedBox(height: 12),
           Wrap(
             spacing: 8,
@@ -409,7 +404,7 @@ class _SettingsSearchPageState extends State<SettingsSearchPage> {
         child: Padding(
           padding: const EdgeInsets.all(32),
           child: Text(
-            context.l10n.noResultsFound,
+            context.strings.noResultsFound,
             style: TextStyles.body.copyWith(
               color: context.componentColors.textLight,
             ),
@@ -449,12 +444,7 @@ class _SettingsSearchPageState extends State<SettingsSearchPage> {
         rows.add(
           Padding(
             padding: const EdgeInsets.only(top: 12, bottom: 8),
-            child: Text(
-              entry.category,
-              style: TextStyles.large.copyWith(
-                color: context.componentColors.textBase,
-              ),
-            ),
+            child: Text(entry.category, style: TextStyles.large),
           ),
         );
       }

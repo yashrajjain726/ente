@@ -3,15 +3,16 @@ mod shares;
 
 use std::sync::Arc;
 
+use ente_accounts::auth::{self, KeyAttributes, SrpSession};
+use ente_core::b64;
 use ente_core::{
-    auth::{self, KeyAttributes, SrpSession},
     crypto::{self, SecretString, SecretVec, kdf, sealed, secretbox},
-    http::{HttpClient, HttpConfig},
+    http::{Api, ApiConfig, Http},
 };
 use uuid::Uuid;
 
 use crate::{
-    ContactsError, Result,
+    Error, Result,
     legacy_kit_models::{
         LEGACY_KIT_PAYLOAD_VERSION, LegacyKit, LegacyKitRecoveryBundle, LegacyKitRecoverySession,
         LegacyKitShare, LegacyKitVariant,
@@ -40,7 +41,7 @@ pub(crate) fn create_legacy_kit_request(
 ) -> Result<(CreateLegacyKitRequest, Vec<LegacyKitShare>)> {
     validate_notice_period(notice_period_in_hours)?;
     if part_names.iter().any(|name| name.trim().is_empty()) {
-        return Err(ContactsError::InvalidInput(
+        return Err(Error::InvalidInput(
             "legacy kit part names must be non-empty".into(),
         ));
     }
@@ -59,7 +60,7 @@ pub(crate) fn create_legacy_kit_request(
             variant,
             kit_id: kit_id.clone(),
             share_index: (index + 1) as u8,
-            share: crypto::encode_b64(&share_bytes),
+            share: b64::encode(&share_bytes),
             checksum: checksum.clone(),
             part_name: part_name.clone(),
         })
@@ -78,8 +79,8 @@ pub(crate) fn create_legacy_kit_request(
             id: kit_id,
             variant,
             notice_period_in_hours,
-            encrypted_recovery_blob: crypto::encode_b64(&encrypted_recovery_blob),
-            auth_public_key: crypto::encode_b64(auth_public_key.as_bytes()),
+            encrypted_recovery_blob: b64::encode(&encrypted_recovery_blob),
+            auth_public_key: b64::encode(auth_public_key.as_bytes()),
             encrypted_owner_blob,
         },
         result_shares,
@@ -125,11 +126,11 @@ pub(crate) fn decode_download_content(
 }
 
 pub struct LegacyKitRecoveryClient {
-    http: Arc<HttpClient>,
+    api: Arc<Api>,
 }
 
 pub struct LegacyKitRecoveryHandle {
-    http: Arc<HttpClient>,
+    api: Arc<Api>,
     session: LegacyKitRecoverySession,
     session_token: SecretString,
     kit_secret: SecretVec,
@@ -151,17 +152,17 @@ impl LegacyKitRecoveryClient {
         client_version: Option<String>,
         user_agent: Option<String>,
     ) -> Result<Self> {
-        let http = HttpClient::new_with_config(HttpConfig {
-            base_url: base_url.into(),
-            auth_token: None,
-            user_agent,
-            client_package,
-            client_version,
-            timeout_secs: Some(30),
-        })?;
-        Ok(Self {
-            http: Arc::new(http),
-        })
+        let api = Api::new(
+            Http::new()?,
+            ApiConfig {
+                origin: base_url.into(),
+                client_package,
+                client_version,
+                user_agent,
+                auth: None,
+            },
+        );
+        Ok(Self { api: Arc::new(api) })
     }
 
     pub fn reconstruct_secret(shares: &[LegacyKitShare]) -> Result<SecretVec> {
@@ -174,18 +175,19 @@ impl LegacyKitRecoveryClient {
         email: Option<&str>,
     ) -> Result<LegacyKitRecoveryHandle> {
         let first_share = shares.first().ok_or_else(|| {
-            ContactsError::InvalidInput("at least two legacy kit shares are required".into())
+            Error::InvalidInput("at least two legacy kit shares are required".into())
         })?;
         let challenge = self
-            .http
-            .post_json::<LegacyKitChallengeResponse, _>(
-                "/legacy-kits/recovery/challenge",
-                &LegacyKitChallengeRequest {
-                    kit_id: first_share.kit_id.clone(),
-                },
-            )
-            .await
-            .map_err(ContactsError::from)?;
+            .api
+            .post("/legacy-kits/recovery/challenge")
+            .json(&LegacyKitChallengeRequest {
+                kit_id: first_share.kit_id.clone(),
+            })
+            .send()
+            .await?
+            .error_for_status()?
+            .json::<LegacyKitChallengeResponse>()
+            .await?;
         self.open_from_encrypted_challenge(shares, &challenge.encrypted_challenge, email)
             .await
     }
@@ -198,7 +200,7 @@ impl LegacyKitRecoveryClient {
     ) -> Result<LegacyKitRecoveryHandle> {
         let kit_secret = reconstruct_secret_2_of_3(shares)?;
         let first_share = shares.first().ok_or_else(|| {
-            ContactsError::InvalidInput("at least two legacy kit shares are required".into())
+            Error::InvalidInput("at least two legacy kit shares are required".into())
         })?;
         let used_part_indexes = used_part_indexes(shares)?;
         self.open_with_kit_secret(
@@ -218,32 +220,35 @@ impl LegacyKitRecoveryHandle {
     }
 
     pub async fn refresh_session(&self) -> Result<LegacyKitRecoverySession> {
-        self.http
-            .post_json(
-                "/legacy-kits/recovery/session",
-                &LegacyKitSessionRequest {
-                    session_id: self.session.id.clone(),
-                    session_token: self.session_token.as_ref().to_owned(),
-                },
-            )
-            .await
-            .map_err(ContactsError::from)
+        Ok(self
+            .api
+            .post("/legacy-kits/recovery/session")
+            .json(&LegacyKitSessionRequest {
+                session_id: self.session.id.clone(),
+                session_token: self.session_token.as_ref().to_owned(),
+            })
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await?)
     }
 
     pub async fn recovery_bundle(&self) -> Result<LegacyKitRecoveryBundle> {
         let response = self
-            .http
-            .post_json::<LegacyKitRecoveryInfoResponse, _>(
-                "/legacy-kits/recovery/info",
-                &LegacyKitSessionRequest {
-                    session_id: self.session.id.clone(),
-                    session_token: self.session_token.as_ref().to_owned(),
-                },
-            )
-            .await
-            .map_err(ContactsError::from)?;
+            .api
+            .post("/legacy-kits/recovery/info")
+            .json(&LegacyKitSessionRequest {
+                session_id: self.session.id.clone(),
+                session_token: self.session_token.as_ref().to_owned(),
+            })
+            .send()
+            .await?
+            .error_for_status()?
+            .json::<LegacyKitRecoveryInfoResponse>()
+            .await?;
         let enc_key = derive_kit_enc_key(&self.kit_secret)?;
-        let encrypted_recovery_blob = crypto::decode_b64(&response.encrypted_recovery_blob)?;
+        let encrypted_recovery_blob = b64::decode(&response.encrypted_recovery_blob)?;
         let recovery_key = secretbox::decrypt_combined(
             &encrypted_recovery_blob,
             &crypto::Key::try_from_slice(&enc_key)?,
@@ -269,46 +274,44 @@ impl LegacyKitRecoveryHandle {
         let (mut srp_session, setup_request) =
             password_reset_setup_request(&srp_user_id, &login_key)?;
         let init_response = self
-            .http
-            .post_json::<LegacyKitSetupSrpResponse, _>(
-                "/legacy-kits/recovery/init-change-password",
-                &LegacyKitInitChangePasswordRequest {
-                    session_id: self.session.id.clone(),
-                    session_token: self.session_token.as_ref().to_owned(),
-                    setup_srp_request: setup_request,
-                },
-            )
-            .await
-            .map_err(ContactsError::from)?;
+            .api
+            .post("/legacy-kits/recovery/init-change-password")
+            .json(&LegacyKitInitChangePasswordRequest {
+                session_id: self.session.id.clone(),
+                session_token: self.session_token.as_ref().to_owned(),
+                setup_srp_request: setup_request,
+            })
+            .send()
+            .await?
+            .error_for_status()?
+            .json::<LegacyKitSetupSrpResponse>()
+            .await?;
         let srp_m1 = srp_session_m1(&mut srp_session, &init_response)?;
         let updated_key_attr = LegacyKitUpdatedKeyAttr {
             kek_salt: updated_key_attrs.kek_salt.clone(),
             encrypted_key: updated_key_attrs.encrypted_key.clone(),
             key_decryption_nonce: updated_key_attrs.key_decryption_nonce.clone(),
-            mem_limit: updated_key_attrs.mem_limit.ok_or_else(|| {
-                ContactsError::InvalidInput("updated key attributes missing memLimit".into())
-            })?,
-            ops_limit: updated_key_attrs.ops_limit.ok_or_else(|| {
-                ContactsError::InvalidInput("updated key attributes missing opsLimit".into())
-            })?,
+            mem_limit: updated_key_attrs.mem_limit,
+            ops_limit: updated_key_attrs.ops_limit,
         };
         let change_response = self
-            .http
-            .post_json::<LegacyKitChangePasswordResponse, _>(
-                "/legacy-kits/recovery/change-password",
-                &LegacyKitChangePasswordRequest {
-                    session_id: self.session.id.clone(),
-                    session_token: self.session_token.as_ref().to_owned(),
-                    update_srp_and_keys_request: LegacyKitUpdateSrpAndKeysRequest {
-                        setup_id: init_response.setup_id,
-                        srp_m1,
-                        updated_key_attr,
-                    },
+            .api
+            .post("/legacy-kits/recovery/change-password")
+            .json(&LegacyKitChangePasswordRequest {
+                session_id: self.session.id.clone(),
+                session_token: self.session_token.as_ref().to_owned(),
+                update_srp_and_keys_request: LegacyKitUpdateSrpAndKeysRequest {
+                    setup_id: init_response.setup_id,
+                    srp_m1,
+                    updated_key_attr,
                 },
-            )
-            .await
-            .map_err(ContactsError::from)?;
-        let server_m2 = crypto::decode_b64(&change_response.srp_m2)?;
+            })
+            .send()
+            .await?
+            .error_for_status()?
+            .json::<LegacyKitChangePasswordResponse>()
+            .await?;
+        let server_m2 = b64::decode(&change_response.srp_m2)?;
         srp_session.verify_m2(&server_m2)?;
         Ok(())
     }
@@ -326,20 +329,21 @@ impl LegacyKitRecoveryClient {
         let (auth_public_key, auth_secret_key) = derive_kit_auth_keypair(&kit_secret)?;
         let challenge = decrypt_challenge(&auth_public_key, &auth_secret_key, encrypted_challenge)?;
         let response = self
-            .http
-            .post_json::<LegacyKitOpenRecoveryResponse, _>(
-                "/legacy-kits/recovery/open",
-                &LegacyKitOpenRecoveryRequest {
-                    kit_id: first_share.kit_id.clone(),
-                    challenge,
-                    used_part_indexes,
-                    email,
-                },
-            )
-            .await
-            .map_err(ContactsError::from)?;
+            .api
+            .post("/legacy-kits/recovery/open")
+            .json(&LegacyKitOpenRecoveryRequest {
+                kit_id: first_share.kit_id.clone(),
+                challenge,
+                used_part_indexes,
+                email,
+            })
+            .send()
+            .await?
+            .error_for_status()?
+            .json::<LegacyKitOpenRecoveryResponse>()
+            .await?;
         Ok(LegacyKitRecoveryHandle {
-            http: Arc::clone(&self.http),
+            api: Arc::clone(&self.api),
             session: response.session,
             session_token: SecretString::new(response.session_token),
             kit_secret,
@@ -351,7 +355,7 @@ pub(crate) fn validate_notice_period(hours: i32) -> Result<()> {
     if LEGACY_KIT_NOTICE_OPTIONS.contains(&hours) {
         Ok(())
     } else {
-        Err(ContactsError::InvalidInput(
+        Err(Error::InvalidInput(
             "legacy kit notice period must be one of 0, 24, 168, 360, 720 hours".into(),
         ))
     }
@@ -359,12 +363,12 @@ pub(crate) fn validate_notice_period(hours: i32) -> Result<()> {
 
 fn derive_kit_enc_key(kit_secret: &[u8]) -> Result<SecretVec> {
     let kit_key = crypto::Key::try_from_slice(kit_secret)?;
-    kdf::derive_subkey(&kit_key, 32, 1, b"lgkenc01").map_err(ContactsError::from)
+    kdf::derive_subkey(&kit_key, 32, 1, b"lgkenc01").map_err(Error::from)
 }
 
 fn derive_kit_auth_keypair(kit_secret: &[u8]) -> Result<(crypto::PublicKey, crypto::SecretKey)> {
     let kit_key = crypto::Key::try_from_slice(kit_secret)?;
-    let seed = kdf::derive_subkey(&kit_key, 32, 2, b"lgkauth1").map_err(ContactsError::from)?;
+    let seed = kdf::derive_subkey(&kit_key, 32, 2, b"lgkauth1").map_err(Error::from)?;
     let sk = crypto::SecretKey::from_seed(seed.as_ref())?;
     Ok((sk.public_key(), sk))
 }
@@ -374,10 +378,10 @@ fn decrypt_challenge(
     auth_secret_key: &crypto::SecretKey,
     encrypted_challenge_b64: &str,
 ) -> Result<String> {
-    let encrypted_challenge = crypto::decode_b64(encrypted_challenge_b64)?;
+    let encrypted_challenge = b64::decode(encrypted_challenge_b64)?;
     let plaintext = sealed::open(&encrypted_challenge, auth_public_key, auth_secret_key)?;
     String::from_utf8(plaintext).map_err(|error| {
-        ContactsError::InvalidInput(format!("legacy kit challenge was not valid UTF-8: {error}"))
+        Error::InvalidInput(format!("legacy kit challenge was not valid UTF-8: {error}"))
     })
 }
 
@@ -389,7 +393,7 @@ fn decrypt_master_key_with_recovery_key(
         .master_key_encrypted_with_recovery_key
         .as_ref()
         .ok_or_else(|| {
-            ContactsError::InvalidInput(
+            Error::InvalidInput(
                 "target key attributes missing masterKeyEncryptedWithRecoveryKey".into(),
             )
         })?;
@@ -397,12 +401,10 @@ fn decrypt_master_key_with_recovery_key(
         .master_key_decryption_nonce
         .as_ref()
         .ok_or_else(|| {
-            ContactsError::InvalidInput(
-                "target key attributes missing masterKeyDecryptionNonce".into(),
-            )
+            Error::InvalidInput("target key attributes missing masterKeyDecryptionNonce".into())
         })?;
-    let encrypted_master_key = crypto::decode_b64(encrypted_master_key)?;
-    let master_key_nonce = crypto::decode_b64(master_key_nonce)?;
+    let encrypted_master_key = b64::decode(encrypted_master_key)?;
+    let master_key_nonce = b64::decode(master_key_nonce)?;
     secretbox::decrypt(
         &encrypted_master_key,
         &crypto::Nonce::try_from_slice(&master_key_nonce)?,
@@ -422,13 +424,13 @@ fn password_reset_setup_request(
         &generated_srp.srp_salt,
         &generated_srp.login_sub_key,
     )?;
-    let srp_a = crypto::encode_b64(&srp_session.public_a());
+    let srp_a = b64::encode(&srp_session.public_a());
     Ok((
         srp_session,
         LegacyKitSetupSrpRequest {
             srp_user_id: srp_user_id.to_string(),
-            srp_salt: crypto::encode_b64(&generated_srp.srp_salt),
-            srp_verifier: crypto::encode_b64(&generated_srp.srp_verifier),
+            srp_salt: b64::encode(&generated_srp.srp_salt),
+            srp_verifier: b64::encode(&generated_srp.srp_verifier),
             srp_a,
         },
     ))
@@ -438,7 +440,7 @@ fn srp_session_m1(
     srp_session: &mut SrpSession,
     init_response: &LegacyKitSetupSrpResponse,
 ) -> Result<String> {
-    let server_b = crypto::decode_b64(&init_response.srp_b)?;
+    let server_b = b64::decode(&init_response.srp_b)?;
     let client_m1 = srp_session.compute_m1(&server_b)?;
-    Ok(crypto::encode_b64(&client_m1))
+    Ok(b64::encode(&client_m1))
 }

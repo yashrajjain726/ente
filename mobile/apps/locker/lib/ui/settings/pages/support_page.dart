@@ -1,5 +1,6 @@
 import "package:ente_components/ente_components.dart";
 import "package:ente_logging/logging.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:ente_strings/extensions.dart";
 import "package:ente_ui/pages/log_file_viewer.dart";
 import "package:ente_ui/utils/toast_util.dart";
@@ -9,9 +10,6 @@ import "package:flutter/foundation.dart";
 import "package:flutter/material.dart";
 import "package:hugeicons/hugeicons.dart";
 import "package:locker/core/constants.dart";
-import "package:locker/l10n/l10n.dart";
-import "package:locker/ui/settings/components/settings_item.dart";
-import "package:locker/ui/settings/components/settings_page_scaffold.dart";
 import "package:url_launcher/url_launcher_string.dart";
 
 class SupportPage extends StatelessWidget {
@@ -29,7 +27,7 @@ class SupportPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = context.l10n;
+    final l10n = context.strings;
 
     return SettingsPageScaffold(
       title: l10n.helpAndSupport,
@@ -64,7 +62,7 @@ class SupportPage extends StatelessWidget {
             onTap: () => _viewLogs(context),
           ),
         ],
-        _SupportLink(
+        SettingsLink(
           label: context.strings.exportLogs,
           onTap: () => _exportLogs(context),
         ),
@@ -117,7 +115,7 @@ class SupportPage extends StatelessWidget {
           icon: HugeIcons.strokeRoundedWrench01,
           faqUrl: _troubleshootingFaqUrl,
         ),
-        _SupportLink(
+        SettingsLink(
           label: l10n.viewAllHelpTopics,
           onTap: () => _openHelpPage(context, title: l10n.helpAndSupport),
         ),
@@ -127,13 +125,9 @@ class SupportPage extends StatelessWidget {
   }
 
   Widget _sectionTitle(BuildContext context, String title) {
-    final colors = context.componentColors;
     return Padding(
       padding: const EdgeInsets.only(left: Spacing.sm, top: 6, bottom: 6),
-      child: Text(
-        title,
-        style: TextStyles.large.copyWith(color: colors.textBase),
-      ),
+      child: Text(title, style: TextStyles.large),
     );
   }
 
@@ -166,7 +160,7 @@ class SupportPage extends StatelessWidget {
   }
 
   Future<void> _onReportIssueTapped(BuildContext context) async {
-    final l10n = context.l10n;
+    final l10n = context.strings;
     await sendLogs(
       context,
       "support@ente.com",
@@ -185,7 +179,7 @@ class SupportPage extends StatelessWidget {
   Future<void> _viewLogs(BuildContext context) async {
     final logFile = SuperLogging.logFile;
     if (logFile == null) {
-      showShortToast(context, context.l10n.somethingWentWrong);
+      showShortToast(context, context.strings.somethingWentWrong);
       return;
     }
     await Navigator.of(
@@ -203,43 +197,8 @@ class SupportPage extends StatelessWidget {
     } catch (e, s) {
       _logger.severe("Failed to export logs", e, s);
       if (context.mounted) {
-        showShortToast(context, context.l10n.somethingWentWrong);
+        showShortToast(context, context.strings.somethingWentWrong);
       }
     }
-  }
-}
-
-class _SupportLink extends StatelessWidget {
-  final String label;
-  final Future<void> Function() onTap;
-
-  const _SupportLink({required this.label, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.componentColors;
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              label,
-              style: TextStyles.bodyBold.copyWith(color: colors.primary),
-            ),
-            const SizedBox(width: 4),
-            HugeIcon(
-              icon: HugeIcons.strokeRoundedArrowRight01,
-              color: colors.primary,
-              size: 16,
-              strokeWidth: 1.6,
-            ),
-          ],
-        ),
-      ),
-    );
   }
 }

@@ -1,10 +1,10 @@
 import "package:ente_components/ente_components.dart";
 import "package:ente_icons/ente_icons.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:hugeicons/hugeicons.dart";
 import "package:logging/logging.dart";
 import "package:photos/core/configuration.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/models/collection/collection.dart";
 import "package:photos/models/file/file.dart";
 import "package:photos/models/selected_albums.dart";
@@ -76,7 +76,7 @@ class AlbumListItemWidget extends StatelessWidget {
       onLongPress: onLongPressCallback == null
           ? null
           : () => onLongPressCallback!(collection),
-      leading: _AlbumListItemCover(collection: collection),
+      leading: AlbumListItemCover(collection: collection),
       title: _buildTitle(
         context,
         showSharingIndicator: showSharingIndicator,
@@ -89,9 +89,7 @@ class AlbumListItemWidget extends StatelessWidget {
         builder: (context, snapshot) {
           String countText = "";
           if (snapshot.hasData) {
-            countText = AppLocalizations.of(
-              context,
-            ).itemCount(count: snapshot.data!);
+            countText = context.strings.itemCount(count: snapshot.data!);
           } else if (snapshot.hasError) {
             Logger("AlbumListItemWidget").severe(
               "Failed to fetch file count of collection",
@@ -102,9 +100,7 @@ class AlbumListItemWidget extends StatelessWidget {
               collection,
             );
             if (cachedCount != null) {
-              countText = AppLocalizations.of(
-                context,
-              ).itemCount(count: cachedCount);
+              countText = context.strings.itemCount(count: cachedCount);
             }
           }
           return _buildSubtitle(
@@ -267,48 +263,44 @@ class AlbumListItemWidget extends StatelessWidget {
   }
 }
 
-class _AlbumListItemCover extends StatelessWidget {
-  final Collection collection;
+class AlbumListItemCover extends StatelessWidget {
+  const AlbumListItemCover({
+    required this.collection,
+    this.borderRadius = ThumbnailListItem.defaultLeadingRadius,
+    super.key,
+  });
 
-  const _AlbumListItemCover({required this.collection});
+  final Collection collection;
+  final double borderRadius;
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        ClipRRect(
-          borderRadius: BorderRadius.circular(
-            ThumbnailListItem.defaultLeadingRadius,
-          ),
-          child: SizedBox.expand(
-            child: FutureBuilder<EnteFile?>(
-              future: CollectionsService.instance.getCover(collection),
-              initialData: CollectionsService.instance.getCoverCache(
-                collection,
-              ),
-              builder: (context, snapshot) {
-                final thumbnail =
-                    snapshot.data ??
-                    CollectionsService.instance.getCoverCache(collection);
-                if (thumbnail != null) {
-                  return ThumbnailWidget(
-                    thumbnail,
-                    shouldShowFavoriteIcon: false,
-                    shouldShowOwnerAvatar: false,
-                    shouldShowSyncStatus: false,
-                    key: Key("album_list:${collection.id}:${thumbnail.tag}"),
-                  );
-                }
-                return const NoThumbnailWidget(
-                  borderRadius: ThumbnailListItem.defaultLeadingRadius,
-                  addBorder: false,
-                );
-              },
-            ),
-          ),
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(borderRadius),
+      child: SizedBox.expand(
+        child: FutureBuilder<EnteFile?>(
+          future: CollectionsService.instance.getCover(collection),
+          initialData: CollectionsService.instance.getCoverCache(collection),
+          builder: (context, snapshot) {
+            final thumbnail =
+                snapshot.data ??
+                CollectionsService.instance.getCoverCache(collection);
+            if (thumbnail == null) {
+              return NoThumbnailWidget(
+                borderRadius: borderRadius,
+                addBorder: false,
+              );
+            }
+            return ThumbnailWidget(
+              thumbnail,
+              shouldShowFavoriteIcon: false,
+              shouldShowOwnerAvatar: false,
+              shouldShowSyncStatus: false,
+              key: Key("album_list:${collection.id}:${thumbnail.tag}"),
+            );
+          },
         ),
-      ],
+      ),
     );
   }
 }

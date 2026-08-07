@@ -1,15 +1,3 @@
-/**
- * @file Service layer for fetching, decrypting, and caching Locker data.
- *
- * Follows the mobile app's encryption-at-rest pattern: all Locker metadata
- * stored locally in the browser (IndexedDB plus the in-memory cache) remains
- * encrypted. Decryption happens only in-memory at read time and decrypted
- * values are never persisted.
- *
- * Key hierarchy (mirrors mobile):
- *   masterKey → collectionKey → fileKey → file metadata (pubMagicMetadata)
- */
-
 import type {
     LockerCollection,
     LockerCollectionParticipant,
@@ -127,10 +115,6 @@ export interface LockerFileShareLinkSummary {
     passwordEnabled: boolean;
 }
 
-// ---------------------------------------------------------------------------
-// File link helpers
-// ---------------------------------------------------------------------------
-
 const decodeUTF8B64 = (b64: string) => utf8Decoder.decode(b64ToBytes(b64));
 
 const generateBase62Secret = (length: number) => {
@@ -224,12 +208,6 @@ const resolveCollectionIDsWithUncategorizedFallback = async (
         ? Array.from(new Set(collectionIDs))
         : [(await ensureUncategorizedCollection(masterKey)).id];
 
-/**
- * Fetch Locker file share links for the current user.
- *
- * The backend endpoint is user-wide rather than per-file, so the client
- * filters to the latest non-disabled record per file.
- */
 export const fetchLockerFileShareLinks = (): Promise<
     Map<number, LockerFileShareLinkSummary>
 > => {
@@ -237,9 +215,6 @@ export const fetchLockerFileShareLinks = (): Promise<
     return Promise.resolve(new Map<number, LockerFileShareLinkSummary>());
 };
 
-/**
- * Get or create a public share link for a Locker file.
- */
 export const getOrCreateLockerFileShareLink = async (
     fileID: number,
     masterKey: string,
@@ -275,9 +250,6 @@ export const getOrCreateLockerFileShareLink = async (
     };
 };
 
-/**
- * Delete a public share link for a Locker file.
- */
 export const deleteLockerFileShareLink = async (
     fileID: number,
     linkID?: string,
@@ -307,22 +279,6 @@ export const deleteLockerFileShareLink = async (
     throw lastError ?? new Error("Failed to delete file share link");
 };
 
-// ---------------------------------------------------------------------------
-// Create info item (note, credential, physical record, emergency contact)
-// ---------------------------------------------------------------------------
-
-/**
- * Create a new info item in the specified collection(s).
- *
- * This uses the `/files/meta` endpoint for metadata-only files (no file
- * content blob, no thumbnail). The info data is stored in pubMagicMetadata.
- *
- * @param collectionIDs The collection IDs to create the item in. Falls back
- * to the user's Uncategorized collection when empty.
- * @param infoType The item type (e.g. "note", "accountCredential").
- * @param infoData The item's structured data (matching the type's schema).
- * @param masterKey The user's master key.
- */
 export const createInfoItem = async (
     collectionIDs: number[],
     infoType: LockerItemType,
@@ -341,26 +297,24 @@ export const createInfoItem = async (
     if (!collectionRecord)
         throw new Error(`Collection ${collectionID} not in cache`);
 
-    // Decrypt collection key
     const collectionKey = await decryptCollectionKey(
         collectionRecord,
         masterKey,
     );
 
-    // Generate a random file key
     const fileKey = await generateKey();
 
-    // Encrypt file key with collection key (SecretBox)
     const encryptedFileKey = await encryptBox(fileKey, collectionKey);
 
-    // Build metadata (basic file metadata — title, creation time, file type)
-    const now = Date.now(); // Epoch milliseconds, matching mobile Locker
+    // Locker timestamps are epoch milliseconds, unlike photos which uses
+    // microseconds.
+    const now = Date.now();
     const title = infoItemTitle(infoType, infoData);
     const metadata = {
         title,
         creationTime: now,
         modificationTime: now,
-        fileType: 4, // FileType.info
+        fileType: 4, // FileType.info in the mobile client's enum
     };
     const metadataJSON = JSON.stringify(metadata);
     const encryptedMetadata = await encryptBlob(
@@ -368,7 +322,6 @@ export const createInfoItem = async (
         fileKey,
     );
 
-    // Build pubMagicMetadata with info field
     const pubMagicMetadata = {
         info: { type: infoType, data: infoData },
         noThumb: true,
@@ -376,7 +329,6 @@ export const createInfoItem = async (
     const pubMMJSON = JSON.stringify(pubMagicMetadata);
     const encryptedPubMM = await encryptBlob(stringToB64(pubMMJSON), fileKey);
 
-    // POST /files/meta
     const res = await fetch(await apiURL("/files/meta"), {
         method: "POST",
         headers: {
@@ -412,18 +364,6 @@ export const createInfoItem = async (
     }
 };
 
-// ---------------------------------------------------------------------------
-// Update info item (edit existing item's pubMagicMetadata)
-// ---------------------------------------------------------------------------
-
-/**
- * Update an existing info item's data by replacing its pubMagicMetadata.
- *
- * @param fileID The file/item ID to update.
- * @param infoType The item type.
- * @param infoData The new structured data.
- * @param masterKey The user's master key.
- */
 export const updateInfoItem = async (
     fileID: number,
     infoType: LockerItemType,
@@ -437,7 +377,6 @@ export const updateInfoItem = async (
     if (!collectionRecord)
         throw new Error(`Collection ${fileRecord.collectionID} not in cache`);
 
-    // Decrypt collection key → file key
     const collectionKey = await decryptCollectionKey(
         collectionRecord,
         masterKey,
@@ -460,8 +399,6 @@ export const updateInfoItem = async (
           )) as Record<string, unknown>)
         : {};
 
-    // Build updated pubMagicMetadata by merging into the existing public
-    // metadata, mirroring mobile's MetadataUpdaterService behavior.
     const title = infoItemTitle(infoType, infoData);
     const pubMagicMetadata = {
         ...existingPubMagicMetadata,
@@ -475,7 +412,6 @@ export const updateInfoItem = async (
 
     const version = fileRecord.pubMagicMetadata?.version ?? 1;
 
-    // PUT /files/public-magic-metadata
     const res = await fetch(await apiURL("/files/public-magic-metadata"), {
         method: "PUT",
         headers: {
@@ -590,16 +526,6 @@ export const updateItemCollections = async (
     });
 };
 
-// ---------------------------------------------------------------------------
-// Trash operations
-// ---------------------------------------------------------------------------
-
-/**
- * Move files to trash.
- *
- * @param fileIDs The file IDs to trash.
- * @param collectionID The collection the files belong to.
- */
 export const trashFiles = async (
     fileIDs: number[],
     collectionID: number,
@@ -617,11 +543,6 @@ export const trashFiles = async (
     ensureOk(res);
 };
 
-/**
- * Permanently delete files from trash.
- *
- * @param fileIDs The file IDs to permanently delete.
- */
 export const permanentlyDeleteFromTrash = async (
     fileIDs: number[],
 ): Promise<void> => {
@@ -636,9 +557,6 @@ export const permanentlyDeleteFromTrash = async (
     ensureOk(res);
 };
 
-/**
- * Empty the entire trash.
- */
 export const emptyTrash = async (lastUpdatedAt: number): Promise<void> => {
     const res = await fetch(await apiURL("/trash/empty"), {
         method: "POST",
@@ -819,13 +737,6 @@ const createCollectionMutationDeps = () => ({
     addFileToCollections,
 });
 
-/**
- * Restore files from trash to a collection.
- *
- * @param items The files to restore with their source collection IDs.
- * @param targetCollectionID The target collection.
- * @param masterKey The user's master key.
- */
 export const restoreFromTrash = async (
     items: Pick<LockerItem, "id" | "collectionID">[],
     targetCollectionID: number,
@@ -860,7 +771,6 @@ export const restoreFromTrash = async (
                 continue;
             }
 
-            // Decrypt file key using original collection key
             const origCollectionRecord = getCollectionRecord(
                 fileRecord.collectionID,
             );
@@ -881,7 +791,6 @@ export const restoreFromTrash = async (
                 origCollectionKey,
             );
 
-            // Re-encrypt file key with target collection key
             const encryptedFileKey = await encryptBox(fileKey, collectionKey);
             files.push({
                 id: item.id,
@@ -895,7 +804,6 @@ export const restoreFromTrash = async (
 
     let { files, skippedFileIDs } = await buildRestorePayload(items);
     if (files.length === 0 && skippedFileIDs.length > 0) {
-        // Recover from stale cache by refetching trash metadata once.
         await fetchLockerTrash(masterKey);
         ({ files, skippedFileIDs } = await buildRestorePayload(items));
     }
@@ -923,17 +831,6 @@ export const restoreFromTrash = async (
     ensureOk(res);
 };
 
-// ---------------------------------------------------------------------------
-// Collection management
-// ---------------------------------------------------------------------------
-
-/**
- * Create a new collection.
- *
- * @param name The collection name.
- * @param masterKey The user's master key.
- * @returns The new collection's ID.
- */
 export const createCollection = async (
     name: string,
     masterKey: string,
@@ -943,8 +840,10 @@ export const createCollection = async (
 };
 
 const ensureUncategorizedCollection = async (masterKey: string) => {
+    const currentUserID = ensureLocalUser().id;
     return ensureUncategorizedCollectionWithDeps(masterKey, {
-        findCollectionByType,
+        findCollectionByType: (type) =>
+            findCollectionByType(type, currentUserID),
         refetchCollections: async (masterKey) => {
             await fetchLockerData(masterKey);
         },
@@ -952,21 +851,16 @@ const ensureUncategorizedCollection = async (masterKey: string) => {
 };
 
 const ensureFavoritesCollection = async (masterKey: string) => {
+    const currentUserID = ensureLocalUser().id;
     return ensureFavoritesCollectionWithDeps(masterKey, {
-        findCollectionByType,
+        findCollectionByType: (type) =>
+            findCollectionByType(type, currentUserID),
         refetchCollections: async (resolvedMasterKey) => {
             await fetchLockerData(resolvedMasterKey);
         },
     });
 };
 
-/**
- * Rename a collection.
- *
- * @param collectionID The collection to rename.
- * @param newName The new name.
- * @param masterKey The user's master key.
- */
 export const renameCollection = async (
     collectionID: number,
     newName: string,
@@ -978,11 +872,6 @@ export const renameCollection = async (
     });
 };
 
-/**
- * Delete a collection (moves to trash).
- *
- * @param collectionID The collection to delete.
- */
 export const deleteCollection = async (
     collectionID: number,
     opts?: { keepFiles?: boolean },
@@ -1002,9 +891,6 @@ export const deleteCollectionKeepingFiles = async (
     await deleteCollection(collection.id, { keepFiles: true });
 };
 
-/**
- * Fetch the current list of participants for a shared collection.
- */
 export const fetchCollectionSharees = async (
     collectionID: number,
 ): Promise<LockerCollectionParticipant[]> => {
@@ -1015,9 +901,6 @@ export const fetchCollectionSharees = async (
     });
 };
 
-/**
- * Share a collection with another Ente user as a viewer.
- */
 export const shareCollection = async (
     collectionID: number,
     email: string,
@@ -1030,9 +913,6 @@ export const shareCollection = async (
     });
 };
 
-/**
- * Remove a participant from a shared collection.
- */
 export const unshareCollection = async (
     collectionID: number,
     email: string,
@@ -1044,9 +924,6 @@ export const unshareCollection = async (
     });
 };
 
-/**
- * Leave a shared collection.
- */
 export const leaveCollection = async (collectionID: number): Promise<void> => {
     const res = await fetch(
         await apiURL(`/collections/leave/${collectionID}`),
@@ -1055,20 +932,21 @@ export const leaveCollection = async (collectionID: number): Promise<void> => {
     ensureOk(res);
 };
 
-/**
- * Mark or unmark a Locker item as Important.
- */
 export const setItemImportant = async (
     fileID: number,
     shouldBeImportant: boolean,
     masterKey: string,
 ): Promise<boolean> => {
+    const currentUserID = ensureLocalUser().id;
     const currentCollectionIDs = getCollectionIDsForFile(fileID);
     if (currentCollectionIDs.length === 0) {
         throw new Error(`File ${fileID} not found in cache`);
     }
 
-    const favoritesCollection = findCollectionByType("favorites");
+    const favoritesCollection = findCollectionByType(
+        "favorites",
+        currentUserID,
+    );
     if (!shouldBeImportant && !favoritesCollection) {
         return false;
     }
@@ -1092,16 +970,12 @@ export const setItemImportant = async (
     }
 
     await updateItemCollectionsWithDeps(fileID, nextCollectionIDs, {
-        currentUserID: ensureLocalUser().id,
+        currentUserID,
         masterKey,
         deps: createCollectionMutationDeps(),
     });
     return true;
 };
-
-// ---------------------------------------------------------------------------
-// File upload
-// ---------------------------------------------------------------------------
 
 export type { LockerUploadProgress } from "./remote-uploads";
 

@@ -1,10 +1,10 @@
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:logging/logging.dart";
 import "package:photos/core/configuration.dart";
 import "package:photos/core/constants.dart";
 import "package:photos/db/files_db.dart";
 import "package:photos/db/ml/db.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/models/file/extensions/file_props.dart";
 import "package:photos/models/file/file.dart";
 import "package:photos/models/file/file_type.dart";
@@ -28,7 +28,6 @@ import "package:photos/services/machine_learning/face_ml/person/person_service.d
 import "package:photos/services/magic_cache_service.dart";
 import "package:photos/services/search_service.dart";
 import "package:photos/ui/viewer/gallery/state/search_filter_data_provider.dart";
-import "package:photos/utils/file_util.dart";
 
 Future<Set<int>> _getFileIDsOfPersonIncludingManualAssignments(
   String personID,
@@ -57,6 +56,24 @@ Future<Set<int>> _getManualAssignmentFileIDsOfOtherPersons(
   return fileIDs;
 }
 
+Future<void> _hydrateFaceFilterMatches(FaceFilter filter) async {
+  if (filter.matchedUploadedIDs.isNotEmpty) {
+    return;
+  }
+
+  if (filter.personId != null) {
+    final fileIDs = await _getFileIDsOfPersonIncludingManualAssignments(
+      filter.personId!,
+    );
+    filter.matchedUploadedIDs.addAll(fileIDs);
+  } else if (filter.clusterId != null) {
+    final fileIDs = await MLDataDB.instance.getFileIDsOfClusterID(
+      filter.clusterId!,
+    );
+    filter.matchedUploadedIDs.addAll(fileIDs);
+  }
+}
+
 Future<List<EnteFile>> getFilteredFiles(
   List<HierarchicalSearchFilter> filters,
 ) async {
@@ -72,17 +89,7 @@ Future<List<EnteFile>> getFilteredFiles(
   for (HierarchicalSearchFilter filter in filters) {
     if (filter is FaceFilter && filter.matchedUploadedIDs.isEmpty) {
       try {
-        if (filter.personId != null) {
-          final fileIDs = await _getFileIDsOfPersonIncludingManualAssignments(
-            filter.personId!,
-          );
-          filter.matchedUploadedIDs.addAll(fileIDs);
-        } else if (filter.clusterId != null) {
-          final fileIDs = await mlDataDB.getFileIDsOfClusterID(
-            filter.clusterId!,
-          );
-          filter.matchedUploadedIDs.addAll(fileIDs);
-        }
+        await _hydrateFaceFilterMatches(filter);
       } catch (e) {
         logger.severe("Error in filtering face filter: $e");
       }
@@ -94,6 +101,8 @@ Future<List<EnteFile>> getFilteredFiles(
         int index = 0;
 
         for (final faceFilter in filter.faceFilters) {
+          await _hydrateFaceFilterMatches(faceFilter);
+
           if (index == 0) {
             intersectionOfSelectedFaceFiltersFileIDs =
                 faceFilter.matchedUploadedIDs;
@@ -188,7 +197,10 @@ Future<void> curateFilters(
   BuildContext context,
 ) async {
   try {
-    final l10n = Localizations.of<AppLocalizations>(context, AppLocalizations);
+    final l10n = Localizations.of<StringsLocalizations>(
+      context,
+      StringsLocalizations,
+    );
     if (l10n == null) {
       Logger("HierarchicalSearchUtil").warning(
         "Skipping filter curation because localizations are unavailable",
@@ -224,7 +236,7 @@ Future<void> curateFilters(
 
 List<OnlyThemFilter> getOnlyThemFilter(
   SearchFilterDataProvider searchFilterDataProvider,
-  AppLocalizations l10n,
+  StringsLocalizations l10n,
 ) {
   if (searchFilterDataProvider.initialGalleryFilter is FaceFilter &&
       searchFilterDataProvider.appliedFilters.isEmpty) {
@@ -289,7 +301,7 @@ Future<List<AlbumFilter>> _curateAlbumFilters(List<EnteFile> files) async {
 
 List<FileTypeFilter> _curateFileTypeFilters(
   List<EnteFile> files,
-  AppLocalizations l10n,
+  StringsLocalizations l10n,
 ) {
   final fileTypeFilters = <FileTypeFilter>[];
   int photosCount = 0;
@@ -375,7 +387,7 @@ List<ContactsFilter> _curateContactsFilter(List<EnteFile> files) {
   }
 
   for (int id in ownerIdToOccurrence.keys) {
-    final user = CollectionsService.instance.getFileOwner(id, null);
+    final user = CollectionsService.instance.resolveUserIdentity(id, null);
     contactsFilters.add(
       ContactsFilter(user: user, occurrence: ownerIdToOccurrence[id]!),
     );
@@ -557,7 +569,7 @@ Future<List<FaceFilter>> curateFaceFilters(List<EnteFile> files) async {
 
 Future<List<MagicFilter>> curateMagicFilters(
   List<EnteFile> files,
-  AppLocalizations l10n,
+  StringsLocalizations l10n,
 ) async {
   final magicFilters = <MagicFilter>[];
 

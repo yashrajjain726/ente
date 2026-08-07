@@ -1,9 +1,9 @@
 import "package:ente_components/ente_components.dart";
 import "package:ente_pure_utils/ente_pure_utils.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:flutter_svg/flutter_svg.dart";
 import "package:intl/intl.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/models/search/generic_search_result.dart";
 import "package:photos/models/search/recent_searches.dart";
 import "package:photos/models/search/search_constants.dart";
@@ -89,7 +89,7 @@ class SearchableItemWidget extends StatelessWidget {
           if (snapshot.hasData && snapshot.data! > 0) {
             final noOfMemories = snapshot.data!;
             return Text(
-              AppLocalizations.of(context).memoryCount(
+              context.strings.memoryCount(
                 count: noOfMemories,
                 formattedCount: NumberFormat().format(noOfMemories),
               ),

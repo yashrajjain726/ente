@@ -1,6 +1,8 @@
 import "dart:async";
 
+import "package:ente_icons/ente_icons.dart";
 import "package:ente_pure_utils/ente_pure_utils.dart";
+import "package:ente_strings/ente_strings.dart";
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import "package:hugeicons/hugeicons.dart";
@@ -12,7 +14,6 @@ import "package:photos/core/event_bus.dart";
 import "package:photos/events/files_updated_event.dart";
 import "package:photos/events/guest_view_event.dart";
 import "package:photos/events/people_changed_event.dart";
-import "package:photos/generated/l10n.dart";
 import 'package:photos/models/collection/collection.dart';
 import 'package:photos/models/device_collection.dart';
 import 'package:photos/models/file/file.dart';
@@ -22,6 +23,7 @@ import 'package:photos/models/gallery_type.dart';
 import "package:photos/models/metadata/common_keys.dart";
 import "package:photos/models/ml/face/person.dart";
 import 'package:photos/models/selected_files.dart';
+import 'package:photos/module/download/gallery.dart';
 import "package:photos/service_locator.dart";
 import 'package:photos/services/collections_service.dart';
 import 'package:photos/services/hidden_service.dart';
@@ -45,7 +47,6 @@ import "package:photos/ui/viewer/location/update_location_data_widget.dart";
 import "package:photos/ui/viewer/people/add_files_to_person_page.dart";
 import 'package:photos/utils/delete_file_util.dart';
 import "package:photos/utils/dialog_util.dart";
-import "package:photos/utils/file_download_util.dart";
 import 'package:photos/utils/magic_util.dart';
 import "package:photos/utils/share_util.dart";
 
@@ -171,14 +172,14 @@ class _FileSelectionActionsWidgetState
       items.add(
         SelectionActionButton(
           hugeIcon: HugeIcons.strokeRoundedRestoreBin,
-          labelText: AppLocalizations.of(context).restore,
+          labelText: context.strings.restore,
           onTap: _restore,
         ),
       );
       items.add(
         SelectionActionButton(
           hugeIcon: HugeIcons.strokeRoundedDelete01,
-          labelText: AppLocalizations.of(context).permanentlyDelete,
+          labelText: context.strings.permanentlyDelete,
           onTap: _permanentlyDelete,
           isCritical: true,
         ),
@@ -187,7 +188,7 @@ class _FileSelectionActionsWidgetState
       items.add(
         SelectionActionButton(
           hugeIcon: HugeIcons.strokeRoundedDelete01,
-          labelText: AppLocalizations.of(context).deleteFromDevice,
+          labelText: context.strings.deleteFromDevice,
           onTap: _deleteSelectedFromDevice,
           isCritical: true,
         ),
@@ -196,7 +197,7 @@ class _FileSelectionActionsWidgetState
       items.add(
         SelectionActionButton(
           hugeIcon: HugeIcons.strokeRoundedDelete01,
-          labelText: AppLocalizations.of(context).delete,
+          labelText: context.strings.delete,
           onTap: split.ownedByCurrentUser.isNotEmpty ? _onDeleteClick : null,
           isCritical: true,
         ),
@@ -204,7 +205,7 @@ class _FileSelectionActionsWidgetState
       items.add(
         SelectionActionButton(
           hugeIcon: HugeIcons.strokeRoundedCancel01,
-          labelText: AppLocalizations.of(context).rejectSuggestions,
+          labelText: context.strings.rejectSuggestions,
           onTap: widget.selectedFiles.files.isNotEmpty
               ? _rejectDeleteSuggestions
               : null,
@@ -216,7 +217,7 @@ class _FileSelectionActionsWidgetState
           items.add(
             SelectionActionButton(
               hugeIcon: HugeIcons.strokeRoundedCopy01,
-              labelText: AppLocalizations.of(context).copyLink,
+              labelText: context.strings.copyLink,
               onTap: anyUploadedFiles ? _sendLink : null,
             ),
           );
@@ -224,7 +225,7 @@ class _FileSelectionActionsWidgetState
           items.add(
             SelectionActionButton(
               hugeIcon: HugeIcons.strokeRoundedNavigation03,
-              labelText: AppLocalizations.of(context).sendLink,
+              labelText: context.strings.sendLink,
               onTap: anyUploadedFiles ? _onSendLinkTapped : null,
               shouldShow: ownedFilesCount > 0,
               key: sendLinkButtonKey,
@@ -236,9 +237,9 @@ class _FileSelectionActionsWidgetState
         items.add(
           SelectionActionButton(
             hugeIcon: HugeIcons.strokeRoundedUserRemove01,
-            labelText: AppLocalizations.of(
-              context,
-            ).notPersonLabel(name: widget.person!.data.name),
+            labelText: context.strings.notPersonLabel(
+              name: widget.person!.data.name,
+            ),
             onTap: _onNotpersonClicked,
           ),
         );
@@ -246,7 +247,7 @@ class _FileSelectionActionsWidgetState
           items.add(
             SelectionActionButton(
               hugeIcon: HugeIcons.strokeRoundedImage01,
-              labelText: AppLocalizations.of(context).useAsCover,
+              labelText: context.strings.useAsCover,
               onTap: anyUploadedFiles ? _setPersonCover : null,
             ),
           );
@@ -256,7 +257,7 @@ class _FileSelectionActionsWidgetState
       if (widget.type == GalleryType.cluster && widget.clusterID != null) {
         items.add(
           SelectionActionButton(
-            labelText: AppLocalizations.of(context).notThisPerson,
+            labelText: context.strings.notThisPerson,
             hugeIcon: HugeIcons.strokeRoundedUserRemove01,
             onTap: _onRemoveFromClusterClicked,
           ),
@@ -271,7 +272,7 @@ class _FileSelectionActionsWidgetState
           items.add(
             SelectionActionButton(
               hugeIcon: HugeIcons.strokeRoundedCloudUpload,
-              labelText: AppLocalizations.of(context).addToEnte,
+              labelText: context.strings.addToEnte,
               onTap: _addToAlbum,
             ),
           );
@@ -279,7 +280,7 @@ class _FileSelectionActionsWidgetState
           items.add(
             SelectionActionButton(
               hugeIcon: HugeIcons.strokeRoundedImageAdd01,
-              labelText: AppLocalizations.of(context).addToAlbum,
+              labelText: context.strings.addToAlbum,
               onTap: _addToAlbum,
             ),
           );
@@ -290,7 +291,7 @@ class _FileSelectionActionsWidgetState
         items.add(
           SelectionActionButton(
             hugeIcon: HugeIcons.strokeRoundedImageAdd01,
-            labelText: AppLocalizations.of(context).addToAlbum,
+            labelText: context.strings.addToAlbum,
             onTap: _addToHiddenAlbum,
           ),
         );
@@ -300,7 +301,7 @@ class _FileSelectionActionsWidgetState
         items.add(
           SelectionActionButton(
             hugeIcon: HugeIcons.strokeRoundedArrowRight01,
-            labelText: AppLocalizations.of(context).moveToAlbum,
+            labelText: context.strings.moveToAlbum,
             onTap: anyUploadedFiles ? _moveFiles : null,
             shouldShow: ownedFilesCount > 0,
           ),
@@ -311,7 +312,7 @@ class _FileSelectionActionsWidgetState
         items.add(
           SelectionActionButton(
             hugeIcon: HugeIcons.strokeRoundedArrowRight01,
-            labelText: AppLocalizations.of(context).moveToAlbum,
+            labelText: context.strings.moveToAlbum,
             onTap: _moveFilesToHiddenAlbum,
           ),
         );
@@ -321,7 +322,7 @@ class _FileSelectionActionsWidgetState
         items.add(
           SelectionActionButton(
             hugeIcon: HugeIcons.strokeRoundedDelete01,
-            labelText: AppLocalizations.of(context).delete,
+            labelText: context.strings.delete,
             onTap: anyOwnedFiles ? _onDeleteClick : null,
             shouldShow: allOwnedFiles,
             isCritical: true,
@@ -333,7 +334,7 @@ class _FileSelectionActionsWidgetState
         items.add(
           SelectionActionButton(
             hugeIcon: HugeIcons.strokeRoundedRemove01,
-            labelText: AppLocalizations.of(context).removeFromAlbum,
+            labelText: context.strings.removeFromAlbum,
             onTap: removeCount > 0 ? _removeFilesFromAlbum : null,
             shouldShow: removeCount > 0,
           ),
@@ -344,7 +345,7 @@ class _FileSelectionActionsWidgetState
         items.add(
           SelectionActionButton(
             hugeIcon: HugeIcons.strokeRoundedFlag01,
-            labelText: AppLocalizations.of(context).suggestDeletion,
+            labelText: context.strings.suggestDeletion,
             onTap: _onSuggestDelete,
           ),
         );
@@ -354,7 +355,7 @@ class _FileSelectionActionsWidgetState
         items.add(
           SelectionActionButton(
             hugeIcon: HugeIcons.strokeRoundedRemove01,
-            labelText: AppLocalizations.of(context).removeFromAlbum,
+            labelText: context.strings.removeFromAlbum,
             onTap: _removeFilesFromHiddenAlbum,
           ),
         );
@@ -363,8 +364,8 @@ class _FileSelectionActionsWidgetState
       if (widget.type.showFavoriteOption()) {
         items.add(
           SelectionActionButton(
-            hugeIcon: HugeIcons.strokeRoundedFavourite,
-            labelText: AppLocalizations.of(context).favorite,
+            iconWidget: const Icon(EnteIcons.favoriteStroke),
+            labelText: context.strings.favorite,
             onTap: anyUploadedFiles ? _onFavoriteClick : null,
             shouldShow: ownedFilesCount > 0,
           ),
@@ -372,8 +373,8 @@ class _FileSelectionActionsWidgetState
       } else if (widget.type.showUnFavoriteOption()) {
         items.add(
           SelectionActionButton(
-            hugeIcon: HugeIcons.strokeRoundedHeartRemove,
-            labelText: AppLocalizations.of(context).removeFromFavorite,
+            iconWidget: const Icon(EnteIcons.favoriteFilled),
+            labelText: context.strings.removeFromFavorite,
             onTap: _onUnFavoriteClick,
             shouldShow: ownedFilesCount > 0,
           ),
@@ -382,7 +383,7 @@ class _FileSelectionActionsWidgetState
       items.add(
         SelectionActionButton(
           hugeIcon: HugeIcons.strokeRoundedIncognito,
-          labelText: AppLocalizations.of(context).guestView,
+          labelText: context.strings.guestView,
           onTap: _onGuestViewClick,
         ),
       );
@@ -392,7 +393,7 @@ class _FileSelectionActionsWidgetState
         items.add(
           SelectionActionButton(
             hugeIcon: HugeIcons.strokeRoundedUserAdd01,
-            labelText: AppLocalizations.of(context).addToPerson,
+            labelText: context.strings.addToPerson,
             onTap: hasUploadedFileIDs ? _onAddFilesToPerson : null,
             shouldShow: hasUploadedFileIDs,
           ),
@@ -402,7 +403,7 @@ class _FileSelectionActionsWidgetState
         items.add(
           SelectionActionButton(
             hugeIcon: HugeIcons.strokeRoundedGridView,
-            labelText: AppLocalizations.of(context).createCollage,
+            labelText: context.strings.createCollage,
             onTap: _onCreateCollageClicked,
             shouldShow: showCollageOption,
           ),
@@ -413,7 +414,7 @@ class _FileSelectionActionsWidgetState
         items.add(
           SelectionActionButton(
             hugeIcon: HugeIcons.strokeRoundedViewOffSlash,
-            labelText: AppLocalizations.of(context).hide,
+            labelText: context.strings.hide,
             onTap: anyUploadedFiles ? _onHideClick : null,
             shouldShow: ownedFilesCount > 0,
           ),
@@ -422,7 +423,7 @@ class _FileSelectionActionsWidgetState
         items.add(
           SelectionActionButton(
             hugeIcon: HugeIcons.strokeRoundedView,
-            labelText: AppLocalizations.of(context).unhide,
+            labelText: context.strings.unhide,
             onTap: _onUnhideClick,
             shouldShow: ownedFilesCount > 0,
           ),
@@ -432,7 +433,7 @@ class _FileSelectionActionsWidgetState
         items.add(
           SelectionActionButton(
             hugeIcon: HugeIcons.strokeRoundedArchive03,
-            labelText: AppLocalizations.of(context).archive,
+            labelText: context.strings.archive,
             onTap: anyUploadedFiles ? _onArchiveClick : null,
             shouldShow: ownedFilesCount > 0,
           ),
@@ -441,7 +442,7 @@ class _FileSelectionActionsWidgetState
         items.add(
           SelectionActionButton(
             hugeIcon: HugeIcons.strokeRoundedUnarchive03,
-            labelText: AppLocalizations.of(context).unarchive,
+            labelText: context.strings.unarchive,
             onTap: _onUnArchiveClick,
             shouldShow: ownedFilesCount > 0,
           ),
@@ -452,7 +453,7 @@ class _FileSelectionActionsWidgetState
         items.add(
           SelectionActionButton(
             hugeIcon: HugeIcons.strokeRoundedRestoreBin,
-            labelText: AppLocalizations.of(context).restore,
+            labelText: context.strings.restore,
             onTap: _restore,
           ),
         );
@@ -462,7 +463,7 @@ class _FileSelectionActionsWidgetState
         items.add(
           SelectionActionButton(
             hugeIcon: HugeIcons.strokeRoundedDelete01,
-            labelText: AppLocalizations.of(context).permanentlyDelete,
+            labelText: context.strings.permanentlyDelete,
             onTap: _permanentlyDelete,
             isCritical: true,
           ),
@@ -475,7 +476,7 @@ class _FileSelectionActionsWidgetState
             shouldShow: widget.selectedFiles.files.every(
               (element) => (element.ownerID == currentUserID),
             ),
-            labelText: AppLocalizations.of(context).editTime,
+            labelText: context.strings.editTime,
             hugeIcon: HugeIcons.strokeRoundedDateTime,
             onTap: () async {
               final newDate = await showEditDateSheet(
@@ -496,7 +497,7 @@ class _FileSelectionActionsWidgetState
             shouldShow: widget.selectedFiles.files.any(
               (element) => (element.ownerID == currentUserID),
             ),
-            labelText: AppLocalizations.of(context).editLocation,
+            labelText: context.strings.editLocation,
             hugeIcon: HugeIcons.strokeRoundedMapsEditing,
             onTap: _editLocation,
           ),
@@ -506,7 +507,7 @@ class _FileSelectionActionsWidgetState
       if (showDownloadOption) {
         items.add(
           SelectionActionButton(
-            labelText: AppLocalizations.of(context).download,
+            labelText: context.strings.download,
             hugeIcon: HugeIcons.strokeRoundedDownload01,
             onTap: () => _download(widget.selectedFiles.files.toList()),
           ),
@@ -515,7 +516,7 @@ class _FileSelectionActionsWidgetState
       if (widget.type != GalleryType.sharedPublicCollection) {
         items.add(
           SelectionActionButton(
-            labelText: AppLocalizations.of(context).share,
+            labelText: context.strings.share,
             hugeIcon: HugeIcons.strokeRoundedShare03,
             key: shareButtonKey,
             onTap: _shareSelectedFiles,
@@ -609,7 +610,7 @@ class _FileSelectionActionsWidgetState
         skipNotify: true,
       );
     }
-    showCollectionActionSheet(
+    await showCollectionActionSheet(
       context,
       selectedFiles: widget.selectedFiles,
       actionType: CollectionActionType.moveFiles,
@@ -617,7 +618,7 @@ class _FileSelectionActionsWidgetState
   }
 
   Future<void> _moveFilesToHiddenAlbum() async {
-    showCollectionActionSheet(
+    await showCollectionActionSheet(
       context,
       selectedFiles: widget.selectedFiles,
       actionType: CollectionActionType.moveToHiddenCollection,
@@ -625,11 +626,14 @@ class _FileSelectionActionsWidgetState
   }
 
   Future<void> _addToAlbum() async {
-    showCollectionActionSheet(context, selectedFiles: widget.selectedFiles);
+    await showCollectionActionSheet(
+      context,
+      selectedFiles: widget.selectedFiles,
+    );
   }
 
   Future<void> _addToHiddenAlbum() async {
-    showCollectionActionSheet(
+    await showCollectionActionSheet(
       context,
       selectedFiles: widget.selectedFiles,
       actionType: CollectionActionType.addToHiddenAlbum,
@@ -657,6 +661,7 @@ class _FileSelectionActionsWidgetState
       );
     } catch (e, s) {
       _logger.warning("Failed to reject delete suggestions", e, s);
+      if (!mounted) return;
       await showGenericErrorDialog(context: context, error: e);
     }
   }
@@ -750,7 +755,7 @@ class _FileSelectionActionsWidgetState
     if (filesWithIds.isEmpty) {
       showShortToast(
         context,
-        AppLocalizations.of(context).onlyUploadedFilesCanBeAddedToPerson,
+        context.strings.onlyUploadedFilesCanBeAddedToPerson,
       );
       return;
     }
@@ -788,9 +793,10 @@ class _FileSelectionActionsWidgetState
           relevantFiles: addedFiles,
         ),
       );
+      if (!mounted) return;
       showToast(
         context,
-        AppLocalizations.of(context).addedFilesToPerson(
+        context.strings.addedFilesToPerson(
           count: addedCount,
           personName: result.person.data.name,
         ),
@@ -803,9 +809,10 @@ class _FileSelectionActionsWidgetState
     }
     final alreadyCount = result.alreadyAssignedFileIds.length;
     if (alreadyCount > 0) {
+      if (!mounted) return;
       showShortToast(
         context,
-        AppLocalizations.of(context).filesAlreadyLinkedToPerson(
+        context.strings.filesAlreadyLinkedToPerson(
           count: alreadyCount,
           personName: result.person.data.name,
         ),
@@ -815,7 +822,9 @@ class _FileSelectionActionsWidgetState
 
   Future<void> _onGuestViewClick() async {
     final List<EnteFile> selectedFiles = widget.selectedFiles.files.toList();
-    if (await LocalAuthentication().isDeviceSupported()) {
+    final isDeviceSupported = await LocalAuthentication().isDeviceSupported();
+    if (!mounted) return;
+    if (isDeviceSupported) {
       final page = DetailPage(
         DetailPageConfiguration(
           selectedFiles,
@@ -825,6 +834,7 @@ class _FileSelectionActionsWidgetState
         ),
       );
       await localSettings.setOnGuestView(true);
+      if (!mounted) return;
       routeToPage(context, page, forceCustomPageRoute: true).ignore();
       WidgetsBinding.instance.addPostFrameCallback((_) {
         Bus.instance.fire(GuestViewEvent(true, false));
@@ -832,10 +842,11 @@ class _FileSelectionActionsWidgetState
     } else {
       await showErrorDialog(
         context,
-        AppLocalizations.of(context).noSystemLockFound,
-        AppLocalizations.of(context).guestViewEnablePreSteps,
+        context.strings.noSystemLockFound,
+        context.strings.guestViewEnablePreSteps,
       );
     }
+    if (!mounted) return;
     widget.selectedFiles.clearAll();
   }
 
@@ -876,7 +887,7 @@ class _FileSelectionActionsWidgetState
         skipNotify: true,
       );
     }
-    showCollectionActionSheet(
+    await showCollectionActionSheet(
       context,
       selectedFiles: widget.selectedFiles,
       actionType: CollectionActionType.unHide,
@@ -897,40 +908,52 @@ class _FileSelectionActionsWidgetState
     if (split.ownedByCurrentUser.isEmpty) {
       showShortToast(
         context,
-        AppLocalizations.of(context).canOnlyCreateLinkForFilesOwnedByYou,
+        context.strings.canOnlyCreateLinkForFilesOwnedByYou,
       );
       return;
     }
     final dialog = createProgressDialog(
       context,
-      AppLocalizations.of(context).creatingLink,
+      context.strings.creatingLink,
       isDismissible: true,
     );
     await dialog.show();
+    if (!mounted) {
+      await dialog.hide();
+      return;
+    }
     _cachedCollectionForSharedLink ??= await collectionActions
         .createSharedCollectionLink(context, split.ownedByCurrentUser);
 
+    if (!mounted) {
+      await dialog.hide();
+      return;
+    }
     if (_cachedCollectionForSharedLink == null) {
       await dialog.hide();
       return;
     }
     await dialog.hide();
+    if (!mounted) return;
     await _sendLink();
+    if (!mounted) return;
     widget.selectedFiles.clearAll();
-    if (mounted) {
-      setState(() => {});
-    }
+    setState(() => {});
   }
 
   Future<void> _setPersonCover() async {
     final EnteFile file = widget.selectedFiles.files.first;
-    final updatedPerson = await PersonService.instance.updateAvatar(
+    final result = await PersonService.instance.updateAvatar(
       widget.person!,
       file,
     );
+    final updatedPerson = result.person;
     widget.selectedFiles.clearAll();
     if (mounted) {
       setState(() => {});
+      if (result.contactPictureUpdateFailed) {
+        showShortToast(context, "Failed to update contact picture");
+      }
     }
     Bus.instance.fire(
       PeopleChangedEvent(
@@ -945,10 +968,10 @@ class _FileSelectionActionsWidgetState
     try {
       final actionResult = await showActionSheet(
         context: context,
-        title: AppLocalizations.of(context).removeFromPersonQuestion,
+        title: context.strings.removeFromPersonQuestion,
         buttons: [
           ButtonWidget(
-            labelText: AppLocalizations.of(context).yesRemove,
+            labelText: context.strings.yesRemove,
             buttonType: ButtonType.neutral,
             buttonSize: ButtonSize.large,
             shouldStickToDarkTheme: true,
@@ -956,7 +979,7 @@ class _FileSelectionActionsWidgetState
             isInAlert: true,
           ),
           ButtonWidget(
-            labelText: AppLocalizations.of(context).cancel,
+            labelText: context.strings.cancel,
             buttonType: ButtonType.secondary,
             buttonSize: ButtonSize.large,
             buttonAction: ButtonAction.second,
@@ -964,9 +987,7 @@ class _FileSelectionActionsWidgetState
             isInAlert: true,
           ),
         ],
-        body: AppLocalizations.of(
-          context,
-        ).selectedItemsWillBeRemovedFromThisPerson,
+        body: context.strings.selectedItemsWillBeRemovedFromThisPerson,
         actionSheetType: ActionSheetType.defaultActionSheet,
       );
       if (actionResult?.action != null) {
@@ -993,10 +1014,10 @@ class _FileSelectionActionsWidgetState
     }
     final actionResult = await showActionSheet(
       context: context,
-      title: AppLocalizations.of(context).removeFromPersonQuestion,
+      title: context.strings.removeFromPersonQuestion,
       buttons: [
         ButtonWidget(
-          labelText: AppLocalizations.of(context).yesRemove,
+          labelText: context.strings.yesRemove,
           buttonType: ButtonType.neutral,
           buttonSize: ButtonSize.large,
           shouldStickToDarkTheme: true,
@@ -1004,7 +1025,7 @@ class _FileSelectionActionsWidgetState
           isInAlert: true,
         ),
         ButtonWidget(
-          labelText: AppLocalizations.of(context).cancel,
+          labelText: context.strings.cancel,
           buttonType: ButtonType.secondary,
           buttonSize: ButtonSize.large,
           buttonAction: ButtonAction.second,
@@ -1012,9 +1033,7 @@ class _FileSelectionActionsWidgetState
           isInAlert: true,
         ),
       ],
-      body: AppLocalizations.of(
-        context,
-      ).selectedItemsWillBeRemovedFromThisPerson,
+      body: context.strings.selectedItemsWillBeRemovedFromThisPerson,
       actionSheetType: ActionSheetType.defaultActionSheet,
     );
     if (actionResult?.action != null) {
@@ -1061,7 +1080,7 @@ class _FileSelectionActionsWidgetState
 
   Future<void> _deleteSelectedFromDevice() async {
     final filesToDelete = widget.selectedFiles.files.toList();
-    final l10n = AppLocalizations.of(context);
+    final l10n = context.strings;
 
     final actionResult = await showActionSheet(
       context: context,
@@ -1079,7 +1098,7 @@ class _FileSelectionActionsWidgetState
             try {
               await deleteFilesOnDeviceOnly(context, filesToDelete);
             } catch (e) {
-              if (context.mounted) {
+              if (mounted) {
                 await showGenericErrorDialog(context: context, error: e);
               }
               rethrow;
@@ -1101,6 +1120,9 @@ class _FileSelectionActionsWidgetState
 
     if (actionResult?.action == ButtonAction.first) {
       widget.selectedFiles.clearAll();
+      if (mounted) {
+        await showMediaManagementHintSheet(context);
+      }
     }
   }
 
@@ -1109,10 +1131,11 @@ class _FileSelectionActionsWidgetState
       return;
     }
 
-    final l10n = AppLocalizations.of(context);
+    final l10n = context.strings;
     final existingLocalFolderNames = await Future.wait(
       files.map((file) => getExistingLocalFolderNameForDownloadSkipToast(file)),
     );
+    if (!mounted) return;
 
     final filesToDownload = <EnteFile>[];
     final skippedFiles = <EnteFile>[];
@@ -1126,7 +1149,9 @@ class _FileSelectionActionsWidgetState
         continue;
       }
       filesToDownload.add(
-        file.isRemoteFile ? file.copyWith() : (file.copyWith()..localID = null),
+        file.isRemoteOnlyFile
+            ? file.copyWith()
+            : (file.copyWith()..localID = null),
       );
     }
     final skippedFilesCount = skippedFiles.length;
@@ -1142,6 +1167,7 @@ class _FileSelectionActionsWidgetState
           addedToQueueCount = enqueueResult.addedCount;
         } catch (e) {
           _logger.warning("Failed to enqueue files for download", e);
+          if (!mounted) return;
           await showGenericErrorDialog(context: context, error: e);
           return;
         }
@@ -1195,6 +1221,7 @@ class _FileSelectionActionsWidgetState
       }
     }
 
+    if (!mounted) return;
     if (skippedFilesCount > 0) {
       String finalMessage;
       if (skippedFilesCount == 1) {
@@ -1216,7 +1243,7 @@ class _FileSelectionActionsWidgetState
         addedToQueueCount > 0) {
       showToast(
         context,
-        AppLocalizations.of(context).filesSavedToGallery,
+        context.strings.filesSavedToGallery,
         iosLongToastLengthInSec: 4,
       );
     }

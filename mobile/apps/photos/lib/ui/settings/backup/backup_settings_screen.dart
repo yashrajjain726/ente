@@ -2,16 +2,14 @@ import "dart:io";
 
 import "package:ente_components/ente_components.dart";
 import "package:ente_pure_utils/ente_pure_utils.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:photo_manager/photo_manager.dart";
-import "package:photos/generated/l10n.dart";
-import "package:photos/l10n/l10n.dart";
 import "package:photos/service_locator.dart";
 import "package:photos/services/sync/local_sync_service.dart";
 import "package:photos/services/sync/sync_service.dart";
 import "package:photos/services/wake_lock_service.dart";
 import "package:photos/ui/common/backup_flow_helper.dart";
-import "package:photos/ui/settings/components/settings_page_scaffold.dart";
 import "package:photos/utils/dialog_util.dart";
 
 class BackupSettingsScreen extends StatelessWidget {
@@ -24,7 +22,7 @@ class BackupSettingsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
+    final l10n = context.strings;
 
     return SettingsPageScaffold(
       title: l10n.backupSettings,
@@ -95,13 +93,10 @@ class BackupSettingsScreen extends StatelessWidget {
           _toggleItem(
             context,
             title: l10n.disableAutoLock,
-            value: () =>
-                EnteWakeLockService.instance.shouldKeepAppAwakeAcrossSessions,
+            value: () => wakeLockService.shouldKeepAppAwakeAcrossSessions,
             onChanged: () async {
-              EnteWakeLockService.instance.updateWakeLock(
-                enable: !EnteWakeLockService
-                    .instance
-                    .shouldKeepAppAwakeAcrossSessions,
+              wakeLockService.updateWakeLock(
+                enable: !wakeLockService.shouldKeepAppAwakeAcrossSessions,
                 wakeLockFor: WakeLockFor.fasterBackupsOniOSByKeepingScreenAwake,
               );
             },
@@ -146,7 +141,7 @@ class _BackupOnlyNewPhotosToggle extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MenuComponent(
-      title: context.l10n.backupOnlyNewPhotos,
+      title: context.strings.backupOnlyNewPhotos,
       trailing: ToggleSwitchComponent.async(
         value: () => backupPreferenceService.isOnlyNewBackupEnabled,
         onChanged: () async {
@@ -154,6 +149,7 @@ class _BackupOnlyNewPhotosToggle extends StatelessWidget {
           if (!hasPermission) {
             return;
           }
+          if (!context.mounted) return;
           final shouldProceed = await _maybeHandleFolderSelection(
             context: context,
           );
@@ -190,10 +186,10 @@ class _BackupOnlyNewPhotosToggle extends StatelessWidget {
     }
     await showChoiceDialog(
       context,
-      title: context.l10n.allowPermTitle,
-      body: context.l10n.allowPermBody,
-      firstButtonLabel: context.l10n.openSettings,
-      secondButtonLabel: context.l10n.cancel,
+      title: context.strings.allowPermTitle,
+      body: context.strings.allowPermBody,
+      firstButtonLabel: context.strings.openSettings,
+      secondButtonLabel: context.strings.cancel,
       firstButtonOnTap: () async {
         await PhotoManager.openSetting();
       },
@@ -231,6 +227,7 @@ class _BackupOnlyNewPhotosToggle extends StatelessWidget {
     }
 
     if (result == _FolderPromptAction.selectFolders) {
+      if (!context.mounted) return false;
       final bool? selected = await handleFolderSelectionBackupFlow(
         context,
         fromOnlyNewPhotosToggle: true,
@@ -251,7 +248,7 @@ Future<_FolderPromptAction?> _showOnlyNewBackupFolderPrompt({
   required bool hasAllFoldersSelected,
   required bool allowContinueAnyway,
 }) async {
-  final l10n = context.l10n;
+  final l10n = context.strings;
   final message = hasAllFoldersSelected
       ? l10n.backupOnlyNewPhotosAllFoldersSelected
       : allowContinueAnyway

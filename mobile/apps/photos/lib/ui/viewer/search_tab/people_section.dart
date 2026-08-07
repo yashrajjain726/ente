@@ -2,9 +2,9 @@ import "dart:async";
 
 import "package:ente_components/theme/text_styles.dart";
 import "package:ente_pure_utils/ente_pure_utils.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:photos/events/event.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/models/file/file.dart";
 import "package:photos/models/ml/face/person.dart";
 import "package:photos/models/search/generic_search_result.dart";
@@ -15,6 +15,7 @@ import "package:photos/models/search/search_types.dart";
 import "package:photos/models/selected_people.dart";
 import "package:photos/service_locator.dart" show isLocalGalleryMode;
 import "package:photos/theme/ente_theme.dart";
+import "package:photos/ui/components/collection_share_badge.dart";
 import "package:photos/ui/settings/ml/machine_learning_settings_page.dart";
 import "package:photos/ui/viewer/actions/select_all_status_icon.dart";
 import "package:photos/ui/viewer/file/no_thumbnail_widget.dart";
@@ -56,12 +57,13 @@ class _PeopleSectionState extends State<PeopleSection> {
     for (Stream<Event> stream in streamsToListenTo) {
       streamSubscriptions.add(
         stream.listen((event) async {
-          _examples =
-              await widget.sectionType.getData(
-                    context,
-                    limit: widget.resultLimit + 1,
-                  )
-                  as List<GenericSearchResult>;
+          if (!mounted) return;
+          final results = await widget.sectionType.getData(
+            context,
+            limit: widget.resultLimit + 1,
+          );
+          if (!mounted) return;
+          _examples = results as List<GenericSearchResult>;
           setState(() {});
         }),
       );
@@ -97,10 +99,7 @@ class _PeopleSectionState extends State<PeopleSection> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                SectionHeader(
-                  widget.sectionType,
-                  hasMore: _examples.length > widget.resultLimit,
-                ),
+                SectionHeader(widget.sectionType, hasMore: true),
                 const SizedBox(height: 4),
                 SearchExampleRow(visibleExamples, widget.sectionType),
                 const SizedBox(height: 20),
@@ -126,7 +125,7 @@ class _PeopleSectionState extends State<PeopleSection> {
                       children: [
                         Text(
                           widget.sectionType.sectionTitle(context),
-                          style: TextStyles.h2.copyWith(
+                          style: TextStyles.display3.copyWith(
                             color: textTheme.largeBold.color,
                           ),
                         ),
@@ -146,8 +145,6 @@ class _PeopleSectionState extends State<PeopleSection> {
 }
 
 class SearchExampleRow extends StatelessWidget {
-  static const _minTileHeight = 158.0;
-
   final SectionType sectionType;
   final List<GenericSearchResult> examples;
 
@@ -159,13 +156,7 @@ class SearchExampleRow extends StatelessWidget {
       spacing: 10,
       children: [
         for (final example in examples)
-          ConstrainedBox(
-            constraints: const BoxConstraints(minHeight: _minTileHeight),
-            child: PersonSearchExample(
-              searchResult: example,
-              selectedPeople: null,
-            ),
-          ),
+          PersonSearchExample(searchResult: example, selectedPeople: null),
       ],
     );
   }
@@ -194,6 +185,8 @@ class PersonSearchExample extends StatelessWidget {
     final bool isCluster =
         searchResult.type() == ResultType.faces &&
         searchResult.params.containsKey(kClusterParamId);
+    final bool isPinnedPerson =
+        !isCluster && (searchResult.params[kPersonPinned] as bool? ?? false);
 
     return ListenableBuilder(
       listenable: selectedPeople ?? ValueNotifier(false),
@@ -286,6 +279,8 @@ class PersonSearchExample extends StatelessWidget {
                           : null,
                     ),
                   ),
+                  if (isPinnedPerson)
+                    const Positioned(left: 8, bottom: 8, child: PinnedBadge()),
                 ],
               ),
               isCluster
@@ -303,6 +298,7 @@ class PersonSearchExample extends StatelessWidget {
                               );
                               if (result != null &&
                                   result is (PersonEntity, EnteFile)) {
+                                if (!context.mounted) return;
                                 // ignore: unawaited_futures
                                 routeToPage(
                                   context,
@@ -313,6 +309,7 @@ class PersonSearchExample extends StatelessWidget {
                                 );
                               } else if (result != null &&
                                   result is PersonEntity) {
+                                if (!context.mounted) return;
                                 // ignore: unawaited_futures
                                 routeToPage(
                                   context,
@@ -326,7 +323,7 @@ class PersonSearchExample extends StatelessWidget {
                             child: Padding(
                               padding: const EdgeInsets.only(top: 6, bottom: 0),
                               child: Text(
-                                AppLocalizations.of(context).addName,
+                                context.strings.addName,
                                 maxLines: 1,
                                 textAlign: TextAlign.center,
                                 overflow: TextOverflow.ellipsis,
@@ -338,7 +335,6 @@ class PersonSearchExample extends StatelessWidget {
                       padding: EdgeInsets.zero,
                       child: _PersonLabel(
                         name: searchResult.name(),
-                        count: searchResult.fileCount(),
                         width: size,
                       ),
                     ),
@@ -351,14 +347,9 @@ class PersonSearchExample extends StatelessWidget {
 }
 
 class _PersonLabel extends StatelessWidget {
-  const _PersonLabel({
-    required this.name,
-    required this.count,
-    required this.width,
-  });
+  const _PersonLabel({required this.name, required this.width});
 
   final String name;
-  final int count;
   final double width;
 
   @override
@@ -376,13 +367,6 @@ class _PersonLabel extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyles.body.copyWith(color: textTheme.body.color),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              AppLocalizations.of(context).itemCount(count: count),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyles.mini.copyWith(color: textTheme.miniMuted.color),
             ),
           ],
         ),

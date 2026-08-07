@@ -18,6 +18,9 @@ import "package:photos/events/reset_zoom_of_photo_view_event.dart";
 import "package:photos/events/retry_failed_image_load_event.dart";
 import "package:photos/models/file/extensions/file_props.dart";
 import 'package:photos/models/file/file.dart';
+import 'package:photos/module/download/file.dart';
+import 'package:photos/module/download/thumbnail.dart';
+import "package:photos/module/metadata/exif.dart";
 import "package:photos/service_locator.dart" show flagService;
 import "package:photos/src/rust/api/image_processing_api.dart" as rust_image;
 import "package:photos/states/detail_page_state.dart";
@@ -26,11 +29,8 @@ import "package:photos/theme/ente_theme.dart";
 import "package:photos/ui/actions/file/file_actions.dart";
 import 'package:photos/ui/common/loading_widget.dart';
 import 'package:photos/ui/viewer/file/thumbnail_widget.dart';
-import "package:photos/utils/exif_util.dart";
-import 'package:photos/utils/file_util.dart';
 import 'package:photos/utils/image_util.dart';
 import "package:photos/utils/ram_check_util.dart";
-import 'package:photos/utils/thumbnail_util.dart';
 
 class ZoomableImage extends StatefulWidget {
   final EnteFile photo;
@@ -41,6 +41,7 @@ class ZoomableImage extends StatefulWidget {
   final bool isGuestView;
   final bool isFromMemories;
   final Function({required int memoryDuration})? onFinalFileLoad;
+  final ValueChanged<File>? onFinalImageLoaded;
 
   const ZoomableImage(
     this.photo, {
@@ -52,6 +53,7 @@ class ZoomableImage extends StatefulWidget {
     this.isGuestView = false,
     this.isFromMemories = false,
     this.onFinalFileLoad,
+    this.onFinalImageLoaded,
   });
 
   @override
@@ -158,7 +160,7 @@ class _ZoomableImageState extends State<ZoomableImage> {
         .on<RetryFailedImageLoadEvent>()
         .listen((_) {
           if (!mounted || _loadedFinalImage) return;
-          if (!_loadedSmallThumbnail && _photo.isRemoteFile) {
+          if (!_loadedSmallThumbnail && _photo.isRemoteOnlyFile) {
             // Evict the stale in-flight thumbnail so the rebuild's
             // getThumbnailFromServer doesn't dedupe against the dead completer.
             removePendingGetThumbnailRequestIfAny(_photo);
@@ -174,6 +176,7 @@ class _ZoomableImageState extends State<ZoomableImage> {
     _zoomStreamSubscription = _photoViewController.outputStateStream.listen((
       value,
     ) {
+      if (!mounted) return;
       final state = InheritedDetailPageState.maybeOf(context);
       if (value.scale == null) return;
       if (!_isZooming) {
@@ -202,7 +205,7 @@ class _ZoomableImageState extends State<ZoomableImage> {
 
   @override
   Widget build(BuildContext context) {
-    if (_photo.isRemoteFile) {
+    if (_photo.isRemoteOnlyFile) {
       _loadNetworkImage();
     } else {
       _loadLocalImage(context);
@@ -290,7 +293,7 @@ class _ZoomableImageState extends State<ZoomableImage> {
               {
                 if (d.delta.dy > dragSensitivity)
                   {
-                    {Navigator.of(context).pop()},
+                    {unawaited(Navigator.maybePop(context))},
                   }
                 else if (d.delta.dy < (dragSensitivity * -1))
                   {showDetailsSheet(context, widget.photo)},
@@ -465,6 +468,7 @@ class _ZoomableImageState extends State<ZoomableImage> {
         quality: 100,
       ).then((cachedThumbnail) {
         if (cachedThumbnail != null) {
+          if (!context.mounted) return;
           _onLargeThumbnailLoaded(Image.memory(cachedThumbnail).image, context);
         }
       });
@@ -602,7 +606,7 @@ class _ZoomableImageState extends State<ZoomableImage> {
         },
       ).then((value) {
         if (mounted && !_loadedFinalImage && !_convertToSupportedFormat) {
-          _updateViewWithFinalImage(imageProvider);
+          _updateViewWithFinalImage(imageProvider, file);
         }
       });
     }
@@ -636,7 +640,10 @@ class _ZoomableImageState extends State<ZoomableImage> {
     );
   }
 
-  Future<void> _updateViewWithFinalImage(ImageProvider imageProvider) async {
+  Future<void> _updateViewWithFinalImage(
+    ImageProvider imageProvider,
+    File file,
+  ) async {
     await _updatePhotoViewController(
       previewImageProvider: _imageProvider,
       finalImageProvider: imageProvider,
@@ -647,6 +654,7 @@ class _ZoomableImageState extends State<ZoomableImage> {
       _logger.info("Final image loaded");
     });
     _notifyReadyOnce();
+    widget.onFinalImageLoaded?.call(file);
   }
 
   Future<void> _updatePhotoViewController({
@@ -749,7 +757,7 @@ class _ZoomableImageState extends State<ZoomableImage> {
 
       await precacheImage(imageProvider, context);
       if (mounted && !_loadedFinalImage) {
-        await _updateViewWithFinalImage(imageProvider);
+        await _updateViewWithFinalImage(imageProvider, file);
       }
       return true;
     } catch (e) {
@@ -853,7 +861,7 @@ class _ZoomableImageState extends State<ZoomableImage> {
       unawaited(
         precacheImage(imageProvider, context).then((value) {
           if (mounted) {
-            _updateViewWithFinalImage(imageProvider);
+            _updateViewWithFinalImage(imageProvider, file);
           }
         }),
       );

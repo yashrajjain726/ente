@@ -2,13 +2,13 @@ import "dart:async";
 
 import 'package:ente_components/ente_components.dart';
 import 'package:ente_pure_utils/ente_pure_utils.dart' hide isValidEmail;
+import "package:ente_strings/ente_strings.dart";
 import 'package:flutter/material.dart';
 import 'package:logging/logging.dart';
 import 'package:photos/core/configuration.dart';
 import "package:photos/core/errors.dart";
 import 'package:photos/db/files_db.dart';
 import 'package:photos/gateways/collections/models/create_request.dart';
-import "package:photos/generated/l10n.dart";
 import "package:photos/models/api/collection/user.dart";
 import 'package:photos/models/button_result.dart';
 import 'package:photos/models/collection/collection.dart';
@@ -52,9 +52,11 @@ class CollectionActions {
       return true;
     } catch (e) {
       if (e is SharingNotPermittedForFreeAccountsError) {
+        if (!context.mounted) return false;
         await _showUnSupportedAlert(context);
       } else {
         logger.severe("Failed to update shareUrl collection", e);
+        if (!context.mounted) return false;
         await showGenericErrorDialog(context: context, error: e);
       }
       return false;
@@ -71,11 +73,11 @@ class CollectionActions {
           shouldStickToDarkTheme: true,
           buttonAction: ButtonAction.first,
           shouldSurfaceExecutionStates: true,
-          labelText: AppLocalizations.of(context).yesRemove,
+          labelText: context.strings.yesRemove,
           onTap: () async {
             // for quickLink collection, we need to trash the collection
             if (collection.isQuickLinkCollection() && !collection.hasSharees) {
-              await trashCollectionKeepingPhotos(collection, context);
+              await trashCollectionKeepingPhotos(collection);
             } else {
               await CollectionsService.instance.disableShareUrl(collection);
             }
@@ -86,18 +88,17 @@ class CollectionActions {
           buttonAction: ButtonAction.cancel,
           isInAlert: true,
           shouldStickToDarkTheme: true,
-          labelText: AppLocalizations.of(context).cancel,
+          labelText: context.strings.cancel,
         ),
       ],
-      title: AppLocalizations.of(context).removePublicLink,
+      title: context.strings.removePublicLink,
       body:
           //'This will remove the public link for accessing "${collection.name}".',
-          AppLocalizations.of(
-            context,
-          ).disableLinkMessage(albumName: collection.displayName),
+          context.strings.disableLinkMessage(albumName: collection.displayName),
     );
     if (actionResult?.action != null) {
       if (actionResult!.action == ButtonAction.error) {
+        if (!context.mounted) return false;
         await showGenericErrorDialog(
           context: context,
           error: actionResult.exception,
@@ -145,7 +146,7 @@ class CollectionActions {
         if (e is SharingNotPermittedForFreeAccountsError) {
           if (newCollection.isQuickLinkCollection() &&
               !newCollection.hasSharees) {
-            await trashCollectionKeepingPhotos(newCollection, context);
+            await trashCollectionKeepingPhotos(newCollection);
           }
           rethrow;
         }
@@ -153,9 +154,11 @@ class CollectionActions {
       return collection;
     } catch (e, s) {
       if (e is SharingNotPermittedForFreeAccountsError) {
+        if (!context.mounted) return null;
         await _showUnSupportedAlert(context);
       } else {
         logger.severe("Failing to create link for selected files", e, s);
+        if (!context.mounted) return null;
         await showGenericErrorDialog(context: context, error: e);
       }
     }
@@ -177,7 +180,7 @@ class CollectionActions {
           shouldStickToDarkTheme: true,
           buttonAction: ButtonAction.first,
           shouldSurfaceExecutionStates: true,
-          labelText: AppLocalizations.of(context).yesRemove,
+          labelText: context.strings.yesRemove,
           onTap: () async {
             final newSharees = await CollectionsService.instance.unshare(
               collection.id,
@@ -191,16 +194,17 @@ class CollectionActions {
           buttonAction: ButtonAction.cancel,
           isInAlert: true,
           shouldStickToDarkTheme: true,
-          labelText: AppLocalizations.of(context).cancel,
+          labelText: context.strings.cancel,
         ),
       ],
-      title: AppLocalizations.of(context).removeWithQuestionMark,
-      body: AppLocalizations.of(
-        context,
-      ).removeParticipantBody(userEmail: resolveDisplayName(user)),
+      title: context.strings.removeWithQuestionMark,
+      body: context.strings.removeAlbumParticipantBody(
+        userEmail: resolveDisplayName(user),
+      ),
     );
     if (actionResult?.action != null) {
       if (actionResult!.action == ButtonAction.error) {
+        if (!context.mounted) return false;
         await showGenericErrorDialog(
           context: context,
           error: actionResult.exception,
@@ -221,7 +225,7 @@ class CollectionActions {
     if (showProgress) {
       dialog = createProgressDialog(
         context,
-        AppLocalizations.of(context).sharing,
+        context.strings.sharing,
         isDismissible: true,
       );
       await dialog.show();
@@ -231,6 +235,7 @@ class CollectionActions {
     } catch (e) {
       await dialog?.hide();
       logger.severe("Failed to get public key", e);
+      if (!context.mounted) return false;
       await showGenericErrorDialog(context: context, error: e);
       return false;
     }
@@ -239,6 +244,7 @@ class CollectionActions {
     if (publicKey == null || publicKey == '') {
       // todo: neeraj replace this as per the design where a new screen
       // is used for error. Do this change along with handling of network errors
+      if (!context.mounted) return false;
       await showInviteDialog(context, email);
       return false;
     } else {
@@ -257,15 +263,15 @@ class CollectionActions {
     if (!isValidEmail(email)) {
       await showErrorDialog(
         context,
-        AppLocalizations.of(context).invalidEmailAddress,
-        AppLocalizations.of(context).enterValidEmail,
+        context.strings.invalidEmailAddress,
+        context.strings.enterValidEmail,
       );
       return false;
     } else if (email.trim() == Configuration.instance.getEmail()) {
       await showErrorDialog(
         context,
-        AppLocalizations.of(context).oops,
-        AppLocalizations.of(context).youCannotShareWithYourself,
+        context.strings.oops,
+        context.strings.youCannotShareWithYourself,
       );
       return false;
     }
@@ -275,7 +281,7 @@ class CollectionActions {
     if (showProgress) {
       dialog = createProgressDialog(
         context,
-        AppLocalizations.of(context).sharing,
+        context.strings.sharing,
         isDismissible: true,
       );
       await dialog.show();
@@ -286,6 +292,7 @@ class CollectionActions {
     } catch (e) {
       await dialog?.hide();
       logger.severe("Failed to get public key", e);
+      if (!context.mounted) return false;
       await showGenericErrorDialog(context: context, error: e);
       return false;
     }
@@ -294,23 +301,22 @@ class CollectionActions {
     if (publicKey == null || publicKey == '') {
       // todo: neeraj replace this as per the design where a new screen
       // is used for error. Do this change along with handling of network errors
+      if (!context.mounted) return false;
       await showDialogWidget(
         context: context,
-        title: AppLocalizations.of(context).inviteToEnte,
+        title: context.strings.inviteToEnte,
         icon: Icons.info_outline,
-        body: AppLocalizations.of(context).emailNoEnteAccount(email: email),
+        body: context.strings.emailNoEnteAccountPhotos(email: email),
         isDismissible: true,
         buttons: [
           ButtonWidget(
             buttonType: ButtonType.neutral,
             icon: Icons.adaptive.share,
-            labelText: AppLocalizations.of(context).sendInvite,
+            labelText: context.strings.sendInvite,
             isInAlert: true,
             onTap: () async {
               unawaited(
-                shareText(
-                  AppLocalizations.of(context).shareTextRecommendUsingEnte,
-                ),
+                shareText(context.strings.shareTextRecommendUsingEnteForPhotos),
               );
             },
           ),
@@ -331,9 +337,11 @@ class CollectionActions {
       } catch (e) {
         await dialog?.hide();
         if (e is SharingNotPermittedForFreeAccountsError) {
+          if (!context.mounted) return false;
           await _showUnSupportedAlert(context);
         } else {
           logger.severe("failed to share collection", e);
+          if (!context.mounted) return false;
           await showGenericErrorDialog(context: context, error: e);
         }
         return false;
@@ -347,14 +355,14 @@ class CollectionActions {
   ) async {
     return _showDeleteCollectionConfirmationSheet(
       context: context,
-      title: AppLocalizations.of(context).deleteMultipleAlbumsQuestion,
-      message: AppLocalizations.of(
-        context,
-      ).deleteMultipleAlbumDialog(count: collections.length),
+      title: context.strings.deleteMultipleAlbumsQuestion,
+      message: context.strings.deleteMultipleAlbumDialog(
+        count: collections.length,
+      ),
       keepPhotos: () async {
         for (final collection in collections) {
           try {
-            await trashCollectionKeepingPhotos(collection, context);
+            await trashCollectionKeepingPhotos(collection);
           } catch (e, s) {
             logger.severe("Failed to keep photos & delete collection", e, s);
             rethrow;
@@ -392,13 +400,14 @@ class CollectionActions {
         return false;
       }
     }
+    if (!bContext.mounted) return false;
     return _showDeleteCollectionConfirmationSheet(
       context: bContext,
-      title: AppLocalizations.of(bContext).deleteAlbumQuestion,
-      message: AppLocalizations.of(bContext).deleteAlbumDialog,
+      title: bContext.strings.deleteAlbumQuestion,
+      message: bContext.strings.deleteAlbumDialog,
       keepPhotos: () async {
         try {
-          await trashCollectionKeepingPhotos(collection, bContext);
+          await trashCollectionKeepingPhotos(collection);
         } catch (e, s) {
           logger.severe("Failed to keep photos & delete collection", e, s);
           rethrow;
@@ -422,7 +431,7 @@ class CollectionActions {
     required Future<void> Function() keepPhotos,
     required Future<void> Function() deletePhotos,
   }) async {
-    final l10n = AppLocalizations.of(context);
+    final l10n = context.strings;
     final actionResult = await showBottomSheetComponent<ButtonResult>(
       context: context,
       builder: (sheetContext) {
@@ -467,6 +476,7 @@ class CollectionActions {
     );
     if (actionResult?.action != null &&
         actionResult!.action == ButtonAction.error) {
+      if (!context.mounted) return false;
       await showGenericErrorDialog(
         context: context,
         error: actionResult.exception,
@@ -505,15 +515,12 @@ class CollectionActions {
     return error is Exception ? error : Exception(error.toString());
   }
 
-  Future<void> trashCollectionKeepingPhotos(
-    Collection collection,
-    BuildContext bContext,
-  ) async {
+  Future<void> trashCollectionKeepingPhotos(Collection collection) async {
     final List<EnteFile> files = await FilesDB.instance.getAllFilesCollection(
       collection.id,
     );
     await moveFilesFromCurrentCollection(
-      bContext,
+      null,
       collection,
       files,
       isHidden: collection.isHidden() && !collection.isDefaultHidden(),
@@ -530,9 +537,11 @@ class CollectionActions {
       final List<EnteFile> files = await FilesDB.instance.getAllFilesCollection(
         collection.id,
       );
+      if (!bContext.mounted) return;
       await moveFilesFromCurrentCollection(bContext, collection, files);
     } catch (e) {
       logger.severe("Failed to remove files from uncategorized", e);
+      if (!bContext.mounted) return;
       await showErrorDialogForException(
         context: bContext,
         exception: e as Exception,
@@ -549,9 +558,9 @@ class CollectionActions {
     final actionResult = await showChoiceActionSheet(
       context,
       isCritical: true,
-      title: AppLocalizations.of(context).deleteSharedAlbum,
-      firstButtonLabel: AppLocalizations.of(context).deleteAlbum,
-      body: AppLocalizations.of(context).deleteSharedAlbumDialogBody,
+      title: context.strings.deleteSharedAlbum,
+      firstButtonLabel: context.strings.deleteAlbum,
+      body: context.strings.deleteSharedAlbumDialogBody,
     );
     return actionResult?.action != null &&
         actionResult!.action == ButtonAction.first;
@@ -575,7 +584,7 @@ class CollectionActions {
   we will just remove (not move) the files from the given collection.
   */
   Future<void> moveFilesFromCurrentCollection(
-    BuildContext context,
+    BuildContext? context,
     Collection collection,
     Iterable<EnteFile> files, {
     bool isHidden = false,
@@ -619,10 +628,9 @@ class CollectionActions {
     }
 
     if (!isCollectionOwner && split.ownedByOtherUsers.isNotEmpty) {
-      showShortToast(
-        context,
-        AppLocalizations.of(context).canOnlyRemoveFilesOwnedByYou,
-      );
+      if (context != null && context.mounted) {
+        showShortToast(context, context.strings.canOnlyRemoveFilesOwnedByYou);
+      }
       return;
     }
 
@@ -764,8 +772,8 @@ class CollectionActions {
 
   Future<void> _showUnSupportedAlert(BuildContext context) async {
     final AlertDialog alert = AlertDialog(
-      title: Text(AppLocalizations.of(context).sorry),
-      content: Text(AppLocalizations.of(context).subscribeToEnableSharing),
+      title: Text(context.strings.sorry),
+      content: Text(context.strings.subscribeToEnableSharing),
       actions: [
         ButtonWidget(
           buttonType: ButtonType.primary,
@@ -773,7 +781,7 @@ class CollectionActions {
           shouldStickToDarkTheme: false,
           buttonAction: ButtonAction.first,
           shouldSurfaceExecutionStates: true,
-          labelText: AppLocalizations.of(context).subscribe,
+          labelText: context.strings.subscribe,
           onTap: () async {
             // for quickLink collection, we need to trash the collection
             Navigator.of(context)
@@ -794,7 +802,7 @@ class CollectionActions {
             buttonAction: ButtonAction.cancel,
             isInAlert: true,
             shouldStickToDarkTheme: false,
-            labelText: AppLocalizations.of(context).ok,
+            labelText: context.strings.ok,
           ),
         ),
       ],

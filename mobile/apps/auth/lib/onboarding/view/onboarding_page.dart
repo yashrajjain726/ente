@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:dots_indicator/dots_indicator.dart';
+import 'package:ente_accounts/pages/developer_settings_page.dart';
 import 'package:ente_accounts/pages/email_entry_page.dart';
 import 'package:ente_accounts/pages/login_page.dart';
 import 'package:ente_accounts/pages/password_entry_page.dart';
@@ -9,24 +10,24 @@ import 'package:ente_accounts/pages/password_reentry_page.dart';
 import 'package:ente_auth/app/view/app.dart';
 import 'package:ente_auth/core/configuration.dart';
 import 'package:ente_auth/events/trigger_logout_event.dart';
-import 'package:ente_auth/l10n/l10n.dart';
 import 'package:ente_auth/locale.dart';
 import 'package:ente_auth/theme/colors.dart';
 import 'package:ente_auth/theme/ente_theme.dart';
 import 'package:ente_auth/ui/account/logout_dialog.dart';
-import 'package:ente_auth/ui/common/gradient_button.dart';
 import 'package:ente_auth/ui/components/buttons/button_widget.dart';
 import 'package:ente_auth/ui/components/models/button_result.dart';
 import 'package:ente_auth/ui/home/widgets/rounded_action_buttons.dart';
 import 'package:ente_auth/ui/home_page.dart';
 import 'package:ente_auth/ui/settings/developer_settings_widget.dart';
 import 'package:ente_auth/ui/settings/language_picker.dart';
+import 'package:ente_auth/utils/debug_build_flags.dart';
 import 'package:ente_auth/utils/dialog_util.dart';
 import 'package:ente_auth/utils/navigation_util.dart';
 import 'package:ente_auth/utils/toast_util.dart';
+import 'package:ente_components/ente_components.dart';
 import 'package:ente_events/event_bus.dart';
+import 'package:ente_strings/ente_strings.dart';
 import 'package:ente_ui/components/alert_bottom_sheet.dart';
-import 'package:ente_ui/pages/developer_settings_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -63,6 +64,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
     _triggerLogoutEvent = Bus.instance.on<TriggerLogoutEvent>().listen((
       event,
     ) async {
+      if (!mounted) return;
       await autoLogoutAlert(context);
     });
     _startAutoScroll();
@@ -81,7 +83,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
   @override
   Widget build(BuildContext context) {
     debugPrint("Building OnboardingPage");
-    final l10n = context.l10n;
+    final l10n = context.strings;
     final textTheme = getEnteTextTheme(context);
 
     return Scaffold(
@@ -98,6 +100,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
                 GestureDetector(
                   onTap: () async {
                     final locale = (await getLocale())!;
+                    if (!context.mounted) return;
                     unawaited(
                       routeToPage(
                         context,
@@ -105,6 +108,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
                           locale,
                         ) async {
                           await setLocale(locale);
+                          if (!context.mounted) return;
                           App.setLocale(context, locale);
                         }, locale),
                       ).then((value) {
@@ -203,14 +207,14 @@ class _OnboardingPageState extends State<OnboardingPage> {
       _developerModeTapCount = 0;
       await showAlertBottomSheet(
         context,
-        title: context.l10n.developerSettings,
-        message: context.l10n.developerSettingsWarning,
+        title: context.strings.developerSettings,
+        message: context.strings.developerSettingsWarning,
         assetPath: 'assets/warning-grey.png',
         isDismissible: false,
         showCloseButton: false,
         buttons: [
-          GradientButton(
-            text: context.l10n.yes,
+          ButtonComponent(
+            label: context.strings.yes,
             onTap: () async {
               Navigator.of(context).pop();
               await Navigator.of(context).push(
@@ -242,6 +246,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
         Platform.isWindows ||
         await LocalAuthentication().canCheckBiometrics;
     if (!canCheckBio) {
+      if (!mounted) return;
       showToast(
         context,
         "Sorry, biometric authentication is not supported on this device.",
@@ -250,17 +255,22 @@ class _OnboardingPageState extends State<OnboardingPage> {
     }
     final bool hasOptedBefore = Configuration.instance.hasOptedForOfflineMode();
     ButtonResult? result;
-    if (!hasOptedBefore) {
+    if (!hasOptedBefore && !shouldSkipAuthGuidance) {
+      if (!mounted) return;
       result = await showChoiceActionSheet(
         context,
-        title: context.l10n.warning,
-        body: context.l10n.offlineModeWarning,
-        secondButtonLabel: context.l10n.cancel,
-        firstButtonLabel: context.l10n.ok,
+        title: context.strings.warning,
+        body: context.strings.offlineModeWarning,
+        secondButtonLabel: context.strings.cancel,
+        firstButtonLabel: context.strings.ok,
       );
     }
-    if (hasOptedBefore || result?.action == ButtonAction.first) {
+    if (hasOptedBefore ||
+        shouldSkipAuthGuidance ||
+        result?.action == ButtonAction.first) {
+      if (!context.mounted) return;
       await Configuration.instance.optForOfflineMode();
+      if (!mounted) return;
       unawaited(
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(
@@ -327,7 +337,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
   }
 
   Widget _buildFeatureSlider(BuildContext context) {
-    final l10n = context.l10n;
+    final l10n = context.strings;
     final features = [
       ("assets/onboarding-1.png", l10n.featureBackupCodes),
       ("assets/onboarding-2.png", l10n.featureSearchEtc),

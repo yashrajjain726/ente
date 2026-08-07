@@ -1,10 +1,11 @@
+import "package:ente_components/theme/theme.dart";
 import 'package:ente_pure_utils/ente_pure_utils.dart';
+import "package:ente_strings/ente_strings.dart";
 import 'package:flutter/material.dart';
 import "package:intl/intl.dart";
 import 'package:photos/ente_theme_data.dart';
 import 'package:photos/gateways/billing/models/subscription.dart';
 import "package:photos/gateways/storage_bonus/models/bonus.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/theme/ente_theme.dart";
 import "package:photos/ui/components/menu_item_widget/menu_item_widget_new.dart";
 import 'package:photos/ui/payment/billing_questions_widget.dart';
@@ -35,11 +36,9 @@ class ValidityWidget extends StatelessWidget {
           DateTime.fromMicrosecondsSinceEpoch(currentSubscription!.expiryTime),
         );
 
-    var message = AppLocalizations.of(context).renewsOn(endDate: endDate);
+    var message = context.strings.renewsOn(endDate: endDate);
     if (currentSubscription!.attributes?.isCancelled ?? false) {
-      message = AppLocalizations.of(
-        context,
-      ).subWillBeCancelledOn(endDate: endDate);
+      message = context.strings.subWillBeCancelledOn(endDate: endDate);
       if (addOnBonus.isNotEmpty) {
         hideSubValidityView = true;
       }
@@ -83,9 +82,10 @@ class AddOnBonusValidity extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(top: 4, bottom: 4),
       child: Text(
-        AppLocalizations.of(
-          context,
-        ).addOnValidTill(storageAmount: storage, endDate: endDate),
+        context.strings.addOnValidTill(
+          storageAmount: storage,
+          endDate: endDate,
+        ),
         style: getEnteTextTheme(context).smallFaint,
         textAlign: TextAlign.center,
       ),
@@ -104,7 +104,7 @@ class SubFaqWidget extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       child: MenuItemWidgetNew(
-        title: AppLocalizations.of(context).faqs,
+        title: context.strings.faqs,
         menuItemColor: colorScheme.fillFaint,
         pressedColor: colorScheme.fillFaintPressed,
         trailingWidget: Icon(
@@ -162,7 +162,7 @@ class _SubscriptionToggleState extends State<SubscriptionToggle> {
     const borderPadding = 2.5;
     const spaceBetweenButtons = 4.0;
     final textTheme = getEnteTextTheme(context);
-    final colorScheme = getEnteColorScheme(context);
+    final componentColors = context.componentColors;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 32),
       child: LayoutBuilder(
@@ -174,7 +174,7 @@ class _SubscriptionToggleState extends State<SubscriptionToggle> {
               2;
           return Container(
             decoration: BoxDecoration(
-              color: colorScheme.fillBaseGrey,
+              color: componentColors.strokeFaint,
               borderRadius: BorderRadius.circular(50),
             ),
             padding: const EdgeInsets.symmetric(
@@ -196,8 +196,8 @@ class _SubscriptionToggleState extends State<SubscriptionToggle> {
                         width: widthOfButton,
                         child: Center(
                           child: Text(
-                            AppLocalizations.of(context).yearly,
-                            style: textTheme.bodyFaint,
+                            context.strings.yearly,
+                            style: textTheme.bodyMuted,
                           ),
                         ),
                       ),
@@ -213,8 +213,8 @@ class _SubscriptionToggleState extends State<SubscriptionToggle> {
                         width: widthOfButton,
                         child: Center(
                           child: Text(
-                            AppLocalizations.of(context).monthly,
-                            style: textTheme.bodyFaint,
+                            context.strings.monthly,
+                            style: textTheme.bodyMuted,
                           ),
                         ),
                       ),
@@ -229,7 +229,7 @@ class _SubscriptionToggleState extends State<SubscriptionToggle> {
                     padding: const EdgeInsets.symmetric(vertical: 8),
                     width: widthOfButton,
                     decoration: BoxDecoration(
-                      color: colorScheme.backgroundColour,
+                      color: componentColors.fillLight,
                       borderRadius: BorderRadius.circular(50),
                     ),
                     child: AnimatedSwitcher(
@@ -239,8 +239,8 @@ class _SubscriptionToggleState extends State<SubscriptionToggle> {
                       child: Text(
                         key: ValueKey(_isYearly),
                         _isYearly
-                            ? AppLocalizations.of(context).yearly
-                            : AppLocalizations.of(context).monthly,
+                            ? context.strings.yearly
+                            : context.strings.monthly,
                         style: textTheme.body,
                       ),
                     ),

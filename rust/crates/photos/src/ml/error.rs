@@ -8,6 +8,9 @@ pub enum MlError {
     InvalidRequest(String),
     #[error("decode error: {0}")]
     Decode(String),
+    /// A deterministic per-image failure that should not be retried.
+    #[error("image processing error: {0}")]
+    Image(String),
     #[error("preprocess error: {0}")]
     Preprocess(String),
     #[error("onnx runtime error: {0}")]
@@ -20,8 +23,8 @@ pub enum MlError {
     Runtime(String),
 }
 
-impl From<ort::Error> for MlError {
-    fn from(value: ort::Error) -> Self {
+impl<R> From<ort::Error<R>> for MlError {
+    fn from(value: ort::Error<R>) -> Self {
         MlError::Ort(value.to_string())
     }
 }
@@ -36,7 +39,7 @@ impl From<ente_image::ImageError> for MlError {
     fn from(value: ente_image::ImageError) -> Self {
         match value {
             ente_image::ImageError::Decode(message) => MlError::Decode(message),
-            ente_image::ImageError::Postprocess(message) => MlError::Postprocess(message),
+            ente_image::ImageError::Postprocess(message) => MlError::Image(message),
         }
     }
 }

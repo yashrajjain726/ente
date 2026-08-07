@@ -1,7 +1,7 @@
+import "package:ente_components/ente_components.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/foundation.dart";
 import 'package:flutter/material.dart';
-import "package:photos/generated/l10n.dart";
-import "package:photos/l10n/l10n.dart";
 import "package:photos/models/collection/collection.dart";
 import "package:photos/models/selected_albums.dart";
 import "package:photos/service_locator.dart";
@@ -13,13 +13,6 @@ import "package:photos/settings/local_settings.dart";
 import "package:photos/theme/ente_theme.dart";
 import "package:photos/ui/collections/flex_grid_view.dart";
 import "package:photos/ui/common/loading_widget.dart";
-import "package:photos/ui/components/buttons/button_widget.dart";
-import 'package:photos/ui/components/buttons/icon_button_widget.dart';
-import "package:photos/ui/components/menu_item_widget/menu_item_widget_new.dart";
-import "package:photos/ui/components/models/button_type.dart";
-import 'package:photos/ui/components/title_bar_title_widget.dart';
-import 'package:photos/ui/components/title_bar_widget.dart';
-import "package:photos/ui/components/toggle_switch_widget.dart";
 
 class AlbumsWidgetSettings extends StatefulWidget {
   const AlbumsWidgetSettings({super.key});
@@ -102,10 +95,8 @@ class _AlbumsWidgetSettingsState extends State<AlbumsWidgetSettings> {
               child: ListenableBuilder(
                 listenable: _selectedAlbums,
                 builder: (context, _) {
-                  return ButtonWidget(
-                    buttonType: ButtonType.primary,
-                    buttonSize: ButtonSize.large,
-                    labelText: AppLocalizations.of(context).save,
+                  return ButtonComponent(
+                    label: context.strings.save,
                     shouldSurfaceExecutionStates: false,
                     onTap: _selectedAlbums.albums.isNotEmpty
                         ? () async {
@@ -114,6 +105,7 @@ class _AlbumsWidgetSettingsState extends State<AlbumsWidgetSettings> {
                                 .toList();
                             await AlbumHomeWidgetService.instance
                                 .updateSelectedAlbums(albums);
+                            if (!context.mounted) return;
                             Navigator.pop(context);
                           }
                         : null,
@@ -126,31 +118,13 @@ class _AlbumsWidgetSettingsState extends State<AlbumsWidgetSettings> {
       body: Scrollbar(
         interactive: true,
         controller: _scrollController,
-        child: CustomScrollView(
+        child: AppBarComponent(
+          title: context.strings.albums,
+          subtitle: hasInstalledAny
+              ? context.strings.albumsWidgetDesc
+              : context.strings.addAlbumWidgetPrompt,
           controller: _scrollController,
-          primary: false,
           slivers: <Widget>[
-            TitleBarWidget(
-              backgroundColor: colorScheme.backgroundColour,
-              flexibleSpaceTitle: TitleBarTitleWidget(
-                title: AppLocalizations.of(context).albums,
-              ),
-              expandedHeight: MediaQuery.textScalerOf(context).scale(136),
-              flexibleSpaceCaption: hasInstalledAny
-                  ? AppLocalizations.of(context).albumsWidgetDesc
-                  : context.l10n.addAlbumWidgetPrompt,
-              actionIcons: [
-                IconButtonWidget(
-                  icon: Icons.close_outlined,
-                  iconButtonType: IconButtonType.secondary,
-                  onTap: () {
-                    Navigator.pop(context);
-                    Navigator.pop(context);
-                    Navigator.pop(context);
-                  },
-                ),
-              ],
-            ),
             if (!hasInstalledAny)
               SliverToBoxAdapter(
                 child: Padding(
@@ -174,17 +148,16 @@ class _AlbumsWidgetSettingsState extends State<AlbumsWidgetSettings> {
               if (kDebugMode)
                 SliverToBoxAdapter(
                   child: Padding(
-                    padding: const EdgeInsets.fromLTRB(6, 18, 6, 8),
-                    child: MenuItemWidgetNew(
-                      title: AppLocalizations.of(context).showTextOnWidget,
-                      trailingWidget: ToggleSwitchWidget(
-                        value: () => _showText,
-                        onChanged: () async {
-                          final next = !_showText;
-                          setState(() => _showText = next);
+                    padding: const EdgeInsets.fromLTRB(16, 18, 16, 8),
+                    child: MenuComponent(
+                      title: context.strings.showTextOnWidget,
+                      trailing: ToggleSwitchComponent(
+                        selected: _showText,
+                        onChanged: (showText) async {
+                          setState(() => _showText = showText);
                           await localSettings.setWidgetTextHidden(
                             WidgetHideTextFlag.album,
-                            !next,
+                            !showText,
                           );
                           await HomeWidgetService.instance.updateWidget(
                             androidClass:

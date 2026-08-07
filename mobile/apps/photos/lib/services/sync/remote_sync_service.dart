@@ -25,20 +25,20 @@ import 'package:photos/models/file/extensions/file_props.dart';
 import 'package:photos/models/file/file.dart';
 import 'package:photos/models/file/file_type.dart';
 import 'package:photos/models/upload_strategy.dart';
+import 'package:photos/module/download/file.dart';
+import 'package:photos/module/upload/service/file_uploader.dart';
+import 'package:photos/module/upload/service/local_file_update_service.dart';
 import 'package:photos/service_locator.dart';
 import 'package:photos/services/app_lifecycle_service.dart';
 import 'package:photos/services/collections_service.dart';
 import 'package:photos/services/hidden_service.dart';
 import 'package:photos/services/ignored_files_service.dart';
 import 'package:photos/services/language_service.dart';
-import 'package:photos/services/local_file_update_service.dart';
 import 'package:photos/services/notification_service.dart';
 import 'package:photos/services/social_notification_coordinator.dart';
 import 'package:photos/services/social_sync_service.dart';
 import 'package:photos/services/sync/diff_fetcher.dart';
 import 'package:photos/services/sync/sync_service.dart';
-import 'package:photos/utils/file_uploader.dart';
-import 'package:photos/utils/file_util.dart';
 import 'package:photos/utils/network_util.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -97,8 +97,11 @@ class RemoteSyncService {
         .listen((event) async {
           if (event.type == EventType.addedOrUpdated) {
             if (_existingSync == null) {
-              // ignore: unawaited_futures
-              sync();
+              try {
+                await sync();
+              } on DeviceStorageFullError catch (e) {
+                Bus.instance.fire(SyncStatusUpdate(SyncStatus.error, error: e));
+              }
             }
           }
         });
@@ -218,6 +221,7 @@ class RemoteSyncService {
             NoActiveSubscriptionError,
             WiFiUnavailableError,
             StorageLimitExceededError,
+            DeviceStorageFullError,
             SyncStopRequestedError,
             NoMediaLocationAccessError,
           }.contains(e.runtimeType)) {
@@ -362,15 +366,14 @@ class RemoteSyncService {
 
   Future<void> _syncCollectionDiffDelete(Diff diff, int collectionID) async {
     final fileIDs = diff.deletedFiles.map((f) => f.uploadedFileID!).toList();
+    final collectionFiles = (await _db.getFilesFromIDs(
+      fileIDs,
+    )).where((file) => file.collectionID == collectionID).toList();
     final localDeleteCount = await _db.deleteFilesFromCollection(
       collectionID,
       fileIDs,
     );
     if (localDeleteCount > 0) {
-      final collectionFiles = (await _db.getFileIDToFileFromIDs(
-        fileIDs,
-      )).values.toList();
-      collectionFiles.removeWhere((f) => f.collectionID != collectionID);
       Bus.instance.fire(
         CollectionUpdatedEvent(
           collectionID,
@@ -719,7 +722,7 @@ class RemoteSyncService {
         break;
       }
       // prefer existing collection ID for manually uploaded files.
-      // See https://github.com/ente-io/photos-app/pull/187
+      // See https://github.com/ente/photos-app/pull/187
       try {
         final collectionID =
             file.collectionID ??

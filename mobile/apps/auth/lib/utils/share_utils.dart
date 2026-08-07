@@ -1,9 +1,9 @@
 import 'dart:io';
 
-import 'package:ente_auth/l10n/l10n.dart';
 import 'package:ente_auth/ui/components/buttons/button_widget.dart';
 import 'package:ente_auth/ui/components/dialog_widget.dart';
 import 'package:ente_auth/ui/components/models/button_type.dart';
+import 'package:ente_strings/ente_strings.dart';
 import 'package:flutter/material.dart';
 import 'package:logging/logging.dart';
 import 'package:share_plus/share_plus.dart';
@@ -14,7 +14,7 @@ Future<void> shareDialog(
   required Function saveAction,
   required Function sendAction,
 }) async {
-  final l10n = context.l10n;
+  final l10n = context.strings;
   await showDialogWidget(
     context: context,
     title: title,

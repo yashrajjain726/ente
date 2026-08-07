@@ -9,32 +9,32 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/ente-io/museum/pkg/controller/access"
+	"github.com/ente/museum/pkg/controller/access"
 	"runtime/debug"
 	"strconv"
 	"strings"
 	"sync"
 	gTime "time"
 
-	"github.com/ente-io/museum/pkg/controller/discord"
-	"github.com/ente-io/museum/pkg/utils/network"
+	"github.com/ente/museum/pkg/controller/discord"
+	"github.com/ente/museum/pkg/utils/network"
 
-	"github.com/ente-io/museum/pkg/controller/email"
-	"github.com/ente-io/museum/pkg/controller/lock"
-	"github.com/ente-io/museum/pkg/utils/auth"
-	"github.com/ente-io/museum/pkg/utils/file"
-	"github.com/ente-io/stacktrace"
+	"github.com/ente/museum/pkg/controller/email"
+	"github.com/ente/museum/pkg/controller/lock"
+	"github.com/ente/museum/pkg/utils/auth"
+	"github.com/ente/museum/pkg/utils/file"
+	"github.com/ente/stacktrace"
 	"github.com/gin-contrib/requestid"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/s3"
-	"github.com/ente-io/museum/ente"
-	"github.com/ente-io/museum/pkg/repo"
-	enteArray "github.com/ente-io/museum/pkg/utils/array"
-	"github.com/ente-io/museum/pkg/utils/s3config"
-	"github.com/ente-io/museum/pkg/utils/time"
+	"github.com/ente/museum/ente"
+	"github.com/ente/museum/pkg/repo"
+	enteArray "github.com/ente/museum/pkg/utils/array"
+	"github.com/ente/museum/pkg/utils/s3config"
+	"github.com/ente/museum/pkg/utils/time"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -57,6 +57,8 @@ type FileController struct {
 	DiscordController     *discord.DiscordController
 	HostName              string
 	cleanupCronRunning    bool
+	outdatedCronRunning   bool
+	outdatedQueueDisabled bool
 }
 
 // StorageOverflowAboveSubscriptionLimit is the amount (50 MB) by which user can go beyond their storage limit
@@ -405,9 +407,8 @@ func (c *FileController) GetThumbnailURLForOwner(ctx *gin.Context, ownerID int64
 	return c.getSignedURLForOwnedObject(ctx, ownerID, fileID, ente.THUMBNAIL)
 }
 
-func (c *FileController) CleanUpStaleCollectionFiles(userID int64, fileID int64) {
+func (c *FileController) CleanUpStaleCollectionFiles(fileID int64) {
 	logger := log.WithFields(log.Fields{
-		"userID": userID,
 		"fileID": fileID,
 		"action": "CleanUpStaleCollectionFiles",
 	})
@@ -417,19 +418,17 @@ func (c *FileController) CleanUpStaleCollectionFiles(userID int64, fileID int64)
 			logger.Error("Recovered from panic", r)
 		}
 	}()
-	fileIDs := make([]int64, 0)
-	fileIDs = append(fileIDs, fileID)
 
-	// verify file ownership
-	err := c.FileRepo.VerifyFileOwner(context.Background(), fileIDs, userID, logger)
-
+	ownerID, err := c.FileRepo.GetOwnerID(fileID)
 	if err != nil {
-		logger.Warning("Failed to verify file ownership", err)
+		logger.WithError(err).Warning("Failed to get file owner")
 		return
 	}
-	err = c.TrashRepository.CleanUpDeletedFilesFromCollection(context.Background(), fileIDs, userID)
+
+	fileIDs := []int64{fileID}
+	err = c.TrashRepository.CleanUpDeletedFilesFromCollection(context.Background(), fileIDs, ownerID)
 	if err != nil {
-		logger.WithError(err).Error("Failed to clean up stale files from collection")
+		logger.WithError(err).WithField("ownerID", ownerID).Error("Failed to clean up stale files from collection")
 	}
 
 }
@@ -440,11 +439,11 @@ func (c *FileController) GetPublicOrCastFileURL(ctx *gin.Context, fileID int64, 
 }
 
 func (c *FileController) DoesFileExistInCollection(ctx *gin.Context, fileID int64, collectionID int64) error {
-	accessible, err := c.CollectionRepo.DoesFileExistInCollections(fileID, []int64{collectionID})
+	state, err := c.CollectionRepo.GetCollectionFileState(ctx, collectionID, fileID)
 	if err != nil {
 		return stacktrace.Propagate(err, "")
 	}
-	if !accessible {
+	if state != repo.CollectionFileActive {
 		return stacktrace.Propagate(ente.ErrPermissionDenied, "")
 	}
 	return nil
@@ -481,7 +480,7 @@ func (c *FileController) getSignedURLForAccessibleObject(ctx *gin.Context, userI
 	}
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			go c.CleanUpStaleCollectionFiles(userID, fileID)
+			go c.CleanUpStaleCollectionFiles(fileID)
 		}
 		return "", stacktrace.Propagate(err, "")
 	}
@@ -507,7 +506,7 @@ func (c *FileController) getSignedURLForOwnedObject(ctx *gin.Context, ownerID in
 	}
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			go c.CleanUpStaleCollectionFiles(ownerID, fileID)
+			go c.CleanUpStaleCollectionFiles(fileID)
 		}
 		return "", stacktrace.Propagate(err, "")
 	}
@@ -693,15 +692,6 @@ func (c *FileController) GetDuplicates(userID int64) ([]ente.DuplicateFiles, err
 		return nil, stacktrace.Propagate(err, "")
 	}
 	return dupes, nil
-}
-
-// GetLargeThumbnailFiles returns the list of files whose thumbnail size is larger than threshold size
-func (c *FileController) GetLargeThumbnailFiles(userID int64, threshold int64) ([]int64, error) {
-	largeThumbnailFiles, err := c.FileRepo.GetLargeThumbnailFiles(userID, threshold)
-	if err != nil {
-		return nil, stacktrace.Propagate(err, "")
-	}
-	return largeThumbnailFiles, nil
 }
 
 // UpdateMagicMetadata updates the magic metadata for list of files
@@ -1182,7 +1172,7 @@ func (c *FileController) GetMultipartUploadURLs(ctx context.Context, userID int6
 	return multipartUploadURLs, nil
 }
 
-// GetMultipartUploadURLWithMetadata enforces content length & per-part checksum requirements
+// GetMultipartUploadURLWithMetadata enforces content length and optional per-part checksums.
 func (c *FileController) GetMultipartUploadURLWithMetadata(ctx context.Context, userID int64, req ente.MultipartUploadURLRequest, app ente.App) (ente.MultipartUploadURLs, error) {
 	if req.ContentLength <= 0 {
 		return ente.MultipartUploadURLs{}, stacktrace.Propagate(ente.ErrBadRequest, "contentLength must be greater than 0")
@@ -1190,7 +1180,7 @@ func (c *FileController) GetMultipartUploadURLWithMetadata(ctx context.Context, 
 	if req.ContentLength > MaxFileSize {
 		return ente.MultipartUploadURLs{}, stacktrace.Propagate(ente.ErrBadRequest, "contentLength exceeds max file size %d", MaxFileSize)
 	}
-	if len(req.PartMD5s) == 0 {
+	if req.PartMD5s != nil && len(req.PartMD5s) == 0 {
 		return ente.MultipartUploadURLs{}, stacktrace.Propagate(ente.ErrBadRequest, "partMd5s must not be empty")
 	}
 	if err := validateMultipartPartLength(req.ContentLength, req.PartLength); err != nil {
@@ -1200,16 +1190,19 @@ func (c *FileController) GetMultipartUploadURLWithMetadata(ctx context.Context, 
 	if partCount > maxMultipartPartCount {
 		return ente.MultipartUploadURLs{}, stacktrace.Propagate(ente.ErrBadRequest, "multipart upload cannot exceed %d parts", maxMultipartPartCount)
 	}
-	if len(req.PartMD5s) != partCount {
-		return ente.MultipartUploadURLs{}, stacktrace.Propagate(ente.ErrBadRequest, "partMd5s size (%d) does not match computed part count (%d)", len(req.PartMD5s), partCount)
-	}
-	normalizedChecksums := make([]string, partCount)
-	for i, checksum := range req.PartMD5s {
-		normalized, err := normalizeMD5String(checksum)
-		if err != nil {
-			return ente.MultipartUploadURLs{}, err
+	var normalizedChecksums []string
+	if req.PartMD5s != nil {
+		if len(req.PartMD5s) != partCount {
+			return ente.MultipartUploadURLs{}, stacktrace.Propagate(ente.ErrBadRequest, "partMd5s size (%d) does not match computed part count (%d)", len(req.PartMD5s), partCount)
 		}
-		normalizedChecksums[i] = normalized
+		normalizedChecksums = make([]string, partCount)
+		for i, checksum := range req.PartMD5s {
+			normalized, err := normalizeMD5String(checksum)
+			if err != nil {
+				return ente.MultipartUploadURLs{}, err
+			}
+			normalizedChecksums[i] = normalized
+		}
 	}
 	partLengths := computePartLengths(req.ContentLength, req.PartLength, partCount)
 	if err := c.UsageCtrl.CanUploadFile(ctx, userID, nil, app); err != nil {
@@ -1234,9 +1227,11 @@ func (c *FileController) GetMultipartUploadURLWithMetadata(ctx context.Context, 
 	for i := 0; i < partCount; i++ {
 		partNumber := int64(i + 1)
 		length := partLengths[i]
-		lengthCopy := length
-		checksumCopy := normalizedChecksums[i]
-		url, err := c.getPartURL(*s3Client, objectKey, partNumber, r.UploadId, &lengthCopy, &checksumCopy)
+		var checksum *string
+		if normalizedChecksums != nil {
+			checksum = &normalizedChecksums[i]
+		}
+		url, err := c.getPartURL(*s3Client, objectKey, partNumber, r.UploadId, &length, checksum)
 		if err != nil {
 			return multipartUploadURLs, stacktrace.Propagate(err, "")
 		}

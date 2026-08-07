@@ -60,7 +60,7 @@ class _VerifyIdentitySheetState extends State<VerifyIdentitySheet> {
     final textStyle = getEnteTextTheme(context);
     final String subTitle = widget.self
         ? context.strings.thisIsYourVerificationId
-        : context.strings.thisIsPersonVerificationId(widget.email);
+        : context.strings.thisIsPersonVerificationId(email: widget.email);
     final String bottomText = widget.self
         ? context.strings.someoneSharingAlbumsWithYouShouldSeeTheSameId
         : context.strings.howToViewShareeVerificationID;
@@ -75,7 +75,7 @@ class _VerifyIdentitySheetState extends State<VerifyIdentitySheet> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  context.strings.emailNoEnteAccount(widget.email),
+                  context.strings.emailNoEnteAccount(email: widget.email),
                   style: textStyle.small.copyWith(color: colorScheme.textMuted),
                 ),
                 const SizedBox(height: 20),
@@ -144,15 +144,16 @@ class _VerifyIdentitySheetState extends State<VerifyIdentitySheet> {
         if (verificationID.isEmpty) {
           return;
         }
+        final shareMessage = widget.self
+            ? context.strings.shareMyVerificationID(
+                verificationID: verificationID,
+              )
+            : context.strings.shareTextConfirmOthersVerificationID(
+                verificationID: verificationID,
+              );
         await Clipboard.setData(ClipboardData(text: verificationID));
         // ignore: unawaited_futures
-        shareText(
-          widget.self
-              ? context.strings.shareMyVerificationID(verificationID)
-              : context.strings.shareTextConfirmOthersVerificationID(
-                  verificationID,
-                ),
-        );
+        shareText(shareMessage);
       },
       child: Container(
         decoration: BoxDecoration(

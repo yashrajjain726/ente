@@ -2,12 +2,12 @@ import "dart:async";
 
 import "package:ente_components/ente_components.dart";
 import "package:ente_pure_utils/ente_pure_utils.dart";
+import "package:ente_strings/ente_strings.dart";
 import 'package:flutter/material.dart';
 import "package:flutter_animate/flutter_animate.dart";
 import "package:hugeicons/hugeicons.dart";
 import "package:logging/logging.dart";
 import "package:photos/data/months.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/models/file/file_type.dart";
 import "package:photos/models/search/album_search_result.dart";
 import "package:photos/models/search/device_album_search_result.dart";
@@ -20,7 +20,7 @@ import "package:photos/services/date_parse_service.dart";
 import "package:photos/theme/ente_theme.dart";
 import "package:photos/ui/components/thumbnail_list_item.dart";
 import "package:photos/ui/viewer/gallery/collection_page.dart";
-import "package:photos/ui/viewer/gallery/device_folder_page.dart";
+import "package:photos/ui/viewer/gallery/device/device_folder_page.dart";
 import "package:photos/ui/viewer/search/result/search_result_widget.dart";
 import "package:photos/ui/viewer/search/search_query_utils.dart";
 import "package:photos/ui/viewer/search/search_widget.dart";
@@ -144,9 +144,7 @@ class _SearchSuggestionsWidgetState extends State<SearchSuggestionsWidget> {
         Padding(
           padding: const EdgeInsets.fromLTRB(4, 0, 4, 12),
           child: Text(
-            AppLocalizations.of(
-              context,
-            ).searchResultCount(count: _resultsCount),
+            context.strings.searchResultCount(count: _resultsCount),
             style: textTheme.smallBold.copyWith(color: colorScheme.textMuted),
           ),
         ),
@@ -162,8 +160,6 @@ class _SearchSuggestionsWidgetState extends State<SearchSuggestionsWidget> {
             Expanded(
               child: ListView(
                 physics: const BouncingScrollPhysics(),
-                keyboardDismissBehavior:
-                    ScrollViewKeyboardDismissBehavior.onDrag,
                 padding: const EdgeInsets.only(bottom: bottomPadding),
                 children: sectionWidgets,
               ),
@@ -484,19 +480,19 @@ _SearchResultsSection _sectionForResult(SearchResult result) {
 String _sectionTitle(BuildContext context, _SearchResultsSection section) {
   switch (section) {
     case _SearchResultsSection.people:
-      return AppLocalizations.of(context).people;
+      return context.strings.people;
     case _SearchResultsSection.shared:
-      return AppLocalizations.of(context).shared;
+      return context.strings.shared;
     case _SearchResultsSection.albums:
-      return AppLocalizations.of(context).albums;
+      return context.strings.albums;
     case _SearchResultsSection.magic:
-      return AppLocalizations.of(context).magic;
+      return context.strings.magic;
     case _SearchResultsSection.files:
-      return AppLocalizations.of(context).files;
+      return context.strings.files;
     case _SearchResultsSection.locations:
-      return AppLocalizations.of(context).locations;
+      return context.strings.locations;
     case _SearchResultsSection.moments:
-      return AppLocalizations.of(context).moments;
+      return context.strings.moments;
   }
 }
 

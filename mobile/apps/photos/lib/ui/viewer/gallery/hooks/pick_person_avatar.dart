@@ -1,8 +1,8 @@
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:modal_bottom_sheet/modal_bottom_sheet.dart";
 import "package:photos/core/event_bus.dart";
 import "package:photos/events/people_changed_event.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/models/file_load_result.dart";
 import "package:photos/models/ml/face/person.dart";
 import "package:photos/models/selected_files.dart";
@@ -14,6 +14,7 @@ import "package:photos/ui/components/bottom_of_title_bar_widget.dart";
 import "package:photos/ui/components/buttons/button_widget.dart";
 import "package:photos/ui/components/models/button_type.dart";
 import "package:photos/ui/components/title_bar_title_widget.dart";
+import "package:photos/ui/notification/toast.dart";
 import "package:photos/ui/viewer/gallery/gallery.dart";
 import "package:photos/ui/viewer/gallery/state/gallery_files_inherited_widget.dart";
 
@@ -71,7 +72,7 @@ class PickPersonCoverPhotoWidget extends StatelessWidget {
                 children: [
                   BottomOfTitleBarWidget(
                     title: TitleBarTitleWidget(
-                      title: AppLocalizations.of(context).selectCoverPhoto,
+                      title: context.strings.selectCoverPhoto,
                     ),
                     caption: personEntity.data.name,
                     showCloseButton: true,
@@ -135,9 +136,7 @@ class PickPersonCoverPhotoWidget extends StatelessWidget {
                               key: ValueKey(value),
                               isDisabled: !value,
                               buttonType: ButtonType.neutral,
-                              labelText: AppLocalizations.of(
-                                context,
-                              ).useSelectedPhoto,
+                              labelText: context.strings.useSelectedPhoto,
                               onTap: () async {
                                 final selectedFile = selectedFiles.files.first;
                                 final result = await PersonService.instance
@@ -145,10 +144,17 @@ class PickPersonCoverPhotoWidget extends StatelessWidget {
                                 Bus.instance.fire(
                                   PeopleChangedEvent(
                                     type: PeopleEventType.saveOrEditPerson,
-                                    person: result,
+                                    person: result.person,
                                   ),
                                 );
-                                Navigator.pop(context, result);
+                                if (!context.mounted) return;
+                                if (result.contactPictureUpdateFailed) {
+                                  showShortToast(
+                                    context,
+                                    "Failed to update contact picture",
+                                  );
+                                }
+                                Navigator.pop(context, result.person);
                               },
                             ),
                           );

@@ -1,8 +1,9 @@
 //! WASM bindings for Ente web apps.
 
+use ente_wasm_log as _;
+
 mod auth;
 mod contacts;
 mod crypto;
-mod http;
 mod legacy_kit;
 mod urls;

@@ -8,10 +8,11 @@ import (
 	"slices"
 	"time"
 
-	"github.com/ente-io/museum/ente"
-	contactmodel "github.com/ente-io/museum/ente/contact"
-	"github.com/ente-io/museum/pkg/utils/crypto"
-	"github.com/ente-io/stacktrace"
+	"github.com/ente/museum/ente"
+	contactmodel "github.com/ente/museum/ente/contact"
+	"github.com/ente/museum/pkg/repo"
+	"github.com/ente/museum/pkg/utils/crypto"
+	"github.com/ente/stacktrace"
 	"github.com/lib/pq"
 )
 
@@ -107,24 +108,11 @@ func (r *Repository) hasActiveEmergencyRelationship(ctx context.Context, actorUs
 }
 
 func (r *Repository) hasSharedActiveFamily(ctx context.Context, actorUserID int64, contactUserID int64) (bool, error) {
-	var exists bool
-	err := r.DB.QueryRowContext(
+	return (&repo.UserRepository{DB: r.DB}).AreUsersInSameFamily(
 		ctx,
-		`SELECT EXISTS(
-			SELECT 1
-			FROM users actor
-			JOIN users contact ON actor.family_admin_id = contact.family_admin_id
-			WHERE actor.user_id = $1
-			  AND contact.user_id = $2
-			  AND actor.family_admin_id IS NOT NULL
-		)`,
 		actorUserID,
 		contactUserID,
-	).Scan(&exists)
-	if err != nil {
-		return false, err
-	}
-	return exists, nil
+	)
 }
 
 func (r *Repository) hasCommonSharedCollection(ctx context.Context, actorUserID int64, contactUserID int64) (bool, error) {
@@ -177,6 +165,30 @@ func (r *Repository) Get(ctx context.Context, userID int64, id string) (*contact
 		return nil, stacktrace.Propagate(err, "failed to get contact")
 	}
 	return entity, nil
+}
+
+type ContactUpdateState struct {
+	ContactUserID int64
+	IsDeleted     bool
+}
+
+func (r *Repository) GetContactUpdateState(ctx context.Context, userID int64, id string) (ContactUpdateState, error) {
+	var state ContactUpdateState
+	err := r.DB.QueryRowContext(
+		ctx,
+		`SELECT contact_user_id, is_deleted
+		   FROM contact_entity
+		  WHERE id = $1 AND user_id = $2`,
+		id,
+		userID,
+	).Scan(&state.ContactUserID, &state.IsDeleted)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return ContactUpdateState{}, &ente.ErrNotFoundError
+		}
+		return ContactUpdateState{}, stacktrace.Propagate(err, "failed to get contact update state")
+	}
+	return state, nil
 }
 
 func (r *Repository) Update(ctx context.Context, userID int64, id string, req contactmodel.UpdateRequest) error {

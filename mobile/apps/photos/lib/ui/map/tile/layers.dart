@@ -1,6 +1,6 @@
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:flutter_map/flutter_map.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/service_locator.dart";
 import "package:photos/theme/ente_theme.dart";
 import "package:photos/ui/map/tile/attribution/map_attribution.dart";
@@ -77,7 +77,7 @@ class OSMTileAttributes extends StatelessWidget {
       iconSize: options.iconSize,
       attributions: [
         TextSourceAttribution(
-          AppLocalizations.of(context).openstreetmapContributors,
+          context.strings.openstreetmapContributors,
           textStyle: textTheme,
           onTap: () => launchUrlString('https://openstreetmap.org/copyright'),
         ),
@@ -110,7 +110,7 @@ class OSMFranceTileAttributes extends StatelessWidget {
       iconSize: options.iconSize,
       attributions: [
         TextSourceAttribution(
-          AppLocalizations.of(context).openstreetmapContributors,
+          context.strings.openstreetmapContributors,
           textStyle: textTheme,
           onTap: () => launchUrlString('https://openstreetmap.org/copyright'),
         ),
@@ -120,7 +120,7 @@ class OSMFranceTileAttributes extends StatelessWidget {
           onTap: () => launchUrl(Uri.parse('https://www.hotosm.org/')),
         ),
         TextSourceAttribution(
-          AppLocalizations.of(context).hostedAtOsmFrance,
+          context.strings.hostedAtOsmFrance,
           textStyle: textTheme,
           onTap: () => launchUrl(Uri.parse('https://www.openstreetmap.fr/')),
         ),

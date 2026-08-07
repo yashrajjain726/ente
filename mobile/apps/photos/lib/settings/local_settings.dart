@@ -37,6 +37,25 @@ enum LocalGalleryFlag {
   localGallerySettingsBannerDismissed,
 }
 
+enum DeletePreference {
+  DeleteFromBoth("delete_from_both"),
+  DeleteFromLocalOnly("delete_from_local_only"),
+  DeleteFromRemoteOnly("delete_from_remote_only");
+
+  const DeletePreference(this._serializedValue);
+
+  final String _serializedValue;
+
+  static DeletePreference? _fromSerializedValue(String? value) {
+    return switch (value) {
+      "delete_from_both" => DeleteFromBoth,
+      "delete_from_local_only" => DeleteFromLocalOnly,
+      "delete_from_remote_only" => DeleteFromRemoteOnly,
+      _ => null,
+    };
+  }
+}
+
 class LocalSettings {
   static const kCollectionSortPref = "collection_sort_pref";
   static const kGalleryGroupType = "gallery_group_type";
@@ -53,6 +72,7 @@ class LocalSettings {
       "ls.birthday_notifications_enabled";
   static const kRateUsPromptThreshold = 2;
   static const shouldLoopVideoKey = "video.should_loop";
+  static const isMutedKey = "video.is_muted";
   static const onGuestViewKey = "on_guest_view";
   static const _hasConfiguredLinksInAppPermissionKey =
       "has_configured_links_in_app_permission";
@@ -87,6 +107,13 @@ class LocalSettings {
       "ml_debug.semantic_search_exact_in_rust";
   static const _kAppMode = "ls.app_mode";
   static const _kShowLocalGalleryModeOption = "ls.show_offline_mode_option";
+  static const _kDeletePreference = "delete_preference";
+  static const _kMediaManagementHintDeleteAttempts =
+      "media_management_hint_delete_attempts";
+  static const _kMediaManagementHintDismissedAt =
+      "media_management_hint_dismissed_at";
+  static const _kIsFromLocalGalleryToEnte =
+      "ls.pending_backup_selection_from_local_import";
 
   static const _kWidgetHideTextFlags = "ls.widget_hide_text_flags";
 
@@ -102,6 +129,8 @@ class LocalSettings {
   static const _kLocalGalleryGetStartedBannerDismissDuration = Duration(
     days: 7,
   );
+  static const _kCraftingMemoriesBannerDismissed =
+      'is_crafting_memories_banner_dismissed';
 
   final SharedPreferences _prefs;
 
@@ -112,6 +141,17 @@ class LocalSettings {
   /// false on the next app launch. Used to defer the get-started banner to
   /// the second app open (after onboarding).
   bool localGalleryModeEnabledThisSession = false;
+
+  /// Set after the first local-gallery import completes before an account is
+  /// configured. When the user later signs in or signs up, the online flow
+  /// replays first-import completion once so backup-folder selection can run
+  /// against the imported local rows, then clears this marker.
+  bool get isFromLocalGalleryToEnte =>
+      _prefs.getBool(_kIsFromLocalGalleryToEnte) ?? false;
+
+  Future<void> setIsFromLocalGalleryToEnte(bool value) async {
+    await _prefs.setBool(_kIsFromLocalGalleryToEnte, value);
+  }
 
   LocalSettings(this._prefs);
 
@@ -427,6 +467,14 @@ class LocalSettings {
     return _prefs.getBool(shouldLoopVideoKey) ?? true;
   }
 
+  Future<void> setIsMuted(bool value) async {
+    await _prefs.setBool(isMutedKey, value);
+  }
+
+  bool isMuted() {
+    return _prefs.getBool(isMutedKey) ?? false;
+  }
+
   Future<void> setOnGuestView(bool value) {
     return _prefs.setBool(onGuestViewKey, value);
   }
@@ -601,4 +649,63 @@ class LocalSettings {
 
   Future<void> setLocalGallerySettingsBannerDismissed(bool value) =>
       _setFlag(LocalGalleryFlag.localGallerySettingsBannerDismissed, value);
+
+  int get _mediaManagementHintDeleteAttempts =>
+      _prefs.getInt(_kMediaManagementHintDeleteAttempts) ?? 0;
+
+  bool hasMediaManagementHintDeleteAttemptsReached() {
+    return _mediaManagementHintDeleteAttempts >=
+        mediaManagementHintDeleteAttemptThreshold;
+  }
+
+  bool get isMediaManagementHintDismissed {
+    final dismissedAtMs = _prefs.getInt(_kMediaManagementHintDismissedAt) ?? 0;
+    if (dismissedAtMs == 0) return false;
+    final elapsed = DateTime.now().millisecondsSinceEpoch - dismissedAtMs;
+    return elapsed >= 0 &&
+        elapsed < mediaManagementHintDismissDuration.inMilliseconds;
+  }
+
+  Future<void> incrementMediaManagementHintDeleteAttempts() async {
+    await _prefs.setInt(
+      _kMediaManagementHintDeleteAttempts,
+      _mediaManagementHintDeleteAttempts + 1,
+    );
+  }
+
+  Future<void> resetMediaManagementHintDeleteAttempts() async {
+    await _prefs.setInt(_kMediaManagementHintDeleteAttempts, 0);
+  }
+
+  Future<void> setMediaManagementHintDismissed() async {
+    await _prefs.setInt(
+      _kMediaManagementHintDismissedAt,
+      DateTime.now().millisecondsSinceEpoch,
+    );
+  }
+
+  DeletePreference? getDeletePreference() {
+    if (!_prefs.containsKey(_kDeletePreference)) {
+      return null;
+    }
+    return DeletePreference._fromSerializedValue(
+      _prefs.getString(_kDeletePreference),
+    );
+  }
+
+  Future<void> setDeletePreference(DeletePreference? preference) async {
+    if (preference == null) {
+      await _prefs.remove(_kDeletePreference);
+    } else {
+      await _prefs.setString(_kDeletePreference, preference._serializedValue);
+    }
+  }
+
+  Future<void> setCraftingMemoriesBannerDismissed() async {
+    await _prefs.setBool(_kCraftingMemoriesBannerDismissed, true);
+  }
+
+  Future<bool> getCraftingMemoriesBannerDismissed() async {
+    return _prefs.getBool(_kCraftingMemoriesBannerDismissed) ?? false;
+  }
 }

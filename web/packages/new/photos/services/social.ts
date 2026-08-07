@@ -4,21 +4,15 @@ import { apiURL } from "ente-base/origins";
 import { z } from "zod";
 import type { Comment } from "./comment";
 
-/**
- * Remove null byte padding from a decrypted reaction type.
- */
 const unpadReaction = (paddedReaction: string): string =>
     paddedReaction.replace(/\0+$/, "");
 
-/**
- * A decrypted reaction from the unified diff endpoint.
- */
 export interface UnifiedReaction {
     id: string;
     collectionID: number;
     fileID?: number;
     commentID?: string;
-    /** True if this reaction is on a reply (only in feed responses). */
+    // Only present in feed responses.
     isCommentReply?: boolean;
     reactionType: string;
     userID: number;
@@ -28,9 +22,6 @@ export interface UnifiedReaction {
     updatedAt: number;
 }
 
-/**
- * Result from the unified social diff endpoint.
- */
 export interface UnifiedSocialDiff {
     comments: Comment[];
     reactions: UnifiedReaction[];
@@ -38,14 +29,6 @@ export interface UnifiedSocialDiff {
     hasMoreReactions: boolean;
 }
 
-/**
- * Get comments and reactions for a file in a single request.
- *
- * @param collectionID The ID of the collection containing the file.
- * @param fileID The ID of the file to get social data for.
- * @param collectionKey The decrypted collection key (base64 encoded).
- * @returns Comments and reactions for the file.
- */
 export const getUnifiedSocialDiff = async (
     collectionID: number,
     fileID: number,
@@ -64,19 +47,8 @@ export const getUnifiedSocialDiff = async (
     return decryptSocialDiff(collectionKey, await res.json());
 };
 
-/**
- * Get album feed - comments and reactions relevant to the current user.
- *
- * This uses a server-side filtered endpoint that only returns:
- * - Comments on files owned by the user (excluding user's own comments)
- * - Replies to user's comments
- * - Reactions on files owned by the user
- * - Reactions on user's comments
- *
- * @param collectionID The ID of the collection.
- * @param collectionKey The decrypted collection key (base64 encoded).
- * @returns Filtered comments and reactions for the user's feed.
- */
+// Remote filters this feed to activity relevant to the current user.
+// This includes replies or reactions to them and activity on files they own.
 export const getAlbumFeed = async (
     collectionID: number,
     collectionKey: string,
@@ -93,16 +65,12 @@ export const getAlbumFeed = async (
     return decryptSocialDiff(collectionKey, await res.json());
 };
 
-/**
- * Decrypt comments and reactions from the unified diff endpoint response.
- */
 const decryptSocialDiff = async (
     collectionKey: string,
     responseJson: unknown,
 ): Promise<UnifiedSocialDiff> => {
     const data = UnifiedDiffResponse.parse(responseJson);
 
-    // Decrypt comments
     const comments: Comment[] = [];
     for (const comment of data.comments) {
         if (comment.isDeleted || !comment.cipher || !comment.nonce) {
@@ -148,7 +116,6 @@ const decryptSocialDiff = async (
         }
     }
 
-    // Decrypt reactions
     const reactions: UnifiedReaction[] = [];
     for (const reaction of data.reactions) {
         if (reaction.isDeleted || !reaction.cipher || !reaction.nonce) continue;
@@ -226,13 +193,6 @@ const UnifiedDiffResponse = z.object({
     hasMoreReactions: z.boolean(),
 });
 
-/**
- * Get anonymous user profiles for a collection.
- *
- * @param collectionID The ID of the collection.
- * @param collectionKey The decrypted collection key (base64 encoded).
- * @returns Map of anonUserID to decrypted userName.
- */
 export const getAnonProfiles = async (
     collectionID: number,
     collectionKey: string,

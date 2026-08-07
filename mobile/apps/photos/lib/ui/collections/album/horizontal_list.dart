@@ -1,11 +1,11 @@
 import "dart:async";
 import "dart:math";
 
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:logging/logging.dart";
 import "package:photos/core/event_bus.dart";
 import "package:photos/events/collection_updated_event.dart";
-import "package:photos/generated/l10n.dart";
 import 'package:photos/models/collection/collection.dart';
 import "package:photos/theme/ente_theme.dart";
 import "package:photos/ui/collections/album/row_item.dart";
@@ -71,7 +71,7 @@ class _AlbumHorizontalListState extends State<AlbumHorizontalList> {
       builder: (context, snapshot) {
         if (snapshot.hasError) {
           _logger.severe("failed to fetch albums", snapshot.error);
-          return Text(AppLocalizations.of(context).somethingWentWrong);
+          return Text(context.strings.somethingWentWrong);
         } else if (snapshot.hasData) {
           if (snapshot.data!.isEmpty) {
             return const SizedBox.shrink();
@@ -94,7 +94,7 @@ class _AlbumHorizontalListState extends State<AlbumHorizontalList> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
-                          AppLocalizations.of(context).albums,
+                          context.strings.albums,
                           style: getEnteTextTheme(context).large,
                         ),
                         if (widget.onViewAllTapped != null)

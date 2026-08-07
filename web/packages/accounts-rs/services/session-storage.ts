@@ -1,9 +1,6 @@
 import { z } from "zod";
 import { decryptBox, encryptBox, generateKey } from "./crypto";
 
-/**
- * Remove all data stored in session storage (data tied to the browser tab).
- */
 export const clearSessionStorage = () => sessionStorage.clear();
 
 const SessionKeyData = z.object({
@@ -72,11 +69,14 @@ export const updateSessionFromElectronSafeStorageIfNeeded = async () => {
 export const stashKeyEncryptionKeyInSessionStore = (kek: string) =>
     saveKeyInSessionStore("keyEncryptionKey", kek);
 
+export const clearStashedKeyEncryptionKeyFromSession = () =>
+    sessionStorage.removeItem("keyEncryptionKey");
+
 export const unstashKeyEncryptionKeyFromSession = async () => {
     const value = sessionStorage.getItem("keyEncryptionKey");
     if (!value) return undefined;
 
-    sessionStorage.removeItem("keyEncryptionKey");
+    clearStashedKeyEncryptionKeyFromSession();
 
     const { encryptedData, key, nonce } = SessionKeyData.parse(
         JSON.parse(value),

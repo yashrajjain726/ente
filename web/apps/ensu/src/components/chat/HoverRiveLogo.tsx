@@ -72,7 +72,8 @@ const HoverRiveLogo = memo(
 
                                 riveRef.current?.pause?.();
                             } catch {
-                                // noop
+                                // The logo animation is decorative; ignore
+                                // Rive runtime errors.
                             }
                             if (!canceled) {
                                 setIsReady(true);
@@ -98,7 +99,8 @@ const HoverRiveLogo = memo(
                 try {
                     riveRef.current?.cleanup?.();
                 } catch {
-                    // noop
+                    // The logo animation is decorative; ignore Rive runtime
+                    // errors.
                 }
                 riveRef.current = null;
                 playbackTargetRef.current = undefined;
@@ -116,7 +118,8 @@ const HoverRiveLogo = memo(
                     riveRef.current?.play?.();
                 }
             } catch {
-                // noop
+                // The logo animation is decorative; ignore Rive runtime
+                // errors.
             }
         };
 
@@ -126,7 +129,8 @@ const HoverRiveLogo = memo(
                 riveRef.current?.pause?.();
                 riveRef.current?.stop?.();
             } catch {
-                // noop
+                // The logo animation is decorative; ignore Rive runtime
+                // errors.
             }
         };
 
@@ -162,8 +166,6 @@ const HoverRiveLogo = memo(
                 <Box
                     component="canvas"
                     ref={canvasRef}
-                    width={sizePx}
-                    height={sizePx}
                     aria-label={`${alt} animation`}
                     sx={{
                         position: "absolute",

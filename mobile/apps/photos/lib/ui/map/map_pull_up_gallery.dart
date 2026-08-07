@@ -1,12 +1,12 @@
 import "dart:async";
 
 import "package:defer_pointer/defer_pointer.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:logging/logging.dart";
 import "package:photos/core/event_bus.dart";
 import "package:photos/events/files_updated_event.dart";
 import "package:photos/events/local_photos_updated_event.dart";
-import "package:photos/generated/l10n.dart";
 import 'package:photos/models/file/file.dart';
 import "package:photos/models/file_load_result.dart";
 import "package:photos/models/gallery_type.dart";
@@ -156,20 +156,14 @@ class _MapPullUpGalleryState extends State<MapPullUpGallery> {
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   Text(
-                                    AppLocalizations.of(
-                                      context,
-                                    ).noPhotosFoundHere,
+                                    context.strings.noPhotosFoundHere,
                                     style: textTheme.large,
                                   ),
                                   const SizedBox(height: 4),
                                   Text(
                                     widget.hasLocationData
-                                        ? AppLocalizations.of(
-                                            context,
-                                          ).zoomOutToSeePhotos
-                                        : AppLocalizations.of(
-                                            context,
-                                          ).noImagesWithLocation,
+                                        ? context.strings.zoomOutToSeePhotos
+                                        : context.strings.noImagesWithLocation,
                                     style: textTheme.smallFaint,
                                   ),
                                 ],

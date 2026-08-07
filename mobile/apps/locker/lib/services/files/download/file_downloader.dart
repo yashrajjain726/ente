@@ -7,6 +7,7 @@ import 'package:ente_network/network.dart';
 import 'package:ente_pure_utils/ente_pure_utils.dart';
 import 'package:locker/services/configuration.dart';
 import 'package:locker/services/db/locker_db.dart';
+import 'package:locker/services/files/download/file_url.dart';
 import 'package:locker/services/files/download/models/task.dart';
 import 'package:locker/services/files/download/service_locator.dart';
 import 'package:locker/services/files/offline/offline_file_storage.dart';
@@ -64,12 +65,19 @@ Future<File> ensureEncryptedOfflineCopy(
     } else {
       late final Response response;
       try {
+        final headers = <String, dynamic>{
+          "X-Auth-Token": Configuration.instance.getToken(),
+        };
+        final signedUrl = await FileUrl.tryGetV3Url(
+          Network.instance.enteDio,
+          file.uploadedFileID!,
+          FileUrlType.download,
+          headers: headers,
+        );
         response = await Network.instance.getDio().download(
-          file.downloadUrl,
+          signedUrl ?? file.downloadUrl,
           tempEncryptedFilePath,
-          options: Options(
-            headers: {"X-Auth-Token": Configuration.instance.getToken()},
-          ),
+          options: Options(headers: signedUrl == null ? headers : null),
           onReceiveProgress: progressCallback,
         );
       } catch (e) {
@@ -265,12 +273,19 @@ Future<File?> downloadAndDecrypt(
           return null;
         }
       } else {
+        final headers = <String, dynamic>{
+          "X-Auth-Token": Configuration.instance.getToken(),
+        };
+        final signedUrl = await FileUrl.tryGetV3Url(
+          Network.instance.enteDio,
+          file.uploadedFileID!,
+          FileUrlType.download,
+          headers: headers,
+        );
         final response = await Network.instance.getDio().download(
-          file.downloadUrl,
+          signedUrl ?? file.downloadUrl,
           tempEncryptedFilePath,
-          options: Options(
-            headers: {"X-Auth-Token": Configuration.instance.getToken()},
-          ),
+          options: Options(headers: signedUrl == null ? headers : null),
           onReceiveProgress: (a, b) {
             progressCallback?.call(a, b);
           },

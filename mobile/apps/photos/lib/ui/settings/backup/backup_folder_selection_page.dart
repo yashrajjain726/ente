@@ -2,6 +2,7 @@ import 'dart:math';
 
 import 'package:ente_components/ente_components.dart';
 import 'package:ente_pure_utils/ente_pure_utils.dart';
+import 'package:ente_strings/ente_strings.dart';
 import 'package:figma_squircle/figma_squircle.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -9,7 +10,6 @@ import 'package:intl/intl.dart';
 import 'package:logging/logging.dart';
 import 'package:photos/db/device_files_db.dart';
 import 'package:photos/db/files_db.dart';
-import 'package:photos/generated/l10n.dart';
 import 'package:photos/models/device_collection.dart';
 import 'package:photos/service_locator.dart';
 import 'package:photos/services/sync/remote_sync_service.dart';
@@ -103,7 +103,7 @@ class _BackupFolderSelectionPageState extends State<BackupFolderSelectionPage> {
   }
 
   Future<void> updateFolderSettings() async {
-    final l10n = AppLocalizations.of(context);
+    final l10n = context.strings;
     final dialog = createProgressDialog(context, l10n.updatingFolderSelection);
     await dialog.show();
     try {
@@ -133,17 +133,19 @@ class _BackupFolderSelectionPageState extends State<BackupFolderSelectionPage> {
       }
 
       if (context.mounted) {
+        if (!mounted) return;
         Navigator.of(context).pop(true);
       }
     } catch (e, s) {
       _logger.severe("Failed to updated backup folder", e, s);
       await dialog.hide();
+      if (!mounted) return;
       await showGenericErrorDialog(context: context, error: e);
     }
   }
 
   Future<bool> _showOnlyNewBackupWarning(int onlyNewSinceEpoch) async {
-    final l10n = AppLocalizations.of(context);
+    final l10n = context.strings;
     final date = DateTime.fromMicrosecondsSinceEpoch(onlyNewSinceEpoch);
     final locale = Localizations.localeOf(context).languageCode;
     final formattedDate = DateFormat.yMMMd(locale).format(date);
@@ -184,6 +186,7 @@ class _BackupFolderSelectionPageState extends State<BackupFolderSelectionPage> {
       return false;
     }
     if (result == _OnlyNewWarningAction.updateSettings) {
+      if (!mounted) return false;
       await routeToPage(context, const BackupSettingsScreen());
       return false;
     }
@@ -195,7 +198,7 @@ class _BackupFolderSelectionPageState extends State<BackupFolderSelectionPage> {
   }
 
   Widget _buildBottomNavigationBar() {
-    final l10n = AppLocalizations.of(context);
+    final l10n = context.strings;
     final colors = context.componentColors;
     final canSubmit = !(_treatAsOnboarding && _selectedDevicePathIDs.isEmpty);
 
@@ -236,7 +239,7 @@ class _BackupFolderSelectionPageState extends State<BackupFolderSelectionPage> {
   }
 
   Widget _buildScrollableBody() {
-    final l10n = AppLocalizations.of(context);
+    final l10n = context.strings;
     final colors = context.componentColors;
 
     return AppBarComponent(
@@ -328,7 +331,7 @@ class _BackupFolderSelectionPageState extends State<BackupFolderSelectionPage> {
     double sideOfThumbnail,
   ) {
     final colors = context.componentColors;
-    final l10n = AppLocalizations.of(context);
+    final l10n = context.strings;
     final isSelected = _selectedDevicePathIDs.contains(deviceCollection.id);
     final importedCount = _pathIDToItemCount?[deviceCollection.id];
     final formattedCount = NumberFormat().format(deviceCollection.count);

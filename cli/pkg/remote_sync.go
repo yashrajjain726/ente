@@ -4,9 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/ente-io/cli/pkg/mapper"
-	"github.com/ente-io/cli/pkg/model"
-	"github.com/ente-io/cli/utils/encoding"
+	"github.com/ente/cli/pkg/mapper"
+	"github.com/ente/cli/pkg/model"
+	"github.com/ente/cli/utils/encoding"
 	"log"
 	"strconv"
 	"time"
@@ -93,7 +93,7 @@ func (c *ClICtrl) fetchRemoteFiles(ctx context.Context) error {
 					maxUpdated = file.UpdationTime
 				}
 				if isFirstSync && file.IsRemovedFromAlbum() {
-					// on first sync, no need to sync delete markers
+					// A first sync has no local album entries to delete.
 					continue
 				}
 				albumEntry := model.AlbumFileEntry{AlbumID: album.ID, FileID: file.ID, IsDeleted: file.IsRemovedFromAlbum(), SyncedLocally: false}

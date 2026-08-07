@@ -3,10 +3,10 @@ import "dart:typed_data";
 
 import "package:ente_components/ente_components.dart";
 import "package:ente_crypto/ente_crypto.dart";
+import "package:ente_strings/ente_strings.dart";
 import 'package:flutter/material.dart';
 import "package:logging/logging.dart";
 import 'package:photos/core/configuration.dart';
-import "package:photos/l10n/l10n.dart";
 import "package:photos/ui/components/alert_bottom_sheet.dart";
 import "package:photos/utils/dialog_util.dart";
 
@@ -69,7 +69,7 @@ class _RequestPasswordVerificationPageState
         padding: const EdgeInsets.symmetric(horizontal: 16),
         child: ButtonComponent(
           key: const ValueKey("verifyPasswordButton"),
-          label: context.l10n.verifyPassword,
+          label: context.strings.verifyPassword,
           isDisabled: !isFormValid,
           onTap: isFormValid ? _verifyPassword : null,
         ),
@@ -83,7 +83,7 @@ class _RequestPasswordVerificationPageState
       return;
     }
     FocusScope.of(context).unfocus();
-    final dialog = createProgressDialog(context, context.l10n.pleaseWait);
+    final dialog = createProgressDialog(context, context.strings.pleaseWait);
     await dialog.show();
     try {
       final attributes = Configuration.instance.getKeyAttributes()!;
@@ -102,6 +102,7 @@ class _RequestPasswordVerificationPageState
       // pop
       await widget.onPasswordVerified(keyEncryptionKey);
       await dialog.hide();
+      if (!mounted) return;
       Navigator.of(context).pop(true);
     } catch (e, s) {
       _logger.severe("Error while verifying password", e, s);
@@ -109,11 +110,12 @@ class _RequestPasswordVerificationPageState
       if (widget.onPasswordError != null) {
         widget.onPasswordError!();
       } else {
+        if (!mounted) return;
         // ignore: unawaited_futures
         showAlertBottomSheet(
           context,
-          title: context.l10n.incorrectPasswordTitle,
-          message: context.l10n.pleaseTryAgain,
+          title: context.strings.incorrectPasswordTitle,
+          message: context.strings.pleaseTryAgain,
           assetPath: 'assets/warning-grey.png',
         );
       }
@@ -130,7 +132,7 @@ class _RequestPasswordVerificationPageState
                 Padding(
                   padding: const EdgeInsets.only(top: 30, left: 20, right: 20),
                   child: Text(
-                    context.l10n.enterPassword,
+                    context.strings.enterPassword,
                     style: TextStyles.display2.copyWith(
                       color: context.componentColors.textBase,
                     ),
@@ -166,7 +168,7 @@ class _RequestPasswordVerificationPageState
                   child: TextInputComponent(
                     key: const ValueKey("passwordInputField"),
                     controller: _passwordController,
-                    hintText: context.l10n.enterYourPassword,
+                    hintText: context.strings.enterYourPassword,
                     autofocus: true,
                     autocorrect: false,
                     isPasswordInput: true,

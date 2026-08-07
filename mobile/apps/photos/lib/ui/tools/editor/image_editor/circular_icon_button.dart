@@ -41,8 +41,8 @@ class CircularIconButton extends StatelessWidget {
     } else if (svgPath != null) {
       iconContent = SvgPicture.asset(
         svgPath!,
-        width: 12,
-        height: 12,
+        width: size * 0.68,
+        height: size * 0.68,
         fit: BoxFit.scaleDown,
         colorFilter: ColorFilter.mode(colors.iconColor, BlendMode.srcIn),
       );

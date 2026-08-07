@@ -119,6 +119,12 @@ After enabling, the app will download and index your photos locally. This is fas
 
 Ente automatically creates collections of photos from past years on the same date, helping you rediscover memories.
 
+To share items from a memory on mobile:
+
+1. Open the memory and tap the share action.
+2. Select the photos and videos you want to include. You can use **Select all**, or tap the selected count to clear the selection.
+3. Tap **Share memory** to create a link containing only the selected items. To send the selected original files instead, tap **Share items**.
+
 ### Memory Lane
 
 Memory Lane creates a timeline for a person using photos of them from different years. When a person's timeline is ready, Ente shows a **Memory lane** banner on their page so you can open it and, on supported platforms, share it as a public link.

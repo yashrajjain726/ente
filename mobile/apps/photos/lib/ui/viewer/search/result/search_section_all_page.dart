@@ -4,10 +4,10 @@ import "dart:math" as math;
 import "package:collection/collection.dart";
 import "package:ente_components/ente_components.dart";
 import "package:ente_pure_utils/ente_pure_utils.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:hugeicons/hugeicons.dart";
 import "package:photos/events/event.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/models/search/album_search_result.dart";
 import "package:photos/models/search/generic_search_result.dart";
 import "package:photos/models/search/hierarchical/magic_filter.dart";
@@ -167,9 +167,7 @@ class _SearchSectionAllPageState extends State<SearchSectionAllPage> {
             slivers.add(
               SliverFillRemaining(
                 child: Center(
-                  child: Text(
-                    AppLocalizations.of(context).noResultsFound + '.',
-                  ),
+                  child: Text(context.strings.noResultsFound + '.'),
                 ),
               ),
             );
@@ -360,7 +358,7 @@ class _SearchSectionAllPageState extends State<SearchSectionAllPage> {
     return TextInputComponent(
       controller: _searchController,
       focusNode: _searchFocusNode,
-      hintText: AppLocalizations.of(context).search,
+      hintText: context.strings.search,
       autofocus: true,
       shouldUnfocusOnClearOrSubmit: true,
       prefix: HugeIcon(

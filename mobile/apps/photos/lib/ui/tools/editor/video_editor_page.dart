@@ -3,6 +3,7 @@ import 'dart:io';
 import "dart:math";
 
 import "package:ente_pure_utils/ente_pure_utils.dart";
+import "package:ente_strings/ente_strings.dart";
 import 'package:flutter/material.dart';
 import "package:logging/logging.dart";
 import 'package:native_video_editor/native_video_editor.dart';
@@ -12,9 +13,9 @@ import "package:photos/core/event_bus.dart";
 import "package:photos/db/files_db.dart";
 import "package:photos/ente_theme_data.dart";
 import "package:photos/events/local_photos_updated_event.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/models/file/file.dart";
 import "package:photos/models/location/location.dart";
+import "package:photos/module/metadata/local_file.dart";
 import "package:photos/service_locator.dart";
 import "package:photos/services/sync/sync_service.dart";
 import "package:photos/theme/ente_theme.dart";
@@ -31,6 +32,7 @@ import "package:photos/ui/tools/editor/video_editor/video_editor_player_control.
 import "package:photos/ui/tools/editor/video_rotate_page.dart";
 import "package:photos/ui/tools/editor/video_trim_page.dart";
 import "package:photos/ui/viewer/file/detail_page.dart";
+import "package:photos/utils/gallery_save_title.dart";
 import "package:video_editor/video_editor.dart";
 
 class VideoEditorPage extends StatefulWidget {
@@ -75,6 +77,7 @@ class _VideoEditorPageState extends State<VideoEditorPage> {
     // First determine rotation correction for Android
     _doRotationCorrectionIfAndroid().then((_) {
       // Then initialize the controller
+      if (!mounted) return;
       _controller = VideoEditorController.file(
         widget.ioFile,
         minDuration: const Duration(seconds: 1),
@@ -111,6 +114,7 @@ class _VideoEditorPageState extends State<VideoEditorPage> {
           })
           .catchError((error) {
             // handle minimum duration bigger than video duration error
+            if (!mounted) return;
             Navigator.pop(context);
           }, test: (e) => e is VideoMinDurationError);
     });
@@ -151,7 +155,7 @@ class _VideoEditorPageState extends State<VideoEditorPage> {
                 if (isExporting) return;
                 replacePage(context, DetailPage(widget.detailPageConfig));
               },
-              primaryActionLabel: AppLocalizations.of(context).saveCopy,
+              primaryActionLabel: context.strings.saveCopy,
               onPrimaryAction: exportVideo,
               isPrimaryEnabled: isReady && !isExporting,
             ),
@@ -232,7 +236,7 @@ class _VideoEditorPageState extends State<VideoEditorPage> {
                           VideoEditorMainActions(
                             children: [
                               VideoEditorBottomAction(
-                                label: AppLocalizations.of(context).trim,
+                                label: context.strings.trim,
                                 svgPath:
                                     "assets/video-editor/video-editor-trim-action.svg",
                                 onPressed: () => _openSubEditor(
@@ -241,7 +245,7 @@ class _VideoEditorPageState extends State<VideoEditorPage> {
                               ),
                               const SizedBox(width: 24),
                               VideoEditorBottomAction(
-                                label: AppLocalizations.of(context).crop,
+                                label: context.strings.crop,
                                 svgPath:
                                     "assets/video-editor/video-editor-crop-action.svg",
                                 onPressed: () => _openSubEditor(
@@ -250,7 +254,7 @@ class _VideoEditorPageState extends State<VideoEditorPage> {
                               ),
                               const SizedBox(width: 24),
                               VideoEditorBottomAction(
-                                label: AppLocalizations.of(context).rotate,
+                                label: context.strings.rotate,
                                 svgPath:
                                     "assets/video-editor/video-editor-rotate-action.svg",
                                 onPressed: () => _openSubEditor(
@@ -282,7 +286,7 @@ class _VideoEditorPageState extends State<VideoEditorPage> {
 
     final dialogKey = GlobalKey<LinearProgressDialogState>();
     final dialog = LinearProgressDialog(
-      AppLocalizations.of(context).savingEdits,
+      context.strings.savingEdits,
       key: dialogKey,
     );
 
@@ -310,7 +314,8 @@ class _VideoEditorPageState extends State<VideoEditorPage> {
         Navigator.of(dialogKey.currentContext!).pop();
       }
 
-      showShortToast(context, AppLocalizations.of(context).somethingWentWrong);
+      if (!mounted) return;
+      showShortToast(context, context.strings.somethingWentWrong);
     }
   }
 
@@ -550,6 +555,7 @@ class _VideoEditorPageState extends State<VideoEditorPage> {
           "_edited_" +
           DateTime.now().microsecondsSinceEpoch.toString() +
           ".mp4";
+      final galleryTitle = await getMediaStoreCompatibleTitle(fileName);
 
       //Disabling notifications for assets changing to insert the file into
       //files db before triggering a sync.
@@ -558,15 +564,12 @@ class _VideoEditorPageState extends State<VideoEditorPage> {
       try {
         final AssetEntity newAsset = await (PhotoManager.editor.saveVideo(
           result,
-          title: fileName,
+          title: galleryTitle,
         ));
 
         result.deleteSync();
 
-        final newFile = await EnteFile.fromAsset(
-          widget.file.deviceFolder ?? '',
-          newAsset,
-        );
+        final newFile = fileFromAsset(widget.file.deviceFolder ?? '', newAsset);
 
         newFile.creationTime = widget.file.creationTime;
         newFile.collectionID = widget.file.collectionID;
@@ -575,10 +578,12 @@ class _VideoEditorPageState extends State<VideoEditorPage> {
           final assetEntity = await widget.file.getAsset;
           if (assetEntity != null) {
             final latLong = await assetEntity.latlngAsync();
-            newFile.location = Location(
-              latitude: latLong.latitude,
-              longitude: latLong.longitude,
-            );
+            if (latLong != null) {
+              newFile.location = Location(
+                latitude: latLong.latitude,
+                longitude: latLong.longitude,
+              );
+            }
           }
         }
 
@@ -590,7 +595,8 @@ class _VideoEditorPageState extends State<VideoEditorPage> {
 
         SyncService.instance.sync().ignore();
 
-        showShortToast(context, AppLocalizations.of(context).editsSaved);
+        if (!mounted) return;
+        showShortToast(context, context.strings.editsSaved);
         final files = List<EnteFile>.of(widget.detailPageConfig.files);
 
         // the index could be -1 if the files fetched doesn't contain the newly
@@ -613,6 +619,7 @@ class _VideoEditorPageState extends State<VideoEditorPage> {
         }
         Navigator.of(dialogKey.currentContext!).pop('dialog');
 
+        if (!mounted) return;
         replacePage(
           context,
           DetailPage(

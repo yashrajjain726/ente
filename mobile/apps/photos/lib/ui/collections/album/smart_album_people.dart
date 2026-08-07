@@ -1,13 +1,13 @@
 import "dart:async";
 
 import "package:ente_components/ente_components.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/foundation.dart";
 import 'package:flutter/material.dart';
 import "package:logging/logging.dart";
 import "package:photos/core/event_bus.dart";
 import "package:photos/db/files_db.dart";
 import "package:photos/events/collection_updated_event.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/models/collection/smart_album_config.dart";
 import "package:photos/models/selected_people.dart";
 import "package:photos/service_locator.dart";
@@ -74,14 +74,14 @@ class _SmartAlbumPeopleState extends State<SmartAlbumPeople> {
                 : _selectedPeople.personIds.isNotEmpty;
             return ButtonComponent(
               variant: ButtonComponentVariant.primary,
-              label: AppLocalizations.of(context).save,
+              label: context.strings.save,
               shouldSurfaceExecutionStates: false,
               isDisabled: !areIdsChanged,
               onTap: areIdsChanged
                   ? () async {
                       final dialog = createProgressDialog(
                         context,
-                        AppLocalizations.of(context).pleaseWait,
+                        context.strings.pleaseWait,
                         isDismissible: true,
                       );
 
@@ -121,6 +121,7 @@ class _SmartAlbumPeopleState extends State<SmartAlbumPeople> {
                               .toList();
 
                           if (removedPersonIds.isNotEmpty) {
+                            if (!context.mounted) return;
                             final toDelete = await removeFilesDialog(context);
                             await dialog.show();
 
@@ -142,7 +143,7 @@ class _SmartAlbumPeopleState extends State<SmartAlbumPeople> {
                                   await CollectionActions(
                                     CollectionsService.instance,
                                   ).moveFilesFromCurrentCollection(
-                                    context,
+                                    null,
                                     collection!,
                                     enteFiles[widget.collectionId] ?? [],
                                     isHidden: collection.isHidden(),
@@ -168,6 +169,7 @@ class _SmartAlbumPeopleState extends State<SmartAlbumPeople> {
                         unawaited(smartAlbumsService.syncSmartAlbums());
 
                         await dialog.hide();
+                        if (!context.mounted) return;
                         Navigator.pop(context);
                       } catch (error, stackTrace) {
                         _logger.severe(
@@ -176,6 +178,7 @@ class _SmartAlbumPeopleState extends State<SmartAlbumPeople> {
                           stackTrace,
                         );
                         await dialog.hide();
+                        if (!context.mounted) return;
                         await showGenericErrorDialog(
                           context: context,
                           error: error,
@@ -188,8 +191,8 @@ class _SmartAlbumPeopleState extends State<SmartAlbumPeople> {
         ),
       ),
       body: AppBarComponent(
-        title: AppLocalizations.of(context).people,
-        subtitle: AppLocalizations.of(context).peopleAutoAddDesc,
+        title: context.strings.people,
+        subtitle: context.strings.peopleAutoAddDesc,
         physics: const BouncingScrollPhysics(),
         slivers: <Widget>[
           SliverFillRemaining(
@@ -208,10 +211,10 @@ Future<bool> removeFilesDialog(BuildContext context) async {
   final completer = Completer<bool>();
   await showActionSheet(
     context: context,
-    body: AppLocalizations.of(context).shouldRemoveFilesSmartAlbumsDesc,
+    body: context.strings.shouldRemoveFilesSmartAlbumsDesc,
     buttons: [
       ButtonWidget(
-        labelText: AppLocalizations.of(context).yes,
+        labelText: context.strings.yes,
         buttonType: ButtonType.neutral,
         buttonSize: ButtonSize.large,
         shouldStickToDarkTheme: true,
@@ -223,7 +226,7 @@ Future<bool> removeFilesDialog(BuildContext context) async {
         },
       ),
       ButtonWidget(
-        labelText: AppLocalizations.of(context).no,
+        labelText: context.strings.no,
         buttonType: ButtonType.secondary,
         buttonSize: ButtonSize.large,
         shouldStickToDarkTheme: true,

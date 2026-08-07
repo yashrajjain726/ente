@@ -1,3 +1,6 @@
+import { PeopleSortOptions } from "@/components/PeopleSortOptions";
+import { useWrapAsyncOperation } from "@/components/utils/use-wrap-async";
+import { sortPeople, type PeopleSortBy } from "@/utils/people-sort";
 import {
     ArrowDownDoubleIcon,
     ArrowUpDoubleIcon,
@@ -36,17 +39,11 @@ import { SingleInputDialog } from "ente-base/components/SingleInputDialog";
 import { useBaseContext } from "ente-base/context";
 import { SlideUpTransition } from "ente-new/photos/components/mui/SlideUpTransition";
 import {
-    sortPeople,
-    type PeopleSortBy,
-} from "ente-new/photos/components/people-sort";
-import { PeopleSortOptions } from "ente-new/photos/components/PeopleSortOptions";
-import {
     ItemCard,
     LargeTileButton,
     LargeTileCreateNewButton,
     LargeTileTextOverlay,
 } from "ente-new/photos/components/Tiles";
-import { useWrapAsyncOperation } from "ente-new/photos/components/utils/use-wrap-async";
 import {
     addCGroup,
     addClusterToCGroup,
@@ -134,11 +131,6 @@ export const AllPeople: React.FC<AllPeopleProps> = ({
 
     const hasSearchQuery = !!searchTerm.trim();
 
-    /**
-     * Preparing the additional faces list when showing
-     * more faces, excluding duplicates from the visible list
-     * and excluding hidden cgroups
-     */
     const extraPeople = useMemo(() => {
         const visiblePersonIDs = new Set(people.map(({ id }) => id));
         const extra = allPeople.filter(
@@ -640,7 +632,7 @@ const AllPeopleContent: React.FC<AllPeopleContentProps> = ({
         return (
             <DialogContent sx={{ height: "80svh" }}>
                 <CenteredMessage>
-                    <Typography color="text.muted">
+                    <Typography sx={{ color: "text.muted" }}>
                         {t("no_results")}
                     </Typography>
                 </CenteredMessage>
@@ -659,9 +651,10 @@ const AllPeopleContent: React.FC<AllPeopleContentProps> = ({
         <DialogContent
             sx={{
                 "&&": { padding: 0 },
-                height: hasSearchQuery
-                    ? "80svh"
-                    : `min(80svh, ${listContentHeight}px)`,
+                height:
+                    hasSearchQuery || items.length === 0
+                        ? "80svh"
+                        : `min(80svh, ${listContentHeight}px)`,
                 display: "flex",
                 flexDirection: "column",
             }}

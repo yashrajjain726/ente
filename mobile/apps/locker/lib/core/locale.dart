@@ -34,7 +34,8 @@ Locale localResolutionCallBack(
   for (Locale supportedLocale in appSupportedLocales) {
     languageSupport.add(supportedLocale.languageCode);
   }
-  for (Locale locale in onDeviceLocales ?? const []) {
+  for (final deviceLocale in onDeviceLocales ?? const []) {
+    final locale = _normalizedLocale(deviceLocale);
     // check if exact local is supported, if yes, return it
     if (appSupportedLocales.contains(locale)) {
       autoDetectedLocale = locale;
@@ -64,7 +65,7 @@ Future<Locale?> getLocale({bool noFallback = false}) async {
       savedLocale = Locale(savedValue);
     }
     if (appSupportedLocales.contains(savedLocale)) {
-      return savedLocale;
+      return _normalizedLocale(savedLocale);
     }
   }
   if (autoDetectedLocale != null) {
@@ -90,3 +91,6 @@ Future<void> setLocale(Locale locale) async {
     out.toString(),
   );
 }
+
+Locale _normalizedLocale(Locale locale) =>
+    locale.languageCode == 'pt' ? const Locale('pt', 'PT') : locale;

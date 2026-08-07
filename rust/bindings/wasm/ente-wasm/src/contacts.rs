@@ -1,61 +1,71 @@
-//! WASM bindings for contacts sync and attachment reads.
-
+use ente_accounts::auth::KeyAttributes;
 use ente_contacts::{
-    ContactsCtx, ContactsError as CoreContactsError, LegacyContactState, OpenContactsCtxInput,
-    RootKeySource, WrappedRootContactKey,
+    ContactsCtx, LegacyContactState, OpenContactsCtxInput, RootKeySource, WrappedRootContactKey,
 };
-use ente_core::{auth::KeyAttributes, crypto};
+use ente_core::b64;
 use js_sys::{Object, Reflect};
 use serde::{Deserialize, Serialize};
 use serde_wasm_bindgen as swb;
 use wasm_bindgen::prelude::*;
 
-/// Contacts error.
-#[wasm_bindgen]
-pub struct ContactsError {
-    code: String,
-    message: String,
+#[derive(Serialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum ContactsError {
+    Network { message: String },
+    Http { status: u16, message: String },
+    Parse { message: String },
+    Crypto { message: String },
+    Auth { message: String },
+    InvalidInput { message: String },
+    MissingEncryptedData { message: String },
+    MissingEncryptedKey { message: String },
+    ProfilePictureNotFound { message: String },
+    ActiveRecoverySession { message: String },
+    Serde { message: String },
+    Decode { message: String },
 }
 
-#[wasm_bindgen]
-impl ContactsError {
-    /// Machine-readable error code.
-    #[wasm_bindgen(getter)]
-    pub fn code(&self) -> String {
-        self.code.clone()
-    }
-
-    /// Human-readable error message.
-    #[wasm_bindgen(getter)]
-    pub fn message(&self) -> String {
-        self.message.clone()
+impl From<ContactsError> for JsValue {
+    fn from(e: ContactsError) -> Self {
+        let object = match swb::to_value(&e) {
+            Ok(object) => object,
+            Err(err) => return JsValue::from_str(&err.to_string()),
+        };
+        let message = Reflect::get(&object, &JsValue::from_str("message"))
+            .ok()
+            .and_then(|message| message.as_string())
+            .unwrap_or_default();
+        let error = js_sys::Error::new(&message);
+        Object::assign(error.as_ref(), object.unchecked_ref());
+        error.into()
     }
 }
 
-impl From<CoreContactsError> for ContactsError {
-    fn from(e: CoreContactsError) -> Self {
-        let code = match &e {
-            CoreContactsError::Http(_) => "http",
-            CoreContactsError::Crypto(_) => "crypto",
-            CoreContactsError::Auth(_) => "auth",
-            CoreContactsError::InvalidInput(_) => "invalid_input",
-            CoreContactsError::MissingEncryptedData => "missing_encrypted_data",
-            CoreContactsError::MissingEncryptedKey => "missing_encrypted_key",
-            CoreContactsError::ProfilePictureNotFound => "profile_picture_not_found",
-        }
-        .to_string();
-
-        Self {
-            code,
-            message: e.to_string(),
+impl From<ente_contacts::Error> for ContactsError {
+    fn from(e: ente_contacts::Error) -> Self {
+        use ente_contacts::ErrorKind as K;
+        let message = ente_core::error::chain(&e);
+        match e.kind() {
+            K::Network => Self::Network { message },
+            K::Http => Self::Http {
+                status: e.status().unwrap_or_default(),
+                message,
+            },
+            K::Parse => Self::Parse { message },
+            K::Crypto => Self::Crypto { message },
+            K::Auth => Self::Auth { message },
+            K::InvalidInput => Self::InvalidInput { message },
+            K::MissingEncryptedData => Self::MissingEncryptedData { message },
+            K::MissingEncryptedKey => Self::MissingEncryptedKey { message },
+            K::ProfilePictureNotFound => Self::ProfilePictureNotFound { message },
+            K::ActiveRecoverySession => Self::ActiveRecoverySession { message },
         }
     }
 }
 
 impl From<swb::Error> for ContactsError {
     fn from(e: swb::Error) -> Self {
-        Self {
-            code: "serde".to_string(),
+        Self::Serde {
             message: e.to_string(),
         }
     }
@@ -81,7 +91,6 @@ struct ContactRecordJs {
     contact_user_id: i64,
     email: Option<String>,
     name: Option<String>,
-    birth_date: Option<String>,
     #[serde(rename = "profilePictureAttachmentID")]
     profile_picture_attachment_id: Option<String>,
     is_deleted: bool,
@@ -103,7 +112,6 @@ impl From<ente_contacts::ContactRecord> for ContactRecordJs {
             contact_user_id: value.contact_user_id,
             email: value.email,
             name: value.name,
-            birth_date: value.birth_date,
             profile_picture_attachment_id: value.profile_picture_attachment_id,
             is_deleted: value.is_deleted,
             created_at: value.created_at,
@@ -112,12 +120,10 @@ impl From<ente_contacts::ContactRecord> for ContactRecordJs {
     }
 }
 
-/// Open contacts context for web.
 #[wasm_bindgen]
 pub async fn contacts_open_ctx(input: JsValue) -> Result<JsValue, ContactsError> {
     let input: OpenContactsCtxJsInput = swb::from_value(input)?;
-    let master_key = crypto::decode_b64(&input.master_key_b64).map_err(|e| ContactsError {
-        code: "decode".to_string(),
+    let master_key = b64::decode(&input.master_key_b64).map_err(|e| ContactsError::Decode {
         message: e.to_string(),
     })?;
 
@@ -159,7 +165,6 @@ pub async fn contacts_open_ctx(input: JsValue) -> Result<JsValue, ContactsError>
     Ok(output.into())
 }
 
-/// Handle to an open contacts context.
 #[wasm_bindgen]
 pub struct ContactsCtxHandle {
     inner: ContactsCtx,
@@ -167,17 +172,14 @@ pub struct ContactsCtxHandle {
 
 #[wasm_bindgen]
 impl ContactsCtxHandle {
-    /// Update auth token without rebuilding the contacts context.
     pub fn update_auth_token(&self, auth_token: String) {
         self.inner.update_auth_token(auth_token);
     }
 
-    /// Return the wrapped root key currently held by this context, if resolved.
     pub fn current_wrapped_root_contact_key(&self) -> Result<JsValue, ContactsError> {
         swb::to_value(&self.inner.current_wrapped_root_contact_key()).map_err(Into::into)
     }
 
-    /// Pull a diff page of contacts.
     pub async fn get_diff(&self, since_time: i64, limit: u16) -> Result<JsValue, ContactsError> {
         let diff: Vec<ContactRecordJs> = self
             .inner
@@ -189,7 +191,6 @@ impl ContactsCtxHandle {
         swb::to_value(&diff).map_err(Into::into)
     }
 
-    /// Fetch and decrypt the profile picture bytes for a contact.
     pub async fn get_profile_picture(&self, contact_id: &str) -> Result<Vec<u8>, ContactsError> {
         self.inner
             .get_profile_picture(contact_id)
@@ -197,26 +198,22 @@ impl ContactsCtxHandle {
             .map_err(Into::into)
     }
 
-    /// Fetch legacy/emergency contact info for the current user.
     pub async fn legacy_get_info(&self) -> Result<JsValue, ContactsError> {
         let info = self.inner.legacy_info().await?;
         swb::to_value(&info).map_err(Into::into)
     }
 
-    /// Lookup a user's public key by email for legacy verify/add flows.
     pub async fn legacy_public_key(&self, email: String) -> Result<JsValue, ContactsError> {
         let public_key = self.inner.legacy_public_key(&email).await?;
         swb::to_value(&public_key).map_err(Into::into)
     }
 
-    /// Generate the mnemonic-style verification ID for a public key.
     pub fn legacy_verification_id(&self, public_key_b64: String) -> Result<String, ContactsError> {
         self.inner
             .legacy_verification_id(&public_key_b64)
             .map_err(Into::into)
     }
 
-    /// Add a trusted legacy contact after sealing the current user's recovery key in Rust.
     pub async fn legacy_add_contact(
         &self,
         email: String,
@@ -230,7 +227,6 @@ impl ContactsCtxHandle {
             .map_err(Into::into)
     }
 
-    /// Update a legacy contact relationship state.
     pub async fn legacy_update_contact(
         &self,
         user_id: i64,
@@ -244,7 +240,6 @@ impl ContactsCtxHandle {
             .map_err(Into::into)
     }
 
-    /// Update the notice period for an existing trusted contact.
     pub async fn legacy_update_recovery_notice(
         &self,
         emergency_contact_id: i64,
@@ -256,7 +251,6 @@ impl ContactsCtxHandle {
             .map_err(Into::into)
     }
 
-    /// Start a recovery flow as the trusted contact.
     pub async fn legacy_start_recovery(
         &self,
         user_id: i64,
@@ -268,7 +262,6 @@ impl ContactsCtxHandle {
             .map_err(Into::into)
     }
 
-    /// Stop a recovery flow as the trusted contact.
     pub async fn legacy_stop_recovery(
         &self,
         recovery_id: String,
@@ -281,7 +274,6 @@ impl ContactsCtxHandle {
             .map_err(Into::into)
     }
 
-    /// Reject a recovery flow as the account owner.
     pub async fn legacy_reject_recovery(
         &self,
         recovery_id: String,
@@ -294,7 +286,6 @@ impl ContactsCtxHandle {
             .map_err(Into::into)
     }
 
-    /// Approve a recovery flow as the account owner.
     pub async fn legacy_approve_recovery(
         &self,
         recovery_id: String,
@@ -307,7 +298,6 @@ impl ContactsCtxHandle {
             .map_err(Into::into)
     }
 
-    /// Fetch and decrypt the recovery payload for a ready session.
     pub async fn legacy_recovery_bundle(
         &self,
         recovery_id: String,
@@ -319,13 +309,12 @@ impl ContactsCtxHandle {
             .legacy_recovery_bundle(&recovery_id, &current_user_key_attrs)
             .await?;
         swb::to_value(&LegacyRecoveryBundleJs {
-            recovery_key: crypto::encode_b64(bundle.recovery_key.as_ref()),
+            recovery_key: b64::encode(bundle.recovery_key.as_ref()),
             user_key_attributes: bundle.user_key_attributes,
         })
         .map_err(Into::into)
     }
 
-    /// Complete the legacy password reset flow fully in Rust.
     pub async fn legacy_change_password(
         &self,
         recovery_id: String,

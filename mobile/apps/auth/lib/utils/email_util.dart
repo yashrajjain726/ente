@@ -3,7 +3,6 @@ import 'dart:io';
 import 'package:archive/archive_io.dart';
 import 'package:email_validator/email_validator.dart';
 import 'package:ente_auth/core/configuration.dart';
-import 'package:ente_auth/l10n/l10n.dart';
 import 'package:ente_auth/ui/components/buttons/button_widget.dart';
 import 'package:ente_auth/ui/components/dialog_widget.dart';
 import 'package:ente_auth/ui/components/models/button_type.dart';
@@ -13,6 +12,7 @@ import 'package:ente_auth/utils/directory_utils.dart' as auth_dir;
 import 'package:ente_auth/utils/share_utils.dart' as auth_share;
 import 'package:ente_auth/utils/toast_util.dart';
 import 'package:ente_logging/logging.dart';
+import 'package:ente_strings/ente_strings.dart';
 import 'package:ente_utils/ente_utils.dart';
 import 'package:file_saver/file_saver.dart';
 import 'package:flutter/material.dart';
@@ -39,7 +39,7 @@ Future<void> sendLogs(
   String? subject,
   String? body,
 }) async {
-  final l10n = context.l10n;
+  final l10n = context.strings;
   await showDialogWidget(
     context: context,
     title: title,
@@ -82,21 +82,23 @@ Future<void> sendLogs(
         labelText: l10n.exportLogs,
         buttonAction: ButtonAction.third,
         onTap: () async {
-          Future.delayed(
-            const Duration(milliseconds: 200),
-            () => auth_share.shareDialog(
+          Future.delayed(const Duration(milliseconds: 200), () {
+            if (!context.mounted) return;
+            auth_share.shareDialog(
               context,
               title,
               saveAction: () async {
                 final zipFilePath = await getZippedLogsFile(context);
+                if (!context.mounted) return;
                 await exportLogs(context, zipFilePath);
               },
               sendAction: () async {
                 final zipFilePath = await getZippedLogsFile(context);
+                if (!context.mounted) return;
                 await exportLogs(context, zipFilePath, true);
               },
-            ),
-          );
+            );
+          });
         },
       ),
       ButtonWidget(
@@ -110,11 +112,9 @@ Future<void> sendLogs(
 }
 
 Future<void> openSupportPage(String? subject, String? body) async {
-  final baseSupportUri = Uri.https(
-    "github.com",
-    "/ente-io/ente/discussions/new",
-    {"category": "q-a"},
-  );
+  final baseSupportUri = Uri.https("github.com", "/ente/ente/discussions/new", {
+    "category": "q-a",
+  });
   final queryParameters = Map<String, String>.from(
     baseSupportUri.queryParameters,
   );
@@ -146,8 +146,8 @@ Future<void> openSupportPage(String? subject, String? body) async {
 }
 
 Future<String> getZippedLogsFile(BuildContext context) async {
-  final l10n = context.l10n;
-  final dialog = createProgressDialog(context, l10n.preparingLogsTitle);
+  final l10n = context.strings;
+  final dialog = createProgressDialog(context, l10n.preparingLogs);
   await dialog.show();
   final logsPath = (await getApplicationSupportDirectory()).path;
   final logsDirectory = Directory("$logsPath/logs");
@@ -167,11 +167,11 @@ Future<void> shareLogs(
   String toEmail,
   String zipFilePath,
 ) async {
-  final l10n = context.l10n;
+  final l10n = context.strings;
   final result = await showDialogWidget(
     context: context,
     title: l10n.emailYourLogs,
-    body: l10n.pleaseSendTheLogsTo(toEmail),
+    body: l10n.pleaseSendTheLogsTo(toEmail: toEmail),
     buttons: [
       ButtonWidget(
         buttonType: ButtonType.neutral,
@@ -198,21 +198,24 @@ Future<void> shareLogs(
     ],
   );
   if (result?.action != null && result!.action == ButtonAction.second) {
-    Future.delayed(
-      const Duration(milliseconds: 200),
-      () => auth_share.shareDialog(
+    if (!context.mounted) return;
+    Future.delayed(const Duration(milliseconds: 200), () {
+      if (!context.mounted) return;
+      auth_share.shareDialog(
         context,
-        context.l10n.exportLogs,
+        context.strings.exportLogs,
         saveAction: () async {
           final zipFilePath = await getZippedLogsFile(context);
+          if (!context.mounted) return;
           await exportLogs(context, zipFilePath);
         },
         sendAction: () async {
           final zipFilePath = await getZippedLogsFile(context);
+          if (!context.mounted) return;
           await exportLogs(context, zipFilePath, true);
         },
-      ),
-    );
+      );
+    });
   }
 }
 
@@ -247,6 +250,7 @@ Future<void> sendEmail(
   String? body,
 }) async {
   try {
+    if (!context.mounted) return;
     final String clientDebugInfo = await _clientInfo();
     final String subject0 = subject ?? '[Support]';
     final String body0 = (body ?? '') + clientDebugInfo;
@@ -259,12 +263,8 @@ Future<void> sendEmail(
     // );
     if (Platform.isAndroid) {
       // Special handling due to issue in proton mail android client
-      // https://github.com/ente-io/frame/pull/253
-      final Uri params = Uri(
-        scheme: 'mailto',
-        path: to,
-        query: 'subject=$subject0&body=$body0',
-      );
+      // https://github.com/ente/photos-app/pull/253
+      final params = buildMailtoUri(to: to, subject: subject0, body: body0);
       if (await canLaunchUrl(params)) {
         await launchUrl(params);
       } else {
@@ -272,10 +272,12 @@ Future<void> sendEmail(
         throw Exception('Could not launch ${params.toString()}');
       }
     } else {
+      if (!context.mounted) return;
       _showNoMailAppsDialog(context, to);
     }
   } catch (e) {
     _logger.severe("Failed to send email to $to", e);
+    if (!context.mounted) return;
     _showNoMailAppsDialog(context, to);
   }
 }
@@ -292,15 +294,16 @@ Future<String> _clientInfo() async {
 }
 
 void _showNoMailAppsDialog(BuildContext context, String toEmail) {
-  final l10n = context.l10n;
+  final l10n = context.strings;
   showChoiceDialog(
     context,
     icon: Icons.email_outlined,
-    title: l10n.emailUsMessage(toEmail),
+    title: l10n.emailUsMessage(email: toEmail),
     firstButtonLabel: l10n.copyEmailAddress,
     secondButtonLabel: l10n.ok,
     firstButtonOnTap: () async {
       await Clipboard.setData(ClipboardData(text: toEmail));
+      if (!context.mounted) return;
       showShortToast(context, l10n.copied);
     },
   );

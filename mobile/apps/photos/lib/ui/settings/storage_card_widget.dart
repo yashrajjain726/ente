@@ -1,9 +1,9 @@
 import 'package:ente_pure_utils/ente_pure_utils.dart';
+import "package:ente_strings/ente_strings.dart";
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:logging/logging.dart';
 import 'package:photos/core/constants.dart';
-import "package:photos/generated/l10n.dart";
 import 'package:photos/models/user_details.dart';
 import 'package:photos/service_locator.dart';
 import 'package:photos/states/user_details_state.dart';
@@ -159,8 +159,8 @@ class _StorageCardWidgetState extends State<StorageCardWidget> {
         children: [
           Text(
             isMobileScreenSmall
-                ? AppLocalizations.of(context).usedSpace
-                : AppLocalizations.of(context).storage,
+                ? context.strings.usedSpace
+                : context.strings.storage,
             style: const TextStyle(
               fontFamily: 'Montserrat',
               fontSize: 11,
@@ -230,7 +230,7 @@ class _StorageCardWidgetState extends State<StorageCardWidget> {
                         ),
                         const SizedBox(width: 4),
                         Text(
-                          AppLocalizations.of(context).storageBreakupYou,
+                          context.strings.storageBreakupYou,
                           style: const TextStyle(
                             fontFamily: 'Montserrat',
                             fontSize: 9,
@@ -249,7 +249,7 @@ class _StorageCardWidgetState extends State<StorageCardWidget> {
                         ),
                         const SizedBox(width: 4),
                         Text(
-                          AppLocalizations.of(context).storageBreakupFamily,
+                          context.strings.storageBreakupFamily,
                           style: const TextStyle(
                             fontFamily: 'Montserrat',
                             fontSize: 9,
@@ -261,7 +261,7 @@ class _StorageCardWidgetState extends State<StorageCardWidget> {
                     )
                   : const SizedBox.shrink(),
               Text(
-                AppLocalizations.of(context).memoryCount(
+                context.strings.memoryCount(
                   count: userDetails.fileCount,
                   formattedCount: NumberFormat().format(userDetails.fileCount),
                 ),

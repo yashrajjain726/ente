@@ -1,26 +1,29 @@
 import 'dart:math' as math;
 
 import 'package:ente_pure_utils/ente_pure_utils.dart';
+import 'package:ente_strings/ente_strings.dart';
 import 'package:flutter/material.dart';
-import 'package:photos/generated/l10n.dart';
 import 'package:photos/models/user_details.dart';
 import 'package:photos/services/family_service.dart';
 import 'package:photos/theme/ente_theme.dart';
 import 'package:photos/ui/components/buttons/button_widget_v2.dart';
 import 'package:photos/ui/family/family_ui.dart';
+import 'package:photos/ui/viewer/search/contact_avatar_widget.dart';
 import 'package:photos/utils/dialog_util.dart';
 
 class EditStorageLimitPage extends StatefulWidget {
   const EditStorageLimitPage({
     required this.member,
+    required this.displayName,
     required this.totalStorageInBytes,
-    required this.avatarColor,
+    required this.linkedPersonId,
     super.key,
   });
 
   final FamilyMember member;
+  final String displayName;
   final int totalStorageInBytes;
-  final Color avatarColor;
+  final String? linkedPersonId;
 
   @override
   State<EditStorageLimitPage> createState() => _EditStorageLimitPageState();
@@ -77,7 +80,7 @@ class _EditStorageLimitPageState extends State<EditStorageLimitPage> {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
+    final l10n = context.strings;
     final colorScheme = getEnteColorScheme(context);
     final textTheme = getEnteTextTheme(context);
 
@@ -93,22 +96,19 @@ class _EditStorageLimitPageState extends State<EditStorageLimitPage> {
                 children: [
                   Row(
                     children: [
-                      CircleAvatar(
-                        radius: 20,
-                        backgroundColor: widget.avatarColor,
-                        child: Text(
-                          widget.member.email.substring(0, 1).toUpperCase(),
-                          style: textTheme.bodyBold.copyWith(
-                            color: Colors.white,
-                          ),
-                        ),
+                      ContactAvatarWidget(
+                        contactUserId: widget.member.userID,
+                        email: widget.member.email,
+                        personId: widget.linkedPersonId,
+                        size: 40,
+                        borderRadius: 20,
                       ),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(widget.member.email, style: textTheme.body),
+                            Text(widget.displayName, style: textTheme.body),
                             const SizedBox(height: 2),
                             Text(
                               l10n.usingStorage(
