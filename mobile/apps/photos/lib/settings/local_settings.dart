@@ -89,7 +89,6 @@ class LocalSettings {
   static const kShowLocalIDOverThumbnails = "show_local_id_over_thumbnails";
   static const kEnableDatabaseLogging = "enable_db_logging";
   static const _kInternalUserDisabled = "ls.internal_user_disabled";
-  static const _kLargeBackupStandbyEnabled = "ls.large_backup_standby_enabled";
   static const _kBGDebugNotificationsEnabled =
       "ls.bg_debug_notifications_enabled";
   static const _kCFUploadProxyEnabled = "ls.cf_upload_proxy_enabled";
@@ -521,13 +520,6 @@ class LocalSettings {
 
   Future<void> setInternalUserDisabled(bool value) async {
     await _prefs.setBool(_kInternalUserDisabled, value);
-  }
-
-  bool get isLargeBackupStandbyEnabled =>
-      _prefs.getBool(_kLargeBackupStandbyEnabled) ?? false;
-
-  Future<void> setLargeBackupStandbyEnabled(bool value) async {
-    await _prefs.setBool(_kLargeBackupStandbyEnabled, value);
   }
 
   bool get isBGDebugNotificationsEnabled =>
