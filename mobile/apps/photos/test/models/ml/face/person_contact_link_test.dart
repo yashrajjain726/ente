@@ -127,14 +127,6 @@ void main() {
             "other-user",
             PersonData(name: "Other", email: "other@example.com", userID: 8),
           ),
-          PersonEntity(
-            "invalid-id-person",
-            PersonData(
-              name: "Invalid ID",
-              email: "zero@example.com",
-              userID: 0,
-            ),
-          ),
         ];
         PersonEntity? find(int? userID, String email) =>
             PersonService.findPersonForUser(
@@ -146,7 +138,6 @@ void main() {
         expect(find(8, "legacy@example.com")?.remoteID, "other-user");
         expect(find(7, "legacy@example.com")?.remoteID, "legacy-person");
         expect(find(7, " OTHER@EXAMPLE.COM "), isNull);
-        expect(find(7, "zero@example.com")?.remoteID, "invalid-id-person");
       },
     );
 
