@@ -33,8 +33,8 @@ class VideoEditorState {
   final double? preferredCropAspectRatio;
 }
 
-class EnteVideoEditorController extends ChangeNotifier {
-  EnteVideoEditorController.file(
+class VideoEditorController extends ChangeNotifier {
+  VideoEditorController.file(
     this.file, {
     this.minDuration = const Duration(seconds: 1),
   }) : video = VideoPlayerController.file(file);

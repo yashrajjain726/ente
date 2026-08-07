@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import "package:photos/ui/tools/editor/video_editor/crop_value.dart";
-import "package:photos/ui/tools/editor/video_editor/ente_video_editor_controller.dart";
-import "package:photos/ui/tools/editor/video_editor/ente_video_editor_widgets.dart";
 import "package:photos/ui/tools/editor/video_editor/video_editor_bottom_action.dart";
+import "package:photos/ui/tools/editor/video_editor/video_editor_controller.dart";
 import "package:photos/ui/tools/editor/video_editor/video_editor_main_actions.dart";
+import "package:photos/ui/tools/editor/video_editor/video_editor_widgets.dart";
 
 class VideoCropPage extends StatefulWidget {
   const VideoCropPage({super.key, required this.controller});
 
-  final EnteVideoEditorController controller;
+  final VideoEditorController controller;
 
   @override
   State<VideoCropPage> createState() => _VideoCropPageState();
@@ -46,9 +46,9 @@ class _VideoCropPageState extends State<VideoCropPage> {
 
   @override
   Widget build(BuildContext context) {
-    return EnteVideoEditorSubPage(
+    return VideoEditorSubPage(
       controller: widget.controller,
-      preview: EnteVideoCropEditor(controller: widget.controller),
+      preview: VideoCropEditor(controller: widget.controller),
       actions: AnimatedBuilder(
         animation: widget.controller,
         builder: (_, _) => VideoEditorMainActions(

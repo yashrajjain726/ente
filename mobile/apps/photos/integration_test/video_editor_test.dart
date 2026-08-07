@@ -20,7 +20,7 @@ import 'package:photos/services/file_magic_service.dart';
 import 'package:photos/ui/tools/editor/native_video_export_service.dart';
 import 'package:photos/ui/tools/editor/video_crop_util.dart';
 import 'package:photos/ui/tools/editor/video_editor/crop_value.dart';
-import 'package:photos/ui/tools/editor/video_editor/ente_video_editor_controller.dart';
+import 'package:photos/ui/tools/editor/video_editor/video_editor_controller.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Trim configuration
@@ -492,7 +492,7 @@ Future<IterationResult> _processVideoIteration({
   required String description,
   required Logger logger,
 }) async {
-  EnteVideoEditorController? controller;
+  VideoEditorController? controller;
   File? tempOutputFile;
   final failures = <ValidationFailure>[];
   CropCalculation? cropCalc;
@@ -500,7 +500,7 @@ Future<IterationResult> _processVideoIteration({
   try {
     // Step 1: Initialize video editor controller
     logger.info('  → Initializing video editor controller...');
-    controller = EnteVideoEditorController.file(
+    controller = VideoEditorController.file(
       sourceIoFile,
       minDuration: const Duration(
         milliseconds: 100,
@@ -633,9 +633,7 @@ Future<IterationResult> _processVideoIteration({
     logger.info('  → Exporting video with native editor...');
 
     // Create temp output path
-    final tempDir = Directory.systemTemp.createTempSync(
-      'ente_video_export_test',
-    );
+    final tempDir = Directory.systemTemp.createTempSync('video_export_test');
     final outputPath = path_helper.join(
       tempDir.path,
       'export_${DateTime.now().millisecondsSinceEpoch}.mp4',

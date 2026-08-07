@@ -1,8 +1,8 @@
 import 'dart:ui';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:photos/ui/tools/editor/video_editor/ente_video_editor_controller.dart';
-import 'package:photos/ui/tools/editor/video_editor/ente_video_editor_widgets.dart';
+import 'package:photos/ui/tools/editor/video_editor/video_editor_controller.dart';
+import 'package:photos/ui/tools/editor/video_editor/video_editor_widgets.dart';
 
 void main() {
   const sourceCrop = Rect.fromLTRB(0.1, 0.2, 0.6, 0.8);

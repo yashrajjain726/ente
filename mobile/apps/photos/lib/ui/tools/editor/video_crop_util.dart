@@ -1,6 +1,6 @@
 import 'dart:ui';
 import 'package:flutter/foundation.dart' show visibleForTesting;
-import 'package:photos/ui/tools/editor/video_editor/ente_video_editor_controller.dart';
+import 'package:photos/ui/tools/editor/video_editor/video_editor_controller.dart';
 
 class CropCalculation {
   const CropCalculation({
@@ -37,7 +37,7 @@ class VideoCropUtil {
   ///
   /// Returns a Rect in display-space so the native plugins can transform to file-space.
   static Rect calculateDisplaySpaceCropRect({
-    required EnteVideoEditorController controller,
+    required VideoEditorController controller,
   }) {
     return calculateDisplaySpaceCropRectFromData(
       minCrop: controller.minCrop,
@@ -106,7 +106,7 @@ class VideoCropUtil {
 
   /// Convert the normalised crop selection into file-space coordinates.
   static CropCalculation calculateFileSpaceCrop({
-    required EnteVideoEditorController controller,
+    required VideoEditorController controller,
   }) {
     final crop = calculateDisplaySpaceCropRect(controller: controller);
     return CropCalculation(

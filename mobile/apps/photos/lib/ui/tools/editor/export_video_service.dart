@@ -7,7 +7,7 @@ import 'package:ffmpeg_kit_flutter/return_code.dart';
 import 'package:ffmpeg_kit_flutter/statistics.dart';
 import 'package:logging/logging.dart';
 import 'package:photos/ui/tools/editor/video_crop_util.dart';
-import 'package:photos/ui/tools/editor/video_editor/ente_video_editor_controller.dart';
+import 'package:photos/ui/tools/editor/video_editor/video_editor_controller.dart';
 
 class FfmpegVideoExportPlan {
   const FfmpegVideoExportPlan({
@@ -25,7 +25,7 @@ class ExportService {
   static final _logger = Logger('ExportService');
 
   static FfmpegVideoExportPlan createPlan({
-    required EnteVideoEditorController controller,
+    required VideoEditorController controller,
     required String outputPath,
   }) {
     CropCalculation? crop;
@@ -131,7 +131,7 @@ class ExportService {
   }
 
   static Future<File> exportVideo({
-    required EnteVideoEditorController controller,
+    required VideoEditorController controller,
     required String outputPath,
     void Function(double)? onProgress,
     void Function(Object, StackTrace)? onError,

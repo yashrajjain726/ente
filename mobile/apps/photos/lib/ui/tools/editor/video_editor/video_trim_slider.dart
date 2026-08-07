@@ -5,27 +5,27 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:native_video_editor/native_video_editor.dart';
 import 'package:path/path.dart' as path;
-import 'package:photos/ui/tools/editor/video_editor/ente_video_editor_controller.dart';
+import 'package:photos/ui/tools/editor/video_editor/video_editor_controller.dart';
 
-class EnteVideoTrimSlider extends StatefulWidget {
-  const EnteVideoTrimSlider({
+class VideoTrimSlider extends StatefulWidget {
+  const VideoTrimSlider({
     super.key,
     required this.controller,
     this.height = 60,
     this.horizontalMargin = 15,
   });
 
-  final EnteVideoEditorController controller;
+  final VideoEditorController controller;
   final double height;
   final double horizontalMargin;
 
   @override
-  State<EnteVideoTrimSlider> createState() => _EnteVideoTrimSliderState();
+  State<VideoTrimSlider> createState() => _VideoTrimSliderState();
 }
 
 enum _TrimDrag { start, end, seek }
 
-class _EnteVideoTrimSliderState extends State<EnteVideoTrimSlider> {
+class _VideoTrimSliderState extends State<VideoTrimSlider> {
   Directory? _directory;
   List<File> _frames = const [];
   String? _requestId;

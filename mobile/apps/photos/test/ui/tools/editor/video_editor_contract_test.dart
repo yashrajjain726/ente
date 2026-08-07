@@ -4,7 +4,7 @@ import 'dart:ui';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:photos/ui/tools/editor/export_video_service.dart';
 import 'package:photos/ui/tools/editor/video_crop_util.dart';
-import 'package:photos/ui/tools/editor/video_editor/ente_video_editor_controller.dart';
+import 'package:photos/ui/tools/editor/video_editor/video_editor_controller.dart';
 
 void main() {
   group('calculateDisplaySpaceCropRectFromData', () {
@@ -58,7 +58,7 @@ void main() {
   });
 
   test('FFmpeg plan preserves file paths as structured arguments', () {
-    final controller = EnteVideoEditorController.file(
+    final controller = VideoEditorController.file(
       File("/tmp/input video's source.mp4"),
     );
     addTearDown(controller.dispose);

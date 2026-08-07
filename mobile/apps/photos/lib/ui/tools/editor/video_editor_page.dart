@@ -24,12 +24,12 @@ import "package:photos/ui/tools/editor/export_video_service.dart";
 import "package:photos/ui/tools/editor/native_video_export_service.dart";
 import 'package:photos/ui/tools/editor/video_crop_page.dart';
 import "package:photos/ui/tools/editor/video_crop_util.dart";
-import "package:photos/ui/tools/editor/video_editor/ente_video_editor_controller.dart";
-import "package:photos/ui/tools/editor/video_editor/ente_video_editor_widgets.dart";
 import "package:photos/ui/tools/editor/video_editor/video_editor_app_bar.dart";
 import "package:photos/ui/tools/editor/video_editor/video_editor_bottom_action.dart";
+import "package:photos/ui/tools/editor/video_editor/video_editor_controller.dart";
 import "package:photos/ui/tools/editor/video_editor/video_editor_main_actions.dart";
 import "package:photos/ui/tools/editor/video_editor/video_editor_player_control.dart";
+import "package:photos/ui/tools/editor/video_editor/video_editor_widgets.dart";
 import "package:photos/ui/tools/editor/video_rotate_page.dart";
 import "package:photos/ui/tools/editor/video_trim_page.dart";
 import "package:photos/ui/viewer/file/detail_page.dart";
@@ -55,7 +55,7 @@ class _VideoEditorPageState extends State<VideoEditorPage> {
   final _isExporting = ValueNotifier<bool>(false);
   final _logger = Logger("VideoEditor");
 
-  EnteVideoEditorController? _controller;
+  VideoEditorController? _controller;
 
   /// Toggle state for internal users to switch between native and FFmpeg export
   /// Initially set to the flag service value
@@ -68,7 +68,7 @@ class _VideoEditorPageState extends State<VideoEditorPage> {
     // Initialize toggle with flagService value
     _useNativeExport = flagService.useNativeVideoEditor;
 
-    _controller = EnteVideoEditorController.file(widget.ioFile);
+    _controller = VideoEditorController.file(widget.ioFile);
     unawaited(_initializeController());
   }
 
@@ -143,7 +143,7 @@ class _VideoEditorPageState extends State<VideoEditorPage> {
                                   Positioned.fill(
                                     child: Hero(
                                       tag: "video-editor-preview",
-                                      child: EnteVideoPreview(
+                                      child: VideoEditorPreview(
                                         controller: _controller!,
                                       ),
                                     ),

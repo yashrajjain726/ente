@@ -3,28 +3,28 @@ import 'dart:math' as math;
 import 'package:ente_strings/ente_strings.dart';
 import 'package:flutter/material.dart';
 import 'package:photos/theme/ente_theme.dart';
-import 'package:photos/ui/tools/editor/video_editor/ente_video_editor_controller.dart';
 import 'package:photos/ui/tools/editor/video_editor/video_editor_app_bar.dart';
+import 'package:photos/ui/tools/editor/video_editor/video_editor_controller.dart';
 import 'package:photos/ui/tools/editor/video_editor/video_editor_player_control.dart';
 import 'package:video_player/video_player.dart';
 
-class EnteVideoEditorSubPage extends StatefulWidget {
-  const EnteVideoEditorSubPage({
+class VideoEditorSubPage extends StatefulWidget {
+  const VideoEditorSubPage({
     super.key,
     required this.controller,
     required this.preview,
     required this.actions,
   });
 
-  final EnteVideoEditorController controller;
+  final VideoEditorController controller;
   final Widget preview;
   final Widget actions;
 
   @override
-  State<EnteVideoEditorSubPage> createState() => _EnteVideoEditorSubPageState();
+  State<VideoEditorSubPage> createState() => _VideoEditorSubPageState();
 }
 
-class _EnteVideoEditorSubPageState extends State<EnteVideoEditorSubPage> {
+class _VideoEditorSubPageState extends State<VideoEditorSubPage> {
   late final VideoEditorState _initialState;
   bool _keepChanges = false;
 
@@ -92,10 +92,10 @@ class _EnteVideoEditorSubPageState extends State<EnteVideoEditorSubPage> {
   }
 }
 
-class EnteVideoPreview extends StatelessWidget {
-  const EnteVideoPreview({super.key, required this.controller});
+class VideoEditorPreview extends StatelessWidget {
+  const VideoEditorPreview({super.key, required this.controller});
 
-  final EnteVideoEditorController controller;
+  final VideoEditorController controller;
 
   @override
   Widget build(BuildContext context) {
@@ -145,13 +145,13 @@ class EnteVideoPreview extends StatelessWidget {
   }
 }
 
-class EnteVideoCropEditor extends StatefulWidget {
-  const EnteVideoCropEditor({super.key, required this.controller});
+class VideoCropEditor extends StatefulWidget {
+  const VideoCropEditor({super.key, required this.controller});
 
-  final EnteVideoEditorController controller;
+  final VideoEditorController controller;
 
   @override
-  State<EnteVideoCropEditor> createState() => _EnteVideoCropEditorState();
+  State<VideoCropEditor> createState() => _VideoCropEditorState();
 }
 
 enum _CropDrag {
@@ -166,7 +166,7 @@ enum _CropDrag {
   bottomRight,
 }
 
-class _EnteVideoCropEditorState extends State<EnteVideoCropEditor> {
+class _VideoCropEditorState extends State<VideoCropEditor> {
   _CropDrag? _drag;
   Rect? _startRect;
   Offset? _startPosition;

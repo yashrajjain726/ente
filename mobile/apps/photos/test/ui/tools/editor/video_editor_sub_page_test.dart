@@ -5,12 +5,12 @@ import 'package:ente_strings/ente_strings.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:photos/ente_theme_data.dart';
-import 'package:photos/ui/tools/editor/video_editor/ente_video_editor_controller.dart';
-import 'package:photos/ui/tools/editor/video_editor/ente_video_editor_widgets.dart';
+import 'package:photos/ui/tools/editor/video_editor/video_editor_controller.dart';
+import 'package:photos/ui/tools/editor/video_editor/video_editor_widgets.dart';
 
 void main() {
   testWidgets('system back restores state while Done keeps it', (tester) async {
-    final controller = EnteVideoEditorController.file(File('unused.mp4'));
+    final controller = VideoEditorController.file(File('unused.mp4'));
     addTearDown(controller.dispose);
 
     await tester.pumpWidget(
@@ -50,11 +50,11 @@ void main() {
 class _SubPage extends StatelessWidget {
   const _SubPage(this.controller);
 
-  final EnteVideoEditorController controller;
+  final VideoEditorController controller;
 
   @override
   Widget build(BuildContext context) {
-    return EnteVideoEditorSubPage(
+    return VideoEditorSubPage(
       controller: controller,
       preview: const ColoredBox(color: Colors.black),
       actions: TextButton(

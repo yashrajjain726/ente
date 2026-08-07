@@ -4,11 +4,11 @@ import 'dart:ui';
 
 import 'package:native_video_editor/native_video_editor.dart';
 import 'package:photos/ui/tools/editor/video_crop_util.dart';
-import 'package:photos/ui/tools/editor/video_editor/ente_video_editor_controller.dart';
+import 'package:photos/ui/tools/editor/video_editor/video_editor_controller.dart';
 
 class NativeVideoExportService {
   static Future<File> exportVideo({
-    required EnteVideoEditorController controller,
+    required VideoEditorController controller,
     required String outputPath,
     void Function(double)? onProgress,
     void Function(Object, StackTrace)? onError,
@@ -28,7 +28,7 @@ class NativeVideoExportService {
 
   static Future<VideoEditResult> _performNativeOperations({
     required String outputPath,
-    required EnteVideoEditorController controller,
+    required VideoEditorController controller,
     void Function(double)? onProgress,
   }) async {
     final inputPath = controller.file.path;

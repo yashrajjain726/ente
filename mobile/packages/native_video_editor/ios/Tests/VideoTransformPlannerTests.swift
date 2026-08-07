@@ -1,6 +1,6 @@
 import CoreGraphics
 import XCTest
-@testable import EnteVideoCore
+@testable import VideoEditorCore
 
 final class VideoTransformPlannerTests: XCTestCase {
     func testClockwiseQuarterTurnProducesNormalizedPortraitBounds() throws {
