@@ -11,8 +11,14 @@ import {
     type DialogProps,
     type Theme,
 } from "@mui/material";
+import { SlideUpTransition } from "ente-new/photos/components/mui/SlideUpTransition";
 import { t } from "i18next";
 import { uploadStatColors } from "../uploadProgressStats";
+import {
+    uploadSheetMediaQuery,
+    uploadSheetPaperSx,
+    useIsUploadSheet,
+} from "./bottom-sheet";
 import { useUploadProgressContext } from "./context";
 import {
     normalizePercent,
@@ -22,11 +28,17 @@ import {
 import { UploadProgressDetails } from "./UploadProgressDetails";
 
 export function UploadProgressDialog() {
-    const { onClose, uploadPhase } = useUploadProgressContext();
+    const { onClose, setExpanded, uploadPhase } = useUploadProgressContext();
     const isDone = uploadPhase == "done";
+    const isSheet = useIsUploadSheet();
 
     const handleClose: DialogProps["onClose"] = (_, reason) => {
-        if (reason != "backdropClick") onClose();
+        if (reason == "backdropClick") {
+            // On mobile, tapping the scrim minimizes the sheet.
+            if (isSheet) setExpanded(false);
+            return;
+        }
+        onClose();
     };
 
     return (
@@ -35,7 +47,12 @@ export function UploadProgressDialog() {
             onClose={handleClose}
             maxWidth={false}
             aria-labelledby="upload-progress-title"
-            slotProps={{ paper: { sx: uploadProgressDialogPaperSx } }}
+            slots={isSheet ? { transition: SlideUpTransition } : undefined}
+            slotProps={{
+                paper: {
+                    sx: [uploadProgressDialogPaperSx, uploadSheetPaperSx],
+                },
+            }}
         >
             <Box sx={uploadProgressDialogContentSx(isDone)}>
                 <UploadProgressHeader />
@@ -211,6 +228,11 @@ const uploadProgressDialogContentSx = (isDone: boolean) => ({
     flexDirection: "column",
     gap: isDone ? "36px" : "20px",
     color: "text.base",
+    [uploadSheetMediaQuery]: {
+        p: "12px 16px",
+        pb: "calc(28px + env(safe-area-inset-bottom, 0px))",
+        overflowY: "auto",
+    },
 });
 const headerSx = (theme: Theme) => ({
     alignItems: "center",
@@ -258,7 +280,7 @@ const summaryLayoutSx = {
     gridTemplateColumns: "minmax(0, 440px) minmax(128px, 1fr)",
     gap: "32px",
     alignItems: "center",
-    "@media (max-width: 620px)": { gridTemplateColumns: "1fr", gap: 2 },
+    [uploadSheetMediaQuery]: { pr: "8px", gridTemplateColumns: "1fr", gap: 2 },
 };
 const mainProgressSx = (theme: Theme) => ({
     height: 14,
@@ -276,5 +298,5 @@ const mascotSx = {
     width: 128,
     maxWidth: "100%",
     justifySelf: "center",
-    "@media (max-width: 620px)": { display: "none" },
+    [uploadSheetMediaQuery]: { display: "none" },
 };

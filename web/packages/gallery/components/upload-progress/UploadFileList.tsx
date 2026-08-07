@@ -15,6 +15,7 @@ import { t } from "i18next";
 import { useEffect, useRef } from "react";
 import { VariableSizeList } from "react-window";
 import { uploadStatColors } from "../uploadProgressStats";
+import { uploadSheetMediaQuery } from "./bottom-sheet";
 import { useUploadProgressContext } from "./context";
 import { uploadStatusText } from "./helpers";
 
@@ -236,10 +237,14 @@ const uploadRowSx = (theme: Theme) => ({
     display: "grid",
     gridTemplateColumns: "minmax(160px, 1fr) minmax(180px, 244px)",
     gap: "24px",
-    "@media (max-width: 620px)": {
+    [uploadSheetMediaQuery]: {
         gridTemplateColumns: "1fr",
         gap: 1,
-        "& > :nth-of-type(2)": { gridColumn: "1 / -1", gridRow: 2 },
+        "& > :nth-of-type(2)": {
+            // Align the progress bar with the file name text (36px icon +
+            // 12px gap) and let it fill the remaining width.
+            pl: "48px",
+        },
     },
 });
 const fileIconSx = {
@@ -285,8 +290,14 @@ const rowProgressSx = {
         borderRadius: "35px",
         backgroundColor: progressGreen,
     },
+    [uploadSheetMediaQuery]: { maxWidth: "none" },
 };
-const rowProgressLabelSx = { width: 46, flexShrink: 0, ...mutedCaptionSx };
+const rowProgressLabelSx = {
+    width: 46,
+    flexShrink: 0,
+    ...mutedCaptionSx,
+    [uploadSheetMediaQuery]: { width: 40, textAlign: "right" },
+};
 const emptyRowsSx = (theme: Theme) => ({
     minHeight: 3 * listedRowHeight,
     alignItems: "center",
