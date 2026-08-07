@@ -1,15 +1,6 @@
-//! Photo media-type validation for Space uploads.
-//!
-//! Space posts accept photos only. These helpers normalize a client-declared
-//! media type and sniff raw bytes by magic number, so a caller can reject
-//! non-photo uploads before they reach the object store.
-
 use super::ONLY_PHOTOS_UPLOAD_MESSAGE;
 use crate::error::{Result, SpaceError};
 
-/// Normalize a client-declared photo media type, rejecting anything that is not
-/// a supported still image. `image/jpg` is folded to `image/jpeg`. Returns
-/// `Ok(None)` when no media type was provided.
 pub(crate) fn ensure_supported_photo_media_type(
     media_type: Option<&str>,
 ) -> Result<Option<String>> {
@@ -31,8 +22,6 @@ pub(crate) fn ensure_supported_photo_media_type(
     Err(SpaceError::InvalidInput(ONLY_PHOTOS_UPLOAD_MESSAGE.into()))
 }
 
-/// Infer the media type of `bytes` from its magic number, erroring if it is not
-/// a supported photo format.
 pub(crate) fn ensure_supported_photo_bytes(bytes: &[u8]) -> Result<&'static str> {
     if let Some(media_type) = supported_photo_media_type_for_bytes(bytes) {
         return Ok(media_type);
@@ -41,8 +30,6 @@ pub(crate) fn ensure_supported_photo_bytes(bytes: &[u8]) -> Result<&'static str>
     Err(SpaceError::InvalidInput(ONLY_PHOTOS_UPLOAD_MESSAGE.into()))
 }
 
-/// Sniff `bytes` and return the matching photo media type, or `None` if the
-/// leading bytes match no supported format.
 pub(crate) fn supported_photo_media_type_for_bytes(bytes: &[u8]) -> Option<&'static str> {
     if bytes.starts_with(&[0xff, 0xd8, 0xff]) {
         return Some("image/jpeg");
@@ -59,8 +46,6 @@ pub(crate) fn supported_photo_media_type_for_bytes(bytes: &[u8]) -> Option<&'sta
     None
 }
 
-/// Whether `bytes` is an ISOBMFF/HEIF container with a still-image brand we
-/// accept (HEIC/HEIF and the related single-image and sequence brands).
 fn is_supported_heif_bytes(bytes: &[u8]) -> bool {
     if bytes.len() < 12 || &bytes[4..8] != b"ftyp" {
         return false;

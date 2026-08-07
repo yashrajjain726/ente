@@ -1,46 +1,25 @@
-//! Typed key material and related fixed-size values.
-//!
-//! These newtypes carry their size in the type, so length validation happens
-//! once, at the boundary where raw bytes enter ([`Key::try_from_slice`] and
-//! friends), rather than inside every operation. Secret types zeroize on drop
-//! and redact their `Debug` output; non-secret types (`Nonce`, `Salt`,
-//! [`Header`]) are plain `Copy` values.
-
 use rand_core::{OsRng, RngCore};
 use subtle::ConstantTimeEq;
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
 use crate::crypto::{Error, Result, SecretVec};
 
-/// A 256-bit symmetric encryption key.
-///
-/// One key type serves the secretbox, blob and stream operations: both
-/// algorithm families take 256-bit keys, and Ente's data model shares key
-/// material across them (e.g. a collection key wraps file keys via secretbox
-/// and encrypts collection metadata via blob).
-///
-/// `Clone` is provided because real pipelines cache and share keys; `Copy` is
-/// deliberately not, so every duplication of secret material is explicit.
 #[derive(Clone, Zeroize, ZeroizeOnDrop)]
 pub struct Key([u8; Self::BYTES]);
 
 impl Key {
-    /// Size of a key in bytes.
     pub const BYTES: usize = 32;
 
-    /// Generate a new random key.
     pub fn generate() -> Self {
         let mut bytes = [0u8; Self::BYTES];
         OsRng.fill_bytes(&mut bytes);
         Self(bytes)
     }
 
-    /// Wrap an existing 32-byte array as a key.
     pub fn from_bytes(bytes: [u8; Self::BYTES]) -> Self {
         Self(bytes)
     }
 
-    /// Construct a key from a byte slice, validating its length.
     pub fn try_from_slice(bytes: &[u8]) -> Result<Self> {
         Ok(Self(bytes.try_into().map_err(|_| {
             Error::InvalidKeyLength {
@@ -50,13 +29,11 @@ impl Key {
         })?))
     }
 
-    /// The raw key bytes.
     pub fn as_bytes(&self) -> &[u8; Self::BYTES] {
         &self.0
     }
 }
 
-/// Consumes the source, so it zeroizes on drop.
 impl TryFrom<SecretVec> for Key {
     type Error = Error;
 
@@ -72,7 +49,6 @@ impl std::fmt::Debug for Key {
 }
 
 impl PartialEq for Key {
-    /// Constant-time comparison.
     fn eq(&self, other: &Self) -> bool {
         self.0.ct_eq(&other.0).into()
     }
@@ -80,27 +56,22 @@ impl PartialEq for Key {
 
 impl Eq for Key {}
 
-/// A 192-bit SecretBox nonce. Not secret.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Nonce([u8; Self::BYTES]);
 
 impl Nonce {
-    /// Size of a nonce in bytes.
     pub const BYTES: usize = 24;
 
-    /// Generate a new random nonce.
     pub fn generate() -> Self {
         let mut bytes = [0u8; Self::BYTES];
         OsRng.fill_bytes(&mut bytes);
         Self(bytes)
     }
 
-    /// Wrap an existing 24-byte array as a nonce.
     pub fn from_bytes(bytes: [u8; Self::BYTES]) -> Self {
         Self(bytes)
     }
 
-    /// Construct a nonce from a byte slice, validating its length.
     pub fn try_from_slice(bytes: &[u8]) -> Result<Self> {
         Ok(Self(bytes.try_into().map_err(|_| {
             Error::InvalidNonceLength {
@@ -110,33 +81,27 @@ impl Nonce {
         })?))
     }
 
-    /// The raw nonce bytes.
     pub fn as_bytes(&self) -> &[u8; Self::BYTES] {
         &self.0
     }
 }
 
-/// A 128-bit key derivation salt. Not secret.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Salt([u8; Self::BYTES]);
 
 impl Salt {
-    /// Size of a salt in bytes.
     pub const BYTES: usize = 16;
 
-    /// Generate a new random salt.
     pub fn generate() -> Self {
         let mut bytes = [0u8; Self::BYTES];
         OsRng.fill_bytes(&mut bytes);
         Self(bytes)
     }
 
-    /// Wrap an existing 16-byte array as a salt.
     pub fn from_bytes(bytes: [u8; Self::BYTES]) -> Self {
         Self(bytes)
     }
 
-    /// Construct a salt from a byte slice, validating its length.
     pub fn try_from_slice(bytes: &[u8]) -> Result<Self> {
         Ok(Self(bytes.try_into().map_err(|_| {
             Error::InvalidSaltLength {
@@ -146,25 +111,17 @@ impl Salt {
         })?))
     }
 
-    /// The raw salt bytes.
     pub fn as_bytes(&self) -> &[u8; Self::BYTES] {
         &self.0
     }
 }
 
-/// A 192-bit SecretStream decryption header. Not secret.
-///
-/// While the exact contents are an implementation detail of the secretstream
-/// construction, it effectively contains the random nonce generated during
-/// encryption, and is required for decryption.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Header([u8; Self::BYTES]);
 
 impl Header {
-    /// Size of a header in bytes.
     pub const BYTES: usize = 24;
 
-    /// Construct a header from a byte slice, validating its length.
     pub fn try_from_slice(bytes: &[u8]) -> Result<Self> {
         Ok(Self(bytes.try_into().map_err(|_| {
             Error::InvalidHeaderLength {
@@ -174,26 +131,21 @@ impl Header {
         })?))
     }
 
-    /// Wrap an existing 24-byte array as a header.
     pub fn from_bytes(bytes: [u8; Self::BYTES]) -> Self {
         Self(bytes)
     }
 
-    /// The raw header bytes.
     pub fn as_bytes(&self) -> &[u8; Self::BYTES] {
         &self.0
     }
 }
 
-/// An X25519 public key. Not secret.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct PublicKey([u8; Self::BYTES]);
 
 impl PublicKey {
-    /// Size of a public key in bytes.
     pub const BYTES: usize = 32;
 
-    /// Construct a public key from a byte slice, validating its length.
     pub fn try_from_slice(bytes: &[u8]) -> Result<Self> {
         Ok(Self(bytes.try_into().map_err(|_| {
             Error::InvalidKeyLength {
@@ -203,38 +155,28 @@ impl PublicKey {
         })?))
     }
 
-    /// Wrap an existing 32-byte array as a public key.
     pub fn from_bytes(bytes: [u8; Self::BYTES]) -> Self {
         Self(bytes)
     }
 
-    /// The raw public key bytes.
     pub fn as_bytes(&self) -> &[u8; Self::BYTES] {
         &self.0
     }
 }
 
-/// An X25519 secret key. Zeroized on drop.
 #[derive(Clone, Zeroize, ZeroizeOnDrop)]
 pub struct SecretKey([u8; Self::BYTES]);
 
 impl SecretKey {
-    /// Size of a secret key in bytes.
     pub const BYTES: usize = 32;
 
-    /// Generate a new random secret key.
     pub fn generate() -> Self {
         let mut bytes = [0u8; Self::BYTES];
         OsRng.fill_bytes(&mut bytes);
         Self(bytes)
     }
 
-    /// Deterministically derive a secret key from a 32-byte seed.
-    ///
-    /// The seed bytes are stored as-is and used as the X25519 secret scalar
-    /// (clamping happens during scalar multiplication, per the X25519
-    /// construction). Suitable for deriving stable box keys from a
-    /// higher-entropy master secret.
+    // Store the seed unchanged; X25519 clamps it during scalar multiplication.
     pub fn from_seed(seed: &[u8]) -> Result<Self> {
         Ok(Self(seed.try_into().map_err(|_| {
             Error::InvalidKeyLength {
@@ -244,18 +186,15 @@ impl SecretKey {
         })?))
     }
 
-    /// Construct a secret key from a byte slice, validating its length.
     pub fn try_from_slice(bytes: &[u8]) -> Result<Self> {
         Self::from_seed(bytes)
     }
 
-    /// The public key corresponding to this secret key.
     pub fn public_key(&self) -> PublicKey {
         let secret = x25519_dalek::StaticSecret::from(self.0);
         PublicKey(*x25519_dalek::PublicKey::from(&secret).as_bytes())
     }
 
-    /// The raw secret key bytes.
     pub fn as_bytes(&self) -> &[u8; Self::BYTES] {
         &self.0
     }
@@ -268,7 +207,6 @@ impl std::fmt::Debug for SecretKey {
 }
 
 impl PartialEq for SecretKey {
-    /// Constant-time comparison.
     fn eq(&self, other: &Self) -> bool {
         self.0.ct_eq(&other.0).into()
     }
@@ -276,7 +214,6 @@ impl PartialEq for SecretKey {
 
 impl Eq for SecretKey {}
 
-/// Generate random bytes of specified length.
 pub fn random_bytes(len: usize) -> Vec<u8> {
     let mut buf = vec![0u8; len];
     OsRng.fill_bytes(&mut buf);

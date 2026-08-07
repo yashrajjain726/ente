@@ -1,11 +1,3 @@
-//! Space asset upload and download.
-//!
-//! Posts and profiles store their media in an object store fronted by presigned
-//! URLs. These methods presign an upload, push the encrypted bytes, and fetch
-//! and decrypt them back. Post assets are keyed by a per-post key; profile
-//! avatar/cover assets by the Space key. Photo bytes are validated before
-//! upload (posts are photo-only).
-
 use super::{
     AccountSpaceCtx, PostPhotoAssetOptions, UPLOAD_PURPOSE_AVATAR, UPLOAD_PURPOSE_COVER,
     encrypt_post_object_metadata, ensure_space_upload_size, ensure_supported_photo_bytes,

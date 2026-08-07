@@ -1,11 +1,3 @@
-//! Space posts and feed.
-//!
-//! Posts carry a per-post key (wrapped to the Space key) plus an encrypted
-//! caption and photo objects. These methods create and list posts, page the
-//! cross-Space feed, decrypt post keys/captions/objects, and handle likes,
-//! notifications, and post asset downloads. Key resolution and caching are
-//! delegated to the spine in [`super`](super::AccountSpaceCtx).
-
 use super::{
     AccountSpaceCtx, decrypt_post_object_metadata, ensure_post_objects_are_photos,
     post_response_from_feed_item,

@@ -1,13 +1,7 @@
-//! URL construction utilities.
-
-/// Production API origin.
 pub const PRODUCTION_API_ORIGIN: &str = "https://api.ente.com";
 
-/// Append a trusted endpoint path to the configured API origin.
-///
-/// The configured value is expected to be an origin and endpoint paths are
-/// trusted. Any path prefix is retained as a best-effort convenience for
-/// self-hosted deployments.
+// `origin` must be an origin. Preserving path prefixes is a best-effort
+// convenience for self-hosters.
 pub(crate) fn api_url(origin: &str, path: &str) -> String {
     format!(
         "{}/{}",
@@ -16,7 +10,6 @@ pub(crate) fn api_url(origin: &str, path: &str) -> String {
     )
 }
 
-/// Generate the download URL for a file.
 pub fn file_download_url(api_origin: &str, file_id: i64) -> String {
     if api_origin == PRODUCTION_API_ORIGIN {
         format!("https://files.ente.com/?fileID={}", file_id)

@@ -1,11 +1,3 @@
-//! Space entity keys.
-//!
-//! Entity keys are small wrapped keys the server stores per account under a
-//! string type tag (for example the Space root key). These methods read and
-//! write them through the generic `/user-entity/key` endpoints. Space callers
-//! keep using a combined secretbox payload; this layer splits and joins the
-//! nonce/header required by the generic API.
-
 use super::AccountSpaceCtx;
 use crate::error::{Result, SpaceError};
 use crate::transport::{CreateEntityKeyRequest, EntityKeyPayload, EntityKeyResponse};
@@ -76,6 +68,8 @@ impl AccountSpaceCtx {
     }
 }
 
+// Space uses a combined secretbox payload, but this API stores its 24-byte
+// nonce separately.
 fn split_entity_key_payload(payload: &EntityKeyPayload) -> Result<(String, String)> {
     let combined = b64::decode(&payload.encrypted_key)?;
     if combined.len() <= SPACE_ENTITY_KEY_HEADER_BYTES {

@@ -38,6 +38,3 @@ gloo-timers = { version = "0.3.0", features = ["futures"] }
 [dev-dependencies]
 tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
 mockito.workspace = true
-
-[lints.rust]
-missing_docs = "warn"

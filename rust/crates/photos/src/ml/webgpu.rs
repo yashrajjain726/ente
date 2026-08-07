@@ -1,7 +1,7 @@
-//! Durable WebGPU crash canary: arm before touching the driver and disarm only
-//! after session construction and warm-up. Three recorded failures quarantine
-//! the model directory across restarts. The caller's model-slot lock serializes
-//! access.
+// Arm the durable canary before touching the driver and disarm it only after
+// session construction and warm-up. Three recorded failures quarantine the
+// model directory across restarts. The caller's model-slot lock serializes
+// access.
 
 #[cfg(all(
     not(target_os = "windows"),
@@ -24,7 +24,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-/// Bump to retry quarantined devices after major ONNX Runtime or Dawn changes.
+// Bump to retry quarantined devices after major ONNX Runtime or Dawn changes.
 #[cfg(any(
     target_os = "android",
     target_os = "linux",
@@ -51,15 +51,15 @@ pub(crate) fn set_enabled(enabled: bool) {
     let _ = enabled;
 }
 
-/// Adapter probing touches Vulkan and therefore happens after arming, not here.
+// Adapter probing touches Vulkan and therefore happens after arming, not here.
 #[cfg(any(target_os = "android", target_os = "linux", target_os = "windows"))]
 pub(crate) fn attempt_permitted(model_path: &str) -> bool {
     WEBGPU_ENABLED.load(Ordering::Relaxed)
         && model_dir(model_path).is_some_and(|dir| !quarantined(&dir))
 }
 
-/// Mirrors Chromium's `gpu/config/webgpu_blocklist_impl.cc` Android 12+ policy
-/// as of 2026-07; revisit with pinned ONNX Runtime or Dawn upgrades.
+// Mirrors Chromium's `gpu/config/webgpu_blocklist_impl.cc` Android 12+ policy
+// as of 2026-07; revisit with pinned ONNX Runtime or Dawn upgrades.
 #[cfg(any(target_os = "android", test))]
 const ALLOWLISTED_VULKAN_VENDOR_IDS: [u32; 3] = [
     0x13B5, // ARM (Mali, Immortalis)
@@ -67,7 +67,7 @@ const ALLOWLISTED_VULKAN_VENDOR_IDS: [u32; 3] = [
     0x8086, // Intel
 ];
 
-/// Dawn chooses independently, so every enumerated adapter must be allowlisted.
+// Dawn chooses independently, so every enumerated adapter must be allowlisted.
 #[cfg(any(target_os = "android", test))]
 fn vendors_allowlisted(vendor_ids: &[u32]) -> bool {
     !vendor_ids.is_empty()
@@ -81,11 +81,12 @@ fn vendors_allowlisted(vendor_ids: &[u32]) -> bool {
 pub(crate) enum AdapterCheck {
     Allowed,
     Denied,
-    /// Probe failures count toward quarantine; policy denials do not.
+    // Probe failures count toward quarantine; policy denials do not.
     Failed,
 }
 
-/// Must run inside an armed canary because this is the first Vulkan driver access.
+// Must run inside an armed canary because this is the first Vulkan driver
+// access.
 #[cfg(target_os = "android")]
 pub(crate) fn check_adapter() -> AdapterCheck {
     static VERDICT: OnceLock<AdapterCheck> = OnceLock::new();
@@ -134,7 +135,7 @@ fn probe_vulkan_vendor_ids() -> Result<Vec<u32>, String> {
     vendor_ids
 }
 
-/// Dropping without disarming intentionally preserves the failed-attempt record.
+// Dropping without disarming intentionally preserves the failed-attempt record.
 #[cfg(any(
     target_os = "android",
     target_os = "linux",

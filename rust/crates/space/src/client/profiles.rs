@@ -1,11 +1,3 @@
-//! Space profiles.
-//!
-//! A Space profile is an encrypted blob (display name, bio, and the like) plus
-//! optional avatar and cover assets, all keyed by the Space key for its
-//! version. These methods fetch the raw or decrypted profile and update it,
-//! re-using the cached owned-Space key via the spine in
-//! [`super`](super::AccountSpaceCtx).
-
 use super::{AccountSpaceCtx, decrypt_space_profile, space_profile_without_payload};
 use crate::crypto::encrypt_secretbox_payload;
 use crate::error::{Result, SpaceError};

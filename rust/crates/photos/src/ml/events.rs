@@ -1,9 +1,7 @@
-//! Reports graceful ML fallbacks and quarantines that would otherwise be
-//! invisible to the app because the calling operation still succeeds.
+// Report ML fallbacks and quarantines even when the calling operation succeeds.
 
 use std::sync::Mutex;
 
-/// Prefer recent, actionable events when the app has not drained the buffer.
 const MAX_BUFFERED_EVENTS: usize = 64;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -59,8 +57,8 @@ pub fn take_events() -> Vec<MlRuntimeEvent> {
 mod tests {
     use super::{MAX_BUFFERED_EVENTS, Severity, record, take_events};
 
-    /// A single test because the buffer is a process-global shared with any
-    /// concurrently running test that records events.
+    // Keep this in one test because the process-global buffer is shared across
+    // tests.
     #[test]
     fn records_in_order_drains_on_take_and_drops_oldest_when_full() {
         take_events();

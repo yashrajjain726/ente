@@ -1,8 +1,3 @@
-//! Developer tooling for the committed ML self-test data.
-//!
-//!   cargo run -p ente-photos --example ml_goldens -- generate
-//!   cargo run -p ente-photos --example ml_goldens -- validate-zero-separation
-
 #[allow(dead_code)]
 #[path = "../tests/support/mod.rs"]
 mod support;
