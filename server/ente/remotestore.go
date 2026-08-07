@@ -61,6 +61,8 @@ const (
 	// only when those clients no longer need to be isolated from a new flag.
 	// CastSessionsV2 gates cast sessions v2 support.
 	CastSessionsV2 int64 = 1 << 5
+	// DeferredMultipartChecksums gates multipart URLs without precomputed checksums.
+	DeferredMultipartChecksums int64 = 1 << 6
 )
 
 type FlagKey string
