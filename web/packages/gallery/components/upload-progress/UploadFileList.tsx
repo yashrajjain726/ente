@@ -240,9 +240,7 @@ const uploadRowSx = (theme: Theme) => ({
     [uploadSheetMediaQuery]: {
         gridTemplateColumns: "1fr",
         gap: 1,
-        "& > :nth-of-type(2)": {
-            pl: "48px",
-        },
+        "& > :nth-of-type(2)": { pl: "48px" },
     },
 });
 const fileIconSx = {
