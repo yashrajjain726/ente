@@ -125,7 +125,7 @@ const minimizedPaperSx = (theme: Theme): SystemStyleObject<Theme> => ({
     color: "text.base",
     overflow: "hidden",
     [uploadSheetMediaQuery]: {
-        width: "100%",
+        width: "calc(100svw - 32px)",
         animation: `${minimizedRiseAnimation} 320ms cubic-bezier(0.2, 0.8, 0.2, 1)`,
         "@media (prefers-reduced-motion: reduce)": { animation: "none" },
     },

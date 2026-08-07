@@ -48,6 +48,11 @@ import type {
     ZipItem,
 } from "ente-base/types/ipc";
 import type { UploadTypeSelectorIntent } from "ente-gallery/components/Upload";
+import {
+    uploadSheetMediaQuery,
+    uploadSheetPaperSx,
+    useIsUploadSheet,
+} from "ente-gallery/components/upload-progress/bottom-sheet";
 import { UploadProgress } from "ente-gallery/components/upload-progress/UploadProgress";
 import { CanvasReadbackBlockedDialog } from "ente-gallery/components/upload/CanvasReadbackBlockedDialog";
 import { DefaultOptions } from "ente-gallery/components/upload/DefaultOptions";
@@ -73,6 +78,7 @@ import {
 import { hasReliableCanvasReadback } from "ente-gallery/utils/upload/canvas-integrity";
 import { CollectionSubType, type Collection } from "ente-media/collection";
 import type { EnteFile } from "ente-media/file";
+import { SlideUpTransition } from "ente-new/photos/components/mui/SlideUpTransition";
 import { suppressAutoLockOnBlurForTrustedPrompt } from "ente-new/photos/services/app-lock";
 import {
     addOrCopyToCollection,
@@ -1487,6 +1493,8 @@ const UploadTypeSelector: React.FC<UploadTypeSelectorProps> = ({
     pendingUploadType,
     onSelect,
 }) => {
+    const isSheet = useIsUploadSheet();
+
     const handleClose: DialogProps["onClose"] = () => {
         // The browser may still be processing the selection after the picker closes.
         if (pendingUploadType) return;
@@ -1498,27 +1506,42 @@ const UploadTypeSelector: React.FC<UploadTypeSelectorProps> = ({
             open={open}
             onClose={handleClose}
             fullWidth
+            slots={isSheet ? { transition: SlideUpTransition } : undefined}
             slotProps={{
                 paper: {
-                    sx: (theme) => ({
-                        maxWidth: "375px",
-                        p: 1,
-                        borderRadius: "28px",
-                        boxShadow: "none",
-                        border: "1px solid",
-                        borderColor: "stroke.faint",
-                        "&:has([data-default-options], [data-takeout-options])":
-                            {
-                                maxWidth: "621px",
-                                p: 0,
-                                borderRadius: "20px",
-                                backgroundColor: "secondary.main",
-                                ...theme.applyStyles("dark", {
-                                    backgroundColor: "background.paper",
-                                }),
+                    sx: [
+                        (theme) => ({
+                            maxWidth: "375px",
+                            p: 1,
+                            borderRadius: "28px",
+                            boxShadow: "none",
+                            border: "1px solid",
+                            borderColor: "stroke.faint",
+                            "&:has([data-default-options], [data-takeout-options])":
+                                {
+                                    maxWidth: "621px",
+                                    p: 0,
+                                    borderRadius: "20px",
+                                    backgroundColor: "secondary.main",
+                                    ...theme.applyStyles("dark", {
+                                        backgroundColor: "background.paper",
+                                    }),
+                                },
+                            [theme.breakpoints.down(360)]: { p: 0 },
+                        }),
+                        uploadSheetPaperSx,
+                        // The ":has()" selector above outweighs the media query
+                        // styles in uploadSheetPaperSx; re-assert the sheet
+                        // shape at matching specificity.
+                        {
+                            [uploadSheetMediaQuery]: {
+                                "&&": {
+                                    maxWidth: "none",
+                                    borderRadius: "20px 20px 0 0",
+                                },
                             },
-                        [theme.breakpoints.down(360)]: { p: 0 },
-                    }),
+                        },
+                    ],
                 },
             }}
             sx={{
@@ -1574,6 +1597,7 @@ const UploadOptions: React.FC<UploadOptionsProps> = ({
 
     return showTakeoutOptions ? (
         <TakeoutOptions
+            isFolderSelectionPending={pendingUploadType == "folders"}
             onBack={handleTakeoutClose}
             onSelectFolder={handleSelectFolder}
             onSelectZips={handleSelectGooglePhotos}

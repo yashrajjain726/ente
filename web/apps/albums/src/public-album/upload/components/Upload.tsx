@@ -35,6 +35,10 @@ import { useBaseContext } from "ente-base/context";
 import { basename } from "ente-base/file-name";
 import type { PublicAlbumsCredentials } from "ente-base/http";
 import log from "ente-base/log";
+import {
+    uploadSheetPaperSx,
+    useIsUploadSheet,
+} from "ente-gallery/components/upload-progress/bottom-sheet";
 import { UploadProgress } from "ente-gallery/components/upload-progress/UploadProgress";
 import { CanvasReadbackBlockedDialog } from "ente-gallery/components/upload/CanvasReadbackBlockedDialog";
 import { DefaultOptions } from "ente-gallery/components/upload/DefaultOptions";
@@ -42,6 +46,7 @@ import { useFileInput } from "ente-gallery/components/utils/use-file-input";
 import { hasReliableCanvasReadback } from "ente-gallery/utils/upload/canvas-integrity";
 import type { Collection } from "ente-media/collection";
 import type { EnteFile } from "ente-media/file";
+import { SlideUpTransition } from "ente-new/photos/components/mui/SlideUpTransition";
 import { firstNonEmpty } from "ente-utils/array";
 import { t } from "i18next";
 import React, { useCallback, useEffect, useRef, useState } from "react";
@@ -520,25 +525,31 @@ const UploadTypeSelector: React.FC<UploadTypeSelectorProps> = ({
         onClose();
     };
 
+    const isSheet = useIsUploadSheet();
+
     return (
         <Dialog
             open={open}
             onClose={handleClose}
             fullWidth
+            slots={isSheet ? { transition: SlideUpTransition } : undefined}
             slotProps={{
                 paper: {
-                    sx: (theme) => ({
-                        maxWidth: "440px",
-                        p: 0,
-                        borderRadius: "20px",
-                        boxShadow: "none",
-                        border: "1px solid",
-                        borderColor: "stroke.faint",
-                        backgroundColor: "secondary.main",
-                        ...theme.applyStyles("dark", {
-                            backgroundColor: "background.paper",
+                    sx: [
+                        (theme) => ({
+                            maxWidth: "440px",
+                            p: 0,
+                            borderRadius: "20px",
+                            boxShadow: "none",
+                            border: "1px solid",
+                            borderColor: "stroke.faint",
+                            backgroundColor: "secondary.main",
+                            ...theme.applyStyles("dark", {
+                                backgroundColor: "background.paper",
+                            }),
                         }),
-                    }),
+                        uploadSheetPaperSx,
+                    ],
                 },
             }}
             sx={{
