@@ -6,7 +6,6 @@ import "package:ente_pure_utils/ente_pure_utils.dart";
 import "package:ente_sharing/components/invite_dialog.dart";
 import "package:ente_sharing/models/user.dart";
 import 'package:ente_strings/ente_strings.dart';
-import "package:ente_ui/components/buttons/button_widget.dart";
 import "package:ente_ui/components/progress_dialog.dart";
 import 'package:ente_ui/utils/dialog_util.dart';
 import "package:ente_ui/utils/toast_util.dart";
@@ -133,7 +132,7 @@ class CollectionActions {
       showDeleteFromAllCollectionsOption: true,
     );
 
-    if (dialogChoice?.buttonResult.action != ButtonAction.first) return;
+    if (dialogChoice == null) return;
 
     ProgressDialog? progressDialog;
     if (context.mounted) {
@@ -142,7 +141,7 @@ class CollectionActions {
     }
 
     bool isFavoriteCollection = false;
-    final bool keepFiles = !(dialogChoice?.deleteFromAllCollections ?? false);
+    final bool keepFiles = !dialogChoice.deleteFromAllCollections;
     final List<Collection> emptyCollections = [];
     final List<Collection> nonEmptyCollections = [];
     final List<dynamic> errors = [];
@@ -286,7 +285,7 @@ class CollectionActions {
       showDeleteFromAllCollectionsOption: true,
     );
 
-    if (result?.buttonResult.action != ButtonAction.first) {
+    if (result == null) {
       return;
     }
 
@@ -302,7 +301,7 @@ class CollectionActions {
       await CollectionService.instance.trashCollection(
         context.mounted ? context : null,
         collection,
-        keepFiles: !(result?.deleteFromAllCollections ?? false),
+        keepFiles: !result.deleteFromAllCollections,
       );
 
       await progressDialog?.hide();
