@@ -1,24 +1,17 @@
 import Flutter
 import UIKit
 
-public final class EnteScreenBrightnessPlugin: NSObject, FlutterPlugin, FlutterSceneLifeCycleDelegate {
+public final class EnteScreenBrightnessPlugin: NSObject, FlutterPlugin {
     private weak var registrar: FlutterPluginRegistrar?
-    private var capturedScreen: UIScreen?
-    private var capturedBrightness: CGFloat?
+    private var dimmingView: UIView?
 
     private init(registrar: FlutterPluginRegistrar) {
         self.registrar = registrar
         super.init()
         NotificationCenter.default.addObserver(
             self,
-            selector: #selector(restoreForAppDeactivation(_:)),
-            name: UIApplication.willResignActiveNotification,
-            object: nil
-        )
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(restoreForAppDeactivation(_:)),
-            name: UIApplication.willTerminateNotification,
+            selector: #selector(applicationDidEnterBackground(_:)),
+            name: UIApplication.didEnterBackgroundNotification,
             object: nil
         )
     }
@@ -30,62 +23,32 @@ public final class EnteScreenBrightnessPlugin: NSObject, FlutterPlugin, FlutterS
         )
         let instance = EnteScreenBrightnessPlugin(registrar: registrar)
         registrar.addMethodCallDelegate(instance, channel: channel)
-        registrar.addSceneDelegate(instance)
     }
 
     public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
         switch call.method {
-        case "setBrightness":
+        case "setApplicationBrightness":
             guard let number = call.arguments as? NSNumber else {
-                result(FlutterError(
-                    code: "INVALID_BRIGHTNESS",
-                    message: "Brightness must be a number from 0 to 1.",
-                    details: nil
-                ))
+                result(invalidBrightnessError())
                 return
             }
 
             let brightness = CGFloat(number.doubleValue)
             guard brightness.isFinite, (0...1).contains(brightness) else {
-                result(FlutterError(
-                    code: "INVALID_BRIGHTNESS",
-                    message: "Brightness must be a number from 0 to 1.",
-                    details: nil
-                ))
+                result(invalidBrightnessError())
                 return
             }
-
-            guard let screen = activeScreen() else {
+            guard UIApplication.shared.applicationState == .active,
+                  let view = registrar?.viewController?.viewIfLoaded else {
                 result(false)
                 return
             }
 
-            if let capturedScreen, capturedScreen !== screen {
-                result(false)
-                return
-            }
+            setApplicationBrightness(brightness, in: view)
+            result(true)
 
-            let currentBrightness = screen.brightness
-            guard currentBrightness > brightness else {
-                result(false)
-                return
-            }
-
-            let startedSession = capturedBrightness == nil
-            if startedSession {
-                capturedScreen = screen
-                capturedBrightness = currentBrightness
-            }
-            screen.brightness = brightness
-            let didDim = screen.brightness < currentBrightness
-            if !didDim && startedSession {
-                capturedScreen = nil
-                capturedBrightness = nil
-            }
-            result(didDim)
-
-        case "restoreBrightness":
-            restoreCapturedBrightness()
+        case "resetApplicationBrightness":
+            resetApplicationBrightness()
             result(nil)
 
         default:
@@ -93,38 +56,56 @@ public final class EnteScreenBrightnessPlugin: NSObject, FlutterPlugin, FlutterS
         }
     }
 
-    private func activeScreen() -> UIScreen? {
-        guard let window = registrar?.viewController?.viewIfLoaded?.window else {
-            return nil
+    private func setApplicationBrightness(_ brightness: CGFloat, in view: UIView) {
+        if brightness == 1 {
+            resetApplicationBrightness()
+            return
         }
-        if let scene = window.windowScene {
-            return scene.activationState == .foregroundActive ? scene.screen : nil
+
+        let overlay: UIView
+        if let dimmingView, dimmingView.superview === view {
+            overlay = dimmingView
+        } else {
+            resetApplicationBrightness()
+            overlay = UIView(frame: view.bounds)
+            overlay.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+            overlay.backgroundColor = .black
+            overlay.isAccessibilityElement = false
+            overlay.isUserInteractionEnabled = false
+            overlay.alpha = 0
+            view.addSubview(overlay)
+            dimmingView = overlay
         }
-        return UIApplication.shared.applicationState == .active ? window.screen : nil
+
+        UIView.animate(
+            withDuration: 0.5,
+            delay: 0,
+            options: [.allowUserInteraction, .beginFromCurrentState]
+        ) {
+            overlay.alpha = 1 - brightness
+        }
     }
 
-    @objc private func restoreForAppDeactivation(_ notification: Notification) {
-        restoreCapturedBrightness()
+    private func resetApplicationBrightness() {
+        dimmingView?.layer.removeAllAnimations()
+        dimmingView?.removeFromSuperview()
+        dimmingView = nil
     }
 
-    public func sceneWillResignActive(_ scene: UIScene) {
-        restoreCapturedBrightness()
+    private func invalidBrightnessError() -> FlutterError {
+        FlutterError(
+            code: "INVALID_BRIGHTNESS",
+            message: "Application brightness must be a number from 0 to 1.",
+            details: nil
+        )
     }
 
-    public func sceneDidDisconnect(_ scene: UIScene) {
-        restoreCapturedBrightness()
-    }
-
-    private func restoreCapturedBrightness() {
-        guard let screen = capturedScreen,
-              let brightness = capturedBrightness else { return }
-        screen.brightness = brightness
-        capturedScreen = nil
-        capturedBrightness = nil
+    @objc private func applicationDidEnterBackground(_ notification: Notification) {
+        resetApplicationBrightness()
     }
 
     deinit {
-        restoreCapturedBrightness()
+        resetApplicationBrightness()
         NotificationCenter.default.removeObserver(self)
     }
 }
