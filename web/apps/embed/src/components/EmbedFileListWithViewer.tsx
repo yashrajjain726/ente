@@ -40,14 +40,10 @@ export const EmbedFileListWithViewer: React.FC<
         [files],
     );
 
-    const handleThumbnailClick = useCallback(
-        (index: number) => {
-            setCurrentIndex(index);
-            setOpenFileViewer(true);
-        },
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-        [files.length],
-    );
+    const handleThumbnailClick = useCallback((index: number) => {
+        setCurrentIndex(index);
+        setOpenFileViewer(true);
+    }, []);
 
     const handleCloseFileViewer = useCallback(() => {
         setOpenFileViewer(false);

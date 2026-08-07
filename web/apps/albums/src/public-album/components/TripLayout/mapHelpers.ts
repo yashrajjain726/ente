@@ -216,26 +216,15 @@ export const getMapCenter = (
     const firstLng =
         firstCluster.reduce((sum, p) => sum + p.lng, 0) / firstCluster.length;
 
-    const isMobile = isMobileDevice();
-    const timelineWidthRatio = isMobile ? 0.0 : 0.5;
-
-    const degreesPerPixelAtZoom10 = 0.35 / 1000;
-    const basePixelsToShift =
-        (window.innerWidth || 1400) * (1 - timelineWidthRatio);
-    const pixelsToShiftFor20Percent = isMobile
-        ? basePixelsToShift * 0.6
-        : basePixelsToShift * 3.0;
-    const lngShift = pixelsToShiftFor20Percent * degreesPerPixelAtZoom10;
-
-    const adjustedLng = firstLng - lngShift;
-
-    return [firstLat, adjustedLng];
+    return offsetLocation(firstLat, firstLng);
 };
 
 export const getLocationPosition = (
     lat: number,
     lng: number,
-): [number, number] => {
+): [number, number] => offsetLocation(lat, lng);
+
+const offsetLocation = (lat: number, lng: number): [number, number] => {
     const isMobile = isMobileDevice();
     const timelineWidthRatio = isMobile ? 0.0 : 0.5;
     const degreesPerPixelAtZoom10 = 0.35 / 1000;

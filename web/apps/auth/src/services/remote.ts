@@ -118,7 +118,7 @@ export const authenticatorEntityDiff = async (
         if (timestamp) {
             // The remote timestamp is in epoch microseconds, while Date.now
             // and timeOffset are in epoch milliseconds.
-            timeOffset = Date.now() - Math.floor(timestamp / 1e3);
+            timeOffset = Math.floor(timestamp / 1e3) - Date.now();
         }
 
         if (diff.length == 0) break;

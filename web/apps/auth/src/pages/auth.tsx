@@ -206,12 +206,15 @@ const CodeDisplay: React.FC<CodeDisplayProps> = ({ code, timeOffset }) => {
             periodMs - ((Date.now() + timeOffset) % periodMs);
 
         let interval: ReturnType<typeof setInterval> | undefined;
-        setTimeout(() => {
+        const timeout = setTimeout(() => {
             regen();
             interval = setInterval(regen, periodMs);
         }, timeToNextCode);
 
-        return () => interval && clearInterval(interval);
+        return () => {
+            clearTimeout(timeout);
+            if (interval) clearInterval(interval);
+        };
     }, [code, timeOffset, regen]);
 
     return (

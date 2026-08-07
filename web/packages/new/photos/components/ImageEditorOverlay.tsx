@@ -862,11 +862,8 @@ const getCropRegionArgs = (
 
     const displayScale = canvasEle.width / canvasRect.width;
 
-    // calculate the coordinates of the crop box relative to the canvas and adjust for any scrolling by adding scroll offsets
-    const x1 =
-        (cropBoxRect.left - canvasRect.left + window.scrollX) * displayScale;
-    const y1 =
-        (cropBoxRect.top - canvasRect.top + window.scrollY) * displayScale;
+    const x1 = (cropBoxRect.left - canvasRect.left) * displayScale;
+    const y1 = (cropBoxRect.top - canvasRect.top) * displayScale;
     const x2 = x1 + cropBoxRect.width * displayScale;
     const y2 = y1 + cropBoxRect.height * displayScale;
 

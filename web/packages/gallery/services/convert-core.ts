@@ -98,9 +98,11 @@ export const playableVideoURLWeb = async (
         try {
             log.info(`Converting ${videoFileName} to mp4`);
             const convertedBlob = await convertToMP4(videoBlob);
-            return URL.createObjectURL(
+            const convertedURL = URL.createObjectURL(
                 new Blob([convertedBlob], { type: "video/mp4" }),
             );
+            URL.revokeObjectURL(videoObjectURL);
+            return convertedURL;
         } catch (e) {
             log.error(`Video conversion failed for ${videoFileName}`, e);
         }

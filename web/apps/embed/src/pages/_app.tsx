@@ -28,7 +28,7 @@ export default function App({ Component, pageProps }: AppProps) {
 
     const isRouteChangeInProgress = useIsRouteChangeInProgress();
 
-    const { showLoadingBar, hideLoadingBar } = useLoadingBar();
+    const { loadingBarRef, showLoadingBar, hideLoadingBar } = useLoadingBar();
 
     useEffect(() => {
         if (isRouteChangeInProgress) {
@@ -66,7 +66,7 @@ export default function App({ Component, pageProps }: AppProps) {
                 <BaseContext.Provider value={baseContext}>
                     <PhotosAppContext.Provider value={photosAppContextValue}>
                         <Component {...pageProps} />
-                        <ThemedLoadingBar ref={{ current: null }} />
+                        <ThemedLoadingBar ref={loadingBarRef} />
                     </PhotosAppContext.Provider>
                 </BaseContext.Provider>
             </ThemeProvider>
