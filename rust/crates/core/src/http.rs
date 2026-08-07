@@ -1,14 +1,3 @@
-//! HTTP client for the Ente API.
-//!
-//! These are thin wrappers over [`reqwest`] with Ente-specific ergonomics.
-//! [`Http`] is a transparent wrapper that adds nothing of its own to a request;
-//! beyond its convenience methods it exists so that a single connection pool can
-//! be shared across clients (an `Http` is cheap to clone, and clones share the
-//! pool). [`Api`] is tailored to one Ente API origin, with pluggable
-//! authentication and built-in Ente headers.
-//!
-//! The interface mirrors reqwest, so if you know reqwest you will feel at home.
-
 use std::future::Future;
 use std::sync::{PoisonError, RwLock};
 use std::time::Duration;
@@ -36,51 +25,34 @@ const LINK_DEVICE_TOKEN: HeaderName = HeaderName::from_static("x-auth-link-devic
 const CAST_ACCESS_TOKEN: HeaderName = HeaderName::from_static("x-cast-access-token");
 const SPACE_SESSION_TOKEN: HeaderName = HeaderName::from_static("x-space-session-token");
 
-/// An error from an HTTP request.
 #[derive(Error, Debug)]
 pub enum Error {
-    /// The request could not be sent, or the response could not be read.
     #[error(transparent)]
     Network(NetworkError),
 
-    /// The server responded with a non-2xx status.
     #[error("HTTP {status} at {path}")]
-    Http {
-        /// The HTTP status code.
-        status: u16,
-        /// The request path that failed, with its query stripped.
-        path: String,
-    },
+    Http { status: u16, path: String },
 
-    /// The server responded with a non-2xx status, and its body carried an
-    /// Ente API error code.
     #[error("HTTP {status} {code} at {path}")]
     Api {
-        /// The HTTP status code.
         status: u16,
-        /// The request path that failed, with its query stripped.
         path: String,
-        /// The server's error code, e.g. `USER_NOT_REGISTERED`.
         code: String,
     },
 
-    /// The response arrived, but its body was not the expected JSON.
     #[error(transparent)]
     Parse(ParseError),
 }
 
-/// The underlying failure of a [`Network`](Error::Network) error.
 #[derive(Error, Debug)]
 #[error(transparent)]
 pub struct NetworkError(reqwest::Error);
 
-/// The underlying failure of a [`Parse`](Error::Parse) error.
 #[derive(Error, Debug)]
 #[error(transparent)]
 pub struct ParseError(serde_json::Error);
 
 impl Error {
-    /// A connection could not be established.
     pub fn is_connect(&self) -> bool {
         #[cfg(not(target_arch = "wasm32"))]
         {
@@ -92,12 +64,10 @@ impl Error {
         }
     }
 
-    /// The request timed out.
     pub fn is_timeout(&self) -> bool {
         matches!(self, Error::Network(e) if e.0.is_timeout())
     }
 
-    /// The HTTP status code, if the server responded with a non-2xx status.
     pub fn status_code(&self) -> Option<u16> {
         match self {
             Error::Http { status, .. } | Error::Api { status, .. } => Some(*status),
@@ -105,8 +75,6 @@ impl Error {
         }
     }
 
-    /// Returns `true` if the request failed in transit, or if the server
-    /// answered with a 429 or a 5xx status.
     pub fn is_retryable(&self) -> bool {
         match self {
             Error::Network(e) => e.0.is_request() || e.0.is_body(),
@@ -127,16 +95,12 @@ impl From<reqwest::Error> for Error {
     }
 }
 
-/// A bare HTTP client for requests to arbitrary URLs.
-///
-/// Cloning is cheap and shares one connection pool.
 #[derive(Clone)]
 pub struct Http {
     client: reqwest::Client,
 }
 
 impl Http {
-    /// Create a transport with default connect and read timeouts.
     pub fn new() -> Result<Self, Error> {
         let builder = reqwest::Client::builder();
         #[cfg(not(target_arch = "wasm32"))]
@@ -148,27 +112,22 @@ impl Http {
         })
     }
 
-    /// Start a GET request to `url`.
     pub fn get(&self, url: &str) -> RequestBuilder {
         self.request(Method::GET, url)
     }
 
-    /// Start a POST request to `url`.
     pub fn post(&self, url: &str) -> RequestBuilder {
         self.request(Method::POST, url)
     }
 
-    /// Start a PUT request to `url`.
     pub fn put(&self, url: &str) -> RequestBuilder {
         self.request(Method::PUT, url)
     }
 
-    /// Start a DELETE request to `url`.
     pub fn delete(&self, url: &str) -> RequestBuilder {
         self.request(Method::DELETE, url)
     }
 
-    /// Start a HEAD request to `url`.
     pub fn head(&self, url: &str) -> RequestBuilder {
         self.request(Method::HEAD, url)
     }
@@ -178,27 +137,15 @@ impl Http {
     }
 }
 
-/// How an [`Api`] authenticates its requests.
-///
-/// An `Api` uses a single scheme for its lifetime. To act as more than one
-/// identity at once, hold several `Api`s over the same [`Http`].
 #[derive(ZeroizeOnDrop)]
 pub enum Auth {
-    /// A logged-in user, sent as the `X-Auth-Token` header.
     User(String),
-    /// A viewer of a public album, sent as `X-Auth-Access-Token` with an optional
-    /// password JWT and link-device token.
     PublicAlbum {
-        /// The album access token.
         access_token: String,
-        /// The password-protected album's JWT, if the album has a password.
         jwt: Option<String>,
-        /// The link-device token, if one has been issued.
         link_device: Option<String>,
     },
-    /// A cast session, sent as the `X-Cast-Access-Token` header.
     Cast(String),
-    /// A Space browser session, sent as the `X-Space-Session-Token` header.
     SpaceSession(String),
 }
 
@@ -241,22 +188,15 @@ fn sensitive_header(
     }
 }
 
-/// Settings for building an [`Api`].
 pub struct ApiConfig {
-    /// The Ente API origin: scheme, host, and port, e.g. `https://api.ente.com`.
     pub origin: String,
-    /// The client package, sent as `X-Client-Package` (e.g. `io.ente.photos`).
     pub client_package: Option<String>,
-    /// The client version, sent as `X-Client-Version`.
     pub client_version: Option<String>,
-    /// The user agent to send. Ignored on wasm.
     pub user_agent: Option<String>,
-    /// The authentication to start with, or `None` to start unauthenticated.
     pub auth: Option<Auth>,
 }
 
 impl ApiConfig {
-    /// Config with only the origin set.
     pub fn new(origin: String) -> Self {
         Self {
             origin,
@@ -268,10 +208,6 @@ impl ApiConfig {
     }
 }
 
-/// An Ente API client, bound to a single origin.
-///
-/// Requests take a path relative to that origin and automatically carry the Ente
-/// client headers and the credentials of the [`Auth`] scheme.
 pub struct Api {
     http: Http,
     origin: String,
@@ -283,7 +219,6 @@ pub struct Api {
 }
 
 impl Api {
-    /// Build a client over `http`, sharing its connection pool.
     pub fn new(http: Http, config: ApiConfig) -> Self {
         Self {
             http,
@@ -296,42 +231,34 @@ impl Api {
         }
     }
 
-    /// The bare transport underneath, for requests to other hosts.
     pub fn http(&self) -> &Http {
         &self.http
     }
 
-    /// Change the authentication used for subsequent requests, e.g. after login.
     pub fn set_auth(&self, auth: Option<Auth>) {
         *self.auth.write().unwrap_or_else(PoisonError::into_inner) = auth;
     }
 
-    /// Start a GET request to `path`, relative to the origin.
     pub fn get(&self, path: &str) -> RequestBuilder {
         self.request(Method::GET, path)
     }
 
-    /// Start a POST request to `path`, relative to the origin.
     pub fn post(&self, path: &str) -> RequestBuilder {
         self.request(Method::POST, path)
     }
 
-    /// Start a PUT request to `path`, relative to the origin.
     pub fn put(&self, path: &str) -> RequestBuilder {
         self.request(Method::PUT, path)
     }
 
-    /// Start a DELETE request to `path`, relative to the origin.
     pub fn delete(&self, path: &str) -> RequestBuilder {
         self.request(Method::DELETE, path)
     }
 
-    /// Start a HEAD request to `path`, relative to the origin.
     pub fn head(&self, path: &str) -> RequestBuilder {
         self.request(Method::HEAD, path)
     }
 
-    /// Check that the server is reachable.
     pub async fn ping(&self) -> Result<PingResponse, Error> {
         self.get("/ping")
             .send()
@@ -363,69 +290,47 @@ impl Api {
     }
 }
 
-/// A request under construction.
-///
-/// Configure it by chaining methods, then [`send`](Self::send) it.
 #[must_use = "a request is only sent when you call send()"]
 pub struct RequestBuilder(reqwest::RequestBuilder);
 
 impl RequestBuilder {
-    /// Add URL query parameters, serialized from any [`Serialize`] value with
-    /// `serde_urlencoded`.
     pub fn query<Q: Serialize + ?Sized>(self, query: &Q) -> Self {
         Self(self.0.query(query))
     }
 
-    /// Add a header.
     pub fn header(self, name: &str, value: &str) -> Self {
         Self(self.0.header(name, value))
     }
 
-    /// Set the body to `body` serialized as JSON, with a JSON `Content-Type`.
     pub fn json<B: Serialize + ?Sized>(self, body: &B) -> Self {
         Self(self.0.json(body))
     }
 
-    /// Set the body to raw bytes.
     pub fn body(self, body: Vec<u8>) -> Self {
         Self(self.0.body(body))
     }
 
-    /// Send the request, returning the [`Response`] for any status.
     pub async fn send(self) -> Result<Response, Error> {
         Ok(Response(self.0.send().await?))
     }
 }
 
-/// The response to a sent request.
-///
-/// The usual flow is to call [`error_for_status`](Self::error_for_status) to
-/// turn a non-2xx status into an error, then read the body with
-/// [`json`](Self::json), [`text`](Self::text), [`bytes`](Self::bytes), or
-/// [`bytes_stream`](Self::bytes_stream).
-///
-/// The [`status`](Self::status) and [`header`](Self::header)s are also available
-/// directly.
 #[derive(Debug)]
 pub struct Response(reqwest::Response);
 
 impl Response {
-    /// The HTTP status code.
     pub fn status(&self) -> u16 {
         self.0.status().as_u16()
     }
 
-    /// The value of a response header, if present and valid UTF-8.
     pub fn header(&self, name: &str) -> Option<&str> {
         self.0.headers().get(name).and_then(|v| v.to_str().ok())
     }
 
-    /// All the response headers.
     pub fn headers(&self) -> &reqwest::header::HeaderMap {
         self.0.headers()
     }
 
-    /// Return an [`Error::Http`] if the status is not 2xx, otherwise the response.
     pub fn error_for_status(self) -> Result<Self, Error> {
         if self.0.status().is_success() {
             Ok(self)
@@ -437,13 +342,6 @@ impl Response {
         }
     }
 
-    /// Return an [`Error::Api`] carrying the server's error code if the
-    /// status is not 2xx, otherwise the response.
-    ///
-    /// A variant of [`error_for_status`](Self::error_for_status) for call
-    /// sites that need to act on the error code that the Ente API includes
-    /// in its error responses. When the body does not carry a code, this
-    /// returns the same [`Error::Http`] that `error_for_status` would.
     pub async fn error_for_code(self) -> Result<Self, Error> {
         if self.0.status().is_success() {
             return Ok(self);
@@ -460,17 +358,14 @@ impl Response {
         }
     }
 
-    /// Read the whole body and deserialize it as JSON.
     pub async fn json<T: DeserializeOwned>(self) -> Result<T, Error> {
         serde_json::from_slice(&self.0.bytes().await?).map_err(|e| Error::Parse(ParseError(e)))
     }
 
-    /// Read the whole body as text.
     pub async fn text(self) -> Result<String, Error> {
         Ok(self.0.text().await?)
     }
 
-    /// Read the whole body as bytes.
     pub async fn bytes(self) -> Result<Vec<u8>, Error> {
         Ok(self.0.bytes().await?.into())
     }
@@ -487,7 +382,6 @@ mod body_stream {
     use super::{Error, Response};
 
     impl Response {
-        /// Stream the body in chunks instead of buffering it, for large downloads.
         pub fn bytes_stream(self) -> impl Stream<Item = Result<Bytes, Error>> + Send {
             BytesStream(Box::pin(self.0.bytes_stream()))
         }
@@ -507,31 +401,20 @@ mod body_stream {
     }
 }
 
-/// The Ente API's error body, e.g. `{"code": "USER_NOT_REGISTERED", ...}`.
 #[derive(Deserialize)]
 struct ApiErrorEnvelope {
     code: String,
 }
 
-/// The reply from the `/ping` endpoint.
 #[derive(Deserialize, Debug)]
 pub struct PingResponse {
-    /// Always `"pong"`.
     pub message: String,
-    /// The server's git commit hash.
     pub id: String,
 }
 
-/// How persistently to retry a failed request.
-///
-/// Both profiles make one original attempt and up to three retries. The
-/// delays match the web client's retry schedules.
 #[derive(Clone, Copy, Debug)]
 pub enum RetryProfile {
-    /// For requests a user is waiting on. Retries after 2, 5, and 10 seconds.
     Interactive,
-    /// For unattended work, where waiting longer handles remote hiccups
-    /// better. Retries after 10, 30, and 120 seconds.
     Background,
 }
 
@@ -544,14 +427,6 @@ impl RetryProfile {
     }
 }
 
-/// Run `operation`, retrying failures per [`RetryProfile::Interactive`].
-///
-/// A failure is retried when [`Error::is_retryable`] says so: the request
-/// failed in transit, or the server answered with a 429 or a 5xx status.
-/// Any other error returns immediately.
-///
-/// Each retry runs the whole closure again, so wrap only operations that
-/// are safe to repeat.
 pub async fn retry<T, F, Fut>(operation: F) -> Result<T, Error>
 where
     F: FnMut() -> Fut,
@@ -560,7 +435,7 @@ where
     retry_with_profile(RetryProfile::Interactive, operation).await
 }
 
-/// Like [`retry`](retry()), but with an explicitly chosen profile.
+// The closure can run four times; callers must only retry operations safe to repeat.
 pub async fn retry_with_profile<T, F, Fut>(profile: RetryProfile, operation: F) -> Result<T, Error>
 where
     F: FnMut() -> Fut,
