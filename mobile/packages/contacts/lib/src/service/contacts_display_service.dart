@@ -16,11 +16,11 @@ class ContactsDisplayService {
 
   ValueListenable<int> get changes => _store.revision;
 
+  /// Known accounts keep the same contact-scoped notifier across hydration.
   ValueListenable<int> changesFor({int? contactUserId, String? email}) {
-    final resolvedUserId = _resolvedContactUserId(
-      contactUserId: contactUserId,
-      email: email,
-    );
+    final resolvedUserId = contactUserId != null && contactUserId > 0
+        ? contactUserId
+        : _resolvedContactUserId(contactUserId: contactUserId, email: email);
     return resolvedUserId == null
         ? changes
         : _store.revisionForContact(resolvedUserId);
