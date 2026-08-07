@@ -5,24 +5,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Ente Log Viewer</title>
     
-    <!-- Dark Reader support -->
     <meta name="darkreader-lock">
     <meta name="color-scheme" content="light dark">
     
-    <!-- Material-UI CSS -->
     <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700&display=swap" />
     <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@mui/material@latest/dist/index.css" />
     
-    <!-- Ente theme -->
     <link rel="stylesheet" href="ente-theme.css">
-    
-    <!-- Custom styles -->
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
     <div class="app">
-        <!-- Header -->
         <header class="header">
             <div class="header-content">
                 <h1>📋 Ente Log Viewer</h1>
@@ -57,7 +51,6 @@
             </div>
         </header>
 
-        <!-- Upload Section -->
         <div class="upload-section" id="upload-section">
             <div class="upload-area" id="upload-area">
                 <div class="upload-content">
@@ -70,9 +63,7 @@
             </div>
         </div>
 
-        <!-- Main Content -->
         <div class="main-content" id="main-content" style="display: none;">
-            <!-- Device Info Section -->
             <div class="device-info-section" id="device-info-section" style="display: none;">
                 <div class="device-info-item" style="display: none;">
                     <span class="material-icons">smartphone</span>
@@ -86,7 +77,6 @@
                 </div>
             </div>
 
-            <!-- Search Bar -->
             <div class="search-section">
                 <div class="search-bar mui-search-container">
                     <div class="mui-textfield">
@@ -99,7 +89,6 @@
                 </div>
             </div>
 
-            <!-- Timeline Filter -->
             <div class="timeline-section" id="timeline-section" style="display: none;">
                 <div class="timeline-header">
                     <span class="material-icons">timeline</span>
@@ -125,21 +114,17 @@
                 </div>
             </div>
 
-            <!-- Active Filters -->
             <div class="active-filters" id="active-filters" style="display: none;">
                 <div class="filter-chips" id="filter-chips"></div>
             </div>
 
-            <!-- Log Stats -->
             <div class="log-stats" id="log-stats">
                 <span id="log-count">0 logs loaded</span>
                 <span id="filtered-count"></span>
             </div>
 
-            <!-- Log List -->
             <div class="log-list-container">
                 <div class="log-list" id="log-list">
-                    <!-- Log entries will be populated here -->
                 </div>
                 <div class="loading" id="loading" style="display: none;">Loading...</div>
                 <div class="load-more" id="load-more" style="display: none;">
@@ -149,7 +134,6 @@
         </div>
     </div>
 
-    <!-- Filter Dialog -->
     <div class="dialog-overlay" id="filter-dialog" style="display: none;">
         <div class="dialog">
             <div class="dialog-header">
@@ -157,27 +141,21 @@
                 <button class="close-btn" id="close-filter">✕</button>
             </div>
             <div class="dialog-content">
-                <!-- Log Levels -->
                 <div class="filter-section">
                     <h3>Log Levels</h3>
                     <div class="level-chips" id="level-chips">
-                        <!-- Level chips will be populated here -->
                     </div>
                 </div>
 
-                <!-- Process -->
                 <div class="filter-section">
                     <h3>Process</h3>
                     <div class="process-list" id="process-list">
-                        <!-- Process checkboxes will be populated here -->
                     </div>
                 </div>
 
-                <!-- Loggers -->
                 <div class="filter-section">
                     <h3>Loggers</h3>
                     <div class="logger-list" id="logger-list">
-                        <!-- Logger checkboxes will be populated here -->
                     </div>
                 </div>
             </div>
@@ -189,7 +167,6 @@
         </div>
     </div>
 
-    <!-- Analytics Dialog -->
     <div class="dialog-overlay" id="analytics-dialog" style="display: none;">
         <div class="dialog">
             <div class="dialog-header">
@@ -198,7 +175,6 @@
             </div>
             <div class="dialog-content">
                 <div id="analytics-content">
-                    <!-- Analytics charts will be populated here -->
                 </div>
             </div>
             <div class="dialog-actions">
@@ -207,7 +183,6 @@
         </div>
     </div>
 
-    <!-- Log Detail Dialog -->
     <div class="dialog-overlay" id="detail-dialog" style="display: none;">
         <div class="dialog large">
             <div class="dialog-header">
@@ -216,7 +191,6 @@
             </div>
             <div class="dialog-content">
                 <div id="detail-content">
-                    <!-- Log details will be populated here -->
                 </div>
             </div>
             <div class="dialog-actions">
@@ -230,7 +204,6 @@
         </div>
     </div>
 
-    <!-- Material-UI JavaScript -->
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@mui/material@latest/umd/material-ui.production.min.js"></script>

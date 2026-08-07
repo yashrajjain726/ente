@@ -95,7 +95,6 @@ def constant_scalar(
     producer_by_output: dict[str, onnx.NodeProto],
     tensor_name: str,
 ) -> float | None:
-    """Return a scalar emitted by an ONNX Constant node, if present."""
     node = producer_by_output.get(tensor_name)
     if node is None or node.op_type != "Constant":
         return None
@@ -110,7 +109,6 @@ def constant_scalar(
 
 
 def ensure_unique_node_names(model: onnx.ModelProto) -> None:
-    """Name adapter nodes inserted by ONNX's opset-version converter."""
     existing = {node.name for node in model.graph.node if node.name}
     for index, node in enumerate(model.graph.node):
         if node.name:
@@ -126,7 +124,7 @@ def ensure_unique_node_names(model: onnx.ModelProto) -> None:
 
 
 def rewrite_exact_gelu(model: onnx.ModelProto) -> int:
-    """Collapse x/sqrt(2) -> Erf -> +1 -> *x -> *0.5 into exact GELU."""
+    # Collapse x/sqrt(2) -> Erf -> +1 -> *x -> *0.5 into exact GELU.
     producer_by_output = {
         output: node for node in model.graph.node for output in node.output
     }
@@ -215,15 +213,8 @@ def rewrite_exact_gelu(model: onnx.ModelProto) -> int:
 
 
 def rewrite_prelu_decompositions(model: onnx.ModelProto) -> int:
-    """Replace exported PReLU expressions with CoreML/WebGPU-compatible ops.
-
-    The source graph expresses PReLU using Relu, Abs, Sub, Mul, Mul, and Add.
-    Abs is not supported by CoreML's documented MLProgram operator set, while
-    native PRelu is not supported by the WebGPU EP used on Android. The exact
-    equivalent below uses only operators documented by both providers:
-
-        PReLU(x, alpha) = Relu(x) - alpha * Relu(x * -1)
-    """
+    # CoreML does not support Abs, and Android's WebGPU EP does not support PRelu.
+    # Both support this equivalent: PReLU(x, alpha) = Relu(x) - alpha * Relu(x * -1)
     consumers = node_consumers(model)
     initializers = {
         initializer.name: initializer for initializer in model.graph.initializer
@@ -348,7 +339,7 @@ def set_batch_one(model: onnx.ModelProto) -> None:
 
 
 def make_implicit_conv_padding_explicit(model: onnx.ModelProto) -> int:
-    """Write ONNX's default zero padding explicitly for CoreML conversion."""
+    # CoreML requires ONNX's default zero padding to be explicit.
     updated = 0
     for node in model.graph.node:
         if node.op_type != "Conv":
@@ -361,7 +352,7 @@ def make_implicit_conv_padding_explicit(model: onnx.ModelProto) -> int:
 
 
 def remove_redundant_output_normalization(model: onnx.ModelProto) -> int:
-    """Remove output L2 normalization because the Rust caller repeats it."""
+    # The Rust caller already performs output L2 normalization.
     graph_outputs = {value.name for value in model.graph.output}
     rewritten_nodes = []
     replaced = 0
@@ -386,7 +377,7 @@ def remove_redundant_output_normalization(model: onnx.ModelProto) -> int:
 
 
 def optimize_with_ort(model: onnx.ModelProto, output_path: Path) -> onnx.ModelProto:
-    """Use ORT's portable basic optimizer to fold static shape subgraphs."""
+    # Use only ORT's portable basic optimizations.
     unoptimized_path = output_path.with_suffix(".unoptimized.onnx")
     onnx.save(model, unoptimized_path)
     try:

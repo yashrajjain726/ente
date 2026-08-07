@@ -1,5 +1,3 @@
-/** Proxy requests for thumbnails. */
-
 export default {
     async fetch(request: Request) {
         switch (request.method) {

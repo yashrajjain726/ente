@@ -1,5 +1,3 @@
-/** Proxy requests for files. */
-
 export default {
     async fetch(request: Request) {
         switch (request.method) {

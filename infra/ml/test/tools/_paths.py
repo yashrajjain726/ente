@@ -1,8 +1,3 @@
-"""Path resolution shared by the parity tools.
-
-Importing this module also puts the ML test directory on sys.path so that
-sibling scripts can import the `ground_truth` and `comparator` packages.
-"""
 from __future__ import annotations
 
 from pathlib import Path
@@ -10,6 +5,7 @@ import subprocess
 import sys
 
 ML_DIR = Path(__file__).resolve().parents[1]
+# Sibling scripts import `ground_truth` and `comparator` from this directory.
 if str(ML_DIR) not in sys.path:
     sys.path.insert(0, str(ML_DIR))
 

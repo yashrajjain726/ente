@@ -1,4 +1,3 @@
-// Log Viewer Application
 class LogViewer {
     constructor() {
         this.logs = [];
@@ -8,7 +7,7 @@ class LogViewer {
         this.allLevels = new Set();
         this.currentFilter = {
             selectedLoggers: new Set(),
-            selectedLevels: new Set(['WARNING', 'SEVERE', 'SHOUT']), // Default to show important levels
+            selectedLevels: new Set(['WARNING', 'SEVERE', 'SHOUT']),
             selectedProcesses: new Set(),
             searchQuery: '',
             startTime: null,
@@ -19,12 +18,10 @@ class LogViewer {
         this.pageSize = 100;
         this.isLoading = false;
 
-        // Context mode state
         this.isContextMode = false;
         this.contextTargetLog = null;
         this.contextLogs = [];
 
-        // Device information
         this.deviceInfo = null;
         this.deviceRAM = null;
 
@@ -32,7 +29,6 @@ class LogViewer {
     }
 
     initializeEventListeners() {
-        // File upload
         const fileInput = document.getElementById('file-input');
         const browseBtn = document.getElementById('browse-btn');
         const uploadArea = document.getElementById('upload-area');
@@ -40,18 +36,15 @@ class LogViewer {
         browseBtn.addEventListener('click', () => fileInput.click());
         fileInput.addEventListener('change', this.handleFileSelect.bind(this));
 
-        // Drag and drop
         uploadArea.addEventListener('dragover', this.handleDragOver.bind(this));
         uploadArea.addEventListener('drop', this.handleDrop.bind(this));
         uploadArea.addEventListener('dragleave', this.handleDragLeave.bind(this));
 
-        // Search
         const searchInput = document.getElementById('search-input');
         const clearSearch = document.getElementById('clear-search');
         searchInput.addEventListener('input', this.handleSearch.bind(this));
         clearSearch.addEventListener('click', this.clearSearch.bind(this));
 
-        // Filter dialog
         const filterBtn = document.getElementById('filter-btn');
         const filterDialog = document.getElementById('filter-dialog');
         const closeFilter = document.getElementById('close-filter');
@@ -65,11 +58,9 @@ class LogViewer {
         applyFilters.addEventListener('click', this.applyFilters.bind(this));
         clearFilters.addEventListener('click', this.clearAllFilters.bind(this));
 
-        // Sort button
         const sortBtn = document.getElementById('sort-btn');
         sortBtn.addEventListener('click', this.toggleSort.bind(this));
 
-        // Timeline
         const timelineToggle = document.getElementById('timeline-toggle');
         const startTime = document.getElementById('start-time');
         const endTime = document.getElementById('end-time');
@@ -80,15 +71,11 @@ class LogViewer {
         endTime.addEventListener('change', this.handleTimelineChange.bind(this));
         resetTimeline.addEventListener('click', this.resetTimeline.bind(this));
 
-        // Other dialogs
         this.setupDialogListeners();
-
-        // Dropdown
         this.setupDropdown();
     }
 
     setupDialogListeners() {
-        // Analytics dialog
         const analyticsBtn = document.getElementById('analytics-btn');
         const analyticsDialog = document.getElementById('analytics-dialog');
         const closeAnalytics = document.getElementById('close-analytics');
@@ -98,7 +85,6 @@ class LogViewer {
         closeAnalytics.addEventListener('click', this.hideAnalytics.bind(this));
         closeAnalyticsBtn.addEventListener('click', this.hideAnalytics.bind(this));
 
-        // Detail dialog
         const detailDialog = document.getElementById('detail-dialog');
         const closeDetail = document.getElementById('close-detail');
         const closeDetailBtn = document.getElementById('close-detail-btn');
@@ -110,7 +96,6 @@ class LogViewer {
         copyLog.addEventListener('click', this.copyLogDetail.bind(this));
         showContext.addEventListener('click', this.showLogContext.bind(this));
 
-        // Export and clear
         const exportBtn = document.getElementById('export-btn');
         const clearBtn = document.getElementById('clear-btn');
 
@@ -132,7 +117,6 @@ class LogViewer {
         });
     }
 
-    // File handling
     handleFileSelect(event) {
         const file = event.target.files[0];
         if (file) {
@@ -173,7 +157,6 @@ class LogViewer {
             this.deviceRAM = null;
             let totalLogs = 0;
 
-            // Process each file in the zip
             for (const [filename, zipEntry] of Object.entries(contents.files)) {
                 if (!zipEntry.dir && filename.includes('.log')) {
                     const content = await zipEntry.async('string');
@@ -183,8 +166,6 @@ class LogViewer {
                 }
             }
 
-            
-            // Sort logs by timestamp
             this.logs.sort((a, b) => {
                 if (this.currentFilter.sortNewestFirst) {
                     return b.timestamp - a.timestamp;
@@ -193,10 +174,7 @@ class LogViewer {
                 }
             });
 
-            // Extract unique values
             this.extractUniqueValues();
-            
-            // Apply initial filters and display
             this.applyCurrentFilter();
             this.showMainContent();
             
@@ -219,7 +197,6 @@ class LogViewer {
             const line = lines[i].trim();
             if (!line) continue;
 
-            // Check if this is an error detail line (starts with ⤷)
             if (line.startsWith('⤷')) {
                 if (currentLog) {
                     errorDetails.push(line);
@@ -228,16 +205,13 @@ class LogViewer {
                 continue;
             }
 
-            // Try to parse as a log entry
             const logEntry = this.parseLogLine(line);
             if (logEntry) {
-                // If we have a current log, finalize it first
                 if (currentLog) {
                     this.finalizeLogEntry(currentLog, errorDetails);
                     logs.push(currentLog);
                 }
 
-                // Check for device info in the message (only if not already found)
                 if (!this.deviceInfo && logEntry.message.startsWith('Device Info:')) {
                     this.deviceInfo = logEntry.message.substring('Device Info:'.length).trim();
                 } else if (!this.deviceRAM && logEntry.message.startsWith('Device RAM:')) {
@@ -249,26 +223,20 @@ class LogViewer {
                 errorDetails = [];
                 isInMultilineError = false;
             } else if (currentLog) {
-                // Check if this might be an inline error continuation
                 if (line.startsWith('Error:') || line.startsWith('Exception:') || 
                     line.includes('Exception in') || line.includes('ErrorCode=') ||
                     isInMultilineError) {
                     
-                    // This is part of error details or stack trace
                     currentLog.message += '\n' + line;
-                    
-                    // Keep track if we're in a multi-line error
                     if (line.includes('Exception:') || line.includes('Error:')) {
                         isInMultilineError = true;
                     }
                 } else {
-                    // Regular message continuation
                     currentLog.message += '\n' + line;
                 }
             }
         }
 
-        // Don't forget the last log
         if (currentLog) {
             this.finalizeLogEntry(currentLog, errorDetails);
             logs.push(currentLog);
@@ -284,11 +252,9 @@ class LogViewer {
             if (errorInfo.stackTrace) logEntry.stackTrace = errorInfo.stackTrace;
             if (errorInfo.id) logEntry.id = errorInfo.id;
             
-            // Add error details to message
             logEntry.message += '\n' + errorDetails.join('\n');
         }
 
-        // Post-process the log entry to extract inline errors
         this.extractInlineErrors(logEntry);
     }
 
@@ -303,28 +269,22 @@ class LogViewer {
             const trimmed = line.trim();
             
             if (trimmed.startsWith('Error:') || trimmed.startsWith('Exception:')) {
-                // This is an error description
                 if (!logEntry.error) {
                     logEntry.error = trimmed;
                 }
                 errorLines.push(trimmed);
             } else if (trimmed.startsWith('#') && (trimmed.includes('package:') || trimmed.includes('<asynchronous'))) {
-                // This looks like a stack trace line
                 stackTraceLines.push(trimmed);
                 isInStackTrace = true;
             } else if (isInStackTrace && (trimmed === '' || trimmed.startsWith('<') || trimmed.includes('suspension'))) {
-                // Continuation of stack trace
                 stackTraceLines.push(trimmed);
             } else {
-                // Regular message line
                 messageLines.push(line);
                 isInStackTrace = false;
             }
         }
         
-        // Update the log entry
         if (messageLines.length < lines.length) {
-            // We found some error/stack trace content
             logEntry.message = messageLines.join('\n').trim();
             
             if (!logEntry.stackTrace && stackTraceLines.length > 0) {
@@ -334,13 +294,8 @@ class LogViewer {
     }
 
     parseLogLine(line) {
-        // Pattern: [processPrefix] [loggerName] [LEVEL] [timestamp] message
-        // Or: [loggerName] [LEVEL] [timestamp] message (no process prefix)
-        
         const patterns = [
-            // With process prefix: [bg] [ente_logging] [INFO] [2025-08-24 01:36:03.677678] message
             /^\[([^\]]+)\]\s*\[([^\]]+)\]\s*\[([^\]]+)\]\s*\[([^\]]+)\]\s*(.*)$/,
-            // Without process prefix: [ente_logging] [INFO] [2025-08-24 01:36:03.677678] message
             /^\[([^\]]+)\]\s*\[([^\]]+)\]\s*\[([^\]]+)\]\s*(.*)$/
         ];
 
@@ -350,15 +305,12 @@ class LogViewer {
                 let processPrefix, loggerName, level, timestampStr, message;
                 
                 if (i === 0) {
-                    // Pattern with process prefix
                     [, processPrefix, loggerName, level, timestampStr, message] = match;
                 } else {
-                    // Pattern without process prefix
                     [, loggerName, level, timestampStr, message] = match;
                     processPrefix = '';
                 }
 
-                // Parse timestamp
                 const timestamp = this.parseTimestamp(timestampStr);
                 if (!timestamp) continue;
 
@@ -381,7 +333,6 @@ class LogViewer {
 
     parseTimestamp(timestampStr) {
         try {
-            // Handle format: 2025-08-24 01:36:03.677678
             const parts = timestampStr.match(/(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2}:\d{2})\.?(\d+)?/);
             if (parts) {
                 const [, date, time, microseconds] = parts;
@@ -406,7 +357,6 @@ class LogViewer {
             } else if (line.startsWith('⤷ id:')) {
                 result.id = line.substring(6).trim();
             } else if (line.startsWith('⤷ type:')) {
-                // Include type info in error
                 const type = line.substring(8).trim();
                 if (result.error) {
                     result.error = `${type}: ${result.error}`;
@@ -414,7 +364,6 @@ class LogViewer {
                     result.error = type;
                 }
             } else if (stackTraceLines.length > 0) {
-                // Additional stack trace lines
                 stackTraceLines.push(line.replace(/^⤷\s*/, ''));
             }
         }
@@ -457,7 +406,6 @@ class LogViewer {
         const deviceInfoText = document.getElementById('device-info-text');
         const deviceRAMText = document.getElementById('device-ram-text');
 
-        // Reset visibility for both items
         if (deviceInfoText) {
             deviceInfoText.parentElement.style.display = 'none';
         }
@@ -487,7 +435,6 @@ class LogViewer {
             const timelineSection = document.getElementById('timeline-section');
             timelineSection.style.display = 'block';
             
-            // Set min/max for datetime inputs
             const startTime = document.getElementById('start-time');
             const endTime = document.getElementById('end-time');
             
@@ -508,7 +455,6 @@ class LogViewer {
         }
     }
 
-    // Search functionality
     handleSearch(event) {
         const query = event.target.value;
         const clearBtn = document.getElementById('clear-search');
@@ -526,7 +472,6 @@ class LogViewer {
             return;
         }
 
-        // Parse logger:name syntax
         const loggerPattern = /logger:(\S+)/g;
         const matches = [...query.matchAll(loggerPattern)];
         
@@ -535,7 +480,6 @@ class LogViewer {
             for (const match of matches) {
                 const loggerPattern = match[1];
                 if (loggerPattern.endsWith('*')) {
-                    // Wildcard pattern
                     const prefix = loggerPattern.slice(0, -1);
                     for (const logger of this.allLoggers) {
                         if (logger.startsWith(prefix)) {
@@ -548,7 +492,6 @@ class LogViewer {
             }
             this.currentFilter.selectedLoggers = newLoggers;
             
-            // Remove logger patterns from search query
             this.currentFilter.searchQuery = query.replace(loggerPattern, '').trim();
         }
     }
@@ -561,12 +504,10 @@ class LogViewer {
         this.applyCurrentFilter();
     }
 
-    // Filtering
     applyCurrentFilter() {
         
         this.filteredLogs = this.logs.filter(log => this.matchesFilter(log));
         
-        // Sort filtered logs
         this.filteredLogs.sort((a, b) => {
             if (this.currentFilter.sortNewestFirst) {
                 return b.timestamp - a.timestamp;
@@ -583,21 +524,18 @@ class LogViewer {
     }
 
     matchesFilter(log) {
-        // Level filter
         if (this.currentFilter.selectedLevels.size > 0) {
             if (!this.currentFilter.selectedLevels.has(log.level)) {
                 return false;
             }
         }
 
-        // Logger filter
         if (this.currentFilter.selectedLoggers.size > 0) {
             if (!this.currentFilter.selectedLoggers.has(log.loggerName)) {
                 return false;
             }
         }
 
-        // Process filter
         if (this.currentFilter.selectedProcesses.size > 0) {
             const processName = log.processPrefix || 'Foreground';
             if (!this.currentFilter.selectedProcesses.has(processName)) {
@@ -605,7 +543,6 @@ class LogViewer {
             }
         }
 
-        // Text search
         if (this.currentFilter.searchQuery) {
             const query = this.currentFilter.searchQuery.toLowerCase();
             const searchText = `${log.message} ${log.loggerName} ${log.error || ''}`.toLowerCase();
@@ -614,7 +551,6 @@ class LogViewer {
             }
         }
 
-        // Time range filter
         if (this.currentFilter.startTime && log.timestamp < this.currentFilter.startTime) {
             return false;
         }
@@ -637,31 +573,27 @@ class LogViewer {
                     <p>${this.logs.length === 0 ? 'Upload a ZIP file to view logs' : 'Try adjusting your filters'}</p>
                 </div>
             `;
-            this.setupInfiniteScroll(); // Still setup scroll listener
+            this.setupInfiniteScroll();
             return;
         }
 
         logList.innerHTML = logsToShow.map(log => this.createLogEntryHTML(log)).join('');
         
-        // Add click listeners
         logList.querySelectorAll('.log-entry').forEach((entry, index) => {
             entry.addEventListener('click', () => this.showLogDetail(logsToShow[index]));
         });
 
         this.currentOffset = logsToShow.length;
         
-        // Hide load more button since we have infinite scroll
         const loadMore = document.getElementById('load-more');
         loadMore.style.display = 'none';
         
-        // Setup infinite scroll
         this.setupInfiniteScroll();
     }
 
     setupInfiniteScroll() {
         const logList = document.getElementById('log-list');
         
-        // Remove existing scroll listener to prevent duplicates
         if (this.scrollListener) {
             logList.removeEventListener('scroll', this.scrollListener);
         }
@@ -669,7 +601,6 @@ class LogViewer {
         this.scrollListener = () => {
             const { scrollTop, scrollHeight, clientHeight } = logList;
             
-            // Load more when scrolled to 80% of the way down
             if (scrollTop + clientHeight >= scrollHeight * 0.8) {
                 this.loadMoreLogs();
             }
@@ -679,27 +610,22 @@ class LogViewer {
     }
 
     loadMoreLogs() {
-        // Prevent multiple simultaneous loads
         if (this.isLoadingMore || this.currentOffset >= this.filteredLogs.length) {
             return;
         }
         
         this.isLoadingMore = true;
         
-        // Show loading indicator
         const loading = document.getElementById('loading');
         loading.style.display = 'block';
         
-        // Simulate a small delay for smooth UX (optional)
         setTimeout(() => {
             const logList = document.getElementById('log-list');
             const newLogsToShow = this.filteredLogs.slice(this.currentOffset, this.currentOffset + this.pageSize);
             
-            // Append new logs
             const newLogsHTML = newLogsToShow.map(log => this.createLogEntryHTML(log)).join('');
             logList.insertAdjacentHTML('beforeend', newLogsHTML);
             
-            // Add click listeners to new entries
             const newEntries = logList.querySelectorAll('.log-entry:nth-last-child(-n+' + newLogsToShow.length + ')');
             newEntries.forEach((entry, index) => {
                 const logIndex = this.currentOffset + index;
@@ -794,17 +720,14 @@ class LogViewer {
         
         const chips = [];
         
-        // Level filters
         for (const level of this.currentFilter.selectedLevels) {
             chips.push(`<span class="filter-chip level-${level}">${level} <span class="remove" onclick="logViewer.removeFilter('level', '${level}')">✕</span></span>`);
         }
         
-        // Logger filters
         for (const logger of this.currentFilter.selectedLoggers) {
             chips.push(`<span class="filter-chip">${logger} <span class="remove" onclick="logViewer.removeFilter('logger', '${logger}')">✕</span></span>`);
         }
         
-        // Process filters
         for (const process of this.currentFilter.selectedProcesses) {
             const displayName = this.getProcessDisplayName(process);
             chips.push(`<span class="filter-chip">${displayName} <span class="remove" onclick="logViewer.removeFilter('process', '${process}')">✕</span></span>`);
@@ -847,7 +770,6 @@ class LogViewer {
         }
     }
 
-    // Filter Dialog
     showFilterDialog() {
         this.populateFilterDialog();
         document.getElementById('filter-dialog').style.display = 'flex';
@@ -858,7 +780,6 @@ class LogViewer {
     }
 
     populateFilterDialog() {
-        // Populate level chips
         const levelChips = document.getElementById('level-chips');
         const levels = ['FINEST', 'FINER', 'FINE', 'CONFIG', 'INFO', 'WARNING', 'SEVERE', 'SHOUT'];
         
@@ -867,14 +788,12 @@ class LogViewer {
             return `<div class="level-chip ${level} ${active}" data-level="${level}">${level}</div>`;
         }).join('');
         
-        // Add click listeners to level chips
         levelChips.querySelectorAll('.level-chip').forEach(chip => {
             chip.addEventListener('click', () => {
                 chip.classList.toggle('active');
             });
         });
 
-        // Populate process list
         const processList = document.getElementById('process-list');
         const processes = Array.from(this.allProcesses).sort();
         
@@ -889,7 +808,6 @@ class LogViewer {
             `;
         }).join('');
 
-        // Populate logger list
         const loggerList = document.getElementById('logger-list');
         const loggers = Array.from(this.allLoggers).sort();
         
@@ -905,27 +823,23 @@ class LogViewer {
     }
 
     applyFilters() {
-        // Get selected levels
         const selectedLevels = new Set();
         document.querySelectorAll('.level-chip.active').forEach(chip => {
             selectedLevels.add(chip.dataset.level);
         });
         
-        // Get selected processes
         const selectedProcesses = new Set();
         document.querySelectorAll('#process-list input:checked').forEach(checkbox => {
             const process = checkbox.id.replace('process-', '');
             selectedProcesses.add(process);
         });
         
-        // Get selected loggers
         const selectedLoggers = new Set();
         document.querySelectorAll('#logger-list input:checked').forEach(checkbox => {
             const logger = checkbox.id.replace('logger-', '');
             selectedLoggers.add(logger);
         });
         
-        // Update current filter
         this.currentFilter.selectedLevels = selectedLevels;
         this.currentFilter.selectedProcesses = selectedProcesses;
         this.currentFilter.selectedLoggers = selectedLoggers;
@@ -949,7 +863,6 @@ class LogViewer {
         this.hideFilterDialog();
     }
 
-    // Sort functionality
     toggleSort() {
         this.currentFilter.sortNewestFirst = !this.currentFilter.sortNewestFirst;
         const sortBtn = document.getElementById('sort-btn');
@@ -963,7 +876,6 @@ class LogViewer {
         this.applyCurrentFilter();
     }
 
-    // Timeline functionality
     toggleTimeline() {
         const timelineControls = document.getElementById('timeline-controls');
         const timelineBtn = document.getElementById('timeline-toggle');
@@ -1000,7 +912,6 @@ class LogViewer {
         }
     }
 
-    // Log details
     showLogDetail(log) {
         const detailContent = document.getElementById('detail-content');
         
@@ -1048,7 +959,6 @@ class LogViewer {
         if (this.currentDetailLog) {
             const logText = this.formatLogForExport(this.currentDetailLog);
             navigator.clipboard.writeText(logText).then(() => {
-                // Show a brief confirmation
                 const btn = document.getElementById('copy-log');
                 const originalText = btn.textContent;
                 btn.textContent = 'Copied!';
@@ -1064,7 +974,6 @@ class LogViewer {
             this.isContextMode = true;
             this.contextTargetLog = this.currentDetailLog;
             
-            // Get logs around the target log (±50 logs)
             const targetIndex = this.logs.findIndex(log => 
                 log.timestamp === this.contextTargetLog.timestamp && 
                 log.message === this.contextTargetLog.message
@@ -1077,11 +986,9 @@ class LogViewer {
                 
                 this.contextLogs = this.logs.slice(startIndex, endIndex);
                 
-                // Update UI to show context mode
                 this.updateContextModeUI();
                 this.displayContextLogs();
                 
-                // Close detail dialog
                 this.hideDetailDialog();
             }
         }
@@ -1105,10 +1012,7 @@ class LogViewer {
                 </div>
             `;
             
-            // Add exit context button listener
             document.getElementById('exit-context').addEventListener('click', this.exitContextMode.bind(this));
-            
-            // Hide search and timeline sections
             searchSection.style.display = 'none';
             timelineSection.style.display = 'none';
             activeFilters.style.display = 'none';
@@ -1132,12 +1036,10 @@ class LogViewer {
             return entryHtml;
         }).join('');
         
-        // Add click listeners
         logList.querySelectorAll('.log-entry').forEach((entry, index) => {
             entry.addEventListener('click', () => this.showLogDetail(this.contextLogs[index]));
         });
         
-        // Scroll to target log
         if (targetIndex !== -1) {
             const targetEntry = logList.children[targetIndex];
             if (targetEntry) {
@@ -1145,7 +1047,6 @@ class LogViewer {
             }
         }
         
-        // Update stats
         const logCount = document.getElementById('log-count');
         logCount.textContent = `Showing context: ${this.contextLogs.length} logs around target`;
     }
@@ -1159,11 +1060,9 @@ class LogViewer {
         this.displayLogs();
     }
 
-    // Analytics
     showAnalytics() {
         const analyticsContent = document.getElementById('analytics-content');
         
-        // Calculate logger statistics
         const loggerStats = this.calculateLoggerStats();
         const levelStats = this.calculateLevelStats();
         
@@ -1251,7 +1150,6 @@ class LogViewer {
         document.getElementById('analytics-dialog').style.display = 'none';
     }
 
-    // Export functionality
     exportLogs() {
         const filteredData = this.filteredLogs.map(log => this.formatLogForExport(log)).join('\n\n');
         const header = `=== Ente App Logs ===
@@ -1289,7 +1187,6 @@ ${'='.repeat(40)}\n\n`;
         URL.revokeObjectURL(url);
     }
 
-    // Clear logs
     clearLogs() {
         if (confirm('Are you sure you want to clear all logs? This will reload the page.')) {
             location.reload();
@@ -1297,5 +1194,4 @@ ${'='.repeat(40)}\n\n`;
     }
 }
 
-// Initialize the application
 const logViewer = new LogViewer();

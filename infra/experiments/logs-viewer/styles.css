@@ -1,4 +1,3 @@
-/* Reset and base styles */
 * {
     margin: 0;
     padding: 0;
@@ -14,7 +13,6 @@ body {
     letter-spacing: -0.011em;
 }
 
-/* App container */
 .app {
     min-height: 100vh;
     display: flex;
@@ -22,7 +20,6 @@ body {
     background: var(--ente-background-default);
 }
 
-/* Header */
 .header {
     background: var(--ente-color-accent-photos);
     color: white;
@@ -54,7 +51,6 @@ body {
     align-items: center;
 }
 
-/* Material-UI Enhanced Components */
 .header .mui-icon-btn {
     background: rgba(255, 255, 255, 0.1);
     border: none;
@@ -126,7 +122,6 @@ body {
     border: 2px solid rgba(255, 255, 255, 0.2);
 }
 
-/* Dropdown */
 .dropdown {
     position: relative;
 }
@@ -190,7 +185,6 @@ body {
     opacity: 0.8;
 }
 
-/* Upload Section */
 .upload-section {
     flex: 1;
     display: flex;
@@ -261,7 +255,6 @@ body {
     font-size: 14px;
 }
 
-/* Buttons */
 .primary-btn {
     background: var(--ente-color-accent-photos);
     color: white;
@@ -324,7 +317,6 @@ body {
     filter: none;
 }
 
-/* Main Content */
 .main-content {
     flex: 1;
     max-width: 1400px;
@@ -334,7 +326,6 @@ body {
     background: var(--ente-background-default);
 }
 
-/* Device Info Section */
 .device-info-section {
     display: flex;
     flex-wrap: wrap;
@@ -370,7 +361,6 @@ body {
     font-family: 'Roboto Mono', monospace;
 }
 
-/* Search Section */
 .search-section {
     margin-bottom: var(--ente-spacing-lg);
 }
@@ -442,7 +432,6 @@ body {
     color: var(--ente-text-base);
 }
 
-/* Timeline Section */
 .timeline-section {
     background: var(--ente-background-paper);
     border-radius: var(--ente-border-radius);
@@ -511,7 +500,6 @@ body {
     font-size: 14px;
 }
 
-/* Active Filters */
 .active-filters {
     margin-bottom: var(--ente-spacing-lg);
 }
@@ -590,7 +578,6 @@ body {
     background: rgba(255, 255, 255, 0.2);
 }
 
-/* Log Stats */
 .log-stats {
     background: var(--ente-background-paper);
     padding: var(--ente-spacing-lg);
@@ -610,7 +597,6 @@ body {
     color: var(--ente-text-base);
 }
 
-/* Log List */
 .log-list-container {
     background: var(--ente-background-paper);
     border-radius: var(--ente-border-radius);
@@ -675,7 +661,6 @@ body {
     border-left: 4px solid var(--ente-warning);
 }
 
-/* Context mode highlighting */
 .log-entry.highlighted {
     background: var(--ente-background-secondary);
     border: 2px solid var(--ente-color-accent-photos);
@@ -697,7 +682,6 @@ body {
     margin-left: auto;
 }
 
-/* Context header styles */
 .context-header {
     display: flex;
     align-items: center;
@@ -820,7 +804,6 @@ body {
     border-left: 3px solid var(--ente-danger);
 }
 
-/* Loading and Load More */
 .loading {
     text-align: center;
     padding: var(--ente-spacing-xl);
@@ -847,7 +830,6 @@ body {
     100% { transform: rotate(360deg); }
 }
 
-/* Dialog */
 .dialog-overlay {
     position: fixed;
     top: 0;
@@ -947,7 +929,6 @@ body {
     background: var(--ente-background-paper2);
 }
 
-/* Filter Dialog Enhancements */
 .filter-section {
     margin-bottom: var(--ente-spacing-xl);
 }
@@ -1013,13 +994,11 @@ body {
     font-size: 14px;
 }
 
-/* Specific text color overrides for light-colored level chips when active */
 .level-chip.active.WARNING,
 .level-chip.active.WARNING::after {
     color: #000;
 }
 
-/* Simple styling for level chips in dialog - no shadows or complex effects */
 .log-detail-table .level-chip {
     padding: 4px 8px;
     border-radius: 12px;
@@ -1053,7 +1032,6 @@ body {
     color: white;
 }
 
-/* Level colors */
 .level-chip.FINEST, .level-chip.FINER, .level-chip.FINE {
     color: var(--ente-text-faint);
 }
@@ -1099,7 +1077,6 @@ body {
     font-weight: var(--ente-font-weight-regular);
 }
 
-/* Empty states */
 .empty-state {
     text-align: center;
     padding: 4rem 2rem;
@@ -1123,7 +1100,6 @@ body {
     font-size: 14px;
 }
 
-/* Responsive */
 @media (max-width: 768px) {
     .header-content {
         padding: 0;
@@ -1164,7 +1140,6 @@ body {
     }
 }
 
-/* Scrollbar styling */
 .log-list::-webkit-scrollbar,
 .process-list::-webkit-scrollbar,
 .logger-list::-webkit-scrollbar {
@@ -1190,7 +1165,6 @@ body {
     background: var(--ente-stroke-muted);
 }
 
-/* Focus styles for accessibility */
 .mui-icon-btn:focus,
 .mui-button:focus,
 .primary-btn:focus {
@@ -1203,7 +1177,6 @@ body {
     box-shadow: 0 0 0 3px rgba(29, 185, 84, 0.1);
 }
 
-/* High contrast mode support */
 @media (prefers-contrast: high) {
     .log-entry {
         border-bottom: 2px solid var(--ente-stroke-muted);
@@ -1216,7 +1189,6 @@ body {
     }
 }
 
-/* Dark Reader extension support */
 [data-darkreader-scheme="dark"] .header {
     background: var(--ente-color-accent-photos) !important;
     color: white !important;
@@ -1237,7 +1209,6 @@ body {
     color: white !important;
 }
 
-/* Dark Reader overrides for error/warning styling */
 [data-darkreader-scheme="dark"] .log-entry.severe {
     border-left-color: var(--ente-danger) !important;
 }
@@ -1246,7 +1217,6 @@ body {
     border-left-color: var(--ente-warning) !important;
 }
 
-/* Log Detail Dialog Styles */
 .log-detail-table {
     width: 100%;
     margin-top: 1rem;
@@ -1327,7 +1297,6 @@ body {
     font-weight: var(--ente-font-weight-medium);
 }
 
-/* Analytics Dialog Styles */
 .analytics-chart {
     margin-bottom: 2rem;
 }

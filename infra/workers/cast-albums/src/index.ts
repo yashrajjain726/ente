@@ -1,5 +1,3 @@
-/** Proxy file and thumbnail requests for the cast web app. */
-
 export default {
     async fetch(request: Request) {
         switch (request.method) {
