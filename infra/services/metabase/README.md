@@ -1,8 +1,8 @@
 # Metabase
 
-Use the embedded H2 database (this db contains users, saved queries etc). The database is a mounted as a file from the local filesystem into the container.
+Metabase uses its embedded H2 database for users, saved queries, and other state. The database is mounted from the local filesystem into the container.
 
-To take backups, backup `/root/metabase.db`
+Back up `/root/metabase.db` to preserve this state.
 
 ## Installation
 
