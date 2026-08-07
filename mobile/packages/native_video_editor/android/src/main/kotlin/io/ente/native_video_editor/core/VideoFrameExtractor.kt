@@ -26,9 +26,9 @@ import java.util.concurrent.ExecutionException
 import kotlin.coroutines.coroutineContext
 
 @UnstableApi
-class AndroidVideoFrameExtractor(
+class VideoFrameExtractor(
     private val context: Context,
-    private val metadataReader: AndroidVideoMetadataReader
+    private val metadataReader: VideoMetadataReader
 ) {
     private val permits = Semaphore(2)
 
@@ -61,7 +61,7 @@ class AndroidVideoFrameExtractor(
         var fallbackExtractor: FrameExtractor? = null
         try {
             retriever.setDataSource(request.inputPath)
-            val videoInfo = metadataReader.read(retriever, request.inputPath)
+            val videoInfo = metadataReader.read(retriever)
             val targetSize = boundedVideoSize(
                 videoInfo.displayWidth,
                 videoInfo.displayHeight,

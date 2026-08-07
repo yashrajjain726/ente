@@ -35,9 +35,9 @@ import kotlinx.coroutines.withContext
 import java.io.File
 
 @UnstableApi
-class AndroidVideoExportEngine(
+class VideoExportEngine(
     private val context: Context,
-    private val metadataReader: AndroidVideoMetadataReader
+    private val metadataReader: VideoMetadataReader
 ) {
     suspend fun processVideo(
         request: VideoEditRequest,

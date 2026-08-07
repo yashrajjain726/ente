@@ -4,9 +4,9 @@ import android.util.Log
 import androidx.annotation.NonNull
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.transformer.ExportException
-import io.ente.native_video_editor.core.AndroidVideoExportEngine
-import io.ente.native_video_editor.core.AndroidVideoFrameExtractor
-import io.ente.native_video_editor.core.AndroidVideoMetadataReader
+import io.ente.native_video_editor.core.VideoExportEngine
+import io.ente.native_video_editor.core.VideoFrameExtractor
+import io.ente.native_video_editor.core.VideoMetadataReader
 import io.ente.native_video_editor.core.VideoCrop
 import io.ente.native_video_editor.core.VideoEditRequest
 import io.ente.native_video_editor.core.VideoEditResult
@@ -42,9 +42,9 @@ class NativeVideoEditorPlugin : FlutterPlugin, MethodCallHandler, EventChannel.S
     private var scope = newPluginScope()
     private var currentExportJob: Job? = null
     private val frameJobs = mutableMapOf<String, Job>()
-    private lateinit var metadataReader: AndroidVideoMetadataReader
-    private lateinit var frameExtractor: AndroidVideoFrameExtractor
-    private lateinit var videoExporter: AndroidVideoExportEngine
+    private lateinit var metadataReader: VideoMetadataReader
+    private lateinit var frameExtractor: VideoFrameExtractor
+    private lateinit var videoExporter: VideoExportEngine
 
     override fun onAttachedToEngine(@NonNull binding: FlutterPlugin.FlutterPluginBinding) {
         if (!scope.isActive) scope = newPluginScope()
@@ -54,9 +54,9 @@ class NativeVideoEditorPlugin : FlutterPlugin, MethodCallHandler, EventChannel.S
         progressChannel = EventChannel(binding.binaryMessenger, PROGRESS_CHANNEL)
         progressChannel.setStreamHandler(this)
 
-        metadataReader = AndroidVideoMetadataReader()
-        frameExtractor = AndroidVideoFrameExtractor(binding.applicationContext, metadataReader)
-        videoExporter = AndroidVideoExportEngine(binding.applicationContext, metadataReader)
+        metadataReader = VideoMetadataReader()
+        frameExtractor = VideoFrameExtractor(binding.applicationContext, metadataReader)
+        videoExporter = VideoExportEngine(binding.applicationContext, metadataReader)
     }
 
     override fun onMethodCall(@NonNull call: MethodCall, @NonNull result: Result) {
