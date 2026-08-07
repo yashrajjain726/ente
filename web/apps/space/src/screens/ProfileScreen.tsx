@@ -295,9 +295,10 @@ interface ProfilePostTileProps {
     imageUrl?: string;
     index: number;
     isSingleItemRow: boolean;
-    isMediaUnavailable: boolean;
+    isUnavailable: boolean;
     item: ProfilePostItem;
     loadRootMargin: string;
+    onImageDecodeError: () => void;
     onLoadImage: () => Promise<string | undefined>;
     onOpen: (imageUrl: string) => void;
     onRememberDimensions: (itemID: string, image: HTMLImageElement) => void;
@@ -311,9 +312,10 @@ const ProfilePostTile: React.FC<ProfilePostTileProps> = ({
     imageUrl,
     index,
     isSingleItemRow,
-    isMediaUnavailable,
+    isUnavailable: isPostUnavailable,
     item,
     loadRootMargin,
+    onImageDecodeError,
     onLoadImage,
     onOpen,
     onRememberDimensions,
@@ -327,8 +329,7 @@ const ProfilePostTile: React.FC<ProfilePostTileProps> = ({
         [item.thumbHash],
     );
     const isCurrentImageReady = Boolean(imageUrl && readyImageUrl == imageUrl);
-    const isUnavailable =
-        Boolean(item.isUnavailable) || isMediaUnavailable || imageDecodeFailed;
+    const isUnavailable = isPostUnavailable || imageDecodeFailed;
 
     React.useEffect(() => {
         if (imageUrl) setShouldLoad(true);
@@ -375,9 +376,7 @@ const ProfilePostTile: React.FC<ProfilePostTileProps> = ({
             type="button"
             aria-label={
                 isUnavailable
-                    ? item.isUnavailable
-                        ? "Post unavailable"
-                        : "Media unavailable"
+                    ? "Post unavailable"
                     : `Open ${displayName} post ${index + 1}`
             }
             disabled={!imageUrl || isUnavailable}
@@ -433,7 +432,13 @@ const ProfilePostTile: React.FC<ProfilePostTileProps> = ({
                         setReadyImageUrl(imageUrl);
                         onRememberDimensions(item.id, event.currentTarget);
                     }}
-                    onError={() => setImageDecodeFailed(true)}
+                    onError={() => {
+                        log.warn(
+                            `Post ${item.postId} is unavailable because the browser could not decode its image`,
+                        );
+                        setImageDecodeFailed(true);
+                        onImageDecodeError();
+                    }}
                     src={imageUrl}
                     sx={{
                         display: "block",
@@ -468,9 +473,7 @@ const ProfilePostTile: React.FC<ProfilePostTileProps> = ({
                         width: "100%",
                     }}
                 >
-                    {item.isUnavailable
-                        ? "Post unavailable"
-                        : "Media unavailable"}
+                    Post unavailable
                 </Box>
             )}
         </Box>
@@ -576,8 +579,9 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     const [loadedPostImageURLsByKey, setLoadedPostImageURLsByKey] = useState<
         Record<string, string>
     >({});
-    const [unavailablePostImagesByKey, setUnavailablePostImagesByKey] =
-        useState<Record<string, true>>({});
+    const [unavailablePostsByKey, setUnavailablePostsByKey] = useState<
+        Record<string, true>
+    >({});
     const [loadedCoverUrl, setLoadedCoverUrl] = useState<string | null>(null);
     const postInputRef = React.useRef<HTMLInputElement | null>(null);
     const postImageLoadsInFlightRef = React.useRef<
@@ -612,8 +616,13 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         }))
         .filter((group) => group.items.length > 0);
     const visiblePostItems = visiblePostGroups.flatMap((group) => group.items);
-    const visiblePostIndexByID = new Map(
-        visiblePostItems.map((item, index) => [item.id, index]),
+    const viewerPostItems = visiblePostItems.filter(
+        (item) =>
+            !item.isUnavailable &&
+            !unavailablePostsByKey[profilePostImageCacheKey(item)],
+    );
+    const viewerPostIndexByID = new Map(
+        viewerPostItems.map((item, index) => [item.id, index]),
     );
     const postsSharedCount = visiblePostGroups.reduce(
         (count, group) => count + group.items.length,
@@ -757,7 +766,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             }
 
             const cacheKey = profilePostImageCacheKey(item);
-            if (unavailablePostImagesByKey[cacheKey]) {
+            if (unavailablePostsByKey[cacheKey]) {
                 return Promise.resolve(undefined);
             }
             const inFlight = postImageLoadsInFlightRef.current.get(cacheKey);
@@ -775,7 +784,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                 .catch((error: unknown) => {
                     log.warn("Failed to load profile post image", error);
                     if (isSpaceContentError(error)) {
-                        setUnavailablePostImagesByKey((current) => ({
+                        setUnavailablePostsByKey((current) => ({
                             ...current,
                             [cacheKey]: true,
                         }));
@@ -788,7 +797,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             postImageLoadsInFlightRef.current.set(cacheKey, load);
             return load;
         },
-        [loadedPostImageURLFor, onLoadPostImage, unavailablePostImagesByKey],
+        [loadedPostImageURLFor, onLoadPostImage, unavailablePostsByKey],
     );
 
     const dimensionsForPost = React.useCallback(
@@ -830,7 +839,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
 
     const profileViewerPhotos = React.useMemo(
         () =>
-            visiblePostItems.map((item, index) => {
+            viewerPostItems.map((item, index) => {
                 const dimensions = dimensionsForPost(item);
                 return {
                     alt: `${displayName} post ${index + 1}`,
@@ -857,13 +866,13 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             profile.avatarUrl,
             selectedPost?.id,
             selectedPost?.photo.imageUrl,
-            visiblePostItems,
+            viewerPostItems,
         ],
     );
 
     const handleSelectedPostIndexChange = React.useCallback(
         (postIndex: number) => {
-            const item = visiblePostItems[postIndex];
+            const item = viewerPostItems[postIndex];
             if (!item) return;
 
             const updateSelectedPost = (imageUrl: string) => {
@@ -895,16 +904,20 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             loadPostImage,
             loadedPostImageURLFor,
             selectedPostForItem,
-            visiblePostItems,
+            viewerPostItems,
         ],
     );
 
+    const selectedViewerPostIndex = selectedPost
+        ? viewerPostIndexByID.get(selectedPost.id)
+        : undefined;
+
     React.useEffect(() => {
-        const currentPostIndex = selectedPost?.postIndex;
+        const currentPostIndex = selectedViewerPostIndex;
         if (currentPostIndex == undefined) return;
 
         for (const offset of [-1, 1]) {
-            const adjacentPost = visiblePostItems[currentPostIndex + offset];
+            const adjacentPost = viewerPostItems[currentPostIndex + offset];
             if (!adjacentPost || loadedPostImageURLFor(adjacentPost)) continue;
 
             void loadPostImage(adjacentPost);
@@ -912,8 +925,8 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     }, [
         loadPostImage,
         loadedPostImageURLFor,
-        selectedPost?.postIndex,
-        visiblePostItems,
+        selectedViewerPostIndex,
+        viewerPostItems,
     ]);
 
     const prepareSelectedPostPhoto = async (file: File) => {
@@ -1864,13 +1877,18 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                                                     isSingleItemRow={
                                                                         isSingleItemRow
                                                                     }
-                                                                    isMediaUnavailable={Boolean(
-                                                                        unavailablePostImagesByKey[
-                                                                            profilePostImageCacheKey(
-                                                                                item,
-                                                                            )
-                                                                        ],
-                                                                    )}
+                                                                    isUnavailable={
+                                                                        Boolean(
+                                                                            item.isUnavailable,
+                                                                        ) ||
+                                                                        Boolean(
+                                                                            unavailablePostsByKey[
+                                                                                profilePostImageCacheKey(
+                                                                                    item,
+                                                                                )
+                                                                            ],
+                                                                        )
+                                                                    }
                                                                     item={item}
                                                                     loadRootMargin={
                                                                         postImageLoadRootMargin
@@ -1880,20 +1898,39 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                                                             item,
                                                                         )
                                                                     }
+                                                                    onImageDecodeError={() =>
+                                                                        setUnavailablePostsByKey(
+                                                                            (
+                                                                                current,
+                                                                            ) => ({
+                                                                                ...current,
+                                                                                [profilePostImageCacheKey(
+                                                                                    item,
+                                                                                )]:
+                                                                                    true,
+                                                                            }),
+                                                                        )
+                                                                    }
                                                                     onOpen={(
                                                                         openedImageUrl,
-                                                                    ) =>
+                                                                    ) => {
+                                                                        const postIndex =
+                                                                            viewerPostIndexByID.get(
+                                                                                item.id,
+                                                                            );
+                                                                        if (
+                                                                            postIndex ==
+                                                                            undefined
+                                                                        )
+                                                                            return;
                                                                         setSelectedPost(
                                                                             selectedPostForItem(
                                                                                 item,
-                                                                                visiblePostIndexByID.get(
-                                                                                    item.id,
-                                                                                ) ??
-                                                                                    index,
+                                                                                postIndex,
                                                                                 openedImageUrl,
                                                                             ),
-                                                                        )
-                                                                    }
+                                                                        );
+                                                                    }}
                                                                     onRememberDimensions={
                                                                         rememberLoadedPhotoDimensions
                                                                     }
@@ -2020,13 +2057,13 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                             selectedPostActionMode
                         }
                         photos={
-                            selectedPost.postIndex == undefined
+                            selectedViewerPostIndex == undefined
                                 ? undefined
                                 : profileViewerPhotos
                         }
-                        photoIndex={selectedPost.postIndex}
+                        photoIndex={selectedViewerPostIndex}
                         onPhotoIndexChange={
-                            selectedPost.postIndex == undefined
+                            selectedViewerPostIndex == undefined
                                 ? undefined
                                 : handleSelectedPostIndexChange
                         }

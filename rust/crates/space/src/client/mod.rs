@@ -583,9 +583,12 @@ impl AccountSpaceCtx {
         let shares = self.list_friend_shares(space_id).await?;
         let mut value = Vec::with_capacity(shares.len());
         for share in shares {
+            let friend = share.friend.clone();
             match self.decrypt_friend_share(space_id, &share).await {
                 Ok(share) => value.push(share),
-                Err(error) if error.is_content_error() => {}
+                Err(error) if error.is_content_error() => {
+                    log::warn!("Space friend share {friend} is unusable: {error}");
+                }
                 Err(error) => return Err(error),
             }
         }

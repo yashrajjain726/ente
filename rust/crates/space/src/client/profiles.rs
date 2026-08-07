@@ -91,7 +91,10 @@ impl AccountSpaceCtx {
         })?;
         match decrypt_space_profile(&profile, &space_key) {
             Ok(decrypted) => Ok(decrypted),
-            Err(error) if error.is_content_error() => Ok(space_profile_without_payload(&profile)),
+            Err(error) if error.is_content_error() => {
+                log::warn!("Space profile {space_id} fell back to public fields: {error}");
+                Ok(space_profile_without_payload(&profile))
+            }
             Err(error) => Err(error),
         }
     }

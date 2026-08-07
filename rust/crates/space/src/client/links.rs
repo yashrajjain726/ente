@@ -425,6 +425,10 @@ async fn fetch_link_snapshot(
         let profile = match decrypt_space_profile(&profile_response.profile, &space_key) {
             Ok(profile) => profile,
             Err(error) if error.is_content_error() => {
+                log::warn!(
+                    "Space profile {} fell back to public fields: {error}",
+                    profile_response.profile.space_id
+                );
                 space_profile_without_payload(&profile_response.profile)
             }
             Err(error) => return Err(error),

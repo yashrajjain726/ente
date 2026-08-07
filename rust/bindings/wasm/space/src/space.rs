@@ -318,7 +318,13 @@ fn created_space_to_js(value: CreatedSpace) -> CreatedSpaceJs {
 }
 
 fn profile_to_js(value: DecryptedSpaceProfile) -> Result<SpaceProfileJs, WasmSpaceError> {
-    let profile = String::from_utf8(value.profile).unwrap_or_default();
+    let profile = String::from_utf8(value.profile).unwrap_or_else(|error| {
+        log::warn!(
+            "Space profile {} has invalid UTF-8: {error}",
+            value.space_id
+        );
+        String::new()
+    });
     Ok(SpaceProfileJs {
         space_id: value.space_id,
         space_slug: value.space_slug,
@@ -357,7 +363,15 @@ async fn account_actor_to_js(
     };
     match converted {
         Ok(actor) => Ok(actor),
-        Err(error) if error.is_content_error() => public_actor_to_js(fallback),
+        Err(error) if error.is_content_error() => {
+            log::warn!(
+                "Space profile {} fell back to public fields: {}: {}",
+                fallback.space_id,
+                error.code,
+                error.message
+            );
+            public_actor_to_js(fallback)
+        }
         Err(error) => Err(error),
     }
 }
@@ -448,6 +462,12 @@ async fn account_post_page_to_js(
         match converted {
             Ok(post) => items.push(post),
             Err(error) if error.is_content_error() => {
+                log::warn!(
+                    "Space post {} is unavailable: {}: {}",
+                    fallback.post_id,
+                    error.code,
+                    error.message
+                );
                 items.push(unavailable_post_to_js(fallback)?);
             }
             Err(error) => return Err(error),
@@ -543,7 +563,15 @@ async fn resilient_account_message_response_to_js(
     let fallback = message.clone();
     match account_message_response_to_js(ctx, viewer_space_id, message).await {
         Ok(message) => Ok(message),
-        Err(error) if error.is_content_error() => Ok(unavailable_message_to_js(fallback)),
+        Err(error) if error.is_content_error() => {
+            log::warn!(
+                "Space message {} is unavailable: {}: {}",
+                fallback.message_id,
+                error.code,
+                error.message
+            );
+            Ok(unavailable_message_to_js(fallback))
+        }
         Err(error) => Err(error),
     }
 }
@@ -628,6 +656,12 @@ async fn resilient_message_conversation_activity_to_js(
     match message_conversation_activity_to_js(ctx, viewer_space_id, activity).await {
         Ok(activity) => Ok(activity),
         Err(error) if error.is_content_error() => {
+            log::warn!(
+                "Space conversation activity {} is unavailable: {}: {}",
+                fallback.id,
+                error.code,
+                error.message
+            );
             Ok(unavailable_message_conversation_activity_to_js(fallback))
         }
         Err(error) => Err(error),
@@ -699,6 +733,12 @@ impl SpaceLinkCtxHandle {
             match converted {
                 Ok(post) => items.push(post),
                 Err(error) if error.is_content_error() => {
+                    log::warn!(
+                        "Space post {} is unavailable: {}: {}",
+                        fallback.post_id,
+                        error.code,
+                        error.message
+                    );
                     items.push(unavailable_post_to_js(fallback)?);
                 }
                 Err(error) => return Err(error),

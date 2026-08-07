@@ -387,7 +387,6 @@ interface FeedItemProps {
     friendID: string;
     imageUrl?: string;
     isAvatarPending: boolean;
-    isMediaUnavailable?: boolean;
     isOwnPost: boolean;
     isUnavailable?: boolean;
     name: string;
@@ -734,7 +733,6 @@ const FeedItem: React.FC<FeedItemProps> = ({
     friendID,
     imageUrl,
     isAvatarPending,
-    isMediaUnavailable = false,
     isOwnPost,
     isUnavailable = false,
     name,
@@ -766,7 +764,6 @@ const FeedItem: React.FC<FeedItemProps> = ({
         () => thumbHashDataURLFromBase64(thumbHash),
         [thumbHash],
     );
-    const showFooter = !isOwnPost && !isUnavailable;
     const canOpenAuthor = isOwnPost
         ? Boolean(onOpenProfile)
         : Boolean(onOpenFriend);
@@ -784,7 +781,8 @@ const FeedItem: React.FC<FeedItemProps> = ({
         useState<LoadedFeedPhotoDimensions | null>(null);
     const decodedPhoto = useDecodedImage(imageUrl, true);
     const decodedAvatar = useDecodedImage(avatarUrl, true);
-    const isPhotoUnavailable = isMediaUnavailable || decodedPhoto.failed;
+    const isPostUnavailable = isUnavailable || decodedPhoto.failed;
+    const showFooter = !isOwnPost && !isPostUnavailable;
     const displayImageUrl =
         (decodedPhoto.failed
             ? undefined
@@ -806,10 +804,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
         feedPhotoFrameDimensionsFor(photoDimensions);
     const isPhotoReady = Boolean(displayImageUrl) && decodedPhoto.ready;
     const canOpenPhoto =
-        !isUnavailable &&
-        !isPhotoUnavailable &&
-        isPhotoReady &&
-        Boolean(onOpenPhoto);
+        !isPostUnavailable && isPhotoReady && Boolean(onOpenPhoto);
     const [showResolvedPhoto, setShowResolvedPhoto] = useState(false);
     const decodedPhotoHeight = decodedPhoto.height;
     const decodedPhotoSrc = decodedPhoto.src;
@@ -876,7 +871,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
     }, [viewerLiked]);
 
     React.useEffect(() => {
-        if (isUnavailable || isPhotoUnavailable) return;
+        if (isPostUnavailable) return;
         if (shouldLoadMedia) return;
         const element = rootRef.current;
         if (!element) return;
@@ -899,10 +894,10 @@ const FeedItem: React.FC<FeedItemProps> = ({
         );
         observer.observe(element);
         return () => observer.disconnect();
-    }, [isPhotoUnavailable, isUnavailable, shouldLoadMedia]);
+    }, [isPostUnavailable, shouldLoadMedia]);
 
     React.useEffect(() => {
-        if (isUnavailable || isPhotoUnavailable) return;
+        if (isPostUnavailable) return;
         if (!shouldLoadMedia) return;
 
         if (!imageUrl) {
@@ -914,12 +909,18 @@ const FeedItem: React.FC<FeedItemProps> = ({
     }, [
         imageUrl,
         isAvatarPending,
-        isPhotoUnavailable,
-        isUnavailable,
+        isPostUnavailable,
         onLoadAvatar,
         onLoadImage,
         shouldLoadMedia,
     ]);
+
+    React.useEffect(() => {
+        if (!decodedPhoto.failed) return;
+        log.warn(
+            `Post ${postId} is unavailable because the browser could not decode its image`,
+        );
+    }, [decodedPhoto.failed, postId]);
 
     React.useEffect(() => {
         if (!decodedPhotoHeight || !decodedPhotoWidth) return;
@@ -1002,11 +1003,9 @@ const FeedItem: React.FC<FeedItemProps> = ({
                     component="button"
                     type="button"
                     aria-label={
-                        isUnavailable
+                        isPostUnavailable
                             ? "Post unavailable"
-                            : isPhotoUnavailable
-                              ? "Media unavailable"
-                              : `Open ${name} photo`
+                            : `Open ${name} photo`
                     }
                     disabled={!canOpenPhoto}
                     onClick={() => openPhoto()}
@@ -1029,8 +1028,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
                         },
                     }}
                 >
-                    {!isUnavailable &&
-                        !isPhotoUnavailable &&
+                    {!isPostUnavailable &&
                         !thumbHashDataURL &&
                         !isPhotoReady && (
                             <Skeleton
@@ -1044,9 +1042,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
                                 }}
                             />
                         )}
-                    {!isUnavailable &&
-                    !isPhotoUnavailable &&
-                    thumbHashDataURL ? (
+                    {!isPostUnavailable && thumbHashDataURL ? (
                         <Box
                             component="img"
                             alt=""
@@ -1065,7 +1061,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
                             }}
                         />
                     ) : null}
-                    {!isUnavailable && !isPhotoUnavailable && isPhotoReady && (
+                    {!isPostUnavailable && isPhotoReady && (
                         <Box
                             component="img"
                             alt={`${name} post`}
@@ -1093,7 +1089,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
                             }}
                         />
                     )}
-                    {(isUnavailable || isPhotoUnavailable) && (
+                    {isPostUnavailable && (
                         <Box
                             sx={{
                                 alignItems: "center",
@@ -1107,9 +1103,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
                                 width: "100%",
                             }}
                         >
-                            {isUnavailable
-                                ? "Post unavailable"
-                                : "Media unavailable"}
+                            Post unavailable
                         </Box>
                     )}
                 </Box>
@@ -1323,7 +1317,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
                         )}
                     </Box>
                 </Box>
-                {displayCaption && (
+                {!isPostUnavailable && displayCaption && (
                     <FeedPhotoCaption caption={displayCaption} />
                 )}
             </Box>
@@ -1595,8 +1589,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     const [loadedFeedImageURLsByKey, setLoadedFeedImageURLsByKey] = useState<
         Record<string, string>
     >({});
-    const [unavailableFeedImagesByKey, setUnavailableFeedImagesByKey] =
-        useState<Record<string, true>>({});
+    const [unavailableFeedPostsByKey, setUnavailableFeedPostsByKey] = useState<
+        Record<string, true>
+    >({});
     const [feedScrollRequest, setFeedScrollRequest] = useState(0);
     const postInputRef = React.useRef<HTMLInputElement | null>(null);
     const feedLoadMoreRef = React.useRef<HTMLDivElement | null>(null);
@@ -1728,7 +1723,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             }
 
             const cacheKey = feedPostImageCacheKey(item);
-            if (unavailableFeedImagesByKey[cacheKey]) {
+            if (unavailableFeedPostsByKey[cacheKey]) {
                 return Promise.resolve(undefined);
             }
             const inFlight = feedImageLoadsInFlightRef.current.get(cacheKey);
@@ -1746,7 +1741,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 .catch((error: unknown) => {
                     log.warn("Failed to load feed post image", error);
                     if (isSpaceContentError(error)) {
-                        setUnavailableFeedImagesByKey((current) => ({
+                        setUnavailableFeedPostsByKey((current) => ({
                             ...current,
                             [cacheKey]: true,
                         }));
@@ -1759,7 +1754,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             feedImageLoadsInFlightRef.current.set(cacheKey, load);
             return load;
         },
-        [loadedFeedImageURLFor, onLoadPostImage, unavailableFeedImagesByKey],
+        [loadedFeedImageURLFor, onLoadPostImage, unavailableFeedPostsByKey],
     );
     const loadFeedPostAvatar = React.useCallback(
         (item: SpacePost) => {
@@ -1809,9 +1804,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         const imageUrl = loadedFeedImageURLFor(item);
         const avatarUrl = loadedFeedAvatarURLFor(item);
         const isAvatarPending = !item.isUnavailable && avatarUrl === undefined;
-        const isMediaUnavailable = Boolean(
-            unavailableFeedImagesByKey[feedPostImageCacheKey(item)],
-        );
+        const isUnavailable =
+            Boolean(item.isUnavailable) ||
+            Boolean(unavailableFeedPostsByKey[feedPostImageCacheKey(item)]);
         return (
             <FeedItem
                 key={key}
@@ -1823,19 +1818,18 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 friendID={item.friendID}
                 imageUrl={imageUrl}
                 isAvatarPending={isAvatarPending}
-                isMediaUnavailable={isMediaUnavailable}
                 isOwnPost={
                     Boolean(viewerSpaceId) && item.spaceId == viewerSpaceId
                 }
-                isUnavailable={item.isUnavailable}
+                isUnavailable={isUnavailable}
                 name={item.name}
                 onLoadAvatar={
-                    isAvatarPending && !item.isUnavailable
+                    isAvatarPending && !isUnavailable
                         ? () => loadFeedPostAvatar(item)
                         : undefined
                 }
                 onLoadImage={
-                    imageUrl || item.isUnavailable || isMediaUnavailable
+                    imageUrl || isUnavailable
                         ? undefined
                         : () => loadFeedPostImage(item)
                 }

@@ -1527,6 +1527,9 @@ const MessageBubble: React.FC<{
                                     fontFamily:
                                         '"Inter Variable", Inter, sans-serif',
                                     fontSize: 14,
+                                    fontStyle: isUnavailable
+                                        ? "italic"
+                                        : "normal",
                                     fontWeight: 600,
                                     lineHeight: "21px",
                                     overflowWrap: "anywhere",
