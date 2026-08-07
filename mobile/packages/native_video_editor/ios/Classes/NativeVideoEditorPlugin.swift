@@ -1,889 +1,445 @@
-import Flutter
-import AVFoundation
-import ImageIO
+@preconcurrency import Flutter
+import Foundation
 
-public class NativeVideoEditorPlugin: NSObject, FlutterPlugin {
+@MainActor
+public final class NativeVideoEditorPlugin: NSObject, @preconcurrency FlutterPlugin {
     private var isDetached = false
-    private var currentExportSession: AVAssetExportSession?
-    private var exportCancellationResult: FlutterResult?
     private var progressEventSink: FlutterEventSink?
-    private var progressTimer: Timer?
-    private var frameGenerators: [String: AVAssetImageGenerator] = [:]
-    private var frameOutputPaths: [String: [String]] = [:]
-    private var cancelledFrameRequests = Set<String>()
+    private var frameTasks: [String: Task<Void, Never>] = [:]
     private var frameCancellationResults: [String: FlutterResult] = [:]
-    private let frameStartQueue = DispatchQueue(
-        label: "io.ente.native-video-editor.frames"
-    )
-    private let frameSemaphore = DispatchSemaphore(value: 2)
+    private var exportTask: Task<Void, Never>?
+    private var exportCancellationResult: FlutterResult?
+    private let metadataReader = VideoMetadataReader()
+    private lazy var frameExtractor = VideoFrameExtractor(metadataReader: metadataReader)
+    private let videoExporter = VideoExportEngine()
 
     public static func register(with registrar: FlutterPluginRegistrar) {
-        let channel = FlutterMethodChannel(name: "native_video_editor", binaryMessenger: registrar.messenger())
+        let channel = FlutterMethodChannel(
+            name: "native_video_editor",
+            binaryMessenger: registrar.messenger()
+        )
         let instance = NativeVideoEditorPlugin()
         registrar.addMethodCallDelegate(instance, channel: channel)
         registrar.publish(instance)
 
-        let progressChannel = FlutterEventChannel(name: "native_video_editor/progress", binaryMessenger: registrar.messenger())
+        let progressChannel = FlutterEventChannel(
+            name: "native_video_editor/progress",
+            binaryMessenger: registrar.messenger()
+        )
         progressChannel.setStreamHandler(instance)
     }
 
     public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
-        switch call.method {
-        case "processVideo":
-            handleProcessVideo(call: call, result: result)
-
-        case "getVideoInfo":
-            guard let args = call.arguments as? [String: Any],
-                  let videoPath = args["videoPath"] as? String else {
-            result(flutterError("INVALID_ARGS", message: "Invalid arguments"))
+        guard !isDetached else {
+            result(flutterError("PLUGIN_DETACHED", message: "Native video editor is detached"))
             return
         }
-
-        getVideoInfo(videoPath: videoPath, result: result)
-
+        switch call.method {
+        case "getVideoInfo":
+            inspectVideo(call, result: result)
         case "extractFrame":
-            guard let args = call.arguments as? [String: Any],
-                  let outputPath = args["outputPath"] as? String,
-                  let position = args["positionMs"] as? NSNumber else {
-                result(flutterError("INVALID_ARGS", message: "Invalid frame arguments"))
-                return
-            }
-            extractFrames(
-                args: args,
-                requestID: UUID().uuidString,
-                outputPaths: [outputPath],
-                positionsMs: [position.int64Value],
-                result: result
-            )
-
+            extractSingleFrame(call, result: result)
         case "extractTimeline":
-            guard let args = call.arguments as? [String: Any],
-                  let requestID = args["requestId"] as? String,
-                  let outputPaths = args["outputPaths"] as? [String],
-                  let positions = args["positionsMs"] as? [NSNumber] else {
-                result(flutterError("INVALID_ARGS", message: "Invalid timeline arguments"))
-                return
-            }
-            extractFrames(
-                args: args,
-                requestID: requestID,
-                outputPaths: outputPaths,
-                positionsMs: positions.map(\.int64Value),
-                result: result
-            )
-
+            extractTimeline(call, result: result)
         case "cancelFrameExtraction":
-            guard let args = call.arguments as? [String: Any],
-                  let requestID = args["requestId"] as? String else {
-                result(flutterError("INVALID_ARGS", message: "Missing frame request ID"))
-                return
-            }
-            if let generator = frameGenerators[requestID] {
-                cancelledFrameRequests.insert(requestID)
-                if frameCancellationResults[requestID] != nil {
-                    result(nil)
-                    return
-                }
-                frameCancellationResults[requestID] = result
-                generator.cancelAllCGImageGeneration()
-            } else {
-                result(nil)
-            }
-
+            cancelFrameExtraction(call, result: result)
+        case "processVideo":
+            processVideo(call, result: result)
         case "cancelProcessing":
-            guard let exportSession = currentExportSession else {
-                result(nil)
-                return
-            }
-            guard exportCancellationResult == nil else {
-                result(nil)
-                return
-            }
-            exportCancellationResult = result
-            exportSession.cancelExport()
-
+            cancelProcessing(result: result)
         default:
             result(FlutterMethodNotImplemented)
         }
     }
 
-    private func extractFrames(
+    private func inspectVideo(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
+        guard let args = call.arguments as? [String: Any],
+            let videoPath = args["videoPath"] as? String,
+            !videoPath.isEmpty
+        else {
+            result(flutterError("INVALID_ARGS", message: "Invalid arguments"))
+            return
+        }
+
+        Task { [weak self] in
+            guard let self else { return }
+            do {
+                let info = try await metadataReader.read(
+                    from: URL(fileURLWithPath: videoPath)
+                )
+                guard !isDetached else { return }
+                result(info.channelValue)
+            } catch {
+                guard !isDetached else { return }
+                result(flutterError(error, defaultCode: "INFO_ERROR"))
+            }
+        }
+    }
+
+    private func extractSingleFrame(
+        _ call: FlutterMethodCall,
+        result: @escaping FlutterResult
+    ) {
+        guard let args = call.arguments as? [String: Any],
+            let outputPath = args["outputPath"] as? String,
+            !outputPath.isEmpty,
+            let positionMs = int64(args["positionMs"])
+        else {
+            result(flutterError("INVALID_ARGS", message: "Invalid frame arguments"))
+            return
+        }
+        startFrameExtraction(
+            args: args,
+            requestID: UUID().uuidString,
+            outputPaths: [outputPath],
+            positionsMs: [positionMs],
+            result: result
+        )
+    }
+
+    private func extractTimeline(
+        _ call: FlutterMethodCall,
+        result: @escaping FlutterResult
+    ) {
+        guard let args = call.arguments as? [String: Any],
+            let requestID = args["requestId"] as? String,
+            !requestID.isEmpty,
+            let outputPaths = args["outputPaths"] as? [String],
+            outputPaths.allSatisfy({ !$0.isEmpty }),
+            let positions = args["positionsMs"] as? [NSNumber]
+        else {
+            result(flutterError("INVALID_ARGS", message: "Invalid timeline arguments"))
+            return
+        }
+        startFrameExtraction(
+            args: args,
+            requestID: requestID,
+            outputPaths: outputPaths,
+            positionsMs: positions.map(\.int64Value),
+            result: result
+        )
+    }
+
+    private func startFrameExtraction(
         args: [String: Any],
         requestID: String,
         outputPaths: [String],
         positionsMs: [Int64],
         result: @escaping FlutterResult
     ) {
-        guard frameGenerators[requestID] == nil else {
-            result(flutterError("DUPLICATE_REQUEST", message: "Frame request ID is already active"))
+        guard frameTasks[requestID] == nil else {
+            result(
+                flutterError(
+                    "DUPLICATE_REQUEST",
+                    message: "Frame request ID is already active",
+                    details: requestID
+                ))
             return
         }
-        guard let inputPath = args["inputPath"] as? String,
-              let maxWidth = args["maxWidth"] as? NSNumber,
-              let maxHeight = args["maxHeight"] as? NSNumber,
-              let quality = args["quality"] as? NSNumber,
-              let policy = args["policy"] as? String,
-              !positionsMs.isEmpty,
-              positionsMs.count == outputPaths.count,
-              maxWidth.intValue > 0,
-              maxHeight.intValue > 0,
-              (1...100).contains(quality.intValue),
-              policy == "precise" || policy == "nearestSync" else {
-            result(flutterError("INVALID_ARGS", message: "Invalid frame extraction arguments"))
-            return
-        }
-        let inputURL = URL(fileURLWithPath: inputPath)
-            .standardizedFileURL.resolvingSymlinksInPath()
-        let outputURLs = outputPaths.map {
-            URL(fileURLWithPath: $0).standardizedFileURL.resolvingSymlinksInPath()
-        }
-        guard FileManager.default.fileExists(atPath: inputURL.path),
-              positionsMs.allSatisfy({ $0 >= 0 }),
-              outputPaths.allSatisfy({ !$0.isEmpty }),
-              !outputURLs.contains(inputURL),
-              Set(outputURLs.map(\.path)).count == outputURLs.count else {
-            result(flutterError("INVALID_ARGS", message: "Invalid frame paths or timestamps"))
+        let request: VideoFrameRequest
+        do {
+            request = try makeFrameRequest(
+                args: args,
+                outputPaths: outputPaths,
+                positionsMs: positionsMs
+            )
+        } catch {
+            result(flutterError(error, defaultCode: "INVALID_ARGS"))
             return
         }
 
-        let asset = AVURLAsset(url: inputURL)
-        let generator = AVAssetImageGenerator(asset: asset)
-        generator.appliesPreferredTrackTransform = true
-        generator.maximumSize = CGSize(
-            width: maxWidth.doubleValue,
-            height: maxHeight.doubleValue
-        )
-        if policy == "precise" {
-            generator.requestedTimeToleranceBefore = .zero
-            generator.requestedTimeToleranceAfter = .zero
-        } else {
-            let tolerance = CMTime(value: 300, timescale: 600)
-            generator.requestedTimeToleranceBefore = tolerance
-            generator.requestedTimeToleranceAfter = tolerance
-        }
-
-        cancelledFrameRequests.remove(requestID)
-        frameGenerators[requestID] = generator
-        frameOutputPaths[requestID] = outputPaths
-        frameStartQueue.async { [weak self] in
-            guard let self = self else { return }
-            self.frameSemaphore.wait()
-            DispatchQueue.main.async {
-                if self.cancelledFrameRequests.contains(requestID) {
-                    self.finishFrameRequest(
-                        requestID: requestID,
-                        generator: generator,
-                        result: result,
-                        value: self.flutterError("FRAME_CANCELLED", message: "Frame extraction was cancelled")
-                    )
-                    return
-                }
-                self.loadVideoInfo(asset: asset) { [weak self] loadedInfo in
-                    guard let self = self else { return }
-                    DispatchQueue.main.async {
-                        switch loadedInfo {
-                        case .success(let info):
-                            let durationMs = info["duration"] as? Int64 ?? 0
-                            self.generateFrame(
-                                generator: generator,
-                                requestID: requestID,
-                                outputPaths: outputPaths,
-                                positionsMs: positionsMs,
-                                durationMs: durationMs,
-                                quality: quality.doubleValue / 100.0,
-                                index: 0,
-                                frames: [],
-                                videoInfo: info,
-                                result: result
-                            )
-                        case .failure(let error):
-                            self.finishFrameRequest(
-                                requestID: requestID,
-                                generator: generator,
-                                result: result,
-                                value: self.flutterError("FRAME_EXTRACTION_ERROR", message: "Failed to inspect video", error: error)
-                            )
-                        }
-                    }
-                }
+        let task = Task { [weak self] in
+            guard let self else { return }
+            let value: Any
+            do {
+                let extraction = try await frameExtractor.extract(request)
+                value = extraction.channelValue(outputPaths: outputPaths)
+            } catch is CancellationError {
+                value = flutterError(
+                    "FRAME_CANCELLED",
+                    message: "Frame extraction was cancelled",
+                    details: requestID
+                )
+            } catch {
+                value = flutterError(error, defaultCode: "FRAME_EXTRACTION_ERROR")
             }
+            finishFrameRequest(requestID: requestID, result: result, value: value)
         }
+        frameTasks[requestID] = task
     }
 
-    private func generateFrame(
-        generator: AVAssetImageGenerator,
-        requestID: String,
-        outputPaths: [String],
-        positionsMs: [Int64],
-        durationMs: Int64,
-        quality: Double,
-        index: Int,
-        frames: [[String: Any]],
-        videoInfo: [String: Any],
+    private func cancelFrameExtraction(
+        _ call: FlutterMethodCall,
         result: @escaping FlutterResult
     ) {
-        if cancelledFrameRequests.contains(requestID) {
-            removeFiles(at: outputPaths.prefix(index))
-            finishFrameRequest(
-                requestID: requestID,
-                generator: generator,
-                result: result,
-                value: flutterError("FRAME_CANCELLED", message: "Frame extraction was cancelled")
-            )
+        guard let args = call.arguments as? [String: Any],
+            let requestID = args["requestId"] as? String
+        else {
+            result(flutterError("INVALID_ARGS", message: "Missing frame request ID"))
             return
         }
-
-        let upperBound = max(Int64(0), durationMs - 1)
-        let positionMs = durationMs > 0
-            ? min(max(Int64(0), positionsMs[index]), upperBound)
-            : max(Int64(0), positionsMs[index])
-        let requestedTime = CMTime(value: positionMs, timescale: 1000)
-
-        generator.generateCGImagesAsynchronously(forTimes: [NSValue(time: requestedTime)]) {
-            [weak self] _, image, _, generationResult, error in
-            guard let self = self else { return }
-            guard generationResult == .succeeded, let image = image else {
-                DispatchQueue.main.async {
-                    self.removeFiles(at: outputPaths.prefix(index))
-                    let code = generationResult == .cancelled
-                        ? "FRAME_CANCELLED"
-                        : "FRAME_EXTRACTION_ERROR"
-                    self.finishFrameRequest(
-                        requestID: requestID,
-                        generator: generator,
-                        result: result,
-                        value: self.flutterError(code, message: "Failed to decode video frame", error: error)
-                    )
-                }
-                return
-            }
-
-            do {
-                try self.writeJPEG(image, to: outputPaths[index], quality: quality)
-                DispatchQueue.main.async {
-                    if self.cancelledFrameRequests.contains(requestID) {
-                        self.removeFiles(at: outputPaths.prefix(index + 1))
-                        self.finishFrameRequest(
-                            requestID: requestID,
-                            generator: generator,
-                            result: result,
-                            value: self.flutterError(
-                                "FRAME_CANCELLED",
-                                message: "Frame extraction was cancelled"
-                            )
-                        )
-                        return
-                    }
-                    var nextFrames = frames
-                    nextFrames.append([
-                        "outputPath": outputPaths[index],
-                        "width": image.width,
-                        "height": image.height,
-                    ])
-                    let nextIndex = index + 1
-                    if nextIndex == positionsMs.count {
-                        self.finishFrameRequest(
-                            requestID: requestID,
-                            generator: generator,
-                            result: result,
-                            value: ["videoInfo": videoInfo, "frames": nextFrames]
-                        )
-                    } else {
-                        self.generateFrame(
-                            generator: generator,
-                            requestID: requestID,
-                            outputPaths: outputPaths,
-                            positionsMs: positionsMs,
-                            durationMs: durationMs,
-                            quality: quality,
-                            index: nextIndex,
-                            frames: nextFrames,
-                            videoInfo: videoInfo,
-                            result: result
-                        )
-                    }
-                }
-            } catch {
-                DispatchQueue.main.async {
-                    self.removeFiles(at: outputPaths.prefix(index + 1))
-                    self.finishFrameRequest(
-                        requestID: requestID,
-                        generator: generator,
-                        result: result,
-                        value: self.flutterError("FRAME_WRITE_ERROR", message: "Failed to write video frame", error: error)
-                    )
-                }
-            }
+        guard let task = frameTasks[requestID] else {
+            result(nil)
+            return
         }
-    }
-
-    private func writeJPEG(_ image: CGImage, to path: String, quality: Double) throws {
-        let url = URL(fileURLWithPath: path)
-        try FileManager.default.createDirectory(
-            at: url.deletingLastPathComponent(),
-            withIntermediateDirectories: true
-        )
-        try? FileManager.default.removeItem(at: url)
-        guard let destination = CGImageDestinationCreateWithURL(
-            url as CFURL,
-            "public.jpeg" as CFString,
-            1,
-            nil
-        ) else {
-            throw NSError(
-                domain: "NativeVideoEditor",
-                code: 3,
-                userInfo: [NSLocalizedDescriptionKey: "Could not create JPEG destination"]
-            )
+        guard frameCancellationResults[requestID] == nil else {
+            result(nil)
+            return
         }
-        let properties = [kCGImageDestinationLossyCompressionQuality: quality] as CFDictionary
-        CGImageDestinationAddImage(destination, image, properties)
-        if !CGImageDestinationFinalize(destination) {
-            throw NSError(
-                domain: "NativeVideoEditor",
-                code: 4,
-                userInfo: [NSLocalizedDescriptionKey: "Could not finalize JPEG output"]
-            )
-        }
+        frameCancellationResults[requestID] = result
+        task.cancel()
     }
 
     private func finishFrameRequest(
         requestID: String,
-        generator: AVAssetImageGenerator,
         result: @escaping FlutterResult,
         value: Any
     ) {
-        guard let activeGenerator = frameGenerators[requestID],
-              activeGenerator === generator else { return }
-        frameGenerators.removeValue(forKey: requestID)
-        frameOutputPaths.removeValue(forKey: requestID)
-        cancelledFrameRequests.remove(requestID)
-        frameSemaphore.signal()
+        guard frameTasks.removeValue(forKey: requestID) != nil else { return }
         let cancellationResult = frameCancellationResults.removeValue(forKey: requestID)
-        if !isDetached {
-            result(value)
-            cancellationResult?(nil)
-        }
+        guard !isDetached else { return }
+        result(value)
+        cancellationResult?(nil)
     }
 
-    private func removeFiles<S: Sequence>(at paths: S) where S.Element == String {
-        for path in paths {
-            try? FileManager.default.removeItem(atPath: path)
-        }
-    }
-
-    private func handleProcessVideo(call: FlutterMethodCall, result: @escaping FlutterResult) {
-        guard currentExportSession == nil else {
+    private func processVideo(
+        _ call: FlutterMethodCall,
+        result: @escaping FlutterResult
+    ) {
+        guard exportTask == nil else {
             result(flutterError("CONCURRENT_EXPORT", message: "A video export is already active"))
             return
         }
         guard let args = call.arguments as? [String: Any],
-              let inputPath = args["inputPath"] as? String,
-              let outputPath = args["outputPath"] as? String else {
+            let outputPath = args["outputPath"] as? String,
+            !outputPath.isEmpty
+        else {
             result(flutterError("INVALID_ARGS", message: "Invalid arguments"))
             return
         }
-        let trimStartMs = args["trimStartMs"] as? Int
-        let trimEndMs = args["trimEndMs"] as? Int
-        let rotateDegrees = args["rotateDegrees"] as? Int
-        let cropX = args["cropX"] as? Int
-        let cropY = args["cropY"] as? Int
-        let cropWidth = args["cropWidth"] as? Int
-        let cropHeight = args["cropHeight"] as? Int
-        let cropValues = [cropX, cropY, cropWidth, cropHeight]
-        let inputURL = URL(fileURLWithPath: inputPath)
-            .standardizedFileURL.resolvingSymlinksInPath()
-        let outputURL = URL(fileURLWithPath: outputPath)
-            .standardizedFileURL.resolvingSymlinksInPath()
-        guard inputURL != outputURL,
-              FileManager.default.fileExists(atPath: inputURL.path),
-              (trimStartMs == nil) == (trimEndMs == nil),
-              trimStartMs == nil || (trimStartMs! >= 0 && trimStartMs! < trimEndMs!),
-              rotateDegrees == nil || [0, 90, 180, 270].contains(rotateDegrees!),
-              cropValues.allSatisfy({ $0 == nil }) || cropValues.allSatisfy({ $0 != nil }),
-              cropWidth == nil || (cropX! >= 0 && cropY! >= 0 && cropWidth! > 0 && cropHeight! > 0) else {
-            result(flutterError("INVALID_ARGS", message: "Invalid video processing arguments"))
-            return
-        }
-
-        let asset = AVAsset(url: inputURL)
-        let composition = AVMutableComposition()
-        var videoComposition: AVMutableVideoComposition?
-
-        var requestedTimeRange = CMTimeRange(start: .zero, duration: asset.duration)
-        if let trimStartMs, let trimEndMs {
-            let startTime = CMTime(value: CMTimeValue(trimStartMs), timescale: 1000)
-            let endTime = CMTime(value: CMTimeValue(trimEndMs), timescale: 1000)
-            requestedTimeRange = CMTimeRange(start: startTime, end: endTime)
-        }
-
-        guard let videoTrack = asset.tracks(withMediaType: .video).first,
-              let compositionVideoTrack = composition.addMutableTrack(
-                withMediaType: .video,
-                preferredTrackID: kCMPersistentTrackID_Invalid) else {
-            result(flutterError("COMPOSITION_ERROR", message: "Failed to create composition"))
-            return
-        }
-        guard let videoTimeRange = intersection(
-            requestedTimeRange,
-            with: videoTrack.timeRange
-        ) else {
-            result(flutterError("INVALID_TIME_RANGE", message: "The edit range does not contain video"))
-            return
-        }
-
+        let request: VideoEditRequest
         do {
-            try compositionVideoTrack.insertTimeRange(videoTimeRange, of: videoTrack, at: .zero)
-
-            if let audioTrack = asset.tracks(withMediaType: .audio).first,
-               let audioTimeRange = intersection(videoTimeRange, with: audioTrack.timeRange),
-               let compositionAudioTrack = composition.addMutableTrack(
-                withMediaType: .audio,
-                preferredTrackID: kCMPersistentTrackID_Invalid) {
-                let insertionTime = CMTimeSubtract(audioTimeRange.start, videoTimeRange.start)
-                try compositionAudioTrack.insertTimeRange(
-                    audioTimeRange,
-                    of: audioTrack,
-                    at: insertionTime
-                )
-            }
+            request = try makeEditRequest(args: args)
         } catch {
-            result(flutterError("INSERT_ERROR", message: "Failed to insert track", error: error))
+            result(flutterError(error, defaultCode: "INVALID_ARGS"))
             return
         }
 
-        var isReEncoded = false
-
-        let naturalSize = videoTrack.naturalSize
-        let preferredTransform = videoTrack.preferredTransform
-        var finalTransform = preferredTransform
-        var renderSize = naturalSize
-
-        if let cropX, let cropY, let cropWidth, let cropHeight {
-            isReEncoded = true
-
-            let requestedRotation = rotateDegrees ?? 0
-            let normalizedRotation = ((requestedRotation % 360) + 360) % 360
-
-            let naturalBounds = CGRect(origin: .zero, size: naturalSize)
-            let preferredBounds = naturalBounds.applying(preferredTransform)
-            let orientationAdjustment = CGAffineTransform(
-                translationX: -preferredBounds.minX,
-                y: -preferredBounds.minY
-            )
-
-            let orientationTransform = preferredTransform.concatenating(orientationAdjustment)
-
-            guard orientationTransform.isNearlyInvertible else {
-                result(flutterError("PROCESS_ERROR", message: "Invalid orientation transform during crop"))
-                return
-            }
-            let orientationInverse = orientationTransform.inverted()
-
-            let cropRectDisplay = CGRect(
-                x: CGFloat(cropX),
-                y: CGFloat(cropY),
-                width: CGFloat(cropWidth),
-                height: CGFloat(cropHeight)
-            )
-            let displayBounds = CGRect(
-                origin: .zero,
-                size: CGSize(
-                    width: abs(preferredBounds.width),
-                    height: abs(preferredBounds.height)
-                )
-            )
-            let cropTolerance: CGFloat = 0.5
-            guard cropRectDisplay.minX >= displayBounds.minX - cropTolerance,
-                  cropRectDisplay.minY >= displayBounds.minY - cropTolerance,
-                  cropRectDisplay.maxX <= displayBounds.maxX + cropTolerance,
-                  cropRectDisplay.maxY <= displayBounds.maxY + cropTolerance else {
-                result(flutterError("PROCESS_ERROR", message: "Crop rectangle exceeds the displayed video"))
-                return
-            }
-
-            let displayCorners = [
-                cropRectDisplay.origin,
-                CGPoint(x: cropRectDisplay.maxX, y: cropRectDisplay.minY),
-                CGPoint(x: cropRectDisplay.minX, y: cropRectDisplay.maxY),
-                CGPoint(x: cropRectDisplay.maxX, y: cropRectDisplay.maxY)
-            ]
-
-            let fileCorners = displayCorners.map { $0.applying(orientationInverse) }
-
-            let fileMinX = fileCorners.map { $0.x }.min() ?? 0
-            let fileMinY = fileCorners.map { $0.y }.min() ?? 0
-            let fileMaxX = fileCorners.map { $0.x }.max() ?? 0
-            let fileMaxY = fileCorners.map { $0.y }.max() ?? 0
-
-            let fileCropRect = CGRect(
-                x: fileMinX,
-                y: fileMinY,
-                width: fileMaxX - fileMinX,
-                height: fileMaxY - fileMinY
-            )
-
-            let cropTranslation = CGAffineTransform(
-                translationX: -fileCropRect.origin.x,
-                y: -fileCropRect.origin.y
-            )
-
-            var transform = cropTranslation.concatenating(orientationTransform)
-
-            if normalizedRotation != 0 {
-                let clockwiseRadians = CGFloat(normalizedRotation) * .pi / 180
-                let rotationTransform = CGAffineTransform(rotationAngle: clockwiseRadians)
-                transform = transform.concatenating(rotationTransform)
-            }
-
-            let transformedCorners = fileCorners.map { $0.applying(transform) }
-
-            let minX = transformedCorners.map { $0.x }.min() ?? 0
-            let minY = transformedCorners.map { $0.y }.min() ?? 0
-            let maxX = transformedCorners.map { $0.x }.max() ?? 0
-            let maxY = transformedCorners.map { $0.y }.max() ?? 0
-
-            let correctionTransform = CGAffineTransform(
-                translationX: -minX,
-                y: -minY
-            )
-            transform = transform.concatenating(correctionTransform)
-
-            let outputWidth = max((maxX - minX).rounded(), CGFloat(1))
-            let outputHeight = max((maxY - minY).rounded(), CGFloat(1))
-            renderSize = CGSize(width: outputWidth, height: outputHeight)
-
-            finalTransform = transform
-
-        } else if let rotateDegrees, rotateDegrees != 0 {
-            isReEncoded = true
-
-            // Apply orientation adjustment to handle existing metadata rotation properly
-            let naturalBounds = CGRect(origin: .zero, size: naturalSize)
-            let preferredBounds = naturalBounds.applying(preferredTransform)
-            let orientationAdjustment = CGAffineTransform(
-                translationX: -preferredBounds.minX,
-                y: -preferredBounds.minY
-            )
-            let orientationTransform = preferredTransform.concatenating(orientationAdjustment)
-
-            // Calculate oriented size for render calculations
-            let orientedSize = CGSize(width: abs(preferredBounds.width), height: abs(preferredBounds.height))
-
-            var transform = orientationTransform
-
-            let clockwiseRadians = CGFloat(rotateDegrees) * .pi / 180
-
-            // Rotate around the center of the input video
-            let centerX = orientedSize.width / 2
-            let centerY = orientedSize.height / 2
-
-            transform = transform.translatedBy(x: centerX, y: centerY)
-            transform = transform.rotated(by: clockwiseRadians)
-            transform = transform.translatedBy(x: -centerX, y: -centerY)
-
-            // Calculate renderSize from actual transformed bounds (more accurate for metadata-rotated videos)
-            // Use naturalSize here because transform expects input in natural/file coordinate space
-            let testRect = CGRect(origin: .zero, size: naturalSize)
-            let transformedBounds = testRect.applying(transform)
-
-            // Get the actual dimensions after the full transform chain
-            let finalWidth = abs(transformedBounds.width)
-            let finalHeight = abs(transformedBounds.height)
-            renderSize = CGSize(width: finalWidth, height: finalHeight)
-
-            // Center the video in the renderSize
-            let targetMinX: CGFloat = (renderSize.width - transformedBounds.width) / 2
-            let additionalTranslateX = targetMinX - transformedBounds.minX
-
-            let targetMinY: CGFloat = (renderSize.height - transformedBounds.height) / 2
-            let additionalTranslateY = targetMinY - transformedBounds.minY
-
-            transform = transform.concatenating(CGAffineTransform(translationX: additionalTranslateX, y: additionalTranslateY))
-
-            finalTransform = transform
-        }
-
-        if isReEncoded {
-            videoComposition = AVMutableVideoComposition()
-            videoComposition!.frameDuration = frameDuration(for: videoTrack)
-            videoComposition!.renderSize = renderSize
-
-            let instruction = AVMutableVideoCompositionInstruction()
-            instruction.timeRange = CMTimeRange(start: .zero, duration: composition.duration)
-
-            let layerInstruction = AVMutableVideoCompositionLayerInstruction(assetTrack: compositionVideoTrack)
-            layerInstruction.setTransform(finalTransform, at: .zero)
-
-            instruction.layerInstructions = [layerInstruction]
-            videoComposition!.instructions = [instruction]
-        } else {
-            compositionVideoTrack.preferredTransform = preferredTransform
-        }
-
-        // Export
-        let presetName = isReEncoded ? AVAssetExportPresetHighestQuality : AVAssetExportPresetPassthrough
-        guard let exportSession = AVAssetExportSession(asset: composition, presetName: presetName) else {
-            result(flutterError("EXPORT_ERROR", message: "Failed to create export session"))
-            return
-        }
-
-        currentExportSession = exportSession
-
-        if let videoComp = videoComposition {
-            exportSession.videoComposition = videoComp
-        }
-
-        exportSession.outputURL = outputURL
-        exportSession.outputFileType = .mp4
-        exportSession.shouldOptimizeForNetworkUse = true
-        try? FileManager.default.removeItem(at: outputURL)
-
-        if !isReEncoded {
-            exportSession.timeRange =  CMTimeRange(start: .zero, duration: composition.duration)
-        }
-
-        startProgressReporting()
-        exportSession.exportAsynchronously {
-            DispatchQueue.main.async {
-                self.stopProgressReporting()
-                if self.isDetached {
-                    try? FileManager.default.removeItem(at: outputURL)
-                } else {
-                    switch exportSession.status {
-                    case .completed:
-                        let outputSize = (try? outputURL.resourceValues(
-                            forKeys: [.fileSizeKey]
-                        ).fileSize) ?? 0
-                        if outputSize > 0 {
-                            result([
-                                "outputPath": outputPath,
-                                "isReEncoded": isReEncoded
-                            ])
-                        } else {
-                            try? FileManager.default.removeItem(at: outputURL)
-                            result(self.flutterError("PROCESS_ERROR", message: "Export produced no output"))
-                        }
-                    case .failed:
-                        try? FileManager.default.removeItem(at: outputURL)
-                        result(self.flutterError("PROCESS_ERROR", message: "Failed to process video", error: exportSession.error))
-                    case .cancelled:
-                        try? FileManager.default.removeItem(at: outputURL)
-                        result(self.flutterError("PROCESS_CANCELLED", message: "Export cancelled"))
-                    default:
-                        try? FileManager.default.removeItem(at: outputURL)
-                        result(self.flutterError("UNKNOWN", message: "Unknown export status", error: exportSession.error))
+        let task = Task { [weak self] in
+            guard let self else { return }
+            let value: Any
+            do {
+                let export = try await videoExporter.export(request) { [weak self] progress in
+                    Task { @MainActor [weak self] in
+                        guard let self, !isDetached else { return }
+                        progressEventSink?(progress)
                     }
                 }
-                self.currentExportSession = nil
-                if !self.isDetached {
-                    self.exportCancellationResult?(nil)
-                }
-                self.exportCancellationResult = nil
+                value = [
+                    "outputPath": outputPath,
+                    "isReEncoded": export.isReEncoded,
+                ]
+            } catch is CancellationError {
+                value = flutterError("PROCESS_CANCELLED", message: "Export cancelled")
+            } catch {
+                value = flutterError(error, defaultCode: "PROCESS_ERROR")
             }
+            finishExport(result: result, value: value)
         }
+        exportTask = task
     }
 
-    private func intersection(
-        _ requestedRange: CMTimeRange,
-        with availableRange: CMTimeRange
-    ) -> CMTimeRange? {
-        let intersection = CMTimeRangeGetIntersection(
-            requestedRange,
-            otherRange: availableRange
+    private func cancelProcessing(result: @escaping FlutterResult) {
+        guard let exportTask else {
+            result(nil)
+            return
+        }
+        guard exportCancellationResult == nil else {
+            result(nil)
+            return
+        }
+        exportCancellationResult = result
+        exportTask.cancel()
+    }
+
+    private func finishExport(result: @escaping FlutterResult, value: Any) {
+        guard exportTask != nil else { return }
+        exportTask = nil
+        let cancellationResult = exportCancellationResult
+        exportCancellationResult = nil
+        guard !isDetached else { return }
+        result(value)
+        cancellationResult?(nil)
+    }
+
+    private func makeFrameRequest(
+        args: [String: Any],
+        outputPaths: [String],
+        positionsMs: [Int64]
+    ) throws -> VideoFrameRequest {
+        guard let inputPath = args["inputPath"] as? String,
+            !inputPath.isEmpty,
+            outputPaths.allSatisfy({ !$0.isEmpty }),
+            let maxWidth = int(args["maxWidth"]),
+            let maxHeight = int(args["maxHeight"]),
+            let quality = int(args["quality"]),
+            let policyValue = args["policy"] as? String
+        else {
+            throw VideoEditorError.invalidRequest("Invalid frame extraction arguments")
+        }
+        let policy: VideoFramePolicy
+        switch policyValue {
+        case "precise": policy = .precise
+        case "nearestSync": policy = .nearestSync
+        default:
+            throw VideoEditorError.invalidRequest("Invalid frame policy")
+        }
+        return try VideoFrameRequest(
+            inputURL: URL(fileURLWithPath: inputPath),
+            outputURLs: outputPaths.map { URL(fileURLWithPath: $0) },
+            positionsMs: positionsMs,
+            maxWidth: maxWidth,
+            maxHeight: maxHeight,
+            quality: quality,
+            policy: policy
         )
-        guard intersection.isValid,
-              !intersection.isEmpty,
-              intersection.duration.isNumeric,
-              CMTimeCompare(intersection.duration, .zero) > 0 else {
-            return nil
-        }
-        return intersection
     }
 
-    private func frameDuration(for track: AVAssetTrack) -> CMTime {
-        let nominal = track.nominalFrameRate
-        if nominal.isFinite && nominal > 0 {
-            return CMTime(value: 1, timescale: Int32(round(nominal)))
+    private func makeEditRequest(args: [String: Any]) throws -> VideoEditRequest {
+        guard let inputPath = args["inputPath"] as? String,
+            !inputPath.isEmpty,
+            let outputPath = args["outputPath"] as? String,
+            !outputPath.isEmpty
+        else {
+            throw VideoEditorError.invalidRequest("Invalid video paths")
         }
-        if track.minFrameDuration.isValid && track.minFrameDuration.value != 0 {
-            return track.minFrameDuration
-        }
-        return CMTime(value: 1, timescale: 30)
-    }
-
-    private func flutterError(_ code: String, message: String, error: Error? = nil, details: Any? = nil) -> FlutterError {
-        let resolvedMessage = error?.localizedDescription ?? message
-        let resolvedDetails: Any?
-        if let details = details {
-            resolvedDetails = details
-        } else if let error = error {
-            resolvedDetails = String(describing: error)
-        } else {
-            resolvedDetails = nil
-        }
-        return FlutterError(code: code, message: resolvedMessage, details: resolvedDetails)
-    }
-
-    private func getVideoInfo(videoPath: String, result: @escaping FlutterResult) {
-        let asset = AVURLAsset(url: URL(fileURLWithPath: videoPath))
-        loadVideoInfo(asset: asset) { [weak self] loadedInfo in
-            guard let self = self else { return }
-            DispatchQueue.main.async {
-                guard !self.isDetached else { return }
-                switch loadedInfo {
-                case .success(let info):
-                    result(info)
-                case .failure(let error):
-                    result(self.flutterError(
-                        "INFO_ERROR",
-                        message: "Failed to load video metadata",
-                        error: error
-                    ))
-                }
-            }
-        }
-    }
-
-    private func loadVideoInfo(
-        asset: AVAsset,
-        completion: @escaping (Result<[String: Any], Error>) -> Void
-    ) {
-        asset.loadValuesAsynchronously(forKeys: ["duration", "tracks"]) { [weak self] in
-            guard let self = self else { return }
-            var error: NSError?
-            guard asset.statusOfValue(forKey: "duration", error: &error) == .loaded,
-                  asset.statusOfValue(forKey: "tracks", error: &error) == .loaded else {
-                completion(.failure(error ?? NSError(
-                    domain: "NativeVideoEditor",
-                    code: 1,
-                    userInfo: [NSLocalizedDescriptionKey: "Video metadata is unavailable"]
-                )))
-                return
-            }
-            guard let videoTrack = asset.tracks.first(where: { $0.mediaType == .video }) else {
-                completion(.failure(NSError(
-                    domain: "NativeVideoEditor",
-                    code: 2,
-                    userInfo: [NSLocalizedDescriptionKey: "Video track is unavailable"]
-                )))
-                return
-            }
-
-            let trackKeys = [
-                "naturalSize",
-                "preferredTransform",
-                "nominalFrameRate",
-                "estimatedDataRate",
-            ]
-            videoTrack.loadValuesAsynchronously(forKeys: trackKeys) {
-                for key in ["naturalSize", "preferredTransform"] {
-                    var trackError: NSError?
-                    guard videoTrack.statusOfValue(forKey: key, error: &trackError) == .loaded else {
-                        completion(.failure(trackError ?? NSError(
-                            domain: "NativeVideoEditor",
-                            code: 3,
-                            userInfo: [NSLocalizedDescriptionKey: "Video track metadata is unavailable: \(key)"]
-                        )))
-                        return
-                    }
-                }
-                completion(.success(self.loadedVideoInfo(asset: asset)))
-            }
-        }
-    }
-
-    private func loadedVideoInfo(asset: AVAsset) -> [String: Any] {
-        let durationSeconds = CMTimeGetSeconds(asset.duration)
-        var info: [String: Any] = [
-            "duration": durationSeconds.isFinite
-                ? Int64(max(0, durationSeconds * 1000))
-                : Int64(0),
-            "width": 0,
-            "height": 0,
-            "displayWidth": 0,
-            "displayHeight": 0,
-            "rotation": 0,
+        let cropValues = [
+            int(args["cropX"]),
+            int(args["cropY"]),
+            int(args["cropWidth"]),
+            int(args["cropHeight"]),
         ]
-
-        if let videoTrack = asset.tracks.first(where: { $0.mediaType == .video }) {
-            let naturalSize = videoTrack.naturalSize
-            let transform = videoTrack.preferredTransform
-            let transformedBounds = CGRect(origin: .zero, size: naturalSize).applying(transform)
-            let angle = atan2(transform.b, transform.a) * 180 / .pi
-            let roundedAngle = Int(angle.rounded())
-            let rotation = ((roundedAngle % 360) + 360) % 360
-
-            info["width"] = Int(abs(naturalSize.width).rounded())
-            info["height"] = Int(abs(naturalSize.height).rounded())
-            info["displayWidth"] = Int(abs(transformedBounds.width).rounded())
-            info["displayHeight"] = Int(abs(transformedBounds.height).rounded())
-            info["rotation"] = rotation
-            if videoTrack.nominalFrameRate > 0 {
-                info["frameRate"] = Double(videoTrack.nominalFrameRate)
-            }
-            if videoTrack.estimatedDataRate > 0 {
-                info["bitrate"] = Int64(videoTrack.estimatedDataRate)
-            }
+        guard cropValues.allSatisfy({ $0 == nil }) || cropValues.allSatisfy({ $0 != nil }) else {
+            throw VideoEditorError.invalidRequest("Crop values must be provided together")
         }
-        return info
+        let crop =
+            cropValues[0] == nil
+            ? nil
+            : try VideoCrop(
+                x: cropValues[0]!,
+                y: cropValues[1]!,
+                width: cropValues[2]!,
+                height: cropValues[3]!
+            )
+        return try VideoEditRequest(
+            inputURL: URL(fileURLWithPath: inputPath),
+            outputURL: URL(fileURLWithPath: outputPath),
+            trimStartMs: int64(args["trimStartMs"]),
+            trimEndMs: int64(args["trimEndMs"]),
+            rotateDegrees: int(args["rotateDegrees"]),
+            crop: crop
+        )
     }
 
-    private func startProgressReporting() {
-        progressTimer?.invalidate()
-        progressTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
-            guard let self = self,
-                  let session = self.currentExportSession,
-                  let sink = self.progressEventSink else { return }
-
-            let progress = Double(session.progress)
-            sink(progress)
-        }
+    private func int(_ value: Any?) -> Int? {
+        (value as? NSNumber)?.intValue
     }
 
-    private func stopProgressReporting() {
-        progressTimer?.invalidate()
-        progressTimer = nil
+    private func int64(_ value: Any?) -> Int64? {
+        (value as? NSNumber)?.int64Value
+    }
+
+    private func flutterError(
+        _ error: Error,
+        defaultCode: String
+    ) -> FlutterError {
+        guard let videoError = error as? VideoEditorError else {
+            return flutterError(
+                defaultCode,
+                message: error.localizedDescription,
+                details: String(describing: error)
+            )
+        }
+        let code: String
+        switch videoError {
+        case .invalidRequest: code = "INVALID_ARGS"
+        case .metadataUnavailable: code = defaultCode
+        case .frameExtraction: code = "FRAME_EXTRACTION_ERROR"
+        case .frameWrite: code = "FRAME_WRITE_ERROR"
+        case .invalidTimeRange: code = "INVALID_TIME_RANGE"
+        case .composition: code = "COMPOSITION_ERROR"
+        case .export: code = defaultCode
+        }
+        return flutterError(
+            code,
+            message: videoError.message,
+            details: videoError.underlyingError.map(String.init(describing:))
+        )
+    }
+
+    private func flutterError(
+        _ code: String,
+        message: String,
+        details: Any? = nil
+    ) -> FlutterError {
+        FlutterError(code: code, message: message, details: details)
     }
 
     public func detachFromEngine(for registrar: FlutterPluginRegistrar) {
         guard !isDetached else { return }
         isDetached = true
         progressEventSink = nil
-        stopProgressReporting()
-
-        currentExportSession?.cancelExport()
-        exportCancellationResult = nil
-
-        cancelledFrameRequests.formUnion(frameGenerators.keys)
-        for outputPaths in frameOutputPaths.values {
-            removeFiles(at: outputPaths)
-        }
+        frameTasks.values.forEach { $0.cancel() }
+        frameTasks.removeAll()
         frameCancellationResults.removeAll()
-        for generator in frameGenerators.values {
-            generator.cancelAllCGImageGeneration()
-        }
+        exportTask?.cancel()
+        exportTask = nil
+        exportCancellationResult = nil
     }
 }
 
-private extension CGAffineTransform {
-    var isNearlyInvertible: Bool {
-        let determinant = (a * d) - (b * c)
-        return abs(determinant) > 1e-8
+private extension VideoMetadata {
+    var channelValue: [String: Any] {
+        var value: [String: Any] = [
+            "duration": durationMs,
+            "width": width,
+            "height": height,
+            "displayWidth": displayWidth,
+            "displayHeight": displayHeight,
+            "rotation": rotationDegrees,
+        ]
+        if let bitrate { value["bitrate"] = bitrate }
+        if let frameRate { value["frameRate"] = frameRate }
+        return value
     }
 }
 
-extension NativeVideoEditorPlugin: FlutterStreamHandler {
-    public func onListen(withArguments arguments: Any?, eventSink events: @escaping FlutterEventSink) -> FlutterError? {
-        if !isDetached {
-            progressEventSink = events
-        }
+private extension VideoFrameExtractionResult {
+    func channelValue(outputPaths: [String]) -> [String: Any] {
+        [
+            "videoInfo": videoInfo.channelValue,
+            "frames": zip(frames, outputPaths).map { frame, outputPath in
+                [
+                    "outputPath": outputPath,
+                    "width": frame.width,
+                    "height": frame.height,
+                ] as [String: Any]
+            },
+        ]
+    }
+}
+
+extension NativeVideoEditorPlugin: @preconcurrency FlutterStreamHandler {
+    public func onListen(
+        withArguments arguments: Any?,
+        eventSink events: @escaping FlutterEventSink
+    ) -> FlutterError? {
+        if !isDetached { progressEventSink = events }
         return nil
     }
 
     public func onCancel(withArguments arguments: Any?) -> FlutterError? {
         progressEventSink = nil
-        stopProgressReporting()
         return nil
     }
 }

@@ -1,9 +1,8 @@
-package io.ente.native_video_editor
+package io.ente.native_video_editor.core
 
 import android.content.Context
 import android.media.MediaExtractor
 import android.media.MediaFormat
-import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
@@ -36,53 +35,29 @@ import kotlinx.coroutines.withContext
 import java.io.File
 
 @UnstableApi
-class Media3TransformerProcessor(private val context: Context) {
+class AndroidVideoExportEngine(
+    private val context: Context,
+    private val metadataReader: AndroidVideoMetadataReader
+) {
     suspend fun processVideo(
-        inputPath: String,
-        outputPath: String,
-        trimStartMs: Long? = null,
-        trimEndMs: Long? = null,
-        rotateDegrees: Int? = null,
-        cropX: Int? = null,
-        cropY: Int? = null,
-        cropWidth: Int? = null,
-        cropHeight: Int? = null,
+        request: VideoEditRequest,
         onProgress: ((Float) -> Unit)? = null
-    ): Boolean {
-        val inputFile = File(inputPath).canonicalFile
-        val outputFile = File(outputPath).canonicalFile
+    ): VideoEditResult = withContext(Dispatchers.IO) {
+        val inputFile = File(request.inputPath).canonicalFile
+        val outputFile = File(request.outputPath).canonicalFile
         require(inputFile.isFile && inputFile != outputFile) {
             "Input must be a video file and output must be a different path"
         }
-        require((trimStartMs == null) == (trimEndMs == null)) {
-            "Trim bounds must be provided together"
-        }
-        require(trimStartMs == null || (trimStartMs >= 0 && trimStartMs < trimEndMs!!)) {
-            "Invalid trim bounds"
-        }
-        require(rotateDegrees == null || rotateDegrees in setOf(0, 90, 180, 270)) {
-            "Invalid rotation"
-        }
-        val cropValues = listOf(cropX, cropY, cropWidth, cropHeight)
-        require(cropValues.all { it == null } || cropValues.all { it != null }) {
-            "Crop values must be provided together"
-        }
-        val crop = if (cropX == null) {
-            null
-        } else {
-            CropSpec(cropX, cropY!!, cropWidth!!, cropHeight!!)
-        }
-        require(crop == null || crop.isPositive) { "Invalid crop rectangle" }
 
-        return try {
+        try {
             val clipRange = resolveVideoClipRangeUs(
                 videoDurationUs = getVideoTrackDurationUs(inputFile.path),
-                requestedStartUs = trimStartMs?.times(1_000L),
-                requestedEndUs = trimEndMs?.times(1_000L)
+                requestedStartUs = request.trimStartMs?.times(1_000L),
+                requestedEndUs = request.trimEndMs?.times(1_000L)
             )
             val mediaItem = buildMediaItem(inputFile, clipRange)
-            val videoInfo = crop?.let { getVideoInfo(inputFile.path) }
-            val effects = buildVideoEffects(videoInfo, crop, rotateDegrees)
+            val videoInfo = request.crop?.let { metadataReader.read(inputFile.path) }
+            val effects = buildVideoEffects(videoInfo, request.crop, request.rotateDegrees)
             val editedMediaItem = EditedMediaItem.Builder(mediaItem).apply {
                 if (effects.isNotEmpty()) {
                     setEffects(Effects(emptyList(), effects))
@@ -97,18 +72,19 @@ class Media3TransformerProcessor(private val context: Context) {
                     composition = composition,
                     outputPath = outputFile.path,
                     transcodeVideo = effects.isNotEmpty(),
-                    optimizeTrim = trimStartMs != null && effects.isEmpty(),
+                    optimizeTrim = request.trimStartMs != null && effects.isEmpty(),
                     onProgress = onProgress
                 )
             }
             require(outputFile.isFile && outputFile.length() > 0) {
                 "Output file was not created"
             }
-            when (exportResult.videoConversionProcess) {
+            val isReEncoded = when (exportResult.videoConversionProcess) {
                 ExportResult.CONVERSION_PROCESS_TRANSCODED,
                 ExportResult.CONVERSION_PROCESS_TRANSMUXED_AND_TRANSCODED -> true
                 else -> false
             }
+            VideoEditResult(request.outputPath, isReEncoded)
         } catch (error: CancellationException) {
             outputFile.delete()
             throw error
@@ -133,22 +109,14 @@ class Media3TransformerProcessor(private val context: Context) {
         .build()
 
     private fun buildVideoEffects(
-        videoInfo: VideoInfo?,
-        crop: CropSpec?,
+        videoInfo: VideoMetadata?,
+        crop: VideoCrop?,
         rotateDegrees: Int?
     ): List<Effect> = buildList {
         val cropSize = crop?.let {
             val video = requireNotNull(videoInfo)
-            val displayWidth = if (video.rotation == 90 || video.rotation == 270) {
-                video.height
-            } else {
-                video.width
-            }
-            val displayHeight = if (video.rotation == 90 || video.rotation == 270) {
-                video.width
-            } else {
-                video.height
-            }
+            val displayWidth = video.displayWidth
+            val displayHeight = video.displayHeight
             require(displayWidth > 0 && displayHeight > 0) {
                 "Video dimensions are unavailable"
             }
@@ -249,26 +217,6 @@ class Media3TransformerProcessor(private val context: Context) {
         }
     }
 
-    private fun getVideoInfo(videoPath: String): VideoInfo {
-        val retriever = MediaMetadataRetriever()
-        return try {
-            retriever.setDataSource(videoPath)
-            VideoInfo(
-                width = retriever.extractMetadata(
-                    MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH
-                )?.toIntOrNull() ?: 0,
-                height = retriever.extractMetadata(
-                    MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT
-                )?.toIntOrNull() ?: 0,
-                rotation = retriever.extractMetadata(
-                    MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION
-                )?.toIntOrNull()?.let { ((it % 360) + 360) % 360 } ?: 0
-            )
-        } finally {
-            retriever.release()
-        }
-    }
-
     private fun getVideoTrackDurationUs(videoPath: String): Long {
         val extractor = MediaExtractor()
         return try {
@@ -306,17 +254,5 @@ internal fun resolveVideoClipRangeUs(
     }
     return VideoClipRangeUs(startUs, endUs)
 }
-
-private data class CropSpec(
-    val x: Int,
-    val y: Int,
-    val width: Int,
-    val height: Int
-) {
-    val isPositive: Boolean
-        get() = x >= 0 && y >= 0 && width > 0 && height > 0
-}
-
-private data class VideoInfo(val width: Int, val height: Int, val rotation: Int)
 
 class VideoProcessingException(message: String, cause: Throwable? = null) : Exception(message, cause)

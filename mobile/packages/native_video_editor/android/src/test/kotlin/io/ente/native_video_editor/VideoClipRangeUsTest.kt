@@ -1,4 +1,4 @@
-package io.ente.native_video_editor
+package io.ente.native_video_editor.core
 
 import org.junit.Assert.assertEquals
 import org.junit.Test
