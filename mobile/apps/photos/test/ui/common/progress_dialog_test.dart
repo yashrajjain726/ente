@@ -108,11 +108,63 @@ void main() {
     expect(find.text("Run"), findsOneWidget);
     expect(find.text("Open"), findsNothing);
   });
+
+  testWidgets("an old dialog cannot clear an active dialog's state", (
+    tester,
+  ) async {
+    final firstWork = Completer<void>();
+    late ProgressDialog secondDialog;
+
+    await _pumpActionPage(
+      tester,
+      onPressed: (context) async {
+        final firstDialog = ProgressDialog(context);
+        firstDialog.style(
+          message: "First",
+          progressWidget: const SizedBox.shrink(),
+        );
+        await firstDialog.show();
+        await firstWork.future;
+        await firstDialog.hide();
+      },
+      secondaryOnPressed: (context) async {
+        secondDialog = ProgressDialog(context);
+        secondDialog.style(
+          message: "Second",
+          progressWidget: const SizedBox.shrink(),
+        );
+        await secondDialog.show();
+      },
+    );
+
+    await tester.tap(find.text("Run"));
+    await tester.pumpAndSettle();
+    await tester.tapAt(const Offset(10, 10));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text("Run second"));
+    await tester.pumpAndSettle();
+    expect(secondDialog.isShowing(), isTrue);
+    expect(find.text("Second"), findsOneWidget);
+
+    firstWork.complete();
+    await tester.pumpAndSettle();
+    expect(secondDialog.isShowing(), isTrue);
+
+    secondDialog.update(message: "Second updated");
+    await tester.pump();
+    expect(find.text("Second updated"), findsOneWidget);
+
+    final hideFuture = secondDialog.hide();
+    await tester.pumpAndSettle();
+    expect(await hideFuture, isTrue);
+  });
 }
 
 Future<void> _pumpActionPage(
   WidgetTester tester, {
   required Future<void> Function(BuildContext) onPressed,
+  Future<void> Function(BuildContext)? secondaryOnPressed,
 }) async {
   await tester.pumpWidget(
     MaterialApp(
@@ -121,7 +173,10 @@ Future<void> _pumpActionPage(
           body: TextButton(
             onPressed: () => Navigator.of(context).push<void>(
               MaterialPageRoute(
-                builder: (_) => _ActionPage(onPressed: onPressed),
+                builder: (_) => _ActionPage(
+                  onPressed: onPressed,
+                  secondaryOnPressed: secondaryOnPressed,
+                ),
               ),
             ),
             child: const Text("Open"),
@@ -136,16 +191,26 @@ Future<void> _pumpActionPage(
 }
 
 class _ActionPage extends StatelessWidget {
-  const _ActionPage({required this.onPressed});
+  const _ActionPage({required this.onPressed, this.secondaryOnPressed});
 
   final Future<void> Function(BuildContext) onPressed;
+  final Future<void> Function(BuildContext)? secondaryOnPressed;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: TextButton(
-        onPressed: () => onPressed(context),
-        child: const Text("Run"),
+      body: Column(
+        children: [
+          TextButton(
+            onPressed: () => onPressed(context),
+            child: const Text("Run"),
+          ),
+          if (secondaryOnPressed != null)
+            TextButton(
+              onPressed: () => secondaryOnPressed!(context),
+              child: const Text("Run second"),
+            ),
+        ],
       ),
     );
   }

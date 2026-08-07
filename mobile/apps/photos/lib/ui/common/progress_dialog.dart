@@ -13,6 +13,7 @@ Alignment _progressWidgetAlignment = Alignment.centerLeft;
 TextDirection _direction = TextDirection.ltr;
 
 bool _isShowing = false;
+_Body? _activeDialog;
 ProgressDialogType? _progressDialogType;
 bool _barrierDismissible = true, _showLogs = false;
 Color? _barrierColor;
@@ -49,6 +50,7 @@ class ProgressDialog {
     final dialogRoute = _dialogRoute;
     return _isShowing &&
         _dialog != null &&
+        identical(_activeDialog, _dialog) &&
         (dialogRoute == null || dialogRoute.isActive);
   }
 
@@ -176,6 +178,7 @@ class ProgressDialog {
       if (!_isShowing) {
         _isShowing = true;
         _dialog = _Body();
+        _activeDialog = _dialog;
         _navigator = Navigator.of(_context);
         _dialogPopped = showDialog<void>(
           context: _context,
@@ -219,7 +222,10 @@ class ProgressDialog {
   }
 
   void _clearDialogState() {
-    _isShowing = false;
+    if (identical(_activeDialog, _dialog)) {
+      _isShowing = false;
+      _activeDialog = null;
+    }
     _dialog = null;
     _dialogPopped = null;
     _dialogRoute = null;
@@ -250,7 +256,10 @@ class _BodyState extends State<_Body> {
 
   @override
   void dispose() {
-    _isShowing = false;
+    if (identical(_activeDialog, widget)) {
+      _isShowing = false;
+      _activeDialog = null;
+    }
     if (_showLogs) debugPrint('ProgressDialog dismissed by back button');
     super.dispose();
   }
