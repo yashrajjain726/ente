@@ -52,7 +52,7 @@ class FileUploader {
   static const kMaximumConcurrentVideoUploads = 2;
   static const kMaxFileSize10Gib = 10737418240;
   static const kBlockedUploadsPollFrequency = Duration(seconds: 2);
-  static const kFileUploadTimeout = Duration(minutes: 50);
+  static const _longRunningUploadThreshold = Duration(minutes: 50);
   static const k20MBStorageBuffer = 20 * 1024 * 1024;
   static const _lastStaleFileCleanupTime = "lastStaleFileCleanupTime";
 
@@ -258,15 +258,15 @@ class FileUploader {
   }) async {
     final file = item.file;
     final collectionID = item.collectionID;
+    final stopwatch = Stopwatch()..start();
     try {
-      final uploadedFile = await _tryToUpload(file, collectionID, forcedUpload)
-          .timeout(
-            kFileUploadTimeout,
-            onTimeout: () {
-              final message = "Upload timed out for file " + file.toString();
-              throw TimeoutException(message);
-            },
-          );
+      final uploadedFile = await _tryToUpload(file, collectionID, forcedUpload);
+      stopwatch.stop();
+      if (stopwatch.elapsed >= _longRunningUploadThreshold) {
+        _logger.info(
+          "Long-running upload completed in ${stopwatch.elapsed} for ${file.tag}",
+        );
+      }
       _queue.complete(item, uploadedFile);
       return uploadedFile;
     } catch (e) {

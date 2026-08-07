@@ -1,5 +1,3 @@
-/** Proxy requests for files and thumbnails in public albums. */
-
 export default {
     async fetch(request: Request) {
         switch (request.method) {

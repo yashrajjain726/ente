@@ -1,6 +1,6 @@
 # Sentry
 
-- [Data flow](#understanding-the-data-flow)
+- [Data flow](#data-flow)
 - [Setting up a new instance](#setting-up-a-new-instance)
 
 ## Data flow
@@ -9,11 +9,11 @@
 
 Clients tunnel events to sentry-reporter.ente.io, and include the DSN in the request. At the other end of the tunnel is a Cloudflare Worker which unwraps the event, remaps the DSN if needed, and sends it to our actual self-hosted Sentry instance, sentry.ente.io.
 
-Among other things, this indirection allows us to treat the Sentry instance as disposable, and recreate it from scratch anytime. The existing DSN's change, but that is not a problem because we remap DSNs in the worker that handles the tunneled requests.
+Among other things, this indirection allows us to treat the Sentry instance as disposable and recreate it from scratch. Project DSNs can change without requiring client updates because the worker remaps them.
 
 ### DSN
 
-Sentry identifies each project with a unique ID it calls **DSN** (Data Source Name). The DSN is a URL that includes the project ID. For example, here is the DSN for the debug builds of the photos mobile app:
+Sentry identifies a project through a **DSN** (Data Source Name), a URL containing its public key, host, and project ID. For example, here is the DSN for debug builds of the photos mobile app:
 
     https://ca5e686dd7f149d9bf94e620564cceba@sentry.ente.io/3
 
@@ -73,7 +73,7 @@ SENTRY_EVENT_RETENTION_DAYS=30
 
 ### Configure external nginx
 
-Add the nginx service (See [services/nginx](../services/nginx/README.md)) to the instance.
+Add the nginx service (see [services/nginx](../nginx/README.md)) to the instance.
 
 Add the Sentry nginx conf and certificates (since this instance will be running only sentry, we can use sentry specific certificates instead of our general wildcard ones).
 
@@ -92,7 +92,7 @@ cd /home/ente/self-hosted
 sudo docker compose up -d
 ```
 
-The (external) nginx service will also start automatically on boot, but if neded it can be manually started by
+The external nginx service also starts automatically on boot, but if needed it can be started manually:
 
 ```sh
 sudo systemctl start nginx

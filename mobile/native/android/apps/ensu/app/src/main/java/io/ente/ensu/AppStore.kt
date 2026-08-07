@@ -55,7 +55,7 @@ class AppStore(
         logRepository = logRepository
     )
     private val modelSettingsActions =
-        ModelSettingsActions(_state, sessionPreferences, llmProvider, logRepository, configDefaults)
+        ModelSettingsActions(_state, sessionPreferences, llmProvider, logRepository)
     private val chatActions = ChatStoreActions(
         state = _state,
         sessionPreferences = sessionPreferences,

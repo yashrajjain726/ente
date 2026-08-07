@@ -7,9 +7,6 @@ import "package:ente_sharing/models/user.dart";
 import "package:ente_sharing/user_avator_widget.dart";
 import "package:ente_sharing/verify_identity_dialog.dart";
 import "package:ente_strings/ente_strings.dart";
-import "package:ente_ui/components/captioned_text_widget_v2.dart";
-import "package:ente_ui/components/divider_widget.dart";
-import "package:ente_ui/components/menu_item_widget_v2.dart";
 import "package:flutter/material.dart";
 import "package:intl/intl.dart";
 import "package:locker/services/collections/collections_service.dart";
@@ -161,55 +158,44 @@ class _AddEmailSheetState extends State<AddEmailSheet> {
                   constraints: const BoxConstraints(
                     maxHeight: maxVisibleHeight,
                   ),
-                  child: ListView.builder(
+                  child: ListView(
                     controller: _scrollController,
                     shrinkWrap: true,
                     padding: EdgeInsets.zero,
-                    itemCount: filteredUsers.length,
-                    itemBuilder: (context, index) {
-                      final user = filteredUsers[index];
-                      final isFirst = index == 0;
-                      final isLast = index == filteredUsers.length - 1;
-                      return Column(
-                        children: [
-                          if (!isFirst)
-                            DividerWidget(
-                              dividerType: DividerType.menu,
-                              bgColor: colors.fillLight,
-                            ),
-                          MenuItemWidgetV2(
-                            captionedTextWidget: CaptionedTextWidgetV2(
-                              title: user.resolvedDisplayName,
-                            ),
-                            leadingIconSize: 24.0,
-                            leadingIconWidget: UserAvatarWidget.suggestion(
-                              user,
-                              type: AvatarType.mini,
-                              config: Configuration.instance,
-                            ),
-                            menuItemColor: colors.fillLight,
-                            surfaceExecutionStates: false,
-                            onTap: () async {
-                              _textFieldFocusNode.unfocus();
-                              _textController.text = user.email;
-                              _email = user.email;
-                              _emailIsValid = true;
-                              setState(() {});
-                            },
-                            onLongPress: () {
-                              showVerifyIdentitySheet(
-                                context,
-                                self: false,
-                                config: Configuration.instance,
-                                email: user.email,
-                              );
-                            },
-                            isTopBorderRadiusRemoved: !isFirst,
-                            isBottomBorderRadiusRemoved: !isLast,
-                          ),
-                        ],
-                      );
-                    },
+                    children: [
+                      MenuGroupComponent(
+                        backgroundColor: colors.fillLight,
+                        showDividers: true,
+                        dividerPadding: const EdgeInsets.only(left: 48),
+                        items: filteredUsers
+                            .map(
+                              (user) => MenuComponent(
+                                title: user.resolvedDisplayName,
+                                leading: UserAvatarWidget.suggestion(
+                                  user,
+                                  type: AvatarType.mini,
+                                  config: Configuration.instance,
+                                ),
+                                onTap: () async {
+                                  _textFieldFocusNode.unfocus();
+                                  _textController.text = user.email;
+                                  _email = user.email;
+                                  _emailIsValid = true;
+                                  setState(() {});
+                                },
+                                onLongPress: () {
+                                  showVerifyIdentitySheet(
+                                    context,
+                                    self: false,
+                                    config: Configuration.instance,
+                                    email: user.email,
+                                  );
+                                },
+                              ),
+                            )
+                            .toList(),
+                      ),
+                    ],
                   ),
                 ),
               ),

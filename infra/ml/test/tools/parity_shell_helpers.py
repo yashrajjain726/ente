@@ -1,9 +1,5 @@
 #!/usr/bin/env python3
-"""Stdlib-only subcommands for run_ml_parity_tests.sh.
-
-Each subcommand was extracted from an inline python3 heredoc in the shell
-script; bodies and exit codes are preserved. Runs under the system python3.
-"""
+# This runs under system Python; keep it stdlib-only.
 from __future__ import annotations
 
 import base64

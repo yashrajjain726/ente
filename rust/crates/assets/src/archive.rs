@@ -20,6 +20,7 @@ pub(crate) fn extract_tar_gz(
 
     let tar_gz = File::open(archive_path)?;
     let mut archive = Archive::new(GzDecoder::new(tar_gz));
+    let mut buffer = vec![0; 1024 * 1024];
     for entry in archive.entries()? {
         if cancellation.is_cancelled() {
             return Err(Error::Cancelled);
@@ -51,7 +52,6 @@ pub(crate) fn extract_tar_gz(
             fs::create_dir_all(parent)?;
         }
         let mut output = File::create(destination)?;
-        let mut buffer = [0; 1024 * 1024];
         loop {
             if cancellation.is_cancelled() {
                 return Err(Error::Cancelled);

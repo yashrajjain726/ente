@@ -127,6 +127,11 @@ class Collection {
 
   bool get hasCover => (pubMagicMetadata.coverID ?? 0) > 0;
 
+  String? get displayDescription {
+    final description = pubMagicMetadata.description?.trim();
+    return description == null || description.isEmpty ? null : description;
+  }
+
   // hasSharees returns true if the collection is shared with other ente users
   bool get hasSharees => sharees.isNotEmpty;
 

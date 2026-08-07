@@ -255,7 +255,7 @@ class _TextInputComponentState extends State<TextInputComponent> {
             children: [
               Text(
                 widget.label!,
-                style: TextStyles.bodyBold.copyWith(color: _labelColor(colors)),
+                style: TextStyles.body.copyWith(color: _labelColor(colors)),
               ),
               if (widget.isRequired) ...[
                 const SizedBox(width: 2),

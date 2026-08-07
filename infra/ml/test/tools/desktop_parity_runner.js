@@ -1,24 +1,4 @@
 #!/usr/bin/env node
-/**
- * Desktop platform runner for the ML indexing parity suite.
- *
- * Run the parity corpus through the desktop build of the Rust ML pipeline
- * (see [Note: ML with Rust] in the desktop app), writing results in the
- * format consumed by compare_parity_outputs.py.
- *
- * This is invoked by run_ml_parity_tests.sh, which syncs the fixture images
- * and models to local disk beforehand; this script performs no network
- * access. It smoke tests the desktop specific pieces — the napi addon and
- * the pinned ONNX Runtime library it loads — while the deep validation of
- * the shared Rust pipeline itself lives in the ente-photos crate's
- * ml_indexing integration test.
- *
- * The desktop build artifacts it needs are the addon in
- * `desktop/rust-bindings/` (built by `node scripts/napi.js build`) and the
- * ONNX Runtime library in `desktop/build/onnxruntime/` (downloaded by the
- * desktop postinstall).
- */
-
 const fsp = require("node:fs/promises");
 const path = require("node:path");
 const { parseArgs } = require("node:util");
@@ -51,7 +31,6 @@ const parseCLIArgs = () => {
     return values;
 };
 
-/** Load the Rust ML addon built by desktop's `scripts/napi.js`. */
 const loadMLAddon = () => {
     const addonPath = path.join(
         desktopDir,
@@ -61,11 +40,8 @@ const loadMLAddon = () => {
     return require(addonPath);
 };
 
-/**
- * The ONNX Runtime dynamic library downloaded by desktop's `scripts/ort.js`
- * for the current architecture, located by scanning so that this script does
- * not duplicate the pinned library version.
- */
+// Desktop's build scripts own the pinned ONNX Runtime version.
+// Scan their output instead of duplicating it here.
 const onnxRuntimeLibraryPath = async () => {
     const libraryDir = path.join(
         desktopDir,
@@ -87,11 +63,6 @@ const onnxRuntimeLibraryPath = async () => {
     return path.join(libraryDir, library.name);
 };
 
-/**
- * Resolve the models needed for indexing from the parity harness' local
- * model mirror cache, which run_ml_parity_tests.sh populates (verifying
- * against the SHA-256s in the asset lock) before invoking us.
- */
 const resolveModels = async (assetLockPath, modelsDir) => {
     const assetLock = JSON.parse(await fsp.readFile(assetLockPath, "utf8"));
 
@@ -156,7 +127,7 @@ const analyzeFixture = async (native, fileID, imagePath, modelPaths) => {
     return result;
 };
 
-/** Mirror of _toParityResult in mobile's ml_parity_shared.dart. */
+// Keep this result shape in sync with mobile's ml_parity_shared.dart.
 const toParityResult = (fileID, result, models, codeRevision, totalMS) => {
     const clip = result.clip;
     if (!clip) throw new Error(`Missing CLIP result for ${fileID}`);

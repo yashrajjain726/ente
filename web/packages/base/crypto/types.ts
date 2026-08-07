@@ -4,6 +4,8 @@ export type SodiumStateAddress = StateAddress;
 
 // Existing encrypted files depend on this chunk boundary.
 export const streamEncryptionChunkSize = 4 * 1024 * 1024;
+// libsodium secretstream adds this many bytes per encrypted chunk.
+export const streamEncryptionChunkOverhead = 17;
 
 export const deriveKeyInsufficientMemoryErrorMessage =
     "Failed to derive key (insufficient memory)";
