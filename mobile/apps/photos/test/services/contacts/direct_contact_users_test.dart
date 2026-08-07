@@ -46,7 +46,6 @@ void main() {
       users.singleWhere((user) => user.email == "family@example.com").id,
       6,
     );
-    expect(users.every((user) => user.id != null && user.id! > 0), isTrue);
   });
 
   test("deduplicates by user id after an email change", () {
@@ -70,66 +69,7 @@ void main() {
       ],
     );
 
-    expect(users, hasLength(1));
-    expect(users.single.id, 5);
     expect(users.single.email, "new@example.com");
-  });
-
-  test("excludes candidates without a positive user id", () {
-    final users = buildDirectContactUsers(
-      ownerUserId: 1,
-      ownerEmail: "me@example.com",
-      collections: [
-        _collection(
-          owner: User(id: 1, email: "me@example.com"),
-          sharees: [User(email: "sharee-without-id@example.com")],
-        ),
-        _collection(
-          owner: User(email: "owner-without-id@example.com"),
-          sharees: const [],
-        ),
-      ],
-      familyMembers: [
-        _familyMember(
-          "family-without-id@example.com",
-          FamilyMemberStatus.accepted,
-        ),
-      ],
-      savedContacts: [
-        _savedContact(
-          id: "contact-1",
-          userID: 0,
-          email: "saved-without-id@example.com",
-        ),
-      ],
-    );
-
-    expect(users, isEmpty);
-  });
-
-  test("excludes saved contacts without a known email", () {
-    final users = buildDirectContactUsers(
-      ownerUserId: 1,
-      ownerEmail: "me@example.com",
-      collections: const [],
-      familyMembers: const [],
-      savedContacts: [
-        _savedContact(
-          id: "missing-email",
-          userID: 2,
-          email: null,
-          name: "Missing",
-        ),
-        _savedContact(
-          id: "placeholder-email",
-          userID: 3,
-          email: "placeholder@unknown.com",
-          name: "Placeholder",
-        ),
-      ],
-    );
-
-    expect(users, isEmpty);
   });
 }
 

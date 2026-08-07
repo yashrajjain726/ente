@@ -3,7 +3,6 @@ import "dart:async";
 import "package:ente_strings/ente_strings.dart";
 import "package:flutter/foundation.dart";
 import "package:flutter/material.dart";
-import "package:photos/core/configuration.dart";
 import "package:photos/emergency/components/email_action_sheet.dart";
 import "package:photos/emergency/components/trusted_contact_sheet.dart";
 import "package:photos/emergency/emergency_service.dart";
@@ -30,13 +29,11 @@ class EmergencyPage extends StatefulWidget {
 }
 
 class _EmergencyPageState extends State<EmergencyPage> {
-  late int currentUserID;
   EmergencyInfo? info;
 
   @override
   void initState() {
     super.initState();
-    currentUserID = Configuration.instance.getUserID()!;
     Future.delayed(const Duration(seconds: 0), () async {
       unawaited(_fetchData());
     });
@@ -122,7 +119,6 @@ class _EmergencyPageState extends State<EmergencyPage> {
                       leadingIconWidget: UserAvatarWidget(
                         emergencyUser,
                         type: AvatarType.medium,
-                        currentUserID: currentUserID,
                       ),
                       menuItemColor: colorScheme.fillFaint,
                       trailingWidget: _buildTrailingWidget(showWarning: false),
@@ -166,7 +162,6 @@ class _EmergencyPageState extends State<EmergencyPage> {
                         leadingIconWidget: UserAvatarWidget(
                           emergencyUser,
                           type: AvatarType.medium,
-                          currentUserID: currentUserID,
                         ),
                         menuItemColor: colorScheme.fillFaint,
                         trailingWidget: _buildTrailingWidget(
@@ -272,7 +267,6 @@ class _EmergencyPageState extends State<EmergencyPage> {
                         leadingIconWidget: UserAvatarWidget(
                           emergencyUser,
                           type: AvatarType.medium,
-                          currentUserID: currentUserID,
                         ),
                         menuItemColor: colorScheme.fillFaint,
                         trailingWidget: _buildTrailingWidget(

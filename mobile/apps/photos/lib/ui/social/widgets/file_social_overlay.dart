@@ -623,11 +623,7 @@ class _LatestCommentPillState extends State<_LatestCommentPill> {
                 color: Colors.white,
                 shape: BoxShape.circle,
               ),
-              child: UserAvatarWidget(
-                widget.author,
-                type: AvatarType.small,
-                currentUserID: widget.currentUserID,
-              ),
+              child: UserAvatarWidget(widget.author, type: AvatarType.small),
             ),
           ),
         ],

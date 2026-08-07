@@ -14,7 +14,6 @@ import 'package:photos/db/files_db.dart';
 import 'package:photos/db/trash_db.dart';
 import 'package:photos/events/files_updated_event.dart';
 import 'package:photos/events/local_photos_updated_event.dart';
-import 'package:photos/models/api/collection/user.dart';
 import 'package:photos/models/file/extensions/file_props.dart';
 import 'package:photos/models/file/file.dart';
 import 'package:photos/models/file/file_type.dart';
@@ -229,12 +228,9 @@ class _ThumbnailWidgetState extends State<ThumbnailWidget> {
           );
         } else if (widget.file.isCollect) {
           contentChildren.add(
-            OwnerAvatarOverlayIcon(
-              User(email: '', name: widget.file.uploaderName),
+            OwnerAvatarOverlayIcon.identity(
+              AvatarIdentity.publicUploader(widget.file.uploaderName!),
               type: widget.ownerAvatarType,
-              fallbackIdentity: AvatarIdentity.publicUploader(
-                label: widget.file.uploaderName!,
-              ),
             ),
           );
         }

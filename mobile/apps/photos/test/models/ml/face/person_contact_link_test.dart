@@ -115,6 +115,47 @@ void main() {
       expect(storedJson["email"], isNull);
     });
 
+    test(
+      "matching keeps IDs authoritative with normalized legacy fallback",
+      () {
+        final persons = [
+          PersonEntity(
+            "legacy-person",
+            PersonData(name: "Legacy", email: " Legacy@Example.com "),
+          ),
+          PersonEntity(
+            "other-user",
+            PersonData(name: "Other", email: "other@example.com", userID: 8),
+          ),
+        ];
+
+        expect(
+          PersonService.findPersonForUser(
+            persons,
+            userID: 8,
+            email: "legacy@example.com",
+          )?.remoteID,
+          "other-user",
+        );
+        expect(
+          PersonService.findPersonForUser(
+            persons,
+            userID: 7,
+            email: "legacy@example.com",
+          )?.remoteID,
+          "legacy-person",
+        );
+        expect(
+          PersonService.findPersonForUser(
+            persons,
+            userID: 7,
+            email: " OTHER@EXAMPLE.COM ",
+          ),
+          isNull,
+        );
+      },
+    );
+
     test("updateAttributes syncs changed name to linked contact", () async {
       final updated = await personService.updateAttributes(
         "person-1",

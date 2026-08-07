@@ -1,17 +1,13 @@
 import "package:photos/models/api/collection/user.dart";
+import "package:photos/models/ml/face/person.dart";
 import "package:photos/services/machine_learning/face_ml/person/person_service.dart";
 
 extension UserExtension on User {
-  Map<String, String>? get _partialPersonData => PersonService.instance
-      .getCachedPartialPersonData(userID: id, email: email);
+  PersonEntity? get _person => _personFor(id, email);
 
-  //Some initial users have name in name field.
-  String? get displayName =>
-      _partialPersonData?[PersonService.kNameKey] ??
-      // ignore: deprecated_member_use_from_same_package
-      ((name?.isEmpty ?? true) ? null : name);
+  String? get displayName => _person?.data.name ?? label;
 
-  String? get linkedPersonID => _partialPersonData?[PersonService.kPersonIDKey];
+  String? get linkedPersonID => _person?.remoteID;
 
   String get nameOrEmail {
     if (PersonService.isInitialized) {
@@ -21,3 +17,12 @@ extension UserExtension on User {
     }
   }
 }
+
+extension UserSuggestionExtension on UserSuggestion {
+  PersonEntity? get _person => _personFor(userID, email);
+
+  String? get displayName => _person?.data.name ?? label;
+}
+
+PersonEntity? _personFor(int? userID, String email) =>
+    PersonService.instance.getCachedPersonForUser(userID, email);

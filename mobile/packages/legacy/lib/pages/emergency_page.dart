@@ -49,14 +49,12 @@ class EmergencyPage extends StatefulWidget {
 }
 
 class _EmergencyPageState extends State<EmergencyPage> {
-  late int currentUserID;
   EmergencyInfo? info;
   List<LegacyKit> legacyKits = [];
 
   @override
   void initState() {
     super.initState();
-    currentUserID = widget.config.getUserID()!;
     Future.delayed(const Duration(seconds: 0), () async {
       unawaited(_fetchData());
     });
@@ -182,7 +180,6 @@ class _EmergencyPageState extends State<EmergencyPage> {
                             leadingIconWidget: UserAvatarWidget(
                               recoverSession.emergencyContact,
                               type: AvatarType.mini,
-                              currentUserID: currentUserID,
                               config: widget.config,
                             ),
                             menuItemColor: colorScheme.fillFaint,
@@ -254,7 +251,6 @@ class _EmergencyPageState extends State<EmergencyPage> {
                                 child: UserAvatarWidget(
                                   contact.emergencyContact,
                                   type: AvatarType.small,
-                                  currentUserID: currentUserID,
                                   config: widget.config,
                                 ),
                               ),
@@ -372,7 +368,6 @@ class _EmergencyPageState extends State<EmergencyPage> {
                                 child: UserAvatarWidget(
                                   currentUser.user,
                                   type: AvatarType.small,
-                                  currentUserID: currentUserID,
                                   config: widget.config,
                                 ),
                               ),
