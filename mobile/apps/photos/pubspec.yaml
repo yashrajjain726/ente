@@ -89,7 +89,6 @@ dependencies:
   equatable: 2.0.7
   event_bus: 2.0.1
   exif_reader: 4.1.0
-  expansion_tile_card: 3.0.0
   extended_image: 9.1.0
   fade_indexed_stack: 0.2.2
   fast_base58: 0.2.1
