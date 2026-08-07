@@ -84,7 +84,10 @@ class _SharedPublicCollectionPageState
       );
       await dialog.show();
       try {
-        if (!mounted) return;
+        if (!mounted) {
+          await dialog.hide();
+          return;
+        }
         await RemoteSyncService.instance.joinAndSyncCollection(
           context,
           widget.c.collection.id,
@@ -231,7 +234,10 @@ class _SharedPublicCollectionPageState
       );
       await dialog.show();
       try {
-        if (!mounted) return;
+        if (!mounted) {
+          await dialog.hide();
+          return;
+        }
         await RemoteSyncService.instance.joinAndSyncCollection(
           context,
           widget.c.collection.id,

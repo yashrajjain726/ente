@@ -162,7 +162,10 @@ class _LoginPasswordVerificationPageState
     );
     await dialog.show();
     try {
-      if (!context.mounted) return;
+      if (!context.mounted) {
+        await dialog.hide();
+        return;
+      }
       await UserService.instance.verifyEmailViaPassword(
         context,
         widget.srpAttributes,
