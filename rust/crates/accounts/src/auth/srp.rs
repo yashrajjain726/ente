@@ -1,9 +1,3 @@
-//! SRP (Secure Remote Password) session implementation.
-//!
-//! Provides a minimal SRP client state machine that avoids exposing low-level
-//! step ordering (e.g. calling set_b before compute_m1). Callers only need to
-//! exchange the public value and proofs with the server.
-
 use ente_core::crypto::SecretVec;
 use sha2::{Digest, Sha256};
 use srp::ClientG4096;
@@ -12,13 +6,6 @@ use zeroize::Zeroize;
 
 use crate::error::{Error, Result};
 
-/// SRP session for password-based authentication.
-///
-/// Usage:
-/// 1. Create session with `new()`
-/// 2. Send `public_a()` to the server
-/// 3. Call `compute_m1(server_b)` to get the client proof
-/// 4. Optionally verify server proof with `verify_m2(server_m2)`
 pub struct SrpSession {
     inner: ClientG4096<Sha256>,
     identity: Vec<u8>,
@@ -30,7 +17,7 @@ pub struct SrpSession {
     k: Option<SecretVec>,
 }
 
-const SRP_N_BYTES: usize = 512; // 4096-bit group size
+const SRP_N_BYTES: usize = 512;
 
 fn pad_to_n(input: &[u8]) -> Vec<u8> {
     if input.len() >= SRP_N_BYTES {
@@ -43,12 +30,6 @@ fn pad_to_n(input: &[u8]) -> Vec<u8> {
 }
 
 impl SrpSession {
-    /// Create a new SRP session.
-    ///
-    /// # Arguments
-    /// * `srp_user_id` - The SRP user ID (UUID string)
-    /// * `srp_salt` - The SRP salt (raw bytes, not base64)
-    /// * `login_key` - The login key derived from password (16 bytes)
     pub fn new(srp_user_id: &str, srp_salt: &[u8], login_key: &[u8]) -> Result<Self> {
         if login_key.len() != 16 {
             return Err(Error::InvalidKey(format!(
@@ -59,12 +40,10 @@ impl SrpSession {
 
         let client = ClientG4096::<Sha256>::new();
 
-        // Generate random ephemeral private key (64 bytes)
         let mut a_private = vec![0u8; 64];
         getrandom::getrandom(&mut a_private)
             .map_err(|e| Error::Srp(format!("Failed to generate random bytes: {}", e)))?;
 
-        // Compute public ephemeral
         let a_public = client.compute_public_ephemeral(&a_private);
 
         // Use the UUID string directly as bytes (matching TypeScript)
@@ -82,18 +61,11 @@ impl SrpSession {
         })
     }
 
-    /// Get the client's public ephemeral value A (padded to N length).
-    ///
-    /// This should be sent to the server to create an SRP session.
-    /// Returns raw bytes (caller should base64 encode for API).
+    // Ente's SRP wire format pads A to the 4096-bit group size.
     pub fn public_a(&self) -> Vec<u8> {
         pad_to_n(&self.a_public)
     }
 
-    /// Compute the client proof M1 from the server's public value B.
-    ///
-    /// This processes the server reply and stores internal state for
-    /// `verify_m2()`.
     pub fn compute_m1(&mut self, server_b: &[u8]) -> Result<Vec<u8>> {
         let verifier = self
             .inner
@@ -107,7 +79,6 @@ impl SrpSession {
             .map_err(|e| Error::Srp(format!("Failed to process server response: {:?}", e)))?;
 
         // The srp crate uses S directly for M2, but our server uses K = H(S).
-        // Compute the proof values the way the server does.
         let s = verifier.key();
         let s_padded = pad_to_n(s);
         let a_padded = pad_to_n(&self.a_public);
@@ -128,17 +99,12 @@ impl SrpSession {
         self.m1 = Some(SecretVec::new(m1.clone()));
         self.k = Some(SecretVec::new(k));
 
-        // No longer needed after we have computed M1/K.
         self.login_key.zeroize();
         self.a_private.zeroize();
 
         Ok(m1)
     }
 
-    /// Verify the server's proof M2.
-    ///
-    /// # Arguments
-    /// * `server_m2` - The server's proof M2 (raw bytes, not base64)
     pub fn verify_m2(&self, server_m2: &[u8]) -> Result<()> {
         let m1 = self
             .m1
@@ -191,7 +157,6 @@ mod tests {
 
         let session = SrpSession::new(srp_user_id, &srp_salt, &login_key).unwrap();
 
-        // Public value should be generated
         let a = session.public_a();
         assert!(!a.is_empty());
         assert!(a.len() >= SRP_N_BYTES);
@@ -344,7 +309,6 @@ mod tests {
         let mut session = SrpSession::new(srp_user_id, &srp_salt, &login_key).unwrap();
         session.compute_m1(&b_pub).unwrap();
 
-        // Precondition: m1 and k are populated with non-zero data
         assert!(
             session.m1.as_ref().unwrap().iter().any(|&b| b != 0),
             "precondition: m1 should be non-zero after compute_m1"
@@ -377,7 +341,7 @@ mod tests {
     fn test_srp_session_invalid_login_key() {
         let srp_user_id = "test-user-id";
         let srp_salt = [0u8; 16];
-        let login_key = [0u8; 32]; // Wrong size
+        let login_key = [0u8; 32];
 
         let result = SrpSession::new(srp_user_id, &srp_salt, &login_key);
         assert!(result.is_err());

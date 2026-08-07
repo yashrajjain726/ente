@@ -1,10 +1,3 @@
-//! Integration tests for the Space client.
-//!
-//! Black-box tests over the public `AccountSpaceCtx` API, driven by a mock HTTP server.
-//! Shared fixtures live in
-//! [`test_support`](super::test_support). Kept in-crate (rather than `tests/`)
-//! because a few fixtures need crate-internal crypto and constructors.
-
 use super::test_support::*;
 use super::*;
 use crate::crypto::{encrypt_asset_payload, seal_with_public_key};

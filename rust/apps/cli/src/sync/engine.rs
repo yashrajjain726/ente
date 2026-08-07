@@ -4,7 +4,6 @@ use crate::api::methods::ApiMethods;
 use crate::models::{account::Account, file::RemoteFile};
 use crate::storage::Storage;
 
-/// Core sync engine responsible for fetching and tracking remote changes
 pub struct SyncEngine {
     api_client: AppClient,
     storage: Storage,
@@ -12,7 +11,6 @@ pub struct SyncEngine {
 }
 
 impl SyncEngine {
-    /// Create a new sync engine for an account
     pub fn new(api_client: AppClient, storage: Storage, account: Account) -> Self {
         Self {
             api_client,
@@ -21,7 +19,6 @@ impl SyncEngine {
         }
     }
 
-    /// Run a full sync for the account
     pub async fn sync(&self) -> Result<SyncStats> {
         log::info!("Starting sync for account: {}", self.account.email);
 
@@ -34,13 +31,11 @@ impl SyncEngine {
         Ok(stats)
     }
 
-    /// Sync collections (albums)
     async fn sync_collections(&self) -> Result<SyncResult> {
         log::debug!("Syncing collections...");
 
         let sync_store = self.storage.sync();
 
-        // Get last sync time for collections
         let last_sync = sync_store
             .get_last_sync(self.account.user_id, "collections")?
             .unwrap_or(0);
@@ -55,7 +50,6 @@ impl SyncEngine {
             deleted: 0,
         };
 
-        // Process each collection
         for collection in &collections {
             log::debug!(
                 "Processing collection: {:?} ({})",
@@ -63,7 +57,6 @@ impl SyncEngine {
                 collection.id
             );
 
-            // Convert API collection to storage collection
             let storage_collection = crate::models::collection::Collection {
                 id: collection.id,
                 owner: collection.owner.id,
@@ -81,27 +74,21 @@ impl SyncEngine {
                 is_deleted: collection.is_deleted,
             };
 
-            // Upsert collection (insert or update)
             sync_store.upsert_collection(&storage_collection)?;
 
-            // Count as new or updated based on updation time
             if collection.updation_time > last_sync {
                 if last_sync == 0 {
-                    // First sync - count as new
                     result.new += 1;
                 } else {
-                    // Incremental sync - count as updated
                     result.updated += 1;
                 }
             }
 
-            // Track deleted collections
             if collection.is_deleted {
                 result.deleted += 1;
             }
         }
 
-        // Update sync timestamp
         let now = chrono::Utc::now().timestamp_micros();
         sync_store.update_sync_state(self.account.user_id, "collections", now)?;
 
@@ -113,7 +100,6 @@ impl SyncEngine {
         Ok(result)
     }
 
-    /// Sync files incrementally
     async fn sync_files(&self) -> Result<SyncResult> {
         log::debug!("Syncing files...");
 
@@ -121,10 +107,8 @@ impl SyncEngine {
         let api = ApiMethods::new(&self.api_client);
         let mut result = SyncResult::default();
 
-        // Get all collections for this account
         let collections = sync_store.get_collections(self.account.user_id)?;
 
-        // Sync files for each collection
         for collection in collections {
             if collection.is_deleted {
                 continue;
@@ -136,7 +120,6 @@ impl SyncEngine {
                 collection.id
             );
 
-            // Get last sync time for this collection's files
             let initial_sync = sync_store
                 .get_last_sync(
                     self.account.user_id,
@@ -147,7 +130,6 @@ impl SyncEngine {
             let mut last_sync = initial_sync;
             let is_first_sync = initial_sync == 0;
 
-            // Log sync status
             if is_first_sync {
                 log::info!(
                     "Initial sync for collection: {} ({})",
@@ -187,11 +169,9 @@ impl SyncEngine {
 
                 result.total += files.len();
 
-                // Convert API files to RemoteFile and process
                 for file in files {
                     log::trace!("Processing file: {}", file.id);
 
-                    // Create RemoteFile from API response
                     let remote_file = RemoteFile {
                         id: file.id,
                         collection_id: file.collection_id,
@@ -201,13 +181,13 @@ impl SyncEngine {
                         file: crate::models::file::FileInfo {
                             encrypted_data: file.file.encrypted_data.clone(),
                             decryption_header: file.file.decryption_header.clone(),
-                            object_key: None, // Not in API response
+                            object_key: None,
                             size: file.file.size,
                         },
                         thumbnail: crate::models::file::FileInfo {
                             encrypted_data: file.thumbnail.encrypted_data.clone(),
                             decryption_header: file.thumbnail.decryption_header.clone(),
-                            object_key: None, // Not in API response
+                            object_key: None,
                             size: file.thumbnail.size,
                         },
                         metadata: crate::models::file::MetadataInfo {
@@ -230,35 +210,29 @@ impl SyncEngine {
                         }),
                     };
 
-                    // Skip deleted files on first sync
+                    // Ignore tombstones during the initial sync.
                     if is_first_sync && file.is_deleted {
                         log::trace!("Skipping deleted file {} on initial sync", file.id);
                         continue;
                     }
 
-                    // Upsert file (insert or update)
                     sync_store.upsert_file(&remote_file)?;
 
-                    // Count as new, updated or deleted
                     if file.is_deleted {
                         result.deleted += 1;
                     } else if file.updation_time > initial_sync {
                         if initial_sync == 0 {
-                            // First sync - count as new
                             result.new += 1;
                         } else {
-                            // Incremental sync - count as updated
                             result.updated += 1;
                         }
                     }
 
-                    // Track the latest updation time for next sync
                     if file.updation_time > last_sync {
                         last_sync = file.updation_time;
                     }
                 }
 
-                // Update sync state after each batch for this collection
                 sync_store.update_sync_state(
                     self.account.user_id,
                     &format!("collection_{}_files", collection.id),
@@ -276,12 +250,9 @@ impl SyncEngine {
         Ok(result)
     }
 
-    /// Get list of files that need to be downloaded
     pub async fn get_pending_downloads(&self) -> Result<Vec<RemoteFile>> {
         let sync_store = self.storage.sync();
 
-        // Get all non-deleted files for this account
-        // Note: We'll need to check all collections for this account
         let collections = sync_store.get_collections(self.account.user_id)?;
 
         let mut all_files = Vec::new();
@@ -290,28 +261,24 @@ impl SyncEngine {
             all_files.extend(files);
         }
 
-        // Filter out deleted files
         let pending: Vec<RemoteFile> = all_files.into_iter().filter(|f| !f.is_deleted).collect();
 
         log::info!("Found {} files pending download", pending.len());
         Ok(pending)
     }
 
-    /// Get collections for decryption keys
     pub async fn get_collections(&self) -> Result<Vec<crate::models::collection::Collection>> {
         let sync_store = self.storage.sync();
         sync_store.get_collections(self.account.user_id)
     }
 }
 
-/// Statistics from a sync operation
 #[derive(Debug, Default)]
 pub struct SyncStats {
     pub collections: SyncResult,
     pub files: SyncResult,
 }
 
-/// Result of syncing a specific type of data
 #[derive(Debug, Default)]
 pub struct SyncResult {
     pub total: usize,

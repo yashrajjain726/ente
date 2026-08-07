@@ -25,7 +25,6 @@ fn main() {
                 app.path().app_data_dir()?,
             ));
 
-            // Show the main window after setup is complete
             if let Some(window) = app.get_webview_window("main")
                 && let Err(err) = window.show()
             {

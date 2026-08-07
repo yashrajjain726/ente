@@ -1,10 +1,3 @@
-//! Space direct messages.
-//!
-//! Messages are sealed to a per-message key that is in turn sealed to both the
-//! sender's and recipient's Space identity public keys, so either party can
-//! open them. These methods list conversations and threads, send and reply to
-//! messages (including replies to a post), and decrypt, like, and delete them.
-
 use super::{
     AccountSpaceCtx, MESSAGE_KIND_POST_REPLY, MESSAGE_KIND_REGULAR, validate_message_payload,
 };
@@ -262,6 +255,8 @@ impl AccountSpaceCtx {
         let plaintext = serde_json::to_vec(payload)
             .map_err(|err| SpaceError::InvalidInput(format!("invalid message payload: {err}")))?;
         validate_message_payload(payload, plaintext.len())?;
+        // Seal the message key to both identities so either party can decrypt
+        // it.
         let sender_key = seal_with_public_key(&message_key, &identity.public_key)?;
         let recipient_key = seal_with_public_key(&message_key, &recipient_public_key)?;
         Ok(CreateMessageRequest {

@@ -165,8 +165,6 @@ impl GeneratedSrpSetup {
     }
 }
 
-/// `srp_attrs` must match the shape returned by the Ente API's
-/// `/users/srp/attributes` endpoint (i.e. camelCased fields).
 #[wasm_bindgen]
 pub fn auth_derive_srp_credentials(
     password: &str,
@@ -244,8 +242,6 @@ pub fn auth_recovery_key_to_mnemonic(recovery_key_b64: &str) -> Result<String, A
     auth::recovery_key_to_mnemonic(recovery_key_b64).map_err(Into::into)
 }
 
-/// `key_attrs` should be the `keyAttributes` object from the auth response.
-/// `encrypted_token_b64` is the `encryptedToken` string from the auth response.
 #[wasm_bindgen]
 pub fn auth_decrypt_secrets(
     kek_b64: &str,

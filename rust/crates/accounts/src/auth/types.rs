@@ -1,5 +1,3 @@
-//! Data types for authentication operations.
-
 use std::fmt;
 
 use serde::{Deserialize, Serialize};
@@ -7,39 +5,26 @@ use uuid::Uuid;
 
 use ente_core::crypto::{SecretString, SecretVec};
 
-/// Attributes stored on server for key derivation and encrypted keys.
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct KeyAttributes {
-    /// Salt for deriving key-encryption-key from password (base64)
     pub kek_salt: String,
-    /// Legacy KEK hash, present only on old accounts (base64)
+    // Legacy KEK hash, present only on old accounts (base64).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub kek_hash: Option<String>,
-    /// Master key encrypted with KEK (base64)
     pub encrypted_key: String,
-    /// Nonce for master key decryption (base64)
     pub key_decryption_nonce: String,
-    /// X25519 public key (base64)
     pub public_key: String,
-    /// Secret key encrypted with master key (base64)
     pub encrypted_secret_key: String,
-    /// Nonce for secret key decryption (base64)
     pub secret_key_decryption_nonce: String,
-    /// Argon2 memory limit
     pub mem_limit: u32,
-    /// Argon2 ops limit
     pub ops_limit: u32,
-    /// Master key encrypted with recovery key (base64)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub master_key_encrypted_with_recovery_key: Option<String>,
-    /// Nonce for master key decryption with recovery key (base64)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub master_key_decryption_nonce: Option<String>,
-    /// Recovery key encrypted with master key (base64)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub recovery_key_encrypted_with_master_key: Option<String>,
-    /// Nonce for recovery key decryption (base64)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub recovery_key_decryption_nonce: Option<String>,
 }
@@ -88,13 +73,9 @@ impl fmt::Debug for KeyAttributes {
     }
 }
 
-/// Private key material (never sent to server).
 pub struct PrivateKeyAttributes {
-    /// Master key (base64)
     pub key: SecretString,
-    /// Recovery key (hex for display to user)
     pub recovery_key: SecretString,
-    /// X25519 secret key (base64)
     pub secret_key: SecretString,
 }
 
@@ -108,15 +89,10 @@ impl fmt::Debug for PrivateKeyAttributes {
     }
 }
 
-/// Result of key generation during sign-up.
 pub struct KeyGenResult {
-    /// Attributes to send to server
     pub key_attributes: KeyAttributes,
-    /// Private keys to store locally
     pub private_key_attributes: PrivateKeyAttributes,
-    /// Key-encryption-key used to encrypt the master key and seed SRP setup.
     pub key_encryption_key: SecretVec,
-    /// Login key for SRP registration (16 bytes)
     pub login_key: SecretVec,
 }
 
@@ -135,22 +111,15 @@ fn default_email_mfa_enabled() -> bool {
     true
 }
 
-/// SRP attributes received from server (`/users/srp/attributes`).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SrpAttributes {
-    /// SRP user ID
     #[serde(rename = "srpUserID")]
     pub srp_user_id: Uuid,
-    /// SRP salt (base64)
     pub srp_salt: String,
-    /// Argon2 memory limit
     pub mem_limit: u32,
-    /// Argon2 ops limit
     pub ops_limit: u32,
-    /// KEK salt (base64) - same as in KeyAttributes
     pub kek_salt: String,
-    /// Whether email MFA is enabled (use email OTT instead of SRP)
     #[serde(rename = "isEmailMFAEnabled", default = "default_email_mfa_enabled")]
     pub is_email_mfa_enabled: bool,
 }

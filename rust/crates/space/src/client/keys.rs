@@ -1,11 +1,3 @@
-//! Space key versions and rotation.
-//!
-//! Each Space key has a version; older posts and profiles stay readable by
-//! walking the wrapped key chain back from the current version. These methods
-//! list versions, reconstruct the version-to-key history, and rotate the Space
-//! key (re-wrapping the profile and previous key under the new one). The private
-//! key-resolution spine lives in [`super`](super::AccountSpaceCtx).
-
 use std::collections::BTreeMap;
 
 use super::{AccountSpaceCtx, build_space_key_history_map};
@@ -112,6 +104,8 @@ impl AccountSpaceCtx {
                 &space_root_key,
                 &next_space_key,
             )?),
+            // Keep old posts and profiles readable through the wrapped key
+            // chain.
             wrapped_prev_key: b64::encode(&encrypt_secretbox_payload(
                 &next_space_key,
                 &current.space_key,

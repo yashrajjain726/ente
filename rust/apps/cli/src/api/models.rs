@@ -3,8 +3,6 @@ use std::fmt;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-// ========== Authentication Models ==========
-
 fn default_email_mfa_enabled() -> bool {
     true
 }
@@ -266,8 +264,6 @@ impl fmt::Debug for EnableTwoFactorRequest {
     }
 }
 
-// ========== User Models ==========
-
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UserDetails {
@@ -320,8 +316,6 @@ pub struct FamilyMember {
 pub struct Storage {
     pub used: i64,
 }
-
-// ========== Collection Models ==========
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -387,8 +381,6 @@ pub struct GetCollectionsResponse {
     pub collections: Vec<Collection>,
 }
 
-// ========== File Models ==========
-
 #[derive(Debug, Deserialize, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct File {
@@ -453,8 +445,6 @@ pub struct GetFileResponse {
     pub file: File,
 }
 
-// ========== Diff/Sync Models ==========
-
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GetDiffRequest {
@@ -468,8 +458,6 @@ pub struct GetDiffResponse {
     #[serde(rename = "hasMore")]
     pub has_more: bool,
 }
-
-// ========== Download Models ==========
 
 #[derive(Debug, Deserialize)]
 pub struct GetFileUrlResponse {

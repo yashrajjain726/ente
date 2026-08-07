@@ -159,8 +159,7 @@ impl RetrievalIndex {
             .collect::<Vec<_>>();
         validate_offsets(&offsets, metadata_len)?;
 
-        // Knowledge-pack revisions are immutable while an index is open. Native callers
-        // synchronize swaps/deletion around this object, satisfying mmap's safety contract.
+        // Native callers prevent pack swaps and deletion while these files are mapped.
         let vectors = unsafe { MmapOptions::new().map(&vector_file)? };
         let metadata = unsafe { MmapOptions::new().map(&metadata_file)? };
 

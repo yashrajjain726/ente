@@ -1,10 +1,3 @@
-//! Space friends.
-//!
-//! Friendship in Spaces is a mutual share of each owner's Space key, sealed to
-//! the other's public key. These methods send and accept friend requests by
-//! username, list and remove friends, query a relationship, and re-seal shares
-//! to friends after a Space key rotation.
-
 use super::AccountSpaceCtx;
 use crate::crypto::seal_with_public_key;
 use crate::error::{Result, SpaceError};

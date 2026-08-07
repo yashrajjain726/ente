@@ -1,8 +1,3 @@
-//! FRB initialization
-
-/// Set up the Rust runtime.
-///
-/// Called when EnteRust.init() is invoked from Dart.
 #[flutter_rust_bridge::frb(init)]
 pub fn init_app() {
     // Install before FRB claims the process logger.

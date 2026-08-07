@@ -30,9 +30,6 @@ impl VectorDB {
             dimensions,
             metric: MetricKind::IP,
             quantization: ScalarKind::F32,
-            connectivity: 0,     // auto
-            expansion_add: 0,    // auto
-            expansion_search: 0, // auto
             ..IndexOptions::default()
         };
 

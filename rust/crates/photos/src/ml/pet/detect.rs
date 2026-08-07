@@ -9,20 +9,17 @@ use crate::ml::{
 
 use super::{COCO_CAT, COCO_DOG, PET_SPECIES_CAT, PET_SPECIES_DOG};
 
-// Pet face detection thresholds (from Python config)
+// These thresholds match the Python pipeline.
 const PET_FACE_IOU_THRESHOLD: f32 = 0.5;
 const PET_FACE_MIN_SCORE: f32 = 0.3;
 
 const BODY_IOU_THRESHOLD: f32 = 0.5;
 const BODY_MIN_SCORE: f32 = 0.3;
 
-// Species IDs used across both Rust and Dart:
-//   0 = dog (face detection class_id=0, COCO_DOG=16)
-//   1 = cat (face detection class_id=1, COCO_CAT=15)
-// Dart maps COCO → species via: cocoClass == 15 ? 1 : 0
+// Species IDs must match Dart: 0 = dog, 1 = cat.
 
-/// Output format per row: [x, y, w, h, obj_conf, lx, ly, rx, ry, nx, ny, ...]
-/// 3 keypoints: left_eye, right_eye, nose (6 values for coords).
+// Rows store x, y, width, height, score, three x/y keypoints, then class scores.
+// Keypoint order is left eye, right eye, nose.
 pub(crate) fn run_pet_face_detection(
     runtime: &MlRuntimeView<'_>,
     input: &YoloInput,
@@ -143,10 +140,7 @@ fn postprocess_pet_face_tensor<T: onnx::FloatTensorData>(
 
         input.correct_box_and_keypoints(&mut box_xyxy, &mut keypoints);
 
-        // For a 2-class model (row_len >= 13): row[11] = cat score,
-        // row[12] = dog score.  Pick argmax and map to 0=dog, 1=cat.
-        // For a 1-class model (row_len == 12): row[11] is the single class
-        // score; class is always 0 (dog).
+        // Two-class rows store cat at 11 and dog at 12. One-class rows are dog-only.
         let class_id: u8 = if row_len >= 13 {
             if output_data.value(start + 12) > output_data.value(start + 11) {
                 PET_SPECIES_DOG
