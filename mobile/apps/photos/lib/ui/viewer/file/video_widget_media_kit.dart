@@ -8,7 +8,6 @@ import "package:media_kit/media_kit.dart";
 import "package:media_kit_video/media_kit_video.dart";
 import "package:photos/core/constants.dart";
 import "package:photos/core/event_bus.dart";
-import "package:photos/events/file_caption_updated_event.dart";
 import "package:photos/events/guest_view_event.dart";
 import "package:photos/events/pause_video_event.dart";
 import "package:photos/events/resume_video_event.dart";
@@ -74,8 +73,6 @@ class _VideoWidgetMediaKitState extends State<VideoWidgetMediaKit>
   bool _isGuestView = false;
   StreamSubscription<StreamSwitchedEvent>? _streamSwitchedSubscription;
   StreamSubscription<DownloadTask>? _downloadTaskSubscription;
-  late final StreamSubscription<FileCaptionUpdatedEvent>
-  _captionUpdatedSubscription;
   final _transformationController = TransformationController();
   bool _isZooming = false;
 
@@ -138,15 +135,6 @@ class _VideoWidgetMediaKitState extends State<VideoWidgetMediaKit>
       },
     );
 
-    _captionUpdatedSubscription = Bus.instance
-        .on<FileCaptionUpdatedEvent>()
-        .listen((event) {
-          if (event.fileGeneratedID == widget.file.generatedID) {
-            if (mounted) {
-              setState(() {});
-            }
-          }
-        });
     wakeLockService.updateWakeLock(
       enable: true,
       wakeLockFor: WakeLockFor.videoPlayback,
@@ -211,7 +199,6 @@ class _VideoWidgetMediaKitState extends State<VideoWidgetMediaKit>
       downloadManager.pause(widget.file.uploadedFileID!).ignore();
     }
     player.dispose();
-    _captionUpdatedSubscription.cancel();
     _transformationController.dispose();
     if (wakeLockService.shouldKeepAppAwakeAcrossSessions) {
       wakeLockService.updateWakeLock(

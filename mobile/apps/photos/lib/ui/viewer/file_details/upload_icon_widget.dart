@@ -4,6 +4,7 @@ import "package:ente_strings/ente_strings.dart";
 import "package:flutter/foundation.dart";
 import "package:flutter/material.dart";
 import "package:flutter_animate/flutter_animate.dart";
+import "package:hugeicons/hugeicons.dart";
 import "package:logging/logging.dart";
 import "package:photos/core/event_bus.dart";
 import "package:photos/db/files_db.dart";
@@ -72,16 +73,22 @@ class _UpdateIconWidgetState extends State<UploadIconWidget> {
     }
     if (widget.file.isUploaded || isUploadedNow) {
       if (isUploadedNow) {
-        return Padding(
-          padding: const EdgeInsets.all(8.0),
-          child: const Icon(Icons.cloud_done_outlined, color: Colors.white)
-              .animate()
-              .fadeIn(duration: 500.ms, curve: Curves.easeInOutCubic)
-              .fadeOut(
-                delay: const Duration(seconds: 3),
-                duration: 500.ms,
-                curve: Curves.easeInOutCubic,
-              ),
+        return SizedBox.square(
+          dimension: kMinInteractiveDimension,
+          child: Center(
+            child:
+                const HugeIcon(
+                      icon: HugeIcons.strokeRoundedCloudSavingDone01,
+                      color: Colors.white,
+                    )
+                    .animate()
+                    .fadeIn(duration: 500.ms, curve: Curves.easeInOutCubic)
+                    .fadeOut(
+                      delay: const Duration(seconds: 3),
+                      duration: 500.ms,
+                      curve: Curves.easeInOutCubic,
+                    ),
+          ),
         );
       }
       return const SizedBox.shrink();
@@ -99,7 +106,10 @@ class _UpdateIconWidgetState extends State<UploadIconWidget> {
           final bool isQueuedForUpload =
               !isIgnored && widget.file.collectionID != null;
           if (isQueuedForUpload && isBeingUploaded) {
-            return const EnteLoadingWidget();
+            return const SizedBox.square(
+              dimension: kMinInteractiveDimension,
+              child: EnteLoadingWidget(color: Colors.white, size: 16),
+            );
           }
           if (isIgnored && (kDebugMode || ignoreReason != kIgnoreReasonTrash)) {
             showToast(
@@ -116,7 +126,10 @@ class _UpdateIconWidgetState extends State<UploadIconWidget> {
                   )
                 : context.strings.tapToUpload,
             child: IconButton(
-              icon: const Icon(Icons.upload_rounded, color: Colors.white),
+              icon: const HugeIcon(
+                icon: HugeIcons.strokeRoundedUpload01,
+                color: Colors.white,
+              ),
               onPressed: () async {
                 if (isIgnored) {
                   await IgnoredFilesService.instance.removeIgnoredMappings([

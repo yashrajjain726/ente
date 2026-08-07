@@ -1,10 +1,11 @@
 import "dart:async";
 import "dart:io";
 
-import "package:ente_icons/ente_icons.dart";
 import "package:ente_strings/ente_strings.dart";
 import "package:flutter/cupertino.dart";
 import "package:flutter/material.dart";
+import "package:flutter_svg/flutter_svg.dart";
+import "package:hugeicons/hugeicons.dart";
 import "package:photos/core/event_bus.dart";
 import "package:photos/events/guest_view_event.dart";
 import "package:photos/models/collection/collection.dart";
@@ -122,10 +123,8 @@ class FileBottomBarState extends State<FileBottomBar> {
             child: Padding(
               padding: const EdgeInsets.only(top: 12),
               child: IconButton(
-                icon: Icon(
-                  Platform.isAndroid
-                      ? Icons.delete_outline
-                      : CupertinoIcons.delete,
+                icon: const HugeIcon(
+                  icon: HugeIcons.strokeRoundedDelete02,
                   color: Colors.white,
                 ),
                 onPressed: () async {
@@ -154,12 +153,12 @@ class FileBottomBarState extends State<FileBottomBar> {
             padding: const EdgeInsets.only(top: 12),
             child: IconButton(
               key: shareButtonKey,
-              icon: Icon(
-                Platform.isAndroid
-                    ? Icons.share_outlined
-                    : CupertinoIcons.share,
-                color: Colors.white,
-              ),
+              icon: Platform.isAndroid
+                  ? const HugeIcon(
+                      icon: HugeIcons.strokeRoundedShare08,
+                      color: Colors.white,
+                    )
+                  : const Icon(CupertinoIcons.share, color: Colors.white),
               onPressed: () {
                 share(context, [widget.file], shareButtonKey: shareButtonKey);
               },
@@ -175,10 +174,10 @@ class FileBottomBarState extends State<FileBottomBar> {
             child: Padding(
               padding: const EdgeInsets.only(top: 12),
               child: IconButton(
-                icon: const Icon(
-                  EnteIcons.addToAlbum,
+                icon: const HugeIcon(
+                  icon: HugeIcons.strokeRoundedAddSquare,
                   color: Colors.white,
-                  size: 28,
+                  size: 24,
                 ),
                 onPressed: () {
                   final selectedFiles = SelectedFiles();
@@ -206,27 +205,13 @@ class FileBottomBarState extends State<FileBottomBar> {
             curve: Curves.easeInOut,
             child: Align(
               alignment: Alignment.bottomCenter,
-              child: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Colors.transparent,
-                      Colors.black.withValues(alpha: 0.6),
-                      Colors.black.withValues(alpha: 0.72),
-                    ],
-                    stops: const [0, 0.8, 1],
-                  ),
-                ),
-                child: SafeArea(
-                  top: false,
-                  left: false,
-                  right: false,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceAround,
-                    children: children,
-                  ),
+              child: SafeArea(
+                top: false,
+                left: false,
+                right: false,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: children,
                 ),
               ),
             ),
@@ -252,7 +237,7 @@ class FileBottomBarState extends State<FileBottomBar> {
         child: Padding(
           padding: const EdgeInsets.only(top: 12),
           child: IconButton(
-            icon: const Icon(Icons.restore_outlined, color: Colors.white),
+            icon: const Icon(CupertinoIcons.gobackward, color: Colors.white),
             onPressed: () {
               final selectedFiles = SelectedFiles();
               selectedFiles.toggleSelection(widget.file);
@@ -273,8 +258,8 @@ class FileBottomBarState extends State<FileBottomBar> {
         child: Padding(
           padding: const EdgeInsets.only(top: 12),
           child: IconButton(
-            icon: const Icon(
-              Icons.delete_forever_outlined,
+            icon: const HugeIcon(
+              icon: HugeIcons.strokeRoundedDelete02,
               color: Colors.white,
             ),
             onPressed: () async {
@@ -297,7 +282,11 @@ class FileBottomBarState extends State<FileBottomBar> {
       child: Padding(
         padding: const EdgeInsets.only(top: 12),
         child: IconButton(
-          icon: const Icon(Icons.flag_outlined, color: Colors.white),
+          icon: SvgPicture.asset(
+            "assets/icons/delete-01.svg",
+            width: 24,
+            height: 24,
+          ),
           onPressed: () => _onSuggestDelete(collection),
         ),
       ),

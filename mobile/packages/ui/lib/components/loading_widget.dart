@@ -23,7 +23,7 @@ class EnteLoadingWidget extends StatelessWidget {
         child: SizedBox.fromSize(
           size: Size.square(size),
           child: CircularProgressIndicator(
-            strokeWidth: 2,
+            strokeWidth: 1.5,
             color: color ?? getEnteColorScheme(context).strokeBase,
           ),
         ),
