@@ -233,6 +233,7 @@ class _EditContactPageState extends State<EditContactPage> {
       label: trimmedName.isNotEmpty ? trimmedName : widget.email,
       email: widget.email,
       userID: widget.contactUserId,
+      currentUserID: Configuration.instance.getUserID(),
       currentUserEmail: Configuration.instance.getEmail(),
     );
 

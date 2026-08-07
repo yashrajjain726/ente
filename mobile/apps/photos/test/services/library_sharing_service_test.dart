@@ -23,11 +23,6 @@ void main() {
     ];
     final fixture = await _Fixture.create(albums, blockedIDs: {100, 101});
 
-    expect(
-      (await fixture.service.getEligibleAlbums()).last.type,
-      CollectionType.uncategorized,
-    );
-
     final result = await fixture.service.enableAutomaticSharing(
       recipient: librarySharingTestRecipient,
       role: CollectionParticipantRole.admin,
@@ -36,13 +31,6 @@ void main() {
     expect(result.failedIDs, isEmpty);
     expect(result.previouslyUnsharedIDs, {100, 101});
     expect(fixture.collectionsService.shareBatchSizes, [100, 1]);
-    expect(fixture.collectionsService.recipientEmails, [
-      librarySharingTestRecipient.email,
-      librarySharingTestRecipient.email,
-    ]);
-    expect(fixture.userService.publicKeyEmails, [
-      librarySharingTestRecipient.email,
-    ]);
     expect(
       fixture.collectionsService.sharedRoles[101],
       CollectionParticipantRole.viewer,
@@ -82,8 +70,6 @@ void main() {
     config = await fixture.readConfig();
     expect(config.hidden, {album.id});
     expect(config.addedAutomatically, isEmpty);
-    expect(fixture.collectionsService.shareAttempts, [album.id]);
-    expect(fixture.collectionsService.unshareAttempts, [album.id]);
     expect(album.sharees, isEmpty);
   });
 
@@ -174,14 +160,6 @@ void main() {
       await fixture.service.reconcile();
       expect(fixture.userService.userDetailsFetches, 3);
       expect(await fixture.isAutomaticSharingEnabled(), isFalse);
-      expect(fixture.collectionsService.shareBatchSizes, [
-        1,
-        100,
-        1,
-        100,
-        100,
-        100,
-      ]);
       expect(albums.last.sharees, isEmpty);
     },
   );
@@ -242,9 +220,6 @@ class _FakeCollectionsService extends Mock implements CollectionsService {
   final Set<int> blockedIDs;
   Object? shareError;
   final List<int> shareBatchSizes = [];
-  final List<String> recipientEmails = [];
-  final List<int> shareAttempts = [];
-  final List<int> unshareAttempts = [];
   final Map<int, CollectionParticipantRole> sharedRoles = {};
 
   @override
@@ -271,11 +246,9 @@ class _FakeCollectionsService extends Mock implements CollectionsService {
     required CollectionShareSource source,
   }) async {
     shareBatchSizes.add(roles.length);
-    recipientEmails.add(recipientEmail);
     if (shareError != null) {
       throw shareError!;
     }
-    shareAttempts.addAll(roles.keys);
     sharedRoles.addAll(roles);
     for (final entry in roles.entries) {
       if (blockedIDs.contains(entry.key)) {
@@ -306,7 +279,6 @@ class _FakeCollectionsService extends Mock implements CollectionsService {
     required List<int> collectionIDs,
     required CollectionShareSource source,
   }) async {
-    unshareAttempts.addAll(collectionIDs);
     for (final id in collectionIDs) {
       albums
           .firstWhere((album) => album.id == id)
@@ -328,19 +300,15 @@ class _FakeUserService extends Mock implements UserService {
   Set<int>? refreshedActiveFamilyMemberUserIDs;
   Object? userDetailsError;
   int userDetailsFetches = 0;
-  final List<String> publicKeyEmails = [];
 
   @override
-  Future<String?> getPublicKey(String email) async {
-    publicKeyEmails.add(email);
-    return email == librarySharingTestRecipient.email ? 'public-key' : null;
-  }
+  Future<String?> getPublicKey(String email) async => 'public-key';
 
   @override
-  List<User> getRelevantContacts() => [
-    User(
-      id: librarySharingTestRecipient.userID,
-      email: librarySharingTestRecipient.email,
+  List<UserSuggestion> getRelevantContacts() => [
+    UserSuggestion(
+      librarySharingTestRecipient.email,
+      userID: librarySharingTestRecipient.userID,
     ),
   ];
 

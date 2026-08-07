@@ -18,7 +18,7 @@ bool canOpenSocialActorContactDestination(
   required int currentUserID,
 }) {
   final userId = user.id;
-  if (userId == null || userId <= 0 || userId == currentUserID) {
+  if (userId <= 0 || userId == currentUserID) {
     return false;
   }
   return resolveKnownEmail(user) != null;
@@ -38,7 +38,7 @@ Future<void> openSocialActorContactDestination(
     return;
   }
 
-  final userId = user.id!;
+  final userId = user.id;
   final email = resolveKnownEmail(user);
   if (email == null) {
     return;

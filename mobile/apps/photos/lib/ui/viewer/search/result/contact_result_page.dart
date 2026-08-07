@@ -307,13 +307,13 @@ class _ContactResultPageState extends State<ContactResultPage> {
       ),
     );
     if (updated is contacts.ContactRecord && mounted) {
-      final personData = PersonService.instance.getCachedPartialPersonData(
-        userID: _contactUserId,
-        email: _contactEmail,
+      final person = PersonService.instance.getCachedPersonForUser(
+        _contactUserId,
+        _contactEmail,
       );
       setState(() {
         _savedContact = updated;
-        _personId = personData?[PersonService.kPersonIDKey];
+        _personId = person?.remoteID;
       });
     }
   }

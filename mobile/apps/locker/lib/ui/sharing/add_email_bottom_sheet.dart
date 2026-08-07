@@ -56,7 +56,7 @@ class _AddEmailSheetState extends State<AddEmailSheet> {
   final _scrollController = ScrollController();
 
   late CollectionActions _collectionActions;
-  late List<User> _suggestedUsers;
+  late List<UserSuggestion> _suggestedUsers;
 
   @override
   void initState() {
@@ -171,7 +171,7 @@ class _AddEmailSheetState extends State<AddEmailSheet> {
                             .map(
                               (user) => MenuComponent(
                                 title: user.resolvedDisplayName,
-                                leading: UserAvatarWidget(
+                                leading: UserAvatarWidget.suggestion(
                                   user,
                                   type: AvatarType.mini,
                                   config: Configuration.instance,
@@ -348,48 +348,39 @@ class _AddEmailSheetState extends State<AddEmailSheet> {
     }
   }
 
-  List<User> _getSuggestedUsers() {
-    final List<User> suggestedUsers = [];
-    final Set<String> existingEmails = {};
-
-    existingEmails.add(Configuration.instance.getEmail() ?? "");
+  List<UserSuggestion> _getSuggestedUsers() {
     final int ownerID = Configuration.instance.getUserID()!;
+    final suggestedUsers = <UserSuggestion>[];
+    final existingEmails = <String>{Configuration.instance.getEmail() ?? ""};
+
+    void add(String email, {int? userID}) {
+      if (email.isNotEmpty && existingEmails.add(email)) {
+        suggestedUsers.add(UserSuggestion(email, userID: userID));
+      }
+    }
 
     for (final c in CollectionService.instance.getActiveCollections()) {
       if (c.owner.id == ownerID) {
         for (final User u in c.sharees) {
-          if (u.id != null &&
-              u.email.isNotEmpty &&
-              !existingEmails.contains(u.email)) {
-            existingEmails.add(u.email);
-            suggestedUsers.add(u);
-          }
+          add(u.email, userID: u.id);
         }
-      } else if (c.owner.id != null &&
-          c.owner.email.isNotEmpty &&
-          !existingEmails.contains(c.owner.email)) {
-        existingEmails.add(c.owner.email);
-        suggestedUsers.add(c.owner);
+      } else {
+        add(c.owner.email, userID: c.owner.id);
       }
     }
 
-    final cachedUserDetails = UserService.instance.getCachedUserDetails();
-    if (cachedUserDetails != null &&
-        (cachedUserDetails.familyData?.members?.isNotEmpty ?? false)) {
-      for (final member in cachedUserDetails.familyData!.members!) {
-        if (!existingEmails.contains(member.email)) {
-          existingEmails.add(member.email);
-          suggestedUsers.add(User(email: member.email));
-        }
-      }
+    final familyMembers =
+        UserService.instance.getCachedUserDetails()?.familyData?.members ?? [];
+    for (final member in familyMembers) {
+      add(member.email, userID: member.userID);
     }
 
-    suggestedUsers.sort((a, b) => a.email.compareTo(b.email));
-    suggestedUsers.sort(
-      (a, b) => a.resolvedDisplayName.toLowerCase().compareTo(
+    suggestedUsers.sort((a, b) {
+      final byName = a.resolvedDisplayName.toLowerCase().compareTo(
         b.resolvedDisplayName.toLowerCase(),
-      ),
-    );
+      );
+      return byName != 0 ? byName : a.email.compareTo(b.email);
+    });
     return suggestedUsers;
   }
 

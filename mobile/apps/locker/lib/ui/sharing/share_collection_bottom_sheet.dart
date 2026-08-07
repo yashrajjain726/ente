@@ -87,7 +87,6 @@ class _ShareCollectionSheetState extends State<ShareCollectionSheet> {
 
   Widget _buildShareesList() {
     final colors = context.componentColors;
-    final currentUserId = Configuration.instance.getUserID() ?? -1;
 
     final List<User> allUsers = [];
 
@@ -131,7 +130,6 @@ class _ShareCollectionSheetState extends State<ShareCollectionSheet> {
                         title: user.email,
                         leading: UserAvatarWidget(
                           user,
-                          currentUserID: currentUserId,
                           config: Configuration.instance,
                           type: AvatarType.mini,
                         ),
@@ -279,7 +277,7 @@ class _ShareCollectionSheetState extends State<ShareCollectionSheet> {
         builder: (_) => BottomSheetComponent(
           title: context.strings.changePermissions,
           message: context.strings.cannotAddMoreFilesAfterBecomingViewer(
-            name: user.displayName ?? user.email,
+            name: user.resolvedDisplayName,
           ),
           illustration: LockerBottomSheetIllustration.warningGrey,
           actions: [
@@ -319,7 +317,7 @@ class _ShareCollectionSheetState extends State<ShareCollectionSheet> {
       builder: (_) => BottomSheetComponent(
         title: context.strings.removeWithQuestionMark,
         message: context.strings.removeCollectionParticipantBody(
-          userEmail: user.displayName ?? user.email,
+          userEmail: user.resolvedDisplayName,
         ),
         illustration: LockerBottomSheetIllustration.warningGrey,
         actions: [

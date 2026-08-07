@@ -135,15 +135,20 @@ class VideoOverlayDuration extends StatelessWidget {
 }
 
 class OwnerAvatarOverlayIcon extends StatelessWidget {
-  final User user;
+  final User? user;
+  final AvatarIdentity? identity;
   final AvatarType type;
-  final AvatarIdentity? fallbackIdentity;
   const OwnerAvatarOverlayIcon(
     this.user, {
     super.key,
     this.type = AvatarType.small,
-    this.fallbackIdentity,
-  });
+  }) : identity = null;
+
+  const OwnerAvatarOverlayIcon.identity(
+    this.identity, {
+    super.key,
+    this.type = AvatarType.small,
+  }) : user = null;
 
   @override
   Widget build(BuildContext context) {
@@ -151,12 +156,9 @@ class OwnerAvatarOverlayIcon extends StatelessWidget {
       alignment: Alignment.topRight,
       child: Padding(
         padding: const EdgeInsets.only(right: 4, top: 4),
-        child: UserAvatarWidget(
-          user,
-          type: type,
-          thumbnailView: true,
-          fallbackIdentity: fallbackIdentity,
-        ),
+        child: user == null
+            ? AvatarIdentityWidget(identity!, type)
+            : UserAvatarWidget(user!, type: type),
       ),
     );
   }

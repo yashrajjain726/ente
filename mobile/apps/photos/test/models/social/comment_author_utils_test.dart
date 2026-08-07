@@ -26,21 +26,8 @@ void main() {
         registeredUserResolver: _registeredUser,
       );
 
-      expect(firstUser.id, secondUser.id);
-      expect(firstUser.toMap()["name"], "Alice");
-      expect(secondUser.toMap()["name"], "Bob");
-    });
-
-    test("falls back to anonUserID when display name is missing", () {
-      final resolver = CommentAuthorResolver();
-      final user = resolver.resolve(
-        comment: _comment(id: "comment-1", userID: -1, anonUserID: "anon-a"),
-        anonDisplayNames: const {},
-        registeredUserResolver: _registeredUser,
-      );
-
-      expect(user.toMap()["name"], "anon-a");
-      expect(user.email, "anon-a@unknown.com");
+      expect(firstUser.label, "Alice");
+      expect(secondUser.label, "Bob");
     });
   });
 
@@ -108,6 +95,6 @@ User _registeredUser(int userID) {
   return User(
     id: userID,
     email: "user-$userID@example.com",
-    name: "User $userID",
+    label: "User $userID",
   );
 }

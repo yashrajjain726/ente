@@ -256,17 +256,14 @@ class EmailItemWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (collection.getSharees().isEmpty) {
+    if (collection.sharees.isEmpty) {
       return const SizedBox.shrink();
-    } else if (collection.getSharees().length == 1) {
-      final User? user = collection.getSharees().firstOrNull;
+    } else if (collection.sharees.length == 1) {
+      final User? user = collection.sharees.firstOrNull;
       final resolvedName = user == null ? '' : resolveDisplayName(user);
       return ShareMenuItem(
         title: resolvedName,
-        leading: UserAvatarWidget(
-          collection.getSharees().first,
-          thumbnailView: false,
-        ),
+        leading: UserAvatarWidget(collection.sharees.first),
         showChevron: true,
         onTap: () async {
           if (onTap != null) {
@@ -275,7 +272,7 @@ class EmailItemWidget extends StatelessWidget {
         },
       );
     } else {
-      final sharees = collection.getSharees();
+      final sharees = collection.sharees;
       const avatarSize = 24.0;
       final total = sharees.length;
       final limit = total > 2 ? 1 : 2;

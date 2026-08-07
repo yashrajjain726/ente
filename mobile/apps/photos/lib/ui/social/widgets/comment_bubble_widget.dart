@@ -897,25 +897,13 @@ class _Header extends StatelessWidget {
       mainAxisSize: MainAxisSize.max,
       children: [
         if (!isOwnComment) ...[
-          UserAvatarWidget(
-            user,
-            currentUserID: currentUserID,
-            type: AvatarType.regular,
-            thumbnailView: true,
-            addStroke: false,
-          ),
+          UserAvatarWidget(user, type: AvatarType.regular),
           const SizedBox(width: 10),
           Flexible(child: headerText),
         ] else ...[
           Flexible(child: headerText),
           const SizedBox(width: 10),
-          UserAvatarWidget(
-            user,
-            currentUserID: currentUserID,
-            type: AvatarType.regular,
-            thumbnailView: true,
-            addStroke: false,
-          ),
+          UserAvatarWidget(user, type: AvatarType.regular),
         ],
       ],
     );

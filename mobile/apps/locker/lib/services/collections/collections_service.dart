@@ -875,62 +875,47 @@ class CollectionService {
   ///   - Owners of collections shared to user.
   ///   - All collaborators of collections in which user is a collaborator or
   ///     a viewer.
-  List<User> getRelevantContacts() {
-    final List<User> relevantUsers = [];
-    final existingEmails = <String>{};
+  List<UserSuggestion> getRelevantContacts() {
     final int ownerID = Configuration.instance.getUserID()!;
     final String ownerEmail = Configuration.instance.getEmail()!;
-    existingEmails.add(ownerEmail);
+    final suggestions = <UserSuggestion>[];
+    final existingEmails = <String>{ownerEmail};
+
+    void add(String email, {int? userID}) {
+      if (email.isNotEmpty && existingEmails.add(email)) {
+        suggestions.add(UserSuggestion(email, userID: userID));
+      }
+    }
 
     for (final c in getActiveCollections()) {
-      // Add collaborators and viewers of collections owned by user
       if (c.owner.id == ownerID) {
+        // Collaborators and viewers of collections owned by user
         for (final User u in c.sharees) {
-          if (u.id != null && u.email.isNotEmpty) {
-            if (!existingEmails.contains(u.email)) {
-              relevantUsers.add(u);
-              existingEmails.add(u.email);
-            }
-          }
+          add(u.email, userID: u.id);
         }
-      } else if (c.owner.id != null && c.owner.email.isNotEmpty) {
+      } else if (c.owner.email.isNotEmpty) {
         // Add owners of collections shared with user
-        if (!existingEmails.contains(c.owner.email)) {
-          relevantUsers.add(c.owner);
-          existingEmails.add(c.owner.email);
-        }
-        // Add collaborators of collections shared with user where user is a
-        // viewer or a collaborator
-        for (final User u in c.sharees) {
-          if (u.id != null &&
-              u.email.isNotEmpty &&
-              u.email == ownerEmail &&
-              (u.isCollaborator || u.isViewer)) {
-            for (final User u in c.sharees) {
-              if (u.id != null && u.email.isNotEmpty && u.isCollaborator) {
-                if (!existingEmails.contains(u.email)) {
-                  relevantUsers.add(u);
-                  existingEmails.add(u.email);
-                }
-              }
+        add(c.owner.email, userID: c.owner.id);
+        // Collaborators of collections in which user participates
+        final participates = c.sharees.any(
+          (u) => u.email == ownerEmail && (u.isCollaborator || u.isViewer),
+        );
+        if (participates) {
+          for (final User u in c.sharees) {
+            if (u.isCollaborator) {
+              add(u.email, userID: u.id);
             }
-            break;
           }
         }
       }
     }
 
-    // Add user's family members
-    final cachedUserDetails = UserService.instance.getCachedUserDetails();
-    if (cachedUserDetails?.familyData?.members?.isNotEmpty ?? false) {
-      for (final member in cachedUserDetails!.familyData!.members!) {
-        if (!existingEmails.contains(member.email)) {
-          relevantUsers.add(User(email: member.email));
-          existingEmails.add(member.email);
-        }
-      }
+    final familyMembers =
+        UserService.instance.getCachedUserDetails()?.familyData?.members ?? [];
+    for (final member in familyMembers) {
+      add(member.email, userID: member.userID);
     }
-    return relevantUsers;
+    return suggestions;
   }
 
   String getPublicUrl(Collection c) {

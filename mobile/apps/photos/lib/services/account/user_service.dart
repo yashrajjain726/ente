@@ -1246,74 +1246,53 @@ class UserService {
   ///     a viewer.
   ///   - All family members of user.
   ///   - All contacts linked to a person.
-  List<User> getRelevantContacts() {
-    final List<User> relevantUsers = [];
-    final existingEmails = <String>{};
+  List<UserSuggestion> getRelevantContacts() {
     final int ownerID = Configuration.instance.getUserID()!;
     final String ownerEmail = Configuration.instance.getEmail()!;
-    existingEmails.add(ownerEmail);
+    final suggestions = <UserSuggestion>[];
+    final existingEmails = <String>{ownerEmail};
+
+    void add(String email, {int? userID}) {
+      if (email.isNotEmpty && existingEmails.add(email)) {
+        suggestions.add(UserSuggestion(email, userID: userID));
+      }
+    }
 
     for (final c in CollectionsService.instance.getActiveCollections()) {
-      // Add collaborators and viewers of collections owned by user
       if (c.owner.id == ownerID) {
+        // Collaborators and viewers of collections owned by user
         for (final User u in c.sharees) {
-          if (u.id != null && u.email.isNotEmpty) {
-            if (!existingEmails.contains(u.email)) {
-              relevantUsers.add(u);
-              existingEmails.add(u.email);
-            }
-          }
+          add(u.email, userID: u.id);
         }
-      } else if (c.owner.id != null && c.owner.email.isNotEmpty) {
-        // Add owners of collections shared with user
-        if (!existingEmails.contains(c.owner.email)) {
-          relevantUsers.add(c.owner);
-          existingEmails.add(c.owner.email);
-        }
-        // Add collaborators of collections shared with user where user is a
-        // viewer or a collaborator
-        for (final User u in c.sharees) {
-          if (u.id != null &&
-              u.email.isNotEmpty &&
+      } else if (c.owner.email.isNotEmpty) {
+        // Owners of collections shared with user
+        add(c.owner.email, userID: c.owner.id);
+        // Collaborators of collections in which user participates
+        final participates = c.sharees.any(
+          (u) =>
               u.email == ownerEmail &&
-              (u.isAdmin || u.isCollaborator || u.isViewer)) {
-            for (final User u in c.sharees) {
-              if (u.id != null &&
-                  u.email.isNotEmpty &&
-                  (u.isCollaborator || u.isAdmin)) {
-                if (!existingEmails.contains(u.email)) {
-                  relevantUsers.add(u);
-                  existingEmails.add(u.email);
-                }
-              }
+              (u.isAdmin || u.isCollaborator || u.isViewer),
+        );
+        if (participates) {
+          for (final User u in c.sharees) {
+            if (u.isCollaborator || u.isAdmin) {
+              add(u.email, userID: u.id);
             }
-            break;
           }
         }
       }
     }
 
-    // Add user's family members
-    final cachedUserDetails = getCachedUserDetails();
-    if (cachedUserDetails?.familyData?.members?.isNotEmpty ?? false) {
-      for (final member in cachedUserDetails!.familyData!.members!) {
-        if (!existingEmails.contains(member.email)) {
-          relevantUsers.add(User(id: member.userID, email: member.email));
-          existingEmails.add(member.email);
-        }
-      }
+    final familyMembers =
+        getCachedUserDetails()?.familyData?.members ?? const <FamilyMember>[];
+    for (final member in familyMembers) {
+      add(member.email, userID: member.userID);
     }
 
-    // Add contacts linked to people
-    final cachedEmailToPartialPersonData =
-        PersonService.instance.emailToPartialPersonDataMapCache;
-    for (final email in cachedEmailToPartialPersonData.keys) {
-      if (!existingEmails.contains(email)) {
-        relevantUsers.add(User(email: email));
-        existingEmails.add(email);
-      }
+    for (final email in PersonService.instance.cachedLinkedPersonEmails) {
+      add(email);
     }
 
-    return relevantUsers;
+    return suggestions;
   }
 }

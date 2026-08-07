@@ -626,9 +626,6 @@ class FeedDataProvider {
         .where((collection) => (collection.sharedAt ?? 0) > 0)
         .map((collection) {
           final ownerID = collection.owner.id;
-          if (ownerID == null) {
-            return null;
-          }
           final sharedFileIDs = initialSharedFileIDsByCollection[collection.id];
           return FeedItem(
             type: FeedItemType.sharedCollection,
@@ -644,7 +641,6 @@ class FeedDataProvider {
             collectionName: collectionNames[collection.id],
           );
         })
-        .whereType<FeedItem>()
         .toList();
   }
 

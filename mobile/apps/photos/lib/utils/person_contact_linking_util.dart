@@ -1,4 +1,3 @@
-import "package:collection/collection.dart";
 import "package:ente_pure_utils/ente_pure_utils.dart";
 import "package:ente_strings/ente_strings.dart";
 import "package:flutter/widgets.dart";
@@ -36,19 +35,10 @@ Future<PersonEntity?> findPersonLinkedToContact({
   required String? email,
 }) async {
   final persons = await PersonService.instance.getPersons();
-  final PersonEntity? userIdMatch = persons.firstWhereOrNull(
-    (person) => person.data.userID == contactUserId,
-  );
-  if (userIdMatch != null) {
-    return userIdMatch;
-  }
-
-  final normalizedEmail = normalizeContactLinkEmail(email);
-  if (normalizedEmail == null) {
-    return null;
-  }
-  return persons.firstWhereOrNull(
-    (person) => contactLinkEmailMatches(person.data.email, normalizedEmail),
+  return PersonService.findPersonForUser(
+    persons,
+    userID: contactUserId,
+    email: email,
   );
 }
 
@@ -61,25 +51,11 @@ Future<PersonEntity?> findPersonLinkedToEmail(
     return null;
   }
   final persons = await PersonService.instance.getPersons();
-  bool includePerson(PersonEntity person) =>
-      person.remoteID != excludedPersonId;
-  if (isCurrentUserContactLinkEmail(normalizedEmail)) {
-    final currentUserMatch = persons.firstWhereOrNull(
-      (person) =>
-          includePerson(person) &&
-          isCurrentUserContactLink(
-            email: person.data.email,
-            userID: person.data.userID,
-          ),
-    );
-    if (currentUserMatch != null) {
-      return currentUserMatch;
-    }
-  }
-  return persons.firstWhereOrNull(
-    (person) =>
-        includePerson(person) &&
-        contactLinkEmailMatches(person.data.email, normalizedEmail),
+  return PersonService.findPersonForUser(
+    persons,
+    userID: currentUserIDForContactLinkEmail(normalizedEmail),
+    email: normalizedEmail,
+    excludedPersonID: excludedPersonId,
   );
 }
 
