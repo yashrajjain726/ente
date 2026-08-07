@@ -1,3 +1,5 @@
+import "dart:async";
+
 import "package:flutter/material.dart";
 import "package:flutter_test/flutter_test.dart";
 import "package:photos/ui/common/progress_dialog.dart";
@@ -77,6 +79,76 @@ void main() {
     expect(find.text("Delete"), findsNothing);
     expect(routeResult, isTrue);
   });
+
+  testWidgets("does not pop the page when barrier dismissal races with hide", (
+    tester,
+  ) async {
+    final work = Completer<void>();
+
+    await _pumpActionPage(
+      tester,
+      onPressed: (context) async {
+        final dialog = ProgressDialog(context);
+        dialog.style(progressWidget: const SizedBox.shrink());
+        await dialog.show();
+        await work.future;
+        await dialog.hide();
+      },
+    );
+
+    await tester.tap(find.text("Run"));
+    await tester.pumpAndSettle();
+    expect(find.byType(Dialog), findsOneWidget);
+
+    await tester.tapAt(const Offset(10, 10));
+    await tester.pump();
+    work.complete();
+    await tester.pumpAndSettle();
+
+    expect(find.text("Run"), findsOneWidget);
+    expect(find.text("Open"), findsNothing);
+  });
+}
+
+Future<void> _pumpActionPage(
+  WidgetTester tester, {
+  required Future<void> Function(BuildContext) onPressed,
+}) async {
+  await tester.pumpWidget(
+    MaterialApp(
+      home: Builder(
+        builder: (context) => Scaffold(
+          body: TextButton(
+            onPressed: () => Navigator.of(context).push<void>(
+              MaterialPageRoute(
+                builder: (_) => _ActionPage(onPressed: onPressed),
+              ),
+            ),
+            child: const Text("Open"),
+          ),
+        ),
+      ),
+    ),
+  );
+
+  await tester.tap(find.text("Open"));
+  await tester.pumpAndSettle();
+}
+
+class _ActionPage extends StatelessWidget {
+  const _ActionPage({required this.onPressed});
+
+  final Future<void> Function(BuildContext) onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: TextButton(
+        onPressed: () => onPressed(context),
+        child: const Text("Run"),
+      ),
+    );
+  }
 }
 
 class _DeletionPage extends StatelessWidget {

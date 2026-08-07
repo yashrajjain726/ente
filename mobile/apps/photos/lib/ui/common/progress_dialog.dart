@@ -45,7 +45,12 @@ class ProgressDialog {
   ModalRoute<void>? _dialogRoute;
   NavigatorState? _navigator;
 
-  bool get _isThisDialogShowing => _isShowing && _dialog != null;
+  bool get _isThisDialogShowing {
+    final dialogRoute = _dialogRoute;
+    return _isShowing &&
+        _dialog != null &&
+        (dialogRoute == null || dialogRoute.isActive);
+  }
 
   ProgressDialog(
     BuildContext context, {
@@ -125,28 +130,38 @@ class ProgressDialog {
   }
 
   bool isShowing() {
-    return _isShowing;
+    return _isThisDialogShowing;
   }
 
   Future<bool> hide() async {
-    if (!_isThisDialogShowing) {
+    if (_dialog == null) {
       if (_showLogs) debugPrint('ProgressDialog already dismissed');
       return false;
     }
 
+    var dismissed = false;
     try {
       final navigator = _navigator;
       if (navigator != null) {
-        navigator.pop();
         final dialogRoute = _dialogRoute;
         if (dialogRoute != null) {
+          if (dialogRoute.isActive) {
+            if (dialogRoute.isCurrent) {
+              navigator.pop();
+            } else {
+              navigator.removeRoute(dialogRoute);
+            }
+            dismissed = true;
+          }
           await dialogRoute.completed;
         } else {
+          navigator.pop();
+          dismissed = true;
           await _dialogPopped;
         }
       }
-      if (_showLogs) debugPrint('ProgressDialog dismissed');
-      return true;
+      if (_showLogs && dismissed) debugPrint('ProgressDialog dismissed');
+      return dismissed;
     } catch (err) {
       debugPrint('Seems there is an issue hiding dialog');
       debugPrint(err.toString());
