@@ -504,5 +504,4 @@ class _AddParticipantPage extends State<AddParticipantPage> {
         return null;
     }
   }
-
 }
