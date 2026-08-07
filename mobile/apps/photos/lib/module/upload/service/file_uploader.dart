@@ -51,6 +51,7 @@ class FileUploader {
   static const kMaximumConcurrentUploads = 4;
   static const kMaximumConcurrentVideoUploads = 2;
   static const kMaxFileSize10Gib = 10737418240;
+  static const kMaxFileSize20Gib = 21474836480;
   static const kBlockedUploadsPollFrequency = Duration(seconds: 2);
   static const _longRunningUploadThreshold = Duration(minutes: 50);
   static const k20MBStorageBuffer = 20 * 1024 * 1024;
@@ -904,13 +905,16 @@ class FileUploader {
         throw StorageLimitExceededError();
       }
       final estimatedEncryptedSize = CryptoUtil.estimateEncryptedSize(fileSize);
-      if (estimatedEncryptedSize > kMaxFileSize10Gib) {
+      final maxFileSize = flagService.flags.internalUser
+          ? kMaxFileSize20Gib
+          : kMaxFileSize10Gib;
+      if (estimatedEncryptedSize > maxFileSize) {
         _logger.warning(
-          'Encrypted file size exceeds 10GiB sourceSize $fileSize '
+          'Encrypted file size exceeds $maxFileSize sourceSize $fileSize '
           'estimatedEncryptedSize $estimatedEncryptedSize',
         );
         throw InvalidFileError(
-          'encrypted file size above 10GiB',
+          'encrypted file size above $maxFileSize',
           InvalidReason.tooLargeFile,
         );
       }
