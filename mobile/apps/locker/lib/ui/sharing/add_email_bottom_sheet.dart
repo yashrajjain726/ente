@@ -7,13 +7,13 @@ import "package:ente_sharing/models/user.dart";
 import "package:ente_sharing/user_avator_widget.dart";
 import "package:ente_sharing/verify_identity_dialog.dart";
 import "package:ente_strings/ente_strings.dart";
+import "package:ente_ui/components/date_time_picker.dart";
 import "package:flutter/material.dart";
 import "package:intl/intl.dart";
 import "package:locker/services/collections/collections_service.dart";
 import "package:locker/services/collections/models/collection.dart";
 import "package:locker/services/configuration.dart";
 import "package:locker/ui/components/custom_list_scrollbar.dart";
-import "package:locker/ui/viewer/date/date_time_picker.dart";
 import "package:locker/utils/collection_actions.dart";
 
 Future<void> showAddEmailSheet(
@@ -294,10 +294,10 @@ class _AddEmailSheetState extends State<AddEmailSheet> {
   Future<void> _selectDate() async {
     final initialDate =
         _scheduledDate ?? DateTime.now().add(const Duration(days: 1));
-    final pickedDate = await showDatePickerSheet(
+    final pickedDate = await showDateTimePickerSheet(
       context,
-      initialDate: initialDate,
-      minDate: DateTime.now(),
+      initialDateTime: initialDate,
+      minDateTime: DateTime.now(),
     );
     if (pickedDate != null && mounted) {
       setState(() {
