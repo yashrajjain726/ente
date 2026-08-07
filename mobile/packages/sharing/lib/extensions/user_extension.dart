@@ -4,33 +4,18 @@ import "package:ente_sharing/models/user.dart";
 typedef ResolvedUserIdentity = ({String displayName, String email});
 
 extension UserExtension on User {
-  String get nameOrEmail {
-    return email.substring(0, email.indexOf("@"));
-  }
-
-  String get resolvedDisplayName => resolvedUserDisplayName(id, email);
-
-  String get resolvedEmail => resolvedUserEmail(id, email);
+  String get resolvedDisplayName => resolveUserIdentity(id, email).displayName;
 
   bool matchesResolvedNameOrEmail(String query) =>
       _matchesResolvedNameOrEmail(id, email, query);
 }
 
 extension UserSuggestionExtension on UserSuggestion {
-  String get resolvedDisplayName => resolvedUserDisplayName(userID, email);
-
-  String get resolvedEmail => resolvedUserEmail(userID, email);
+  String get resolvedDisplayName =>
+      resolveUserIdentity(userID, email).displayName;
 
   bool matchesResolvedNameOrEmail(String query) =>
       _matchesResolvedNameOrEmail(userID, email, query);
-}
-
-String resolvedUserDisplayName(int? userID, String email) {
-  return resolveUserIdentity(userID, email).displayName;
-}
-
-String resolvedUserEmail(int? userID, String email) {
-  return resolveUserIdentity(userID, email).email;
 }
 
 ResolvedUserIdentity resolveUserIdentity(int? userID, String email) {

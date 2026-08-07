@@ -145,8 +145,9 @@ class PersonService {
     return null;
   }
 
+  // Pre-userID Person entities are email-only; only positive IDs block fallback.
   static bool _canUseEmailFallback(PersonEntity person, int? requestedUserID) {
-    return requestedUserID == null || person.data.userID == null;
+    return requestedUserID == null || (person.data.userID ?? 0) <= 0;
   }
 
   void clearCache() {

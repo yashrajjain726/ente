@@ -22,6 +22,7 @@ import "package:photos/services/search_service.dart";
 import "package:photos/theme/ente_theme.dart";
 import "package:photos/ui/common/loading_widget.dart";
 import "package:photos/utils/avatar_util.dart";
+import "package:photos/utils/contact_string_util.dart";
 import "package:photos/utils/face/face_thumbnail_cache.dart";
 
 final _logger = Logger("PersonFaceWidget");
@@ -302,20 +303,16 @@ class _PersonFaceWidgetState extends State<PersonFaceWidget>
           return null;
         }
         final personData = personEntity.data;
-        final resolvedEmail = PhotosContactsService.instance
-            .getCachedResolvedEmail(
-              contactUserId: personData.userID,
-              email: personData.userID == null ? personData.email : null,
-            );
-        final resolvedName = PhotosContactsService.instance.getCachedSavedName(
+        final contact = PhotosContactsService.instance.getCachedContact(
           contactUserId: personData.userID,
-          email: personData.userID == null ? personData.email : null,
+          email: personData.email,
         );
         _personIdentity = AvatarIdentity.account(
-          label: resolvedName ?? personData.name,
-          email: resolvedEmail ?? personData.email,
+          label: trimToNull(contact?.data?.name) ?? personData.name,
+          email: trimToNull(contact?.email) ?? personData.email,
           userID: personData.userID,
           personID: personEntity.remoteID,
+          currentUserID: Configuration.instance.getUserID(),
           currentUserEmail: Configuration.instance.getEmail(),
         );
         if (contactPhotoBytes != null) {
