@@ -85,7 +85,7 @@ class ScannerPageState extends State<ScannerPage> {
             child: ScannerCameraView(
               overlay: EnteQrScannerOverlay(
                 borderColor: colorScheme.primary700,
-                cutOutSize: 260,
+                cutOutSize: 320,
                 overlayColor: Colors.black.withValues(alpha: 0.45),
               ),
               onScannerCreated: _onScannerCreated,

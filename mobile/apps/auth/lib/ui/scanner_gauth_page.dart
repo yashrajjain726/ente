@@ -45,6 +45,7 @@ class ScannerGoogleAuthPageState extends State<ScannerGoogleAuthPage> {
             child: ScannerCameraView(
               overlay: EnteQrScannerOverlay(
                 borderColor: getEnteColorScheme(context).primary700,
+                cutOutSize: 320,
                 overlayColor: Colors.black.withValues(alpha: 0.45),
               ),
               onScannerCreated: _onScannerCreated,
