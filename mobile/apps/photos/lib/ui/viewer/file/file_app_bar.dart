@@ -682,7 +682,10 @@ class FileAppBarState extends State<FileAppBar> {
       isDismissible: true,
     );
     await dialog.show();
-    if (!mounted) return;
+    if (!mounted) {
+      await dialog.hide();
+      return;
+    }
     final Collection? sharedLinkCollection = await CollectionActions(
       CollectionsService.instance,
     ).createSharedCollectionLink(context, [file]);
@@ -714,7 +717,10 @@ class FileAppBarState extends State<FileAppBar> {
       final m = MediaExtension();
       final bool result = await m.setAs("file://${fileToSave.path}", "image/*");
       if (result == false) {
-        if (!mounted) return;
+        if (!mounted) {
+          await dialog.hide();
+          return;
+        }
         showShortToast(context, context.strings.somethingWentWrong);
       }
       await dialog.hide();
