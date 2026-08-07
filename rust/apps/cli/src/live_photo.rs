@@ -61,11 +61,11 @@ pub(crate) async fn extract_live_photo(zip_data: &[u8], output_path: &Path) -> R
         .and_then(|name| name.to_str())
         .ok_or_else(|| Error::Generic("Invalid filename".into()))?;
     let mut expanded = 0;
+    let mut buffer = vec![0; 64 * 1024];
     for entry in [image, video] {
         let mut input = archive.by_index(entry.index)?;
         let path = parent.join(format!("{base}.{}", entry.extension));
         let mut output = fs::File::create(&path).await?;
-        let mut buffer = [0; 64 * 1024];
         loop {
             let count = input.read(&mut buffer)?;
             if count == 0 {
