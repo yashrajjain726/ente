@@ -29,7 +29,6 @@ export type RenderableSourceURLs =
 
 export interface FileDownloadOpts {
     background?: boolean;
-    onProgress?: (progress: number) => void;
 }
 
 export interface DownloadManagerTransport {
@@ -266,7 +265,6 @@ export class DownloadManagerCore {
         const onDownloadProgress = this.trackDownloadProgress(
             file.id,
             file.info?.fileSize,
-            opts?.onProgress,
         );
 
         const contentLength =
@@ -360,9 +358,7 @@ export class DownloadManagerCore {
     private trackDownloadProgress(
         fileID: number,
         fileSize: number | undefined,
-        onProgress?: (progress: number) => void,
     ) {
-        let lastProgress: number | undefined;
         return (event: { loaded: number; total: number }) => {
             if (isNaN(event.total) || event.total === 0) {
                 if (!fileSize) {
@@ -370,18 +366,14 @@ export class DownloadManagerCore {
                 }
                 event.total = fileSize;
             }
-            const progressValue = Math.round(
-                (event.loaded * 100) / event.total,
-            );
             const progress = new Map(this.fileDownloadProgress);
             if (event.loaded === event.total) {
                 progress.delete(fileID);
             } else {
-                progress.set(fileID, progressValue);
-            }
-            if (progressValue !== lastProgress) {
-                lastProgress = progressValue;
-                onProgress?.(progressValue);
+                progress.set(
+                    fileID,
+                    Math.round((event.loaded * 100) / event.total),
+                );
             }
             this.setFileDownloadProgress(progress);
         };

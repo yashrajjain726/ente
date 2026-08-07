@@ -155,9 +155,7 @@ export const DownloadStatusNotifications: React.FC<
                 const completedCount = group.success + group.failed;
                 const progress =
                     group.total === 1
-                        ? group.progress === undefined
-                            ? undefined
-                            : t("percent_complete", { percent: group.progress })
+                        ? undefined
                         : t("download_progress", {
                               count: completedCount,
                               total: group.total,
