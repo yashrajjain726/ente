@@ -29,6 +29,7 @@ export const profilePostGroupsFromPosts = (
             id: String(post.postId),
             imageAsset: post.imageAsset,
             imageUrl: post.imageUrl,
+            isUnavailable: post.isUnavailable,
             name: post.name,
             postId: post.postId,
             spaceId: post.spaceId,

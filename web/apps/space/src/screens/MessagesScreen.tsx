@@ -184,6 +184,7 @@ const isCurrentProfileActor = (
 
 const conversationPreview = (conversation: SpaceMessageConversation) => {
     const activity = conversation.latestActivity;
+    if (activity.isUnavailable) return "Message unavailable";
     if (activity.type == "empty") {
         return "You're now friends. Say hello!";
     }
@@ -1144,7 +1145,9 @@ const MessageReplyPreview: React.FC<{
             >
                 {isDeleted
                     ? "Deleted message"
-                    : truncateMessageText(parentMessage.text)}
+                    : parentMessage.isUnavailable
+                      ? "Message unavailable"
+                      : truncateMessageText(parentMessage.text)}
             </Box>
         </QuoteFrame>
     );
@@ -1297,14 +1300,15 @@ const MessageBubble: React.FC<{
     profile,
 }) => {
     const isOwn = message.sender.spaceId == ownSpaceID;
+    const isUnavailable = Boolean(message.isUnavailable);
     const bubbleBorderRadius = isOwn
         ? `20px ${groupsWithPrevious ? "6px" : "20px"} ${groupsWithNext ? "6px" : "20px"} 20px`
         : `${groupsWithPrevious ? "6px" : "20px"} 20px 20px ${groupsWithNext ? "6px" : "20px"}`;
-    const isSyntheticPostLike = message.kind == "post_like";
-    const isFriendAdded = message.kind == "friend_added";
-    const isPostReply = message.kind == "post_reply";
+    const isSyntheticPostLike = !isUnavailable && message.kind == "post_like";
+    const isFriendAdded = !isUnavailable && message.kind == "friend_added";
+    const isPostReply = !isUnavailable && message.kind == "post_reply";
     const isSystemMessage = isSyntheticPostLike || isFriendAdded;
-    const hasMessageReply = Boolean(message.replyMessageId);
+    const hasMessageReply = !isUnavailable && Boolean(message.replyMessageId);
     const actionLabel = isSyntheticPostLike
         ? isOwn
             ? "You liked a post"
@@ -1344,24 +1348,30 @@ const MessageBubble: React.FC<{
 
     const openActions = React.useCallback(
         (bubbleElement: HTMLElement, source: MessageActionsOpenSource) => {
-            if (isSystemMessage) return;
+            if (isSystemMessage || isUnavailable) return;
             clearLongPressTimer();
             longPressStartRef.current = undefined;
             window.getSelection()?.removeAllRanges();
             onOpenActions(message, bubbleElement, source);
         },
-        [clearLongPressTimer, isSystemMessage, message, onOpenActions],
+        [
+            clearLongPressTimer,
+            isSystemMessage,
+            isUnavailable,
+            message,
+            onOpenActions,
+        ],
     );
 
     const handleContextMenu = (event: React.MouseEvent<HTMLElement>) => {
-        if (isSystemMessage) return;
+        if (isSystemMessage || isUnavailable) return;
         event.preventDefault();
         event.stopPropagation();
         openActions(event.currentTarget, "contextmenu");
     };
 
     const handleTouchStart = (event: React.TouchEvent<HTMLElement>) => {
-        if (isSystemMessage) {
+        if (isSystemMessage || isUnavailable) {
             cancelLongPress();
             return;
         }
@@ -1480,7 +1490,9 @@ const MessageBubble: React.FC<{
                                 color: isOwn
                                     ? outgoingMessageText
                                     : incomingMessageText,
-                                cursor: "context-menu",
+                                cursor: isUnavailable
+                                    ? "default"
+                                    : "context-menu",
                                 display: "block",
                                 maxWidth: "100%",
                                 minWidth: 0,
@@ -1521,9 +1533,11 @@ const MessageBubble: React.FC<{
                                     whiteSpace: "pre-wrap",
                                 }}
                             >
-                                {message.text}
+                                {isUnavailable
+                                    ? "Message unavailable"
+                                    : message.text}
                             </Box>
-                            {message.liked && (
+                            {!isUnavailable && message.liked && (
                                 <Box
                                     component="span"
                                     role="img"

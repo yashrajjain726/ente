@@ -2579,6 +2579,7 @@ dependencies = [
  "ente-wasm-log",
  "serde",
  "serde-wasm-bindgen",
+ "tokio",
  "wasm-bindgen",
  "wasm-bindgen-futures",
 ]

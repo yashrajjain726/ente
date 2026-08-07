@@ -171,13 +171,22 @@ async fn account_space_key_resolution_is_cached_within_context() {
         .match_header("x-space-session-token", "space-session-token")
         .with_status(200)
         .with_body(
-            json!([{
-                "friend": "friend",
-                "spaceId": "space_friend",
-                "spaceSlug": "friend",
-                "friendSealedSpaceKey": friend_sealed_space_key,
-                "keyVersion": 1
-            }])
+            json!([
+                {
+                    "friend": "corrupt",
+                    "spaceId": "space_corrupt",
+                    "spaceSlug": "corrupt",
+                    "friendSealedSpaceKey": "not-base64",
+                    "keyVersion": 1
+                },
+                {
+                    "friend": "friend",
+                    "spaceId": "space_friend",
+                    "spaceSlug": "friend",
+                    "friendSealedSpaceKey": friend_sealed_space_key,
+                    "keyVersion": 1
+                }
+            ])
             .to_string(),
         )
         .expect(1)
@@ -1187,6 +1196,60 @@ async fn get_space_profile_decrypted_returns_decryption_error() {
         .expect_err("profile decryption should fail");
 
     assert!(matches!(error, SpaceError::Crypto(_)));
+    profile.assert_async().await;
+    spaces.assert_async().await;
+}
+
+#[tokio::test]
+async fn get_space_profile_for_display_keeps_envelope_on_decryption_error() {
+    let mut server = Server::new_async().await;
+    let space_root_key = generate_key();
+    let ctx = test_account_ctx_with_space_root_key(&server.url(), space_root_key.clone());
+    let space_key = generate_key();
+    let encrypted_profile = b64::encode(
+        &encrypt_secretbox_payload(&generate_key(), b"profile-json").expect("profile wrap"),
+    );
+    let profile = server
+        .mock("GET", "/spaces/space_owner_main/profile")
+        .match_header("x-space-session-token", "space-session-token")
+        .with_status(200)
+        .with_body(
+            json!({
+                "spaceId": "space_owner_main",
+                "spaceSlug": "owner-main",
+                "version": 3,
+                "friends": 2,
+                "encryptedProfile": encrypted_profile,
+                "updatedAt": "2026-04-16T00:00:00Z"
+            })
+            .to_string(),
+        )
+        .create_async()
+        .await;
+    let spaces = server
+        .mock("GET", "/account/space")
+        .match_header("x-space-session-token", "space-session-token")
+        .with_status(200)
+        .with_body(owned_space_response(
+            &space_root_key,
+            &space_key,
+            "space_owner_main",
+            "owner-main",
+            3,
+        ))
+        .create_async()
+        .await;
+
+    let decrypted = ctx
+        .get_space_profile_for_display("space_owner_main", None, None)
+        .await
+        .expect("profile envelope should remain available");
+
+    assert_eq!(decrypted.space_id, "space_owner_main");
+    assert_eq!(decrypted.space_slug, "owner-main");
+    assert_eq!(decrypted.version, 3);
+    assert_eq!(decrypted.friends, 2);
+    assert!(decrypted.profile.is_empty());
     profile.assert_async().await;
     spaces.assert_async().await;
 }

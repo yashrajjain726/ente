@@ -585,11 +585,7 @@ impl AccountSpaceCtx {
         for share in shares {
             match self.decrypt_friend_share(space_id, &share).await {
                 Ok(share) => value.push(share),
-                Err(
-                    SpaceError::Crypto(_)
-                    | SpaceError::InvalidInput(_)
-                    | SpaceError::MissingFriendSealedSpaceKey,
-                ) => {}
+                Err(error) if error.is_content_error() => {}
                 Err(error) => return Err(error),
             }
         }
@@ -770,6 +766,25 @@ pub(super) fn decrypt_space_profile(
             Some(profile.updated_at.clone())
         },
     })
+}
+
+pub(super) fn space_profile_without_payload(
+    profile: &SpaceProfileResponse,
+) -> DecryptedSpaceProfile {
+    DecryptedSpaceProfile {
+        space_id: profile.space_id.clone(),
+        space_slug: profile.space_slug.clone(),
+        version: profile.version,
+        friends: profile.friends,
+        profile: Vec::new(),
+        avatar: profile.avatar.clone(),
+        cover: profile.cover.clone(),
+        updated_at: if profile.updated_at.is_empty() {
+            None
+        } else {
+            Some(profile.updated_at.clone())
+        },
+    }
 }
 
 pub(super) fn build_space_key_history_map(

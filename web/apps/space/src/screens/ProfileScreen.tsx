@@ -29,7 +29,7 @@ import log from "ente-base/log";
 import { useBrowserBackClose } from "hooks/useBrowserBackClose";
 import React, { useState } from "react";
 import type { SetupProfile } from "screens/SetupProfileScreen";
-import type { SpacePostAsset } from "services/space";
+import { isSpaceContentError, type SpacePostAsset } from "services/space";
 import type { SpaceInviteIntent } from "services/spaceInvite";
 import { openSpaceShareLinkDialog } from "services/spaceShareLink";
 import { spaceTouchTargetSize } from "styles/touchTargets";
@@ -82,6 +82,7 @@ export interface ProfilePostItem {
     id: string;
     imageAsset?: SpacePostAsset;
     imageUrl?: string;
+    isUnavailable?: boolean;
     name?: string;
     postId?: number;
     spaceId?: string;
@@ -294,6 +295,7 @@ interface ProfilePostTileProps {
     imageUrl?: string;
     index: number;
     isSingleItemRow: boolean;
+    isMediaUnavailable: boolean;
     item: ProfilePostItem;
     loadRootMargin: string;
     onLoadImage: () => Promise<string | undefined>;
@@ -309,6 +311,7 @@ const ProfilePostTile: React.FC<ProfilePostTileProps> = ({
     imageUrl,
     index,
     isSingleItemRow,
+    isMediaUnavailable,
     item,
     loadRootMargin,
     onLoadImage,
@@ -317,18 +320,22 @@ const ProfilePostTile: React.FC<ProfilePostTileProps> = ({
 }) => {
     const [shouldLoad, setShouldLoad] = React.useState(Boolean(imageUrl));
     const [readyImageUrl, setReadyImageUrl] = React.useState<string>();
+    const [imageDecodeFailed, setImageDecodeFailed] = React.useState(false);
     const tileRef = React.useRef<HTMLButtonElement | null>(null);
     const thumbHashDataURL = React.useMemo(
         () => thumbHashDataURLFromBase64(item.thumbHash),
         [item.thumbHash],
     );
     const isCurrentImageReady = Boolean(imageUrl && readyImageUrl == imageUrl);
+    const isUnavailable =
+        Boolean(item.isUnavailable) || isMediaUnavailable || imageDecodeFailed;
 
     React.useEffect(() => {
         if (imageUrl) setShouldLoad(true);
     }, [imageUrl]);
 
     React.useEffect(() => {
+        if (isUnavailable) return;
         if (shouldLoad || imageUrl) return;
         const element = tileRef.current;
         if (!element) return;
@@ -351,24 +358,31 @@ const ProfilePostTile: React.FC<ProfilePostTileProps> = ({
         );
         observer.observe(element);
         return () => observer.disconnect();
-    }, [imageUrl, loadRootMargin, shouldLoad]);
+    }, [imageUrl, isUnavailable, loadRootMargin, shouldLoad]);
 
     React.useEffect(() => {
+        if (isUnavailable) return;
         if (!shouldLoad || imageUrl) return;
         void onLoadImage().catch((error: unknown) => {
             log.warn("Failed to load profile post image", error);
         });
-    }, [imageUrl, onLoadImage, shouldLoad]);
+    }, [imageUrl, isUnavailable, onLoadImage, shouldLoad]);
 
     return (
         <Box
             ref={tileRef}
             component="button"
             type="button"
-            aria-label={`Open ${displayName} post ${index + 1}`}
-            disabled={!imageUrl}
+            aria-label={
+                isUnavailable
+                    ? item.isUnavailable
+                        ? "Post unavailable"
+                        : "Media unavailable"
+                    : `Open ${displayName} post ${index + 1}`
+            }
+            disabled={!imageUrl || isUnavailable}
             onClick={() => {
-                if (imageUrl) onOpen(imageUrl);
+                if (imageUrl && !isUnavailable) onOpen(imageUrl);
             }}
             sx={{
                 appearance: "none",
@@ -377,7 +391,7 @@ const ProfilePostTile: React.FC<ProfilePostTileProps> = ({
                     : undefined,
                 bgcolor: photoMasonryPlaceholderBackground,
                 border: 0,
-                cursor: imageUrl ? "pointer" : "default",
+                cursor: imageUrl && !isUnavailable ? "pointer" : "default",
                 display: "block",
                 flex: isSingleItemRow ? "0 0 100%" : `${aspectRatio} 1 0`,
                 height: isSingleItemRow ? "auto" : "100%",
@@ -392,7 +406,7 @@ const ProfilePostTile: React.FC<ProfilePostTileProps> = ({
                 },
             }}
         >
-            {thumbHashDataURL ? (
+            {!isUnavailable && thumbHashDataURL ? (
                 <Box
                     component="img"
                     alt=""
@@ -411,7 +425,7 @@ const ProfilePostTile: React.FC<ProfilePostTileProps> = ({
                     }}
                 />
             ) : null}
-            {imageUrl ? (
+            {!isUnavailable && imageUrl ? (
                 <Box
                     component="img"
                     alt={`${groupLabel} post ${index + 1}`}
@@ -419,6 +433,7 @@ const ProfilePostTile: React.FC<ProfilePostTileProps> = ({
                         setReadyImageUrl(imageUrl);
                         onRememberDimensions(item.id, event.currentTarget);
                     }}
+                    onError={() => setImageDecodeFailed(true)}
                     src={imageUrl}
                     sx={{
                         display: "block",
@@ -440,6 +455,24 @@ const ProfilePostTile: React.FC<ProfilePostTileProps> = ({
                     }}
                 />
             ) : null}
+            {isUnavailable && (
+                <Box
+                    sx={{
+                        alignItems: "center",
+                        color: textSoft,
+                        display: "flex",
+                        fontSize: 12,
+                        fontWeight: 600,
+                        height: "100%",
+                        justifyContent: "center",
+                        width: "100%",
+                    }}
+                >
+                    {item.isUnavailable
+                        ? "Post unavailable"
+                        : "Media unavailable"}
+                </Box>
+            )}
         </Box>
     );
 };
@@ -543,6 +576,8 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     const [loadedPostImageURLsByKey, setLoadedPostImageURLsByKey] = useState<
         Record<string, string>
     >({});
+    const [unavailablePostImagesByKey, setUnavailablePostImagesByKey] =
+        useState<Record<string, true>>({});
     const [loadedCoverUrl, setLoadedCoverUrl] = useState<string | null>(null);
     const postInputRef = React.useRef<HTMLInputElement | null>(null);
     const postImageLoadsInFlightRef = React.useRef<
@@ -722,6 +757,9 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             }
 
             const cacheKey = profilePostImageCacheKey(item);
+            if (unavailablePostImagesByKey[cacheKey]) {
+                return Promise.resolve(undefined);
+            }
             const inFlight = postImageLoadsInFlightRef.current.get(cacheKey);
             if (inFlight) return inFlight;
 
@@ -736,6 +774,12 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                 })
                 .catch((error: unknown) => {
                     log.warn("Failed to load profile post image", error);
+                    if (isSpaceContentError(error)) {
+                        setUnavailablePostImagesByKey((current) => ({
+                            ...current,
+                            [cacheKey]: true,
+                        }));
+                    }
                     return undefined;
                 })
                 .finally(() => {
@@ -744,7 +788,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             postImageLoadsInFlightRef.current.set(cacheKey, load);
             return load;
         },
-        [loadedPostImageURLFor, onLoadPostImage],
+        [loadedPostImageURLFor, onLoadPostImage, unavailablePostImagesByKey],
     );
 
     const dimensionsForPost = React.useCallback(
@@ -1820,6 +1864,13 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                                                     isSingleItemRow={
                                                                         isSingleItemRow
                                                                     }
+                                                                    isMediaUnavailable={Boolean(
+                                                                        unavailablePostImagesByKey[
+                                                                            profilePostImageCacheKey(
+                                                                                item,
+                                                                            )
+                                                                        ],
+                                                                    )}
                                                                     item={item}
                                                                     loadRootMargin={
                                                                         postImageLoadRootMargin

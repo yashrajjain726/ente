@@ -8,6 +8,7 @@ use ente_core::{
 
 use super::{
     AccountSpaceCtx, build_api, build_space_key_history_map, cache_lock, decrypt_space_profile,
+    space_profile_without_payload,
 };
 use crate::{
     crypto::{decrypt_asset_payload, decrypt_secretbox_payload, encrypt_secretbox_payload},
@@ -421,7 +422,13 @@ async fn fetch_link_snapshot(
         }
         let encrypted_space_key = b64::decode(&profile_response.encrypted_space_key)?;
         let space_key = decrypt_secretbox_payload(wrap_key, &encrypted_space_key)?;
-        let profile = decrypt_space_profile(&profile_response.profile, &space_key)?;
+        let profile = match decrypt_space_profile(&profile_response.profile, &space_key) {
+            Ok(profile) => profile,
+            Err(error) if error.is_content_error() => {
+                space_profile_without_payload(&profile_response.profile)
+            }
+            Err(error) => return Err(error),
+        };
         let key_history = build_space_key_history_map(current_version, &space_key, &versions)?;
         return Ok(SpaceLinkSnapshot {
             profile,
