@@ -14,7 +14,6 @@ export default {
     },
 } satisfies ExportedHandler;
 
-// Strict allowlist of upload destinations.
 const ALLOWED_UPLOAD_HOSTS = new Set<string>([
     "ente-prod-eu.s3.eu-central-003.backblazeb2.com",
 ]);

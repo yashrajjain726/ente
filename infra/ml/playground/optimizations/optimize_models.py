@@ -1,11 +1,4 @@
 #!/usr/bin/env python3
-"""Build Ente's optimized ONNX models for the mobile ML pipeline.
-
-The generated models remain standard ONNX. The transformations make their
-graphs easier for CoreML, WebGPU, and mobile CPU runtimes to optimize while
-preserving the outputs used by the application.
-"""
-
 from __future__ import annotations
 
 import argparse

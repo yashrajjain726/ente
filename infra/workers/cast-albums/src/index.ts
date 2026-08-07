@@ -39,7 +39,6 @@ const isAllowedOrigin = (origin: string | null) => {
         const url = new URL(origin);
         return allowed.includes(url.hostname);
     } catch {
-        // origin is likely an invalid URL
         return false;
     }
 };

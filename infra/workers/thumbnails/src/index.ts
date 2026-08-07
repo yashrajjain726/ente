@@ -32,12 +32,11 @@ const isAllowedOrigin = (origin: string | null) => {
         const url = new URL(origin);
         const hostname = url.hostname;
         return (
-            origin == "ente://app" /* desktop app */ ||
+            origin == "ente://app" ||
             isEnteHostname(hostname) ||
             hostname == "localhost"
         );
     } catch {
-        // `origin` is likely an invalid URL.
         return false;
     }
 };
