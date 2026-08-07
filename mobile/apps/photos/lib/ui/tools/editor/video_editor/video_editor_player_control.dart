@@ -1,6 +1,6 @@
 import "package:flutter/material.dart";
 import "package:photos/ente_theme_data.dart";
-import "package:video_editor/video_editor.dart";
+import "package:photos/ui/tools/editor/video_editor/video_editor_controller.dart";
 
 class VideoEditorPlayerControl extends StatelessWidget {
   const VideoEditorPlayerControl({super.key, required this.controller});

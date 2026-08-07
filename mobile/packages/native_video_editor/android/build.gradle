@@ -3,7 +3,7 @@ version '1.0'
 
 buildscript {
     ext.kotlin_version = '1.9.25'
-    ext.media3_version = '1.9.2'
+    ext.media3_version = '1.10.1'
     repositories {
         google()
         mavenCentral()
@@ -24,6 +24,11 @@ rootProject.allprojects {
 
 apply plugin: 'com.android.library'
 apply plugin: 'kotlin-android'
+
+configurations.configureEach {
+    // Frame extraction receives videos only, never still images.
+    exclude group: "androidx.exifinterface", module: "exifinterface"
+}
 
 def nativeVideoEditorCompileSdkVersion = rootProject.ext.has('compileSdkVersion') ?
         rootProject.ext.compileSdkVersion : 35
@@ -53,12 +58,14 @@ android {
 dependencies {
     implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version"
     implementation "org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3"
+    testImplementation 'junit:junit:4.13.2'
 
     // Media3 Transformer for efficient video operations
     implementation "androidx.media3:media3-transformer:$media3_version"
     implementation "androidx.media3:media3-common:$media3_version"
     implementation "androidx.media3:media3-effect:$media3_version"
     implementation "androidx.media3:media3-extractor:$media3_version"
+    implementation "androidx.media3:media3-inspector-frame:$media3_version"
 
     // Guava for ImmutableList
     implementation "com.google.guava:guava:31.1-android"
