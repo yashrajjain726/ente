@@ -1,0 +1,7 @@
+[package]
+name = "ente-frb-log"
+edition = "2024"
+
+[dependencies]
+flutter_rust_bridge.workspace = true
+log.workspace = true

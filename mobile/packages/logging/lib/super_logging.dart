@@ -184,7 +184,7 @@ class SuperLogging {
       setupSentry().ignore();
     }
 
-    log.Logger.root.level = log.Level.ALL;
+    log.Logger.root.level = kDebugMode ? log.Level.ALL : log.Level.INFO;
     log.Logger.root.onRecord.listen(onLogRecord);
 
     if (!enable) {

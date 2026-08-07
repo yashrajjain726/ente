@@ -5,6 +5,9 @@ use ente_photos::ml::{
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
 
+mod log;
+pub use log::init_logging;
+
 #[napi]
 pub fn init_ort(dylib_path: String) -> Result<()> {
     ort::init_from(&dylib_path)

@@ -13,7 +13,7 @@ crypto_secretstream = "=0.2.0"
 # `wasm32-unknown-unknown` (it uses the browser's `crypto.getRandomValues`).
 # This also enables `rand_core::OsRng` on WASM.
 getrandom = { version = "0.2", features = ["js"] }
-log = "0.4"
+log.workspace = true
 md-5.workspace = true
 rand_core = { version = "0.6", features = ["getrandom"] }
 reqwest = { workspace = true, features = ["http2", "charset", "system-proxy", "json", "rustls-tls-native-roots", "rustls-tls-webpki-roots"] }
