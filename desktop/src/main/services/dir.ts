@@ -15,7 +15,7 @@ export const openDirectory = async (dirPath: string) => {
     // shell.openPath requires native separators, not our POSIX IPC paths.
     const res = await shell.openPath(path.normalize(dirPath));
     // Electron resolves with an error message on failure.
-    if (res) throw new Error(`Failed to open directory ${dirPath}: res`);
+    if (res) throw new Error(`Failed to open directory ${dirPath}: ${res}`);
 };
 
 export const openLogDirectory = () => openDirectory(logDirectoryPath());
