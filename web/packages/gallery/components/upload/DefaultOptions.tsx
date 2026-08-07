@@ -494,12 +494,6 @@ function PendingIndicator(): React.JSX.Element {
     return <CircularProgress size={18} sx={{ color: "stroke.muted" }} />;
 }
 
-/**
- * Title style for the upload options surfaces.
- *
- * Per the mobile design, these titles keep the display font in both the
- * desktop dialog and the bottom sheet presentations.
- */
 const optionsTitleSx = {
     fontFamily: "'Outfit Variable', sans-serif",
     fontSize: "24px",

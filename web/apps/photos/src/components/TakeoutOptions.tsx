@@ -20,13 +20,6 @@ import {
 import { t } from "i18next";
 import React from "react";
 
-/**
- * Title style for the takeout options surface.
- *
- * Per the mobile design, this second-level sheet uses the app's base font for
- * its title (unlike the top-level options titles, which keep the display
- * font); the desktop dialog keeps the display font.
- */
 const optionsTitleSx = {
     fontFamily: "'Outfit Variable', sans-serif",
     fontSize: "24px",

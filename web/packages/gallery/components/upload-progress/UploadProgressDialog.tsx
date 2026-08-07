@@ -34,7 +34,6 @@ export function UploadProgressDialog() {
 
     const handleClose: DialogProps["onClose"] = (_, reason) => {
         if (reason == "backdropClick") {
-            // On mobile, tapping the scrim minimizes the sheet.
             if (isSheet) setExpanded(false);
             return;
         }

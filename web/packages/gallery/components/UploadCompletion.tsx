@@ -45,7 +45,6 @@ export function UploadCompletion({
     const isSheet = useIsUploadSheet();
 
     const handleClose: DialogProps["onClose"] = (_, reason) => {
-        // On mobile, tapping the scrim also dismisses the sheet.
         if (reason != "backdropClick" || isSheet) onClose();
     };
 

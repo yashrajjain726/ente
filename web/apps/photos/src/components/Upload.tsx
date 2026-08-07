@@ -1530,9 +1530,6 @@ const UploadTypeSelector: React.FC<UploadTypeSelectorProps> = ({
                             [theme.breakpoints.down(360)]: { p: 0 },
                         }),
                         uploadSheetPaperSx,
-                        // The ":has()" selector above outweighs the media query
-                        // styles in uploadSheetPaperSx; re-assert the sheet
-                        // shape at matching specificity.
                         {
                             [uploadSheetMediaQuery]: {
                                 "&&": {

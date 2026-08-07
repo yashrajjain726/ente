@@ -241,8 +241,6 @@ const uploadRowSx = (theme: Theme) => ({
         gridTemplateColumns: "1fr",
         gap: 1,
         "& > :nth-of-type(2)": {
-            // Align the progress bar with the file name text (36px icon +
-            // 12px gap) and let it fill the remaining width.
             pl: "48px",
         },
     },
