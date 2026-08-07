@@ -14,6 +14,8 @@ class LargeBackupSessionTracker extends ChangeNotifier {
 
   bool get isActive => _isUploading && _isEligible;
 
+  bool get isUploading => _isUploading;
+
   int get remainingCount => _remainingCount;
 
   bool get isStandbyScreenActive => _isStandbyScreenActive;
@@ -24,6 +26,7 @@ class LargeBackupSessionTracker extends ChangeNotifier {
 
   void update(SyncStatusUpdate event) {
     final wasActive = isActive;
+    final wasUploading = _isUploading;
     final previousRemainingCount = _remainingCount;
 
     switch (event.status) {
@@ -55,14 +58,18 @@ class LargeBackupSessionTracker extends ChangeNotifier {
     }
 
     if (event.status == SyncStatus.preparingForUpload ||
-        wasActive != isActive) {
+        wasActive != isActive ||
+        wasUploading != _isUploading) {
       _logger.info(
         "status=${event.status.name}, batchTotal=$_batchTotal, "
-        "eligible=$_isEligible, remaining=$_remainingCount, active=$isActive",
+        "eligible=$_isEligible, uploading=$_isUploading, "
+        "remaining=$_remainingCount, active=$isActive",
       );
     }
 
-    if (wasActive != isActive || previousRemainingCount != _remainingCount) {
+    if (wasActive != isActive ||
+        wasUploading != _isUploading ||
+        previousRemainingCount != _remainingCount) {
       notifyListeners();
     }
   }

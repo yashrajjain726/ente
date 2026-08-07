@@ -10,7 +10,7 @@ public final class EnteScreenBrightnessPlugin: NSObject, FlutterPlugin {
         super.init()
         NotificationCenter.default.addObserver(
             self,
-            selector: #selector(applicationDidEnterBackground(_:)),
+            selector: #selector(handleDidEnterBackgroundNotification(_:)),
             name: UIApplication.didEnterBackgroundNotification,
             object: nil
         )
@@ -100,7 +100,7 @@ public final class EnteScreenBrightnessPlugin: NSObject, FlutterPlugin {
         )
     }
 
-    @objc private func applicationDidEnterBackground(_ notification: Notification) {
+    @objc private func handleDidEnterBackgroundNotification(_ notification: Notification) {
         resetApplicationBrightness()
     }
 
