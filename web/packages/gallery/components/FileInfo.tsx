@@ -1,9 +1,5 @@
 /* eslint-disable @typescript-eslint/ban-ts-comment */
 // TODO: Split this file to deal with the ente-new/photos imports.
-// 1. Move common components into FileInfoComponents.tsx
-// 2. Move the rest out to files in the apps themselves:
-//    - albums/SharedFileInfo
-//    - photos/FileInfo
 
 import CalendarTodayIcon from "@mui/icons-material/CalendarToday";
 import CameraOutlinedIcon from "@mui/icons-material/CameraOutlined";
