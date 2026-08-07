@@ -1232,7 +1232,7 @@ export const loadCurrentSpacePost = async (
             true,
             viewerSpaceId,
         );
-        return post.spaceId == spaceId ? post : null;
+        return !post.isUnavailable && post.spaceId == spaceId ? post : null;
     } finally {
         releaseCurrentSpaceContext(ctx);
     }
