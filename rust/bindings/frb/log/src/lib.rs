@@ -1,12 +1,12 @@
 #[macro_export]
 macro_rules! setup {
-    () => {
+    ($stream_sink:path) => {
         use std::sync::atomic::{AtomicU64, Ordering};
         use std::sync::{Mutex, Once};
 
         use $crate::__flutter_rust_bridge::frb;
 
-        use crate::frb_generated::StreamSink;
+        use $stream_sink;
 
         #[derive(Clone, Copy)]
         pub enum LogLevel {
