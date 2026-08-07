@@ -1,1 +1,1 @@
-- Improved search result ordering to prioritize files for filename and file-type searches, moments for date searches, and Magic for general searches.
+- Improved search results ordering based on the query.
