@@ -123,7 +123,6 @@ impl<'a> SyncStore<'a> {
                 let metadata: String = row.get(5)?;
                 let pub_magic_metadata_json: Option<String> = row.get(9)?;
 
-                // Deserialize stored data - thumbnail might not be stored properly
                 let file_obj: crate::models::file::FileInfo = serde_json::from_str(&file_info)
                     .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))?;
 
@@ -131,7 +130,6 @@ impl<'a> SyncStore<'a> {
                     serde_json::from_str(&metadata)
                         .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))?;
 
-                // Deserialize pub_magic_metadata if present
                 let pub_magic_metadata = match pub_magic_metadata_json {
                     Some(json) => Some(
                         serde_json::from_str(&json)
@@ -140,7 +138,6 @@ impl<'a> SyncStore<'a> {
                     None => None,
                 };
 
-                // Create a default thumbnail info if not available
                 let thumbnail = crate::models::file::FileInfo {
                     encrypted_data: None,
                     decryption_header: String::new(),
@@ -292,7 +289,6 @@ impl<'a> SyncStore<'a> {
                 let metadata: String = row.get(5)?;
                 let pub_magic_metadata_json: Option<String> = row.get(9)?;
 
-                // Deserialize stored data - thumbnail might not be stored properly
                 let file_obj: crate::models::file::FileInfo = serde_json::from_str(&file_info)
                     .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))?;
 
@@ -300,7 +296,6 @@ impl<'a> SyncStore<'a> {
                     serde_json::from_str(&metadata)
                         .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))?;
 
-                // Deserialize pub_magic_metadata if present
                 let pub_magic_metadata = match pub_magic_metadata_json {
                     Some(json) => Some(
                         serde_json::from_str(&json)
@@ -309,7 +304,6 @@ impl<'a> SyncStore<'a> {
                     None => None,
                 };
 
-                // Create a default thumbnail info if not available
                 let thumbnail = crate::models::file::FileInfo {
                     encrypted_data: None,
                     decryption_header: String::new(),

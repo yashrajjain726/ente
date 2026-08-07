@@ -231,14 +231,11 @@ async fn export_account(storage: &Storage, account: &Account, filter: &ExportFil
 
     let api_client = AppClient::new(Some(account.endpoint.clone()), account.app)?;
 
-    // The decrypted token is raw bytes. The API expects padded URL-safe base64,
-    // matching the Go CLI.
     let token = b64::encode_url_safe(&secrets.token);
     api_client.set_token(&token);
 
     let api = ApiMethods::new(&api_client);
 
-    // Master key is already raw bytes, no need to decode
     let master_key = &secrets.master_key;
 
     let secret_key = &secrets.secret_key;
@@ -493,6 +490,7 @@ async fn export_account(storage: &Storage, account: &Account, filter: &ExportFil
         }
 
         let existing_files = album_existing_files.get_mut(&album_folder).unwrap();
+        // Remove current files so only deleted files remain after the loop.
         if let Some(existing) = existing_files.remove(&file.id) {
             if existing.file_path == file_path {
                 log::debug!(
@@ -614,7 +612,7 @@ async fn export_account(storage: &Storage, account: &Account, filter: &ExportFil
 
             let encrypted_data = api.download_file(file.id).await?;
 
-            // The file nonce/header is stored separately in the API response
+            // The API stores the file header separately from its ciphertext.
             let file_nonce = match b64::decode(&file.file.decryption_header) {
                 Ok(nonce) => nonce,
                 Err(e) => {
@@ -651,7 +649,6 @@ async fn export_account(storage: &Storage, account: &Account, filter: &ExportFil
             if is_live_photo {
                 if let Err(e) = extract_live_photo(&decrypted, &file_path).await {
                     log::error!("Failed to extract live photo {}: {}", file.id, e);
-                    // Fall back to saving as ZIP
                     let mut file_handle = fs::File::create(&file_path).await?;
                     file_handle.write_all(&decrypted).await?;
                     file_handle.sync_all().await?;
@@ -689,8 +686,6 @@ async fn export_account(storage: &Storage, account: &Account, filter: &ExportFil
             *file_index,
         )
         .await?;
-
-        // Keep this map limited to pre-existing files; leftovers are deleted below.
 
         *file_index += 1;
 
@@ -796,7 +791,6 @@ fn generate_export_path(
 ) -> Result<PathBuf> {
     let mut path = export_dir.to_path_buf();
 
-    // Match Go CLI structure: export_dir/AlbumName/filename
     let album_folder = if let Some(col) = collection
         && let Some(ref name) = col.name
         && !name.is_empty()
@@ -989,24 +983,19 @@ fn check_collection_visibility(
     collection: &crate::api::models::Collection,
     collection_key: &[u8],
 ) -> bool {
-    // Try encrypted magic metadata (private metadata) - this is where visibility is stored per Go CLI
-    if let Some(ref magic_metadata) = collection.magic_metadata {
-        // Try to decrypt and parse the magic metadata
-        if let Ok(Some(decrypted_json)) = decrypt_magic_metadata(magic_metadata, collection_key) {
-            // Check for visibility field - value of 2 means hidden (matching Go CLI logic)
-            if let Some(visibility) = decrypted_json.get("visibility").and_then(|v| v.as_i64()) {
-                log::debug!(
-                    "Collection {} has visibility: {} (hidden={})",
-                    collection.id,
-                    visibility,
-                    visibility == 2
-                );
-                return visibility == 2;
-            }
-        }
+    if let Some(ref magic_metadata) = collection.magic_metadata
+        && let Ok(Some(decrypted_json)) = decrypt_magic_metadata(magic_metadata, collection_key)
+        && let Some(visibility) = decrypted_json.get("visibility").and_then(|v| v.as_i64())
+    {
+        log::debug!(
+            "Collection {} has visibility: {} (hidden={})",
+            collection.id,
+            visibility,
+            visibility == 2
+        );
+        return visibility == 2;
     }
 
-    // Default to not hidden if we can't determine visibility
     false
 }
 

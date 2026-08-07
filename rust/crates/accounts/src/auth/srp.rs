@@ -363,8 +363,7 @@ mod tests {
         use srp::{Group, bigint::BoxedUint, groups::G4096};
 
         // Deterministic edge-case vector:
-        // A has a leading 0x00 on the wire (512-byte padded form), which used to
-        // trigger interop failures when u was computed over trimmed A/B bytes.
+        // A's padded leading zero must be included when computing u.
         let srp_user_id = "repro-user-id";
         let srp_salt = *b"0123456789abcdef";
         let login_key = *b"1234567890abcdef";

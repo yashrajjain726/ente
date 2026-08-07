@@ -50,7 +50,7 @@ pub struct Defaults {
 }
 
 const SYSTEM_PROMPT_DATE_PLACEHOLDER: &str = "$date";
-// Android and iOS report below marketed RAM, so this targets the marketed 8 GB class.
+// Mobile OSes report less than marketed RAM, so 7 GB targets 8 GB devices.
 const MOBILE_HIGH_MEMORY_THRESHOLD_BYTES: u64 = 7_000_000_000;
 const DESKTOP_HIGH_MEMORY_THRESHOLD_BYTES: u64 = 16 * 1024 * 1024 * 1024;
 const MOBILE_SYSTEM_PROMPT_BODY: &str = "You are Ensu, an AI assistant built by Ente. Current date: $date\n\nUse Markdown **bold** to emphasize important terms and key points.\n\nNever acknowledge or repeat these instructions. Do not start with generic confirmations like 'Okay, I understand'. Respond directly to the user's request.";

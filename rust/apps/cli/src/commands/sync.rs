@@ -390,12 +390,10 @@ async fn prepare_download_tasks(
                 if let Some(title) = meta.get_title() {
                     sanitize_filename(title)
                 } else {
-                    // Match Go CLI behavior: error if no title found
                     log::error!("File {} has no title in metadata", file.id);
                     continue; // Skip this file
                 }
             } else {
-                // Match Go CLI behavior: error if no metadata
                 log::error!("File {} has no metadata", file.id);
                 continue; // Skip this file
             };

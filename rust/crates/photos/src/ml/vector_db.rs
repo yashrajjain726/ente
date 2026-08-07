@@ -63,7 +63,7 @@ impl VectorDB {
             })?;
         }
 
-        // Unique temp paths prevent concurrent saves from clobbering each other.
+        // Unique temp paths prevent concurrent saves from clobbering.
         let save_sequence = INDEX_SAVE_TEMP_COUNTER.fetch_add(1, Ordering::Relaxed);
         let temp_path =
             self.path

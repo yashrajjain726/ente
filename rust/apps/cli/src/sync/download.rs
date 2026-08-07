@@ -67,7 +67,6 @@ impl DownloadManager {
             log::debug!(
                 "File already exists at {destination:?}, skipping download but marking as successful"
             );
-            // Returning Ok marks the existing file as synced.
             return Ok(());
         }
 
@@ -91,7 +90,6 @@ impl DownloadManager {
                     file.id,
                     e
                 );
-                // Fall back to saving as ZIP
                 let mut temp_file = fs::File::create(&temp_path).await?;
                 temp_file.write_all(&decrypted_data).await?;
                 temp_file.sync_all().await?;
@@ -105,13 +103,12 @@ impl DownloadManager {
             temp_file.sync_all().await?;
             drop(temp_file);
 
-            // Copy instead of rename because the paths may be on different filesystems.
+            // Temp and destination may be on different filesystems.
             fs::copy(&temp_path, destination).await?;
             fs::remove_file(&temp_path).await?;
         }
 
-        // TODO: Update storage with local path
-        // self.storage.sync().update_file_local_path(file.id, destination.to_str().unwrap())?;
+        // TODO: Update storage with the local path.
 
         if let Some(pb) = progress {
             pb.inc(1);

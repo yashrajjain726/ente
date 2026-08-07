@@ -255,8 +255,6 @@ impl AccountSpaceCtx {
         let plaintext = serde_json::to_vec(payload)
             .map_err(|err| SpaceError::InvalidInput(format!("invalid message payload: {err}")))?;
         validate_message_payload(payload, plaintext.len())?;
-        // Seal the message key to both identities so either party can decrypt
-        // it.
         let sender_key = seal_with_public_key(&message_key, &identity.public_key)?;
         let recipient_key = seal_with_public_key(&message_key, &recipient_public_key)?;
         Ok(CreateMessageRequest {

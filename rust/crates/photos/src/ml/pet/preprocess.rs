@@ -58,7 +58,7 @@ pub(super) struct PixelCrop {
     pub(super) height: u32,
 }
 
-// Keep this aligned with the Python pet pipeline's ImageNet-normalized CHW input.
+// Match the Python pipeline's ImageNet-normalized CHW input.
 pub(super) struct PetEmbeddingPreprocessor {
     crop_resizer: RgbCropResizer,
 }

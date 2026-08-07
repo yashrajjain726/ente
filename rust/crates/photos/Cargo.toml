@@ -30,7 +30,6 @@ ort = { workspace = true, features = [
     "std",
     "ndarray",
     "half",
-    # CoreML is the preferred iOS execution provider for Rust ML sessions.
     "coreml",
     "api-28",
 ] }

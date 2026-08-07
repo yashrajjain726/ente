@@ -16,7 +16,7 @@ fn simsimd_dot_product(a: &[f32], b: &[f32]) -> f64 {
     let mut score = 0.0_f64;
     // SAFETY:
     // - `a` and `b` are valid, non-null slices for `a.len()` elements.
-    // - SimSIMD only reads from the input buffers and writes one f64 to `score`.
+    // - SimSIMD only reads the input buffers and writes one f64 to `score`.
     unsafe {
         simsimd_dot_f32(a.as_ptr(), b.as_ptr(), a.len() as u64, &mut score);
     }

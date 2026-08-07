@@ -427,6 +427,7 @@ impl RetryProfile {
     }
 }
 
+// Retried operations must be safe to run multiple times.
 pub async fn retry<T, F, Fut>(operation: F) -> Result<T, Error>
 where
     F: FnMut() -> Fut,
@@ -435,7 +436,6 @@ where
     retry_with_profile(RetryProfile::Interactive, operation).await
 }
 
-// The closure can run four times; callers must only retry operations safe to repeat.
 pub async fn retry_with_profile<T, F, Fut>(profile: RetryProfile, operation: F) -> Result<T, Error>
 where
     F: FnMut() -> Fut,

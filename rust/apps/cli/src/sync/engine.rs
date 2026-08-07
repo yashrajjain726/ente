@@ -210,7 +210,6 @@ impl SyncEngine {
                         }),
                     };
 
-                    // Ignore tombstones during the initial sync.
                     if is_first_sync && file.is_deleted {
                         log::trace!("Skipping deleted file {} on initial sync", file.id);
                         continue;

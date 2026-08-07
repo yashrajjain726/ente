@@ -100,7 +100,7 @@ impl Decryptor {
         Ok(is_final)
     }
 
-    // A valid non-final chunk can end at EOF, so callers must finish the stream.
+    // EOF can follow a non-final chunk, so callers must finish the stream.
     pub fn finish(self) -> Result<()> {
         if self.seen_final {
             Ok(())

@@ -1,7 +1,6 @@
 use chrono::{DateTime, Local, TimeZone};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-// Match the Go CLI's ISO 8601 timestamp format.
 fn serialize_timestamp_as_iso8601<S>(
     timestamp_micros: &i64,
     serializer: S,

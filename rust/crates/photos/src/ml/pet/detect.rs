@@ -16,10 +16,6 @@ const PET_FACE_MIN_SCORE: f32 = 0.3;
 const BODY_IOU_THRESHOLD: f32 = 0.5;
 const BODY_MIN_SCORE: f32 = 0.3;
 
-// Species IDs must match Dart: 0 = dog, 1 = cat.
-
-// Rows store x, y, width, height, score, three x/y keypoints, then class scores.
-// Keypoint order is left eye, right eye, nose.
 pub(crate) fn run_pet_face_detection(
     runtime: &MlRuntimeView<'_>,
     input: &YoloInput,
@@ -100,6 +96,7 @@ fn postprocess_pet_face_tensor<T: onnx::FloatTensorData>(
     let detection_rows = output_data.len() / row_len;
     let mut detections = Vec::new();
 
+    // Row: x, y, width, height, score, left eye, right eye, nose, classes.
     for i in 0..detection_rows {
         let start = i * row_len;
         let score = output_data.value(start + 4);
@@ -140,7 +137,7 @@ fn postprocess_pet_face_tensor<T: onnx::FloatTensorData>(
 
         input.correct_box_and_keypoints(&mut box_xyxy, &mut keypoints);
 
-        // Two-class rows store cat at 11 and dog at 12. One-class rows are dog-only.
+        // Two-class rows are [cat, dog]; one-class rows are dog-only.
         let class_id: u8 = if row_len >= 13 {
             if output_data.value(start + 12) > output_data.value(start + 11) {
                 PET_SPECIES_DOG
