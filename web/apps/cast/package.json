@@ -6,7 +6,6 @@
         "Chrome 92"
     ],
     "dependencies": {
-        "ente-accounts": "*",
         "ente-base": "*",
         "ente-media": "*"
     },
