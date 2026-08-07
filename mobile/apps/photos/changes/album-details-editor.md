@@ -1,0 +1,1 @@
+- Added album descriptions for updating the name, cover photo, and description.

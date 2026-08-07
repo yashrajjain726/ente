@@ -308,6 +308,7 @@ class SliverAppBarComponent extends StatelessWidget {
     this.onBack,
     this.actions = const [],
     this.bottom,
+    this.collapsibleBottom,
     this.expandedHeight,
     this.collapsedHeight = _defaultCollapsedHeight,
     this.horizontalPadding = Spacing.lg,
@@ -329,6 +330,11 @@ class SliverAppBarComponent extends StatelessWidget {
   final VoidCallback? onBack;
   final List<Widget> actions;
   final PreferredSizeWidget? bottom;
+
+  /// Optional content shown above [bottom] in the expanded header. It fades
+  /// and gives up its height as the header collapses, while [bottom] remains
+  /// pinned.
+  final PreferredSizeWidget? collapsibleBottom;
   final double? expandedHeight;
   final double collapsedHeight;
   final double horizontalPadding;
@@ -343,6 +349,7 @@ class SliverAppBarComponent extends StatelessWidget {
     double collapsedHeight = _defaultCollapsedHeight,
     double? titleBuilderHeight,
     double bottomHeight = 0,
+    double collapsibleBottomHeight = 0,
   }) {
     final metrics = _resolveHeaderAppBarMetrics(
       context,
@@ -355,7 +362,11 @@ class SliverAppBarComponent extends StatelessWidget {
     final topPadding = MediaQuery.paddingOf(context).top;
     return HeaderAppBarGeometry(
       minExtent: topPadding + metrics.collapsedHeight + bottomHeight,
-      maxExtent: topPadding + metrics.expandedHeight + bottomHeight,
+      maxExtent:
+          topPadding +
+          metrics.expandedHeight +
+          bottomHeight +
+          collapsibleBottomHeight,
     );
   }
 
@@ -389,6 +400,8 @@ class SliverAppBarComponent extends StatelessWidget {
         actions: actions,
         bottom: bottom,
         bottomHeight: bottom?.preferredSize.height ?? 0,
+        collapsibleBottom: collapsibleBottom,
+        collapsibleBottomHeight: collapsibleBottom?.preferredSize.height ?? 0,
         expandedHeight: metrics.expandedHeight,
         collapsedHeight: metrics.collapsedHeight,
         horizontalPadding: horizontalPadding,
@@ -421,6 +434,8 @@ class _HeaderAppBarDelegate extends SliverPersistentHeaderDelegate {
     required this.actions,
     required this.bottom,
     required this.bottomHeight,
+    required this.collapsibleBottom,
+    required this.collapsibleBottomHeight,
     required this.expandedHeight,
     required this.collapsedHeight,
     required this.horizontalPadding,
@@ -448,6 +463,8 @@ class _HeaderAppBarDelegate extends SliverPersistentHeaderDelegate {
   final List<Widget> actions;
   final PreferredSizeWidget? bottom;
   final double bottomHeight;
+  final PreferredSizeWidget? collapsibleBottom;
+  final double collapsibleBottomHeight;
   final double expandedHeight;
   final double collapsedHeight;
   final double horizontalPadding;
@@ -460,7 +477,8 @@ class _HeaderAppBarDelegate extends SliverPersistentHeaderDelegate {
   final double subtitleLineHeight;
 
   @override
-  double get maxExtent => topPadding + expandedHeight + bottomHeight;
+  double get maxExtent =>
+      topPadding + expandedHeight + bottomHeight + collapsibleBottomHeight;
 
   @override
   double get minExtent => topPadding + collapsedHeight + bottomHeight;
@@ -476,6 +494,8 @@ class _HeaderAppBarDelegate extends SliverPersistentHeaderDelegate {
         ? 1.0
         : (shrinkOffset / scrollRange).clamp(0.0, 1.0);
     final titleProgress = Curves.easeInOut.transform(progress);
+    final visibleCollapsibleBottomHeight =
+        collapsibleBottomHeight * (1 - progress);
     final eyebrowLineHeight = eyebrow == null
         ? 0.0
         : _scaledLineHeight(
@@ -538,7 +558,7 @@ class _HeaderAppBarDelegate extends SliverPersistentHeaderDelegate {
           fit: StackFit.expand,
           children: [
             Positioned.fill(
-              bottom: bottomHeight,
+              bottom: bottomHeight + visibleCollapsibleBottomHeight,
               child: Padding(
                 padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
                 child: Stack(
@@ -621,6 +641,28 @@ class _HeaderAppBarDelegate extends SliverPersistentHeaderDelegate {
                 ),
               ),
             ),
+            if (collapsibleBottom != null)
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: bottomHeight,
+                child: ClipRect(
+                  child: Align(
+                    alignment: Alignment.topCenter,
+                    heightFactor: 1 - progress,
+                    child: IgnorePointer(
+                      ignoring: progress >= 0.99,
+                      child: ExcludeSemantics(
+                        excluding: progress >= 0.99,
+                        child: Opacity(
+                          opacity: 1 - titleProgress,
+                          child: collapsibleBottom!,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
             if (bottom != null)
               Positioned(
                 left: 0,
@@ -653,6 +695,8 @@ class _HeaderAppBarDelegate extends SliverPersistentHeaderDelegate {
         oldDelegate.actions != actions ||
         oldDelegate.bottom != bottom ||
         oldDelegate.bottomHeight != bottomHeight ||
+        oldDelegate.collapsibleBottom != collapsibleBottom ||
+        oldDelegate.collapsibleBottomHeight != collapsibleBottomHeight ||
         oldDelegate.expandedHeight != expandedHeight ||
         oldDelegate.collapsedHeight != collapsedHeight ||
         oldDelegate.horizontalPadding != horizontalPadding ||
