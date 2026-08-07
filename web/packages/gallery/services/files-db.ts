@@ -4,7 +4,6 @@ import {
     CollectionPrivateMagicMetadataData,
     CollectionPublicMagicMetadataData,
     CollectionShareeMagicMetadataData,
-    ignore,
     RemoteCollectionUser,
     RemotePublicURL,
 } from "ente-media/collection";
@@ -94,14 +93,6 @@ const LocalCollection = z
             isDeleted,
             ...rest
         } = c;
-        ignore([
-            encryptedKey,
-            keyDecryptionNonce,
-            encryptedName,
-            nameDecryptionNonce,
-            attributes,
-            isDeleted,
-        ]);
         return rest;
     });
 
@@ -154,7 +145,6 @@ const transformFile = (file: EnteFile & { isDeleted?: unknown }) => {
         pubMagicMetadata,
         ...rest
     } = file;
-    ignore(isDeleted);
     const metadata = transformDecryptedMetadataJSON(
         file.id,
         origMetadata,

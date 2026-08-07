@@ -149,6 +149,7 @@ export const decryptRemoteCollection = async (
         encryptedName,
         nameDecryptionNonce,
         sharees,
+        // The attributes field is mobile specific and unused by the web clients.
         attributes,
         isDeleted,
         magicMetadata: encryptedMagicMetadata,
@@ -156,11 +157,6 @@ export const decryptRemoteCollection = async (
         sharedMagicMetadata: encryptedSharedMagicMetadata,
         ...rest
     } = collection;
-
-    ignore([encryptedKey, keyDecryptionNonce]);
-    // The attributes field is mobile specific and unused by the web clients.
-    ignore(attributes);
-    ignore(isDeleted);
 
     const name =
         // The `||` is deliberate: remote sets name to blank to indicate
@@ -216,15 +212,10 @@ export const decryptRemoteCollection = async (
     };
 };
 
-export const ignore = (xs: unknown) => typeof xs;
-
 const parseRemoteCollectionUser = ({
     name,
     ...rest
-}: RemoteCollectionUser): CollectionUser => {
-    ignore(name);
-    return rest;
-};
+}: RemoteCollectionUser): CollectionUser => rest;
 
 export const CollectionSubType = {
     default: 0,
