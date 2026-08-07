@@ -21,7 +21,7 @@ import "package:photos/ui/social/widgets/comment_actions_popup.dart";
 import "package:photos/ui/social/widgets/comment_like_count_capsule.dart";
 import "package:photos/ui/social/widgets/delete_comment_confirmation_dialog.dart";
 import "package:photos/ui/social/widgets/resolved_social_user_name.dart";
-import "package:photos/utils/social/relative_time_formatter.dart";
+import "package:photos/utils/relative_time_formatter.dart";
 
 final _logger = Logger("CommentBubbleWidget");
 
@@ -828,7 +828,9 @@ class _Header extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = getEnteColorScheme(context);
     final textTheme = getEnteTextTheme(context);
-    final timestamp = formatRelativeTime(createdAt);
+    final timestamp = formatCompactRelativeTime(
+      DateTime.fromMicrosecondsSinceEpoch(createdAt),
+    );
 
     if (isOwnComment) {
       return Align(

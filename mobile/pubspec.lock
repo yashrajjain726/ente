@@ -659,14 +659,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "5.0.1"
-  expansion_tile_card:
-    dependency: transitive
-    description:
-      name: expansion_tile_card
-      sha256: "27ce4cb518f00e21d0f2309aaa6462b26b148e93cee2029a73088cecf42b1eb0"
-      url: "https://pub.dev"
-    source: hosted
-    version: "3.0.0"
   extended_image:
     dependency: transitive
     description:
@@ -1658,14 +1650,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "3.3.1"
-  maps_launcher:
-    dependency: transitive
-    description:
-      name: maps_launcher
-      sha256: dac4c609720211fa6336b5903d917fe45e545c6b5665978efc3db2a3f436b1ae
-      url: "https://pub.dev"
-    source: hosted
-    version: "3.0.0+1"
   matcher:
     dependency: transitive
     description:
@@ -2862,14 +2846,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.1.11"
-  timeago:
-    dependency: transitive
-    description:
-      name: timeago
-      sha256: b05159406a97e1cbb2b9ee4faa9fb096fe0e2dfcd8b08fcd2a00553450d3422e
-      url: "https://pub.dev"
-    source: hosted
-    version: "3.7.1"
   timezone:
     dependency: transitive
     description:
