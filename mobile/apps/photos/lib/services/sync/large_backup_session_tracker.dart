@@ -8,15 +8,17 @@ class LargeBackupSessionTracker extends ChangeNotifier {
 
   bool _isEligible = false;
   bool _isUploading = false;
-  int _batchTotal = 0;
-  int _remainingCount = 0;
+  int _completedCount = 0;
+  int _totalCount = 0;
   bool _isStandbyScreenActive = false;
 
   bool get isActive => _isUploading && _isEligible;
 
   bool get isUploading => _isUploading;
 
-  int get remainingCount => _remainingCount;
+  int get completedCount => _completedCount;
+
+  int get totalCount => _totalCount;
 
   bool get isStandbyScreenActive => _isStandbyScreenActive;
 
@@ -27,22 +29,24 @@ class LargeBackupSessionTracker extends ChangeNotifier {
   void update(SyncStatusUpdate event) {
     final wasActive = isActive;
     final wasUploading = _isUploading;
-    final previousRemainingCount = _remainingCount;
+    final previousCompletedCount = _completedCount;
+    final previousTotalCount = _totalCount;
 
     switch (event.status) {
       case SyncStatus.preparingForUpload:
         final total = event.total ?? 0;
         _isUploading = total > 0;
         _isEligible = _isEligible || total >= minimumFileCount;
-        _batchTotal = total;
-        _remainingCount = total;
+        _completedCount = 0;
+        _totalCount = total;
         break;
       case SyncStatus.inProgress:
-        if (_batchTotal == 0) {
+        final total = event.total ?? 0;
+        if (total == 0) {
           break;
         }
-        final completed = event.completed ?? 0;
-        _remainingCount = (_batchTotal - completed).clamp(0, _batchTotal);
+        _completedCount = (event.completed ?? 0).clamp(0, total);
+        _totalCount = total;
         break;
       case SyncStatus.completedBackup:
       case SyncStatus.error:
@@ -61,15 +65,17 @@ class LargeBackupSessionTracker extends ChangeNotifier {
         wasActive != isActive ||
         wasUploading != _isUploading) {
       _logger.info(
-        "status=${event.status.name}, batchTotal=$_batchTotal, "
+        "status=${event.status.name}, completed=$_completedCount, "
+        "total=$_totalCount, "
         "eligible=$_isEligible, uploading=$_isUploading, "
-        "remaining=$_remainingCount, active=$isActive",
+        "active=$isActive",
       );
     }
 
     if (wasActive != isActive ||
         wasUploading != _isUploading ||
-        previousRemainingCount != _remainingCount) {
+        previousCompletedCount != _completedCount ||
+        previousTotalCount != _totalCount) {
       notifyListeners();
     }
   }
@@ -77,7 +83,7 @@ class LargeBackupSessionTracker extends ChangeNotifier {
   void _reset() {
     _isEligible = false;
     _isUploading = false;
-    _batchTotal = 0;
-    _remainingCount = 0;
+    _completedCount = 0;
+    _totalCount = 0;
   }
 }

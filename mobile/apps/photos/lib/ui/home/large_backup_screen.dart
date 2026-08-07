@@ -13,33 +13,25 @@ import "package:photos/events/force_reload_home_gallery_event.dart";
 import "package:photos/service_locator.dart";
 import "package:photos/services/sync/large_backup_session_tracker.dart";
 import "package:photos/services/wake_lock_service.dart";
+import "package:photos/ui/components/alert_bottom_sheet.dart";
 import "package:photos/ui/settings/components/settings_page_scaffold.dart";
 import "package:rive/rive.dart" as rive;
 
 Future<void> showLargeBackupScreen(
   BuildContext context,
-  LargeBackupSessionTracker sessionTracker, {
-  bool allowWithoutActiveBackup = false,
-}) {
+  LargeBackupSessionTracker sessionTracker,
+) {
   return Navigator.of(context).push(
     MaterialPageRoute<void>(
-      builder: (_) => LargeBackupScreen(
-        sessionTracker: sessionTracker,
-        allowWithoutActiveBackup: allowWithoutActiveBackup,
-      ),
+      builder: (_) => LargeBackupScreen(sessionTracker: sessionTracker),
     ),
   );
 }
 
 class LargeBackupScreen extends StatefulWidget {
-  const LargeBackupScreen({
-    required this.sessionTracker,
-    required this.allowWithoutActiveBackup,
-    super.key,
-  });
+  const LargeBackupScreen({required this.sessionTracker, super.key});
 
   final LargeBackupSessionTracker sessionTracker;
-  final bool allowWithoutActiveBackup;
 
   @override
   State<LargeBackupScreen> createState() => _LargeBackupScreenState();
@@ -52,10 +44,8 @@ class _LargeBackupScreenState extends State<LargeBackupScreen>
   static const _dimmingDelay = Duration(seconds: 3);
 
   late final rive.FileLoader _animationLoader;
-  late int _remainingCount;
   Timer? _dimmingTimer;
   bool _didStartStandby = false;
-  bool _hasObservedUpload = false;
   bool _isClosing = false;
   bool _isScreenDimmed = false;
   bool _isStandbyActive = false;
@@ -67,7 +57,6 @@ class _LargeBackupScreenState extends State<LargeBackupScreen>
       "assets/home_tab.riv",
       riveFactory: rive.Factory.flutter,
     );
-    _remainingCount = widget.sessionTracker.remainingCount;
     WidgetsBinding.instance.addObserver(this);
     widget.sessionTracker.addListener(_handleBackupSessionChanged);
   }
@@ -80,7 +69,7 @@ class _LargeBackupScreenState extends State<LargeBackupScreen>
 
     switch (state) {
       case AppLifecycleState.resumed:
-        if (_canStartStandby) {
+        if (widget.sessionTracker.isUploading) {
           _scheduleScreenDimming();
         } else {
           _closePage();
@@ -140,7 +129,6 @@ class _LargeBackupScreenState extends State<LargeBackupScreen>
           child: ButtonComponent(
             key: const ValueKey("start-large-backup-mode"),
             label: pendingTranslation("Start backup mode"),
-            isDisabled: !_canStartStandby,
             shouldSurfaceExecutionStates: false,
             onTap: _startStandby,
           ),
@@ -215,11 +203,7 @@ class _LargeBackupScreenState extends State<LargeBackupScreen>
 
   Widget _buildStandbyScreen(BuildContext context) {
     final colors = context.componentColors;
-    final formattedCount = NumberFormat().format(_remainingCount);
-    final memoryLabel = _remainingCount == 1 ? "memory" : "memories";
-    final statusText = _remainingCount > 0
-        ? pendingTranslation("Preserving $formattedCount $memoryLabel")
-        : pendingTranslation("Checking for more…");
+    final countFormatter = NumberFormat();
     return GestureDetector(
       key: const ValueKey("large-backup-standby-screen"),
       behavior: HitTestBehavior.opaque,
@@ -230,9 +214,27 @@ class _LargeBackupScreenState extends State<LargeBackupScreen>
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
-                statusText,
-                style: TextStyles.large.copyWith(color: colors.textBase),
+              ListenableBuilder(
+                listenable: widget.sessionTracker,
+                builder: (context, _) {
+                  final completed = widget.sessionTracker.completedCount;
+                  final total = widget.sessionTracker.totalCount;
+                  final statusText = switch ((completed, total)) {
+                    (0, 1) => context.strings.uploadingSingleMemory,
+                    (0, > 1) => context.strings.uploadingMultipleMemories(
+                      count: countFormatter.format(total),
+                    ),
+                    (_, > 0) => context.strings.syncProgress(
+                      completed: countFormatter.format(completed),
+                      total: countFormatter.format(total),
+                    ),
+                    _ => pendingTranslation("Checking for more…"),
+                  };
+                  return Text(
+                    statusText,
+                    style: TextStyles.large.copyWith(color: colors.textBase),
+                  );
+                },
               ),
               const SizedBox(height: 17),
               Text(
@@ -247,37 +249,29 @@ class _LargeBackupScreenState extends State<LargeBackupScreen>
   }
 
   void _handleBackupSessionChanged() {
-    if (_isClosing) {
+    if (_isClosing || !_isStandbyActive) {
       return;
     }
 
-    if (_isStandbyActive) {
-      final isUploading = widget.sessionTracker.isUploading;
-      if ((!widget.allowWithoutActiveBackup &&
-              !widget.sessionTracker.isActive) ||
-          (_hasObservedUpload && !isUploading)) {
-        _closePage();
-        return;
-      }
-      _hasObservedUpload = _hasObservedUpload || isUploading;
+    if (!widget.sessionTracker.isUploading) {
+      _closePage();
     }
-
-    setState(() {
-      _remainingCount = widget.sessionTracker.remainingCount;
-    });
   }
 
-  void _startStandby() {
-    if (!_canStartStandby) {
+  Future<void> _startStandby() async {
+    if (!widget.sessionTracker.isUploading) {
+      await showAlertBottomSheet<void>(
+        context,
+        title: pendingTranslation("No backup in progress"),
+        message: pendingTranslation("Start a backup before using backup mode."),
+      );
       return;
     }
 
     setState(() {
       _didStartStandby = true;
-      _hasObservedUpload = widget.sessionTracker.isUploading;
       _isScreenDimmed = false;
       _isStandbyActive = true;
-      _remainingCount = widget.sessionTracker.remainingCount;
     });
     widget.sessionTracker.setStandbyScreenActive(true);
     wakeLockService.updateWakeLock(
@@ -371,14 +365,11 @@ class _LargeBackupScreenState extends State<LargeBackupScreen>
     }
   }
 
-  bool get _canStartStandby =>
-      widget.allowWithoutActiveBackup || widget.sessionTracker.isActive;
-
   bool get _canDimScreen =>
       mounted &&
       !_isClosing &&
       _isStandbyActive &&
-      _canStartStandby &&
+      widget.sessionTracker.isUploading &&
       WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed;
 }
 

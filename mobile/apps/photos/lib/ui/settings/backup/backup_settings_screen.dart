@@ -106,7 +106,6 @@ class BackupSettingsScreen extends StatelessWidget {
                 return showLargeBackupScreen(
                   context,
                   SyncService.instance.largeBackupSessionTracker,
-                  allowWithoutActiveBackup: true,
                 );
               },
             ),
