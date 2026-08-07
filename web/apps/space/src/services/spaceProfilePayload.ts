@@ -1,3 +1,5 @@
+import log from "ente-base/log";
+
 export interface SpaceProfilePayload {
     displayName?: unknown;
     fullName?: unknown;
@@ -9,11 +11,15 @@ export const parseSpaceProfilePayload = (
 ): SpaceProfilePayload => {
     const trimmed = profile.trim();
     if (!trimmed) return {};
-    const parsed: unknown = JSON.parse(trimmed);
-    if (!parsed || typeof parsed != "object" || Array.isArray(parsed)) {
-        throw new Error("Space profile payload must be a JSON object");
+    try {
+        const parsed: unknown = JSON.parse(trimmed);
+        if (parsed && typeof parsed == "object" && !Array.isArray(parsed)) {
+            return parsed;
+        }
+    } catch (error) {
+        log.warn("Failed to decode Space profile JSON", error);
     }
-    return parsed;
+    return {};
 };
 
 export const spaceProfileTextField = (value: unknown) =>
