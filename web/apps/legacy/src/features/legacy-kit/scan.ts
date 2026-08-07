@@ -1,9 +1,13 @@
 import type { PDFDocumentProxy, PDFPageProxy } from "pdfjs-dist";
 
+import {
+    findLegacyKitJSONObject,
+    legacyKitCodeFromPDFMetadata,
+    legacyKitCodeFromVisiblePDFText,
+} from "./pdf-payload";
+
 type DecodeQR = (typeof import("qr/decode.js"))["default"];
 
-const legacyKitShareMetadataPrefix = "ente-legacy-kit-share-v1:";
-const legacyKitBundleMetadataPrefix = "ente-legacy-kit-shares-v1:";
 const maxTextFileBytes = 64 * 1024;
 const maxPDFFileBytes = 32 * 1024 * 1024;
 const maxImageFileBytes = 32 * 1024 * 1024;
@@ -38,6 +42,7 @@ interface DrawableImage {
 }
 
 let decodeQrPromise: Promise<DecodeQR> | undefined;
+let pdfJSPromise: Promise<typeof import("pdfjs-dist")> | undefined;
 
 export class LegacyKitQRDecodeError extends Error {}
 
@@ -48,6 +53,14 @@ const loadDecodeQr = () =>
             decodeQrPromise = undefined;
             throw error;
         }));
+
+const loadPDFJS = () =>
+    (pdfJSPromise ??= import("pdfjs-dist/legacy/build/pdf.mjs").then(
+        (pdfjs) => {
+            pdfjs.GlobalWorkerOptions.workerSrc = process.env.pdfWorkerSrc!;
+            return pdfjs;
+        },
+    ));
 
 const isPDF = (file: File) =>
     file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
@@ -335,86 +348,6 @@ const imageDimensionsFromFile = async (file: File) => {
     return dimensions;
 };
 
-const findJsonObject = (value: string) => {
-    const start = value.indexOf('{"pv"');
-    if (start < 0) return undefined;
-
-    let depth = 0;
-    let inString = false;
-    let escaped = false;
-
-    for (let index = start; index < value.length; index++) {
-        const char = value[index];
-        if (escaped) {
-            escaped = false;
-            continue;
-        }
-        if (char === "\\") {
-            escaped = true;
-            continue;
-        }
-        if (char === '"') {
-            inString = !inString;
-            continue;
-        }
-        if (inString) {
-            continue;
-        }
-        if (char === "{") {
-            depth += 1;
-        } else if (char === "}") {
-            depth -= 1;
-            if (depth === 0) {
-                return value.slice(start, index + 1);
-            }
-        }
-    }
-
-    return undefined;
-};
-
-const markerPayload = (value: string, marker: string) => {
-    const markerStart = value.indexOf(marker);
-    if (markerStart < 0) return undefined;
-
-    const payloadStart = markerStart + marker.length;
-    const payload = /^[A-Za-z0-9_-]+/.exec(value.slice(payloadStart))?.[0];
-    return payload || undefined;
-};
-
-const decodeBase64URLUTF8 = (value: string) => {
-    const base64 = value
-        .replaceAll("-", "+")
-        .replaceAll("_", "/")
-        .padEnd(Math.ceil(value.length / 4) * 4, "=");
-    const binary = atob(base64);
-    const bytes = new Uint8Array(binary.length);
-    for (let index = 0; index < binary.length; index++) {
-        bytes[index] = binary.charCodeAt(index);
-    }
-    return new TextDecoder().decode(bytes);
-};
-
-const codeFromPDFMetadata = (bytes: Uint8Array) => {
-    const pdfText = new TextDecoder("latin1").decode(bytes);
-    const sharePayload = markerPayload(pdfText, legacyKitShareMetadataPrefix);
-    if (sharePayload) {
-        return decodeBase64URLUTF8(sharePayload);
-    }
-
-    const bundlePayload = markerPayload(pdfText, legacyKitBundleMetadataPrefix);
-    if (!bundlePayload) return undefined;
-
-    const payloads: unknown = JSON.parse(decodeBase64URLUTF8(bundlePayload));
-    if (!Array.isArray(payloads)) {
-        throw new Error("Legacy Kit PDF metadata is invalid.");
-    }
-    if (payloads.length === 1 && typeof payloads[0] === "string") {
-        return payloads[0];
-    }
-    throw new Error("Choose individual Legacy Kit sheet PDFs.");
-};
-
 const loadImageFromFile = (file: File) =>
     new Promise<DrawableImage>((resolve, reject) => {
         const objectURL = URL.createObjectURL(file);
@@ -588,7 +521,11 @@ const textFromPDF = async (pdf: PDFDocumentProxy) => {
                 "Could not read that PDF page.",
             );
             const pageText = textContent.items
-                .map((item) => ("str" in item ? item.str : ""))
+                .map((item) =>
+                    "str" in item
+                        ? `${item.str}${item.hasEOL ? "\n" : ""}`
+                        : "",
+                )
                 .join("")
                 .slice(0, maxPDFTextChars - charCount);
             chunks.push(pageText);
@@ -657,8 +594,7 @@ const renderPDFPage = async (page: PDFPageProxy) => {
 };
 
 const decodeQrFromPDFBytes = async (bytes: Uint8Array) => {
-    const pdfjs =
-        (await import("pdfjs-dist/legacy/webpack.mjs")) as unknown as typeof import("pdfjs-dist");
+    const pdfjs = await loadPDFJS();
     const loadingTask = pdfjs.getDocument({
         data: bytes.slice(),
         disableFontFace: true,
@@ -678,7 +614,10 @@ const decodeQrFromPDFBytes = async (bytes: Uint8Array) => {
     try {
         let textCode: string | undefined;
         try {
-            textCode = findJsonObject(await textFromPDF(pdf));
+            const text = await textFromPDF(pdf);
+            const jsonCode = findLegacyKitJSONObject(text);
+            if (jsonCode) return jsonCode;
+            textCode = legacyKitCodeFromVisiblePDFText(text);
         } catch {
             // Text extraction is a fast path; scanned PDFs should still use QR rendering.
         }
@@ -698,7 +637,7 @@ const decodeQrFromPDFBytes = async (bytes: Uint8Array) => {
             }
         }
     } finally {
-        await pdf.destroy();
+        await loadingTask.destroy();
     }
 
     throw new LegacyKitQRDecodeError(
@@ -709,7 +648,7 @@ const decodeQrFromPDFBytes = async (bytes: Uint8Array) => {
 const decodeQrFromPDF = async (file: File) => {
     assertFileSize(file, maxPDFFileBytes);
     const bytes = new Uint8Array(await file.arrayBuffer());
-    const metadataCode = codeFromPDFMetadata(bytes);
+    const metadataCode = legacyKitCodeFromPDFMetadata(bytes);
     if (metadataCode) return metadataCode;
     return decodeQrFromPDFBytes(bytes);
 };
@@ -719,7 +658,7 @@ export const readLegacyKitCodeFromFile = async (file: File) => {
     if (isPlainText(file)) {
         assertFileSize(file, maxTextFileBytes);
         const value = await file.text();
-        return findJsonObject(value) ?? value.trim();
+        return findLegacyKitJSONObject(value) ?? value.trim();
     }
     assertFileSize(file, maxImageFileBytes);
     return decodeQrImage(await imageDataFromFile(file));
