@@ -12,7 +12,6 @@ import "package:logging/logging.dart";
 import 'package:photos/core/event_bus.dart';
 import 'package:photos/ente_theme_data.dart';
 import 'package:photos/events/christmas_banner_event.dart';
-import "package:photos/events/force_reload_home_gallery_event.dart";
 import 'package:photos/events/notification_event.dart';
 import 'package:photos/events/sync_status_update_event.dart';
 import "package:photos/service_locator.dart";
@@ -21,10 +20,10 @@ import 'package:photos/services/sync/sync_service.dart';
 import "package:photos/theme/ente_theme.dart";
 import 'package:photos/ui/account/verify_recovery_page.dart';
 import 'package:photos/ui/components/home_header_widget.dart';
-import "package:photos/ui/home/backup_standby_screen.dart";
 import 'package:photos/ui/home/christmas/christmas_lights_banner.dart';
 import 'package:photos/ui/home/christmas/christmas_utils.dart';
 import 'package:photos/ui/home/header_error_widget.dart';
+import "package:photos/ui/home/large_backup_screen.dart";
 import "package:photos/ui/settings/backup/backup_settings_screen.dart";
 import "package:photos/ui/settings/backup/backup_status_screen.dart";
 import "package:photos/ui/settings/ml/machine_learning_settings_page.dart";
@@ -155,12 +154,8 @@ class _StatusBarWidgetState extends State<StatusBarWidget> {
     );
   }
 
-  bool get _isLargeBackupStandbyEnabled =>
-      flagService.largeBackupStandby &&
-      localSettings.isLargeBackupStandbyEnabled;
-
   bool get _shouldShowLargeBackupBanner =>
-      _isLargeBackupStandbyEnabled &&
+      flagService.largeBackupStandby &&
       Platform.isIOS &&
       !_showErrorBanner &&
       _largeBackupSession.isActive;
@@ -170,24 +165,16 @@ class _StatusBarWidgetState extends State<StatusBarWidget> {
       BannerComponent(
         key: const ValueKey("large-backup-standby-banner"),
         leadingIcon: HugeIcons.strokeRoundedMoon02,
-        title: pendingTranslation("Keep the app open"),
+        title: pendingTranslation("Keep Ente awake"),
         subtitle: pendingTranslation(
-          "Screen goes black while your backup finishes",
+          "Dim the screen while your large backup finishes",
         ),
         state: BannerComponentState.success,
         onTap: () async {
           if (!_largeBackupSession.isActive) {
             return;
           }
-          final standbyRoute = MaterialPageRoute<void>(
-            builder: (_) =>
-                BackupStandbyScreen(sessionTracker: _largeBackupSession),
-          );
-          await Navigator.of(context).push(standbyRoute);
-          await standbyRoute.completed;
-          Bus.instance.fire(
-            ForceReloadHomeGalleryEvent("largeBackupStandbyEnded"),
-          );
+          await showLargeBackupScreen(context, _largeBackupSession);
         },
       ),
     );
