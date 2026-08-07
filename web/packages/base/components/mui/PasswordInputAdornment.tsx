@@ -11,7 +11,7 @@ interface ShowHidePasswordInputAdornmentProps {
 
 export const ShowHidePasswordInputAdornment: React.FC<
     ShowHidePasswordInputAdornmentProps
-> = ({ showPassword, onToggle: onToggle }) => {
+> = ({ showPassword, onToggle }) => {
     // Prevent the visibility button from blurring the password field.
     const preventDefault = (event: React.MouseEvent<HTMLButtonElement>) => {
         event.preventDefault();

@@ -23,7 +23,6 @@ export const passkeyVerificationRedirectURL = (
     accountsURL: string,
     passkeySessionID: string,
 ) => {
-    const clientPackage = clientPackageName;
     // In the desktop app, window.location.origin is the custom app protocol
     // origin, which doubles as the deeplink back into the app.
     const redirect = `${window.location.origin}/passkeys/finish`;
@@ -33,7 +32,7 @@ export const passkeyVerificationRedirectURL = (
         ? {}
         : { recover: `${window.location.origin}/passkeys/recover` };
     const params = new URLSearchParams({
-        clientPackage,
+        clientPackage: clientPackageName,
         passkeySessionID,
         redirect,
         ...recoverOption,

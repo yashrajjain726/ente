@@ -19,10 +19,6 @@ logUnhandledErrorsAndRejectionsInWorker();
 
 const heicToJPEG = async (heicBlob: Blob): Promise<Blob> => {
     const buffer = new Uint8Array(await heicBlob.arrayBuffer());
-    // TypeScript versions after 5.6.3 report a type error here, possibly fixed
-    // by newer Node.js types.
-    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-ignore
     const result = await HeicConvert({ buffer, format: "JPEG" });
     const convertedData = new Uint8Array(result);
     return new Blob([convertedData], { type: "image/jpeg" });

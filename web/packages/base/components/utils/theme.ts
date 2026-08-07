@@ -20,54 +20,44 @@ const getTheme = (appName: AppName): Theme => {
 
 const getColors = (appName: AppName) => ({
     ..._colors,
-    ...{
-        fixed: {
-            ..._colors.fixed,
-            dark: {
-                background: _colors.dark.background,
-                text: _colors.dark.text,
-                divider: _colors.dark.stroke.faint,
-            },
+    fixed: {
+        ..._colors.fixed,
+        dark: {
+            background: _colors.dark.background,
+            text: _colors.dark.text,
+            divider: _colors.dark.stroke.faint,
         },
     },
-    ...{
-        accent:
-            appName == "auth"
-                ? _colors.accentAuth
-                : appName == "share" || appName == "locker"
-                  ? _colors.accentShare
-                  : appName == "ensu"
-                    ? _colors.accentEnsu
-                    : _colors.accentPhotos,
-        accentDark:
-            appName == "ensu"
-                ? _colors.accentEnsuDark
-                : appName == "auth"
-                  ? _colors.accentAuth
-                  : appName == "share" || appName == "locker"
-                    ? _colors.accentShare
-                    : _colors.accentPhotos,
-    },
-    ...{
-        accentContrastText:
-            appName == "ensu" ? _colors.fixed.black : _colors.fixed.white,
-    },
-    ...{
-        light:
-            appName == "share" || appName == "locker"
-                ? _colors.lightShare
-                : appName == "ensu"
-                  ? _colors.lightEnsu
-                  : _colors.light,
-    },
-    ...{
-        dark:
-            appName == "share" || appName == "locker"
-                ? _colors.darkShare
-                : appName == "ensu"
-                  ? _colors.darkEnsu
-                  : _colors.dark,
-    },
+    accent:
+        appName == "auth"
+            ? _colors.accentAuth
+            : appName == "share" || appName == "locker"
+              ? _colors.accentShare
+              : appName == "ensu"
+                ? _colors.accentEnsu
+                : _colors.accentPhotos,
+    accentDark:
+        appName == "ensu"
+            ? _colors.accentEnsuDark
+            : appName == "auth"
+              ? _colors.accentAuth
+              : appName == "share" || appName == "locker"
+                ? _colors.accentShare
+                : _colors.accentPhotos,
+    accentContrastText:
+        appName == "ensu" ? _colors.fixed.black : _colors.fixed.white,
+    light:
+        appName == "share" || appName == "locker"
+            ? _colors.lightShare
+            : appName == "ensu"
+              ? _colors.lightEnsu
+              : _colors.light,
+    dark:
+        appName == "share" || appName == "locker"
+            ? _colors.darkShare
+            : appName == "ensu"
+              ? _colors.darkEnsu
+              : _colors.dark,
 });
 
 const _colors = {

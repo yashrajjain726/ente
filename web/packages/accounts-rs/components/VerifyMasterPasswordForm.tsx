@@ -60,7 +60,7 @@ export const VerifyMasterPasswordForm: React.FC<
             try {
                 await verifyPassword(password, setPasswordFieldError);
             } catch (e) {
-                log.error("Failed to to verify password", e);
+                log.error("Failed to verify password", e);
                 setPasswordFieldError(t("generic_error"));
             }
         },

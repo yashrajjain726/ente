@@ -249,26 +249,3 @@ export const getLocationPosition = (
 
     return [lat, lng - lngShift];
 };
-
-export const getLocationPositionAtZoom = (
-    lat: number,
-    lng: number,
-    zoom: number,
-): [number, number] => {
-    const isMobile = isMobileDevice();
-    const timelineWidthRatio = isMobile ? 0.0 : 0.5;
-
-    const baseDegreesPerPixelAtZoom10 = 0.35 / 1000;
-    const zoomScaleFactor = Math.pow(2, 10 - zoom);
-    const degreesPerPixelAtCurrentZoom =
-        baseDegreesPerPixelAtZoom10 * zoomScaleFactor;
-
-    const basePixelsToShift =
-        (window.innerWidth || 1400) * (1 - timelineWidthRatio);
-    const pixelsToShiftFor20Percent = isMobile
-        ? basePixelsToShift * 0.6
-        : basePixelsToShift * 3.0;
-    const lngShift = pixelsToShiftFor20Percent * degreesPerPixelAtCurrentZoom;
-
-    return [lat, lng - lngShift];
-};

@@ -210,7 +210,6 @@ export const decryptRemoteCollection = async (
         owner: parseRemoteCollectionUser(owner),
         name,
         sharees: sharees.map(parseRemoteCollectionUser),
-        publicURLs: rest.publicURLs,
         magicMetadata,
         pubMagicMetadata,
         sharedMagicMetadata,

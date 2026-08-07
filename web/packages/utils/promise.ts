@@ -42,10 +42,16 @@ export const withTimeout = async <T>(
 };
 
 export class PromiseQueue<T> {
-    private q: { task: () => Promise<T>; handlers: unknown }[] = [];
+    private q: {
+        task: () => Promise<T>;
+        handlers: [
+            (value: T | PromiseLike<T>) => void,
+            (reason?: unknown) => void,
+        ];
+    }[] = [];
 
     async add(task: () => Promise<T>): Promise<T> {
-        let handlers;
+        let handlers!: (typeof this.q)[number]["handlers"];
         const p = new Promise<T>((...args) => (handlers = args));
         this.q.push({ task, handlers });
         if (this.q.length == 1) this.next();
@@ -57,7 +63,6 @@ export class PromiseQueue<T> {
         if (!item) return;
         const { task, handlers } = item;
         void task()
-            // @ts-expect-error Can't think of an easy way to satisfy tsc.
             .then(...handlers)
             .finally(() => {
                 this.q.shift();
