@@ -16,7 +16,7 @@ bool get enoughRamForLocalGalleryLocalIndexing =>
 Future<int?> checkDeviceTotalRAM() async {
   if (deviceTotalRAM != null) return deviceTotalRAM;
   try {
-    final memory = await EntePhotosDeviceHealth.instance.getMemorySnapshot();
+    final memory = await DeviceHealthClient.instance.getMemorySnapshot();
     if (memory.status == DeviceSignalStatus.available) {
       deviceTotalRAM = memory.totalBytes! ~/ (1024 * 1024);
     }

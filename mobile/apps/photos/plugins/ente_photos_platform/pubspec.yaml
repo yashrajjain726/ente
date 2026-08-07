@@ -20,6 +20,6 @@ flutter:
     platforms:
       android:
         package: io.ente.photos.platform
-        pluginClass: EntePhotosPlatformPlugin
+        pluginClass: PhotosPlatformPlugin
       ios:
-        pluginClass: EntePhotosPlatformPlugin
+        pluginClass: PhotosPlatformPlugin

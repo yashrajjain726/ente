@@ -64,8 +64,7 @@ class ComputeController {
     this._localSettings, {
     DeviceHealthSource? deviceHealthSource,
     DeviceHealthPolicy deviceHealthPolicy = const DeviceHealthPolicy(),
-  }) : _deviceHealthSource =
-           deviceHealthSource ?? EntePhotosDeviceHealth.instance,
+  }) : _deviceHealthSource = deviceHealthSource ?? DeviceHealthClient.instance,
        _deviceHealthPolicy = deviceHealthPolicy {
     _logger.info('ComputeController constructor');
     unawaited(init());

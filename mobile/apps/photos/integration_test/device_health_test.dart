@@ -10,8 +10,8 @@ void main() {
   testWidgets('native device health snapshot is current and usable', (
     tester,
   ) async {
-    final snapshot = await EntePhotosDeviceHealth.instance.getSnapshot();
-    final memory = await EntePhotosDeviceHealth.instance.getMemorySnapshot();
+    final snapshot = await DeviceHealthClient.instance.getSnapshot();
+    final memory = await DeviceHealthClient.instance.getMemorySnapshot();
     final now = DateTime.now();
 
     expect(snapshot.isFreshAt(now, const Duration(seconds: 10)), isTrue);

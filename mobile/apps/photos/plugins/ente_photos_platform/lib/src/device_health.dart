@@ -214,15 +214,12 @@ abstract interface class DeviceMemorySource {
   Future<DeviceMemorySnapshot> getMemorySnapshot();
 }
 
-class EntePhotosDeviceHealth implements DeviceHealthSource, DeviceMemorySource {
-  EntePhotosDeviceHealth({
-    MethodChannel? methodChannel,
-    EventChannel? eventChannel,
-  }) : _methodChannel =
-           methodChannel ?? const MethodChannel(_methodChannelName),
-       _eventChannel = eventChannel ?? const EventChannel(_eventChannelName);
+class DeviceHealthClient implements DeviceHealthSource, DeviceMemorySource {
+  DeviceHealthClient({MethodChannel? methodChannel, EventChannel? eventChannel})
+    : _methodChannel = methodChannel ?? const MethodChannel(_methodChannelName),
+      _eventChannel = eventChannel ?? const EventChannel(_eventChannelName);
 
-  static final instance = EntePhotosDeviceHealth();
+  static final instance = DeviceHealthClient();
   static const _methodChannelName = 'io.ente.photos.platform';
   static const _eventChannelName =
       'io.ente.photos.platform/device_health_events';

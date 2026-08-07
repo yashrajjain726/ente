@@ -94,7 +94,7 @@ void main() {
           .setMockMethodCallHandler(channel, null),
     );
 
-    final source = EntePhotosDeviceHealth(methodChannel: channel);
+    final source = DeviceHealthClient(methodChannel: channel);
     expect((await source.getSnapshot()).battery.levelPercent, 64);
     expect(
       (await source.getMemorySnapshot()).totalBytes,
