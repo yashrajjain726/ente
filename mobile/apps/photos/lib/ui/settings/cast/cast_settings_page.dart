@@ -12,7 +12,7 @@ import "package:photos/service_locator.dart";
 import "package:photos/services/collections_service.dart";
 import "package:photos/theme/ente_theme.dart";
 import "package:photos/ui/common/loading_widget.dart";
-import 'package:timeago/timeago.dart' as timeago;
+import "package:photos/utils/relative_time_formatter.dart";
 
 class CastSettingsPage extends StatelessWidget {
   const CastSettingsPage({super.key});
@@ -179,7 +179,7 @@ class _CastSessionItem extends StatelessWidget {
     final title = collection?.displayName ?? session.collectionID.toString();
     return SettingsItem(
       title: "$title on ${session.deviceName ?? session.deviceIP}",
-      subtitle: timeago.format(session.lastUsedAt),
+      subtitle: formatTimeAgo(session.lastUsedAt),
       icon: HugeIcons.strokeRoundedTvSmart,
       showChevron: false,
       showOnlyLoadingState: true,
