@@ -200,9 +200,9 @@ export const convertToMP4 = async (
 
 const convertToMP4Native = async (electron: Electron, blob: Blob) => {
     const token = await initiateConvertToMP4(electron, blob);
-    const mp4Blob = await readVideoStream(electron, token).then((res) =>
-        res.blob(),
-    );
-    await videoStreamDone(electron, token);
-    return mp4Blob;
+    try {
+        return await readVideoStream(electron, token).then((res) => res.blob());
+    } finally {
+        await videoStreamDone(electron, token);
+    }
 };

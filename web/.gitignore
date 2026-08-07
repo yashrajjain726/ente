@@ -10,8 +10,6 @@ dist
 out/
 next-env.d.ts
 
-apps/ensu/next/
-
 packages/wasm/pkg/
 packages/wasm/space/pkg/
 packages/wasm-core/pkg/

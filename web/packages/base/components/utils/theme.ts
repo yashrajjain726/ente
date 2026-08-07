@@ -20,54 +20,44 @@ const getTheme = (appName: AppName): Theme => {
 
 const getColors = (appName: AppName) => ({
     ..._colors,
-    ...{
-        fixed: {
-            ..._colors.fixed,
-            dark: {
-                background: _colors.dark.background,
-                text: _colors.dark.text,
-                divider: _colors.dark.stroke.faint,
-            },
+    fixed: {
+        ..._colors.fixed,
+        dark: {
+            background: _colors.dark.background,
+            text: _colors.dark.text,
+            divider: _colors.dark.stroke.faint,
         },
     },
-    ...{
-        accent:
-            appName == "auth"
-                ? _colors.accentAuth
-                : appName == "share" || appName == "locker"
-                  ? _colors.accentShare
-                  : appName == "ensu"
-                    ? _colors.accentEnsu
-                    : _colors.accentPhotos,
-        accentDark:
-            appName == "ensu"
-                ? _colors.accentEnsuDark
-                : appName == "auth"
-                  ? _colors.accentAuth
-                  : appName == "share" || appName == "locker"
-                    ? _colors.accentShare
-                    : _colors.accentPhotos,
-    },
-    ...{
-        accentContrastText:
-            appName == "ensu" ? _colors.fixed.black : _colors.fixed.white,
-    },
-    ...{
-        light:
-            appName == "share" || appName == "locker"
-                ? _colors.lightShare
-                : appName == "ensu"
-                  ? _colors.lightEnsu
-                  : _colors.light,
-    },
-    ...{
-        dark:
-            appName == "share" || appName == "locker"
-                ? _colors.darkShare
-                : appName == "ensu"
-                  ? _colors.darkEnsu
-                  : _colors.dark,
-    },
+    accent:
+        appName == "auth"
+            ? _colors.accentAuth
+            : appName == "share" || appName == "locker"
+              ? _colors.accentShare
+              : appName == "ensu"
+                ? _colors.accentEnsu
+                : _colors.accentPhotos,
+    accentDark:
+        appName == "ensu"
+            ? _colors.accentEnsu
+            : appName == "auth"
+              ? _colors.accentAuth
+              : appName == "share" || appName == "locker"
+                ? _colors.accentShare
+                : _colors.accentPhotos,
+    accentContrastText:
+        appName == "ensu" ? _colors.fixed.black : _colors.fixed.white,
+    light:
+        appName == "share" || appName == "locker"
+            ? _colors.lightShare
+            : appName == "ensu"
+              ? _colors.lightEnsu
+              : _colors.light,
+    dark:
+        appName == "share" || appName == "locker"
+            ? _colors.darkShare
+            : appName == "ensu"
+              ? _colors.darkEnsu
+              : _colors.dark,
 });
 
 const _colors = {
@@ -75,7 +65,6 @@ const _colors = {
     accentAuth: { dark: "#8e0fcb", main: "#9610d6", light: "#8e2de2" },
     accentShare: { dark: "#0056CC", main: "#1071FF", light: "#1071FF" },
     accentEnsu: { dark: "#f5d93a", main: "#f5d93a", light: "#f5d93a" },
-    accentEnsuDark: { dark: "#f5d93a", main: "#f5d93a", light: "#f5d93a" },
     fixed: {
         white: "#fff",
         black: "#000",
@@ -118,7 +107,6 @@ const _colors = {
         boxShadow: {
             paper: "0px 0px 10px rgba(0 0 0 / 0.25)",
             menu: "0px 0px 6px rgba(0 0 0 / 0.16), 0px 3px 6px rgba(0 0 0 / 0.12)",
-            button: "0px 4px 4px rgba(0 0 0 / 0.25)",
         },
     },
     lightEnsu: {
@@ -155,7 +143,6 @@ const _colors = {
         boxShadow: {
             paper: "0px 0px 10px rgba(0 0 0 / 0.18)",
             menu: "0px 0px 6px rgba(0 0 0 / 0.14), 0px 3px 6px rgba(0 0 0 / 0.10)",
-            button: "0px 4px 4px rgba(0 0 0 / 0.18)",
         },
     },
     darkShare: {
@@ -192,7 +179,6 @@ const _colors = {
         boxShadow: {
             paper: "0px 2px 12px rgba(0 0 0 / 0.75)",
             menu: "0px 0px 6px rgba(0 0 0 / 0.50), 0px 3px 6px rgba(0 0 0 / 0.25)",
-            button: "0px 4px 4px rgba(0 0 0 / 0.75)",
         },
     },
     darkEnsu: {
@@ -229,7 +215,6 @@ const _colors = {
         boxShadow: {
             paper: "0px 2px 12px rgba(0 0 0 / 0.75)",
             menu: "0px 0px 6px rgba(0 0 0 / 0.50), 0px 3px 6px rgba(0 0 0 / 0.25)",
-            button: "0px 4px 4px rgba(0 0 0 / 0.75)",
         },
     },
     light: {
@@ -266,7 +251,6 @@ const _colors = {
         boxShadow: {
             paper: "0px 0px 10px rgba(0 0 0 / 0.25)",
             menu: "0px 0px 6px rgba(0 0 0 / 0.16), 0px 3px 6px rgba(0 0 0 / 0.12)",
-            button: "0px 4px 4px rgba(0 0 0 / 0.25)",
         },
     },
     dark: {
@@ -303,7 +287,6 @@ const _colors = {
         boxShadow: {
             paper: "0px 2px 12px rgba(0 0 0 / 0.75)",
             menu: "0px 0px 6px rgba(0 0 0 / 0.50), 0px 3px 6px rgba(0 0 0 / 0.25)",
-            button: "0px 4px 4px rgba(0 0 0 / 0.75)",
         },
     },
 };

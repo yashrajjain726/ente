@@ -77,6 +77,8 @@ const AuthenticatorEntityDiffResponse = z.object({
     timestamp: z.number().nullish().transform(nullToUndefined),
 });
 
+const authenticatorEntityDiffBatchSize = 2500;
+
 export interface AuthenticatorEntityDiffResult {
     entities: AuthenticatorEntity[];
     timeOffset: number | undefined;
@@ -96,7 +98,6 @@ export const authenticatorEntityDiff = async (
         { id: string; encryptedData: string; header: string }
     >();
     let sinceTime = 0;
-    const batchSize = 2500;
 
     let timeOffset: number | undefined = undefined;
 
@@ -104,7 +105,7 @@ export const authenticatorEntityDiff = async (
         const res = await fetch(
             await apiURL("/authenticator/entity/diff", {
                 sinceTime,
-                limit: batchSize,
+                limit: authenticatorEntityDiffBatchSize,
             }),
             { headers: await authenticatedRequestHeaders() },
         );
@@ -117,7 +118,7 @@ export const authenticatorEntityDiff = async (
         if (timestamp) {
             // The remote timestamp is in epoch microseconds, while Date.now
             // and timeOffset are in epoch milliseconds.
-            timeOffset = Date.now() - Math.floor(timestamp / 1e3);
+            timeOffset = Math.floor(timestamp / 1e3) - Date.now();
         }
 
         if (diff.length == 0) break;
@@ -164,9 +165,8 @@ export const getAuthenticatorEntityKey = async (): Promise<
     if (!res.ok) {
         if (res.status == 404) return undefined;
         throw new HTTPError(res);
-    } else {
-        return AuthenticatorEntityKey.parse(await res.json());
     }
+    return AuthenticatorEntityKey.parse(await res.json());
 };
 
 const decryptAuthenticatorKey = async (

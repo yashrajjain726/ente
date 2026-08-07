@@ -89,7 +89,7 @@ export const deleteSelectedLargeFiles = async (
     let completedSteps = 0;
     const totalSteps = 2;
     const tickProgress = () =>
-        onProgress((completedSteps++ / totalSteps) * 100);
+        onProgress((++completedSteps / totalSteps) * 100);
 
     await moveToTrash(filesToTrash);
     tickProgress();

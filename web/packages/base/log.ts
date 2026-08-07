@@ -34,9 +34,7 @@ const messageWithError = (message: string, e?: unknown) => {
         const st = e.stack;
         if (st) {
             // V8 stacks already start with "Name: message".
-            es = st.startsWith(es)
-                ? es.concat(st.slice(es.length))
-                : [es, st].join("\n");
+            es = st.startsWith(es) ? st : [es, st].join("\n");
         }
     } else {
         // Best-effort for arbitrary thrown values.

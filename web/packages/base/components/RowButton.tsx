@@ -45,9 +45,7 @@ export const RowButtonGroupHint: React.FC<React.PropsWithChildren> = ({
     </Typography>
 );
 
-export const RowButtonDivider = () => (
-    <Divider sx={{ "&&&": { mttty: 0 }, opacity: 0.4 }} />
-);
+export const RowButtonDivider = () => <Divider sx={{ opacity: 0.4 }} />;
 
 // Group styling only supports primary RowButtons.
 export const RowButtonGroup = styled("div")(

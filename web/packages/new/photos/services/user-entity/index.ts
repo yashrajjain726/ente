@@ -160,7 +160,7 @@ const getOrCreateEntityKey = async (type: EntityType, masterKey: string) => {
     // were fetched from remote and then try to decrypt it before doing anything
     // with it.
     const generated = await generateEncryptedEntityKey(masterKey);
-    const result = decryptEntityKey(generated, masterKey);
+    const result = await decryptEntityKey(generated, masterKey);
     await postUserEntityKey(type, generated);
     await saveRemoteUserEntityKey(type, generated);
     return result;

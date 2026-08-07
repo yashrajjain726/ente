@@ -18,25 +18,8 @@ export class InMemoryStorage {
         this.storage.delete(key);
     }
 
-    clear(): void {
-        this.storage.clear();
-    }
-
     ready(): void {
         // No-op that exists only to satisfy the localForage interface.
-    }
-
-    keys(): string[] {
-        return Array.from(this.storage.keys());
-    }
-
-    length(): number {
-        return this.storage.size;
-    }
-
-    key(index: number): string | null {
-        const keys = this.keys();
-        return keys[index] || null;
     }
 
     config(): void {

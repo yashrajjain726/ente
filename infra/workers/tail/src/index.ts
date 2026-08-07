@@ -20,7 +20,7 @@ const handleTail = async (events: TraceItem[], env: Env) => {
 };
 
 const hasLogOrException = (event: TraceItem) =>
-    event.logs.length ?? event.exceptions.length;
+    event.logs.length || event.exceptions.length;
 
 const pushLogLine = async (timestampMs: number, logLine: string, env: Env) =>
     await fetch(env.LOKI_PUSH_URL, {

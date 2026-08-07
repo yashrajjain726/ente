@@ -208,7 +208,7 @@ interface AddPasskeyFormProps {
     onRefreshPasskeys: () => Promise<void>;
 }
 
-export const AddPasskeyForm: React.FC<AddPasskeyFormProps> = ({
+const AddPasskeyForm: React.FC<AddPasskeyFormProps> = ({
     token,
     onRefreshPasskeys,
 }) => {
