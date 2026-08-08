@@ -9,6 +9,7 @@ import 'package:ente_auth/utils/directory_utils.dart' as auth_dir;
 import 'package:ente_auth/utils/share_utils.dart' as auth_share;
 import 'package:ente_auth/utils/toast_util.dart';
 import 'package:ente_logging/logging.dart';
+import 'package:ente_mail/ente_mail.dart';
 import 'package:ente_strings/ente_strings.dart';
 import 'package:ente_ui/components/buttons/button_widget.dart';
 import 'package:ente_ui/components/buttons/models/button_type.dart';
@@ -24,6 +25,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 final Logger _logger = Logger('email_util');
+const MailComposer _mailComposer = MailComposer();
 
 bool isValidEmail(String? email) {
   if (email == null) {
@@ -123,21 +125,6 @@ Future<void> openSupportPage(String? subject, String? body) async {
   if (!launched) {
     _logger.warning("Failed to open support discussions at $supportUri");
   }
-  // final String zipFilePath = await getZippedLogsFile(context);
-  // final Email email = Email(
-  //   recipients: [toEmail],
-  //   subject: subject ?? '',
-  //   body: body ?? '',
-  //   attachmentPaths: [zipFilePath],
-  //   isHTML: false,
-  // );
-  // try {
-  //   await FlutterEmailSender.send(email);
-  // } catch (e, s) {
-  //   _logger.severe('email sender failed', e, s);
-  //   Navigator.of(context, rootNavigator: true).pop();
-  //   await shareLogs(context, toEmail, zipFilePath);
-  // }
 }
 
 Future<String> getZippedLogsFile(BuildContext context) async {
@@ -249,25 +236,10 @@ Future<void> sendEmail(
     final String clientDebugInfo = await _clientInfo();
     final String subject0 = subject ?? '[Support]';
     final String body0 = (body ?? '') + clientDebugInfo;
-    // final EmailContent email = EmailContent(
-    //   to: [
-    //     to,
-    //   ],
-    //   subject: subject ?? '[Support]',
-    //   body: (body ?? '') + clientDebugInfo,
-    // );
-    if (Platform.isAndroid) {
-      // Special handling due to issue in proton mail android client
-      // https://github.com/ente/photos-app/pull/253
-      final params = buildMailtoUri(to: to, subject: subject0, body: body0);
-      if (await canLaunchUrl(params)) {
-        await launchUrl(params);
-      } else {
-        // this will trigger _showNoMailAppsDialog
-        throw Exception('Could not launch ${params.toString()}');
-      }
-    } else {
-      if (!context.mounted) return;
+    final result = await _mailComposer.compose(
+      MailDraft(recipient: to, subject: subject0, body: body0),
+    );
+    if (result is MailUnavailable && context.mounted) {
       _showNoMailAppsDialog(context, to);
     }
   } catch (e) {

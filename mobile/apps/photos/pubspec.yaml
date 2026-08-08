@@ -66,6 +66,8 @@ dependencies:
     path: ../../packages/install_source
   ente_lock_screen:
     path: ../../packages/lock_screen
+  ente_mail:
+    path: ../../packages/mail
   ente_panorama_viewer:
     path: plugins/ente_panorama_viewer
   ente_photos_platform:
@@ -109,7 +111,6 @@ dependencies:
       path: flutter_cache_manager
   flutter_displaymode: 0.6.0
   flutter_easyloading: 3.0.5
-  flutter_email_sender: 7.0.0
   flutter_image_compress: 2.4.0
   flutter_inappwebview: 6.1.5
   flutter_local_notifications: 19.3.0
@@ -178,10 +179,6 @@ dependencies:
   native_video_editor:
     path: ../../packages/native_video_editor
   native_video_player: 4.0.1
-  open_mail_app: # replace plugin, git is archived
-    git:
-      url: https://github.com/ente/open-mail-app-flutter.git
-      ref: 13c0244db82b386ad1a53b2451bdfda8d2687cb6
   package_info_plus: 8.3.1
   password_strength: 0.2.0
   path: 1.9.1 #dart

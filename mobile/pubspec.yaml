@@ -34,6 +34,7 @@ workspace:
   - packages/lock_screen
   - packages/log_viewer
   - packages/logging
+  - packages/mail
   - packages/native_video_editor
   - packages/network
   - packages/qr

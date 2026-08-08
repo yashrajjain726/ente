@@ -16,6 +16,8 @@ PODS:
     - Flutter
   - ente_cast (0.0.1):
     - Flutter
+  - ente_mail (0.0.1):
+    - Flutter
   - ente_panorama_viewer (0.0.1):
     - Flutter
   - ente_photos_platform (0.0.1):
@@ -68,8 +70,6 @@ PODS:
     - GoogleUtilities/UserDefaults (~> 8.1)
     - nanopb (~> 3.30910.0)
   - Flutter (1.0.0)
-  - flutter_email_sender (0.0.1):
-    - Flutter
   - flutter_image_compress_common (1.0.0):
     - Flutter
     - Mantle
@@ -172,8 +172,6 @@ PODS:
     - Flutter
   - native_video_player (4.0.0):
     - Flutter
-  - open_mail_app (0.0.1):
-    - Flutter
   - OrderedSet (6.0.3)
   - package_info_plus (0.4.5):
     - Flutter
@@ -252,6 +250,7 @@ DEPENDENCIES:
   - cupertino_http (from `.symlinks/plugins/cupertino_http/darwin`)
   - device_info_plus (from `.symlinks/plugins/device_info_plus/ios`)
   - ente_cast (from `.symlinks/plugins/ente_cast/ios`)
+  - ente_mail (from `.symlinks/plugins/ente_mail/ios`)
   - ente_panorama_viewer (from `.symlinks/plugins/ente_panorama_viewer/ios`)
   - ente_photos_platform (from `.symlinks/plugins/ente_photos_platform/ios`)
   - ente_photos_rust (from `.symlinks/plugins/ente_photos_rust/ios`)
@@ -264,7 +263,6 @@ DEPENDENCIES:
   - firebase_core (from `.symlinks/plugins/firebase_core/ios`)
   - firebase_messaging (from `.symlinks/plugins/firebase_messaging/ios`)
   - Flutter (from `Flutter`)
-  - flutter_email_sender (from `.symlinks/plugins/flutter_email_sender/ios`)
   - flutter_image_compress_common (from `.symlinks/plugins/flutter_image_compress_common/ios`)
   - flutter_inappwebview_ios (from `.symlinks/plugins/flutter_inappwebview_ios/ios`)
   - flutter_local_notifications (from `.symlinks/plugins/flutter_local_notifications/ios`)
@@ -287,7 +285,6 @@ DEPENDENCIES:
   - move_to_background (from `.symlinks/plugins/move_to_background/ios`)
   - native_video_editor (from `.symlinks/plugins/native_video_editor/ios`)
   - native_video_player (from `.symlinks/plugins/native_video_player/ios`)
-  - open_mail_app (from `.symlinks/plugins/open_mail_app/ios`)
   - package_info_plus (from `.symlinks/plugins/package_info_plus/ios`)
   - permission_handler_apple (from `.symlinks/plugins/permission_handler_apple/ios`)
   - photo_manager (from `.symlinks/plugins/photo_manager/darwin`)
@@ -342,6 +339,8 @@ EXTERNAL SOURCES:
     :path: ".symlinks/plugins/device_info_plus/ios"
   ente_cast:
     :path: ".symlinks/plugins/ente_cast/ios"
+  ente_mail:
+    :path: ".symlinks/plugins/ente_mail/ios"
   ente_panorama_viewer:
     :path: ".symlinks/plugins/ente_panorama_viewer/ios"
   ente_photos_platform:
@@ -366,8 +365,6 @@ EXTERNAL SOURCES:
     :path: ".symlinks/plugins/firebase_messaging/ios"
   Flutter:
     :path: Flutter
-  flutter_email_sender:
-    :path: ".symlinks/plugins/flutter_email_sender/ios"
   flutter_image_compress_common:
     :path: ".symlinks/plugins/flutter_image_compress_common/ios"
   flutter_inappwebview_ios:
@@ -412,8 +409,6 @@ EXTERNAL SOURCES:
     :path: ".symlinks/plugins/native_video_editor/ios"
   native_video_player:
     :path: ".symlinks/plugins/native_video_player/ios"
-  open_mail_app:
-    :path: ".symlinks/plugins/open_mail_app/ios"
   package_info_plus:
     :path: ".symlinks/plugins/package_info_plus/ios"
   permission_handler_apple:
@@ -454,6 +449,7 @@ SPEC CHECKSUMS:
   cupertino_http: 94ac07f5ff090b8effa6c5e2c47871d48ab7c86c
   device_info_plus: 21fcca2080fbcd348be798aa36c3e5ed849eefbe
   ente_cast: a25feb3127397e5fc6aff03a12120916707757d4
+  ente_mail: 90753dd584f49ee092759a32d4143ca51db69641
   ente_panorama_viewer: 87bb22e7868c3005314f80c05ee0787aa07edcd8
   ente_photos_platform: 9a5d62b4008563bdfefe6a42cc4297c5c19bf70c
   ente_photos_rust: 2db1f31cbe3f13ef0f52909a52b1f885b880a6ec
@@ -472,7 +468,6 @@ SPEC CHECKSUMS:
   FirebaseInstallations: 317270fec08a5d418fdbc8429282238cab3ac843
   FirebaseMessaging: 3b26e2cee503815e01c3701236b020aa9b576f09
   Flutter: cabc95a1d2626b1b06e7179b784ebcf0c0cde467
-  flutter_email_sender: aa1e9772696691d02cd91fea829856c11efb8e58
   flutter_image_compress_common: 1697a328fd72bfb335507c6bca1a65fa5ad87df1
   flutter_inappwebview_ios: b89ba3482b96fb25e00c967aae065701b66e9b99
   flutter_local_notifications: a5a732f069baa862e728d839dd2ebb904737effb
@@ -500,7 +495,6 @@ SPEC CHECKSUMS:
   nanopb: fad817b59e0457d11a5dfbde799381cd727c1275
   native_video_editor: a6a0fbb3b418961d09f4fecf5730c740f7210247
   native_video_player: 6809dec117e8997161dbfb42a6f90d6df71a504d
-  open_mail_app: 7314a609e88eed22d53671279e189af7a0ab0f11
   OrderedSet: e539b66b644ff081c73a262d24ad552a69be3a94
   package_info_plus: af8e2ca6888548050f16fa2f1938db7b5a5df499
   permission_handler_apple: 92d754bbaa7361d436db2d6c3c1c2a0fdcec462e
