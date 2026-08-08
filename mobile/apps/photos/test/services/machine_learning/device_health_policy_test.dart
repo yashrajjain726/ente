@@ -42,6 +42,21 @@ void main() {
     );
   });
 
+  test('accepts unsupported iOS battery evidence', () {
+    expect(
+      issues(
+        _snapshot(
+          now,
+          platform: DeviceHealthPlatform.ios,
+          battery: const DeviceBatterySnapshot(
+            status: DeviceSignalStatus.unsupported,
+          ),
+        ),
+      ),
+      isEmpty,
+    );
+  });
+
   test('rejects hot or unknown Android battery evidence', () {
     expect(
       issues(_snapshot(now, battery: _androidBattery(temperature: 42.1))),

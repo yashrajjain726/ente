@@ -14,7 +14,9 @@ public final class DeviceHealthService {
 
     public func snapshot() -> DeviceHealthSnapshot {
         let device = UIDevice.current
-        let restoreMonitoring = !device.isBatteryMonitoringEnabled
+        let restoreMonitoring =
+            Self.supportsBatteryMonitoring
+            && !device.isBatteryMonitoringEnabled
         if restoreMonitoring {
             device.isBatteryMonitoringEnabled = true
         }
@@ -38,7 +40,7 @@ public final class DeviceHealthService {
         self.observer = observer
 
         let device = UIDevice.current
-        if !device.isBatteryMonitoringEnabled {
+        if Self.supportsBatteryMonitoring && !device.isBatteryMonitoringEnabled {
             device.isBatteryMonitoringEnabled = true
             enabledBatteryMonitoring = true
         }
@@ -46,27 +48,31 @@ public final class DeviceHealthService {
         let center = NotificationCenter.default
         observerTokens = [
             center.addObserver(
-                forName: UIDevice.batteryLevelDidChangeNotification,
-                object: device,
-                queue: .main
-            ) { [weak self] _ in
-                Task { @MainActor [weak self] in self?.emitSnapshot() }
-            },
-            center.addObserver(
-                forName: UIDevice.batteryStateDidChangeNotification,
-                object: device,
-                queue: .main
-            ) { [weak self] _ in
-                Task { @MainActor [weak self] in self?.emitSnapshot() }
-            },
-            center.addObserver(
                 forName: ProcessInfo.thermalStateDidChangeNotification,
                 object: ProcessInfo.processInfo,
                 queue: .main
             ) { [weak self] _ in
                 Task { @MainActor [weak self] in self?.emitSnapshot() }
-            },
+            }
         ]
+        if Self.supportsBatteryMonitoring {
+            observerTokens += [
+                center.addObserver(
+                    forName: UIDevice.batteryLevelDidChangeNotification,
+                    object: device,
+                    queue: .main
+                ) { [weak self] _ in
+                    Task { @MainActor [weak self] in self?.emitSnapshot() }
+                },
+                center.addObserver(
+                    forName: UIDevice.batteryStateDidChangeNotification,
+                    object: device,
+                    queue: .main
+                ) { [weak self] _ in
+                    Task { @MainActor [weak self] in self?.emitSnapshot() }
+                },
+            ]
+        }
         emitSnapshot()
     }
 
@@ -99,6 +105,7 @@ public final class DeviceHealthService {
     }
 
     private func batterySnapshot() -> DeviceSignal<BatteryReading> {
+        guard Self.supportsBatteryMonitoring else { return .unsupported }
         let level = UIDevice.current.batteryLevel
         guard level >= 0, level <= 1,
             let reading = try? BatteryReading(levelPercent: Int(level * 100))
@@ -121,5 +128,13 @@ public final class DeviceHealthService {
     private struct HealthState: Equatable {
         let battery: DeviceSignal<BatteryReading>
         let thermal: DeviceSignal<ThermalState>
+    }
+
+    private static var supportsBatteryMonitoring: Bool {
+        #if targetEnvironment(simulator)
+            false
+        #else
+            true
+        #endif
     }
 }

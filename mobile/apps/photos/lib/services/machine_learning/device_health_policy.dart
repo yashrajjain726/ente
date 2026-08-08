@@ -43,10 +43,15 @@ class DeviceHealthPolicy {
 
     final issues = <DeviceHealthIssue>{};
     final battery = snapshot.battery;
-    if (battery.status != DeviceSignalStatus.available) {
-      issues.add(DeviceHealthIssue.batteryUnavailable);
-    } else if (battery.levelPercent! < minimumBatteryLevel) {
-      issues.add(DeviceHealthIssue.lowBattery);
+    final batteryUnsupportedOnIOS =
+        snapshot.platform == DeviceHealthPlatform.ios &&
+        battery.status == DeviceSignalStatus.unsupported;
+    if (!batteryUnsupportedOnIOS) {
+      if (battery.status != DeviceSignalStatus.available) {
+        issues.add(DeviceHealthIssue.batteryUnavailable);
+      } else if (battery.levelPercent! < minimumBatteryLevel) {
+        issues.add(DeviceHealthIssue.lowBattery);
+      }
     }
 
     if (snapshot.platform == DeviceHealthPlatform.android &&
