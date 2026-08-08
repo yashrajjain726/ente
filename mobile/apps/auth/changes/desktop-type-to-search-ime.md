@@ -1,0 +1,1 @@
+- Added type-to-search on desktop for faster code lookup (@StDensity).
