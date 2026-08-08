@@ -27,6 +27,7 @@ class ApiResponseInterceptor extends Interceptor {
     final unexpected = UnexpectedApiResponseException(
       error.requestOptions,
       response,
+      error.type,
     );
     handler.reject(unexpected);
   }
@@ -50,6 +51,7 @@ class UnexpectedApiResponseException extends DioException
   UnexpectedApiResponseException(
     RequestOptions request,
     Response<dynamic>? originalResponse,
+    DioExceptionType originalType,
   ) : details = _details(originalResponse),
       super(
         requestOptions: _safeRequest(request),
@@ -60,7 +62,7 @@ class UnexpectedApiResponseException extends DioException
                 statusCode: originalResponse.statusCode,
                 data: _details(originalResponse),
               ),
-        type: DioExceptionType.badResponse,
+        type: originalType,
         message: "The API returned an unexpected response",
       );
 
@@ -79,7 +81,6 @@ Map<String, Object> _details(Response<dynamic>? response) {
     "content_type": ?response?.headers.value(Headers.contentTypeHeader),
     "server": ?response?.headers.value("server"),
     "cf_ray": ?response?.headers.value("cf-ray"),
-    "retry_after": ?response?.headers.value("retry-after"),
     if (body is String) "body_length": utf8.encode(body).length,
   });
 }
@@ -91,5 +92,6 @@ RequestOptions _safeRequest(RequestOptions request) {
   return RequestOptions(
     method: request.method,
     path: segments.isEmpty ? "/" : "/${segments.first}",
+    headers: {"x-request-id": ?request.headers["x-request-id"]},
   );
 }
