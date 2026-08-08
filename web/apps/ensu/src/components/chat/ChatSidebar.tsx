@@ -308,6 +308,11 @@ export const ChatSidebar = memo(
                                         "&.Mui-selected:hover": {
                                             backgroundColor: "fill.faintHover",
                                         },
+                                        "& .rename-chat-button": {
+                                            visibility: "hidden",
+                                        },
+                                        "&:hover .rename-chat-button, &:focus-within .rename-chat-button":
+                                            { visibility: "visible" },
                                     }}
                                 >
                                     <Stack
@@ -350,6 +355,7 @@ export const ChatSidebar = memo(
                                             </Typography>
                                         </Box>
                                         <IconButton
+                                            className="rename-chat-button"
                                             aria-label="Rename chat"
                                             sx={actionButtonSx}
                                             onClick={(event) => {
