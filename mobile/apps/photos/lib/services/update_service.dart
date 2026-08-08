@@ -15,6 +15,7 @@ enum ChangeLogAction { skip, consumeWithoutShowing, show }
 
 class UpdateService {
   static const kUpdateAvailableShownTimeKey = "update_available_shown_time_key";
+  static const _updateNotificationsEnabledKey = "update_notifications_enabled";
   static const changeLogVersionKey = "update_change_log_key";
   static const currentChangeLogVersion = 58;
 
@@ -98,10 +99,23 @@ class UpdateService {
     return _latestVersion;
   }
 
+  bool get updateNotificationsEnabled =>
+      _prefs.getBool(_updateNotificationsEnabledKey) ?? true;
+
+  Future<void> setUpdateNotificationsEnabled(bool enabled) async {
+    await _prefs.setBool(_updateNotificationsEnabledKey, enabled);
+  }
+
   Future<bool> shouldShowUpdateNotification() async {
     final shouldUpdate = await this.shouldUpdate();
 
-    if (!shouldUpdate) {
+    if (!shouldUpdate || _latestVersion == null) {
+      return false;
+    }
+    if (shouldForceUpdate(_latestVersion!)) {
+      return true;
+    }
+    if (!updateNotificationsEnabled) {
       return false;
     }
 
@@ -112,7 +126,7 @@ class UpdateService {
         (now - lastNotificationShownTime) >
         ((_latestVersion!.shouldNotify ? 1 : 3) * microSecondsInDay);
 
-    return shouldUpdate && hasBeenThresholdDaysSinceLastNotification;
+    return hasBeenThresholdDaysSinceLastNotification;
   }
 
   Future<void> showUpdateNotification() async {

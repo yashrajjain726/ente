@@ -15,6 +15,7 @@ class UpdateService {
 
   static final UpdateService instance = UpdateService._privateConstructor();
   static const kUpdateAvailableShownTimeKey = "update_available_shown_time_key";
+  static const _updateNotificationsEnabledKey = "update_notifications_enabled";
 
   LatestVersionInfo? _latestVersion;
   final _logger = Logger("UpdateService");
@@ -58,33 +59,53 @@ class UpdateService {
     return _latestVersion;
   }
 
-  Future<bool> showUpdateNotification() async {
-    if (!supportsInAppUpdates()) {
+  bool get updateNotificationsEnabled =>
+      _prefs.getBool(_updateNotificationsEnabledKey) ?? true;
+
+  Future<void> setUpdateNotificationsEnabled(bool enabled) async {
+    await _prefs.setBool(_updateNotificationsEnabledKey, enabled);
+  }
+
+  Future<bool> shouldShowUpdatePrompt() async {
+    if (!await shouldUpdate()) {
       return false;
     }
-    final shouldUpdate = await this.shouldUpdate();
+    final isCritical = shouldForceUpdate(_latestVersion);
+    return isCritical || _shouldShowNotification(isCritical: false);
+  }
+
+  Future<void> showUpdateNotification() async {
+    if (!await shouldUpdate()) {
+      return;
+    }
+    final isCritical = shouldForceUpdate(_latestVersion);
+    if (!_shouldShowNotification(isCritical: isCritical)) {
+      _logger.info("Debouncing notification");
+      return;
+    }
+    final now = DateTime.now().microsecondsSinceEpoch;
+    await _prefs.setInt(kUpdateAvailableShownTimeKey, now);
+    if (Platform.isAndroid) {
+      unawaited(
+        NotificationService.instance.showNotification(
+          "Update available",
+          "Click to install our best version yet",
+        ),
+      );
+    }
+  }
+
+  bool _shouldShowNotification({required bool isCritical}) {
+    if (!isCritical && !updateNotificationsEnabled) {
+      return false;
+    }
     final lastNotificationShownTime =
         _prefs.getInt(kUpdateAvailableShownTimeKey) ?? 0;
     final now = DateTime.now().microsecondsSinceEpoch;
     final hasBeen3DaysSinceLastNotification =
         (now - lastNotificationShownTime) > (3 * microSecondsInDay);
-    if (shouldUpdate &&
-        hasBeen3DaysSinceLastNotification &&
-        _latestVersion!.shouldNotify!) {
-      await _prefs.setInt(kUpdateAvailableShownTimeKey, now);
-      if (Platform.isAndroid) {
-        unawaited(
-          NotificationService.instance.showNotification(
-            "Update available",
-            "Click to install our best version yet",
-          ),
-        );
-      }
-      return true;
-    } else {
-      _logger.info("Debouncing notification");
-      return false;
-    }
+    return hasBeen3DaysSinceLastNotification &&
+        (isCritical || _latestVersion!.shouldNotify!);
   }
 
   Future<LatestVersionInfo> _getLatestVersionInfo() async {
