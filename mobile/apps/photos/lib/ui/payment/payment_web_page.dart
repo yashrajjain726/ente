@@ -101,9 +101,11 @@ class _PaymentWebPageState extends State<PaymentWebPage> {
                   if (navigationAction.isForMainFrame == true &&
                       error.type != WebResourceErrorType.CANCELLED) {
                     if (!mounted) return;
-                    Navigator.of(context).pop(false);
+                    final navigator = Navigator.of(context);
+                    navigator.pop(false);
+                    if (!navigator.mounted) return;
                     await showGenericErrorDialog(
-                      context: context,
+                      context: navigator.context,
                       error: error,
                     );
                   }
