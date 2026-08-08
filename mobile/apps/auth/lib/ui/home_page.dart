@@ -35,6 +35,7 @@ import 'package:ente_auth/ui/home/home_empty_state.dart';
 import 'package:ente_auth/ui/home/shortcuts.dart';
 import 'package:ente_auth/ui/home/speed_dial_label_widget.dart';
 import 'package:ente_auth/ui/home/widgets/auth_logo_widget.dart';
+import 'package:ente_auth/ui/home/widgets/home_search_field.dart';
 import 'package:ente_auth/ui/reorder_codes_page.dart';
 import 'package:ente_auth/ui/scanner_page.dart';
 import 'package:ente_auth/ui/settings/data/import/google_auth_import.dart';
@@ -1068,7 +1069,8 @@ class _HomePageState extends State<HomePage> {
         return true;
       }
 
-      // On desktop, typing a printable character opens search with that input.
+      // On desktop, typing a printable character opens search. Keep the key
+      // unhandled so the text input system can preserve IME composition.
       if (PlatformDetector.isDesktop() &&
           !isHomeSearchFocused &&
           !isMetaKeyPressed &&
@@ -1078,26 +1080,19 @@ class _HomePageState extends State<HomePage> {
           !isFocusedCopyShortcut &&
           event.character != null &&
           event.character!.trim().isNotEmpty) {
-        final String searchText = _showSearchBox
-            ? _textController.text + event.character!
-            : event.character!;
-        setState(() {
-          _showSearchBox = true;
-          _searchText = searchText;
-          _textController.value = TextEditingValue(
-            text: searchText,
-            selection: TextSelection.collapsed(offset: searchText.length),
-          );
-        });
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (!mounted) return;
-          searchBoxFocusNode.requestFocus();
-        });
-        return true;
+        return activateHomeSearchFromKeyEvent(
+          showSearch: () {
+            setState(() {
+              _showSearchBox = true;
+            });
+          },
+          focusNode: searchBoxFocusNode,
+        );
       }
 
       // Only use Escape for the HomePage search UI.
       if (event.logicalKey == LogicalKeyboardKey.escape && _showSearchBox) {
+        searchBoxFocusNode.unfocus();
         setState(() {
           _textController.clear();
           _searchText = "";
@@ -1505,6 +1500,36 @@ class _HomePageState extends State<HomePage> {
   ) {
     final colorScheme = getEnteColorScheme(context);
     final iconColor = colorScheme.textBase;
+    final searchField = AndroidTextInputAutofocus(
+      enabled: _autoFocusSearch && _showSearchBox,
+      focusNode: searchBoxFocusNode,
+      child: TextField(
+        autocorrect: false,
+        enableSuggestions: false,
+        autofocus: _autoFocusSearch && _showSearchBox && !Platform.isAndroid,
+        selectAllOnFocus: false,
+        controller: _textController,
+        onChanged: (val) {
+          _searchText = val;
+          _applyFilteringAndRefresh();
+        },
+        onSubmitted: (_) {
+          if (_filteredCodes.isNotEmpty) {
+            // Move focus to the first item in the grid
+            _firstItemFocusNode.requestFocus();
+          }
+        },
+        decoration: InputDecoration(
+          hintText: l10n.searchHint,
+          border: InputBorder.none,
+          focusedBorder: InputBorder.none,
+        ),
+        focusNode: searchBoxFocusNode,
+      ),
+    );
+    final nonDesktopTitle = _showSearchBox
+        ? searchField
+        : const AuthLogoWidget(height: 18);
 
     return AppBar(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -1521,35 +1546,18 @@ class _HomePageState extends State<HomePage> {
           scaffoldKey.currentState?.openDrawer();
         },
       ),
-      title: !_showSearchBox
-          ? const AuthLogoWidget(height: 18)
-          : AndroidTextInputAutofocus(
-              enabled: _autoFocusSearch,
-              focusNode: searchBoxFocusNode,
-              child: TextField(
-                autocorrect: false,
-                enableSuggestions: false,
-                autofocus: _autoFocusSearch && !Platform.isAndroid,
-                selectAllOnFocus: false,
-                controller: _textController,
-                onChanged: (val) {
-                  _searchText = val;
-                  _applyFilteringAndRefresh();
-                },
-                onSubmitted: (_) {
-                  if (_filteredCodes.isNotEmpty) {
-                    // Move focus to the first item in the grid
-                    _firstItemFocusNode.requestFocus();
-                  }
-                },
-                decoration: InputDecoration(
-                  hintText: l10n.searchHint,
-                  border: InputBorder.none,
-                  focusedBorder: InputBorder.none,
+      title: isDesktop
+          ? Stack(
+              alignment: Alignment.center,
+              children: [
+                if (!_showSearchBox) const AuthLogoWidget(height: 18),
+                PersistentSearchField(
+                  visible: _showSearchBox,
+                  child: searchField,
                 ),
-                focusNode: searchBoxFocusNode,
-              ),
-            ),
+              ],
+            )
+          : nonDesktopTitle,
       centerTitle: true,
       actions: <Widget>[
         if (isDesktop)
@@ -1600,6 +1608,7 @@ class _HomePageState extends State<HomePage> {
             setState(() {
               _showSearchBox = !_showSearchBox;
               if (!_showSearchBox) {
+                searchBoxFocusNode.unfocus();
                 _textController.clear();
                 _searchText = "";
               } else {
