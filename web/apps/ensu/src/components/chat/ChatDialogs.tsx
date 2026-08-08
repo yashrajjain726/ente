@@ -75,6 +75,11 @@ export interface ChatDialogsProps {
     openModelSettings: () => void;
     openSystemPromptSettings: () => void;
     isSmall: boolean;
+    renameSessionId: string | null;
+    renameSessionTitle: string;
+    setRenameSessionTitle: (title: string) => void;
+    handleCancelRenameSession: () => void;
+    handleConfirmRenameSession: () => void | Promise<void>;
     deleteSessionId: string | null;
     deleteSessionLabel: string;
     handleCancelDeleteSession: () => void;
@@ -122,6 +127,11 @@ export const ChatDialogs = memo(
         openModelSettings,
         openSystemPromptSettings,
         isSmall,
+        renameSessionId,
+        renameSessionTitle,
+        setRenameSessionTitle,
+        handleCancelRenameSession,
+        handleConfirmRenameSession,
         deleteSessionId,
         deleteSessionLabel,
         handleCancelDeleteSession,
@@ -623,6 +633,53 @@ export const ChatDialogs = memo(
                             onClick={() => setShowBackupComingSoon(false)}
                         >
                             Got it
+                        </Button>
+                    </DialogActions>
+                </Dialog>
+
+                <Dialog
+                    open={Boolean(renameSessionId)}
+                    onClose={handleCancelRenameSession}
+                    fullScreen={isSmall}
+                    maxWidth="xs"
+                    fullWidth
+                    slotProps={{ paper: { sx: dialogPaperSx } }}
+                >
+                    <DialogTitle sx={dialogTitleSx}>Rename chat</DialogTitle>
+                    <DialogContent>
+                        <TextField
+                            value={renameSessionTitle}
+                            onChange={(event) =>
+                                setRenameSessionTitle(event.target.value)
+                            }
+                            autoFocus
+                            fullWidth
+                            label="Chat name"
+                            slotProps={{ htmlInput: { maxLength: 40 } }}
+                            onKeyDown={(event) => {
+                                if (
+                                    event.key === "Enter" &&
+                                    !event.nativeEvent.isComposing
+                                ) {
+                                    void handleConfirmRenameSession();
+                                }
+                            }}
+                        />
+                    </DialogContent>
+                    <DialogActions sx={{ px: 3, pb: 3 }}>
+                        <Button
+                            onClick={handleCancelRenameSession}
+                            color="secondary"
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            variant="contained"
+                            color="accent"
+                            disabled={!renameSessionTitle.trim()}
+                            onClick={() => void handleConfirmRenameSession()}
+                        >
+                            Rename
                         </Button>
                     </DialogActions>
                 </Dialog>
