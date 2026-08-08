@@ -1,5 +1,6 @@
 import "package:ente_components/ente_components.dart";
 import "package:ente_strings/ente_strings.dart";
+import "package:ente_ui/components/loading_widget.dart";
 import "package:flutter/foundation.dart";
 import 'package:flutter/material.dart';
 import "package:photos/models/collection/collection.dart";
@@ -12,7 +13,6 @@ import "package:photos/services/home_widget_service.dart";
 import "package:photos/settings/local_settings.dart";
 import "package:photos/theme/ente_theme.dart";
 import "package:photos/ui/collections/flex_grid_view.dart";
-import "package:photos/ui/common/loading_widget.dart";
 
 class AlbumsWidgetSettings extends StatefulWidget {
   const AlbumsWidgetSettings({super.key});

@@ -1,8 +1,8 @@
 import "dart:io";
 
 import "package:ente_strings/ente_strings.dart";
+import "package:ente_ui/components/loading_widget.dart";
 import "package:flutter/material.dart";
-import "package:photos/ui/common/loading_widget.dart";
 
 class LogFileViewer extends StatefulWidget {
   final File file;

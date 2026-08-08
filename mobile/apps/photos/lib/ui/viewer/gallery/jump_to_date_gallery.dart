@@ -1,5 +1,6 @@
 import "dart:async";
 
+import 'package:ente_ui/components/loading_widget.dart';
 import 'package:flutter/material.dart';
 import "package:photos/core/configuration.dart";
 import 'package:photos/core/event_bus.dart';
@@ -12,7 +13,6 @@ import 'package:photos/models/selected_files.dart';
 import "package:photos/service_locator.dart" show isLocalGalleryMode;
 import 'package:photos/services/search_service.dart';
 import "package:photos/theme/ente_theme.dart";
-import 'package:photos/ui/common/loading_widget.dart';
 import 'package:photos/ui/viewer/actions/file_selection_overlay_bar.dart';
 import 'package:photos/ui/viewer/gallery/component/group/type.dart';
 import 'package:photos/ui/viewer/gallery/gallery.dart';

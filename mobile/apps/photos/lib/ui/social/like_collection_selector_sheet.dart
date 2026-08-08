@@ -1,5 +1,6 @@
 import "package:ente_icons/ente_icons.dart";
 import "package:ente_strings/ente_strings.dart";
+import "package:ente_ui/components/loading_widget.dart";
 import "package:flutter/foundation.dart";
 import "package:flutter/material.dart";
 import "package:logging/logging.dart";
@@ -11,7 +12,6 @@ import "package:photos/models/file/file.dart";
 import "package:photos/models/social/social_data_provider.dart";
 import "package:photos/service_locator.dart";
 import "package:photos/theme/ente_theme.dart";
-import "package:photos/ui/common/loading_widget.dart";
 import "package:photos/ui/components/buttons/icon_button_widget.dart";
 import "package:photos/ui/notification/toast.dart";
 import "package:photos/ui/viewer/file/thumbnail_widget.dart";

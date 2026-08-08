@@ -1,9 +1,9 @@
 import 'dart:convert';
 
+import 'package:ente_ui/components/loading_widget.dart';
 import 'package:flutter/material.dart';
 import 'package:photos/core/network/network.dart';
 import 'package:photos/ente_theme_data.dart';
-import 'package:photos/ui/common/loading_widget.dart';
 
 class BillingQuestionsWidget extends StatelessWidget {
   const BillingQuestionsWidget({super.key});

@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import "package:ente_strings/ente_strings.dart";
+import 'package:ente_ui/components/loading_widget.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
@@ -11,7 +12,6 @@ import 'package:photos/gateways/billing/models/subscription.dart';
 import "package:photos/service_locator.dart";
 import 'package:photos/services/account/billing_service.dart';
 import 'package:photos/services/account/user_service.dart';
-import 'package:photos/ui/common/loading_widget.dart';
 import 'package:photos/utils/dialog_util.dart';
 import "package:photos/utils/email_util.dart";
 

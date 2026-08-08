@@ -2,6 +2,7 @@ import "dart:async";
 import "dart:io";
 
 import "package:ente_strings/ente_strings.dart";
+import "package:ente_ui/components/loading_widget.dart";
 import "package:flutter/material.dart";
 import "package:logging/logging.dart";
 import "package:media_kit/media_kit.dart";
@@ -24,7 +25,6 @@ import "package:photos/states/detail_page_state.dart";
 import "package:photos/theme/colors.dart";
 import "package:photos/theme/ente_theme.dart";
 import "package:photos/ui/actions/file/file_actions.dart";
-import "package:photos/ui/common/loading_widget.dart";
 import "package:photos/ui/notification/toast.dart";
 import "package:photos/ui/viewer/file/video_widget_media_kit_common.dart"
     as common;
