@@ -1,6 +1,7 @@
 import "dart:async";
 
 import "package:ente_strings/ente_strings.dart";
+import "package:ente_ui/components/divider_widget.dart";
 import "package:ente_ui/components/loading_widget.dart";
 import "package:flutter/foundation.dart";
 import "package:flutter/material.dart";
@@ -14,7 +15,6 @@ import "package:photos/services/contacts/contact_identity_resolver.dart";
 import "package:photos/theme/ente_theme.dart";
 import "package:photos/ui/components/alert_bottom_sheet.dart";
 import "package:photos/ui/components/buttons/button_widget_v2.dart";
-import "package:photos/ui/components/divider_widget.dart";
 import "package:photos/ui/components/menu_item_widget/menu_item_widget_new.dart";
 import "package:photos/ui/components/menu_section_title.dart";
 import "package:photos/ui/components/title_bar_title_widget.dart";
