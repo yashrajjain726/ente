@@ -63,6 +63,7 @@ import 'package:ente_ui/pages/base_home_page.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart' as widgets;
 import 'package:flutter_speed_dial/flutter_speed_dial.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'package:hugeicons/hugeicons.dart';
@@ -1038,6 +1039,16 @@ class _HomePageState extends State<HomePage> {
           pressed.contains(LogicalKeyboardKey.shiftRight) ||
           pressed.contains(LogicalKeyboardKey.shift);
 
+      final focusContext = primaryFocus?.context;
+      final bool isFocusedCopyShortcut =
+          focusContext != null &&
+          ((event.logicalKey == LogicalKeyboardKey.keyC &&
+                  widgets.Actions.maybeFind<CopyIntent>(focusContext) !=
+                      null) ||
+              (event.logicalKey == LogicalKeyboardKey.keyN &&
+                  widgets.Actions.maybeFind<CopyNextIntent>(focusContext) !=
+                      null));
+
       if (isMetaKeyPressed && event.logicalKey == LogicalKeyboardKey.keyW) {
         if (PlatformDetector.isDesktop()) {
           windowManager.close();
@@ -1052,6 +1063,34 @@ class _HomePageState extends State<HomePage> {
               !isShiftPressed)) {
         setState(() {
           _showSearchBox = true;
+          searchBoxFocusNode.requestFocus();
+        });
+        return true;
+      }
+
+      // On desktop, typing a printable character opens search with that input.
+      if (PlatformDetector.isDesktop() &&
+          !isHomeSearchFocused &&
+          !isMetaKeyPressed &&
+          !pressed.contains(LogicalKeyboardKey.altLeft) &&
+          !pressed.contains(LogicalKeyboardKey.alt) &&
+          !pressed.contains(LogicalKeyboardKey.altRight) &&
+          !isFocusedCopyShortcut &&
+          event.character != null &&
+          event.character!.trim().isNotEmpty) {
+        final String searchText = _showSearchBox
+            ? _textController.text + event.character!
+            : event.character!;
+        setState(() {
+          _showSearchBox = true;
+          _searchText = searchText;
+          _textController.value = TextEditingValue(
+            text: searchText,
+            selection: TextSelection.collapsed(offset: searchText.length),
+          );
+        });
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
           searchBoxFocusNode.requestFocus();
         });
         return true;
@@ -1491,6 +1530,7 @@ class _HomePageState extends State<HomePage> {
                 autocorrect: false,
                 enableSuggestions: false,
                 autofocus: _autoFocusSearch && !Platform.isAndroid,
+                selectAllOnFocus: false,
                 controller: _textController,
                 onChanged: (val) {
                   _searchText = val;
