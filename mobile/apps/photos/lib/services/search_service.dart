@@ -303,6 +303,44 @@ class SearchService {
     return FilesDB.instance.hasAnyFile();
   }
 
+  Future<List<GenericSearchResult>> getUploadedFileIDsSearchResults(
+    String query,
+    Set<int> uploadedFileIDs,
+  ) async {
+    if (uploadedFileIDs.isEmpty) {
+      return [];
+    }
+
+    try {
+      final files = await FilesDB.instance.getFilesFromIDs(
+        uploadedFileIDs.toList(),
+        dedupeByUploadId: true,
+        collectionsToIgnore: ignoreCollections(),
+      );
+      if (files.isEmpty) {
+        return [];
+      }
+
+      final matchedUploadedFileIDs = filesToUploadedFileIDs(files);
+      return [
+        GenericSearchResult(
+          ResultType.file,
+          query.trim(),
+          files,
+          hierarchicalSearchFilter: TopLevelGenericFilter(
+            filterName: query.trim(),
+            occurrence: kMostRelevantFilter,
+            filterResultType: ResultType.file,
+            matchedUploadedIDs: matchedUploadedFileIDs,
+          ),
+        ),
+      ];
+    } catch (e, s) {
+      _logger.severe("Failed to search by uploaded file IDs", e, s);
+      return [];
+    }
+  }
+
   Future<List<EnteFile>> getAllFilesForHierarchicalSearch() async {
     if (_cachedFilesFuture != null &&
         _cachedFilesForHierarchicalSearch != null) {
