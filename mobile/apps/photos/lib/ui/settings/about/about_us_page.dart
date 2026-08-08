@@ -4,7 +4,7 @@ import "package:ente_ui/components/settings/about_settings_section.dart";
 import "package:flutter/material.dart";
 import "package:photos/service_locator.dart";
 import "package:photos/ui/notification/toast.dart";
-import "package:photos/ui/settings/app_update_dialog.dart";
+import "package:photos/ui/settings/app_update_sheet.dart";
 
 class AboutUsPage extends StatelessWidget {
   const AboutUsPage({super.key});
@@ -37,11 +37,6 @@ class AboutUsPage extends StatelessWidget {
       showShortToast(context, context.strings.youAreOnTheLatestVersion);
       return;
     }
-    await showDialog(
-      useRootNavigator: false,
-      context: context,
-      builder: (_) => AppUpdateDialog(latestVersion),
-      barrierColor: Colors.black.withValues(alpha: 0.85),
-    );
+    await showAppUpdateSheet(context, latestVersionInfo: latestVersion);
   }
 }

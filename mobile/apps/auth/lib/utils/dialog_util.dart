@@ -3,7 +3,6 @@ import 'dart:math';
 
 import 'package:confetti/confetti.dart';
 import "package:dio/dio.dart";
-import 'package:ente_auth/ui/common/loading_widget.dart';
 import 'package:ente_auth/ui/components/action_sheet_widget.dart';
 import 'package:ente_auth/ui/components/buttons/button_widget.dart';
 import 'package:ente_auth/ui/components/components_constants.dart';
@@ -15,6 +14,7 @@ import 'package:ente_auth/utils/platform_util.dart';
 import 'package:ente_base/typedefs.dart';
 import 'package:ente_components/ente_components.dart';
 import 'package:ente_strings/ente_strings.dart';
+import 'package:ente_ui/components/loading_widget.dart';
 import 'package:ente_ui/components/progress_dialog.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';

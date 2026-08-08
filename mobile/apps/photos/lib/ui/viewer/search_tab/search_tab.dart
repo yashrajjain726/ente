@@ -1,5 +1,6 @@
 import "package:ente_components/theme/text_styles.dart";
 import "package:ente_strings/ente_strings.dart";
+import "package:ente_ui/components/loading_widget.dart";
 import "package:fade_indexed_stack/fade_indexed_stack.dart";
 import "package:flutter/foundation.dart";
 import "package:flutter/material.dart";
@@ -13,7 +14,6 @@ import "package:photos/service_locator.dart";
 import "package:photos/services/wrapped/wrapped_service.dart";
 import "package:photos/states/all_sections_examples_state.dart";
 import "package:photos/theme/ente_theme.dart";
-import "package:photos/ui/common/loading_widget.dart";
 import "package:photos/ui/components/banners/ml_progress_banner.dart";
 import "package:photos/ui/rituals/rituals_banner.dart";
 import "package:photos/ui/viewer/search/result/no_result_widget.dart";

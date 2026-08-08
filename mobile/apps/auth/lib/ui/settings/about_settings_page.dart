@@ -1,5 +1,5 @@
 import 'package:ente_auth/services/update_service.dart';
-import 'package:ente_auth/ui/settings/app_update_dialog.dart';
+import 'package:ente_auth/ui/settings/app_update_sheet.dart';
 import 'package:ente_auth/ui/settings/components/auth_settings_page_scaffold.dart';
 import 'package:ente_auth/utils/toast_util.dart';
 import 'package:ente_strings/ente_strings.dart';
@@ -36,10 +36,6 @@ class AboutSettingsPage extends StatelessWidget {
       showShortToast(context, context.strings.youAreOnTheLatestVersion);
       return;
     }
-    await showDialog<void>(
-      context: context,
-      builder: (_) => AppUpdateDialog(latestVersion),
-      barrierColor: Colors.black.withValues(alpha: 0.85),
-    );
+    await showAppUpdateSheet(context, latestVersionInfo: latestVersion);
   }
 }

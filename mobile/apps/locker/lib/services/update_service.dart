@@ -13,6 +13,8 @@ class UpdateService {
   static final UpdateService instance = UpdateService._privateConstructor();
   static const String kUpdateAvailableShownTimeKey =
       "update_available_shown_time_key";
+  static const String _updateNotificationsEnabledKey =
+      "update_notifications_enabled";
   static const String kChangeLogShownVersionKey = "update_change_log_key";
   static const int currentChangeLogVersion = 1;
   static const String _lockerIndependentPackageName =
@@ -68,6 +70,13 @@ class UpdateService {
     return _latestVersion;
   }
 
+  bool get updateNotificationsEnabled =>
+      _prefs!.getBool(_updateNotificationsEnabledKey) ?? true;
+
+  Future<void> setUpdateNotificationsEnabled(bool enabled) async {
+    await _prefs!.setBool(_updateNotificationsEnabledKey, enabled);
+  }
+
   Future<bool> shouldShowUpdateNotification() async {
     if (!_isInitialized || !isIndependent()) {
       return false;
@@ -75,6 +84,12 @@ class UpdateService {
 
     final shouldUpdate = await this.shouldUpdate();
     if (!shouldUpdate || _latestVersion == null) {
+      return false;
+    }
+    if (shouldForceUpdate(_latestVersion)) {
+      return true;
+    }
+    if (!updateNotificationsEnabled) {
       return false;
     }
 

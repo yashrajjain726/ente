@@ -1,5 +1,6 @@
 import "dart:typed_data";
 
+import "package:ente_ui/components/loading_widget.dart";
 import 'package:flutter/widgets.dart';
 import "package:logging/logging.dart";
 import "package:photos/db/ml/db.dart";
@@ -8,7 +9,6 @@ import 'package:photos/models/file/file.dart';
 import "package:photos/models/ml/face/face.dart";
 import "package:photos/service_locator.dart" show isLocalGalleryMode;
 import "package:photos/theme/ente_theme.dart";
-import "package:photos/ui/common/loading_widget.dart";
 import "package:photos/ui/viewer/file/thumbnail_widget.dart";
 import "package:photos/utils/face/face_thumbnail_cache.dart";
 

@@ -16,7 +16,7 @@ import 'package:locker/services/contacts_display_service.dart';
 import "package:locker/services/update_service.dart";
 import 'package:locker/ui/pages/home_page.dart';
 import 'package:locker/ui/pages/onboarding_page.dart';
-import "package:locker/ui/settings/widgets/app_update_dialog.dart";
+import "package:locker/ui/settings/app_update_sheet.dart";
 import "package:locker/ui/settings/widgets/change_log_sheet.dart";
 
 class App extends StatefulWidget {
@@ -95,7 +95,7 @@ class _AppState extends State<App> with WidgetsBindingObserver {
       return false;
     }
 
-    await showAppUpdateBottomSheet(context, latestVersionInfo: latestVersion);
+    await showAppUpdateSheet(context, latestVersionInfo: latestVersion);
     await UpdateService.instance.markUpdateNotificationShown();
     return true;
   }
