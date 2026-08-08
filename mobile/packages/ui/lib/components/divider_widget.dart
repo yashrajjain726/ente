@@ -18,19 +18,21 @@ class DividerWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final dividerColor = divColorHasBlur
-        ? getEnteColorScheme(context).blurStrokeFaint
-        : getEnteColorScheme(context).strokeFaint;
+    final colorScheme = getEnteColorScheme(context);
+    final dividerColor = dividerType == DividerType.solid || !divColorHasBlur
+        ? colorScheme.fillMuted
+        : colorScheme.blurStrokeFaint;
 
-    if (dividerType == DividerType.solid) {
-      return Container(
-        color: getEnteColorScheme(context).strokeFaint,
-        width: double.infinity,
-        height: 1,
+    if (dividerType == DividerType.solid ||
+        dividerType == DividerType.bottomBar) {
+      return Padding(
+        padding: padding ?? EdgeInsets.zero,
+        child: Container(
+          color: dividerColor,
+          width: double.infinity,
+          height: 1,
+        ),
       );
-    }
-    if (dividerType == DividerType.bottomBar) {
-      return Container(color: dividerColor, width: double.infinity, height: 1);
     }
 
     return Container(
