@@ -4,6 +4,7 @@ import {
     ArrowRight01Icon,
     Cancel01Icon,
     Delete01Icon,
+    Edit01Icon,
     PlusSignIcon,
     Search01Icon,
 } from "@hugeicons/core-free-icons";
@@ -42,6 +43,7 @@ export interface ChatSidebarProps {
     groupedSessions: Array<[string, ChatSession[]]>;
     currentSessionId?: string;
     handleSelectSession: (sessionId: string) => void;
+    requestRenameSession: (session: ChatSession) => void;
     requestDeleteSession: (sessionId: string) => void;
     openSettingsModal: () => void;
 }
@@ -65,6 +67,7 @@ export const ChatSidebar = memo(
         groupedSessions,
         currentSessionId,
         handleSelectSession,
+        requestRenameSession,
         requestDeleteSession,
         openSettingsModal,
     }: ChatSidebarProps) => (
@@ -346,6 +349,19 @@ export const ChatSidebar = memo(
                                                     "Nothing here"}
                                             </Typography>
                                         </Box>
+                                        <IconButton
+                                            aria-label="Rename chat"
+                                            sx={actionButtonSx}
+                                            onClick={(event) => {
+                                                event.stopPropagation();
+                                                requestRenameSession(session);
+                                            }}
+                                        >
+                                            <HugeiconsIcon
+                                                icon={Edit01Icon}
+                                                {...actionIconProps}
+                                            />
+                                        </IconButton>
                                         <IconButton
                                             aria-label="Delete chat"
                                             sx={actionButtonSx}

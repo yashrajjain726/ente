@@ -650,6 +650,8 @@ const Page: React.FC = () => {
     >("checking");
     const [modelGateError, setModelGateError] = useState<string | null>(null);
     const [isTauriRuntime, setIsTauriRuntime] = useState(false);
+    const [renameSessionId, setRenameSessionId] = useState<string | null>(null);
+    const [renameSessionTitle, setRenameSessionTitle] = useState("");
     const [deleteSessionId, setDeleteSessionId] = useState<string | null>(null);
 
     const allowMmproj = isTauriRuntime;
@@ -664,6 +666,9 @@ const Page: React.FC = () => {
         previousSelection?: string | null;
     } | null>(null);
     const sessionSummaryInFlightRef = useRef(false);
+    const manuallyRenamedSessionIdsRef = useRef(new Set<string>());
+    const pendingSessionRenamesRef = useRef(new Set<string>());
+    const sessionTitleUpdatesRef = useRef(new Map<string, Promise<void>>());
     const inputRef = useRef<HTMLTextAreaElement | null>(null);
     const attachmentPreviewUrlsRef = useRef<Record<string, string>>({});
     const pendingPreviewUrlsRef = useRef<Record<string, string>>({});
@@ -1853,6 +1858,30 @@ const Page: React.FC = () => {
         [],
     );
 
+    const persistSessionTitle = useCallback(
+        (sessionUuid: string, title: string, key: string) => {
+            const previous = sessionTitleUpdatesRef.current.get(sessionUuid);
+            const task = (previous?.catch(() => {}) ?? Promise.resolve()).then(
+                async () => {
+                    await updateSessionTitle(sessionUuid, title, key);
+                    updateSessionTitleInState(sessionUuid, title);
+                },
+            );
+            sessionTitleUpdatesRef.current.set(sessionUuid, task);
+            void task
+                .finally(() => {
+                    if (
+                        sessionTitleUpdatesRef.current.get(sessionUuid) === task
+                    ) {
+                        sessionTitleUpdatesRef.current.delete(sessionUuid);
+                    }
+                })
+                .catch(() => {});
+            return task;
+        },
+        [updateSessionTitleInState],
+    );
+
     const maybeGenerateSessionTitle = useCallback(
         async ({
             sessionUuid,
@@ -1899,20 +1928,17 @@ const Page: React.FC = () => {
                     ? sessionTitleFromText(summarySeed, fallbackTitle)
                     : fallbackTitle;
 
-                await updateSessionTitle(sessionUuid, title, chatKey);
-                updateSessionTitleInState(sessionUuid, title);
+                if (manuallyRenamedSessionIdsRef.current.has(sessionUuid)) {
+                    return;
+                }
+                await persistSessionTitle(sessionUuid, title, chatKey);
             } catch (error) {
                 log.error("Failed to generate session title", error);
             } finally {
                 sessionSummaryInFlightRef.current = false;
             }
         },
-        [
-            chatKey,
-            generateSessionSummary,
-            trimToWords,
-            updateSessionTitleInState,
-        ],
+        [chatKey, generateSessionSummary, persistSessionTitle, trimToWords],
     );
 
     const preloadModelIfAvailable = useCallback(async () => {
@@ -2236,6 +2262,7 @@ const Page: React.FC = () => {
 
     const removeSessionFromState = useCallback(
         (sessionId: string) => {
+            manuallyRenamedSessionIdsRef.current.delete(sessionId);
             setSessions((prev) =>
                 prev.filter((session) => session.sessionUuid !== sessionId),
             );
@@ -2288,6 +2315,45 @@ const Page: React.FC = () => {
     const requestDeleteSession = useCallback((sessionId: string) => {
         setDeleteSessionId(sessionId);
     }, []);
+
+    const requestRenameSession = useCallback((session: ChatSession) => {
+        if (pendingSessionRenamesRef.current.has(session.sessionUuid)) return;
+        setRenameSessionId(session.sessionUuid);
+        setRenameSessionTitle(session.title?.trim() || "New chat");
+    }, []);
+
+    const handleCancelRenameSession = useCallback(() => {
+        setRenameSessionId(null);
+        setRenameSessionTitle("");
+    }, []);
+
+    const handleConfirmRenameSession = useCallback(async () => {
+        if (!chatKey || !renameSessionId || !renameSessionTitle.trim()) return;
+        if (pendingSessionRenamesRef.current.has(renameSessionId)) return;
+        pendingSessionRenamesRef.current.add(renameSessionId);
+        const title = sessionTitleFromText(renameSessionTitle);
+        const wasManuallyRenamed =
+            manuallyRenamedSessionIdsRef.current.has(renameSessionId);
+        manuallyRenamedSessionIdsRef.current.add(renameSessionId);
+        handleCancelRenameSession();
+        try {
+            await persistSessionTitle(renameSessionId, title, chatKey);
+        } catch (error) {
+            if (!wasManuallyRenamed) {
+                manuallyRenamedSessionIdsRef.current.delete(renameSessionId);
+            }
+            onGenericError(error);
+        } finally {
+            pendingSessionRenamesRef.current.delete(renameSessionId);
+        }
+    }, [
+        chatKey,
+        handleCancelRenameSession,
+        onGenericError,
+        persistSessionTitle,
+        renameSessionId,
+        renameSessionTitle,
+    ]);
 
     const handleConfirmDeleteSession = useCallback(async () => {
         if (!deleteSessionId) return;
@@ -3890,6 +3956,7 @@ const Page: React.FC = () => {
             groupedSessions={groupedSessions}
             currentSessionId={currentSessionId}
             handleSelectSession={handleSelectSession}
+            requestRenameSession={requestRenameSession}
             requestDeleteSession={requestDeleteSession}
             openSettingsModal={openSettingsModal}
         />
@@ -4171,6 +4238,11 @@ const Page: React.FC = () => {
                 openModelSettings={openModelSettings}
                 openSystemPromptSettings={openSystemPromptSettings}
                 isSmall={isSmall}
+                renameSessionId={renameSessionId}
+                renameSessionTitle={renameSessionTitle}
+                setRenameSessionTitle={setRenameSessionTitle}
+                handleCancelRenameSession={handleCancelRenameSession}
+                handleConfirmRenameSession={handleConfirmRenameSession}
                 deleteSessionId={deleteSessionId}
                 deleteSessionLabel={deleteSessionLabel}
                 handleCancelDeleteSession={handleCancelDeleteSession}
