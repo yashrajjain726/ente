@@ -7,24 +7,15 @@ public final class DeviceHealthService {
 
     private var observer: Observer?
     private var observerTokens: [NSObjectProtocol] = []
-    private var enabledBatteryMonitoring = false
+    private var hasBatteryMonitoringLease = false
     private var lastState: HealthState?
 
     public init() {}
 
     public func snapshot() -> DeviceHealthSnapshot {
-        let device = UIDevice.current
-        let restoreMonitoring =
-            Self.supportsBatteryMonitoring
-            && !device.isBatteryMonitoringEnabled
-        if restoreMonitoring {
-            device.isBatteryMonitoringEnabled = true
-        }
-        defer {
-            if restoreMonitoring {
-                device.isBatteryMonitoringEnabled = false
-            }
-        }
+        guard Self.supportsBatteryMonitoring else { return currentSnapshot() }
+        Self.acquireBatteryMonitoring()
+        defer { Self.releaseBatteryMonitoring() }
         return currentSnapshot()
     }
 
@@ -40,16 +31,18 @@ public final class DeviceHealthService {
         self.observer = observer
 
         let device = UIDevice.current
-        if Self.supportsBatteryMonitoring && !device.isBatteryMonitoringEnabled {
-            device.isBatteryMonitoringEnabled = true
-            enabledBatteryMonitoring = true
+        if Self.supportsBatteryMonitoring {
+            Self.acquireBatteryMonitoring()
+            hasBatteryMonitoringLease = true
         }
 
         let center = NotificationCenter.default
+        let processInfo = ProcessInfo.processInfo
+        _ = processInfo.thermalState
         observerTokens = [
             center.addObserver(
                 forName: ProcessInfo.thermalStateDidChangeNotification,
-                object: ProcessInfo.processInfo,
+                object: processInfo,
                 queue: .main
             ) { [weak self] _ in
                 Task { @MainActor [weak self] in self?.emitSnapshot() }
@@ -81,9 +74,9 @@ public final class DeviceHealthService {
         lastState = nil
         observerTokens.forEach(NotificationCenter.default.removeObserver)
         observerTokens.removeAll()
-        if enabledBatteryMonitoring {
-            UIDevice.current.isBatteryMonitoringEnabled = false
-            enabledBatteryMonitoring = false
+        if hasBatteryMonitoringLease {
+            Self.releaseBatteryMonitoring()
+            hasBatteryMonitoringLease = false
         }
     }
 
@@ -136,5 +129,26 @@ public final class DeviceHealthService {
         #else
             true
         #endif
+    }
+
+    private static var batteryMonitoringLeaseCount = 0
+    private static var ownsBatteryMonitoring = false
+
+    private static func acquireBatteryMonitoring() {
+        let device = UIDevice.current
+        if !device.isBatteryMonitoringEnabled {
+            device.isBatteryMonitoringEnabled = true
+            ownsBatteryMonitoring = true
+        }
+        batteryMonitoringLeaseCount += 1
+    }
+
+    private static func releaseBatteryMonitoring() {
+        precondition(batteryMonitoringLeaseCount > 0)
+        batteryMonitoringLeaseCount -= 1
+        if batteryMonitoringLeaseCount == 0 && ownsBatteryMonitoring {
+            UIDevice.current.isBatteryMonitoringEnabled = false
+            ownsBatteryMonitoring = false
+        }
     }
 }

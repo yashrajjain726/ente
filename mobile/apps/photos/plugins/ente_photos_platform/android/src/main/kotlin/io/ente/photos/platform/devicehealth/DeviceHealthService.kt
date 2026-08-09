@@ -80,7 +80,7 @@ class DeviceHealthService(context: Context) {
                     context.registerReceiver(
                         batteryReceiver,
                         IntentFilter(Intent.ACTION_BATTERY_CHANGED),
-                        Context.RECEIVER_NOT_EXPORTED,
+                        Context.RECEIVER_EXPORTED,
                     )
                 } else {
                     @Suppress("DEPRECATION")
@@ -182,7 +182,7 @@ class DeviceHealthService(context: Context) {
     private fun stickyBatteryIntent(): Intent? {
         val filter = IntentFilter(Intent.ACTION_BATTERY_CHANGED)
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            context.registerReceiver(null, filter, Context.RECEIVER_NOT_EXPORTED)
+            context.registerReceiver(null, filter, Context.RECEIVER_EXPORTED)
         } else {
             @Suppress("DEPRECATION")
             context.registerReceiver(null, filter)
