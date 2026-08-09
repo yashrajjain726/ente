@@ -1912,7 +1912,25 @@ const Page: React.FC = () => {
                 );
                 if (!firstUser) return;
 
+                const currentTitle = sessions.find(
+                    (session) => session.sessionUuid === sessionUuid,
+                )?.title;
                 const userText = parseDocumentBlocks(firstUser.text).text;
+                const automaticFallbackTitles = [
+                    sessionTitleFromText(firstUser.text, "New chat"),
+                    sessionTitleFromText(
+                        userText || firstUser.text,
+                        "New chat",
+                    ),
+                ];
+                if (
+                    currentTitle &&
+                    currentTitle.toLowerCase() !== "new chat" &&
+                    !automaticFallbackTitles.includes(currentTitle)
+                ) {
+                    return;
+                }
+
                 const assistantText = stripHiddenPartsText(firstAssistant.text);
 
                 const fallbackSeed = trimToWords(userText, 7) || "New chat";
@@ -1938,7 +1956,13 @@ const Page: React.FC = () => {
                 sessionSummaryInFlightRef.current = false;
             }
         },
-        [chatKey, generateSessionSummary, persistSessionTitle, trimToWords],
+        [
+            chatKey,
+            generateSessionSummary,
+            persistSessionTitle,
+            sessions,
+            trimToWords,
+        ],
     );
 
     const preloadModelIfAvailable = useCallback(async () => {
@@ -2330,8 +2354,15 @@ const Page: React.FC = () => {
     const handleConfirmRenameSession = useCallback(async () => {
         if (!chatKey || !renameSessionId || !renameSessionTitle.trim()) return;
         if (pendingSessionRenamesRef.current.has(renameSessionId)) return;
-        pendingSessionRenamesRef.current.add(renameSessionId);
         const title = sessionTitleFromText(renameSessionTitle);
+        const currentTitle = sessions.find(
+            (session) => session.sessionUuid === renameSessionId,
+        )?.title;
+        if (!currentTitle || title === currentTitle) {
+            handleCancelRenameSession();
+            return;
+        }
+        pendingSessionRenamesRef.current.add(renameSessionId);
         const wasManuallyRenamed =
             manuallyRenamedSessionIdsRef.current.has(renameSessionId);
         manuallyRenamedSessionIdsRef.current.add(renameSessionId);
@@ -2353,6 +2384,7 @@ const Page: React.FC = () => {
         persistSessionTitle,
         renameSessionId,
         renameSessionTitle,
+        sessions,
     ]);
 
     const handleConfirmDeleteSession = useCallback(async () => {
