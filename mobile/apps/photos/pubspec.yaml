@@ -27,10 +27,6 @@ dependencies:
   audio_session: 0.2.2
   backup_exclusion:
     path: ../../packages/backup_exclusion
-  battery_info: # replace with battery_plus
-    git:
-      url: https://github.com/ente/battery_info
-      ref: 95c7a9f0400b968b3bfdc98c8c10a07fb4a62ea2
   bip39: 1.0.6
   cached_network_image: 3.4.1
   camera: 0.11.2+1
@@ -72,6 +68,8 @@ dependencies:
     path: ../../packages/lock_screen
   ente_panorama_viewer:
     path: plugins/ente_panorama_viewer
+  ente_photos_platform:
+    path: plugins/ente_photos_platform
   ente_photos_rust:
     path: rust_builder
   ente_pure_utils:
@@ -214,8 +212,6 @@ dependencies:
   sqlite_async: 0.11.7
   styled_text: 8.1.0
   synchronized: 3.4.0
-  system_info_plus: 0.0.6
-  thermal: 1.1.11
   timezone: 0.10.1
   tuple: 2.0.2
   ua_client_hints: 1.4.1

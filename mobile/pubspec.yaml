@@ -12,6 +12,7 @@ workspace:
   - apps/photos/plugins/ente_crypto
   - apps/photos/plugins/ente_feature_flag
   - apps/photos/plugins/ente_panorama_viewer
+  - apps/photos/plugins/ente_photos_platform
   - packages/accounts
   - packages/account_deletion
   - packages/backup_exclusion
