@@ -24,6 +24,7 @@ class ComputeController {
   // ignore: cancel_subscriptions
   StreamSubscription<DeviceHealthSnapshot>? _deviceHealthSubscription;
   Timer? _deviceHealthRefreshTimer;
+  int _deviceHealthGeneration = 0;
 
   bool _isDeviceHealthy = false;
   bool _isUserInteracting = true;
@@ -273,17 +274,23 @@ class ComputeController {
   }
 
   Future<void> _refreshDeviceHealth() async {
+    final generation = _deviceHealthGeneration;
     try {
       final snapshot = await _deviceHealthSource.getSnapshot().timeout(
         _healthRequestTimeout,
       );
-      _onDeviceHealthUpdate(snapshot);
+      if (generation == _deviceHealthGeneration) {
+        _onDeviceHealthUpdate(snapshot);
+      }
     } catch (error, stackTrace) {
-      _onDeviceHealthError(error, stackTrace);
+      if (generation == _deviceHealthGeneration) {
+        _onDeviceHealthError(error, stackTrace);
+      }
     }
   }
 
   void _onDeviceHealthUpdate(DeviceHealthSnapshot snapshot) {
+    _deviceHealthGeneration++;
     final evaluation = _deviceHealthPolicy.evaluate(
       snapshot,
       now: DateTime.now(),
@@ -298,6 +305,7 @@ class ComputeController {
   }
 
   void _onDeviceHealthError(Object error, [StackTrace? stackTrace]) {
+    _deviceHealthGeneration++;
     _logger.warning('Failed to observe device health', error, stackTrace);
     _setDeviceHealth(false);
     _fireControlEvent();
