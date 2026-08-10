@@ -36,8 +36,6 @@ type RecoveryUpdateSRPAndKeysRequest struct {
 	UpdateSrp  UpdateSRPAndKeysRequest `json:"updateSrpAndKeysRequest" binding:"required"`
 }
 
-// UpdateSRPAndKeysRequest is used to update the SRP attributes (e.g. when user updates his password) and also
-// update the keys attributes
 type UpdateSRPAndKeysRequest struct {
 	SetupID            uuid.UUID          `json:"setupID" binding:"required"`
 	SRPM1              string             `json:"srpM1" binding:"required"`
@@ -82,7 +80,6 @@ type VerifySRPSessionRequest struct {
 	SRPM1     string    `json:"srpM1"`
 }
 
-// SRPSessionEntity represents a row in the srp_sessions table
 type SRPSessionEntity struct {
 	ID           uuid.UUID
 	SRPUserID    uuid.UUID
