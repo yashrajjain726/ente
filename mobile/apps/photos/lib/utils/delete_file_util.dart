@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:math';
 
 import 'package:ente_components/ente_components.dart';
+import "package:ente_pure_utils/ente_pure_utils.dart";
 import "package:ente_strings/ente_strings.dart";
 import 'package:flutter/material.dart';
 import 'package:logging/logging.dart';
@@ -16,6 +17,7 @@ import "package:photos/events/force_reload_trash_page_event.dart";
 import 'package:photos/events/local_photos_updated_event.dart';
 import 'package:photos/gateways/trash/models/trash_item_request.dart';
 import "package:photos/models/button_result.dart";
+import "package:photos/models/file/extensions/file_props.dart";
 import 'package:photos/models/file/file.dart';
 import "package:photos/models/file/trash_file.dart";
 import "package:photos/models/files_split.dart";
@@ -294,41 +296,28 @@ Future<List<EnteFile>> deleteFilesOnDeviceOnly(
 Future<bool> deleteFromTrash(BuildContext context, List<EnteFile> files) async {
   final trashFiles = files.map((file) => file as EnteTrashFile).toList();
   bool didDeletionStart = false;
-  final l10n = context.strings;
   final actionResult = await showBottomSheetComponent<ButtonResult>(
     context: context,
     useRootNavigator: Platform.isIOS,
-    builder: (sheetContext) => BottomSheetComponent(
-      title: l10n.areYouSure,
-      message: l10n.selectedItemsWillBePermanentlyDeletedAndCannotBeRecovered,
-      illustration: Image.asset("assets/warning-grey.png"),
-      closeTooltip: l10n.close,
-      closeResult: ButtonResult(ButtonAction.fourth),
-      actions: [
-        ButtonComponent(
-          label: l10n.yesDelete,
-          variant: ButtonComponentVariant.critical,
-          onTap: () =>
-              _runDeleteAction(sheetContext, ButtonAction.first, () async {
-                try {
-                  didDeletionStart = true;
-                  await trashSyncService.deleteFromTrash(trashFiles);
-                  Bus.instance.fire(
-                    FilesUpdatedEvent(
-                      trashFiles,
-                      type: EventType.deletedFromEverywhere,
-                      source: "deleteFromTrash",
-                    ),
-                  );
-                  // FilesUpdatedEvent does not reload Trash here.
-                  Bus.instance.fire(ForceReloadTrashPageEvent());
-                } catch (e, s) {
-                  _logger.info("failed to delete from trash", e, s);
-                  rethrow;
-                }
-              }),
-        ),
-      ],
+    builder: (_) => PermanentlyDeleteConfirmationSheet(
+      onDelete: () async {
+        try {
+          didDeletionStart = true;
+          await trashSyncService.deleteFromTrash(trashFiles);
+          Bus.instance.fire(
+            FilesUpdatedEvent(
+              trashFiles,
+              type: EventType.deletedFromEverywhere,
+              source: "deleteFromTrash",
+            ),
+          );
+          // FilesUpdatedEvent does not reload Trash here.
+          Bus.instance.fire(ForceReloadTrashPageEvent());
+        } catch (e, s) {
+          _logger.info("failed to delete from trash", e, s);
+          rethrow;
+        }
+      },
     ),
   );
 
@@ -1051,6 +1040,31 @@ Exception _toException(Object error) {
   return error is Exception ? error : Exception(error.toString());
 }
 
+class PermanentlyDeleteConfirmationSheet extends StatelessWidget {
+  const PermanentlyDeleteConfirmationSheet({required this.onDelete, super.key});
+
+  final Future<void> Function() onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.strings;
+    return BottomSheetComponent(
+      title: l10n.areYouSure,
+      message: l10n.selectedItemsWillBePermanentlyDeletedAndCannotBeRecovered,
+      illustration: Image.asset("assets/warning-grey.png"),
+      closeTooltip: l10n.close,
+      closeResult: ButtonResult(ButtonAction.fourth),
+      actions: [
+        ButtonComponent(
+          label: l10n.yesDelete,
+          variant: ButtonComponentVariant.critical,
+          onTap: () => _runDeleteAction(context, ButtonAction.first, onDelete),
+        ),
+      ],
+    );
+  }
+}
+
 class _MoreOptionsButton extends StatefulWidget {
   const _MoreOptionsButton({required this.onTap});
 
@@ -1317,5 +1331,58 @@ class DeleteConfirmationSheetState extends State<DeleteConfirmationSheet> {
           ),
       ],
     );
+  }
+}
+
+Future<void> permanentlyDeleteFromSystemTrash(
+  BuildContext context,
+  SelectedFiles selectedFiles,
+) async {
+  if (!await PhotoManager.canManageMedia()) {
+    try {
+      await _deleteFromSystemTrash(selectedFiles);
+    } catch (e) {
+      if (context.mounted) {
+        await showGenericErrorDialog(context: context, error: e);
+      }
+    }
+  } else {
+    if (!context.mounted) return;
+    final actionResult = await showBottomSheetComponent<ButtonResult>(
+      context: context,
+      builder: (_) => PermanentlyDeleteConfirmationSheet(
+        onDelete: () => _deleteFromSystemTrash(selectedFiles),
+      ),
+    );
+    if (actionResult?.action == ButtonAction.error && context.mounted) {
+      await showGenericErrorDialog(
+        context: context,
+        error: actionResult!.exception,
+      );
+    }
+  }
+  if (context.mounted) {
+    await showMediaManagementHintSheet(context);
+  }
+}
+
+Future<void> _deleteFromSystemTrash(SelectedFiles selectedFiles) async {
+  final fileIDs = selectedFiles.files
+      .map((f) => f.asTrashFile!.systemTrashID!.toString())
+      .toList();
+  final deletedIDs = <int>{};
+  try {
+    for (final batch in fileIDs.chunks(batchSize)) {
+      final result = await PhotoManager.editor.deleteWithIds(batch);
+      deletedIDs.addAll(result.map(int.parse));
+    }
+  } finally {
+    if (deletedIDs.isNotEmpty) {
+      final deletedFiles = selectedFiles.files.where(
+        (f) => deletedIDs.contains(f.asTrashFile!.systemTrashID!),
+      );
+      selectedFiles.unSelectAll(deletedFiles.toSet());
+      Bus.instance.fire(ForceReloadTrashPageEvent());
+    }
   }
 }

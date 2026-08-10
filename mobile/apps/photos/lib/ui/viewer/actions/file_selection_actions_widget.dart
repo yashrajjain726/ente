@@ -1114,7 +1114,7 @@ class _FileSelectionActionsWidgetState
       (f) => f.asTrashFile!.isSystemOnly,
     );
     if (isSystemOnly) {
-      await _deleteFromSystemTrash(widget.selectedFiles);
+      await permanentlyDeleteFromSystemTrash(context, widget.selectedFiles);
       return;
     }
     if (await deleteFromEnteTrash(
@@ -1321,27 +1321,6 @@ Future<void> _restoreFilesFromSystemTrash(SelectedFiles selectedFiles) async {
         (f) => restoredIDs.contains(f.asTrashFile!.systemTrashID!),
       );
       selectedFiles.unSelectAll(restoredFiles.toSet());
-      Bus.instance.fire(ForceReloadTrashPageEvent());
-    }
-  }
-}
-
-Future<void> _deleteFromSystemTrash(SelectedFiles selectedFiles) async {
-  final fileIDs = selectedFiles.files
-      .map((f) => f.asTrashFile!.systemTrashID!.toString())
-      .toList();
-  final deletedIDs = <int>{};
-  try {
-    for (final batch in fileIDs.chunks(batchSize)) {
-      final result = await PhotoManager.editor.deleteWithIds(batch);
-      deletedIDs.addAll(result.map(int.parse));
-    }
-  } finally {
-    if (deletedIDs.isNotEmpty) {
-      final deletedFiles = selectedFiles.files.where(
-        (f) => deletedIDs.contains(f.asTrashFile!.systemTrashID!),
-      );
-      selectedFiles.unSelectAll(deletedFiles.toSet());
       Bus.instance.fire(ForceReloadTrashPageEvent());
     }
   }
