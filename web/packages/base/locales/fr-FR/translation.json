@@ -463,6 +463,7 @@
     "no_photos_found_here": "Pas de photos trouvées ici",
     "zoom_out_to_see_photos": "Zoom arrière pour voir les photos",
     "no_geotagged_photos": "Aucune photo trouvée avec les informations de localisation",
+    "no_location": "",
     "search_hint": "Recherche d'albums, dates, descriptions, ...",
     "albums_search_hint": "Recherche d'albums...",
     "album": "l'album",

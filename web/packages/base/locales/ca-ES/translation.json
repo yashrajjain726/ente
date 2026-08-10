@@ -463,6 +463,7 @@
     "no_photos_found_here": "No s'han trobat fotos aquí",
     "zoom_out_to_see_photos": "Allunya el zoom per veure fotos",
     "no_geotagged_photos": "No s'han trobat fotos amb informació d'ubicació",
+    "no_location": "",
     "search_hint": "Cerca àlbums, dates, descripcions, ...",
     "albums_search_hint": "Cerca àlbums...",
     "album": "Àlbum",

@@ -463,6 +463,7 @@
     "no_photos_found_here": "Zde nebyly nalezeny žádné fotografie",
     "zoom_out_to_see_photos": "Oddalte pro zobrazení fotografií",
     "no_geotagged_photos": "Nebyly nalezeny žádné fotografie s informacemi o poloze",
+    "no_location": "",
     "search_hint": "Hledat alba, data, popisky, ...",
     "albums_search_hint": "Vyhledat alba...",
     "album": "Album",

@@ -463,6 +463,7 @@
     "no_photos_found_here": "Không tìm thấy ảnh ở đây",
     "zoom_out_to_see_photos": "Phóng to để xem ảnh",
     "no_geotagged_photos": "Không tìm thấy ảnh chứa thông tin vị trí",
+    "no_location": "",
     "search_hint": "Tìm album, ngày chụp, mô tả,...",
     "albums_search_hint": "Tìm album...",
     "album": "Album",
