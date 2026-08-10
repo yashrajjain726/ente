@@ -463,6 +463,7 @@
     "no_photos_found_here": "這裡找不到相片",
     "zoom_out_to_see_photos": "縮小以查看相片",
     "no_geotagged_photos": "找不到含有位置資訊的相片",
+    "no_location": "",
     "search_hint": "搜尋相簿、日期、描述等…",
     "albums_search_hint": "搜尋相簿…",
     "album": "相簿",

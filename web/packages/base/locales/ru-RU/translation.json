@@ -463,6 +463,7 @@
     "no_photos_found_here": "Фото здесь не найдены",
     "zoom_out_to_see_photos": "Уменьшите масштаб, чтобы посмотреть фотографии",
     "no_geotagged_photos": "Фотографии с локацией не найдены",
+    "no_location": "",
     "search_hint": "Поиск альбомов, дат, описаний, ...",
     "albums_search_hint": "Поиск альбомов...",
     "album": "Альбом",
