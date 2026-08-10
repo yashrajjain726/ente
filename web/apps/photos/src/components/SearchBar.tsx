@@ -4,6 +4,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import CalendarIcon from "@mui/icons-material/CalendarMonth";
 import CloseIcon from "@mui/icons-material/Close";
 import ImageIcon from "@mui/icons-material/Image";
+import NoLocationIcon from "@mui/icons-material/LocationOffOutlined";
 import LocationIcon from "@mui/icons-material/LocationOn";
 import CameraIcon from "@mui/icons-material/PhotoCameraOutlined";
 import SettingsIcon from "@mui/icons-material/Settings";
@@ -375,6 +376,8 @@ const iconForOption = (option: SearchOption | undefined) => {
         case "location":
         case "city":
             return <LocationIcon />;
+        case "noLocation":
+            return <NoLocationIcon />;
         default:
             return <HugeiconsIcon icon={Search01Icon} />;
     }
@@ -570,6 +573,9 @@ const labelForOption = (option: SearchOption) => {
 
         case "date":
             return t("date");
+
+        case "noLocation":
+            return t("location");
 
         case "location":
             return t("location");

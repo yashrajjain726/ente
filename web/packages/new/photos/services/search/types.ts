@@ -53,6 +53,7 @@ export type SearchSuggestion = { label: string } & (
     | { type: "cameraMake"; fileIDs: number[] }
     | { type: "cameraModel"; fileIDs: number[] }
     | { type: "date"; dateComponents: SearchDateComponents }
+    | { type: "noLocation" }
     | { type: "location"; locationTag: LocationTag }
     | { type: "city"; city: City }
     | { type: "clip"; clipScoreForFileID: Map<number, number> }
@@ -67,6 +68,7 @@ export interface SearchOption {
 }
 
 export interface SearchCollectionsAndFiles {
+    currentUserID: number;
     collections: Collection[];
     // Unique by file ID.
     files: EnteFile[];
@@ -88,6 +90,7 @@ export interface LocalizedSearchData {
     locale: string;
     holidays: LabelledSearchDateComponents[];
     labelledFileTypes: LabelledFileType[];
+    noLocationLabel: string;
 }
 
 // At least one component is always present.

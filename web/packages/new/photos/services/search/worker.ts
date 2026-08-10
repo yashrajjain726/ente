@@ -35,6 +35,7 @@ export class SearchWorker {
     private locationTags: LocationTag[] = [];
     private cities: City[] = [];
     private collectionsAndFiles: SearchCollectionsAndFiles = {
+        currentUserID: 0,
         collections: [],
         files: [],
         collectionFiles: [],
@@ -100,7 +101,12 @@ const suggestionsForString = (
     searchString: string,
     { collections, files }: SearchCollectionsAndFiles,
     people: NamedPerson[],
-    { locale, holidays, labelledFileTypes }: LocalizedSearchData,
+    {
+        locale,
+        holidays,
+        labelledFileTypes,
+        noLocationLabel,
+    }: LocalizedSearchData,
     locationTags: LocationTag[],
     cities: City[],
 ): [SearchSuggestion[], SearchSuggestion[]] => [
@@ -108,6 +114,7 @@ const suggestionsForString = (
     [
         fileTypeSuggestions(re, labelledFileTypes),
         dateSuggestions(s, re, locale, holidays),
+        noLocationSuggestion(s, noLocationLabel),
         locationSuggestions(re, locationTags, cities),
         collectionSuggestions(re, collections),
         fileNameSuggestion(s, re, searchString, files),
@@ -381,21 +388,30 @@ const locationSuggestions = (
     ].flat();
 };
 
+const noLocationSuggestion = (s: string, label: string): SearchSuggestion[] =>
+    s.length > 2 && label.toLowerCase().startsWith(s)
+        ? [{ type: "noLocation", label }]
+        : [];
+
 const filterSearchableFiles = (
-    { files, collectionFiles }: SearchCollectionsAndFiles,
+    { currentUserID, files, collectionFiles }: SearchCollectionsAndFiles,
     suggestion: SearchSuggestion,
 ) => {
     if (suggestion.type == "sidebarAction") return [];
 
     return sortMatchesIfNeeded(
         (suggestion.type == "collection" ? collectionFiles : files).filter(
-            (f) => isMatchingFile(f, suggestion),
+            (f) => isMatchingFile(f, suggestion, currentUserID),
         ),
         suggestion,
     );
 };
 
-const isMatchingFile = (file: EnteFile, suggestion: SearchSuggestion) => {
+const isMatchingFile = (
+    file: EnteFile,
+    suggestion: SearchSuggestion,
+    currentUserID: number,
+) => {
     switch (suggestion.type) {
         case "collection":
             return suggestion.collectionID === file.collectionID;
@@ -416,6 +432,9 @@ const isMatchingFile = (file: EnteFile, suggestion: SearchSuggestion) => {
                 suggestion.dateComponents,
                 fileCreationPhotoDate(file),
             );
+
+        case "noLocation":
+            return file.ownerID == currentUserID && !fileLocation(file);
 
         case "location": {
             const location = fileLocation(file);
