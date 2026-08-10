@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/ban-ts-comment */
 import exportService, {
     CustomError,
     ExportStage,
@@ -76,31 +75,38 @@ export const Export: React.FC<ExportProps> = ({
         total: 0,
     });
     const [pendingFiles, setPendingFiles] = useState<EnteFile[]>([]);
-    const [lastExportTime, setLastExportTime] = useState(0);
+    const [lastExportTime, setLastExportTime] = useState<number | null>(0);
 
-    const syncExportRecord = useCallback(async (exportFolder: string) => {
-        try {
-            if (!(await exportService.exportFolderExists(exportFolder))) {
-                setPendingFiles(await exportService.pendingFiles());
+    const syncExportRecord = useCallback(
+        async (exportFolder: string | undefined) => {
+            try {
+                if (!(await exportService.exportFolderExists(exportFolder))) {
+                    setPendingFiles(await exportService.pendingFiles());
+                }
+                const exportRecord =
+                    await exportService.getExportRecord(exportFolder);
+                const currentStage = exportService.getCurrentExportStage();
+                const isRunning = Boolean(exportService.isExportInProgress());
+                const effectiveStage =
+                    isRunning && currentStage !== ExportStage.init
+                        ? currentStage
+                        : exportRecord.stage;
+                setExportStage(effectiveStage);
+                setLastExportTime(exportRecord.lastAttemptTimestamp);
+                setPendingFiles(await exportService.pendingFiles(exportRecord));
+            } catch (e) {
+                if (
+                    !(
+                        e instanceof Error &&
+                        e.message === CustomError.EXPORT_FOLDER_DOES_NOT_EXIST
+                    )
+                ) {
+                    log.error("syncExportRecord failed", e);
+                }
             }
-            const exportRecord =
-                await exportService.getExportRecord(exportFolder);
-            const currentStage = exportService.getCurrentExportStage();
-            const isRunning = Boolean(exportService.isExportInProgress());
-            const effectiveStage =
-                isRunning && currentStage !== ExportStage.init
-                    ? currentStage
-                    : exportRecord.stage;
-            setExportStage(effectiveStage);
-            setLastExportTime(exportRecord.lastAttemptTimestamp);
-            setPendingFiles(await exportService.pendingFiles(exportRecord));
-        } catch (e) {
-            // @ts-ignore
-            if (e.message !== CustomError.EXPORT_FOLDER_DOES_NOT_EXIST) {
-                log.error("syncExportRecord failed", e);
-            }
-        }
-    }, []);
+        },
+        [],
+    );
 
     useEffect(() => {
         if (!isDesktop) return;
@@ -114,9 +120,6 @@ export const Export: React.FC<ExportProps> = ({
         const exportSettings = exportService.getExportSettings();
         setExportFolder(exportSettings?.folder ?? "");
         setContinuousExport(exportSettings?.continuousExport ?? false);
-        // TODO: The type of syncExportRecord is wrong. It can work with an
-        // undefined value, but the type prohibits that.
-        // @ts-ignore
         void syncExportRecord(exportSettings?.folder);
     }, [syncExportRecord]);
 
@@ -461,7 +464,7 @@ const ExportInProgressDialogContent: React.FC<
 
 interface ExportFinishedDialogContentProps {
     pendingFiles: EnteFile[];
-    lastExportTime: number;
+    lastExportTime: number | null;
     collectionNameByID: Map<number, string>;
     onClose: () => void;
     onResyncExport: () => void;
