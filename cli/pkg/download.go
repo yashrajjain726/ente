@@ -45,15 +45,21 @@ func (c *ClICtrl) downloadAndDecrypt(
 func UnpackLive(src string) (imagePath, videoPath string, retErr error) {
 	var filenames []string
 	reader, err := zip.OpenReader(src)
+	if reader != nil {
+		defer reader.Close()
+	}
 	if err != nil {
 		retErr = err
 		return
 	}
-	defer reader.Close()
 
 	dest := filepath.Dir(src)
 
 	for _, file := range reader.File {
+		if !filepath.IsLocal(file.Name) {
+			retErr = fmt.Errorf("invalid file path in live photo zip %s: %w", file.Name, zip.ErrInsecurePath)
+			return
+		}
 		destFilePath := filepath.Join(dest, file.Name)
 		filenames = append(filenames, destFilePath)
 

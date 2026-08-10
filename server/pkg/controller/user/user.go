@@ -317,7 +317,7 @@ func (c *UserController) handleAccountDeletion(
 	}
 
 	email := user.Email
-	// See also: Do not block on mailing list errors
+	// Mailing list failures must not block account deletion.
 	go func() {
 		if err := c.MailingListsController.Unsubscribe(email); err != nil {
 			logger.WithError(err).WithFields(logrus.Fields{
@@ -411,12 +411,7 @@ func (c *UserController) createUser(email string, source *string) (int64, ente.S
 	if err != nil {
 		return -1, ente.Subscription{}, stacktrace.Propagate(err, "")
 	}
-	// Do not block on mailing list errors
-	//
-	// The mailing lists are hosted on a third party (Zoho), so we do not wish
-	// to fail user creation in case Zoho is having temporary issues. So we
-	// perform these actions async, and ignore errors that happen with them (a
-	// notification will be sent to Discord for those).
+	// Mailing list failures must not block user creation.
 	go func() {
 		if err := c.MailingListsController.Subscribe(email); err != nil {
 			logrus.WithError(err).WithFields(logrus.Fields{

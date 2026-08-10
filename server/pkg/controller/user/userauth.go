@@ -369,12 +369,7 @@ func (c *UserController) UpdateEmail(ctx *gin.Context, userID int64, email strin
 			}).Error("stripe update email failed")
 	}
 
-	// Unsubscribe the old email, subscribe the new one.
-	//
-	// Note that resubscribing the same email after it has been unsubscribed
-	// once works fine.
-	//
-	// See also: Do not block on mailing list errors
+	// Mailing list failures must not block email changes.
 	go func() {
 		if err := c.MailingListsController.Unsubscribe(oldEmail); err != nil {
 			log.WithError(err).WithFields(log.Fields{
