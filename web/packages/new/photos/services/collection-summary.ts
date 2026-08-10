@@ -20,6 +20,7 @@ export type CollectionSummaryAttribute =
     | "sharedIncomingAdmin"
     | "sharedViaLink"
     | "sharedOnlyViaLink"
+    | "quickLink"
     | "system"
     | "archived"
     | "hideFromCollectionBar"

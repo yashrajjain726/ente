@@ -6,6 +6,7 @@ import {
 } from "ente-gallery/utils/file";
 import {
     CollectionOrder,
+    CollectionSubType,
     collectionTypes,
     findUserUncategorizedCollection,
     type Collection,
@@ -1316,6 +1317,14 @@ const createCollectionSummaries = (
 
         attributes.add(type);
         attributes.add(collectionType);
+
+        if (
+            collection.magicMetadata?.data.subType ==
+                CollectionSubType.quicklink &&
+            !collection.sharees.length
+        ) {
+            attributes.add("quickLink");
+        }
 
         if (collection.owner.id == user.id && collection.sharees.length) {
             attributes.add("shared");
