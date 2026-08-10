@@ -11,7 +11,6 @@ import "package:ente_lock_screen/local_authentication_service.dart";
 import "package:ente_lock_screen/lock_screen_settings.dart";
 import "package:ente_lock_screen/ui/lock_screen_options.dart";
 import "package:ente_strings/ente_strings.dart";
-import "package:ente_utils/email_util.dart";
 import "package:flutter/material.dart";
 import "package:hugeicons/hugeicons.dart";
 import "package:locker/services/configuration.dart";
@@ -164,13 +163,8 @@ class _SecuritySettingsPageState extends State<SecuritySettingsPage> {
           illustration: LockerBottomSheetIllustration.warningGrey,
           actions: [
             ButtonComponent(
-              label: context.strings.contactSupport,
-              onTap: () async {
-                await sendLogs(context, "support@ente.com", postShare: () {});
-                if (sheetContext.mounted) {
-                  Navigator.of(sheetContext).pop();
-                }
-              },
+              label: l10n.ok,
+              onTap: () => Navigator.of(sheetContext).pop(),
             ),
           ],
         ),
