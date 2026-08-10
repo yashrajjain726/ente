@@ -26,6 +26,8 @@ class VideoTrimSlider extends StatefulWidget {
 enum _TrimDrag { start, end, seek }
 
 class _VideoTrimSliderState extends State<VideoTrimSlider> {
+  static const _handleHitRadius = 28.0;
+
   Directory? _directory;
   List<File> _frames = const [];
   String? _requestId;
@@ -169,10 +171,10 @@ class _VideoTrimSliderState extends State<VideoTrimSlider> {
     }
     final start = _durationToPixels(widget.controller.startTrim, width);
     final end = _durationToPixels(widget.controller.endTrim, width);
-    if ((x - start).abs() <= 28) {
-      _drag = _TrimDrag.start;
-    } else if ((x - end).abs() <= 28) {
-      _drag = _TrimDrag.end;
+    final startDistance = (x - start).abs();
+    final endDistance = (x - end).abs();
+    if (startDistance <= _handleHitRadius || endDistance <= _handleHitRadius) {
+      _drag = startDistance <= endDistance ? _TrimDrag.start : _TrimDrag.end;
     } else {
       _drag = _TrimDrag.seek;
       _seek(x, width);
