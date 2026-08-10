@@ -2502,6 +2502,7 @@ dependencies = [
  "html-escape",
  "image",
  "imageproc",
+ "log",
  "nalgebra 0.33.3",
  "once_cell",
  "ort",

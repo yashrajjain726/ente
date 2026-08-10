@@ -125,15 +125,6 @@ const assetStore = () => {
     );
 };
 
-const logMLRuntimeEvents = (native: MLNative) => {
-    for (const { severity, message } of native.takeMlRuntimeEvents()) {
-        const s = `[ml-rt] ${message}`;
-        if (severity == "severe") log.error(s);
-        else if (severity == "warning") log.warn(s);
-        else log.info(s);
-    }
-};
-
 const _indexingModelPaths = new Map<
     number,
     Promise<MLNativeModule.ModelPaths>
@@ -175,7 +166,6 @@ export const releaseMLRuntime = () => {
     if (!_native) return;
     _native.releaseMlRuntime();
     _preparedRuntimeKey = undefined;
-    logMLRuntimeEvents(_native);
 };
 
 export interface MLWorkerAnalyzeImageRequest {
@@ -200,11 +190,7 @@ export const analyzeImage = async (
 
 const analyzeImageOrThrow = async (req: MLWorkerAnalyzeImageRequest) => {
     const native = mlNative();
-    try {
-        return await analyzeImageOnce(native, req);
-    } finally {
-        logMLRuntimeEvents(native);
-    }
+    return analyzeImageOnce(native, req);
 };
 
 // A corrupt on-disk model will fail every retry, so report an init failure that
@@ -281,8 +267,6 @@ const warmUpClipTextEncoder = async (native: MLNative) => {
         });
     } catch (e) {
         log.warn("Failed to warm up the CLIP text encoder", e);
-    } finally {
-        logMLRuntimeEvents(native);
     }
 };
 
@@ -304,14 +288,10 @@ export const computeCLIPTextEmbeddingIfAvailable = async (text: string) => {
     }
 
     const { modelPath, vocabPath } = pathsOrSkip;
-    try {
-        const { embedding } = await native.runClipText({
-            text,
-            modelPath,
-            vocabPath,
-        });
-        return embedding;
-    } finally {
-        logMLRuntimeEvents(native);
-    }
+    const { embedding } = await native.runClipText({
+        text,
+        modelPath,
+        vocabPath,
+    });
+    return embedding;
 };

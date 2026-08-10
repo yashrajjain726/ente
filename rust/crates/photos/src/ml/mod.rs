@@ -1,7 +1,6 @@
 pub mod assets;
 mod clip;
 pub mod error;
-pub mod events;
 pub mod face;
 pub mod golden;
 mod golden_data;

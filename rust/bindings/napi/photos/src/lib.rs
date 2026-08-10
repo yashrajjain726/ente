@@ -288,23 +288,6 @@ pub fn tokenize_clip_text(text: String, vocab_path: String) -> Result<Vec<i32>> 
     shared_indexing::tokenize_clip_text(&text, &vocab_path).map_err(ml_error_to_napi)
 }
 
-#[napi(object)]
-pub struct MlRuntimeEvent {
-    pub severity: String,
-    pub message: String,
-}
-
-#[napi]
-pub fn take_ml_runtime_events() -> Vec<MlRuntimeEvent> {
-    ente_photos::ml::events::take_events()
-        .into_iter()
-        .map(|event| MlRuntimeEvent {
-            severity: event.severity.as_str().to_string(),
-            message: event.message,
-        })
-        .collect()
-}
-
 // Error kind prefixes survive Comlink's MessagePort serialization.
 fn ml_error_to_napi(error: MlError) -> Error {
     let kind = match &error {
