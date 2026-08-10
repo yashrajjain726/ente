@@ -208,7 +208,7 @@ class MemoriesCacheService {
   }
 
   bool _shouldInvalidateForDeletedFiles(EventType type) {
-    if (type == EventType.deletedFromEverywhere) {
+    if (type == EventType.deletedFromEverywhere || type == EventType.hide) {
       return true;
     }
 
