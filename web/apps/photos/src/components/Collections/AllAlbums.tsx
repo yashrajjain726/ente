@@ -78,12 +78,6 @@ import {
 
 type AlbumFilter = "all" | "shared" | "received" | "links" | "empty-albums";
 
-/**
- * The filters, each with the pill label that selects it and the dialog title
- * that replaces "All Albums" while it is selected. The two differ because the
- * pill sits in a row of siblings that names the context ("Shared"), while the
- * title has to carry it alone ("Shared Albums").
- */
 const albumFilters: {
     value: AlbumFilter;
     label: () => string;
@@ -209,8 +203,6 @@ export const AllAlbums: React.FC<AllAlbums> = ({
         () => collectionSummaries.filter(isBulkDeletableEmptyAlbum),
         [collectionSummaries],
     );
-    // Matching mobile, the cleanup is only worth surfacing once there are
-    // enough empty albums for it to be a chore.
     const hasEnoughEmptyAlbums = emptyAlbumCandidates.length >= 3;
 
     const showDeleteEmptyAlbums =
@@ -219,7 +211,6 @@ export const AllAlbums: React.FC<AllAlbums> = ({
         albumFilter == "empty-albums" &&
         !searchTerm.trim();
 
-    // A filter with nothing worth showing is not worth a pill.
     const visibleAlbumFilters = useMemo(
         () =>
             albumFilters.filter(
@@ -234,16 +225,11 @@ export const AllAlbums: React.FC<AllAlbums> = ({
         [collectionSummaries, hasEnoughEmptyAlbums],
     );
 
-    // The title names whichever filter is showing, so that the pills and the
-    // heading never disagree about what is on screen.
     const activeFilterTitle = (
         albumFilters.find(({ value }) => value == albumFilter) ??
         albumFilters[0]!
     ).title();
 
-    // Losing the last quick link (or dropping under the empty-album threshold)
-    // takes that pill away; fall back to "all" rather than strand the user on
-    // a filter they can no longer see or leave.
     useEffect(() => {
         if (!visibleAlbumFilters.some(({ value }) => value == albumFilter)) {
             setAlbumFilter("all");
@@ -521,7 +507,6 @@ export const AllAlbums: React.FC<AllAlbums> = ({
     );
 };
 
-/** Keep the dialog docked to the right edge, as it has always been. */
 const dialogSx: SxProps<Theme> = {
     "& .MuiDialog-container": { justifyContent: "flex-end" },
 };
@@ -532,22 +517,16 @@ const sweepFooterSx = {
     bottom: "20px",
     px: "20px",
     display: "flex",
-    // Let the album grid underneath stay interactive alongside the button.
     pointerEvents: "none",
 };
 const sweepButtonSx: SxProps<Theme> = (theme) => ({
     pointerEvents: "auto",
     flex: 1,
     height: 52,
-    // The dialog's own radius, so the button sits concentrically inside it.
     borderRadius: "20px",
     border: `1px solid ${surfaceStroke}`,
-    // White in both themes, deliberately: this is the one control that has to
-    // read as raised above the album grid it floats over.
     backgroundColor: "fixed.white",
     color: "fixed.black",
-    // DS "body": 500 14px/20px. MUI's own button typography would otherwise
-    // impose its wider default letter spacing here.
     fontSize: 14,
     lineHeight: "20px",
     fontWeight: 500,
@@ -597,13 +576,11 @@ const filterPillsSx = (theme: Theme) => ({
         "&.Mui-selected:hover": { backgroundColor: "accent.dark" },
     },
 });
-/** Columns in the album grid, and the gutters around and between them. */
 const GridColumns = 3;
 const GridGap = 8;
 const GridPaddingInline = 20;
 const GridPaddingBlockStart = 16;
 const GridPaddingBlockEnd = 20;
-/** Space kept clear below the grid for the floating "Delete empty albums". */
 const GridFooterHeight = 88;
 
 interface ItemData {
@@ -641,8 +618,6 @@ const AlbumsRow = React.memo(
                 <Stack
                     direction="row"
                     sx={{
-                        // Consumed by TileButton, so that the tiles can stay
-                        // static styled components across resizes.
                         "--tile-size": `${tileSize}px`,
                         px: `${GridPaddingInline}px`,
                         gap: `${GridGap}px`,
@@ -762,8 +737,6 @@ const AllAlbumsContent: React.FC<AllAlbumsContentProps> = ({
         >
             <AutoSizer>
                 {({ width, height }) => {
-                    // Square tiles, sized so that GridColumns of them fill the
-                    // width once the gutters are taken out.
                     const tileSize = Math.max(
                         0,
                         Math.floor(
@@ -848,7 +821,6 @@ const AlbumCard: React.FC<AlbumCardProps> = ({
 };
 
 const albumNameSx = {
-    // body
     fontSize: 14,
     lineHeight: "20px",
     fontWeight: 500,
@@ -859,7 +831,6 @@ const albumNameSx = {
     WebkitBoxOrient: "vertical",
 };
 const albumCountSx = {
-    // mini
     fontSize: 12,
     lineHeight: "16px",
     fontWeight: 500,
