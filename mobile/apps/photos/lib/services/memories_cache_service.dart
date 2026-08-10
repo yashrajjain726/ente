@@ -94,7 +94,8 @@ class MemoriesCacheService {
     Bus.instance
         .on<FilesUpdatedEvent>()
         .where((event) {
-          return _shouldInvalidateForDeletedFiles(event.type);
+          return _shouldInvalidateForDeletedFiles(event.type) &&
+              event.source != "moveFrom";
         })
         .listen((event) async {
           await _invalidateDeletedFiles(event.updatedFiles);
