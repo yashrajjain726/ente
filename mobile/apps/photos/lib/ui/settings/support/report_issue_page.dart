@@ -143,7 +143,14 @@ class _ReportIssuePageState extends State<ReportIssuePage> {
 
       if (_attachLogs) {
         if (!mounted) return;
-        logsZipFilePath = await getZippedLogsFile(context);
+        logsZipFilePath = await getZippedLogsFile(
+          context,
+          reportText: buildSupportReportText(
+            to: recipientEmail,
+            subject: subject,
+            body: body,
+          ),
+        );
         logsLabel = l10n.export;
       }
 
@@ -160,7 +167,6 @@ class _ReportIssuePageState extends State<ReportIssuePage> {
       } else {
         if (!mounted) return;
         didOpenComposer = await sendComposedEmail(
-          context,
           to: recipientEmail,
           subject: subject,
           body: body,
