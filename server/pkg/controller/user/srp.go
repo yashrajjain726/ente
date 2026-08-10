@@ -90,7 +90,7 @@ func (c *UserController) UpdateSrpAndKeyAttributes(context *gin.Context,
 
 	if shouldClearTokens {
 		token := auth.GetToken(context)
-		err = c.UserAuthRepo.RemoveAllOtherTokens(userID, token)
+		err = c.RemoveAllOtherTokens(userID, token)
 		if err != nil {
 			return nil, err
 		}
