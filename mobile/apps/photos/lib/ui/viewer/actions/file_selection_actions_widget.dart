@@ -179,7 +179,7 @@ class _FileSelectionActionsWidgetState
         SelectionActionButton(
           hugeIcon: HugeIcons.strokeRoundedDelete01,
           labelText: context.strings.permanentlyDelete,
-          onTap: _permanentlyDelete,
+          onTap: _permanentlyDeleteFromTrash,
           isCritical: true,
         ),
       );
@@ -484,6 +484,27 @@ class _FileSelectionActionsWidgetState
             labelText: context.strings.unarchive,
             onTap: _onUnArchiveClick,
             shouldShow: ownedFilesCount > 0,
+          ),
+        );
+      }
+
+      if (widget.type.showRestoreOption()) {
+        items.add(
+          SelectionActionButton(
+            hugeIcon: HugeIcons.strokeRoundedRestoreBin,
+            labelText: context.strings.restore,
+            onTap: _restore,
+          ),
+        );
+      }
+
+      if (widget.type.showPermanentlyDeleteOption()) {
+        items.add(
+          SelectionActionButton(
+            hugeIcon: HugeIcons.strokeRoundedDelete01,
+            labelText: context.strings.permanentlyDelete,
+            onTap: _permanentlyDeleteFromTrash,
+            isCritical: true,
           ),
         );
       }
@@ -1087,8 +1108,18 @@ class _FileSelectionActionsWidgetState
     );
   }
 
-  Future<void> _permanentlyDelete() async {
-    if (await deleteFromTrash(context, widget.selectedFiles.files.toList())) {
+  Future<void> _permanentlyDeleteFromTrash() async {
+    final isSystemOnly = widget.selectedFiles.files.every(
+      (f) => f.asTrashFile!.isSystemOnly,
+    );
+    if (isSystemOnly) {
+      await _deleteFromSystemTrash(widget.selectedFiles);
+      return;
+    }
+    if (await deleteFromEnteTrash(
+      context,
+      widget.selectedFiles.files.toList(),
+    )) {
       widget.selectedFiles.clearAll();
     }
   }
@@ -1285,5 +1316,20 @@ Future<void> _restoreFilesFromSystemTrash(SelectedFiles selectedFiles) async {
     (f) => restoredIDs.contains(f.asTrashFile!.systemTrashID!),
   );
   selectedFiles.unSelectAll(restoredFiles.toSet());
+  Bus.instance.fire(ForceReloadTrashPageEvent());
+}
+
+Future<void> _deleteFromSystemTrash(SelectedFiles selectedFiles) async {
+  final fileIDs = selectedFiles.files
+      .map((f) => f.asTrashFile!.systemTrashID!.toString())
+      .toList();
+  final deletedIDs = (await PhotoManager.editor.deleteWithIds(
+    fileIDs,
+  )).map(int.parse);
+  if (deletedIDs.isEmpty) return;
+  final deletedFiles = selectedFiles.files.where(
+    (f) => deletedIDs.contains(f.asTrashFile!.systemTrashID!),
+  );
+  selectedFiles.unSelectAll(deletedFiles.toSet());
   Bus.instance.fire(ForceReloadTrashPageEvent());
 }
