@@ -154,48 +154,56 @@ class _AddEmailSheetState extends State<AddEmailSheet> {
             Expanded(
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(20),
-                child: Container(
+                child: ConstrainedBox(
                   constraints: const BoxConstraints(
                     maxHeight: maxVisibleHeight,
                   ),
-                  child: ListView(
+                  child: ListView.separated(
                     controller: _scrollController,
                     shrinkWrap: true,
                     padding: EdgeInsets.zero,
-                    children: [
-                      MenuGroupComponent(
-                        backgroundColor: colors.fillLight,
-                        showDividers: true,
-                        dividerPadding: const EdgeInsets.only(left: 48),
-                        items: filteredUsers
-                            .map(
-                              (user) => MenuComponent(
-                                title: user.resolvedDisplayName,
-                                leading: UserAvatarWidget.suggestion(
-                                  user,
-                                  type: AvatarType.mini,
-                                  config: Configuration.instance,
-                                ),
-                                onTap: () async {
-                                  _textFieldFocusNode.unfocus();
-                                  _textController.text = user.email;
-                                  _email = user.email;
-                                  _emailIsValid = true;
-                                  setState(() {});
-                                },
-                                onLongPress: () {
-                                  showVerifyIdentitySheet(
-                                    context,
-                                    self: false,
-                                    config: Configuration.instance,
-                                    email: user.email,
-                                  );
-                                },
-                              ),
-                            )
-                            .toList(),
+                    itemCount: filteredUsers.length,
+                    separatorBuilder: (_, _) => ColoredBox(
+                      color: colors.fillLight,
+                      child: const DividerComponent(
+                        padding: EdgeInsets.only(left: 48),
                       ),
-                    ],
+                    ),
+                    itemBuilder: (context, index) {
+                      final user = filteredUsers[index];
+                      return MenuGroupComponent(
+                        backgroundColor: colors.fillLight,
+                        borderRadius: MenuGroupComponent.itemBorderRadius(
+                          index: index,
+                          itemCount: filteredUsers.length,
+                        ),
+                        items: [
+                          MenuComponent(
+                            title: user.resolvedDisplayName,
+                            leading: UserAvatarWidget.suggestion(
+                              user,
+                              type: AvatarType.mini,
+                              config: Configuration.instance,
+                            ),
+                            onTap: () async {
+                              _textFieldFocusNode.unfocus();
+                              _textController.text = user.email;
+                              _email = user.email;
+                              _emailIsValid = true;
+                              setState(() {});
+                            },
+                            onLongPress: () {
+                              showVerifyIdentitySheet(
+                                context,
+                                self: false,
+                                config: Configuration.instance,
+                                email: user.email,
+                              );
+                            },
+                          ),
+                        ],
+                      );
+                    },
                   ),
                 ),
               ),
