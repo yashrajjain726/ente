@@ -16,6 +16,16 @@ description: Fixing Docker-related errors when trying to self-host Ente
 > docker compose up
 > ```
 
+## Permission denied on the Docker daemon socket
+
+If you see an error like this when starting your cluster:
+
+```
+permission denied while trying to connect to the Docker daemon socket at unix:///var/run/docker.sock
+```
+
+Then the user running the commands does not have permission to access the Docker daemon. Learn more in Docker's [Linux post-installation steps](https://docs.docker.com/engine/install/linux-postinstall/).
+
 ## post_start
 
 The Docker compose file used if relying on quickstart script or installation using Docker Compose uses the "post_start" lifecycle hook to provision the MinIO instance.
