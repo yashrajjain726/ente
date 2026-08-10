@@ -84,7 +84,7 @@ func (c *ClICtrl) syncFiles(ctx context.Context, account model.Account) error {
 			if err != nil {
 				if errors.Is(err, model.ErrDecryption) {
 					continue
-				} else if existingEntry.IsLivePhoto() && errors.Is(err, zip.ErrFormat) {
+				} else if existingEntry.IsLivePhoto() && (errors.Is(err, zip.ErrFormat) || errors.Is(err, zip.ErrInsecurePath)) {
 					log.Printf("err processing live photo %s (%d), %s", existingEntry.GetTitle(), existingEntry.ID, err.Error())
 					continue
 				} else if existingEntry.IsLivePhoto() && errors.Is(err, model.ErrLiveZip) {

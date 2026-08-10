@@ -54,6 +54,10 @@ func UnpackLive(src string) (imagePath, videoPath string, retErr error) {
 	dest := filepath.Dir(src)
 
 	for _, file := range reader.File {
+		if !filepath.IsLocal(file.Name) {
+			retErr = fmt.Errorf("invalid file path in live photo zip %s: %w", file.Name, zip.ErrInsecurePath)
+			return
+		}
 		destFilePath := filepath.Join(dest, file.Name)
 		filenames = append(filenames, destFilePath)
 
