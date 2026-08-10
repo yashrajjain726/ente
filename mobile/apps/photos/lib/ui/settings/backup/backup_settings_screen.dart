@@ -96,9 +96,9 @@ class BackupSettingsScreen extends StatelessWidget {
           const SizedBox(height: 24),
           if (flagService.largeBackupStandby) ...[
             SettingsItem(
-              title: pendingTranslation("(i) Keep Ente awake"),
+              title: pendingTranslation("(i) Backup mode"),
               subtitle: pendingTranslation(
-                "Dim the screen while a large backup finishes",
+                "Keep Ente awake while your backup finishes",
               ),
               icon: HugeIcons.strokeRoundedMoon02,
               showOnlyLoadingState: true,

@@ -37,18 +37,8 @@ class LargeBackupScreen extends StatefulWidget {
   State<LargeBackupScreen> createState() => _LargeBackupScreenState();
 }
 
-class _LargeBackupScreenState extends State<LargeBackupScreen>
-    with WidgetsBindingObserver {
-  static final _logger = Logger("LargeBackupScreen");
-  static const _applicationBrightness = 0.15;
-  static const _dimmingDelay = Duration(seconds: 3);
-
+class _LargeBackupScreenState extends State<LargeBackupScreen> {
   late final rive.FileLoader _animationLoader;
-  Timer? _dimmingTimer;
-  bool _didStartStandby = false;
-  bool _isClosing = false;
-  bool _isScreenDimmed = false;
-  bool _isStandbyActive = false;
 
   @override
   void initState() {
@@ -57,46 +47,11 @@ class _LargeBackupScreenState extends State<LargeBackupScreen>
       "assets/home_tab.riv",
       riveFactory: rive.Factory.flutter,
     );
-    WidgetsBinding.instance.addObserver(this);
-    widget.sessionTracker.addListener(_handleBackupSessionChanged);
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (!_isStandbyActive) {
-      return;
-    }
-
-    switch (state) {
-      case AppLifecycleState.resumed:
-        if (widget.sessionTracker.isUploading) {
-          _scheduleScreenDimming();
-        } else {
-          _closePage();
-        }
-        break;
-      case AppLifecycleState.inactive:
-        break;
-      case AppLifecycleState.paused:
-      case AppLifecycleState.hidden:
-        _stopStandby();
-        break;
-      case AppLifecycleState.detached:
-        break;
-    }
   }
 
   @override
   void dispose() {
     _animationLoader.dispose();
-    widget.sessionTracker.removeListener(_handleBackupSessionChanged);
-    WidgetsBinding.instance.removeObserver(this);
-    if (_isStandbyActive) {
-      _deactivateStandby();
-    }
-    if (_didStartStandby) {
-      Bus.instance.fire(ForceReloadHomeGalleryEvent("largeBackupStandbyEnded"));
-    }
     super.dispose();
   }
 
@@ -105,157 +60,92 @@ class _LargeBackupScreenState extends State<LargeBackupScreen>
     return Theme(
       data: darkThemeData,
       child: Builder(
-        builder: (context) => _isStandbyActive
-            ? _buildStandbyScreen(context)
-            : _buildInstructionsScreen(context),
-      ),
-    );
-  }
-
-  Widget _buildInstructionsScreen(BuildContext context) {
-    final colors = context.componentColors;
-
-    return SettingsPageScaffold(
-      title: pendingTranslation("Large backup"),
-      bottomNavigationBar: SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(
-            Spacing.lg,
-            Spacing.sm,
-            Spacing.lg,
-            Spacing.lg,
-          ),
-          child: ButtonComponent(
-            key: const ValueKey("start-large-backup-mode"),
-            label: pendingTranslation("Start backup mode"),
-            shouldSurfaceExecutionStates: false,
-            onTap: _startStandby,
-          ),
-        ),
-      ),
-      children: [
-        const SizedBox(height: Spacing.xl),
-        Center(
-          child: SizedBox(
-            height: 128,
-            child: rive.RiveWidgetBuilder(
-              fileLoader: _animationLoader,
-              builder: (context, state) {
-                if (state is rive.RiveLoaded) {
-                  return rive.RiveWidget(
-                    controller: state.controller,
-                    fit: rive.Fit.contain,
-                  );
-                }
-                return const SizedBox.shrink();
-              },
-            ),
-          ),
-        ),
-        const SizedBox(height: Spacing.xl),
-        Text(
-          pendingTranslation("Keep Ente awake"),
-          textAlign: TextAlign.center,
-          style: TextStyles.display1.copyWith(color: colors.textBase),
-        ),
-        const SizedBox(height: Spacing.md),
-        Text(
-          pendingTranslation(
-            "Keep Ente open while your backup finishes. The screen will stay awake and dim to reduce distraction.",
-          ),
-          textAlign: TextAlign.center,
-          style: TextStyles.body.copyWith(color: colors.textLight),
-        ),
-        const SizedBox(height: Spacing.xxl),
-        Text(
-          pendingTranslation("Before you start"),
-          style: TextStyles.h2.copyWith(color: colors.textBase),
-        ),
-        const SizedBox(height: Spacing.lg),
-        _InstructionItem(
-          icon: HugeIcons.strokeRoundedSmartPhone01,
-          title: pendingTranslation("Keep Ente open"),
-          description: pendingTranslation(
-            "Don't switch apps or lock your iPhone.",
-          ),
-        ),
-        const SizedBox(height: Spacing.xl),
-        _InstructionItem(
-          icon: HugeIcons.strokeRoundedMoon02,
-          title: pendingTranslation("The screen will dim"),
-          description: pendingTranslation(
-            "This screen dims while your backup continues.",
-          ),
-        ),
-        const SizedBox(height: Spacing.xl),
-        _InstructionItem(
-          icon: HugeIcons.strokeRoundedPlug01,
-          title: pendingTranslation("Connect your charger"),
-          description: pendingTranslation(
-            "Keeping your iPhone plugged in is recommended.",
-          ),
-        ),
-        const SizedBox(height: Spacing.xxl),
-      ],
-    );
-  }
-
-  Widget _buildStandbyScreen(BuildContext context) {
-    final colors = context.componentColors;
-    final countFormatter = NumberFormat();
-    return GestureDetector(
-      key: const ValueKey("large-backup-standby-screen"),
-      behavior: HitTestBehavior.opaque,
-      onTap: _stopStandby,
-      child: Scaffold(
-        backgroundColor: colors.fillDark,
-        body: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListenableBuilder(
-                listenable: widget.sessionTracker,
-                builder: (context, _) {
-                  final completed = widget.sessionTracker.completedCount;
-                  final total = widget.sessionTracker.totalCount;
-                  final statusText = switch ((completed, total)) {
-                    (0, 1) => context.strings.uploadingSingleMemory,
-                    (0, > 1) => context.strings.uploadingMultipleMemories(
-                      count: countFormatter.format(total),
-                    ),
-                    (_, > 0) => context.strings.syncProgress(
-                      completed: countFormatter.format(completed),
-                      total: countFormatter.format(total),
-                    ),
-                    _ => pendingTranslation("Checking for more…"),
-                  };
-                  return Text(
-                    statusText,
-                    style: TextStyles.large.copyWith(color: colors.textBase),
-                  );
-                },
+        builder: (context) {
+          final colors = context.componentColors;
+          return SettingsPageScaffold(
+            title: pendingTranslation("Backup mode"),
+            bottomNavigationBar: SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  Spacing.lg,
+                  Spacing.sm,
+                  Spacing.lg,
+                  Spacing.lg,
+                ),
+                child: ButtonComponent(
+                  key: const ValueKey("start-large-backup-mode"),
+                  label: pendingTranslation("Start backup mode"),
+                  shouldSurfaceExecutionStates: false,
+                  onTap: _startStandby,
+                ),
               ),
-              const SizedBox(height: 17),
+            ),
+            children: [
+              const SizedBox(height: Spacing.xl),
+              Center(
+                child: SizedBox(
+                  height: 128,
+                  child: rive.RiveWidgetBuilder(
+                    fileLoader: _animationLoader,
+                    builder: (context, state) {
+                      if (state is rive.RiveLoaded) {
+                        return rive.RiveWidget(
+                          controller: state.controller,
+                          fit: rive.Fit.contain,
+                        );
+                      }
+                      return const SizedBox.shrink();
+                    },
+                  ),
+                ),
+              ),
+              const SizedBox(height: Spacing.xl),
               Text(
-                pendingTranslation("Tap to return"),
+                pendingTranslation("Finish your backup"),
+                textAlign: TextAlign.center,
+                style: TextStyles.display1.copyWith(color: colors.textBase),
+              ),
+              const SizedBox(height: Spacing.md),
+              Text(
+                pendingTranslation(
+                  "Keep Ente open while your backup finishes. The screen will dim and your iPhone will stay awake.",
+                ),
+                textAlign: TextAlign.center,
                 style: TextStyles.body.copyWith(color: colors.textLight),
               ),
+              const SizedBox(height: Spacing.xxl),
+              Text(
+                pendingTranslation("Good to know"),
+                style: TextStyles.h2.copyWith(color: colors.textBase),
+              ),
+              const SizedBox(height: Spacing.lg),
+              _InstructionItem(
+                icon: HugeIcons.strokeRoundedSmartPhone01,
+                text: pendingTranslation(
+                  "Leave Ente open. Keep your iPhone unlocked.",
+                ),
+              ),
+              const SizedBox(height: Spacing.xl),
+              _InstructionItem(
+                icon: HugeIcons.strokeRoundedMoon02,
+                text: pendingTranslation(
+                  "The screen will dim. Tap it when you want to return.",
+                ),
+              ),
+              const SizedBox(height: Spacing.xl),
+              _InstructionItem(
+                icon: HugeIcons.strokeRoundedPlug01,
+                text: pendingTranslation(
+                  "Keep your iPhone plugged in so your backup can continue.",
+                ),
+              ),
+              const SizedBox(height: Spacing.xxl),
             ],
-          ),
-        ),
+          );
+        },
       ),
     );
-  }
-
-  void _handleBackupSessionChanged() {
-    if (_isClosing || !_isStandbyActive) {
-      return;
-    }
-
-    if (!widget.sessionTracker.isUploading) {
-      _closePage();
-    }
   }
 
   Future<void> _startStandby() async {
@@ -263,50 +153,174 @@ class _LargeBackupScreenState extends State<LargeBackupScreen>
       await showAlertBottomSheet<void>(
         context,
         title: pendingTranslation("No backup in progress"),
-        message: pendingTranslation("Start a backup before using backup mode."),
+        message: pendingTranslation(
+          "Start a backup, then return to backup mode.",
+        ),
       );
       return;
     }
 
-    setState(() {
-      _didStartStandby = true;
-      _isScreenDimmed = false;
-      _isStandbyActive = true;
-    });
+    final result = await Navigator.of(context).push<_StandbyResult>(
+      MaterialPageRoute<_StandbyResult>(
+        builder: (_) =>
+            _LargeBackupStandbyScreen(sessionTracker: widget.sessionTracker),
+      ),
+    );
+    if (mounted && result == _StandbyResult.backupEnded) {
+      Navigator.of(context).pop();
+    }
+  }
+}
+
+enum _StandbyResult { returnedToInstructions, backupEnded }
+
+class _LargeBackupStandbyScreen extends StatefulWidget {
+  const _LargeBackupStandbyScreen({required this.sessionTracker});
+
+  final LargeBackupSessionTracker sessionTracker;
+
+  @override
+  State<_LargeBackupStandbyScreen> createState() =>
+      _LargeBackupStandbyScreenState();
+}
+
+class _LargeBackupStandbyScreenState extends State<_LargeBackupStandbyScreen>
+    with WidgetsBindingObserver {
+  static final _logger = Logger("LargeBackupStandbyScreen");
+  static const _applicationBrightness = 0.15;
+  static const _dimmingDelay = Duration(seconds: 3);
+
+  final NumberFormat _countFormatter = NumberFormat();
+  Timer? _dimmingTimer;
+  bool _isClosing = false;
+  bool _isScreenDimmed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    widget.sessionTracker.addListener(_handleBackupSessionChanged);
     widget.sessionTracker.setStandbyScreenActive(true);
     wakeLockService.updateWakeLock(
       enable: true,
       wakeLockFor: WakeLockFor.largeBackupStandbyScreen,
     );
-    _scheduleScreenDimming();
-  }
-
-  void _stopStandby() {
-    if (!_isStandbyActive) {
-      return;
+    if (widget.sessionTracker.isUploading) {
+      _scheduleScreenDimming();
+    } else {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _close(_StandbyResult.backupEnded);
+        }
+      });
     }
-
-    _deactivateStandby();
-    setState(() {
-      _isStandbyActive = false;
-    });
   }
 
-  void _closePage() {
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    switch (state) {
+      case AppLifecycleState.resumed:
+        if (widget.sessionTracker.isUploading) {
+          _scheduleScreenDimming();
+        } else {
+          _close(_StandbyResult.backupEnded);
+        }
+        break;
+      case AppLifecycleState.inactive:
+        break;
+      case AppLifecycleState.paused:
+      case AppLifecycleState.hidden:
+        _close(_StandbyResult.returnedToInstructions);
+        break;
+      case AppLifecycleState.detached:
+        break;
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.sessionTracker.removeListener(_handleBackupSessionChanged);
+    WidgetsBinding.instance.removeObserver(this);
+    if (!_isClosing) {
+      _stopScreenEffects();
+    }
+    widget.sessionTracker.setStandbyScreenActive(false);
+    Bus.instance.fire(ForceReloadHomeGalleryEvent("largeBackupStandbyEnded"));
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Theme(
+      data: darkThemeData,
+      child: Builder(
+        builder: (context) {
+          final colors = context.componentColors;
+          return GestureDetector(
+            key: const ValueKey("large-backup-standby-screen"),
+            behavior: HitTestBehavior.opaque,
+            onTap: () => _close(_StandbyResult.returnedToInstructions),
+            child: Scaffold(
+              backgroundColor: colors.fillDark,
+              body: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    ListenableBuilder(
+                      listenable: widget.sessionTracker,
+                      builder: (context, _) {
+                        final completed = widget.sessionTracker.completedCount;
+                        final total = widget.sessionTracker.totalCount;
+                        final statusText = switch ((completed, total)) {
+                          (0, 1) => context.strings.uploadingSingleMemory,
+                          (0, > 1) => context.strings.uploadingMultipleMemories(
+                            count: _countFormatter.format(total),
+                          ),
+                          (_, > 0) => context.strings.syncProgress(
+                            completed: _countFormatter.format(completed),
+                            total: _countFormatter.format(total),
+                          ),
+                          _ => pendingTranslation("Finding more memories…"),
+                        };
+                        return Text(
+                          statusText,
+                          style: TextStyles.large.copyWith(
+                            color: colors.textBase,
+                          ),
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 17),
+                    Text(
+                      pendingTranslation("Tap to return"),
+                      style: TextStyles.body.copyWith(color: colors.textLight),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  void _handleBackupSessionChanged() {
+    if (!widget.sessionTracker.isUploading) {
+      _close(_StandbyResult.backupEnded);
+    }
+  }
+
+  void _close(_StandbyResult result) {
     if (_isClosing) {
       return;
     }
-
     _isClosing = true;
-    if (_isStandbyActive) {
-      _deactivateStandby();
-      _isStandbyActive = false;
-    }
-    Navigator.of(context).pop();
+    _stopScreenEffects();
+    Navigator.of(context).pop(result);
   }
 
-  void _deactivateStandby() {
-    widget.sessionTracker.setStandbyScreenActive(false);
+  void _stopScreenEffects() {
     _dimmingTimer?.cancel();
     _dimmingTimer = null;
     _isScreenDimmed = false;
@@ -318,7 +332,7 @@ class _LargeBackupScreenState extends State<LargeBackupScreen>
   }
 
   void _scheduleScreenDimming() {
-    if (_isScreenDimmed || _dimmingTimer != null) {
+    if (_isScreenDimmed || _dimmingTimer != null || _isClosing) {
       return;
     }
     _dimmingTimer = Timer(
@@ -368,21 +382,15 @@ class _LargeBackupScreenState extends State<LargeBackupScreen>
   bool get _canDimScreen =>
       mounted &&
       !_isClosing &&
-      _isStandbyActive &&
       widget.sessionTracker.isUploading &&
       WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed;
 }
 
 class _InstructionItem extends StatelessWidget {
-  const _InstructionItem({
-    required this.icon,
-    required this.title,
-    required this.description,
-  });
+  const _InstructionItem({required this.icon, required this.text});
 
   final List<List<dynamic>> icon;
-  final String title;
-  final String description;
+  final String text;
 
   @override
   Widget build(BuildContext context) {
@@ -391,35 +399,12 @@ class _InstructionItem extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          width: 52,
-          height: 52,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: colors.fillDarkest,
-            shape: BoxShape.circle,
-          ),
-          child: SizedBox(
-            width: 18,
-            height: 18,
-            child: HugeIcon(icon: icon, color: colors.textBase, size: 18),
-          ),
-        ),
+        HugeIcon(icon: icon, color: colors.textBase, size: 24),
         const SizedBox(width: Spacing.lg),
         Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: TextStyles.large.copyWith(color: colors.textBase),
-              ),
-              const SizedBox(height: Spacing.xs),
-              Text(
-                description,
-                style: TextStyles.body.copyWith(color: colors.textLight),
-              ),
-            ],
+          child: Text(
+            text,
+            style: TextStyles.body.copyWith(color: colors.textBase),
           ),
         ),
       ],

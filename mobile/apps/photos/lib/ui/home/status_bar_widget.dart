@@ -165,10 +165,8 @@ class _StatusBarWidgetState extends State<StatusBarWidget> {
       BannerComponent(
         key: const ValueKey("large-backup-standby-banner"),
         leadingIcon: HugeIcons.strokeRoundedMoon02,
-        title: pendingTranslation("Keep Ente awake"),
-        subtitle: pendingTranslation(
-          "Dim the screen while your large backup finishes",
-        ),
+        title: pendingTranslation("Finish your backup"),
+        subtitle: pendingTranslation("Keep Ente open with the screen dimmed"),
         state: BannerComponentState.success,
         onTap: () async {
           if (!_largeBackupSession.isActive) {

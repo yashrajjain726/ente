@@ -50,10 +50,8 @@ class LargeBackupSessionTracker extends ChangeNotifier {
         break;
       case SyncStatus.completedBackup:
       case SyncStatus.error:
-        _reset();
-        break;
       case SyncStatus.paused:
-        _isUploading = false;
+        _reset();
         break;
       case SyncStatus.startedFirstGalleryImport:
       case SyncStatus.completedFirstGalleryImport:
