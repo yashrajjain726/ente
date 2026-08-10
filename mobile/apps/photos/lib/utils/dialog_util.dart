@@ -130,6 +130,7 @@ String parseErrorForUI(
   if (error is WebResourceError) {
     if (error.type == WebResourceErrorType.HOST_LOOKUP ||
         error.type == WebResourceErrorType.NOT_CONNECTED_TO_INTERNET ||
+        error.type == WebResourceErrorType.NETWORK_CONNECTION_LOST ||
         error.type == WebResourceErrorType.TIMEOUT) {
       return context.strings.networkHostLookUpErr;
     } else if (error.type == WebResourceErrorType.CANNOT_CONNECT_TO_HOST ||
