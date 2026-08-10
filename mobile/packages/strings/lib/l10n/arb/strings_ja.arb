@@ -909,10 +909,6 @@
     }
   },
   "freeUpDeviceSpace": "デバイスの空き領域を解放する",
-  "freeUpDeviceSpaceDescICloud": "iCloud共有アルバム内のファイルは削除できません。",
-  "@freeUpDeviceSpaceDescICloud": {
-    "description": "Here 'cleared' means 'deleted' from the device"
-  },
   "freeUpSpace": "スペースを解放する",
   "gallery": "ギャラリー",
   "galleryMemoryLimitInfo": "ギャラリーに表示されるメモリは最大1000個までです",
@@ -1201,7 +1197,6 @@
   },
   "manage": "管理",
   "manageDeviceStorage": "端末のキャッシュを管理",
-  "manageDeviceStorageDesc": "端末上のキャッシュを確認・削除",
   "manageFamily": "ファミリーの管理",
   "manageLink": "リンクを管理",
   "manageParticipants": "管理",
@@ -1732,8 +1727,6 @@
   "@removeContact": {
     "description": "Button label to remove a trusted contact"
   },
-  "removeDuplicates": "重複した項目を削除",
-  "removeDuplicatesDesc": "完全に重複しているファイルを確認し、削除します。",
   "removeFromAlbum": "アルバムから削除",
   "removeFromAlbumTitle": "アルバムから削除しますか？",
   "removeFromFavorite": "お気に入りリストから外す",
@@ -2475,7 +2468,6 @@
   "viewAllHelpTopics": "すべてのヘルプを表示",
   "viewer": "ビューアー",
   "viewLargeFiles": "大きなファイル",
-  "viewLargeFilesDesc": "最も多くのストレージを消費しているファイルを表示します。",
   "viewLogs": "ログを表示",
   "@viewLogs": {
     "description": "Button to view logs"

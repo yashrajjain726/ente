@@ -783,7 +783,6 @@
   "deleteSharedAlbum": "刪除共享相簿？",
   "deleteSharedAlbumDialogBody": "此相簿將對所有人刪除\n\n您將失去此相簿中由他人擁有的共享照片存取權",
   "deleteSuggestions": "刪除建議",
-  "deleteSuggestionsDesc": "檢視系統建議刪除的檔案。",
   "deleteSuggestionSent": "刪除建議已傳送",
   "deleteTagMessage": "您確定要刪除此標籤嗎？此操作是不可逆的。",
   "deleteTagTitle": "要刪除標籤嗎？",
@@ -1279,11 +1278,6 @@
       "count": {}
     }
   },
-  "freeUpDeviceSpaceDesc": "清除已備份的檔案以節省裝置空間。",
-  "freeUpDeviceSpaceDescICloud": "iCloud 共享相簿中的檔案無法清除。",
-  "@freeUpDeviceSpaceDescICloud": {
-    "description": "Here 'cleared' means 'deleted' from the device"
-  },
   "freeUpSpace": "釋放空間",
   "gallery": "圖片庫",
   "galleryMemoryLimitInfo": "圖庫最多顯示 1000 個回憶",
@@ -1646,7 +1640,6 @@
   },
   "manage": "管理",
   "manageDeviceStorage": "管理裝置快取",
-  "manageDeviceStorageDesc": "檢視並清除本機快取儲存空間。",
   "manageFamily": "管理家庭",
   "manageLink": "管理連結",
   "manageParticipants": "管理",
@@ -2341,8 +2334,6 @@
     "description": "Description for remove contact confirmation dialog"
   },
   "removeContactPhoto": "移除聯絡人照片",
-  "removeDuplicates": "移除重複項目",
-  "removeDuplicatesDesc": "檢視並移除完全重複的檔案。",
   "removeFromAlbum": "從相簿移除",
   "removeFromAlbumTitle": "從相簿移除？",
   "removeFromFamily": "從家庭移除",
@@ -3307,7 +3298,6 @@
   "useAsCover": "設定為封面",
   "usedSpace": "已用空間",
   "usedYourCode": "使用了您的推薦碼",
-  "useMLToFindSimilarImages": "檢視並移除彼此看起來相似的照片。",
   "useOffline": "在無備份的情況下使用",
   "useRecoveryKey": "使用復原金鑰",
   "@useRecoveryKey": {
@@ -3374,7 +3364,6 @@
   "viewAllHelpTopics": "查看所有說明主題",
   "viewer": "檢視者",
   "viewLargeFiles": "大型檔案",
-  "viewLargeFilesDesc": "檢視佔用最多儲存空間的檔案。",
   "viewLogs": "檢視記錄",
   "@viewLogs": {
     "description": "Button to view logs"

@@ -550,7 +550,6 @@
   "deleteSharedAlbum": "Paylaşılan albom silinsin?",
   "deleteSharedAlbumDialogBody": "Albom hər kəs üçün silinəcək.\n\nBu albomda başqalarına məxsus olan paylaşılan fotoşəkillərə giriş imkanını itirəcəksiniz",
   "deleteSuggestions": "Silmə təklifləri",
-  "deleteSuggestionsDesc": "Silinməsi təklif olunan faylları nəzərdən keçirin.",
   "deleteSuggestionSent": "Silmə təklifi göndərildi",
   "deleteWithCount": "Sil ({count})",
   "@deleteWithCount": {
@@ -928,11 +927,6 @@
     }
   },
   "freeUpDeviceSpace": "Cihazda yer açın",
-  "freeUpDeviceSpaceDesc": "Artıq yedəklənmiş faylları təmizləyərək cihazınızda yerə qənaət edin.",
-  "freeUpDeviceSpaceDescICloud": "Icloud paylaşılan albomlarındakı fayllar təmizlənə bilməz.",
-  "@freeUpDeviceSpaceDescICloud": {
-    "description": "Here 'cleared' means 'deleted' from the device"
-  },
   "freeUpSpace": "Yer boşaltın",
   "gallery": "Qalereya",
   "galleryMemoryLimitInfo": "Qalereyada 1000-ə qədər xatirə göstərilir",
@@ -1179,7 +1173,6 @@
   },
   "manage": "İdarə et",
   "manageDeviceStorage": "Cihaz keşini idarə et",
-  "manageDeviceStorageDesc": "Yerli keş yaddaşını nəzərdən keçirin və təmizləyin.",
   "manageFamily": "Ailəni idarə et",
   "manageLink": "Linki idarə et",
   "manageParticipants": "İdarə et",
@@ -1722,8 +1715,6 @@
   "@removeContactDesc": {
     "description": "Description for remove contact confirmation dialog"
   },
-  "removeDuplicates": "Dublikatları sil",
-  "removeDuplicatesDesc": "Tam eyni olan dublikat faylları nəzərdən keçirin və silin.",
   "removeFromAlbum": "Albomdan sil",
   "removeFromAlbumTitle": "Albomdan silinsin?",
   "removeFromFavorite": "Seçilmişlərdən sil",
@@ -2437,7 +2428,6 @@
   "useAsCover": "Üzlük kimi istifadə et",
   "usedSpace": "İstifadə edilmiş sahə",
   "usedYourCode": "kodunuzu istifadə etdi",
-  "useMLToFindSimilarImages": "Bir-birinə oxşayan şəkilləri nəzərdən keçirin və silin.",
   "useRecoveryKey": "Bərpa açarından istifadə edin",
   "@useRecoveryKey": {
     "description": "Use recovery key button label"
@@ -2493,7 +2483,6 @@
   "viewAllExifData": "Bütün EXIF məlumatlarına baxın",
   "viewer": "İzləyici",
   "viewLargeFiles": "Böyük fayllar",
-  "viewLargeFilesDesc": "Ən çox yaddaş tutan fayllara baxın.",
   "viewLogs": "Qeydlərə bax",
   "@viewLogs": {
     "description": "Button to view logs"

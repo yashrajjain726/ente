@@ -1067,7 +1067,6 @@
   "machineLearning": "تعلم الآلة",
   "manage": "إدارة",
   "manageDeviceStorage": "إدارة مساحة تخزين الجهاز",
-  "manageDeviceStorageDesc": "مراجعة ومسح ذاكرة التخزين المؤقت المحلية.",
   "manageFamily": "إدارة العائلة",
   "manageLink": "إدارة الرابط",
   "manageParticipants": "إدارة المشاركين",
@@ -1492,8 +1491,6 @@
       "userEmail": {}
     }
   },
-  "removeDuplicates": "إزالة النسخ المكررة",
-  "removeDuplicatesDesc": "مراجعة وإزالة الملفات المتطابقة تمامًا.",
   "removeFromAlbum": "إزالة من الألبوم",
   "removeFromAlbumTitle": "إزالة من الألبوم؟",
   "removeFromFavorite": "إزالة من المفضلة",
@@ -2112,7 +2109,6 @@
   "viewAllExifData": "عرض جميع بيانات EXIF",
   "viewer": "مشاهد",
   "viewLargeFiles": "الملفات الكبيرة",
-  "viewLargeFilesDesc": "عرض الملفات التي تستهلك أكبر قدر من مساحة التخزين.",
   "viewLogs": "عرض السجلات",
   "@viewLogs": {
     "description": "Button to view logs"

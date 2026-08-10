@@ -1126,7 +1126,6 @@
   "machineLearning": "Машыннае навучанне",
   "manage": "Кіраванне",
   "manageDeviceStorage": "Кіраваць кэшам прылады",
-  "manageDeviceStorageDesc": "Паглядзець і ачысціць лакальны кэш сховішча.",
   "manageFamily": "Кіраванне сям'ёй",
   "manageLink": "Кіраваць спасылкай",
   "manageParticipants": "Кіраванне",
@@ -1626,8 +1625,6 @@
       "userEmail": {}
     }
   },
-  "removeDuplicates": "Выдаліць дублікаты",
-  "removeDuplicatesDesc": "Пераглядзіце і выдаліце дубліраваныя файлы.",
   "removeFromAlbum": "Выдаліць з альбома",
   "removeFromAlbumTitle": "Выдаліць з альбома?",
   "removeFromFavorite": "Выдаліць з абранага",
@@ -2279,7 +2276,6 @@
   },
   "useAsCover": "Выкарыстоўваць як вокладку",
   "usedSpace": "Выкарыстаная прастора",
-  "useMLToFindSimilarImages": "Паглядзіце і выдаліце відарысы, якія выглядаюць падобна.",
   "useOffline": "Выкарыстоўваць без рэзервовых копій",
   "useRecoveryKey": "Выкарыстоўваць ключ аднаўлення",
   "@useRecoveryKey": {
@@ -2332,7 +2328,6 @@
   "viewAllExifData": "Паглядзець усе даныя EXIF",
   "viewer": "Праглядальнік",
   "viewLargeFiles": "Вялікія файлы",
-  "viewLargeFilesDesc": "Праглядзіце файлы, якія займаюць найбольш месца на прыладзе.",
   "viewLogs": "Паглядзець журналы",
   "@viewLogs": {
     "description": "Button to view logs"
