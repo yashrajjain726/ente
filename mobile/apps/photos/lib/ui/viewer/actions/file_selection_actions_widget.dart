@@ -11,6 +11,7 @@ import "package:logging/logging.dart";
 import "package:modal_bottom_sheet/modal_bottom_sheet.dart";
 import "package:photo_manager/photo_manager.dart";
 import 'package:photos/core/configuration.dart';
+import "package:photos/core/constants.dart";
 import "package:photos/core/event_bus.dart";
 import "package:photos/events/files_updated_event.dart";
 import "package:photos/events/force_reload_trash_page_event.dart";
@@ -1307,29 +1308,41 @@ class _FileSelectionActionsWidgetState
 }
 
 Future<void> _restoreFilesFromSystemTrash(SelectedFiles selectedFiles) async {
-  final assets = selectedFiles.files.map(trashFileToAssetEntity).toList();
-  final restoredIDs = (await PhotoManager.editor.android.restoreFromTrash(
-    assets,
-  )).map(int.parse);
-  if (restoredIDs.isEmpty) return;
-  final restoredFiles = selectedFiles.files.where(
-    (f) => restoredIDs.contains(f.asTrashFile!.systemTrashID!),
-  );
-  selectedFiles.unSelectAll(restoredFiles.toSet());
-  Bus.instance.fire(ForceReloadTrashPageEvent());
+  final files = selectedFiles.files.map(trashFileToAssetEntity).toList();
+  final restoredIDs = <int>{};
+  try {
+    for (final batch in files.chunks(batchSize)) {
+      final result = await PhotoManager.editor.android.restoreFromTrash(batch);
+      restoredIDs.addAll(result.map(int.parse));
+    }
+  } finally {
+    if (restoredIDs.isNotEmpty) {
+      final restoredFiles = selectedFiles.files.where(
+        (f) => restoredIDs.contains(f.asTrashFile!.systemTrashID!),
+      );
+      selectedFiles.unSelectAll(restoredFiles.toSet());
+      Bus.instance.fire(ForceReloadTrashPageEvent());
+    }
+  }
 }
 
 Future<void> _deleteFromSystemTrash(SelectedFiles selectedFiles) async {
   final fileIDs = selectedFiles.files
       .map((f) => f.asTrashFile!.systemTrashID!.toString())
       .toList();
-  final deletedIDs = (await PhotoManager.editor.deleteWithIds(
-    fileIDs,
-  )).map(int.parse);
-  if (deletedIDs.isEmpty) return;
-  final deletedFiles = selectedFiles.files.where(
-    (f) => deletedIDs.contains(f.asTrashFile!.systemTrashID!),
-  );
-  selectedFiles.unSelectAll(deletedFiles.toSet());
-  Bus.instance.fire(ForceReloadTrashPageEvent());
+  final deletedIDs = <int>{};
+  try {
+    for (final batch in fileIDs.chunks(batchSize)) {
+      final result = await PhotoManager.editor.deleteWithIds(batch);
+      deletedIDs.addAll(result.map(int.parse));
+    }
+  } finally {
+    if (deletedIDs.isNotEmpty) {
+      final deletedFiles = selectedFiles.files.where(
+        (f) => deletedIDs.contains(f.asTrashFile!.systemTrashID!),
+      );
+      selectedFiles.unSelectAll(deletedFiles.toSet());
+      Bus.instance.fire(ForceReloadTrashPageEvent());
+    }
+  }
 }
