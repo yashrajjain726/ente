@@ -6,7 +6,9 @@ import "package:flutter/cupertino.dart";
 import "package:flutter/material.dart";
 import "package:flutter_svg/flutter_svg.dart";
 import "package:hugeicons/hugeicons.dart";
+import "package:photo_manager/photo_manager.dart";
 import "package:photos/core/event_bus.dart";
+import "package:photos/events/force_reload_trash_page_event.dart";
 import "package:photos/events/guest_view_event.dart";
 import "package:photos/models/collection/collection.dart";
 import "package:photos/models/file/extensions/file_props.dart";
@@ -21,6 +23,7 @@ import "package:photos/ui/actions/file/file_actions.dart";
 import "package:photos/ui/collections/collection_action_sheet.dart";
 import "package:photos/ui/viewer/actions/suggest_delete_sheet.dart";
 import "package:photos/utils/delete_file_util.dart";
+import "package:photos/utils/dialog_util.dart";
 import "package:photos/utils/share_util.dart";
 
 class FileBottomBar extends StatefulWidget {
@@ -239,6 +242,13 @@ class FileBottomBarState extends State<FileBottomBar> {
           child: IconButton(
             icon: const Icon(CupertinoIcons.gobackward, color: Colors.white),
             onPressed: () {
+              if (widget.file.asTrashFile!.isSystemOnly) {
+                _restoreFromSystemTrash().onError((e, s) {
+                  if (!mounted) return;
+                  showGenericErrorDialog(context: context, error: e).ignore();
+                });
+                return;
+              }
               final selectedFiles = SelectedFiles();
               selectedFiles.toggleSelection(widget.file);
               showCollectionActionSheet(
@@ -307,5 +317,15 @@ class FileBottomBarState extends State<FileBottomBar> {
         widget.onFileRemoved(widget.file);
       },
     );
+  }
+
+  Future<void> _restoreFromSystemTrash() async {
+    final asset = trashFileToAssetEntity(widget.file);
+    final restoredIDs = await PhotoManager.editor.android.restoreFromTrash([
+      asset,
+    ]);
+    if (restoredIDs.isEmpty) return;
+    Bus.instance.fire(ForceReloadTrashPageEvent());
+    await widget.onFileRemoved(widget.file);
   }
 }

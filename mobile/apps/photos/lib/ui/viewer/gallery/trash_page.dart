@@ -2,9 +2,11 @@ import "dart:io";
 
 import "package:collection/collection.dart";
 import "package:ente_components/ente_components.dart";
+import "package:ente_pure_utils/ente_pure_utils.dart";
 import "package:ente_strings/extensions.dart";
 import 'package:flutter/material.dart';
 import "package:photo_manager/photo_manager.dart";
+import "package:photos/core/constants.dart";
 import "package:photos/core/event_bus.dart";
 import "package:photos/db/trash_db.dart";
 import "package:photos/events/files_updated_event.dart";
@@ -24,22 +26,33 @@ import "package:photos/ui/viewer/gallery/gallery_app_bar_widget.dart";
 import "package:photos/ui/viewer/gallery/state/gallery_boundaries_provider.dart";
 import "package:photos/ui/viewer/gallery/state/gallery_files_inherited_widget.dart";
 import "package:photos/ui/viewer/gallery/state/selection_state.dart";
+import "package:photos/utils/device_info.dart";
 
-class TrashPage extends StatefulWidget {
-  const TrashPage({super.key});
-
-  @override
-  State<TrashPage> createState() => _TrashPageState();
+Future<void> showTrashPage(BuildContext context) async {
+  final isDeviceTrashSupported =
+      Platform.isAndroid &&
+      !await isAndroidSDKVersionLowerThan(android11SDKINT);
+  if (!context.mounted) return;
+  await routeToPage(context, _TrashPage(isDeviceTrashSupported));
 }
 
-class _TrashPageState extends State<TrashPage> {
-  bool _isOnEnteTrash = true;
+class _TrashPage extends StatefulWidget {
+  final bool _isSystemTrashSupported;
+
+  const _TrashPage(this._isSystemTrashSupported);
+
+  @override
+  State<_TrashPage> createState() => _TrashPageState();
+}
+
+class _TrashPageState extends State<_TrashPage> {
+  bool _isOnEnteTrash = !isLocalGalleryMode;
   final _selectedFiles = SelectedFiles();
 
   @override
   Widget build(BuildContext context) {
     final l10n = context.strings;
-    final header = (isLocalGalleryMode || !Platform.isAndroid)
+    final header = (isLocalGalleryMode || !widget._isSystemTrashSupported)
         ? null
         : Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -50,18 +63,24 @@ class _TrashPageState extends State<TrashPage> {
                   label: l10n.ente,
                   state: _isOnEnteTrash ? .selected : .unselected,
                   onTap: () {
-                    setState(() {
-                      _isOnEnteTrash = true;
-                    });
+                    if (!_isOnEnteTrash) {
+                      setState(() {
+                        _selectedFiles.clearAll();
+                        _isOnEnteTrash = true;
+                      });
+                    }
                   },
                 ),
                 TagChipComponent(
                   label: l10n.onDevice,
                   state: !_isOnEnteTrash ? .selected : .unselected,
                   onTap: () {
-                    setState(() {
-                      _isOnEnteTrash = false;
-                    });
+                    if (_isOnEnteTrash) {
+                      setState(() {
+                        _selectedFiles.clearAll();
+                        _isOnEnteTrash = false;
+                      });
+                    }
                   },
                 ),
               ],
@@ -130,7 +149,7 @@ class _TrashPageState extends State<TrashPage> {
     int? limit,
     bool? asc,
   }) async {
-    if (!Platform.isAndroid || (!isLocalGalleryMode && _isOnEnteTrash)) {
+    if (_isOnEnteTrash) {
       return await TrashDB.instance.getTrashedFiles(
         creationStartTime,
         creationEndTime,

@@ -9,15 +9,19 @@ import "package:hugeicons/hugeicons.dart";
 import "package:local_auth/local_auth.dart";
 import "package:logging/logging.dart";
 import "package:modal_bottom_sheet/modal_bottom_sheet.dart";
+import "package:photo_manager/photo_manager.dart";
 import 'package:photos/core/configuration.dart';
 import "package:photos/core/event_bus.dart";
 import "package:photos/events/files_updated_event.dart";
+import "package:photos/events/force_reload_trash_page_event.dart";
 import "package:photos/events/guest_view_event.dart";
 import "package:photos/events/people_changed_event.dart";
 import 'package:photos/models/collection/collection.dart';
 import 'package:photos/models/device_collection.dart';
+import "package:photos/models/file/extensions/file_props.dart";
 import 'package:photos/models/file/file.dart';
 import 'package:photos/models/file/file_type.dart';
+import "package:photos/models/file/trash_file.dart";
 import 'package:photos/models/files_split.dart';
 import 'package:photos/models/gallery_type.dart';
 import "package:photos/models/metadata/common_keys.dart";
@@ -1066,6 +1070,16 @@ class _FileSelectionActionsWidgetState
   }
 
   void _restore() {
+    final isSystemOnly = widget.selectedFiles.files.every(
+      (f) => f.asTrashFile!.isSystemOnly,
+    );
+    if (isSystemOnly) {
+      _restoreFilesFromSystemTrash(widget.selectedFiles).onError((e, s) {
+        if (!mounted) return;
+        showGenericErrorDialog(context: context, error: e).ignore();
+      });
+      return;
+    }
     showCollectionActionSheet(
       context,
       selectedFiles: widget.selectedFiles,
@@ -1259,4 +1273,17 @@ class _FileSelectionActionsWidgetState
       widget.selectedFiles.replaceSelection(skippedFiles.toSet());
     }
   }
+}
+
+Future<void> _restoreFilesFromSystemTrash(SelectedFiles selectedFiles) async {
+  final assets = selectedFiles.files.map(trashFileToAssetEntity).toList();
+  final restoredIDs = (await PhotoManager.editor.android.restoreFromTrash(
+    assets,
+  )).map(int.parse);
+  if (restoredIDs.isEmpty) return;
+  final restoredFiles = selectedFiles.files.where(
+    (f) => restoredIDs.contains(f.asTrashFile!.systemTrashID!),
+  );
+  selectedFiles.unSelectAll(restoredFiles.toSet());
+  Bus.instance.fire(ForceReloadTrashPageEvent());
 }
