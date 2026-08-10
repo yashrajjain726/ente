@@ -62,6 +62,7 @@ Open the specific video, tap the overflow menu (⋮) in the top-right corner, an
 
 ### On mobile
 
+- Use the mute button in the video player to turn sound on or off; Ente remembers this preference for other videos
 - Open `Settings > Backup > Backup status` to see processing status
 - Processed videos show a green play button
 - Tap processed videos to see a `Play stream` button

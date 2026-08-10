@@ -29,7 +29,9 @@ With Ente Cast, you can play a slideshow of your favourite albums on your Google
 
     </div>
 
-    On Google Chrome and other Chromium browsers, you will see a button labeled "Auto Pair". This option will prompt you to select a Chromecast supported device on your local network. Note: this option requires connecting to Google servers to load necessary dependencies. This option does not transmit any sensitive data through Google servers, such as your photos. Once your Chromecast device is connected, you're all set.
+    In the mobile app, **Auto Pair** discovers compatible Cast devices on your local network. Select a device from the list to connect. On iOS, allow the local network permission when prompted so Ente can discover devices.
+
+    On Google Chrome and other Chromium browsers, **Auto Pair** prompts you to select a Chromecast-supported device on your local network. This option requires connecting to Google servers to load necessary dependencies, but does not transmit sensitive data such as your photos through Google servers.
 
     On all browsers, you'll see the option to "Pair with PIN". This option works with all devices, Chromecast-enabled or not. You'll be required to load up [cast.ente.com](https://cast.ente.com) on your large screen device.
 
@@ -57,13 +59,13 @@ This is especially useful if you cast the same album to different screens at dif
 
 ## Pairing options explained
 
-### Auto Pair (Chromium browsers only)
+### Auto Pair
 
-- Available in Google Chrome and other Chromium-based browsers
-- Automatically detects Chromecast devices on your local network
-- Requires connecting to Google servers to load necessary dependencies
-- Does not transmit sensitive data (like your photos) through Google servers
-- Quickest option if you have a Chromecast-enabled device
+- Available in the Ente mobile app and in Chromium-based browsers
+- Automatically detects compatible Cast devices on your local network
+- On iOS, requires local network permission for device discovery
+- In Chromium browsers, requires connecting to Google servers to load necessary dependencies
+- Does not transmit sensitive data such as your photos through Google servers
 
 ### Pair with PIN (All browsers & devices)
 
