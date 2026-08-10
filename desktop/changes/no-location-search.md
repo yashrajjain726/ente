@@ -1,0 +1,1 @@
+- Added search for photos without location information.

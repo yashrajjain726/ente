@@ -1,3 +1,4 @@
+import { ensureLocalUser } from "ente-accounts/services/user";
 import log from "ente-base/log";
 import { ensureMasterKeyFromSession } from "ente-base/session";
 import { ComlinkWorker } from "ente-base/worker/comlink-worker";
@@ -51,6 +52,7 @@ export const updateSearchCollectionsAndFiles = (
     );
     void worker().then((w) =>
         w.setCollectionsAndFiles({
+            currentUserID: ensureLocalUser().id,
             collections: normalCollections,
             files: uniqueFilesByID(normalCollectionFiles),
             collectionFiles: normalCollectionFiles,
@@ -127,6 +129,7 @@ const localizedSearchData = () =>
         locale: i18n.language,
         holidays: holidays(),
         labelledFileTypes: labelledFileTypes(),
+        noLocationLabel: t("no_location"),
     });
 
 const holidays = (): LabelledSearchDateComponents[] => [
