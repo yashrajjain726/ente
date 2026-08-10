@@ -24,7 +24,6 @@ import "package:photos/models/memories/memory.dart";
 import "package:photos/models/memories/people_memory.dart";
 import "package:photos/models/memories/smart_memory.dart";
 import "package:photos/models/memories/smart_memory_constants.dart";
-import "package:photos/models/memories/trip_memory.dart";
 import "package:photos/service_locator.dart";
 import "package:photos/services/app_navigation_service.dart";
 import "package:photos/services/language_service.dart";
@@ -862,11 +861,14 @@ class MemoriesCacheService {
         final now = DateTime.now();
         final next = now.add(kMemoriesUpdateFrequency);
         final mlReady = await _isMlReady();
-        final nowResult = await smartMemoriesService.calcSmartMemories(
-          now,
-          newCache,
-          mlEnabled: mlReady,
-        );
+        final periodResults = await smartMemoriesService
+            .calcCurrentAndNextSmartMemories(
+              now,
+              next,
+              newCache,
+              mlEnabled: mlReady,
+            );
+        final nowResult = periodResults.current;
         if (nowResult.failed) {
           _logger.warning(
             "Skipping memories cache update because current calculation failed",
@@ -876,16 +878,7 @@ class MemoriesCacheService {
         final carriedForwardTripEntries = List<ToShowMemory>.from(
           newCache.toShowMemories,
         );
-        newCache.toShowMemories.addAll(
-          nowResult.memories.whereType<TripMemory>().map(
-            (memory) => ToShowMemory.fromSmartMemory(memory, now),
-          ),
-        );
-        final nextResult = await smartMemoriesService.calcSmartMemories(
-          next,
-          newCache,
-          mlEnabled: mlReady,
-        );
+        final nextResult = periodResults.next;
         if (nextResult.failed) {
           _logger.warning(
             "Skipping memories cache update because next calculation failed",
