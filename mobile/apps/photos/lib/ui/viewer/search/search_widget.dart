@@ -12,6 +12,7 @@ import "package:photos/models/search/generic_search_result.dart";
 import "package:photos/models/search/index_of_indexed_stack.dart";
 import "package:photos/models/search/search_result.dart";
 import "package:photos/services/search_service.dart";
+import "package:photos/ui/viewer/search/search_query_utils.dart";
 import "package:photos/ui/viewer/search/search_suffix_icon_widget.dart";
 import "package:photos/utils/pending_translation.dart";
 
@@ -225,7 +226,7 @@ class SearchWidgetState extends State<SearchWidget> {
     }
 
     int resultCount = 0;
-    final maxResultCount = _isYearValid(query) ? 13 : 12;
+    final maxResultCount = isYearSearchQuery(query) ? 13 : 12;
     final streamController = StreamController<List<SearchResult>>();
 
     void onResultsReceived(List<SearchResult> results) {
@@ -241,7 +242,7 @@ class SearchWidgetState extends State<SearchWidget> {
       }
     }
 
-    if (_isYearValid(query)) {
+    if (isYearSearchQuery(query)) {
       _searchService.getYearSearchResults(query).then((yearSearchResults) {
         onResultsReceived(yearSearchResults);
       });
@@ -310,10 +311,5 @@ class SearchWidgetState extends State<SearchWidget> {
     });
 
     return streamController.stream.asBroadcastStream();
-  }
-
-  bool _isYearValid(String year) {
-    final yearAsInt = int.tryParse(year); //returns null if cannot be parsed
-    return yearAsInt != null && yearAsInt <= currentYear;
   }
 }
