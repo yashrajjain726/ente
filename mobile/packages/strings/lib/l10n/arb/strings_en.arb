@@ -1660,6 +1660,16 @@
     }
   },
   "fileSavedToGallery": "File saved to gallery",
+  "filesCanBeRestoredFromTrash": "{count, plural, one{Item not backed up. It can be restored from Trash.} other{Items not backed up. They can be restored from Trash.}}",
+  "@filesCanBeRestoredFromTrash": {
+    "description": "Delete confirmation message for device-only items that will be moved to trash.",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "2"
+      }
+    }
+  },
   "filesDeleted": "Files deleted",
   "filesDeletedPermanently": "{count, plural, one{{count} item deleted permanently} other{{count} items deleted permanently}}",
   "@filesDeletedPermanently": {
