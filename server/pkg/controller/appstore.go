@@ -27,7 +27,6 @@ import (
 	"github.com/ente/museum/pkg/repo/remotestore"
 )
 
-// AppStoreController provides abstractions for handling billing on AppStore
 type AppStoreController struct {
 	AppStoreClient         appstore.Client
 	BillingRepo            *repo.BillingRepository
@@ -37,11 +36,9 @@ type AppStoreController struct {
 	BillingPlansPerCountry ente.BillingPlansPerCountry
 	CommonBillCtrl         *commonbilling.Controller
 	DiscordController      *discord.DiscordController
-	// appStoreSharedPassword is the password to be used to access AppStore APIs
 	appStoreSharedPassword string
 }
 
-// Return a new instance of AppStoreController
 func NewAppStoreController(
 	plans ente.BillingPlansPerCountry,
 	billingRepo *repo.BillingRepository,
@@ -105,7 +102,6 @@ func (c *AppStoreController) validateSandboxRequest(ctx context.Context, environ
 	return stacktrace.Propagate(ente.NewInternalError("sandbox request from external user"), "")
 }
 
-// HandleNotification handles an AppStore notification
 func (c *AppStoreController) HandleNotification(ctx *gin.Context, notification appstore.SubscriptionNotification) error {
 	logger := logrus.WithFields(logrus.Fields{
 		"req_id": requestid.Get(ctx),
@@ -118,7 +114,6 @@ func (c *AppStoreController) HandleNotification(ctx *gin.Context, notification a
 	if latestReceiptInfo.TransactionID == latestReceiptInfo.OriginalTransactionID && !slices.Contains(SubsUpdateNotificationTypes, string(notification.NotificationType)) {
 		var logMsg = fmt.Sprintf("Ignoring notification of type %s", notification.NotificationType)
 		if notification.NotificationType != appstore.NotificationTypeInitialBuy {
-			// log unexpected notification types
 			logger.Error(logMsg)
 		} else {
 			logger.Info(logMsg)
@@ -149,7 +144,7 @@ func (c *AppStoreController) HandleNotification(ctx *gin.Context, notification a
 					break
 				}
 			}
-			if newPlan.Storage < subscription.Storage { // Downgrade
+			if newPlan.Storage < subscription.Storage {
 				canDowngrade, canDowngradeErr := c.CommonBillCtrl.CanDowngradeToGivenStorage(newPlan.Storage, subscription.UserID)
 				if canDowngradeErr != nil {
 					return stacktrace.Propagate(canDowngradeErr, "")
@@ -196,7 +191,6 @@ func (c *AppStoreController) HandleNotification(ctx *gin.Context, notification a
 	return stacktrace.Propagate(err, "")
 }
 
-// GetVerifiedSubscription verifies and returns the verified subscription
 func (c *AppStoreController) GetVerifiedSubscription(userID int64, productID string, verificationData string) (ente.Subscription, error) {
 	var s ente.Subscription
 	s.UserID = userID
@@ -227,7 +221,6 @@ func (c *AppStoreController) GetVerifiedSubscription(userID int64, productID str
 	return s, nil
 }
 
-// VerifyAppStoreSubscription verifies an AppStore subscription
 func (c *AppStoreController) verifyAppStoreSubscription(verificationData string) (*appstore.IAPResponse, error) {
 	iapRequest := appstore.IAPRequest{
 		ReceiptData: verificationData,

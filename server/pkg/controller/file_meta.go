@@ -6,7 +6,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// CreateMetaFile adds an entry for a file in the respective tables
 func (c *FileController) CreateMetaFile(ctx *gin.Context, userID int64, file ente.MetaFile, userAgent string, app ente.App) (*ente.File, error) {
 	collection, collErr := c.CollectionRepo.Get(file.CollectionID)
 	if collErr != nil {

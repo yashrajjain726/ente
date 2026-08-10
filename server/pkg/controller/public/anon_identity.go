@@ -12,20 +12,17 @@ import (
 	gonanoid "github.com/matoous/go-nanoid/v2"
 )
 
-// AnonIdentityController issues anonymous identities for public commenters.
 type AnonIdentityController struct {
 	JwtSecret     []byte
 	AnonUsersRepo *socialrepo.AnonUsersRepository
 }
 
-// AnonIdentityResponse is returned when minting anon identities.
 type AnonIdentityResponse struct {
 	AnonUserID string `json:"anonUserID"`
 	Token      string `json:"token"`
 	ExpiresAt  int64  `json:"expiresAt"`
 }
 
-// CreateAnonIdentityRequest captures the profile payload for a new anonymous user.
 type CreateAnonIdentityRequest struct {
 	CollectionID int64
 	Cipher       string

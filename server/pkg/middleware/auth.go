@@ -21,17 +21,12 @@ import (
 	"github.com/spf13/viper"
 )
 
-// AuthMiddleware intercepts and authenticates incoming requests
 type AuthMiddleware struct {
 	UserAuthRepo   *repo.UserAuthRepository
 	Cache          *cache.Cache
 	UserController *user.UserController
 }
 
-// TokenAuthMiddleware returns a middle ware that extracts the `X-AuthToken`
-// within the header of a request and uses it to authenticate and insert the
-// authenticated user to the request's `X-Auth-User-ID` field.
-// If isJWT is true we use JWT token validation
 func (m *AuthMiddleware) TokenAuthMiddleware(jwtClaimScope *jwt.ClaimScope) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		token := auth.GetToken(c)
@@ -92,8 +87,6 @@ func (m *AuthMiddleware) TokenAuthMiddleware(jwtClaimScope *jwt.ClaimScope) gin.
 	}
 }
 
-// TokenOrJWTAuthMiddleware authenticates either a user session token or a JWT
-// with the given claim scope.
 func (m *AuthMiddleware) TokenOrJWTAuthMiddleware(jwtClaimScope jwt.ClaimScope) gin.HandlerFunc {
 	userAuth := m.TokenAuthMiddleware(nil)
 	jwtAuth := m.TokenAuthMiddleware(jwtClaimScope.Ptr())
@@ -122,8 +115,6 @@ func RejectAuthApp() gin.HandlerFunc {
 	}
 }
 
-// AdminAuthMiddleware returns a middle ware that extracts the `userID` added by the TokenAuthMiddleware
-// within the header of a request and uses it to check admin status
 // NOTE: Should be added after TokenAuthMiddleware middleware
 func (m *AuthMiddleware) AdminAuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {

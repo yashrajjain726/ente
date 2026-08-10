@@ -1,7 +1,6 @@
 use crate::ml::{
     clip::{run_clip_image, run_clip_text_query, tokenize_clip_text as tokenize_clip_text_impl},
     error::{MlError, MlResult},
-    events,
     face::{
         run_face_alignment, run_face_detection, run_face_embedding,
         thumbnail::{FaceBox, generate_face_thumbnails},
@@ -129,13 +128,7 @@ pub fn analyze_image(req: AnalyzeImageRequest) -> MlResult<AnalyzeImageResult> {
                         match generate_face_thumbnails(&decoded, std::slice::from_ref(&face_box)) {
                             Ok(mut crops) => crops.pop(),
                             Err(error) => {
-                                events::record(
-                                    events::Severity::Warning,
-                                    format!(
-                                        "skipping face crop for face {}: {error}",
-                                        face.face_id
-                                    ),
-                                );
+                                log::warn!("skipping face crop for face {}: {error}", face.face_id);
                                 None
                             }
                         }

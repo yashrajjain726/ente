@@ -19,7 +19,6 @@ type UserDetailsResponse struct {
 	BonusData              *storagebonus.ActiveStorageBonus `json:"bonusData"`
 }
 
-// LockerFamilyUsage contains locker-specific usage data for family members
 type LockerFamilyUsage struct {
 	FamilyFileCount int64 `json:"familyFileCount"`
 }

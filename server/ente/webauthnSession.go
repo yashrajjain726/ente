@@ -12,7 +12,6 @@ import (
 	"github.com/google/uuid"
 )
 
-// WebAuthnSession is a protocol level session that stores challenges and other metadata during registration and login ceremonies
 type WebAuthnSession struct {
 	ID uuid.UUID
 

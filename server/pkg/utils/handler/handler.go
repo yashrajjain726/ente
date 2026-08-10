@@ -41,8 +41,6 @@ func BindJSON(c *gin.Context, obj any) error {
 	return nil
 }
 
-// Error parses the error, translates it into an HTTP response and aborts
-// the request
 func Error(c *gin.Context, err error) {
 	unWrappedErr := errors.Unwrap(err)
 	if unWrappedErr == nil {
@@ -98,16 +96,11 @@ func logLevel(level log.Level) *log.Level {
 }
 
 func isRequestIOError(err error) bool {
-	// Tip: To trigger the "unexpected EOF" error, connect with:
-	//
-	//    echo "GET /ping HTTP/1.0\r\nContent-Length: 300\r\n\r\n" | nc localhost 8080
 	return errors.Is(err, io.ErrUnexpectedEOF) ||
 		errors.Is(err, syscall.EPIPE) ||
 		errors.Is(err, syscall.ECONNRESET)
 }
 
-// If `err` directly maps to an HTTP status code, return the HTTP status code.
-// Otherwise return 0.
 func httpStatusCode(err error) int {
 	switch {
 	case errors.Is(err, ente.ErrNotFound) ||

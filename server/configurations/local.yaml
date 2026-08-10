@@ -357,15 +357,6 @@ discord:
             token:
             channel:
 
-# Zoho Campaigns config (optional)
-# Use case: Sending emails
-zoho:
-    client-id:
-    client-secret:
-    refresh-token:
-    list-key:
-    topic-ids:
-
 # Listmonk Campaigns config (optional)
 # Use case: Sending emails
 listmonk:

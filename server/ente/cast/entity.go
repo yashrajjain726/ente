@@ -2,7 +2,6 @@ package cast
 
 import "github.com/google/uuid"
 
-// CastRequest ..
 type CastRequest struct {
 	CollectionID int64  `json:"collectionID" binding:"required"`
 	CastToken    string `json:"castToken" binding:"required"`

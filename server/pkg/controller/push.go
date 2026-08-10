@@ -25,7 +25,6 @@ import (
 	"golang.org/x/oauth2/google"
 )
 
-// PushController controls all push related operations
 type PushController struct {
 	PushRepo     *repo.PushTokenRepository
 	TaskLockRepo *repo.TaskLockRepository
@@ -42,10 +41,8 @@ type PushToken struct {
 	LastNotifiedAt int64
 }
 
-// Interval before which the last push was sent
 const pushIntervalInMinutes = 60
 
-// Max number of devices to notify in a single run.
 const concurrentPushesInOneShot = 500
 
 const fcmSendConcurrency = 10

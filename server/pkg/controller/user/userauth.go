@@ -90,7 +90,6 @@ func hardcodedOTTForEmail(hardCodedOTT HardCodedOTT, email string) string {
 	return ""
 }
 
-// SendEmailOTT generates and sends an OTT to the provided email address
 func (c *UserController) SendEmailOTT(context *gin.Context, email string, purpose string, mobile bool) error {
 	if c.OTTSendLimiter.IsGloballyBlocked() {
 		return stacktrace.Propagate(ente.ErrTooManyBadRequest, "too many OTT requests")
@@ -107,7 +106,6 @@ func (c *UserController) SendEmailOTT(context *gin.Context, email string, purpos
 	if err != nil {
 		return stacktrace.Propagate(err, "")
 	}
-	// check if user has already requested for more than 10 codes in last 10mins
 	app := auth.GetApp(context)
 	otts, err := c.UserAuthRepo.GetValidOTTs(emailHash, app)
 	if err != nil {
@@ -163,11 +161,9 @@ func (c *UserController) SendEmailOTT(context *gin.Context, email string, purpos
 func (c *UserController) isEmailAlreadyUsed(email string) error {
 	_, err := c.UserRepo.GetUserIDWithEmailUnrestricted(email)
 	if err == nil {
-		// email already owned by a user
 		return stacktrace.Propagate(ente.ErrPermissionDenied, "email already belongs to a user")
 	}
 	if !errors.Is(err, sql.ErrNoRows) {
-		// unknown error, rethrow
 		return stacktrace.Propagate(err, "")
 	}
 	return nil
@@ -312,8 +308,6 @@ func (c *UserController) verifyEmailOtt(context *gin.Context, email string, ott 
 	return nil
 }
 
-// VerifyEmail validates that the OTT provided in the request is valid for the
-// provided email address and if yes returns the users credentials
 func (c *UserController) VerifyEmail(context *gin.Context, request ente.EmailVerificationRequest) (ente.EmailAuthorizationResponse, error) {
 	email := emailUtil.NormalizeEmail(request.Email)
 	err := c.verifyEmailOtt(context, email, request.OTT)
@@ -323,8 +317,6 @@ func (c *UserController) VerifyEmail(context *gin.Context, request ente.EmailVer
 	return c.onVerificationSuccess(context, email, request.Source)
 }
 
-// ChangeEmail validates that the OTT provided in the request is valid for the
-// provided email address and if yes updates the user's existing email address
 func (c *UserController) ChangeEmail(ctx *gin.Context, request ente.EmailVerificationRequest) error {
 	email := emailUtil.NormalizeEmail(request.Email)
 	err := c.verifyEmailOtt(ctx, email, request.OTT)
@@ -335,17 +327,14 @@ func (c *UserController) ChangeEmail(ctx *gin.Context, request ente.EmailVerific
 	return c.UpdateEmail(ctx, auth.GetUserID(ctx.Request.Header), email)
 }
 
-// UpdateEmail updates the email address of the user with the provided userID
 func (c *UserController) UpdateEmail(ctx *gin.Context, userID int64, email string) error {
 	email = emailUtil.NormalizeEmail(email)
 
 	_, err := c.UserRepo.GetUserIDWithEmailUnrestricted(email)
 	if err == nil {
-		// email already owned by a user
 		return stacktrace.Propagate(ente.ErrPermissionDenied, "")
 	}
 	if !errors.Is(err, sql.ErrNoRows) {
-		// unknown error, rethrow
 		return stacktrace.Propagate(err, "")
 	}
 	user, err := c.UserRepo.Get(userID)
@@ -380,12 +369,7 @@ func (c *UserController) UpdateEmail(ctx *gin.Context, userID int64, email strin
 			}).Error("stripe update email failed")
 	}
 
-	// Unsubscribe the old email, subscribe the new one.
-	//
-	// Note that resubscribing the same email after it has been unsubscribed
-	// once works fine.
-	//
-	// See also: Do not block on mailing list errors
+	// Mailing list failures must not block email changes.
 	go func() {
 		if err := c.MailingListsController.Unsubscribe(oldEmail); err != nil {
 			log.WithError(err).WithFields(log.Fields{
@@ -418,7 +402,6 @@ func (c *UserController) touchContactsAfterEmailUpdate(ctx *gin.Context, userID 
 	}
 }
 
-// Logout removes the token from the cache and database.
 // known issue: the token may be still cached in other instances till the expiry time (10min), JWTs might remain too
 func (c *UserController) Logout(ctx *gin.Context) error {
 	token := auth.GetToken(ctx)
@@ -426,7 +409,6 @@ func (c *UserController) Logout(ctx *gin.Context) error {
 	return c.TerminateSession(userID, token)
 }
 
-// GetActiveSessions returns the list of active tokens for userID
 func (c *UserController) GetActiveSessions(context *gin.Context, userID int64) ([]ente.Session, error) {
 	tokens, err := c.UserAuthRepo.GetActiveSessions(userID, auth.GetApp(context))
 	if err != nil {
@@ -562,7 +544,6 @@ func (c *UserController) AddTokenAndNotify(ctx *gin.Context, userID int64, app e
 	return nil
 }
 
-// RemoveTokensForApps marks the given app tokens as deleted and evicts them from the auth cache.
 func (c *UserController) RemoveTokensForApps(userID int64, apps []ente.App) error {
 	if len(apps) == 0 {
 		return nil
@@ -590,7 +571,6 @@ func (c *UserController) RemoveAllTokens(userID int64) error {
 	return nil
 }
 
-// TerminateSession removes the token for a user from cache and database
 func (c *UserController) TerminateSession(userID int64, token string) error {
 	apps, err := c.UserAuthRepo.GetAppsForUser(userID)
 	if err != nil {
@@ -642,8 +622,6 @@ func emailOTT(app ente.App, to string, ott string, purpose string, mobile bool) 
 	return nil
 }
 
-// onVerificationSuccess is called when the user has successfully verified their email address.
-// source indicates where the user came from.  It can be nil.
 func (c *UserController) onVerificationSuccess(context *gin.Context, email string, source *string) (ente.EmailAuthorizationResponse, error) {
 	isTwoFactorEnabled := false
 	app := auth.GetApp(context)
@@ -721,7 +699,7 @@ func (c *UserController) onVerificationSuccess(context *gin.Context, email strin
 		}
 	}
 	var encryptedToken string
-	encryptedToken, err = crypto.GetEncryptedTokenNative(token, keyAttributes.PublicKey)
+	encryptedToken, err = crypto.GetEncryptedToken(token, keyAttributes.PublicKey)
 	if err != nil {
 		return ente.EmailAuthorizationResponse{}, stacktrace.Propagate(err, "")
 	}

@@ -9,13 +9,11 @@ import (
 
 const anonIdentityTokenType = "anon-identity"
 
-// AnonymousIdentityClaim represents the JWT issued for anonymous commenters.
 type AnonymousIdentityClaim struct {
 	Typ string `json:"typ"`
 	jwt.RegisteredClaims
 }
 
-// NewAnonymousIdentityToken signs a token for the provided anonUserID.
 func NewAnonymousIdentityToken(secret []byte, anonUserID string) (string, int64, error) {
 	issuedAt := time.Now()
 	expiry := issuedAt.AddDate(1, 0, 0) // 1 year validity
@@ -36,7 +34,6 @@ func NewAnonymousIdentityToken(secret []byte, anonUserID string) (string, int64,
 	return tokenString, MicrosecondsFromTime(expiry), nil
 }
 
-// ParseAnonymousIdentityToken validates the token and returns the parsed claim.
 func ParseAnonymousIdentityToken(secret []byte, tokenString string) (*AnonymousIdentityClaim, error) {
 	token, err := jwt.ParseWithClaims(tokenString, &AnonymousIdentityClaim{}, func(t *jwt.Token) (interface{}, error) {
 		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {

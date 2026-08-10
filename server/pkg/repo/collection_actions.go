@@ -28,7 +28,6 @@ func (r *CollectionActionsRepository) Create(ctx context.Context, userID int64, 
 	return id, stacktrace.Propagate(err, "")
 }
 
-// CreateBulk inserts multiple collection actions that only differ by fileID.
 func (r *CollectionActionsRepository) CreateBulk(ctx context.Context, userID int64, actorUserID int64, collectionID int64, fileIDs []int64, data map[string]interface{}, action string, isPending bool) error {
 	if len(fileIDs) == 0 {
 		return nil

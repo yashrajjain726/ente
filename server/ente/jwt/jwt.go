@@ -43,7 +43,6 @@ func (w WebCommonJWTClaim) Valid() error {
 	return nil
 }
 
-// LinkPasswordClaim refer to token granted post link password verification
 type LinkPasswordClaim struct {
 	PassHash   string `json:"passKey"`
 	ExpiryTime int64  `json:"expiryTime"`
@@ -56,7 +55,6 @@ func (c LinkPasswordClaim) Valid() error {
 	return nil
 }
 
-// PasteGuardClaim gates one-time paste consumption.
 type PasteGuardClaim struct {
 	AccessToken   string `json:"accessToken"`
 	UserAgentHash string `json:"userAgentHash"`

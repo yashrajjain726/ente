@@ -4,7 +4,6 @@
 /* eslint-disable @typescript-eslint/no-unnecessary-condition */
 /* eslint-disable react-hooks/exhaustive-deps */
 /* eslint-disable @typescript-eslint/prefer-promise-reject-errors */
-/* eslint-disable @typescript-eslint/no-unnecessary-type-assertion */
 
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import CloseIcon from "@mui/icons-material/Close";
@@ -739,11 +738,11 @@ const canvasToFile = async (
             break;
     }
 
-    const blob = (await new Promise<Blob>((resolve) =>
+    const blob = await new Promise<Blob>((resolve) =>
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         // @ts-ignore
         canvas.toBlob(resolve, mimeType),
-    ))!;
+    );
 
     const [originalName] = nameAndExtension(originalFileName);
     const fileName = `${originalName}-edited.${extension}`;
@@ -1262,7 +1261,7 @@ const ColoursMenu: React.FC<ColoursMenuProps> = (props) => (
                 value={props.brightness}
                 marks={[{ value: 100, label: "100%" }]}
                 onChange={(_, value) => {
-                    props.setBrightness(value as number);
+                    props.setBrightness(value);
                 }}
             />
             <RowButtonGroupTitle>{t("contrast")}</RowButtonGroupTitle>
@@ -1274,7 +1273,7 @@ const ColoursMenu: React.FC<ColoursMenuProps> = (props) => (
                 valueLabelDisplay="auto"
                 value={props.contrast}
                 onChange={(_, value) => {
-                    props.setContrast(value as number);
+                    props.setContrast(value);
                 }}
                 marks={[{ value: 100, label: "100%" }]}
             />
@@ -1287,7 +1286,7 @@ const ColoursMenu: React.FC<ColoursMenuProps> = (props) => (
                 valueLabelDisplay="auto"
                 value={props.blur}
                 onChange={(_, value) => {
-                    props.setBlur(value as number);
+                    props.setBlur(value);
                 }}
             />
             <RowButtonGroupTitle>{t("saturation")}</RowButtonGroupTitle>
@@ -1299,7 +1298,7 @@ const ColoursMenu: React.FC<ColoursMenuProps> = (props) => (
                 valueLabelDisplay="auto"
                 value={props.saturation}
                 onChange={(_, value) => {
-                    props.setSaturation(value as number);
+                    props.setSaturation(value);
                 }}
                 marks={[{ value: 100, label: "100%" }]}
             />

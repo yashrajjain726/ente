@@ -37,7 +37,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// AdminHandler exposes request handlers for all admin related requests
 type AdminHandler struct {
 	QueueRepo              *repo.QueueRepository
 	UserRepo               *repo.UserRepository
@@ -59,7 +58,6 @@ type AdminHandler struct {
 	StorageBonusCtl        *storagebonusCtrl.Controller
 }
 
-// Duration for which an admin's token is considered valid
 const AdminTokenValidityInMinutes = 10
 
 func (h *AdminHandler) SendMail(c *gin.Context) {

@@ -179,7 +179,6 @@ func (c *Controller) AddCoupons(ctx *gin.Context, req AddCouponsRequest) error {
 		return ente.NewBadRequestWithMessage("No coupon codes provided")
 	}
 
-	// Filter out empty codes and validate
 	validCodes := make([]string, 0, len(req.Codes))
 	for _, code := range req.Codes {
 		trimmed := strings.TrimSpace(code)

@@ -19,7 +19,6 @@ type CollectionActionsHandler struct {
 
 const collectionActionsLimit = 2000
 
-// ListPendingRemove returns pending REMOVE actions after the provided updatedAt timestamp
 func (h *CollectionActionsHandler) ListPendingRemove(c *gin.Context) {
 	userID := auth.GetUserID(c.Request.Header)
 	updatedAfter, err := parseSinceTime(c.Query("sinceTime"))
@@ -38,7 +37,6 @@ func (h *CollectionActionsHandler) ListPendingRemove(c *gin.Context) {
 	})
 }
 
-// ListDeleteSuggestions returns pending DELETE_SUGGESTED actions for the actor.
 func (h *CollectionActionsHandler) ListDeleteSuggestions(c *gin.Context) {
 	userID := auth.GetUserID(c.Request.Header)
 	updatedAfter, err := parseSinceTime(c.Query("sinceTime"))
@@ -61,7 +59,6 @@ type rejectDeleteSuggestionsRequest struct {
 	FileIDs []int64 `json:"fileIDs" binding:"required"`
 }
 
-// RejectDeleteSuggestions clears pending DELETE_SUGGESTED actions for the provided file IDs.
 func (h *CollectionActionsHandler) RejectDeleteSuggestions(c *gin.Context) {
 	userID := auth.GetUserID(c.Request.Header)
 	var req rejectDeleteSuggestionsRequest

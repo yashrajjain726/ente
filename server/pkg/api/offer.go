@@ -7,7 +7,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// OfferHandler expose request handlers to all offer related requests
 type OfferHandler struct {
 	Controller *offer.OfferController
 }

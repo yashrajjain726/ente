@@ -21,8 +21,6 @@ import (
 	"github.com/lib/pq"
 )
 
-// CollectionRepository defines the methods for inserting, updating and
-// retrieving collection entities from the underlying repository
 type CollectionRepository struct {
 	DB                  *sql.DB
 	FileRepo            *FileRepository
@@ -39,10 +37,8 @@ type SharedCollection struct {
 	FromUserID   int64
 }
 
-// Create creates a collection
 func (repo *CollectionRepository) Create(c ente.Collection) (ente.Collection, error) {
 
-	// Check if the app type can create collection
 	if !ente.App(c.App).IsValidForCollection() {
 		return ente.Collection{}, ente.ErrInvalidApp
 	}
@@ -61,7 +57,6 @@ func (repo *CollectionRepository) Create(c ente.Collection) (ente.Collection, er
 	return c, stacktrace.Propagate(err, "")
 }
 
-// Get returns a collection identified by the collectionID
 func (repo *CollectionRepository) Get(collectionID int64) (ente.Collection, error) {
 	row := repo.DB.QueryRow(`SELECT collection_id, app, owner_id, encrypted_key, key_decryption_nonce, name, encrypted_name, name_decryption_nonce, type, attributes, updation_time, is_deleted, magic_metadata, pub_magic_metadata
 		FROM collections
@@ -254,8 +249,6 @@ pct.access_token, pct.valid_till, pct.device_limit, pct.created_at, pct.updated_
 	return result, nil
 }
 
-// GetCollectionsSharedWithUser returns the list of collections that are shared
-// with a user
 func (repo *CollectionRepository) GetCollectionsSharedWithUser(userID int64, updationTime int64, app ente.App, limit *int64) ([]ente.Collection, error) {
 	query := `
 		SELECT collections.collection_id, collections.owner_id, users.encrypted_email, users.email_decryption_nonce, collection_shares.encrypted_key, collections.name, collections.encrypted_name, collections.name_decryption_nonce, collections.type, collections.app, collections.pub_magic_metadata, collection_shares.magic_metadata, collections.updation_time, collection_shares.is_deleted, collection_shares.role_type, collection_shares.shared_at
@@ -355,7 +348,6 @@ func (repo *CollectionRepository) GetCollectionsSharedWithUser(userID int64, upd
 	return collections, nil
 }
 
-// GetCollectionIDsSharedWithUser returns the list of collections that a user has access to
 func (repo *CollectionRepository) GetCollectionIDsSharedWithUser(userID int64) ([]int64, error) {
 	rows, err := repo.DB.Query(`
 		SELECT collection_id
@@ -378,7 +370,6 @@ func (repo *CollectionRepository) GetCollectionIDsSharedWithUser(userID int64) (
 	return cIDs, nil
 }
 
-// FilterNonDeletedCollectionIDs returns collection IDs that are not deleted and match the provided app.
 func (repo *CollectionRepository) FilterNonDeletedCollectionIDs(collectionIDs []int64, app ente.App) ([]int64, error) {
 	if len(collectionIDs) == 0 {
 		return nil, nil
@@ -432,7 +423,6 @@ func (repo *CollectionRepository) GetCollectionsSharedWithOrByUser(userID int64)
 
 }
 
-// GetCollectionIDsOwnedByUser returns the map of collectionID (owned by user) to collection deletion status
 func (repo *CollectionRepository) GetCollectionIDsOwnedByUser(userID int64) (map[int64]bool, error) {
 	rows, err := repo.DB.Query(`
 		SELECT collection_id, is_deleted
@@ -457,7 +447,6 @@ func (repo *CollectionRepository) GetCollectionIDsOwnedByUser(userID int64) (map
 	return result, nil
 }
 
-// GetAllSharedCollections returns list of SharedCollection in which the given user is involed
 func (repo *CollectionRepository) GetAllSharedCollections(ctx context.Context, userID int64) ([]SharedCollection, error) {
 	rows, err := repo.DB.QueryContext(ctx, `SELECT collection_id, to_user_id, from_user_id
 		FROM collection_shares
@@ -480,7 +469,6 @@ func (repo *CollectionRepository) GetAllSharedCollections(ctx context.Context, u
 	return result, nil
 }
 
-// GetCollectionShareeRole returns true if the collection is shared with the user
 func (repo *CollectionRepository) GetCollectionShareeRole(cID int64, userID int64) (*ente.CollectionParticipantRole, error) {
 	var role *ente.CollectionParticipantRole
 	err := repo.DB.QueryRow(`(SELECT role_type FROM collection_shares WHERE collection_id = $1 AND to_user_id = $2 AND is_deleted = $3)`,
@@ -495,7 +483,6 @@ func (repo *CollectionRepository) GetOwnerID(collectionID int64) (int64, error) 
 	return ownerID, stacktrace.Propagate(err, "failed to get collection owner")
 }
 
-// Share shares a collection with a userID
 func (repo *CollectionRepository) Share(
 	collectionID int64,
 	fromUserID int64,
@@ -594,7 +581,6 @@ func (repo *CollectionRepository) ShareAutomatically(
 	return ente.CollectionShared, nil
 }
 
-// UpdateShareeMetadata shares a collection with a userID
 func (repo *CollectionRepository) UpdateShareeMetadata(
 	collectionID int64,
 	ownerUserID int64,
@@ -606,14 +592,12 @@ func (repo *CollectionRepository) UpdateShareeMetadata(
 	if err != nil {
 		return stacktrace.Propagate(err, "")
 	}
-	// Update collection_shares metadata if the collection is not deleted
 	sqlResult, err := tx.ExecContext(context, `UPDATE collection_shares SET magic_metadata = $1, updation_time = $2  WHERE collection_id = $3 AND from_user_id = $4 AND to_user_id = $5 AND is_deleted = $6`,
 		metadata, updationTime, collectionID, ownerUserID, shareeUserID, false)
 	if err != nil {
 		tx.Rollback()
 		return stacktrace.Propagate(err, "")
 	}
-	// verify that only one row is affected
 	affected, err := sqlResult.RowsAffected()
 	if err != nil {
 		tx.Rollback()
@@ -634,13 +618,11 @@ func (repo *CollectionRepository) UpdateShareeMetadata(
 	return stacktrace.Propagate(err, "")
 }
 
-// UnShare un-shares a collection from a userID
 func (repo *CollectionRepository) UnShare(collectionID int64, toUserID int64) error {
 	_, err := repo.UnShareContext(context.Background(), collectionID, toUserID)
 	return err
 }
 
-// UnShareContext revokes access to a collection.
 func (repo *CollectionRepository) UnShareContext(
 	ctx context.Context,
 	collectionID int64,
@@ -693,7 +675,6 @@ func (repo *CollectionRepository) UnShareContext(
 	return status, nil
 }
 
-// AddFiles adds files to a collection
 func (repo *CollectionRepository) AddFiles(
 	collectionID int64,
 	collectionOwnerID int64,
@@ -742,7 +723,6 @@ func (repo *CollectionRepository) RestoreFiles(ctx context.Context, userID int64
 	for _, newFile := range newCollectionFiles {
 		fileIDs = append(fileIDs, newFile.ID)
 	}
-	// verify that all files are restorable
 	_, canRestoreAllFiles, err := repo.TrashRepo.GetFilesInTrashState(ctx, userID, fileIDs)
 	if err != nil {
 		return stacktrace.Propagate(err, "")
@@ -807,8 +787,6 @@ func (repo *CollectionRepository) RemoveFilesV3(context context.Context, collect
 		return errors.New("can not remove files owned by album owner")
 	}
 
-	// check if there are files owned by collection owner
-
 	tx, err := repo.DB.BeginTx(context, nil)
 	if err != nil {
 		return stacktrace.Propagate(err, "")
@@ -857,7 +835,6 @@ func (repo *CollectionRepository) SuggestAction(ctx context.Context, collectionI
 	return tx.Commit()
 }
 
-// MoveFiles move files from one collection to another collection
 func (repo *CollectionRepository) MoveFiles(ctx context.Context,
 	toCollectionID int64, fromCollectionID int64,
 	fileItems []ente.CollectionFileItem,
@@ -920,8 +897,6 @@ func (repo *CollectionRepository) MoveFiles(ctx context.Context,
 	return tx.Commit()
 }
 
-// GetDiff returns the diff of files added or modified within a collection since
-// the specified time
 func (repo *CollectionRepository) GetDiff(collectionID int64, sinceTime int64, limit int) ([]ente.File, error) {
 	startTime := t.Now()
 	defer func() {
@@ -994,7 +969,6 @@ func (repo *CollectionRepository) GetFile(collectionID int64, fileID int64) ([]e
 	return files, nil
 }
 
-// GetSharees returns the list of users a collection has been shared with
 func (repo *CollectionRepository) GetSharees(cID int64) ([]ente.CollectionUser, error) {
 	rows, err := repo.DB.Query(`
 		SELECT users.user_id, users.encrypted_email, users.email_decryption_nonce, collection_shares.role_type
@@ -1037,7 +1011,6 @@ func convertRowsToFileId(rows *sql.Rows) ([]int64, error) {
 	return fileIDs, nil
 }
 
-// TrashV3  move the files belonging to the collection owner to the trash
 func (repo *CollectionRepository) TrashV3(ctx context.Context, collectionID int64) error {
 	log := logrus.WithFields(logrus.Fields{
 		"deleting_collection": collectionID,
@@ -1075,7 +1048,6 @@ func (repo *CollectionRepository) TrashV3(ctx context.Context, collectionID int6
 			return stacktrace.Propagate(err, "")
 		}
 	}
-	// Verify that all files are processed in the collection.
 	count, err := repo.GetCollectionsFilesCount(collectionID)
 	if err != nil {
 		return stacktrace.Propagate(err, "")
@@ -1155,7 +1127,6 @@ func (repo *CollectionRepository) ScheduleDelete(collectionID int64) error {
 	return stacktrace.Propagate(err, "")
 }
 
-// Rename updates the collection's name by updating the encrypted_name and name_decryption_nonce of the collection
 func (repo *CollectionRepository) Rename(collectionID int64, encryptedName string, nameDecryptionNonce string) error {
 	updationTime := time.Microseconds()
 	_, err := repo.DB.Exec(`UPDATE collections 
@@ -1167,7 +1138,6 @@ func (repo *CollectionRepository) Rename(collectionID int64, encryptedName strin
 	return stacktrace.Propagate(err, "")
 }
 
-// UpdateMagicMetadata updates the magic metadata for the given collection
 func (repo *CollectionRepository) UpdateMagicMetadata(ctx context.Context,
 	collectionID int64,
 	magicMetadata ente.MagicMetadata,

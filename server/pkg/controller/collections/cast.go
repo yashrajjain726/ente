@@ -21,7 +21,6 @@ func (c *CollectionController) GetCastCollection(ctx *gin.Context) (*ente.Collec
 	return &collection, nil
 }
 
-// GetCastDiff returns the changes in the collections since a timestamp, along with hasMore bool flag.
 func (c *CollectionController) GetCastDiff(ctx *gin.Context, sinceTime int64) ([]ente.File, bool, error) {
 	castCtx := auth.GetCastCtx(ctx)
 	collectionID := castCtx.CollectionID

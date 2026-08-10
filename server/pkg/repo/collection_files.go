@@ -11,8 +11,6 @@ import (
 	"github.com/lib/pq"
 )
 
-// GetCollectionFileIDs return list of fileIDs are  currently present in the given collection
-// and fileIDs are owned by the collection owner
 func (repo *CollectionRepository) GetCollectionFileIDs(collectionID int64, collectionOwnerID int64) ([]int64, error) {
 	// Collaboration Todo: Filter out files which are not owned by the collection owner
 	rows, err := repo.DB.Query(
@@ -55,7 +53,6 @@ func (repo *CollectionRepository) GetCollectionFileState(ctx context.Context, co
 }
 
 func (repo *CollectionRepository) DoAllFilesExistInGivenCollections(fileIDs []int64, cIDs []int64) error {
-	// Query to get all distinct file_ids that exist in the collections
 	rows, err := repo.DB.Query(`
         SELECT DISTINCT file_id 
         FROM collection_files 
@@ -69,25 +66,22 @@ func (repo *CollectionRepository) DoAllFilesExistInGivenCollections(fileIDs []in
 	}
 	defer rows.Close()
 
-	// Create a map of input fileIDs for easy lookup
 	fileIDMap := make(map[int64]bool)
 	for _, id := range fileIDs {
-		fileIDMap[id] = false // false means not found yet
+		fileIDMap[id] = false
 	}
-	// Mark files that were found
 	for rows.Next() {
 		var fileID int64
 		if err := rows.Scan(&fileID); err != nil {
 			return stacktrace.Propagate(err, "")
 		}
-		fileIDMap[fileID] = true // mark as found
+		fileIDMap[fileID] = true
 	}
 
 	if err = rows.Err(); err != nil {
 		return stacktrace.Propagate(err, "")
 	}
 
-	// Collect missing files
 	var missingFiles []int64
 	for id, found := range fileIDMap {
 		if !found {
@@ -100,7 +94,6 @@ func (repo *CollectionRepository) DoAllFilesExistInGivenCollections(fileIDs []in
 	return nil
 }
 
-// VerifyAllFileIDsExistsInCollection returns error if the fileIDs don't exist in the collection
 func (repo *CollectionRepository) VerifyAllFileIDsExistsInCollection(ctx context.Context, cID int64, fileIDs []int64) error {
 	if len(fileIDs) == 0 {
 		return nil
@@ -122,7 +115,6 @@ func (repo *CollectionRepository) VerifyAllFileIDsExistsInCollection(ctx context
 	if err := rows.Err(); err != nil {
 		return stacktrace.Propagate(err, "")
 	}
-	// find fileIds that are not present in the collection
 	for _, fileID := range fileIDs {
 		if _, ok := fileIdMap[fileID]; !ok {
 			return stacktrace.Propagate(fmt.Errorf("fileID %d not found in collection %d", fileID, cID), "")
@@ -182,7 +174,6 @@ func (repo *CollectionRepository) FilterActiveFileIDsInCollection(ctx context.Co
 	return active, nil
 }
 
-// GetCollectionsFilesCount returns the number of non-deleted files which are present in the given collection
 func (repo *CollectionRepository) GetCollectionsFilesCount(collectionID int64) (int64, error) {
 	row := repo.DB.QueryRow(`SELECT count(*) FROM collection_files WHERE collection_id=$1 AND is_deleted = false`, collectionID)
 	var count int64 = 0

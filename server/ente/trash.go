@@ -1,6 +1,5 @@
 package ente
 
-// Trash indicates a trashed file in the system.
 type Trash struct {
 	File       File  `json:"file"`
 	IsDeleted  bool  `json:"isDeleted"`
@@ -10,14 +9,12 @@ type Trash struct {
 	UpdatedAt  int64 `json:"updatedAt"`
 }
 
-// DeleteTrashFilesRequest represents a request to delete a trashed files
 type DeleteTrashFilesRequest struct {
 	FileIDs []int64 `json:"fileIDs" binding:"required"`
 	// OwnerID will be set based on the authenticated user
 	OwnerID int64
 }
 
-// EmptyTrashRequest represents a request to empty items from user's trash
 type EmptyTrashRequest struct {
 	// LastUpdatedAt timestamp will be used to delete trashed files with updatedAt timestamp <= LastUpdatedAt
 	// User's trash will be cleaned up in an async manner. The timestamp is used to ensure that newly trashed files
@@ -25,7 +22,6 @@ type EmptyTrashRequest struct {
 	LastUpdatedAt int64 `json:"lastUpdatedAt" binding:"required"`
 }
 
-// TrashCollectionV3Request represents the request for trashing/deleting a collection.
 // In V3, while trashing/deleting any album, the user can decide to either keep or delete the all files which are
 // present in to the trash. When user wants to keep the files, the clients are expected to move all the files from
 // the underlying collection to any other collection owned by the user, inlcuding uncategorized.

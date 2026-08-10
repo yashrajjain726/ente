@@ -13,7 +13,6 @@ import (
 	"github.com/ente/stacktrace"
 )
 
-// UsageController exposes functions which can be used to check around storage
 type UsageController struct {
 	mu                sync.Mutex
 	BillingCtrl       *BillingController
@@ -26,11 +25,10 @@ type UsageController struct {
 	UploadResultCache map[int64]bool
 }
 
-// Locker limits by subscription tier
 const lockerFreeFileLimit = 100
 const lockerPaidFileLimit = 1000
-const lockerFreeStorageLimit = 1 * 1024 * 1024 * 1024  // 1 GiB
-const lockerPaidStorageLimit = 10 * 1024 * 1024 * 1024 // 10 GiB
+const lockerFreeStorageLimit = 1 * 1024 * 1024 * 1024
+const lockerPaidStorageLimit = 10 * 1024 * 1024 * 1024
 
 const hundredMBInBytes = 100 * 1024 * 1024
 
@@ -56,7 +54,6 @@ func GetLockerLimitsForTier(isPaid bool) LockerLimits {
 // CanUploadFile returns error if the file of given size (with StorageOverflowAboveSubscriptionLimit buffer) can be
 // uploaded or not. If size is not passed, it validates if current usage is less than subscription storage.
 func (c *UsageController) CanUploadFile(ctx context.Context, userID int64, size *int64, app ente.App) error {
-	// check if size is nil or less than 100 MB
 	if app != ente.Locker && (size == nil || *size < hundredMBInBytes) {
 		c.mu.Lock()
 		canUpload, ok := c.UploadResultCache[userID]
@@ -127,7 +124,6 @@ func (c *UsageController) canUploadFile(ctx context.Context, userID int64, size 
 	} else {
 		subStorage = sub.Storage
 	}
-	// Plan expiry check is done at this point
 	var lockerUsage *repo.LockerUsage
 	var lUsageErr error
 	if app == ente.Locker {
@@ -136,7 +132,6 @@ func (c *UsageController) canUploadFile(ctx context.Context, userID int64, size 
 			return stacktrace.Propagate(lUsageErr, "failed to fetch locker usage")
 		}
 
-		// Determine if user has paid subscription for tiered limits
 		isPaidUser := false
 		if err := c.BillingCtrl.HasActiveSelfOrFamilySubscription(subscriptionAdminID, true); err == nil {
 			isPaidUser = true
@@ -144,12 +139,10 @@ func (c *UsageController) canUploadFile(ctx context.Context, userID int64, size 
 
 		limits := GetLockerLimitsForTier(isPaidUser)
 
-		// Check file count limit
 		if lockerUsage.TotalFileCount >= limits.FileLimit {
 			return stacktrace.Propagate(&ente.ErrFileLimitReached, "")
 		}
 
-		// Check storage limit
 		projectedLockerUsage := lockerUsage.TotalUsage
 		if size != nil {
 			projectedLockerUsage += *size
@@ -168,13 +161,11 @@ func (c *UsageController) canUploadFile(ctx context.Context, userID int64, size 
 	newUsage := usage
 
 	if size != nil {
-		// Add the size of the file to be uploaded to the current usage and buffer in sub.Storage
 		newUsage += *size
 		subStorage += StorageOverflowAboveSubscriptionLimit
 	}
 	if newUsage > subStorage {
 		if bonus == nil {
-			// Check if the subAdmin has any storage bonus
 			bonus, err = c.UserCacheCtrl.GetActiveStorageBonus(ctx, subscriptionAdminID)
 			if err != nil {
 				return stacktrace.Propagate(err, "failed to get storage bonus")
@@ -182,7 +173,6 @@ func (c *UsageController) canUploadFile(ctx context.Context, userID int64, size 
 		}
 		var eligibleBonus = bonus.GetUsableBonus(subStorage)
 		if newUsage > (subStorage + eligibleBonus) {
-			// fetch lockerUsage if it's null. We need to discount locker usage while checking storage limit
 			if lockerUsage == nil && lUsageErr == nil {
 				lockerUsage, lUsageErr = c.UsageRepo.GetLockerUsage(ctx, subscriptionUserIDs)
 				if lUsageErr != nil {
@@ -195,8 +185,6 @@ func (c *UsageController) canUploadFile(ctx context.Context, userID int64, size 
 		}
 	}
 
-	// Get particular member's storage and check if the file size is larger than the size of the storage allocated
-	// to the Member and fail if it's too large.
 	if subscriptionAdminID != userID && memberStorageLimit != nil {
 		memberUsage, memberUsageErr := c.UsageRepo.GetUsage(userID)
 		if memberUsageErr != nil {
@@ -205,7 +193,6 @@ func (c *UsageController) canUploadFile(ctx context.Context, userID int64, size 
 		if size != nil {
 			memberUsage += *size
 		}
-		// Upload fail if memberStorageLimit > memberUsage ((fileSize + total Usage) + StorageOverflowAboveSubscriptionLimit (50mb))
 		if memberUsage > (*memberStorageLimit + StorageOverflowAboveSubscriptionLimit) {
 			return stacktrace.Propagate(ente.ErrStorageLimitExceeded, "member Storage Limit Exceeded (limit %d, usage %d)", *memberStorageLimit, memberUsage)
 

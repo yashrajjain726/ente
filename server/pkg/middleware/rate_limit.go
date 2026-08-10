@@ -19,7 +19,7 @@ import (
 )
 
 type RateLimitMiddleware struct {
-	count              int64 // Use int64 for atomic operations
+	count              int64
 	limit              int64
 	reset              time.Duration
 	ticker             *time.Ticker
@@ -51,26 +51,21 @@ func NewRateLimitMiddleware(discordCtrl *discord.DiscordController, limit int64,
 	}
 	go func() {
 		for range rl.ticker.C {
-			atomic.StoreInt64(&rl.count, 0) // Reset the count every reset interval
+			atomic.StoreInt64(&rl.count, 0)
 		}
 	}()
 	return rl
 }
 
-// Increment increments the counter in a thread-safe manner.
-// Returns true if the increment was within the rate limit, false if the rate limit was exceeded.
 func (r *RateLimitMiddleware) Increment() bool {
-	// Atomically increment the count
 	newCount := atomic.AddInt64(&r.count, 1)
 	return newCount <= r.limit
 }
 
-// Stop the internal ticker, effectively stopping the rate limiter.
 func (r *RateLimitMiddleware) Stop() {
 	r.ticker.Stop()
 }
 
-// GlobalRateLimiter rate limits all requests to the server, regardless of the endpoint.
 func (r *RateLimitMiddleware) GlobalRateLimiter() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if !r.Increment() {
@@ -84,8 +79,6 @@ func (r *RateLimitMiddleware) GlobalRateLimiter() gin.HandlerFunc {
 	}
 }
 
-// APIRateLimitMiddleware only rate limits sensitive public endpoints which have a higher risk
-// of abuse by any bad actor.
 func (r *RateLimitMiddleware) APIRateLimitMiddleware(urlSanitizer func(_ *gin.Context) string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		requestPath := urlSanitizer(c)
@@ -107,8 +100,6 @@ func (r *RateLimitMiddleware) APIRateLimitMiddleware(urlSanitizer func(_ *gin.Co
 	}
 }
 
-// APIRateLimitForUserMiddleware only rate limits sensitive authenticated endpoints which have a higher risk
-// of abuse by any bad actor.
 func (r *RateLimitMiddleware) APIRateLimitForUserMiddleware(urlSanitizer func(_ *gin.Context) string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		requestPath := urlSanitizer(c)
@@ -149,9 +140,6 @@ func (r *RateLimitMiddleware) isRateLimited(c *gin.Context, rateLimiter *limiter
 	return true
 }
 
-// getGlobalLimiter, based on reqPath & reqMethod, returns a limiter that should
-// be applied globally for requests matching the route. It returns nil if no
-// global route-specific limit should be applied.
 func (r *RateLimitMiddleware) getGlobalLimiter(reqPath string, reqMethod string) *limiter.Limiter {
 	if isEventURLPath(reqPath) {
 		return r.limit120ReqPerHour
@@ -210,8 +198,6 @@ func isSpaceViewerReadURLPath(reqPath string) bool {
 		reqPath == "/spaces/:spaceID/versions"
 }
 
-// getLimiter, based on reqPath & reqMethod, return instance of limiter.Limiter which needs to
-// be applied for a request. It returns nil if the request is not rate limited
 func (r *RateLimitMiddleware) getLimiter(reqPath string, reqMethod string) *limiter.Limiter {
 	if strings.HasPrefix(reqPath, "/files/preview/") ||
 		strings.HasPrefix(reqPath, "/files/thumbnail/") {

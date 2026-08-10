@@ -14,7 +14,6 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-// TrashController has the business logic related to trash feature
 type TrashController struct {
 	TrashRepo               *repo.TrashRepository
 	FileRepo                *repo.FileRepository
@@ -25,12 +24,9 @@ type TrashController struct {
 	dropFileMetadataRunning bool
 	collectionTrashRunning  bool
 	emptyTrashRunning       bool
-	// deleteAgedTrashRunning indicates whether the cron to delete trashed files which are in trash
-	// since repo.TrashDurationInDays is running
-	deleteAgedTrashRunning bool
+	deleteAgedTrashRunning  bool
 }
 
-// GetDiff returns the changes in user's trash since a timestamp, along with hasMore bool flag.
 func (t *TrashController) GetDiff(userID int64, sinceTime int64, stripMetadata bool, app ente.App) ([]ente.Trash, bool, error) {
 	trashFilesDiff, hasMore, err := t.getDiff(userID, sinceTime, repo.TrashDiffLimit, app)
 	if err != nil {
@@ -121,7 +117,6 @@ func (t *TrashController) CleanupTrashedCollections() {
 		t.collectionTrashRunning = false
 	}()
 
-	// process delete collection request for DELETE V3
 	itemsV3, err2 := t.QueueRepo.GetItemsReadyForDeletion(repo.TrashCollectionQueueV3, 100)
 	if err2 != nil {
 		log.Error("Could not fetch from collection trash queue", err2)
@@ -142,7 +137,6 @@ func (t *TrashController) ProcessEmptyTrashRequests() {
 	defer func() {
 		t.emptyTrashRunning = false
 	}()
-	// Process photos queue
 	items, err := t.QueueRepo.GetItemsReadyForDeletion(repo.TrashEmptyQueue, 100)
 	if err != nil {
 		log.Error("Could not fetch from emptyTrashQueue queue", err)
@@ -152,7 +146,6 @@ func (t *TrashController) ProcessEmptyTrashRequests() {
 		}
 	}
 
-	// Process locker queue
 	itemsLocker, err2 := t.QueueRepo.GetItemsReadyForDeletion(repo.TrashEmptyLockerQueue, 100)
 	if err2 != nil {
 		log.Error("Could not fetch from emptyTrashLockerQueue queue", err2)
@@ -163,7 +156,6 @@ func (t *TrashController) ProcessEmptyTrashRequests() {
 	}
 }
 
-// DeleteAgedTrashedFiles delete trashed files which are in trash since repo.TrashDurationInDays
 func (t *TrashController) DeleteAgedTrashedFiles() {
 	if t.deleteAgedTrashRunning {
 		log.Info("Already deleting older trashed files, skipping cron")

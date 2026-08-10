@@ -30,7 +30,6 @@ import (
 	"golang.org/x/text/currency"
 )
 
-// StripeController provides abstractions for handling billing on Stripe
 type StripeController struct {
 	StripeClients          ente.StripeClientPerAccount
 	BillingPlansPerAccount ente.BillingPlansPerAccount
@@ -46,7 +45,6 @@ type StripeController struct {
 
 const BufferPeriodOnPaymentFailureInDays = 7
 
-// Return a new instance of StripeController
 func NewStripeController(plans ente.BillingPlansPerAccount, stripeClients ente.StripeClientPerAccount, billingRepo *repo.BillingRepository, fileRepo *repo.FileRepository, userRepo *repo.UserRepository, storageBonusRepo *storagebonus.Repository, discordController *discord.DiscordController, emailNotificationController *emailCtrl.EmailNotificationController, offerController *offer.OfferController, commonBillCtrl *commonbilling.Controller) *StripeController {
 	return &StripeController{
 		StripeClients:          stripeClients,
@@ -62,7 +60,6 @@ func NewStripeController(plans ente.BillingPlansPerAccount, stripeClients ente.S
 	}
 }
 
-// GetCheckoutSession handles the creation of stripe checkout session for subscription purchase
 func (c *StripeController) GetCheckoutSession(productID string, userID int64, redirectRootURL string) (string, error) {
 	if productID == "" {
 		return "", stacktrace.Propagate(ente.ErrBadRequest, "")
@@ -110,7 +107,6 @@ func (c *StripeController) GetCheckoutSession(productID string, userID int64, re
 	var stripeClient *client.API
 	if subscription.PaymentProvider == ente.Stripe {
 		stripeClient = c.StripeClients[subscription.Attributes.StripeAccountCountry]
-		// attach the subscription to existing customerID
 		params.Customer = stripe.String(subscription.Attributes.CustomerID)
 	} else {
 		stripeClient = c.StripeClients[ente.DefaultStripeAccountCountry]
@@ -118,7 +114,6 @@ func (c *StripeController) GetCheckoutSession(productID string, userID int64, re
 		if err != nil {
 			return "", stacktrace.Propagate(err, "")
 		}
-		// attach user's emailID to the checkout session and subsequent subscription bought
 		params.CustomerEmail = stripe.String(user.Email)
 	}
 
@@ -129,17 +124,14 @@ func (c *StripeController) GetCheckoutSession(productID string, userID int64, re
 	return s.ID, nil
 }
 
-// GetVerifiedSubscription verifies and returns the verified subscription
 func (c *StripeController) GetVerifiedSubscription(userID int64, sessionID string) (ente.Subscription, error) {
 	var stripeSubscription stripe.Subscription
 	var err error
 	if sessionID != "" {
 		log.Info("Received session ID: " + sessionID)
-		// Get verified subscription request was received from success redirect page
 		stripeSubscription, err = c.getStripeSubscriptionFromSession(userID, sessionID)
 	} else {
 		log.Info("Did not receive a session ID")
-		// Get verified subscription request for a subscription update
 		stripeSubscription, err = c.getUserStripeSubscription(userID)
 	}
 	if err != nil {
@@ -210,8 +202,6 @@ func (c *StripeController) findHandlerForEvent(event stripe.Event) func(event st
 	}
 }
 
-// Payment is successful and the subscription is created.
-// You should provision the subscription.
 func (c *StripeController) handleCheckoutSessionCompleted(event stripe.Event, country ente.StripeAccountCountry) (ente.StripeEventLog, error) {
 	var session stripe.CheckoutSession
 	json.Unmarshal(event.Data.Raw, &session)
@@ -324,7 +314,6 @@ func (c *StripeController) handleCustomerSubscriptionUpdated(event stripe.Event,
 	return ente.StripeEventLog{UserID: userID, StripeSubscription: stripeSubscription, Event: event}, nil
 }
 
-// Continue to provision the subscription as payments continue to be made.
 func (c *StripeController) handleInvoicePaid(event stripe.Event, country ente.StripeAccountCountry) (ente.StripeEventLog, error) {
 	var invoice stripe.Invoice
 	json.Unmarshal(event.Data.Raw, &invoice)
@@ -449,7 +438,7 @@ func (c *StripeController) UpdateSubscription(stripeID string, userID int64) (en
 	if subscription.PaymentProvider != ente.Stripe || subscription.ProductID == stripeID || subscription.Attributes.StripeAccountCountry != newStripeAccountCountry {
 		return ente.SubscriptionUpdateResponse{}, stacktrace.Propagate(ente.ErrBadRequest, "")
 	}
-	if newPlan.Storage < subscription.Storage { // Downgrade
+	if newPlan.Storage < subscription.Storage {
 		canDowngrade, canDowngradeErr := c.CommonBillCtrl.CanDowngradeToGivenStorage(newPlan.Storage, userID)
 		if canDowngradeErr != nil {
 			return ente.SubscriptionUpdateResponse{}, stacktrace.Propagate(canDowngradeErr, "")
@@ -659,7 +648,7 @@ func (c *StripeController) getPriceIDFromSession(sessionID string) (string, erro
 	params := &stripe.CheckoutSessionListLineItemsParams{}
 	params.AddExpand("data.price")
 	items := stripeClient.CheckoutSessions.ListLineItems(sessionID, params)
-	for items.Next() { // Return the first PriceID that has been fetched
+	for items.Next() {
 		return items.LineItem().Price.ID, nil
 	}
 	return "", stacktrace.Propagate(ente.ErrNotFound, "")
@@ -825,8 +814,6 @@ func getPaymentIntentErrorPaymentMethodType(paymentIntent stripe.PaymentIntent) 
 	return paymentIntent.LastPaymentError.PaymentMethodType
 }
 
-// handleStripeError processes Stripe errors, sends Discord alerts for invalid_request_error,
-// and returns user-friendly errors to prevent 5xx responses
 func (c *StripeController) handleStripeError(err error, userID int64, context string) error {
 	if err == nil {
 		return nil
@@ -834,13 +821,10 @@ func (c *StripeController) handleStripeError(err error, userID int64, context st
 
 	stripeError, ok := err.(*stripe.Error)
 	if !ok {
-		// Not a Stripe error, propagate as-is
 		return stacktrace.Propagate(err, "")
 	}
 
-	// Check if it's an invalid_request_error
 	if stripeError.Type == stripe.ErrorTypeInvalidRequest {
-		// Send Discord alert with details
 		alertMsg := fmt.Sprintf(
 			"⚠️ Stripe Invalid Request Error\n"+
 				"**Context:** %s\n"+
@@ -858,13 +842,11 @@ func (c *StripeController) handleStripeError(err error, userID int64, context st
 		)
 		c.DiscordController.Notify(alertMsg)
 
-		// Return user-friendly error based on error code
 		var userMsg string
 		switch stripeError.Code {
 		case stripe.ErrorCodeResourceMissing:
 			userMsg = "The requested resource no longer exists. Please create a new subscription or contact support."
 		default:
-			// For other invalid_request_error codes, use the Stripe message if available
 			if stripeError.Msg != "" {
 				userMsg = fmt.Sprintf("Unable to process request: %s", stripeError.Msg)
 			} else {
@@ -875,6 +857,5 @@ func (c *StripeController) handleStripeError(err error, userID int64, context st
 		return stacktrace.Propagate(ente.NewBadRequestWithMessage(userMsg), "")
 	}
 
-	// For other Stripe errors, propagate as-is
 	return stacktrace.Propagate(err, "")
 }

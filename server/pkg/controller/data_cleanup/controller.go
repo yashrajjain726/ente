@@ -31,15 +31,11 @@ type SpaceDataRepo interface {
 }
 
 const (
-	// nextStageDelayInHoursOnError is number of afters after which next attempt should be made to process
-	// current stage.
 	nextStageDelayInHoursOnError = 2
 
-	// maximum number of storage check attempt before moving to the next stage.
 	maxStorageCheckAttempt = 10
 )
 
-// DeleteDataCron delete trashed files which are in trash since repo.TrashDurationInDays
 func (c *DeleteUserCleanupController) DeleteDataCron() {
 	if c.running {
 		log.Info("Already running DeleteDataCron, skipping cron")
@@ -114,7 +110,6 @@ func (c *DeleteUserCleanupController) deleteUserData(ctx context.Context, item *
 
 }
 
-// startClean up will just verify that user
 func (c *DeleteUserCleanupController) startCleanup(ctx context.Context, item *entity.DataCleanup) error {
 	deleted, err := c.isDeleted(ctx, item)
 	if err != nil {
@@ -123,11 +118,9 @@ func (c *DeleteUserCleanupController) startCleanup(ctx context.Context, item *en
 	if !deleted {
 		return nil
 	}
-	// move to next stage for deleting collection
 	return c.Repo.MoveToNextStage(ctx, item.UserID, entity.Collection, time.Microseconds())
 }
 
-// deleteCollection will schedule all the collections for deletion and queue up Trash stage to run after 30 min
 func (c *DeleteUserCleanupController) deleteCollections(ctx context.Context, item *entity.DataCleanup) error {
 	collectionsMap, err := c.CollectionRepo.GetCollectionIDsOwnedByUser(item.UserID)
 	if err != nil {
@@ -135,7 +128,6 @@ func (c *DeleteUserCleanupController) deleteCollections(ctx context.Context, ite
 	}
 	for collectionID, isAlreadyDeleted := range collectionsMap {
 		if !isAlreadyDeleted {
-			// Delete all files in the collection
 			err = c.CollectionRepo.ScheduleDelete(collectionID)
 			if err != nil {
 				return stacktrace.Propagate(err, "error while deleting collection %d", collectionID)
@@ -148,7 +140,6 @@ func (c *DeleteUserCleanupController) deleteCollections(ctx context.Context, ite
 }
 
 func (c *DeleteUserCleanupController) emptyTrash(ctx context.Context, item *entity.DataCleanup) error {
-	// Enqueue empty-trash for both apps
 	err := c.TrashRepo.EmptyTrash(ctx, item.UserID, time.Microseconds(), ente.Photos)
 	if err != nil {
 		return stacktrace.Propagate(err, "")
@@ -183,19 +174,16 @@ func (c *DeleteUserCleanupController) storageCheck(ctx context.Context, item *en
 		return stacktrace.Propagate(err, "")
 	}
 	if usage != 0 {
-		// check if trash still has entry
 		timeStamp, err2 := c.TrashRepo.GetTimeStampForLatestNonDeletedEntry(item.UserID)
 		if err2 != nil {
 			return stacktrace.Propagate(err2, "failed to fetch timestamp")
 		}
-		// no entry in trash
 		if timeStamp != nil {
 			log.WithFields(log.Fields{
 				"user_id":   item.UserID,
 				"flow":      "delete_user_data",
 				"timeStamp": timeStamp,
 			}).Info("trash is not empty")
-			// Enqueue empty-trash for both apps
 			err = c.TrashRepo.EmptyTrash(ctx, item.UserID, *timeStamp, ente.Photos)
 			if err != nil {
 				return stacktrace.Propagate(err, "")

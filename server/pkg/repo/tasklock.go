@@ -8,7 +8,6 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// TaskLockRepository defines the methods for acquire and release locks
 type TaskLockRepository struct {
 	DB *sql.DB
 }

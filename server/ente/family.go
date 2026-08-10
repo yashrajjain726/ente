@@ -58,8 +58,7 @@ type ModifyMemberStorage struct {
 type FamilyMemberResponse struct {
 	Members []FamilyMember `json:"members" binding:"required"`
 	// Family admin subscription storage capacity. This excludes add-on and any other bonus storage
-	Storage int64 `json:"storage" binding:"required"`
-	// Family admin subscription expiry time
+	Storage    int64 `json:"storage" binding:"required"`
 	ExpiryTime int64 `json:"expiryTime" binding:"required"`
 
 	AdminBonus int64 `json:"adminBonus" binding:"required"`
@@ -70,10 +69,7 @@ type UserUsageWithSubData struct {
 	// StorageConsumed by the current member.
 	// This information should not be sent back in the response if the membership status is `INVITED`
 	StorageConsumed int64
-	// ExpiryTime of member's current subscription plan
-	ExpiryTime int64
-	// Storage indicates storage capacity based on member's current subscription plan
-	Storage int64
-	// Email of the member. It will be populated on need basis
-	Email *string
+	ExpiryTime      int64
+	Storage         int64
+	Email           *string
 }

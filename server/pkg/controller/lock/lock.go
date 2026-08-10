@@ -8,7 +8,6 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-// LockController exposes functions to obtain locks before entering critical sections
 type LockController struct {
 	TaskLockingRepo *repo.TaskLockRepository
 	HostName        string
@@ -49,7 +48,6 @@ func (c *LockController) ExtendLock(lockID string, lockUntil int64) error {
 	return nil
 }
 
-// Release a lock that was obtained earlier using TryLock.
 func (c *LockController) ReleaseLock(lockID string) {
 	err := c.TaskLockingRepo.ReleaseLock(lockID)
 	if err != nil {

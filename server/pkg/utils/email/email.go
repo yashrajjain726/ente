@@ -1,7 +1,3 @@
-// The email package contains functions for directly sending emails.
-//
-// These functions can be used for directly sending emails to given email
-// addresses. This is used for transactional emails, for example OTP requests.
 package email
 
 import (
@@ -28,7 +24,6 @@ var knownInvalidEmailErrors = []string{
 	"Invalid domain name",
 }
 
-// NormalizeEmail returns a canonical form for case-insensitive email lookup and hashing.
 func NormalizeEmail(email string) string {
 	return strings.ToLower(strings.TrimSpace(email))
 }
@@ -36,8 +31,6 @@ func NormalizeEmail(email string) string {
 // https://datatracker.ietf.org/doc/html/rfc5322#section-2.1.1
 const base64LineLength = 900 // standard MIME line length for base64 content
 
-// sanitizeHeaderValue removes CR/LF and other control characters from header values
-// to prevent header injection and ensures values are single-line.
 func sanitizeHeaderValue(s string) string {
 	if s == "" {
 		return s
@@ -45,11 +38,9 @@ func sanitizeHeaderValue(s string) string {
 	var b strings.Builder
 	b.Grow(len(s))
 	for _, r := range s {
-		// Disallow CR and LF entirely in header values
 		if r == '\r' || r == '\n' {
 			continue
 		}
-		// Strip other ASCII control chars except tab
 		if r < 0x20 && r != '\t' {
 			continue
 		}
@@ -58,7 +49,6 @@ func sanitizeHeaderValue(s string) string {
 	return strings.TrimSpace(b.String())
 }
 
-// containsCRLF checks for raw CR/LF which must not appear in addresses
 func containsCRLF(s string) bool {
 	return strings.ContainsRune(s, '\r') || strings.ContainsRune(s, '\n')
 }
@@ -68,14 +58,12 @@ func wrapToMaxLineLength(s string, maxLen int) string {
 	if maxLen <= 0 {
 		return s
 	}
-	// Remove existing line breaks so we can re-wrap deterministically.
 	clean := strings.ReplaceAll(strings.ReplaceAll(s, "\r", ""), "\n", "")
 	if len(clean) <= maxLen {
 		return clean
 	}
 
 	var b strings.Builder
-	// Grow buffer to avoid re-allocations; add extra space for newline characters.
 	b.Grow(len(clean) + len(clean)/maxLen)
 	for i := 0; i < len(clean); i += maxLen {
 		end := min(i+maxLen, len(clean))
@@ -102,7 +90,6 @@ func buildHTMLMIMEPart(htmlBody string) (string, error) {
 		encodedBody.String() + "\n", nil
 }
 
-// Send sends an email
 func Send(toEmails []string, fromName string, fromEmail string, subject string, htmlBody string, inlineImages []map[string]interface{}) error {
 	if len(toEmails) == 0 {
 		return ente.ErrBadRequest
@@ -129,7 +116,6 @@ func sendViaSMTP(toEmails []string, fromName string, fromEmail string, subject s
 		auth = smtp.PlainAuth("", smtpUsername, smtpPassword, smtpServer)
 	}
 
-	// Validate that no envelope addresses contain CR/LF
 	if containsCRLF(fromEmail) {
 		return stacktrace.Propagate(ente.ErrBadRequest, "invalid from email")
 	}
@@ -137,21 +123,17 @@ func sendViaSMTP(toEmails []string, fromName string, fromEmail string, subject s
 		return stacktrace.Propagate(ente.ErrBadRequest, "invalid recipient email")
 	}
 
-	// If a sender email is provided use it instead of the fromEmail.
 	if smtpEmail != "" {
 		fromEmail = smtpEmail
 	}
-	// If a sender name is provided use it instead of the fromName.
 	if smtpSenderName != "" {
 		fromName = smtpSenderName
 	}
 
-	// Sanitize header fields to prevent header injection
 	cleanFromName := sanitizeHeaderValue(fromName)
 	cleanFromEmail := sanitizeHeaderValue(fromEmail)
 	cleanSubject := sanitizeHeaderValue(subject)
 
-	// Construct 'emailAddresses' with comma-separated sanitized email addresses for header
 	var emailAddresses string
 	for i, addr := range toEmails {
 		if i != 0 {
@@ -195,7 +177,6 @@ func sendViaSMTP(toEmails []string, fromName string, fromEmail string, subject s
 		emailMessage += "--boundary--"
 	}
 
-	// Send the email to each recipient
 	for _, toEmail := range toEmails {
 		err := sendMailWithEncryption(smtpServer, smtpPort, auth, fromEmail, []string{toEmail}, []byte(emailMessage), smtpEncryption)
 		if err != nil {
@@ -212,16 +193,11 @@ func sendViaSMTP(toEmails []string, fromName string, fromEmail string, subject s
 	return nil
 }
 
-// sendMailWithEncryption sends an email with the specified encryption type
-// encryption can be one of:
-// - "tls" or "ssl": Uses TLS/SSL encryption for the entire connection
-// - "" (empty string) or any other value: No encryption
 func sendMailWithEncryption(host, port string, auth smtp.Auth, from string, to []string, msg []byte, encryption string) error {
 	addr := net.JoinHostPort(host, port)
 
 	switch strings.ToLower(encryption) {
 	case "tls", "ssl":
-		// For TLS/SSL, establish a secure connection directly
 		tlsConfig := &tls.Config{
 			ServerName: host,
 			MinVersion: tls.VersionTLS12,
@@ -241,12 +217,10 @@ func sendMailWithEncryption(host, port string, auth smtp.Auth, from string, to [
 		return sendWithClient(client, auth, from, to, msg)
 
 	default:
-		// No encryption, use standard SendMail
 		return smtp.SendMail(addr, auth, from, to, msg)
 	}
 }
 
-// sendWithClient sends an email using an established SMTP client
 func sendWithClient(client *smtp.Client, auth smtp.Auth, from string, to []string, msg []byte) error {
 	if auth != nil {
 		if err := client.Auth(auth); err != nil {
@@ -311,13 +285,10 @@ func GetMaskedEmail(email string) string {
 		}
 		return maskedUsername + "@" + domain
 	} else {
-		// Should ideally never happen, there should always be an @ symbol
 		return "[invalid_email]"
 	}
 }
 
-// GetMaskedEmailForPublic masks an email for public display.
-// Format: first 2 chars of username + masked remainder + @ + first char of domain + masked middle + last char of domain
 func GetMaskedEmailForPublic(email string) string {
 	email = strings.TrimSpace(email)
 	at := strings.LastIndex(email, "@")
@@ -333,8 +304,6 @@ func GetMaskedEmailForPublic(email string) string {
 	return maskedUsername + "@" + maskedDomain
 }
 
-// maskForPublicUsername masks a username keeping the first 2 runes visible.
-// Remaining runes are replaced with asterisks.
 func maskForPublicUsername(s string) string {
 	runes := []rune(s)
 	if len(runes) <= 2 {
@@ -343,8 +312,6 @@ func maskForPublicUsername(s string) string {
 	return string(runes[:2]) + strings.Repeat("*", len(runes)-2)
 }
 
-// maskForPublicDomain masks a domain showing first and last rune.
-// Middle runes are replaced with asterisks.
 func maskForPublicDomain(domain string) string {
 	runes := []rune(domain)
 	if len(runes) <= 2 {
@@ -353,7 +320,6 @@ func maskForPublicDomain(domain string) string {
 	return string(runes[0]) + strings.Repeat("*", len(runes)-2) + string(runes[len(runes)-1])
 }
 
-// GetMaskedEmailWithHint masks both the username and non-TLD domain segments while keeping helpful hints.
 func GetMaskedEmailWithHint(email string) string {
 	email = strings.TrimSpace(email)
 	at := strings.LastIndex(email, "@")
@@ -395,7 +361,6 @@ func maskEmailSegment(segment string) string {
 	return segment[:1] + strings.Repeat("*", len(segment)-2) + segment[len(segment)-1:]
 }
 
-// getMailBody generates the mail html body from provided template and data
 func getMailBody(templateName string, templateData map[string]interface{}) (string, error) {
 	htmlbody := new(bytes.Buffer)
 	t := template.Must(template.New(templateName).ParseFiles("mail-templates/" + templateName))
@@ -406,11 +371,9 @@ func getMailBody(templateName string, templateData map[string]interface{}) (stri
 	return htmlbody.String(), nil
 }
 
-// getMailBody generates the mail HTML body from the provided template and data, supporting inheritance
 func getMailBodyWithBase(baseTemplateName, templateName string, templateData map[string]interface{}) (string, error) {
 	htmlBody := new(bytes.Buffer)
 
-	// Define paths for the base template and the specific template
 	baseTemplate := "mail-templates/" + baseTemplateName
 	specificTemplate := "mail-templates/" + templateName
 
@@ -418,13 +381,11 @@ func getMailBodyWithBase(baseTemplateName, templateName string, templateData map
 	lastPart := parts[len(parts)-1]
 	baseTemplateID := strings.TrimSuffix(lastPart, path.Ext(lastPart))
 
-	// Parse the base and specific templates together
 	t, err := template.ParseFiles(baseTemplate, specificTemplate)
 	if err != nil {
 		return "", stacktrace.Propagate(err, "failed to parse templates")
 	}
 
-	// Execute the base template with the provided data
 	err = t.ExecuteTemplate(htmlBody, baseTemplateID, templateData)
 	if err != nil {
 		return "", stacktrace.Propagate(err, "failed to execute template")

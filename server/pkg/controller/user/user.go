@@ -40,7 +40,6 @@ type SpaceAccountDeletionAccessResetter interface {
 	ResetAccountDeletionAccess(ctx context.Context, userID int64) error
 }
 
-// UserController exposes request handlers for all user related requests
 type UserController struct {
 	UserRepo                *repo.UserRepository
 	TwoFactorRecoveryRepo   *two_factor_recovery.Repository
@@ -67,7 +66,7 @@ type UserController struct {
 	HashingKey              []byte
 	SecretEncryptionKey     []byte
 	JwtSecret               []byte
-	Cache                   *cache.Cache // refers to the auth token cache
+	Cache                   *cache.Cache
 	HardCodedOTT            HardCodedOTT
 	UserCache               *cache2.UserCache
 	UserCacheController     *usercache.Controller
@@ -77,29 +76,18 @@ type UserController struct {
 }
 
 const (
-	// OTTValidityDurationInMicroSeconds is the duration for which an OTT is valid
-	// (60 minutes)
 	OTTValidityDurationInMicroSeconds = 60 * 60 * 1000000
 
-	// OTTWrongAttemptLimit is the max number of wrong attempt to verify OTT (to prevent bruteforce guessing)
-	// When client hits this limit, they will need to trigger new OTT.
 	OTTWrongAttemptLimit = 20
 
-	// OTTActiveCodeLimit is the max number of active OTT a user can have in
-	// a time window of OTTValidityDurationInMicroSeconds duration
 	OTTActiveCodeLimit = 10
 
-	// TwoFactorValidityDurationInMicroSeconds is the duration for which an OTT is valid
-	// (10 minutes)
 	TwoFactorValidityDurationInMicroSeconds = 10 * 60 * 1000000
 
-	// TokenLength is the length of the token issued to a verified user
 	TokenLength = 32
 
-	// TwoFactorSessionIDLength is the length of the twoFactorSessionID issued to a verified user
 	TwoFactorSessionIDLength = 32
 
-	// PassKeySessionIDLength is the length of the passKey sessionID issued to a verified user
 	PassKeySessionIDLength = 32
 
 	CryptoPwhashMemLimitInteractive = 67108864
@@ -107,8 +95,6 @@ const (
 
 	TOTPIssuerORG = "ente"
 
-	// Template and subject for the mail that we send when the user deletes
-	// their account.
 	AccountDeletedEmailTemplate                       = "account_deleted.html"
 	AccountDeletedWithActiveSubscriptionEmailTemplate = "account_deleted_active_sub.html"
 	AccountDeletedEmailSubject                        = "Your Ente account has been deleted"
@@ -181,15 +167,13 @@ func NewUserController(
 	}
 }
 
-// GetAttributes returns the key attributes for a user
 func (c *UserController) GetAttributes(userID int64) (ente.KeyAttributes, error) {
 	return c.UserRepo.GetKeyAttributes(userID)
 }
 
-// SetAttributes sets the attributes for a user. The request will fail if key attributes are already set
 func (c *UserController) SetAttributes(userID int64, request ente.SetUserAttributesRequest) error {
 	_, err := c.UserRepo.GetKeyAttributes(userID)
-	if err == nil { // If there are key attributes already set
+	if err == nil {
 		return stacktrace.Propagate(ente.ErrPermissionDenied, "key attributes are already set")
 	}
 	if request.KeyAttributes.MemLimit <= 0 || request.KeyAttributes.OpsLimit <= 0 {
@@ -205,14 +189,12 @@ func (c *UserController) SetAttributes(userID int64, request ente.SetUserAttribu
 	return nil
 }
 
-// UpdateEmailMFA updates the email MFA for a user.
 func (c *UserController) UpdateEmailMFA(context *gin.Context, userID int64, isEnabled bool) error {
 	if !isEnabled {
 		isSrpSetupDone, err := c.UserAuthRepo.IsSRPSetupDone(context, userID)
 		if err != nil {
 			return stacktrace.Propagate(err, "")
 		}
-		// if SRP is not setup, then we can not disable email MFA
 		if !isSrpSetupDone {
 			return stacktrace.Propagate(ente.NewConflictError("SRP setup incomplete"), "can not disable email MFA before SRP is setup")
 		}
@@ -220,7 +202,6 @@ func (c *UserController) UpdateEmailMFA(context *gin.Context, userID int64, isEn
 	return c.UserAuthRepo.UpdateEmailMFA(context, userID, isEnabled)
 }
 
-// SetRecoveryKey sets the recovery key attributes for a user, if not already set
 func (c *UserController) SetRecoveryKey(userID int64, request ente.SetRecoveryKeyRequest) error {
 	keyAttr, keyErr := c.UserRepo.GetKeyAttributes(userID)
 	if keyErr != nil {
@@ -236,7 +217,6 @@ func (c *UserController) SetRecoveryKey(userID int64, request ente.SetRecoveryKe
 	return nil
 }
 
-// GetPublicKey returns the public key of a user
 func (c *UserController) GetPublicKey(requesterUserID int64, email string) (string, error) {
 	userID, err := c.UserLookup.LookupUserID(requesterUserID, email)
 	if err != nil {
@@ -249,7 +229,6 @@ func (c *UserController) GetPublicKey(requesterUserID int64, email string) (stri
 	return key, nil
 }
 
-// GetTwoFactorStatus returns a user's two factor status
 func (c *UserController) GetTwoFactorStatus(userID int64) (bool, error) {
 	isTwoFactorEnabled, err := c.UserRepo.IsTwoFactorEnabled(userID)
 	if err != nil {
@@ -338,7 +317,7 @@ func (c *UserController) handleAccountDeletion(
 	}
 
 	email := user.Email
-	// See also: Do not block on mailing list errors
+	// Mailing list failures must not block account deletion.
 	go func() {
 		if err := c.MailingListsController.Unsubscribe(email); err != nil {
 			logger.WithError(err).WithFields(logrus.Fields{
@@ -432,12 +411,7 @@ func (c *UserController) createUser(email string, source *string) (int64, ente.S
 	if err != nil {
 		return -1, ente.Subscription{}, stacktrace.Propagate(err, "")
 	}
-	// Do not block on mailing list errors
-	//
-	// The mailing lists are hosted on a third party (Zoho), so we do not wish
-	// to fail user creation in case Zoho is having temporary issues. So we
-	// perform these actions async, and ignore errors that happen with them (a
-	// notification will be sent to Discord for those).
+	// Mailing list failures must not block user creation.
 	go func() {
 		if err := c.MailingListsController.Subscribe(email); err != nil {
 			logrus.WithError(err).WithFields(logrus.Fields{

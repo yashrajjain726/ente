@@ -18,14 +18,12 @@ const (
 	AccessTokenLength = 10
 )
 
-// Controller handles memory share operations
 type Controller struct {
 	Repo       *repo.MemoryShareRepository
 	FileRepo   *repo.FileRepository
 	AccessCtrl access.Controller
 }
 
-// NewController creates a new memory share controller
 func NewController(
 	repo *repo.MemoryShareRepository,
 	fileRepo *repo.FileRepository,
@@ -38,7 +36,6 @@ func NewController(
 	}
 }
 
-// Create creates a new memory share
 func (c *Controller) Create(ctx *gin.Context, userID int64, req ente.CreateMemoryShareRequest) (*ente.CreateMemoryShareResponse, error) {
 	shareType := req.Type
 	if shareType == "" {

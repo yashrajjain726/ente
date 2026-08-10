@@ -11,7 +11,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// PushHandler exposes request handlers for all push related requests
 type PushHandler struct {
 	PushController *controller.PushController
 }

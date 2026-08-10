@@ -13,8 +13,6 @@ import (
 	"github.com/spf13/viper"
 )
 
-// S3Config is the file which abstracts away s3 related configs for clients.
-//
 // Objects are replicated in multiple "data centers". Each data center is an
 // S3-compatible provider, and has an associated "bucket".
 //
@@ -24,31 +22,22 @@ import (
 // centers. So as such, the constants used to specify these data centers in the
 // YAML configuration matter.
 type S3Config struct {
-	// A map from data centers to the name of the bucket used in that DC.
-	buckets map[string]string
-	// Primary (hot) data center
-	hotDC string
-	// Secondary (hot) data center
-	secondaryHotDC string
-	//Derived data data center for derived files like ml embeddings & preview files
-	derivedStorageDC string
-	// A map from data centers to S3 configurations
-	s3Configs map[string]*aws.Config
-	// A map from data centers to pre-created S3 clients
-	s3Clients map[string]s3.S3
-	// Indicates if compliance is enabled for the Wasabi DC.
+	buckets                   map[string]string
+	hotDC                     string
+	secondaryHotDC            string
+	derivedStorageDC          string
+	s3Configs                 map[string]*aws.Config
+	s3Clients                 map[string]s3.S3
 	isWasabiComplianceEnabled bool
 	// Indicates if local minio buckets are being used. Enables various
 	// debugging workarounds; not tested/intended for production.
 	areLocalBuckets bool
 
-	// FileDataConfig is the configuration for various file data.
 	// If for particular object type, the bucket is not specified, it will
 	// default to hotDC as the bucket with no replicas. Initially, this config won't support
 	// existing objectType (file, thumbnail) and will be used for new objectTypes. In the future,
 	// we can migrate existing objectTypes to this config.
 	fileDataConfig FileDataConfig
-	// attachmentConfig is the configuration for contact and future user attachments.
 	// If no explicit config is present, attachments default to hot storage with no replicas.
 	attachmentConfig AttachmentConfig
 }
@@ -253,12 +242,10 @@ func (config *S3Config) GetDerivedStorageS3Client() *s3.S3 {
 	return &s3Client
 }
 
-// Return the name of the hot Backblaze data center
 func (config *S3Config) GetHotBackblazeDC() string {
 	return dcB2EuropeCentral
 }
 
-// Return the name of the hot Wasabi data center
 func (config *S3Config) GetHotWasabiDC() string {
 	return dcWasabiEuropeCentral_v3
 }
@@ -267,7 +254,6 @@ func (config *S3Config) GetWasabiDerivedDC() string {
 	return dcWasabiEuropeCentralDerived
 }
 
-// Return the name of the cold Scaleway data center
 func (config *S3Config) GetColdScalewayDC() string {
 	return dcSCWEuropeFrance_v3
 }
@@ -281,8 +267,6 @@ func (config *S3Config) ShouldDeleteFromDataCenter(dc string) bool {
 	return dc != dcSCWEuropeFranceDeprecated && dc != dcSCWEuropeFranceLockedDeprecated && dc != dcWasabiEuropeCentralDeprecated
 }
 
-// Return the name of the Wasabi DC if objects in that DC are kept under the
-// Wasabi compliance lock. Otherwise return the empty string.
 func (config *S3Config) WasabiComplianceDC() string {
 	if config.isWasabiComplianceEnabled {
 		return dcWasabiEuropeCentral_v3

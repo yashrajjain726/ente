@@ -14,13 +14,11 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// PublicMemoryShareHandler exposes request handlers for publicly accessible memory shares
 type PublicMemoryShareHandler struct {
 	PublicCtrl   *public.MemoryShareController
 	FileDataCtrl *filedata.Controller
 }
 
-// GetInfo returns the public memory share metadata
 func (h *PublicMemoryShareHandler) GetInfo(c *gin.Context) {
 	accessCtx := auth.MustGetMemoryShareAccessContext(c)
 
@@ -35,7 +33,6 @@ func (h *PublicMemoryShareHandler) GetInfo(c *gin.Context) {
 	})
 }
 
-// GetFiles returns the files in a public memory share
 func (h *PublicMemoryShareHandler) GetFiles(c *gin.Context) {
 	accessCtx := auth.MustGetMemoryShareAccessContext(c)
 
@@ -48,12 +45,10 @@ func (h *PublicMemoryShareHandler) GetFiles(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
-// GetThumbnail redirects to the file's thumbnail location
 func (h *PublicMemoryShareHandler) GetThumbnail(c *gin.Context) {
 	h.getFileForType(c, ente.THUMBNAIL)
 }
 
-// GetFile redirects to the file's full location
 func (h *PublicMemoryShareHandler) GetFile(c *gin.Context) {
 	h.getFileForType(c, ente.FILE)
 }
@@ -70,7 +65,6 @@ func (h *PublicMemoryShareHandler) GetFileURLV3(c *gin.Context) {
 	writeFileURLV3(c, url, err)
 }
 
-// GetFileData returns HLS playlist data for video streaming
 func (h *PublicMemoryShareHandler) GetFileData(c *gin.Context) {
 	var req fileData.GetFileData
 	if err := c.ShouldBindQuery(&req); err != nil {
@@ -101,7 +95,6 @@ func (h *PublicMemoryShareHandler) GetFileData(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"data": resp})
 }
 
-// GetPreviewURL returns pre-signed URL for video preview data
 func (h *PublicMemoryShareHandler) GetPreviewURL(c *gin.Context) {
 	var req fileData.GetPreviewURLRequest
 	if err := c.ShouldBindQuery(&req); err != nil {

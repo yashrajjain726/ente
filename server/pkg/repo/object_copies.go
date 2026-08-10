@@ -11,8 +11,6 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-// ObjectCopiesRepository wraps over our interaction with the database related
-// to the object_copies table.
 type ObjectCopiesRepository struct {
 	DB *sql.DB
 }
@@ -53,9 +51,9 @@ func (repo *ObjectCopiesRepository) GetAndLockUnreplicatedObject(ctx context.Con
 		&r.WantSCW, &r.SCW)
 
 	if err != nil {
-		rollback() // Rollback transaction on any error
+		rollback()
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, err // Return sql.ErrNoRows without committing the transaction
+			return nil, err
 		}
 		return nil, stacktrace.Propagate(err, "")
 	}
@@ -120,32 +118,24 @@ func (repo *ObjectCopiesRepository) DelayNextAttemptByDays(ctx context.Context, 
 	return stacktrace.Propagate(err, "")
 }
 
-// ResetNeedsB2Replication modifies the db to indicate that objectKey should be
-// re-replicated to Backblaze even if it has already been replicated there.
 func (repo *ObjectCopiesRepository) ResetNeedsB2Replication(objectKey string) error {
 	_, err := repo.DB.Exec(`UPDATE object_copies SET b2 = null WHERE object_key = $1`,
 		objectKey)
 	return stacktrace.Propagate(err, "")
 }
 
-// ResetNeedsWasabiReplication modifies the db to indicate that objectKey should
-// be re-replicated to Wasabi even if it has already been replicated there.
 func (repo *ObjectCopiesRepository) ResetNeedsWasabiReplication(objectKey string) error {
 	_, err := repo.DB.Exec(`UPDATE object_copies SET wasabi = null WHERE object_key = $1`,
 		objectKey)
 	return stacktrace.Propagate(err, "")
 }
 
-// ResetNeedsScalewayReplication modifies the db to indicate that objectKey
-// should be re-replicated to Scaleway even if it has already been replicated there.
 func (repo *ObjectCopiesRepository) ResetNeedsScalewayReplication(objectKey string) error {
 	_, err := repo.DB.Exec(`UPDATE object_copies SET scw = null WHERE object_key = $1`,
 		objectKey)
 	return stacktrace.Propagate(err, "")
 }
 
-// UnmarkFromReplication clears the want_* flags so that this objectKey is
-// marked as not requiring further replication.
 func (repo *ObjectCopiesRepository) UnmarkFromReplication(objectKey string) error {
 	_, err := repo.DB.Exec(`
 	UPDATE object_copies
@@ -155,8 +145,6 @@ func (repo *ObjectCopiesRepository) UnmarkFromReplication(objectKey string) erro
 	return stacktrace.Propagate(err, "")
 }
 
-// MarkObjectReplicatedB2 sets the time when `objectKey` was replicated to
-// Wasabi to the current timestamp.
 func (repo *ObjectCopiesRepository) MarkObjectReplicatedWasabi(objectKey string) error {
 	return repo.markObjectReplicated(`
 	UPDATE object_copies SET wasabi = now_utc_micro_seconds()
@@ -164,8 +152,6 @@ func (repo *ObjectCopiesRepository) MarkObjectReplicatedWasabi(objectKey string)
 	`, objectKey)
 }
 
-// MarkObjectReplicatedScaleway sets the time when `objectKey` was replicated to
-// Wasabi to the current timestamp.
 func (repo *ObjectCopiesRepository) MarkObjectReplicatedScaleway(objectKey string) error {
 	return repo.markObjectReplicated(`
 	UPDATE object_copies SET scw = now_utc_micro_seconds()

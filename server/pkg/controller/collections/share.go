@@ -284,7 +284,6 @@ func (c *CollectionController) JoinViaLink(ctx *gin.Context, req ente.JoinCollec
 	return nil
 }
 
-// UnShare unshares a collection with a user
 func (c *CollectionController) UnShare(ctx *gin.Context, cID int64, fromUserID int64, toUserEmail string) ([]ente.CollectionUser, error) {
 	collection, err := c.collectionForShareMutation(cID, fromUserID)
 	if err != nil {
@@ -425,7 +424,6 @@ func shareeIndexForEmail(sharees []ente.CollectionUser, targetEmail string) int 
 	})
 }
 
-// Leave leaves the collection owned by someone else,
 func (c *CollectionController) Leave(ctx *gin.Context, cID int64) error {
 	userID := auth.GetUserID(ctx.Request.Header)
 	collection, err := c.CollectionRepo.Get(cID)
@@ -475,7 +473,6 @@ func (c *CollectionController) UpdateShareeMagicMetadata(ctx *gin.Context, req e
 	return nil
 }
 
-// ShareURL generates a public auth-token for the given collectionID
 func (c *CollectionController) ShareURL(ctx *gin.Context, userID int64, req ente.CreatePublicAccessTokenRequest) (
 	ente.PublicURL, error) {
 	collection, err := c.CollectionRepo.Get(req.CollectionID)
@@ -497,7 +494,6 @@ func (c *CollectionController) ShareURL(ctx *gin.Context, userID int64, req ente
 		if !errors.Is(err, ente.ErrSharingDisabledForFreeAccounts) {
 			return ente.PublicURL{}, stacktrace.Propagate(err, "")
 		}
-		// Override device limit for free users
 		req.DeviceLimit = public.FreeUserDeviceLimit
 	}
 	response, err := c.CollectionLinkCtrl.CreateLink(ctx, req)
@@ -507,7 +503,6 @@ func (c *CollectionController) ShareURL(ctx *gin.Context, userID int64, req ente
 	return response, nil
 }
 
-// UpdateShareURL updates the shared url configuration
 func (c *CollectionController) UpdateShareURL(
 	ctx *gin.Context,
 	userID int64,
@@ -522,11 +517,9 @@ func (c *CollectionController) UpdateShareURL(
 	err := c.BillingCtrl.HasActiveSelfOrFamilySubscription(userID, true)
 	if err != nil {
 		if errors.Is(err, ente.ErrSharingDisabledForFreeAccounts) {
-			// Only throw error if free user tries to change device limit to non-default value
 			if req.DeviceLimit != nil && *req.DeviceLimit != public.FreeUserDeviceLimit {
 				return nil, stacktrace.Propagate(&ente.ErrLinkEditNotAllowed, "")
 			}
-			// Allow other settings changes for free users
 		} else {
 			return nil, stacktrace.Propagate(err, "")
 		}
@@ -538,7 +531,6 @@ func (c *CollectionController) UpdateShareURL(
 	return &response, nil
 }
 
-// DisableSharedURL disable a public auth-token for the given collectionID
 func (c *CollectionController) DisableSharedURL(ctx context.Context, userID int64, cID int64) error {
 	if err := c.verifyOwnership(cID, userID); err != nil {
 		return stacktrace.Propagate(err, "")
@@ -547,7 +539,6 @@ func (c *CollectionController) DisableSharedURL(ctx context.Context, userID int6
 	return stacktrace.Propagate(err, "")
 }
 
-// GetSharees returns the list of users a collection has been shared with
 func (c *CollectionController) GetSharees(ctx *gin.Context, cID int64, userID int64) ([]ente.CollectionUser, error) {
 	_, err := c.AccessCtrl.GetCollection(ctx, &access.GetCollectionParams{
 		CollectionID: cID,
@@ -563,7 +554,6 @@ func (c *CollectionController) GetSharees(ctx *gin.Context, cID int64, userID in
 	return sharees, nil
 }
 
-// GetPublicDiff returns the changes in the collections since a timestamp, along with hasMore bool flag.
 func (c *CollectionController) GetPublicDiff(ctx *gin.Context, sinceTime int64) ([]ente.File, bool, error) {
 	accessContext := auth.MustGetPublicAccessContext(ctx)
 	reqContextLogger := log.WithFields(log.Fields{

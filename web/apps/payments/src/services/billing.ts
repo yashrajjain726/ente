@@ -424,6 +424,11 @@ type FailureReason =
     | "canceled"
     | "server_error";
 
+const isEnteHostname = (hostname: string) =>
+    hostname.endsWith(".ente.com") ||
+    hostname.endsWith(".ente.io") ||
+    hostname.endsWith(".ente.sh");
+
 // Assigning window.location.href does not stop script execution; statements
 // after a redirect still run, so callers must return explicitly.
 const redirectToApp = (
@@ -431,14 +436,31 @@ const redirectToApp = (
     status: RedirectStatus,
     reason?: FailureReason,
 ) => {
-    if (new URL(redirectURL).pathname == "/desktop-redirect") {
-        redirectToApp("ente://app/gallery", status, reason);
-        return;
+    let url = new URL(redirectURL);
+    if (url.protocol != "http:" && url.protocol != "https:") {
+        throw new Error("Invalid payment redirect URL");
     }
 
-    let url = `${redirectURL}?status=${status}`;
-    if (reason) url = `${url}&reason=${reason}`;
-    window.location.href = url;
+    const isSameOrigin = url.origin == window.location.origin;
+    const isDevURL =
+        import.meta.env.DEV && url.hostname == window.location.hostname;
+    const isEnteURL =
+        url.protocol == "https:" &&
+        url.port == "" &&
+        isEnteHostname(url.hostname);
+    const isAllowedURL = isSameOrigin || isDevURL || isEnteURL;
+    if (!isAllowedURL) {
+        throw new Error("Invalid payment redirect URL");
+    }
+
+    if (isSameOrigin && url.pathname == "/desktop-redirect") {
+        url = new URL("ente://app/gallery");
+    }
+
+    url.searchParams.set("status", status);
+    if (reason) url.searchParams.set("reason", reason);
+    else url.searchParams.delete("reason");
+    window.location.href = url.href;
 };
 
 const redirectHome = () => {

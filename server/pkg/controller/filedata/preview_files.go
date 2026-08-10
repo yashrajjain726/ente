@@ -42,7 +42,6 @@ func (c *Controller) PreviewUploadURL(ctx *gin.Context, request filedata.Preview
 		return nil, stacktrace.Propagate(err, "")
 	}
 	id := filedata.NewUploadID(request.Type)
-	// note: instead of the final url, give a temp url for upload purpose.
 	objectKey := filedata.ObjectKey(request.FileID, fileOwnerID, request.Type, &id)
 	bucketID := c.S3Config.GetBucketID(request.Type)
 	if request.IsMultiPart {

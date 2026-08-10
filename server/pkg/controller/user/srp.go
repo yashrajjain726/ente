@@ -65,7 +65,6 @@ func (c *UserController) CompleteSRPSetup(context *gin.Context, req ente.Complet
 	}, nil
 }
 
-// UpdateSrpAndKeyAttributes updates the SRP and keys attributes if the SRP setup is successfully done
 func (c *UserController) UpdateSrpAndKeyAttributes(context *gin.Context,
 	userID int64,
 	req ente.UpdateSRPAndKeysRequest,

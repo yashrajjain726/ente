@@ -182,26 +182,6 @@ pub fn tokenize_clip_text_rust(text: String, vocab_path: String) -> Result<Vec<i
     indexing::tokenize_clip_text(&text, &vocab_path).map_err(|e| e.to_string())
 }
 
-// Execution-provider fallbacks and golden self-test failures are buffered for
-// app-side logging. Severity is "info", "warning", or "severe".
-#[derive(Clone, Debug)]
-pub struct RustMlRuntimeEvent {
-    pub severity: String,
-    pub message: String,
-}
-
-// Drain after ML operations and log each event at its severity. The buffer is
-// process-wide.
-pub fn take_ml_runtime_events() -> Vec<RustMlRuntimeEvent> {
-    ente_photos::ml::events::take_events()
-        .into_iter()
-        .map(|event| RustMlRuntimeEvent {
-            severity: event.severity.as_str().to_string(),
-            message: event.message,
-        })
-        .collect()
-}
-
 fn to_model_paths(paths: &RustModelPaths) -> ModelPaths {
     ModelPaths {
         face_detection: paths.face_detection.clone(),

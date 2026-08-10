@@ -14,7 +14,6 @@ type TwoFactorRepository struct {
 	SecretEncryptionKey []byte
 }
 
-// GetTwoFactorSecret gets the user's two factor secret
 func (repo *TwoFactorRepository) GetTwoFactorSecret(userID int64) (string, error) {
 	var encryptedTwoFASecret, nonce []byte
 	row := repo.DB.QueryRow(`SELECT encrypted_two_factor_secret, two_factor_secret_decryption_nonce FROM two_factor WHERE user_id = $1`, userID)
@@ -29,27 +28,23 @@ func (repo *TwoFactorRepository) GetTwoFactorSecret(userID int64) (string, error
 	return twoFASecret, nil
 }
 
-// UpdateTwoFactorStatus the activates/deactivates user's two factor
 func (repo *TwoFactorRepository) UpdateTwoFactorStatus(userID int64, status bool) error {
 	_, err := repo.DB.Exec(`UPDATE users SET is_two_factor_enabled = $1 WHERE user_id = $2`, status, userID)
 	return stacktrace.Propagate(err, "")
 }
 
-// AddTwoFactorSession added a new two factor session a user
 func (repo *TwoFactorRepository) AddTwoFactorSession(userID int64, sessionID string, expirationTime int64) error {
 	_, err := repo.DB.Exec(`INSERT INTO two_factor_sessions(user_id, session_id, creation_time, expiration_time) VALUES($1, $2, $3, $4)`,
 		userID, sessionID, time.Microseconds(), expirationTime)
 	return stacktrace.Propagate(err, "")
 }
 
-// RemoveExpiredTwoFactorSessions removes all two factor sessions that have expired
 func (repo *TwoFactorRepository) RemoveExpiredTwoFactorSessions() error {
 	_, err := repo.DB.Exec(`DELETE FROM two_factor_sessions WHERE expiration_time <= $1`,
 		time.Microseconds())
 	return stacktrace.Propagate(err, "")
 }
 
-// GetUserIDWithTwoFactorSession returns the userID associated with a given session
 func (repo *TwoFactorRepository) GetUserIDWithTwoFactorSession(sessionID string) (int64, error) {
 	row := repo.DB.QueryRow(`SELECT user_id FROM two_factor_sessions WHERE session_id = $1 AND expiration_time > $2`, sessionID, time.Microseconds())
 	var id int64
@@ -60,7 +55,6 @@ func (repo *TwoFactorRepository) GetUserIDWithTwoFactorSession(sessionID string)
 	return id, nil
 }
 
-// GetRecoveryKeyEncryptedTwoFactorSecret gets the user two factor encrypted with recovery key
 func (repo *TwoFactorRepository) GetRecoveryKeyEncryptedTwoFactorSecret(userID int64) (ente.TwoFactorRecoveryResponse, error) {
 	var response ente.TwoFactorRecoveryResponse
 	row := repo.DB.QueryRow(`SELECT recovery_encrypted_two_factor_secret, recovery_two_factor_secret_decryption_nonce FROM two_factor WHERE user_id = $1`, userID)
@@ -71,7 +65,6 @@ func (repo *TwoFactorRepository) GetRecoveryKeyEncryptedTwoFactorSecret(userID i
 	return response, nil
 }
 
-// VerifyTwoFactorSecret verifies the if a two secret factor secret belongs to a user
 func (repo *TwoFactorRepository) VerifyTwoFactorSecret(userID int64, secretHash string) (bool, error) {
 	var exists bool
 	row := repo.DB.QueryRow(`SELECT EXISTS( SELECT 1 FROM two_factor WHERE user_id = $1 AND two_factor_secret_hash = $2)`, userID, secretHash)
@@ -82,7 +75,6 @@ func (repo *TwoFactorRepository) VerifyTwoFactorSecret(userID int64, secretHash 
 	return exists, nil
 }
 
-// SetTempTwoFactorSecret sets the two factor secret for a user when he tries to setup a new two-factor app
 func (repo *TwoFactorRepository) SetTempTwoFactorSecret(userID int64, secret ente.EncryptionResult, secretHash string, expirationTime int64) error {
 	_, err := repo.DB.Exec(`INSERT INTO temp_two_factor(user_id, encrypted_two_factor_secret, two_factor_secret_decryption_nonce, two_factor_secret_hash, creation_time, expiration_time) 
 		VALUES($1, $2, $3, $4, $5, $6)`,
@@ -90,7 +82,6 @@ func (repo *TwoFactorRepository) SetTempTwoFactorSecret(userID int64, secret ent
 	return stacktrace.Propagate(err, "")
 }
 
-// GetTempTwoFactorSecret gets the user's two factor secret for validing and enabling a new two-factor configuration
 func (repo *TwoFactorRepository) GetTempTwoFactorSecret(userID int64) ([]ente.EncryptionResult, []string, error) {
 	rows, err := repo.DB.Query(`SELECT encrypted_two_factor_secret, two_factor_secret_decryption_nonce, two_factor_secret_hash FROM temp_two_factor WHERE user_id = $1 AND expiration_time > $2`, userID, time.Microseconds())
 	if err != nil {
@@ -112,20 +103,17 @@ func (repo *TwoFactorRepository) GetTempTwoFactorSecret(userID int64) ([]ente.En
 	return encryptedSecrets, hashedSecrets, nil
 }
 
-// RemoveTempTwoFactorSecret removes the specified secret with hash value `secretHash`
 func (repo *TwoFactorRepository) RemoveTempTwoFactorSecret(secretHash string) error {
 	_, err := repo.DB.Exec(`DELETE FROM temp_two_factor WHERE two_factor_secret_hash = $1`, secretHash)
 	return stacktrace.Propagate(err, "")
 }
 
-// RemoveExpiredTempTwoFactorSecrets removes all two temp factor secrets  that have expired
 func (repo *TwoFactorRepository) RemoveExpiredTempTwoFactorSecrets() error {
 	_, err := repo.DB.Exec(`DELETE FROM temp_two_factor WHERE expiration_time <= $1`,
 		time.Microseconds())
 	return stacktrace.Propagate(err, "")
 }
 
-// GetWrongAttempts returns the wrong attempt count for the given two factor session
 func (repo *TwoFactorRepository) GetWrongAttempts(sessionID string) (int, error) {
 	row := repo.DB.QueryRow(`SELECT wrong_attempt FROM two_factor_sessions WHERE session_id = $1`,
 		sessionID)
@@ -165,7 +153,6 @@ func (repo *TwoFactorRepository) TryRecordUsedOTPCode(userID int64, codeHash str
 	return rowsAffected > 0, nil
 }
 
-// RemoveExpiredUsedOTPCodes removes OTP codes older than the specified duration
 func (repo *TwoFactorRepository) RemoveExpiredUsedOTPCodes(expirationMicroseconds int64) error {
 	cutoffTime := time.Microseconds() - expirationMicroseconds
 	_, err := repo.DB.Exec(`DELETE FROM two_factor_used_codes WHERE used_at < $1`, cutoffTime)

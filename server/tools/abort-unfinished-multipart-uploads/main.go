@@ -32,9 +32,6 @@ func main() {
 
 	s3Client := s3.New(sess)
 
-	// - List all multipart uploads
-	// - Delete the ones that are older than x days (but only if `--confirm` is specified)
-
 	listOut, err := s3Client.ListMultipartUploads(&s3.ListMultipartUploadsInput{
 		Bucket: aws.String(bucket),
 	})
@@ -49,7 +46,6 @@ func main() {
 		fmt.Printf("Warning: Found more than 1000 pending multipart uploads. We were not expecting this many.")
 	}
 
-	// 20 days ago
 	cutoff := time.Now().AddDate(0, 0, -20)
 	fmt.Printf("Cutoff: %v\n", cutoff)
 

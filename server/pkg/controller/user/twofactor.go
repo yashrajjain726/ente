@@ -20,7 +20,6 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-// SetupTwoFactor generates a two factor secret and sends it to user to setup his authenticator app with
 func (c *UserController) SetupTwoFactor(userID int64) (ente.TwoFactorSecret, error) {
 	user, err := c.UserRepo.Get(userID)
 	if err != nil {
@@ -57,7 +56,6 @@ func (c *UserController) SetupTwoFactor(userID int64) (ente.TwoFactorSecret, err
 	return ente.TwoFactorSecret{SecretCode: key.Secret(), QRCode: base64.StdEncoding.EncodeToString(buf.Bytes())}, nil
 }
 
-// EnableTwoFactor handles the two factor activation request after user has setup his two factor by validing a totp request
 func (c *UserController) EnableTwoFactor(userID int64, request ente.TwoFactorEnableRequest) error {
 	encryptedSecrets, hashedSecrets, err := c.TwoFactorRepo.GetTempTwoFactorSecret(userID)
 	if err != nil {
@@ -99,7 +97,6 @@ func (c *UserController) EnableTwoFactor(userID int64, request ente.TwoFactorEna
 	return stacktrace.Propagate(err, "")
 }
 
-// VerifyTwoFactor handles the two factor validation request
 func (c *UserController) VerifyTwoFactor(context *gin.Context, sessionID string, otp string) (ente.TwoFactorAuthorizationResponse, error) {
 	userID, err := c.TwoFactorRepo.GetUserIDWithTwoFactorSession(sessionID)
 	if err != nil {
@@ -164,14 +161,11 @@ func (c *UserController) VerifyTwoFactor(context *gin.Context, sessionID string,
 	return response, nil
 }
 
-// DisableTwoFactor disables the two factor authentication for a user
 func (c *UserController) DisableTwoFactor(userID int64) error {
 	err := c.TwoFactorRepo.UpdateTwoFactorStatus(userID, false)
 	return stacktrace.Propagate(err, "")
 }
 
-// RecoverTwoFactor handles the two factor recovery request by sending the
-// recoveryKeyEncryptedTwoFactorSecret for the user to decrypt it and make twoFactor removal api call
 func (c *UserController) RecoverTwoFactor(sessionID string) (*ente.TwoFactorRecoveryResponse, error) {
 	userID, err := c.TwoFactorRepo.GetUserIDWithTwoFactorSession(sessionID)
 	if err != nil {
@@ -184,8 +178,6 @@ func (c *UserController) RecoverTwoFactor(sessionID string) (*ente.TwoFactorReco
 	return &response, nil
 }
 
-// RemoveTOTPTwoFactor handles two factor deactivation request if user lost his device
-// by authenticating him using his twoFactorsessionToken and twoFactor secret
 func (c *UserController) RemoveTOTPTwoFactor(context *gin.Context, sessionID string, secret string) (*ente.TwoFactorAuthorizationResponse, error) {
 	userID, err := c.TwoFactorRepo.GetUserIDWithTwoFactorSession(sessionID)
 	if err != nil {
@@ -221,7 +213,7 @@ func (c *UserController) GetKeyAttributeAndToken(context *gin.Context, userID in
 		return ente.TwoFactorAuthorizationResponse{}, stacktrace.Propagate(err, "")
 	}
 	token := auth.GenerateURLSafeRandomString(TokenLength)
-	encryptedToken, err := crypto.GetEncryptedTokenNative(token, keyAttributes.PublicKey)
+	encryptedToken, err := crypto.GetEncryptedToken(token, keyAttributes.PublicKey)
 	if err != nil {
 		return ente.TwoFactorAuthorizationResponse{}, stacktrace.Propagate(err, "")
 	}
