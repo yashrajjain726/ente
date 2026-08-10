@@ -2,15 +2,14 @@ import "dart:async";
 
 import "package:ente_components/ente_components.dart";
 import "package:ente_strings/ente_strings.dart";
+import "package:ente_ui/components/loading_widget.dart";
 import "package:flutter/material.dart";
 import "package:hugeicons/hugeicons.dart";
 import "package:photos/core/event_bus.dart";
 import "package:photos/events/video_preview_state_changed_event.dart";
 import "package:photos/models/preview/preview_item_status.dart";
 import "package:photos/services/video_preview_service.dart";
-import "package:photos/ui/common/loading_widget.dart";
 import "package:photos/ui/common/web_page.dart";
-import "package:photos/ui/settings/components/settings_page_scaffold.dart";
 
 const helpUrl =
     "https://ente.com/help/photos/features/utilities/video-streaming#related-faqs";

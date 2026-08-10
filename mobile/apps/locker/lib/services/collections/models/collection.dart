@@ -113,7 +113,7 @@ class Collection {
   }
 
   bool isOwner(int userID) {
-    return (owner.id ?? -100) == userID;
+    return owner.id == userID;
   }
 
   bool isDownloadEnabledForPublicLink() {

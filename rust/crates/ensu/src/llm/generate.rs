@@ -240,7 +240,6 @@ struct DecodeStep {
     stop: bool,
 }
 
-/// Incremental UTF-8 streaming decoder with stop-sequence handling.
 struct StreamDecoder {
     generated_text: String,
     pending_bytes: Vec<u8>,

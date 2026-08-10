@@ -19,12 +19,6 @@ export function formattedByteSize(bytes: number, precision = 2): string {
 }
 
 interface FormattedStorageByteSizeOptions {
-    /**
-     * If `true` then round up the fractional quantity we obtain when dividing
-     * the number of bytes by the number of bytes in the unit that got chosen.
-     *
-     * The default behaviour is to take the ceiling.
-     */
     round?: boolean;
 }
 

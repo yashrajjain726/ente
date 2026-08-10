@@ -6,9 +6,6 @@ import 'package:ente_accounts/pages/sessions_page.dart';
 import 'package:ente_accounts/services/passkey_service.dart';
 import 'package:ente_accounts/services/user_service.dart';
 import 'package:ente_auth/core/configuration.dart';
-import 'package:ente_auth/ui/components/buttons/button_widget.dart';
-import 'package:ente_auth/ui/components/models/button_result.dart';
-import 'package:ente_auth/ui/settings/components/auth_settings_item.dart';
 import 'package:ente_auth/ui/settings/components/auth_settings_page_scaffold.dart';
 import 'package:ente_auth/utils/dialog_util.dart';
 import 'package:ente_auth/utils/toast_util.dart';
@@ -18,6 +15,8 @@ import 'package:ente_lock_screen/local_authentication_service.dart';
 import 'package:ente_lock_screen/lock_screen_settings.dart';
 import 'package:ente_lock_screen/ui/lock_screen_options.dart';
 import 'package:ente_strings/ente_strings.dart';
+import 'package:ente_ui/components/buttons/button_widget.dart';
+import 'package:ente_ui/components/buttons/models/button_result.dart';
 import 'package:flutter/material.dart';
 import 'package:hugeicons/hugeicons.dart';
 import 'package:logging/logging.dart';
@@ -49,7 +48,7 @@ class _SecuritySettingsPageState extends State<SecuritySettingsPage> {
       title: context.strings.security,
       children: [
         if (_hasLoggedIn) ...[
-          AuthSettingsItem(
+          SettingsItem(
             title: context.strings.emailVerificationToggle,
             icon: HugeIcons.strokeRoundedMailSecure01,
             showChevron: false,
@@ -59,14 +58,14 @@ class _SecuritySettingsPageState extends State<SecuritySettingsPage> {
             ),
           ),
           const SizedBox(height: Spacing.sm),
-          AuthSettingsItem(
+          SettingsItem(
             title: context.strings.passkey,
             icon: HugeIcons.strokeRoundedFingerAccess,
             showOnlyLoadingState: true,
             onTap: _openPasskey,
           ),
           const SizedBox(height: Spacing.sm),
-          AuthSettingsItem(
+          SettingsItem(
             title: context.strings.viewActiveSessions,
             icon: HugeIcons.strokeRoundedSmartPhone01,
             showOnlyLoadingState: true,
@@ -74,7 +73,7 @@ class _SecuritySettingsPageState extends State<SecuritySettingsPage> {
           ),
           const SizedBox(height: Spacing.sm),
         ],
-        AuthSettingsItem(
+        SettingsItem(
           title: context.strings.appLock,
           icon: HugeIcons.strokeRoundedSquareLock02,
           showOnlyLoadingState: true,

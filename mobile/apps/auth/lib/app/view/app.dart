@@ -9,7 +9,7 @@ import 'package:ente_auth/services/auth_theme_preferences.dart';
 import 'package:ente_auth/services/authenticator_service.dart';
 import 'package:ente_auth/services/update_service.dart';
 import 'package:ente_auth/ui/home_page.dart';
-import 'package:ente_auth/ui/settings/app_update_dialog.dart';
+import 'package:ente_auth/ui/settings/app_update_sheet.dart';
 import 'package:ente_events/event_bus.dart';
 import 'package:ente_events/models/signed_in_event.dart';
 import 'package:ente_events/models/signed_out_event.dart';
@@ -85,18 +85,15 @@ class _AppState extends State<App> with WidgetsBindingObserver {
       }
     });
     locale = widget.locale;
-    UpdateService.instance.showUpdateNotification().then((shouldUpdate) {
+    UpdateService.instance.shouldShowUpdatePrompt().then((shouldUpdate) {
       if (shouldUpdate) {
         Future.delayed(Duration.zero, () {
           if (!mounted) return;
-          showDialog(
-            context: context,
-            builder: (BuildContext context) {
-              return AppUpdateDialog(
-                UpdateService.instance.getLatestVersionInfo(),
-              );
-            },
-            barrierColor: Colors.black.withValues(alpha: 0.85),
+          unawaited(
+            showAppUpdateSheet(
+              context,
+              latestVersionInfo: UpdateService.instance.getLatestVersionInfo()!,
+            ),
           );
         });
       }

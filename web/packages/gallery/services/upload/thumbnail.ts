@@ -43,30 +43,33 @@ const generateImageThumbnailUsingCanvas = async (blob: Blob) => {
     const canvasCtx = canvas.getContext("2d")!;
 
     const imageURL = URL.createObjectURL(blob);
-    await withTimeout(
-        new Promise((resolve, reject) => {
-            const image = new Image();
-            image.setAttribute("src", imageURL);
-            image.onload = () => {
-                try {
-                    URL.revokeObjectURL(imageURL);
-                    const { width, height } = scaledImageDimensions(
-                        image.width,
-                        image.height,
-                        maxThumbnailDimension,
-                    );
-                    canvas.width = width;
-                    canvas.height = height;
-                    canvasCtx.drawImage(image, 0, 0, width, height);
-                    resolve(undefined);
-                } catch (e: unknown) {
-                    // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors
-                    reject(e);
-                }
-            };
-        }),
-        canvasThumbnailGenerationTimeout,
-    );
+    try {
+        await withTimeout(
+            new Promise((resolve, reject) => {
+                const image = new Image();
+                image.setAttribute("src", imageURL);
+                image.onload = () => {
+                    try {
+                        const { width, height } = scaledImageDimensions(
+                            image.width,
+                            image.height,
+                            maxThumbnailDimension,
+                        );
+                        canvas.width = width;
+                        canvas.height = height;
+                        canvasCtx.drawImage(image, 0, 0, width, height);
+                        resolve(undefined);
+                    } catch (e: unknown) {
+                        // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors
+                        reject(e);
+                    }
+                };
+            }),
+            canvasThumbnailGenerationTimeout,
+        );
+    } finally {
+        URL.revokeObjectURL(imageURL);
+    }
 
     return await compressedJPEGData(canvas);
 };
@@ -116,31 +119,34 @@ export const generateVideoThumbnailUsingCanvas = async (blob: Blob) => {
     const canvasCtx = canvas.getContext("2d")!;
 
     const videoURL = URL.createObjectURL(blob);
-    await withTimeout(
-        new Promise((resolve, reject) => {
-            const video = document.createElement("video");
-            video.preload = "metadata";
-            video.src = videoURL;
-            video.addEventListener("loadeddata", () => {
-                try {
-                    URL.revokeObjectURL(videoURL);
-                    const { width, height } = scaledImageDimensions(
-                        video.videoWidth,
-                        video.videoHeight,
-                        maxThumbnailDimension,
-                    );
-                    canvas.width = width;
-                    canvas.height = height;
-                    canvasCtx.drawImage(video, 0, 0, width, height);
-                    resolve(undefined);
-                } catch (e) {
-                    // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors
-                    reject(e);
-                }
-            });
-        }),
-        canvasThumbnailGenerationTimeout,
-    );
+    try {
+        await withTimeout(
+            new Promise((resolve, reject) => {
+                const video = document.createElement("video");
+                video.preload = "metadata";
+                video.src = videoURL;
+                video.addEventListener("loadeddata", () => {
+                    try {
+                        const { width, height } = scaledImageDimensions(
+                            video.videoWidth,
+                            video.videoHeight,
+                            maxThumbnailDimension,
+                        );
+                        canvas.width = width;
+                        canvas.height = height;
+                        canvasCtx.drawImage(video, 0, 0, width, height);
+                        resolve(undefined);
+                    } catch (e) {
+                        // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors
+                        reject(e);
+                    }
+                });
+            }),
+            canvasThumbnailGenerationTimeout,
+        );
+    } finally {
+        URL.revokeObjectURL(videoURL);
+    }
 
     return await compressedJPEGData(canvas);
 };

@@ -785,7 +785,7 @@ class CollectionsService {
         if (collection.owner.id == userID) {
           _cachedUserIdToUser[userID] = collection.owner;
         } else {
-          final matchingUser = collection.getSharees().firstWhereOrNull(
+          final matchingUser = collection.sharees.firstWhereOrNull(
             (u) => u.id == userID,
           );
           if (matchingUser != null) {

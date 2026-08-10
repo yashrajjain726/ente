@@ -29,7 +29,7 @@ func DecryptExport(inputPath string, outputPath string, password string) error {
 	outputFile, err := internal.ResolvePath(outputPath)
 	if err != nil {
 		return fmt.Errorf("error resolving outputFile path (out): %v", err)
-	} // Implement your decryption logic here
+	}
 
 	data, err := os.ReadFile(exportFile)
 	if err != nil {

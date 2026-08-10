@@ -24,16 +24,12 @@ thiserror.workspace = true
 # Newer usearch releases switched that implementation to numkong symbols.
 usearch = { version = "=2.21.4", optional = true }
 
-# ORT source and version are pinned once in the workspace manifest; only the
-# per-target feature sets are declared here.
-# The iOS Cargokit build sets ORT_LIB_PATH to the directory containing the
-# verified custom static archive.
+# Cargokit sets ORT_LIB_PATH to Ente's verified iOS archive.
 [target.'cfg(target_os = "ios")'.dependencies]
 ort = { workspace = true, features = [
     "std",
     "ndarray",
     "half",
-    # CoreML is the preferred iOS execution provider for Rust ML sessions.
     "coreml",
     "api-28",
 ] }

@@ -68,8 +68,8 @@ export const formattedDateRelative = (
 
     const date = toDate(dateOrEpochMicroseconds);
 
-    // Math.abs accounts for both past and future scenarios.
-    const elapsed = Math.abs(date.getTime() - Date.now());
+    const elapsed = date.getTime() - Date.now();
+    const elapsedMagnitude = Math.abs(elapsed);
 
     const relativeTimeFormat = (_relativeTimeFormat ??=
         new Intl.RelativeTimeFormat(i18n.language, {
@@ -79,7 +79,7 @@ export const formattedDateRelative = (
         }));
 
     for (const [u, d] of units) {
-        if (elapsed > d)
+        if (elapsedMagnitude > d)
             return relativeTimeFormat.format(Math.round(elapsed / d), u);
     }
 

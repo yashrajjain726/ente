@@ -1,10 +1,9 @@
 import 'dart:convert';
 
-import 'package:expansion_tile_card/expansion_tile_card.dart';
+import 'package:ente_ui/components/loading_widget.dart';
 import 'package:flutter/material.dart';
 import 'package:photos/core/network/network.dart';
 import 'package:photos/ente_theme_data.dart';
-import 'package:photos/ui/common/loading_widget.dart';
 
 class BillingQuestionsWidget extends StatelessWidget {
   const BillingQuestionsWidget({super.key});
@@ -54,13 +53,26 @@ class FaqWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final expandedColor = theme.colorScheme.greenAlternative;
+    const shape = RoundedRectangleBorder(
+      borderRadius: BorderRadius.all(Radius.circular(8)),
+    );
+
     return Padding(
       padding: const EdgeInsets.all(2),
-      child: ExpansionTileCard(
-        elevation: 0,
+      child: ExpansionTile(
+        key: PageStorageKey(faq!.q),
         title: Text(faq!.q!),
-        expandedTextColor: Theme.of(context).colorScheme.greenAlternative,
-        baseColor: Theme.of(context).cardColor,
+        tilePadding: const EdgeInsets.symmetric(horizontal: 18),
+        textColor: expandedColor,
+        collapsedTextColor: theme.textTheme.titleMedium?.color,
+        iconColor: expandedColor,
+        collapsedIconColor: theme.unselectedWidgetColor,
+        backgroundColor: theme.cardColor,
+        collapsedBackgroundColor: theme.cardColor,
+        shape: shape,
+        collapsedShape: shape,
         children: [
           Padding(
             padding: const EdgeInsets.only(left: 16, right: 16, bottom: 12),

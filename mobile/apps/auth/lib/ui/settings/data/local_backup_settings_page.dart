@@ -1,4 +1,3 @@
-import 'package:ente_auth/ui/settings/components/auth_settings_item.dart';
 import 'package:ente_auth/ui/settings/components/auth_settings_page_scaffold.dart';
 import 'package:ente_auth/ui/settings/data/local_backup/local_backup_experience.dart';
 import 'package:ente_components/ente_components.dart';
@@ -40,7 +39,7 @@ class LocalBackupSettingsPage extends StatelessWidget {
     return [
       MenuGroupComponent(
         items: [
-          AuthSettingsItem(
+          SettingsItem(
             title: l10n.enableAutomaticBackups,
             showChevron: false,
             trailing: Semantics(
@@ -68,20 +67,21 @@ class LocalBackupSettingsPage extends StatelessWidget {
                 final title = snapshot.data == true
                     ? l10n.updateBackupPassword
                     : l10n.setBackupPassword;
-                return AuthSettingsItem(
+                return SettingsItem(
                   title: title,
                   semanticsIdentifier: 'auth_local_backup_password',
                   onTap: () => controller.updatePassword(context),
                 );
               },
             ),
-            AuthSettingsItem(
+            SettingsItem(
               title: l10n.setBackupFolder,
               subtitle: _locationDescription(context, controller),
+              subtitleMaxLines: 2,
               semanticsIdentifier: 'auth_local_backup_folder',
               onTap: controller.changeLocation,
             ),
-            AuthSettingsItem(
+            SettingsItem(
               title: l10n.createBackupNow,
               semanticsIdentifier: 'auth_local_backup_create_now',
               showOnlyLoadingState: true,
@@ -97,13 +97,13 @@ class LocalBackupSettingsPage extends StatelessWidget {
           showDividers: true,
           dividerPadding: const EdgeInsets.only(left: Spacing.lg),
           items: [
-            AuthSettingsItem(
+            SettingsItem(
               title: l10n.clearBackupFolder,
               showChevron: false,
               showOnlyLoadingState: true,
               onTap: controller.resetBackupLocation,
             ),
-            AuthSettingsItem(
+            SettingsItem(
               title: l10n.clearBackupPassword,
               showChevron: false,
               showOnlyLoadingState: true,

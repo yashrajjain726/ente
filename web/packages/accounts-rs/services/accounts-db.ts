@@ -148,7 +148,7 @@ export const savedIsFirstLogin = () => {
 };
 
 export const saveIsFirstLogin = () => {
-    localStorage.setItem("isFirstLogin", JSON.stringify({ status: true }));
+    localStorage.setItem("isFirstLogin", JSON.stringify(true));
 };
 
 export const getAndClearIsFirstLogin = () => {
@@ -170,7 +170,7 @@ export const savedJustSignedUp = () => {
 };
 
 export const saveJustSignedUp = () => {
-    localStorage.setItem("justSignedUp", JSON.stringify({ status: true }));
+    localStorage.setItem("justSignedUp", JSON.stringify(true));
 };
 
 export const getAndClearJustSignedUp = () => {

@@ -11,12 +11,12 @@ export const detectFileTypeInfo = async (file: File): Promise<FileTypeInfo> =>
     detectFileTypeInfoFromChunk(() => readInitialChunkOfFile(file), file.name);
 
 export const detectFileTypeInfoFromChunk = async (
-    readInitialChunk: () => Promise<Uint8Array>,
+    readInitialChunk: () => Promise<Uint8Array | undefined>,
     fileNameOrPath: string,
 ): Promise<FileTypeInfo> => {
     try {
         const typeResult = await detectFileTypeFromBuffer(
-            await readInitialChunk(),
+            (await readInitialChunk())!,
         );
 
         const mimeType = typeResult.mime;

@@ -403,17 +403,16 @@ class _FamilyPlanPageState extends State<FamilyPlanPage> {
       if (userID == null) {
         continue;
       }
-      final personData = PersonService.instance.getCachedPartialPersonData(
-        userID: userID,
-        email: member.email,
+      final person = PersonService.instance.getCachedPersonForUser(
+        userID,
+        member.email,
       );
-      final personID = personData?[PersonService.kPersonIDKey];
-      if (personID == null) {
+      if (person == null) {
         continue;
       }
-      idsByUserId[userID] = personID;
-      final personName = personData?[PersonService.kNameKey]?.trim();
-      if (personName != null && personName.isNotEmpty) {
+      idsByUserId[userID] = person.remoteID;
+      final personName = person.data.name.trim();
+      if (personName.isNotEmpty) {
         namesByUserId[userID] = personName;
       }
     }
@@ -534,10 +533,9 @@ class _FamilyPlanPageState extends State<FamilyPlanPage> {
         : savedContactName;
     final linkedPersonId = member.userID == null || !PersonService.isInitialized
         ? null
-        : PersonService.instance.getCachedPartialPersonData(
-            userID: member.userID,
-            email: member.email,
-          )?[PersonService.kPersonIDKey];
+        : PersonService.instance
+              .getCachedPersonForUser(member.userID, member.email)
+              ?.remoteID;
     final l10n = context.strings;
     await showBottomSheetComponent<void>(
       context: context,

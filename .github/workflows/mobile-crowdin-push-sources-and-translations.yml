@@ -1,34 +1,12 @@
 name: "Push sources and translations to Crowdin (Mobile)"
 
-# This is a variant of the mobile Crowdin sync workflows that uploads the
-# translated strings in addition to the source strings.
-#
-# This allows us to change the strings in our source code for an automated
-# refactoring (e.g. renaming a placeholder), and then run this workflow to
-# update the data in Crowdin taking our source code as the source of truth.
-
-# USAGE:
-#
-# Be careful with this workflow since it updates both the sources and
-# translations on Crowdin, and any changes on Crowdin that are not in the
-# branch from which this workflow is run will be lost.
-#
-# 1. Run the normal sync workflow:
-#   `gh workflow run mobile-crowdin-sync.yml`
-#
-# 2. Merge the translations PR it creates. So now `main` includes the latest
-#    Crowdin translations.
-#
-# 3. Branch from updated `main` and make the string edits.
-#
-# 4. Push the branch and run this workflow
-#   `gh workflow run mobile-crowdin-push-sources-and-translations.yml --ref <branch>`
-#
-# 5. After it succeeds, merge the string-edit PR.
+# This overwrites Crowdin sources and translations from the selected branch.
+# To avoid losing Crowdin changes:
+# 1. Run the normal sync and merge its translation PR.
+# 2. Branch from updated main, then edit and push the strings.
+# 3. Run this workflow on that branch, then merge the edit PR.
 
 on:
-    # Trigger manually, or using
-    # `gh workflow run mobile-crowdin-push-sources-and-translations.yml --ref <my-branch>`
     workflow_dispatch:
 
 permissions:

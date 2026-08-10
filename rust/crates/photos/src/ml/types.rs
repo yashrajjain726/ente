@@ -50,9 +50,9 @@ pub(crate) fn to_face_id(file_id: i64, box_xyxy: [f32; 4]) -> String {
 pub struct PetFaceDetection {
     pub score: f32,
     pub box_xyxy: [f32; 4],
-    /// 3 keypoints: [left_eye, right_eye, nose]
+    // [left eye, right eye, nose].
     pub keypoints: [[f32; 2]; 3],
-    /// 0 = dog, 1 = cat (from class scores in detector output)
+    // 0 = dog, 1 = cat.
     pub class_id: u8,
 }
 
@@ -66,7 +66,7 @@ pub struct PetAlignmentResult {
 #[derive(Clone, Debug)]
 pub struct PetFaceResult {
     pub detection: PetFaceDetection,
-    /// 0 = dog, 1 = cat
+    // 0 = dog, 1 = cat.
     pub species: u8,
     pub face_embedding: Vec<f32>,
     pub pet_face_id: String,
@@ -77,7 +77,7 @@ pub struct PetFaceResult {
 pub struct PetBodyDetection {
     pub score: f32,
     pub box_xyxy: [f32; 4],
-    /// COCO class: 15 = cat, 16 = dog
+    // COCO class: 15 = cat, 16 = dog.
     pub coco_class: u8,
 }
 

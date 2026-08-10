@@ -43,8 +43,6 @@ pub struct AnalyzeImageResult {
     pub clip: Option<ClipResult>,
     pub pet_faces: Option<Vec<PetFaceResult>>,
     pub pet_bodies: Option<Vec<PetBodyResult>>,
-    /// True when any model that contributed to this result ran on the
-    /// respective accelerated execution provider.
     pub used_coreml: bool,
     pub used_webgpu: bool,
 }
@@ -61,8 +59,7 @@ pub struct RunClipTextResult {
     pub embedding: Vec<f32>,
 }
 
-/// Configures process-wide ML execution behavior. Must be called before the
-/// first session is created to take effect for that session.
+// Call before creating sessions; existing sessions keep their configuration.
 pub fn set_ml_execution_config(enable_webgpu: bool) {
     webgpu::set_enabled(enable_webgpu);
 }

@@ -1,14 +1,13 @@
 import "package:ente_components/ente_components.dart";
 import "package:ente_pure_utils/ente_pure_utils.dart";
 import "package:ente_strings/ente_strings.dart";
+import 'package:ente_ui/components/loading_widget.dart';
 import 'package:flutter/material.dart';
 import 'package:logging/logging.dart';
 import 'package:photos/core/configuration.dart';
 import 'package:photos/gateways/users/models/sessions.dart';
 import 'package:photos/services/account/user_service.dart';
-import 'package:photos/ui/common/loading_widget.dart';
 import 'package:photos/ui/notification/toast.dart';
-import "package:photos/ui/settings/components/settings_page_scaffold.dart";
 import 'package:photos/utils/dialog_util.dart';
 
 class SessionsPage extends StatefulWidget {

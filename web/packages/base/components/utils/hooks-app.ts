@@ -1,6 +1,6 @@
 import type { NotificationAttributes } from "ente-base/components/Notification";
 import { setupI18n } from "ente-base/i18n";
-import { disableDiskLogs } from "ente-base/log";
+import { attachRustLogHook, disableDiskLogs } from "ente-base/log";
 import { logUnhandledErrorsAndRejections } from "ente-base/log-web";
 import { useRouter } from "next/router";
 import { useCallback, useEffect, useState } from "react";
@@ -22,6 +22,7 @@ interface SetupLoggingOptions {
 export const useSetupLogs = (opts?: SetupLoggingOptions) => {
     useEffect(() => {
         if (opts?.disableDiskLogs) disableDiskLogs();
+        attachRustLogHook();
         logUnhandledErrorsAndRejections(true);
         return () => logUnhandledErrorsAndRejections(false);
     }, []);

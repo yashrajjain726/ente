@@ -277,7 +277,6 @@
   "machineLearning": "Ikasketa automatikoa",
   "manage": "Kudeatu",
   "manageDeviceStorage": "Kudeatu gailuaren katxea",
-  "manageDeviceStorageDesc": "Berrikusi eta garbitu katxe lokalaren biltegiratzea.",
   "manageLink": "Kudeatu esteka",
   "manageParticipants": "Kudeatu",
   "memoryCount": "{count, plural,=0{oroitzapenik ez}one{oroitzapen {formattedCount}} other{{formattedCount} oroitzapen}}",

@@ -37,7 +37,6 @@ class AlbumSharesIcons extends StatelessWidget {
         left: overlapPadding * index,
         child: UserAvatarWidget(
           sharees[index],
-          thumbnailView: removeBorder,
           type: type,
           config: Configuration.instance,
         ),

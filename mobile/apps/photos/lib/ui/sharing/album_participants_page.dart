@@ -80,12 +80,12 @@ class _AlbumParticipantsPageState extends State<AlbumParticipantsPage> {
         _collection.type != CollectionType.uncategorized &&
         !isOwner &&
         hasActivePublicLink;
-    final int participants = 1 + _collection.getSharees().length;
+    final int participants = 1 + _collection.sharees.length;
     final User owner = _collection.owner;
     if (owner.id == currentUserID && owner.email == "") {
       owner.email = Configuration.instance.getEmail()!;
     }
-    final List<User> allSharees = _collection.getSharees();
+    final List<User> allSharees = _collection.sharees;
     final List<User> admins = [];
     final List<User> collaborators = [];
     final List<User> viewers = [];
@@ -128,7 +128,7 @@ class _AlbumParticipantsPageState extends State<AlbumParticipantsPage> {
             title: isOwner
                 ? context.strings.you
                 : _nameIfAvailableElseEmail(owner),
-            leading: UserAvatarWidget(owner, currentUserID: currentUserID),
+            leading: UserAvatarWidget(owner),
             isDisabled: true,
           ),
         ],
@@ -199,11 +199,7 @@ class _AlbumParticipantsPageState extends State<AlbumParticipantsPage> {
           title: user.id == currentUserID
               ? context.strings.you
               : _nameIfAvailableElseEmail(user),
-          leading: UserAvatarWidget(
-            user,
-            type: AvatarType.medium,
-            currentUserID: currentUserID,
-          ),
+          leading: UserAvatarWidget(user, type: AvatarType.medium),
           showChevron: canManageParticipants && user.id != currentUserID,
           isDisabled: !canManageParticipants || user.id == currentUserID,
           onTap: canManageParticipants && user.id != currentUserID

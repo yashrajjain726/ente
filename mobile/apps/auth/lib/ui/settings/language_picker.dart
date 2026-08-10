@@ -1,8 +1,6 @@
 import 'package:ente_auth/ui/settings/components/auth_settings_page_scaffold.dart';
-import 'package:ente_components/ente_components.dart';
-import 'package:ente_pure_utils/ente_pure_utils.dart';
 import 'package:ente_strings/ente_strings.dart';
-import 'package:flutter/foundation.dart';
+import 'package:ente_ui/components/language_selector_list.dart';
 import 'package:flutter/material.dart';
 
 class LanguageSelectorPage extends StatelessWidget {
@@ -21,86 +19,15 @@ class LanguageSelectorPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return AuthSettingsPageScaffold(
       title: context.strings.selectLanguage,
-      children: [ItemsWidget(supportedLocales, onLocaleChanged, currentLocale)],
+      children: [
+        LanguageSelectorList(
+          supportedLocales,
+          onLocaleChanged,
+          currentLocale,
+          semanticsIdentifier: 'auth_language_list',
+        ),
+        const SizedBox(height: 24),
+      ],
     );
   }
-}
-
-class ItemsWidget extends StatefulWidget {
-  final List<Locale> supportedLocales;
-  final ValueChanged<Locale> onLocaleChanged;
-  final Locale currentLocale;
-
-  const ItemsWidget(
-    this.supportedLocales,
-    this.onLocaleChanged,
-    this.currentLocale, {
-    super.key,
-  });
-
-  @override
-  State<ItemsWidget> createState() => _ItemsWidgetState();
-}
-
-class _ItemsWidgetState extends State<ItemsWidget> {
-  late Locale currentLocale;
-
-  @override
-  void initState() {
-    currentLocale = _resolvedCurrentLocale(
-      widget.currentLocale,
-      widget.supportedLocales,
-    );
-    super.initState();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      identifier: 'auth_language_list',
-      child: MenuGroupComponent(
-        showDividers: true,
-        dividerPadding: const EdgeInsets.only(left: Spacing.lg),
-        items: [
-          for (final locale in widget.supportedLocales)
-            _menuItemForPicker(locale),
-        ],
-      ),
-    );
-  }
-
-  MenuComponent _menuItemForPicker(Locale locale) {
-    final selected = currentLocale == locale;
-    return MenuComponent(
-      key: ValueKey(locale.toString()),
-      title: getLocaleDisplayName(locale) + (kDebugMode ? ' ($locale)' : ''),
-      selected: selected,
-      trailing: RadioComponent(
-        selected: selected,
-        onChanged: (_) => _selectLocale(locale),
-      ),
-      showOnlyLoadingState: true,
-      onTap: () => _selectLocale(locale),
-    );
-  }
-
-  void _selectLocale(Locale locale) {
-    widget.onLocaleChanged(locale);
-    currentLocale = locale;
-    setState(() {});
-  }
-}
-
-Locale _resolvedCurrentLocale(Locale current, List<Locale> supported) {
-  if (supported.contains(current)) return current;
-
-  final languageMatches = supported
-      .where((locale) => locale.languageCode == current.languageCode)
-      .toList();
-  if (languageMatches.isEmpty) return current;
-
-  return languageMatches.firstWhere(
-    (locale) => locale.countryCode == null,
-    orElse: () => languageMatches.first,
-  );
 }

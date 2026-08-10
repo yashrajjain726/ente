@@ -15,8 +15,6 @@ import "package:ente_utils/email_util.dart";
 import "package:flutter/material.dart";
 import "package:hugeicons/hugeicons.dart";
 import "package:locker/services/configuration.dart";
-import "package:locker/ui/settings/components/settings_item.dart";
-import "package:locker/ui/settings/components/settings_page_scaffold.dart";
 import "package:locker/utils/bottom_sheet_illustration.dart";
 import "package:logging/logging.dart";
 

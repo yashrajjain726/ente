@@ -93,6 +93,16 @@ Duplicates can occur:
 >
 > Special mention to l1br3770 for his [detailed guide](https://www.reddit.com/r/enteio/comments/1jyxk4b/howto_migration_from_google_photos_pitfalls/).
 
+### Will Ente automatically clean up a messy, duplicate-filled library when I import it? {#dedup-before-import-messy-library}
+
+Not entirely. Ente's deduplication only catches exact duplicates - same file name and hash. If any service compressed some of your originals, for example using Storage saver, the compressed and original versions have different hashes and won't be detected as duplicates.
+
+**Recommended approach:**
+
+1. Use a third-party tool to find and remove exact and near-identical duplicates locally, before importing.
+2. Import the cleaned-up collection into Ente.
+3. If any duplicates slip through, use the [Remove duplicates](/photos/features/albums-and-organization/storage-optimization#remove-exact-duplicates) and [Remove similar images](/photos/features/albums-and-organization/storage-optimization#remove-similar-images) tools inside Ente afterwards.
+
 ### Why aren't my Google Takeout albums preserved after import? {#takeout-albums-not-preserved}
 
 Usually because the album folders weren't placed directly inside one parent folder during extraction. Ente expects this structure:

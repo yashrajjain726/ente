@@ -1,17 +1,11 @@
 import "package:ente_components/ente_components.dart";
 import "package:ente_strings/ente_strings.dart";
-import "package:ente_ui/components/buttons/button_widget.dart";
-import "package:ente_ui/components/buttons/models/button_result.dart";
 import "package:flutter/material.dart";
 
 class DeleteConfirmationResult {
-  final ButtonResult buttonResult;
   final bool deleteFromAllCollections;
 
-  DeleteConfirmationResult({
-    required this.buttonResult,
-    required this.deleteFromAllCollections,
-  });
+  DeleteConfirmationResult({required this.deleteFromAllCollections});
 }
 
 Future<DeleteConfirmationResult?> showDeleteConfirmationSheet(
@@ -103,7 +97,6 @@ class _DeleteConfirmationSheetState extends State<DeleteConfirmationSheet> {
           onTap: () {
             Navigator.of(context).pop(
               DeleteConfirmationResult(
-                buttonResult: ButtonResult(ButtonAction.first),
                 deleteFromAllCollections: _deleteFromAllCollections,
               ),
             );

@@ -2,6 +2,7 @@ import "dart:async";
 import "dart:math";
 
 import "package:ente_strings/ente_strings.dart";
+import "package:ente_ui/components/loading_widget.dart";
 import "package:flutter/material.dart";
 import "package:logging/logging.dart";
 import "package:photos/core/event_bus.dart";
@@ -9,7 +10,6 @@ import "package:photos/events/collection_updated_event.dart";
 import 'package:photos/models/collection/collection.dart';
 import "package:photos/theme/ente_theme.dart";
 import "package:photos/ui/collections/album/row_item.dart";
-import "package:photos/ui/common/loading_widget.dart";
 
 class AlbumHorizontalList extends StatefulWidget {
   final Future<List<Collection>> Function() collectionsFuture;

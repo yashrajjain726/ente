@@ -35,31 +35,37 @@ import androidx.compose.ui.unit.dp
 import io.ente.ensu.designsystem.EnsuColor
 import io.ente.ensu.designsystem.EnsuSpacing
 import io.ente.ensu.designsystem.EnsuTypography
-import io.ente.ensu.bindings.ConfigDefaults
-import io.ente.ensu.llm.ModelSettingsState
+import io.ente.ensu.bindings.ModelRuntimeSurface
+import io.ente.ensu.bindings.resolveModelPolicy
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ModelSettingsScreen(
-    defaults: ConfigDefaults,
+    totalMemoryBytes: Long?,
     state: ModelSettingsState,
     onSave: (ModelSettingsState) -> Unit,
     onReset: () -> Unit
 ) {
     val context = LocalContext.current
-    val modelChoices = remember {
+    val modelChoices = remember(totalMemoryBytes) {
+        val modelPolicy = resolveModelPolicy(
+            surface = ModelRuntimeSurface.ANDROID,
+            totalMemoryBytes = totalMemoryBytes?.toULong()
+        )
         listOf(
             ModelChoice(
                 id = DEFAULT_OPTION_ID,
-                title = defaults.mobileDefaultModel.title,
+                title = modelPolicy.defaultModel.title,
                 isDefault = true
             )
-        ) + defaults.mobileModelPresets.map { preset ->
-            ModelChoice(
-                id = preset.id,
-                title = preset.title
-            )
-        }
+        ) + modelPolicy.visibleModels
+            .filter { it.id != modelPolicy.defaultModel.id }
+            .map { preset ->
+                ModelChoice(
+                    id = preset.id,
+                    title = preset.title
+                )
+            }
     }
 
     var selectedModelId by remember(state) {

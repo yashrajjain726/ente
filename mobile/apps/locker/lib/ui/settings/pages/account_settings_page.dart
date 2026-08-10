@@ -15,8 +15,6 @@ import "package:hugeicons/hugeicons.dart";
 import "package:locker/services/configuration.dart";
 import "package:locker/ui/components/recovery_key_sheet.dart";
 import "package:locker/ui/pages/home_page.dart";
-import "package:locker/ui/settings/components/settings_item.dart";
-import "package:locker/ui/settings/components/settings_page_scaffold.dart";
 
 class AccountSettingsPage extends StatelessWidget {
   const AccountSettingsPage({super.key});

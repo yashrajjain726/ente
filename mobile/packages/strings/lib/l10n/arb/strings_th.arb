@@ -406,8 +406,6 @@
       "storageInGB": {}
     }
   },
-  "removeDuplicates": "ลบไฟล์ซ้ำ",
-  "removeDuplicatesDesc": "ตรวจสอบแล้วลบไฟล์ที่ซ้ำกัน",
   "removeFromAlbum": "นำออกจากอัลบั้ม",
   "removeFromAlbumTitle": "นำออกจากอัลบั้ม?",
   "removeLink": "ลบลิ้งค์",

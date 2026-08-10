@@ -20,12 +20,11 @@ struct ModelSettingsView: View {
     @State private var toastTask: Task<Void, Never>?
 
     private let modelChoices: [ModelChoice] = {
-        let defaults = ConfigDefaults.shared
-        let defaultModel = defaults.mobileDefaultModel
-        let presets = defaults.mobileModelPresets
+        let policy = ModelSettingsStore.modelPolicy
+        let defaultModel = policy.defaultModel
         return [
             ModelChoice(id: Self.defaultOptionId, name: defaultModel.title, isDefault: true)
-        ] + presets.map { preset in
+        ] + policy.visibleModels.filter { $0.id != defaultModel.id }.map { preset in
             ModelChoice(id: preset.id, name: preset.title)
         }
     }()

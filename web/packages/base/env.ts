@@ -1,4 +1,4 @@
-// Replaced at build time.
+// The build replaces these process.env reads in browser bundles.
 declare const process: {
     readonly env: {
         readonly NODE_ENV: "development" | "production" | "test";

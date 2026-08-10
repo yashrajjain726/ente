@@ -1,3 +1,4 @@
+import { useBaseContext } from "ente-base/context";
 import type { EnteFile } from "ente-media/file";
 import { useEffect, useRef } from "react";
 
@@ -20,6 +21,7 @@ export const useThumbnailGeneration = ({
     thumbnailsGeneratedRef,
     setJourneyData,
 }: UseThumbnailGenerationParams) => {
+    const { onGenericError } = useBaseContext();
     const processedPhotoIdsRef = useRef<Set<number>>(new Set());
 
     useEffect(() => {
@@ -41,10 +43,8 @@ export const useThumbnailGeneration = ({
 
             if (photosNeedingThumbnails.length === 0) return;
 
-            const { thumbnailUpdates } = await generateNeededThumbnails({
-                photoClusters,
-                files,
-            });
+            const { thumbnailUpdates, thumbnailError } =
+                await generateNeededThumbnails({ photoClusters, files });
 
             if (thumbnailUpdates.size > 0) {
                 setJourneyData((prevData) =>
@@ -58,6 +58,10 @@ export const useThumbnailGeneration = ({
                 );
             }
 
+            if (thumbnailError) {
+                onGenericError(thumbnailError);
+            }
+
             processedPhotoIdsRef.current = new Set([
                 ...processedPhotoIdsRef.current,
                 ...currentPhotoIds,
@@ -66,5 +70,11 @@ export const useThumbnailGeneration = ({
         };
 
         void generateThumbs();
-    }, [photoClusters, files, thumbnailsGeneratedRef, setJourneyData]);
+    }, [
+        photoClusters,
+        files,
+        thumbnailsGeneratedRef,
+        setJourneyData,
+        onGenericError,
+    ]);
 };

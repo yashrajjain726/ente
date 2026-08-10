@@ -1,0 +1,6 @@
+[package]
+name = "ente-uniffi-log"
+edition = "2024"
+
+[dependencies]
+log = { workspace = true, features = ["std"] }

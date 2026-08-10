@@ -1,15 +1,41 @@
+import "dart:io" show Platform;
+
 import "package:ente_pure_utils/ente_pure_utils.dart";
 import "package:flutter/material.dart";
 import "package:flutter_map/flutter_map.dart";
 import "package:flutter_map_marker_cluster/flutter_map_marker_cluster.dart";
 import "package:latlong2/latlong.dart";
-import "package:maps_launcher/maps_launcher.dart";
 import "package:photos/ui/map/image_marker.dart";
 import "package:photos/ui/map/map_button.dart";
 import "package:photos/ui/map/map_gallery_tile.dart";
 import "package:photos/ui/map/map_gallery_tile_badge.dart";
 import "package:photos/ui/map/map_marker.dart";
 import "package:photos/ui/map/tile/layers.dart";
+import "package:url_launcher/url_launcher.dart";
+
+Future<bool> _launchCoordinates(double latitude, double longitude) async {
+  final uri = Platform.isAndroid
+      ? Uri(
+          scheme: 'geo',
+          host: 'ul',
+          queryParameters: {'q': '$latitude,$longitude'},
+        )
+      : Uri.https('maps.apple.com', '/', {
+          'll': '$latitude,$longitude',
+          'q': '$latitude, $longitude',
+        });
+
+  final LaunchMode mode;
+  if (await supportsLaunchMode(LaunchMode.externalNonBrowserApplication)) {
+    mode = LaunchMode.externalNonBrowserApplication;
+  } else if (await supportsLaunchMode(LaunchMode.externalApplication)) {
+    mode = LaunchMode.externalApplication;
+  } else {
+    mode = LaunchMode.platformDefault;
+  }
+
+  return launchUrl(uri, mode: mode);
+}
 
 class MapView extends StatefulWidget {
   final List<ImageMarker> imageMarkers;
@@ -162,7 +188,7 @@ class _MapViewState extends State<MapView> {
                   child: MapButton(
                     icon: Icons.navigation_outlined,
                     onPressed: () {
-                      MapsLauncher.launchCoordinates(
+                      _launchCoordinates(
                         widget.controller.camera.center.latitude,
                         widget.controller.camera.center.longitude,
                       );

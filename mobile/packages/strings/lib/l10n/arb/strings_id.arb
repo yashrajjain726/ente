@@ -713,7 +713,6 @@
   "machineLearning": "Pemelajaran mesin",
   "manage": "Atur",
   "manageDeviceStorage": "Mengelola cache perangkat",
-  "manageDeviceStorageDesc": "Tinjau dan hapus penyimpanan cache lokal.",
   "manageFamily": "Atur keluarga",
   "manageLink": "Atur link",
   "manageParticipants": "Atur",
@@ -980,8 +979,6 @@
       "userEmail": {}
     }
   },
-  "removeDuplicates": "Hapus duplikat",
-  "removeDuplicatesDesc": "Lihat dan hapus file yang sama persis.",
   "removeFromAlbum": "Hapus dari album",
   "removeFromAlbumTitle": "Hapus dari album?",
   "removeFromFavorite": "Hapus dari favorit",
@@ -1352,7 +1349,6 @@
   "viewAllExifData": "Lihat seluruh data EXIF",
   "viewer": "Pemirsa",
   "viewLargeFiles": "File berukuran besar",
-  "viewLargeFilesDesc": "Tampilkan file yang paling besar mengonsumsi ruang penyimpanan.",
   "viewLogs": "Lihat log",
   "@viewLogs": {
     "description": "Button to view logs"

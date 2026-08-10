@@ -56,6 +56,24 @@ Future<Set<int>> _getManualAssignmentFileIDsOfOtherPersons(
   return fileIDs;
 }
 
+Future<void> _hydrateFaceFilterMatches(FaceFilter filter) async {
+  if (filter.matchedUploadedIDs.isNotEmpty) {
+    return;
+  }
+
+  if (filter.personId != null) {
+    final fileIDs = await _getFileIDsOfPersonIncludingManualAssignments(
+      filter.personId!,
+    );
+    filter.matchedUploadedIDs.addAll(fileIDs);
+  } else if (filter.clusterId != null) {
+    final fileIDs = await MLDataDB.instance.getFileIDsOfClusterID(
+      filter.clusterId!,
+    );
+    filter.matchedUploadedIDs.addAll(fileIDs);
+  }
+}
+
 Future<List<EnteFile>> getFilteredFiles(
   List<HierarchicalSearchFilter> filters,
 ) async {
@@ -71,17 +89,7 @@ Future<List<EnteFile>> getFilteredFiles(
   for (HierarchicalSearchFilter filter in filters) {
     if (filter is FaceFilter && filter.matchedUploadedIDs.isEmpty) {
       try {
-        if (filter.personId != null) {
-          final fileIDs = await _getFileIDsOfPersonIncludingManualAssignments(
-            filter.personId!,
-          );
-          filter.matchedUploadedIDs.addAll(fileIDs);
-        } else if (filter.clusterId != null) {
-          final fileIDs = await mlDataDB.getFileIDsOfClusterID(
-            filter.clusterId!,
-          );
-          filter.matchedUploadedIDs.addAll(fileIDs);
-        }
+        await _hydrateFaceFilterMatches(filter);
       } catch (e) {
         logger.severe("Error in filtering face filter: $e");
       }
@@ -93,6 +101,8 @@ Future<List<EnteFile>> getFilteredFiles(
         int index = 0;
 
         for (final faceFilter in filter.faceFilters) {
+          await _hydrateFaceFilterMatches(faceFilter);
+
           if (index == 0) {
             intersectionOfSelectedFaceFiltersFileIDs =
                 faceFilter.matchedUploadedIDs;

@@ -23,7 +23,6 @@ export const passkeyVerificationRedirectURL = (
     accountsURL: string,
     passkeySessionID: string,
 ) => {
-    const clientPackage = clientPackageName;
     // In the desktop app, window.location.origin is the custom app protocol
     // origin, which doubles as the deeplink back into the app.
     const redirect = `${window.location.origin}/passkeys/finish`;
@@ -33,7 +32,7 @@ export const passkeyVerificationRedirectURL = (
         ? {}
         : { recover: `${window.location.origin}/passkeys/recover` };
     const params = new URLSearchParams({
-        clientPackage,
+        clientPackage: clientPackageName,
         passkeySessionID,
         redirect,
         ...recoverOption,
@@ -46,11 +45,8 @@ interface OpenPasskeyVerificationURLOptions {
     url: string;
 }
 
-// Passkeys are tied to web origins and do not work over the custom protocol
-// that the desktop app uses to serve the bundled web app. So the desktop app
-// (like the mobile app) opens the accounts app origin in the system browser,
-// and on successful verification the accounts app redirects back to the
-// desktop app via a registered custom protocol.
+// Passkeys do not work on the desktop app's custom protocol.
+// Complete the flow in the system browser and return through a deep link.
 export const openPasskeyVerificationURL = ({
     passkeySessionID,
     url,

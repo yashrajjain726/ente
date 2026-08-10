@@ -4,16 +4,15 @@ import "package:adaptive_theme/adaptive_theme.dart";
 import "package:ente_components/ente_components.dart";
 import "package:ente_pure_utils/ente_pure_utils.dart";
 import "package:ente_strings/ente_strings.dart";
+import "package:ente_ui/components/settings/theme_selector.dart";
+import "package:ente_ui/pages/language_selector_page.dart";
 import "package:flutter/foundation.dart";
 import "package:flutter/material.dart";
 import "package:hugeicons/hugeicons.dart";
 import "package:photos/app.dart";
 import "package:photos/locale.dart";
 import "package:photos/ui/settings/app_icon_selection_screen.dart";
-import "package:photos/ui/settings/components/settings_item.dart";
-import "package:photos/ui/settings/components/settings_page_scaffold.dart";
 import "package:photos/ui/settings/gallery_settings_screen.dart";
-import "package:photos/ui/settings/language_picker.dart";
 
 class AppearanceSettingsPage extends StatefulWidget {
   const AppearanceSettingsPage({super.key});
@@ -112,60 +111,26 @@ class _AppearanceSettingsPageState extends State<AppearanceSettingsPage> {
 }
 
 class _ThemePickerSheet extends StatelessWidget {
-  final AdaptiveThemeMode? currentThemeMode;
-  final Function(AdaptiveThemeMode) onThemeChanged;
-
   const _ThemePickerSheet({
     required this.currentThemeMode,
     required this.onThemeChanged,
   });
+
+  final AdaptiveThemeMode? currentThemeMode;
+  final ValueChanged<AdaptiveThemeMode> onThemeChanged;
 
   @override
   Widget build(BuildContext context) {
     return BottomSheetComponent(
       title: context.strings.theme,
       showCloseButton: false,
-      content: MenuGroupComponent(
-        items: [
-          _themeOption(
-            context,
-            title: context.strings.lightTheme,
-            isSelected: currentThemeMode == AdaptiveThemeMode.light,
-            onTap: () => _selectTheme(context, AdaptiveThemeMode.light),
-          ),
-          _themeOption(
-            context,
-            title: context.strings.darkTheme,
-            isSelected: currentThemeMode == AdaptiveThemeMode.dark,
-            onTap: () => _selectTheme(context, AdaptiveThemeMode.dark),
-          ),
-          _themeOption(
-            context,
-            title: context.strings.systemTheme,
-            isSelected: currentThemeMode == AdaptiveThemeMode.system,
-            onTap: () => _selectTheme(context, AdaptiveThemeMode.system),
-          ),
-        ],
+      content: ThemeSelector(
+        currentMode: currentThemeMode,
+        systemMode: AdaptiveThemeMode.system,
+        lightMode: AdaptiveThemeMode.light,
+        darkMode: AdaptiveThemeMode.dark,
+        onChanged: (themeMode) => _selectTheme(context, themeMode),
       ),
-    );
-  }
-
-  MenuComponent _themeOption(
-    BuildContext context, {
-    required String title,
-    required bool isSelected,
-    required VoidCallback onTap,
-  }) {
-    return MenuComponent(
-      title: title,
-      trailing: isSelected
-          ? HugeIcon(
-              icon: HugeIcons.strokeRoundedTick02,
-              color: context.componentColors.primary,
-              size: IconSizes.medium,
-            )
-          : null,
-      onTap: onTap,
     );
   }
 

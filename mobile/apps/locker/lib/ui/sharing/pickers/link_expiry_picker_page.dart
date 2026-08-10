@@ -1,9 +1,9 @@
 import 'package:ente_components/ente_components.dart';
 import "package:ente_strings/ente_strings.dart";
+import "package:ente_ui/components/date_time_picker.dart";
 import 'package:flutter/material.dart';
 import "package:locker/services/collections/collections_api_client.dart";
 import "package:locker/services/collections/models/collection.dart";
-import "package:locker/ui/viewer/date/date_time_picker.dart";
 import "package:locker/utils/error_sheet.dart";
 import "package:tuple/tuple.dart";
 
@@ -84,10 +84,10 @@ class _ItemsWidgetState extends State<ItemsWidget> {
         // need to manually select time
         if (expireAfterInMicroseconds < 0) {
           final now = DateTime.now();
-          final DateTime? picked = await showDatePickerSheet(
+          final DateTime? picked = await showDateTimePickerSheet(
             context,
-            initialDate: now,
-            minDate: now,
+            initialDateTime: now,
+            minDateTime: now,
           );
           final timeInMicrosecondsFromEpoch = picked?.microsecondsSinceEpoch;
           if (timeInMicrosecondsFromEpoch != null) {

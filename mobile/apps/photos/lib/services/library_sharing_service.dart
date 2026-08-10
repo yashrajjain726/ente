@@ -196,11 +196,7 @@ class LibrarySharingService implements LibrarySharingRepository {
 
   Future<void> unshareAlbumFromAll(Collection collection) async {
     final recipientUserIDs = collection.sharees
-        .map(
-          (sharee) =>
-              sharee.id ??
-              (throw StateError('A collection sharee has no user ID')),
-        )
+        .map((sharee) => sharee.id)
         .toList();
     for (final recipientUserID in recipientUserIDs) {
       final failedIDs = await unshareAlbums(
@@ -565,7 +561,7 @@ class LibrarySharingService implements LibrarySharingRepository {
   String _recipientEmail(int recipientUserID) {
     String? email;
     for (final user in _userService.getRelevantContacts()) {
-      if (user.id == recipientUserID) {
+      if (user.userID == recipientUserID) {
         email = knownContactEmailOrNull(user.email) ?? email;
       }
     }

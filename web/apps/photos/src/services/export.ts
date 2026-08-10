@@ -1060,7 +1060,8 @@ class ExportService {
         fileStream: ReadableStream,
         file: EnteFile,
     ) {
-        const fs = ensureElectron().fs;
+        const electron = ensureElectron();
+        const fs = electron.fs;
         const fileBlob = await new Response(fileStream).blob();
         const livePhoto = await decodeLivePhoto(fileFileName(file), fileBlob);
         const imageExportName = await safeFileName(
@@ -1085,7 +1086,6 @@ class ExportService {
             file,
         );
         await writeStream(
-            // @ts-ignore
             electron,
             joinPath(collectionExportPath, imageExportName),
             new Response(livePhoto.imageData).body,
@@ -1098,7 +1098,6 @@ class ExportService {
         );
         try {
             await writeStream(
-                // @ts-ignore
                 electron,
                 joinPath(collectionExportPath, videoExportName),
                 new Response(livePhoto.videoData).body,

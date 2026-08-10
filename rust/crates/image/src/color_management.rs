@@ -311,7 +311,7 @@ fn transform_u8_out_of_place(
     Ok(transformed)
 }
 
-/// Mirrors moxcms's crate-private `ColorProfile::has_device_to_pcs_lut`.
+// Mirrors moxcms's crate-private `ColorProfile::has_device_to_pcs_lut`.
 fn profile_has_device_to_pcs_lut(profile: &ColorProfile) -> bool {
     profile.lut_a_to_b_perceptual.is_some()
         || profile.lut_a_to_b_colorimetric.is_some()

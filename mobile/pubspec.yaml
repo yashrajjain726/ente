@@ -12,6 +12,7 @@ workspace:
   - apps/photos/plugins/ente_crypto
   - apps/photos/plugins/ente_feature_flag
   - apps/photos/plugins/ente_panorama_viewer
+  - apps/photos/plugins/ente_photos_platform
   - packages/accounts
   - packages/account_deletion
   - packages/backup_exclusion
@@ -34,6 +35,7 @@ workspace:
   - packages/lock_screen
   - packages/log_viewer
   - packages/logging
+  - packages/mail
   - packages/native_video_editor
   - packages/network
   - packages/qr

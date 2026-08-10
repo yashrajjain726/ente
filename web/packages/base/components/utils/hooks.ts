@@ -4,7 +4,8 @@ import { useCallback, useEffect, useEffectEvent, useState } from "react";
 export const useIsSmallWidth = () =>
     useMediaQuery(useTheme().breakpoints.down("sm"));
 
-// Only use this touchscreen heuristic where misclassification degrades gracefully.
+// This media query is only a heuristic: a tablet with a mouse can be
+// misclassified. Use it only when either result is safe.
 export const useIsTouchscreen = () =>
     useMediaQuery("(hover: none) and (pointer: coarse)", { noSsr: true });
 

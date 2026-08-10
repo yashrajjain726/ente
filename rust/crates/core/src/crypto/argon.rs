@@ -1,84 +1,43 @@
-//! Deriving keys from passwords with Argon2id.
-//!
-//! Argon2id stretches a low-entropy, human-chosen password into a key, spending
-//! tunable memory and time to make brute-force guessing expensive. Use it to
-//! turn a passphrase into a key; to derive subkeys from a key that is already
-//! high-entropy, use [`kdf`](super::kdf) instead.
-//!
-//! The same password, salt, and [`Params`] always produce the same key, so the
-//! salt and parameters must be stored alongside the data for other clients to
-//! reproduce it (see [`DerivedKey`]).
-
 use std::fmt;
 
 use argon2::{Algorithm, Argon2, Params as Argon2Params, Version};
 
 use crate::crypto::{Error, Key, Result, Salt};
 
-/// Argon2id cost parameters: how much memory to use and how many passes to make.
-///
-/// Higher values cost an attacker more but also slow legitimate derivation. Use
-/// the presets ([`INTERACTIVE`](Self::INTERACTIVE), [`MODERATE`](Self::MODERATE),
-/// [`SENSITIVE`](Self::SENSITIVE)) unless re-deriving a key with parameters that
-/// were stored alongside it, such as the server's key attributes.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Params {
-    /// Memory limit in bytes.
     pub mem_limit: u32,
-    /// Operations (iterations) limit.
     pub ops_limit: u32,
 }
 
 impl Params {
-    /// Parameters for interactive use (64 MiB, 2 ops): fast, for UI
-    /// responsiveness.
     pub const INTERACTIVE: Self = Self {
         mem_limit: 67_108_864,
         ops_limit: 2,
     };
 
-    /// Parameters for moderate-cost password gates (256 MiB, 3 ops).
     pub const MODERATE: Self = Self {
         mem_limit: 268_435_456,
         ops_limit: 3,
     };
 
-    /// Parameters for sensitive keys (1 GiB, 4 ops).
-    ///
-    /// New sensitive derivations should normally go through
-    /// [`derive_sensitive_key`], which adaptively trades memory for ops while
-    /// preserving this strength.
     pub const SENSITIVE: Self = Self {
         mem_limit: 1_073_741_824,
         ops_limit: 4,
     };
 
-    /// The cheapest parameters Argon2 accepts (8 KiB, 1 op).
-    ///
-    /// These provide essentially no brute-force protection, and are only for
-    /// inputs that are already high-entropy keys (where the KDF is a
-    /// formality), never for human-chosen passwords.
+    // Only for inputs that are already high-entropy, never passwords.
     pub const MIN: Self = Self {
         mem_limit: 8_192,
         ops_limit: 1,
     };
 }
 
-/// Minimum memory limit for adaptive sensitive derivation (128 MiB).
-///
-/// This matches the server-side floor for accepted account key attributes.
 const MEMLIMIT_SENSITIVE_MIN: u32 = 134_217_728;
 
-/// A key derived from a passphrase, along with the salt and parameters used.
-///
-/// The salt and parameters must be stored alongside the encrypted data: other
-/// clients need them to re-derive the same key.
 pub struct DerivedKey {
-    /// The derived key.
     pub key: Key,
-    /// The salt used for derivation.
     pub salt: Salt,
-    /// The Argon2 parameters used for derivation.
     pub params: Params,
 }
 
@@ -92,21 +51,8 @@ impl fmt::Debug for DerivedKey {
     }
 }
 
-/// Derive a key from `password` and `salt` with the given Argon2id `params`.
-///
-/// Deterministic: the same inputs always yield the same key, which is how other
-/// clients reproduce it. The result is a [`Key`], zeroized on drop. To make a
-/// new key, the `derive_*_key` helpers choose parameters and a salt for you.
-///
-/// # Errors
-///
-/// Returns
-/// [`InvalidKeyDerivationParams`](Error::InvalidKeyDerivationParams) if
-/// `params` fall below the accepted minimum or memory is not a multiple of 1024
-/// bytes.
-///
-/// Produces the same key as libsodium's `crypto_pwhash` with
-/// `crypto_pwhash_ALG_ARGON2ID13`.
+// Produces the same key as libsodium's `crypto_pwhash` with
+// `crypto_pwhash_ALG_ARGON2ID13`.
 pub fn derive_key(password: &str, salt: &Salt, params: Params) -> Result<Key> {
     derive_key_impl(password.as_bytes(), salt, params)
 }
@@ -135,10 +81,9 @@ fn derive_key_impl(password: &[u8], salt: &Salt, params: Params) -> Result<Key> 
         )));
     }
 
-    // Convert bytes to KiB (Argon2 uses KiB internally)
     let m_cost = params.mem_limit / 1024;
     let t_cost = params.ops_limit;
-    let p_cost = 1; // Parallelism degree
+    let p_cost = 1;
 
     let argon2_params = Argon2Params::new(m_cost, t_cost, p_cost, Some(Key::BYTES))
         .map_err(|e| Error::InvalidKeyDerivationParams(e.to_string()))?;
@@ -153,11 +98,6 @@ fn derive_key_impl(password: &[u8], salt: &Salt, params: Params) -> Result<Key> 
     Ok(Key::from_bytes(key))
 }
 
-/// Derive a key from `password` with [`Params::INTERACTIVE`] and a freshly
-/// generated salt.
-///
-/// Returns the key together with the salt and parameters used, which must be
-/// stored to reproduce it.
 pub fn derive_interactive_key(password: &str) -> Result<DerivedKey> {
     let salt = Salt::generate();
     let key = derive_key(password, &salt, Params::INTERACTIVE)?;
@@ -168,11 +108,6 @@ pub fn derive_interactive_key(password: &str) -> Result<DerivedKey> {
     })
 }
 
-/// Derive a key from `password` with [`Params::MODERATE`] and a freshly
-/// generated salt.
-///
-/// Returns the key together with the salt and parameters used, which must be
-/// stored to reproduce it.
 pub fn derive_moderate_key(password: &str) -> Result<DerivedKey> {
     let salt = Salt::generate();
     let key = derive_key(password, &salt, Params::MODERATE)?;
@@ -183,18 +118,6 @@ pub fn derive_moderate_key(password: &str) -> Result<DerivedKey> {
     })
 }
 
-/// Derive a high-security key from `password`, adapting the cost to the device.
-///
-/// Aims for [`Params::SENSITIVE`] strength but starts at moderate memory
-/// (256 MiB) with the ops limit scaled up to compensate, then halves memory and
-/// doubles ops whenever allocation fails, down to a 128 MiB floor (the
-/// server-side minimum for accepted account key attributes). Holding the
-/// product of memory and ops constant preserves the work factor while fitting
-/// low-memory devices, and matches the policy used by the web and Flutter
-/// clients so the same account derives consistently everywhere.
-///
-/// Returns the key together with the salt and parameters actually used, which
-/// must be stored to reproduce it.
 pub fn derive_sensitive_key(password: &str) -> Result<DerivedKey> {
     let salt = Salt::generate();
     derive_sensitive_adaptive(password.as_bytes(), &salt)
@@ -230,6 +153,8 @@ fn derive_sensitive_adaptive(password: &[u8], salt: &Salt) -> Result<DerivedKey>
         )));
     }
 
+    // The server rejects account key attributes below 128 MiB. Halving memory
+    // and doubling ops matches the web and Flutter fallback policy.
     let mut last_error = None;
     while mem_limit >= MEMLIMIT_SENSITIVE_MIN {
         let params = Params {
@@ -272,8 +197,6 @@ mod tests {
         let password = "correct horse battery staple";
         let salt = Salt::generate();
 
-        // Just checks the derivation succeeds; determinism and length are
-        // covered below (length is in the type).
         derive_key(password, &salt, Params::INTERACTIVE).unwrap();
     }
 

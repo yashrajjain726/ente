@@ -48,7 +48,11 @@ export const savedCollectionFiles = async (): Promise<EnteFile[]> => {
     // Zod parsing 200k self-written records costs about a second.
     let files = (await localForage.getItem<EnteFile[]>("files")) ?? [];
 
-    // TODO: Remove this June 2025 hidden-file migration when obsolete.
+    // Previously hidden files were stored separately. If that key is present,
+    // also read those files, and migrate them (save the concatenation to disk
+    // and delete the corresponding DB key).
+    //
+    // This migration was added Jun 2025, v1.7.14-beta (tag: Migration).
     const previousHiddenFiles =
         await localForage.getItem<EnteFile[]>("hidden-files");
     if (previousHiddenFiles) {

@@ -2,6 +2,10 @@ import "package:ente_components/ente_components.dart";
 import "package:ente_lock_screen/local_authentication_service.dart";
 import "package:ente_pure_utils/ente_pure_utils.dart";
 import "package:ente_strings/ente_strings.dart";
+import "package:ente_ui/components/settings/app_engagement_section.dart";
+import "package:ente_ui/components/settings/app_version_widget.dart";
+import "package:ente_ui/components/settings/social_icons_row.dart";
+import "package:ente_ui/pages/settings_search_page.dart";
 import "package:flutter/foundation.dart";
 import "package:flutter/material.dart";
 import "package:hugeicons/hugeicons.dart";
@@ -11,28 +15,25 @@ import "package:photos/emergency/emergency_page.dart";
 import "package:photos/models/user_details.dart";
 import "package:photos/service_locator.dart";
 import "package:photos/services/account/user_service.dart";
+import "package:photos/services/review_service.dart";
 import "package:photos/ui/account/email_entry_page.dart";
 import "package:photos/ui/account/login_page.dart";
 import "package:photos/ui/components/banners/offline_settings_banner.dart";
-import "package:photos/ui/components/settings/social_icons_row.dart";
 import "package:photos/ui/growth/referral_screen.dart";
 import "package:photos/ui/notification/toast.dart";
 import "package:photos/ui/settings/about/about_us_page.dart";
 import "package:photos/ui/settings/account/account_settings_page.dart";
-import "package:photos/ui/settings/app_version_widget.dart";
 import "package:photos/ui/settings/appearance/appearance_settings_page.dart";
 import "package:photos/ui/settings/backup/backup_settings_page.dart";
 import "package:photos/ui/settings/backup/free_space_options.dart";
 import "package:photos/ui/settings/cast/cast_settings_page.dart";
-import "package:photos/ui/settings/components/settings_item.dart";
-import "package:photos/ui/settings/components/settings_page_scaffold.dart";
 import "package:photos/ui/settings/debug/debug_settings_page.dart";
 import "package:photos/ui/settings/debug/ml_debug_settings_page.dart";
 import "package:photos/ui/settings/inherited_settings_state.dart";
 import "package:photos/ui/settings/memories_settings_screen.dart";
 import "package:photos/ui/settings/ml/machine_learning_settings_page.dart";
 import "package:photos/ui/settings/notification_settings_screen.dart";
-import "package:photos/ui/settings/search/settings_search_page.dart";
+import "package:photos/ui/settings/search/settings_search_registry.dart";
 import "package:photos/ui/settings/security/security_settings_page.dart";
 import "package:photos/ui/settings/storage_card_widget.dart";
 import "package:photos/ui/settings/streaming/video_streaming_settings_page.dart";
@@ -40,7 +41,6 @@ import "package:photos/ui/settings/support/help_support_page.dart";
 import "package:photos/ui/settings/widget_settings_screen.dart";
 import "package:photos/ui/sharing/verify_identity_dialog.dart";
 import "package:photos/utils/dialog_util.dart";
-import "package:url_launcher/url_launcher_string.dart";
 
 class SettingsPage extends StatelessWidget {
   final ValueNotifier<String?> emailNotifier;
@@ -151,7 +151,7 @@ class _SettingsBody extends StatelessWidget {
               const SizedBox(height: 8),
             ],
             // Engagement section
-            _buildEngagementCard(context),
+            AppEngagementSection(reviewUrl: ReviewService.url),
             const SizedBox(height: 8),
             // Support section
             _buildMenuItem(
@@ -215,7 +215,16 @@ class _SettingsBody extends StatelessWidget {
         icon: const HugeIcon(icon: HugeIcons.strokeRoundedSearch01),
         onTap: () {
           Navigator.of(context).push(
-            MaterialPageRoute(builder: (context) => const SettingsSearchPage()),
+            MaterialPageRoute(
+              builder: (context) => SettingsSearchPage(
+                items: SettingsSearchRegistry.getSearchableItems(context),
+                suggestions: SettingsSearchRegistry.getSuggestions(context),
+                onNavigate: (context, routeBuilder) {
+                  Navigator.of(context).pop();
+                  routeToPage(context, routeBuilder(context));
+                },
+              ),
+            ),
           );
         },
       ),
@@ -241,7 +250,6 @@ class _SettingsBody extends StatelessWidget {
     Widget? trailing,
     Future<void> Function()? onTap,
     bool showOnlyLoadingState = false,
-    bool shouldSurfaceExecutionStates = false,
     bool isDestructive = false,
   }) {
     return SettingsItem(
@@ -250,7 +258,6 @@ class _SettingsBody extends StatelessWidget {
       icon: icon,
       trailing: trailing,
       showOnlyLoadingState: showOnlyLoadingState,
-      shouldSurfaceExecutionStates: shouldSurfaceExecutionStates,
       isDestructive: isDestructive,
       onTap: onTap,
     );
@@ -347,7 +354,6 @@ class _SettingsBody extends StatelessWidget {
           title: context.strings.family,
           icon: HugeIcons.strokeRoundedUserMultiple,
           showOnlyLoadingState: true,
-          shouldSurfaceExecutionStates: true,
           onTap: () async {
             late final UserDetails userDetails;
             try {
@@ -459,31 +465,6 @@ class _SettingsBody extends StatelessWidget {
           }
         },
       ),
-    );
-  }
-
-  Widget _buildEngagementCard(BuildContext context) {
-    return MenuGroupComponent(
-      items: [
-        _buildMenuItem(
-          title: context.strings.merchandise,
-          icon: HugeIcons.strokeRoundedTShirt,
-          onTap: () async {
-            await launchUrlString(
-              "https://shop.ente.com",
-              mode: LaunchMode.externalApplication,
-            );
-          },
-        ),
-        _buildMenuItem(
-          title: context.strings.rateUs,
-          icon: HugeIcons.strokeRoundedStar,
-          onTap: () async {
-            final rateUrl = updateService.getRateDetails().item2;
-            await launchUrlString(rateUrl);
-          },
-        ),
-      ],
     );
   }
 

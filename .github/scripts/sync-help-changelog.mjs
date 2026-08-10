@@ -1,8 +1,5 @@
 #!/usr/bin/env node
 
-// Prepend a release's notes to the help-site changelog. Run by app-release.yml's
-// promote, with the published release body in RELEASE_BODY.
-
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";

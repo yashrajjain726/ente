@@ -6,6 +6,7 @@ import "package:ente_components/components/menu_component.dart";
 import "package:ente_contacts/contacts.dart" as contacts;
 import "package:ente_pure_utils/ente_pure_utils.dart";
 import "package:ente_strings/ente_strings.dart";
+import "package:ente_ui/components/loading_widget.dart";
 import "package:flutter/material.dart";
 import "package:hugeicons/hugeicons.dart";
 import "package:photos/core/event_bus.dart";
@@ -25,7 +26,6 @@ import "package:photos/services/photos_contacts_service.dart";
 import "package:photos/theme/colors.dart";
 import "package:photos/theme/ente_theme.dart";
 import "package:photos/ui/collections/album/row_item.dart";
-import "package:photos/ui/common/loading_widget.dart";
 import "package:photos/ui/viewer/actions/file_selection_overlay_bar.dart";
 import "package:photos/ui/viewer/gallery/empty_state.dart";
 import "package:photos/ui/viewer/gallery/gallery.dart";
@@ -307,13 +307,13 @@ class _ContactResultPageState extends State<ContactResultPage> {
       ),
     );
     if (updated is contacts.ContactRecord && mounted) {
-      final personData = PersonService.instance.getCachedPartialPersonData(
-        userID: _contactUserId,
-        email: _contactEmail,
+      final person = PersonService.instance.getCachedPersonForUser(
+        _contactUserId,
+        _contactEmail,
       );
       setState(() {
         _savedContact = updated;
-        _personId = personData?[PersonService.kPersonIDKey];
+        _personId = person?.remoteID;
       });
     }
   }

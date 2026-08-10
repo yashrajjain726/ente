@@ -10,6 +10,24 @@ pub struct ConfigModelPreset {
     pub mmproj_sha256: Option<String>,
 }
 
+#[derive(Debug, Clone, Copy, uniffi::Enum)]
+pub enum ModelRuntimeSurface {
+    Android,
+    Ios,
+}
+
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct ModelOption {
+    pub id: String,
+    pub title: String,
+}
+
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct ResolvedModelPolicy {
+    pub default_model: ModelOption,
+    pub visible_models: Vec<ModelOption>,
+}
+
 #[derive(Debug, Clone, uniffi::Record)]
 pub struct KnowledgeEmbeddingConfig {
     pub target_id: String,
@@ -42,10 +60,6 @@ pub struct ConfigDefaults {
     pub desktop_system_prompt_body: String,
     pub system_prompt_date_placeholder: String,
     pub session_summary_system_prompt: String,
-    pub mobile_default_model: ConfigModelPreset,
-    pub mobile_model_presets: Vec<ConfigModelPreset>,
-    pub desktop_default_model: ConfigModelPreset,
-    pub desktop_model_presets: Vec<ConfigModelPreset>,
     pub transcription_model: ConfigModelPreset,
     pub voice_activity_model: ConfigModelPreset,
     pub knowledge_embedding: KnowledgeEmbeddingConfig,
@@ -61,6 +75,33 @@ impl From<config::ModelPreset> for ConfigModelPreset {
             sha256: value.sha256,
             mmproj_url: value.mmproj_url,
             mmproj_sha256: value.mmproj_sha256,
+        }
+    }
+}
+
+impl From<ModelRuntimeSurface> for config::ModelRuntimeSurface {
+    fn from(value: ModelRuntimeSurface) -> Self {
+        match value {
+            ModelRuntimeSurface::Android => Self::Android,
+            ModelRuntimeSurface::Ios => Self::Ios,
+        }
+    }
+}
+
+impl From<config::ModelPreset> for ModelOption {
+    fn from(value: config::ModelPreset) -> Self {
+        Self {
+            id: value.id,
+            title: value.title,
+        }
+    }
+}
+
+impl From<config::ResolvedModelPolicy> for ResolvedModelPolicy {
+    fn from(value: config::ResolvedModelPolicy) -> Self {
+        Self {
+            default_model: value.default_model.into(),
+            visible_models: value.visible_models.into_iter().map(Into::into).collect(),
         }
     }
 }
@@ -107,18 +148,6 @@ impl From<config::Defaults> for ConfigDefaults {
             desktop_system_prompt_body: value.desktop_system_prompt_body,
             system_prompt_date_placeholder: value.system_prompt_date_placeholder,
             session_summary_system_prompt: value.session_summary_system_prompt,
-            mobile_default_model: value.mobile_default_model.into(),
-            mobile_model_presets: value
-                .mobile_model_presets
-                .into_iter()
-                .map(Into::into)
-                .collect(),
-            desktop_default_model: value.desktop_default_model.into(),
-            desktop_model_presets: value
-                .desktop_model_presets
-                .into_iter()
-                .map(Into::into)
-                .collect(),
             transcription_model: value.transcription_model.into(),
             voice_activity_model: value.voice_activity_model.into(),
             knowledge_embedding: value.knowledge_embedding.into(),
@@ -134,4 +163,26 @@ impl From<config::Defaults> for ConfigDefaults {
 #[uniffi::export]
 pub fn config_defaults() -> ConfigDefaults {
     config::defaults().into()
+}
+
+#[uniffi::export]
+pub fn resolve_model_policy(
+    surface: ModelRuntimeSurface,
+    total_memory_bytes: Option<u64>,
+) -> ResolvedModelPolicy {
+    config::resolve_model_policy(surface.into(), total_memory_bytes).into()
+}
+
+#[uniffi::export]
+pub fn resolve_effective_model_id(
+    surface: ModelRuntimeSurface,
+    total_memory_bytes: Option<u64>,
+    preferred_model_id: Option<String>,
+) -> String {
+    config::resolve_effective_model(
+        surface.into(),
+        total_memory_bytes,
+        preferred_model_id.as_deref(),
+    )
+    .id
 }

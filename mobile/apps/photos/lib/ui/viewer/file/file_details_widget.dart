@@ -4,6 +4,7 @@ import "dart:io";
 
 import "package:ente_components/ente_components.dart";
 import "package:ente_strings/ente_strings.dart";
+import "package:ente_ui/components/divider_widget.dart";
 import "package:exif_reader/exif_reader.dart";
 import "package:flutter/foundation.dart";
 import "package:flutter/material.dart";
@@ -24,7 +25,6 @@ import "package:photos/module/metadata/exif.dart";
 import "package:photos/module/metadata/video.dart";
 import "package:photos/service_locator.dart";
 import "package:photos/services/file_magic_service.dart";
-import "package:photos/ui/components/divider_widget.dart";
 import 'package:photos/ui/viewer/file/file_caption_widget.dart';
 import "package:photos/ui/viewer/file_details/added_by_widget.dart";
 import "package:photos/ui/viewer/file_details/albums_item_widget.dart";
@@ -401,15 +401,15 @@ class _FileDetailsWidgetState extends State<FileDetailsWidget> {
 
   void _generateExifForDetails(Map<String, IfdTag> exif) {
     if (exif["EXIF FocalLength"] != null) {
-      _exifData["focalLength"] =
-          (exif["EXIF FocalLength"]!.values.toList()[0] as Ratio).numerator /
-          (exif["EXIF FocalLength"]!.values.toList()[0] as Ratio).denominator;
+      _exifData["focalLength"] = _formatExifRatio(
+        exif["EXIF FocalLength"]!.values.toList()[0] as Ratio,
+      );
     }
 
     if (exif["EXIF FNumber"] != null) {
-      _exifData["fNumber"] =
-          (exif["EXIF FNumber"]!.values.toList()[0] as Ratio).numerator /
-          (exif["EXIF FNumber"]!.values.toList()[0] as Ratio).denominator;
+      _exifData["fNumber"] = _formatExifRatio(
+        exif["EXIF FNumber"]!.values.toList()[0] as Ratio,
+      );
     }
     final imageWidth = _firstPositiveDimensionTag(exif, const [
       "EXIF ExifImageWidth",
@@ -442,6 +442,14 @@ class _FileDetailsWidgetState extends State<FileDetailsWidget> {
     if (exif["EXIF ISOSpeedRatings"] != null) {
       _exifData['ISO'] = exif["EXIF ISOSpeedRatings"].toString();
     }
+  }
+
+  String _formatExifRatio(Ratio ratio) {
+    if (ratio.denominator == 0) {
+      return ratio.toString();
+    }
+    final value = ratio.numerator / ratio.denominator;
+    return value.toStringAsFixed(2).replaceFirst(RegExp(r"\.?0+$"), "");
   }
 
   /// Formats exposure time from EXIF data into a human-readable string.

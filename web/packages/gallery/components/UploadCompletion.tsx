@@ -10,7 +10,13 @@ import {
     type Theme,
 } from "@mui/material";
 import type { PreUploadSkippedFile } from "ente-base/types/ipc";
+import { SlideUpTransition } from "ente-new/photos/components/mui/SlideUpTransition";
 import { t } from "i18next";
+import {
+    uploadSheetMediaQuery,
+    uploadSheetPaperSx,
+    useIsUploadSheet,
+} from "./upload-progress/bottom-sheet";
 import {
     finishedStatKinds,
     uploadCompletionCounts,
@@ -36,9 +42,10 @@ export function UploadCompletion({
         preUploadSkippedFiles,
     );
     const hasReviewableUploads = counts.failed > 0 || counts.skipped > 0;
+    const isSheet = useIsUploadSheet();
 
     const handleClose: DialogProps["onClose"] = (_, reason) => {
-        if (reason != "backdropClick") onClose();
+        if (reason != "backdropClick" || isSheet) onClose();
     };
 
     if (!open) {
@@ -51,7 +58,10 @@ export function UploadCompletion({
             onClose={handleClose}
             maxWidth={false}
             aria-labelledby="upload-completion-title"
-            slotProps={{ paper: { sx: completionDialogPaperSx } }}
+            slots={isSheet ? { transition: SlideUpTransition } : undefined}
+            slotProps={{
+                paper: { sx: [completionDialogPaperSx, uploadSheetPaperSx] },
+            }}
         >
             <Stack sx={completionDialogContentSx}>
                 <Stack direction="row" sx={{ justifyContent: "flex-end" }}>
@@ -153,7 +163,16 @@ const completionDialogPaperSx = (theme: Theme) => ({
     }),
 });
 
-const completionDialogContentSx = { p: "20px", gap: 3, color: "text.base" };
+const completionDialogContentSx = {
+    p: "20px",
+    gap: 3,
+    color: "text.base",
+    [uploadSheetMediaQuery]: {
+        p: "12px 16px",
+        pb: "calc(20px + env(safe-area-inset-bottom, 0px))",
+        overflowY: "auto",
+    },
+};
 
 const completionCloseButtonSx = (theme: Theme) => ({
     width: 38,
@@ -184,7 +203,6 @@ const completionStatsGridSx = {
     display: "grid",
     gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
     gap: "10px",
-    "@media (max-width: 420px)": { gridTemplateColumns: "1fr" },
 };
 
 const completionStatSx = (theme: Theme) => ({
@@ -194,6 +212,7 @@ const completionStatSx = (theme: Theme) => ({
     gap: "4px",
     borderRadius: "16px",
     backgroundColor: "background.paper",
+    [uploadSheetMediaQuery]: { px: 1 },
     ...theme.applyStyles("dark", { backgroundColor: "#282828" }),
 });
 

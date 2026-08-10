@@ -28,7 +28,6 @@ pub(crate) fn run_face_embedding(
 
     let face_input_size = FACE_INPUT_SIZE as i64;
     let expected_input_len = (face_input_size * face_input_size * FACE_INPUT_CHANNELS) as usize;
-    let mut face_embedding = runtime.face_embedding_session()?;
     for (aligned, face_result) in aligned_faces.into_iter().zip(face_results.iter_mut()) {
         if aligned.len() != expected_input_len {
             return Err(MlError::Preprocess(format!(
@@ -38,11 +37,14 @@ pub(crate) fn run_face_embedding(
             )));
         }
 
-        let (shape, mut embedding) = onnx::run_f32(
-            &mut face_embedding,
-            aligned,
-            [1, face_input_size, face_input_size, FACE_INPUT_CHANNELS],
-        )?;
+        let input = onnx::PreparedF32Input::new(aligned);
+        let (shape, mut embedding) = runtime.with_face_embedding_session(|session| {
+            onnx::run_f32(
+                session,
+                &input,
+                [1, face_input_size, face_input_size, FACE_INPUT_CHANNELS],
+            )
+        })?;
         if shape.first() != Some(&1) || embedding.is_empty() {
             return Err(MlError::Postprocess(format!(
                 "invalid single-face embedding tensor shape {:?} for data length {}",

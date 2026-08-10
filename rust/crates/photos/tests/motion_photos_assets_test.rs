@@ -1,17 +1,14 @@
 use ente_photos::{extract_motion_video_from_path, get_motion_video_index_from_path};
 use std::path::{Path, PathBuf};
 
+// External fixtures live beside the repository unless overridden.
 fn fixture_dir() -> Option<PathBuf> {
-    // Optional override for CI or custom local layouts.
     if let Some(path) = std::env::var_os("ENTE_TEST_FIXTURES_DIR") {
         return Some(PathBuf::from(path).join("media/motion-photos/v1/files"));
     }
 
-    // CARGO_MANIFEST_DIR points to `<repo>/rust/crates/photos`.
-    // We resolve `<repo>/..../test-fixtures/media/motion-photos/v1/files`,
-    // where `test-fixtures` is expected to be a sibling of the main repo root.
     let manifest_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let repo_root = manifest_dir.parent()?.parent()?.parent()?; // photos -> crates -> rust -> <repo root>
+    let repo_root = manifest_dir.parent()?.parent()?.parent()?;
     let parent_of_repo = repo_root.parent()?;
     Some(
         parent_of_repo
@@ -85,7 +82,6 @@ fn validates_known_motion_photo_indices_when_fixtures_present() {
         .expect("video present");
     assert!(motion_heic_video.len() > 1_000_000);
 
-    // Dual-MP4 motion photo: two embedded MP4s, full video is the second (larger) one.
     let Some(dual_mp4) = fixture("dual_mp4_video_last.jpg") else {
         eprintln!("Skipping: external fixture dual_mp4_video_last.jpg not present");
         return;
@@ -101,7 +97,6 @@ fn validates_known_motion_photo_indices_when_fixtures_present() {
         .expect("video present");
     assert!(dual_video.len() > 1_000_000);
 
-    // Dual-MP4 motion photo: two embedded MP4s, full video is the first (larger) one.
     let Some(dual_mp4_first) = fixture("dual_mp4_video_first.jpg") else {
         eprintln!("Skipping: external fixture dual_mp4_video_first.jpg not present");
         return;

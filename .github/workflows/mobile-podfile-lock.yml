@@ -1,7 +1,5 @@
 name: "Verify Podfile.lock (Mobile)"
 
-# Verify each app's Podfile.lock is in sync with its Flutter plugins.
-
 on:
     pull_request:
         paths:

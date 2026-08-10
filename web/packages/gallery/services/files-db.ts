@@ -4,7 +4,6 @@ import {
     CollectionPrivateMagicMetadataData,
     CollectionPublicMagicMetadataData,
     CollectionShareeMagicMetadataData,
-    ignore,
     RemoteCollectionUser,
     RemotePublicURL,
 } from "ente-media/collection";
@@ -81,7 +80,10 @@ const LocalCollection = z
         ),
     })
     .transform((c) => {
-        // TODO: Remove this June 2025 local collection migration when obsolete.
+        // Old data stored locally contained fields which are no longer needed.
+        // Do some zod gymnastics to drop these when reading (so that they're
+        // not written back the next time). This code was added June 2025,
+        // 1.7.14-beta, and can be removed after a bit (tag: Migration).
         const {
             encryptedKey,
             keyDecryptionNonce,
@@ -91,14 +93,6 @@ const LocalCollection = z
             isDeleted,
             ...rest
         } = c;
-        ignore([
-            encryptedKey,
-            keyDecryptionNonce,
-            encryptedName,
-            nameDecryptionNonce,
-            attributes,
-            isDeleted,
-        ]);
         return rest;
     });
 
@@ -120,7 +114,15 @@ export const LocalEnteFile = z.looseObject({
 
 export const LocalEnteFiles = z.array(LocalEnteFile);
 
-// TODO: Remove this June 2025 local file migration when obsolete.
+// Two transforms when reading files from the DB, both added June 2025,
+// 1.7.14-beta, prune eventually (tag: Migration):
+//
+// 1. Patch metadata of legacy entries. Freshly fetched files get this
+//    transform in decryptRemoteFile; this handles items that were already
+//    present locally.
+// 2. Drop fields we no longer forward when parsing the remote object. The
+//    collections DB does this via its Zod read transform; files are not
+//    routed through Zod when reading, so it happens here instead.
 export const transformFilesIfNeeded = (files: EnteFile[]) =>
     isFilesTransformNeeded(files) ? files.map(transformFile) : files;
 
@@ -143,7 +145,6 @@ const transformFile = (file: EnteFile & { isDeleted?: unknown }) => {
         pubMagicMetadata,
         ...rest
     } = file;
-    ignore(isDeleted);
     const metadata = transformDecryptedMetadataJSON(
         file.id,
         origMetadata,

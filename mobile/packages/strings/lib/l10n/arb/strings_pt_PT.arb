@@ -1130,7 +1130,6 @@
   },
   "manage": "Gerir",
   "manageDeviceStorage": "Gerir cache do aparelho",
-  "manageDeviceStorageDesc": "Reveja e limpe o armazenamento de cache local.",
   "manageFamily": "Gerir família",
   "manageLink": "Gerir link",
   "manageParticipants": "Gerir",
@@ -1593,8 +1592,6 @@
       "userEmail": {}
     }
   },
-  "removeDuplicates": "Remover duplicados",
-  "removeDuplicatesDesc": "Rever e remover ficheiros que sejam duplicados exatos.",
   "removeFromAlbum": "Remover do álbum",
   "removeFromAlbumTitle": "Remover do álbum",
   "removeFromFavorite": "Remover dos favoritos",
@@ -2238,7 +2235,6 @@
   "viewAllExifData": "Ver todos os dados EXIF",
   "viewer": "Visualizador",
   "viewLargeFiles": "Ficheiros grandes",
-  "viewLargeFilesDesc": "Ver os ficheiros que estão a consumir a maior quantidade de armazenamento.",
   "viewLogs": "Ver logs",
   "@viewLogs": {
     "description": "Button to view logs"

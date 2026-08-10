@@ -36,4 +36,4 @@ sudo systemctl reload nginx
 
 ## Administration
 
-Login into the [dashboard](https://status.ente.com/dashboard) for administration.
+Log in to the [dashboard](https://status.ente.com/dashboard) for administration.

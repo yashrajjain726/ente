@@ -8,7 +8,7 @@ on:
             - "release/auth-v*"
     workflow_dispatch:
     schedule:
-        # Run every weekday at ~3:45 AM IST
+        # Weekdays at ~3:45 AM IST
         - cron: "15 22 * * 0-4"
 
 permissions:

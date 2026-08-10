@@ -2,6 +2,7 @@ import "dart:async";
 
 import "package:ente_icons/ente_icons.dart";
 import "package:ente_strings/ente_strings.dart";
+import "package:ente_ui/components/loading_widget.dart";
 import "package:flutter/material.dart";
 import "package:flutter/services.dart";
 import "package:logging/logging.dart";
@@ -13,7 +14,6 @@ import "package:photos/models/social/reaction.dart";
 import "package:photos/models/social/social_data_provider.dart";
 import "package:photos/theme/colors.dart";
 import "package:photos/theme/ente_theme.dart";
-import "package:photos/ui/common/loading_widget.dart";
 import "package:photos/ui/notification/toast.dart";
 import "package:photos/ui/sharing/user_avator_widget.dart";
 import "package:photos/ui/social/comment_likes_bottom_sheet.dart";
@@ -21,7 +21,7 @@ import "package:photos/ui/social/widgets/comment_actions_popup.dart";
 import "package:photos/ui/social/widgets/comment_like_count_capsule.dart";
 import "package:photos/ui/social/widgets/delete_comment_confirmation_dialog.dart";
 import "package:photos/ui/social/widgets/resolved_social_user_name.dart";
-import "package:photos/utils/social/relative_time_formatter.dart";
+import "package:photos/utils/relative_time_formatter.dart";
 
 final _logger = Logger("CommentBubbleWidget");
 
@@ -828,7 +828,9 @@ class _Header extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = getEnteColorScheme(context);
     final textTheme = getEnteTextTheme(context);
-    final timestamp = formatRelativeTime(createdAt);
+    final timestamp = formatCompactRelativeTime(
+      DateTime.fromMicrosecondsSinceEpoch(createdAt),
+    );
 
     if (isOwnComment) {
       return Align(
@@ -897,25 +899,13 @@ class _Header extends StatelessWidget {
       mainAxisSize: MainAxisSize.max,
       children: [
         if (!isOwnComment) ...[
-          UserAvatarWidget(
-            user,
-            currentUserID: currentUserID,
-            type: AvatarType.regular,
-            thumbnailView: true,
-            addStroke: false,
-          ),
+          UserAvatarWidget(user, type: AvatarType.regular),
           const SizedBox(width: 10),
           Flexible(child: headerText),
         ] else ...[
           Flexible(child: headerText),
           const SizedBox(width: 10),
-          UserAvatarWidget(
-            user,
-            currentUserID: currentUserID,
-            type: AvatarType.regular,
-            thumbnailView: true,
-            addStroke: false,
-          ),
+          UserAvatarWidget(user, type: AvatarType.regular),
         ],
       ],
     );

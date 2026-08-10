@@ -7,13 +7,11 @@ import (
 )
 
 func TestResolvePath(t *testing.T) {
-	// Get current working directory for testing relative paths
 	cwd, err := os.Getwd()
 	if err != nil {
 		t.Fatalf("Failed to get current working directory: %v", err)
 	}
 
-	// Get home directory for testing ~ expansion
 	home, err := os.UserHomeDir()
 	if err != nil {
 		t.Fatalf("Failed to get home directory: %v", err)
@@ -109,7 +107,6 @@ func TestResolvePath(t *testing.T) {
 				return
 			}
 
-			// Clean both paths for comparison to handle path separator differences
 			expectedClean := filepath.Clean(tt.expected)
 			resultClean := filepath.Clean(result)
 
@@ -117,7 +114,6 @@ func TestResolvePath(t *testing.T) {
 				t.Errorf("Expected %q, got %q", expectedClean, resultClean)
 			}
 
-			// Verify the result is an absolute path
 			if !filepath.IsAbs(result) {
 				t.Errorf("Result %q is not an absolute path", result)
 			}

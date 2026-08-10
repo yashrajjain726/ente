@@ -2,10 +2,8 @@ name: "Sync Crowdin (Mobile)"
 
 on:
     schedule:
-        # Run Mondays at ~6:20 AM IST
-        # See: [Note: Run workflow on specific days of the week]
+        # Mondays at ~6:20 AM IST
         - cron: "50 0 * * 1"
-    # Also allow manually running the workflow.
     workflow_dispatch:
 
 permissions:

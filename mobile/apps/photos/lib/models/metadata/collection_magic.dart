@@ -13,6 +13,9 @@ const muteKey = "mute";
 
 const orderKey = "order";
 
+const albumDescriptionKey = "caption";
+const maxAlbumDescriptionLength = 200;
+
 class CollectionMagicMetadata {
   // 0 -> visible
   // 1 -> archived
@@ -68,7 +71,15 @@ class CollectionPubMagicMetadata {
   // layout for public link sharing (masonry, grouped, continuous, trip)
   String? layout;
 
-  CollectionPubMagicMetadata({this.asc, this.coverID, this.layout});
+  // description shown below the album name
+  String? description;
+
+  CollectionPubMagicMetadata({
+    this.asc,
+    this.coverID,
+    this.layout,
+    this.description,
+  });
 
   Map<String, dynamic> toJson() {
     final Map<String, dynamic> result = {"asc": asc ?? false};
@@ -77,6 +88,9 @@ class CollectionPubMagicMetadata {
     }
     if (layout != null) {
       result["layout"] = layout!;
+    }
+    if (description != null) {
+      result[albumDescriptionKey] = description!;
     }
     return result;
   }
@@ -92,6 +106,7 @@ class CollectionPubMagicMetadata {
       asc: map["asc"] as bool?,
       coverID: map["coverID"],
       layout: map["layout"] as String? ?? "masonry",
+      description: map[albumDescriptionKey] as String?,
     );
   }
 }

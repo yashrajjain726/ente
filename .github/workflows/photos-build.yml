@@ -8,7 +8,7 @@ on:
             - "release/photos-v*"
     workflow_dispatch:
     schedule:
-        # Run every weekday at ~2:35 AM IST
+        # Weekdays at ~2:35 AM IST
         - cron: "5 21 * * 0-4"
 
 permissions:

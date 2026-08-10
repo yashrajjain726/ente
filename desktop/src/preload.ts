@@ -3,6 +3,8 @@
 // Node's ReadableStream types; see main/utils/stream.ts.
 /// <reference lib="dom" />
 
+// Keep the exposed bridge in sync with web/packages/base/types/ipc.ts.
+
 import { contextBridge, ipcRenderer, webUtils } from "electron/renderer";
 
 import type { IpcRendererEvent } from "electron";

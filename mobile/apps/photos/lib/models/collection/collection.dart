@@ -127,6 +127,11 @@ class Collection {
 
   bool get hasCover => (pubMagicMetadata.coverID ?? 0) > 0;
 
+  String? get displayDescription {
+    final description = pubMagicMetadata.description?.trim();
+    return description == null || description.isEmpty ? null : description;
+  }
+
   // hasSharees returns true if the collection is shared with other ente users
   bool get hasSharees => sharees.isNotEmpty;
 
@@ -155,12 +160,8 @@ class Collection {
         !hasSharees;
   }
 
-  List<User> getSharees() {
-    return sharees;
-  }
-
   bool isOwner(int userID) {
-    return (owner.id ?? -100) == userID;
+    return owner.id == userID;
   }
 
   bool isAdmin(int userID) {

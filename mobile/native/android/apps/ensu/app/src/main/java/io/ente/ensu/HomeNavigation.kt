@@ -195,7 +195,7 @@ internal fun HomeNavigation(
                     popExitTransition = { backExit() }
                 ) {
                     ModelSettingsScreen(
-                        defaults = configDefaults,
+                        totalMemoryBytes = appState.chat.deviceCapability.totalMemoryBytes,
                         state = appState.modelSettings,
                         onSave = { modelSettings ->
                             store.updateModelSettings(modelSettings)

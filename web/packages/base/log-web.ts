@@ -1,5 +1,5 @@
 import { buildEnvGitSHA, isDevBuild } from "ente-base/env";
-import log from "ente-base/log";
+import log, { attachRustLogHook } from "ente-base/log";
 import { appName, appNames } from "./app";
 
 export const logStartupBanner = (userID?: number) => {
@@ -46,6 +46,8 @@ export const logUnhandledErrorsAndRejections = (attach: boolean) => {
 
 // Worker promise rejections are only observed when attached inside the worker.
 export const logUnhandledErrorsAndRejectionsInWorker = () => {
+    attachRustLogHook();
+
     const handleError = (event: ErrorEvent) => {
         log.error("Unhandled error", event.error);
     };

@@ -10,7 +10,6 @@ use crate::{
 
 const DATABASE: &str = "ente_test";
 
-/// A temporary local Postgres, torn down on drop.
 pub struct Postgres {
     inner: PostgreSQL,
 }

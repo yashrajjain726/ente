@@ -18,7 +18,6 @@ type ClICtrl struct {
 
 func (c *ClICtrl) Init() error {
 	tempPath := filepath.Join(GetCLITempPath(), "ente-download")
-	// create temp folder if not exists
 	if _, err := os.Stat(tempPath); os.IsNotExist(err) {
 		err = os.Mkdir(tempPath, 0755)
 		if err != nil {

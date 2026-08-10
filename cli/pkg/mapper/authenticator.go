@@ -14,7 +14,6 @@ func MapRemoteAuthEntityToString(ctx context.Context, authEntity models.AuthEnti
 		return nil, fmt.Errorf("failed to decrypt auth enityt %s: %v", authEntity.ID, err)
 	}
 	decryptedStr := string(decrypted)
-	// json decode the string
 	var jsonDecodedStr string
 	err = json.Unmarshal([]byte(decryptedStr), &jsonDecodedStr)
 	if err != nil {

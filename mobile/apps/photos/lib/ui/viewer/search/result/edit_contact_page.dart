@@ -5,6 +5,7 @@ import "package:ente_components/ente_components.dart";
 import "package:ente_contacts/contacts.dart" as contacts;
 import "package:ente_pure_utils/ente_pure_utils.dart";
 import "package:ente_strings/ente_strings.dart";
+import "package:ente_ui/components/loading_widget.dart";
 import "package:flutter/material.dart";
 import "package:hugeicons/hugeicons.dart";
 import "package:logging/logging.dart";
@@ -19,7 +20,6 @@ import "package:photos/services/machine_learning/face_ml/person/person_service.d
 import "package:photos/services/photos_contacts_service.dart";
 import "package:photos/services/search_service.dart";
 import "package:photos/theme/ente_theme.dart";
-import "package:photos/ui/common/loading_widget.dart";
 import "package:photos/ui/components/action_sheet_widget.dart";
 import "package:photos/ui/components/buttons/button_widget.dart";
 import "package:photos/ui/components/models/button_type.dart";
@@ -233,6 +233,7 @@ class _EditContactPageState extends State<EditContactPage> {
       label: trimmedName.isNotEmpty ? trimmedName : widget.email,
       email: widget.email,
       userID: widget.contactUserId,
+      currentUserID: Configuration.instance.getUserID(),
       currentUserEmail: Configuration.instance.getEmail(),
     );
 

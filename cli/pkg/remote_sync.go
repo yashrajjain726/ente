@@ -93,7 +93,7 @@ func (c *ClICtrl) fetchRemoteFiles(ctx context.Context) error {
 					maxUpdated = file.UpdationTime
 				}
 				if isFirstSync && file.IsRemovedFromAlbum() {
-					// on first sync, no need to sync delete markers
+					// A first sync has no local album entries to delete.
 					continue
 				}
 				albumEntry := model.AlbumFileEntry{AlbumID: album.ID, FileID: file.ID, IsDeleted: file.IsRemovedFromAlbum(), SyncedLocally: false}

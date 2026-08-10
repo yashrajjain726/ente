@@ -6,7 +6,6 @@ import "package:hugeicons/hugeicons.dart";
 import "package:logging/logging.dart";
 import "package:photos/core/constants.dart";
 import "package:photos/ui/notification/toast.dart";
-import "package:photos/ui/settings/components/settings_page_scaffold.dart";
 import "package:photos/ui/settings/support/no_mail_app_sheet.dart";
 import "package:photos/utils/email_util.dart";
 
@@ -144,7 +143,14 @@ class _ReportIssuePageState extends State<ReportIssuePage> {
 
       if (_attachLogs) {
         if (!mounted) return;
-        logsZipFilePath = await getZippedLogsFile(context);
+        logsZipFilePath = await getZippedLogsFile(
+          context,
+          reportText: buildSupportReportText(
+            to: recipientEmail,
+            subject: subject,
+            body: body,
+          ),
+        );
         logsLabel = l10n.export;
       }
 
@@ -161,7 +167,6 @@ class _ReportIssuePageState extends State<ReportIssuePage> {
       } else {
         if (!mounted) return;
         didOpenComposer = await sendComposedEmail(
-          context,
           to: recipientEmail,
           subject: subject,
           body: body,

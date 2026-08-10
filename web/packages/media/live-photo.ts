@@ -30,7 +30,6 @@ const potentialVideoExtensions = [
     "webm",
     "3gp",
     "3g2",
-    "avi",
     "ogv",
     "mpg",
     "mp",

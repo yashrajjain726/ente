@@ -1,10 +1,8 @@
 import "package:adaptive_theme/adaptive_theme.dart";
 import "package:ente_components/ente_components.dart";
 import "package:ente_strings/ente_strings.dart";
+import "package:ente_ui/components/settings/theme_selector.dart";
 import "package:flutter/material.dart";
-import "package:hugeicons/hugeicons.dart";
-import "package:locker/ui/settings/components/settings_item.dart";
-import "package:locker/ui/settings/components/settings_page_scaffold.dart";
 
 class ThemeSettingsPage extends StatefulWidget {
   const ThemeSettingsPage({super.key});
@@ -30,41 +28,15 @@ class _ThemeSettingsPageState extends State<ThemeSettingsPage> {
   @override
   Widget build(BuildContext context) {
     final l10n = context.strings;
-    final colors = context.componentColors;
-
     return SettingsPageScaffold(
       title: l10n.theme,
       children: [
-        MenuGroupComponent(
-          items: [
-            SettingsItem(
-              title: l10n.systemTheme,
-              icon: HugeIcons.strokeRoundedSmartPhone01,
-              showChevron: false,
-              trailing: currentThemeMode == AdaptiveThemeMode.system
-                  ? Icon(Icons.check, color: colors.primary)
-                  : null,
-              onTap: () => _setTheme(AdaptiveThemeMode.system),
-            ),
-            SettingsItem(
-              title: l10n.lightTheme,
-              icon: HugeIcons.strokeRoundedSun03,
-              showChevron: false,
-              trailing: currentThemeMode == AdaptiveThemeMode.light
-                  ? Icon(Icons.check, color: colors.primary)
-                  : null,
-              onTap: () => _setTheme(AdaptiveThemeMode.light),
-            ),
-            SettingsItem(
-              title: l10n.darkTheme,
-              icon: HugeIcons.strokeRoundedMoon02,
-              showChevron: false,
-              trailing: currentThemeMode == AdaptiveThemeMode.dark
-                  ? Icon(Icons.check, color: colors.primary)
-                  : null,
-              onTap: () => _setTheme(AdaptiveThemeMode.dark),
-            ),
-          ],
+        ThemeSelector(
+          currentMode: currentThemeMode,
+          systemMode: AdaptiveThemeMode.system,
+          lightMode: AdaptiveThemeMode.light,
+          darkMode: AdaptiveThemeMode.dark,
+          onChanged: _setTheme,
         ),
       ],
     );

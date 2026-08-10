@@ -86,7 +86,6 @@ export const getLocationName = async (
 
         return result;
     } catch {
-        // Fallback on error
         return { place: "Unknown", country: "Unknown" };
     }
 };

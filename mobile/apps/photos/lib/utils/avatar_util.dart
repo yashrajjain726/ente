@@ -22,13 +22,16 @@ class AvatarIdentity {
     required String label,
     required String? email,
     required int? userID,
+    int? currentUserID,
     required String? currentUserEmail,
     String? personID,
   }) {
     final normalizedEmail = normalizeAvatarEmail(email);
-    final role =
-        normalizedEmail != null &&
-            normalizedEmail == normalizeAvatarEmail(currentUserEmail)
+    final isCurrentUser =
+        (userID != null && userID > 0 && userID == currentUserID) ||
+        (normalizedEmail != null &&
+            normalizedEmail == normalizeAvatarEmail(currentUserEmail));
+    final role = isCurrentUser
         ? AvatarIdentityRole.currentUser
         : AvatarIdentityRole.standard;
     return AvatarIdentity._(
@@ -44,7 +47,7 @@ class AvatarIdentity {
     );
   }
 
-  factory AvatarIdentity.publicUploader({required String label}) {
+  factory AvatarIdentity.publicUploader(String label) {
     return AvatarIdentity._(
       label: label,
       key: avatarIdentityKey(name: label),

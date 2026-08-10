@@ -2,7 +2,6 @@ import { decryptBox, decryptMetadataJSON } from "ente-base/crypto";
 import log from "ente-base/log";
 import { nullishToBlank, nullToUndefined } from "ente-utils/transform";
 import { z } from "zod";
-import { ignore } from "./collection";
 import {
     fileFileName,
     FileMetadata,
@@ -97,16 +96,14 @@ export const decryptRemoteFile = async (
         id,
         encryptedKey,
         keyDecryptionNonce,
+        // isDeleted only matters in the diff response, and it has already been
+        // acted on before we get here.
         isDeleted,
         metadata: encryptedMetadata,
         magicMetadata: encryptedMagicMetadata,
         pubMagicMetadata: encryptedPubMagicMetadata,
         ...rest
     } = remoteFile;
-
-    // isDeleted only matters in the diff response, and it has already been
-    // acted on before we get here.
-    ignore(isDeleted);
 
     const key = await decryptBox(
         { encryptedData: encryptedKey, nonce: keyDecryptionNonce },

@@ -1,8 +1,3 @@
-//! Shared account flow orchestration built on [`crate::client::AccountsClient`].
-//!
-//! This layer is intended for interactive CLI/e2e flows. Callers that need
-//! raw server `code/message/status` should prefer [`crate::client::AccountsClient`].
-
 use ente_core::b64;
 use ente_core::crypto::{self, SecretVec, secretbox};
 use std::fmt;
@@ -27,12 +22,9 @@ use crate::{
 
 const SRP_A_LEN: usize = 512;
 
-/// Purpose of an OTP prompt.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum OtpPurpose {
-    /// OTP for login/email MFA.
     Login,
-    /// OTP for signup.
     Signup,
 }
 
@@ -45,52 +37,34 @@ impl OtpPurpose {
     }
 }
 
-/// Purpose of a TOTP prompt.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TotpPurpose {
-    /// TOTP during login.
     Login,
-    /// TOTP during initial setup.
     Setup,
 }
 
-/// Supported second-factor methods during login.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SecondFactorMethod {
-    /// TOTP auth app code.
     Totp,
-    /// Passkey verification.
     Passkey,
 }
 
-/// UI adapter for interactive account flows.
 pub trait AuthFlowUi {
-    /// Read an email OTP from the user.
     fn read_email_otp(&mut self, email: &str, purpose: OtpPurpose, resent: bool) -> Result<String>;
-    /// Read a TOTP code from the user.
     fn read_totp_code(&mut self, purpose: TotpPurpose) -> Result<String>;
-    /// Display a retryable error and continue.
     fn report_retryable_error(&mut self, message: &str) -> Result<()>;
-    /// Let the user choose a second-factor method.
     fn choose_second_factor(
         &mut self,
         methods: &[SecondFactorMethod],
     ) -> Result<SecondFactorMethod>;
-    /// Show a passkey verification URL.
     fn present_passkey_verification(&mut self, url: &str) -> Result<()>;
-    /// Wait until the user has attempted passkey verification.
     fn wait_for_passkey_verification(&mut self) -> Result<()>;
-    /// Present a TOTP secret to the user.
     fn present_totp_secret(&mut self, secret_code: &str, qr_code: &str) -> Result<()>;
 }
 
-/// Parameters for account creation.
 pub struct CreateAccountParams {
-    /// Email address to register.
     pub email: String,
-    /// Password used for signup.
     pub password: Zeroizing<String>,
-    /// Optional referral source.
     pub source: Option<String>,
 }
 
@@ -104,11 +78,8 @@ impl fmt::Debug for CreateAccountParams {
     }
 }
 
-/// Parameters for login.
 pub struct LoginParams {
-    /// Email address to login.
     pub email: String,
-    /// Password for the account.
     pub password: Zeroizing<String>,
 }
 
@@ -121,11 +92,8 @@ impl fmt::Debug for LoginParams {
     }
 }
 
-/// Parameters for TOTP setup.
 pub struct SetupTwoFactorParams {
-    /// Master key for the account.
     pub master_key: SecretVec,
-    /// Optional cached key attributes.
     pub key_attributes: Option<KeyAttributes>,
 }
 
@@ -138,17 +106,11 @@ impl fmt::Debug for SetupTwoFactorParams {
     }
 }
 
-/// Parameters for password changes.
 pub struct ChangePasswordParams {
-    /// Email address of the account.
     pub email: String,
-    /// New password.
     pub password: Zeroizing<String>,
-    /// Current master key bytes.
     pub master_key: SecretVec,
-    /// Current key attributes.
     pub key_attributes: KeyAttributes,
-    /// Whether to logout other devices.
     pub log_out_other_devices: bool,
 }
 
@@ -164,11 +126,8 @@ impl fmt::Debug for ChangePasswordParams {
     }
 }
 
-/// Result of a password-change flow.
 pub struct ChangePasswordResult {
-    /// Updated key attributes.
     pub key_attributes: KeyAttributes,
-    /// Fresh SRP attributes fetched from remote.
     pub srp_attributes: SrpAttributes,
 }
 
@@ -181,11 +140,8 @@ impl fmt::Debug for ChangePasswordResult {
     }
 }
 
-/// Parameters for session-validity checks.
 pub struct CheckSessionValidityParams {
-    /// Email address used to fetch fresh SRP attributes.
     pub email: String,
-    /// Locally saved SRP attributes.
     pub local_srp_attributes: SrpAttributes,
 }
 
@@ -198,32 +154,21 @@ impl fmt::Debug for CheckSessionValidityParams {
     }
 }
 
-/// Outcome of a session-validity check.
 #[derive(Debug)]
 #[expect(clippy::large_enum_variant)]
 pub enum SessionValidity {
-    /// Token is invalid.
     Invalid,
-    /// Session is valid and password unchanged.
     Valid,
-    /// Session is valid but password was changed elsewhere.
     ValidButPasswordChanged {
-        /// Fresh key attributes from remote.
         updated_key_attributes: KeyAttributes,
-        /// Fresh SRP attributes from remote.
         updated_srp_attributes: SrpAttributes,
     },
 }
 
-/// Authenticated account returned by shared flows.
 pub struct AuthenticatedAccount {
-    /// User ID.
     pub user_id: i64,
-    /// Full key attributes.
     pub key_attributes: KeyAttributes,
-    /// Decrypted account secrets.
     pub secrets: AccountSecrets,
-    /// Recovery key, if derivable.
     pub recovery_key: Option<String>,
 }
 
@@ -238,13 +183,9 @@ impl fmt::Debug for AuthenticatedAccount {
     }
 }
 
-/// Result of setting up TOTP.
 pub struct SetupTwoFactorResult {
-    /// Secret code shown to the user.
     pub secret_code: String,
-    /// QR code payload.
     pub qr_code: String,
-    /// Recovery key used to encrypt the TOTP secret.
     pub recovery_key: String,
 }
 
@@ -258,11 +199,8 @@ impl fmt::Debug for SetupTwoFactorResult {
     }
 }
 
-/// Result of creating a new recovery key for old accounts.
 pub struct RecoveryKeyResult {
-    /// Fresh recovery key in hex.
     pub recovery_key: String,
-    /// Updated key attributes including recovery-key fields.
     pub key_attributes: KeyAttributes,
 }
 
@@ -275,7 +213,6 @@ impl fmt::Debug for RecoveryKeyResult {
     }
 }
 
-/// Shared high-level account flow orchestration.
 pub struct AuthFlow<'a, U> {
     client: &'a AccountsClient,
     ui: &'a mut U,
@@ -285,12 +222,10 @@ impl<'a, U> AuthFlow<'a, U>
 where
     U: AuthFlowUi,
 {
-    /// Create a new shared account flow instance.
     pub fn new(client: &'a AccountsClient, ui: &'a mut U) -> Self {
         Self { client, ui }
     }
 
-    /// Create a new account.
     pub async fn create_account(
         &mut self,
         params: CreateAccountParams,
@@ -299,7 +234,6 @@ where
             .await
     }
 
-    /// Create a new account after the caller has already sent and collected a signup OTP.
     pub async fn create_account_with_otp(
         &mut self,
         params: CreateAccountParams,
@@ -321,7 +255,6 @@ where
         .await
     }
 
-    /// Login to an existing account.
     pub async fn login(&mut self, params: LoginParams) -> Result<AuthenticatedAccount> {
         let srp_attrs = self.client.get_srp_attributes(&params.email).await?;
 
@@ -352,7 +285,6 @@ where
         self.build_authenticated_account(auth_response, &kek)
     }
 
-    /// Setup TOTP two-factor authentication.
     pub async fn setup_two_factor(
         &mut self,
         params: SetupTwoFactorParams,
@@ -394,7 +326,6 @@ where
         }
     }
 
-    /// Change the account password and update SRP/key attributes on remote.
     pub async fn change_password(
         &self,
         params: ChangePasswordParams,
@@ -460,7 +391,6 @@ where
         })
     }
 
-    /// Check if the current session is still valid and whether password changed elsewhere.
     pub async fn check_session_validity(
         &self,
         params: CheckSessionValidityParams,
@@ -484,12 +414,10 @@ where
         Ok(SessionValidity::Valid)
     }
 
-    /// Change the authenticated user's email address.
     pub async fn change_email(&self, email: &str, ott: &str) -> Result<()> {
         self.client.change_email(email, ott).await
     }
 
-    /// Create a new recovery key for old accounts that do not have one yet.
     pub async fn create_recovery_key(
         &self,
         master_key: &[u8],
@@ -525,7 +453,6 @@ where
         })
     }
 
-    /// Get the server-side two-factor recovery payload for a pending second-factor session.
     pub async fn get_two_factor_recovery(
         &self,
         session_id: &str,
@@ -536,7 +463,6 @@ where
             .await
     }
 
-    /// Remove/bypass the second factor using a recovery key input.
     pub async fn recover_two_factor(
         &self,
         two_factor_type: TwoFactorType,
@@ -562,17 +488,14 @@ where
         self.client.remove_two_factor(&request).await
     }
 
-    /// Return whether the authenticated user has TOTP enabled.
     pub async fn get_two_factor_status(&self) -> Result<bool> {
         self.client.get_two_factor_status().await
     }
 
-    /// Disable TOTP for the authenticated user.
     pub async fn disable_two_factor(&self) -> Result<()> {
         self.client.disable_two_factor().await
     }
 
-    /// Get passkey recovery status.
     pub async fn get_passkey_recovery_status(&self) -> Result<bool> {
         Ok(self
             .client
@@ -581,7 +504,6 @@ where
             .is_passkey_recovery_enabled)
     }
 
-    /// Configure passkey recovery by encrypting a reset secret with the user's recovery key.
     pub async fn configure_passkey_recovery(
         &self,
         secret: &str,
@@ -600,12 +522,10 @@ where
         self.client.configure_passkey_recovery(&request).await
     }
 
-    /// Get the accounts-token response used to open the accounts broker.
     pub async fn get_accounts_token(&self) -> Result<crate::models::AccountsTokenResponse> {
         self.client.get_accounts_token().await
     }
 
-    /// Poll passkey verification status.
     pub async fn check_passkey_status(&self, session_id: &str) -> Result<AuthResponse> {
         self.client.check_passkey_status(session_id).await
     }
@@ -903,7 +823,6 @@ where
     }
 }
 
-/// Build the passkey verification URL for an accounts broker.
 pub fn build_passkey_verification_url(
     accounts_url: &str,
     passkey_session_id: &str,

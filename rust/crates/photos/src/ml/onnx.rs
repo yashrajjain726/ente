@@ -42,18 +42,16 @@ use crate::ml::webgpu;
 #[cfg(any(target_os = "ios", target_os = "macos", test))]
 const COREML_CACHE_SCHEMA: &str = "ort-1_28-mlprogram-all-default-v1";
 const COREML_CACHE_COMPLETE_MARKER: &str = ".ente-cache-complete";
-/// The name ONNX Runtime's CoreML EP gives the compiled model it stores
-/// inside each generated MLProgram package directory in the cache
-/// (`model.mm` `CompileOrReadCachedModel`).
+// The name ONNX Runtime's CoreML EP gives the compiled model it stores
+// inside each generated MLProgram package directory in the cache
+// (`model.mm` `CompileOrReadCachedModel`).
 const COREML_CACHE_COMPILED_MODEL: &str = "compiled_model.mlmodelc";
-/// The weight blob file name inside an ORT-generated `.mlpackage`
-/// (`model_builder.cc` writes `@model_path/weights/weight.bin`).
+// The weight blob file name inside an ORT-generated `.mlpackage`
+// (`model_builder.cc` writes `@model_path/weights/weight.bin`).
 const COREML_PACKAGE_WEIGHT_BLOB: &str = "weight.bin";
 #[cfg(any(target_os = "ios", target_os = "macos"))]
 const ENABLE_PERSISTENT_COREML_CACHE: bool = true;
 
-/// The FP16 representation is created lazily and retained so that a shared
-/// preprocessing result only pays the conversion cost once.
 pub(crate) struct PreparedF32Input {
     f32_data: Vec<f32>,
     f16_data: OnceCell<Vec<half::f16>>,
@@ -114,8 +112,8 @@ pub(crate) enum ExecutionMode {
     CpuOnly,
 }
 
-/// Identifies the successful attempt's preferred provider, not its registered
-/// fallback providers, for result attribution.
+// Identifies the successful attempt's preferred provider, not its registered
+// fallback providers, for result attribution.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[allow(dead_code)] // Accelerated variants are constructed only on their target OS.
 pub(crate) enum ExecutionProvider {
@@ -198,9 +196,9 @@ pub(crate) fn build_session(
     )))
 }
 
-/// A CoreML self-test failure is treated as construction failure so the caller
-/// invalidates the possibly corrupt persistent cache. WebGPU validation stays
-/// inside its crash-canary window instead.
+// A CoreML self-test failure is treated as construction failure so the caller
+// invalidates the possibly corrupt persistent cache. WebGPU validation stays
+// inside its crash-canary window instead.
 fn build_and_validate_session(model_path: &str, attempt: ProviderAttempt) -> MlResult<Session> {
     #[cfg(any(
         target_os = "android",
@@ -240,8 +238,8 @@ fn build_and_validate_session(model_path: &str, attempt: ProviderAttempt) -> MlR
     Ok(session)
 }
 
-/// The durable canary remains armed through construction and self-test, so
-/// crashes and soft failures both count toward quarantine.
+// The durable canary remains armed through construction and self-test, so
+// crashes and soft failures both count toward quarantine.
 #[cfg(any(target_os = "android", target_os = "linux", target_os = "windows"))]
 fn build_webgpu_session_with_canary(
     model_path: &str,
@@ -450,7 +448,7 @@ fn model_file_label(model_path: &str) -> &str {
         .unwrap_or(model_path)
 }
 
-/// Shared with the generator so its inference path stays identical to devices.
+// Shared with the generator so its inference path stays identical to devices.
 pub(crate) fn run_golden_tensor(
     session: &mut Session,
     input_shape: &[i64],
@@ -591,7 +589,7 @@ fn coreml_provider(
     (provider.build().error_on_failure(), prepared_cache_dir)
 }
 
-/// Disabling the feature must also reclaim caches created by earlier releases.
+// Disabling the feature must also reclaim caches created by earlier releases.
 #[cfg(any(target_os = "ios", target_os = "macos"))]
 fn remove_persistent_coreml_cache(model_path: &str) {
     let Some(coreml_root) = coreml_cache_root(Path::new(model_path))
@@ -661,7 +659,8 @@ fn platform_default_attempts(
     attempts
 }
 
-/// Missing goldens fail closed, usually indicating they were not regenerated after an update.
+// Missing goldens fail closed, usually indicating they were not regenerated
+// after an update.
 #[cfg(any(
     target_os = "android",
     target_os = "ios",
@@ -743,7 +742,7 @@ fn prepare_coreml_cache_directory(
     Ok(cache_dir)
 }
 
-/// Rebuild unmarked entries so ORT cannot reuse a package interrupted mid-build.
+// Rebuild unmarked entries so ORT cannot reuse a package interrupted mid-build.
 #[cfg(any(target_os = "ios", target_os = "macos", test))]
 fn prepare_coreml_cache_entry(cache_dir: &Path) -> std::io::Result<()> {
     if cache_dir.exists() && !coreml_cache_complete_marker(cache_dir).is_file() {
@@ -752,8 +751,8 @@ fn prepare_coreml_cache_entry(cache_dir: &Path) -> std::io::Result<()> {
     std::fs::create_dir_all(cache_dir)
 }
 
-/// Trim before marking complete so a crash mid-trim forces a clean rebuild.
-/// Trim failures only waste disk space and therefore do not fail the load.
+// Trim before marking complete so a crash mid-trim forces a clean rebuild.
+// Trim failures only waste disk space and therefore do not fail the load.
 fn finalize_coreml_cache(cache_dir: &Path, model_path: &str) {
     match trim_coreml_cache_weights(cache_dir) {
         Ok(0) => {}
@@ -785,10 +784,10 @@ fn finalize_coreml_cache(cache_dir: &Path, model_path: &str) {
     }
 }
 
-/// On a warm cache hit ONNX Runtime 1.28 only checks that the generated
-/// package directory and loads `compiled_model.mlmodelc`, making the package's
-/// own weights redundant. Uncompiled packages remain intact; incompatible
-/// future runtimes will fail construction and trigger cache invalidation.
+// On a warm cache hit ONNX Runtime 1.28 only checks that the generated
+// package directory and loads `compiled_model.mlmodelc`, making the package's
+// own weights redundant. Uncompiled packages remain intact; incompatible
+// future runtimes will fail construction and trigger cache invalidation.
 fn trim_coreml_cache_weights(cache_dir: &Path) -> std::io::Result<u64> {
     let mut reclaimed = 0;
     // ORT 1.28 stores the compiled MLProgram inside
@@ -813,9 +812,9 @@ fn trim_coreml_cache_weights(cache_dir: &Path) -> std::io::Result<u64> {
     Ok(reclaimed)
 }
 
-/// Truncates `weight.bin` files under `dir`, never descending into
-/// `.mlmodelc` bundles: the compiled model keeps its own `weights/weight.bin`
-/// copy, and that one is exactly what warm loads read, so it must survive.
+// Truncates `weight.bin` files under `dir`, never descending into
+// `.mlmodelc` bundles: the compiled model keeps its own `weights/weight.bin`
+// copy, and that one is exactly what warm loads read, so it must survive.
 fn truncate_weight_blobs(dir: &Path) -> std::io::Result<u64> {
     let mut reclaimed = 0;
     for entry in std::fs::read_dir(dir)? {
@@ -853,7 +852,8 @@ fn coreml_cache_complete_marker(cache_dir: &Path) -> PathBuf {
     cache_dir.join(COREML_CACHE_COMPLETE_MARKER)
 }
 
-/// Use Library/Caches for eviction and backup exclusion, or temp for unusual layouts.
+// Use Library/Caches for eviction and backup exclusion, or temp for unusual
+// layouts.
 #[cfg(any(target_os = "ios", target_os = "macos", test))]
 fn coreml_cache_root(model_path: &Path) -> PathBuf {
     let cache_base = model_path
@@ -869,9 +869,9 @@ fn coreml_cache_root(model_path: &Path) -> PathBuf {
         .join(COREML_CACHE_SCHEMA)
 }
 
-/// Include the filename and file metadata in the directory name because ONNX
-/// Runtime's internal CoreML cache key does not necessarily change when only
-/// model weights change.
+// Include the filename and file metadata in the directory name because ONNX
+// Runtime's internal CoreML cache key does not necessarily change when only
+// model weights change.
 #[cfg(any(target_os = "ios", target_os = "macos", test))]
 fn coreml_model_cache_key(model_path: &Path) -> std::io::Result<String> {
     use std::time::UNIX_EPOCH;
@@ -909,7 +909,7 @@ fn sanitize_cache_component(value: &str) -> String {
         .collect()
 }
 
-/// Schema bumps must not orphan the previous version's large cache trees.
+// Schema bumps must not orphan the previous version's large cache trees.
 #[cfg(any(target_os = "ios", target_os = "macos", test))]
 fn prune_stale_coreml_schema_directories(
     coreml_root: &Path,
@@ -984,9 +984,9 @@ fn build_session_with_providers(model_path: &str, attempt: ProviderAttempt) -> M
     Ok(session)
 }
 
-/// Guard against execution providers that return NaN or infinity instead of
-/// failing. The error message matches `is_execution_provider_failure` so the
-/// runtime advances to the next execution provider fallback.
+// Guard against execution providers that return NaN or infinity instead of
+// failing. The error message matches `is_execution_provider_failure` so the
+// runtime advances to the next execution provider fallback.
 fn ensure_finite_f32(data: &[f32]) -> MlResult<()> {
     if data.iter().copied().all(f32::is_finite) {
         return Ok(());
@@ -1018,15 +1018,16 @@ fn session_expects_f16(session: &Session) -> bool {
 
 pub(crate) fn run_f32<const N: usize>(
     session: &mut Session,
-    input: Vec<f32>,
+    input: &PreparedF32Input,
     input_shape: [i64; N],
 ) -> MlResult<(Vec<i64>, Vec<f32>)> {
     let outputs = if session_expects_f16(session) {
-        let f16_input = Vec::<half::f16>::from_f32_slice(&input);
-        let input_tensor = Tensor::<half::f16>::from_array((input_shape, f16_input))?;
+        let input_tensor =
+            TensorRef::<half::f16>::from_array_view((input_shape, input.f16_data()))?;
         session.run(ort::inputs![input_tensor])?
     } else {
-        let input_tensor = Tensor::<f32>::from_array((input_shape, input))?;
+        let input_tensor =
+            TensorRef::<f32>::from_array_view((input_shape, input.f32_data.as_slice()))?;
         session.run(ort::inputs![input_tensor])?
     };
 

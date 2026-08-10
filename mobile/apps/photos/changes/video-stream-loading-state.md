@@ -1,1 +1,0 @@
-- Fix a black screen flash while loading videos on Android. This issue only affected video stream playback.

@@ -1,6 +1,7 @@
 use crate::ml::{
     error::{MlError, MlResult},
     onnx,
+    postprocess::MAX_DETECTIONS_PER_IMAGE,
     preprocess::{YOLO_INPUT_SIZE, YoloInput},
     runtime::MlRuntimeView,
     types::FaceDetection,
@@ -13,13 +14,14 @@ pub(crate) fn run_face_detection(
     runtime: &MlRuntimeView<'_>,
     input: &YoloInput,
 ) -> MlResult<Vec<FaceDetection>> {
-    let mut face_detection = runtime.face_detection_session()?;
-    onnx::with_prepared_float_output(
-        &mut face_detection,
-        &input.tensor,
-        [1, 3, YOLO_INPUT_SIZE as i64, YOLO_INPUT_SIZE as i64],
-        |_output_shape, output_data| postprocess_face_detections(output_data, input),
-    )
+    runtime.with_face_detection_session(|session| {
+        onnx::with_prepared_float_output(
+            session,
+            &input.tensor,
+            [1, 3, YOLO_INPUT_SIZE as i64, YOLO_INPUT_SIZE as i64],
+            |_output_shape, output_data| postprocess_face_detections(output_data, input),
+        )
+    })
 }
 
 fn postprocess_face_detections(
@@ -99,37 +101,31 @@ fn postprocess_face_tensor<T: onnx::FloatTensorData>(
         });
     }
 
-    Ok(naive_non_max_suppression(detections, IOU_THRESHOLD))
+    Ok(greedy_non_max_suppression(detections, IOU_THRESHOLD))
 }
 
-fn naive_non_max_suppression(
+fn greedy_non_max_suppression(
     mut detections: Vec<FaceDetection>,
     iou_threshold: f32,
 ) -> Vec<FaceDetection> {
     detections.sort_by(|a, b| b.score.total_cmp(&a.score));
 
-    let mut suppressed = vec![false; detections.len()];
-    for i in 0..detections.len() {
-        if suppressed[i] {
+    let mut retained = Vec::with_capacity(detections.len().min(MAX_DETECTIONS_PER_IMAGE));
+    for detection in detections {
+        if retained
+            .iter()
+            .any(|existing| calculate_iou(existing, &detection) >= iou_threshold)
+        {
             continue;
         }
 
-        for j in (i + 1)..detections.len() {
-            if suppressed[j] {
-                continue;
-            }
-            let iou = calculate_iou(&detections[i], &detections[j]);
-            if iou >= iou_threshold {
-                suppressed[j] = true;
-            }
+        retained.push(detection);
+        if retained.len() == MAX_DETECTIONS_PER_IMAGE {
+            break;
         }
     }
 
-    detections
-        .into_iter()
-        .enumerate()
-        .filter_map(|(index, detection)| (!suppressed[index]).then_some(detection))
-        .collect()
+    retained
 }
 
 fn calculate_iou(a: &FaceDetection, b: &FaceDetection) -> f32 {
@@ -155,4 +151,55 @@ fn calculate_iou(a: &FaceDetection, b: &FaceDetection) -> f32 {
         return 0.0;
     }
     intersection_area / union_area
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        FaceDetection, IOU_THRESHOLD, MAX_DETECTIONS_PER_IMAGE, greedy_non_max_suppression,
+    };
+
+    #[test]
+    fn face_nms_retains_the_highest_scoring_hundred_detections() {
+        let detections = (0..=MAX_DETECTIONS_PER_IMAGE)
+            .map(|index| FaceDetection {
+                score: index as f32,
+                box_xyxy: separated_box(index),
+                keypoints: [[0.0; 2]; 5],
+            })
+            .collect();
+
+        let retained = greedy_non_max_suppression(detections, IOU_THRESHOLD);
+
+        assert_eq!(retained.len(), MAX_DETECTIONS_PER_IMAGE);
+        assert_eq!(retained.first().unwrap().score, 100.0);
+        assert_eq!(retained.last().unwrap().score, 1.0);
+    }
+
+    #[test]
+    fn face_nms_suppresses_lower_scoring_overlaps() {
+        let retained = greedy_non_max_suppression(
+            vec![
+                FaceDetection {
+                    score: 0.8,
+                    box_xyxy: [0.0, 0.0, 1.0, 1.0],
+                    keypoints: [[0.0; 2]; 5],
+                },
+                FaceDetection {
+                    score: 0.9,
+                    box_xyxy: [0.0, 0.0, 1.0, 1.0],
+                    keypoints: [[0.0; 2]; 5],
+                },
+            ],
+            IOU_THRESHOLD,
+        );
+
+        assert_eq!(retained.len(), 1);
+        assert_eq!(retained[0].score, 0.9);
+    }
+
+    fn separated_box(index: usize) -> [f32; 4] {
+        let x = index as f32 * 2.0;
+        [x, 0.0, x + 1.0, 1.0]
+    }
 }

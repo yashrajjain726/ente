@@ -12,7 +12,7 @@ import {
 import InfoIcon from "@mui/icons-material/Info";
 import KeyIcon from "@mui/icons-material/Key";
 import { Paper, Stack, Typography, styled } from "@mui/material";
-import { TwoFactorAuthorizationResponse } from "ente-accounts/services/user";
+import { TwoFactorAuthorizationResponse } from "ente-accounts-rs/services/user";
 import { CenteredFill } from "ente-base/components/containers";
 import { EnteLogo } from "ente-base/components/EnteLogo";
 import { ActivityIndicator } from "ente-base/components/mui/ActivityIndicator";
@@ -42,11 +42,8 @@ const Page = () => {
 
     const [status, setStatus] = useState<Status>("loading");
 
-    // Safari can reject the WebAuthn call with "NotAllowedError: The document
-    // is not focused" even when it has just opened the page and brought it to
-    // the front. So the flow is split into two phases: the state phase 2 needs
-    // is stashed in this continuation, and phase 2 runs again after an
-    // explicit user click (the "needUserFocus" status).
+    // Safari can reject WebAuthn on a newly opened page as unfocused.
+    // Preserve the server response so a user click can retry the browser step.
     interface Continuation {
         redirectURL: URL;
         clientPackage: string;

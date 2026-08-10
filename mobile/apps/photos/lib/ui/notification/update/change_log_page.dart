@@ -3,6 +3,7 @@ import "package:ente_strings/ente_strings.dart";
 import 'package:flutter/material.dart';
 import 'package:hugeicons/hugeicons.dart';
 import "package:photos/service_locator.dart";
+import "package:photos/services/review_service.dart";
 import 'package:photos/ui/notification/update/change_log_entry.dart';
 import 'package:photos/ui/notification/update/change_log_strings.dart';
 
@@ -60,7 +61,7 @@ class _ChangeLogPageState extends State<ChangeLogPage> {
           shouldSurfaceExecutionStates: false,
           onTap: () async {
             if (isLocalGallery) {
-              await updateService.launchReviewUrl();
+              await ReviewService.launch();
             } else if (Navigator.of(context).canPop()) {
               Navigator.of(context).pop(ChangeLogPageAction.openReferrals);
             }

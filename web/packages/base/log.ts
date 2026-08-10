@@ -34,9 +34,7 @@ const messageWithError = (message: string, e?: unknown) => {
         const st = e.stack;
         if (st) {
             // V8 stacks already start with "Name: message".
-            es = st.startsWith(es)
-                ? es.concat(st.slice(es.length))
-                : [es, st].join("\n");
+            es = st.startsWith(es) ? st : [es, st].join("\n");
         }
     } else {
         // Best-effort for arbitrary thrown values.
@@ -90,4 +88,25 @@ export default {
     warn: logWarn,
     info: logInfo,
     debug: logDebug,
+};
+
+const rustLogGlobal = globalThis as typeof globalThis & {
+    enteRustLog?: (level: string, target: string, message: string) => void;
+};
+
+export const attachRustLogHook = () => {
+    rustLogGlobal.enteRustLog = (level, target, message) => {
+        const m = `[rust] ${target}: ${message}`;
+        switch (level) {
+            case "ERROR":
+                logError(m);
+                break;
+            case "WARN":
+                logWarn(m);
+                break;
+            case "INFO":
+                logInfo(m);
+                break;
+        }
+    };
 };

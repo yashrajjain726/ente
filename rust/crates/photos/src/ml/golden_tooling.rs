@@ -7,18 +7,16 @@ use crate::ml::{clip, golden, golden_data::GOLDEN_ENTRIES, onnx};
 
 pub use crate::ml::golden::GoldenMetric;
 
-/// Each generated entry stores this seed, so devices do not depend on it.
 const GOLDEN_NOISE_SEED: u64 = 0x0060_1DE2_5EED_2026;
 
 const GENERATED_FILE_HEADER: &str = "\
-//! GENERATED FILE — do not edit by hand.
-//!
-//! Regenerate with:
-//!   cargo run -p ente-photos --example ml_goldens -- generate
-//!
-//! TODO: the pet models are CPU-only and therefore have no golden entries
-//! yet; they must get entries here before they are moved off CPU-only
-//! execution (see `MlRuntime::new` in runtime.rs).
+// Generated file. Do not edit by hand.
+//
+// Regenerate with:
+//   cargo run -p ente-photos --example ml_goldens -- generate
+//
+// TODO: Pet models have no golden entries because they are CPU-only. Add
+// entries before moving them off CPU (see `MlRuntime::new` in runtime.rs).
 
 use crate::ml::golden::{GoldenEntry, GoldenInput, GoldenMetric};
 
@@ -89,7 +87,7 @@ pub struct PinnedModel {
     pub sha256: String,
 }
 
-/// Metadata-only CI guard; it does not detect numeric CPU-provider drift.
+// This checks metadata only, not numeric CPU-provider drift.
 pub fn verify_goldens_against_pins(pins: &[PinnedModel]) -> Vec<String> {
     let mut failures = Vec::new();
 
@@ -205,8 +203,8 @@ fn build_cpu_session(model_path: &str) -> Result<ort::session::Session, String> 
         .map_err(|error| format!("building CPU session for '{model_path}': {error}"))
 }
 
-/// The first input's static shape. Golden inputs require fully static shapes
-/// so that device and generator tensors are identical.
+// Golden inputs require a fully static shape so device and generator tensors
+// match.
 fn static_input_shape(
     session: &mut ort::session::Session,
     file_name: &str,

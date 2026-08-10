@@ -32,6 +32,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/ente/museum/ente"
 	"github.com/ente/museum/pkg/repo"
+	"github.com/ente/museum/pkg/repo/remotestore"
 	enteArray "github.com/ente/museum/pkg/utils/array"
 	"github.com/ente/museum/pkg/utils/s3config"
 	"github.com/ente/museum/pkg/utils/time"
@@ -45,6 +46,7 @@ type FileController struct {
 	ObjectCleanupRepo     *repo.ObjectCleanupRepository
 	TrashRepository       *repo.TrashRepository
 	UserRepo              *repo.UserRepository
+	RemoteStoreRepo       *remotestore.Repository
 	UsageCtrl             *UsageController
 	CollectionRepo        *repo.CollectionRepository
 	TaskLockingRepo       *repo.TaskLockRepository
@@ -67,6 +69,9 @@ const StorageOverflowAboveSubscriptionLimit = int64(1024 * 1024 * 50)
 // MaxFileSize is the maximum file size a user can upload
 const MaxFileSize = int64(1024 * 1024 * 1024 * 10)
 
+// InternalUserMaxFileSize is the maximum file size an internal user can upload
+const InternalUserMaxFileSize = int64(1024 * 1024 * 1024 * 20)
+
 // MaxUploadURLsLimit indicates the max number of upload urls which can be request in one go
 const MaxUploadURLsLimit = 50
 
@@ -78,6 +83,26 @@ const (
 const (
 	DeletedObjectQueueLock = "deleted_objects_queue_lock"
 )
+
+func (c *FileController) isFileSizeAllowed(ctx context.Context, userID int64, fileSize int64, app ente.App) (bool, error) {
+	if fileSize <= MaxFileSize {
+		return true, nil
+	}
+	if fileSize > InternalUserMaxFileSize {
+		return false, nil
+	}
+	if app != ente.Photos {
+		return false, nil
+	}
+	value, err := c.RemoteStoreRepo.GetValue(ctx, userID, string(ente.IsInternalUser))
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, stacktrace.Propagate(err, "failed to get internal user flag")
+	}
+	return value == "true", nil
+}
 
 func (c *FileController) validateFileCreateOrUpdateReq(userID int64, file ente.File, app ente.App) error {
 	objectPathPrefix := strconv.FormatInt(userID, 10) + "/"
@@ -161,7 +186,11 @@ func (c *FileController) Create(ctx *gin.Context, userID int64, file ente.File, 
 	}
 	fileSize := fileResult.size
 	thumbnailSize := thumbResult.size
-	if fileSize > MaxFileSize {
+	isFileSizeAllowed, err := c.isFileSizeAllowed(ctx, userID, fileSize, app)
+	if err != nil {
+		return file, stacktrace.Propagate(err, "")
+	}
+	if !isFileSizeAllowed {
 		return file, stacktrace.Propagate(ente.ErrFileTooLarge, "")
 	}
 
@@ -264,7 +293,11 @@ func (c *FileController) Update(ctx context.Context, userID int64, file ente.Fil
 	if err != nil {
 		return response, stacktrace.Propagate(err, "")
 	}
-	if fileSize > MaxFileSize {
+	isFileSizeAllowed, err := c.isFileSizeAllowed(ctx, userID, fileSize, app)
+	if err != nil {
+		return response, stacktrace.Propagate(err, "")
+	}
+	if !isFileSizeAllowed {
 		return response, stacktrace.Propagate(ente.ErrFileTooLarge, "")
 	}
 	if file.File.Size != 0 && file.File.Size != fileSize {
@@ -362,7 +395,11 @@ func (c *FileController) GetUploadURLWithMetadata(ctx context.Context, userID in
 	if req.ContentLength <= 0 {
 		return ente.UploadURL{}, stacktrace.Propagate(ente.ErrBadRequest, "contentLength must be greater than 0")
 	}
-	if req.ContentLength > MaxFileSize {
+	isFileSizeAllowed, err := c.isFileSizeAllowed(ctx, userID, req.ContentLength, app)
+	if err != nil {
+		return ente.UploadURL{}, stacktrace.Propagate(err, "")
+	}
+	if !isFileSizeAllowed {
 		return ente.UploadURL{}, stacktrace.Propagate(ente.ErrBadRequest, "contentLength exceeds max file size %d", MaxFileSize)
 	}
 	checksum, err := normalizeMD5String(req.ContentMD5)
@@ -1172,15 +1209,19 @@ func (c *FileController) GetMultipartUploadURLs(ctx context.Context, userID int6
 	return multipartUploadURLs, nil
 }
 
-// GetMultipartUploadURLWithMetadata enforces content length & per-part checksum requirements
+// GetMultipartUploadURLWithMetadata enforces content length and optional per-part checksums.
 func (c *FileController) GetMultipartUploadURLWithMetadata(ctx context.Context, userID int64, req ente.MultipartUploadURLRequest, app ente.App) (ente.MultipartUploadURLs, error) {
 	if req.ContentLength <= 0 {
 		return ente.MultipartUploadURLs{}, stacktrace.Propagate(ente.ErrBadRequest, "contentLength must be greater than 0")
 	}
-	if req.ContentLength > MaxFileSize {
+	isFileSizeAllowed, err := c.isFileSizeAllowed(ctx, userID, req.ContentLength, app)
+	if err != nil {
+		return ente.MultipartUploadURLs{}, stacktrace.Propagate(err, "")
+	}
+	if !isFileSizeAllowed {
 		return ente.MultipartUploadURLs{}, stacktrace.Propagate(ente.ErrBadRequest, "contentLength exceeds max file size %d", MaxFileSize)
 	}
-	if len(req.PartMD5s) == 0 {
+	if req.PartMD5s != nil && len(req.PartMD5s) == 0 {
 		return ente.MultipartUploadURLs{}, stacktrace.Propagate(ente.ErrBadRequest, "partMd5s must not be empty")
 	}
 	if err := validateMultipartPartLength(req.ContentLength, req.PartLength); err != nil {
@@ -1190,16 +1231,19 @@ func (c *FileController) GetMultipartUploadURLWithMetadata(ctx context.Context, 
 	if partCount > maxMultipartPartCount {
 		return ente.MultipartUploadURLs{}, stacktrace.Propagate(ente.ErrBadRequest, "multipart upload cannot exceed %d parts", maxMultipartPartCount)
 	}
-	if len(req.PartMD5s) != partCount {
-		return ente.MultipartUploadURLs{}, stacktrace.Propagate(ente.ErrBadRequest, "partMd5s size (%d) does not match computed part count (%d)", len(req.PartMD5s), partCount)
-	}
-	normalizedChecksums := make([]string, partCount)
-	for i, checksum := range req.PartMD5s {
-		normalized, err := normalizeMD5String(checksum)
-		if err != nil {
-			return ente.MultipartUploadURLs{}, err
+	var normalizedChecksums []string
+	if req.PartMD5s != nil {
+		if len(req.PartMD5s) != partCount {
+			return ente.MultipartUploadURLs{}, stacktrace.Propagate(ente.ErrBadRequest, "partMd5s size (%d) does not match computed part count (%d)", len(req.PartMD5s), partCount)
 		}
-		normalizedChecksums[i] = normalized
+		normalizedChecksums = make([]string, partCount)
+		for i, checksum := range req.PartMD5s {
+			normalized, err := normalizeMD5String(checksum)
+			if err != nil {
+				return ente.MultipartUploadURLs{}, err
+			}
+			normalizedChecksums[i] = normalized
+		}
 	}
 	partLengths := computePartLengths(req.ContentLength, req.PartLength, partCount)
 	if err := c.UsageCtrl.CanUploadFile(ctx, userID, nil, app); err != nil {
@@ -1224,9 +1268,11 @@ func (c *FileController) GetMultipartUploadURLWithMetadata(ctx context.Context, 
 	for i := 0; i < partCount; i++ {
 		partNumber := int64(i + 1)
 		length := partLengths[i]
-		lengthCopy := length
-		checksumCopy := normalizedChecksums[i]
-		url, err := c.getPartURL(*s3Client, objectKey, partNumber, r.UploadId, &lengthCopy, &checksumCopy)
+		var checksum *string
+		if normalizedChecksums != nil {
+			checksum = &normalizedChecksums[i]
+		}
+		url, err := c.getPartURL(*s3Client, objectKey, partNumber, r.UploadId, &length, checksum)
 		if err != nil {
 			return multipartUploadURLs, stacktrace.Propagate(err, "")
 		}
