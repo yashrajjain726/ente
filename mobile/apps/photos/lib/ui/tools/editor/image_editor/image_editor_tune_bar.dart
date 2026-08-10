@@ -506,7 +506,7 @@ class _ColorPickerThumbShape extends SliderComponentShape {
 
   @override
   Size getPreferredSize(bool isEnabled, bool isDiscrete) {
-    return const Size(20, 20);
+    return const Size(thumbRadius * 2, thumbRadius * 2);
   }
 
   @override
