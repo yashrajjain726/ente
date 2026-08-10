@@ -1,5 +1,4 @@
 // TODO: Audit this file (too many null assertions + other issues)
-/* eslint-disable @typescript-eslint/no-floating-promises */
 import { useAlbumsAppContext } from "@/app/context/albums-app-context";
 import { LazyNotification } from "@/app/lazy/global-ui";
 import {
@@ -333,7 +332,7 @@ export default function PublicAlbumPage() {
                 }
             }
         };
-        main();
+        void main();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
@@ -406,7 +405,7 @@ export default function PublicAlbumPage() {
             if (!isPasswordProtected && credentials.current?.accessTokenJWT) {
                 credentials.current.accessTokenJWT = undefined;
                 setPublicAlbumsCredentials(credentials.current);
-                removePublicCollectionAccessTokenJWT(accessToken);
+                await removePublicCollectionAccessTokenJWT(accessToken);
             }
 
             if (isPasswordProtected && !credentials.current?.accessTokenJWT) {
