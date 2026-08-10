@@ -1,23 +1,41 @@
 // TODO: Audit this file.
+import {
+    CreateAlbumTile,
+    CollectionDialogSearchField as SearchField,
+    CollectionTileButton as TileButton,
+    CollectionTileTextOverlay as TileTextOverlay,
+} from "@/components/CollectionDialog/Primitives";
+import {
+    collectionDialogBodyMutedSx as bodyMutedSx,
+    collectionDialogFullScreenQuery,
+    collectionDialogDividerSx as dividerSx,
+    collectionDialogHeaderActionsSx as headerActionsSx,
+    collectionDialogHeaderRowSx as headerRowSx,
+    collectionDialogHeaderSx as headerSx,
+    collectionDialogIconButtonSx as iconButtonSx,
+    collectionDialogNoResultsSx as noResultsSx,
+    collectionDialogPaperSx as paperSx,
+    collectionDialogSurfaceStroke as surfaceStroke,
+    collectionDialogSurfaceStrokeDark as surfaceStrokeDark,
+    collectionDialogTitleSx as titleSx,
+} from "@/components/CollectionDialog/styles";
 import { CollectionsSortOptions } from "@/components/CollectionsSortOptions";
 import { StarIcon } from "@/components/icons/StarIcon";
-import AddIcon from "@mui/icons-material/Add";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import CloseIcon from "@mui/icons-material/Close";
 import DeleteSweepOutlinedIcon from "@mui/icons-material/DeleteSweepOutlined";
 import PushPinIcon from "@mui/icons-material/PushPin";
-import SearchIcon from "@mui/icons-material/Search";
 import {
     Box,
     Button,
     Dialog,
     DialogTitle,
     IconButton,
-    InputBase,
     Paper,
     Snackbar,
     Stack,
-    styled,
+    ToggleButton,
+    ToggleButtonGroup,
     Tooltip,
     Typography,
     useMediaQuery,
@@ -29,7 +47,7 @@ import { SingleInputDialog } from "ente-base/components/SingleInputDialog";
 import { useModalVisibility } from "ente-base/components/utils/modal";
 import { useBaseContext } from "ente-base/context";
 import { SlideUpTransition } from "ente-new/photos/components/mui/SlideUpTransition";
-import { BaseTileButton, ItemCard } from "ente-new/photos/components/Tiles";
+import { ItemCard } from "ente-new/photos/components/Tiles";
 import {
     createAlbum,
     createHiddenAlbum,
@@ -114,7 +132,7 @@ export const AllAlbums: React.FC<AllAlbums> = ({
     canCreateAlbum,
     onRemotePull,
 }) => {
-    const fullScreen = useMediaQuery(`(width < ${FullScreenBreakpoint}px)`);
+    const fullScreen = useMediaQuery(collectionDialogFullScreenQuery);
     const [searchTerm, setSearchTerm] = useState("");
     const [albumFilter, setAlbumFilter] = useState<AlbumFilter>("all");
     const { showMiniDialog } = useBaseContext();
@@ -176,23 +194,21 @@ export const AllAlbums: React.FC<AllAlbums> = ({
         !searchTerm.trim();
 
     // A filter with nothing worth showing is not worth a pill.
-    const hasQuickLinks = useMemo(
-        () => collectionSummaries.some((cs) => cs.attributes.has("quickLink")),
-        [collectionSummaries],
-    );
     const visibleAlbumFilters = useMemo(
         () =>
             albumFilters.filter(({ value }) => {
                 switch (value) {
                     case "links":
-                        return hasQuickLinks;
+                        return collectionSummaries.some((cs) =>
+                            cs.attributes.has("quickLink"),
+                        );
                     case "empty-albums":
                         return hasEnoughEmptyAlbums;
                     default:
                         return true;
                 }
             }),
-        [hasEnoughEmptyAlbums, hasQuickLinks],
+        [collectionSummaries, hasEnoughEmptyAlbums],
     );
 
     // The title names whichever filter is showing, so that the pills and the
@@ -355,11 +371,24 @@ export const AllAlbums: React.FC<AllAlbums> = ({
                         </Stack>
                     </Stack>
                     {!isInHiddenSection && (
-                        <FilterPills
-                            filters={visibleAlbumFilters}
+                        <ToggleButtonGroup
+                            exclusive
                             value={albumFilter}
-                            onChange={setAlbumFilter}
-                        />
+                            aria-label={t("filter_albums")}
+                            onChange={(_, nextValue: AlbumFilter | null) => {
+                                if (nextValue) setAlbumFilter(nextValue);
+                            }}
+                            sx={filterPillsSx}
+                        >
+                            {visibleAlbumFilters.map((filter) => (
+                                <ToggleButton
+                                    key={filter.value}
+                                    value={filter.value}
+                                >
+                                    {filter.label()}
+                                </ToggleButton>
+                            ))}
+                        </ToggleButtonGroup>
                     )}
                     <SearchField value={searchTerm} onChange={setSearchTerm} />
                 </Stack>
@@ -456,98 +485,10 @@ export const AllAlbums: React.FC<AllAlbums> = ({
     );
 };
 
-/**
- * Below this the dialog goes full screen, and the surface loses its rounded
- * corners and border. Kept in sync with {@link CollectionSelector}.
- */
-const FullScreenBreakpoint = 491;
-
-const surfaceLight = "#f4f4f4";
-const surfaceDark = "#1b1b1b";
-const surfaceStroke = "#e0e0e0";
-const surfaceStrokeDark = "rgba(255 255 255 / 0.12)";
-
 /** Keep the dialog docked to the right edge, as it has always been. */
 const dialogSx: SxProps<Theme> = {
     "& .MuiDialog-container": { justifyContent: "flex-end" },
 };
-
-const paperSx: SxProps<Theme> = (theme) => ({
-    position: "relative",
-    width: "min(500px, calc(100svw - 32px))",
-    maxWidth: "500px",
-    boxSizing: "content-box",
-    borderRadius: "20px",
-    border: `1px solid ${surfaceStroke}`,
-    backgroundColor: surfaceLight,
-    backgroundImage: "none",
-    boxShadow: "none",
-    color: "text.base",
-    [`@media (width >= ${FullScreenBreakpoint}px)`]: { height: "100%" },
-    [`@media (width < ${FullScreenBreakpoint}px)`]: {
-        width: "100%",
-        maxWidth: "100%",
-        height: "100%",
-        boxSizing: "border-box",
-        borderRadius: 0,
-        border: "none",
-    },
-    ...theme.applyStyles("dark", {
-        borderColor: surfaceStrokeDark,
-        backgroundColor: surfaceDark,
-    }),
-});
-
-const headerSx = { p: "20px", gap: "16px" };
-const headerRowSx = {
-    alignItems: "flex-start",
-    justifyContent: "space-between",
-    gap: "12px",
-};
-const headerActionsSx = { alignItems: "center", gap: 1, flexShrink: 0 };
-/**
- * The DS text styles this dialog draws on. The app's MUI typography variants
- * predate the DS and disagree with it (`body` is 16/20, `mini` 12/15), so the
- * styles are spelled out rather than taken from a variant.
- *
- * - display-2 — 600 24/32
- * - body      — 500 14/20
- * - mini      — 500 12/16
- */
-const titleSx = {
-    // display-2
-    fontSize: 24,
-    lineHeight: "32px",
-    fontWeight: 600,
-    overflow: "hidden",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-};
-/** body, muted: the album count, the empty state, the toast's album name. */
-const bodyMutedSx = {
-    fontSize: 14,
-    lineHeight: "20px",
-    fontWeight: 500,
-    color: "text.muted",
-};
-const iconButtonSx = (theme: Theme) => ({
-    width: 38,
-    height: 38,
-    p: 0,
-    color: "text.base",
-    backgroundColor: "background.paper",
-    "&:hover": { backgroundColor: "fill.faintHover" },
-    ...theme.applyStyles("dark", {
-        backgroundColor: "rgba(255 255 255 / 0.12)",
-    }),
-});
-const dividerSx = (theme: Theme) => ({
-    height: "1px",
-    backgroundColor: "rgba(0 0 0 / 0.06)",
-    ...theme.applyStyles("dark", {
-        backgroundColor: "rgba(255 255 255 / 0.08)",
-    }),
-});
 
 const sweepFooterSx = {
     position: "absolute",
@@ -580,217 +521,46 @@ const sweepButtonSx: SxProps<Theme> = (theme) => ({
     ...theme.applyStyles("dark", { borderColor: surfaceStrokeDark }),
 });
 
-interface FilterPillsProps {
-    filters: typeof albumFilters;
-    value: AlbumFilter;
-    onChange: (value: AlbumFilter) => void;
-}
-
-/** The horizontal padding a pill adds around its label, both edges together. */
-const PillPaddingInline = 24;
-
-/**
- * A single row of filter chips, mirroring mobile's tag chips.
- *
- * The pills stretch to fill the row, but in proportion to their own labels, so
- * that widening the row scales the pills rather than levelling them out: a
- * filled row keeps the same relative widths the labels have on their own.
- */
-const FilterPills: React.FC<FilterPillsProps> = ({
-    filters,
-    value,
-    onChange,
-}) => {
-    const rowRef = useRef<HTMLDivElement>(null);
-    const [labelWidths, setLabelWidths] = useState<Record<string, number>>({});
-
-    const labels = filters.map((filter) => filter.label());
-    const labelKey = labels.join("\n");
-
-    // A stretched pill tells us nothing about how wide it wanted to be, but the
-    // label inside it keeps its intrinsic width, so measure that instead and
-    // hand each pill a grow factor proportional to it.
-    useEffect(() => {
-        const row = rowRef.current;
-        if (!row) return;
-
-        let cancelled = false;
-        const measure = () => {
-            const widths: Record<string, number> = {};
-            for (const label of row.querySelectorAll<HTMLElement>(
-                "[data-filter]",
-            )) {
-                const width = label.getBoundingClientRect().width;
-                if (width) widths[label.dataset.filter!] = width;
-            }
-            if (!cancelled && Object.keys(widths).length) {
-                setLabelWidths(widths);
-            }
-        };
-
-        measure();
-        // Inter arrives as a webfont, and its metrics land after first paint.
-        void document.fonts.ready.then(() => !cancelled && measure());
-        return () => {
-            cancelled = true;
-        };
-    }, [labelKey]);
-
-    return (
-        <Stack
-            ref={rowRef}
-            direction="row"
-            role="group"
-            aria-label={t("filter_albums")}
-            sx={{ gap: "8px" }}
-        >
-            {filters.map((filter, i) => {
-                const labelWidth = labelWidths[filter.value];
-                return (
-                    <Pill
-                        key={filter.value}
-                        aria-pressed={value == filter.value}
-                        onClick={() => onChange(filter.value)}
-                        // Until measured, sit at the natural width the grow
-                        // factors are about to reproduce.
-                        style={
-                            labelWidth
-                                ? {
-                                      flexBasis: 0,
-                                      flexGrow: labelWidth + PillPaddingInline,
-                                  }
-                                : undefined
-                        }
-                        sx={pillSx(value == filter.value)}
-                    >
-                        <span data-filter={filter.value}>{labels[i]}</span>
-                    </Pill>
-                );
-            })}
-        </Stack>
-    );
-};
-/**
- * A bare `button` and not MUI's ButtonBase: buttons do not inherit the page
- * font, and ButtonBase does not restore it either, so spell the DS "body" text
- * style (500 14px/20px Inter) out in full here.
- */
-const Pill = styled("button")(({ theme }) => ({
-    // The natural size, until FilterPills measures the labels and swaps in a
-    // proportional grow factor. `block` (not `flex`) so that a squeezed label
-    // ellipsizes instead of being clipped.
-    flex: "0 1 auto",
-    minWidth: 0,
-    display: "block",
-    // 10 + 20 line + 10 = 40px. The design's chip is 44px, but that is mobile's
-    // touch target rather than a pointer's.
-    paddingBlock: "10px",
-    // The design pads its chips by 20px, but that is sized for a row that
-    // scrolls; five pills have to share one fixed-width row here. Keep this in
-    // step with PillPaddingInline.
-    paddingInline: "12px",
-    border: 0,
-    borderRadius: "16px",
-    cursor: "pointer",
-    textAlign: "center",
-    fontFamily: theme.typography.fontFamily,
-    fontSize: "14px",
-    lineHeight: "20px",
-    fontWeight: 500,
-    letterSpacing: "-0.011em",
-    whiteSpace: "nowrap",
-    overflow: "hidden",
-    textOverflow: "ellipsis",
-    "&:focus-visible": {
-        outline: `1px solid ${theme.vars.palette.stroke.base}`,
-        outlineOffset: 2,
+const filterPillsSx = (theme: Theme) => ({
+    display: "flex",
+    gap: "8px",
+    "& .MuiToggleButtonGroup-grouped": {
+        flex: "1 1 0",
+        minWidth: 0,
+        marginLeft: "0 !important",
+        padding: "10px 12px",
+        border: 0,
+        borderRadius: "16px !important",
+        color: "text.muted",
+        backgroundColor: "background.paper",
+        fontSize: "14px",
+        lineHeight: "20px",
+        fontWeight: 500,
+        letterSpacing: "-0.011em",
+        textTransform: "none",
+        whiteSpace: "nowrap",
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+        transition: theme.transitions.create("background-color", {
+            duration: 120,
+        }),
+        "&:hover": { backgroundColor: "fill.faintHover", color: "text.base" },
+        "&:focus-visible": {
+            outline: `1px solid ${theme.vars.palette.stroke.base}`,
+            outlineOffset: 2,
+        },
+        ...theme.applyStyles("dark", {
+            "&:not(.Mui-selected)": {
+                backgroundColor: "rgba(255 255 255 / 0.12)",
+            },
+        }),
+        "&.Mui-selected": {
+            backgroundColor: "accent.main",
+            color: "accent.contrastText",
+        },
+        "&.Mui-selected:hover": { backgroundColor: "accent.dark" },
     },
-}));
-
-const pillSx = (selected: boolean) => (theme: Theme) => ({
-    transition: theme.transitions.create("background-color", { duration: 120 }),
-    ...(selected
-        ? {
-              backgroundColor: "accent.main",
-              color: "accent.contrastText",
-              "&:hover": { backgroundColor: "accent.dark" },
-          }
-        : {
-              backgroundColor: "background.paper",
-              color: "text.muted",
-              "&:hover": {
-                  backgroundColor: "fill.faintHover",
-                  color: "text.base",
-              },
-              ...theme.applyStyles("dark", {
-                  backgroundColor: "rgba(255 255 255 / 0.12)",
-              }),
-          }),
 });
-interface SearchFieldProps {
-    value: string;
-    onChange: (value: string) => void;
-}
-
-const SearchField: React.FC<SearchFieldProps> = ({ value, onChange }) => {
-    const inputRef = useRef<HTMLInputElement>(null);
-
-    const handleClear = () => {
-        onChange("");
-        inputRef.current?.focus();
-    };
-
-    return (
-        <Stack direction="row" sx={searchFieldSx}>
-            <SearchIcon sx={searchIconSx} />
-            <InputBase
-                inputRef={inputRef}
-                fullWidth
-                autoFocus
-                placeholder={t("albums_search_hint")}
-                value={value}
-                onChange={(e) => onChange(e.target.value)}
-                sx={{
-                    fontSize: 14,
-                    lineHeight: "20px",
-                    fontWeight: 500,
-                    color: "text.base",
-                    "& input::placeholder": { color: "text.muted", opacity: 1 },
-                }}
-                endAdornment={
-                    value ? (
-                        <CloseIcon
-                            fontSize="small"
-                            onClick={handleClear}
-                            sx={{
-                                color: "stroke.muted",
-                                cursor: "pointer",
-                                "&:hover": { color: "text.base" },
-                            }}
-                        />
-                    ) : undefined
-                }
-            />
-        </Stack>
-    );
-};
-
-const searchFieldSx = (theme: Theme) => ({
-    alignItems: "center",
-    gap: "10px",
-    height: 44,
-    borderRadius: "16px",
-    backgroundColor: "background.paper",
-    px: "14px",
-    ...theme.applyStyles("dark", { backgroundColor: "#282828" }),
-});
-const searchIconSx = (theme: Theme) => ({
-    fontSize: 20,
-    flexShrink: 0,
-    color: "rgba(0 0 0 / 0.4)",
-    ...theme.applyStyles("dark", { color: "rgba(255 255 255 / 0.4)" }),
-});
-
 /** Columns in the album grid, and the gutters around and between them. */
 const GridColumns = 3;
 const GridGap = 8;
@@ -988,35 +758,6 @@ const AllAlbumsContent: React.FC<AllAlbumsContentProps> = ({
     );
 };
 
-const noResultsSx = {
-    flex: 1,
-    display: "flex",
-    justifyContent: "center",
-    alignItems: "center",
-    minHeight: 154,
-};
-
-const TileButton = styled(BaseTileButton)`
-    flex: none;
-    width: var(--tile-size);
-    height: var(--tile-size);
-    border-radius: 16px;
-`;
-
-const TileTextOverlay = styled("div")`
-    position: absolute;
-    inset: 0;
-    padding: 10px;
-    color: #fff;
-    background: linear-gradient(
-        -10deg,
-        rgba(0, 0, 0, 0.1) 0%,
-        rgba(0, 0, 0, 0.2) 50%,
-        rgba(0, 0, 0, 0.4) 60%,
-        rgba(0, 0, 0, 0.6) 100%
-    );
-`;
-
 interface AlbumCardProps {
     collectionSummary: CollectionSummary;
     onCollectionClick: (collectionID: number) => void;
@@ -1088,28 +829,3 @@ const albumCountSx = {
     fontWeight: 500,
     opacity: 0.7,
 };
-
-const CreateAlbumTile: React.FC<{ onClick: () => void }> = ({ onClick }) => (
-    <TileButton aria-label={t("new_album")} onClick={onClick}>
-        <CreateTileInner>
-            <AddIcon />
-        </CreateTileInner>
-    </TileButton>
-);
-
-const CreateTileInner = styled("span")(({ theme }) => ({
-    position: "absolute",
-    inset: 0,
-    padding: 10,
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    border: "1px dashed",
-    borderColor: theme.vars.palette.stroke.muted,
-    borderRadius: 16,
-    color: theme.vars.palette.text.muted,
-    "&:hover": { borderColor: "rgba(0 0 0 / 0.45)" },
-    ...theme.applyStyles("dark", {
-        "&:hover": { borderColor: "rgba(255 255 255 / 0.45)" },
-    }),
-}));
