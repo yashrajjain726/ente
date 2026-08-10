@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:ente_pure_utils/ente_pure_utils.dart';
+import "package:ente_strings/ente_strings.dart";
 import 'package:flutter/material.dart';
 import 'package:lottie/lottie.dart';
 import "package:photos/core/constants.dart";
@@ -8,7 +9,6 @@ import 'package:photos/core/event_bus.dart';
 import 'package:photos/ente_theme_data.dart';
 import 'package:photos/events/local_import_progress.dart';
 import 'package:photos/events/sync_status_update_event.dart';
-import "package:photos/generated/l10n.dart";
 import "package:photos/service_locator.dart";
 import 'package:photos/ui/common/bottom_shadow.dart';
 import "package:photos/ui/components/buttons/button_widget.dart";
@@ -129,9 +129,9 @@ class _LoadingPhotosWidgetState extends State<LoadingPhotosWidget> {
       _importProgressEvent = Bus.instance.on<LocalImportProgressEvent>().listen(
         (event) {
           if (!mounted) return;
-          _loadingMessage = AppLocalizations.of(
-            context,
-          ).processingImport(folderName: event.folderName);
+          _loadingMessage = context.strings.processingImport(
+            folderName: event.folderName,
+          );
           if (mounted) {
             setState(() {});
           }
@@ -151,7 +151,7 @@ class _LoadingPhotosWidgetState extends State<LoadingPhotosWidget> {
 
   @override
   Widget build(BuildContext context) {
-    _loadingMessage ??= AppLocalizations.of(context).loadingYourPhotos;
+    _loadingMessage ??= context.strings.loadingYourPhotos;
     _setupLoadingMessages(context);
     final isLightMode = Theme.of(context).brightness == Brightness.light;
     return Scaffold(
@@ -200,7 +200,7 @@ class _LoadingPhotosWidgetState extends State<LoadingPhotosWidget> {
                       mainAxisAlignment: MainAxisAlignment.start,
                       children: [
                         Text(
-                          AppLocalizations.of(context).didYouKnow,
+                          context.strings.didYouKnow,
                           style: Theme.of(context).textTheme.titleLarge!
                               .copyWith(
                                 color: Theme.of(context).colorScheme.greenText,
@@ -249,23 +249,19 @@ class _LoadingPhotosWidgetState extends State<LoadingPhotosWidget> {
                       onPressed: () {
                         showDialogWidget(
                           context: context,
-                          title: AppLocalizations.of(context).oops,
+                          title: context.strings.oops,
                           icon: Icons.error_outline_outlined,
-                          body: AppLocalizations.of(
-                            context,
-                          ).localSyncErrorMessage,
+                          body: context.strings.localSyncErrorMessage,
                           isDismissible: true,
                           buttons: [
                             ButtonWidget(
                               buttonType: ButtonType.primary,
-                              labelText: AppLocalizations.of(
-                                context,
-                              ).contactSupport,
+                              labelText: context.strings.contactSupport,
                               buttonAction: ButtonAction.second,
                               onTap: () async {
                                 await sendLogs(
                                   context,
-                                  AppLocalizations.of(context).contactSupport,
+                                  context.strings.contactSupport,
                                   "support@ente.com",
                                   postShare: () {},
                                 );
@@ -284,21 +280,19 @@ class _LoadingPhotosWidgetState extends State<LoadingPhotosWidget> {
   }
 
   void _setupLoadingMessages(BuildContext context) {
-    _messages.add(AppLocalizations.of(context).loadMessage1);
+    _messages.add(context.strings.loadMessage1);
     _messages.add(
-      AppLocalizations.of(context).loadMessage2(
+      context.strings.loadMessage2(
         memoriesCountInMillions: _preservedMemoriesCountInMillions,
       ),
     );
-    _messages.add(AppLocalizations.of(context).loadMessage3);
-    _messages.add(AppLocalizations.of(context).loadMessage4);
-    _messages.add(AppLocalizations.of(context).loadMessage5);
-    _messages.add(AppLocalizations.of(context).loadMessage6);
-    _messages.add(AppLocalizations.of(context).loadMessage7);
-    _messages.add(
-      AppLocalizations.of(context).loadMessage8(webUrl: kPhotosWebDomain),
-    );
-    _messages.add(AppLocalizations.of(context).loadMessage9);
+    _messages.add(context.strings.loadMessage3);
+    _messages.add(context.strings.loadMessage4);
+    _messages.add(context.strings.loadMessage5);
+    _messages.add(context.strings.loadMessage6);
+    _messages.add(context.strings.loadMessage7);
+    _messages.add(context.strings.loadMessage8(webUrl: kPhotosWebDomain));
+    _messages.add(context.strings.loadMessage9);
   }
 
   Widget _getMessage(String text) {

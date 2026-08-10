@@ -1,5 +1,7 @@
 uniffi::setup_scaffolding!("cast");
 
+pub mod log;
+
 use ente_core::crypto;
 use thiserror::Error;
 

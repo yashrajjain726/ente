@@ -1,6 +1,6 @@
 import "package:ente_components/ente_components.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/ui/account/email_entry_page.dart";
 import "package:photos/ui/collections/collection_action_sheet.dart";
 import "package:photos/ui/components/banners/banner_action_button.dart";
@@ -20,7 +20,7 @@ class FeedEmptyState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.componentColors;
-    final strings = AppLocalizations.of(context);
+    final strings = context.strings;
     final bottomPadding = 64 + MediaQuery.paddingOf(context).bottom + 32;
     final content = _content(context, strings);
 
@@ -104,7 +104,7 @@ class FeedEmptyState extends StatelessWidget {
 
   _FeedEmptyStateContent _content(
     BuildContext context,
-    AppLocalizations strings,
+    StringsLocalizations strings,
   ) {
     if (localGalleryMode) {
       return _FeedEmptyStateContent(
@@ -113,7 +113,7 @@ class FeedEmptyState extends StatelessWidget {
         features: [
           strings.albumsSharedEmptyFeatureShareLovedOnes,
           strings.albumsSharedEmptyFeatureReactAndComment,
-          strings.albumsSharedEmptyFeaturePrivacy,
+          strings.albumsOnEnteEmptyFeaturePrivacy,
         ],
         buttonLabel: strings.getStarted,
         showTag: true,
@@ -136,7 +136,7 @@ class FeedEmptyState extends StatelessWidget {
       features: [
         strings.albumsSharedEmptyFeatureShareLovedOnes,
         strings.albumsSharedEmptyFeatureReactAndComment,
-        strings.albumsSharedEmptyFeaturePrivacy,
+        strings.albumsOnEnteEmptyFeaturePrivacy,
       ],
       buttonLabel: strings.shareAnAlbum,
       onTap: () {

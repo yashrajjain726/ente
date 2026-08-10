@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use crate::{
     Result,
     models::{collection::Collection, file::RemoteFile},
@@ -16,7 +14,6 @@ impl<'a> SyncStore<'a> {
         Self { conn }
     }
 
-    /// Store a collection
     pub fn upsert_collection(&self, collection: &Collection) -> Result<()> {
         let metadata = serde_json::to_string(&collection)?;
 
@@ -38,7 +35,6 @@ impl<'a> SyncStore<'a> {
         Ok(())
     }
 
-    /// Get all collections for a user
     pub fn get_collections(&self, user_id: i64) -> Result<Vec<Collection>> {
         let mut stmt = self.conn.prepare(
             "SELECT metadata FROM collections 
@@ -56,12 +52,10 @@ impl<'a> SyncStore<'a> {
         Ok(collections)
     }
 
-    /// Store a file
     pub fn upsert_file(&self, file: &RemoteFile) -> Result<()> {
         self.upsert_file_with_hash(file, None)
     }
 
-    /// Store a file with optional content hash
     pub fn upsert_file_with_hash(
         &self,
         file: &RemoteFile,
@@ -74,7 +68,7 @@ impl<'a> SyncStore<'a> {
             None => None,
         };
 
-        // First check if file exists and preserve is_synced_locally flag
+        // Refreshing remote metadata must preserve the local-sync flag.
         let existing_sync_status: Option<i32> = self
             .conn
             .query_row(
@@ -110,7 +104,6 @@ impl<'a> SyncStore<'a> {
         Ok(())
     }
 
-    /// Get files for a collection
     pub fn get_files_by_collection(
         &self,
         user_id: i64,
@@ -130,7 +123,6 @@ impl<'a> SyncStore<'a> {
                 let metadata: String = row.get(5)?;
                 let pub_magic_metadata_json: Option<String> = row.get(9)?;
 
-                // Deserialize stored data - thumbnail might not be stored properly
                 let file_obj: crate::models::file::FileInfo = serde_json::from_str(&file_info)
                     .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))?;
 
@@ -138,7 +130,6 @@ impl<'a> SyncStore<'a> {
                     serde_json::from_str(&metadata)
                         .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))?;
 
-                // Deserialize pub_magic_metadata if present
                 let pub_magic_metadata = match pub_magic_metadata_json {
                     Some(json) => Some(
                         serde_json::from_str(&json)
@@ -147,7 +138,6 @@ impl<'a> SyncStore<'a> {
                     None => None,
                 };
 
-                // Create a default thumbnail info if not available
                 let thumbnail = crate::models::file::FileInfo {
                     encrypted_data: None,
                     decryption_header: String::new(),
@@ -174,11 +164,8 @@ impl<'a> SyncStore<'a> {
         Ok(files)
     }
 
-    /// Update sync state
     pub fn update_sync_state(&self, user_id: i64, sync_type: &str, timestamp: i64) -> Result<()> {
-        // For per-collection sync, store in collection_sync_state table
         if sync_type.starts_with("collection_") {
-            // Extract collection_id from sync_type (format: "collection_{id}_files")
             let collection_id = sync_type
                 .strip_prefix("collection_")
                 .and_then(|s| s.strip_suffix("_files"))
@@ -214,11 +201,8 @@ impl<'a> SyncStore<'a> {
         Ok(())
     }
 
-    /// Get last sync timestamp
     pub fn get_last_sync(&self, user_id: i64, sync_type: &str) -> Result<Option<i64>> {
-        // For per-collection sync, retrieve from collection_sync_state table
         if sync_type.starts_with("collection_") {
-            // Extract collection_id from sync_type (format: "collection_{id}_files")
             let collection_id = sync_type
                 .strip_prefix("collection_")
                 .and_then(|s| s.strip_suffix("_files"))
@@ -259,7 +243,6 @@ impl<'a> SyncStore<'a> {
         Ok(timestamp)
     }
 
-    /// Mark album file as synced
     pub fn mark_album_file_synced(&self, album_id: i64, file_id: i64) -> Result<()> {
         self.conn.execute(
             "UPDATE album_files SET synced_locally = 1 
@@ -270,9 +253,7 @@ impl<'a> SyncStore<'a> {
         Ok(())
     }
 
-    /// Clear sync state for an account (for full sync)
     pub fn clear_sync_state(&self, user_id: i64) -> Result<()> {
-        // Clear both sync_state and collection_sync_state
         self.conn.execute(
             "DELETE FROM sync_state WHERE user_id = ?1 AND app = 'photos'",
             params![user_id],
@@ -286,9 +267,7 @@ impl<'a> SyncStore<'a> {
         Ok(())
     }
 
-    /// Get files that need downloading (not synced locally)
     pub fn get_pending_downloads(&self, user_id: i64) -> Result<Vec<RemoteFile>> {
-        // First check how many files are already synced
         let synced_count: i64 = self.conn.query_row(
             "SELECT COUNT(*) FROM files WHERE owner_id = ?1 AND is_synced_locally = 1",
             params![user_id],
@@ -310,7 +289,6 @@ impl<'a> SyncStore<'a> {
                 let metadata: String = row.get(5)?;
                 let pub_magic_metadata_json: Option<String> = row.get(9)?;
 
-                // Deserialize stored data - thumbnail might not be stored properly
                 let file_obj: crate::models::file::FileInfo = serde_json::from_str(&file_info)
                     .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))?;
 
@@ -318,7 +296,6 @@ impl<'a> SyncStore<'a> {
                     serde_json::from_str(&metadata)
                         .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))?;
 
-                // Deserialize pub_magic_metadata if present
                 let pub_magic_metadata = match pub_magic_metadata_json {
                     Some(json) => Some(
                         serde_json::from_str(&json)
@@ -327,7 +304,6 @@ impl<'a> SyncStore<'a> {
                     None => None,
                 };
 
-                // Create a default thumbnail info if not available
                 let thumbnail = crate::models::file::FileInfo {
                     encrypted_data: None,
                     decryption_header: String::new(),
@@ -354,7 +330,6 @@ impl<'a> SyncStore<'a> {
         Ok(files)
     }
 
-    /// Mark file as synced locally after successful download
     pub fn mark_file_synced(&self, file_id: i64, local_path: Option<&str>) -> Result<()> {
         let rows_updated = if let Some(path) = local_path {
             self.conn.execute(
@@ -375,7 +350,6 @@ impl<'a> SyncStore<'a> {
         Ok(())
     }
 
-    /// Check if a file with the same hash already exists for this user
     pub fn find_duplicate_by_hash(&self, owner_id: i64, content_hash: &str) -> Result<Option<i64>> {
         let file_id: Option<i64> = self
             .conn
@@ -392,7 +366,6 @@ impl<'a> SyncStore<'a> {
         Ok(file_id)
     }
 
-    /// Get local path of a file
     pub fn get_file_local_path(&self, file_id: i64) -> Result<Option<String>> {
         let path: Option<String> = self
             .conn

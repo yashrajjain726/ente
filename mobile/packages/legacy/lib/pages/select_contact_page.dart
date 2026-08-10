@@ -77,7 +77,7 @@ class _AddContactSheetState extends State<AddContactSheet> {
       builder: (context, _, _) {
         final colorScheme = getEnteColorScheme(context);
         final textTheme = getEnteTextTheme(context);
-        final List<User> suggestedUsers = _getSuggestedUser();
+        final List<UserSuggestion> suggestedUsers = _getSuggestedUser();
         final bool canAdd = selectedEmail.isNotEmpty || _emailIsValid;
 
         return SingleChildScrollView(
@@ -184,7 +184,7 @@ class _AddContactSheetState extends State<AddContactSheet> {
   }
 
   Widget _buildExistingContactsSection(
-    List<User> suggestedUsers,
+    List<UserSuggestion> suggestedUsers,
     EnteColorScheme colorScheme,
     EnteTextTheme textTheme,
   ) {
@@ -226,12 +226,10 @@ class _AddContactSheetState extends State<AddContactSheet> {
                         ),
                       ),
                       leadingIconSize: 24.0,
-                      leadingIconWidget: UserAvatarWidget(
+                      leadingIconWidget: UserAvatarWidget.suggestion(
                         user,
                         type: AvatarType.mini,
-                        currentUserID: widget.config.getUserID()!,
                         config: widget.config,
-                        thumbnailView: false,
                       ),
                       menuItemColor: colorScheme.fillFaint,
                       pressedColor: colorScheme.fillFaintPressed,
@@ -367,7 +365,10 @@ class _AddContactSheetState extends State<AddContactSheet> {
     return showAlertBottomSheet<bool>(
       context,
       title: context.strings.warning,
-      message: context.strings.confirmAddingTrustedContact(email, recoveryDays),
+      message: context.strings.confirmAddingTrustedContact(
+        email: email,
+        numOfDays: recoveryDays,
+      ),
       assetPath: "assets/warning-blue.png",
       buttons: [
         GradientButton(
@@ -384,7 +385,7 @@ class _AddContactSheetState extends State<AddContactSheet> {
       await showAlertBottomSheet(
         context,
         title: context.strings.invalidEmailAddress,
-        message: context.strings.enterValidEmail,
+        message: context.strings.enterValidEmailDetailed,
         assetPath: "assets/warning-blue.png",
       );
       return;
@@ -398,29 +399,25 @@ class _AddContactSheetState extends State<AddContactSheet> {
     );
   }
 
-  List<User> _getSuggestedUser() {
-    final List<User> suggestedUsers = [];
-    final Set<String> existingEmails = {};
+  List<UserSuggestion> _getSuggestedUser() {
+    final suggestedUsers = <UserSuggestion>[];
+    final existingEmails = <String>{widget.config.getEmail() ?? ""};
 
-    existingEmails.add(widget.config.getEmail() ?? "");
-
-    // Get suggested users from othersEmergencyContact (people who added you)
-    for (final contact in widget.emergencyInfo.othersEmergencyContact) {
-      if (!existingEmails.contains(contact.user.email)) {
-        existingEmails.add(contact.user.email);
-        suggestedUsers.add(contact.user);
+    void add(String email, {int? userID}) {
+      if (email.isNotEmpty && existingEmails.add(email)) {
+        suggestedUsers.add(UserSuggestion(email, userID: userID));
       }
     }
 
-    final cachedUserDetails = UserService.instance.getCachedUserDetails();
-    if (cachedUserDetails != null &&
-        (cachedUserDetails.familyData?.members?.isNotEmpty ?? false)) {
-      for (final member in cachedUserDetails.familyData!.members!) {
-        if (!existingEmails.contains(member.email)) {
-          existingEmails.add(member.email);
-          suggestedUsers.add(User(email: member.email));
-        }
-      }
+    // People who added you as their emergency contact
+    for (final contact in widget.emergencyInfo.othersEmergencyContact) {
+      add(contact.user.email, userID: contact.user.id);
+    }
+
+    final familyMembers =
+        UserService.instance.getCachedUserDetails()?.familyData?.members ?? [];
+    for (final member in familyMembers) {
+      add(member.email, userID: member.userID);
     }
 
     // Filter by search text

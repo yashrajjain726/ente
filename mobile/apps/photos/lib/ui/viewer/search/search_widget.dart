@@ -30,6 +30,7 @@ class SearchWidget extends StatefulWidget {
 }
 
 class SearchWidgetState extends State<SearchWidget> {
+  static const _uploadedFileIDsSearchPrefix = "uploaded_ids:";
   static final ValueNotifier<Stream<List<SearchResult>>?>
   searchResultsStreamNotifier = ValueNotifier(null);
 
@@ -203,16 +204,29 @@ class SearchWidgetState extends State<SearchWidget> {
     BuildContext context,
     String query,
   ) {
-    int resultCount = 0;
-    final maxResultCount = _isYearValid(query) ? 13 : 12;
-    final streamController = StreamController<List<SearchResult>>();
-
     if (query.isEmpty) {
       return Stream<List<SearchResult>>.multi((controller) {
         controller.add([]);
         controller.close();
       });
     }
+
+    if (query.startsWith(_uploadedFileIDsSearchPrefix)) {
+      final uploadedFileIDs = query
+          .substring(_uploadedFileIDsSearchPrefix.length)
+          .split(",")
+          .map((value) => int.tryParse(value.trim()))
+          .whereType<int>()
+          .where((id) => id > 0)
+          .toSet();
+      return Stream.fromFuture(
+        _searchService.getUploadedFileIDsSearchResults(query, uploadedFileIDs),
+      );
+    }
+
+    int resultCount = 0;
+    final maxResultCount = _isYearValid(query) ? 13 : 12;
+    final streamController = StreamController<List<SearchResult>>();
 
     void onResultsReceived(List<SearchResult> results) {
       streamController.sink.add(results);

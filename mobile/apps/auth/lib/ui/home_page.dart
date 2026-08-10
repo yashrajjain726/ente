@@ -10,7 +10,6 @@ import 'package:ente_auth/events/codes_updated_event.dart';
 import 'package:ente_auth/events/icons_changed_event.dart';
 import 'package:ente_auth/events/multi_select_action_requested_event.dart';
 import 'package:ente_auth/events/trigger_logout_event.dart';
-import 'package:ente_auth/l10n/l10n.dart';
 import 'package:ente_auth/models/code.dart';
 import 'package:ente_auth/onboarding/model/tag_enums.dart';
 import 'package:ente_auth/onboarding/view/common/tag_chip.dart';
@@ -24,13 +23,10 @@ import 'package:ente_auth/theme/ente_theme.dart';
 import 'package:ente_auth/ui/account/logout_dialog.dart';
 import 'package:ente_auth/ui/code_error_widget.dart';
 import 'package:ente_auth/ui/code_widget.dart';
-import 'package:ente_auth/ui/common/loading_widget.dart';
 import 'package:ente_auth/ui/components/auth_qr_dialog.dart';
 import 'package:ente_auth/ui/components/auth_selection_action_button.dart';
-import 'package:ente_auth/ui/components/buttons/button_widget.dart';
 import 'package:ente_auth/ui/components/dialog_widget.dart';
 import 'package:ente_auth/ui/components/horizontal_scroll_area.dart';
-import 'package:ente_auth/ui/components/models/button_type.dart';
 import 'package:ente_auth/ui/components/note_dialog.dart';
 import 'package:ente_auth/ui/custom_icon_page.dart';
 import 'package:ente_auth/ui/home/add_tag_sheet.dart';
@@ -39,6 +35,7 @@ import 'package:ente_auth/ui/home/home_empty_state.dart';
 import 'package:ente_auth/ui/home/shortcuts.dart';
 import 'package:ente_auth/ui/home/speed_dial_label_widget.dart';
 import 'package:ente_auth/ui/home/widgets/auth_logo_widget.dart';
+import 'package:ente_auth/ui/home/widgets/home_search_field.dart';
 import 'package:ente_auth/ui/reorder_codes_page.dart';
 import 'package:ente_auth/ui/scanner_page.dart';
 import 'package:ente_auth/ui/settings/data/import/google_auth_import.dart';
@@ -59,11 +56,15 @@ import 'package:ente_lock_screen/local_authentication_service.dart';
 import 'package:ente_lock_screen/lock_screen_settings.dart';
 import 'package:ente_lock_screen/ui/app_lock.dart';
 import 'package:ente_pure_utils/ente_pure_utils.dart';
-import 'package:ente_ui/components/android_text_input_autofocus.dart';
+import 'package:ente_strings/ente_strings.dart';
+import 'package:ente_ui/components/buttons/button_widget.dart';
+import 'package:ente_ui/components/buttons/models/button_type.dart';
+import 'package:ente_ui/components/loading_widget.dart';
 import 'package:ente_ui/pages/base_home_page.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart' as widgets;
 import 'package:flutter_speed_dial/flutter_speed_dial.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'package:hugeicons/hugeicons.dart';
@@ -220,14 +221,14 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _onDeleteForeverPressed() async {
-    final l10n = context.l10n;
+    final l10n = context.strings;
     final selectedIds = _codeDisplayStore.selectedCodeIds.value;
     if (selectedIds.isEmpty) return;
 
     bool isAuthSuccessful = await LocalAuthenticationService.instance
         .requestLocalAuthentication(
           context,
-          context.l10n.deleteCodeAuthMessage,
+          context.strings.deleteCodeAuthMessage,
         );
 
     if (!isAuthSuccessful) return;
@@ -272,7 +273,7 @@ class _HomePageState extends State<HomePage> {
       child: Row(
         children: [
           _buildActionButton(
-            context.l10n.restore,
+            context.strings.restore,
             _onRestoreSelectedPressed,
             semanticsIdentifier: 'auth_selection_restore',
             iconWidget: HugeIcon(
@@ -282,7 +283,7 @@ class _HomePageState extends State<HomePage> {
             ),
           ),
           _buildActionButton(
-            context.l10n.delete,
+            context.strings.delete,
             _onDeleteForeverPressed,
             semanticsIdentifier: 'auth_selection_delete_forever',
             iconWidget: HugeIcon(
@@ -341,10 +342,15 @@ class _HomePageState extends State<HomePage> {
         if (codesToUpdate.length == 1) {
           showToast(
             context,
-            context.l10n.unpinnedCodeMessage(codesToUpdate.first.issuer),
+            context.strings.unpinnedCodeMessage(
+              code: codesToUpdate.first.issuer,
+            ),
           );
         } else {
-          showToast(context, context.l10n.unpinnedCount(codesToUpdate.length));
+          showToast(
+            context,
+            context.strings.unpinnedCount(count: codesToUpdate.length),
+          );
         }
       } else {
         int pinnedCount = 0;
@@ -360,9 +366,12 @@ class _HomePageState extends State<HomePage> {
 
         if (pinnedCount == 1) {
           final pinnedCode = codesToUpdate.firstWhere((c) => !c.isPinned);
-          showToast(context, context.l10n.pinnedCodeMessage(pinnedCode.issuer));
+          showToast(
+            context,
+            context.strings.pinnedCodeMessage(code: pinnedCode.issuer),
+          );
         } else if (pinnedCount > 0) {
-          showToast(context, context.l10n.pinnedCount(pinnedCount));
+          showToast(context, context.strings.pinnedCount(count: pinnedCount));
         }
       }
 
@@ -405,10 +414,10 @@ class _HomePageState extends State<HomePage> {
         final unpinnedCode = codesToUpdate.firstWhere((c) => c.isPinned);
         showToast(
           context,
-          context.l10n.unpinnedCodeMessage(unpinnedCode.issuer),
+          context.strings.unpinnedCodeMessage(code: unpinnedCode.issuer),
         );
       } else if (unpinnedCount > 0) {
-        showToast(context, context.l10n.unpinnedCount(unpinnedCount));
+        showToast(context, context.strings.unpinnedCount(count: unpinnedCount));
       }
 
       await _saveCodesWithSingleSync(updatedCodes);
@@ -423,14 +432,14 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _onTrashSelectedPressed() async {
-    final l10n = context.l10n;
+    final l10n = context.strings;
     final selectedIds = _codeDisplayStore.selectedCodeIds.value;
     if (selectedIds.isEmpty) return;
 
     bool isAuthSuccessful = await LocalAuthenticationService.instance
         .requestLocalAuthentication(
           context,
-          context.l10n.deleteCodeAuthMessage,
+          context.strings.deleteCodeAuthMessage,
         );
     if (!isAuthSuccessful) return;
 
@@ -448,9 +457,9 @@ class _HomePageState extends State<HomePage> {
           final issuerAccount = code.account.isNotEmpty
               ? '${code.issuer} (${code.account})'
               : code.issuer;
-          return l10n.trashCodeMessage(issuerAccount);
+          return l10n.trashCodeMessage(account: issuerAccount);
         } else {
-          return l10n.moveMultipleToTrashMessage(selectedIds.length);
+          return l10n.moveMultipleToTrashMessage(count: selectedIds.length);
         }
       })(),
       firstButtonLabel: l10n.trash,
@@ -484,7 +493,10 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _onEditPressed(Code code) async {
     bool isAuthSuccessful = await LocalAuthenticationService.instance
-        .requestLocalAuthentication(context, context.l10n.editCodeAuthMessage);
+        .requestLocalAuthentication(
+          context,
+          context.strings.editCodeAuthMessage,
+        );
     await PlatformUtil.refocusWindows();
     if (!isAuthSuccessful) return;
 
@@ -508,7 +520,10 @@ class _HomePageState extends State<HomePage> {
       return;
     }
     bool isAuthSuccessful = await LocalAuthenticationService.instance
-        .requestLocalAuthentication(context, context.l10n.authenticateGeneric);
+        .requestLocalAuthentication(
+          context,
+          context.strings.authenticateGeneric,
+        );
     await PlatformUtil.refocusWindows();
     if (!isAuthSuccessful) return;
 
@@ -519,7 +534,7 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _onShowQrPressed(Code code) async {
     bool isAuthSuccessful = await LocalAuthenticationService.instance
-        .requestLocalAuthentication(context, context.l10n.showQRAuthMessage);
+        .requestLocalAuthentication(context, context.strings.showQRAuthMessage);
     await PlatformUtil.refocusWindows();
     if (!isAuthSuccessful) return;
 
@@ -545,8 +560,8 @@ class _HomePageState extends State<HomePage> {
           subtitle: code.account,
           shareFileName: 'ente_auth_qr_${code.account}.png',
           shareText: 'QR code for ${code.account}',
-          dialogTitle: dialogContext.l10n.qrCode,
-          shareButtonText: dialogContext.l10n.share,
+          dialogTitle: dialogContext.strings.qrCode,
+          shareButtonText: dialogContext.strings.share,
         );
       },
     );
@@ -580,7 +595,7 @@ class _HomePageState extends State<HomePage> {
         Row(
           children: [
             _buildActionButton(
-              context.l10n.edit,
+              context.strings.edit,
               () => _onEditPressed(code),
               iconWidget: HugeIcon(
                 icon: HugeIcons.strokeRoundedEdit03,
@@ -591,7 +606,7 @@ class _HomePageState extends State<HomePage> {
             const SizedBox(width: 10),
             if (code.type.canShareCodes) ...[
               _buildActionButton(
-                context.l10n.share,
+                context.strings.share,
                 () => _onSharePressed(code),
                 iconWidget: HugeIcon(
                   icon: HugeIcons.strokeRoundedNavigation03,
@@ -602,7 +617,7 @@ class _HomePageState extends State<HomePage> {
               const SizedBox(width: 10),
             ],
             _buildActionButton(
-              context.l10n.qrCode,
+              context.strings.qrCode,
               () => _onShowQrPressed(code),
               iconWidget: HugeIcon(
                 icon: HugeIcons.strokeRoundedQrCode,
@@ -640,8 +655,8 @@ class _HomePageState extends State<HomePage> {
 
                   return _buildActionButton(
                     allArePinned
-                        ? context.l10n.unpinText
-                        : context.l10n.pinText,
+                        ? context.strings.unpinText
+                        : context.strings.pinText,
                     _onPinSelectedPressed,
                     iconWidget: HugeIcon(
                       icon: allArePinned
@@ -654,7 +669,7 @@ class _HomePageState extends State<HomePage> {
                 },
               ),
               _buildActionButton(
-                context.l10n.addTag,
+                context.strings.addTag,
                 _onAddTagPressed,
                 semanticsIdentifier: 'auth_selection_add_tag',
                 iconWidget: HugeIcon(
@@ -664,7 +679,7 @@ class _HomePageState extends State<HomePage> {
                 ),
               ),
               _buildActionButton(
-                context.l10n.trash,
+                context.strings.trash,
                 _onTrashSelectedPressed,
                 iconWidget: HugeIcon(
                   icon: HugeIcons.strokeRoundedDelete02,
@@ -711,7 +726,7 @@ class _HomePageState extends State<HomePage> {
             return Row(
               children: [
                 _buildActionButton(
-                  context.l10n.pinText,
+                  context.strings.pinText,
                   _onPinSelectedPressed,
                   iconWidget: HugeIcon(
                     icon: HugeIcons.strokeRoundedPin,
@@ -720,7 +735,7 @@ class _HomePageState extends State<HomePage> {
                   ),
                 ),
                 _buildActionButton(
-                  context.l10n.unpinText,
+                  context.strings.unpinText,
                   _onUnpinSelectedPressed,
                   iconWidget: HugeIcon(
                     icon: HugeIcons.strokeRoundedPinOff,
@@ -729,7 +744,7 @@ class _HomePageState extends State<HomePage> {
                   ),
                 ),
                 _buildActionButton(
-                  context.l10n.addTag,
+                  context.strings.addTag,
                   _onAddTagPressed,
                   semanticsIdentifier: 'auth_selection_add_tag',
                   iconWidget: HugeIcon(
@@ -739,7 +754,7 @@ class _HomePageState extends State<HomePage> {
                   ),
                 ),
                 _buildActionButton(
-                  context.l10n.trash,
+                  context.strings.trash,
                   _onTrashSelectedPressed,
                   iconWidget: HugeIcon(
                     icon: HugeIcons.strokeRoundedDelete02,
@@ -755,7 +770,9 @@ class _HomePageState extends State<HomePage> {
             return Row(
               children: [
                 _buildActionButton(
-                  allArePinned ? context.l10n.unpinText : context.l10n.pinText,
+                  allArePinned
+                      ? context.strings.unpinText
+                      : context.strings.pinText,
                   _onPinSelectedPressed,
                   iconWidget: HugeIcon(
                     icon: allArePinned
@@ -766,7 +783,7 @@ class _HomePageState extends State<HomePage> {
                   ),
                 ),
                 _buildActionButton(
-                  context.l10n.addTag,
+                  context.strings.addTag,
                   _onAddTagPressed,
                   semanticsIdentifier: 'auth_selection_add_tag',
                   iconWidget: HugeIcon(
@@ -776,7 +793,7 @@ class _HomePageState extends State<HomePage> {
                   ),
                 ),
                 _buildActionButton(
-                  context.l10n.trash,
+                  context.strings.trash,
                   _onTrashSelectedPressed,
                   iconWidget: HugeIcon(
                     icon: HugeIcons.strokeRoundedDelete02,
@@ -859,7 +876,7 @@ class _HomePageState extends State<HomePage> {
                   Row(
                     children: [
                       FilterChipComponent(
-                        label: context.l10n.selectAll,
+                        label: context.strings.selectAll,
                         trailing: const HugeIcon(
                           icon: HugeIcons.strokeRoundedTickDouble02,
                           size: IconSizes.small,
@@ -930,7 +947,9 @@ class _HomePageState extends State<HomePage> {
                           valueListenable: _codeDisplayStore.selectedCodeIds,
                           builder: (context, selectedIds, child) {
                             return FilterChipComponent(
-                              label: context.l10n.nSelected(selectedIds.length),
+                              label: context.strings.selectedCount(
+                                count: selectedIds.length,
+                              ),
                               trailing: const Icon(
                                 Icons.close,
                                 size: IconSizes.small,
@@ -1021,6 +1040,16 @@ class _HomePageState extends State<HomePage> {
           pressed.contains(LogicalKeyboardKey.shiftRight) ||
           pressed.contains(LogicalKeyboardKey.shift);
 
+      final focusContext = primaryFocus?.context;
+      final bool isFocusedCopyShortcut =
+          focusContext != null &&
+          ((event.logicalKey == LogicalKeyboardKey.keyC &&
+                  widgets.Actions.maybeFind<CopyIntent>(focusContext) !=
+                      null) ||
+              (event.logicalKey == LogicalKeyboardKey.keyN &&
+                  widgets.Actions.maybeFind<CopyNextIntent>(focusContext) !=
+                      null));
+
       if (isMetaKeyPressed && event.logicalKey == LogicalKeyboardKey.keyW) {
         if (PlatformDetector.isDesktop()) {
           windowManager.close();
@@ -1040,8 +1069,30 @@ class _HomePageState extends State<HomePage> {
         return true;
       }
 
+      // On desktop, typing a printable character opens search. Keep the key
+      // unhandled so the text input system can preserve IME composition.
+      if (PlatformDetector.isDesktop() &&
+          !isHomeSearchFocused &&
+          !isMetaKeyPressed &&
+          !pressed.contains(LogicalKeyboardKey.altLeft) &&
+          !pressed.contains(LogicalKeyboardKey.alt) &&
+          !pressed.contains(LogicalKeyboardKey.altRight) &&
+          !isFocusedCopyShortcut &&
+          event.character != null &&
+          event.character!.trim().isNotEmpty) {
+        return activateHomeSearchFromKeyEvent(
+          showSearch: () {
+            setState(() {
+              _showSearchBox = true;
+            });
+          },
+          focusNode: searchBoxFocusNode,
+        );
+      }
+
       // Only use Escape for the HomePage search UI.
       if (event.logicalKey == LogicalKeyboardKey.escape && _showSearchBox) {
+        searchBoxFocusNode.unfocus();
         setState(() {
           _textController.clear();
           _searchText = "";
@@ -1327,8 +1378,8 @@ class _HomePageState extends State<HomePage> {
       if (!mounted) return;
       await showDialogWidget(
         context: context,
-        title: context.l10n.appLockNotEnabled,
-        body: context.l10n.appLockNotEnabledDescription,
+        title: context.strings.appLockNotEnabled,
+        body: context.strings.appLockNotEnabledDescription,
         isDismissible: true,
         buttons: const [
           ButtonWidget(
@@ -1366,7 +1417,7 @@ class _HomePageState extends State<HomePage> {
     LockScreenSettings.instance.setLightMode(
       getEnteColorScheme(context).isLightTheme,
     );
-    final l10n = context.l10n;
+    final l10n = context.strings;
     isCompactMode = PreferenceService.instance.isCompactMode();
 
     return ValueListenableBuilder<bool>(
@@ -1444,11 +1495,41 @@ class _HomePageState extends State<HomePage> {
   }
 
   PreferredSizeWidget _buildStandardAppBar(
-    AppLocalizations l10n,
+    StringsLocalizations l10n,
     bool isDesktop,
   ) {
     final colorScheme = getEnteColorScheme(context);
     final iconColor = colorScheme.textBase;
+    final searchField = AndroidTextInputAutofocus(
+      enabled: _autoFocusSearch && _showSearchBox,
+      focusNode: searchBoxFocusNode,
+      child: TextField(
+        autocorrect: false,
+        enableSuggestions: false,
+        autofocus: _autoFocusSearch && _showSearchBox && !Platform.isAndroid,
+        selectAllOnFocus: false,
+        controller: _textController,
+        onChanged: (val) {
+          _searchText = val;
+          _applyFilteringAndRefresh();
+        },
+        onSubmitted: (_) {
+          if (_filteredCodes.isNotEmpty) {
+            // Move focus to the first item in the grid
+            _firstItemFocusNode.requestFocus();
+          }
+        },
+        decoration: InputDecoration(
+          hintText: l10n.searchHint,
+          border: InputBorder.none,
+          focusedBorder: InputBorder.none,
+        ),
+        focusNode: searchBoxFocusNode,
+      ),
+    );
+    final nonDesktopTitle = _showSearchBox
+        ? searchField
+        : const AuthLogoWidget(height: 18);
 
     return AppBar(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -1465,34 +1546,18 @@ class _HomePageState extends State<HomePage> {
           scaffoldKey.currentState?.openDrawer();
         },
       ),
-      title: !_showSearchBox
-          ? const AuthLogoWidget(height: 18)
-          : AndroidTextInputAutofocus(
-              enabled: _autoFocusSearch,
-              focusNode: searchBoxFocusNode,
-              child: TextField(
-                autocorrect: false,
-                enableSuggestions: false,
-                autofocus: _autoFocusSearch && !Platform.isAndroid,
-                controller: _textController,
-                onChanged: (val) {
-                  _searchText = val;
-                  _applyFilteringAndRefresh();
-                },
-                onSubmitted: (_) {
-                  if (_filteredCodes.isNotEmpty) {
-                    // Move focus to the first item in the grid
-                    _firstItemFocusNode.requestFocus();
-                  }
-                },
-                decoration: InputDecoration(
-                  hintText: l10n.searchHint,
-                  border: InputBorder.none,
-                  focusedBorder: InputBorder.none,
+      title: isDesktop
+          ? Stack(
+              alignment: Alignment.center,
+              children: [
+                if (!_showSearchBox) const AuthLogoWidget(height: 18),
+                PersistentSearchField(
+                  visible: _showSearchBox,
+                  child: searchField,
                 ),
-                focusNode: searchBoxFocusNode,
-              ),
-            ),
+              ],
+            )
+          : nonDesktopTitle,
       centerTitle: true,
       actions: <Widget>[
         if (isDesktop)
@@ -1543,6 +1608,7 @@ class _HomePageState extends State<HomePage> {
             setState(() {
               _showSearchBox = !_showSearchBox;
               if (!_showSearchBox) {
+                searchBoxFocusNode.unfocus();
                 _textController.clear();
                 _searchText = "";
               } else {
@@ -1558,7 +1624,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildDesktopSelectionBottomBar() {
-    final l10n = context.l10n;
+    final l10n = context.strings;
     final visibleIds = _filteredCodes.map((c) => c.selectionKey).toSet();
     final colorScheme = getEnteColorScheme(context);
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
@@ -1671,7 +1737,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _getBody() {
-    final l10n = context.l10n;
+    final l10n = context.strings;
     final crossAxisCount = _calculateGridColumnCount(context);
     _currentGridColumns = crossAxisCount;
     final double keyboardInset = MediaQuery.of(context).viewInsets.bottom;
@@ -2070,38 +2136,38 @@ class _HomePageState extends State<HomePage> {
     if (!allTrashed) {
       if (isMixedPinned) {
         addButton(
-          context.l10n.pinText,
+          context.strings.pinText,
           Icons.push_pin,
           () => _onPinSelectedPressed(),
         );
         addButton(
-          context.l10n.unpinText,
+          context.strings.unpinText,
           Icons.push_pin,
           () => _onUnpinSelectedPressed(),
           iconWidget: _buildUnpinIcon(context),
         );
       } else if (allPinned) {
         addButton(
-          context.l10n.unpinText,
+          context.strings.unpinText,
           Icons.push_pin,
           () => _onUnpinSelectedPressed(),
           iconWidget: _buildUnpinIcon(context),
         );
       } else {
         addButton(
-          context.l10n.pinText,
+          context.strings.pinText,
           Icons.push_pin,
           () => _onPinSelectedPressed(),
         );
       }
 
       addButton(
-        context.l10n.addTag,
+        context.strings.addTag,
         Icons.local_offer_outlined,
         _onAddTagPressed,
       );
       addButton(
-        context.l10n.trash,
+        context.strings.trash,
         Icons.delete_outline,
         () => _onTrashSelectedPressed(),
       );
@@ -2109,30 +2175,30 @@ class _HomePageState extends State<HomePage> {
       if (singleCode != null) {
         if (singleCode.type.canShareCodes) {
           addButton(
-            context.l10n.share,
+            context.strings.share,
             Icons.adaptive.share_outlined,
             () => _onSharePressed(singleCode),
           );
         }
         addButton(
-          context.l10n.qr,
+          context.strings.qr,
           Icons.qr_code_2_outlined,
           () => _onShowQrPressed(singleCode),
         );
         addButton(
-          context.l10n.edit,
+          context.strings.edit,
           Icons.edit_outlined,
           () => _onEditPressed(singleCode),
         );
       }
     } else {
       addButton(
-        context.l10n.restore,
+        context.strings.restore,
         Icons.restore_outlined,
         () => _onRestoreSelectedPressed(),
       );
       addButton(
-        context.l10n.delete,
+        context.strings.delete,
         Icons.delete_forever_outlined,
         () => _onDeleteForeverPressed(),
       );
@@ -2216,7 +2282,7 @@ class _HomePageState extends State<HomePage> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                context.l10n.selectAll,
+                context.strings.selectAll,
                 style: TextStyle(fontSize: 12, color: textColor),
               ),
               const SizedBox(width: 6),
@@ -2312,7 +2378,7 @@ class _HomePageState extends State<HomePage> {
       spacing: 3,
       childPadding: const EdgeInsets.all(5),
       spaceBetweenChildren: 4,
-      tooltip: context.l10n.addCode,
+      tooltip: context.strings.addCode,
       foregroundColor: Theme.of(context).colorScheme.fabForegroundColor,
       backgroundColor: Theme.of(context).colorScheme.fabBackgroundColor,
       overlayOpacity: 0.5,
@@ -2325,14 +2391,16 @@ class _HomePageState extends State<HomePage> {
             child: const HugeIcon(icon: HugeIcons.strokeRoundedQrCode),
             foregroundColor: Theme.of(context).colorScheme.fabForegroundColor,
             backgroundColor: Theme.of(context).colorScheme.fabBackgroundColor,
-            labelWidget: SpeedDialLabelWidget(context.l10n.scanAQrCode),
+            labelWidget: SpeedDialLabelWidget(context.strings.scanAQrCode),
             onTap: _redirectToScannerPage,
           ),
         SpeedDialChild(
           child: const Icon(Icons.keyboard_alt_outlined),
           foregroundColor: Theme.of(context).colorScheme.fabForegroundColor,
           backgroundColor: Theme.of(context).colorScheme.fabBackgroundColor,
-          labelWidget: SpeedDialLabelWidget(context.l10n.enterDetailsManually),
+          labelWidget: SpeedDialLabelWidget(
+            context.strings.enterDetailsManually,
+          ),
           onTap: _redirectToManualEntryPage,
         ),
         if (isDesktop || PlatformDetector.isMobile())
@@ -2340,7 +2408,9 @@ class _HomePageState extends State<HomePage> {
             child: const HugeIcon(icon: HugeIcons.strokeRoundedAlbum02),
             backgroundColor: Theme.of(context).colorScheme.fabBackgroundColor,
             foregroundColor: Theme.of(context).colorScheme.fabForegroundColor,
-            labelWidget: SpeedDialLabelWidget(context.l10n.importFromGallery),
+            labelWidget: SpeedDialLabelWidget(
+              context.strings.importFromGallery,
+            ),
             onTap: _importFromGalleryNative,
           ),
       ],

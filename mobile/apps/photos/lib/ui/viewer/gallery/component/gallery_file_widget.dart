@@ -106,7 +106,7 @@ class _GalleryFileWidgetState extends State<GalleryFileWidget> {
         widget.file.isUploaded &&
         widget.file.ownerID != null &&
         widget.file.ownerID != widget.currentUserID) {
-      final owner = CollectionsService.instance.getFileOwner(
+      final owner = CollectionsService.instance.resolveUserIdentity(
         widget.file.ownerID!,
         widget.file.collectionID,
       );

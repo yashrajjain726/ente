@@ -92,6 +92,10 @@ class SrpSetupNotCompleteError extends Error {}
 
 class SharingNotPermittedForFreeAccountsError extends Error {}
 
+class RecipientIdentityMismatchError extends Error {}
+
+class AutomaticShareRecipientNotEligibleError extends Error {}
+
 class LinkEditNotAllowedError extends Error {}
 
 class NoMediaLocationAccessError extends Error {}

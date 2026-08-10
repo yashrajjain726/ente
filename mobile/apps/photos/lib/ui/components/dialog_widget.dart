@@ -1,9 +1,9 @@
 import 'dart:async';
 
 import "package:ente_components/ente_components.dart";
+import "package:ente_strings/ente_strings.dart";
 import 'package:flutter/material.dart';
 import "package:flutter/services.dart";
-import "package:photos/generated/l10n.dart";
 import 'package:photos/models/button_result.dart';
 import 'package:photos/models/typedefs.dart';
 import "package:photos/ui/components/buttons/button_component_adapter.dart";
@@ -78,7 +78,7 @@ class LegacyDialogWidget extends StatelessWidget {
           ButtonComponentAdapter(button: button),
       ],
       showCloseButton: cancelButton != null,
-      closeTooltip: AppLocalizations.of(context).close,
+      closeTooltip: context.strings.close,
       closeResult: cancelButton == null ? null : sheetCloseResult(cancelButton),
       onClose: cancelButton == null
           ? null
@@ -252,7 +252,7 @@ class _LegacyTextInputDialogState extends State<LegacyTextInputDialog> {
       ],
       isKeyboardAware: true,
       showCloseButton: true,
-      closeTooltip: AppLocalizations.of(context).close,
+      closeTooltip: context.strings.close,
       closeResult: ButtonResult(),
     );
   }

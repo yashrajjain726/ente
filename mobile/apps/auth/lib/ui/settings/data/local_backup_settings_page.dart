@@ -1,8 +1,7 @@
-import 'package:ente_auth/l10n/l10n.dart';
-import 'package:ente_auth/ui/settings/components/auth_settings_item.dart';
 import 'package:ente_auth/ui/settings/components/auth_settings_page_scaffold.dart';
 import 'package:ente_auth/ui/settings/data/local_backup/local_backup_experience.dart';
 import 'package:ente_components/ente_components.dart';
+import 'package:ente_strings/ente_strings.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
@@ -13,11 +12,11 @@ class LocalBackupSettingsPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return LocalBackupExperience(
       builder: (context, controller) {
-        final l10n = context.l10n;
+        final l10n = context.strings;
         return Semantics(
           identifier: 'auth_local_backup_settings',
           child: AuthSettingsPageScaffold(
-            title: l10n.localBackupSettingsTitle,
+            title: l10n.localBackupSidebarTitle,
             children: controller.hasLoaded
                 ? _settings(context, controller)
                 : const [
@@ -36,11 +35,11 @@ class LocalBackupSettingsPage extends StatelessWidget {
     BuildContext context,
     LocalBackupExperienceController controller,
   ) {
-    final l10n = context.l10n;
+    final l10n = context.strings;
     return [
       MenuGroupComponent(
         items: [
-          AuthSettingsItem(
+          SettingsItem(
             title: l10n.enableAutomaticBackups,
             showChevron: false,
             trailing: Semantics(
@@ -68,20 +67,21 @@ class LocalBackupSettingsPage extends StatelessWidget {
                 final title = snapshot.data == true
                     ? l10n.updateBackupPassword
                     : l10n.setBackupPassword;
-                return AuthSettingsItem(
+                return SettingsItem(
                   title: title,
                   semanticsIdentifier: 'auth_local_backup_password',
                   onTap: () => controller.updatePassword(context),
                 );
               },
             ),
-            AuthSettingsItem(
+            SettingsItem(
               title: l10n.setBackupFolder,
               subtitle: _locationDescription(context, controller),
+              subtitleMaxLines: 2,
               semanticsIdentifier: 'auth_local_backup_folder',
               onTap: controller.changeLocation,
             ),
-            AuthSettingsItem(
+            SettingsItem(
               title: l10n.createBackupNow,
               semanticsIdentifier: 'auth_local_backup_create_now',
               showOnlyLoadingState: true,
@@ -97,13 +97,13 @@ class LocalBackupSettingsPage extends StatelessWidget {
           showDividers: true,
           dividerPadding: const EdgeInsets.only(left: Spacing.lg),
           items: [
-            AuthSettingsItem(
+            SettingsItem(
               title: l10n.clearBackupFolder,
               showChevron: false,
               showOnlyLoadingState: true,
               onTap: controller.resetBackupLocation,
             ),
-            AuthSettingsItem(
+            SettingsItem(
               title: l10n.clearBackupPassword,
               showChevron: false,
               showOnlyLoadingState: true,
@@ -119,7 +119,7 @@ class LocalBackupSettingsPage extends StatelessWidget {
     BuildContext context,
     LocalBackupExperienceController controller,
   ) {
-    final l10n = context.l10n;
+    final l10n = context.strings;
     final location = controller.backupPath ?? controller.backupTreeUri;
     if (location == null || location.isEmpty) {
       return l10n.selectBackupFolder;

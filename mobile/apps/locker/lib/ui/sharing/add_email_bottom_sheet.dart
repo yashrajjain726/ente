@@ -6,17 +6,14 @@ import "package:ente_sharing/extensions/user_extension.dart";
 import "package:ente_sharing/models/user.dart";
 import "package:ente_sharing/user_avator_widget.dart";
 import "package:ente_sharing/verify_identity_dialog.dart";
-import "package:ente_ui/components/captioned_text_widget_v2.dart";
-import "package:ente_ui/components/divider_widget.dart";
-import "package:ente_ui/components/menu_item_widget_v2.dart";
+import "package:ente_strings/ente_strings.dart";
+import "package:ente_ui/components/date_time_picker.dart";
 import "package:flutter/material.dart";
 import "package:intl/intl.dart";
-import "package:locker/l10n/l10n.dart";
 import "package:locker/services/collections/collections_service.dart";
 import "package:locker/services/collections/models/collection.dart";
 import "package:locker/services/configuration.dart";
 import "package:locker/ui/components/custom_list_scrollbar.dart";
-import "package:locker/ui/viewer/date/date_time_picker.dart";
 import "package:locker/utils/collection_actions.dart";
 
 Future<void> showAddEmailSheet(
@@ -59,7 +56,7 @@ class _AddEmailSheetState extends State<AddEmailSheet> {
   final _scrollController = ScrollController();
 
   late CollectionActions _collectionActions;
-  late List<User> _suggestedUsers;
+  late List<UserSuggestion> _suggestedUsers;
 
   @override
   void initState() {
@@ -79,7 +76,7 @@ class _AddEmailSheetState extends State<AddEmailSheet> {
   @override
   Widget build(BuildContext context) {
     return BottomSheetComponent(
-      title: context.l10n.addNewEmail,
+      title: context.strings.addNewEmail,
       isKeyboardAware: true,
       content: ValueListenableBuilder<int>(
         valueListenable: ContactsDisplayService.instance.changes,
@@ -109,7 +106,7 @@ class _AddEmailSheetState extends State<AddEmailSheet> {
     return TextInputComponent(
       controller: _textController,
       focusNode: _textFieldFocusNode,
-      hintText: context.l10n.enterNameOrEmailToShareWith,
+      hintText: context.strings.enterNameOrEmailToShareWith,
       keyboardType: TextInputType.emailAddress,
       autofillHints: const [AutofillHints.email],
       autocorrect: false,
@@ -147,7 +144,7 @@ class _AddEmailSheetState extends State<AddEmailSheet> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          context.l10n.chooseFromAnExistingContact,
+          context.strings.chooseFromAnExistingContact,
           style: TextStyles.body.copyWith(color: colors.textLight),
         ),
         const SizedBox(height: 8),
@@ -161,55 +158,44 @@ class _AddEmailSheetState extends State<AddEmailSheet> {
                   constraints: const BoxConstraints(
                     maxHeight: maxVisibleHeight,
                   ),
-                  child: ListView.builder(
+                  child: ListView(
                     controller: _scrollController,
                     shrinkWrap: true,
                     padding: EdgeInsets.zero,
-                    itemCount: filteredUsers.length,
-                    itemBuilder: (context, index) {
-                      final user = filteredUsers[index];
-                      final isFirst = index == 0;
-                      final isLast = index == filteredUsers.length - 1;
-                      return Column(
-                        children: [
-                          if (!isFirst)
-                            DividerWidget(
-                              dividerType: DividerType.menu,
-                              bgColor: colors.fillLight,
-                            ),
-                          MenuItemWidgetV2(
-                            captionedTextWidget: CaptionedTextWidgetV2(
-                              title: user.resolvedDisplayName,
-                            ),
-                            leadingIconSize: 24.0,
-                            leadingIconWidget: UserAvatarWidget(
-                              user,
-                              type: AvatarType.mini,
-                              config: Configuration.instance,
-                            ),
-                            menuItemColor: colors.fillLight,
-                            surfaceExecutionStates: false,
-                            onTap: () async {
-                              _textFieldFocusNode.unfocus();
-                              _textController.text = user.email;
-                              _email = user.email;
-                              _emailIsValid = true;
-                              setState(() {});
-                            },
-                            onLongPress: () {
-                              showVerifyIdentitySheet(
-                                context,
-                                self: false,
-                                config: Configuration.instance,
-                                email: user.email,
-                              );
-                            },
-                            isTopBorderRadiusRemoved: !isFirst,
-                            isBottomBorderRadiusRemoved: !isLast,
-                          ),
-                        ],
-                      );
-                    },
+                    children: [
+                      MenuGroupComponent(
+                        backgroundColor: colors.fillLight,
+                        showDividers: true,
+                        dividerPadding: const EdgeInsets.only(left: 48),
+                        items: filteredUsers
+                            .map(
+                              (user) => MenuComponent(
+                                title: user.resolvedDisplayName,
+                                leading: UserAvatarWidget.suggestion(
+                                  user,
+                                  type: AvatarType.mini,
+                                  config: Configuration.instance,
+                                ),
+                                onTap: () async {
+                                  _textFieldFocusNode.unfocus();
+                                  _textController.text = user.email;
+                                  _email = user.email;
+                                  _emailIsValid = true;
+                                  setState(() {});
+                                },
+                                onLongPress: () {
+                                  showVerifyIdentitySheet(
+                                    context,
+                                    self: false,
+                                    config: Configuration.instance,
+                                    email: user.email,
+                                  );
+                                },
+                              ),
+                            )
+                            .toList(),
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -308,10 +294,10 @@ class _AddEmailSheetState extends State<AddEmailSheet> {
   Future<void> _selectDate() async {
     final initialDate =
         _scheduledDate ?? DateTime.now().add(const Duration(days: 1));
-    final pickedDate = await showDatePickerSheet(
+    final pickedDate = await showDateTimePickerSheet(
       context,
-      initialDate: initialDate,
-      minDate: DateTime.now(),
+      initialDateTime: initialDate,
+      minDateTime: DateTime.now(),
     );
     if (pickedDate != null && mounted) {
       setState(() {
@@ -337,8 +323,8 @@ class _AddEmailSheetState extends State<AddEmailSheet> {
     final bool canShare =
         _emailIsValid && (!_shareLater || _isScheduledDateTimeValid());
     final buttonText = _shareLater
-        ? context.l10n.scheduleShare
-        : context.l10n.share;
+        ? context.strings.scheduleShare
+        : context.strings.share;
     return ButtonComponent(
       label: buttonText,
       onTap: canShare ? _onShareTap : null,
@@ -362,48 +348,39 @@ class _AddEmailSheetState extends State<AddEmailSheet> {
     }
   }
 
-  List<User> _getSuggestedUsers() {
-    final List<User> suggestedUsers = [];
-    final Set<String> existingEmails = {};
-
-    existingEmails.add(Configuration.instance.getEmail() ?? "");
+  List<UserSuggestion> _getSuggestedUsers() {
     final int ownerID = Configuration.instance.getUserID()!;
+    final suggestedUsers = <UserSuggestion>[];
+    final existingEmails = <String>{Configuration.instance.getEmail() ?? ""};
+
+    void add(String email, {int? userID}) {
+      if (email.isNotEmpty && existingEmails.add(email)) {
+        suggestedUsers.add(UserSuggestion(email, userID: userID));
+      }
+    }
 
     for (final c in CollectionService.instance.getActiveCollections()) {
       if (c.owner.id == ownerID) {
         for (final User u in c.sharees) {
-          if (u.id != null &&
-              u.email.isNotEmpty &&
-              !existingEmails.contains(u.email)) {
-            existingEmails.add(u.email);
-            suggestedUsers.add(u);
-          }
+          add(u.email, userID: u.id);
         }
-      } else if (c.owner.id != null &&
-          c.owner.email.isNotEmpty &&
-          !existingEmails.contains(c.owner.email)) {
-        existingEmails.add(c.owner.email);
-        suggestedUsers.add(c.owner);
+      } else {
+        add(c.owner.email, userID: c.owner.id);
       }
     }
 
-    final cachedUserDetails = UserService.instance.getCachedUserDetails();
-    if (cachedUserDetails != null &&
-        (cachedUserDetails.familyData?.members?.isNotEmpty ?? false)) {
-      for (final member in cachedUserDetails.familyData!.members!) {
-        if (!existingEmails.contains(member.email)) {
-          existingEmails.add(member.email);
-          suggestedUsers.add(User(email: member.email));
-        }
-      }
+    final familyMembers =
+        UserService.instance.getCachedUserDetails()?.familyData?.members ?? [];
+    for (final member in familyMembers) {
+      add(member.email, userID: member.userID);
     }
 
-    suggestedUsers.sort((a, b) => a.email.compareTo(b.email));
-    suggestedUsers.sort(
-      (a, b) => a.resolvedDisplayName.toLowerCase().compareTo(
+    suggestedUsers.sort((a, b) {
+      final byName = a.resolvedDisplayName.toLowerCase().compareTo(
         b.resolvedDisplayName.toLowerCase(),
-      ),
-    );
+      );
+      return byName != 0 ? byName : a.email.compareTo(b.email);
+    });
     return suggestedUsers;
   }
 

@@ -3,6 +3,7 @@ package controller
 import (
 	"database/sql"
 	"errors"
+	"strconv"
 
 	"github.com/ente/museum/ente"
 	"github.com/ente/museum/pkg/repo"
@@ -22,6 +23,7 @@ type potentialAbuseNotifier interface {
 // UserLookup applies the shared authenticated email-discovery policy.
 type UserLookup interface {
 	LookupUserID(requesterUserID int64, email string) (int64, error)
+	VerifyUserID(requesterUserID int64, email string, expectedUserID int64) error
 }
 
 // UserLookupController limits email discovery before querying the user repository.
@@ -42,12 +44,38 @@ func NewUserLookupController(userRepo *repo.UserRepository, notifier potentialAb
 }
 
 func (c *UserLookupController) LookupUserID(requesterUserID int64, email string) (int64, error) {
+	return c.lookupUserID(requesterUserID, email, nil)
+}
+
+// VerifyUserID applies the shared lookup policy and verifies that email still
+// identifies expectedUserID.
+func (c *UserLookupController) VerifyUserID(
+	requesterUserID int64,
+	email string,
+	expectedUserID int64,
+) error {
+	_, err := c.lookupUserID(requesterUserID, email, &expectedUserID)
+	return err
+}
+
+func (c *UserLookupController) lookupUserID(
+	requesterUserID int64,
+	email string,
+	expectedUserID *int64,
+) (int64, error) {
 	if requesterUserID <= 0 {
 		return -1, stacktrace.Propagate(ente.ErrAuthenticationRequired, "")
 	}
+	if expectedUserID != nil && *expectedUserID <= 0 {
+		return -1, stacktrace.Propagate(ente.ErrBadRequest, "invalid expected user ID")
+	}
 
 	normalizedEmail := emailUtil.NormalizeEmail(email)
-	targetHash, err := crypto.GetHash(normalizedEmail, c.hashingKey)
+	limitTarget := normalizedEmail
+	if expectedUserID != nil {
+		limitTarget = "email-user-id\x00" + normalizedEmail + "\x00" + strconv.FormatInt(*expectedUserID, 10)
+	}
+	targetHash, err := crypto.GetHash(limitTarget, c.hashingKey)
 	if err != nil {
 		return -1, stacktrace.Propagate(err, "")
 	}
@@ -58,9 +86,14 @@ func (c *UserLookupController) LookupUserID(requesterUserID int64, email string)
 	}
 
 	userID, err := c.userRepo.GetUserIDWithEmailUnrestricted(normalizedEmail)
-	decision = c.lookupLimit.Finish(attempt, errors.Is(err, sql.ErrNoRows))
+	identityMismatch := errors.Is(err, sql.ErrNoRows) ||
+		(err == nil && expectedUserID != nil && userID != *expectedUserID)
+	decision = c.lookupLimit.Finish(attempt, identityMismatch)
 	if !decision.allowed {
 		return -1, c.limitExceeded(decision)
+	}
+	if expectedUserID != nil && identityMismatch {
+		return -1, stacktrace.Propagate(ente.ErrRecipientIdentityMismatch, "")
 	}
 	return userID, err
 }

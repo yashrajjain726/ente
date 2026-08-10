@@ -146,7 +146,7 @@ class EnteFile {
   }
 
   String get downloadUrl =>
-      FileUrl.getUrl(uploadedFileID!, FileUrlType.download);
+      FileUrl.getLegacyUrl(uploadedFileID!, FileUrlType.download);
 
   String? get caption {
     return pubMagicMetadata?.caption;

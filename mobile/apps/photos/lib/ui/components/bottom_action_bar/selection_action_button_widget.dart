@@ -114,7 +114,10 @@ class __BodyState extends State<_Body> {
                     color: foregroundColor,
                   )
                 else
-                  widget.iconWidget!,
+                  IconTheme(
+                    data: IconThemeData(size: iconSize, color: foregroundColor),
+                    child: widget.iconWidget!,
+                  ),
                 const SizedBox(height: 4),
                 Text(
                   widget.labelText,

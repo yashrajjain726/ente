@@ -100,15 +100,7 @@ fn import(
             .map_err(ApiError::from)?;
         for message in source.get_messages(session.uuid).map_err(ApiError::from)? {
             target
-                .insert_message_with_uuid(
-                    message.uuid,
-                    message.session_uuid,
-                    message.sender.as_str(),
-                    &message.text,
-                    message.parent_message_uuid,
-                    message.attachments.clone(),
-                    message.created_at,
-                )
+                .insert_message_with_uuid(&message)
                 .map_err(ApiError::from)?;
             for attachment in message.attachments {
                 let from = source_attachments.join(&attachment.id);

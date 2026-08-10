@@ -1,8 +1,3 @@
-//! High-level authentication API for applications.
-//!
-//! This module provides the main entry points that CLI/GUI applications should use
-//! for authentication flows. It wraps the lower-level crypto operations.
-
 use std::fmt;
 
 use ente_core::b64;
@@ -10,13 +5,11 @@ use ente_core::crypto::{self, Salt, SecretVec, argon, kdf, sealed, secretbox};
 use sha2::Sha256;
 use srp::ClientG4096;
 
-use super::{Error, KeyAttributes, Result, SrpAttributes};
+use super::{KeyAttributes, SrpAttributes};
+use crate::error::{Error, Result};
 
-/// Credentials derived from password for SRP authentication.
 pub struct SrpCredentials {
-    /// Key encryption key (32 bytes) - used to decrypt master key after auth.
     pub kek: SecretVec,
-    /// Login key (16 bytes) - used as password in SRP protocol.
     pub login_key: SecretVec,
 }
 
@@ -29,13 +22,9 @@ impl fmt::Debug for SrpCredentials {
     }
 }
 
-/// Decrypted secrets after successful authentication.
 pub struct DecryptedSecrets {
-    /// Master key for encrypting/decrypting data.
     pub master_key: SecretVec,
-    /// Secret key (private key) for asymmetric operations.
     pub secret_key: SecretVec,
-    /// Authentication token (decrypted).
     pub token: SecretVec,
 }
 
@@ -49,15 +38,10 @@ impl fmt::Debug for DecryptedSecrets {
     }
 }
 
-/// A derived key-encryption-key and the parameters used to derive it.
 pub struct GeneratedKek {
-    /// Derived KEK bytes.
     pub key: SecretVec,
-    /// Salt used for Argon2 derivation.
     pub salt: Vec<u8>,
-    /// Argon2 memory limit in bytes.
     pub mem_limit: u32,
-    /// Argon2 operations limit.
     pub ops_limit: u32,
 }
 
@@ -72,13 +56,9 @@ impl fmt::Debug for GeneratedKek {
     }
 }
 
-/// Attributes needed to register or update SRP for a user.
 pub struct GeneratedSrpSetup {
-    /// SRP salt bytes.
     pub srp_salt: Vec<u8>,
-    /// SRP verifier bytes.
     pub srp_verifier: Vec<u8>,
-    /// Derived 16-byte login sub-key bytes.
     pub login_sub_key: SecretVec,
 }
 
@@ -92,17 +72,6 @@ impl fmt::Debug for GeneratedSrpSetup {
     }
 }
 
-/// Derive SRP credentials from password.
-///
-/// This is the first step in the SRP login flow. Call this after password entry
-/// to get the credentials needed for the SRP protocol.
-///
-/// # Arguments
-/// * `password` - User's password
-/// * `srp_attrs` - SRP attributes from the server
-///
-/// # Returns
-/// * `SrpCredentials` containing KEK (for later decryption) and login_key (for SRP)
 pub fn derive_srp_credentials(password: &str, srp_attrs: &SrpAttributes) -> Result<SrpCredentials> {
     let kek_salt =
         b64::decode(&srp_attrs.kek_salt).map_err(|e| Error::Decode(format!("kek_salt: {}", e)))?;
@@ -125,16 +94,6 @@ pub fn derive_srp_credentials(password: &str, srp_attrs: &SrpAttributes) -> Resu
     })
 }
 
-/// Derive only the KEK from password.
-///
-/// Use this for email MFA flow where SRP is skipped. The KEK is used
-/// to decrypt the master key after email/TOTP verification.
-///
-/// # Arguments
-/// * `password` - User's password
-/// * `kek_salt` - Base64-encoded salt from key attributes
-/// * `mem_limit` - Argon2 memory limit
-/// * `ops_limit` - Argon2 operations limit
 pub fn derive_kek(
     password: &str,
     kek_salt: &str,
@@ -156,7 +115,6 @@ pub fn derive_kek(
     Ok(SecretVec::new(key.as_bytes().to_vec()))
 }
 
-/// Generate a KEK using the current adaptive sensitive client policy.
 pub fn generate_sensitive_kek(password: &str) -> Result<GeneratedKek> {
     let derived = argon::derive_sensitive_key(password).map_err(|e| match e {
         crypto::Error::InvalidKeyDerivationParams(_) => Error::Crypto(e),
@@ -166,7 +124,6 @@ pub fn generate_sensitive_kek(password: &str) -> Result<GeneratedKek> {
     Ok(generated_kek(derived))
 }
 
-/// Generate a KEK using the current interactive web policy.
 pub fn generate_interactive_kek(password: &str) -> Result<GeneratedKek> {
     let derived = argon::derive_interactive_key(password)?;
 
@@ -182,13 +139,11 @@ fn generated_kek(derived: argon::DerivedKey) -> GeneratedKek {
     }
 }
 
-/// Generate the SRP setup payload for a given KEK and SRP user ID.
 pub fn generate_srp_setup(kek: &[u8], srp_user_id: &str) -> Result<GeneratedSrpSetup> {
     let login_sub_key = kdf::derive_login_key(&crypto::Key::try_from_slice(kek)?);
     generate_srp_setup_with_login_key(&login_sub_key, srp_user_id)
 }
 
-/// Generate the SRP setup payload from an already-derived login key.
 pub fn generate_srp_setup_with_login_key(
     login_key: &[u8],
     srp_user_id: &str,
@@ -211,10 +166,6 @@ pub fn generate_srp_setup_with_login_key(
     })
 }
 
-/// Decrypt only the master key and secret key.
-///
-/// Use this when you only need access to the decrypted keys (e.g. when the
-/// auth token comes from a different source than a sealed box).
 pub fn decrypt_keys_only(kek: &[u8], key_attrs: &KeyAttributes) -> Result<(SecretVec, SecretVec)> {
     let encrypted_key = b64::decode(&key_attrs.encrypted_key)
         .map_err(|e| Error::Decode(format!("encrypted_key: {}", e)))?;
@@ -247,18 +198,6 @@ pub fn decrypt_keys_only(kek: &[u8], key_attrs: &KeyAttributes) -> Result<(Secre
     Ok((master_key, secret_key))
 }
 
-/// Decrypt secrets after successful authentication.
-///
-/// Call this after SRP + 2FA is complete, when you have the key attributes
-/// and encrypted token from the server.
-///
-/// # Arguments
-/// * `kek` - Key encryption key (from `derive_srp_credentials` or `derive_kek`)
-/// * `key_attrs` - Key attributes from the server
-/// * `encrypted_token` - Base64-encoded encrypted authentication token
-///
-/// # Returns
-/// * `DecryptedSecrets` containing master_key, secret_key, and token
 pub fn decrypt_secrets(
     kek: &[u8],
     key_attrs: &KeyAttributes,
@@ -266,7 +205,6 @@ pub fn decrypt_secrets(
 ) -> Result<DecryptedSecrets> {
     let (master_key, secret_key) = decrypt_keys_only(kek, key_attrs)?;
 
-    // Decrypt token with sealed box (public key crypto)
     let public_key = b64::decode(&key_attrs.public_key)
         .map_err(|e| Error::Decode(format!("public_key: {}", e)))?;
     let sealed_token = b64::decode(encrypted_token)
@@ -319,7 +257,6 @@ mod tests {
         let gen_result =
             generate_keys_with_strength(password, KeyDerivationStrength::Interactive).unwrap();
 
-        // Create a sealed token
         let token = b"auth_token_12345";
         let public_key = b64::decode(&gen_result.key_attributes.public_key).unwrap();
         let sealed_token = sealed::seal(
@@ -329,7 +266,6 @@ mod tests {
         .unwrap();
         let encrypted_token = b64::encode(&sealed_token);
 
-        // Derive KEK
         let kek = derive_kek(
             password,
             &gen_result.key_attributes.kek_salt,
@@ -338,10 +274,8 @@ mod tests {
         )
         .unwrap();
 
-        // Decrypt secrets
         let secrets = decrypt_secrets(&kek, &gen_result.key_attributes, &encrypted_token).unwrap();
 
-        // Verify
         let original_master_key = b64::decode(&gen_result.private_key_attributes.key).unwrap();
         assert_eq!(secrets.master_key.as_ref(), original_master_key.as_slice());
 
@@ -366,7 +300,6 @@ mod tests {
         .unwrap();
         let encrypted_token = b64::encode(&sealed_token);
 
-        // Derive KEK with wrong password
         let kek = derive_kek(
             "wrong_password",
             &gen_result.key_attributes.kek_salt,
@@ -375,7 +308,6 @@ mod tests {
         )
         .unwrap();
 
-        // Decryption should fail
         let result = decrypt_secrets(&kek, &gen_result.key_attributes, &encrypted_token);
         assert!(matches!(result, Err(Error::IncorrectPassword)));
     }

@@ -37,8 +37,7 @@ jobs:
                   shared-key: photos-desktop-ensu-android
                   save-if: false
 
-            # cargo codegen native builds the uniffi library for the host, which
-            # on Linux enables the llama.cpp Vulkan backend.
+            # cargo codegen native enables llama.cpp's Vulkan backend on Linux.
             - name: Install Vulkan build dependencies
               run: |
                   sudo apt-get update

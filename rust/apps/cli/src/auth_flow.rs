@@ -35,19 +35,9 @@ fn shared_client(
 
 fn to_shared_error(error: Error) -> ente_accounts::Error {
     match error {
-        Error::Io(source) => ente_accounts::Error::Generic(source.to_string()),
-        Error::Serialization(source) => ente_accounts::Error::Serialization(source),
-        Error::Database(source) => ente_accounts::Error::Generic(source.to_string()),
-        Error::Crypto(message) => ente_accounts::Error::Crypto(message),
-        Error::AuthenticationFailed(message) => ente_accounts::Error::AuthenticationFailed(message),
-        Error::InvalidConfig(message) => ente_accounts::Error::Generic(message),
-        Error::NotFound(message) => ente_accounts::Error::Generic(message),
-        Error::InvalidInput(message) => ente_accounts::Error::InvalidInput(message),
-        Error::Srp(message) => ente_accounts::Error::Srp(message),
-        Error::Base64Decode(source) => ente_accounts::Error::Base64Decode(source),
-        Error::Zip(source) => ente_accounts::Error::Generic(source.to_string()),
         Error::Http(source) => ente_accounts::Error::Http(source),
-        Error::Generic(message) => ente_accounts::Error::Generic(message),
+        Error::Accounts(source) => source,
+        other => ente_accounts::Error::Ui(Box::new(other)),
     }
 }
 

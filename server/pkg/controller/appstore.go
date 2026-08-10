@@ -67,6 +67,12 @@ func NewAppStoreController(
 
 var SubsUpdateNotificationTypes = []string{string(appstore.NotificationTypeDidChangeRenewalStatus), string(appstore.NotificationTypeCancel), string(appstore.NotificationTypeDidRevoke)}
 
+func isEnteSandboxEmail(userEmail string) bool {
+	normalizedEmail := email.NormalizeEmail(userEmail)
+	return strings.HasSuffix(normalizedEmail, "@ente.io") ||
+		strings.HasSuffix(normalizedEmail, "@ente.com")
+}
+
 // validateSandboxRequest checks if the request is from sandbox environment.
 // If sandbox, it sends a Discord alert and returns an error for non-whitelisted users.
 func (c *AppStoreController) validateSandboxRequest(ctx context.Context, environment string, userID int64, sandboxContext string) error {
@@ -83,7 +89,7 @@ func (c *AppStoreController) validateSandboxRequest(ctx context.Context, environ
 	c.DiscordController.NotifyThrottled(fmt.Sprintf("iOS Sandbox %s for user: %s (userID: %d)",
 		sandboxContext, maskedEmail, userID), 10*time.Minute)
 
-	if strings.HasSuffix(email.NormalizeEmail(user.Email), "@ente.io") {
+	if isEnteSandboxEmail(user.Email) {
 		return nil
 	}
 

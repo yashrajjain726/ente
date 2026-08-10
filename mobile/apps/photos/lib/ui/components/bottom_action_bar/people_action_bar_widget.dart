@@ -1,6 +1,6 @@
 import "package:ente_components/ente_components.dart" as components;
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/models/selected_people.dart";
 
 class PeopleActionBarWidget extends StatefulWidget {
@@ -47,7 +47,7 @@ class _PeopleActionBarWidgetState extends State<PeopleActionBarWidget> {
                 builder: (context, value, child) {
                   final count = widget.selectedPeople?.personIds.length ?? 0;
                   return Text(
-                    AppLocalizations.of(context).selectedPhotos(count: count),
+                    context.strings.selectedPhotos(count: count),
                     style: miniStyle,
                   );
                 },
@@ -64,10 +64,7 @@ class _PeopleActionBarWidgetState extends State<PeopleActionBarWidget> {
                   },
                   child: Align(
                     alignment: Alignment.centerRight,
-                    child: Text(
-                      AppLocalizations.of(context).cancel,
-                      style: miniStyle,
-                    ),
+                    child: Text(context.strings.cancel, style: miniStyle),
                   ),
                 ),
               ),

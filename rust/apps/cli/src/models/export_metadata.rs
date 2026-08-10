@@ -1,7 +1,6 @@
 use chrono::{DateTime, Local, TimeZone};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-/// Custom serializer for timestamp fields to match Go CLI's ISO 8601 format
 fn serialize_timestamp_as_iso8601<S>(
     timestamp_micros: &i64,
     serializer: S,
@@ -17,13 +16,11 @@ where
         .single()
         .ok_or_else(|| serde::ser::Error::custom("Invalid timestamp"))?;
 
-    // Format with milliseconds and timezone offset (matching Go CLI format)
     let iso_string = datetime.to_rfc3339_opts(chrono::SecondsFormat::Millis, true);
 
     serializer.serialize_str(&iso_string)
 }
 
-/// Custom deserializer that can handle both i64 and ISO string timestamps
 fn deserialize_timestamp_from_iso_or_i64<'de, D>(deserializer: D) -> Result<i64, D::Error>
 where
     D: Deserializer<'de>,
@@ -39,16 +36,12 @@ where
 
     match TimestampFormat::deserialize(deserializer)? {
         TimestampFormat::Microseconds(micros) => Ok(micros),
-        TimestampFormat::IsoString(s) => {
-            // Parse ISO string back to microseconds
-            DateTime::parse_from_rfc3339(&s)
-                .map(|dt| dt.timestamp_micros())
-                .map_err(|e| Error::custom(format!("Invalid ISO timestamp: {}", e)))
-        }
+        TimestampFormat::IsoString(s) => DateTime::parse_from_rfc3339(&s)
+            .map(|dt| dt.timestamp_micros())
+            .map_err(|e| Error::custom(format!("Invalid ISO timestamp: {}", e))),
     }
 }
 
-/// Album metadata matching Go's export.AlbumMetadata structure
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AlbumMetadata {
@@ -57,10 +50,8 @@ pub struct AlbumMetadata {
     pub owner_id: i64,
     pub album_name: String,
     pub is_deleted: bool,
-    /// Account IDs that own this album (for shared export directories)
     #[serde(rename = "accountOwnerIDs")]
     pub account_owner_ids: Vec<i64>,
-    /// Folder name on disk (excluded from JSON)
     #[serde(skip)]
     pub folder_name: String,
 }
@@ -78,7 +69,6 @@ impl AlbumMetadata {
     }
 }
 
-/// File metadata matching Go's export.DiskFileMetadata structure
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DiskFileMetadata {
@@ -91,19 +81,17 @@ pub struct DiskFileMetadata {
         serialize_with = "serialize_timestamp_as_iso8601",
         deserialize_with = "deserialize_timestamp_from_iso_or_i64"
     )]
-    pub creation_time: i64, // Unix timestamp in microseconds (serialized as ISO 8601)
+    pub creation_time: i64,
     #[serde(
         serialize_with = "serialize_timestamp_as_iso8601",
         deserialize_with = "deserialize_timestamp_from_iso_or_i64"
     )]
-    pub modification_time: i64, // Unix timestamp in microseconds (serialized as ISO 8601)
+    pub modification_time: i64,
     pub info: FileInfo,
-    /// Meta filename on disk (excluded from JSON)
     #[serde(skip)]
     pub meta_file_name: String,
 }
 
-/// File info matching Go's export.Info structure
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FileInfo {
@@ -112,11 +100,9 @@ pub struct FileInfo {
     pub hash: Option<String>,
     #[serde(rename = "ownerID")]
     pub owner_id: i64,
-    /// Multiple filenames for live photos or burst photos
     pub file_names: Vec<String>,
 }
 
-/// Location metadata
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Location {
@@ -130,7 +116,6 @@ impl DiskFileMetadata {
         metadata: Option<&crate::models::metadata::FileMetadata>,
         filename: String,
     ) -> Self {
-        // Extract metadata values
         let (title, location, creation_time) = if let Some(meta) = metadata {
             let title = meta.get_title().unwrap_or(&filename).to_string();
             let location = meta.latitude.and_then(|lat| {
@@ -140,7 +125,6 @@ impl DiskFileMetadata {
                 })
             });
 
-            // Use creation time from metadata if available
             let creation_time = meta.creation_time.unwrap_or(file.updation_time);
 
             (title, location, creation_time)
@@ -150,12 +134,10 @@ impl DiskFileMetadata {
             (title, None, creation_time)
         };
 
-        // Use modification time from metadata or fall back to updation time
         let modification_time = metadata
             .and_then(|m| m.modification_time)
             .unwrap_or(file.updation_time);
 
-        // Get hash from metadata
         let hash = metadata.and_then(|m| {
             m.hash
                 .as_ref()
@@ -166,7 +148,7 @@ impl DiskFileMetadata {
 
         Self {
             title,
-            description: None, // FileMetadata doesn't have description field
+            description: None,
             location,
             creation_time,
             modification_time,

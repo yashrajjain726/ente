@@ -66,7 +66,6 @@ export const FileShareView: React.FC = () => {
                         },
                     }}
                 >
-                    {/* Ente Locker Logo */}
                     <Box
                         sx={{
                             width: "100%",
@@ -99,7 +98,6 @@ export const FileShareView: React.FC = () => {
                         </a>
                     </Box>
 
-                    {/* Main Container */}
                     <Box
                         sx={{
                             display: "flex",
@@ -118,7 +116,6 @@ export const FileShareView: React.FC = () => {
                                 : 0,
                         }}
                     >
-                        {/* Loading State */}
                         {loading && (
                             <Box
                                 sx={{
@@ -135,7 +132,6 @@ export const FileShareView: React.FC = () => {
                             </Box>
                         )}
 
-                        {/* Error State */}
                         {error && !loading && (
                             <Box
                                 sx={{
@@ -156,10 +152,8 @@ export const FileShareView: React.FC = () => {
                             </Box>
                         )}
 
-                        {/* File Info Display */}
                         {fileInfo && iconInfo && !loading && (
                             <>
-                                {/* File Info - Centered */}
                                 <Box
                                     sx={{
                                         display: "flex",
@@ -171,7 +165,6 @@ export const FileShareView: React.FC = () => {
                                         marginBottom: 4,
                                     }}
                                 >
-                                    {/* Large File Icon */}
                                     <Box
                                         sx={{
                                             backgroundColor:
@@ -186,7 +179,6 @@ export const FileShareView: React.FC = () => {
                                         {iconInfo.icon}
                                     </Box>
 
-                                    {/* File Name */}
                                     <Typography
                                         variant="h5"
                                         sx={{
@@ -202,7 +194,6 @@ export const FileShareView: React.FC = () => {
                                         {fileInfo.fileName}
                                     </Typography>
 
-                                    {/* File Size - only show if no locker type */}
                                     {!fileInfo.lockerType && (
                                         <Typography
                                             variant="body"
@@ -220,7 +211,6 @@ export const FileShareView: React.FC = () => {
                                         </Typography>
                                     )}
 
-                                    {/* Locker Type Display */}
                                     {fileInfo.lockerType &&
                                         fileInfo.lockerInfoData && (
                                             <LockerTypeDisplay
@@ -231,7 +221,6 @@ export const FileShareView: React.FC = () => {
                                         )}
                                 </Box>
 
-                                {/* Download Button - Only show if not a LockerInfoType */}
                                 {!fileInfo.lockerType && (
                                     <Box sx={{ width: "100%", mt: 4 }}>
                                         <Button

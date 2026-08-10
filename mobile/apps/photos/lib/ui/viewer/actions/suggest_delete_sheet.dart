@@ -1,6 +1,6 @@
+import 'package:ente_strings/ente_strings.dart';
 import 'package:flutter/material.dart';
 import 'package:photos/core/configuration.dart';
-import 'package:photos/generated/l10n.dart';
 import 'package:photos/models/collection/collection.dart';
 import 'package:photos/models/file/extensions/file_props.dart';
 import 'package:photos/models/file/file.dart';
@@ -30,7 +30,7 @@ Future<bool> showSuggestDeleteSheet({
   required BuildContext context,
   required SuggestDeleteConfirmCallback onConfirm,
 }) async {
-  final l10n = AppLocalizations.of(context);
+  final l10n = context.strings;
   final actionResult = await showActionSheet(
     context: context,
     title: l10n.suggestDeletion,

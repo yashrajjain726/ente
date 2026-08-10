@@ -38,7 +38,7 @@ When adding new services that sit behind Nginx,
 
 1. Add its nginx conf file to `/root/nginx/conf.d`
 
-2. Restart nginx (`sudo systemctl reload nginx`)
+2. Reload nginx (`sudo systemctl reload nginx`)
 
 ## Configuration files
 
@@ -61,6 +61,6 @@ This is a [handy tool](https://nginx-playground.wizardzines.com) to check the sy
 
 Nginx configuration files can be changed without needing to restart anything.
 
-1. Update the configuration file at `/root/nginx/conf.d/museum.conf`
+1. Update the service's configuration file under `/root/nginx/conf.d`.
 2. Verify that there are no errors in the configuration by using `sudo docker exec nginx nginx -t`.
 3. Ask nginx to reload the configuration `sudo systemctl reload nginx`.

@@ -1,7 +1,7 @@
 import 'package:ente_auth/core/configuration.dart';
-import 'package:ente_auth/l10n/l10n.dart';
 import 'package:ente_auth/store/authenticator_db.dart';
 import 'package:ente_auth/utils/dialog_util.dart';
+import 'package:ente_strings/ente_strings.dart';
 import 'package:flutter/material.dart';
 import 'package:logging/logging.dart';
 
@@ -13,7 +13,7 @@ Future<void> autoLogoutAlert(BuildContext context) async {
   }
   try {
     showingLogoutDialog = true;
-    final l10n = context.l10n;
+    final l10n = context.strings;
     await showErrorDialog(
       context,
       l10n.sessionExpired,
@@ -34,7 +34,7 @@ Future<void> autoLogoutAlert(BuildContext context) async {
         context,
         title: l10n.pendingSyncs,
         body: l10n.pendingSyncsWarningBody,
-        firstButtonLabel: context.l10n.yesLogout,
+        firstButtonLabel: context.strings.yesLogout,
         isCritical: true,
         firstButtonOnTap: () async {
           await _logout(context, l10n);
@@ -50,7 +50,7 @@ Future<void> autoLogoutAlert(BuildContext context) async {
   }
 }
 
-Future<void> _logout(BuildContext context, AppLocalizations l10n) async {
+Future<void> _logout(BuildContext context, StringsLocalizations l10n) async {
   final dialog = createProgressDialog(context, l10n.loggingOut);
   await dialog.show();
   await Configuration.instance.logout();

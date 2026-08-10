@@ -3,7 +3,7 @@ use ente_core::crypto::{self, SecretVec};
 use sha2::{Digest, Sha256};
 
 use crate::{
-    ContactsError, Result,
+    Error, Result,
     legacy_kit_models::{LEGACY_KIT_PAYLOAD_VERSION, LegacyKitShare, LegacyKitVariant},
 };
 
@@ -23,7 +23,7 @@ pub(super) fn checksum(
 
 pub(super) fn split_secret_2_of_3(secret: &[u8]) -> Result<Vec<Vec<u8>>> {
     if secret.len() != 32 {
-        return Err(ContactsError::InvalidInput(
+        return Err(Error::InvalidInput(
             "legacy kit secret must be 32 bytes".into(),
         ));
     }
@@ -43,7 +43,7 @@ pub(super) fn split_secret_2_of_3(secret: &[u8]) -> Result<Vec<Vec<u8>>> {
 
 pub(super) fn reconstruct_secret_2_of_3(shares: &[LegacyKitShare]) -> Result<SecretVec> {
     if shares.len() < 2 {
-        return Err(ContactsError::InvalidInput(
+        return Err(Error::InvalidInput(
             "at least two legacy kit shares are required".into(),
         ));
     }
@@ -52,27 +52,27 @@ pub(super) fn reconstruct_secret_2_of_3(shares: &[LegacyKitShare]) -> Result<Sec
     validate_share_header(first)?;
     validate_share_header(second)?;
     if first.payload_version != second.payload_version {
-        return Err(ContactsError::InvalidInput(
+        return Err(Error::InvalidInput(
             "legacy kit share payload version mismatch".into(),
         ));
     }
     if first.variant != second.variant {
-        return Err(ContactsError::InvalidInput(
+        return Err(Error::InvalidInput(
             "legacy kit share variant mismatch".into(),
         ));
     }
     if first.kit_id != second.kit_id {
-        return Err(ContactsError::InvalidInput(
+        return Err(Error::InvalidInput(
             "legacy kit shares must belong to the same kit".into(),
         ));
     }
     if first.checksum != second.checksum {
-        return Err(ContactsError::InvalidInput(
+        return Err(Error::InvalidInput(
             "legacy kit share checksum mismatch".into(),
         ));
     }
     if first.share_index == second.share_index {
-        return Err(ContactsError::InvalidInput(
+        return Err(Error::InvalidInput(
             "legacy kit shares must use different indices".into(),
         ));
     }
@@ -80,7 +80,7 @@ pub(super) fn reconstruct_secret_2_of_3(shares: &[LegacyKitShare]) -> Result<Sec
     let y1 = b64::decode(&first.share)?;
     let y2 = b64::decode(&second.share)?;
     if y1.len() != 32 || y2.len() != 32 {
-        return Err(ContactsError::InvalidInput(
+        return Err(Error::InvalidInput(
             "legacy kit shares must be 32 bytes".into(),
         ));
     }
@@ -89,7 +89,7 @@ pub(super) fn reconstruct_secret_2_of_3(shares: &[LegacyKitShare]) -> Result<Sec
     let x2 = second.share_index;
     let denom = x1 ^ x2;
     if denom == 0 {
-        return Err(ContactsError::InvalidInput(
+        return Err(Error::InvalidInput(
             "legacy kit shares must use different x coordinates".into(),
         ));
     }
@@ -100,7 +100,7 @@ pub(super) fn reconstruct_secret_2_of_3(shares: &[LegacyKitShare]) -> Result<Sec
     }
     let expected = checksum(first.payload_version, first.variant, &first.kit_id, &secret);
     if expected != first.checksum {
-        return Err(ContactsError::InvalidInput(
+        return Err(Error::InvalidInput(
             "legacy kit shares failed checksum verification".into(),
         ));
     }
@@ -108,12 +108,12 @@ pub(super) fn reconstruct_secret_2_of_3(shares: &[LegacyKitShare]) -> Result<Sec
 }
 
 pub(super) fn used_part_indexes(shares: &[LegacyKitShare]) -> Result<Vec<u8>> {
-    let first = shares.first().ok_or_else(|| {
-        ContactsError::InvalidInput("at least two legacy kit shares are required".into())
-    })?;
+    let first = shares
+        .first()
+        .ok_or_else(|| Error::InvalidInput("at least two legacy kit shares are required".into()))?;
     validate_share_header(first)?;
     if shares.len() < first.variant.threshold() {
-        return Err(ContactsError::InvalidInput(
+        return Err(Error::InvalidInput(
             "at least two legacy kit shares are required".into(),
         ));
     }
@@ -122,17 +122,17 @@ pub(super) fn used_part_indexes(shares: &[LegacyKitShare]) -> Result<Vec<u8>> {
 
 fn validate_share_header(share: &LegacyKitShare) -> Result<()> {
     if share.payload_version != LEGACY_KIT_PAYLOAD_VERSION {
-        return Err(ContactsError::InvalidInput(
+        return Err(Error::InvalidInput(
             "unsupported legacy kit share payload version".into(),
         ));
     }
     if share.variant != LegacyKitVariant::TwoOfThree {
-        return Err(ContactsError::InvalidInput(
+        return Err(Error::InvalidInput(
             "unsupported legacy kit share variant".into(),
         ));
     }
     if share.share_index == 0 || share.share_index as usize > share.variant.part_count() {
-        return Err(ContactsError::InvalidInput(
+        return Err(Error::InvalidInput(
             "legacy kit share index is out of range".into(),
         ));
     }
@@ -169,9 +169,7 @@ fn gf_pow(mut base: u8, mut exp: u8) -> u8 {
 
 fn gf_inv(value: u8) -> Result<u8> {
     if value == 0 {
-        return Err(ContactsError::InvalidInput(
-            "cannot invert zero in GF(256)".into(),
-        ));
+        return Err(Error::InvalidInput("cannot invert zero in GF(256)".into()));
     }
     Ok(gf_pow(value, 254))
 }

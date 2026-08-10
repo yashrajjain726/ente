@@ -60,12 +60,6 @@ interface LockerSidebarProps {
     };
 }
 
-/**
- * Left sidebar drawer for the Locker web app.
- *
- * Shows user info, storage usage, collections, trash, help & support,
- * about section, and logout.
- */
 export const LockerSidebar: React.FC<LockerSidebarProps> = ({
     open,
     onClose,
@@ -160,7 +154,6 @@ export const LockerSidebar: React.FC<LockerSidebarProps> = ({
                             WebkitOverflowScrolling: "touch",
                         }}
                     >
-                        {/* Header */}
                         <Stack sx={{ px: 1, pt: 0.5, pb: 0.5 }}>
                             <Stack
                                 direction="row"

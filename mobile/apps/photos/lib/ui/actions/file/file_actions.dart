@@ -2,11 +2,12 @@ import "dart:async";
 import "dart:io";
 
 import "package:ente_components/ente_components.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:photo_manager/photo_manager.dart";
+import "package:photos/core/constants.dart";
 import "package:photos/core/event_bus.dart";
 import "package:photos/events/details_sheet_event.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/models/file/extensions/file_props.dart";
 import 'package:photos/models/file/file.dart';
 import 'package:photos/module/metadata/panorama.dart';
@@ -14,6 +15,7 @@ import "package:photos/service_locator.dart";
 import "package:photos/ui/notification/toast.dart";
 import 'package:photos/ui/viewer/file/file_details_widget.dart';
 import "package:photos/utils/delete_file_util.dart";
+import "package:photos/utils/device_info.dart";
 
 Future<void> showSingleFileDeleteSheet(
   BuildContext context,
@@ -21,7 +23,7 @@ Future<void> showSingleFileDeleteSheet(
   Function(EnteFile)? onFileRemoved,
   bool isLocalOnlyContext = false,
 }) async {
-  final l10n = AppLocalizations.of(context);
+  final l10n = context.strings;
   final bool isLocal = file.localID != null;
   final bool isRemote = file.uploadedFileID != null;
   if (isLocalGalleryMode) {
@@ -29,7 +31,9 @@ Future<void> showSingleFileDeleteSheet(
       showShortToast(context, l10n.noDeviceThatCanBeDeleted);
       return;
     }
-    if (Platform.isAndroid && await PhotoManager.canManageMedia()) {
+    if (Platform.isAndroid &&
+        (await isAndroidSDKVersionLowerThan(android11SDKINT) ||
+            await PhotoManager.canManageMedia())) {
       if (!context.mounted) return;
       await showBottomSheetComponent<bool>(
         context: context,

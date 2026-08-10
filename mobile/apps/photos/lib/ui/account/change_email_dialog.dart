@@ -1,6 +1,6 @@
 import 'package:ente_components/ente_components.dart';
+import "package:ente_strings/ente_strings.dart";
 import 'package:flutter/material.dart';
-import "package:photos/l10n/l10n.dart";
 import 'package:photos/services/account/user_service.dart';
 import 'package:photos/utils/email_util.dart';
 
@@ -31,7 +31,7 @@ class _ChangeEmailBottomSheetState extends State<_ChangeEmailBottomSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = context.l10n;
+    final l10n = context.strings;
 
     return BottomSheetComponent(
       title: l10n.enterYourNewEmailAddress,
@@ -75,7 +75,7 @@ class _ChangeEmailBottomSheetState extends State<_ChangeEmailBottomSheet> {
   }
 
   Future<void> _verify() async {
-    final l10n = context.l10n;
+    final l10n = context.strings;
     final email = _emailController.text.trim();
 
     if (!isValidEmail(email)) {

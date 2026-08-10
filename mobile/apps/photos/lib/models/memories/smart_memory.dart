@@ -1,4 +1,4 @@
-import "package:photos/generated/l10n.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:photos/models/base/id.dart";
 import "package:photos/models/memories/memory.dart";
 
@@ -67,7 +67,7 @@ class SmartMemory {
     return now >= firstDateToShow && now <= lastDateToShow;
   }
 
-  String createTitle(AppLocalizations locals, String languageCode) {
+  String createTitle(StringsLocalizations locals, String languageCode) {
     throw UnimplementedError("createTitle must be implemented in subclass");
   }
 

@@ -2,11 +2,10 @@ import 'dart:async';
 
 import 'package:ente_components/ente_components.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart' show ScrollDirection;
 import 'package:hugeicons/hugeicons.dart';
 import 'package:photos/models/collection/collection.dart';
 import 'package:photos/models/library_sharing/library_sharing_recipient.dart';
-import 'package:photos/services/library_sharing_service.dart';
+import 'package:photos/service_locator.dart' show librarySharingService;
 import 'package:photos/ui/collections/flex_grid_view.dart';
 import 'package:photos/ui/components/empty_state_component.dart';
 import 'package:photos/ui/sharing/library_sharing/library_sharing_controller.dart';
@@ -30,17 +29,20 @@ class LibrarySharingPage extends StatefulWidget {
 }
 
 class _LibrarySharingPageState extends State<LibrarySharingPage> {
+  static const _sheetToggleScrollThreshold = 32.0;
+
   late final LibrarySharingController _controller =
       widget.controller ??
       LibrarySharingController(
         recipient: widget.recipient,
-        repository: LibrarySharingService(),
+        repository: librarySharingService,
       );
   late final bool _ownsController = widget.controller == null;
   final ScrollController _scrollController = ScrollController();
   final GlobalKey _selectionSheetKey = GlobalKey();
   bool _isSelectionSheetExpanded = true;
   bool _selectionSheetWasVisible = false;
+  double _selectionSheetScrollDistance = 0;
   double? _expandedSelectionSheetHeight;
 
   LibrarySharingRecipient get _recipient => _controller.recipient;
@@ -92,8 +94,8 @@ class _LibrarySharingPageState extends State<LibrarySharingPage> {
     return Stack(
       children: [
         Positioned.fill(
-          child: NotificationListener<UserScrollNotification>(
-            onNotification: _handleUserScroll,
+          child: NotificationListener<ScrollNotification>(
+            onNotification: _handleScroll,
             child: _content(context),
           ),
         ),
@@ -124,8 +126,9 @@ class _LibrarySharingPageState extends State<LibrarySharingPage> {
   Widget _content(BuildContext context) {
     return AppBarComponent(
       title: _recipient.label,
-      titleBuilderHeight: _titleBuilderHeight(context),
-      titleBuilder: _titleBuilder,
+      eyebrow: _controller.isAddingAlbums
+          ? LibrarySharingStrings.shareWith
+          : LibrarySharingStrings.sharingWith,
       controller: _scrollController,
       onBack: () => Navigator.of(context).maybePop(),
       actions: [
@@ -147,30 +150,6 @@ class _LibrarySharingPageState extends State<LibrarySharingPage> {
 
   bool get _showSelectionSheet =>
       _controller.isSelecting && _controller.hasSelection;
-
-  Widget _titleBuilder(BuildContext context, HeaderAppBarTitleState state) {
-    final colors = context.componentColors;
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          _controller.isAddingAlbums
-              ? LibrarySharingStrings.shareWith
-              : LibrarySharingStrings.sharingWith,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: _librarySharingEyebrowStyle.copyWith(color: colors.textLight),
-        ),
-        Text(
-          _recipient.label,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: state.textStyle.copyWith(color: colors.textBase),
-        ),
-      ],
-    );
-  }
 
   List<Widget> _slivers(BuildContext context) {
     if (_controller.isLoading) {
@@ -249,9 +228,9 @@ class _LibrarySharingPageState extends State<LibrarySharingPage> {
         tag: 'library_sharing_${_recipient.userID}',
         selectionCallbacks: (
           isSelected: _controller.isSelected,
-          toggle: _handleAlbumTap,
+          toggle: _toggleAlbumSelection,
         ),
-        enableSelectionMode: true,
+        enableSelectionMode: !_controller.isMutating,
         gridTopLeftOverlayBuilder: _roleOverlay,
         topPadding: Spacing.sm,
         bottomPadding: _gridBottomPadding,
@@ -274,12 +253,13 @@ class _LibrarySharingPageState extends State<LibrarySharingPage> {
             MenuComponent(
               title: LibrarySharingStrings.librarySharing,
               subtitle: LibrarySharingStrings.shareAllYourAlbums,
-              onTap: _showEnableLibrarySharing,
+              onTap: _toggleLibrarySharing,
+              showOnlyLoadingState: true,
               trailing: IgnorePointer(
                 child: ExcludeSemantics(
                   child: ToggleSwitchComponent(
                     key: const ValueKey('library-sharing-toggle'),
-                    selected: false,
+                    selected: _controller.isAutomaticSharingEnabled,
                     onChanged: (_) {},
                   ),
                 ),
@@ -296,7 +276,7 @@ class _LibrarySharingPageState extends State<LibrarySharingPage> {
     return role == null ? null : LibrarySharingRoleBadge(role: role);
   }
 
-  void _handleAlbumTap(Collection album) {
+  void _toggleAlbumSelection(Collection album) {
     if (_controller.isMutating) {
       return;
     }
@@ -306,19 +286,44 @@ class _LibrarySharingPageState extends State<LibrarySharingPage> {
     _controller.toggleSelection(album);
   }
 
-  bool _handleUserScroll(UserScrollNotification notification) {
-    if (!_showSelectionSheet ||
-        _controller.isMutating ||
-        notification.metrics.axis != Axis.vertical) {
+  bool _handleScroll(ScrollNotification notification) {
+    if (notification.depth != 0 || notification.metrics.axis != Axis.vertical) {
       return false;
     }
-    switch (notification.direction) {
-      case ScrollDirection.reverse:
-        _setSelectionSheetExpanded(false);
-      case ScrollDirection.forward:
-        _setSelectionSheetExpanded(true);
-      case ScrollDirection.idle:
-        break;
+    if (notification is ScrollEndNotification) {
+      _selectionSheetScrollDistance = 0;
+      return false;
+    }
+    if (!_showSelectionSheet ||
+        _controller.isMutating ||
+        notification is! ScrollUpdateNotification ||
+        notification.dragDetails == null ||
+        notification.scrollDelta == null) {
+      return false;
+    }
+
+    final scrollDelta = notification.scrollDelta!;
+    if (scrollDelta == 0) {
+      return false;
+    }
+    if (_isSelectionSheetExpanded && scrollDelta > 0) {
+      _selectionSheetScrollDistance = 0;
+      _setSelectionSheetExpanded(false);
+      return false;
+    }
+    if (scrollDelta.sign != _selectionSheetScrollDistance.sign) {
+      _selectionSheetScrollDistance = 0;
+    }
+    _selectionSheetScrollDistance += scrollDelta;
+
+    if (_isSelectionSheetExpanded &&
+        _selectionSheetScrollDistance >= _sheetToggleScrollThreshold) {
+      _selectionSheetScrollDistance = 0;
+      _setSelectionSheetExpanded(false);
+    } else if (!_isSelectionSheetExpanded &&
+        _selectionSheetScrollDistance <= -_sheetToggleScrollThreshold) {
+      _selectionSheetScrollDistance = 0;
+      _setSelectionSheetExpanded(true);
     }
     return false;
   }
@@ -327,6 +332,7 @@ class _LibrarySharingPageState extends State<LibrarySharingPage> {
     final isVisible = _showSelectionSheet;
     if (isVisible && !_selectionSheetWasVisible) {
       _isSelectionSheetExpanded = true;
+      _selectionSheetScrollDistance = 0;
       _expandedSelectionSheetHeight = null;
     }
     _selectionSheetWasVisible = isVisible;
@@ -369,17 +375,6 @@ class _LibrarySharingPageState extends State<LibrarySharingPage> {
     });
   }
 
-  double _titleBuilderHeight(BuildContext context) {
-    final textScaler = MediaQuery.textScalerOf(context);
-    return _scaledLineHeight(textScaler, _librarySharingEyebrowStyle) +
-        _scaledLineHeight(textScaler, TextStyles.display2);
-  }
-
-  double _scaledLineHeight(TextScaler textScaler, TextStyle style) {
-    final fontSize = style.fontSize ?? 14;
-    return textScaler.scale(fontSize) * (style.height ?? 1);
-  }
-
   Future<void> _applySelection() async {
     await _showFailureIfNeeded(
       await _controller.applySelection(),
@@ -409,13 +404,40 @@ class _LibrarySharingPageState extends State<LibrarySharingPage> {
     }
   }
 
-  Future<void> _showEnableLibrarySharing() async {
-    final shouldEnable = await showEnableLibrarySharingSheet(
+  Future<void> _toggleLibrarySharing() async {
+    if (_controller.isAutomaticSharingEnabled) {
+      await _showFailureIfNeeded(
+        await _controller.disableAutomaticSharing(),
+        _toggleLibrarySharing,
+      );
+      return;
+    }
+    final role = await showEnableLibrarySharingSheet(
       context: context,
       recipientLabel: _recipient.label,
     );
-    if (shouldEnable && mounted) {
-      showToastComponent(context, LibrarySharingStrings.comingSoon);
+    if (role == null || !mounted) {
+      return;
+    }
+    await _enableLibrarySharing(role);
+  }
+
+  Future<void> _enableLibrarySharing(CollectionParticipantRole role) async {
+    final result = await _controller.enableAutomaticSharing(role);
+    if (result == null || result.failedIDs.isNotEmpty) {
+      await _showFailureIfNeeded(false, () => _enableLibrarySharing(role));
+      return;
+    }
+    final previouslyUnsharedCount = result.previouslyUnsharedIDs.length;
+    if (!mounted || previouslyUnsharedCount == 0) {
+      return;
+    }
+    final review = await showPreviouslyUnsharedAlbums(
+      context: context,
+      count: previouslyUnsharedCount,
+    );
+    if (review && mounted) {
+      _controller.enterAddMode();
     }
   }
 
@@ -436,13 +458,6 @@ class _LibrarySharingPageState extends State<LibrarySharingPage> {
 /// Positions the 250px empty state group at the reference screen's y=287.
 /// Source: https://www.figma.com/design/BuBNPPytxlVnqfmCUW0mgz/Ente-Visual-Design?node-id=17186-38829&m=dev
 const double _fullLibraryEmptyStateTopPadding = 131;
-
-/// The reference uses an Outfit Semibold 16/32 eyebrow above Display 2.
-/// Source: https://www.figma.com/design/BuBNPPytxlVnqfmCUW0mgz/Ente-Visual-Design?node-id=15782-102259&m=dev
-final TextStyle _librarySharingEyebrowStyle = TextStyles.display2.copyWith(
-  fontSize: 16,
-  height: 2,
-);
 
 // Prevents the final grid row from jumping under the sheet before measurement.
 const double _estimatedExpandedSelectionSheetHeight = 320;

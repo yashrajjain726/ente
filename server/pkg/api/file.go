@@ -1,6 +1,8 @@
 package api
 
 import (
+	"database/sql"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -223,8 +225,8 @@ func (h *FileHandler) Get(c *gin.Context) {
 	c.Redirect(http.StatusTemporaryRedirect, url)
 }
 
-// GetV2 returns the URL of the file to the client
-func (h *FileHandler) GetV2(c *gin.Context) {
+// GetURL returns the URL of the file to the client.
+func (h *FileHandler) GetURL(c *gin.Context) {
 	userID, fileID := getUserAndFileIDs(c)
 	url, err := h.Controller.GetFileURL(c, userID, fileID)
 	if err != nil {
@@ -232,6 +234,13 @@ func (h *FileHandler) GetV2(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"url": url})
+}
+
+// GetURLV3 returns the URL of the file and reserves HTTP 404 for an unavailable endpoint.
+func (h *FileHandler) GetURLV3(c *gin.Context) {
+	userID, fileID := getUserAndFileIDs(c)
+	url, err := h.Controller.GetFileURL(c, userID, fileID)
+	writeFileURLV3(c, url, err)
 }
 
 // GetThumbnail redirects the request to the file's thumbnail location
@@ -246,8 +255,8 @@ func (h *FileHandler) GetThumbnail(c *gin.Context) {
 	c.Redirect(http.StatusTemporaryRedirect, url)
 }
 
-// GetThumbnailV2 returns the URL of the thumbnail to the client
-func (h *FileHandler) GetThumbnailV2(c *gin.Context) {
+// GetThumbnailURL returns the URL of the thumbnail to the client.
+func (h *FileHandler) GetThumbnailURL(c *gin.Context) {
 	userID, fileID := getUserAndFileIDs(c)
 	url, err := h.Controller.GetThumbnailURL(c, userID, fileID)
 	if err != nil {
@@ -255,6 +264,34 @@ func (h *FileHandler) GetThumbnailV2(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"url": url})
+}
+
+// GetThumbnailURLV3 returns the thumbnail URL and reserves HTTP 404 for an unavailable endpoint.
+func (h *FileHandler) GetThumbnailURLV3(c *gin.Context) {
+	userID, fileID := getUserAndFileIDs(c)
+	url, err := h.Controller.GetThumbnailURL(c, userID, fileID)
+	writeFileURLV3(c, url, err)
+}
+
+func writeFileURLV3(c *gin.Context, url string, err error) {
+	if err != nil {
+		handler.Error(c, stacktrace.Propagate(fileURLV3Error(err), ""))
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"url": url})
+}
+
+func fileURLV3Error(err error) error {
+	var apiErr *ente.ApiError
+	if errors.Is(err, sql.ErrNoRows) ||
+		errors.Is(err, ente.ErrNotFound) ||
+		(errors.As(err, &apiErr) && apiErr.Code == ente.NotFoundError) {
+		return ente.NewBadRequestError(&ente.ApiErrorParams{
+			Code:    ente.NotFoundError,
+			Message: "requested object was not found",
+		})
+	}
+	return err
 }
 
 // Trash moves the given files to the trash bin

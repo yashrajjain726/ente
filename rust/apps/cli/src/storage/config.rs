@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use crate::Result;
 use rusqlite::{Connection, OptionalExtension, params};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -13,7 +11,6 @@ impl<'a> ConfigStore<'a> {
         Self { conn }
     }
 
-    /// Set a configuration value
     pub fn set(&self, key: &str, value: &str) -> Result<()> {
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -29,7 +26,6 @@ impl<'a> ConfigStore<'a> {
         Ok(())
     }
 
-    /// Get a configuration value
     pub fn get(&self, key: &str) -> Result<Option<String>> {
         let mut stmt = self
             .conn
@@ -42,7 +38,6 @@ impl<'a> ConfigStore<'a> {
         Ok(value)
     }
 
-    /// Delete a configuration value
     pub fn delete(&self, key: &str) -> Result<()> {
         self.conn
             .execute("DELETE FROM config WHERE key = ?1", params![key])?;
@@ -50,7 +45,6 @@ impl<'a> ConfigStore<'a> {
         Ok(())
     }
 
-    /// Get all configuration values
     pub fn list(&self) -> Result<Vec<(String, String)>> {
         let mut stmt = self
             .conn

@@ -8,28 +8,10 @@ import React, { useEffect, useState } from "react";
 import OtpInput from "react-otp-input";
 
 interface Verify2FACodeFormProps {
-    /**
-     * Called when the user submits the OTP.
-     *
-     * The submission can happen in two ways:
-     * 1. The fill-in all the required 6 digits, or
-     * 2. They press the "Enable" button.
-     *
-     * The form will stay in a submitting state until this callback returns.
-     *
-     * @param otp The OTP that the user entered.
-     */
     onSubmit: (otp: string) => Promise<void>;
-    /**
-     * The label for the submit button.
-     */
     submitButtonText: string;
 }
 
-/**
- * A form that can be used to ask the user to fill in a 6 digit OTP that their
- * authenticator app is providing them with.
- */
 export const Verify2FACodeForm: React.FC<Verify2FACodeFormProps> = ({
     onSubmit,
     submitButtonText,
@@ -50,7 +32,9 @@ export const Verify2FACodeForm: React.FC<Verify2FACodeFormProps> = ({
         onSubmit: async ({ otp }, { setFieldError, resetForm }) => {
             try {
                 await onSubmit(otp);
-                resetForm(); // Prevent resubmission via the useEffect.
+                // Reset the form, otherwise the auto-submit effect below
+                // resubmits.
+                resetForm();
             } catch (e) {
                 log.error("Failed to submit 2FA code", e);
                 resetForm();
@@ -85,8 +69,16 @@ export const Verify2FACodeForm: React.FC<Verify2FACodeFormProps> = ({
                     value={values.otp}
                     onChange={handleChange("otp")}
                     numInputs={6}
+                    inputType="tel"
                     renderSeparator={<span>-</span>}
-                    renderInput={(props) => <IndividualInput {...props} />}
+                    renderInput={(props, index) => (
+                        <IndividualInput
+                            {...props}
+                            autoComplete={index === 0 ? "one-time-code" : "off"}
+                            name={index === 0 ? "otp" : undefined}
+                            pattern="[0-9]*"
+                        />
+                    )}
                 />
                 {errors.otp && (
                     <Typography variant="mini" sx={{ color: "critical.main" }}>

@@ -1,6 +1,8 @@
 # ML Indexing Parity Test Suite
 
-This directory contains the ML indexing parity framework for desktop, Android, iOS, and Python ground truth. (The desktop runner is a smoke test of the desktop-specific addon path — the napi bindings and the pinned ONNX Runtime library — since deep validation of the shared Rust pipeline itself lives in the `ente-photos` crate's `ml_indexing` integration test.)
+This directory contains the ML indexing parity framework for desktop, Android, iOS, and Python ground truth.
+
+The desktop runner smoke-tests the desktop-specific N-API bindings and pinned ONNX Runtime library. Deep validation of the shared Rust pipeline lives in the `ente-photos` crate's `ml_indexing` integration test.
 
 ## Layout
 

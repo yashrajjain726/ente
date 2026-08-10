@@ -1,7 +1,7 @@
 import 'package:ente_components/ente_components.dart';
+import 'package:ente_strings/ente_strings.dart';
 import 'package:flutter/material.dart';
 import 'package:hugeicons/hugeicons.dart';
-import 'package:photos/generated/l10n.dart';
 import 'package:photos/models/collection/collection.dart';
 import 'package:photos/ui/sharing/library_sharing/library_sharing_controller.dart';
 import 'package:photos/ui/sharing/library_sharing/library_sharing_role_badge.dart';
@@ -45,12 +45,12 @@ class LibrarySharingSelectionSheet extends StatelessWidget {
                 ? LibrarySharingStrings.shareAlbumCount(
                     controller.selectedCount,
                   )
-                : AppLocalizations.of(context).save,
+                : context.strings.save,
             density: ButtonComponentDensity.compact,
             isDisabled: !controller.canApply,
             onTap: onApply,
           ),
-          if (isExpanded && controller.canStopSharing) ...[
+          if (controller.canStopSharing) ...[
             const SizedBox(height: Spacing.md),
             ButtonComponent(
               label: LibrarySharingStrings.stopSharing,
@@ -83,7 +83,7 @@ class LibrarySharingSelectionSheet extends StatelessWidget {
   }
 
   Widget _summary(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
+    final l10n = context.strings;
     final selectableAlbumCount = controller.selectableAlbumCount;
     final allSelected =
         selectableAlbumCount > 0 &&
@@ -148,10 +148,11 @@ class LibrarySharingSelectionSheet extends StatelessWidget {
 
   Widget _roleControl(BuildContext context) {
     final selectedRole = controller.selectedRole;
-    final canEditRole = controller.hasSelection && !controller.isMutating;
+    final canEditRole = controller.canEditSelectedRoles;
     final trailing = LibrarySharingRoleSelector(
       role: selectedRole,
       fallbackLabel: LibrarySharingStrings.mixed,
+      showChevron: canEditRole,
     );
     final menu = MenuComponent(
       title: LibrarySharingStrings.role,

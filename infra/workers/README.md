@@ -2,39 +2,40 @@
 
 Source code for our [Cloudflare Workers](https://developers.cloudflare.com/workers/).
 
-Workers are organized as npm workspaces sharing a common `package.json` and base `tsconfig`. They can however be deployed individually.
+Workers are npm workspaces that share a root `package.json` and base `tsconfig`, but are deployed individually.
 
 ## Deploying
 
-Install dependencies with `npm ci`.
+Install dependencies:
 
-> [!NOTE]
->
-> If `package-lock.json` has not changed since your last `npm ci`, you can use `npm install` as a faster incremental alternative.
+```sh
+npm ci
+```
 
-Then, to deploy an individual worker
+Log in if needed, then deploy the worker:
 
-- Login into wrangler (if needed) using `npm exec --workspace health-check -- wrangler login`
+```sh
+npm exec --workspace health-check -- wrangler login
+npm exec --workspace health-check -- wrangler deploy
+```
 
-- Deploy! `npm exec --workspace health-check -- wrangler deploy`
+Replace `health-check` with the worker to deploy. Wrangler credentials are shared across the workspaces.
 
-Wrangler is the CLI provided by Cloudflare to manage workers. Apart from deploying, it also allows us to stream logs from running workers by using `npm exec --workspace <worker-name> -- wrangler tail`.
+Stream logs from a deployed worker:
 
-> [!NOTE]
->
-> When you're done, remember to logout!
->
-> ```sh
-> npm exec --workspace health-check -- wrangler logout
-> ```
+```sh
+npm exec --workspace health-check -- wrangler tail
+```
 
-> [!TIP]
->
-> `wrangler login` and `wrangler logout` can be run from any of the worker workspaces, wrangler stores the credentials in some OS dependent shared location.
+Log out when finished:
+
+```sh
+npm exec --workspace health-check -- wrangler logout
+```
 
 ## Creating a new worker
 
-Copy paste an existing one. Unironically this is a good option because Cloudflare's template has a lot of unnecessary noise, but if really do want to create one from scratch, use `npm create cloudflare@latest`.
+Copy an existing workspace. This avoids the unnecessary boilerplate in Cloudflare's template. To create one from scratch, use `npm create cloudflare@latest`.
 
 To import an existing worker from the Cloudflare dashboard, use
 
@@ -44,8 +45,10 @@ npm create cloudflare@2 existing-worker-name -- --type pre-existing --existing-s
 
 ## Logging
 
-Attach the tail worker to your worker by adding
+Attach the tail worker by adding this to `wrangler.toml`:
 
-    tail_consumers = [{ service = "tail" }]
+```toml
+tail_consumers = [{ service = "tail" }]
+```
 
-in its `wrangler.toml`. Then any `console.(log|warn|error)` statements and uncaught exceptions in your worker will be logged to Grafana.
+The tail worker sends console output and uncaught exceptions to Grafana.

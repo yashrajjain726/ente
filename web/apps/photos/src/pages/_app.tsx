@@ -1,6 +1,17 @@
+import { AppLockReauthenticationDialog } from "@/components/app-lock/AppLockReauthenticationDialog";
 import { AppLockSetupError } from "@/components/app-lock/LockScreenContents";
+import {
+    updateAvailableForDownloadDialogAttributes,
+    updateReadyToInstallDialogAttributes,
+} from "@/components/utils/download";
+import {
+    useAutoLockWhenBackgrounded,
+    useSetupAppLock,
+} from "@/components/utils/use-app-lock";
 import { useDesktopAppLockRoute } from "@/components/utils/use-app-lock-route";
+import { resumeExportsIfNeeded } from "@/services/export";
 import { photosLogout } from "@/services/logout";
+import { runMigrations } from "@/services/migration";
 import "@fontsource-variable/inter";
 import "@fontsource-variable/outfit";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
@@ -12,7 +23,7 @@ import {
 } from "ente-accounts/services/accounts-db";
 import { isDesktop, staticAppTitle } from "ente-base/app";
 import { CenteredRow } from "ente-base/components/containers";
-import { CustomHead } from "ente-base/components/Head";
+import { CustomHeadPhotos } from "ente-base/components/Head";
 import {
     LoadingIndicator,
     TranslucentLoadingOverlay,
@@ -37,18 +48,7 @@ import {
     initVideoProcessing,
     isHLSGenerationSupported,
 } from "ente-gallery/services/video";
-import { AppLockReauthenticationDialog } from "ente-new/photos/components/app-lock/AppLockReauthenticationDialog";
-import {
-    updateAvailableForDownloadDialogAttributes,
-    updateReadyToInstallDialogAttributes,
-} from "ente-new/photos/components/utils/download";
-import {
-    useAutoLockWhenBackgrounded,
-    useSetupAppLock,
-} from "ente-new/photos/components/utils/use-app-lock";
 import { useAppLockSnapshot } from "ente-new/photos/components/utils/use-snapshot";
-import { resumeExportsIfNeeded } from "ente-new/photos/services/export";
-import { runMigrations } from "ente-new/photos/services/migration";
 import { initML, isMLSupported } from "ente-new/photos/services/ml";
 import { PhotosAppContext } from "ente-new/photos/types/context";
 import { t } from "i18next";
@@ -95,10 +95,6 @@ const App: React.FC<PhotosAppProps> = ({ Component, pageProps }) => {
     useEffect(() => {
         const electron = globalThis.electron;
         if (!electron) return undefined;
-
-        // Attach various listeners for events sent to us by the Node.js layer.
-        // This is for events that we should listen for always, not just when
-        // the user is logged in.
 
         const handleOpenEnteURL = (url: string) => {
             if (url.startsWith("ente://app")) {
@@ -165,7 +161,7 @@ const App: React.FC<PhotosAppProps> = ({ Component, pageProps }) => {
 
     return (
         <ThemeProvider theme={photosTheme}>
-            <CustomHead title={title} />
+            <CustomHeadPhotos {...{ title }} />
             <CssBaseline enableColorScheme />
 
             <ThemedLoadingBar ref={loadingBarRef} />
@@ -174,13 +170,6 @@ const App: React.FC<PhotosAppProps> = ({ Component, pageProps }) => {
 
             {isDesktop && <WindowTitlebar>{title}</WindowTitlebar>}
             <BaseContext value={baseContext}>
-                {
-                    // The web and desktop components are rendered separately
-                    // because the desktop currently supports app-lock,
-                    // for which we have certain hooks and components.
-                    // We don't want this to load in the web as well, since there
-                    // is no particular purpose it would serve.
-                }
                 <PhotosAppContext value={appContext}>
                     {!isI18nReady ? (
                         <LoadingIndicator />
@@ -259,12 +248,10 @@ const WindowTitlebar: React.FC<React.PropsWithChildren> = ({ children }) => (
     </WindowTitlebarArea>
 );
 
-// See: [Note: Customize the desktop title bar]
+// Electron uses this as a window drag region.
 const WindowTitlebarArea = styled(CenteredRow)`
     width: 100%;
-    height: env(titlebar-area-height, 30px /* fallback */);
-    /* LoadingIndicator is 100vh, so resist shrinking when shown with it. */
+    height: env(titlebar-area-height, 30px);
     flex-shrink: 0;
-    /* Allow using the titlebar to drag the window. */
     app-region: drag;
 `;

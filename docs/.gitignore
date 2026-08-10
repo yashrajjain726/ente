@@ -1,4 +1,2 @@
-# VitePress dev server cache
 /docs/.vitepress/cache/
-# VitePress production build
 /docs/.vitepress/dist/

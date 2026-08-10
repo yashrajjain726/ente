@@ -6,88 +6,50 @@ import "package:photos/core/event_bus.dart";
 import "package:photos/events/contacts_changed_event.dart";
 import "package:photos/events/user_logged_out_event.dart";
 import "package:photos/service_locator.dart";
-import "package:photos/utils/contact_string_util.dart";
 
+/// Photos-specific session and event adapter for the shared contact directory.
 class PhotosContactsService {
   PhotosContactsService._privateConstructor()
-    : _contactsServiceFactory = (() => contacts.ContactsService(
-        preferences: ServiceLocator.instance.prefs,
-      )) {
-    _attachSessionResetListeners();
+    : _store = contacts.ContactDirectory(
+        contactsServiceFactory: () => contacts.ContactsService(
+          preferences: ServiceLocator.instance.prefs,
+        ),
+        onContactsChanged: _notifyContactsChanged,
+        profilePictureFailureTtl: Duration.zero,
+      ) {
+    _attachSessionResetListener();
   }
 
   @visibleForTesting
   PhotosContactsService.forTesting({
     contacts.ContactsService? contactsService,
     contacts.ContactsService Function()? contactsServiceFactory,
-  }) : _contacts = contactsService,
-       _contactsServiceFactory =
-           contactsServiceFactory ??
-           (contactsService != null ? () => contactsService : null) {
-    _attachSessionResetListeners();
+  }) : _store = contacts.ContactDirectory(
+         contactsService: contactsService,
+         contactsServiceFactory: contactsServiceFactory,
+         onContactsChanged: _notifyContactsChanged,
+         profilePictureFailureTtl: Duration.zero,
+       ) {
+    _attachSessionResetListener();
   }
 
   static final PhotosContactsService instance =
       PhotosContactsService._privateConstructor();
 
-  final contacts.ContactsService Function()? _contactsServiceFactory;
+  final contacts.ContactDirectory _store;
   final _logger = Logger("PhotosContactsService");
-  // Deleted records evict entries; these indexes contain active contacts only.
-  final Map<int, contacts.ContactRecord> _activeContactsByUserId = {};
-  final Map<String, contacts.ContactRecord> _activeContactsByNormalizedEmail =
-      {};
-  final Map<int, Uint8List?> _profilePictureBytesByUserId = {};
-  final Set<int> _resolvedProfilePictureUserIds = {};
-  final Map<int, Future<Uint8List?>> _profilePictureLoadsByUserId = {};
 
-  contacts.ContactsService? _contacts;
-  Future<void>? _readyFuture;
-  String? _sessionKey;
-  String? _sessionAuthToken;
-  bool _hasHydratedCache = false;
-  int _sessionGeneration = 0;
+  bool get hasHydratedCache => _store.hasHydratedCache;
 
-  bool get hasHydratedCache => _hasHydratedCache;
-
-  bool get needsWarmup => !_hasHydratedCache || _readyFuture == null;
+  bool get needsWarmup => _store.needsWarmup;
 
   Future<void> ensureReady() async {
     final session = _buildSession();
     if (session == null) {
-      _sessionGeneration += 1;
-      _resetSessionState(notify: true);
+      _store.clearSession();
       return;
     }
-    final sessionKey = _buildSessionKey(session);
-    if (_readyFuture != null && _sessionKey == sessionKey) {
-      final contacts = _requireContacts();
-      await _readyFuture;
-      if (_sessionAuthToken != session.authToken) {
-        await contacts.updateAuthToken(session.authToken);
-        _sessionAuthToken = session.authToken;
-      }
-      return;
-    }
-    if (_sessionKey != sessionKey) {
-      _sessionGeneration += 1;
-      _resetSessionState(notify: true);
-    }
-    _contacts ??= _newContactsService();
-    final currentContacts = _requireContacts();
-    _sessionKey = sessionKey;
-    _sessionAuthToken = session.authToken;
-    late final Future<void> readyFuture;
-    final generation = _sessionGeneration;
-    readyFuture = _openAndSync(currentContacts, session, generation).catchError(
-      (Object error, StackTrace stackTrace) {
-        if (identical(_readyFuture, readyFuture)) {
-          _readyFuture = null;
-        }
-        throw error;
-      },
-    );
-    _readyFuture = readyFuture;
-    return readyFuture;
+    await _store.ensureReady(session);
   }
 
   Future<contacts.ContactRecord?> getContact({
@@ -100,24 +62,6 @@ class PhotosContactsService {
     }
     return _runReadSafely(() async {
       await ensureReady();
-      final hydratedCached = getCachedContact(
-        contactUserId: contactUserId,
-        email: email,
-      );
-      if (hydratedCached != null) {
-        return hydratedCached;
-      }
-      if (contactUserId == null) {
-        return null;
-      }
-      final contacts = _activeContactsOrNull();
-      if (contacts == null) {
-        return null;
-      }
-      final contact = await contacts.getContactByUserId(contactUserId);
-      if (contact != null) {
-        _cacheContact(contact);
-      }
       return getCachedContact(contactUserId: contactUserId, email: email);
     }, description: "load contact for user $contactUserId");
   }
@@ -125,136 +69,43 @@ class PhotosContactsService {
   contacts.ContactRecord? getCachedContact({
     int? contactUserId,
     String? email,
-  }) {
-    if (_sessionKey == null) {
-      return null;
-    }
-    if (contactUserId != null) {
-      return _activeContactsByUserId[contactUserId];
-    }
-    final normalizedEmail = normalizeContactLinkEmail(email);
-    return normalizedEmail == null
-        ? null
-        : _activeContactsByNormalizedEmail[normalizedEmail];
-  }
+  }) => _store.getCachedContact(contactUserId: contactUserId, email: email);
 
-  List<contacts.ContactRecord> getCachedContacts() {
-    if (_sessionKey == null) {
-      return const [];
-    }
-    return List.unmodifiable(_activeContactsByUserId.values);
-  }
+  List<contacts.ContactRecord> getCachedContacts() =>
+      _store.getCachedContacts();
 
-  String? getCachedSavedName({int? contactUserId, String? email}) {
-    return trimToNull(
-      getCachedContact(contactUserId: contactUserId, email: email)?.data?.name,
-    );
-  }
+  String? getCachedSavedName({int? contactUserId, String? email}) =>
+      _store.getCachedSavedName(contactUserId: contactUserId, email: email);
 
-  String? getCachedResolvedEmail({int? contactUserId, String? email}) {
-    return trimToNull(
-      getCachedContact(contactUserId: contactUserId, email: email)?.email,
-    );
-  }
+  String? getCachedResolvedEmail({int? contactUserId, String? email}) =>
+      _store.getCachedResolvedEmail(contactUserId: contactUserId, email: email);
 
-  Uint8List? getCachedProfilePictureBytesByUserId(int? contactUserId) {
-    if (!hasResolvedProfilePictureByUserId(contactUserId)) {
-      return null;
-    }
-    return _profilePictureBytesByUserId[contactUserId!];
-  }
+  Uint8List? getCachedProfilePictureBytesByUserId(int? contactUserId) =>
+      _store.getCachedProfilePictureBytesByUserId(contactUserId);
 
-  bool hasResolvedProfilePictureByUserId(int? contactUserId) {
-    return contactUserId != null &&
-        _sessionKey != null &&
-        _resolvedProfilePictureUserIds.contains(contactUserId);
-  }
+  bool hasResolvedProfilePictureByUserId(int? contactUserId) =>
+      _store.hasResolvedProfilePictureByUserId(contactUserId);
 
   Future<Uint8List?> getProfilePictureBytesByUserId(int? contactUserId) async {
     if (contactUserId == null) {
       return null;
     }
-    if (_sessionKey == null) {
-      return null;
+    if (_store.hasResolvedProfilePictureByUserId(contactUserId)) {
+      return _store.getCachedProfilePictureBytesByUserId(contactUserId);
     }
-    if (hasResolvedProfilePictureByUserId(contactUserId)) {
-      return _profilePictureBytesByUserId[contactUserId];
-    }
-    final contact = await getContact(contactUserId: contactUserId);
-    if (contact == null) {
-      if (_hasHydratedCache) {
-        _profilePictureBytesByUserId.remove(contactUserId);
-        _resolvedProfilePictureUserIds.add(contactUserId);
-      }
-      return null;
-    }
-    if (_resolvedProfilePictureUserIds.contains(contactUserId)) {
-      return _profilePictureBytesByUserId[contactUserId];
-    }
-    final inflightLoad = _profilePictureLoadsByUserId[contactUserId];
-    if (inflightLoad != null) {
-      return inflightLoad;
-    }
-    final load = _loadProfilePictureBytes(contact);
-    _profilePictureLoadsByUserId[contactUserId] = load;
-    return load.whenComplete(() {
-      _profilePictureLoadsByUserId.remove(contactUserId);
-    });
-  }
-
-  Future<Uint8List?> _loadProfilePictureBytes(
-    contacts.ContactRecord contact,
-  ) async {
-    final contactUserId = contact.contactUserId;
-    final attachmentId = contact.profilePictureAttachmentId;
-    if (attachmentId == null) {
-      _profilePictureBytesByUserId.remove(contactUserId);
-      _resolvedProfilePictureUserIds.add(contactUserId);
-      return null;
-    }
-    final contactId = contact.id;
-    try {
-      final bytes = await _requireContacts().getProfilePicture(contactId);
-      final latestContact = _activeContactsByUserId[contactUserId];
-      if (latestContact == null ||
-          latestContact.isDeleted ||
-          latestContact.id != contactId ||
-          latestContact.profilePictureAttachmentId != attachmentId) {
-        return _profilePictureBytesByUserId[contactUserId];
-      }
-      _profilePictureBytesByUserId[contactUserId] = bytes;
-      _resolvedProfilePictureUserIds.add(contactUserId);
-      return bytes;
-    } catch (e, s) {
-      _logger.warning(
-        "Failed to load contact profile picture for user $contactUserId",
-        e,
-        s,
-      );
-      return null;
-    }
+    await getContact(contactUserId: contactUserId);
+    return _store.getProfilePictureBytesByUserId(contactUserId);
   }
 
   Future<contacts.ContactRecord> createOrUpdateContact({
     required int contactUserId,
     required String name,
   }) async {
-    final contactsService = await _ensureReadyForWrite();
-    final trimmedName = name.trim();
-    final existing = await contactsService.getContactByUserId(
-      contactUserId,
-      includeDeleted: true,
-    );
-    final data = contacts.ContactData(
+    await ensureReady();
+    return _store.createOrUpdateContact(
       contactUserId: contactUserId,
-      name: trimmedName,
+      name: name,
     );
-    final contact = existing == null
-        ? await contactsService.createContact(data)
-        : await contactsService.updateContact(existing.id, data);
-    _cacheContact(contact);
-    _notifyChanged(contact);
-    return contact;
   }
 
   Future<contacts.ContactRecord?> createContactWithProfilePictureIfAbsent({
@@ -262,108 +113,41 @@ class PhotosContactsService {
     required String name,
     required Uint8List bytes,
   }) async {
-    final contactsService = await _ensureReadyForWrite();
-    if (!identical(contactsService, _activeContactsOrNull())) {
-      return null;
-    }
-    final generation = _sessionGeneration;
-    final existing = await contactsService.getContactByUserId(
-      contactUserId,
-      includeDeleted: true,
+    await ensureReady();
+    return _store.createContactWithProfilePictureIfAbsent(
+      contactUserId: contactUserId,
+      name: name,
+      bytes: bytes,
     );
-    if (generation != _sessionGeneration) {
-      return null;
-    }
-    if (existing != null) {
-      if (!existing.isDeleted) {
-        _cacheContact(existing);
-        return existing;
-      }
-      return null;
-    }
-
-    final contact = await contactsService.createContact(
-      contacts.ContactData(contactUserId: contactUserId, name: name.trim()),
-    );
-    if (generation != _sessionGeneration) {
-      return null;
-    }
-    late contacts.ContactRecord updated;
-    try {
-      updated = await contactsService.setProfilePicture(contact.id, bytes);
-    } catch (_) {
-      if (generation != _sessionGeneration ||
-          !identical(contactsService, _activeContactsOrNull())) {
-        rethrow;
-      }
-      updated = await contactsService.setProfilePicture(contact.id, bytes);
-    }
-    if (generation != _sessionGeneration) {
-      return null;
-    }
-    _cacheContact(updated);
-    _profilePictureBytesByUserId[updated.contactUserId] = bytes;
-    _resolvedProfilePictureUserIds.add(updated.contactUserId);
-    _notifyChanged(updated);
-    return updated;
   }
 
   Future<contacts.ContactRecord> setProfilePicture({
     required String contactId,
     required Uint8List bytes,
   }) async {
-    final contactsService = await _ensureReadyForWrite();
-    final contact = await contactsService.setProfilePicture(contactId, bytes);
-    _cacheContact(contact);
-    _profilePictureBytesByUserId[contact.contactUserId] = bytes;
-    _resolvedProfilePictureUserIds.add(contact.contactUserId);
-    _notifyChanged(contact);
-    return contact;
+    await ensureReady();
+    return _store.setProfilePicture(contactId: contactId, bytes: bytes);
   }
 
   Future<contacts.ContactRecord> deleteProfilePicture({
     required String contactId,
   }) async {
-    final contactsService = await _ensureReadyForWrite();
-    final contact = await contactsService.deleteProfilePicture(contactId);
-    _cacheContact(contact);
-    _profilePictureBytesByUserId.remove(contact.contactUserId);
-    _resolvedProfilePictureUserIds.add(contact.contactUserId);
-    _notifyChanged(contact);
-    return contact;
+    await ensureReady();
+    return _store.deleteProfilePicture(contactId: contactId);
   }
 
   @visibleForTesting
-  Future<void> debugOpenAndSync(contacts.ContactsSession session) async {
-    final sessionKey = _buildSessionKey(session);
-    if (_sessionKey != sessionKey) {
-      _sessionGeneration += 1;
-      _resetSessionState(notify: false);
-    }
-    _contacts ??= _newContactsService();
-    final currentContacts = _requireContacts();
-    _sessionKey = _buildSessionKey(session);
-    _sessionAuthToken = session.authToken;
-    await _openAndSync(currentContacts, session, _sessionGeneration);
-  }
+  Future<void> debugOpenAndSync(contacts.ContactsSession session) =>
+      _store.ensureReady(session);
 
   @visibleForTesting
   void debugHydrateContacts(
-    List<contacts.ContactRecord> contacts, {
+    List<contacts.ContactRecord> records, {
     bool markHydrated = false,
-  }) {
-    for (final contact in contacts) {
-      _cacheContact(contact);
-    }
-    if (markHydrated) {
-      _hasHydratedCache = true;
-    }
-  }
+  }) => _store.debugHydrateContacts(records, markHydrated: markHydrated);
 
   @visibleForTesting
-  void debugReset({bool notify = false}) {
-    _resetSessionState(notify: notify);
-  }
+  void debugReset({bool notify = false}) => _store.clearSession(notify: notify);
 
   contacts.ContactsSession? _buildSession() {
     final config = Configuration.instance;
@@ -384,108 +168,32 @@ class PhotosContactsService {
     );
   }
 
-  String _buildSessionKey(contacts.ContactsSession session) {
-    return "${session.baseUrl}|${session.userId}";
-  }
-
-  Future<void> _openAndSync(
-    contacts.ContactsService contactsService,
-    contacts.ContactsSession session,
-    int generation,
-  ) async {
-    await contactsService.open(session);
-    if (!_isSessionGenerationCurrent(generation, session)) {
-      return;
-    }
-
-    final cachedUserIdsBeforeHydration = _activeContactsByUserId.keys.toSet();
-    final localContacts = await contactsService.getContacts();
-    if (!_isSessionGenerationCurrent(generation, session)) {
-      return;
-    }
-    for (final contact in localContacts) {
-      _cacheContact(contact);
-    }
-    _hasHydratedCache = true;
-    final newlyHydratedLocalUserIds = localContacts
-        .map((contact) => contact.contactUserId)
-        .where((userId) => !cachedUserIdsBeforeHydration.contains(userId))
-        .toSet();
-    final changedUserIds = <int>{...newlyHydratedLocalUserIds};
-    var shouldRetrySync = false;
-    try {
-      final contactsDiff = await contactsService.sync();
-      if (!_isSessionGenerationCurrent(generation, session)) {
-        return;
-      }
-      for (final contact in contactsDiff) {
-        _invalidateProfilePictureCache(contact.contactUserId);
-        _cacheContact(contact);
-      }
-      changedUserIds.addAll(
-        contactsDiff.map((contact) => contact.contactUserId),
-      );
-    } catch (e, s) {
-      if (!_isSessionGenerationCurrent(generation, session)) {
-        return;
-      }
-      shouldRetrySync = true;
-      _logger.warning(
-        "Failed to sync contacts after hydrating local cache",
-        e,
-        s,
-      );
-    }
-    if (changedUserIds.isNotEmpty) {
-      _notifyContactsChanged(changedUserIds);
-    }
-    if (shouldRetrySync && _sessionKey == _buildSessionKey(session)) {
-      _readyFuture = null;
-    }
-  }
-
-  bool _isSessionGenerationCurrent(
-    int generation,
-    contacts.ContactsSession session,
-  ) {
-    return _sessionGeneration == generation &&
-        _sessionKey == _buildSessionKey(session);
-  }
-
-  void _notifyChanged(contacts.ContactRecord contact) {
-    _notifyContactsChanged({contact.contactUserId});
-  }
-
-  void _notifyContactsChanged(Set<int>? contactUserIds) {
-    Bus.instance.fire(ContactsChangedEvent(contactUserIds: contactUserIds));
-  }
-
   Future<T?> _runReadSafely<T>(
     Future<T?> Function() task, {
     required String description,
   }) async {
     try {
       return await task();
-    } on StateError catch (e, s) {
-      if (_isRustInitializationError(e)) {
+    } on StateError catch (error, stackTrace) {
+      if (_isRustInitializationError(error)) {
         _logger.warning(
           "Contacts integration unavailable while Rust bindings are not initialized during $description. Photos initializes EntePhotosRust in main.dart, but ente_contacts calls into package:ente_rust.",
-          e,
-          s,
+          error,
+          stackTrace,
         );
         return null;
       }
-      if (_isContactsDatabaseNotConfiguredError(e)) {
+      if (_isContactsDatabaseNotConfiguredError(error)) {
         _logger.warning(
           "Contacts integration unavailable while contacts are disabled or not initialized during $description",
-          e,
-          s,
+          error,
+          stackTrace,
         );
         return null;
       }
       rethrow;
-    } catch (e, s) {
-      _logger.warning("Failed to $description", e, s);
+    } catch (error, stackTrace) {
+      _logger.warning("Failed to $description", error, stackTrace);
       return null;
     }
   }
@@ -502,94 +210,13 @@ class PhotosContactsService {
     );
   }
 
-  void _cacheContact(contacts.ContactRecord contact) {
-    final userId = contact.contactUserId;
-    final existing = _activeContactsByUserId[userId];
-    final previousEmail = normalizeContactLinkEmail(existing?.email);
-    if (previousEmail != null &&
-        _activeContactsByNormalizedEmail[previousEmail]?.contactUserId ==
-            userId) {
-      _activeContactsByNormalizedEmail.remove(previousEmail);
-    }
-    if (contact.isDeleted) {
-      _activeContactsByUserId.remove(userId);
-      _invalidateProfilePictureCache(userId);
-      return;
-    }
-    _activeContactsByUserId[userId] = contact;
-    final normalizedEmail = normalizeContactLinkEmail(contact.email);
-    if (normalizedEmail != null) {
-      _activeContactsByNormalizedEmail[normalizedEmail] = contact;
-    }
-    if (existing?.profilePictureAttachmentId !=
-        contact.profilePictureAttachmentId) {
-      _invalidateProfilePictureCache(userId);
-    }
+  static void _notifyContactsChanged(Set<int>? contactUserIds) {
+    Bus.instance.fire(ContactsChangedEvent(contactUserIds: contactUserIds));
   }
 
-  void _resetSessionState({required bool notify}) {
-    final hadCachedContacts = _activeContactsByUserId.isNotEmpty;
-    _activeContactsByUserId.clear();
-    _activeContactsByNormalizedEmail.clear();
-    _profilePictureBytesByUserId.clear();
-    _resolvedProfilePictureUserIds.clear();
-    _profilePictureLoadsByUserId.clear();
-    _readyFuture = null;
-    _contacts = null;
-    _sessionKey = null;
-    _sessionAuthToken = null;
-    _hasHydratedCache = false;
-    if (notify && hadCachedContacts) {
-      _notifyContactsChanged(null);
-    }
-  }
-
-  void _invalidateProfilePictureCache(int contactUserId) {
-    _profilePictureBytesByUserId.remove(contactUserId);
-    _resolvedProfilePictureUserIds.remove(contactUserId);
-    _profilePictureLoadsByUserId.remove(contactUserId);
-  }
-
-  void _attachSessionResetListeners() {
+  void _attachSessionResetListener() {
     Bus.instance.on<UserLoggedOutEvent>().listen((_) {
-      _sessionGeneration += 1;
-      _resetSessionState(notify: true);
+      _store.clearSession();
     });
-  }
-
-  contacts.ContactsService _newContactsService() {
-    final factory = _contactsServiceFactory;
-    if (factory != null) {
-      return factory();
-    }
-    throw StateError(
-      "PhotosContactsService was not initialized with a contacts service factory",
-    );
-  }
-
-  contacts.ContactsService _requireContacts() {
-    final contacts = _contacts;
-    if (contacts == null) {
-      throw StateError(
-        "PhotosContactsService.ensureReady() must be called before use",
-      );
-    }
-    return contacts;
-  }
-
-  contacts.ContactsService? _activeContactsOrNull() {
-    if (_sessionKey == null) {
-      return null;
-    }
-    return _contacts;
-  }
-
-  Future<contacts.ContactsService> _ensureReadyForWrite() async {
-    await ensureReady();
-    final contacts = _activeContactsOrNull();
-    if (contacts == null) {
-      throw StateError("Contacts are unavailable without an active session");
-    }
-    return contacts;
   }
 }

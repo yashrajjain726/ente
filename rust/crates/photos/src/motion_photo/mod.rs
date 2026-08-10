@@ -173,13 +173,12 @@ mod tests {
     use std::fs;
     use tempfile::tempdir;
 
-    /// Build a minimal ftyp box with the given major brand (16 bytes).
     fn make_ftyp_box(brand: &[u8; 4]) -> Vec<u8> {
         let mut buf = Vec::with_capacity(16);
-        buf.extend_from_slice(&16u32.to_be_bytes()); // box size
+        buf.extend_from_slice(&16u32.to_be_bytes());
         buf.extend_from_slice(b"ftyp");
         buf.extend_from_slice(brand);
-        buf.extend_from_slice(&0u32.to_be_bytes()); // minor version
+        buf.extend_from_slice(&0u32.to_be_bytes());
         buf
     }
 
@@ -213,14 +212,13 @@ mod tests {
 
     #[test]
     fn picks_largest_segment_when_multiple_ftyp_exist() {
-        // Scenario 1: first segment is larger (full video first, preview second)
         let mut bytes = b"jpeg-prefix".to_vec();
         let first_start = bytes.len();
         bytes.extend_from_slice(&make_ftyp_box(b"mp42"));
-        bytes.extend_from_slice(&[0xAA; 500]); // large segment
+        bytes.extend_from_slice(&[0xAA; 500]);
         let second_start = bytes.len();
         bytes.extend_from_slice(&make_ftyp_box(b"isom"));
-        bytes.extend_from_slice(&[0xBB; 50]); // small segment
+        bytes.extend_from_slice(&[0xBB; 50]);
 
         let index = get_motion_video_index(&bytes).expect("video index should exist");
         assert_eq!(index.start, first_start);
@@ -229,13 +227,12 @@ mod tests {
             extract_motion_video(&bytes, Some(index)).expect("video bytes should extract");
         assert_eq!(extracted.len(), second_start - first_start);
 
-        // Scenario 2: second segment is larger (preview first, full video second)
         let mut bytes2 = b"jpeg-prefix".to_vec();
         bytes2.extend_from_slice(&make_ftyp_box(b"mp42"));
-        bytes2.extend_from_slice(&[0xCC; 50]); // small segment
+        bytes2.extend_from_slice(&[0xCC; 50]);
         let second_start = bytes2.len();
         bytes2.extend_from_slice(&make_ftyp_box(b"isom"));
-        bytes2.extend_from_slice(&[0xDD; 500]); // large segment
+        bytes2.extend_from_slice(&[0xDD; 500]);
 
         let index2 = get_motion_video_index(&bytes2).expect("video index should exist");
         assert_eq!(index2.start, second_start);
@@ -275,7 +272,6 @@ mod tests {
     fn detects_ftyp_with_larger_box_size() {
         let mut bytes = b"jpeg-prefix-data".to_vec();
         let box_start = bytes.len();
-        // 28-byte ftyp box (like Pixel 6): size + "ftyp" + brand + version + compat brands
         bytes.extend_from_slice(&28u32.to_be_bytes());
         bytes.extend_from_slice(b"ftyp");
         bytes.extend_from_slice(b"isom");
@@ -297,7 +293,7 @@ mod tests {
     #[test]
     fn rejects_ftyp_with_implausible_box_size() {
         let mut bytes = b"jpeg-prefix-data".to_vec();
-        bytes.extend_from_slice(&0u32.to_be_bytes()); // box size 0 (invalid)
+        bytes.extend_from_slice(&0u32.to_be_bytes());
         bytes.extend_from_slice(b"ftyp");
         bytes.extend_from_slice(b"mp42");
         bytes.extend_from_slice(&0u32.to_be_bytes());

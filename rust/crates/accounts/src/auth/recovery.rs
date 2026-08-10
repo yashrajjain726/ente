@@ -1,13 +1,11 @@
-//! Account recovery using recovery key.
-
 use bip39::{Language, Mnemonic};
 
 use ente_core::b64;
 use ente_core::crypto::{self, SecretVec, secretbox};
 
-use super::{Error, KeyAttributes, Result};
+use super::KeyAttributes;
+use crate::error::{Error, Result};
 
-/// Get the recovery key from stored encrypted form.
 pub fn get_recovery_key(master_key: &[u8], attributes: &KeyAttributes) -> Result<String> {
     let encrypted_recovery_key = attributes
         .recovery_key_encrypted_with_master_key
@@ -38,10 +36,7 @@ pub fn get_recovery_key(master_key: &[u8], attributes: &KeyAttributes) -> Result
     Ok(hex::encode(&recovery_key))
 }
 
-/// Convert a user-provided recovery key mnemonic or hex string into raw bytes.
-///
-/// The mnemonic form must be a 24-word English BIP-39 phrase. The legacy hex
-/// form is still accepted for compatibility.
+// Accept 24-word English BIP-39 mnemonics and legacy hex recovery keys.
 pub fn recovery_key_from_mnemonic_or_hex(recovery_key_mnemonic_or_hex: &str) -> Result<SecretVec> {
     let trimmed_input = recovery_key_mnemonic_or_hex
         .split_whitespace()
@@ -69,7 +64,6 @@ pub fn recovery_key_from_mnemonic_or_hex(recovery_key_mnemonic_or_hex: &str) -> 
     Ok(recovery_key)
 }
 
-/// Convert a base64-encoded recovery key into its 24-word English mnemonic.
 pub fn recovery_key_to_mnemonic(recovery_key_b64: &str) -> Result<String> {
     let recovery_key = SecretVec::new(
         b64::decode(recovery_key_b64).map_err(|e| Error::Decode(format!("recovery_key: {}", e)))?,

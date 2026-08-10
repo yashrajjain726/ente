@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:ente_pure_utils/ente_pure_utils.dart';
+import 'package:ente_ui/components/loading_widget.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import "package:modal_bottom_sheet/modal_bottom_sheet.dart";
@@ -10,7 +11,6 @@ import 'package:photos/models/typedefs.dart';
 import 'package:photos/theme/colors.dart';
 import 'package:photos/theme/ente_theme.dart';
 import 'package:photos/theme/text_style.dart';
-import 'package:photos/ui/common/loading_widget.dart';
 import 'package:photos/ui/components/models/button_type.dart';
 import 'package:photos/ui/components/models/custom_button_style.dart';
 import "package:photos/utils/dialog_util.dart";

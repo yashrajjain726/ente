@@ -49,7 +49,8 @@ Locale localResolutionCallBack(
   for (Locale supportedLocale in appSupportedLocales) {
     languageSupport.add(supportedLocale.languageCode);
   }
-  for (Locale locale in onDeviceLocales ?? const []) {
+  for (final deviceLocale in onDeviceLocales ?? const []) {
+    final locale = _normalizedLocale(deviceLocale);
     // check if exact local is supported, if yes, return it
     if (appSupportedLocales.contains(locale)) {
       autoDetectedLocale = locale;
@@ -78,8 +79,9 @@ Future<Locale?> getLocale({bool noFallback = false}) async {
     } else {
       savedLocale = Locale(savedValue);
     }
-    if (appSupportedLocales.contains(savedLocale)) {
-      return savedLocale;
+    final normalizedLocale = _normalizedLocale(savedLocale);
+    if (appSupportedLocales.contains(normalizedLocale)) {
+      return normalizedLocale;
     }
   }
   if (autoDetectedLocale != null) {
@@ -104,4 +106,23 @@ Future<void> setLocale(Locale locale) async {
     'locale',
     out.toString(),
   );
+}
+
+Locale _normalizedLocale(Locale locale) {
+  if (locale.languageCode == 'pt') {
+    return const Locale('pt', 'BR');
+  }
+  if (locale.languageCode != 'zh') {
+    return locale;
+  }
+  if (locale.scriptCode == 'Hant') {
+    return const Locale('zh', 'TW');
+  }
+  if (locale.scriptCode == 'Hans') {
+    return const Locale('zh', 'CN');
+  }
+  return switch (locale.countryCode) {
+    'TW' || 'HK' || 'MO' => const Locale('zh', 'TW'),
+    _ => const Locale('zh', 'CN'),
+  };
 }

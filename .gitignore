@@ -1,15 +1,10 @@
-# Editors
 .vscode/
 .idea/
 
-# macOS
 .DS_Store
 
-# Local assistant files
 CLAUDE.local.md
 
-# Node
 node_modules/
 
-# FVM Version Cache
 .fvm/

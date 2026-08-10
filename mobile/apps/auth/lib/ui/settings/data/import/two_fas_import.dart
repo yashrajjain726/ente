@@ -1,12 +1,12 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
-import 'package:ente_auth/l10n/l10n.dart';
 import 'package:ente_auth/models/code.dart';
 import 'package:ente_auth/models/code_display.dart';
 import 'package:ente_auth/ui/settings/data/import/import_file_cleanup.dart';
 import 'package:ente_auth/ui/settings/data/import/import_flow.dart';
 import 'package:ente_auth/utils/dialog_util.dart';
+import 'package:ente_strings/ente_strings.dart';
 import 'package:ente_ui/components/progress_dialog.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -14,12 +14,12 @@ import 'package:logging/logging.dart';
 import 'package:pointycastle/export.dart';
 
 Future<void> show2FasImportInstruction(BuildContext context) async {
-  final l10n = context.l10n;
+  final l10n = context.strings;
   await showFileImportInstruction(
     context: context,
     title: "2FAS Authenticator",
     body: l10n.import2FasGuide,
-    actionLabel: l10n.importSelectAppExport("2FAS Authenticator"),
+    actionLabel: l10n.importSelectAppExport(appName: "2FAS Authenticator"),
     semanticsIdentifier: 'auth_import_instruction_two_fas',
     onImport: () => _pick2FasFile(context),
   );
@@ -28,7 +28,7 @@ Future<void> show2FasImportInstruction(BuildContext context) async {
 Future<void> _pick2FasFile(BuildContext context) async {
   await pickAndProcessImportFile(
     context: context,
-    dialogTitle: context.l10n.importSelectJsonFile,
+    dialogTitle: context.strings.importSelectJsonFile,
     showProgressBeforeProcessing: false,
     logger: Logger('2FASImport'),
     logMessage: 'Exception while processing 2FAS import',
@@ -77,7 +77,7 @@ Future<int?> _process2FasExportFile(
     try {
       password = await promptForImportPassword(
         context,
-        title: context.l10n.enterPasswordToDecrypt2FASBackup,
+        title: context.strings.enterPasswordToDecrypt2FASBackup,
       );
       if (password == null) {
         await dialog.hide();
@@ -93,8 +93,8 @@ Future<int?> _process2FasExportFile(
         if (!context.mounted) return null;
         await showErrorDialog(
           context,
-          context.l10n.failedToDecrypt2FASExport,
-          context.l10n.pleaseCheckPasswordAndTryAgain,
+          context.strings.failedToDecrypt2FASExport,
+          context.strings.pleaseCheckPasswordAndTryAgain,
         );
       }
       return null;

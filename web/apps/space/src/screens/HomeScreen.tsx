@@ -28,13 +28,13 @@ import { SpaceLoadingSpinner } from "components/SpaceRouteFallback";
 import { SpaceShareInviteButton } from "components/SpaceShareInviteButton";
 import log from "ente-base/log";
 import { useBrowserBackClose } from "hooks/useBrowserBackClose";
-import { useHideOnScrollDirection } from "hooks/useHideOnScrollDirection";
 import React, { useState } from "react";
 import type { SetupProfile } from "screens/SetupProfileScreen";
-import type {
-    SpacePost,
-    SpacePostAssetURLLoader,
-    SpacePostAvatarURLLoader,
+import {
+    isSpaceContentError,
+    type SpacePost,
+    type SpacePostAssetURLLoader,
+    type SpacePostAvatarURLLoader,
 } from "services/space";
 import type { LocalSpaceFeedPost } from "state/spaceAppState";
 import { spaceTouchTargetSize } from "styles/touchTargets";
@@ -143,6 +143,7 @@ interface LoadedFeedPhotoDimensions extends FeedPhotoDimensions {
 }
 
 interface DecodedImageState {
+    failed?: boolean;
     height?: number;
     ready: boolean;
     src?: string | null;
@@ -387,6 +388,7 @@ interface FeedItemProps {
     imageUrl?: string;
     isAvatarPending: boolean;
     isOwnPost: boolean;
+    isUnavailable?: boolean;
     name: string;
     onLoadAvatar?: () => Promise<string | null | undefined>;
     onLoadImage?: () => Promise<string | undefined>;
@@ -473,13 +475,17 @@ const useDecodedImage = (
                 width: image.naturalWidth || undefined,
             });
         };
+        const fail = () => {
+            if (cancelled) return;
+            setState({ failed: true, ready: true, src });
+        };
         const decodeLoadedImage = () => {
             if (typeof image.decode != "function") {
                 finish();
                 return;
             }
 
-            void image.decode().then(finish, finish);
+            void image.decode().then(finish, fail);
         };
 
         setState((currentState) =>
@@ -488,14 +494,17 @@ const useDecodedImage = (
                 : { ready: false, src },
         );
         image.addEventListener("load", decodeLoadedImage, { once: true });
-        image.addEventListener("error", finish, { once: true });
+        image.addEventListener("error", fail, { once: true });
         image.src = src;
-        if (image.complete) decodeLoadedImage();
+        if (image.complete) {
+            if (image.naturalWidth) decodeLoadedImage();
+            else fail();
+        }
 
         return () => {
             cancelled = true;
             image.removeEventListener("load", decodeLoadedImage);
-            image.removeEventListener("error", finish);
+            image.removeEventListener("error", fail);
         };
     }, [keepPreviousUntilReady, src]);
 
@@ -725,6 +734,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
     imageUrl,
     isAvatarPending,
     isOwnPost,
+    isUnavailable = false,
     name,
     onLoadAvatar,
     onLoadImage,
@@ -743,7 +753,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
     const [isLiked, setIsLiked] = useState(viewerLiked);
     const [likePopID, setLikePopID] = useState(0);
     const [shouldLoadMedia, setShouldLoadMedia] = useState(
-        Boolean(imageUrl) && !isAvatarPending,
+        !isUnavailable && Boolean(imageUrl) && !isAvatarPending,
     );
     const rootRef = React.useRef<HTMLElement | null>(null);
     const firstName = firstNameFrom(name);
@@ -754,7 +764,6 @@ const FeedItem: React.FC<FeedItemProps> = ({
         () => thumbHashDataURLFromBase64(thumbHash),
         [thumbHash],
     );
-    const showFooter = !isOwnPost;
     const canOpenAuthor = isOwnPost
         ? Boolean(onOpenProfile)
         : Boolean(onOpenFriend);
@@ -772,10 +781,20 @@ const FeedItem: React.FC<FeedItemProps> = ({
         useState<LoadedFeedPhotoDimensions | null>(null);
     const decodedPhoto = useDecodedImage(imageUrl, true);
     const decodedAvatar = useDecodedImage(avatarUrl, true);
+    const isPostUnavailable = isUnavailable || decodedPhoto.failed;
+    const showFooter = !isOwnPost && !isPostUnavailable;
     const displayImageUrl =
-        (decodedPhoto.ready ? decodedPhoto.src : imageUrl) ?? undefined;
+        (decodedPhoto.failed
+            ? undefined
+            : decodedPhoto.ready
+              ? decodedPhoto.src
+              : imageUrl) ?? undefined;
     const displayAvatarUrl =
-        (decodedAvatar.ready ? decodedAvatar.src : avatarUrl) ?? undefined;
+        (decodedAvatar.failed
+            ? undefined
+            : decodedAvatar.ready
+              ? decodedAvatar.src
+              : avatarUrl) ?? undefined;
     const isAvatarReady = !isAvatarPending && decodedAvatar.ready;
     const photoDimensions =
         loadedPhotoDimensions && loadedPhotoDimensions.src == displayImageUrl
@@ -784,7 +803,8 @@ const FeedItem: React.FC<FeedItemProps> = ({
     const feedPhotoFrameDimensions =
         feedPhotoFrameDimensionsFor(photoDimensions);
     const isPhotoReady = Boolean(displayImageUrl) && decodedPhoto.ready;
-    const canOpenPhoto = isPhotoReady && Boolean(onOpenPhoto);
+    const canOpenPhoto =
+        !isPostUnavailable && isPhotoReady && Boolean(onOpenPhoto);
     const [showResolvedPhoto, setShowResolvedPhoto] = useState(false);
     const decodedPhotoHeight = decodedPhoto.height;
     const decodedPhotoSrc = decodedPhoto.src;
@@ -851,6 +871,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
     }, [viewerLiked]);
 
     React.useEffect(() => {
+        if (isPostUnavailable) return;
         if (shouldLoadMedia) return;
         const element = rootRef.current;
         if (!element) return;
@@ -873,9 +894,10 @@ const FeedItem: React.FC<FeedItemProps> = ({
         );
         observer.observe(element);
         return () => observer.disconnect();
-    }, [shouldLoadMedia]);
+    }, [isPostUnavailable, shouldLoadMedia]);
 
     React.useEffect(() => {
+        if (isPostUnavailable) return;
         if (!shouldLoadMedia) return;
 
         if (!imageUrl) {
@@ -884,7 +906,21 @@ const FeedItem: React.FC<FeedItemProps> = ({
         if (isAvatarPending) {
             void onLoadAvatar?.();
         }
-    }, [imageUrl, isAvatarPending, onLoadAvatar, onLoadImage, shouldLoadMedia]);
+    }, [
+        imageUrl,
+        isAvatarPending,
+        isPostUnavailable,
+        onLoadAvatar,
+        onLoadImage,
+        shouldLoadMedia,
+    ]);
+
+    React.useEffect(() => {
+        if (!decodedPhoto.failed) return;
+        log.warn(
+            `Post ${postId} is unavailable because the browser could not decode its image`,
+        );
+    }, [decodedPhoto.failed, postId]);
 
     React.useEffect(() => {
         if (!decodedPhotoHeight || !decodedPhotoWidth) return;
@@ -966,7 +1002,11 @@ const FeedItem: React.FC<FeedItemProps> = ({
                 <Box
                     component="button"
                     type="button"
-                    aria-label={`Open ${name} photo`}
+                    aria-label={
+                        isPostUnavailable
+                            ? "Post unavailable"
+                            : `Open ${name} photo`
+                    }
                     disabled={!canOpenPhoto}
                     onClick={() => openPhoto()}
                     sx={{
@@ -988,19 +1028,21 @@ const FeedItem: React.FC<FeedItemProps> = ({
                         },
                     }}
                 >
-                    {!thumbHashDataURL && !isPhotoReady && (
-                        <Skeleton
-                            variant="rectangular"
-                            sx={{
-                                bgcolor: feedSkeletonElementBackground,
-                                display: "block",
-                                height: "100%",
-                                transform: "none",
-                                width: "100%",
-                            }}
-                        />
-                    )}
-                    {thumbHashDataURL ? (
+                    {!isPostUnavailable &&
+                        !thumbHashDataURL &&
+                        !isPhotoReady && (
+                            <Skeleton
+                                variant="rectangular"
+                                sx={{
+                                    bgcolor: feedSkeletonElementBackground,
+                                    display: "block",
+                                    height: "100%",
+                                    transform: "none",
+                                    width: "100%",
+                                }}
+                            />
+                        )}
+                    {!isPostUnavailable && thumbHashDataURL ? (
                         <Box
                             component="img"
                             alt=""
@@ -1019,7 +1061,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
                             }}
                         />
                     ) : null}
-                    {isPhotoReady && (
+                    {!isPostUnavailable && isPhotoReady && (
                         <Box
                             component="img"
                             alt={`${name} post`}
@@ -1047,18 +1089,36 @@ const FeedItem: React.FC<FeedItemProps> = ({
                             }}
                         />
                     )}
+                    {isPostUnavailable && (
+                        <Box
+                            sx={{
+                                alignItems: "center",
+                                bgcolor: feedSkeletonElementBackground,
+                                color: "#6D6D72",
+                                display: "flex",
+                                fontSize: 14,
+                                fontWeight: 600,
+                                height: "100%",
+                                justifyContent: "center",
+                                width: "100%",
+                            }}
+                        >
+                            Post unavailable
+                        </Box>
+                    )}
                 </Box>
                 <Box
                     aria-hidden
                     sx={{
                         background:
-                            "linear-gradient(180deg, rgba(0, 0, 0, 0.62), rgba(0, 0, 0, 0))",
-                        height: 72,
-                        left: 0,
+                            "linear-gradient(180deg, rgba(0, 0, 0, 0.78), rgba(0, 0, 0, 0))",
+                        filter: "blur(12px)",
+                        height: 100,
+                        left: -12,
                         pointerEvents: "none",
                         position: "absolute",
-                        right: 0,
-                        top: 0,
+                        right: -12,
+                        top: -12,
                         zIndex: 1,
                     }}
                 />
@@ -1257,7 +1317,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
                         )}
                     </Box>
                 </Box>
-                {displayCaption && (
+                {!isPostUnavailable && displayCaption && (
                     <FeedPhotoCaption caption={displayCaption} />
                 )}
             </Box>
@@ -1518,6 +1578,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 }) => {
     const [selectedViewer, setSelectedViewer] =
         useState<SelectedHomeViewer | null>(null);
+    const [isDraftPostExitAnimating, setIsDraftPostExitAnimating] =
+        useState(false);
     const [isDraftPostExiting, setIsDraftPostExiting] = useState(false);
     const [isInviteSharing, setIsInviteSharing] = useState(false);
     const [isPostPhotoOpening, setIsPostPhotoOpening] = useState(false);
@@ -1527,10 +1589,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     const [loadedFeedImageURLsByKey, setLoadedFeedImageURLsByKey] = useState<
         Record<string, string>
     >({});
+    const [unavailableFeedPostsByKey, setUnavailableFeedPostsByKey] = useState<
+        Record<string, true>
+    >({});
     const [feedScrollRequest, setFeedScrollRequest] = useState(0);
-    const isHeaderTriggered = useHideOnScrollDirection();
-    const [isHeaderFocused, setIsHeaderFocused] = useState(false);
-    const isHeaderHidden = isHeaderTriggered && !isHeaderFocused;
     const postInputRef = React.useRef<HTMLInputElement | null>(null);
     const feedLoadMoreRef = React.useRef<HTMLDivElement | null>(null);
     const localPostObjectUrlsRef = React.useRef<Set<string>>(new Set());
@@ -1619,6 +1681,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     };
     const closeSelectedPhoto = () => {
         activeLocalPostObjectUrlRef.current = null;
+        setIsDraftPostExitAnimating(false);
         setIsDraftPostExiting(false);
         setSelectedViewer(null);
         revokeLocalPostObjectUrls();
@@ -1626,7 +1689,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     const { clearBrowserBackState: clearSelectedPhotoHistory } =
         useBrowserBackClose({
             open: Boolean(selectedViewer),
-            onClose: closeSelectedPhoto,
+            onClose: () => {
+                if (!isDraftPostExiting) closeSelectedPhoto();
+            },
             stateKey: "space-feed-viewer",
         });
     const deleteSelectedPost = async () => {
@@ -1658,6 +1723,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             }
 
             const cacheKey = feedPostImageCacheKey(item);
+            if (unavailableFeedPostsByKey[cacheKey]) {
+                return Promise.resolve(undefined);
+            }
             const inFlight = feedImageLoadsInFlightRef.current.get(cacheKey);
             if (inFlight) return inFlight;
 
@@ -1672,6 +1740,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 })
                 .catch((error: unknown) => {
                     log.warn("Failed to load feed post image", error);
+                    if (isSpaceContentError(error)) {
+                        setUnavailableFeedPostsByKey((current) => ({
+                            ...current,
+                            [cacheKey]: true,
+                        }));
+                    }
                     return undefined;
                 })
                 .finally(() => {
@@ -1680,7 +1754,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             feedImageLoadsInFlightRef.current.set(cacheKey, load);
             return load;
         },
-        [loadedFeedImageURLFor, onLoadPostImage],
+        [loadedFeedImageURLFor, onLoadPostImage, unavailableFeedPostsByKey],
     );
     const loadFeedPostAvatar = React.useCallback(
         (item: SpacePost) => {
@@ -1729,7 +1803,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     ) => {
         const imageUrl = loadedFeedImageURLFor(item);
         const avatarUrl = loadedFeedAvatarURLFor(item);
-        const isAvatarPending = avatarUrl === undefined;
+        const isAvatarPending = !item.isUnavailable && avatarUrl === undefined;
+        const isUnavailable =
+            Boolean(item.isUnavailable) ||
+            Boolean(unavailableFeedPostsByKey[feedPostImageCacheKey(item)]);
         return (
             <FeedItem
                 key={key}
@@ -1744,12 +1821,17 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 isOwnPost={
                     Boolean(viewerSpaceId) && item.spaceId == viewerSpaceId
                 }
+                isUnavailable={isUnavailable}
                 name={item.name}
                 onLoadAvatar={
-                    isAvatarPending ? () => loadFeedPostAvatar(item) : undefined
+                    isAvatarPending && !isUnavailable
+                        ? () => loadFeedPostAvatar(item)
+                        : undefined
                 }
                 onLoadImage={
-                    imageUrl ? undefined : () => loadFeedPostImage(item)
+                    imageUrl || isUnavailable
+                        ? undefined
+                        : () => loadFeedPostImage(item)
                 }
                 onOpenFriend={onOpenFriend}
                 onOpenPhoto={openFeedPhoto}
@@ -1978,7 +2060,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             }}
         >
             {selectedViewer && (
-                <SpaceViewerFeedBackdrop exiting={isDraftPostExiting} />
+                <SpaceViewerFeedBackdrop exiting={isDraftPostExitAnimating} />
             )}
             <Box
                 sx={{
@@ -1995,17 +2077,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             >
                 <Box
                     component="header"
-                    onFocusCapture={() => setIsHeaderFocused(true)}
-                    onBlurCapture={(event) => {
-                        const nextFocus = event.relatedTarget;
-                        if (
-                            nextFocus instanceof Node &&
-                            event.currentTarget.contains(nextFocus)
-                        )
-                            return;
-
-                        setIsHeaderFocused(false);
-                    }}
                     sx={{
                         alignItems: "center",
                         background: "transparent",
@@ -2014,17 +2085,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                         gap: "12px",
                         gridTemplateColumns: `${headerSideWidth}px minmax(0, 1fr) ${headerSideWidth}px`,
                         height: headerHeight,
-                        left: "50%",
                         maxWidth: "100%",
                         pb: 2,
-                        position: "fixed",
+                        position: "relative",
                         pt: 1.5,
                         px: 2,
-                        top: 0,
-                        transform: isHeaderHidden
-                            ? "translate(-50%, calc(-100% - 4px))"
-                            : "translate(-50%, 0)",
-                        transition: "transform 180ms ease",
                         width: "100%",
                         zIndex: 4,
                         "&::before": {
@@ -2032,8 +2097,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                             WebkitMaskImage:
                                 "linear-gradient(to bottom, #000 0%, transparent 100%)",
                             backdropFilter: "blur(4px)",
-                            background:
-                                "linear-gradient(to bottom, rgba(245, 245, 247, 0.8), transparent)",
+                            background: `linear-gradient(to bottom, ${homeBackground}, rgba(245, 245, 247, 0.35) 75%, transparent)`,
                             content: '""',
                             height: "calc(100% + 28px)",
                             left: 0,
@@ -2046,9 +2110,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                             zIndex: -1,
                         },
                         "@media (min-width: 600px)": { maxWidth: 390 },
-                        "@media (prefers-reduced-motion: reduce)": {
-                            transition: "none",
-                        },
                     }}
                 >
                     <Box
@@ -2232,7 +2293,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                         )}
                     </Box>
                 </Box>
-                <Box aria-hidden sx={{ height: headerHeight }} />
                 <Box
                     sx={{
                         boxSizing: "border-box",
@@ -2460,6 +2520,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                                   }
                                 : undefined
                         }
+                        onDraftPostExitAnimationStart={() => {
+                            setIsDraftPostExitAnimating(true);
+                        }}
                         onDraftPostExitStart={() => {
                             setIsDraftPostExiting(true);
                         }}

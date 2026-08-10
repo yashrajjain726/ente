@@ -1,11 +1,11 @@
 import 'package:ente_accounts/ente_accounts.dart';
+import 'package:ente_components/ente_components.dart';
 import 'package:ente_configuration/base_configuration.dart';
 import 'package:ente_pure_utils/ente_pure_utils.dart';
 import 'package:ente_strings/ente_strings.dart';
 import 'package:ente_ui/components/base_bottom_sheet.dart';
 import 'package:ente_ui/components/buttons/button_widget.dart';
 import 'package:ente_ui/components/buttons/models/button_type.dart';
-import 'package:ente_ui/components/centered_constrained_widget.dart';
 import 'package:ente_ui/components/loading_widget.dart';
 import 'package:ente_ui/theme/ente_theme.dart';
 import 'package:ente_ui/utils/dialog_util.dart';
@@ -39,7 +39,7 @@ class _SessionsPageState extends State<SessionsPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(elevation: 0, title: Text(context.strings.activeSessions)),
-      body: CenteredConstrainedWidget(child: _getBody()),
+      body: CenteredConstrainedComponent(child: _getBody()),
     );
   }
 

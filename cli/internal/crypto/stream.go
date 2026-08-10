@@ -10,16 +10,10 @@ import (
 	"golang.org/x/crypto/poly1305"
 )
 
-// public constants
 const (
-	//TagMessage the most common tag, that doesn't add any information about the nature of the message.
 	TagMessage = 0
-	// TagPush indicates that the message marks the end of a set of messages,
-	// but not the end of the stream. For example, a huge JSON string sent as multiple chunks can use this tag to indicate to the application that the string is complete and that it can be decoded. But the stream itself is not closed, and more data may follow.
 	TagPush = 0x01
-	// TagRekey "forget" the key used to encrypt this message and the previous ones, and derive a new secret key.
 	TagRekey = 0x02
-	// TagFinal indicates that the message marks the end of the stream, and erases the secret key used to encrypt the previous sequence.
 	TagFinal = TagPush | TagRekey
 
 	StreamKeyBytes              = chacha20poly1305.KeySize
@@ -83,7 +77,6 @@ func NewEncryptor(key []byte) (Encryptor, []byte, error) {
 
 	k, err := chacha20.HChaCha20(key[:], header[:16])
 	if err != nil {
-		//fmt.Printf("error: %v", err)
 		return nil, nil, err
 	}
 	copy(stream.k[:], k)
@@ -96,8 +89,6 @@ func NewEncryptor(key []byte) (Encryptor, []byte, error) {
 	for i, b := range header[cryptoCoreHchacha20InputBytes:] {
 		stream.nonce[i+cryptoSecretStreamXchacha20poly1305Counterbytes] = b
 	}
-	// fmt.Printf("stream: %+v\n", stream.streamState)
-
 	return stream, header, nil
 }
 

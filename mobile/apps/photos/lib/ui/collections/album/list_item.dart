@@ -1,10 +1,10 @@
 import "package:ente_components/ente_components.dart";
 import "package:ente_icons/ente_icons.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:hugeicons/hugeicons.dart";
 import "package:logging/logging.dart";
 import "package:photos/core/configuration.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/models/collection/collection.dart";
 import "package:photos/models/file/file.dart";
 import "package:photos/models/selected_albums.dart";
@@ -89,9 +89,7 @@ class AlbumListItemWidget extends StatelessWidget {
         builder: (context, snapshot) {
           String countText = "";
           if (snapshot.hasData) {
-            countText = AppLocalizations.of(
-              context,
-            ).itemCount(count: snapshot.data!);
+            countText = context.strings.itemCount(count: snapshot.data!);
           } else if (snapshot.hasError) {
             Logger("AlbumListItemWidget").severe(
               "Failed to fetch file count of collection",
@@ -102,9 +100,7 @@ class AlbumListItemWidget extends StatelessWidget {
               collection,
             );
             if (cachedCount != null) {
-              countText = AppLocalizations.of(
-                context,
-              ).itemCount(count: cachedCount);
+              countText = context.strings.itemCount(count: cachedCount);
             }
           }
           return _buildSubtitle(
@@ -240,11 +236,10 @@ class AlbumListItemWidget extends StatelessWidget {
         key: const ValueKey("owner"),
         collection.owner,
         type: AvatarType.medium,
-        thumbnailView: true,
       );
     }
     if (collection.hasSharees) {
-      final sharees = collection.getSharees();
+      final sharees = collection.sharees;
       final int total = sharees.length;
       final int limit = total > 2 ? 1 : 2;
       final int displayCount = total.clamp(1, limit).toInt();

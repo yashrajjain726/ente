@@ -536,6 +536,64 @@ func (repo *CollectionRepository) Share(
 	return stacktrace.Propagate(err, "")
 }
 
+// ShareAutomatically creates a share without modifying a prior share.
+func (repo *CollectionRepository) ShareAutomatically(
+	ctx context.Context,
+	collectionID int64,
+	fromUserID int64,
+	toUserID int64,
+	encryptedKey string,
+	role ente.CollectionParticipantRole,
+	updationTime int64,
+) (ente.CollectionShareStatus, error) {
+	if role != ente.VIEWER && role != ente.COLLABORATOR && role != ente.ADMIN {
+		return "", stacktrace.Propagate(fmt.Errorf("invalid role %s", role), "")
+	}
+	tx, err := repo.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return "", stacktrace.Propagate(err, "")
+	}
+	defer tx.Rollback()
+
+	result, err := tx.ExecContext(ctx, `INSERT INTO collection_shares(
+			collection_id, from_user_id, to_user_id, encrypted_key, updation_time,
+			role_type, shared_at
+		) VALUES($1, $2, $3, $4, $5, $6, $7)
+		ON CONFLICT (collection_id, from_user_id, to_user_id)
+		DO NOTHING
+	`, collectionID, fromUserID, toUserID, encryptedKey, updationTime, role, updationTime)
+	if err != nil {
+		return "", stacktrace.Propagate(err, "")
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return "", stacktrace.Propagate(err, "")
+	}
+	if affected == 0 {
+		var isDeleted bool
+		err := tx.QueryRowContext(ctx, `SELECT is_deleted
+			FROM collection_shares
+			WHERE collection_id = $1 AND from_user_id = $2 AND to_user_id = $3`,
+			collectionID, fromUserID, toUserID).
+			Scan(&isDeleted)
+		if err != nil {
+			return "", stacktrace.Propagate(err, "")
+		}
+		if isDeleted {
+			return ente.CollectionBlockedPriorRemoval, nil
+		}
+		return ente.CollectionAlreadyShared, nil
+	}
+
+	if _, err = tx.ExecContext(ctx, `UPDATE collections SET updation_time = $1 WHERE collection_id = $2`, updationTime, collectionID); err != nil {
+		return "", stacktrace.Propagate(err, "")
+	}
+	if err := tx.Commit(); err != nil {
+		return "", stacktrace.Propagate(err, "")
+	}
+	return ente.CollectionShared, nil
+}
+
 // UpdateShareeMetadata shares a collection with a userID
 func (repo *CollectionRepository) UpdateShareeMetadata(
 	collectionID int64,
@@ -578,37 +636,61 @@ func (repo *CollectionRepository) UpdateShareeMetadata(
 
 // UnShare un-shares a collection from a userID
 func (repo *CollectionRepository) UnShare(collectionID int64, toUserID int64) error {
+	_, err := repo.UnShareContext(context.Background(), collectionID, toUserID)
+	return err
+}
+
+// UnShareContext revokes access to a collection.
+func (repo *CollectionRepository) UnShareContext(
+	ctx context.Context,
+	collectionID int64,
+	toUserID int64,
+) (ente.CollectionShareStatus, error) {
 	updationTime := time.Microseconds()
-	context := context.Background()
-	tx, err := repo.DB.BeginTx(context, nil)
+	tx, err := repo.DB.BeginTx(ctx, nil)
 	if err != nil {
-		return stacktrace.Propagate(err, "")
+		return "", stacktrace.Propagate(err, "")
 	}
-	_, err = tx.ExecContext(context, `UPDATE collection_shares 
-		SET is_deleted = $1, updation_time = $2 
-		WHERE collection_id = $3 AND to_user_id = $4`, true, updationTime, collectionID, toUserID)
-	if err != nil {
-		tx.Rollback()
-		return stacktrace.Propagate(err, "")
+	defer tx.Rollback()
+
+	status := ente.CollectionAlreadyUnshared
+	var isDeleted bool
+	err = tx.QueryRowContext(ctx, `SELECT is_deleted
+		FROM collection_shares
+		WHERE collection_id = $1 AND to_user_id = $2
+		FOR UPDATE`, collectionID, toUserID).Scan(&isDeleted)
+	if errors.Is(err, sql.ErrNoRows) {
+		return ente.CollectionNotShared, nil
 	}
-	// remove all the files which were added by this user
-	// todo: should we also add c_owner_id != toUserId
-	_, err = tx.ExecContext(context, `UPDATE collection_files 
-		SET is_deleted = $1, updation_time = $2 
-		WHERE collection_id = $3 AND f_owner_id = $4`, true, updationTime, collectionID, toUserID)
 	if err != nil {
-		tx.Rollback()
-		return stacktrace.Propagate(err, "")
+		return "", stacktrace.Propagate(err, "")
+	}
+	if !isDeleted {
+		status = ente.CollectionUnshared
+	}
+	_, err = tx.ExecContext(ctx, `UPDATE collection_shares
+		SET is_deleted = TRUE, updation_time = $1
+		WHERE collection_id = $2 AND to_user_id = $3 AND is_deleted = FALSE`,
+		updationTime, collectionID, toUserID)
+	if err != nil {
+		return "", stacktrace.Propagate(err, "")
 	}
 
-	_, err = tx.ExecContext(context, `UPDATE collections SET updation_time = $1 
-		WHERE collection_id = $2`, updationTime, collectionID)
+	_, err = tx.ExecContext(ctx, `UPDATE collection_files
+		SET is_deleted = TRUE, updation_time = $1
+		WHERE collection_id = $2 AND f_owner_id = $3 AND is_deleted = FALSE`,
+		updationTime, collectionID, toUserID)
 	if err != nil {
-		tx.Rollback()
-		return stacktrace.Propagate(err, "")
+		return "", stacktrace.Propagate(err, "")
 	}
-	err = tx.Commit()
-	return stacktrace.Propagate(err, "")
+	if _, err = tx.ExecContext(ctx, `UPDATE collections SET updation_time = $1
+		WHERE collection_id = $2`, updationTime, collectionID); err != nil {
+		return "", stacktrace.Propagate(err, "")
+	}
+	if err := tx.Commit(); err != nil {
+		return "", stacktrace.Propagate(err, "")
+	}
+	return status, nil
 }
 
 // AddFiles adds files to a collection

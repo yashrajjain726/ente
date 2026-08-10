@@ -9,6 +9,7 @@ import 'package:ente_pure_utils/ente_pure_utils.dart'
     show deleteFileSystemEntityIfPresent, isFileSystemPathMissing;
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:logging/logging.dart';
+import 'package:native_video_editor/native_video_editor.dart';
 import 'package:path/path.dart' as p;
 import 'package:photo_manager/photo_manager.dart';
 import 'package:photos/core/cache/thumbnail_in_memory_cache.dart';
@@ -23,7 +24,6 @@ import "package:photos/module/download/file_url.dart";
 import "package:photos/services/collections_service.dart";
 import "package:photos/utils/file_key.dart";
 import 'package:uuid/uuid.dart';
-import 'package:video_thumbnail/video_thumbnail.dart';
 
 final _logger = Logger("ThumbnailUtil");
 final _uploadIDToDownloadItem = <int, _ThumbnailDownload>{};
@@ -224,13 +224,8 @@ Future<Uint8List?> getThumbnailFromInAppCacheFile(EnteFile file) async {
   }
   if (file.fileType == FileType.video) {
     try {
-      return await withTemporaryVideoThumbnail<Uint8List>(
-        videoPath: localFile.path,
-        maxWidth: thumbnailLargeSize,
-        quality: 80,
-        use: (thumbnailFile) async =>
-            compressThumbnailToSizeLimit(await thumbnailFile.readAsBytes()),
-      );
+      final result = await getVideoThumbnailFromInAppCacheFile(file);
+      return result?.data;
     } catch (e) {
       _logger.warning('Failed to generate video thumbnail', e);
       return null;
@@ -239,12 +234,12 @@ Future<Uint8List?> getThumbnailFromInAppCacheFile(EnteFile file) async {
   return compressThumbnailToSizeLimit(await localFile.readAsBytes());
 }
 
-Future<T?> withTemporaryVideoThumbnail<T>({
-  required String videoPath,
-  required int quality,
-  required Future<T?> Function(File thumbnailFile) use,
-  int maxWidth = 0,
-}) async {
+Future<({Uint8List data, NativeVideoInfo info})?>
+getVideoThumbnailFromInAppCacheFile(EnteFile file) async {
+  final localFile = File(getSharedMediaFilePath(file));
+  if (!localFile.existsSync() || file.fileType != FileType.video) {
+    return null;
+  }
   final thumbnailFile = File(
     p.join(
       Configuration.instance.getTempDirectory(),
@@ -252,17 +247,22 @@ Future<T?> withTemporaryVideoThumbnail<T>({
     ),
   );
   try {
-    final thumbnailFilePath = await VideoThumbnail.thumbnailFile(
-      video: videoPath,
-      imageFormat: ImageFormat.JPEG,
-      thumbnailPath: thumbnailFile.path,
-      maxWidth: maxWidth,
-      quality: quality,
+    final extraction = await NativeVideoEditor.extractFrame(
+      VideoFrameRequest(
+        inputPath: localFile.path,
+        outputPath: thumbnailFile.path,
+        position: Duration.zero,
+        maxWidth: thumbnailLargeSize,
+        maxHeight: thumbnailLargeSize,
+        quality: 80,
+      ),
     );
-    if (thumbnailFilePath == null) {
-      return null;
-    }
-    return await use(File(thumbnailFilePath));
+    return (
+      data: await compressThumbnailToSizeLimit(
+        await thumbnailFile.readAsBytes(),
+      ),
+      info: extraction.videoInfo,
+    );
   } finally {
     try {
       await deleteFileSystemEntityIfPresent(thumbnailFile);
@@ -308,15 +308,39 @@ Future<void> _downloadAndDecryptThumbnail(_ThumbnailDownload item) async {
       final headers = CollectionsService.instance.publicCollectionHeaders(
         file.collectionID!,
       );
+      final signedUrl = await FileUrl.tryGetV3Url(
+        NetworkClient.instance.enteDio,
+        file.uploadedFileID!,
+        FileUrlType.publicThumbnail,
+        headers: headers,
+      );
       encryptedThumbnail = (await NetworkClient.instance.downloadDio.get(
-        FileUrl.getUrl(file.uploadedFileID!, FileUrlType.publicThumbnail),
-        options: Options(headers: headers, responseType: ResponseType.bytes),
+        signedUrl ??
+            FileUrl.getLegacyUrl(
+              file.uploadedFileID!,
+              FileUrlType.publicThumbnail,
+            ),
+        options: Options(
+          headers: signedUrl == null ? headers : null,
+          responseType: ResponseType.bytes,
+        ),
       )).data;
     } else {
+      final headers = <String, dynamic>{
+        "X-Auth-Token": Configuration.instance.getToken(),
+      };
+      final signedUrl = await FileUrl.tryGetV3Url(
+        NetworkClient.instance.enteDio,
+        file.uploadedFileID!,
+        FileUrlType.thumbnail,
+        headers: headers,
+        cancelToken: item.cancelToken,
+      );
       encryptedThumbnail = (await NetworkClient.instance.downloadDio.get(
-        FileUrl.getUrl(file.uploadedFileID!, FileUrlType.thumbnail),
+        signedUrl ??
+            FileUrl.getLegacyUrl(file.uploadedFileID!, FileUrlType.thumbnail),
         options: Options(
-          headers: {"X-Auth-Token": Configuration.instance.getToken()},
+          headers: signedUrl == null ? headers : null,
           responseType: ResponseType.bytes,
         ),
         cancelToken: item.cancelToken,

@@ -186,6 +186,19 @@ struct RangePartState {
     retry_count: u32,
 }
 
+struct RangeDownloadContext<'a, 'progress> {
+    client: &'a Client,
+    target: &'a DownloadTarget,
+    total: u64,
+    response_metadata: Option<&'a ResponseMetadata>,
+    range_states: &'a Mutex<Vec<RangePartState>>,
+    range_metadata: &'a Mutex<RangeDownloadMetadata>,
+    range_metadata_path: &'a Path,
+    file_started_at: Instant,
+    on_progress: &'a Mutex<&'progress mut (dyn FnMut(FileProgress) + Send)>,
+    is_cancelled: &'a (dyn Fn() -> bool + Sync),
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct ContentRange {
     start: u64,
@@ -700,7 +713,6 @@ async fn download_file_ranged(
         .truncate(false)
         .open(&tmp_path)?;
     file.set_len(total)?;
-    let file = Arc::new(file);
 
     let range_states = range_metadata
         .ranges
@@ -715,11 +727,23 @@ async fn download_file_ranged(
             retry_count: 0,
         })
         .collect::<Vec<_>>();
-    let range_states = Arc::new(Mutex::new(range_states));
-    let range_metadata = Arc::new(Mutex::new(range_metadata));
-    let on_progress = Arc::new(Mutex::new(on_progress));
+    let range_states = Mutex::new(range_states);
+    let range_metadata = Mutex::new(range_metadata);
+    let on_progress = Mutex::new(on_progress);
+    let range_download = RangeDownloadContext {
+        client,
+        target,
+        total,
+        response_metadata: response_metadata.as_ref(),
+        range_states: &range_states,
+        range_metadata: &range_metadata,
+        range_metadata_path: &range_metadata_path,
+        file_started_at,
+        on_progress: &on_progress,
+        is_cancelled,
+    };
 
-    emit_range_file_progress(total, file_started_at, &range_states, &on_progress);
+    range_download.emit_progress();
 
     let mut downloads = Vec::new();
     {
@@ -729,38 +753,13 @@ async fn download_file_ranged(
                 continue;
             }
 
-            let file = Arc::clone(&file);
-            let range_states = Arc::clone(&range_states);
-            let range_metadata = Arc::clone(&range_metadata);
-            let range_metadata_path = range_metadata_path.clone();
-            let response_metadata = response_metadata.clone();
-            let on_progress = Arc::clone(&on_progress);
-
-            downloads.push(async move {
-                download_range_part(
-                    client,
-                    target,
-                    file,
-                    part_index,
-                    range,
-                    total,
-                    response_metadata,
-                    range_states,
-                    range_metadata,
-                    range_metadata_path,
-                    file_started_at,
-                    on_progress,
-                    is_cancelled,
-                )
-                .await
-            });
+            downloads.push(range_download.download_part(&file, part_index, range));
         }
     }
 
     try_join_all(downloads).await?;
     drop(file);
-
-    emit_range_file_progress(total, file_started_at, &range_states, &on_progress);
+    range_download.emit_progress();
 
     if let Err(err) = check_sha256(&tmp_path, &target.sha256, &target.label).await {
         let _ = fs::remove_file(&tmp_path);
@@ -802,149 +801,184 @@ async fn download_file_ranged(
     })
 }
 
-#[allow(clippy::too_many_arguments)]
-async fn download_range_part(
-    client: &Client,
-    target: &DownloadTarget,
-    file: Arc<File>,
-    part_index: usize,
-    range: RangeDownloadPartMetadata,
-    total: u64,
-    response_metadata: Option<ResponseMetadata>,
-    range_states: Arc<Mutex<Vec<RangePartState>>>,
-    range_metadata: Arc<Mutex<RangeDownloadMetadata>>,
-    range_metadata_path: PathBuf,
-    file_started_at: Instant,
-    on_progress: Arc<Mutex<&mut (dyn FnMut(FileProgress) + Send)>>,
-    is_cancelled: &(impl Fn() -> bool + Sync),
-) -> Result<(), Error> {
-    let range_len = range_download_len(range);
+impl RangeDownloadContext<'_, '_> {
+    async fn download_part(
+        &self,
+        file: &File,
+        part_index: usize,
+        range: RangeDownloadPartMetadata,
+    ) -> Result<(), Error> {
+        let range_len = range_download_len(range);
 
-    for attempt in 1..=MAX_ATTEMPTS {
-        if is_cancelled() {
-            return Err(Error::Cancelled);
-        }
-
-        {
-            let mut states = range_states.lock().expect("range state lock");
-            if let Some(state) = states.get_mut(part_index) {
-                state.downloaded_bytes = 0;
+        for attempt in 1..=MAX_ATTEMPTS {
+            if (self.is_cancelled)() {
+                return Err(Error::Cancelled);
             }
-        }
-        emit_range_file_progress(total, file_started_at, &range_states, &on_progress);
 
-        let mut response =
-            match request_model_range(client, &target.url, range, response_metadata.as_ref()).await
+            {
+                let mut states = self.range_states.lock().expect("range state lock");
+                if let Some(state) = states.get_mut(part_index) {
+                    state.downloaded_bytes = 0;
+                }
+            }
+            self.emit_progress();
+
+            let mut response = match request_model_range(
+                self.client,
+                &self.target.url,
+                range,
+                self.response_metadata,
+            )
+            .await
             {
                 Ok(response) => response,
                 Err(err) => {
                     if attempt == MAX_ATTEMPTS {
                         return Err(err);
                     }
-                    increment_range_retry(&range_states, part_index);
-                    emit_range_file_progress(total, file_started_at, &range_states, &on_progress);
+                    self.increment_retry(part_index);
+                    self.emit_progress();
                     continue;
                 }
             };
 
-        if response.status() != StatusCode::PARTIAL_CONTENT {
-            if response.status() == StatusCode::OK
-                || response.status() == StatusCode::RANGE_NOT_SATISFIABLE
-            {
-                return Err(Error::Http(response.status().as_u16()));
-            }
-            if attempt == MAX_ATTEMPTS {
-                return Err(Error::Http(response.status().as_u16()));
-            }
-            increment_range_retry(&range_states, part_index);
-            emit_range_file_progress(total, file_started_at, &range_states, &on_progress);
-            continue;
-        }
-
-        validate_range_response(&response, range, total)?;
-
-        let mut downloaded_in_range = 0u64;
-        let mut last_progress = Instant::now();
-        let mut retry_attempt = false;
-
-        loop {
-            if is_cancelled() {
-                return Err(Error::Cancelled);
+            if response.status() != StatusCode::PARTIAL_CONTENT {
+                if response.status() == StatusCode::OK
+                    || response.status() == StatusCode::RANGE_NOT_SATISFIABLE
+                {
+                    return Err(Error::Http(response.status().as_u16()));
+                }
+                if attempt == MAX_ATTEMPTS {
+                    return Err(Error::Http(response.status().as_u16()));
+                }
+                self.increment_retry(part_index);
+                self.emit_progress();
+                continue;
             }
 
-            let chunk = match response.chunk().await {
-                Ok(chunk) => chunk,
-                Err(err) => {
-                    if attempt == MAX_ATTEMPTS {
-                        return Err(Error::Network(err.to_string()));
+            validate_range_response(&response, range, self.total)?;
+
+            let mut downloaded_in_range = 0u64;
+            let mut last_progress = Instant::now();
+            let mut retry_attempt = false;
+
+            loop {
+                if (self.is_cancelled)() {
+                    return Err(Error::Cancelled);
+                }
+
+                let chunk = match response.chunk().await {
+                    Ok(chunk) => chunk,
+                    Err(err) => {
+                        if attempt == MAX_ATTEMPTS {
+                            return Err(Error::Network(err.to_string()));
+                        }
+                        self.increment_retry(part_index);
+                        retry_attempt = true;
+                        break;
                     }
-                    increment_range_retry(&range_states, part_index);
-                    retry_attempt = true;
+                };
+                let Some(chunk) = chunk else {
                     break;
-                }
-            };
-            let Some(chunk) = chunk else {
-                break;
-            };
+                };
 
-            let chunk_len = chunk.len() as u64;
-            if downloaded_in_range.saturating_add(chunk_len) > range_len {
-                return Err(Error::Protocol(
-                    "received more bytes than requested".to_string(),
-                ));
+                let chunk_len = chunk.len() as u64;
+                if downloaded_in_range.saturating_add(chunk_len) > range_len {
+                    return Err(Error::Protocol(
+                        "received more bytes than requested".to_string(),
+                    ));
+                }
+
+                write_all_at(file, chunk.as_ref(), range.start + downloaded_in_range)?;
+                downloaded_in_range = downloaded_in_range.saturating_add(chunk_len);
+
+                {
+                    let mut states = self.range_states.lock().expect("range state lock");
+                    if let Some(state) = states.get_mut(part_index) {
+                        state.downloaded_bytes = downloaded_in_range;
+                        state.network_downloaded_bytes =
+                            state.network_downloaded_bytes.saturating_add(chunk_len);
+                    }
+                }
+
+                if last_progress.elapsed() >= PROGRESS_INTERVAL {
+                    self.emit_progress();
+                    last_progress = Instant::now();
+                }
             }
 
-            write_all_at(
-                file.as_ref(),
-                chunk.as_ref(),
-                range.start + downloaded_in_range,
-            )?;
-            downloaded_in_range = downloaded_in_range.saturating_add(chunk_len);
+            if retry_attempt {
+                self.emit_progress();
+                continue;
+            }
+
+            if downloaded_in_range != range_len {
+                if attempt == MAX_ATTEMPTS {
+                    return Err(Error::SizeMismatch {
+                        expected: range_len,
+                        actual: downloaded_in_range,
+                    });
+                }
+                self.increment_retry(part_index);
+                self.emit_progress();
+                continue;
+            }
 
             {
-                let mut states = range_states.lock().expect("range state lock");
+                let mut states = self.range_states.lock().expect("range state lock");
                 if let Some(state) = states.get_mut(part_index) {
-                    state.downloaded_bytes = downloaded_in_range;
-                    state.network_downloaded_bytes =
-                        state.network_downloaded_bytes.saturating_add(chunk_len);
+                    state.downloaded_bytes = range_len;
                 }
             }
-
-            if last_progress.elapsed() >= PROGRESS_INTERVAL {
-                emit_range_file_progress(total, file_started_at, &range_states, &on_progress);
-                last_progress = Instant::now();
-            }
+            self.mark_complete(part_index)?;
+            self.emit_progress();
+            return Ok(());
         }
 
-        if retry_attempt {
-            emit_range_file_progress(total, file_started_at, &range_states, &on_progress);
-            continue;
-        }
-
-        if downloaded_in_range != range_len {
-            if attempt == MAX_ATTEMPTS {
-                return Err(Error::SizeMismatch {
-                    expected: range_len,
-                    actual: downloaded_in_range,
-                });
-            }
-            increment_range_retry(&range_states, part_index);
-            emit_range_file_progress(total, file_started_at, &range_states, &on_progress);
-            continue;
-        }
-
-        {
-            let mut states = range_states.lock().expect("range state lock");
-            if let Some(state) = states.get_mut(part_index) {
-                state.downloaded_bytes = range_len;
-            }
-        }
-        mark_range_complete(&range_metadata, &range_metadata_path, part_index)?;
-        emit_range_file_progress(total, file_started_at, &range_states, &on_progress);
-        return Ok(());
+        unreachable!("the final attempt returns")
     }
 
-    unreachable!("the final attempt returns")
+    fn emit_progress(&self) {
+        let states = self.range_states.lock().expect("range state lock");
+        let downloaded_bytes = states
+            .iter()
+            .map(|state| state.downloaded_bytes)
+            .sum::<u64>()
+            .min(self.total);
+        let network_downloaded_bytes = states
+            .iter()
+            .map(|state| state.network_downloaded_bytes)
+            .sum::<u64>();
+        let retry_count = states
+            .iter()
+            .map(|state| state.retry_count)
+            .fold(0u32, u32::saturating_add);
+        drop(states);
+
+        let mut callback = self.on_progress.lock().expect("progress lock");
+        (**callback)(FileProgress {
+            downloaded_bytes,
+            total_bytes: Some(self.total),
+            network_downloaded_bytes,
+            elapsed: self.file_started_at.elapsed(),
+            retry_count,
+        });
+    }
+
+    fn increment_retry(&self, part_index: usize) {
+        let mut states = self.range_states.lock().expect("range state lock");
+        if let Some(state) = states.get_mut(part_index) {
+            state.retry_count = state.retry_count.saturating_add(1);
+        }
+    }
+
+    fn mark_complete(&self, part_index: usize) -> Result<(), Error> {
+        let mut metadata = self.range_metadata.lock().expect("range metadata lock");
+        if let Some(range) = metadata.ranges.get_mut(part_index) {
+            range.complete = true;
+        }
+        write_range_download_metadata(self.range_metadata_path, &metadata)
+    }
 }
 
 async fn request_file(
@@ -997,7 +1031,7 @@ async fn fetch_download_probe(client: &Client, url: &str) -> DownloadProbe {
         .content_length()
         .filter(|value| *value > 0)
         .or_else(|| {
-            // HEAD responses have no body, so reqwest can report a semantic length of 0.
+            // HEAD responses have no body, so reqwest can report length 0.
             response
                 .headers()
                 .get("Content-Length")
@@ -1128,57 +1162,6 @@ fn range_download_validators_match(
 
 fn range_download_len(range: RangeDownloadPartMetadata) -> u64 {
     range.end.saturating_sub(range.start).saturating_add(1)
-}
-
-fn emit_range_file_progress(
-    total_bytes: u64,
-    file_started_at: Instant,
-    range_states: &Arc<Mutex<Vec<RangePartState>>>,
-    on_progress: &Arc<Mutex<&mut (dyn FnMut(FileProgress) + Send)>>,
-) {
-    let states = range_states.lock().expect("range state lock");
-    let downloaded_bytes = states
-        .iter()
-        .map(|state| state.downloaded_bytes)
-        .sum::<u64>()
-        .min(total_bytes);
-    let network_downloaded_bytes = states
-        .iter()
-        .map(|state| state.network_downloaded_bytes)
-        .sum::<u64>();
-    let retry_count = states
-        .iter()
-        .map(|state| state.retry_count)
-        .fold(0u32, u32::saturating_add);
-    drop(states);
-
-    let mut callback = on_progress.lock().expect("progress lock");
-    (**callback)(FileProgress {
-        downloaded_bytes,
-        total_bytes: Some(total_bytes),
-        network_downloaded_bytes,
-        elapsed: file_started_at.elapsed(),
-        retry_count,
-    });
-}
-
-fn increment_range_retry(range_states: &Arc<Mutex<Vec<RangePartState>>>, part_index: usize) {
-    let mut states = range_states.lock().expect("range state lock");
-    if let Some(state) = states.get_mut(part_index) {
-        state.retry_count = state.retry_count.saturating_add(1);
-    }
-}
-
-fn mark_range_complete(
-    range_metadata: &Arc<Mutex<RangeDownloadMetadata>>,
-    range_metadata_path: &Path,
-    part_index: usize,
-) -> Result<(), Error> {
-    let mut metadata = range_metadata.lock().expect("range metadata lock");
-    if let Some(range) = metadata.ranges.get_mut(part_index) {
-        range.complete = true;
-    }
-    write_range_download_metadata(range_metadata_path, &metadata)
 }
 
 fn validate_range_response(

@@ -7,6 +7,7 @@ import "package:ente_lock_screen/auth_util.dart";
 import "package:ente_lock_screen/local_authentication_service.dart";
 import "package:ente_lock_screen/ui/lock_screen_options.dart";
 import "package:ente_pure_utils/ente_pure_utils.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:hugeicons/hugeicons.dart";
 import "package:local_auth/local_auth.dart";
@@ -15,8 +16,6 @@ import "package:photos/core/configuration.dart";
 import "package:photos/core/error-reporting/super_logging.dart";
 import "package:photos/core/event_bus.dart";
 import "package:photos/events/user_details_changed_event.dart";
-import "package:photos/generated/l10n.dart";
-import "package:photos/l10n/l10n.dart";
 import "package:photos/models/user_details.dart";
 import "package:photos/service_locator.dart";
 import "package:photos/services/account/passkey_service.dart";
@@ -24,8 +23,6 @@ import "package:photos/services/account/user_service.dart";
 import "package:photos/ui/account/request_pwd_verification_page.dart";
 import "package:photos/ui/account/sessions_page.dart";
 import "package:photos/ui/notification/toast.dart";
-import "package:photos/ui/settings/components/settings_item.dart";
-import "package:photos/ui/settings/components/settings_page_scaffold.dart";
 import "package:photos/utils/dialog_util.dart";
 
 class SecuritySettingsPage extends StatefulWidget {
@@ -61,7 +58,7 @@ class _SecuritySettingsPageState extends State<SecuritySettingsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
+    final l10n = context.strings;
     final showAccountSecurity =
         _config.hasConfiguredAccount() && !isLocalGalleryMode;
 
@@ -88,7 +85,7 @@ class _SecuritySettingsPageState extends State<SecuritySettingsPage> {
           ),
           const SizedBox(height: 8),
           SettingsItem(
-            title: context.l10n.passkey,
+            title: context.strings.passkey,
             icon: HugeIcons.strokeRoundedFingerAccess,
             onTap: () async => _onPasskeyTap(context),
           ),
@@ -147,7 +144,7 @@ class _SecuritySettingsPageState extends State<SecuritySettingsPage> {
     final hasAuthenticated = await LocalAuthenticationService.instance
         .requestLocalAuthentication(
           context,
-          AppLocalizations.of(context).authToConfigureTwofactorAuthentication,
+          context.strings.authToConfigureTwofactorAuthentication,
         );
     final isTwoFactorEnabled = UserService.instance.hasEnabledTwoFactor();
     if (hasAuthenticated) {
@@ -163,7 +160,7 @@ class _SecuritySettingsPageState extends State<SecuritySettingsPage> {
   }
 
   Future<void> _disableTwoFactor() async {
-    final l10n = AppLocalizations.of(context);
+    final l10n = context.strings;
     await showBottomSheetComponent<void>(
       context: context,
       builder: (sheetContext) => BottomSheetComponent(
@@ -190,7 +187,7 @@ class _SecuritySettingsPageState extends State<SecuritySettingsPage> {
     final hasAuthenticated = await LocalAuthenticationService.instance
         .requestLocalAuthentication(
           context,
-          AppLocalizations.of(context).authToChangeEmailVerificationSetting,
+          context.strings.authToChangeEmailVerificationSetting,
         );
     final isEmailMFAEnabled = UserService.instance.hasEmailMFAEnabled();
     if (hasAuthenticated) {
@@ -220,16 +217,13 @@ class _SecuritySettingsPageState extends State<SecuritySettingsPage> {
       await UserService.instance.updateEmailMFA(isEnabled);
     } catch (e) {
       if (!mounted) return;
-      showToast(context, AppLocalizations.of(context).somethingWentWrong);
+      showToast(context, context.strings.somethingWentWrong);
     }
   }
 
   Future<void> _onPasskeyTap(BuildContext context) async {
     final hasAuthenticated = await LocalAuthenticationService.instance
-        .requestLocalAuthentication(
-          context,
-          AppLocalizations.of(context).authToViewPasskey,
-        );
+        .requestLocalAuthentication(context, context.strings.authToViewPasskey);
     if (hasAuthenticated && mounted && context.mounted) {
       await _handlePasskeyClick(context);
     }
@@ -267,7 +261,7 @@ class _SecuritySettingsPageState extends State<SecuritySettingsPage> {
       if (!context.mounted) return;
       final bool result = await requestAuthentication(
         context,
-        AppLocalizations.of(context).authToChangeLockscreenSetting,
+        context.strings.authToChangeLockscreenSetting,
       );
       if (result) {
         if (!context.mounted) return;
@@ -283,10 +277,8 @@ class _SecuritySettingsPageState extends State<SecuritySettingsPage> {
       if (!context.mounted) return;
       await showErrorDialog(
         context,
-        AppLocalizations.of(context).noSystemLockFound,
-        AppLocalizations.of(
-          context,
-        ).toEnableAppLockPleaseSetupDevicePasscodeOrScreen,
+        context.strings.noSystemLockFound,
+        context.strings.toEnableAppLockPleaseSetupDevicePasscodeOrScreen,
       );
     }
   }
@@ -295,7 +287,7 @@ class _SecuritySettingsPageState extends State<SecuritySettingsPage> {
     final hasAuthenticated = await LocalAuthenticationService.instance
         .requestLocalAuthentication(
           context,
-          AppLocalizations.of(context).authToViewYourActiveSessions,
+          context.strings.authToViewYourActiveSessions,
         );
     if (hasAuthenticated) {
       if (!context.mounted) return;

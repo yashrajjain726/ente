@@ -1,11 +1,11 @@
 import 'package:ente_accounts/ente_accounts.dart';
+import 'package:ente_components/ente_components.dart';
 import 'package:ente_configuration/base_configuration.dart';
 import 'package:ente_pure_utils/ente_pure_utils.dart';
 import 'package:ente_strings/ente_strings.dart';
 import "package:ente_ui/components/alert_bottom_sheet.dart";
 import "package:ente_ui/components/base_bottom_sheet.dart";
 import 'package:ente_ui/components/buttons/dynamic_fab.dart';
-import "package:ente_ui/components/buttons/gradient_button.dart";
 import 'package:ente_ui/pages/base_home_page.dart';
 import 'package:ente_ui/theme/ente_theme.dart';
 import 'package:ente_ui/utils/dialog_util.dart';
@@ -317,7 +317,7 @@ class _PasswordEntryPageState extends State<PasswordEntryPage> {
                             padding: const EdgeInsets.symmetric(vertical: 8),
                             child: Text(
                               context.strings.passwordStrength(
-                                passwordStrengthText,
+                                passwordStrengthValue: passwordStrengthText,
                               ),
                               style: TextStyle(color: passwordStrengthColor),
                             ),
@@ -485,12 +485,13 @@ class _PasswordEntryPageState extends State<PasswordEntryPage> {
                 style: textTheme.body.copyWith(color: colorScheme.textMuted),
               ),
               const SizedBox(height: 20),
-              GradientButton(
-                text: context.strings.doNotSignOut,
+              ButtonComponent(
+                label: context.strings.doNotSignOut,
                 onTap: () {
                   logOutFromOther = false;
                   Navigator.of(bottomSheetContext).pop();
                 },
+                shouldSurfaceExecutionStates: false,
               ),
               const SizedBox(height: 20),
               GestureDetector(

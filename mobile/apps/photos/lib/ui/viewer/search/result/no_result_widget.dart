@@ -1,5 +1,5 @@
+import "package:ente_strings/ente_strings.dart";
 import 'package:flutter/material.dart';
-import "package:photos/generated/l10n.dart";
 import "package:photos/models/search/search_result.dart";
 import "package:photos/models/search/search_types.dart";
 import "package:photos/states/all_sections_examples_state.dart";
@@ -90,15 +90,13 @@ class _NoResultWidgetState extends State<NoResultWidget> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  AppLocalizations.of(context).noResultsFound,
+                  context.strings.noResultsFound,
                   style: textTheme.largeBold,
                 ),
                 const SizedBox(height: 6),
                 searchTypeToQuerySuggestion.isNotEmpty
                     ? Text(
-                        AppLocalizations.of(
-                          context,
-                        ).modifyYourQueryOrTrySearchingFor,
+                        context.strings.modifyYourQueryOrTrySearchingFor,
                         style: textTheme.smallMuted,
                       )
                     : const SizedBox.shrink(),

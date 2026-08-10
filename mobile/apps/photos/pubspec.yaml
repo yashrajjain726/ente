@@ -12,7 +12,7 @@ description: ente photos application
 # Read more about iOS versioning at
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 
-version: 1.3.60+2158
+version: 1.3.61+2158
 publish_to: none
 
 resolution: workspace
@@ -24,14 +24,9 @@ dependencies:
   android_intent_plus: 5.3.0
   app_links: 6.4.1
   archive: 4.0.9
-  async: 2.13.1
   audio_session: 0.2.2
   backup_exclusion:
     path: ../../packages/backup_exclusion
-  battery_info: # replace with battery_plus
-    git:
-      url: https://github.com/ente/battery_info
-      ref: 95c7a9f0400b968b3bfdc98c8c10a07fb4a62ea2
   bip39: 1.0.6
   cached_network_image: 3.4.1
   camera: 0.11.2+1
@@ -42,7 +37,6 @@ dependencies:
       url: https://github.com/ente/computer.git
       ref: 82e365fed8a1a76f6eea0220de98389eed7b0445
   connectivity_plus: 6.1.4
-  convert: 3.1.2
   crypto: 3.0.7
   cupertino_icons: 1.0.8
   defer_pointer: 0.0.2
@@ -50,7 +44,6 @@ dependencies:
   dio: 5.9.2
   dio_http2_adapter: 2.7.1
   dotted_border: 3.1.0
-  dropdown_button2: 2.3.9
   email_validator: 3.0.0
   encrypt: 5.0.3
   ente_account_deletion:
@@ -73,8 +66,12 @@ dependencies:
     path: ../../packages/install_source
   ente_lock_screen:
     path: ../../packages/lock_screen
+  ente_mail:
+    path: ../../packages/mail
   ente_panorama_viewer:
     path: plugins/ente_panorama_viewer
+  ente_photos_platform:
+    path: plugins/ente_photos_platform
   ente_photos_rust:
     path: rust_builder
   ente_pure_utils:
@@ -92,8 +89,6 @@ dependencies:
   equatable: 2.0.7
   event_bus: 2.0.1
   exif_reader: 4.1.0
-  expandable: 5.0.1
-  expansion_tile_card: 3.0.0
   extended_image: 9.1.0
   fade_indexed_stack: 0.2.2
   fast_base58: 0.2.1
@@ -106,7 +101,6 @@ dependencies:
   file_saver: 0.3.1
   firebase_core: 3.15.1
   firebase_messaging: 15.2.9
-  fixnum: 1.1.1
   flutter:
     sdk: flutter
   flutter_animate: 4.5.2
@@ -117,7 +111,6 @@ dependencies:
       path: flutter_cache_manager
   flutter_displaymode: 0.6.0
   flutter_easyloading: 3.0.5
-  flutter_email_sender: 7.0.0
   flutter_image_compress: 2.4.0
   flutter_inappwebview: 6.1.5
   flutter_local_notifications: 19.3.0
@@ -137,7 +130,6 @@ dependencies:
     git:
       url: https://github.com/ente/flutter_sodium
       ref: a05d5b1bfdce64a387f8f5970160b22ce7b88282
-  flutter_spinkit: 5.2.1
   flutter_staggered_grid_view: 0.7.0
   flutter_svg: 2.3.0
   flutter_timezone: 4.1.1
@@ -145,12 +137,10 @@ dependencies:
   fraction: 5.0.5
   freezed_annotation: 3.1.0
   home_widget: 0.8.0
-  html_unescape: 2.0.0
   http: 1.6.0
   hugeicons: 1.1.7
   image: 4.7.0
-  in_app_purchase: 3.3.0
-  in_app_purchase_storekit: 0.4.11
+  in_app_purchase: 3.2.1
   intl: 0.20.2
   just_audio: 0.10.5
   latlong2: 0.9.1
@@ -162,7 +152,6 @@ dependencies:
     path: ../../packages/log_viewer
   logging: 1.3.0
   lottie: 3.3.1
-  maps_launcher: 3.0.0+1
   media_extension:
     git:
       url: https://github.com/ente/media_extension.git
@@ -190,10 +179,6 @@ dependencies:
   native_video_editor:
     path: ../../packages/native_video_editor
   native_video_player: 4.0.1
-  open_mail_app: # replace plugin, git is archived
-    git:
-      url: https://github.com/ente/open-mail-app-flutter.git
-      ref: 13c0244db82b386ad1a53b2451bdfda8d2687cb6
   package_info_plus: 8.3.1
   password_strength: 0.2.0
   path: 1.9.1 #dart
@@ -224,20 +209,12 @@ dependencies:
   sqlite_async: 0.11.7
   styled_text: 8.1.0
   synchronized: 3.4.0
-  system_info_plus: 0.0.6
-  thermal: 1.1.11
-  timeago: 3.7.1
   timezone: 0.10.1
   tuple: 2.0.2
   ua_client_hints: 1.4.1
   url_launcher: 6.3.2
   uuid: 4.5.3
-  video_editor: # edge cases handled in fork
-    git:
-      url: https://github.com/ente/video_editor_fork.git
-      ref: 1eeb18e2b1ce36bd8ca70178c0d4b485e9982257
   video_player: 2.10.0
-  video_thumbnail: 0.5.6
   visibility_detector: 0.4.0+2
   wakelock_plus: 1.3.2
   wechat_assets_picker: 9.8.0

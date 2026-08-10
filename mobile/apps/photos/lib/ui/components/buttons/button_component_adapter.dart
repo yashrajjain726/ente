@@ -1,9 +1,9 @@
 import "dart:async";
 
 import "package:ente_components/ente_components.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:modal_bottom_sheet/modal_bottom_sheet.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/models/button_result.dart";
 import "package:photos/ui/components/buttons/button_widget.dart";
 import "package:photos/ui/components/models/button_type.dart";
@@ -122,7 +122,7 @@ Exception _toException(Object error) {
 }
 
 int sheetCancelButtonIndex(BuildContext context, List<ButtonWidget> buttons) {
-  final cancelLabels = {AppLocalizations.of(context).cancel, 'Cancel'};
+  final cancelLabels = {context.strings.cancel, 'Cancel'};
   return buttons.indexWhere(
     (button) =>
         button.isInAlert &&

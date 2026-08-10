@@ -1,8 +1,8 @@
 import "dart:async";
 
 import "package:ente_components/ente_components.dart";
+import "package:ente_strings/ente_strings.dart";
 import 'package:flutter/material.dart';
-import "package:photos/generated/l10n.dart";
 
 class NewAlbumRowItemWidget extends StatelessWidget {
   static const _cornerRadius = 20.0;
@@ -44,7 +44,7 @@ class NewAlbumRowItemWidget extends StatelessWidget {
           ),
           const SizedBox(height: _thumbnailToTextSpacing),
           Text(
-            AppLocalizations.of(context).createAlbum,
+            context.strings.createAlbum,
             style: TextStyles.body.copyWith(color: colors.textLight),
             maxLines: 1,
             softWrap: false,

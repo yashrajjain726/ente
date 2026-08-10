@@ -6,10 +6,6 @@ import 'package:ente_accounts/pages/sessions_page.dart';
 import 'package:ente_accounts/services/passkey_service.dart';
 import 'package:ente_accounts/services/user_service.dart';
 import 'package:ente_auth/core/configuration.dart';
-import 'package:ente_auth/l10n/l10n.dart';
-import 'package:ente_auth/ui/components/buttons/button_widget.dart';
-import 'package:ente_auth/ui/components/models/button_result.dart';
-import 'package:ente_auth/ui/settings/components/auth_settings_item.dart';
 import 'package:ente_auth/ui/settings/components/auth_settings_page_scaffold.dart';
 import 'package:ente_auth/utils/dialog_util.dart';
 import 'package:ente_auth/utils/toast_util.dart';
@@ -18,6 +14,9 @@ import 'package:ente_crypto_api/ente_crypto_api.dart';
 import 'package:ente_lock_screen/local_authentication_service.dart';
 import 'package:ente_lock_screen/lock_screen_settings.dart';
 import 'package:ente_lock_screen/ui/lock_screen_options.dart';
+import 'package:ente_strings/ente_strings.dart';
+import 'package:ente_ui/components/buttons/button_widget.dart';
+import 'package:ente_ui/components/buttons/models/button_result.dart';
 import 'package:flutter/material.dart';
 import 'package:hugeicons/hugeicons.dart';
 import 'package:logging/logging.dart';
@@ -46,11 +45,11 @@ class _SecuritySettingsPageState extends State<SecuritySettingsPage> {
   @override
   Widget build(BuildContext context) {
     return AuthSettingsPageScaffold(
-      title: context.l10n.security,
+      title: context.strings.security,
       children: [
         if (_hasLoggedIn) ...[
-          AuthSettingsItem(
-            title: context.l10n.emailVerificationToggle,
+          SettingsItem(
+            title: context.strings.emailVerificationToggle,
             icon: HugeIcons.strokeRoundedMailSecure01,
             showChevron: false,
             trailing: ToggleSwitchComponent.async(
@@ -59,23 +58,23 @@ class _SecuritySettingsPageState extends State<SecuritySettingsPage> {
             ),
           ),
           const SizedBox(height: Spacing.sm),
-          AuthSettingsItem(
-            title: context.l10n.passkey,
+          SettingsItem(
+            title: context.strings.passkey,
             icon: HugeIcons.strokeRoundedFingerAccess,
             showOnlyLoadingState: true,
             onTap: _openPasskey,
           ),
           const SizedBox(height: Spacing.sm),
-          AuthSettingsItem(
-            title: context.l10n.viewActiveSessions,
+          SettingsItem(
+            title: context.strings.viewActiveSessions,
             icon: HugeIcons.strokeRoundedSmartPhone01,
             showOnlyLoadingState: true,
             onTap: _openActiveSessions,
           ),
           const SizedBox(height: Spacing.sm),
         ],
-        AuthSettingsItem(
-          title: context.l10n.appLock,
+        SettingsItem(
+          title: context.strings.appLock,
           icon: HugeIcons.strokeRoundedSquareLock02,
           showOnlyLoadingState: true,
           onTap: _openAppLock,
@@ -88,7 +87,7 @@ class _SecuritySettingsPageState extends State<SecuritySettingsPage> {
     final hasAuthenticated = await LocalAuthenticationService.instance
         .requestLocalAuthentication(
           context,
-          context.l10n.authToChangeEmailVerificationSetting,
+          context.strings.authToChangeEmailVerificationSetting,
         );
     if (!hasAuthenticated) return;
     await _updateEmailMFA(!UserService.instance.hasEmailMFAEnabled());
@@ -99,7 +98,7 @@ class _SecuritySettingsPageState extends State<SecuritySettingsPage> {
       final hasAuthenticated = await LocalAuthenticationService.instance
           .requestLocalAuthentication(
             context,
-            context.l10n.authenticateGeneric,
+            context.strings.authenticateGeneric,
             refocusWindows: false,
           );
       if (!hasAuthenticated) return;
@@ -130,7 +129,7 @@ class _SecuritySettingsPageState extends State<SecuritySettingsPage> {
     final hasAuthenticated = await LocalAuthenticationService.instance
         .requestLocalAuthentication(
           context,
-          context.l10n.authToViewYourActiveSessions,
+          context.strings.authToViewYourActiveSessions,
         );
     if (!hasAuthenticated || !mounted) return;
     await Navigator.of(context).push<void>(
@@ -144,10 +143,10 @@ class _SecuritySettingsPageState extends State<SecuritySettingsPage> {
         LockScreenSettings.instance.getOfflineModeWarningStatus()) {
       result = await showChoiceActionSheet(
         context,
-        title: context.l10n.warning,
-        body: context.l10n.appLockOfflineModeWarning,
-        secondButtonLabel: context.l10n.cancel,
-        firstButtonLabel: context.l10n.ok,
+        title: context.strings.warning,
+        body: context.strings.appLockOfflineModeWarning,
+        secondButtonLabel: context.strings.cancel,
+        firstButtonLabel: context.strings.ok,
       );
       if (result?.action != ButtonAction.first) return;
       await LockScreenSettings.instance.setOfflineModeWarningStatus(false);
@@ -156,7 +155,7 @@ class _SecuritySettingsPageState extends State<SecuritySettingsPage> {
     final hasAuthenticated = await LocalAuthenticationService.instance
         .requestLocalAuthentication(
           context,
-          context.l10n.authToChangeLockscreenSetting,
+          context.strings.authToChangeLockscreenSetting,
         );
     if (!hasAuthenticated || !mounted) return;
     await Navigator.of(
@@ -189,12 +188,12 @@ class _SecuritySettingsPageState extends State<SecuritySettingsPage> {
         if (!mounted) return;
         await showChoiceActionSheet(
           context,
-          title: context.l10n.warning,
-          body: context.l10n.emailVerificationEnableWarning,
+          title: context.strings.warning,
+          body: context.strings.emailVerificationEnableWarning,
           isCritical: true,
           firstButtonOnTap: () => UserService.instance.updateEmailMFA(true),
-          secondButtonLabel: context.l10n.cancel,
-          firstButtonLabel: context.l10n.iUnderStand,
+          secondButtonLabel: context.strings.cancel,
+          firstButtonLabel: context.strings.iUnderStand,
         );
       } else {
         await UserService.instance.updateEmailMFA(false);
@@ -202,7 +201,7 @@ class _SecuritySettingsPageState extends State<SecuritySettingsPage> {
       if (mounted) setState(() {});
     } catch (_) {
       if (mounted) {
-        showToast(context, context.l10n.somethingWentWrongMessage);
+        showToast(context, context.strings.somethingWentWrongMessage);
       }
     }
   }

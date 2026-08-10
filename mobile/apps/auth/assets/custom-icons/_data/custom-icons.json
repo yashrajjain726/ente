@@ -20,6 +20,10 @@
       ]
     },
     {
+      "title": "ABB",
+      "slug": "abb"
+    },
+    {
       "title": "Accredible",
       "slug": "accredible",
       "altNames": [
@@ -1659,6 +1663,10 @@
     {
       "title": "NVIDIA"
     },
+        {
+      "title": "OCENSA",
+      "slug": "ocensa"
+    },
     {
       "title": "Odido"
     },
@@ -1667,6 +1675,13 @@
       "hex": "000000",
       "altNames": [
         "\u6b27\u6613"
+      ]
+    },
+    {
+      "title": "ONEROXE",
+      "hex": "000000",
+      "altNames": [
+        "Arcle"
       ]
     },
     {
@@ -1704,6 +1719,10 @@
     {
       "title": "Oracle Cloud",
       "slug": "oracle_cloud"
+    },
+    {
+      "title": "Palform",
+      "slug": "palform"
     },
     {
       "title": "Pangolin",
@@ -2477,11 +2496,26 @@
         "uscis.gov"
       ]
     },
+      {
+      "title": "UU",
+      "altNames": [
+        "Utrecht University",
+        "Universiteit Utrecht",
+        "uu"
+      ]
+    },
     {
       "title": "Venice AI",
       "slug": "venice_ai",
       "altNames": [
         "Venice.ai"
+      ]
+    },
+    {
+      "title": "VGen",
+      "slug": "vgen",
+      "altNames": [
+        "vgen.co"
       ]
     },
     {

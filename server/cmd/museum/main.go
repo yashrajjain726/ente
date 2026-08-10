@@ -327,6 +327,7 @@ func main() {
 		ObjectCleanupRepo:     objectCleanupRepo,
 		TrashRepository:       trashRepo,
 		UserRepo:              userRepo,
+		RemoteStoreRepo:       remoteStoreRepository,
 		UsageCtrl:             usageController,
 		AccessCtrl:            accessCtrl,
 		CollectionRepo:        collectionRepo,
@@ -606,9 +607,11 @@ func main() {
 	storageAPI.POST("/files/upload-url", fileHandler.GetUploadURLV2)
 	storageAPI.POST("/files/multipart-upload-url", fileHandler.GetMultipartUploadURLV2)
 	storageAPI.GET("/files/download/:fileID", fileHandler.Get)
-	storageAPI.GET("/files/download/v2/:fileID", fileHandler.GetV2)
+	storageAPI.GET("/files/download/v2/:fileID", fileHandler.GetURL)
+	storageAPI.GET("/files/download/v3/:fileID", fileHandler.GetURLV3)
 	storageAPI.GET("/files/preview/:fileID", fileHandler.GetThumbnail)
-	storageAPI.GET("/files/preview/v2/:fileID", fileHandler.GetThumbnailV2)
+	storageAPI.GET("/files/preview/v2/:fileID", fileHandler.GetThumbnailURL)
+	storageAPI.GET("/files/thumbnail/v3/:fileID", fileHandler.GetThumbnailURLV3)
 
 	storageAPI.POST("/files/share-url", fileHandler.ShareUrl)
 	storageAPI.GET("/files/share-url", fileHandler.GetUrls)
@@ -749,11 +752,13 @@ func main() {
 	storageAPI.GET("/collections/v2", collectionHandler.GetV2)
 	storageAPI.GET("/collections/v3", collectionHandler.GetWithLimit)
 	storageAPI.POST("/collections/share", collectionHandler.Share)
+	storageAPI.POST("/collections/share/bulk", collectionHandler.BulkShare)
 	storageAPI.POST("/collections/join-link", collectionHandler.JoinLink)
 	storageAPI.POST("/collections/share-url", collectionHandler.ShareURL)
 	storageAPI.PUT("/collections/share-url", collectionHandler.UpdateShareURL)
 	storageAPI.DELETE("/collections/share-url/:collectionID", collectionHandler.UnShareURL)
 	storageAPI.POST("/collections/unshare", collectionHandler.UnShare)
+	storageAPI.POST("/collections/unshare/bulk", collectionHandler.BulkUnShare)
 	storageAPI.POST("/collections/leave/:collectionID", collectionHandler.Leave)
 	storageAPI.POST("/collections/add-files", collectionHandler.AddFiles)
 	storageAPI.POST("/collections/move-files", collectionHandler.MoveFiles)
@@ -780,11 +785,15 @@ func main() {
 	fileLinkApi.GET("/info", fileHandler.LinkInfo)
 	fileLinkApi.GET("/pass-info", fileHandler.PasswordInfo)
 	fileLinkApi.GET("/thumbnail", fileHandler.LinkThumbnail)
+	fileLinkApi.GET("/thumbnail/v3", fileHandler.LinkThumbnailURLV3)
 	fileLinkApi.GET("/file", fileHandler.LinkFile)
+	fileLinkApi.GET("/file/v3", fileHandler.LinkFileURLV3)
 	fileLinkApi.POST("/verify-password", fileHandler.VerifyPassword)
 
 	publicCollectionAPI.GET("/files/preview/:fileID", publicCollectionHandler.GetThumbnail)
+	publicCollectionAPI.GET("/files/thumbnail/v3/:fileID", publicCollectionHandler.GetThumbnailURLV3)
 	publicCollectionAPI.GET("/files/download/:fileID", publicCollectionHandler.GetFile)
+	publicCollectionAPI.GET("/files/download/v3/:fileID", publicCollectionHandler.GetFileURLV3)
 	publicCollectionAPI.GET("/files/data/fetch", publicCollectionHandler.GetFileData)
 	publicCollectionAPI.GET("/files/data/preview", publicCollectionHandler.GetPreviewURL)
 	publicCollectionAPI.GET("/diff", publicCollectionHandler.GetDiff)
@@ -821,7 +830,9 @@ func main() {
 	publicMemoryAPI.GET("/info", publicMemoryShareHandler.GetInfo)
 	publicMemoryAPI.GET("/files", publicMemoryShareHandler.GetFiles)
 	publicMemoryAPI.GET("/files/preview/:fileID", publicMemoryShareHandler.GetThumbnail)
+	publicMemoryAPI.GET("/files/thumbnail/v3/:fileID", publicMemoryShareHandler.GetThumbnailURLV3)
 	publicMemoryAPI.GET("/files/download/:fileID", publicMemoryShareHandler.GetFile)
+	publicMemoryAPI.GET("/files/download/v3/:fileID", publicMemoryShareHandler.GetFileURLV3)
 	publicMemoryAPI.GET("/file-data", publicMemoryShareHandler.GetFileData)
 	publicMemoryAPI.GET("/files/data/preview", publicMemoryShareHandler.GetPreviewURL)
 
@@ -857,7 +868,9 @@ func main() {
 	storageAPI.DELETE("/cast/revoke-all-tokens/", castHandler.RevokeAllToken)
 
 	castAPI.GET("/files/preview/:fileID", castHandler.GetThumbnail)
+	castAPI.GET("/files/thumbnail/v3/:fileID", castHandler.GetThumbnailURLV3)
 	castAPI.GET("/files/download/:fileID", castHandler.GetFile)
+	castAPI.GET("/files/download/v3/:fileID", castHandler.GetFileURLV3)
 	castAPI.GET("/diff", castHandler.GetDiff)
 	castAPI.GET("/info", castHandler.GetCollection)
 	familyHandler := &api.FamilyHandler{

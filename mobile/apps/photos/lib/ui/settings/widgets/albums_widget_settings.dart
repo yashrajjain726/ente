@@ -1,8 +1,8 @@
 import "package:ente_components/ente_components.dart";
+import "package:ente_strings/ente_strings.dart";
+import "package:ente_ui/components/loading_widget.dart";
 import "package:flutter/foundation.dart";
 import 'package:flutter/material.dart';
-import "package:photos/generated/l10n.dart";
-import "package:photos/l10n/l10n.dart";
 import "package:photos/models/collection/collection.dart";
 import "package:photos/models/selected_albums.dart";
 import "package:photos/service_locator.dart";
@@ -13,7 +13,6 @@ import "package:photos/services/home_widget_service.dart";
 import "package:photos/settings/local_settings.dart";
 import "package:photos/theme/ente_theme.dart";
 import "package:photos/ui/collections/flex_grid_view.dart";
-import "package:photos/ui/common/loading_widget.dart";
 
 class AlbumsWidgetSettings extends StatefulWidget {
   const AlbumsWidgetSettings({super.key});
@@ -97,7 +96,7 @@ class _AlbumsWidgetSettingsState extends State<AlbumsWidgetSettings> {
                 listenable: _selectedAlbums,
                 builder: (context, _) {
                   return ButtonComponent(
-                    label: AppLocalizations.of(context).save,
+                    label: context.strings.save,
                     shouldSurfaceExecutionStates: false,
                     onTap: _selectedAlbums.albums.isNotEmpty
                         ? () async {
@@ -120,10 +119,10 @@ class _AlbumsWidgetSettingsState extends State<AlbumsWidgetSettings> {
         interactive: true,
         controller: _scrollController,
         child: AppBarComponent(
-          title: AppLocalizations.of(context).albums,
+          title: context.strings.albums,
           subtitle: hasInstalledAny
-              ? AppLocalizations.of(context).albumsWidgetDesc
-              : context.l10n.addAlbumWidgetPrompt,
+              ? context.strings.albumsWidgetDesc
+              : context.strings.addAlbumWidgetPrompt,
           controller: _scrollController,
           slivers: <Widget>[
             if (!hasInstalledAny)
@@ -151,7 +150,7 @@ class _AlbumsWidgetSettingsState extends State<AlbumsWidgetSettings> {
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(16, 18, 16, 8),
                     child: MenuComponent(
-                      title: AppLocalizations.of(context).showTextOnWidget,
+                      title: context.strings.showTextOnWidget,
                       trailing: ToggleSwitchComponent(
                         selected: _showText,
                         onChanged: (showText) async {

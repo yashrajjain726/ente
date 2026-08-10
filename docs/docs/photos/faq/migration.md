@@ -44,7 +44,11 @@ To fix this:
 
 ### Can I retry failed uploads?
 
-Yes. You can check the progress/info tab that appears during upload to determine the cause of failed uploads. You can also drag and drop the folder or files again. Ente will automatically ignore already backed up files and try to upload just the rest.
+Yes. When an upload finishes, the completion screen shows the **Completed**, **Skipped**, and **Failed** totals. If any items need attention, select **Review items**, open **Failed**, and click **Retry failed uploads**.
+
+Skipped items are listed separately with a reason and are not presented as retryable failures. For example, partner-shared photos excluded from a Google Takeout import appear under **Skipped** with the reason **Shared by partner**.
+
+You can also select or drag and drop the same folder or files again. Ente skips items already uploaded to the target album and processes the rest. Learn more in [Import from Local Hard Disk](/photos/migration/from-local-hard-disk).
 
 ### Why does my google takeout upload fail?
 
@@ -88,6 +92,16 @@ Duplicates can occur:
 > [!NOTE]
 >
 > Special mention to l1br3770 for his [detailed guide](https://www.reddit.com/r/enteio/comments/1jyxk4b/howto_migration_from_google_photos_pitfalls/).
+
+### Will Ente automatically clean up a messy, duplicate-filled library when I import it? {#dedup-before-import-messy-library}
+
+Not entirely. Ente's deduplication only catches exact duplicates - same file name and hash. If any service compressed some of your originals, for example using Storage saver, the compressed and original versions have different hashes and won't be detected as duplicates.
+
+**Recommended approach:**
+
+1. Use a third-party tool to find and remove exact and near-identical duplicates locally, before importing.
+2. Import the cleaned-up collection into Ente.
+3. If any duplicates slip through, use the [Remove duplicates](/photos/features/albums-and-organization/storage-optimization#remove-exact-duplicates) and [Remove similar images](/photos/features/albums-and-organization/storage-optimization#remove-similar-images) tools inside Ente afterwards.
 
 ### Why aren't my Google Takeout albums preserved after import? {#takeout-albums-not-preserved}
 

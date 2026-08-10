@@ -13,83 +13,11 @@ pub enum AccountSubcommands {
 
     /// Login into existing account
     #[command(alias = "login")]
-    Add {
-        /// Email address (optional - will prompt if not provided)
-        #[arg(long)]
-        email: Option<String>,
-
-        /// Password (optional - will prompt if not provided)
-        #[arg(long)]
-        password: Option<String>,
-
-        /// Specify the app (photos, locker, auth)
-        #[arg(long, default_value = "photos")]
-        app: String,
-
-        /// API endpoint (defaults to https://api.ente.com)
-        #[arg(long, default_value = "https://api.ente.com")]
-        endpoint: String,
-
-        /// Export directory path
-        #[arg(long)]
-        export_dir: Option<String>,
-
-        /// Email verification code for email-MFA accounts
-        #[arg(long)]
-        otp: Option<String>,
-
-        /// TOTP code to use if login requires two-factor verification
-        #[arg(long)]
-        totp_code: Option<String>,
-
-        /// Preferred second-factor method when multiple are available (totp or passkey)
-        #[arg(long)]
-        second_factor: Option<String>,
-    },
+    Add(AddArgs),
 
     /// Create a new account via email verification, key setup, and SRP registration
     #[command(alias = "signup")]
-    Create {
-        /// Email address (optional - will prompt if not provided)
-        #[arg(long)]
-        email: Option<String>,
-
-        /// Password (optional - will prompt if not provided)
-        #[arg(long)]
-        password: Option<String>,
-
-        /// Specify the app (photos, locker, auth)
-        #[arg(long, default_value = "photos")]
-        app: String,
-
-        /// API endpoint (defaults to https://api.ente.com)
-        #[arg(long, default_value = "https://api.ente.com")]
-        endpoint: String,
-
-        /// Export directory path
-        #[arg(long)]
-        export_dir: Option<String>,
-
-        /// Signup email verification code
-        #[arg(long)]
-        otp: Option<String>,
-
-        /// Referral/source string to pass during verify-email
-        #[arg(long)]
-        source: Option<String>,
-
-        /// Enable TOTP two-factor immediately after signup
-        #[arg(long)]
-        setup_2fa: bool,
-
-        /// TOTP code to use when enabling two-factor
-        #[arg(long)]
-        totp_code: Option<String>,
-
-        /// Print the recovery key after signup
-        #[arg(long)]
-        show_recovery_key: bool,
-    },
+    Create(CreateArgs),
 
     /// Update an existing account's export directory
     Update {
@@ -136,4 +64,82 @@ pub enum AccountSubcommands {
         #[arg(long)]
         show_recovery_key: bool,
     },
+}
+
+#[derive(Args)]
+pub struct AddArgs {
+    /// Email address (optional - will prompt if not provided)
+    #[arg(long)]
+    pub email: Option<String>,
+
+    /// Password (optional - will prompt if not provided)
+    #[arg(long)]
+    pub password: Option<String>,
+
+    /// Specify the app (photos, locker, auth)
+    #[arg(long, default_value = "photos")]
+    pub app: String,
+
+    /// API endpoint (defaults to https://api.ente.com)
+    #[arg(long, default_value = "https://api.ente.com")]
+    pub endpoint: String,
+
+    /// Export directory path
+    #[arg(long)]
+    pub export_dir: Option<String>,
+
+    /// Email verification code for email-MFA accounts
+    #[arg(long)]
+    pub otp: Option<String>,
+
+    /// TOTP code to use if login requires two-factor verification
+    #[arg(long)]
+    pub totp_code: Option<String>,
+
+    /// Preferred second-factor method when multiple are available (totp or passkey)
+    #[arg(long)]
+    pub second_factor: Option<String>,
+}
+
+#[derive(Args)]
+pub struct CreateArgs {
+    /// Email address (optional - will prompt if not provided)
+    #[arg(long)]
+    pub email: Option<String>,
+
+    /// Password (optional - will prompt if not provided)
+    #[arg(long)]
+    pub password: Option<String>,
+
+    /// Specify the app (photos, locker, auth)
+    #[arg(long, default_value = "photos")]
+    pub app: String,
+
+    /// API endpoint (defaults to https://api.ente.com)
+    #[arg(long, default_value = "https://api.ente.com")]
+    pub endpoint: String,
+
+    /// Export directory path
+    #[arg(long)]
+    pub export_dir: Option<String>,
+
+    /// Signup email verification code
+    #[arg(long)]
+    pub otp: Option<String>,
+
+    /// Referral/source string to pass during verify-email
+    #[arg(long)]
+    pub source: Option<String>,
+
+    /// Enable TOTP two-factor immediately after signup
+    #[arg(long)]
+    pub setup_2fa: bool,
+
+    /// TOTP code to use when enabling two-factor
+    #[arg(long)]
+    pub totp_code: Option<String>,
+
+    /// Print the recovery key after signup
+    #[arg(long)]
+    pub show_recovery_key: bool,
 }

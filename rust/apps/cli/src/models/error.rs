@@ -1,4 +1,3 @@
-use ente_accounts::auth;
 use ente_core::{b64, crypto};
 use thiserror::Error;
 
@@ -40,6 +39,9 @@ pub enum Error {
     #[error(transparent)]
     Http(#[from] ente_core::http::Error),
 
+    #[error(transparent)]
+    Accounts(#[from] ente_accounts::Error),
+
     #[error("{0}")]
     Generic(String),
 }
@@ -64,41 +66,6 @@ impl From<crypto::Error> for Error {
         match err {
             crypto::Error::Io(source) => Error::Io(source),
             other => Error::Crypto(other.to_string()),
-        }
-    }
-}
-
-impl From<auth::Error> for Error {
-    fn from(err: auth::Error) -> Self {
-        use auth::Error as E;
-        match err {
-            E::IncorrectPassword => Error::AuthenticationFailed("Incorrect password".to_string()),
-            E::IncorrectRecoveryKey => {
-                Error::AuthenticationFailed("Incorrect recovery key".to_string())
-            }
-            E::InvalidKeyAttributes => Error::Crypto(err.to_string()),
-            E::InsufficientMemory => Error::Crypto(err.to_string()),
-            E::MissingField(field) => Error::Crypto(format!("Missing field: {field}")),
-            E::Crypto(source) => source.into(),
-            E::Decode(msg) => Error::Crypto(msg),
-            E::InvalidKey(msg) => Error::Crypto(msg),
-            E::Srp(msg) => Error::Srp(msg),
-        }
-    }
-}
-
-impl From<ente_accounts::Error> for Error {
-    fn from(err: ente_accounts::Error) -> Self {
-        use ente_accounts::Error as E;
-        match err {
-            E::Http(error) => Error::from(error),
-            E::Serialization(source) => Error::Serialization(source),
-            E::Crypto(message) => Error::Crypto(message),
-            E::AuthenticationFailed(message) => Error::AuthenticationFailed(message),
-            E::InvalidInput(message) => Error::InvalidInput(message),
-            E::Srp(message) => Error::Srp(message),
-            E::Base64Decode(source) => Error::Base64Decode(source),
-            E::Generic(message) => Error::Generic(message),
         }
     }
 }

@@ -1,5 +1,6 @@
 import "dart:async";
 
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:media_extension/media_extension.dart";
 import "package:media_extension/media_extension_action_types.dart";
@@ -12,7 +13,6 @@ import "package:photos/events/backup_folders_updated_event.dart";
 import "package:photos/events/files_updated_event.dart";
 import "package:photos/events/force_reload_home_gallery_event.dart";
 import "package:photos/events/local_photos_updated_event.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/models/file/file.dart";
 import "package:photos/models/file/file_type.dart";
 import "package:photos/models/file_load_result.dart";
@@ -137,7 +137,7 @@ class _ExternalMediaPickerPageState extends State<ExternalMediaPickerPage> {
       return;
     }
     if (uris.isEmpty) {
-      showShortToast(context, AppLocalizations.of(context).somethingWentWrong);
+      showShortToast(context, context.strings.somethingWentWrong);
       setState(() {
         _isCompleting = false;
       });
@@ -214,10 +214,10 @@ class _ExternalMediaPickerPageState extends State<ExternalMediaPickerPage> {
                     final selectedCount = _selectedFiles.files.length;
                     return Text(
                       selectedCount == 0
-                          ? AppLocalizations.of(context).selectItemsToAdd
-                          : AppLocalizations.of(
-                              context,
-                            ).selectedPhotos(count: selectedCount),
+                          ? context.strings.selectItemsToAdd
+                          : context.strings.selectedPhotos(
+                              count: selectedCount,
+                            ),
                       style: getEnteTextTheme(context).largeBold,
                     );
                   },
@@ -326,7 +326,7 @@ class _PickerBottomActionBar extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            AppLocalizations.of(context).selectedPhotos(count: selectedCount),
+            context.strings.selectedPhotos(count: selectedCount),
             style: textTheme.miniMuted,
             textAlign: TextAlign.center,
           ),
@@ -337,7 +337,7 @@ class _PickerBottomActionBar extends StatelessWidget {
                 child: ButtonWidgetV2(
                   buttonType: ButtonTypeV2.secondary,
                   buttonSize: ButtonSizeV2.large,
-                  labelText: AppLocalizations.of(context).cancel,
+                  labelText: context.strings.cancel,
                   isDisabled: isCompleting,
                   shouldSurfaceExecutionStates: false,
                   onTap: isCompleting
@@ -352,7 +352,7 @@ class _PickerBottomActionBar extends StatelessWidget {
                 child: ButtonWidgetV2(
                   buttonType: ButtonTypeV2.primary,
                   buttonSize: ButtonSizeV2.large,
-                  labelText: AppLocalizations.of(context).done,
+                  labelText: context.strings.done,
                   isDisabled: isCompleting,
                   onTap: isCompleting ? null : onDone,
                 ),

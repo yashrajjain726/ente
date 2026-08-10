@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data' show Uint8List;
 
+import 'package:ente_ui/components/loading_widget.dart';
 import 'package:flutter/material.dart';
 import "package:flutter_image_compress/flutter_image_compress.dart";
 import 'package:logging/logging.dart';
@@ -11,7 +12,6 @@ import 'package:photos/core/cache/thumbnail_in_memory_cache.dart';
 import 'package:photos/core/constants.dart';
 import 'package:photos/core/event_bus.dart';
 import 'package:photos/db/files_db.dart';
-import "package:photos/events/file_caption_updated_event.dart";
 import "package:photos/events/files_updated_event.dart";
 import 'package:photos/events/local_photos_updated_event.dart';
 import "package:photos/events/reset_zoom_of_photo_view_event.dart";
@@ -24,10 +24,7 @@ import "package:photos/module/metadata/exif.dart";
 import "package:photos/service_locator.dart" show flagService;
 import "package:photos/src/rust/api/image_processing_api.dart" as rust_image;
 import "package:photos/states/detail_page_state.dart";
-import "package:photos/theme/colors.dart";
-import "package:photos/theme/ente_theme.dart";
 import "package:photos/ui/actions/file/file_actions.dart";
-import 'package:photos/ui/common/loading_widget.dart';
 import 'package:photos/ui/viewer/file/thumbnail_widget.dart';
 import 'package:photos/utils/image_util.dart';
 import "package:photos/utils/ram_check_util.dart";
@@ -41,6 +38,7 @@ class ZoomableImage extends StatefulWidget {
   final bool isGuestView;
   final bool isFromMemories;
   final Function({required int memoryDuration})? onFinalFileLoad;
+  final ValueChanged<File>? onFinalImageLoaded;
 
   const ZoomableImage(
     this.photo, {
@@ -52,6 +50,7 @@ class ZoomableImage extends StatefulWidget {
     this.isGuestView = false,
     this.isFromMemories = false,
     this.onFinalFileLoad,
+    this.onFinalImageLoaded,
   });
 
   @override
@@ -86,8 +85,6 @@ class _ZoomableImageState extends State<ZoomableImage> {
   // Baseline PhotoView scale for the current image/controller when the image
   // is at its contained size. ZoomTransform.scale is reported relative to this.
   double? _initialScale;
-  late final StreamSubscription<FileCaptionUpdatedEvent>
-  _captionUpdatedSubscription;
   late final StreamSubscription<ResetZoomOfPhotoView> _resetZoomSubscription;
   late final StreamSubscription<RetryFailedImageLoadEvent>
   _retryFailedLoadSubscription;
@@ -132,16 +129,6 @@ class _ZoomableImageState extends State<ZoomableImage> {
     };
 
     _subscribeToZoomStream();
-
-    _captionUpdatedSubscription = Bus.instance
-        .on<FileCaptionUpdatedEvent>()
-        .listen((event) {
-          if (event.fileGeneratedID == _photo.generatedID) {
-            if (mounted) {
-              setState(() {});
-            }
-          }
-        });
 
     _resetZoomSubscription = Bus.instance.on<ResetZoomOfPhotoView>().listen((
       event,
@@ -195,7 +182,6 @@ class _ZoomableImageState extends State<ZoomableImage> {
     _zoomStreamSubscription?.cancel();
     _photoViewController.dispose();
     _scaleStateController.dispose();
-    _captionUpdatedSubscription.cancel();
     _resetZoomSubscription.cancel();
     _retryFailedLoadSubscription.cancel();
     super.dispose();
@@ -299,69 +285,7 @@ class _ZoomableImageState extends State<ZoomableImage> {
           };
     return GestureDetector(
       onVerticalDragUpdate: verticalDragCallback,
-      child: widget.photo.caption?.isNotEmpty ?? false
-          ? Stack(
-              clipBehavior: Clip.none,
-              children: [
-                content,
-                Positioned(
-                  bottom: 72 + MediaQuery.paddingOf(context).bottom,
-                  left: 0,
-                  right: 0,
-                  child: ValueListenableBuilder<bool>(
-                    valueListenable:
-                        InheritedDetailPageState.maybeOf(
-                          context,
-                        )?.enableFullScreenNotifier ??
-                        ValueNotifier(false),
-                    builder: (context, doNotShowCaption, _) {
-                      return AnimatedOpacity(
-                        opacity: doNotShowCaption ? 0.0 : 1.0,
-                        duration: const Duration(milliseconds: 200),
-                        child: IgnorePointer(
-                          ignoring: doNotShowCaption,
-                          child: GestureDetector(
-                            onTap: () {
-                              showDetailsSheet(context, widget.photo);
-                            },
-                            child: Container(
-                              color: Colors.black.withValues(alpha: 0.1),
-                              width: double.infinity,
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                      vertical: 4.0,
-                                      horizontal: 8.0,
-                                    ),
-                                    child: SizedBox(
-                                      width:
-                                          MediaQuery.sizeOf(context).width - 16,
-                                      child: Center(
-                                        child: Text(
-                                          widget.photo.caption!,
-                                          maxLines: 3,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: getEnteTextTheme(
-                                            context,
-                                          ).mini.copyWith(color: textBaseDark),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              ],
-            )
-          : content,
+      child: content,
     );
   }
 
@@ -604,7 +528,7 @@ class _ZoomableImageState extends State<ZoomableImage> {
         },
       ).then((value) {
         if (mounted && !_loadedFinalImage && !_convertToSupportedFormat) {
-          _updateViewWithFinalImage(imageProvider);
+          _updateViewWithFinalImage(imageProvider, file);
         }
       });
     }
@@ -638,7 +562,10 @@ class _ZoomableImageState extends State<ZoomableImage> {
     );
   }
 
-  Future<void> _updateViewWithFinalImage(ImageProvider imageProvider) async {
+  Future<void> _updateViewWithFinalImage(
+    ImageProvider imageProvider,
+    File file,
+  ) async {
     await _updatePhotoViewController(
       previewImageProvider: _imageProvider,
       finalImageProvider: imageProvider,
@@ -649,6 +576,7 @@ class _ZoomableImageState extends State<ZoomableImage> {
       _logger.info("Final image loaded");
     });
     _notifyReadyOnce();
+    widget.onFinalImageLoaded?.call(file);
   }
 
   Future<void> _updatePhotoViewController({
@@ -751,7 +679,7 @@ class _ZoomableImageState extends State<ZoomableImage> {
 
       await precacheImage(imageProvider, context);
       if (mounted && !_loadedFinalImage) {
-        await _updateViewWithFinalImage(imageProvider);
+        await _updateViewWithFinalImage(imageProvider, file);
       }
       return true;
     } catch (e) {
@@ -855,7 +783,7 @@ class _ZoomableImageState extends State<ZoomableImage> {
       unawaited(
         precacheImage(imageProvider, context).then((value) {
           if (mounted) {
-            _updateViewWithFinalImage(imageProvider);
+            _updateViewWithFinalImage(imageProvider, file);
           }
         }),
       );

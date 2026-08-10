@@ -1,11 +1,10 @@
 import "package:ente_pure_utils/ente_pure_utils.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:hugeicons/hugeicons.dart";
 import "package:logging/logging.dart";
 import "package:photos/core/event_bus.dart";
 import "package:photos/events/people_changed_event.dart";
-import "package:photos/generated/l10n.dart";
-import "package:photos/l10n/l10n.dart";
 import "package:photos/models/ml/face/person.dart";
 import "package:photos/models/search/search_constants.dart";
 import "package:photos/models/selected_people.dart";
@@ -191,7 +190,7 @@ class _PeopleSelectionActionWidgetState
 
         items.add(
           SelectionActionButton(
-            labelText: AppLocalizations.of(context).edit,
+            labelText: context.strings.edit,
             hugeIcon: HugeIcons.strokeRoundedPencilEdit01,
             onTap: _onEditPerson,
             shouldShow: showEditAction,
@@ -199,7 +198,7 @@ class _PeopleSelectionActionWidgetState
         );
         items.add(
           SelectionActionButton(
-            labelText: AppLocalizations.of(context).review,
+            labelText: context.strings.review,
             hugeIcon: HugeIcons.strokeRoundedSearch01,
             onTap: _onReviewSuggestion,
             shouldShow: showReviewAction,
@@ -207,7 +206,7 @@ class _PeopleSelectionActionWidgetState
         );
         items.add(
           SelectionActionButton(
-            labelText: AppLocalizations.of(context).ignore,
+            labelText: context.strings.ignore,
             hugeIcon: HugeIcons.strokeRoundedImageNotFound01,
             onTap: _onIgnore,
             shouldShow: showIgnoreAction,
@@ -215,7 +214,7 @@ class _PeopleSelectionActionWidgetState
         );
         items.add(
           SelectionActionButton(
-            labelText: AppLocalizations.of(context).merge,
+            labelText: context.strings.merge,
             hugeIcon: HugeIcons.strokeRoundedGitMerge,
             onTap: _onMerge,
             shouldShow: showMergeAction,
@@ -223,7 +222,7 @@ class _PeopleSelectionActionWidgetState
         );
         items.add(
           SelectionActionButton(
-            labelText: AppLocalizations.of(context).reset,
+            labelText: context.strings.reset,
             hugeIcon: HugeIcons.strokeRoundedRemove01,
             onTap: _onResetPerson,
             shouldShow: showResetAction,
@@ -231,7 +230,7 @@ class _PeopleSelectionActionWidgetState
         );
         items.add(
           SelectionActionButton(
-            labelText: AppLocalizations.of(context).showPerson,
+            labelText: context.strings.showPerson,
             hugeIcon: HugeIcons.strokeRoundedView,
             onTap: _onShowPerson,
             shouldShow: showShowPersonAction,
@@ -239,7 +238,7 @@ class _PeopleSelectionActionWidgetState
         );
         items.add(
           SelectionActionButton(
-            labelText: AppLocalizations.of(context).pin,
+            labelText: context.strings.pin,
             hugeIcon: HugeIcons.strokeRoundedPin,
             onTap: () => _updatePinState(true),
             shouldShow: showPinAction,
@@ -247,7 +246,7 @@ class _PeopleSelectionActionWidgetState
         );
         items.add(
           SelectionActionButton(
-            labelText: AppLocalizations.of(context).unpin,
+            labelText: context.strings.unpin,
             hugeIcon: HugeIcons.strokeRoundedPinOff,
             onTap: () => _updatePinState(false),
             shouldShow: showUnpinAction,
@@ -255,7 +254,7 @@ class _PeopleSelectionActionWidgetState
         );
         items.add(
           SelectionActionButton(
-            labelText: AppLocalizations.of(context).hideFromMemories,
+            labelText: context.strings.hideFromMemories,
             hugeIcon: HugeIcons.strokeRoundedViewOffSlash,
             onTap: () => _updateHideFromMemoriesState(true),
             shouldShow: showHideFromMemoriesAction,
@@ -263,7 +262,7 @@ class _PeopleSelectionActionWidgetState
         );
         items.add(
           SelectionActionButton(
-            labelText: context.l10n.showInMemories,
+            labelText: context.strings.showInMemories,
             hugeIcon: HugeIcons.strokeRoundedView,
             onTap: () => _updateHideFromMemoriesState(false),
             shouldShow: showShowInMemoriesAction,
@@ -271,7 +270,7 @@ class _PeopleSelectionActionWidgetState
         );
         items.add(
           SelectionActionButton(
-            labelText: AppLocalizations.of(context).autoAddToAlbum,
+            labelText: context.strings.autoAddToAlbum,
             iconWidget: Image.asset(
               "assets/auto-add-people.png",
               width: 22,
@@ -415,9 +414,9 @@ class _PeopleSelectionActionWidgetState
     if (!mounted) return;
     await showChoiceDialog(
       context,
-      title: AppLocalizations.of(context).areYouSureYouWantToResetThisPerson,
-      body: AppLocalizations.of(context).allPersonGroupingWillReset,
-      firstButtonLabel: AppLocalizations.of(context).yesResetPerson,
+      title: context.strings.areYouSureYouWantToResetThisPerson,
+      body: context.strings.allPersonGroupingWillReset,
+      firstButtonLabel: context.strings.yesResetPerson,
       firstButtonOnTap: () async {
         try {
           await PersonService.instance.deletePerson(person.remoteID);
@@ -440,12 +439,12 @@ class _PeopleSelectionActionWidgetState
     final result = await showChoiceDialog(
       context,
       title: multiple
-          ? AppLocalizations.of(context).areYouSureYouWantToIgnoreThesePersons
-          : AppLocalizations.of(context).areYouSureYouWantToIgnoreThisPerson,
+          ? context.strings.areYouSureYouWantToIgnoreThesePersons
+          : context.strings.areYouSureYouWantToIgnoreThisPerson,
       body: multiple
-          ? AppLocalizations.of(context).thePersonGroupsWillNotBeDisplayed
-          : AppLocalizations.of(context).thePersonWillNotBeDisplayed,
-      firstButtonLabel: AppLocalizations.of(context).yesIgnore,
+          ? context.strings.thePersonGroupsWillNotBeDisplayed
+          : context.strings.thePersonWillNotBeDisplayed,
+      firstButtonLabel: context.strings.yesIgnore,
     );
     if (!mounted || result?.action != ButtonAction.first) {
       return;
@@ -467,7 +466,7 @@ class _PeopleSelectionActionWidgetState
     required List<String> selectedPersonIds,
     required List<String> selectedClusterIds,
   }) async {
-    final l10n = AppLocalizations.of(context);
+    final l10n = context.strings;
     final personIdsToIgnore = selectedPersonIds.where((personID) {
       final person = personMap[personID];
       return person != null && !person.data.isIgnored;
@@ -534,7 +533,7 @@ class _PeopleSelectionActionWidgetState
   }
 
   String _bulkIgnoreProgressMessage(
-    AppLocalizations l10n,
+    StringsLocalizations l10n,
     int completed,
     int total,
   ) {
@@ -557,15 +556,15 @@ class _PeopleSelectionActionWidgetState
     await showChoiceDialog(
       context,
       title: multiple
-          ? AppLocalizations.of(
-              context,
-            ).areYouSureYouWantToShowThesePeopleInPeopleSectionAgain
-          : AppLocalizations.of(
-              context,
-            ).areYouSureYouWantToShowThisPersonInPeopleSectionAgain,
+          ? context
+                .strings
+                .areYouSureYouWantToShowThesePeopleInPeopleSectionAgain
+          : context
+                .strings
+                .areYouSureYouWantToShowThisPersonInPeopleSectionAgain,
       firstButtonLabel: multiple
-          ? AppLocalizations.of(context).yesShowPeople
-          : AppLocalizations.of(context).yesShowPerson,
+          ? context.strings.yesShowPeople
+          : context.strings.yesShowPerson,
       firstButtonOnTap: () async {
         try {
           for (final personID in ignoredSelectedPersonIds) {

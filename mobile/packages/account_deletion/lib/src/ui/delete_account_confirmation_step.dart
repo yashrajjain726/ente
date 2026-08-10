@@ -112,8 +112,10 @@ class _SummaryRows extends StatelessWidget {
           title: summary == null
               ? context.strings.entePhotos
               : context.strings.photosAndVideosCount(
-                  summary.photosAndVideosCount,
-                  numberFormat.format(summary.photosAndVideosCount),
+                  count: summary.photosAndVideosCount,
+                  formattedCount: numberFormat.format(
+                    summary.photosAndVideosCount,
+                  ),
                 ),
           subtitle: summary == null ? null : context.strings.entePhotos,
         ),
@@ -123,8 +125,10 @@ class _SummaryRows extends StatelessWidget {
           title: summary == null
               ? context.strings.enteAuth
               : context.strings.authenticatorCodesCount(
-                  summary.authenticatorCodesCount,
-                  numberFormat.format(summary.authenticatorCodesCount),
+                  count: summary.authenticatorCodesCount,
+                  formattedCount: numberFormat.format(
+                    summary.authenticatorCodesCount,
+                  ),
                 ),
           subtitle: summary == null ? null : context.strings.enteAuth,
         ),
@@ -134,8 +138,10 @@ class _SummaryRows extends StatelessWidget {
           title: summary == null
               ? context.strings.enteLocker
               : context.strings.lockerRecordsCount(
-                  summary.lockerRecordsCount,
-                  numberFormat.format(summary.lockerRecordsCount),
+                  count: summary.lockerRecordsCount,
+                  formattedCount: numberFormat.format(
+                    summary.lockerRecordsCount,
+                  ),
                 ),
           subtitle: summary == null ? null : context.strings.enteLocker,
         ),

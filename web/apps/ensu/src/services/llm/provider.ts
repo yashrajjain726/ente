@@ -13,11 +13,8 @@ const DEFAULT_WEB_CONTEXT_SIZE = 4096;
 const DEFAULT_TAURI_CONTEXT_SIZE = 12000;
 const DEFAULT_GENERATION_MAX_TOKENS = 8_192;
 const OVERFLOW_SAFETY_TOKENS = 256;
-const MIN_DESKTOP_DEFAULT_MEMORY_BYTES = 16 * 1024 * 1024 * 1024;
 
 // These fallback values must stay in sync with rust/crates/ensu/src/config.rs.
-// When running inside Tauri, resolveDefaultModelForDevice() overwrites them with
-// values fetched from the Rust config_defaults command.
 export const DEFAULT_MODEL: ModelInfo = {
     id: "lfm-vl-1.6b",
     name: "LFM 2.5 VL 1.6B (Q4_0)",
@@ -35,10 +32,10 @@ export const DEFAULT_MODEL: ModelInfo = {
 const DESKTOP_DEFAULT_MODEL: ModelInfo = {
     id: "gemma-4-e4b-q4km",
     name: "Gemma 4 E4B (Q4_K_M)",
-    url: "https://huggingface.co/unsloth/gemma-4-E4B-it-GGUF/resolve/main/gemma-4-E4B-it-Q4_K_M.gguf?download=true",
-    sha256: "519b9793ed6ce0ff530f1b7c96e848e08e49e7af4d57bb97f76215963a54146d",
+    url: "https://huggingface.co/ente-ai/gemma-4-E4B-it-GGUF/resolve/f0089e04ac8494e513619d18b44c829c6b815440/gemma-4-E4B-it-Q4_K_M.gguf?download=true",
+    sha256: "85a896a047553e842f25297ee5b031d64ff30147d9c4af17b1e4b394cd1fab87",
     mmprojUrl:
-        "https://huggingface.co/unsloth/gemma-4-E4B-it-GGUF/resolve/main/mmproj-F16.gguf",
+        "https://huggingface.co/ente-ai/gemma-4-E4B-it-GGUF/resolve/f0089e04ac8494e513619d18b44c829c6b815440/mmproj-F16.gguf",
     mmprojSha256:
         "ddf46c21d7078e95338cfc22306b19b276a29a5ad089023449dd54d4b6170a51",
     sizeBytes: 4_977_169_088,
@@ -55,15 +52,10 @@ interface ConfigModelPreset {
     mmprojSha256?: string | null;
 }
 
-interface ConfigDefaults {
-    mobileSystemPromptBody: string;
-    desktopSystemPromptBody: string;
-    systemPromptDatePlaceholder: string;
-    sessionSummarySystemPrompt: string;
-    mobileDefaultModel: ConfigModelPreset;
-    mobileModelPresets: ConfigModelPreset[];
-    desktopDefaultModel: ConfigModelPreset;
-    desktopModelPresets: ConfigModelPreset[];
+interface ResolvedModelPolicy {
+    defaultModel: ConfigModelPreset;
+    visibleModels: ConfigModelPreset[];
+    allowedPreferredModels: ConfigModelPreset[];
 }
 
 interface TauriLlmModelDownloadProgress {
@@ -108,10 +100,10 @@ const FALLBACK_SHARED_MODEL_PRESETS: ModelInfo[] = [
     {
         id: "gemma-4-e2b-q4km",
         name: "Gemma 4 E2B (Q4_K_M)",
-        url: "https://huggingface.co/unsloth/gemma-4-E2B-it-GGUF/resolve/main/gemma-4-E2B-it-Q4_K_M.gguf?download=true",
-        sha256: "9378bc471710229ef165709b62e34bfb62231420ddaf6d729e727305b5b8672d",
+        url: "https://huggingface.co/ente-ai/gemma-4-E2B-it-GGUF/resolve/d9f70b02c9a2193b7263daee865dfa93276fd99a/gemma-4-E2B-it-Q4_K_M.gguf?download=true",
+        sha256: "740185b21d22ceb83a11c3aa62ad5842ef32c70f6096d756bbee85a1e4ec34b8",
         mmprojUrl:
-            "https://huggingface.co/unsloth/gemma-4-E2B-it-GGUF/resolve/main/mmproj-F16.gguf",
+            "https://huggingface.co/ente-ai/gemma-4-E2B-it-GGUF/resolve/d9f70b02c9a2193b7263daee865dfa93276fd99a/mmproj-F16.gguf",
         mmprojSha256:
             "140be8d7849741f88c50757d529b84373ee8e27052cc2236855b537f4a8215fa",
     },
@@ -136,6 +128,11 @@ export const FALLBACK_DESKTOP_MODEL_PRESETS: ModelInfo[] = [
     ...FALLBACK_SHARED_MODEL_PRESETS,
 ];
 
+const MODEL_INFO_FALLBACKS = [
+    DESKTOP_DEFAULT_MODEL,
+    ...FALLBACK_DESKTOP_MODEL_PRESETS,
+];
+
 export class LlmProvider {
     private backend = createInferenceBackend({
         backend: "auto",
@@ -148,8 +145,7 @@ export class LlmProvider {
     private currentMmprojPath?: string;
     private currentContextKey?: string;
     private defaultModel = DEFAULT_MODEL;
-    private configDefaults?: ConfigDefaults;
-    private useDesktopRustDefaults = false;
+    private modelPolicy?: ResolvedModelPolicy;
 
     private downloadActive = false;
     private progressListeners = new Set<(progress: DownloadProgress) => void>();
@@ -182,19 +178,14 @@ export class LlmProvider {
         return this.defaultModel;
     }
 
-    public getConfigDefaults(): ConfigDefaults | undefined {
-        return this.configDefaults;
-    }
-
     public getResolvedModelPresets(): ResolvedModelPreset[] | undefined {
-        if (!this.configDefaults) {
+        const policy = this.modelPolicy;
+        if (!policy) {
             return undefined;
         }
-
-        const presets = this.useDesktopRustDefaults
-            ? this.configDefaults.desktopModelPresets
-            : this.configDefaults.mobileModelPresets;
-        return presets.map((preset) => ({ id: preset.id, name: preset.title }));
+        return policy.visibleModels
+            .filter((preset) => preset.id !== policy.defaultModel.id)
+            .map((preset) => ({ id: preset.id, name: preset.title }));
     }
 
     public getBackendKind() {
@@ -301,7 +292,8 @@ export class LlmProvider {
             try {
                 await this.ensureInFlight.promise;
             } catch {
-                // ignore errors from previous load
+                // Wait only for settlement; the failure belongs to the
+                // original caller.
             }
         }
 
@@ -466,7 +458,7 @@ export class LlmProvider {
 
     private async resolveDefaultModelForDevice() {
         this.defaultModel = DEFAULT_MODEL;
-        this.useDesktopRustDefaults = false;
+        this.modelPolicy = undefined;
 
         if (this.backend.kind !== "tauri") {
             return;
@@ -482,38 +474,11 @@ export class LlmProvider {
             const platform = info.platform?.toLowerCase();
             const totalMemoryBytes = info.totalMemoryBytes ?? 0;
 
-            this.useDesktopRustDefaults =
-                totalMemoryBytes >= MIN_DESKTOP_DEFAULT_MEMORY_BYTES;
-
-            if (this.useDesktopRustDefaults) {
-                this.defaultModel = DESKTOP_DEFAULT_MODEL;
-            }
-
-            // Overlay Rust-authoritative fields (id, name, url, mmprojUrl)
-            // while keeping the web-only display fields (sizeBytes etc.)
-            // as fallbacks.
-            try {
-                const defaults =
-                    await invoke<ConfigDefaults>("config_defaults");
-                const rustPreset = this.useDesktopRustDefaults
-                    ? defaults.desktopDefaultModel
-                    : defaults.mobileDefaultModel;
-                this.defaultModel = {
-                    ...this.defaultModel,
-                    id: rustPreset.id,
-                    name: rustPreset.title,
-                    url: rustPreset.url,
-                    sha256: rustPreset.sha256,
-                    mmprojUrl: rustPreset.mmprojUrl ?? undefined,
-                    mmprojSha256: rustPreset.mmprojSha256 ?? undefined,
-                };
-                this.configDefaults = defaults;
-            } catch (defaultsError) {
-                log.warn(
-                    "Failed to fetch ensu defaults from Rust",
-                    defaultsError,
-                );
-            }
+            this.modelPolicy = await invoke<ResolvedModelPolicy>(
+                "desktop_model_policy",
+                { totalMemoryBytes: info.totalMemoryBytes },
+            );
+            this.defaultModel = this.modelInfo(this.modelPolicy.defaultModel);
 
             log.info("LLM default model resolved", {
                 platform,
@@ -526,40 +491,34 @@ export class LlmProvider {
     }
 
     private resolveTargetModel(settings: ModelSettings): ModelInfo {
-        const preset = this.resolveConfigPreset(settings.modelId);
-        if (preset) {
-            return {
-                id: preset.id,
-                name: preset.title,
-                url: preset.url,
-                sha256: preset.sha256,
-                mmprojUrl: preset.mmprojUrl ?? undefined,
-                mmprojSha256: preset.mmprojSha256 ?? undefined,
-            };
+        if (this.modelPolicy) {
+            const preset = settings.modelId
+                ? this.modelPolicy.allowedPreferredModels.find(
+                      (candidate) => candidate.id === settings.modelId,
+                  )
+                : undefined;
+            return preset ? this.modelInfo(preset) : this.defaultModel;
         }
-        if (settings.modelId && !this.configDefaults) {
-            const fallback = [
-                ...FALLBACK_DESKTOP_MODEL_PRESETS,
-                ...FALLBACK_MOBILE_MODEL_PRESETS,
-            ].find((preset) => preset.id === settings.modelId);
-            if (fallback) {
-                return fallback;
-            }
-        }
-        return this.defaultModel;
+        return (
+            FALLBACK_DESKTOP_MODEL_PRESETS.find(
+                (preset) => preset.id === settings.modelId,
+            ) ?? this.defaultModel
+        );
     }
 
-    private resolveConfigPreset(modelId: string | undefined) {
-        const defaults = this.configDefaults;
-        if (!defaults || !modelId) {
-            return undefined;
-        }
-        return [
-            defaults.mobileDefaultModel,
-            defaults.desktopDefaultModel,
-            ...defaults.mobileModelPresets,
-            ...defaults.desktopModelPresets,
-        ].find((preset) => preset.id == modelId);
+    private modelInfo(preset: ConfigModelPreset): ModelInfo {
+        const fallback = MODEL_INFO_FALLBACKS.find(
+            (candidate) => candidate.id === preset.id,
+        );
+        return {
+            ...fallback,
+            id: preset.id,
+            name: preset.title,
+            url: preset.url,
+            sha256: preset.sha256,
+            mmprojUrl: preset.mmprojUrl ?? undefined,
+            mmprojSha256: preset.mmprojSha256 ?? undefined,
+        };
     }
 
     private async modelStatus(modelId: string): Promise<TauriModelStatus> {

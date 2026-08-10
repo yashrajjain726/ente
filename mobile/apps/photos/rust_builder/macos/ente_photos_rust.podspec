@@ -22,7 +22,7 @@ A new Flutter FFI plugin project.
   s.dependency 'FlutterMacOS'
 
   s.platform = :osx, '10.11'
-  # ONNX Runtime 1.27 does not publish Apple x86_64 binaries, so consumers
+  # ONNX Runtime 1.28 does not publish Apple x86_64 binaries, so consumers
   # must also avoid trying to link an x86_64 application slice.
   s.user_target_xcconfig = { 'EXCLUDED_ARCHS[sdk=macosx*]' => 'x86_64' }
   s.swift_version = '5.0'
@@ -39,7 +39,7 @@ A new Flutter FFI plugin project.
   }
   s.pod_target_xcconfig = {
     'DEFINES_MODULE' => 'YES',
-    # ONNX Runtime 1.27 does not publish Apple x86_64 binaries.
+    # ONNX Runtime 1.28 does not publish Apple x86_64 binaries.
     'EXCLUDED_ARCHS[sdk=macosx*]' => 'x86_64',
     'OTHER_LDFLAGS' => '-force_load ${BUILT_PRODUCTS_DIR}/libente_photos_rust.a -lc++',
   }

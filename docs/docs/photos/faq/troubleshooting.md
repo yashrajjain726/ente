@@ -535,13 +535,16 @@ You can also try opening photos.ente.com in an incognito or private window to ru
 
 ### How do I identify which files failed to upload? {#identify-failed-uploads}
 
-**On desktop:** Check the sections within the upload progress bar for:
+**On desktop:** Expand the upload progress card and open one of these sections:
 
-- "Failed Uploads"
-- "Ignored Uploads"
-- "Unsuccessful Uploads"
+- **In progress**: Files currently being prepared or uploaded.
+- **Completed**: Files uploaded successfully.
+- **Skipped**: Files not uploaded. While the upload is active, you can filter them by reasons such as **Already on Ente** and **Hidden file**.
+- **Failed**: Files whose upload attempt failed.
 
-Click on each section to see the specific files and error messages.
+After the upload finishes, click **Review items**, open **Failed**, and review the filenames and error status. Click **Retry failed uploads** to try those files again. Skipped items are not retryable failures; review the reason shown beside each filename to understand why it was skipped.
+
+![Failed upload details with the retry button](../migration/from-local-hard-disk/failed-upload-review.webp)
 
 **On mobile:** Open `Settings > Backup` to see the backup status and any errors.
 
@@ -602,6 +605,26 @@ Machine learning features (face recognition and magic search) require downloadin
 - Once indexed on one device, the indexes sync to other devices
 
 Learn more in [Search and Discovery FAQ](/photos/faq/search-and-discovery#ml-offline).
+
+### Why does my phone overheat while using the app? {#phone-overheating}
+
+Overheating usually happens when Ente works through a large historical backup at the same time as local ML indexing, which together can keep the CPU busy for a sustained stretch. Once the backup queue clears and indexing catches up, the app falls back to normal incremental syncs and the heating should stop.
+
+**Steps to take:**
+
+1. Plug in your iPhone, remove the case if you use one, connect to WiFi, and leave Ente open in the foreground.
+2. Disable auto-lock.
+3. Close all other apps before starting.
+4. If the phone still overheats, turn off ML and video streaming: `Settings > Machine learning` and `Settings > Video streaming`.
+5. Let it run overnight, then re-enable ML and video streaming once the upload completes.
+
+> [!NOTE]
+>
+> iOS can still throttle, suspend, or terminate apps under heat pressure even with auto-lock disabled - that setting only keeps the screen from sleeping while the app is active, not the app from being suspended by the system. This can slow uploads considerably.
+>
+> If iCloud Photos "Optimize iPhone Storage" is enabled, originals may need to download from iCloud first, which can also slow or stall uploads.
+>
+> If overheating continues, [send us your logs](#sharing-logs) so we can take a closer look.
 
 ### What are the minimum device requirements for Ente apps? {#minimum-requirements}
 

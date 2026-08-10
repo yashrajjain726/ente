@@ -1,8 +1,3 @@
-//! Shared account flow orchestration built on [`crate::client::AccountsClient`].
-//!
-//! This layer is intended for interactive CLI/e2e flows. Callers that need
-//! raw server `code/message/status` should prefer [`crate::client::AccountsClient`].
-
 use ente_core::b64;
 use ente_core::crypto::{self, SecretVec, secretbox};
 use std::fmt;
@@ -27,12 +22,9 @@ use crate::{
 
 const SRP_A_LEN: usize = 512;
 
-/// Purpose of an OTP prompt.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum OtpPurpose {
-    /// OTP for login/email MFA.
     Login,
-    /// OTP for signup.
     Signup,
 }
 
@@ -45,52 +37,34 @@ impl OtpPurpose {
     }
 }
 
-/// Purpose of a TOTP prompt.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TotpPurpose {
-    /// TOTP during login.
     Login,
-    /// TOTP during initial setup.
     Setup,
 }
 
-/// Supported second-factor methods during login.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SecondFactorMethod {
-    /// TOTP auth app code.
     Totp,
-    /// Passkey verification.
     Passkey,
 }
 
-/// UI adapter for interactive account flows.
 pub trait AuthFlowUi {
-    /// Read an email OTP from the user.
     fn read_email_otp(&mut self, email: &str, purpose: OtpPurpose, resent: bool) -> Result<String>;
-    /// Read a TOTP code from the user.
     fn read_totp_code(&mut self, purpose: TotpPurpose) -> Result<String>;
-    /// Display a retryable error and continue.
     fn report_retryable_error(&mut self, message: &str) -> Result<()>;
-    /// Let the user choose a second-factor method.
     fn choose_second_factor(
         &mut self,
         methods: &[SecondFactorMethod],
     ) -> Result<SecondFactorMethod>;
-    /// Show a passkey verification URL.
     fn present_passkey_verification(&mut self, url: &str) -> Result<()>;
-    /// Wait until the user has attempted passkey verification.
     fn wait_for_passkey_verification(&mut self) -> Result<()>;
-    /// Present a TOTP secret to the user.
     fn present_totp_secret(&mut self, secret_code: &str, qr_code: &str) -> Result<()>;
 }
 
-/// Parameters for account creation.
 pub struct CreateAccountParams {
-    /// Email address to register.
     pub email: String,
-    /// Password used for signup.
     pub password: Zeroizing<String>,
-    /// Optional referral source.
     pub source: Option<String>,
 }
 
@@ -104,11 +78,8 @@ impl fmt::Debug for CreateAccountParams {
     }
 }
 
-/// Parameters for login.
 pub struct LoginParams {
-    /// Email address to login.
     pub email: String,
-    /// Password for the account.
     pub password: Zeroizing<String>,
 }
 
@@ -121,11 +92,8 @@ impl fmt::Debug for LoginParams {
     }
 }
 
-/// Parameters for TOTP setup.
 pub struct SetupTwoFactorParams {
-    /// Master key for the account.
     pub master_key: SecretVec,
-    /// Optional cached key attributes.
     pub key_attributes: Option<KeyAttributes>,
 }
 
@@ -138,17 +106,11 @@ impl fmt::Debug for SetupTwoFactorParams {
     }
 }
 
-/// Parameters for password changes.
 pub struct ChangePasswordParams {
-    /// Email address of the account.
     pub email: String,
-    /// New password.
     pub password: Zeroizing<String>,
-    /// Current master key bytes.
     pub master_key: SecretVec,
-    /// Current key attributes.
     pub key_attributes: KeyAttributes,
-    /// Whether to logout other devices.
     pub log_out_other_devices: bool,
 }
 
@@ -164,11 +126,8 @@ impl fmt::Debug for ChangePasswordParams {
     }
 }
 
-/// Result of a password-change flow.
 pub struct ChangePasswordResult {
-    /// Updated key attributes.
     pub key_attributes: KeyAttributes,
-    /// Fresh SRP attributes fetched from remote.
     pub srp_attributes: SrpAttributes,
 }
 
@@ -181,11 +140,8 @@ impl fmt::Debug for ChangePasswordResult {
     }
 }
 
-/// Parameters for session-validity checks.
 pub struct CheckSessionValidityParams {
-    /// Email address used to fetch fresh SRP attributes.
     pub email: String,
-    /// Locally saved SRP attributes.
     pub local_srp_attributes: SrpAttributes,
 }
 
@@ -198,32 +154,21 @@ impl fmt::Debug for CheckSessionValidityParams {
     }
 }
 
-/// Outcome of a session-validity check.
 #[derive(Debug)]
 #[expect(clippy::large_enum_variant)]
 pub enum SessionValidity {
-    /// Token is invalid.
     Invalid,
-    /// Session is valid and password unchanged.
     Valid,
-    /// Session is valid but password was changed elsewhere.
     ValidButPasswordChanged {
-        /// Fresh key attributes from remote.
         updated_key_attributes: KeyAttributes,
-        /// Fresh SRP attributes from remote.
         updated_srp_attributes: SrpAttributes,
     },
 }
 
-/// Authenticated account returned by shared flows.
 pub struct AuthenticatedAccount {
-    /// User ID.
     pub user_id: i64,
-    /// Full key attributes.
     pub key_attributes: KeyAttributes,
-    /// Decrypted account secrets.
     pub secrets: AccountSecrets,
-    /// Recovery key, if derivable.
     pub recovery_key: Option<String>,
 }
 
@@ -238,13 +183,9 @@ impl fmt::Debug for AuthenticatedAccount {
     }
 }
 
-/// Result of setting up TOTP.
 pub struct SetupTwoFactorResult {
-    /// Secret code shown to the user.
     pub secret_code: String,
-    /// QR code payload.
     pub qr_code: String,
-    /// Recovery key used to encrypt the TOTP secret.
     pub recovery_key: String,
 }
 
@@ -258,11 +199,8 @@ impl fmt::Debug for SetupTwoFactorResult {
     }
 }
 
-/// Result of creating a new recovery key for old accounts.
 pub struct RecoveryKeyResult {
-    /// Fresh recovery key in hex.
     pub recovery_key: String,
-    /// Updated key attributes including recovery-key fields.
     pub key_attributes: KeyAttributes,
 }
 
@@ -275,7 +213,6 @@ impl fmt::Debug for RecoveryKeyResult {
     }
 }
 
-/// Shared high-level account flow orchestration.
 pub struct AuthFlow<'a, U> {
     client: &'a AccountsClient,
     ui: &'a mut U,
@@ -285,12 +222,10 @@ impl<'a, U> AuthFlow<'a, U>
 where
     U: AuthFlowUi,
 {
-    /// Create a new shared account flow instance.
     pub fn new(client: &'a AccountsClient, ui: &'a mut U) -> Self {
         Self { client, ui }
     }
 
-    /// Create a new account.
     pub async fn create_account(
         &mut self,
         params: CreateAccountParams,
@@ -299,7 +234,6 @@ where
             .await
     }
 
-    /// Create a new account after the caller has already sent and collected a signup OTP.
     pub async fn create_account_with_otp(
         &mut self,
         params: CreateAccountParams,
@@ -321,7 +255,6 @@ where
         .await
     }
 
-    /// Login to an existing account.
     pub async fn login(&mut self, params: LoginParams) -> Result<AuthenticatedAccount> {
         let srp_attrs = self.client.get_srp_attributes(&params.email).await?;
 
@@ -352,7 +285,6 @@ where
         self.build_authenticated_account(auth_response, &kek)
     }
 
-    /// Setup TOTP two-factor authentication.
     pub async fn setup_two_factor(
         &mut self,
         params: SetupTwoFactorParams,
@@ -364,15 +296,10 @@ where
                 .get_session_validity()
                 .await?
                 .key_attributes
-                .ok_or_else(|| {
-                    Error::AuthenticationFailed(
-                        "Account keys are not available for two-factor setup".into(),
-                    )
-                })?
+                .ok_or(Error::MissingKeyAttributes)?
         };
 
-        let recovery_key =
-            get_recovery_key(&params.master_key, &key_attributes).map_err(Error::from)?;
+        let recovery_key = get_recovery_key(&params.master_key, &key_attributes)?;
 
         let secret = self.client.setup_two_factor().await?;
         self.ui
@@ -399,7 +326,6 @@ where
         }
     }
 
-    /// Change the account password and update SRP/key attributes on remote.
     pub async fn change_password(
         &self,
         params: ChangePasswordParams,
@@ -453,7 +379,7 @@ where
             mismatches.push("opsLimit");
         }
         if !mismatches.is_empty() {
-            return Err(Error::AuthenticationFailed(format!(
+            return Err(Error::Protocol(format!(
                 "Remote SRP attributes mismatched after password change: {}",
                 mismatches.join(", ")
             )));
@@ -465,7 +391,6 @@ where
         })
     }
 
-    /// Check if the current session is still valid and whether password changed elsewhere.
     pub async fn check_session_validity(
         &self,
         params: CheckSessionValidityParams,
@@ -489,12 +414,10 @@ where
         Ok(SessionValidity::Valid)
     }
 
-    /// Change the authenticated user's email address.
     pub async fn change_email(&self, email: &str, ott: &str) -> Result<()> {
         self.client.change_email(email, ott).await
     }
 
-    /// Create a new recovery key for old accounts that do not have one yet.
     pub async fn create_recovery_key(
         &self,
         master_key: &[u8],
@@ -530,7 +453,6 @@ where
         })
     }
 
-    /// Get the server-side two-factor recovery payload for a pending second-factor session.
     pub async fn get_two_factor_recovery(
         &self,
         session_id: &str,
@@ -541,7 +463,6 @@ where
             .await
     }
 
-    /// Remove/bypass the second factor using a recovery key input.
     pub async fn recover_two_factor(
         &self,
         two_factor_type: TwoFactorType,
@@ -557,27 +478,24 @@ where
             &crypto::Nonce::try_from_slice(&nonce)?,
             &crypto::Key::try_from_slice(&recovery_key)?,
         )
-        .map_err(|_| Error::AuthenticationFailed("Incorrect recovery key".into()))?;
+        .map_err(|_| Error::IncorrectRecoveryKey)?;
         let request = RemoveTwoFactorRequest {
             session_id: session_id.to_string(),
             secret: String::from_utf8(secret)
-                .map_err(|e| Error::Crypto(format!("invalid recovery secret: {e}")))?,
+                .map_err(|e| Error::Protocol(format!("invalid recovery secret: {e}")))?,
             two_factor_type,
         };
         self.client.remove_two_factor(&request).await
     }
 
-    /// Return whether the authenticated user has TOTP enabled.
     pub async fn get_two_factor_status(&self) -> Result<bool> {
         self.client.get_two_factor_status().await
     }
 
-    /// Disable TOTP for the authenticated user.
     pub async fn disable_two_factor(&self) -> Result<()> {
         self.client.disable_two_factor().await
     }
 
-    /// Get passkey recovery status.
     pub async fn get_passkey_recovery_status(&self) -> Result<bool> {
         Ok(self
             .client
@@ -586,7 +504,6 @@ where
             .is_passkey_recovery_enabled)
     }
 
-    /// Configure passkey recovery by encrypting a reset secret with the user's recovery key.
     pub async fn configure_passkey_recovery(
         &self,
         secret: &str,
@@ -605,12 +522,10 @@ where
         self.client.configure_passkey_recovery(&request).await
     }
 
-    /// Get the accounts-token response used to open the accounts broker.
     pub async fn get_accounts_token(&self) -> Result<crate::models::AccountsTokenResponse> {
         self.client.get_accounts_token().await
     }
 
-    /// Poll passkey verification status.
     pub async fn check_passkey_status(&self, session_id: &str) -> Result<AuthResponse> {
         self.client.check_passkey_status(session_id).await
     }
@@ -623,7 +538,7 @@ where
         let key_attributes = auth_response
             .key_attributes
             .clone()
-            .ok_or_else(|| Error::AuthenticationFailed("No key attributes".into()))?;
+            .ok_or(Error::MissingKeyAttributes)?;
         let secrets = decrypt_auth_response(&auth_response, &key_attributes, kek)?;
         let public_key = b64::decode(&key_attributes.public_key)?;
         let recovery_key = get_recovery_key(&secrets.master_key, &key_attributes).ok();
@@ -669,7 +584,7 @@ where
         key_derivation_strength: KeyDerivationStrength,
     ) -> Result<AuthenticatedAccount> {
         let token = verification.token.clone().ok_or_else(|| {
-            Error::AuthenticationFailed("Signup verification did not return a session token".into())
+            Error::Protocol("Signup verification did not return a session token".into())
         })?;
 
         self.client.set_auth_token(Some(token.clone()));
@@ -681,9 +596,7 @@ where
             || session_validity.has_set_keys
             || session_validity.key_attributes.is_some()
         {
-            return Err(Error::AuthenticationFailed(
-                "Email already has server-side key state; use the existing account or recover the incomplete signup instead of creating a new account.".into(),
-            ));
+            return Err(Error::AccountAlreadyExists);
         }
 
         let key_gen_result = generate_keys_with_strength(&password, key_derivation_strength)?;
@@ -743,9 +656,7 @@ where
                     resent = false;
                 }
                 Err(error) if error.is_http_status(&[429]) => {
-                    return Err(Error::AuthenticationFailed(
-                        "Too many incorrect email verification attempts. Please wait and request a new code.".into(),
-                    ));
+                    return Err(Error::EmailVerificationRateLimited);
                 }
                 Err(error) if error.is_http_status(&[410]) => {
                     self.client
@@ -780,7 +691,7 @@ where
     async fn verify_totp(&mut self, auth_response: &AuthResponse) -> Result<AuthResponse> {
         let session_id = auth_response
             .get_two_factor_session_id()
-            .ok_or_else(|| Error::AuthenticationFailed("No 2FA session ID".into()))?;
+            .ok_or_else(|| Error::Protocol("No 2FA session ID".into()))?;
 
         loop {
             let code = self.ui.read_totp_code(TotpPurpose::Login)?;
@@ -791,14 +702,10 @@ where
                         .report_retryable_error("Incorrect TOTP code. Try again.")?;
                 }
                 Err(error) if error.is_http_status(&[429]) => {
-                    return Err(Error::AuthenticationFailed(
-                        "Too many incorrect TOTP attempts. Please restart login.".into(),
-                    ));
+                    return Err(Error::TotpRateLimited);
                 }
                 Err(error) if error.is_http_status(&[404, 410]) => {
-                    return Err(Error::AuthenticationFailed(
-                        "TOTP session expired. Please restart login.".into(),
-                    ));
+                    return Err(Error::SecondFactorSessionExpired);
                 }
                 Err(error) => return Err(error),
             }
@@ -810,7 +717,7 @@ where
             .passkey_session_id
             .as_ref()
             .filter(|session_id| !session_id.is_empty())
-            .ok_or_else(|| Error::AuthenticationFailed("No passkey session ID".into()))?;
+            .ok_or_else(|| Error::Protocol("No passkey session ID".into()))?;
 
         let accounts_url = auth_response
             .accounts_url
@@ -833,9 +740,7 @@ where
                 Ok(result) => return Ok(result),
                 Err(error) if error.is_http_status(&[400]) => {}
                 Err(error) if error.is_http_status(&[404, 410]) => {
-                    return Err(Error::AuthenticationFailed(
-                        "Passkey session expired. Please restart login.".into(),
-                    ));
+                    return Err(Error::SecondFactorSessionExpired);
                 }
                 Err(error) => return Err(error),
             }
@@ -871,7 +776,7 @@ where
             .complete_srp_setup(&response.setup_id, &srp_m1)
             .await?;
         let srp_m2 = b64::decode(&complete.srp_m2)?;
-        srp_session.verify_m2(&srp_m2).map_err(Error::from)?;
+        srp_session.verify_m2(&srp_m2)?;
         Ok(())
     }
 
@@ -913,12 +818,11 @@ where
             .await?;
 
         let srp_m2 = b64::decode(&response.srp_m2)?;
-        srp_session.verify_m2(&srp_m2).map_err(Error::from)?;
+        srp_session.verify_m2(&srp_m2)?;
         Ok(response)
     }
 }
 
-/// Build the passkey verification URL for an accounts broker.
 pub fn build_passkey_verification_url(
     accounts_url: &str,
     passkey_session_id: &str,
@@ -957,7 +861,7 @@ fn pad_left(data: &[u8], len: usize) -> Vec<u8> {
 fn decode_plain_token(token: &str) -> Result<SecretVec> {
     let bytes = b64::decode_url_safe(token)
         .or_else(|_| b64::decode(token))
-        .map_err(|e| Error::Crypto(format!("token: {e}")))?;
+        .map_err(|e| Error::Decode(format!("token: {e}")))?;
     Ok(SecretVec::new(bytes))
 }
 
@@ -967,7 +871,7 @@ fn decrypt_auth_response(
     kek: &[u8],
 ) -> Result<DecryptedSecrets> {
     if let Some(encrypted_token) = auth_response.encrypted_token.as_deref() {
-        auth::decrypt_secrets(kek, key_attributes, encrypted_token).map_err(Error::from)
+        auth::decrypt_secrets(kek, key_attributes, encrypted_token)
     } else if let Some(token) = auth_response.token.as_deref() {
         let (master_key, secret_key) = auth::decrypt_keys_only(kek, key_attributes)?;
         Ok(DecryptedSecrets {
@@ -976,7 +880,7 @@ fn decrypt_auth_response(
             token: decode_plain_token(token)?,
         })
     } else {
-        Err(Error::AuthenticationFailed("No token in response".into()))
+        Err(Error::Protocol("No token in response".into()))
     }
 }
 
@@ -1006,7 +910,7 @@ fn validate_remote_srp_attributes(
     }
 
     if !mismatches.is_empty() {
-        return Err(Error::AuthenticationFailed(format!(
+        return Err(Error::Protocol(format!(
             "Remote SRP attributes mismatched after signup: {}",
             mismatches.join(", ")
         )));
@@ -1021,7 +925,7 @@ fn encrypt_two_factor_secret(
     code: &str,
 ) -> Result<EnableTwoFactorRequest> {
     let recovery_key =
-        hex::decode(recovery_key_hex).map_err(|e| Error::Crypto(format!("recovery_key: {e}")))?;
+        hex::decode(recovery_key_hex).map_err(|e| Error::Decode(format!("recovery_key: {e}")))?;
     let encrypted = secretbox::encrypt(
         secret_code.as_bytes(),
         &crypto::Key::try_from_slice(&recovery_key)?,
@@ -1372,12 +1276,7 @@ mod tests {
             .unwrap_err();
 
         match error {
-            Error::AuthenticationFailed(message) => {
-                assert_eq!(
-                    message,
-                    "Too many incorrect email verification attempts. Please wait and request a new code."
-                );
-            }
+            Error::EmailVerificationRateLimited => {}
             other => panic!("unexpected error: {other:?}"),
         }
         assert!(ui.retryable_errors.is_empty());
@@ -1461,9 +1360,7 @@ mod tests {
             .unwrap_err();
 
         match error {
-            Error::AuthenticationFailed(message) => {
-                assert_eq!(message, "TOTP session expired. Please restart login.");
-            }
+            Error::SecondFactorSessionExpired => {}
             other => panic!("unexpected error: {other:?}"),
         }
 
@@ -1547,12 +1444,7 @@ mod tests {
             .unwrap_err();
 
         match error {
-            Error::AuthenticationFailed(message) => {
-                assert_eq!(
-                    message,
-                    "Too many incorrect TOTP attempts. Please restart login."
-                );
-            }
+            Error::TotpRateLimited => {}
             other => panic!("unexpected error: {other:?}"),
         }
         assert!(ui.retryable_errors.is_empty());
@@ -1742,9 +1634,7 @@ mod tests {
             .unwrap_err();
 
         match error {
-            Error::AuthenticationFailed(message) => {
-                assert_eq!(message, "Passkey session expired. Please restart login.");
-            }
+            Error::SecondFactorSessionExpired => {}
             other => panic!("unexpected error: {other:?}"),
         }
         assert!(ui.passkey_presented);

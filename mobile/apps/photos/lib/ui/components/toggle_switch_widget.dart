@@ -1,13 +1,13 @@
 import "dart:io";
 
 import 'package:ente_pure_utils/ente_pure_utils.dart';
+import 'package:ente_ui/components/loading_widget.dart';
 import "package:flutter/cupertino.dart";
 import 'package:flutter/material.dart';
 import 'package:photos/ente_theme_data.dart';
 import 'package:photos/models/execution_states.dart';
 import 'package:photos/models/typedefs.dart';
 import "package:photos/theme/colors.dart";
-import 'package:photos/ui/common/loading_widget.dart';
 
 class ToggleSwitchWidget extends StatefulWidget {
   final BoolCallBack value;

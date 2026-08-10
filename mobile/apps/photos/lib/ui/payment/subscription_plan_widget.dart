@@ -1,8 +1,8 @@
 import 'dart:math' as math;
 
 import 'package:ente_pure_utils/ente_pure_utils.dart';
+import "package:ente_strings/ente_strings.dart";
 import 'package:flutter/material.dart';
-import "package:photos/generated/l10n.dart";
 import "package:photos/service_locator.dart";
 import "package:photos/theme/ente_theme.dart";
 
@@ -190,7 +190,7 @@ class _Price extends StatelessWidget {
           children: [
             TextSpan(text: price),
             TextSpan(
-              text: "/${AppLocalizations.of(context).month}",
+              text: "/${context.strings.month}",
               style: textTheme.small.copyWith(color: colorScheme.contentLight),
             ),
           ],
@@ -228,7 +228,7 @@ class _Price extends StatelessWidget {
                 children: [
                   TextSpan(text: price),
                   TextSpan(
-                    text: "/${AppLocalizations.of(context).yearShort}",
+                    text: "/${context.strings.yearShort}",
                     style: textTheme.small.copyWith(
                       color: colorScheme.contentLight,
                     ),
@@ -239,13 +239,13 @@ class _Price extends StatelessWidget {
             ),
           if (isPlayStore)
             Text(
-              "$currencySymbol$pricePerMonthString / ${AppLocalizations.of(context).month}",
+              "$currencySymbol$pricePerMonthString / ${context.strings.month}",
               style: textTheme.tiny.copyWith(color: colorScheme.contentLight),
               textAlign: TextAlign.end,
             ),
           if (!isPlayStore)
             Text(
-              "$currencySymbol$pricePerMonthString / ${AppLocalizations.of(context).month}",
+              "$currencySymbol$pricePerMonthString / ${context.strings.month}",
               style: textTheme.largeBold.copyWith(
                 color: colorScheme.contentDarker,
               ),
@@ -257,7 +257,7 @@ class _Price extends StatelessWidget {
                 style: textTheme.tiny.copyWith(color: colorScheme.contentLight),
                 children: [
                   TextSpan(text: price),
-                  TextSpan(text: "/${AppLocalizations.of(context).yearShort}"),
+                  TextSpan(text: "/${context.strings.yearShort}"),
                 ],
               ),
               textAlign: TextAlign.end,

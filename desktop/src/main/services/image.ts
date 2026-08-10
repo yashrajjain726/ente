@@ -1,5 +1,3 @@
-/** @file Image format conversions and thumbnail generation */
-
 import fs from "node:fs/promises";
 import path from "node:path";
 import { type ZipItem } from "../../types/ipc";
@@ -53,9 +51,6 @@ const convertToJPEGCommand = (
     }
 };
 
-/**
- * Path to the vips executable bundled with our app on Linux and Windows.
- */
 const vipsPath = () =>
     path.join(
         isDev ? "build" : process.resourcesPath,
@@ -75,7 +70,6 @@ export const generateImageThumbnail = async (
 
     const outputFilePath = await makeTempFilePath("jpeg");
 
-    // Construct the command first, it may throw `NotAvailable`.
     let quality = 70;
     let command = generateImageThumbnailCommand(
         inputFilePath,

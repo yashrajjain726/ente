@@ -6,7 +6,7 @@ Generally our services (including museum itself) follow the same pattern:
 
 - They're run on vanilla Ubuntu instances. The only expectation they have is for Docker to be installed.
 
-- They log to fixed, known, locations - `/root/var/log/foo.log` - so that these logs can get ingested by Promtail if needed.
+- They log to fixed, known locations such as `/root/var/logs/foo.log` so Promtail can ingest them when needed.
 
 - Each service should consist of a Docker image (or a Docker compose file), and a systemd unit file.
 
@@ -51,29 +51,18 @@ SSH into the instance.
 ssh <instance>
 ```
 
-Move the service `/etc/systemd/service`, and any config files to their expected place. env and other config files that contain credentials are kept in `/root`.
+Move the service to `/etc/systemd/system`, and put configuration files containing credentials under `/root`.
 
 ```sh
 sudo mv example.service /etc/systemd/system
 sudo mv example.env /root
 ```
 
-If you want to start the service on boot (as spoken of in the `[Install]` section above), then enable it (this only needs to be done once):
-
-```sh
-sudo systemctl enable service
-```
-
-Restarts systemd so that it gets to know of the service.
+Tell systemd to load the unit, enable it on boot, and start it:
 
 ```sh
 sudo systemctl daemon-reload
-```
-
-Now you can manage the service using standard systemd commands.
-
-```sh
-sudo systemctl start example
+sudo systemctl enable --now example
 ```
 
 To view stdout/err, use:
@@ -84,12 +73,10 @@ sudo journalctl --follow --unit example
 
 ## Logging
 
-Simple services can log to their standard output: these are captured by Docker, and by default promtail is setup to injest Docker logs and send them to Grafana.
+Simple services can log to standard output and error. Docker captures these logs, and Promtail sends them to Grafana.
 
-One issue with the above simple setup is that we cannot attach job names.
-
-If the service needs to to attach a specific job name, or if the service wants more control over the log retention etc, then then services can log to to its own files.
+Services that need a specific job name or more control over retention can log to their own files.
 
 - Such files should be in `/var/logs` within the container, and this should be mounted to `/root/var/logs` on the instance (using the `-v` flag in the service file which launches the Docker container or the Docker compose cluster).
 
-- There should be entry for this log file in the `promtail/promtail.yaml` on that instance. The logs will then get scraped by Promtail and sent over to Grafana.
+- Add each log file to `promtail/promtail.yaml` on that instance so Promtail can send it to Grafana.

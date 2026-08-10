@@ -1,7 +1,7 @@
 import "dart:async";
 import "dart:io";
 
-import "package:ente_qr/ente_qr.dart";
+import "package:ente_strings/ente_strings.dart";
 import 'package:flutter/material.dart';
 import 'package:logging/logging.dart';
 import "package:media_kit/media_kit.dart";
@@ -9,7 +9,6 @@ import "package:media_kit_video/media_kit_video.dart";
 import "package:path_provider/path_provider.dart";
 import "package:photos/core/event_bus.dart";
 import "package:photos/events/guest_view_event.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/models/file/extensions/file_props.dart";
 import 'package:photos/models/file/file.dart';
 import "package:photos/models/metadata/file_magic.dart";
@@ -19,6 +18,7 @@ import "package:photos/src/rust/api/motion_photo_api.dart";
 import "package:photos/states/detail_page_state.dart";
 import 'package:photos/ui/notification/toast.dart';
 import "package:photos/ui/viewer/file/live_image_long_press_router.dart";
+import "package:photos/ui/viewer/file/qr_code_detection_helper.dart";
 import 'package:photos/ui/viewer/file/zoomable_image.dart';
 
 class ZoomableLiveImageNew extends StatefulWidget {
@@ -28,7 +28,8 @@ class ZoomableLiveImageNew extends StatefulWidget {
   final Decoration? backgroundDecoration;
   final bool isFromMemories;
   final Function({required int memoryDuration})? onFinalFileLoad;
-  final ValueNotifier<List<QrDetection>>? qrDetectionsNotifier;
+  final ValueChanged<File>? onFinalImageLoaded;
+  final ValueNotifier<QrCodeDetectionResult?>? qrDetectionsNotifier;
   final GestureLongPressStartCallback? onTextSelectionStart;
 
   const ZoomableLiveImageNew(
@@ -39,6 +40,7 @@ class ZoomableLiveImageNew extends StatefulWidget {
     this.backgroundDecoration,
     this.isFromMemories = false,
     this.onFinalFileLoad,
+    this.onFinalImageLoaded,
     this.qrDetectionsNotifier,
     this.onTextSelectionStart,
   });
@@ -86,7 +88,9 @@ class _ZoomableLiveImageNewState extends State<ZoomableLiveImageNew>
   /// Check if a local position (relative to this widget) falls within any
   /// detected QR code bounding box.
   bool _isPositionInQrRegion(Offset localPosition) {
-    final detections = widget.qrDetectionsNotifier?.value;
+    final detections = widget.qrDetectionsNotifier?.value?.forFile(
+      widget.enteFile,
+    );
     if (detections == null || detections.isEmpty) return false;
     final file = widget.enteFile;
     if (!file.hasDimensions) return false;
@@ -199,6 +203,7 @@ class _ZoomableLiveImageNewState extends State<ZoomableLiveImageNew>
       isGuestView: isGuestView,
       isFromMemories: widget.isFromMemories,
       onFinalFileLoad: widget.onFinalFileLoad,
+      onFinalImageLoaded: widget.onFinalImageLoaded,
     );
 
     final shouldShowVideo =
@@ -284,7 +289,7 @@ class _ZoomableLiveImageNewState extends State<ZoomableLiveImageNew>
     if (videoFile != null && videoFile.existsSync()) {
       await _setVideoController(videoFile.path);
     } else if (_enteFile.isLivePhoto) {
-      showShortToast(context, AppLocalizations.of(context).downloadFailed);
+      showShortToast(context, context.strings.downloadFailed);
     }
     return result.availability;
   }
@@ -293,7 +298,7 @@ class _ZoomableLiveImageNewState extends State<ZoomableLiveImageNew>
     if (_enteFile.isRemoteOnlyFile &&
         !(await isFileCached(_enteFile, liveVideo: true))) {
       if (!mounted) return null;
-      showShortToast(context, AppLocalizations.of(context).downloading);
+      showShortToast(context, context.strings.downloading);
     }
 
     File? videoFile = await getFile(widget.enteFile, liveVideo: true)
@@ -326,7 +331,7 @@ class _ZoomableLiveImageNewState extends State<ZoomableLiveImageNew>
           null,
         );
       }
-      showShortToast(context, AppLocalizations.of(context).downloading);
+      showShortToast(context, context.strings.downloading);
     }
 
     final File? imageFile =

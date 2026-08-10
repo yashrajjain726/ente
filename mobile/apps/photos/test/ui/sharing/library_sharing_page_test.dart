@@ -1,12 +1,12 @@
 import 'dart:async';
+import 'dart:ui' show Tristate;
 
 import 'package:ente_components/ente_components.dart';
+import 'package:ente_strings/ente_strings.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart' show ScrollDirection;
-import 'package:flutter/semantics.dart' show SemanticsAction, SemanticsFlag;
+import 'package:flutter/semantics.dart' show SemanticsAction;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:photos/ente_theme_data.dart';
-import 'package:photos/generated/l10n.dart';
 import 'package:photos/models/collection/collection.dart';
 import 'package:photos/ui/sharing/library_sharing/library_sharing_controller.dart';
 import 'package:photos/ui/sharing/library_sharing/library_sharing_page.dart';
@@ -75,7 +75,7 @@ void main() {
     expect(find.byType(ToggleSwitchComponent), findsNothing);
   });
 
-  testWidgets('library sharing banner opens the enable preview', (
+  testWidgets('library sharing banner enables and disables automatic sharing', (
     tester,
   ) async {
     final controller = _LayoutTestLibrarySharingController();
@@ -98,7 +98,8 @@ void main() {
     expect(toggle.selected, isFalse);
 
     await tester.tap(find.text('Library sharing'));
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
 
     expect(find.text('Enable library sharing?'), findsOneWidget);
     expect(
@@ -120,7 +121,17 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Enable library sharing?'), findsNothing);
-    expect(find.text('Coming soon'), findsOneWidget);
+    expect(
+      tester
+          .widget<ToggleSwitchComponent>(
+            find.byKey(const ValueKey('library-sharing-toggle')),
+          )
+          .selected,
+      isTrue,
+    );
+
+    await tester.tap(find.text('Library sharing'));
+    await tester.pumpAndSettle();
     expect(
       tester
           .widget<ToggleSwitchComponent>(
@@ -129,7 +140,45 @@ void main() {
           .selected,
       isFalse,
     );
-    await tester.pump(const Duration(seconds: 5));
+  });
+
+  testWidgets('offers to review albums that were previously unshared', (
+    tester,
+  ) async {
+    final repository = FakeLibrarySharingRepository([
+      librarySharingTestAlbum(1),
+      librarySharingTestAlbum(2),
+    ])..automaticSharingBlockedIDs.add(2);
+    final controller = _LayoutTestLibrarySharingController(repository);
+
+    await tester.pumpWidget(
+      _app(
+        LibrarySharingPage(
+          recipient: librarySharingTestRecipient,
+          controller: controller,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Library sharing'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.tap(find.text('Enable'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+
+    expect(find.text("1 album wasn't shared"), findsOneWidget);
+    expect(
+      find.text(
+        "Sharing was stopped for this album earlier, so it wasn't shared again.",
+      ),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.text('Review'));
+    await tester.pumpAndSettle();
+    expect(controller.isAddingAlbums, isTrue);
+    expect(find.text('Share with'), findsOneWidget);
   });
 
   testWidgets('keeps the library sharing banner while albums are selected', (
@@ -347,7 +396,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(isExpanded(), isFalse);
     expect(find.text('Role'), findsNothing);
-    expect(find.text('Stop sharing'), findsNothing);
+    expect(find.text('Stop sharing'), findsOneWidget);
     expect(find.text('Save'), findsOneWidget);
 
     await tester.drag(selectionSheet, const Offset(0, -100));
@@ -379,18 +428,38 @@ void main() {
           find.descendant(of: scrollView, matching: find.byType(Scrollable)),
         )
         .position;
-    UserScrollNotification(
+    ScrollUpdateNotification(
       metrics: scrollPosition,
       context: scrollContext,
-      direction: ScrollDirection.reverse,
+      scrollDelta: 16,
+      dragDetails: DragUpdateDetails(globalPosition: Offset.zero),
     ).dispatch(scrollContext);
     await tester.pumpAndSettle();
     expect(isExpanded(), isFalse);
 
-    UserScrollNotification(
+    ScrollUpdateNotification(
       metrics: scrollPosition,
       context: scrollContext,
-      direction: ScrollDirection.forward,
+      scrollDelta: 16,
+      dragDetails: DragUpdateDetails(globalPosition: Offset.zero),
+    ).dispatch(scrollContext);
+    await tester.pumpAndSettle();
+    expect(isExpanded(), isFalse);
+
+    ScrollUpdateNotification(
+      metrics: scrollPosition,
+      context: scrollContext,
+      scrollDelta: -16,
+      dragDetails: DragUpdateDetails(globalPosition: Offset.zero),
+    ).dispatch(scrollContext);
+    await tester.pumpAndSettle();
+    expect(isExpanded(), isFalse);
+
+    ScrollUpdateNotification(
+      metrics: scrollPosition,
+      context: scrollContext,
+      scrollDelta: -16,
+      dragDetails: DragUpdateDetails(globalPosition: Offset.zero),
     ).dispatch(scrollContext);
     await tester.pumpAndSettle();
     expect(isExpanded(), isTrue);
@@ -400,8 +469,7 @@ void main() {
     var semanticsData = tester
         .getSemantics(selectionControls)
         .getSemanticsData();
-    expect(semanticsData.hasFlag(SemanticsFlag.hasExpandedState), isTrue);
-    expect(semanticsData.hasFlag(SemanticsFlag.isExpanded), isTrue);
+    expect(semanticsData.flagsCollection.isExpanded, Tristate.isTrue);
     expect(semanticsData.hasAction(SemanticsAction.collapse), isTrue);
     expect(semanticsData.hasAction(SemanticsAction.expand), isFalse);
 
@@ -413,7 +481,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(isExpanded(), isFalse);
     semanticsData = tester.getSemantics(selectionControls).getSemanticsData();
-    expect(semanticsData.hasFlag(SemanticsFlag.isExpanded), isFalse);
+    expect(semanticsData.flagsCollection.isExpanded, Tristate.isFalse);
     expect(semanticsData.hasAction(SemanticsAction.expand), isTrue);
     expect(semanticsData.hasAction(SemanticsAction.collapse), isFalse);
     semantics.dispose();
@@ -512,23 +580,26 @@ void main() {
 Widget _app(Widget home) {
   return MaterialApp(
     theme: lightThemeData,
-    localizationsDelegates: AppLocalizations.localizationsDelegates,
-    supportedLocales: AppLocalizations.supportedLocales,
+    localizationsDelegates: StringsLocalizations.localizationsDelegates,
+    supportedLocales: StringsLocalizations.supportedLocales,
     home: home,
   );
 }
 
 class _LayoutTestLibrarySharingController extends LibrarySharingController {
-  _LayoutTestLibrarySharingController()
-    : super(
-        recipient: librarySharingTestRecipient,
-        repository: FakeLibrarySharingRepository([
-          librarySharingTestAlbum(
-            1,
-            recipientRole: CollectionParticipantRole.viewer,
-          ),
-        ]),
-      );
+  _LayoutTestLibrarySharingController([
+    FakeLibrarySharingRepository? repository,
+  ]) : super(
+         recipient: librarySharingTestRecipient,
+         repository:
+             repository ??
+             FakeLibrarySharingRepository([
+               librarySharingTestAlbum(
+                 1,
+                 recipientRole: CollectionParticipantRole.viewer,
+               ),
+             ]),
+       );
 
   @override
   List<Collection> get visibleAlbums => const [];

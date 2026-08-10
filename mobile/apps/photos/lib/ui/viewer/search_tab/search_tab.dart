@@ -1,10 +1,11 @@
 import "package:ente_components/theme/text_styles.dart";
+import "package:ente_strings/ente_strings.dart";
+import "package:ente_ui/components/loading_widget.dart";
 import "package:fade_indexed_stack/fade_indexed_stack.dart";
 import "package:flutter/foundation.dart";
 import "package:flutter/material.dart";
 import "package:flutter_animate/flutter_animate.dart";
 import "package:logging/logging.dart";
-import "package:photos/generated/intl/app_localizations.dart";
 import "package:photos/models/search/generic_search_result.dart";
 import "package:photos/models/search/index_of_indexed_stack.dart";
 import "package:photos/models/search/search_result.dart";
@@ -13,7 +14,6 @@ import "package:photos/service_locator.dart";
 import "package:photos/services/wrapped/wrapped_service.dart";
 import "package:photos/states/all_sections_examples_state.dart";
 import "package:photos/theme/ente_theme.dart";
-import "package:photos/ui/common/loading_widget.dart";
 import "package:photos/ui/components/banners/ml_progress_banner.dart";
 import "package:photos/ui/rituals/rituals_banner.dart";
 import "package:photos/ui/viewer/search/result/no_result_widget.dart";
@@ -195,7 +195,7 @@ class _SearchHeaderTitle extends StatelessWidget {
         heightFactor: (1 - (progress * 1.35)).clamp(0.0, 1.0),
         child: Opacity(
           opacity: progress < 0.08 ? 1 : 0,
-          child: Text(AppLocalizations.of(context).search, style: style),
+          child: Text(context.strings.search, style: style),
         ),
       ),
     );
@@ -240,7 +240,7 @@ class _AllSearchSectionsState extends State<AllSearchSections> {
             return Padding(
               padding: const EdgeInsets.only(bottom: 72),
               child: Text(
-                AppLocalizations.of(context).searchSectionsLengthMismatch(
+                context.strings.searchSectionsLengthMismatch(
                   snapshotLength: sectionResults.length,
                   searchLength: SectionType.values.length,
                 ),
@@ -340,9 +340,7 @@ class _AllSearchSectionsState extends State<AllSearchSections> {
           if (kDebugMode) {
             return Padding(
               padding: const EdgeInsets.only(bottom: 72),
-              child: Text(
-                AppLocalizations.of(context).error + ': ${snapshot.error}',
-              ),
+              child: Text(context.strings.error + ': ${snapshot.error}'),
             );
           }
           return const Padding(

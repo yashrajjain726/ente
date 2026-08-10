@@ -1,11 +1,10 @@
-//! GENERATED FILE — do not edit by hand.
-//!
-//! Regenerate with:
-//!   cargo run -p ente-photos --example ml_goldens -- generate
-//!
-//! TODO: the pet models are CPU-only and therefore have no golden entries
-//! yet; they must get entries here before they are moved off CPU-only
-//! execution (see `MlRuntime::new` in runtime.rs).
+// Generated file. Do not edit by hand.
+//
+// Regenerate with:
+//   cargo run -p ente-photos --example ml_goldens -- generate
+//
+// TODO: Pet models have no golden entries because they are CPU-only. Add
+// entries before moving them off CPU (see `MlRuntime::new` in runtime.rs).
 
 use crate::ml::golden::{GoldenEntry, GoldenInput, GoldenMetric};
 

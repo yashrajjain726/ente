@@ -1,8 +1,8 @@
 import "package:collection/collection.dart";
 import "package:ente_components/ente_components.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:hugeicons/hugeicons.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/models/ml/face/person.dart";
 import "package:photos/models/search/generic_search_result.dart";
 import "package:photos/models/search/search_constants.dart";
@@ -106,7 +106,7 @@ class _ContactPersonPickerPageState extends State<ContactPersonPickerPage> {
   @override
   Widget build(BuildContext context) {
     final colors = context.componentColors;
-    final l10n = AppLocalizations.of(context);
+    final l10n = context.strings;
     final personCandidates =
         widget.candidates
             .whereType<ContactPersonPickerPersonCandidate>()
@@ -170,7 +170,7 @@ class _ContactPersonPickerPageState extends State<ContactPersonPickerPage> {
 
   Widget _buildSearchRow(BuildContext context) {
     final colors = context.componentColors;
-    final l10n = AppLocalizations.of(context);
+    final l10n = context.strings;
     return Row(
       children: [
         Expanded(
@@ -203,7 +203,7 @@ class _ContactPersonPickerPageState extends State<ContactPersonPickerPage> {
   }
 
   Future<void> _showSortMenu(BuildContext context) async {
-    final l10n = AppLocalizations.of(context);
+    final l10n = context.strings;
     final selected = await showEntePopupMenu<bool>(
       context: context,
       options: [

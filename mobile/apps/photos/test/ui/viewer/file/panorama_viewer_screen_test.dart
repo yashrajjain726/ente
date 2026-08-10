@@ -3,9 +3,10 @@ import "dart:io";
 import "dart:typed_data";
 
 import "package:ente_panorama_viewer/ente_panorama_viewer.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:flutter_test/flutter_test.dart";
-import "package:photos/generated/l10n.dart";
+import "package:hugeicons/hugeicons.dart";
 import "package:photos/ui/viewer/file/panorama_viewer_screen.dart";
 
 // A minimal valid 1x1 RGBA PNG, so Image.file/Image.memory can decode it.
@@ -110,8 +111,8 @@ void main() {
 
   Widget wrap(Widget child) {
     return MaterialApp(
-      localizationsDelegates: AppLocalizations.localizationsDelegates,
-      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: StringsLocalizations.localizationsDelegates,
+      supportedLocales: StringsLocalizations.supportedLocales,
       home: child,
     );
   }
@@ -225,15 +226,23 @@ void main() {
     );
     await tester.pump();
 
-    expect(find.byIcon(Icons.explore_outlined), findsOneWidget);
-    await tester.tap(find.byIcon(Icons.explore_outlined));
+    final motionIcon = find.byType(HugeIcon);
+    expect(motionIcon, findsOneWidget);
+    expect(
+      tester.widget<HugeIcon>(motionIcon).icon,
+      same(HugeIcons.strokeRoundedNavigation05),
+    );
+    await tester.tap(motionIcon);
     await tester.pump();
 
     final pano = tester.widget<EntePanoramaViewer>(
       find.byType(EntePanoramaViewer),
     );
     expect(pano.motionEnabled, isTrue);
-    expect(find.byIcon(Icons.explore_off_outlined), findsOneWidget);
+    expect(
+      tester.widget<HugeIcon>(motionIcon).icon,
+      same(HugeIcons.strokeRoundedNavigationOff),
+    );
 
     await tester.pump(const Duration(seconds: 6));
     await tester.pumpWidget(const SizedBox());

@@ -1,18 +1,18 @@
+import "package:ente_strings/ente_strings.dart";
+import "package:ente_ui/components/divider_widget.dart";
+import "package:ente_ui/components/loading_widget.dart";
 import 'package:flutter/material.dart';
 import "package:intl/intl.dart";
 import "package:modal_bottom_sheet/modal_bottom_sheet.dart";
 import "package:photos/core/constants.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/models/local_entity_data.dart";
 import "package:photos/models/location_tag/location_tag.dart";
 import "package:photos/service_locator.dart";
 import "package:photos/states/location_state.dart";
 import "package:photos/theme/colors.dart";
 import "package:photos/theme/ente_theme.dart";
-import "package:photos/ui/common/loading_widget.dart";
 import "package:photos/ui/components/bottom_of_title_bar_widget.dart";
 import "package:photos/ui/components/buttons/button_widget.dart";
-import "package:photos/ui/components/divider_widget.dart";
 import 'package:photos/ui/components/keyboard/keyboard_oveylay.dart';
 import "package:photos/ui/components/keyboard/keyboard_top_button.dart";
 import "package:photos/ui/components/models/button_type.dart";
@@ -96,9 +96,7 @@ class _EditLocationSheetState extends State<EditLocationSheet> {
           Padding(
             padding: const EdgeInsets.only(bottom: 16),
             child: BottomOfTitleBarWidget(
-              title: TitleBarTitleWidget(
-                title: AppLocalizations.of(context).editLocationTagTitle,
-              ),
+              title: TitleBarTitleWidget(title: context.strings.editLocation),
             ),
           ),
           Expanded(
@@ -117,9 +115,7 @@ class _EditLocationSheetState extends State<EditLocationSheet> {
                           children: [
                             Expanded(
                               child: TextInputWidget(
-                                hintText: AppLocalizations.of(
-                                  context,
-                                ).locationName,
+                                hintText: context.strings.locationName,
                                 focusNode: _focusNode,
                                 submitNotifier: _submitNotifer,
                                 cancelNotifier: _cancelNotifier,
@@ -148,9 +144,7 @@ class _EditLocationSheetState extends State<EditLocationSheet> {
                                     key: ValueKey(value),
                                     buttonType: ButtonType.secondary,
                                     buttonSize: ButtonSize.small,
-                                    labelText: AppLocalizations.of(
-                                      context,
-                                    ).save,
+                                    labelText: context.strings.save,
                                     isDisabled: value,
                                     onTap: () async {
                                       _focusNode.unfocus();
@@ -195,7 +189,7 @@ class _EditLocationSheetState extends State<EditLocationSheet> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  AppLocalizations.of(context).memoryCount(
+                                  context.strings.memoryCount(
                                     count: value,
                                     formattedCount: NumberFormat().format(
                                       value,
@@ -207,9 +201,7 @@ class _EditLocationSheetState extends State<EditLocationSheet> {
                                   Padding(
                                     padding: const EdgeInsets.only(top: 2),
                                     child: Text(
-                                      AppLocalizations.of(
-                                        context,
-                                      ).galleryMemoryLimitInfo,
+                                      context.strings.galleryMemoryLimitInfo,
                                       style: textTheme.miniMuted,
                                     ),
                                   ),

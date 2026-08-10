@@ -1,18 +1,21 @@
 import "dart:async";
+import "dart:io";
 import "dart:math";
 
 import 'package:ente_lock_screen/local_authentication_service.dart';
 import 'package:ente_pure_utils/ente_pure_utils.dart';
+import "package:ente_strings/ente_strings.dart";
 import 'package:extended_image/extended_image.dart';
 import "package:flutter/foundation.dart";
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import "package:flutter_svg/flutter_svg.dart";
 import 'package:logging/logging.dart';
 import 'package:photos/core/configuration.dart';
 import 'package:photos/core/errors.dart';
 import "package:photos/core/event_bus.dart";
+import "package:photos/events/file_caption_updated_event.dart";
 import "package:photos/events/guest_view_event.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/models/file/extensions/file_props.dart";
 import 'package:photos/models/file/file.dart';
 import "package:photos/models/file/file_type.dart";
@@ -23,6 +26,9 @@ import "package:photos/module/download/thumbnail.dart";
 import "package:photos/service_locator.dart";
 import "package:photos/services/collections_service.dart";
 import "package:photos/states/detail_page_state.dart";
+import "package:photos/theme/colors.dart";
+import "package:photos/theme/ente_theme.dart";
+import "package:photos/ui/actions/file/file_actions.dart";
 import "package:photos/ui/common/fast_scroll_physics.dart";
 import 'package:photos/ui/notification/toast.dart';
 import "package:photos/ui/social/widgets/file_social_overlay.dart";
@@ -35,11 +41,16 @@ import "package:photos/ui/viewer/file/inline_text_detection.dart";
 import "package:photos/ui/viewer/file/panorama_viewer_screen.dart";
 import "package:photos/ui/viewer/file/qr_code_detection_helper.dart";
 import "package:photos/ui/viewer/file/qr_code_highlight_overlay.dart";
+import "package:photos/ui/viewer/file/video_control/gallery_video_controls.dart";
 import 'package:photos/ui/viewer/gallery/gallery.dart';
 import 'package:photos/utils/dialog_util.dart';
 
 const _socialRightInset = 24.0;
 const _socialBottomBarClearance = 130.0;
+const _galleryBottomBarHeight = 60.0;
+const _galleryCaptionGap = 12.0;
+const _galleryCaptionLineHeight = 16.0;
+const _galleryCaptionScrimTopPadding = 12.0;
 
 enum DetailPageMode { minimalistic, full }
 
@@ -157,7 +168,10 @@ class _BodyState extends State<_Body> {
   bool isGuestView = false;
   bool swipeLocked = false;
   late final StreamSubscription<GuestViewEvent> _guestViewEventSubscription;
+  late final StreamSubscription<FileCaptionUpdatedEvent>
+  _captionUpdatedSubscription;
   QrCodeDetectionHelper? _qrHelper;
+  final Map<String, File> _renderedFiles = {};
 
   @override
   void initState() {
@@ -178,6 +192,13 @@ class _BodyState extends State<_Body> {
         swipeLocked = event.swipeLocked;
       });
     });
+    _captionUpdatedSubscription = Bus.instance
+        .on<FileCaptionUpdatedEvent>()
+        .listen((event) {
+          if (event.fileGeneratedID == _selectedFile?.generatedID) {
+            setState(() {});
+          }
+        });
     if (flagService.qrFeatureEnabled &&
         widget.config.mode != DetailPageMode.minimalistic) {
       _qrHelper = QrCodeDetectionHelper();
@@ -200,6 +221,7 @@ class _BodyState extends State<_Body> {
   @override
   void dispose() {
     _guestViewEventSubscription.cancel();
+    _captionUpdatedSubscription.cancel();
     _pageController.dispose();
     _selectedIndexNotifier.dispose();
     _qrHelper?.dispose();
@@ -292,17 +314,28 @@ class _BodyState extends State<_Body> {
               ),
               ValueListenableBuilder(
                 builder: (BuildContext context, int selectedIndex, _) {
-                  return widget.config.mode == DetailPageMode.minimalistic
-                      ? const SizedBox()
-                      : FileBottomBar(
-                          _files![selectedIndex],
+                  final file = _files![selectedIndex];
+                  final fullScreenNotifier = InheritedDetailPageState.of(
+                    context,
+                  ).enableFullScreenNotifier;
+                  return Stack(
+                    children: [
+                      _GalleryFileViewerBottomOverlay(
+                        file: file,
+                        mode: widget.config.mode,
+                        isGuestView: isGuestView,
+                        enableFullScreenNotifier: fullScreenNotifier,
+                      ),
+                      if (widget.config.mode != DetailPageMode.minimalistic)
+                        FileBottomBar(
+                          file,
                           onFileRemoved: _onFileRemoved,
                           userID: Configuration.instance.getUserID(),
-                          enableFullScreenNotifier: InheritedDetailPageState.of(
-                            context,
-                          ).enableFullScreenNotifier,
+                          enableFullScreenNotifier: fullScreenNotifier,
                           isLocalOnlyContext: widget.config.isLocalOnlyContext,
-                        );
+                        ),
+                    ],
+                  );
                 },
                 valueListenable: _selectedIndexNotifier,
               ),
@@ -327,10 +360,11 @@ class _BodyState extends State<_Body> {
                     }
                     return ValueListenableBuilder(
                       valueListenable: _qrHelper!.qrDetectionsNotifier,
-                      builder: (context, detections, _) {
+                      builder: (context, result, _) {
+                        final file = _files![selectedIndex];
                         return QrCodeHighlightOverlay(
-                          detections: detections,
-                          file: _files![selectedIndex],
+                          detections: result?.forFile(file) ?? const [],
+                          file: file,
                         );
                       },
                     );
@@ -353,16 +387,20 @@ class _BodyState extends State<_Body> {
                             child: Align(
                               alignment: Alignment.center,
                               child: Tooltip(
-                                message: AppLocalizations.of(context).panorama,
+                                message: context.strings.panorama,
                                 child: IconButton(
                                   style: IconButton.styleFrom(
                                     backgroundColor: const Color(0xAA252525),
                                     fixedSize: const Size(44, 44),
                                   ),
-                                  icon: const Icon(
-                                    Icons.threesixty,
-                                    color: Colors.white,
-                                    size: 26,
+                                  icon: SvgPicture.asset(
+                                    "assets/icons/panorama.svg",
+                                    width: 24,
+                                    height: 24,
+                                    colorFilter: const ColorFilter.mode(
+                                      Colors.white,
+                                      BlendMode.srcIn,
+                                    ),
                                   ),
                                   onPressed: () async {
                                     await openPanoramaViewerPage(
@@ -435,6 +473,12 @@ class _BodyState extends State<_Body> {
             });
           },
           backgroundDecoration: const BoxDecoration(color: Colors.black),
+          onFinalImageLoaded: (localFile) {
+            _renderedFiles[file.tag] = localFile;
+            if (_selectedFile?.tag == file.tag) {
+              _evaluateQrIfEligible(file);
+            }
+          },
           qrDetectionsNotifier: _qrHelper?.qrDetectionsNotifier,
           onTextSelectionStart:
               flagService.ocrOverlayEnabled &&
@@ -482,8 +526,10 @@ class _BodyState extends State<_Body> {
   }
 
   void _evaluateQrIfEligible(EnteFile file) {
-    if (_qrHelper == null || isGuestView || file is TrashFile) return;
-    _qrHelper!.evaluateFile(file);
+    _qrHelper?.evaluateFile(
+      file,
+      isGuestView || file is TrashFile ? null : _renderedFiles[file.tag],
+    );
   }
 
   bool shouldAutoPlay() {
@@ -542,27 +588,19 @@ class _BodyState extends State<_Body> {
       // ignore: unawaited_futures
       showErrorDialog(
         context,
-        AppLocalizations.of(context).sorry,
-        AppLocalizations.of(
-          context,
-        ).weDontSupportEditingPhotosAndAlbumsThatYouDont,
+        context.strings.sorry,
+        context.strings.weDontSupportEditingPhotosAndAlbumsThatYouDont,
       );
       return;
     }
-    final dialog = createProgressDialog(
-      context,
-      AppLocalizations.of(context).pleaseWait,
-    );
+    final dialog = createProgressDialog(context, context.strings.pleaseWait);
     await dialog.show();
 
     try {
       final ioFile = await getFile(file);
       if (ioFile == null) {
         if (!mounted) return;
-        showShortToast(
-          context,
-          AppLocalizations.of(context).failedToFetchOriginalForEdit,
-        );
+        showShortToast(context, context.strings.failedToFetchOriginalForEdit);
         await dialog.hide();
         return;
       }
@@ -646,6 +684,116 @@ class _BodyState extends State<_Body> {
       return null;
     }
     return files[index];
+  }
+}
+
+class _GalleryFileViewerBottomOverlay extends StatelessWidget {
+  final EnteFile file;
+  final DetailPageMode mode;
+  final bool isGuestView;
+  final ValueListenable<bool> enableFullScreenNotifier;
+
+  const _GalleryFileViewerBottomOverlay({
+    required this.file,
+    required this.mode,
+    required this.isGuestView,
+    required this.enableFullScreenNotifier,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isVideo = file.fileType == FileType.video;
+    final caption = file.caption;
+    final captionText = caption == null || caption.isEmpty ? null : caption;
+    final hasBottomBar = mode != DetailPageMode.minimalistic && !isGuestView;
+    if (captionText == null && (isVideo || !hasBottomBar)) {
+      return const SizedBox.shrink();
+    }
+
+    final safePadding = MediaQuery.paddingOf(context);
+    final captionStyle = getEnteTextTheme(
+      context,
+    ).mini.copyWith(color: textBaseDark.withValues(alpha: 0.8));
+    return ValueListenableBuilder<bool>(
+      valueListenable: enableFullScreenNotifier,
+      builder: (context, isFullScreen, _) {
+        return IgnorePointer(
+          ignoring: isFullScreen,
+          child: AnimatedOpacity(
+            opacity: isFullScreen ? 0 : 1,
+            duration: const Duration(milliseconds: 200),
+            child: Stack(
+              children: [
+                if (!isVideo)
+                  Align(
+                    alignment: Alignment.bottomCenter,
+                    child: IgnorePointer(
+                      child: SizedBox(
+                        width: double.infinity,
+                        height:
+                            safePadding.bottom +
+                            _galleryBottomBarHeight +
+                            (captionText == null
+                                ? 0
+                                : _galleryCaptionGap +
+                                      _galleryCaptionLineHeight +
+                                      _galleryCaptionScrimTopPadding),
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: [
+                                Colors.transparent,
+                                Colors.black.withValues(alpha: 0.6),
+                                Colors.black.withValues(alpha: 0.72),
+                              ],
+                              stops: const [0, 0.8, 1],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                if (captionText != null)
+                  Positioned(
+                    left: safePadding.left + 16,
+                    right: safePadding.right + 16,
+                    bottom:
+                        safePadding.bottom +
+                        (isVideo
+                            ? kVideoProgressBottomInset +
+                                  kVideoProgressHeight +
+                                  kVideoCaptionGap
+                            : _galleryBottomBarHeight + _galleryCaptionGap),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: GestureDetector(
+                        onTap: () => showDetailsSheet(context, file),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text('"', style: captionStyle),
+                            Flexible(
+                              child: Text(
+                                captionText,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: captionStyle,
+                              ),
+                            ),
+                            Text('"', style: captionStyle),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 }
 

@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:ente_auth/l10n/l10n.dart';
 import 'package:ente_auth/models/code.dart';
 import 'package:ente_auth/services/authenticator_service.dart';
 import 'package:ente_auth/store/code_store.dart';
@@ -13,6 +12,7 @@ import 'package:ente_auth/utils/dialog_util.dart';
 import 'package:ente_auth/utils/gallery_import_util.dart';
 import 'package:ente_components/ente_components.dart';
 import 'package:ente_pure_utils/ente_pure_utils.dart';
+import 'package:ente_strings/ente_strings.dart';
 import 'package:flutter/material.dart';
 import 'package:logging/logging.dart';
 
@@ -21,7 +21,7 @@ export 'package:ente_auth/ui/settings/data/import/google_auth_qr_parser.dart';
 final _migrationTracker = GoogleAuthMigrationTracker();
 
 Future<bool> showGoogleAuthInstruction(BuildContext context) async {
-  final l10n = context.l10n;
+  final l10n = context.strings;
   final isMobile = PlatformDetector.isMobile();
   final result = await showImportInstructionSheet(
     context: context,
@@ -80,8 +80,8 @@ Future<bool> _importGoogleAuthFromImage(BuildContext context) async {
     if (!context.mounted) return false;
     await showErrorDialog(
       context,
-      context.l10n.errorInvalidQRCode,
-      context.l10n.errorInvalidQRCodeBody,
+      context.strings.invalidQRCode,
+      context.strings.errorInvalidQRCodeBody,
     );
     return false;
   }
@@ -110,11 +110,11 @@ Future<bool> confirmGoogleAuthImport(
   BuildContext context,
   int codeCount,
 ) async {
-  final l10n = context.l10n;
+  final l10n = context.strings;
   final result = await showImportInstructionSheet(
     context: context,
     title: "Google Authenticator",
-    body: l10n.importGoogleAuthConfirmation(codeCount),
+    body: l10n.importGoogleAuthConfirmation(codeCount: codeCount),
     cancelLabel: l10n.cancel,
     semanticsIdentifier: 'auth_import_confirm_google_authenticator',
     actions: [

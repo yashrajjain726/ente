@@ -7,6 +7,7 @@ import "package:ente_pure_utils/ente_pure_utils.dart"
     show deleteFileSystemEntityIfPresent;
 import "package:exif_reader/exif_reader.dart";
 import 'package:logging/logging.dart';
+import 'package:native_video_editor/native_video_editor.dart';
 import 'package:path/path.dart';
 import 'package:photo_manager/photo_manager.dart';
 import 'package:photos/core/constants.dart';
@@ -312,7 +313,8 @@ Future<MediaUploadData> _getMediaUploadDataFromAppCache(EnteFile file) async {
       InvalidReason.sourceFileMissing,
     );
   }
-  thumbnailData = await _getAppCacheThumbnailForUpload(file);
+  final thumbnailResult = await _getAppCacheThumbnailForUpload(file);
+  thumbnailData = thumbnailResult.data;
   final fileHash = CryptoUtil.bin2base64(await CryptoUtil.getHash(sourceFile));
   ({int width, int height})? dimensions;
   if (file.fileType == FileType.image) {
@@ -328,13 +330,10 @@ Future<MediaUploadData> _getMediaUploadDataFromAppCache(EnteFile file) async {
         }
       }
     }
-  } else if (thumbnailData != null) {
-    // The thumbnail null check ensures that video thumbnail generation worked.
-    // Use it without a max dimension to obtain the video's aspect ratio.
-    dimensions = await withTemporaryVideoThumbnail<({int width, int height})>(
-      videoPath: localPath,
-      quality: 10,
-      use: (thumbnailFile) => getImageDimensions(imagePath: thumbnailFile.path),
+  } else if (thumbnailResult.videoInfo != null) {
+    dimensions = (
+      width: thumbnailResult.videoInfo!.displayWidth,
+      height: thumbnailResult.videoInfo!.displayHeight,
     );
   }
 
@@ -359,11 +358,19 @@ Future<MediaUploadData> _getMediaUploadDataFromAppCache(EnteFile file) async {
   );
 }
 
-Future<Uint8List?> _getAppCacheThumbnailForUpload(EnteFile file) async {
+Future<({Uint8List? data, NativeVideoInfo? videoInfo})>
+_getAppCacheThumbnailForUpload(EnteFile file) async {
   try {
-    return await getThumbnailFromInAppCacheFile(file);
+    if (file.fileType == FileType.video) {
+      final result = await getVideoThumbnailFromInAppCacheFile(file);
+      return (data: result?.data, videoInfo: result?.info);
+    }
+    return (data: await getThumbnailFromInAppCacheFile(file), videoInfo: null);
   } catch (e, s) {
     _logger.warning("failed to generate thumbnail", e, s);
+    if (file.fileType == FileType.video) {
+      return (data: null, videoInfo: null);
+    }
     throw InvalidFileError(
       "thumbnail failed for appCache fileType: ${file.fileType.toString()}",
       InvalidReason.thumbnailMissing,

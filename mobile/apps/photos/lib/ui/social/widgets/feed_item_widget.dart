@@ -1,9 +1,10 @@
 import "package:ente_icons/ente_icons.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:photos/db/files_db.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/models/api/collection/user.dart";
 import "package:photos/models/file/file.dart";
+import "package:photos/models/social/comment_author_utils.dart";
 import "package:photos/models/social/feed_item.dart";
 import "package:photos/services/collections_service.dart";
 import "package:photos/theme/colors.dart";
@@ -404,12 +405,7 @@ class _StackedAvatars extends StatelessWidget {
                     width: 1.167,
                   ),
                 ),
-                child: UserAvatarWidget(
-                  actors.first,
-                  type: AvatarType.regular,
-                  currentUserID: currentUserID,
-                  addStroke: false,
-                ),
+                child: UserAvatarWidget(actors.first, type: AvatarType.regular),
               ),
             ),
             // Second (back) avatar
@@ -423,12 +419,7 @@ class _StackedAvatars extends StatelessWidget {
                     width: 1.167,
                   ),
                 ),
-                child: UserAvatarWidget(
-                  actors[1],
-                  type: AvatarType.regular,
-                  currentUserID: currentUserID,
-                  addStroke: false,
-                ),
+                child: UserAvatarWidget(actors[1], type: AvatarType.regular),
               ),
             ),
           ],
@@ -444,12 +435,7 @@ class _StackedAvatars extends StatelessWidget {
         shape: BoxShape.circle,
         border: Border.all(color: colorScheme.backgroundColour, width: 1.167),
       ),
-      child: UserAvatarWidget(
-        user,
-        type: AvatarType.regular,
-        currentUserID: currentUserID,
-        addStroke: false,
-      ),
+      child: UserAvatarWidget(user, type: AvatarType.regular),
     );
   }
 
@@ -473,15 +459,17 @@ class _StackedAvatars extends StatelessWidget {
       final userID = feedItem.actorUserIDs[i];
       final anonID = feedItem.actorAnonIDs[i];
 
-      if (userID <= 0 && anonID != null) {
-        // Anonymous user - use decrypted display name if available
-        final displayName = anonDisplayNames[anonID] ?? anonID;
+      if (userID <= 0) {
         users.add(
-          User(id: userID, email: "$anonID@unknown.com", name: displayName),
+          anonymousSocialUser(
+            userID: userID,
+            anonUserID: anonID,
+            anonDisplayNames: anonDisplayNames,
+          ),
         );
       } else {
         // Get user from collections service
-        final user = CollectionsService.instance.getFileOwner(
+        final user = CollectionsService.instance.resolveUserIdentity(
           userID,
           feedItem.collectionID,
         );
@@ -576,8 +564,8 @@ class _FeedTextContent extends StatelessWidget {
     // Multiple users: "Username and X others"
     final othersCount = feedItem.additionalActorCount;
     final othersText = othersCount == 1
-        ? AppLocalizations.of(context).and1Other
-        : AppLocalizations.of(context).andXOthers(count: othersCount);
+        ? context.strings.and1Other
+        : context.strings.andXOthers(count: othersCount);
 
     return Text.rich(
       TextSpan(
@@ -607,7 +595,7 @@ class _FeedTextContent extends StatelessWidget {
     BuildContext context,
     TextStyle baseStyle,
   ) {
-    final l10n = AppLocalizations.of(context);
+    final l10n = context.strings;
     final isOwn = feedItem.isOwnedByCurrentUser;
     switch (feedItem.type) {
       case FeedItemType.photoLike:
@@ -655,7 +643,7 @@ class _FeedTextContent extends StatelessWidget {
     BuildContext context,
     TextStyle baseStyle,
   ) {
-    final l10n = AppLocalizations.of(context);
+    final l10n = context.strings;
     final count = feedItem.sharedFileCount;
     final albumName = feedItem.collectionName ?? l10n.albums;
 
@@ -703,13 +691,15 @@ class _FeedTextContent extends StatelessWidget {
     final userID = feedItem.primaryActorUserID;
     final anonID = feedItem.primaryActorAnonID;
 
-    if (userID <= 0 && anonID != null) {
-      // Anonymous user - use decrypted display name if available
-      final displayName = anonDisplayNames[anonID] ?? anonID;
-      return User(id: userID, email: "$anonID@unknown.com", name: displayName);
+    if (userID <= 0) {
+      return anonymousSocialUser(
+        userID: userID,
+        anonUserID: anonID,
+        anonDisplayNames: anonDisplayNames,
+      );
     }
 
-    return CollectionsService.instance.getFileOwner(
+    return CollectionsService.instance.resolveUserIdentity(
       userID,
       feedItem.collectionID,
     );

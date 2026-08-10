@@ -1,19 +1,19 @@
 import "dart:async";
 
 import "package:ente_pure_utils/ente_pure_utils.dart";
+import "package:ente_strings/ente_strings.dart";
+import "package:ente_ui/components/loading_widget.dart";
 import "package:flutter/material.dart";
 import "package:logging/logging.dart";
 import "package:photos/core/event_bus.dart";
 import "package:photos/events/files_updated_event.dart";
 import "package:photos/events/local_photos_updated_event.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/models/file/file.dart";
 import "package:photos/models/file_load_result.dart";
 import "package:photos/models/ml/face/person.dart";
 import "package:photos/models/search/hierarchical/face_filter.dart";
 import "package:photos/models/search/hierarchical/hierarchical_search_filter.dart";
 import "package:photos/models/selected_files.dart";
-import "package:photos/ui/common/loading_widget.dart";
 import "package:photos/ui/viewer/gallery/gallery.dart";
 import "package:photos/ui/viewer/gallery/gallery_app_bar_config.dart";
 import "package:photos/ui/viewer/gallery/state/gallery_files_inherited_widget.dart";
@@ -200,8 +200,8 @@ class _HierarchicalSearchGalleryState extends State<HierarchicalSearchGallery> {
                             clusterID:
                                 _firstUnnamedAppliedFaceFilter!.clusterId,
                           ),
-                          text: AppLocalizations.of(context).savePerson,
-                          subText: AppLocalizations.of(context).findThemQuickly,
+                          text: context.strings.savePerson,
+                          subText: context.strings.findThemQuickly,
                           onTap: _handleSavePerson,
                         )
                       : null,

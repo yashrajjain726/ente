@@ -2,11 +2,9 @@ import 'dart:io';
 
 import 'package:ente_auth/app/view/app.dart';
 import 'package:ente_auth/events/icons_changed_event.dart';
-import 'package:ente_auth/l10n/l10n.dart';
 import 'package:ente_auth/locale.dart';
 import 'package:ente_auth/services/preference_service.dart';
 import 'package:ente_auth/ui/settings/app_icon_selection_screen.dart';
-import 'package:ente_auth/ui/settings/components/auth_settings_item.dart';
 import 'package:ente_auth/ui/settings/components/auth_settings_navigation.dart';
 import 'package:ente_auth/ui/settings/components/auth_settings_page_scaffold.dart';
 import 'package:ente_auth/ui/settings/language_picker.dart';
@@ -15,6 +13,7 @@ import 'package:ente_components/ente_components.dart';
 import 'package:ente_events/event_bus.dart';
 import 'package:ente_logging/logging.dart';
 import 'package:ente_pure_utils/ente_pure_utils.dart';
+import 'package:ente_strings/ente_strings.dart';
 import 'package:flutter/material.dart';
 import 'package:hugeicons/hugeicons.dart';
 
@@ -23,18 +22,18 @@ class GeneralSettingsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = context.l10n;
+    final l10n = context.strings;
     return AuthSettingsPageScaffold(
       title: l10n.general,
       children: [
-        AuthSettingsItem(
+        SettingsItem(
           title: l10n.language,
           icon: HugeIcons.strokeRoundedLanguageSquare,
           onTap: () => _openLanguage(context),
         ),
         if (Platform.isIOS || Platform.isAndroid) ...[
           const SizedBox(height: Spacing.sm),
-          AuthSettingsItem(
+          SettingsItem(
             title: l10n.appIcon,
             icon: HugeIcons.strokeRoundedImage01,
             onTap: () =>
@@ -128,12 +127,12 @@ class GeneralSettingsPage extends StatelessWidget {
     );
   }
 
-  AuthSettingsItem _toggleItem({
+  SettingsItem _toggleItem({
     required String title,
     required ValueGetter<bool> value,
     required Future<void> Function() onChanged,
   }) {
-    return AuthSettingsItem(
+    return SettingsItem(
       title: title,
       showChevron: false,
       trailing: ToggleSwitchComponent.async(value: value, onChanged: onChanged),

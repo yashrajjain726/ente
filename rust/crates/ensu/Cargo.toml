@@ -15,7 +15,7 @@ serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
 tokio = { version = "1", features = ["rt", "time"] }
-transcribe-rs = { version = "0.3.11", default-features = false, features = ["onnx", "vad-silero"], optional = true }
+transcribe-rs = { git = "https://github.com/cjpais/transcribe-rs.git", rev = "efc66111d519a434e28d51d94740008a7ce29360", default-features = false, features = ["onnx", "vad-silero"], optional = true }
 url.workspace = true
 uuid = { version = "1", features = ["v4", "rng-getrandom"] }
 zeroize.workspace = true
@@ -24,32 +24,18 @@ zstd = "0.13.3"
 [dev-dependencies]
 tempfile = "3.27.0"
 
-# llama-cpp-2's default features are "openmp" and "android-shared-stdcxx".
-#
-# - "openmp" enables OpenMP CPU parallelism. It requires libomp, which usually
-#   ships with Linux/Windows toolchains but not Apple's clang. Without it,
-#   llama.cpp falls back to its built-in thread pool.
-#
-# - "android-shared-stdcxx" is a no-op everywhere except Android (where it
-#   enables the NDK's shared C++ runtime).
-#
-# On Apple platforms, Accelerate is auto-linked by llama-cpp-sys-2 for CPU
-# SIMD helpers. llama-cpp-2 additionally enables the "metal" feature on arm64,
-# which causes Metal to be used for GPU inference.
-#
-# "mtmd" is used on all platforms for enabling multimodal support.
+# Keep `mtmd` on every platform for multimodal support.
+# macOS disables OpenMP because Apple's clang lacks libomp. llama.cpp uses its
+# own thread pool, Accelerate, and Metal on arm64 instead.
 [target.'cfg(target_os = "macos")'.dependencies]
 llama-cpp-2 = { version = "=0.1.144", default-features = false, features = ["mtmd"] }
 
-# Desktop Linux enables the Vulkan GPU backend, which runs on AMD, Intel and
-# NVIDIA GPUs through the system Vulkan loader (no vendor SDK required). The
-# build needs a Vulkan loader plus "glslc" to compile the compute shaders.
+# Linux Vulkan needs a system Vulkan loader and glslc.
 [target.'cfg(target_os = "linux")'.dependencies]
 llama-cpp-2 = { version = "=0.1.144", features = ["mtmd", "vulkan"] }
 
-# Android (and anything else that is neither macOS nor desktop Linux) stays on
-# the CPU backend. Windows Vulkan additionally requires a VULKAN_SDK, so it is
-# intentionally left out here.
+# Other platforms stay on CPU. Android keeps the shared C++ runtime; Windows
+# avoids Vulkan's VULKAN_SDK requirement.
 [target.'cfg(all(not(target_os = "macos"), not(target_os = "linux")))'.dependencies]
 llama-cpp-2 = { version = "=0.1.144", features = ["mtmd"] }
 

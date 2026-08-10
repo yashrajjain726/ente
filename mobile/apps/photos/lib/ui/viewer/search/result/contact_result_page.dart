@@ -5,14 +5,14 @@ import "package:ente_components/components/buttons/icon_button_component.dart";
 import "package:ente_components/components/menu_component.dart";
 import "package:ente_contacts/contacts.dart" as contacts;
 import "package:ente_pure_utils/ente_pure_utils.dart";
+import "package:ente_strings/ente_strings.dart";
+import "package:ente_ui/components/loading_widget.dart";
 import "package:flutter/material.dart";
 import "package:hugeicons/hugeicons.dart";
 import "package:photos/core/event_bus.dart";
 import "package:photos/events/contacts_changed_event.dart";
 import "package:photos/events/files_updated_event.dart";
 import "package:photos/events/local_photos_updated_event.dart";
-import "package:photos/generated/l10n.dart";
-import "package:photos/l10n/l10n.dart";
 import "package:photos/models/collection/collection.dart";
 import "package:photos/models/file/file.dart";
 import "package:photos/models/file_load_result.dart";
@@ -26,7 +26,6 @@ import "package:photos/services/photos_contacts_service.dart";
 import "package:photos/theme/colors.dart";
 import "package:photos/theme/ente_theme.dart";
 import "package:photos/ui/collections/album/row_item.dart";
-import "package:photos/ui/common/loading_widget.dart";
 import "package:photos/ui/viewer/actions/file_selection_overlay_bar.dart";
 import "package:photos/ui/viewer/gallery/empty_state.dart";
 import "package:photos/ui/viewer/gallery/gallery.dart";
@@ -308,13 +307,13 @@ class _ContactResultPageState extends State<ContactResultPage> {
       ),
     );
     if (updated is contacts.ContactRecord && mounted) {
-      final personData = PersonService.instance.getCachedPartialPersonData(
-        userID: _contactUserId,
-        email: _contactEmail,
+      final person = PersonService.instance.getCachedPersonForUser(
+        _contactUserId,
+        _contactEmail,
       );
       setState(() {
         _savedContact = updated;
-        _personId = personData?[PersonService.kPersonIDKey];
+        _personId = person?.remoteID;
       });
     }
   }
@@ -408,7 +407,7 @@ class _SavedContactAppBar extends StatelessWidget {
               ? const []
               : [
                   IconButtonComponent(
-                    tooltip: context.l10n.edit,
+                    tooltip: context.strings.edit,
                     icon: const HugeIcon(icon: HugeIcons.strokeRoundedEdit03),
                     variant: IconButtonComponentVariant.primary,
                     shouldSurfaceExecutionStates: false,
@@ -439,7 +438,7 @@ class _AlbumsSection extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
             child: Text(
-              AppLocalizations.of(context).albums,
+              context.strings.albums,
               style: getEnteTextTheme(context).largeBold,
             ),
           ),
@@ -478,7 +477,7 @@ class _UnsavedContactHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = getEnteColorScheme(context);
-    final l10n = AppLocalizations.of(context);
+    final l10n = context.strings;
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
       child: SizedBox(
@@ -530,7 +529,7 @@ class _UnsavedContactEmptyState extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = getEnteColorScheme(context);
     final textTheme = getEnteTextTheme(context);
-    final l10n = AppLocalizations.of(context);
+    final l10n = context.strings;
     return Padding(
       padding: const EdgeInsets.fromLTRB(36, 32, 36, 0),
       child: Column(

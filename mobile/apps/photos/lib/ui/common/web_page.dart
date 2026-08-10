@@ -1,7 +1,7 @@
+import 'package:ente_ui/components/loading_widget.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import "package:logging/logging.dart";
-import 'package:photos/ui/common/loading_widget.dart';
 import "package:url_launcher/url_launcher_string.dart";
 
 class WebPage extends StatefulWidget {

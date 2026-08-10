@@ -2,13 +2,7 @@ import { expose } from "comlink";
 import { logUnhandledErrorsAndRejectionsInWorker } from "ente-base/log-web";
 import * as libsodium from "./libsodium";
 
-/**
- * A web worker that exposes the functions defined by libsodium.ts.
- *
- * See: [Note: Crypto code hierarchy].
- *
- * Note: Keep these methods logic free. They are meant to be trivial proxies.
- */
+// Keep these as direct proxies; crypto logic belongs in libsodium.ts.
 export class CryptoWorker {
     toB64 = libsodium.toB64;
     fromB64 = libsodium.fromB64;

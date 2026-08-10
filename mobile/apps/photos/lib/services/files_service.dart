@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:ente_pure_utils/ente_pure_utils.dart';
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:latlong2/latlong.dart";
 import 'package:logging/logging.dart';
@@ -10,7 +11,6 @@ import 'package:photos/core/configuration.dart';
 import "package:photos/db/device_files_db.dart";
 import 'package:photos/db/files_db.dart';
 import "package:photos/gateways/files/files_gateway.dart";
-import "package:photos/generated/l10n.dart";
 import 'package:photos/models/file/file.dart';
 import "package:photos/models/file_load_result.dart";
 import "package:photos/models/freeable_space_info.dart";
@@ -165,10 +165,10 @@ class FilesService {
     final Map<int, Map<String, dynamic>> fileIDToUpdateMetadata = {};
     await showActionSheet(
       context: context,
-      body: AppLocalizations.of(context).changeLocationOfSelectedItems,
+      body: context.strings.changeLocationOfSelectedItems,
       buttons: [
         ButtonWidget(
-          labelText: AppLocalizations.of(context).yes,
+          labelText: context.strings.yes,
           buttonType: ButtonType.neutral,
           buttonSize: ButtonSize.large,
           shouldStickToDarkTheme: true,
@@ -185,7 +185,7 @@ class FilesService {
           },
         ),
         ButtonWidget(
-          labelText: AppLocalizations.of(context).cancel,
+          labelText: context.strings.cancel,
           buttonType: ButtonType.secondary,
           buttonSize: ButtonSize.large,
           shouldStickToDarkTheme: true,

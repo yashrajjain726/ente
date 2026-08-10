@@ -16,16 +16,18 @@ import {
 } from "@mui/material";
 import { EnteSwitch } from "ente-base/components/EnteSwitch";
 import { FocusVisibleButton } from "ente-base/components/mui/FocusVisibleButton";
+import {
+    uploadSheetMediaQuery,
+    uploadSheetPaperSx,
+    useIsUploadSheet,
+} from "ente-gallery/components/upload-progress/bottom-sheet";
+import { SlideUpTransition } from "ente-new/photos/components/mui/SlideUpTransition";
 import { t } from "i18next";
 import type { ChangeEvent, ReactElement } from "react";
 
 interface UploadConfirmationDialogProps {
     open: boolean;
     loading: boolean;
-    /**
-     * `true` if the items being uploaded were detected to be a Google Takeout
-     * import (Takeout metadata JSONs were found amongst them).
-     */
     isTakeout: boolean;
     fileCount: number;
     albumCount: number;
@@ -56,6 +58,8 @@ export function UploadConfirmationDialog({
     onConfirm,
     onCancel,
 }: UploadConfirmationDialogProps): ReactElement {
+    const isSheet = useIsUploadSheet();
+
     return (
         <Dialog
             open={open}
@@ -63,13 +67,18 @@ export function UploadConfirmationDialog({
             maxWidth={false}
             aria-labelledby="upload-confirmation-title"
             aria-busy={loading}
-            slotProps={{ paper: { sx: paperSx } }}
+            slots={isSheet ? { transition: SlideUpTransition } : undefined}
+            slotProps={{ paper: { sx: [paperSx, uploadSheetPaperSx] } }}
         >
             <Stack sx={contentSx}>
                 <Stack direction="row" sx={headerSx}>
                     <Typography sx={displayTitleSx}>
                         {isTakeout
-                            ? t("import_from_google_photos")
+                            ? t(
+                                  isSheet
+                                      ? "google_takeout"
+                                      : "import_from_google_photos",
+                              )
                             : t("upload_to_ente")}
                     </Typography>
                     <Stack direction="row" sx={headerActionsSx}>
@@ -258,7 +267,6 @@ function StatCard({
     );
 }
 
-/* primary/default in the design */
 const green = "#08c225";
 
 const paperSx = (theme: Theme) => ({
@@ -276,7 +284,16 @@ const paperSx = (theme: Theme) => ({
     }),
 });
 
-const contentSx = { p: "20px", gap: "36px", color: "text.base" };
+const contentSx = {
+    p: "20px",
+    gap: "36px",
+    color: "text.base",
+    [uploadSheetMediaQuery]: {
+        p: "12px 16px",
+        pb: "calc(20px + env(safe-area-inset-bottom, 0px))",
+        overflowY: "auto",
+    },
+};
 
 const headerSx = {
     alignItems: "center",

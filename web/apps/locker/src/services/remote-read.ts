@@ -7,14 +7,10 @@ import {
     ensureLocalUser,
     ensureUserKeyPair,
 } from "ente-accounts-rs/services/user";
-import {
-    authenticatedRequestHeaders,
-    ensureOk,
-    publicRequestHeaders,
-} from "ente-base/http";
+import { fetchFile } from "ente-base/file-download";
+import { authenticatedRequestHeaders, ensureOk } from "ente-base/http";
 import log from "ente-base/log";
 import { apiURL, customAPIOrigin } from "ente-base/origins";
-import { ensureAuthToken } from "ente-base/token";
 import { z } from "zod";
 import {
     boxSealOpen,
@@ -630,9 +626,8 @@ const decryptFileToLockerItem = async (
                     fileKey,
                 )) as Record<string, unknown> | undefined;
             } catch {
-                // Public metadata can be missing or unreadable for some older
-                // files. We still want to surface the file row if basic
-                // metadata decrypts successfully.
+                // Older files may have unreadable public metadata.
+                // Basic metadata is enough to keep the row.
             }
         }
 
@@ -1046,9 +1041,7 @@ export const downloadLockerFile = async (
     let response: Response;
     try {
         if (customOrigin) {
-            const token = await ensureAuthToken();
-            const url = await apiURL(`/files/download/${fileID}`, { token });
-            response = await fetch(url, { headers: publicRequestHeaders() });
+            response = await fetchFile(fileID, "file");
         } else {
             response = await fetch(`https://files.ente.com/?fileID=${fileID}`, {
                 headers: await authenticatedRequestHeaders(),

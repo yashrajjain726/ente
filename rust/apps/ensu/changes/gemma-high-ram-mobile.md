@@ -1,0 +1,1 @@
+- Gemma as default for high RAM mobile devices

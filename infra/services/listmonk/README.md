@@ -26,7 +26,7 @@ sudo mv listmonk.service /etc/systemd/system/
 sudo mv listmonk.nginx.conf /root/nginx/conf.d
 ```
 
-> The very first time we ran Listmonk, at this point we also needed to get it to install the tables it needs in the Postgres DB. For this, we used the `initialize-db.sh` script.
+> For a fresh database, run `initialize-db.sh` once before starting Listmonk.
 >
 > ```sh
 > scp services/listmonk/initialize-db.sh <instance>:

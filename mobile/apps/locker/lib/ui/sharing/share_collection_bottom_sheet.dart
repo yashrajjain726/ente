@@ -2,14 +2,11 @@ import "package:ente_components/ente_components.dart";
 import "package:ente_pure_utils/ente_pure_utils.dart";
 import "package:ente_sharing/models/user.dart";
 import "package:ente_sharing/user_avator_widget.dart";
-import "package:ente_ui/components/captioned_text_widget_v2.dart";
-import "package:ente_ui/components/divider_widget.dart";
-import "package:ente_ui/components/menu_item_widget_v2.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:ente_utils/share_utils.dart";
 import "package:flutter/material.dart";
 import "package:hugeicons/hugeicons.dart";
 import "package:locker/extensions/user_extension.dart";
-import "package:locker/l10n/l10n.dart";
 import "package:locker/services/collections/collections_service.dart";
 import "package:locker/services/collections/models/collection.dart";
 import "package:locker/services/configuration.dart";
@@ -67,7 +64,7 @@ class _ShareCollectionSheetState extends State<ShareCollectionSheet> {
     final shouldShowSharedWithLabel = !_isOwner || _sharees.isNotEmpty;
 
     return BottomSheetComponent(
-      title: context.l10n.shareCollection,
+      title: context.strings.shareCollection,
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -75,7 +72,7 @@ class _ShareCollectionSheetState extends State<ShareCollectionSheet> {
           if (_isOwner) ...[_buildOwnerActions(), const SizedBox(height: 20)],
           if (shouldShowSharedWithLabel) ...[
             Text(
-              context.l10n.sharedWith,
+              context.strings.sharedWith,
               style: TextStyles.body.copyWith(color: colors.textLight),
             ),
             const SizedBox(height: 8),
@@ -90,7 +87,6 @@ class _ShareCollectionSheetState extends State<ShareCollectionSheet> {
 
   Widget _buildShareesList() {
     final colors = context.componentColors;
-    final currentUserId = Configuration.instance.getUserID() ?? -1;
 
     final List<User> allUsers = [];
 
@@ -117,48 +113,33 @@ class _ShareCollectionSheetState extends State<ShareCollectionSheet> {
             borderRadius: BorderRadius.circular(20),
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxHeight: maxVisibleHeight),
-              child: ListView.builder(
+              child: ListView(
                 controller: _scrollController,
                 shrinkWrap: true,
                 padding: EdgeInsets.zero,
-                itemCount: allUsers.length,
-                itemBuilder: (context, index) {
-                  final user = allUsers[index];
-                  final isFirst = index == 0;
-                  final isLast = index == allUsers.length - 1;
-                  final role = CollectionParticipantRoleExtn.fromString(
-                    user.role,
-                  );
-
-                  return Column(
-                    children: [
-                      if (!isFirst)
-                        DividerWidget(
-                          dividerType: DividerType.menu,
-                          bgColor: colors.fillLight,
-                        ),
-                      MenuItemWidgetV2(
-                        captionedTextWidget: CaptionedTextWidgetV2(
-                          title: user.email,
-                        ),
-                        leadingIconSize: 24,
-                        leadingIconWidget: UserAvatarWidget(
+                children: [
+                  MenuGroupComponent(
+                    backgroundColor: colors.fillLight,
+                    showDividers: true,
+                    dividerPadding: const EdgeInsets.only(left: 48),
+                    items: allUsers.map((user) {
+                      final role = CollectionParticipantRoleExtn.fromString(
+                        user.role,
+                      );
+                      return MenuComponent(
+                        title: user.email,
+                        leading: UserAvatarWidget(
                           user,
-                          currentUserID: currentUserId,
                           config: Configuration.instance,
                           type: AvatarType.mini,
                         ),
-                        menuItemColor: colors.fillLight,
-                        trailingWidget: _isOwner
+                        trailing: _isOwner
                             ? _buildRolePopupMenu(user)
                             : _buildRoleIcon(role),
-                        surfaceExecutionStates: false,
-                        isTopBorderRadiusRemoved: !isFirst,
-                        isBottomBorderRadiusRemoved: !isLast,
-                      ),
-                    ],
-                  );
-                },
+                      );
+                    }).toList(),
+                  ),
+                ],
               ),
             ),
           ),
@@ -181,7 +162,7 @@ class _ShareCollectionSheetState extends State<ShareCollectionSheet> {
       children: [
         _ShareActionOption(
           icon: HugeIcons.strokeRoundedAdd01,
-          label: context.l10n.addEmail,
+          label: context.strings.addEmail,
           onTap: () async {
             await showAddEmailSheet(
               context,
@@ -199,8 +180,8 @@ class _ShareCollectionSheetState extends State<ShareCollectionSheet> {
           _ShareActionOption(
             icon: HugeIcons.strokeRoundedLink02,
             label: _hasPublicLink
-                ? context.l10n.manageLink
-                : context.l10n.linkLabel,
+                ? context.strings.manageLink
+                : context.strings.linkLabel,
             onTap: () async {
               if (!_hasPublicLink) {
                 await _createAndSharePublicLink();
@@ -261,7 +242,7 @@ class _ShareCollectionSheetState extends State<ShareCollectionSheet> {
       optionsBuilder: () => [
         EntePopupMenuOption(
           value: "remove",
-          label: context.l10n.removeAccess,
+          label: context.strings.removeAccess,
           labelColor: colors.warning,
           leadingWidget: HugeIcon(
             icon: HugeIcons.strokeRoundedDelete02,
@@ -294,14 +275,14 @@ class _ShareCollectionSheetState extends State<ShareCollectionSheet> {
       final confirmed = await showBottomSheetComponent(
         context: context,
         builder: (_) => BottomSheetComponent(
-          title: context.l10n.changePermissions,
-          message: context.l10n.cannotAddMoreFilesAfterBecomingViewer(
-            user.displayName ?? user.email,
+          title: context.strings.changePermissions,
+          message: context.strings.cannotAddMoreFilesAfterBecomingViewer(
+            name: user.resolvedDisplayName,
           ),
           illustration: LockerBottomSheetIllustration.warningGrey,
           actions: [
             ButtonComponent(
-              label: context.l10n.yesConvertToViewer,
+              label: context.strings.yesConvertToViewer,
               variant: ButtonComponentVariant.critical,
               onTap: () {
                 Navigator.of(context).pop(true);
@@ -334,14 +315,14 @@ class _ShareCollectionSheetState extends State<ShareCollectionSheet> {
     final confirmed = await showBottomSheetComponent(
       context: context,
       builder: (_) => BottomSheetComponent(
-        title: context.l10n.removeWithQuestionMark,
-        message: context.l10n.removeParticipantBody(
-          user.displayName ?? user.email,
+        title: context.strings.removeWithQuestionMark,
+        message: context.strings.removeCollectionParticipantBody(
+          userEmail: user.resolvedDisplayName,
         ),
         illustration: LockerBottomSheetIllustration.warningGrey,
         actions: [
           ButtonComponent(
-            label: context.l10n.yesRemove,
+            label: context.strings.yesRemove,
             variant: ButtonComponentVariant.critical,
             onTap: () {
               Navigator.of(context).pop(true);

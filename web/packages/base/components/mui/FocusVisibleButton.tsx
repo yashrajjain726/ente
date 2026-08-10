@@ -6,10 +6,6 @@ export const RippleDisabledButton: React.FC<ButtonProps> = (props) => (
     <Button disableRipple {...props} />
 );
 
-/**
- * A MUI {@link Button} that shows a keyboard focus indicator (e.g. when the
- * user tabs to it) and also an affordance to indicate when it is activated.
- */
 export const FocusVisibleButton = styled(RippleDisabledButton)(
     ({ theme }) => `
     &.Mui-focusVisible {

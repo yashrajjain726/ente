@@ -20,8 +20,6 @@ After updating Flutter dependencies, run `pod install` from `ios/` on macOS and 
 
 ## 🌍 Translate
 
-[![Crowdin](https://badges.crowdin.net/ente-locker/localized.svg)](https://crowdin.com/project/ente-locker)
+[![Crowdin](https://badges.crowdin.net/ente-photos-app/localized.svg)](https://crowdin.com/project/ente-photos-app)
 
-If you're interested in helping out with translation, please visit our [Crowdin project](https://crowdin.com/project/ente-locker) to get started. Thank you for your support.
-
-If your language is not listed for translation, please [create a GitHub issue](https://github.com/ente/ente/issues/new?title=Request+for+New+Language+Translation&body=Language+name%3A) to have it added.
+If you're interested in helping out with translation, please visit our [Crowdin project](https://crowdin.com/project/ente-photos-app). For more details, see the docs for the [strings package](../../packages/strings/README.md).

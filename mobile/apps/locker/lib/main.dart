@@ -16,17 +16,14 @@ import 'package:ente_lock_screen/ui/app_lock.dart';
 import 'package:ente_lock_screen/ui/lock_screen.dart';
 import 'package:ente_logging/logging.dart';
 import 'package:ente_network/network.dart';
-import 'package:ente_pure_utils/ente_pure_utils.dart';
 import 'package:ente_rust/ente_rust.dart';
-import "package:ente_strings/l10n/strings_localizations.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:ente_ui/theme/theme_config.dart";
-import 'package:ente_ui/utils/window_listener_service.dart';
 import "package:flutter/material.dart";
 import 'package:flutter/services.dart';
 import 'package:flutter_displaymode/flutter_displaymode.dart';
 import 'package:locker/app.dart';
 import 'package:locker/core/locale.dart';
-import 'package:locker/l10n/app_localizations.dart';
 import 'package:locker/services/collections/collections_api_client.dart';
 import 'package:locker/services/collections/collections_service.dart';
 import 'package:locker/services/configuration.dart';
@@ -45,31 +42,16 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:rive/rive.dart' as rive;
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:tray_manager/tray_manager.dart';
-import 'package:window_manager/window_manager.dart';
 
 final _logger = Logger("main");
 bool _isRustInitialized = false;
 Future<void>? _rustInitFuture;
+late final LogSinkGuard _rustLogSinkGuard;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await rive.RiveNative.init();
   registerCryptoApi(const EnteCryptoDartAdapter());
-
-  if (PlatformDetector.isDesktop()) {
-    await windowManager.ensureInitialized();
-    await WindowListenerService.instance.init();
-    final WindowOptions windowOptions = WindowOptions(
-      size: WindowListenerService.instance.getWindowSize(),
-      maximumSize: const Size(8192, 8192),
-    );
-    await windowManager.waitUntilReadyToShow(windowOptions, () async {
-      await windowManager.show();
-      await windowManager.focus();
-      _initSystemTray().ignore();
-    });
-  }
 
   await _runInForeground();
   if (Platform.isAndroid) {
@@ -82,23 +64,6 @@ void main() async {
       ),
     );
   }
-}
-
-Future<void> _initSystemTray() async {
-  if (PlatformDetector.isMobile()) return;
-  final String path = Platform.isWindows
-      ? 'assets/icons/locker-icon.ico'
-      : 'assets/icons/locker-icon.png';
-  await trayManager.setIcon(path);
-  final Menu menu = Menu(
-    items: [
-      MenuItem(key: 'hide_window', label: 'Hide Window'),
-      MenuItem(key: 'show_window', label: 'Show Window'),
-      MenuItem.separator(),
-      MenuItem(key: 'exit_app', label: 'Exit App'),
-    ],
-  );
-  await trayManager.setContextMenu(menu);
 }
 
 Future<void> _runInForeground() async {
@@ -135,7 +100,6 @@ Future<void> _runInForeground() async {
         supportedLocales: appSupportedLocales,
         localizationsDelegates: const [
           ...StringsLocalizations.localizationsDelegates,
-          ...AppLocalizations.localizationsDelegates,
         ],
         localeListResolutionCallback: localResolutionCallBack,
       ),
@@ -157,9 +121,26 @@ Future<void> _ensureRustInitialized() async {
   try {
     await initFuture;
     _isRustInitialized = true;
+    _attachRustLogStream();
   } finally {
     _rustInitFuture = null;
   }
+}
+
+void _attachRustLogStream() {
+  final logger = Logger("rust");
+  _rustLogSinkGuard = LogSinkGuard();
+  _rustLogSinkGuard.attachLogStream().listen((entry) {
+    final message = "[${entry.target}] ${entry.message}";
+    switch (entry.level) {
+      case LogLevel.error:
+        logger.severe(message);
+      case LogLevel.warn:
+        logger.warning(message);
+      case LogLevel.info:
+        logger.info(message);
+    }
+  });
 }
 
 ThemeMode _themeMode(AdaptiveThemeMode? savedThemeMode) {

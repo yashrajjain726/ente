@@ -7,11 +7,7 @@ import { SpacePublicProfileNotificationControl } from "components/SpacePublicPro
 import { SpaceRouteFallback } from "components/SpaceRouteFallback";
 import log from "ente-base/log";
 import React, { useEffect, useMemo, useState } from "react";
-import {
-    OnboardingScreen,
-    addFriendOnboardingTitle,
-    onboardingGreen,
-} from "screens/OnboardingScreen";
+import { OnboardingScreen, onboardingGreen } from "screens/OnboardingScreen";
 import { ProfileScreen, profileBackground } from "screens/ProfileScreen";
 import {
     loadCurrentSpaceRelationship,
@@ -56,6 +52,14 @@ type AuthenticatedProfileRouteStatus = "idle" | "loading" | "complete";
 interface PageProps {
     invitePreview?: boolean;
 }
+
+const addFriendOnboardingTitle = (username: string) => (
+    <>
+        {`See @${username}'s`}
+        <br />
+        everyday moments
+    </>
+);
 
 const addFriendPostActionOnboardingTitle = (
     username: string,
@@ -541,6 +545,18 @@ export const Page: React.FC<PageProps> = ({ invitePreview }) => {
     }
 
     if (routeMode.kind == "public-profile") {
+        if (!publicIdentity && publicError) {
+            return (
+                <>
+                    <SpacePageMeta
+                        themeColor={profileBackground}
+                        preview="invite"
+                    />
+                    <PublicProfileUnavailable />
+                </>
+            );
+        }
+
         if (
             profileLoadStatus == "loading" ||
             (profile && authenticatedProfileRouteStatus != "complete")
@@ -561,20 +577,8 @@ export const Page: React.FC<PageProps> = ({ invitePreview }) => {
             return <SpaceRouteFallback background={profileBackground} />;
         }
 
-        if (!publicIdentity && !publicError) {
-            return <SpaceRouteFallback background={profileBackground} />;
-        }
-
         if (!publicIdentity) {
-            return (
-                <>
-                    <SpacePageMeta
-                        themeColor={profileBackground}
-                        preview="invite"
-                    />
-                    <PublicProfileUnavailable />
-                </>
-            );
+            return <SpaceRouteFallback background={profileBackground} />;
         }
 
         const inviteFriend = {

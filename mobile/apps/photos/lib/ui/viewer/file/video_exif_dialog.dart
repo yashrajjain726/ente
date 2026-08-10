@@ -1,5 +1,5 @@
+import "package:ente_strings/ente_strings.dart";
 import 'package:flutter/material.dart';
-import "package:photos/l10n/l10n.dart";
 import "package:photos/models/ffmpeg/ffprobe_keys.dart";
 import "package:photos/models/ffmpeg/ffprobe_props.dart";
 import "package:photos/theme/ente_theme.dart";
@@ -45,10 +45,10 @@ class VideoExifDialog extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(context.l10n.videoInfo, style: getEnteTextTheme(context).large),
+        Text(context.strings.videoInfo, style: getEnteTextTheme(context).large),
         _buildInfoRow(context, 'Creation Time', props, 'creation_time'),
         _buildInfoRow(context, 'Duration', props, 'duration'),
-        _buildInfoRow(context, context.l10n.location, props, 'location'),
+        _buildInfoRow(context, context.strings.location, props, 'location'),
         _buildInfoRow(context, 'Bitrate', props, 'bitrate'),
         _buildInfoRow(context, 'Frame Rate', props, FFProbeKeys.rFrameRate),
         _buildInfoRow(context, 'Width', props, null),

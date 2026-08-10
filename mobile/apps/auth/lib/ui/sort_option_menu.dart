@@ -1,6 +1,6 @@
-import 'package:ente_auth/l10n/l10n.dart';
 import 'package:ente_auth/services/preference_service.dart';
 import 'package:ente_components/ente_components.dart';
+import 'package:ente_strings/ente_strings.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
@@ -18,7 +18,7 @@ class SortCodeMenuWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = context.l10n;
+    final l10n = context.strings;
     return Semantics(
       button: true,
       label: l10n.editOrder,
@@ -42,7 +42,7 @@ class SortCodeMenuWidget extends StatelessWidget {
   }
 
   Future<void> _showSortOptions(BuildContext context) {
-    final l10n = context.l10n;
+    final l10n = context.strings;
     return showBottomSheetComponent<void>(
       context: context,
       builder: (sheetContext) => Semantics(
@@ -75,7 +75,7 @@ class SortCodeMenuWidget extends StatelessWidget {
     onSelected(key);
   }
 
-  String _labelFor(AppLocalizations l10n, CodeSortKey key) {
+  String _labelFor(StringsLocalizations l10n, CodeSortKey key) {
     return switch (key) {
       CodeSortKey.issuerName => l10n.codeIssuerHint,
       CodeSortKey.accountName => l10n.account,

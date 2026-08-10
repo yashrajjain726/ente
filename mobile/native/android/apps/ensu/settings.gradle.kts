@@ -19,7 +19,7 @@ dependencyResolutionManagement {
             forRepository {
                 ivy {
                     name = "enteOnnxRuntimePackaging"
-                    url = uri("https://github.com/laurens-pilot/ort-packaging/releases/download")
+                    url = uri("https://github.com/ente/ort-packaging/releases/download")
                     patternLayout {
                         artifact("ort-[revision]/[artifact]-[revision].[ext]")
                     }

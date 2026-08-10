@@ -2,6 +2,7 @@ import "dart:async";
 import "dart:math";
 
 import 'package:ente_pure_utils/ente_pure_utils.dart';
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:hugeicons/hugeicons.dart";
 import 'package:logging/logging.dart';
@@ -18,7 +19,6 @@ import "package:photos/db/ml/db.dart";
 import "package:photos/db/offline_files_db.dart";
 import 'package:photos/events/local_photos_updated_event.dart';
 import "package:photos/extensions/user_extension.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/models/api/collection/user.dart";
 import 'package:photos/models/collection/collection.dart';
 import 'package:photos/models/collection/collection_items.dart';
@@ -109,7 +109,7 @@ class SearchService {
     List<Collection> collections,
   ) {
     final contactUserId = user.id;
-    if (contactUserId == null || contactUserId <= 0) {
+    if (contactUserId <= 0) {
       throw ArgumentError.value(
         contactUserId,
         "user.id",
@@ -163,7 +163,7 @@ class SearchService {
     final contactsByUserId = <int, User>{};
     for (final contact in directContacts) {
       contactsToFiles[contact] = [];
-      contactsByUserId[contact.id!] = contact;
+      contactsByUserId[contact.id] = contact;
     }
 
     for (final file in allFiles) {
@@ -195,7 +195,7 @@ class SearchService {
         continue;
       }
       final contactUserId = collection.owner.id;
-      if (contactUserId != null && contactUserId > 0) {
+      if (contactUserId > 0) {
         collectionsByUserId
             .putIfAbsent(contactUserId, () => [])
             .add(collection);
@@ -232,7 +232,7 @@ class SearchService {
     User user,
   ) async {
     final userId = user.id;
-    if (userId == null || userId <= 0) {
+    if (userId <= 0) {
       return null;
     }
 
@@ -269,7 +269,7 @@ class SearchService {
   bool _isSameContactUser(User source, User target) {
     final sourceId = source.id;
     final targetId = target.id;
-    if (sourceId != null && targetId != null && sourceId > 0 && targetId > 0) {
+    if (sourceId > 0 && targetId > 0) {
       return sourceId == targetId;
     }
     return source.email == target.email;
@@ -301,6 +301,44 @@ class SearchService {
     }
 
     return FilesDB.instance.hasAnyFile();
+  }
+
+  Future<List<GenericSearchResult>> getUploadedFileIDsSearchResults(
+    String query,
+    Set<int> uploadedFileIDs,
+  ) async {
+    if (uploadedFileIDs.isEmpty) {
+      return [];
+    }
+
+    try {
+      final files = await FilesDB.instance.getFilesFromIDs(
+        uploadedFileIDs.toList(),
+        dedupeByUploadId: true,
+        collectionsToIgnore: ignoreCollections(),
+      );
+      if (files.isEmpty) {
+        return [];
+      }
+
+      final matchedUploadedFileIDs = filesToUploadedFileIDs(files);
+      return [
+        GenericSearchResult(
+          ResultType.file,
+          query.trim(),
+          files,
+          hierarchicalSearchFilter: TopLevelGenericFilter(
+            filterName: query.trim(),
+            occurrence: kMostRelevantFilter,
+            filterResultType: ResultType.file,
+            matchedUploadedIDs: matchedUploadedFileIDs,
+          ),
+        ),
+      ];
+    } catch (e, s) {
+      _logger.severe("Failed to search by uploaded file IDs", e, s);
+      return [];
+    }
   }
 
   Future<List<EnteFile>> getAllFilesForHierarchicalSearch() async {
@@ -928,9 +966,9 @@ class SearchService {
     final Map<LocalEntity<LocationTag>, List<EnteFile>> result = {};
     final normalizedQuery = query.toLowerCase();
     if (!context.mounted) return const [];
-    final noLocationName = AppLocalizations.of(context).noLocation;
+    final noLocationName = context.strings.noLocation;
     if (!context.mounted) return const [];
-    final noLocationTagName = AppLocalizations.of(context).noLocationTag;
+    final noLocationTagName = context.strings.noLocationTag;
     final normalizedNoLocationName = noLocationName.toLowerCase();
     final normalizedNoLocationTagName = noLocationTagName.toLowerCase();
     final disambiguationPrefixLength = min(
@@ -1930,9 +1968,9 @@ class SearchService {
         return aName.compareTo(bName);
       });
 
-      final limitedEntries = limit != null
-          ? _preserveEmailOnlyContactsWithinLimit(sortedEntries, limit)
-          : sortedEntries;
+      final limitedEntries = limit == null
+          ? sortedEntries
+          : sortedEntries.take(limit).toList();
 
       return _toContactSearchResults(limitedEntries, peopleToSharedAlbums);
     } catch (e) {
@@ -1948,37 +1986,6 @@ class SearchService {
               monthData.name.toLowerCase().startsWith(query.toLowerCase()),
         )
         .toList();
-  }
-
-  List<MapEntry<User, List<EnteFile>>> _preserveEmailOnlyContactsWithinLimit(
-    List<MapEntry<User, List<EnteFile>>> sortedEntries,
-    int limit,
-  ) {
-    if (limit <= 0) {
-      return const [];
-    }
-    final limitedEntries = sortedEntries.take(limit).toList();
-    if (limitedEntries.length < limit ||
-        limitedEntries.any((entry) => entry.key.id == null)) {
-      return limitedEntries;
-    }
-
-    final includedEmails = limitedEntries
-        .map((entry) => entry.key.email)
-        .toSet();
-    MapEntry<User, List<EnteFile>>? overflowEmailOnly;
-    for (final entry in sortedEntries.skip(limit)) {
-      if (entry.key.id == null && !includedEmails.contains(entry.key.email)) {
-        overflowEmailOnly = entry;
-        break;
-      }
-    }
-    if (overflowEmailOnly == null) {
-      return limitedEntries;
-    }
-
-    limitedEntries[limitedEntries.length - 1] = overflowEmailOnly;
-    return limitedEntries;
   }
 
   Future<List<EnteFile>> _getFilesInYear(List<int> durationOfYear) async {

@@ -2,14 +2,13 @@ import { haveWindow } from "ente-base/env";
 import type { JourneyPoint } from "./types";
 import { iconCache } from "./utils/geocoding";
 
-// Mobile/tablet detection using media query breakpoint
 const isMobileDevice = () => {
     if (typeof window === "undefined") return false;
-    // Use 960px breakpoint to match Material-UI's "md" breakpoint for mobile and tablet
+    // Keep this aligned with MUI's md breakpoint.
     return window.innerWidth < 960;
 };
 
-// Conditionally import leaflet only in browser environment
+// Leaflet reads window during import.
 const getLeaflet = () => {
     if (haveWindow()) {
         // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -18,14 +17,14 @@ const getLeaflet = () => {
     return null;
 };
 
-// Calculate distance between two points using Haversine formula (returns distance in km)
+// Haversine distance in kilometers.
 export const calculateDistance = (
     lat1: number,
     lng1: number,
     lat2: number,
     lng2: number,
 ): number => {
-    const R = 6371; // Radius of Earth in kilometers
+    const R = 6371;
     const dLat = (lat2 - lat1) * (Math.PI / 180);
     const dLng = (lng2 - lng1) * (Math.PI / 180);
     const a =
@@ -38,14 +37,13 @@ export const calculateDistance = (
     return R * c;
 };
 
-// Geographic clustering with responsive distance thresholds and day separation
 export const clusterPhotosByProximity = (photos: JourneyPoint[]) => {
     if (photos.length === 0) return [];
 
-    // 5km clustering distance (roughly 0.05 degrees)
-    const distanceThreshold = 0.05; // About 5km in degrees
+    // Approximate five kilometers in coordinate degrees.
+    const distanceThreshold = 0.05;
 
-    // First, group photos by day
+    // Never cluster photos across local calendar days.
     const photosByDay = new Map<string, JourneyPoint[]>();
     photos.forEach((photo) => {
         const date = new Date(photo.timestamp);
@@ -57,7 +55,6 @@ export const clusterPhotosByProximity = (photos: JourneyPoint[]) => {
         photosByDay.get(dayKey)!.push(photo);
     });
 
-    // Then cluster within each day
     const allClusters: JourneyPoint[][] = [];
 
     photosByDay.forEach((dayPhotos) => {
@@ -90,13 +87,10 @@ export const clusterPhotosByProximity = (photos: JourneyPoint[]) => {
     return allClusters;
 };
 
-// Return fixed zoom level of 10 for consistent positioning
 export const calculateOptimalZoom = (): number => {
-    // Return fixed zoom of 10 as per new requirements
     return 10;
 };
 
-// Function to create icon with specific image and progress styling
 export const createIcon = (
     imageSrc: string,
     size = 40,
@@ -106,20 +100,17 @@ export const createIcon = (
 ): import("leaflet").DivIcon | null => {
     const leaflet = getLeaflet();
     if (typeof window === "undefined" || !leaflet) {
-        // Fallback icon for SSR
         return null;
     }
 
-    const pinSize = size + 16; // Make it square and bigger
-    const triangleHeight = size <= 30 ? 7 : 10; // Smaller triangle for mobile
-    const pinHeight = pinSize + triangleHeight + 2; // Add space for triangle
+    const pinSize = size + 16;
+    const triangleHeight = size <= 30 ? 7 : 10;
+    const pinHeight = pinSize + triangleHeight + 2;
     const hasImage = imageSrc && imageSrc.trim() !== "";
 
-    // Adjust border radius for smaller mobile markers
     const outerBorderRadius = size <= 30 ? 14 : 16;
     const innerBorderRadius = size <= 30 ? 10 : 12;
 
-    // Create cache key based on all parameters including border radius and triangle size
     const cacheKey = `icon_${imageSrc}_${size}_${borderColor}_${isReached}_${outerBorderRadius}_${innerBorderRadius}_${triangleHeight}`;
 
     const cachedIcon = iconCache.get(cacheKey);
@@ -136,7 +127,6 @@ export const createIcon = (
           cursor: pointer;
           transition: all 0.3s ease;
         ">
-          <!-- Main rounded rectangle container -->
           <div style="
             width: ${pinSize}px;
             height: ${pinSize}px;
@@ -154,7 +144,6 @@ export const createIcon = (
             ${
                 hasImage
                     ? `
-              <!-- Image inside the rounded rectangle -->
               <img
                 src="${imageSrc}"
                 style="
@@ -167,7 +156,6 @@ export const createIcon = (
               />
             `
                     : `
-              <!-- Loading skeleton when no image -->
               <div style="
                 width: 100%;
                 height: 100%;
@@ -184,8 +172,6 @@ export const createIcon = (
             `
             }
           </div>
-          
-          <!-- Triangle at the bottom -->
           <div style="
             position: absolute;
             bottom: 2px;
@@ -206,106 +192,49 @@ export const createIcon = (
         popupAnchor: [0, -pinHeight],
     });
 
-    // Cache the icon
     iconCache.set(cacheKey, icon);
     return icon;
 };
 
-// Calculate map center with first location positioned at 20% from right edge
+// Offset markers right to leave room for the desktop timeline.
+// The constants below are tuned around zoom level 10.
 export const getMapCenter = (
     photoClusters: JourneyPoint[][],
     journeyData: JourneyPoint[],
 ): [number, number] => {
-    // If no clusters yet, check journey data
     if (photoClusters.length === 0) {
         const firstPoint = journeyData[0];
-        if (!firstPoint) return [0, 0]; // Fallback, but map won't render anyway
+        if (!firstPoint) return [0, 0];
         return [firstPoint.lat, firstPoint.lng];
     }
 
-    // Start at first cluster center
     const firstCluster = photoClusters[0];
-    if (!firstCluster || firstCluster.length === 0) return [0, 0]; // Fallback, but map won't render anyway
+    if (!firstCluster || firstCluster.length === 0) return [0, 0];
 
     const firstLat =
         firstCluster.reduce((sum, p) => sum + p.lat, 0) / firstCluster.length;
     const firstLng =
         firstCluster.reduce((sum, p) => sum + p.lng, 0) / firstCluster.length;
 
-    // Position first location at 20% from right edge (80% from left)
-    // At zoom level 10, each pixel represents approximately 152.87 meters
-    // On mobile, timeline is at bottom so full width is available; on desktop, timeline takes up 50% of screen width
-    // We want the first location to be at 20% from right of the visible map area
-    // This means shifting map center left so marker appears more to the right
-
-    const isMobile = isMobileDevice();
-    const timelineWidthRatio = isMobile ? 0.0 : 0.5; // Mobile: full width, Desktop: timeline takes up 50% of screen
-
-    // At zoom 10, approximately 0.35 degrees per 1000px at equator
-    // For positioning, we need to shift the longitude to place marker at desired position
-    const degreesPerPixelAtZoom10 = 0.35 / 1000; // rough approximation
-    const basePixelsToShift =
-        (window.innerWidth || 1400) * (1 - timelineWidthRatio);
-    const pixelsToShiftFor20Percent = isMobile
-        ? basePixelsToShift * 0.6 // Mobile: less aggressive positioning (60% instead of 300%)
-        : basePixelsToShift * 3.0; // Desktop: 300% of visible map width to shift map left
-    const lngShift = pixelsToShiftFor20Percent * degreesPerPixelAtZoom10;
-
-    const adjustedLng = firstLng - lngShift;
-
-    return [firstLat, adjustedLng];
+    return offsetLocation(firstLat, firstLng);
 };
 
-// Calculate position for a location to be at 20% from right edge of visible map
 export const getLocationPosition = (
     lat: number,
     lng: number,
-): [number, number] => {
-    // Position location at 20% from right edge (80% from left) of visible map area
-    // On mobile, the timeline is at the bottom, not the side, so full width is available for map
-    const isMobile = isMobileDevice();
-    const timelineWidthRatio = isMobile ? 0.0 : 0.5; // Mobile: full width, Desktop: timeline takes up 50% of screen
-    const degreesPerPixelAtZoom10 = 0.35 / 1000; // rough approximation at zoom 10
+): [number, number] => offsetLocation(lat, lng);
 
-    // Calculate shift to position marker at 20% from right edge of visible map
-    // Need to shift map center left so the marker appears more to the right
-    // On mobile, use less aggressive positioning since we have full width
+const offsetLocation = (lat: number, lng: number): [number, number] => {
+    const isMobile = isMobileDevice();
+    const timelineWidthRatio = isMobile ? 0.0 : 0.5;
+    const degreesPerPixelAtZoom10 = 0.35 / 1000;
+
     const basePixelsToShift =
         (window.innerWidth || 1400) * (1 - timelineWidthRatio);
     const pixelsToShiftFor20Percent = isMobile
-        ? basePixelsToShift * 0.6 // Mobile: less aggressive positioning (60% instead of 300%)
-        : basePixelsToShift * 3.0; // Desktop: 300% of visible map width to shift map left
+        ? basePixelsToShift * 0.6
+        : basePixelsToShift * 3.0;
     const lngShift = pixelsToShiftFor20Percent * degreesPerPixelAtZoom10;
-
-    return [lat, lng - lngShift];
-};
-
-// Calculate position for a location to be at 20% from right edge at a specific zoom level
-export const getLocationPositionAtZoom = (
-    lat: number,
-    lng: number,
-    zoom: number,
-): [number, number] => {
-    // Position location at 20% from right edge (80% from left) of visible map area
-    // On mobile, the timeline is at the bottom, not the side, so full width is available for map
-    const isMobile = isMobileDevice();
-    const timelineWidthRatio = isMobile ? 0.0 : 0.5; // Mobile: full width, Desktop: timeline takes up 50% of screen
-
-    // Scale the positioning offset based on zoom level
-    // At higher zoom levels, we need less offset since we're more zoomed in
-    const baseDegreesPerPixelAtZoom10 = 0.35 / 1000;
-    const zoomScaleFactor = Math.pow(2, 10 - zoom); // Scale relative to zoom 10
-    const degreesPerPixelAtCurrentZoom =
-        baseDegreesPerPixelAtZoom10 * zoomScaleFactor;
-
-    // Calculate shift to position marker at 20% from right edge of visible map
-    // On mobile, use less aggressive positioning since we have full width
-    const basePixelsToShift =
-        (window.innerWidth || 1400) * (1 - timelineWidthRatio);
-    const pixelsToShiftFor20Percent = isMobile
-        ? basePixelsToShift * 0.6 // Mobile: less aggressive positioning (60% instead of 300%)
-        : basePixelsToShift * 3.0; // Desktop: 300% of visible map width to shift map left
-    const lngShift = pixelsToShiftFor20Percent * degreesPerPixelAtCurrentZoom;
 
     return [lat, lng - lngShift];
 };

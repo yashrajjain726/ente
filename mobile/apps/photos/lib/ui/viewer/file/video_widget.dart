@@ -2,6 +2,7 @@ import "dart:async";
 import "dart:io";
 
 import "package:ente_pure_utils/ente_pure_utils.dart";
+import "package:ente_ui/components/loading_widget.dart";
 import "package:flutter/foundation.dart";
 import "package:flutter/material.dart";
 import "package:fluttertoast/fluttertoast.dart";
@@ -16,7 +17,6 @@ import "package:photos/service_locator.dart";
 import "package:photos/services/video_preview_service.dart";
 import "package:photos/states/detail_page_state.dart";
 import "package:photos/theme/colors.dart";
-import "package:photos/ui/common/loading_widget.dart";
 import "package:photos/ui/notification/toast.dart";
 import "package:photos/ui/viewer/file/video_widget_media_kit.dart";
 import "package:photos/ui/viewer/file/video_widget_native.dart";

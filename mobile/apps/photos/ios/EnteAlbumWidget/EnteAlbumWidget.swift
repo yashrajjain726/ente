@@ -198,7 +198,7 @@ struct EnteAlbumWidgetEntryView: View {
                             )
                     }
                 } else if let uiImage = UIImage(named: "AlbumsWidgetDefault") {
-                    VStack(spacing: 8) {
+                    VStack(spacing: 4) {
                         Spacer()
                         Image(uiImage: uiImage)
                             .resizable()
@@ -206,8 +206,15 @@ struct EnteAlbumWidgetEntryView: View {
                             .aspectRatio(contentMode: .fit)
                             .padding(8)
 
-                        Text("Go to Settings -> Widgets to customise the widget")
-                            .font(.custom("Inter", size: 12, relativeTo: .caption))
+                        Text("Albums")
+                            .font(.custom("Inter", size: 14, relativeTo: .caption))
+                            .bold()
+                            .foregroundStyle(.white)
+                            .multilineTextAlignment(.center)
+                            .backwardWidgetAccentable(true)
+
+                        Text("Click to customise")
+                            .font(.custom("Inter", size: 12, relativeTo: .caption2))
                             .foregroundStyle(.white)  // Tint-aware color
                             .multilineTextAlignment(.center)
                             .padding(.bottom, 12)
@@ -224,8 +231,9 @@ struct EnteAlbumWidgetEntryView: View {
             .edgesIgnoringSafeArea(.all)
             .widgetURL(
                 URL(
-                    string:
-                        "albumwidget://message?generatedId=\(entry.generatedId != nil ? String(entry.generatedId!) : "nan")&mainKey=\(entry.mainKey != nil ? entry.mainKey! : "nan")&homeWidget"
+                    string: entry.generatedId != nil
+                        ? "albumwidget://message?generatedId=\(entry.generatedId!)&mainKey=\(entry.mainKey ?? "")&homeWidget"
+                        : "albumwidget://configure?homeWidget"
                 )
             )
         }

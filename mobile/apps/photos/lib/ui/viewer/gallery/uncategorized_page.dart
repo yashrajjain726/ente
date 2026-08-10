@@ -1,10 +1,10 @@
+import "package:ente_strings/ente_strings.dart";
 import 'package:flutter/material.dart';
 import 'package:photos/core/event_bus.dart';
 import 'package:photos/db/files_db.dart';
 import 'package:photos/events/collection_meta_event.dart';
 import 'package:photos/events/collection_updated_event.dart';
 import 'package:photos/events/files_updated_event.dart';
-import "package:photos/generated/l10n.dart";
 import 'package:photos/models/collection/collection.dart';
 import 'package:photos/models/file_load_result.dart';
 import 'package:photos/models/gallery_type.dart';
@@ -42,7 +42,7 @@ class UnCategorizedPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final appBar = GalleryAppBarWidget.sliverConfig(
       appBarType,
-      AppLocalizations.of(context).uncategorized,
+      context.strings.uncategorized,
       _selectedFiles,
       collection: collection,
     );
@@ -86,10 +86,10 @@ class UnCategorizedPage extends StatelessWidget {
       selectedFiles: _selectedFiles,
       sortAsyncFn: () => collection.pubMagicMetadata.asc ?? false,
       initialFiles: null,
-      albumName: AppLocalizations.of(context).uncategorized,
+      albumName: context.strings.uncategorized,
       emptyState: EmptyStateComponent(
         assetPath: "assets/empty-uncategorized.png",
-        title: AppLocalizations.of(context).uncategorizedItemsWillShowUpHere,
+        title: context.strings.uncategorizedItemsWillShowUpHere,
       ),
     );
     return GalleryBoundariesProvider(

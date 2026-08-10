@@ -1,11 +1,11 @@
 import 'dart:convert';
 
-import 'package:ente_auth/l10n/l10n.dart';
 import 'package:ente_auth/models/code.dart';
 import 'package:ente_auth/models/code_display.dart';
 import 'package:ente_auth/ui/settings/data/import/import_file_cleanup.dart';
 import 'package:ente_auth/ui/settings/data/import/import_flow.dart';
 import 'package:ente_auth/utils/dialog_util.dart';
+import 'package:ente_strings/ente_strings.dart';
 import 'package:ente_ui/components/progress_dialog.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
@@ -16,12 +16,12 @@ import 'package:pointycastle/export.dart';
 final _logger = Logger('AndOTPImport');
 
 Future<void> showAndOTPImportInstruction(BuildContext context) async {
-  final l10n = context.l10n;
+  final l10n = context.strings;
   await showFileImportInstruction(
     context: context,
     title: "andOTP",
     body: l10n.importAndOTPGuide,
-    actionLabel: l10n.importSelectAppExport("andOTP"),
+    actionLabel: l10n.importSelectAppExport(appName: "andOTP"),
     semanticsIdentifier: 'auth_import_instruction_andotp',
     onImport: () => _pickAndOTPFile(context),
   );
@@ -30,7 +30,7 @@ Future<void> showAndOTPImportInstruction(BuildContext context) async {
 Future<void> _pickAndOTPFile(BuildContext context) async {
   await pickAndProcessImportFile(
     context: context,
-    dialogTitle: context.l10n.importSelectAppExport("andOTP"),
+    dialogTitle: context.strings.importSelectAppExport(appName: "andOTP"),
     type: FileType.custom,
     allowedExtensions: ['json', 'aes'],
     showProgressBeforeProcessing: false,
@@ -71,7 +71,7 @@ Future<int?> _processAndOTPFile(
     try {
       password = await promptForImportPassword(
         context,
-        title: context.l10n.enterPasswordToDecryptAndOTP,
+        title: context.strings.enterPasswordToDecryptAndOTP,
       );
       if (password == null) {
         return null;
@@ -89,8 +89,8 @@ Future<int?> _processAndOTPFile(
         if (!context.mounted) return null;
         await showErrorDialog(
           context,
-          context.l10n.failedToDecryptAndOTPBackup,
-          context.l10n.pleaseCheckPasswordAndTryAgain,
+          context.strings.failedToDecryptAndOTPBackup,
+          context.strings.pleaseCheckPasswordAndTryAgain,
         );
       }
       return null;

@@ -7,6 +7,7 @@ import "package:ente_components/ente_components.dart";
 import 'package:ente_events/event_bus.dart';
 import "package:ente_events/models/trigger_logout_event.dart";
 import "package:ente_legacy/events/legacy_kit_created_event.dart";
+import 'package:ente_strings/ente_strings.dart';
 import 'package:ente_ui/utils/dialog_util.dart';
 import "package:ente_utils/email_util.dart";
 import 'package:flutter/material.dart';
@@ -15,7 +16,6 @@ import "package:hugeicons/hugeicons.dart";
 import 'package:listen_sharing_intent/listen_sharing_intent.dart';
 import 'package:locker/events/collections_updated_event.dart';
 import 'package:locker/events/opened_settings_event.dart';
-import 'package:locker/l10n/l10n.dart';
 import 'package:locker/models/selected_files.dart';
 import 'package:locker/services/collections/collections_service.dart';
 import 'package:locker/services/collections/models/collection.dart';
@@ -87,7 +87,7 @@ class LockerHomeHeader extends StatelessWidget {
                             ),
                             const SizedBox(width: 8),
                             Text(
-                              context.l10n.syncing,
+                              context.strings.syncing,
                               style: TextStyles.body.copyWith(
                                 color: colors.textBase,
                               ),
@@ -308,7 +308,7 @@ class _HomePageState extends UploaderPageState<HomePage>
     if (!mounted) return;
 
     final navigator = Navigator.of(context);
-    final l10n = context.l10n;
+    final l10n = context.strings;
 
     await showBottomSheetComponent(
       context: context,
@@ -320,7 +320,7 @@ class _HomePageState extends UploaderPageState<HomePage>
         illustration: LockerBottomSheetIllustration.warningGrey,
         actions: [
           ButtonComponent(
-            label: context.l10n.ok,
+            label: context.strings.ok,
             onTap: () async {
               navigator.pop();
               final dialog = createProgressDialog(context, l10n.pleaseWait);
@@ -423,12 +423,12 @@ class _HomePageState extends UploaderPageState<HomePage>
         await showBottomSheetComponent(
           context: context,
           builder: (_) => BottomSheetComponent(
-            title: context.l10n.uploadError,
-            message: context.l10n.somethingWentWrong,
+            title: context.strings.uploadError,
+            message: context.strings.somethingWentWrong,
             illustration: LockerBottomSheetIllustration.warningGrey,
             actions: [
               ButtonComponent(
-                label: context.l10n.contactSupport,
+                label: context.strings.contactSupport,
                 onTap: () async {
                   await sendLogs(context, "support@ente.com", postShare: () {});
                 },
@@ -694,13 +694,13 @@ class _HomePageState extends UploaderPageState<HomePage>
             children: [
               EmptyStateWidget(
                 assetPath: 'assets/empty_state.png',
-                title: context.l10n.somethingWentWrong,
+                title: context.strings.somethingWentWrong,
                 subtitle: _error!,
                 showBorder: false,
               ),
               const SizedBox(height: 20),
               ButtonComponent(
-                label: context.l10n.retry,
+                label: context.strings.retry,
                 onTap: _loadCollections,
               ),
             ],
@@ -815,7 +815,7 @@ class _HomePageState extends UploaderPageState<HomePage>
         child: TextInputComponent(
           controller: searchController,
           focusNode: searchFocusNode,
-          hintText: context.l10n.searchHint,
+          hintText: context.strings.documentSearchHint,
           onChanged: _handleSearchChange,
           autocorrect: false,
           enableSuggestions: false,

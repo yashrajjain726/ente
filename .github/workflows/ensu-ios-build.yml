@@ -40,8 +40,7 @@ jobs:
             - run: cargo codegen native
               working-directory: rust
 
-            # This pull_request workflow does not provide the inference fixtures,
-            # so this step is only a build + startup smoke test.
+            # PRs lack inference fixtures, so this only tests build and startup.
             - name: Build and test Ensu
               working-directory: mobile/native/apple/apps/ensu
               run: xcodebuild test -scheme Ensu -destination 'platform=iOS Simulator,name=iPhone 17'

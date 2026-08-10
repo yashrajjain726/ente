@@ -8,7 +8,7 @@ use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
 use crate::crypto as contacts_crypto;
-use crate::error::{ContactsError, Result};
+use crate::error::{Error, Result};
 use crate::legacy_kit::{
     create_legacy_kit_request, decode_download_content, decode_legacy_kit_record,
     validate_notice_period,
@@ -163,9 +163,9 @@ impl ContactsCtx {
                 .root_contact_key
                 .read()
                 .expect("root contact key lock poisoned");
-            let root_contact_key = root_contact_key_guard.as_ref().ok_or_else(|| {
-                ContactsError::InvalidInput("contacts root key is unresolved".into())
-            })?;
+            let root_contact_key = root_contact_key_guard
+                .as_ref()
+                .ok_or_else(|| Error::InvalidInput("contacts root key is unresolved".into()))?;
             contacts_crypto::wrap_contact_key(&contact_key, root_contact_key)?
         };
         let encrypted_data = contacts_crypto::encrypt_contact_data(data, &contact_key)?;
@@ -244,15 +244,15 @@ impl ContactsCtx {
         let encrypted_key = current
             .encrypted_key
             .as_deref()
-            .ok_or(ContactsError::MissingEncryptedKey)?;
+            .ok_or(Error::MissingEncryptedKey)?;
         let contact_key = {
             let root_contact_key_guard = self
                 .root_contact_key
                 .read()
                 .expect("root contact key lock poisoned");
-            let root_contact_key = root_contact_key_guard.as_ref().ok_or_else(|| {
-                ContactsError::InvalidInput("contacts root key is unresolved".into())
-            })?;
+            let root_contact_key = root_contact_key_guard
+                .as_ref()
+                .ok_or_else(|| Error::InvalidInput("contacts root key is unresolved".into()))?;
             contacts_crypto::unwrap_contact_key(encrypted_key, root_contact_key)?
         };
         let encrypted_data = contacts_crypto::encrypt_contact_data(data, &contact_key)?;
@@ -301,15 +301,15 @@ impl ContactsCtx {
         let encrypted_key = current
             .encrypted_key
             .as_deref()
-            .ok_or(ContactsError::MissingEncryptedKey)?;
+            .ok_or(Error::MissingEncryptedKey)?;
         let contact_key = {
             let root_contact_key_guard = self
                 .root_contact_key
                 .read()
                 .expect("root contact key lock poisoned");
-            let root_contact_key = root_contact_key_guard.as_ref().ok_or_else(|| {
-                ContactsError::InvalidInput("contacts root key is unresolved".into())
-            })?;
+            let root_contact_key = root_contact_key_guard
+                .as_ref()
+                .ok_or_else(|| Error::InvalidInput("contacts root key is unresolved".into()))?;
             contacts_crypto::unwrap_contact_key(encrypted_key, root_contact_key)?
         };
         let encrypted_attachment =
@@ -398,22 +398,22 @@ impl ContactsCtx {
             .json::<ContactEntityResponse>()
             .await?;
         if current.is_deleted || current.profile_picture_attachment_id.is_none() {
-            return Err(ContactsError::ProfilePictureNotFound);
+            return Err(Error::ProfilePictureNotFound);
         }
         self.ensure_confirmed_root_contact_key().await?;
 
         let encrypted_key = current
             .encrypted_key
             .as_deref()
-            .ok_or(ContactsError::MissingEncryptedKey)?;
+            .ok_or(Error::MissingEncryptedKey)?;
         let contact_key = {
             let root_contact_key_guard = self
                 .root_contact_key
                 .read()
                 .expect("root contact key lock poisoned");
-            let root_contact_key = root_contact_key_guard.as_ref().ok_or_else(|| {
-                ContactsError::InvalidInput("contacts root key is unresolved".into())
-            })?;
+            let root_contact_key = root_contact_key_guard
+                .as_ref()
+                .ok_or_else(|| Error::InvalidInput("contacts root key is unresolved".into()))?;
             contacts_crypto::unwrap_contact_key(encrypted_key, root_contact_key)?
         };
         let encrypted_picture = self
@@ -502,7 +502,7 @@ impl ContactsCtx {
         let public_key = self
             .legacy_public_key(email)
             .await?
-            .ok_or_else(|| ContactsError::InvalidInput("legacy contact is not on Ente".into()))?;
+            .ok_or_else(|| Error::InvalidInput("legacy contact is not on Ente".into()))?;
         let recovery_key = self.current_recovery_key(current_user_key_attrs)?;
         let recipient_public_key = b64::decode(&public_key)?;
         let encrypted_key = sealed::seal(
@@ -790,7 +790,7 @@ impl ContactsCtx {
             .await?;
         if response.status() == 400 {
             return if response.text().await?.contains("active recovery session") {
-                Err(ContactsError::ActiveRecoverySession)
+                Err(Error::ActiveRecoverySession)
             } else {
                 Err(http::Error::Http {
                     status: 400,
@@ -841,18 +841,18 @@ impl ContactsCtx {
         let encrypted_key = entity
             .encrypted_key
             .as_deref()
-            .ok_or(ContactsError::MissingEncryptedKey)?;
+            .ok_or(Error::MissingEncryptedKey)?;
         let encrypted_data = entity
             .encrypted_data
             .as_deref()
-            .ok_or(ContactsError::MissingEncryptedData)?;
+            .ok_or(Error::MissingEncryptedData)?;
         let root_contact_key_guard = self
             .root_contact_key
             .read()
             .expect("root contact key lock poisoned");
         let root_contact_key = root_contact_key_guard
             .as_ref()
-            .ok_or_else(|| ContactsError::InvalidInput("contacts root key is unresolved".into()))?;
+            .ok_or_else(|| Error::InvalidInput("contacts root key is unresolved".into()))?;
         let contact_key = contacts_crypto::unwrap_contact_key(encrypted_key, root_contact_key)?;
         let data = contacts_crypto::decrypt_contact_data(encrypted_data, &contact_key)?;
 
@@ -1026,7 +1026,7 @@ fn decrypt_master_key_with_recovery_key(
         .master_key_encrypted_with_recovery_key
         .as_ref()
         .ok_or_else(|| {
-            ContactsError::InvalidInput(
+            Error::InvalidInput(
                 "target key attributes missing masterKeyEncryptedWithRecoveryKey".into(),
             )
         })?;
@@ -1034,9 +1034,7 @@ fn decrypt_master_key_with_recovery_key(
         .master_key_decryption_nonce
         .as_ref()
         .ok_or_else(|| {
-            ContactsError::InvalidInput(
-                "target key attributes missing masterKeyDecryptionNonce".into(),
-            )
+            Error::InvalidInput("target key attributes missing masterKeyDecryptionNonce".into())
         })?;
     let encrypted_master_key = b64::decode(encrypted_master_key)?;
     let master_key_nonce = b64::decode(master_key_nonce)?;

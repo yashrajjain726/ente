@@ -1,7 +1,7 @@
 import "package:ente_components/ente_components.dart";
+import "package:ente_strings/ente_strings.dart";
 import 'package:flutter/material.dart';
 import 'package:photos/core/configuration.dart';
-import "package:photos/generated/l10n.dart";
 import 'package:photos/ui/account/password_entry_page.dart';
 import "package:photos/ui/components/alert_bottom_sheet.dart";
 import 'package:photos/ui/notification/toast.dart';
@@ -43,7 +43,7 @@ class _RecoveryPageState extends State<RecoveryPage> {
           },
         ),
         title: Text(
-          AppLocalizations.of(context).recoverAccount,
+          context.strings.recoverAccount,
           style: TextStyles.large.copyWith(color: colors.textBase),
         ),
         centerTitle: true,
@@ -53,7 +53,7 @@ class _RecoveryPageState extends State<RecoveryPage> {
         padding: const EdgeInsets.symmetric(horizontal: 16),
         child: ButtonComponent(
           key: const ValueKey("recoveryButton"),
-          label: AppLocalizations.of(context).logInLabel,
+          label: context.strings.logInLabel,
           isDisabled: !isFormValid,
           onTap: isFormValid ? _onRecoverPressed : null,
         ),
@@ -69,8 +69,8 @@ class _RecoveryPageState extends State<RecoveryPage> {
         children: [
           const SizedBox(height: 12),
           TextInputComponent(
-            label: AppLocalizations.of(context).recoveryKey,
-            hintText: AppLocalizations.of(context).enterYourRecoveryKey,
+            label: context.strings.recoveryKey,
+            hintText: context.strings.enterYourRecoveryKey,
             controller: _recoveryKeyController,
             keyboardType: TextInputType.multiline,
             maxLines: null,
@@ -84,7 +84,7 @@ class _RecoveryPageState extends State<RecoveryPage> {
           Align(
             alignment: Alignment.centerRight,
             child: ButtonComponent(
-              label: AppLocalizations.of(context).noRecoveryKey,
+              label: context.strings.forgotRecoveryKey,
               variant: ButtonComponentVariant.link,
               size: ButtonComponentSize.small,
               shouldSurfaceExecutionStates: false,
@@ -92,10 +92,8 @@ class _RecoveryPageState extends State<RecoveryPage> {
                 // ignore: unawaited_futures
                 showAlertBottomSheet(
                   context,
-                  title: AppLocalizations.of(context).sorry,
-                  message: AppLocalizations.of(
-                    context,
-                  ).noRecoveryKeyNoDecryption,
+                  title: context.strings.sorry,
+                  message: context.strings.noRecoveryKeyNoDecryption,
                   assetPath: 'assets/warning-grey.png',
                 );
               },
@@ -108,16 +106,13 @@ class _RecoveryPageState extends State<RecoveryPage> {
 
   Future<void> _onRecoverPressed() async {
     FocusScope.of(context).unfocus();
-    final dialog = createProgressDialog(
-      context,
-      AppLocalizations.of(context).decrypting,
-    );
+    final dialog = createProgressDialog(context, context.strings.decrypting);
     await dialog.show();
     try {
       await Configuration.instance.recover(_recoveryKeyController.text.trim());
       await dialog.hide();
       if (!mounted) return;
-      showShortToast(context, AppLocalizations.of(context).recoverySuccessful);
+      showShortToast(context, context.strings.recoverySuccessful);
       if (!mounted) return;
       // ignore: unawaited_futures
       Navigator.of(context).pushReplacement(
@@ -133,7 +128,7 @@ class _RecoveryPageState extends State<RecoveryPage> {
     } catch (e) {
       await dialog.hide();
       if (!mounted) return;
-      String errMessage = AppLocalizations.of(context).incorrectRecoveryKeyBody;
+      String errMessage = context.strings.incorrectRecoveryKeyBody;
       if (e is AssertionError) {
         errMessage = '$errMessage : ${e.message}';
       }
@@ -141,7 +136,7 @@ class _RecoveryPageState extends State<RecoveryPage> {
       // ignore: unawaited_futures
       showAlertBottomSheet(
         context,
-        title: AppLocalizations.of(context).incorrectRecoveryKeyTitle,
+        title: context.strings.incorrectRecoveryKeyTitle,
         message: errMessage,
         assetPath: 'assets/warning-grey.png',
       );

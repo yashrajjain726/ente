@@ -88,7 +88,6 @@ export const TopNavButtons: React.FC<TopNavButtonsProps> = ({
     );
 };
 
-// Styled components
 const ButtonContainer = styled(Box)({
     position: "fixed",
     top: "58px",

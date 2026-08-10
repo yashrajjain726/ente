@@ -1,6 +1,7 @@
+import { useBaseContext } from "ente-base/context";
 import type { Collection } from "ente-media/collection";
 import type { EnteFile } from "ente-media/file";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 
 import type { JourneyPoint } from "../types";
 import { loadCoverImage, processPhotosData } from "../utils/dataProcessing";
@@ -34,7 +35,9 @@ export const useDataProcessing = ({
     setIsLoadingLocations,
     setCoverImageUrl,
 }: UseDataProcessingParams) => {
-    // Process photos data when files change
+    const { onGenericError } = useBaseContext();
+    const reportedCoverErrorFileIDRef = useRef<number | undefined>(undefined);
+
     useEffect(() => {
         const hasFilesCountChanged = files.length !== filesCountRef.current;
         filesCountRef.current = files.length;
@@ -45,10 +48,12 @@ export const useDataProcessing = ({
 
         thumbnailsGeneratedRef.current = false;
 
-        const { photoData, hasLocationData } = processPhotosData({
-            files,
-            locationDataRef,
-        });
+        const { photoData, hasLocationData, processingError } =
+            processPhotosData({ files, locationDataRef });
+
+        if (processingError) {
+            onGenericError(processingError);
+        }
 
         setJourneyData(photoData);
         setIsInitialLoad(false);
@@ -65,21 +70,35 @@ export const useDataProcessing = ({
         setJourneyData,
         setIsInitialLoad,
         setIsLoadingLocations,
+        onGenericError,
     ]);
 
-    // Load cover image after data loads
     useEffect(() => {
         const loadCover = async () => {
-            const coverUrl = await loadCoverImage({
+            const { coverImageURL, coverImageError } = await loadCoverImage({
                 journeyData,
                 files,
                 collection,
             });
-            if (coverUrl) {
-                setCoverImageUrl(coverUrl);
+            const coverFileID =
+                collection?.pubMagicMetadata?.data.coverID ??
+                journeyData[0]?.fileId;
+
+            if (
+                coverImageError &&
+                reportedCoverErrorFileIDRef.current !== coverFileID
+            ) {
+                reportedCoverErrorFileIDRef.current = coverFileID;
+                onGenericError(coverImageError);
+            } else if (!coverImageError) {
+                reportedCoverErrorFileIDRef.current = undefined;
+            }
+
+            if (coverImageURL) {
+                setCoverImageUrl(coverImageURL);
             }
         };
 
         void loadCover();
-    }, [journeyData, files, collection, setCoverImageUrl]);
+    }, [journeyData, files, collection, setCoverImageUrl, onGenericError]);
 };

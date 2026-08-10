@@ -171,34 +171,15 @@ fn should_attempt_tiff_fallback(format: Option<ImageFormat>) -> bool {
 fn decode_with_tiff_crate(image_path: &str) -> ImageResult<DecodedDynamicImage> {
     let file = File::open(image_path)
         .map_err(|e| ImageError::Decode(format!("failed to open TIFF file '{image_path}': {e}")))?;
-    let mut decoder = TiffDecoder::new(BufReader::new(file))
-        .map_err(|e| ImageError::Decode(format!("failed to initialize TIFF decoder: {e}")))?;
-    let (width, height) = decoder
-        .dimensions()
-        .map_err(|e| ImageError::Decode(format!("failed to read TIFF dimensions: {e}")))?;
-    let color_type = decoder
-        .colortype()
-        .map_err(|e| ImageError::Decode(format!("failed to read TIFF color type: {e}")))?;
-    let icc_profile = decoder.get_tag_u8_vec(TiffTag::IccProfile).ok();
-    let orientation = decoder
-        .find_tag_unsigned::<u16>(TiffTag::Orientation)
-        .ok()
-        .flatten()
-        .and_then(|value| u8::try_from(value).ok())
-        .and_then(Orientation::from_exif);
-    let decoded = decoder
-        .read_image()
-        .map_err(|e| ImageError::Decode(format!("failed to decode TIFF image data: {e}")))?;
-
-    Ok(DecodedDynamicImage {
-        image: dynamic_image_from_tiff(image_path, width, height, color_type, decoded)?,
-        icc_profile,
-        orientation,
-    })
+    decode_tiff(BufReader::new(file), image_path)
 }
 
 fn decode_tiff_from_bytes(image_bytes: &[u8]) -> ImageResult<DecodedDynamicImage> {
-    let mut decoder = TiffDecoder::new(Cursor::new(image_bytes))
+    decode_tiff(Cursor::new(image_bytes), "<bytes>")
+}
+
+fn decode_tiff<R: Read + Seek>(reader: R, source: &str) -> ImageResult<DecodedDynamicImage> {
+    let mut decoder = TiffDecoder::new(reader)
         .map_err(|e| ImageError::Decode(format!("failed to initialize TIFF decoder: {e}")))?;
     let (width, height) = decoder
         .dimensions()
@@ -218,14 +199,14 @@ fn decode_tiff_from_bytes(image_bytes: &[u8]) -> ImageResult<DecodedDynamicImage
         .map_err(|e| ImageError::Decode(format!("failed to decode TIFF image data: {e}")))?;
 
     Ok(DecodedDynamicImage {
-        image: dynamic_image_from_tiff("<bytes>", width, height, color_type, decoded)?,
+        image: dynamic_image_from_tiff(source, width, height, color_type, decoded)?,
         icc_profile,
         orientation,
     })
 }
 
 fn dynamic_image_from_tiff(
-    image_path: &str,
+    source: &str,
     width: u32,
     height: u32,
     color_type: TiffColorType,
@@ -234,60 +215,59 @@ fn dynamic_image_from_tiff(
     match (color_type, decoded) {
         (TiffColorType::Gray(8), TiffDecodingResult::U8(data)) => {
             let image = image::GrayImage::from_raw(width, height, data)
-                .ok_or_else(|| tiff_buffer_mismatch_error(image_path, width, height, "Gray(8)"))?;
+                .ok_or_else(|| tiff_buffer_mismatch_error(source, width, height, "Gray(8)"))?;
             Ok(DynamicImage::ImageLuma8(image))
         }
         (TiffColorType::GrayA(8), TiffDecodingResult::U8(data)) => {
             let image = image::GrayAlphaImage::from_raw(width, height, data)
-                .ok_or_else(|| tiff_buffer_mismatch_error(image_path, width, height, "GrayA(8)"))?;
+                .ok_or_else(|| tiff_buffer_mismatch_error(source, width, height, "GrayA(8)"))?;
             Ok(DynamicImage::ImageLumaA8(image))
         }
         (TiffColorType::RGB(8), TiffDecodingResult::U8(data)) => {
             let image = image::RgbImage::from_raw(width, height, data)
-                .ok_or_else(|| tiff_buffer_mismatch_error(image_path, width, height, "RGB(8)"))?;
+                .ok_or_else(|| tiff_buffer_mismatch_error(source, width, height, "RGB(8)"))?;
             Ok(DynamicImage::ImageRgb8(image))
         }
         (TiffColorType::RGBA(8), TiffDecodingResult::U8(data)) => {
             let image = image::RgbaImage::from_raw(width, height, data)
-                .ok_or_else(|| tiff_buffer_mismatch_error(image_path, width, height, "RGBA(8)"))?;
+                .ok_or_else(|| tiff_buffer_mismatch_error(source, width, height, "RGBA(8)"))?;
             Ok(DynamicImage::ImageRgba8(image))
         }
         (TiffColorType::Gray(16), TiffDecodingResult::U16(data)) => {
             let image = image::ImageBuffer::from_raw(width, height, data)
-                .ok_or_else(|| tiff_buffer_mismatch_error(image_path, width, height, "Gray(16)"))?;
+                .ok_or_else(|| tiff_buffer_mismatch_error(source, width, height, "Gray(16)"))?;
             Ok(DynamicImage::ImageLuma16(image))
         }
         (TiffColorType::GrayA(16), TiffDecodingResult::U16(data)) => {
-            let image = image::ImageBuffer::from_raw(width, height, data).ok_or_else(|| {
-                tiff_buffer_mismatch_error(image_path, width, height, "GrayA(16)")
-            })?;
+            let image = image::ImageBuffer::from_raw(width, height, data)
+                .ok_or_else(|| tiff_buffer_mismatch_error(source, width, height, "GrayA(16)"))?;
             Ok(DynamicImage::ImageLumaA16(image))
         }
         (TiffColorType::RGB(16), TiffDecodingResult::U16(data)) => {
             let image = image::ImageBuffer::from_raw(width, height, data)
-                .ok_or_else(|| tiff_buffer_mismatch_error(image_path, width, height, "RGB(16)"))?;
+                .ok_or_else(|| tiff_buffer_mismatch_error(source, width, height, "RGB(16)"))?;
             Ok(DynamicImage::ImageRgb16(image))
         }
         (TiffColorType::RGBA(16), TiffDecodingResult::U16(data)) => {
             let image = image::ImageBuffer::from_raw(width, height, data)
-                .ok_or_else(|| tiff_buffer_mismatch_error(image_path, width, height, "RGBA(16)"))?;
+                .ok_or_else(|| tiff_buffer_mismatch_error(source, width, height, "RGBA(16)"))?;
             Ok(DynamicImage::ImageRgba16(image))
         }
         (observed_color_type, observed_result_type) => Err(ImageError::Decode(format!(
-            "unsupported TIFF pixel format for '{image_path}': color_type={observed_color_type:?}, sample_type={}",
+            "unsupported TIFF pixel format for '{source}': color_type={observed_color_type:?}, sample_type={}",
             tiff_result_type_name(&observed_result_type)
         ))),
     }
 }
 
 fn tiff_buffer_mismatch_error(
-    image_path: &str,
+    source: &str,
     width: u32,
     height: u32,
     color_type: &str,
 ) -> ImageError {
     ImageError::Decode(format!(
-        "decoded TIFF buffer length does not match dimensions for '{image_path}': {width}x{height}, color_type={color_type}"
+        "decoded TIFF buffer length does not match dimensions for '{source}': {width}x{height}, color_type={color_type}"
     ))
 }
 
@@ -460,7 +440,7 @@ fn read_exif_orientation_from_bytes(image_bytes: &[u8]) -> Option<u8> {
         .filter(|value| (1..=8).contains(value))
 }
 
-/// jxl-oxide applies codestream orientation; ignore redundant container EXIF.
+// jxl-oxide applies codestream orientation; ignore redundant container EXIF.
 fn bytes_look_like_jxl(image_bytes: &[u8]) -> bool {
     const BARE_CODESTREAM_SIGNATURE: [u8; 2] = [0xFF, 0x0A];
     const CONTAINER_SIGNATURE: [u8; 12] = [

@@ -61,12 +61,6 @@ const hasFileViewerBackStateMarker = (state: unknown, marker: string) =>
     typeof state == "object" &&
     (state as Record<string, unknown>)[fileViewerBackStateKey] == marker;
 
-/**
- * Derived data for a file that is needed to display the file viewer controls
- * etc associated with the file.
- *
- * This is recomputed on-demand each time the slide changes.
- */
 export interface FileViewerFileAnnotation {
     fileID: number;
     showFavorite: boolean;
@@ -76,16 +70,12 @@ export interface FileViewerFileAnnotation {
     showCopyImage: boolean;
 }
 
-/**
- * A file, its annotation, and its item data, in a nice cosy box.
- */
 export interface FileViewerAnnotatedFile {
     file: EnteFile;
     annotation: FileViewerFileAnnotation;
     itemData: ItemData;
 }
 
-/** The type of sidebar to open initially in the file viewer. */
 export type FileViewerInitialSidebar = "likes" | "comments";
 
 export type FileViewerProps = ModalVisibilityProps & {
@@ -101,10 +91,6 @@ export type FileViewerProps = ModalVisibilityProps & {
     publicAlbumsCredentials?: PublicAlbumsCredentials;
     shouldCloseOnBrowserBack?: boolean;
     disableEscapeClose?: boolean;
-    /**
-     * Disable PhotoSwipe's gesture-driven dismissals, such as pinch-to-close
-     * and vertical drag close.
-     */
     disableGestureClose?: boolean;
     collectionKey?: string;
     onJoinAlbum?: () => void;
@@ -112,9 +98,6 @@ export type FileViewerProps = ModalVisibilityProps & {
     enableJoin?: boolean;
 };
 
-/**
- * A PhotoSwipe based image, live photo and video viewer.
- */
 export const FileViewer: React.FC<FileViewerProps> = ({
     open,
     onClose,
@@ -139,45 +122,23 @@ export const FileViewer: React.FC<FileViewerProps> = ({
     const { onGenericError } = useBaseContext();
     const shouldCloseOnBrowserBack = shouldCloseOnBrowserBackOverride ?? true;
 
-    // There are 3 things involved in this dance:
-    //
-    // 1. Us, "FileViewer". We're a React component.
-    // 2. The custom PhotoSwipe wrapper, "FileViewerPhotoSwipe". It is a class.
-    // 3. The delegate, "FileViewerPhotoSwipeDelegate".
-    //
-    // The delegate acts as a bridge between us and (our custom) photoswipe
-    // class, to avoid recreating the class each time a "dynamic" prop changes.
-    // The delegate has a stable identity, we just keep updating the callback
-    // functions that it holds.
-    //
-    // The word "dynamic" here means a prop on whose change we should not
-    // recreate the photoswipe dialog.
+    // PhotoSwipe keeps one delegate for its lifetime.
+    // Update its callbacks instead of recreating the viewer when props change.
     const delegateRef = useRef<
         FileViewerPhotoSwipeDelegate<FileViewerAnnotatedFile> | undefined
     >(undefined);
 
-    // We also need to maintain a ref to the currently displayed dialog since we
-    // might need to ask it to refresh its contents.
     const psRef = useRef<
         FileViewerPhotoSwipe<FileViewerAnnotatedFile> | undefined
     >(undefined);
     const handleCloseRef = useRef<() => void>(() => undefined);
     const browserBackStateRef = useRef<string | undefined>(undefined);
 
-    // Whenever we get a callback from our custom PhotoSwipe instance, we also
-    // get the active file on which that action was performed as an argument. We
-    // save it as the `activeAnnotatedFile` state so that the rest of our React
-    // tree can use it.
-    //
-    // This is not guaranteed, or even intended, to be in sync with the active
-    // file shown within the file viewer. All that this guarantees is this will
-    // refer to the file on which the last user initiated action was performed.
+    // This is the last action target, not necessarily the visible slide.
     const [activeAnnotatedFile, setActiveAnnotatedFile] = useState<
         FileViewerAnnotatedFile | undefined
     >(undefined);
 
-    // With semantics similar to `activeAnnotatedFile`, this is the exif data
-    // associated with the `activeAnnotatedFile`, if any.
     const [activeFileExif, setActiveFileExif] = useState<
         FileInfoExif | undefined
     >(undefined);
@@ -193,32 +154,48 @@ export const FileViewer: React.FC<FileViewerProps> = ({
 
     const [isFullscreen, setIsFullscreen] = useState(false);
 
-    // Map of file ID to map of collection ID to array of comments.
-    // For gallery view, we fetch comments from all collections.
-    // For collection view, we only fetch comments from that collection.
     const [fileComments, setFileComments] = useState<
         Map<number, Map<number, Comment[]>>
     >(new Map());
 
-    // Map of file ID to map of collection ID to array of all reactions.
-    // Includes both file reactions and comment reactions.
     const [allReactions, setAllReactions] = useState<
         Map<number, Map<number, UnifiedReaction[]>>
     >(new Map());
 
-    // Map of user ID to email for displaying reaction/comment authors.
-    // Built from collection owner and sharees when fetching social data.
     const [userIDToEmail, setUserIDToEmail] = useState<Map<number, string>>(
         new Map(),
     );
 
-    // Map of anon user ID to decrypted user name for anonymous users.
     const [anonUserNames, setAnonUserNames] = useState<Map<string, string>>(
         () =>
             initialAnonUserNames ? new Map(initialAnonUserNames) : new Map(),
     );
     const [publicSocialDataStatusByFileID, setPublicSocialDataStatusByFileID] =
         useState<Map<number, "loading" | "ready">>(new Map());
+    const publicSocialDataErrorReportedRef = useRef(false);
+    const anonProfilesErrorReportedRef = useRef(false);
+
+    const reportPublicSocialDataError = useCallback(
+        (e: unknown) => {
+            if (publicSocialDataErrorReportedRef.current) return;
+            publicSocialDataErrorReportedRef.current = true;
+            onGenericError(e);
+        },
+        [onGenericError],
+    );
+
+    const reportAnonProfilesError = useCallback(
+        (e: unknown) => {
+            if (anonProfilesErrorReportedRef.current) return;
+            anonProfilesErrorReportedRef.current = true;
+            onGenericError(e);
+        },
+        [onGenericError],
+    );
+
+    useEffect(() => {
+        anonProfilesErrorReportedRef.current = false;
+    }, [collectionKey]);
 
     useEffect(() => {
         if (!initialAnonUserNames?.size) return;
@@ -237,16 +214,13 @@ export const FileViewer: React.FC<FileViewerProps> = ({
         });
     }, [initialAnonUserNames]);
 
-    // Ref for allReactions to use in callbacks
     const allReactionsRef = useRef(allReactions);
     useEffect(() => {
         allReactionsRef.current = allReactions;
     }, [allReactions]);
 
-    // Track whether we've already opened the initial sidebar for this open
     const hasOpenedInitialSidebarRef = useRef(false);
 
-    // Open the initial sidebar when the file viewer opens with initialSidebar set
     useEffect(() => {
         if (open && initialSidebar && !hasOpenedInitialSidebarRef.current) {
             hasOpenedInitialSidebarRef.current = true;
@@ -256,7 +230,6 @@ export const FileViewer: React.FC<FileViewerProps> = ({
                 setOpenLikes(true);
             }
         }
-        // Reset the flag when the viewer closes
         if (!open) {
             hasOpenedInitialSidebarRef.current = false;
         }
@@ -268,16 +241,12 @@ export const FileViewer: React.FC<FileViewerProps> = ({
         setOpenComments(false);
         setOpenLikes(false);
         setOpenPublicLikeModal(false);
-        // No need to `resetMoreMenuButtonOnMenuClose` since we're closing
-        // anyway and it'll be removed from the DOM.
         setMoreMenuAnchorEl(null);
         setOpenShortcuts(false);
         setIsFullscreen(false);
         onClose();
     }, [onClose]);
 
-    // Keep the latest close callback available to non-react event handlers
-    // without forcing effects that register handlers to re-run.
     handleCloseRef.current = handleClose;
 
     const handleViewInfo = useCallback(
@@ -298,7 +267,6 @@ export const FileViewer: React.FC<FileViewerProps> = ({
 
     const handleCommentsClose = useCallback(() => setOpenComments(false), []);
 
-    // Handle a new comment being added
     const handleCommentAdded = useCallback((comment: Comment) => {
         const fileID = comment.fileID;
         if (!fileID) return;
@@ -319,7 +287,6 @@ export const FileViewer: React.FC<FileViewerProps> = ({
         });
     }, []);
 
-    // Handle a comment being deleted
     const handleCommentDeleted = useCallback(
         (collectionID: number, commentID: string) => {
             const fileID = activeAnnotatedFile?.file.id;
@@ -346,7 +313,6 @@ export const FileViewer: React.FC<FileViewerProps> = ({
         [activeAnnotatedFile],
     );
 
-    // Handle a comment reaction being added
     const handleCommentReactionAdded = useCallback(
         (reaction: UnifiedReaction) => {
             const fileID = activeAnnotatedFile?.file.id;
@@ -370,7 +336,6 @@ export const FileViewer: React.FC<FileViewerProps> = ({
         [activeAnnotatedFile],
     );
 
-    // Handle a comment reaction being deleted
     const handleCommentReactionDeleted = useCallback(
         (collectionID: number, reactionID: string) => {
             const fileID = activeAnnotatedFile?.file.id;
@@ -399,14 +364,11 @@ export const FileViewer: React.FC<FileViewerProps> = ({
 
     const handleLikesClose = useCallback(() => setOpenLikes(false), []);
 
-    // Refs to access current state without causing re-renders
-    // when used in callbacks that are dependencies of the PhotoSwipe effect.
     const activeAnnotatedFileRef = useRef(activeAnnotatedFile);
     activeAnnotatedFileRef.current = activeAnnotatedFile;
 
     const haveUser = false;
 
-    // Called when the like button (heart) is clicked in public album mode.
     const handleLikeClick = useCallback(() => {
         const file = activeAnnotatedFileRef.current?.file;
         if (!file || !publicAlbumsCredentials) {
@@ -418,7 +380,6 @@ export const FileViewer: React.FC<FileViewerProps> = ({
         const collectionId = file.collectionID;
         const storedAnonIdentity = getStoredAnonIdentity(collectionId);
 
-        // Check if already liked by current anon user (file-level only, not comment likes)
         const fileReactionsMap = allReactionsRef.current.get(fileId);
         const collectionReactions = fileReactionsMap?.get(collectionId) ?? [];
         const existingReaction = collectionReactions.find(
@@ -430,7 +391,6 @@ export const FileViewer: React.FC<FileViewerProps> = ({
         );
 
         if (existingReaction) {
-            // Already liked - unlike (delete reaction)
             void (async () => {
                 try {
                     await deletePublicReaction(
@@ -439,7 +399,6 @@ export const FileViewer: React.FC<FileViewerProps> = ({
                         existingReaction.id,
                     );
 
-                    // Update local state
                     setAllReactions((prev) => {
                         const next = new Map(prev);
                         const fileReactionsMap = new Map<
@@ -458,7 +417,6 @@ export const FileViewer: React.FC<FileViewerProps> = ({
                 }
             })();
         } else if (storedAnonIdentity) {
-            // Has identity but not liked - add reaction directly
             void (async () => {
                 try {
                     if (!collectionKey) {
@@ -473,7 +431,6 @@ export const FileViewer: React.FC<FileViewerProps> = ({
                         collectionKey,
                     );
 
-                    // Update local state
                     setAllReactions((prev) => {
                         const next = new Map(prev);
                         const fileReactionsMap = new Map<
@@ -504,7 +461,6 @@ export const FileViewer: React.FC<FileViewerProps> = ({
                 }
             })();
         } else {
-            // No identity - show modal to get name
             setOpenPublicLikeModal(true);
         }
     }, [publicAlbumsCredentials, collectionKey]);
@@ -541,7 +497,7 @@ export const FileViewer: React.FC<FileViewerProps> = ({
             }
 
             const fileId = file.id;
-            // Use file.collectionID for public albums since activeCollectionID is a pseudo ID (0)
+            // Public album gallery mode uses collection ID 0 as a sentinel.
             const collectionId =
                 activeCollectionID && activeCollectionID > 0
                     ? activeCollectionID
@@ -549,7 +505,6 @@ export const FileViewer: React.FC<FileViewerProps> = ({
 
             void (async () => {
                 try {
-                    // Check if we already have an anon identity for this collection, otherwise create one
                     let identity = getStoredAnonIdentity(collectionId);
                     if (!identity) {
                         identity = await createAnonIdentity(
@@ -560,7 +515,6 @@ export const FileViewer: React.FC<FileViewerProps> = ({
                         );
                     }
 
-                    // Add the public reaction
                     const reactionId = await addPublicReaction(
                         publicAlbumsCredentials,
                         collectionId,
@@ -570,7 +524,6 @@ export const FileViewer: React.FC<FileViewerProps> = ({
                         identity,
                     );
 
-                    // Update local state
                     setAllReactions((prev) => {
                         const next = new Map(prev);
                         const fileReactionsMap = new Map<
@@ -586,7 +539,7 @@ export const FileViewer: React.FC<FileViewerProps> = ({
                                 collectionID: collectionId,
                                 fileID: fileId,
                                 reactionType: "green_heart",
-                                // Use a special userID for anonymous users (derived from anonUserID)
+                                // Anonymous users use userID 0.
                                 userID: 0,
                                 anonUserID: identity.anonUserID,
                                 isDeleted: false,
@@ -598,7 +551,6 @@ export const FileViewer: React.FC<FileViewerProps> = ({
                         return next;
                     });
 
-                    // Update anonUserNames so the name shows immediately in likers list
                     setAnonUserNames((prev) => {
                         const next = new Map(prev);
                         next.set(identity.anonUserID, name);
@@ -622,8 +574,6 @@ export const FileViewer: React.FC<FileViewerProps> = ({
         ],
     );
 
-    // Callback invoked when the download action is triggered by activating the
-    // download button in the PhotoSwipe bar.
     const handleDownloadBarAction = useCallback(
         (annotatedFile: FileViewerAnnotatedFile) => {
             onDownload!(annotatedFile.file);
@@ -643,15 +593,13 @@ export const FileViewer: React.FC<FileViewerProps> = ({
         });
     }, []);
 
-    // Not memoized since it uses the frequently changing `activeAnnotatedFile`.
     const handleCopyImage = useCallback(() => {
         handleMoreMenuCloseIfNeeded();
         if (!activeAnnotatedFile) return;
         const { imageURL } = activeAnnotatedFile.itemData;
         if (!imageURL) return;
-        // Safari does not copy if we do not call `navigator.clipboard.write`
-        // synchronously within the click event handler, but it does supports
-        // passing a promise in lieu of the blob.
+        // Safari requires clipboard.write during the click event.
+        // It accepts a promise for the blob.
         void window.navigator.clipboard
             .write([
                 new ClipboardItem({
@@ -695,7 +643,6 @@ export const FileViewer: React.FC<FileViewerProps> = ({
     );
     const showSocialButtons = true;
 
-    // Delegate callback to check if social buttons should be shown for a file.
     const shouldShowSocialButtons_ = useCallback((): boolean => false, []);
 
     const getFiles = useCallback(() => files, [files]);
@@ -711,15 +658,12 @@ export const FileViewer: React.FC<FileViewerProps> = ({
             const fileReactionsMap = allReactions.get(file.id);
             if (!fileReactionsMap) return false;
 
-            // Check if user has liked this file in any collection
             for (const [collectionId, reactions] of fileReactionsMap) {
-                // Get stored anonymous identity for this specific collection
                 const storedAnonIdentity = getStoredAnonIdentity(collectionId);
 
                 const hasUserLike = reactions.some((r) => {
                     if (r.commentID || r.reactionType !== "green_heart")
                         return false;
-                    // Check for anonymous user
                     if (
                         storedAnonIdentity &&
                         r.anonUserID === storedAnonIdentity.anonUserID
@@ -742,7 +686,6 @@ export const FileViewer: React.FC<FileViewerProps> = ({
             const isGalleryView =
                 !activeCollectionID || activeCollectionID === 0;
             if (isGalleryView) {
-                // Return the count from the collection with most comments
                 let maxCount = 0;
                 for (const comments of commentsMap.values()) {
                     const count = comments.filter((c) => !c.isDeleted).length;
@@ -750,7 +693,6 @@ export const FileViewer: React.FC<FileViewerProps> = ({
                 }
                 return maxCount;
             } else {
-                // Return count from the active collection
                 const comments = commentsMap.get(activeCollectionID);
                 return comments?.filter((c) => !c.isDeleted).length ?? 0;
             }
@@ -779,7 +721,6 @@ export const FileViewer: React.FC<FileViewerProps> = ({
     const handleShortcutsClose = useCallback(() => setOpenShortcuts(false), []);
 
     const shouldIgnoreKeyboardEvent = useCallback(() => {
-        // Don't handle keydowns if any of the viewer's own modals are open.
         if (
             openFileInfo ||
             openComments ||
@@ -791,8 +732,6 @@ export const FileViewer: React.FC<FileViewerProps> = ({
             return true;
         }
 
-        // Also ignore keydowns if keyboard focus is inside an editable field
-        // (e.g., when the CollectionSelector dialog's search TextField is focused)
         const activeElement = document.activeElement as HTMLElement | null;
         if (activeElement) {
             const tagName = activeElement.tagName;
@@ -854,7 +793,6 @@ export const FileViewer: React.FC<FileViewerProps> = ({
         ],
     );
 
-    // Initial value of delegate.
     if (!delegateRef.current) {
         delegateRef.current = {
             getFiles,
@@ -869,7 +807,6 @@ export const FileViewer: React.FC<FileViewerProps> = ({
         };
     }
 
-    // Updates to delegate callbacks.
     useEffect(() => {
         const delegate = delegateRef.current!;
         delegate.getFiles = getFiles;
@@ -895,17 +832,13 @@ export const FileViewer: React.FC<FileViewerProps> = ({
 
     useEffect(() => {
         if (!files.length) {
-            // If there are no more files left, close the viewer.
             handleClose();
         } else if (open && activeAnnotatedFile) {
-            // Only refresh if the viewer is still open and we have an active file.
-            // This prevents race conditions when navigating away (e.g., when clicking
-            // the navigate button in AlbumAddedNotification while the viewer is open).
+            // Refreshing while the viewer closes can race navigation.
             psRef.current?.refreshSlideOnFilesUpdateIfNeeded();
         }
     }, [handleClose, files, open, activeAnnotatedFile]);
 
-    // Refresh like button when allReactions changes.
     useEffect(() => {
         if (open && files.length) {
             psRef.current?.refreshCurrentSlideLikeButtonIfNeeded();
@@ -924,7 +857,6 @@ export const FileViewer: React.FC<FileViewerProps> = ({
         shouldFetchPublicSocialData &&
         publicSocialDataStatusByFileID.get(activeFileID) !== "ready";
 
-    // Fetch social data (comments + reactions) for public albums (when viewing as anonymous user).
     useEffect(() => {
         if (
             !open ||
@@ -938,6 +870,8 @@ export const FileViewer: React.FC<FileViewerProps> = ({
         const file = files.find((f) => f.id === activeFileID);
         if (!file) return;
 
+        publicSocialDataErrorReportedRef.current = false;
+
         setPublicSocialDataStatusByFileID((prev) => {
             if (prev.get(activeFileID) === "ready") return prev;
 
@@ -948,14 +882,18 @@ export const FileViewer: React.FC<FileViewerProps> = ({
 
         void (async () => {
             try {
-                // Fetch both comments and reactions in a single API call
-                const { comments, reactions } = await getPublicSocialDiff(
-                    publicAlbumsCredentials,
-                    activeFileID,
-                    collectionKey,
-                );
+                const { comments, reactions, decryptionError } =
+                    await getPublicSocialDiff(
+                        publicAlbumsCredentials,
+                        activeFileID,
+                        collectionKey,
+                    );
+                if (decryptionError) {
+                    reportPublicSocialDataError(decryptionError);
+                } else {
+                    publicSocialDataErrorReportedRef.current = false;
+                }
 
-                // Convert PublicComment to Comment format
                 const commentsForFile: Comment[] = comments.map((c) => ({
                     id: c.id,
                     collectionID: c.collectionID,
@@ -978,7 +916,6 @@ export const FileViewer: React.FC<FileViewerProps> = ({
                     return next;
                 });
 
-                // Convert PublicReaction to UnifiedReaction format
                 const unifiedReactions: UnifiedReaction[] = reactions.map(
                     (r) => ({
                         id: r.id,
@@ -1003,12 +940,17 @@ export const FileViewer: React.FC<FileViewerProps> = ({
                     return next;
                 });
 
-                // Fetch anonymous user profiles for public albums
                 try {
-                    const anonProfiles = await getPublicAnonProfiles(
-                        publicAlbumsCredentials,
-                        collectionKey,
-                    );
+                    const { anonUserNames: anonProfiles, decryptionError } =
+                        await getPublicAnonProfiles(
+                            publicAlbumsCredentials,
+                            collectionKey,
+                        );
+                    if (decryptionError) {
+                        reportAnonProfilesError(decryptionError);
+                    } else {
+                        anonProfilesErrorReportedRef.current = false;
+                    }
                     setAnonUserNames((prev) => {
                         const next = new Map(prev);
                         for (const [id, name] of anonProfiles) {
@@ -1016,11 +958,10 @@ export const FileViewer: React.FC<FileViewerProps> = ({
                         }
                         return next;
                     });
-                } catch {
-                    // Ignore anon profiles fetch failures
+                } catch (e) {
+                    reportAnonProfilesError(e);
                 }
 
-                // Fetch registered participants' masked emails for public albums
                 try {
                     const participantEmails =
                         await getPublicParticipantsMaskedEmails(
@@ -1034,10 +975,10 @@ export const FileViewer: React.FC<FileViewerProps> = ({
                         return next;
                     });
                 } catch {
-                    // Ignore participants fetch failures
+                    // Names are optional enrichment.
                 }
             } catch (e) {
-                log.error("Failed to fetch public social data", e);
+                reportPublicSocialDataError(e);
             } finally {
                 setPublicSocialDataStatusByFileID((prev) => {
                     if (prev.get(activeFileID) === "ready") return prev;
@@ -1055,9 +996,10 @@ export const FileViewer: React.FC<FileViewerProps> = ({
         publicAlbumsCredentials,
         collectionKey,
         files,
+        reportAnonProfilesError,
+        reportPublicSocialDataError,
     ]);
 
-    // Refresh comment count when fileComments changes.
     useEffect(() => {
         if (open && files.length) {
             psRef.current?.refreshCurrentSlideCommentCountIfNeeded();
@@ -1066,7 +1008,6 @@ export const FileViewer: React.FC<FileViewerProps> = ({
 
     const SOCIAL_REFRESH_INTERVAL_MS = 5_000;
 
-    // Refresh social data for public albums
     const refreshPublicSocialData = useCallback(async () => {
         if (
             !activeFileID ||
@@ -1080,11 +1021,17 @@ export const FileViewer: React.FC<FileViewerProps> = ({
         if (!file) return;
 
         try {
-            const { comments, reactions } = await getPublicSocialDiff(
-                publicAlbumsCredentials,
-                activeFileID,
-                collectionKey,
-            );
+            const { comments, reactions, decryptionError } =
+                await getPublicSocialDiff(
+                    publicAlbumsCredentials,
+                    activeFileID,
+                    collectionKey,
+                );
+            if (decryptionError) {
+                reportPublicSocialDataError(decryptionError);
+            } else {
+                publicSocialDataErrorReportedRef.current = false;
+            }
 
             const commentsForFile: Comment[] = comments.map((c) => ({
                 id: c.id,
@@ -1130,12 +1077,17 @@ export const FileViewer: React.FC<FileViewerProps> = ({
                 return next;
             });
 
-            // Fetch anon profiles (new anonymous users may have commented)
             try {
-                const anonProfiles = await getPublicAnonProfiles(
-                    publicAlbumsCredentials,
-                    collectionKey,
-                );
+                const { anonUserNames: anonProfiles, decryptionError } =
+                    await getPublicAnonProfiles(
+                        publicAlbumsCredentials,
+                        collectionKey,
+                    );
+                if (decryptionError) {
+                    reportAnonProfilesError(decryptionError);
+                } else {
+                    anonProfilesErrorReportedRef.current = false;
+                }
                 setAnonUserNames((prev) => {
                     const next = new Map(prev);
                     for (const [id, name] of anonProfiles) {
@@ -1143,13 +1095,12 @@ export const FileViewer: React.FC<FileViewerProps> = ({
                     }
                     return next;
                 });
-            } catch {
-                // Ignore
+            } catch (e) {
+                reportAnonProfilesError(e);
             }
-            // Note: Masked emails for registered participants are fetched only
-            // on initial load since they rarely change during a session.
+            // Masked participant emails are stable enough to fetch only on open.
         } catch (e) {
-            log.error("Failed to refresh public social data", e);
+            reportPublicSocialDataError(e);
         }
     }, [
         activeFileID,
@@ -1157,9 +1108,10 @@ export const FileViewer: React.FC<FileViewerProps> = ({
         collectionKey,
         enableComment,
         files,
+        reportAnonProfilesError,
+        reportPublicSocialDataError,
     ]);
 
-    // Poll for social data when comments or likes sidebar is open (public albums)
     useInterval(
         refreshPublicSocialData,
         (openComments || openLikes) && publicAlbumsCredentials
@@ -1169,7 +1121,6 @@ export const FileViewer: React.FC<FileViewerProps> = ({
 
     useEffect(() => {
         if (open) {
-            // We're open. Create psRef. This will show the file viewer dialog.
             log.debug(() => "Opening file viewer");
 
             const pswp = new FileViewerPhotoSwipe({
@@ -1195,22 +1146,14 @@ export const FileViewer: React.FC<FileViewerProps> = ({
             psRef.current = pswp;
 
             return () => {
-                // Close dialog in the effect callback.
                 log.debug(() => "Closing file viewer");
                 pswp.closeIfNeeded();
             };
         } else {
             return undefined;
         }
-        // Be careful with adding new dependencies here, or changing the source
-        // of existing ones. If any of these dependencies change unnecessarily,
-        // then the file viewer will start getting reloaded even when it is
-        // already open.
-        //
-        // Note: showSocialButtons and enableComment are intentionally NOT included
-        // here even though they're passed to the constructor. The delegate's
-        // public-album branch is static, and these values should not trigger a
-        // full recreation.
+        // Changing these dependencies recreates PhotoSwipe.
+        // showSocialButtons and enableComment deliberately stay out.
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [
         open,
@@ -1233,8 +1176,7 @@ export const FileViewer: React.FC<FileViewerProps> = ({
     useEffect(() => {
         if (!open || !shouldCloseOnBrowserBack) return;
 
-        // In public albums, consume one browser-back action to close the
-        // viewer overlay instead of navigating away from the shared link.
+        // Back closes the overlay without leaving the shared link.
         const stateMarker = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
         browserBackStateRef.current = stateMarker;
 
@@ -1341,7 +1283,6 @@ export const FileViewer: React.FC<FileViewerProps> = ({
                         <MoreMenuItemTitle>
                             {t("copy_as_png")}
                         </MoreMenuItemTitle>
-                        {/* Tweak icon size to visually fit better with neighbours */}
                         <ContentCopyIcon sx={{ "&&": { fontSize: "18px" } }} />
                     </MoreMenuItem>
                 )}
@@ -1396,14 +1337,11 @@ const MoreMenu = styled(Menu)(
 `,
 );
 
+// Override MUI's responsive min-height so menu rows remain 44px.
 const MoreMenuItem = styled(MenuItem)(
     ({ theme }) => `
     min-width: 210px;
 
-    /* MUI MenuItem default implementation has a minHeight of "48px" below the
-       "sm" breakpoint, and auto after it. We always want the same height, so
-       set minHeight auto and use an explicit padding always to come out to 44px
-       (20px (icon or Typography height + 12 + 12) */
     padding-block: 12px;
     min-height: auto;
 
@@ -1411,7 +1349,6 @@ const MoreMenuItem = styled(MenuItem)(
     justify-content: space-between;
     align-items: center;
 
-    /* Same as other controls on the PhotoSwipe UI */
     color: rgba(255 255 255 / 0.85);
     &:hover {
         color: rgba(255 255 255 / 1);
@@ -1429,12 +1366,7 @@ const MoreMenuItemTitle: React.FC<React.PropsWithChildren> = ({ children }) => (
 );
 
 type ShortcutsProps = ModalVisibilityProps &
-    Pick<FileViewerProps, "disableDownload"> & {
-        /**
-         * `true` if we're running in a context where there is a logged in user.
-         */
-        haveUser: boolean;
-    };
+    Pick<FileViewerProps, "disableDownload"> & { haveUser: boolean };
 
 const Shortcuts: React.FC<ShortcutsProps> = ({
     open,
@@ -1545,10 +1477,6 @@ const Shortcut: React.FC<ShortcutProps> = ({ action, shortcut }) => (
     </tr>
 );
 
-/**
- * Return a promise that resolves with a "image/png" blob derived from the given
- * {@link imageURL} that can be written to the navigator's clipboard.
- */
 const createImagePNGBlob = async (imageURL: string): Promise<Blob> =>
     new Promise((resolve, reject) => {
         const image = new Image();

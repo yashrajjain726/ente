@@ -1,1 +1,0 @@
-- Simplified local chat storage while preserving existing chats and attachments.

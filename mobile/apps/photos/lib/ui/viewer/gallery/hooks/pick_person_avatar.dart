@@ -1,8 +1,8 @@
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:modal_bottom_sheet/modal_bottom_sheet.dart";
 import "package:photos/core/event_bus.dart";
 import "package:photos/events/people_changed_event.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/models/file_load_result.dart";
 import "package:photos/models/ml/face/person.dart";
 import "package:photos/models/selected_files.dart";
@@ -72,7 +72,7 @@ class PickPersonCoverPhotoWidget extends StatelessWidget {
                 children: [
                   BottomOfTitleBarWidget(
                     title: TitleBarTitleWidget(
-                      title: AppLocalizations.of(context).selectCoverPhoto,
+                      title: context.strings.selectCoverPhoto,
                     ),
                     caption: personEntity.data.name,
                     showCloseButton: true,
@@ -136,9 +136,7 @@ class PickPersonCoverPhotoWidget extends StatelessWidget {
                               key: ValueKey(value),
                               isDisabled: !value,
                               buttonType: ButtonType.neutral,
-                              labelText: AppLocalizations.of(
-                                context,
-                              ).useSelectedPhoto,
+                              labelText: context.strings.useSelectedPhoto,
                               onTap: () async {
                                 final selectedFile = selectedFiles.files.first;
                                 final result = await PersonService.instance

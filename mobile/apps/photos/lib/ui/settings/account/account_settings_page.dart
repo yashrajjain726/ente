@@ -1,19 +1,18 @@
 import "dart:async";
 
 import "package:ente_account_deletion/account_deletion.dart";
+import "package:ente_components/ente_components.dart";
 import "package:ente_crypto/ente_crypto.dart";
 import "package:ente_lock_screen/local_authentication_service.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:hugeicons/hugeicons.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/service_locator.dart";
 import "package:photos/services/account/user_service.dart";
 import "package:photos/ui/account/change_email_dialog.dart";
 import "package:photos/ui/account/password_entry_page.dart";
 import "package:photos/ui/account/recovery_key_page.dart";
 import "package:photos/ui/payment/subscription.dart";
-import "package:photos/ui/settings/components/settings_item.dart";
-import "package:photos/ui/settings/components/settings_page_scaffold.dart";
 import "package:photos/utils/dialog_util.dart";
 import "package:url_launcher/url_launcher_string.dart";
 
@@ -22,7 +21,7 @@ class AccountSettingsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
+    final l10n = context.strings;
 
     return SettingsPageScaffold(
       title: l10n.account,
@@ -31,7 +30,6 @@ class AccountSettingsPage extends StatelessWidget {
           title: l10n.manageSubscription,
           icon: HugeIcons.strokeRoundedCreditCard,
           showOnlyLoadingState: true,
-          shouldSurfaceExecutionStates: true,
           onTap: () async => _onManageSubscriptionTapped(context),
         ),
         const SizedBox(height: 8),
@@ -119,7 +117,7 @@ class AccountSettingsPage extends StatelessWidget {
     final hasAuthenticated = await LocalAuthenticationService.instance
         .requestLocalAuthentication(
           context,
-          AppLocalizations.of(context).authToChangeYourEmail,
+          context.strings.authToChangeYourEmail,
         );
     if (hasAuthenticated) {
       if (!context.mounted) return;
@@ -131,7 +129,7 @@ class AccountSettingsPage extends StatelessWidget {
     final hasAuthenticated = await LocalAuthenticationService.instance
         .requestLocalAuthentication(
           context,
-          AppLocalizations.of(context).authToChangeYourPassword,
+          context.strings.authToChangeYourPassword,
         );
     if (hasAuthenticated) {
       if (!context.mounted) return;
@@ -151,7 +149,7 @@ class AccountSettingsPage extends StatelessWidget {
     final hasAuthenticated = await LocalAuthenticationService.instance
         .requestLocalAuthentication(
           context,
-          AppLocalizations.of(context).authToViewYourRecoveryKey,
+          context.strings.authToViewYourRecoveryKey,
         );
     if (hasAuthenticated) {
       String recoveryKey;
@@ -170,7 +168,7 @@ class AccountSettingsPage extends StatelessWidget {
             builder: (BuildContext context) {
               return RecoveryKeyPage(
                 recoveryKey,
-                AppLocalizations.of(context).ok,
+                context.strings.ok,
                 onDone: () {},
               );
             },
@@ -190,7 +188,7 @@ class AccountSettingsPage extends StatelessWidget {
     final hasAuthenticated = await LocalAuthenticationService.instance
         .requestLocalAuthentication(
           context,
-          AppLocalizations.of(context).authToInitiateAccountDeletion,
+          context.strings.authToInitiateAccountDeletion,
         );
     if (!context.mounted || !hasAuthenticated) {
       return;

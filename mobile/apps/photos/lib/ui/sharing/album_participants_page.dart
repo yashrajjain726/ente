@@ -1,10 +1,10 @@
 import 'package:collection/collection.dart';
 import 'package:ente_components/ente_components.dart';
 import 'package:ente_pure_utils/ente_pure_utils.dart';
+import "package:ente_strings/ente_strings.dart";
 import 'package:flutter/material.dart';
 import 'package:hugeicons/hugeicons.dart';
 import 'package:photos/core/configuration.dart';
-import "package:photos/generated/l10n.dart";
 import "package:photos/models/api/collection/user.dart";
 import 'package:photos/models/collection/collection.dart';
 import 'package:photos/service_locator.dart';
@@ -80,12 +80,12 @@ class _AlbumParticipantsPageState extends State<AlbumParticipantsPage> {
         _collection.type != CollectionType.uncategorized &&
         !isOwner &&
         hasActivePublicLink;
-    final int participants = 1 + _collection.getSharees().length;
+    final int participants = 1 + _collection.sharees.length;
     final User owner = _collection.owner;
     if (owner.id == currentUserID && owner.email == "") {
       owner.email = Configuration.instance.getEmail()!;
     }
-    final List<User> allSharees = _collection.getSharees();
+    final List<User> allSharees = _collection.sharees;
     final List<User> admins = [];
     final List<User> collaborators = [];
     final List<User> viewers = [];
@@ -114,58 +114,58 @@ class _AlbumParticipantsPageState extends State<AlbumParticipantsPage> {
 
     final children = <Widget>[
       if (shouldShowPublicLink) ...[
-        ShareSectionTitle(AppLocalizations.of(context).publicLinkEnabled),
+        ShareSectionTitle(context.strings.publicLinkEnabled),
         PublicLinkEnabledActionsWidget(
           collection: _collection,
           sendLinkButtonKey: _sendLinkButtonKey,
         ),
         const SizedBox(height: Spacing.xxl),
       ],
-      ShareSectionTitle(AppLocalizations.of(context).albumOwner),
+      ShareSectionTitle(context.strings.albumOwner),
       ShareMenuGroup(
         items: [
           ShareMenuItem(
             title: isOwner
-                ? AppLocalizations.of(context).you
+                ? context.strings.you
                 : _nameIfAvailableElseEmail(owner),
-            leading: UserAvatarWidget(owner, currentUserID: currentUserID),
+            leading: UserAvatarWidget(owner),
             isDisabled: true,
           ),
         ],
       ),
       ..._participantSection(
         context,
-        title: AppLocalizations.of(context).admins,
+        title: context.strings.admins,
         users: admins,
         currentUserID: currentUserID,
         canManageParticipants: canManageParticipants,
         addTitle: admins.isNotEmpty
-            ? AppLocalizations.of(context).addMoreAdmins
-            : AppLocalizations.of(context).addAdmin,
+            ? context.strings.addMoreAdmins
+            : context.strings.addAdmin,
         addActions: const [ActionTypesToShow.addAdmin],
         addIcon: HugeIcons.strokeRoundedCrown,
       ),
       ..._participantSection(
         context,
-        title: AppLocalizations.of(context).collaborator,
+        title: context.strings.collaborator,
         users: collaborators,
         currentUserID: currentUserID,
         canManageParticipants: canManageParticipants,
         addTitle: collaborators.isNotEmpty
-            ? AppLocalizations.of(context).addMore
-            : AppLocalizations.of(context).addCollaborator,
+            ? context.strings.addMore
+            : context.strings.addCollaborator,
         addActions: const [ActionTypesToShow.addCollaborator],
         addIcon: HugeIcons.strokeRoundedUserGroup,
       ),
       ..._participantSection(
         context,
-        title: AppLocalizations.of(context).viewer,
+        title: context.strings.viewer,
         users: viewers,
         currentUserID: currentUserID,
         canManageParticipants: canManageParticipants,
         addTitle: viewers.isNotEmpty
-            ? AppLocalizations.of(context).addMore
-            : AppLocalizations.of(context).addViewer,
+            ? context.strings.addMore
+            : context.strings.addViewer,
         addActions: const [ActionTypesToShow.addViewer],
         addIcon: HugeIcons.strokeRoundedView,
       ),
@@ -174,9 +174,7 @@ class _AlbumParticipantsPageState extends State<AlbumParticipantsPage> {
 
     return ShareScaffold(
       title: _collection.displayName,
-      subtitle: AppLocalizations.of(
-        context,
-      ).albumParticipantsCount(count: participants),
+      subtitle: context.strings.albumParticipantsCount(count: participants),
       children: children,
     );
   }
@@ -199,13 +197,9 @@ class _AlbumParticipantsPageState extends State<AlbumParticipantsPage> {
       for (final user in users)
         ShareMenuItem(
           title: user.id == currentUserID
-              ? AppLocalizations.of(context).you
+              ? context.strings.you
               : _nameIfAvailableElseEmail(user),
-          leading: UserAvatarWidget(
-            user,
-            type: AvatarType.medium,
-            currentUserID: currentUserID,
-          ),
+          leading: UserAvatarWidget(user, type: AvatarType.medium),
           showChevron: canManageParticipants && user.id != currentUserID,
           isDisabled: !canManageParticipants || user.id == currentUserID,
           onTap: canManageParticipants && user.id != currentUserID

@@ -1,6 +1,6 @@
 import 'package:ente_components/ente_components.dart';
+import 'package:ente_strings/ente_strings.dart';
 import 'package:flutter/material.dart';
-import 'package:locker/l10n/l10n.dart';
 import 'package:locker/models/info/info_item.dart';
 import 'package:locker/ui/components/collection_selection_widget.dart';
 import 'package:locker/ui/pages/base_info_page.dart';
@@ -56,7 +56,7 @@ class _PersonalNotePageState
   @override
   String get pageTitle {
     if (isInEditMode) {
-      return context.l10n.note;
+      return context.strings.note;
     }
 
     final controllerTitle = _nameController.text.trim();
@@ -69,11 +69,11 @@ class _PersonalNotePageState
       return dataTitle;
     }
 
-    return context.l10n.personalNote;
+    return context.strings.personalNote;
   }
 
   @override
-  String get submitButtonText => context.l10n.saveRecord;
+  String get submitButtonText => context.strings.save;
 
   @override
   InfoType get infoType => InfoType.note;
@@ -123,7 +123,7 @@ class _PersonalNotePageState
     }
     return [
       buildViewField(
-        label: context.l10n.noteContent,
+        label: context.strings.noteContent,
         value: _contentController.text,
         minLines: 12,
         maxLines: 24,
@@ -138,8 +138,8 @@ class _PersonalNotePageState
       sliver: SliverList.list(
         children: [
           TextInputComponent(
-            label: context.l10n.noteName,
-            hintText: context.l10n.noteNameHint,
+            label: context.strings.noteName,
+            hintText: context.strings.noteNameHint,
             controller: _nameController,
             textCapitalization: TextCapitalization.sentences,
             textInputAction: TextInputAction.done,
@@ -147,8 +147,8 @@ class _PersonalNotePageState
           ),
           const SizedBox(height: 24),
           TextInputComponent(
-            label: context.l10n.noteContent,
-            hintText: context.l10n.noteContentHint,
+            label: context.strings.noteContent,
+            hintText: context.strings.noteContentHint,
             controller: _contentController,
             focusNode: _contentFocusNode,
             isRequired: true,
@@ -164,7 +164,9 @@ class _PersonalNotePageState
             selectedCollectionIds: selectedCollectionIds,
             onToggleCollection: toggleCollectionSelection,
             onCollectionsUpdated: updateAvailableCollections,
-            title: showCollectionSelectionTitle ? context.l10n.collections : '',
+            title: showCollectionSelectionTitle
+                ? context.strings.collections
+                : '',
           ),
         ],
       ),
@@ -227,12 +229,12 @@ class _PersonalNotePageState
     final result = await showBottomSheetComponent<bool>(
       context: context,
       builder: (_) => BottomSheetComponent(
-        title: context.l10n.unsavedNoteChangesTitle,
-        message: context.l10n.unsavedNoteChangesDescription,
+        title: context.strings.unsavedNoteChangesTitle,
+        message: context.strings.unsavedNoteChangesDescription,
         illustration: LockerBottomSheetIllustration.warningGrey,
         actions: [
           ButtonComponent(
-            label: context.l10n.discardChanges,
+            label: context.strings.discardChanges,
             variant: ButtonComponentVariant.critical,
             onTap: () => Navigator.of(context).pop(true),
           ),

@@ -1,7 +1,7 @@
 import 'package:ente_components/ente_components.dart';
 import "package:ente_pure_utils/ente_pure_utils.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/ui/components/menu_section_description_widget.dart";
 import "package:photos/ui/viewer/gallery/cleanup_hidden_from_device_page.dart";
 
@@ -20,7 +20,7 @@ class CleanupHiddenFromDeviceWidget extends StatelessWidget {
       child: Column(
         children: [
           MenuComponent(
-            title: AppLocalizations.of(context).deleteHiddenFilesFromDevice,
+            title: context.strings.deleteHiddenFilesFromDevice,
             leading: const Icon(Icons.phone_android_outlined),
             trailing: const Icon(Icons.chevron_right),
             onTap: () async {
@@ -33,9 +33,7 @@ class CleanupHiddenFromDeviceWidget extends StatelessWidget {
             },
           ),
           MenuSectionDescriptionWidget(
-            content: AppLocalizations.of(
-              context,
-            ).deleteHiddenFilesFromDeviceDescription,
+            content: context.strings.deleteHiddenFilesFromDeviceDescription,
           ),
         ],
       ),

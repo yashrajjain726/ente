@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:collection/collection.dart';
 import 'package:ente_crypto/ente_crypto.dart';
+import "package:ente_strings/ente_strings.dart";
 import 'package:flutter/material.dart';
 import 'package:logging/logging.dart';
 import "package:photos/core/configuration.dart";
@@ -13,7 +14,6 @@ import 'package:photos/events/files_updated_event.dart';
 import 'package:photos/events/local_photos_updated_event.dart';
 import 'package:photos/gateways/collections/models/create_request.dart';
 import "package:photos/gateways/collections/models/metadata.dart";
-import "package:photos/generated/l10n.dart";
 import 'package:photos/models/collection/action.dart';
 import 'package:photos/models/collection/collection.dart';
 import 'package:photos/models/file/file.dart';
@@ -285,11 +285,7 @@ extension HiddenService on CollectionsService {
       await dialog.hide();
       if (!context.mounted) return false;
       unawaited(
-        showErrorDialog(
-          context,
-          AppLocalizations.of(context).oops,
-          e.message as String,
-        ),
+        showErrorDialog(context, context.strings.oops, e.message as String),
       );
       return false;
     } catch (e, s) {
@@ -549,10 +545,7 @@ extension HiddenService on CollectionsService {
   /// For files whose hidden collection is not owned by the user,
   /// they are moved to the user's default hidden collection.
   Future<void> cleanupHiddenFiles(BuildContext context) async {
-    final dialog = createProgressDialog(
-      context,
-      AppLocalizations.of(context).pleaseWait,
-    );
+    final dialog = createProgressDialog(context, context.strings.pleaseWait);
     await dialog.show();
 
     try {
@@ -606,7 +599,7 @@ extension HiddenService on CollectionsService {
 
       await dialog.hide();
       if (!context.mounted) return;
-      showShortToast(context, AppLocalizations.of(context).cleanupComplete);
+      showShortToast(context, context.strings.cleanupComplete);
     } catch (e, s) {
       _logger.severe("Failed to cleanup hidden files", e, s);
       await dialog.hide();

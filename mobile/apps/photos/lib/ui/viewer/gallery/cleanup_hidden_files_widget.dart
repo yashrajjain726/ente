@@ -1,6 +1,6 @@
 import 'package:ente_components/ente_components.dart';
+import "package:ente_strings/ente_strings.dart";
 import 'package:flutter/material.dart';
-import "package:photos/generated/l10n.dart";
 import 'package:photos/services/collections_service.dart';
 import "package:photos/services/hidden_service.dart";
 import 'package:photos/ui/components/menu_section_description_widget.dart';
@@ -17,7 +17,7 @@ class CleanupHiddenFilesWidget extends StatelessWidget {
       child: Column(
         children: [
           MenuComponent(
-            title: AppLocalizations.of(context).cleanupHiddenFiles,
+            title: context.strings.cleanupHiddenFiles,
             leading: const Icon(Icons.cleaning_services_outlined),
             shouldSurfaceExecutionStates: true,
             shouldShowSuccessConfirmation: true,
@@ -27,7 +27,7 @@ class CleanupHiddenFilesWidget extends StatelessWidget {
             },
           ),
           MenuSectionDescriptionWidget(
-            content: AppLocalizations.of(context).cleanupHiddenFilesDescription,
+            content: context.strings.cleanupHiddenFilesDescription,
           ),
         ],
       ),

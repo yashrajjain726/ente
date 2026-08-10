@@ -1,9 +1,9 @@
+import "package:ente_strings/ente_strings.dart";
 import 'package:flutter/material.dart';
 import 'package:photos/core/event_bus.dart';
 import 'package:photos/events/collection_meta_event.dart';
 import 'package:photos/events/collection_updated_event.dart';
 import 'package:photos/events/files_updated_event.dart';
-import "package:photos/generated/l10n.dart";
 import "package:photos/models/file/extensions/file_props.dart";
 import "package:photos/models/file/file.dart";
 import "package:photos/models/file/file_type.dart";
@@ -102,7 +102,7 @@ class _LargeFilesPagePageState extends State<LargeFilesPagePage> {
       sortAsyncFn: () => false,
       groupType: GroupType.size,
       initialFiles: null,
-      albumName: AppLocalizations.of(context).viewLargeFiles,
+      albumName: context.strings.viewLargeFiles,
     );
     return GalleryBoundariesProvider(
       child: GalleryFilesState(
@@ -156,7 +156,7 @@ class _LargeFilesAppBarState extends State<_LargeFilesAppBar>
         elevation: 0,
         centerTitle: false,
         title: Text(
-          AppLocalizations.of(context).viewLargeFiles,
+          context.strings.viewLargeFiles,
           style: Theme.of(
             context,
           ).textTheme.headlineSmall!.copyWith(fontSize: 16),
@@ -170,20 +170,20 @@ class _LargeFilesAppBarState extends State<_LargeFilesAppBar>
             child: Row(
               children: [
                 _FilterChip(
-                  label: AppLocalizations.of(context).all,
+                  label: context.strings.all,
                   isSelected: widget.currentFilter == LargeFileFilter.all,
                   onTap: () => widget.onFilterChanged(LargeFileFilter.all),
                 ),
                 const SizedBox(width: 8),
                 _FilterChip(
-                  label: AppLocalizations.of(context).photos,
+                  label: context.strings.photos,
                   icon: Icons.image,
                   isSelected: widget.currentFilter == LargeFileFilter.photos,
                   onTap: () => widget.onFilterChanged(LargeFileFilter.photos),
                 ),
                 const SizedBox(width: 8),
                 _FilterChip(
-                  label: AppLocalizations.of(context).videos,
+                  label: context.strings.videos,
                   icon: Icons.videocam,
                   isSelected: widget.currentFilter == LargeFileFilter.videos,
                   onTap: () => widget.onFilterChanged(LargeFileFilter.videos),

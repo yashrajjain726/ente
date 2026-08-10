@@ -1,6 +1,5 @@
 import 'dart:convert';
 
-import 'package:ente_auth/l10n/l10n.dart';
 import 'package:ente_auth/models/code.dart';
 import 'package:ente_auth/models/export/ente.dart';
 import 'package:ente_auth/ui/settings/data/import/import_file_cleanup.dart';
@@ -9,6 +8,7 @@ import 'package:ente_auth/ui/settings/data/import/import_success.dart';
 import 'package:ente_auth/utils/dialog_util.dart';
 import 'package:ente_auth/utils/toast_util.dart';
 import 'package:ente_crypto_api/ente_crypto_api.dart';
+import 'package:ente_strings/ente_strings.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
@@ -16,7 +16,7 @@ import 'package:flutter/material.dart';
 import 'package:logging/logging.dart';
 
 Future<void> showEncryptedImportInstruction(BuildContext context) async {
-  final l10n = context.l10n;
+  final l10n = context.strings;
   await showFileImportInstruction(
     context: context,
     title: "Ente Auth",
@@ -31,7 +31,7 @@ Future<void> _decryptExportData(
   BuildContext context,
   EnteAuthExport enteAuthExport,
 ) async {
-  final l10n = context.l10n;
+  final l10n = context.strings;
   bool shouldRetry = false;
   int? importedCodeCount;
   await showTextInputDialog(
@@ -125,8 +125,8 @@ Future<void> _pickEnteJsonFile(BuildContext context) async {
     if (!context.mounted) return;
     await showErrorDialog(
       context,
-      context.l10n.sorry,
-      context.l10n.importFailureDesc,
+      context.strings.sorry,
+      context.strings.importFailureDesc,
     );
   }
 }

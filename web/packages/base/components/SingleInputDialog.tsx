@@ -15,20 +15,8 @@ import React, { useCallback } from "react";
 import { SingleInputForm, type SingleInputFormProps } from "./SingleInputForm";
 
 type SingleInputDialogProps = ModalVisibilityProps &
-    Omit<SingleInputFormProps, "onCancel"> & {
-        /** Title of the dialog. */
-        title: string;
-    };
+    Omit<SingleInputFormProps, "onCancel"> & { title: string };
 
-/**
- * A dialog that can be used to ask for a single text input using a
- * {@link SingleInputForm}.
- *
- * The dialog closes when the promise returned by the {@link onSubmit} callback
- * fulfills.
- *
- * See also: {@link CollectionNamer}, its older sibling.
- */
 export const SingleInputDialog: React.FC<SingleInputDialogProps> = ({
     open,
     onClose,

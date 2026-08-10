@@ -1,22 +1,17 @@
-//! Key generation for new account sign-up.
-
 use ente_core::b64;
 use ente_core::crypto::{self, Key, SecretString, SecretVec, argon, kdf, secretbox};
 
-use super::{KeyAttributes, KeyGenResult, PrivateKeyAttributes, Result};
+use super::{KeyAttributes, KeyGenResult, PrivateKeyAttributes};
+use crate::error::Result;
 
-/// Key derivation strength for password-based key generation.
 #[derive(Debug, Clone, Copy, Default)]
 pub enum KeyDerivationStrength {
-    /// Fast derivation (64MB, 2 ops) - for testing only
     Interactive,
-    /// Strong derivation (1GB, 4 ops) - for production
     #[default]
     Sensitive,
 }
 
-/// Encrypt data and return (encrypted_data, nonce) as base64 strings.
-/// The encrypted_data is MAC || ciphertext format (compatible with Dart).
+// Account APIs expect the nonce separately from the encrypted data.
 fn encrypt_to_b64(plaintext: &[u8], key: &Key) -> Result<(String, String)> {
     let encrypted = secretbox::encrypt(plaintext, key);
     Ok((
@@ -25,40 +20,31 @@ fn encrypt_to_b64(plaintext: &[u8], key: &Key) -> Result<(String, String)> {
     ))
 }
 
-/// Generate all keys needed for a new account, with the specified derivation
-/// strength.
 pub fn generate_keys_with_strength(
     password: &str,
     strength: KeyDerivationStrength,
 ) -> Result<KeyGenResult> {
-    // Create master key and recovery key
     let master_key = Key::generate();
     let recovery_key = Key::generate();
 
-    // Encrypt master key with recovery key and vice versa
     let (enc_master_with_recovery, nonce_master_recovery) =
         encrypt_to_b64(master_key.as_bytes(), &recovery_key)?;
     let (enc_recovery_with_master, nonce_recovery_master) =
         encrypt_to_b64(recovery_key.as_bytes(), &master_key)?;
 
-    // Derive key-encryption-key from password
     let derived = match strength {
         KeyDerivationStrength::Interactive => argon::derive_interactive_key(password)?,
         KeyDerivationStrength::Sensitive => argon::derive_sensitive_key(password)?,
     };
     let login_key = kdf::derive_login_key(&derived.key);
 
-    // Encrypt master key with derived key
     let (enc_key, key_nonce) = encrypt_to_b64(master_key.as_bytes(), &derived.key)?;
 
-    // Generate X25519 keypair
     let secret_key = crypto::SecretKey::generate();
     let public_key = secret_key.public_key();
 
-    // Encrypt secret key with master key
     let (enc_secret_key, secret_key_nonce) = encrypt_to_b64(secret_key.as_bytes(), &master_key)?;
 
-    // Build key attributes for server
     let key_attributes = KeyAttributes {
         kek_salt: b64::encode(derived.salt.as_bytes()),
         kek_hash: None,
@@ -75,7 +61,6 @@ pub fn generate_keys_with_strength(
         recovery_key_decryption_nonce: Some(nonce_recovery_master),
     };
 
-    // Build private key attributes for local storage
     let private_key_attributes = PrivateKeyAttributes {
         key: SecretString::new(b64::encode(master_key.as_bytes())),
         recovery_key: SecretString::new(hex::encode(recovery_key.as_bytes())),
@@ -90,9 +75,6 @@ pub fn generate_keys_with_strength(
     })
 }
 
-/// Generate new key attributes when user changes password.
-///
-/// Preserves existing key material and recovery fields.
 pub fn generate_key_attributes_for_new_password(
     master_key: &[u8],
     existing_attributes: &KeyAttributes,
@@ -106,23 +88,19 @@ pub fn generate_key_attributes_for_new_password(
     )
 }
 
-/// Generate new key attributes with specified derivation strength.
-///
-/// Preserves existing key material and recovery fields.
+// Changing the password must not rotate the account or recovery keys.
 pub fn generate_key_attributes_for_new_password_with_strength(
     master_key: &[u8],
     existing_attributes: &KeyAttributes,
     password: &str,
     strength: KeyDerivationStrength,
 ) -> Result<(KeyAttributes, SecretVec)> {
-    // Derive new KEK from new password
     let derived = match strength {
         KeyDerivationStrength::Interactive => argon::derive_interactive_key(password)?,
         KeyDerivationStrength::Sensitive => argon::derive_sensitive_key(password)?,
     };
     let login_key = kdf::derive_login_key(&derived.key);
 
-    // Encrypt master key with new derived key
     let (enc_key, key_nonce) = encrypt_to_b64(master_key, &derived.key)?;
 
     let key_attributes = KeyAttributes {
@@ -148,7 +126,6 @@ pub fn generate_key_attributes_for_new_password_with_strength(
     Ok((key_attributes, login_key))
 }
 
-/// Create a new recovery key for an existing account.
 pub fn create_new_recovery_key(
     master_key: &[u8],
 ) -> Result<(String, String, String, String, String)> {
@@ -173,7 +150,6 @@ mod tests {
     use super::*;
     use ente_core::crypto::Nonce;
 
-    // Typed-decrypt helper for byte-slice test material.
     fn decrypt_raw(data: &[u8], nonce: &[u8], key: &[u8]) -> Vec<u8> {
         secretbox::decrypt(
             data,
@@ -183,7 +159,6 @@ mod tests {
         .unwrap()
     }
 
-    // Use Interactive strength for fast tests
     fn generate_test_keys(password: &str) -> Result<KeyGenResult> {
         generate_keys_with_strength(password, KeyDerivationStrength::Interactive)
     }
@@ -299,7 +274,6 @@ mod tests {
         assert_ne!(new_attrs.kek_salt, initial.key_attributes.kek_salt);
         assert_ne!(new_login_key, initial.login_key);
 
-        // Verify we can decrypt with new password
         let kek_salt = b64::decode(&new_attrs.kek_salt).unwrap();
         let salt = crypto::Salt::try_from_slice(&kek_salt).unwrap();
         let kek = argon::derive_key(

@@ -151,7 +151,6 @@ export default function EmbedGallery() {
                 const accessToken = accessTokenFromURL(currentURL);
                 const ck = await extractCollectionKeyFromShareURL(currentURL);
                 if (!accessToken && !ck) {
-                    // Only redirect to ente.com if this is not a self-hosted instance.
                     if (!isCustomAPIOrigin) {
                         window.location.href = "https://ente.com";
                         redirectingToWebsite = true;

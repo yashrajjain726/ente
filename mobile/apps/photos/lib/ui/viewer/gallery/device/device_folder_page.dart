@@ -1,4 +1,5 @@
 import "package:ente_pure_utils/ente_pure_utils.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:logging/logging.dart";
 import "package:photos/core/configuration.dart";
@@ -7,7 +8,6 @@ import "package:photos/db/device_files_db.dart";
 import "package:photos/db/files_db.dart";
 import "package:photos/events/files_updated_event.dart";
 import "package:photos/events/local_photos_updated_event.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/models/device_collection.dart";
 import "package:photos/models/file/file.dart";
 import "package:photos/models/file_load_result.dart";
@@ -63,7 +63,7 @@ class _DeviceFolderPageState extends State<DeviceFolderPage> {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
+    final l10n = context.strings;
     final appBar = GalleryAppBarWidget.sliverConfig(
       GalleryType.localFolder,
       widget.deviceCollection.name,

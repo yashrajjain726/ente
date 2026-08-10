@@ -4,7 +4,6 @@ import "package:ente_lock_screen/ui/lock_screen_confirm_password.dart";
 import "package:ente_lock_screen/ui/lock_screen_options.dart";
 import "package:ente_lock_screen/ui/lock_screen_submit_fab.dart";
 import "package:ente_strings/ente_strings.dart";
-import "package:ente_ui/components/android_text_input_autofocus.dart";
 import "package:flutter/material.dart";
 import "package:flutter/services.dart";
 import "package:flutter_svg/flutter_svg.dart";

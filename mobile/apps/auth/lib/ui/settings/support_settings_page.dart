@@ -1,10 +1,9 @@
 import 'package:ente_auth/core/constants.dart';
-import 'package:ente_auth/l10n/l10n.dart';
-import 'package:ente_auth/ui/settings/components/auth_settings_item.dart';
 import 'package:ente_auth/ui/settings/components/auth_settings_page_scaffold.dart';
 import 'package:ente_auth/utils/email_util.dart';
 import 'package:ente_auth/utils/platform_util.dart';
 import 'package:ente_components/ente_components.dart';
+import 'package:ente_strings/ente_strings.dart';
 import 'package:flutter/material.dart';
 import 'package:hugeicons/hugeicons.dart';
 import 'package:logging/logging.dart';
@@ -15,29 +14,29 @@ class SupportSettingsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = context.l10n;
+    final l10n = context.strings;
     return AuthSettingsPageScaffold(
       title: l10n.support,
       children: [
-        AuthSettingsItem(
+        SettingsItem(
           title: l10n.faq,
           icon: HugeIcons.strokeRoundedHelpCircle,
           showOnlyLoadingState: true,
           onTap: () => _openFaq(),
         ),
         const SizedBox(height: Spacing.sm),
-        AuthSettingsItem(
+        SettingsItem(
           title: l10n.suggestFeatures,
           icon: HugeIcons.strokeRoundedIdea01,
           showOnlyLoadingState: true,
           onTap: _suggestFeatures,
         ),
         const SizedBox(height: Spacing.sm),
-        AuthSettingsItem(
+        SettingsItem(
           title: l10n.reportABug,
           icon: HugeIcons.strokeRoundedBug01,
           showOnlyLoadingState: true,
-          onTap: () => sendLogs(context, l10n.reportBug),
+          onTap: () => sendLogs(context, l10n.reportABug),
           onDoubleTap: () => _shareLogs(context),
         ),
       ],

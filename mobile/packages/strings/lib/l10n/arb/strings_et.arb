@@ -1,132 +1,451 @@
 {
-  "error": "Viga",
-  "@error": {
-    "description": "Generic error title"
+  "activeSessions": "Aktiivsed sessioonid",
+  "@activeSessions": {
+    "description": "Title for active sessions page"
   },
-  "ok": "Sobib",
-  "@ok": {
-    "description": "Generic OK button label"
+  "addCode": "Lisa kood",
+  "addedAs": "Lisatud kui",
+  "addLocation": "Lisa asukoht",
+  "addLocationButton": "Lisa",
+  "addMore": "Lisa veel",
+  "addTag": "Lisa silt",
+  "albumOwner": "Omanik",
+  "@albumOwner": {
+    "description": "Role of the album owner"
   },
-  "faq": "KKK",
-  "@faq": {
-    "description": "FAQ link label"
+  "albumUpdated": "Albumit on uuendatud",
+  "algorithm": "Algoritm",
+  "all": "Kõik",
+  "allowDownloads": "Luba allalaadimised",
+  "allTabEmptyHint": "Siin pole veel midagi. Koodi lisamiseks klõpsa + ikooni või otsi prüügikastist mõnu kustutatud kirje.",
+  "@allTabEmptyHint": {
+    "description": "Shown when the All tab has no active codes but Trash contains codes"
   },
-  "contactSupport": "Võtke ühendust klienditoega",
-  "@contactSupport": {
-    "description": "Contact support button label"
+  "androidCancelButton": "Katkesta",
+  "@androidCancelButton": {
+    "description": "Message showed on a button that the user can click to leave the current dialog. It is used on Android side. Maximum 30 characters."
   },
-  "cancel": "Katkesta",
-  "@cancel": {
-    "description": "Cancel button label"
+  "androidSignInTitle": "Autentimine on vajalik",
+  "@androidSignInTitle": {
+    "description": "Message showed as a title in a dialog which indicates the user that they need to scan biometric to continue. It is used on Android side. Maximum 60 characters."
   },
-  "reportABug": "Teata veast",
-  "@reportABug": {
-    "description": "Label for reporting a bug"
+  "appleId": "Apple ID",
+  "apply": "Rakenda",
+  "areYouSureThatYouWantToLeaveTheFamily": "Kas oled kindel et soovid pere teenusepaketist lahkuda?",
+  "areYouSureYouWantToLogout": "Kas oled kindel, et soovid välja logida?",
+  "@areYouSureYouWantToLogout": {
+    "description": "Confirmation message before logout"
   },
-  "save": "Salvesta",
-  "@save": {
-    "description": "Label for save button"
+  "authenticationFailedPleaseTryAgain": "Autentimine ei õnnestunud, palun proovi uuesti",
+  "@authenticationFailedPleaseTryAgain": {
+    "description": "Error message when authentication fails"
   },
-  "send": "Saada",
-  "@send": {
-    "description": "Label for send button"
+  "authenticationSuccessful": "Autentimine õnnestus!",
+  "@authenticationSuccessful": {
+    "description": "Success message when authentication is successful"
   },
-  "enterNewEmailHint": "Sisesta oma uus e-posti aadress",
-  "@enterNewEmailHint": {
-    "description": "Hint text for entering new email address"
+  "authToChangeLockscreenSetting": "Lukustusvaate seadistuste muutmiseks palun tuvasta end",
+  "authToChangeYourEmail": "Oma e-posti aadressi muutmiseks palun tuvasta end",
+  "authToChangeYourPassword": "Oma salasõna aadressi muutmiseks palun tuvasta end",
+  "authToExportCodes": "Oma koodide eksportimiseks palun tuvasta end",
+  "authToInitiateSignIn": "Varukoopia loomiseks vajaliku sisselogimise kontekstis palun tuvasta end.",
+  "authToViewSecrets": "Oma salakoodide vaatamiseks palun tuvasta end",
+  "@authToViewSecrets": {
+    "description": "Message prompting authentication to view secrets"
   },
+  "authToViewYourActiveSessions": "Oma aktiivsete sessioonide vaatamiseks palun tuvasta end",
+  "blog": "Blogi",
+  "bothIssuerAndAccountCanNotBeEmpty": "Nii kasutajakonto kui väljaandja ei tohi tühjaks jääda",
+  "changePassword": "Muuda salasõna",
+  "changePasswordTitle": "Muuda salasõna",
+  "@changePasswordTitle": {
+    "description": "Change password title"
+  },
+  "changePermissionsQuestion": "Muuta õiguseid?",
+  "checkForUpdates": "Kontrolli uuendusi",
+  "close": "Sulge",
+  "codeIssuerHint": "Väljaandja",
+  "collaborator": "Kaastööline",
+  "collectPhotos": "Kogu fotod",
+  "color": "Värv",
+  "compactMode": "Kompaktne vaade",
+  "confirm": "Kinnita",
+  "@confirm": {
+    "description": "Confirm button label"
+  },
+  "confirmRecoveryKey": "Kinnita oma taastevõti uuesti",
+  "confirmYourRecoveryKey": "Kinnita oma taastevõti uuesti",
+  "continueLabel": "Jätka",
+  "@continueLabel": {
+    "description": "Continue button label"
+  },
+  "convertToAlbum": "Konverdi albumiks",
+  "copied": "Kopeeritud",
+  "copiedNextToClipboard": "Järgmine kood on kopeeritud lõikelauale",
+  "copiedToClipboard": "Kopeeritud lõikelauale",
+  "copyEmailAddress": "Kopeeri e-posti aadress",
+  "@copyEmailAddress": {
+    "description": "Button to copy email address to clipboard"
+  },
+  "copyLink": "Kopeeri link",
+  "crashAndErrorReporting": "Teatamine vigadest ja kokkujooksmistest",
+  "create": "Loo",
+  "createAccount": "Loo konto",
+  "@createAccount": {
+    "description": "Create account button label"
+  },
+  "createNewTag": "Lisa uus silt",
+  "creatingLink": "Lingi loomine...",
+  "criticalUpdateAvailable": "Saadaval on kriitiline uuendus",
+  "custom": "Kohandatud",
+  "@custom": {
+    "description": "Label for setting custom value for link expiry"
+  },
+  "customEndpoint": "Ühendatud otspunktiga {endpoint}",
+  "@customEndpoint": {
+    "description": "Text showing user is connected to a custom endpoint",
+    "placeholders": {
+      "endpoint": {
+        "type": "String",
+        "description": "URL of the custom endpoint"
+      }
+    }
+  },
+  "data": "Andmed",
+  "dayToday": "Täna",
+  "dayYesterday": "Eile",
+  "delete": "Kustuta",
+  "@delete": {
+    "description": "Delete button label"
+  },
+  "deleteAll": "Kustuta kõik",
+  "deleteCodeAuthMessage": "Koodi kustutamiseks tuvasta end",
+  "deleteCodeMessage": "Kas sa oled kindel, et soovid selle koodi kustutada? Seda tegevust ei saa tagasi pöörata.",
+  "deleteCodeTitle": "Kas kustutame koodi?",
+  "deleteFromBoth": "Kustuta mõlemast",
+  "deleteFromDevice": "Kustutage seadmest",
+  "deleteLocation": "Kustuta asukoht",
+  "deletePhotos": "Kustuta fotod",
+  "deleteTagMessage": "Kas sa oled kindel, et soovid selle sildi kustutada? Seda tegevust ei saa tagasi pöörata.",
+  "deleteTagTitle": "Kas kustutame sildi?",
+  "details": "Üksikasjad",
+  "developerSettings": "Seadistused arendajale",
+  "@developerSettings": {
+    "description": "Label for developer settings"
+  },
+  "deviceLock": "Seadme lukustus",
+  "@deviceLock": {
+    "description": "Device lock option title"
+  },
+  "digits": "Numbreid",
+  "discover": "Avasta",
+  "@discover": {
+    "description": "The text to display for the discover section under which we show receipts, screenshots, sunsets, greenery, etc."
+  },
+  "discover_babies": "Beebid",
+  "discover_identity": "Identiteet",
+  "discover_memes": "Meemid",
+  "discover_notes": "Märkmed",
+  "discover_pets": "Lemmikloomad",
+  "discover_receipts": "Kviitungid",
+  "discover_screenshots": "Ekraanipildid",
+  "discover_visiting_cards": "Visiitkaardid",
+  "distanceInKMUnit": "km",
+  "@distanceInKMUnit": {
+    "description": "Unit for distance in km"
+  },
+  "done": "Valmis",
+  "doThisLater": "Tee seda hiljem",
+  "@doThisLater": {
+    "description": "Do this later button label"
+  },
+  "doubleTapToViewHiddenCode": "Koodi nähemiseks topeltklõpsa kirjel",
+  "downloadUpdate": "Laadi alla",
+  "edit": "Muuda",
+  "editCodeAuthMessage": "Koodi muutmiseks tuvasta end",
+  "editOrder": "Muuda järjekorda",
+  "editTag": "Muuda silti",
   "email": "E-post",
   "@email": {
     "description": "Email field label"
   },
-  "verify": "Kinnita",
-  "@verify": {
-    "description": "Verify button label"
+  "emailAlreadyRegistered": "E-posti aadress on juba registreeritud.",
+  "@emailAlreadyRegistered": {
+    "description": "Error message when email is already registered"
+  },
+  "emailChangedTo": "E-posti aadress on nüüd muudetud, uus aadress on {newEmail}",
+  "@emailChangedTo": {
+    "description": "Message when email has been changed",
+    "placeholders": {
+      "newEmail": {
+        "description": "The new email address",
+        "type": "String",
+        "example": "new@example.com"
+      }
+    }
+  },
+  "emailHint": "Sisesta oma e-posti aadress",
+  "emailNotRegistered": "E-posti aadress pole registreeritud.",
+  "@emailNotRegistered": {
+    "description": "Error message when email is not registered"
+  },
+  "emailUsMessage": "Saada meile e-kiri aadressile {email}",
+  "@emailUsMessage": {
+    "placeholders": {
+      "email": {
+        "type": "String"
+      }
+    }
+  },
+  "emailYourLogs": "Saada oma logid e-kirjana",
+  "@emailYourLogs": {
+    "description": "Title for emailing logs dialog"
+  },
+  "encrypted": "Krüptitud",
+  "encryptionKeys": "Krüptovõtmed",
+  "@encryptionKeys": {
+    "description": "Encryption keys title"
+  },
+  "endpointUpdatedMessage": "Otspunkti uuendamine õnnestus",
+  "@endpointUpdatedMessage": {
+    "description": "Success message when endpoint is updated"
+  },
+  "enterCode": "Sisesta kood",
+  "enterCodeHint": "Sisesta oma autentimisrakendusest\n6-numbriline kood",
+  "@enterCodeHint": {
+    "description": "Hint for entering 2FA code"
+  },
+  "enterDetailsManually": "Sisesta üksikasjad käsitsi",
+  "enterEmail": "Sisesta e-post",
+  "enterNewEmailHint": "Sisesta oma uus e-posti aadress",
+  "@enterNewEmailHint": {
+    "description": "Hint text for entering new email address"
+  },
+  "enterNewPasswordToEncrypt": "Palun uus sisesta salasõna, mida me kasutame sinu andmete krüptimiseks",
+  "@enterNewPasswordToEncrypt": {
+    "description": "Prompt to enter new password for encryption"
+  },
+  "enterPasswordToDecrypt2FASBackup": "Sisesta salasõna 2FAS-i varukoopia dekrüptimiseks",
+  "enterPasswordToDecryptAndOTP": "Sisesta salasõna andOTP varukoopia dekrüptimiseks",
+  "enterPasswordToEncrypt": "Palun sisesta salasõna, mida me kasutame sinu andmete krüptimiseks",
+  "@enterPasswordToEncrypt": {
+    "description": "Prompt to enter password for encryption"
+  },
+  "enterRecoveryKeyHint": "Sisesta oma taastevõti",
+  "@enterRecoveryKeyHint": {
+    "description": "Hint for entering recovery key"
+  },
+  "enterValidEmail": "Palun sisesta korrektne e-posti aadress.",
+  "enterYourPassword": "Sisesta oma parool",
+  "enterYourPasswordHint": "Sisesta oma salasõna",
+  "@enterYourPasswordHint": {
+    "description": "Hint for password field"
+  },
+  "enterYourRecoveryKey": "Sisesta oma taastevõti",
+  "error": "Viga",
+  "@error": {
+    "description": "Generic error title"
+  },
+  "errorGenericBody": "Importimisel tekkis ootamatu viga.",
+  "errorGenericTitle": "Tekkis viga",
+  "errorInvalidQRCodeBody": "Skaneeritud QR-kood pole korrektne 2FA kasutajakonto.",
+  "errorNoQRCode": "QR-koodi ei leidu",
+  "export": "Ekspordi",
+  "exportCodes": "Ekspordi koode",
+  "exportDialogDesc": "Krüptitud ekspordifailid on kaitstud sinu sisestatud salasõnaga.",
+  "exportLogs": "Ekspordi logid",
+  "@exportLogs": {
+    "description": "Button to export logs"
+  },
+  "exportWarningDesc": "Eksporditud failis on privaatsed andmed. Palun hoia seda turvaliselt.",
+  "exportYourData": "Ekspordi oma andmed",
+  "faq": "KKK",
+  "@faq": {
+    "description": "FAQ link label"
+  },
+  "faqs": "KKK",
+  "featureBackupCodes": "Läbivalt krüptitud varundus ja sünkroonimine",
+  "featureOpenSource": "Avatud lähtekoodiga ja\nauditeeritud turvaekspertide poolt",
+  "featureSearchEtc": "Otsing, sildid, jagamine,\njärgmine kood ja paljugi veel",
+  "flip": "Pööra ümber",
+  "focusOnSearchBar": "Rakenduse käivitamisel säti fookus otsingule",
+  "forgotPassword": "Unustasin salasõna",
+  "@forgotPassword": {
+    "description": "Forgot password link label"
+  },
+  "freeTrial": "Tasuta prooviaeg",
+  "general": "Üldine",
+  "generatingEncryptionKeys": "Loon krüptovõtmeid...",
+  "@generatingEncryptionKeys": {
+    "description": "Generating encryption keys message"
+  },
+  "generatingEncryptionKeysTitle": "Loon krüptovõtmeid...",
+  "@generatingEncryptionKeysTitle": {
+    "description": "Generating encryption keys title"
+  },
+  "getStarted": "Alusta",
+  "googlePlayId": "Google Play ID",
+  "help": "Abiinfo",
+  "hidden": "Peidetud",
+  "hide": "Peida",
+  "hintForDesktop": "Koodi muutmiseks või eemaldamiseks paremklõpsa.",
+  "hintForMobile": "Koodi muutmiseks või eemaldamiseks vajuta tal pikalt.",
+  "howItWorks": "Kuidas see töötab",
+  "@howItWorks": {
+    "description": "How it works button label"
+  },
+  "importAccountPageTitle": "Sisesta kasutajakonto üksikasjad",
+  "importCodes": "Impordi koode",
+  "importEnterSetupKey": "Sisesta seadistusvõti",
+  "importFromGallery": "Impordi galeriist",
+  "importInstruction": "Palun vali fail, milles sisalduvad importitavad koodid järgmises vormingus",
+  "importLabel": "Impordi",
+  "importSelectAppExport": "Vali {appName} rakenduse ekspordifail",
+  "@importSelectAppExport": {
+    "placeholders": {
+      "appName": {}
+    }
+  },
+  "importSelectJsonFile": "Vali JSON-fail",
+  "importSuccessDesc": "Sa oled importinud {count} koodi!",
+  "@importSuccessDesc": {
+    "placeholders": {
+      "count": {
+        "description": "The number of codes imported",
+        "type": "int",
+        "example": "1"
+      }
+    }
+  },
+  "importSuccessTitle": "Jee!",
+  "importTypeEnteEncrypted": "Ente krüptitud ekspordina",
+  "incorrectCode": "Vigane kood",
+  "@incorrectCode": {
+    "description": "Error message when code is incorrect"
+  },
+  "incorrectDetails": "Viga üksikasjades",
+  "incorrectRecoveryKey": "Vigane taasetvõti",
+  "@incorrectRecoveryKey": {
+    "description": "Error message when recovery key is incorrect"
+  },
+  "insecureDevice": "Ebaturvaline seade",
+  "@insecureDevice": {
+    "description": "Insecure device warning title"
+  },
+  "invalidEmailAddress": "Vigane e-posti aadress",
+  "invalidEmailMessage": "Palun sisesta korrektne e-posti aadress.",
+  "@invalidEmailMessage": {
+    "description": "Message for invalid email error dialog"
   },
   "invalidEmailTitle": "Vigane e-posti aadress",
   "@invalidEmailTitle": {
     "description": "Title for invalid email error dialog"
   },
-  "invalidEmailMessage": "Palun sisesta korrektne e-posti aadress.",
-  "@invalidEmailMessage": {
-    "description": "Message for invalid email error dialog"
+  "invalidEndpoint": "Vigane otspunkt",
+  "@invalidEndpoint": {
+    "description": "Error message when endpoint is invalid"
   },
-  "pleaseWait": "Palun oota...",
-  "@pleaseWait": {
-    "description": "Please wait message"
+  "invalidEndpointMessage": "Vabandust, sinu sisestatud otspunkt on vigane või vale. Palun sisesta korrektne otspunkt ja proovi uuesti.",
+  "@invalidEndpointMessage": {
+    "description": "Detailed error message when endpoint is invalid"
   },
-  "verifyPassword": "Korda salasõna",
-  "@verifyPassword": {
-    "description": "Verify password button label"
+  "invalidKey": "Vigane võti",
+  "invalidQRCode": "Vigane QR-kood",
+  "ok": "OK",
+  "@ok": {
+    "description": "Generic OK button label"
   },
-  "incorrectPasswordTitle": "Vale salasõna",
-  "@incorrectPasswordTitle": {
-    "description": "Title for incorrect password error"
+  "iUnderStand": "Sain aru",
+  "@iUnderStand": {
+    "description": "Text for the button to confirm the user understands the warning"
   },
-  "pleaseTryAgain": "Palun proovi uuesti",
-  "@pleaseTryAgain": {
-    "description": "Message asking user to try again"
+  "kiloMeterUnit": "km",
+  "language": "Keel",
+  "lastUpdated": "Viimati uuendatud",
+  "leaveFamily": "Lahku perekonnast",
+  "leaveSharedAlbum": "Lahkuda jagatud albumist?",
+  "linkDeviceLimit": "Seadme limit",
+  "linkEnabled": "Sees",
+  "linkExpired": "Aegunud",
+  "linkExpiry": "Lingi aegumine",
+  "linkHasExpired": "Link on aegunud",
+  "linkNeverExpires": "Mitte kunagi",
+  "locationName": "Asukoha nimi",
+  "lockButtonLabel": "Lukusta",
+  "loggingOut": "Väljalogimine...",
+  "@loggingOut": {
+    "description": "Message shown while logging out"
   },
-  "enterPassword": "Sisesta salasõna",
-  "@enterPassword": {
-    "description": "Enter password field label"
+  "logInLabel": "Logi sisse",
+  "@logInLabel": {
+    "description": "Log in button label"
   },
-  "enterYourPasswordHint": "Sisesta oma salasõna",
-  "@enterYourPasswordHint": {
-    "description": "Hint for password field"
+  "loginTerms": "Sisselogdes nõustun <u-terms>kasutustingimustega</u-terms> ja <u-policy>privaatsusreeglitega</u-policy>",
+  "@loginTerms": {
+    "description": "Terms agreement text for login"
   },
-  "oops": "Vaat kus lops!",
-  "@oops": {
-    "description": "Oops error title"
+  "logout": "Logi välja",
+  "lostDeviceTitle": "Kas kaotasid oma seadme?",
+  "@lostDeviceTitle": {
+    "description": "Lost device title"
   },
-  "weakStrength": "Nõrk",
-  "@weakStrength": {
-    "description": "Weak password strength label"
-  },
+  "manage": "Halda",
+  "manageLink": "Halda linki",
+  "manageParticipants": "Halda",
+  "manageSubscription": "Halda tellimust",
+  "manualSort": "Kohandatud",
+  "merchandise": "Kaup",
+  "minimizeToTrayOnClose": "Sulgemisel minimeeri rakendus süsteemisalve",
   "moderateStrength": "Keskmine",
   "@moderateStrength": {
     "description": "Moderate password strength label"
   },
-  "strongStrength": "Tugev",
-  "@strongStrength": {
-    "description": "Strong password strength label"
+  "mostFrequentlyUsed": "Sageli kasutatud",
+  "mostRecentlyUsed": "Hiljuti kasutatud",
+  "movedToTrash": "Liigutatud prügikasti",
+  "name": "Nimi",
+  "never": "Mitte kunagi",
+  "newest": "Uusimad",
+  "next": "Järgmine",
+  "@next": {
+    "description": "Next button label"
   },
-  "deleteAccount": "Kustuta kasutajakonto",
-  "@deleteAccount": {
-    "description": "Delete account button label"
+  "nextTotpTitle": "järgmine",
+  "no": "Ei",
+  "noDeviceLimit": "Puudub",
+  "@noDeviceLimit": {
+    "description": "Text to indicate that there is limit on number of devices"
   },
-  "deleteAccountQuery": "Meil on kahju, et soovid lahkuda. Kas sul tekkis mõni viga või probleem?",
-  "@deleteAccountQuery": {
-    "description": "Message asking user why they want to delete account"
+  "noRecoveryKeyTitle": "Sul pole taastevõtit?",
+  "@noRecoveryKeyTitle": {
+    "description": "No recovery key title"
   },
-  "yesSendFeedbackAction": "Jah, saadan tagasisidet",
-  "@yesSendFeedbackAction": {
-    "description": "Button to confirm sending feedback"
+  "noResult": "Tulemusi pole",
+  "note": "Märkus",
+  "notes": "Märkmed",
+  "notesLengthLimit": "Märkmete pikkus võib olla kuni {count} tähemärki",
+  "@notesLengthLimit": {
+    "description": "Text to indicate the maximum number of characters allowed for notes",
+    "placeholders": {
+      "count": {
+        "description": "The maximum number of characters allowed for notes",
+        "type": "int",
+        "example": "100"
+      }
+    }
   },
-  "noDeleteAccountAction": "Ei, kustuta kasutajakonto",
-  "@noDeleteAccountAction": {
-    "description": "Button to proceed with account deletion"
+  "offlineModeWarning": "Sa oled otsustanud jätkata ilma varundust kasutamata. Tagamaks, et su andmed ei kao, plaun tee varukoopiaid käsitsi.",
+  "oops": "Oih",
+  "@oops": {
+    "description": "Oops error title"
   },
-  "initiateAccountDeleteTitle": "Kasutajakonto kustutamiseks palun tuvasta end",
-  "@initiateAccountDeleteTitle": {
-    "description": "Title for authentication dialog before account deletion"
+  "oopsSomethingWentWrong": "Oih, midagi läks valesti",
+  "passwordChangedSuccessfully": "Salasõna muutmine õnnestus",
+  "@passwordChangedSuccessfully": {
+    "description": "Password changed successfully message"
   },
-  "delete": "Kustuta",
-  "@delete": {
-    "description": "Delete button label"
-  },
-  "createNewAccount": "Loo uus kasutajakonto",
-  "@createNewAccount": {
-    "description": "Create new account button label"
-  },
-  "password": "Salasõna",
-  "@password": {
-    "description": "Password field label"
-  },
-  "confirmPassword": "Korda salasõna",
-  "@confirmPassword": {
-    "description": "Confirm password field label"
-  },
+  "passwordEmptyError": "Salasõna väli ei saa olla tühi",
+  "passwordForDecryptingExport": "Salasõna eksporditud andmete dekrüptimiseks",
   "passwordStrength": "Salasõna tugevus: {passwordStrengthValue}",
   "@passwordStrength": {
     "description": "Text to indicate the password strength",
@@ -138,169 +457,322 @@
       }
     }
   },
-  "termsOfServicesTitle": "Kasutustingimused",
-  "@termsOfServicesTitle": {
-    "description": "Terms of service title"
+  "passwordToEncryptExport": "Salasõna eksporditud andmete krüptimiseks",
+  "pendingSyncs": "Hoiatus",
+  "pendingSyncsWarningBody": "Mõned sinu koodid on varundamata.\n\nEnne väljalogimist palun kontrolli, et sa oleksid nad varundanud.",
+  "period": "Ajavahemik",
+  "pinnedCodeMessage": "{code} on tõstetud esile",
+  "@pinnedCodeMessage": {
+    "placeholders": {
+      "code": {}
+    }
   },
-  "privacyPolicyTitle": "Privaatsusreeglid",
-  "@privacyPolicyTitle": {
-    "description": "Privacy policy title"
+  "pinText": "Tõsta esile",
+  "plainHTML": "Tavaline HTML",
+  "plainText": "Vormindamata tekst",
+  "pleaseLoginAgain": "Palun logi uuesti sisse",
+  "pleaseSendTheLogsTo": "Palun saada logid e-posti aadressile \n{toEmail}",
+  "@pleaseSendTheLogsTo": {
+    "description": "Message asking user to send logs to email address",
+    "placeholders": {
+      "toEmail": {
+        "type": "String",
+        "description": "Email address to send logs to"
+      }
+    }
   },
-  "ackPasswordLostWarning": "Ma saan aru, et salasõna kaotamisel kaotan ka ligipääsu oma andmetele - minu andmed on ju <underline>läbivalt krüptitud</underline>.",
-  "@ackPasswordLostWarning": {
-    "description": "Warning about password loss"
+  "pleaseTryAgain": "Palun proovi uuesti",
+  "@pleaseTryAgain": {
+    "description": "Message asking user to try again"
   },
-  "encryption": "Krüptimine",
-  "@encryption": {
-    "description": "Encryption label"
+  "pleaseVerifyDetails": "Palun kontrolli andmeid ja proovi uuesti",
+  "pleaseWait": "Palun oota...",
+  "@pleaseWait": {
+    "description": "Please wait message"
   },
-  "logInLabel": "Logi sisse",
-  "@logInLabel": {
-    "description": "Log in button label"
-  },
-  "welcomeBack": "Tere tulemast tagasi!",
-  "@welcomeBack": {
-    "description": "Welcome back message"
-  },
-  "loginTerms": "Sisselogdes nõustun <u-terms>kasutustingimustega</u-terms> ja <u-policy>privaatsusreeglitega</u-policy>",
-  "@loginTerms": {
-    "description": "Terms agreement text for login"
-  },
-  "recreatePasswordTitle": "Loo salasõna uuesti",
-  "@recreatePasswordTitle": {
-    "description": "Title for recreate password dialog"
-  },
-  "useRecoveryKey": "Kasuta taastevõtit",
-  "@useRecoveryKey": {
-    "description": "Use recovery key button label"
-  },
-  "forgotPassword": "Unustasin salasõna",
-  "@forgotPassword": {
-    "description": "Forgot password link label"
-  },
-  "changeEmail": "Muuda e-posti aadressi",
-  "@changeEmail": {
-    "description": "Change email button label"
-  },
-  "verifyEmail": "Kinnita e-posti aadress",
-  "@verifyEmail": {
-    "description": "Verify email title"
-  },
-  "sendEmail": "Saada e-kiri",
-  "tryAgain": "Proovi uuesti",
-  "@tryAgain": {
-    "description": "Try again button label"
-  },
-  "checkStatus": "Kontrolli olekut",
-  "@checkStatus": {
-    "description": "Check status button label"
-  },
-  "recoverAccount": "Taasta oma kasutajakonto",
-  "@recoverAccount": {
-    "description": "Recover account button label"
-  },
-  "setPasswordTitle": "Sisesta salasõna",
-  "@setPasswordTitle": {
-    "description": "Set password title"
-  },
-  "changePasswordTitle": "Muuda salasõna",
-  "@changePasswordTitle": {
-    "description": "Change password title"
-  },
-  "resetPasswordTitle": "Lähtesta salasõna",
-  "@resetPasswordTitle": {
-    "description": "Reset password title"
-  },
-  "encryptionKeys": "Krüptovõtmed",
-  "@encryptionKeys": {
-    "description": "Encryption keys title"
-  },
-  "howItWorks": "Kuidas see töötab",
-  "@howItWorks": {
-    "description": "How it works button label"
-  },
-  "passwordChangedSuccessfully": "Salasõna muutmine õnnestus",
-  "@passwordChangedSuccessfully": {
-    "description": "Password changed successfully message"
-  },
-  "generatingEncryptionKeysTitle": "Loon krüptovõtmeid...",
-  "@generatingEncryptionKeysTitle": {
-    "description": "Generating encryption keys title"
-  },
-  "recoveryKeyCopiedToClipboard": "Taastevõti on kopeeritud lõikelauale",
-  "@recoveryKeyCopiedToClipboard": {
-    "description": "Recovery key copied message"
-  },
-  "recoveryKey": "Taastevõti",
-  "@recoveryKey": {
-    "description": "Recovery key label"
-  },
-  "recoveryKeyOnForgotPassword": "Kui unustad oma salasõna, siis see krüptovõti on ainus võimalus sinu andmete taastamiseks.",
-  "@recoveryKeyOnForgotPassword": {
-    "description": "Recovery key importance explanation"
-  },
-  "saveKey": "Salvesta võti",
-  "@saveKey": {
-    "description": "Save key button label"
-  },
-  "noRecoveryKeyTitle": "Sul pole taastevõtit?",
-  "@noRecoveryKeyTitle": {
-    "description": "No recovery key title"
-  },
-  "enterCodeHint": "Sisesta oma autentimisrakendusest\n6-numbriline kood",
-  "@enterCodeHint": {
-    "description": "Hint for entering 2FA code"
-  },
-  "lostDeviceTitle": "Kas kaotasid oma seadme?",
-  "@lostDeviceTitle": {
-    "description": "Lost device title"
-  },
-  "enterRecoveryKeyHint": "Sisesta oma taastevõti",
-  "@enterRecoveryKeyHint": {
-    "description": "Hint for entering recovery key"
+  "preparingLogs": "Valmistan logisid ette...",
+  "privacy": "Privaatsus",
+  "qr": "QR-kood",
+  "qrCode": "QR-kood",
+  "radius": "Raadius",
+  "rateUsOnStore": "Arvusta meid rakendustepoes: {storeName}",
+  "@rateUsOnStore": {
+    "placeholders": {
+      "storeName": {}
+    }
   },
   "recover": "Taasta",
   "@recover": {
     "description": "Recover button label"
   },
-  "loggingOut": "Väljalogimine...",
-  "@loggingOut": {
-    "description": "Message shown while logging out"
+  "recoverAccount": "Taasta oma kasutajakonto",
+  "@recoverAccount": {
+    "description": "Recover account button label"
   },
-  "areYouSureYouWantToLogout": "Kas oled kindel, et soovid välja logida?",
-  "@areYouSureYouWantToLogout": {
-    "description": "Confirmation message before logout"
+  "recoveryKey": "Taastevõti",
+  "@recoveryKey": {
+    "description": "Recovery key label"
   },
-  "yesLogout": "Jah, logi välja",
-  "@yesLogout": {
-    "description": "Confirmation button for logout"
+  "recoveryKeyCopiedToClipboard": "Taastevõti on kopeeritud lõikelauale",
+  "@recoveryKeyCopiedToClipboard": {
+    "description": "Recovery key copied message"
   },
-  "setNewPassword": "Sisesta uus salasõna",
-  "@setNewPassword": {
-    "description": "Set new password title"
+  "recoveryKeyOnForgotPassword": "Kui unustad oma salasõna, siis see krüptovõti on ainus võimalus sinu andmete taastamiseks.",
+  "@recoveryKeyOnForgotPassword": {
+    "description": "Recovery key importance explanation"
   },
-  "enterPin": "Sisesta PIN-kood",
-  "@enterPin": {
-    "description": "Enter PIN prompt"
-  },
-  "setNewPin": "Määra uus PIN-kood",
-  "@setNewPin": {
-    "description": "Set new PIN title"
+  "recoveryKeyVerified": "Taastevõti on kontrollitud",
+  "recreatePasswordTitle": "Loo salasõna uuesti",
+  "@recreatePasswordTitle": {
+    "description": "Title for recreate password dialog"
   },
   "reEnterPassword": "Sisesta salasõna uuesti",
   "@reEnterPassword": {
     "description": "Re-enter password prompt"
   },
-  "emailAlreadyRegistered": "E-posti aadress on juba registreeritud.",
-  "@emailAlreadyRegistered": {
-    "description": "Error message when email is already registered"
+  "reEnterPin": "Sisesta PIN-kood uuesti",
+  "@reEnterPin": {
+    "description": "Re-enter PIN prompt"
   },
-  "emailNotRegistered": "E-posti aadress pole registreeritud.",
-  "@emailNotRegistered": {
-    "description": "Error message when email is not registered"
+  "remove": "Eemalda",
+  "removeFromAlbum": "Eemalda albumist",
+  "removeLink": "Eemalda link",
+  "removeParticipant": "Eemalda osaleja",
+  "@removeParticipant": {
+    "description": "menuSectionTitle for removing a participant"
+  },
+  "removePublicLink": "Eemalda avalik link",
+  "removeWithQuestionMark": "Eemaldada?",
+  "rename": "Nimeta ümber",
+  "renameAlbum": "Nimeta album ümber",
+  "reportABug": "Teata veast",
+  "@reportABug": {
+    "description": "Label for reporting a bug"
+  },
+  "resetPasswordTitle": "Lähtesta salasõna",
+  "@resetPasswordTitle": {
+    "description": "Reset password title"
+  },
+  "restore": "Taasta",
+  "@restore": {
+    "description": "Display text for an action which triggers a restore of item from trash",
+    "type": "text"
+  },
+  "save": "Salvesta",
+  "@save": {
+    "description": "Label for save button"
+  },
+  "saveCopy": "Salvesta koopia",
+  "saveKey": "Salvesta võti",
+  "@saveKey": {
+    "description": "Save key button label"
+  },
+  "saving": "Salvestamine...",
+  "scan": "Skanneeri",
+  "scanACode": "Skanneeri QR-koodi",
+  "scanAQrCode": "Skanneeri QR-koodi",
+  "scanCode": "Skanni koodi",
+  "scanThisBarcodeWithnyourAuthenticatorApp": "Skaneeri seda QR koodi\noma autentimisrakendusega",
+  "search": "Otsi",
+  "searchHint": "Otsi...",
+  "secret": "Saladus",
+  "secretCanNotBeEmpty": "Saladus ei tohi jääda tühjaks",
+  "security": "Turvalisus",
+  "selectAll": "Vali kõik",
+  "selectExportFormat": "Vali ekspordivorming",
+  "selectFile": "Vali fail",
+  "selectLanguage": "Vali keel",
+  "send": "Saada",
+  "@send": {
+    "description": "Label for send button"
+  },
+  "sendLink": "Saada link",
+  "serverEndpoint": "Serveri otspunkt",
+  "@serverEndpoint": {
+    "description": "Label for server endpoint setting"
   },
   "sessionExpired": "Sessioon on aegunud",
   "@sessionExpired": {
     "description": "Error message when session has expired"
+  },
+  "setAPassword": "Määra parool",
+  "setCover": "Määra kaanepilt",
+  "@setCover": {
+    "description": "Text to set cover photo for an album"
+  },
+  "setNewPassword": "Sisesta uus salasõna",
+  "@setNewPassword": {
+    "description": "Set new password title"
+  },
+  "setNewPin": "Määra uus PIN-kood",
+  "@setNewPin": {
+    "description": "Set new PIN title"
+  },
+  "setPasswordTitle": "Sisesta salasõna",
+  "@setPasswordTitle": {
+    "description": "Set password title"
+  },
+  "settings": "Seadistused",
+  "setupComplete": "Seadistamine on lõpetatud",
+  "setupFirstAccount": "Lisa oma esimene\nkasutajakonto",
+  "share": "Jaga",
+  "shareALink": "Jaga linki",
+  "shareCodes": "Jaga koodi",
+  "sharing": "Jagamine...",
+  "shouldHideCode": "Peida koodid",
+  "showLargeIcons": "Näita suuri ikoone",
+  "showQRAuthMessage": "QR-koodi näitamiseks tuvasta end",
+  "sigInBackupReminder": "Peale sisselogimist varundab Ente koode automaatselt.\n\nTäiendava varukoopia mõttes soovitame, et ka ekspordid oma koode.",
+  "signInToBackup": "Oma koodide varindamiseks logi sisse",
+  "signUp": "Loo konto ja liitu",
+  "singIn": "Logi sisse",
+  "skip": "Jäta vahele",
+  "somethingWentWrongMessage": "Midagi läks valesti, palun proovi uuesti",
+  "somethingWentWrongParsingCode": "{x} kinnituskoodi töötlemine polnud võimalik.",
+  "@somethingWentWrongParsingCode": {
+    "placeholders": {
+      "x": {}
+    }
+  },
+  "somethingWentWrongPleaseTryAgain": "Midagi läks valesti, palun proovi uuesti",
+  "@somethingWentWrongPleaseTryAgain": {
+    "description": "Generic error message"
+  },
+  "sorry": "Vabandust",
+  "sorryTheCodeYouveEnteredIsIncorrect": "Vabandust, sinu sisestatud kood on vigane",
+  "@sorryTheCodeYouveEnteredIsIncorrect": {
+    "description": "Detailed error message when code is incorrect"
+  },
+  "sortAlbumsBy": "Sorteeri",
+  "sortNewestFirst": "Uuemad eespool",
+  "sortOldestFirst": "Vanemad eespool",
+  "storage": "Mäluruum",
+  "storageBreakupFamily": "Perekond",
+  "storageBreakupYou": "Sina",
+  "@storageBreakupYou": {
+    "description": "Label to indicate how much storage you are using when you are part of a family plan"
+  },
+  "strongStrength": "Tugev",
+  "@strongStrength": {
+    "description": "Strong password strength label"
+  },
+  "subscribe": "Telli",
+  "suggestFeatures": "Soovita funktsionaalsust",
+  "support": "Kasutajatugi",
+  "tag": "Silt",
+  "tags": "Sildid",
+  "tapToCopy": "kopeerimiseks vajuta",
+  "tapToUnlock": "Avamiseks puuduta",
+  "@tapToUnlock": {
+    "description": "Message prompting user to tap to unlock"
+  },
+  "terminate": "Lõpeta",
+  "@terminate": {
+    "description": "Terminate button label"
+  },
+  "terminateSession": "Kas lõpetad sessiooni?",
+  "@terminateSession": {
+    "description": "Title for terminate session dialog"
+  },
+  "theRecoveryKeyYouEnteredIsIncorrect": "Sinu sisestatud taasetvõti on vigane",
+  "@theRecoveryKeyYouEnteredIsIncorrect": {
+    "description": "Detailed error message when recovery key is incorrect"
+  },
+  "thisDevice": "See seade",
+  "@thisDevice": {
+    "description": "Label for current device"
+  },
+  "thisEmailIsAlreadyInUse": "See e-posti aadress on juba kasutuses",
+  "@thisEmailIsAlreadyInUse": {
+    "description": "Error message when email is already in use"
+  },
+  "thisWillLogYouOutOfTheFollowingDevice": "Järgnevaga logitakse sind sellest seadmest välja:",
+  "@thisWillLogYouOutOfTheFollowingDevice": {
+    "description": "Warning message for logging out of another device"
+  },
+  "thisWillLogYouOutOfThisDevice": "Järgnevaga logitakse sind seadmest välja!",
+  "@thisWillLogYouOutOfThisDevice": {
+    "description": "Warning message for logging out of current device"
+  },
+  "tooManyIncorrectAttempts": "Liga palju ebaõnnestunud katseid",
+  "@tooManyIncorrectAttempts": {
+    "description": "Message shown when too many incorrect attempts are made"
+  },
+  "toResetVerifyEmail": "Salasõna lähtestamiseks palun esmalt kinnita oma e-posti aadress.",
+  "@toResetVerifyEmail": {
+    "description": "Message asking user to verify email before password reset"
+  },
+  "trash": "Prügikast",
+  "trashCode": "Kas viskad koodi prügikasti?",
+  "tryAgain": "Proovi uuesti",
+  "@tryAgain": {
+    "description": "Try again button label"
+  },
+  "twofactorAuthenticationSuccessfullyReset": "Kahefaktorilise autentimise lähtestamine õnnestus",
+  "@twofactorAuthenticationSuccessfullyReset": {
+    "description": "Message when two-factor authentication is successfully reset"
+  },
+  "twoFactorAuthTitle": "Kaheastmeline kinnitamine",
+  "@twoFactorAuthTitle": {
+    "description": "Two-factor authentication title"
+  },
+  "type": "Tüüp",
+  "uncategorized": "Liigitamata",
+  "unlock": "Ava",
+  "@unlock": {
+    "description": "Short action label used as the system authentication reason when unlocking the app"
+  },
+  "unpinnedCodeMessage": "{code} esiletõstmine on lõppenud",
+  "@unpinnedCodeMessage": {
+    "placeholders": {
+      "code": {}
+    }
+  },
+  "unpinText": "Lõpeta esiletõstmine",
+  "updateAvailable": "Saadaval on uuendus",
+  "usedSpace": "Kasutatud kettaruum",
+  "useOffline": "Kasuta ilma varunduseta",
+  "useRecoveryKey": "Kasuta taastevõtit",
+  "@useRecoveryKey": {
+    "description": "Use recovery key button label"
+  },
+  "verificationFailedPleaseTryAgain": "Kinnitamine ei õnnestunud, palun proovi uuesti",
+  "@verificationFailedPleaseTryAgain": {
+    "description": "Verification failed error message"
+  },
+  "verify": "Kinnita",
+  "@verify": {
+    "description": "Verify button label"
+  },
+  "verifyEmail": "Kinnita e-posti aadress",
+  "@verifyEmail": {
+    "description": "Verify email title"
+  },
+  "verifyingRecoveryKey": "Kontrollin taastevõtit...",
+  "viewActiveSessions": "Vaata aktiivseid sessioone",
+  "viewer": "Vaataja",
+  "viewLogsAction": "Vaata logisid",
+  "viewRecoveryKey": "Vaata taastevõtit",
+  "warning": "Hoiatus",
+  "weakStrength": "Nõrk",
+  "@weakStrength": {
+    "description": "Weak password strength label"
+  },
+  "weAreOpenSource": "Meie rakendus on avatud lähtekoodiga!",
+  "yes": "Jah",
+  "yesConvertToViewer": "Jah, muuda vaatajaks",
+  "yesDelete": "Jah, kustuta",
+  "yesDiscardChanges": "Jah, tühista muutused",
+  "yesLogout": "Jah, logi välja",
+  "@yesLogout": {
+    "description": "Confirmation button for logout"
+  },
+  "yesRemove": "Jah, eemalda",
+  "you": "Sina",
+  "youAreOnTheLatestVersion": "Kasutad viimast versiooni",
+  "youCannotShareWithYourself": "Sa ei saa iseendaga jagada",
+  "yourVerificationCodeHasExpired": "Sinu verifitseerimiskood on aegunud",
+  "@yourVerificationCodeHasExpired": {
+    "description": "Error message when verification code has expired"
   }
 }

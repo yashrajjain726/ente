@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use crate::{
     Result,
     models::account::{Account, AccountSecrets, App},
@@ -16,7 +14,6 @@ impl<'a> AccountStore<'a> {
         Self { conn }
     }
 
-    /// Add a new account
     pub fn add(&self, account: &Account) -> Result<()> {
         let now = current_timestamp();
 
@@ -37,7 +34,6 @@ impl<'a> AccountStore<'a> {
         Ok(())
     }
 
-    /// Get an account by email and app
     pub fn get(&self, email: &str, app: App) -> Result<Option<Account>> {
         let mut stmt = self.conn.prepare(
             "SELECT user_id, app, email, endpoint, export_dir FROM accounts 
@@ -53,7 +49,6 @@ impl<'a> AccountStore<'a> {
         Ok(account)
     }
 
-    /// List all accounts
     pub fn list(&self) -> Result<Vec<Account>> {
         let mut stmt = self.conn.prepare(
             "SELECT user_id, app, email, endpoint, export_dir FROM accounts 
@@ -67,7 +62,6 @@ impl<'a> AccountStore<'a> {
         Ok(accounts)
     }
 
-    /// Update account export directory
     pub fn update_export_dir(&self, email: &str, app: App, export_dir: &str) -> Result<()> {
         let now = current_timestamp();
 
@@ -87,7 +81,6 @@ impl<'a> AccountStore<'a> {
         Ok(())
     }
 
-    /// Delete an account
     pub fn delete(&self, user_id: i64, app: App) -> Result<()> {
         let rows_affected = self.conn.execute(
             "DELETE FROM accounts WHERE user_id = ?1 AND app = ?2",
@@ -104,7 +97,6 @@ impl<'a> AccountStore<'a> {
         Ok(())
     }
 
-    /// Store account secrets (encrypted)
     pub fn store_secrets(&self, user_id: i64, app: App, secrets: &AccountSecrets) -> Result<()> {
         let now = current_timestamp();
 
@@ -126,7 +118,6 @@ impl<'a> AccountStore<'a> {
         Ok(())
     }
 
-    /// Get account secrets
     pub fn get_secrets(&self, user_id: i64, app: App) -> Result<Option<AccountSecrets>> {
         let mut stmt = self.conn.prepare(
             "SELECT token, master_key, secret_key, public_key FROM secrets 

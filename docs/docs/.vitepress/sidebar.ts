@@ -1,5 +1,4 @@
-// When adding new pages, they need to be manually inserted into their
-// appropriate place here.
+// Add new pages to this sidebar manually.
 
 export const sidebar = [
     {

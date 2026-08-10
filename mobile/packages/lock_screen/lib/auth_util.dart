@@ -307,11 +307,11 @@ Future<bool> requestAuthentication(
           signInTitle: title ?? l10n.androidSignInTitle,
         ),
         IOSAuthMessages(
-          cancelButton: l10n.iOSOkButton,
+          cancelButton: l10n.ok,
           localizedFallbackTitle: l10n.enterPassword,
         ),
         MacOSAuthMessages(
-          cancelButton: l10n.iOSOkButton,
+          cancelButton: l10n.ok,
           localizedFallbackTitle: l10n.enterPassword,
         ),
       ],

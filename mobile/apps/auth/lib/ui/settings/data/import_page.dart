@@ -1,8 +1,7 @@
-import 'package:ente_auth/l10n/l10n.dart';
-import 'package:ente_auth/ui/settings/components/auth_settings_item.dart';
 import 'package:ente_auth/ui/settings/components/auth_settings_page_scaffold.dart';
 import 'package:ente_auth/ui/settings/data/import/import_service.dart';
 import 'package:ente_components/ente_components.dart';
+import 'package:ente_strings/ente_strings.dart';
 import 'package:flutter/material.dart';
 
 enum ImportType {
@@ -39,9 +38,9 @@ class ImportCodePage extends StatelessWidget {
   String getTitle(BuildContext context, ImportType type) {
     switch (type) {
       case ImportType.plainText:
-        return context.l10n.importTypePlainText;
+        return context.strings.plainText;
       case ImportType.encrypted:
-        return context.l10n.importTypeEnteEncrypted;
+        return context.strings.importTypeEnteEncrypted;
       case ImportType.ravio:
         return 'Raivo OTP';
       case ImportType.googleAuthenticator:
@@ -66,13 +65,13 @@ class ImportCodePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AuthSettingsPageScaffold(
-      title: context.l10n.importCodes,
+      title: context.strings.importCodes,
       children: [
         MenuGroupComponent(
           showDividers: true,
           items: [
             for (final type in importOptions)
-              AuthSettingsItem(
+              SettingsItem(
                 title: getTitle(context, type),
                 semanticsIdentifier: 'auth_import_${type.name}',
                 onTap: () => _import(context, type),

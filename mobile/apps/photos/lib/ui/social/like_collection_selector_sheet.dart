@@ -1,17 +1,17 @@
 import "package:ente_icons/ente_icons.dart";
+import "package:ente_strings/ente_strings.dart";
+import "package:ente_ui/components/loading_widget.dart";
 import "package:flutter/foundation.dart";
 import "package:flutter/material.dart";
 import "package:logging/logging.dart";
 import "package:photos/core/constants.dart";
 import "package:photos/db/files_db.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/models/collection/collection.dart";
 import "package:photos/models/file/extensions/file_props.dart";
 import "package:photos/models/file/file.dart";
 import "package:photos/models/social/social_data_provider.dart";
 import "package:photos/service_locator.dart";
 import "package:photos/theme/ente_theme.dart";
-import "package:photos/ui/common/loading_widget.dart";
 import "package:photos/ui/components/buttons/icon_button_widget.dart";
 import "package:photos/ui/notification/toast.dart";
 import "package:photos/ui/viewer/file/thumbnail_widget.dart";
@@ -140,10 +140,7 @@ class _LikeCollectionSelectorSheetState
       if (mounted) {
         setState(() => state.isLiked = previousState);
         if (flagService.internalUser || kDebugMode) {
-          showShortToast(
-            context,
-            AppLocalizations.of(context).failedToUpdateLike,
-          );
+          showShortToast(context, context.strings.failedToUpdateLike);
         }
       }
     }
@@ -196,7 +193,7 @@ class _LikeCollectionSelectorSheetState
       });
       showShortToast(
         context,
-        AppLocalizations.of(context).failedToLikeAlbums(count: failed.length),
+        context.strings.failedToLikeAlbums(count: failed.length),
       );
       // Don't close sheet - let user retry
       return;
@@ -309,7 +306,7 @@ class _LikeCollectionSelectorSheetState
   }
 
   Widget _buildErrorState() {
-    final l10n = AppLocalizations.of(context);
+    final l10n = context.strings;
     final textTheme = getEnteTextTheme(context);
 
     return Padding(
@@ -336,7 +333,7 @@ class _AlbumsHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
+    final l10n = context.strings;
     final textTheme = getEnteTextTheme(context);
     final colorScheme = getEnteColorScheme(context);
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
@@ -384,7 +381,7 @@ class _TitleSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
+    final l10n = context.strings;
     final textTheme = getEnteTextTheme(context);
     final colorScheme = getEnteColorScheme(context);
 

@@ -1,10 +1,10 @@
 import "dart:async";
 
 import "package:ente_pure_utils/ente_pure_utils.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:photos/core/event_bus.dart";
 import "package:photos/events/gallery_downloads_events.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/module/download/manager.dart";
 import "package:photos/module/download/task.dart";
 import "package:photos/service_locator.dart";
@@ -135,7 +135,7 @@ class _GalleryDownloadBannerState extends State<GalleryDownloadBanner>
                     onPressed: () {
                       service.dismissCompletionBanner().ignore();
                     },
-                    child: Text(AppLocalizations.of(context).dismiss),
+                    child: Text(context.strings.dismiss),
                   )
                 else
                   IconButton(
@@ -154,7 +154,7 @@ class _GalleryDownloadBannerState extends State<GalleryDownloadBanner>
   }
 
   String _bannerMessage(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
+    final l10n = context.strings;
     final service = galleryDownloadQueueService;
 
     if (service.isCompletionBannerVisible) {
@@ -415,7 +415,7 @@ class _TaskStatus extends StatelessWidget {
         );
       case DownloadStatus.pending:
         return Text(
-          "${AppLocalizations.of(context).queued} • ${formatBytes(task.totalBytes)}",
+          "${context.strings.queued} • ${formatBytes(task.totalBytes)}",
           style: textTheme.miniMuted,
         );
       case DownloadStatus.paused:
@@ -439,7 +439,7 @@ class _TaskStatus extends StatelessWidget {
       return "Unavailable";
     }
     if (error == DownloadManager.applePhotosUnsupportedResourceError) {
-      return AppLocalizations.of(context).applePhotosUnsupportedResource;
+      return context.strings.applePhotosUnsupportedResource;
     }
     if (error == null || error.isEmpty) {
       return "Download failed";

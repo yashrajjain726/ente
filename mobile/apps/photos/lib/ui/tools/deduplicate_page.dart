@@ -1,12 +1,12 @@
 import "dart:developer";
 
 import 'package:ente_pure_utils/ente_pure_utils.dart';
+import "package:ente_strings/ente_strings.dart";
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:photos/core/constants.dart';
 import 'package:photos/core/event_bus.dart';
 import 'package:photos/events/user_details_changed_event.dart';
-import "package:photos/generated/l10n.dart";
 import 'package:photos/models/duplicate_files.dart';
 import 'package:photos/models/file/file.dart';
 import 'package:photos/services/collections_service.dart';
@@ -69,7 +69,7 @@ class _DeduplicatePageState extends State<DeduplicatePage> {
     return Scaffold(
       appBar: AppBar(
         elevation: 0,
-        title: Text(AppLocalizations.of(context).deduplicateFiles),
+        title: Text(context.strings.deduplicateFiles),
         actions: _duplicates.isNotEmpty ? [_getSortMenu()] : null,
       ),
       body: _getBody(),
@@ -146,10 +146,10 @@ class _DeduplicatePageState extends State<DeduplicatePage> {
       String text = key.toString();
       switch (key) {
         case SortKey.count:
-          text = AppLocalizations.of(context).count;
+          text = context.strings.count;
           break;
         case SortKey.size:
-          text = AppLocalizations.of(context).totalSize;
+          text = context.strings.totalSize;
           break;
       }
       return Text(text, style: textTheme.miniBold);
@@ -225,7 +225,7 @@ class _DeduplicatePageState extends State<DeduplicatePage> {
                       width: double.infinity,
                       child: ButtonWidget(
                         labelText:
-                            "${AppLocalizations.of(context).deleteItemCount(count: fileCount)} (${formatBytes(totalSize)})",
+                            "${context.strings.deleteItemCount(count: fileCount)} (${formatBytes(totalSize)})",
                         buttonType: ButtonType.critical,
                         onTap: () async {
                           try {
@@ -245,7 +245,7 @@ class _DeduplicatePageState extends State<DeduplicatePage> {
                     SizedBox(
                       width: double.infinity,
                       child: ButtonWidget(
-                        labelText: AppLocalizations.of(context).unselectAll,
+                        labelText: context.strings.unselectAll,
                         buttonType: ButtonType.secondary,
                         onTap: () async {
                           setState(() {
@@ -336,7 +336,7 @@ class _DeduplicatePageState extends State<DeduplicatePage> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  AppLocalizations.of(context).duplicateItemsGroup(
+                  context.strings.duplicateItemsGroup(
                     count: duplicates.files.length,
                     formattedSize: formatBytes(duplicates.size),
                   ),

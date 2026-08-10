@@ -1,6 +1,7 @@
 import "dart:math" as math;
 
 import "package:ente_components/ente_components.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:hugeicons/hugeicons.dart";
 import "package:logging/logging.dart";
@@ -8,8 +9,6 @@ import "package:photos/core/configuration.dart";
 import "package:photos/core/event_bus.dart";
 import "package:photos/ente_theme_data.dart";
 import "package:photos/events/people_changed_event.dart";
-import "package:photos/generated/l10n.dart";
-import "package:photos/l10n/l10n.dart";
 import "package:photos/models/file/file.dart";
 import "package:photos/models/ml/face/person.dart";
 import "package:photos/models/search/generic_search_result.dart";
@@ -163,8 +162,8 @@ class _SaveOrEditPersonState extends State<SaveOrEditPerson> {
               Expanded(
                 child: AppBarComponent(
                   title: widget.isEditing
-                      ? context.l10n.editPerson
-                      : context.l10n.savePerson,
+                      ? context.strings.editPerson
+                      : context.strings.savePerson,
                   physics: const BouncingScrollPhysics(),
                   slivers: [
                     SliverPadding(
@@ -184,8 +183,8 @@ class _SaveOrEditPersonState extends State<SaveOrEditPerson> {
                               const SizedBox(height: Spacing.xxl),
                             ],
                             TextInputComponent(
-                              label: context.l10n.name,
-                              hintText: context.l10n.enterName,
+                              label: context.strings.name,
+                              hintText: context.strings.enterName,
                               initialValue: widget.person?.data.name,
                               focusNode: _nameFocsNode,
                               keyboardType: TextInputType.name,
@@ -217,7 +216,7 @@ class _SaveOrEditPersonState extends State<SaveOrEditPerson> {
                                   selected: _isMe,
                                   onChanged: _setIsMe,
                                 ),
-                                label: context.l10n.thisIsMeExclamation,
+                                label: context.strings.thisIsMeExclamation,
                                 foreground: colors.textLighter,
                                 onTap: () => _setIsMe(!_isMe),
                               ),
@@ -227,7 +226,7 @@ class _SaveOrEditPersonState extends State<SaveOrEditPerson> {
                             if (widget.isEditing) ...[
                               const SizedBox(height: 28),
                               Text(
-                                context.l10n.mergedPhotos,
+                                context.strings.mergedPhotos,
                                 style: TextStyles.h2.copyWith(
                                   color: colors.textBase,
                                 ),
@@ -248,7 +247,7 @@ class _SaveOrEditPersonState extends State<SaveOrEditPerson> {
                 child: Column(
                   children: [
                     ButtonComponent(
-                      label: context.l10n.savePerson,
+                      label: context.strings.savePerson,
                       isDisabled: !_canSave,
                       shouldShowSuccessState: false,
                       onTap: _canSave ? _savePerson : null,
@@ -302,8 +301,8 @@ class _SaveOrEditPersonState extends State<SaveOrEditPerson> {
 
   Widget _buildBirthdayInput() {
     return DatePickerField(
-      label: context.l10n.birthday,
-      hintText: context.l10n.enterDateOfBirthHint,
+      label: context.strings.birthday,
+      hintText: context.strings.enterDateOfBirthHint,
       firstDate: DateTime(100),
       lastDate: DateTime.now(),
       initialValue: _selectedDate,
@@ -532,12 +531,12 @@ class _SaveOrEditPersonState extends State<SaveOrEditPerson> {
   Future<dynamic> _saveChangesPrompt(BuildContext context) async {
     PersonEntity? updatedPersonEntity;
     return await showActionSheet(
-      body: context.l10n.saveChangesBeforeLeavingQuestion,
+      body: context.strings.saveChangesBeforeLeavingQuestion,
       context: context,
       buttons: [
         ButtonWidget(
           buttonType: ButtonType.neutral,
-          labelText: AppLocalizations.of(context).save,
+          labelText: context.strings.save,
           isInAlert: true,
           buttonAction: ButtonAction.first,
           shouldStickToDarkTheme: true,
@@ -561,14 +560,14 @@ class _SaveOrEditPersonState extends State<SaveOrEditPerson> {
         ),
         ButtonWidget(
           buttonType: ButtonType.secondary,
-          labelText: context.l10n.dontSave,
+          labelText: context.strings.dontSave,
           isInAlert: true,
           buttonAction: ButtonAction.second,
           shouldStickToDarkTheme: true,
         ),
         ButtonWidget(
           buttonType: ButtonType.secondary,
-          labelText: AppLocalizations.of(context).cancel,
+          labelText: context.strings.cancel,
           isInAlert: true,
           buttonAction: ButtonAction.cancel,
           shouldStickToDarkTheme: true,
@@ -630,7 +629,7 @@ class _SaveOrEditPersonState extends State<SaveOrEditPerson> {
       final bool extraPhotosFound = await ClusterFeedbackService.instance
           .checkAndDoAutomaticMerges(personEntity, personClusterID: clusterID);
       if (extraPhotosFound && context.mounted) {
-        showShortToast(context, AppLocalizations.of(context).extraPhotosFound);
+        showShortToast(context, context.strings.extraPhotosFound);
       }
       Bus.instance.fire(
         PeopleChangedEvent(
@@ -785,13 +784,13 @@ class _MergeWithExistingSection extends StatelessWidget {
           ),
           const SizedBox(height: Spacing.sm),
           Text(
-            context.l10n.mergeWithExisting,
+            context.strings.mergeWithExisting,
             style: TextStyles.body.copyWith(color: colors.textBase),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: Spacing.lg),
           ButtonComponent(
-            label: context.l10n.selectPerson,
+            label: context.strings.selectPerson,
             variant: ButtonComponentVariant.secondary,
             shouldSurfaceExecutionStates: false,
             shouldShowSuccessState: false,
@@ -1008,7 +1007,7 @@ class _MergePersonConfirmationSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
+    final l10n = context.strings;
     final textTheme = getEnteTextTheme(context);
 
     return BottomSheetComponent(

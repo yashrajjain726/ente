@@ -1,6 +1,6 @@
 use crate::{
     api::client::USER_AGENT,
-    cli::account::{AccountCommand, AccountSubcommands},
+    cli::account::{AccountCommand, AccountSubcommands, AddArgs, CreateArgs},
     models::{
         account::{Account, AccountSecrets as StoredAccountSecrets, App},
         error::{Error, Result},
@@ -22,56 +22,8 @@ use zeroize::Zeroizing;
 pub async fn handle_account_command(cmd: AccountCommand, storage: &Storage) -> Result<()> {
     match cmd.command {
         AccountSubcommands::List => list_accounts(storage).await,
-        AccountSubcommands::Add {
-            email,
-            password,
-            app,
-            endpoint,
-            export_dir,
-            otp,
-            totp_code,
-            second_factor,
-        } => {
-            add_account(
-                storage,
-                email,
-                password,
-                &app,
-                endpoint,
-                export_dir,
-                otp,
-                totp_code,
-                second_factor,
-            )
-            .await
-        }
-        AccountSubcommands::Create {
-            email,
-            password,
-            app,
-            endpoint,
-            export_dir,
-            otp,
-            source,
-            setup_2fa,
-            totp_code,
-            show_recovery_key,
-        } => {
-            create_account(
-                storage,
-                email,
-                password,
-                &app,
-                endpoint,
-                export_dir,
-                otp,
-                source,
-                setup_2fa,
-                totp_code,
-                show_recovery_key,
-            )
-            .await
-        }
+        AccountSubcommands::Add(args) => add_account(storage, args).await,
+        AccountSubcommands::Create(args) => create_account(storage, args).await,
         AccountSubcommands::Update { email, dir, app } => {
             update_account(storage, &email, &dir, &app).await
         }
@@ -256,24 +208,24 @@ async fn list_accounts(storage: &Storage) -> Result<()> {
     Ok(())
 }
 
-#[allow(clippy::too_many_arguments)]
-async fn add_account(
-    storage: &Storage,
-    email_arg: Option<String>,
-    password_arg: Option<String>,
-    app_arg: &str,
-    endpoint: String,
-    export_dir_arg: Option<String>,
-    otp: Option<String>,
-    totp_code: Option<String>,
-    second_factor: Option<String>,
-) -> Result<()> {
+async fn add_account(storage: &Storage, args: AddArgs) -> Result<()> {
     println!("\n=== Add Existing Ente Account ===\n");
 
-    let email = prompt_email(email_arg)?;
-    let interactive_password = password_arg.is_none();
-    let mut password = Zeroizing::new(prompt_password(password_arg, "Enter your password")?);
-    let app = resolve_app(app_arg)?;
+    let AddArgs {
+        email,
+        password,
+        app,
+        endpoint,
+        export_dir,
+        otp,
+        totp_code,
+        second_factor,
+    } = args;
+
+    let email = prompt_email(email)?;
+    let interactive_password = password.is_none();
+    let mut password = Zeroizing::new(prompt_password(password, "Enter your password")?);
+    let app = resolve_app(&app)?;
     let second_factor = parse_second_factor(second_factor.as_deref())?;
 
     if let Ok(Some(_)) = storage.accounts().get(&email, app) {
@@ -281,7 +233,7 @@ async fn add_account(
         return Ok(());
     }
 
-    let export_dir = resolve_export_dir(export_dir_arg, &email)?;
+    let export_dir = resolve_export_dir(export_dir, &email)?;
     ensure_export_dir(&export_dir)?;
 
     let client = new_accounts_client(&endpoint, app)?;
@@ -315,32 +267,32 @@ async fn add_account(
     Ok(())
 }
 
-#[allow(clippy::too_many_arguments)]
-async fn create_account(
-    storage: &Storage,
-    email_arg: Option<String>,
-    password_arg: Option<String>,
-    app_arg: &str,
-    endpoint: String,
-    export_dir_arg: Option<String>,
-    otp: Option<String>,
-    source: Option<String>,
-    setup_2fa: bool,
-    totp_code: Option<String>,
-    show_recovery_key: bool,
-) -> Result<()> {
+async fn create_account(storage: &Storage, args: CreateArgs) -> Result<()> {
     println!("\n=== Create Ente Account ===\n");
 
-    let email = prompt_email(email_arg)?;
-    let password = Zeroizing::new(prompt_password(password_arg, "Choose a password")?);
-    let app = resolve_app(app_arg)?;
+    let CreateArgs {
+        email,
+        password,
+        app,
+        endpoint,
+        export_dir,
+        otp,
+        source,
+        setup_2fa,
+        totp_code,
+        show_recovery_key,
+    } = args;
+
+    let email = prompt_email(email)?;
+    let password = Zeroizing::new(prompt_password(password, "Choose a password")?);
+    let app = resolve_app(&app)?;
 
     if let Ok(Some(_)) = storage.accounts().get(&email, app) {
         println!("\nAccount already exists for {email} with app {app}");
         return Ok(());
     }
 
-    let export_dir = resolve_export_dir(export_dir_arg, &email)?;
+    let export_dir = resolve_export_dir(export_dir, &email)?;
     ensure_export_dir(&export_dir)?;
 
     let client = new_accounts_client(&endpoint, app)?;
@@ -586,10 +538,7 @@ fn new_accounts_client(endpoint: &str, app: App) -> Result<AccountsClient> {
 }
 
 fn is_retryable_password_error(error: &ente_accounts::Error) -> bool {
-    matches!(
-        error,
-        ente_accounts::Error::AuthenticationFailed(message) if message == "Incorrect password"
-    ) || error.is_http_status(&[401])
+    matches!(error, ente_accounts::Error::IncorrectPassword) || error.is_http_status(&[401])
 }
 
 fn can_open_automatically(url: &str) -> bool {

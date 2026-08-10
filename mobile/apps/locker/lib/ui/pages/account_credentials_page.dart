@@ -1,6 +1,6 @@
 import 'package:ente_components/ente_components.dart';
+import 'package:ente_strings/ente_strings.dart';
 import 'package:flutter/material.dart';
-import 'package:locker/l10n/l10n.dart';
 import 'package:locker/models/info/info_item.dart';
 import 'package:locker/ui/pages/base_info_page.dart';
 
@@ -58,9 +58,9 @@ class _AccountCredentialsPageState
   String get pageTitle {
     if (isInEditMode) {
       if (widget.existingFile != null || currentData != null) {
-        return context.l10n.editSecret;
+        return context.strings.editSecret;
       }
-      return context.l10n.accountCredentials;
+      return context.strings.accountCredentials;
     }
 
     final controllerName = _nameController.text.trim();
@@ -73,11 +73,11 @@ class _AccountCredentialsPageState
       return dataName;
     }
 
-    return context.l10n.accountCredentials;
+    return context.strings.accountCredentials;
   }
 
   @override
-  String get submitButtonText => context.l10n.saveRecord;
+  String get submitButtonText => context.strings.save;
 
   @override
   InfoType get infoType => InfoType.accountCredential;
@@ -105,8 +105,8 @@ class _AccountCredentialsPageState
   List<Widget> buildFormFields() {
     return [
       TextInputComponent(
-        label: context.l10n.credentialName,
-        hintText: context.l10n.credentialNameHint,
+        label: context.strings.credentialName,
+        hintText: context.strings.credentialNameHint,
         controller: _nameController,
         isRequired: true,
         textCapitalization: TextCapitalization.sentences,
@@ -116,8 +116,8 @@ class _AccountCredentialsPageState
       ),
       const SizedBox(height: 24),
       TextInputComponent(
-        label: context.l10n.username,
-        hintText: context.l10n.usernameHint,
+        label: context.strings.username,
+        hintText: context.strings.usernameHint,
         controller: _usernameController,
         isRequired: true,
         textInputAction: TextInputAction.next,
@@ -125,8 +125,8 @@ class _AccountCredentialsPageState
       ),
       const SizedBox(height: 24),
       TextInputComponent(
-        label: context.l10n.password,
-        hintText: context.l10n.passwordHint,
+        label: context.strings.password,
+        hintText: context.strings.passwordHint,
         controller: _passwordController,
         isRequired: true,
         isPasswordInput: true,
@@ -135,8 +135,8 @@ class _AccountCredentialsPageState
       ),
       const SizedBox(height: 24),
       TextInputComponent(
-        label: context.l10n.credentialNotes,
-        hintText: context.l10n.credentialNotesHint,
+        label: context.strings.credentialNotes,
+        hintText: context.strings.credentialNotesHint,
         controller: _notesController,
         minLines: 3,
         maxLines: 12,
@@ -154,10 +154,10 @@ class _AccountCredentialsPageState
     final notesText = _notesController.text;
 
     final fields = <Widget>[
-      buildViewField(label: context.l10n.username, value: usernameText),
+      buildViewField(label: context.strings.username, value: usernameText),
       const SizedBox(height: 24),
       buildViewField(
-        label: context.l10n.password,
+        label: context.strings.password,
         value: passwordText,
         isSecret: true,
       ),
@@ -167,7 +167,7 @@ class _AccountCredentialsPageState
       fields.addAll([
         const SizedBox(height: 24),
         buildViewField(
-          label: context.l10n.credentialNotes,
+          label: context.strings.credentialNotes,
           value: notesText,
           maxLines: 6,
         ),

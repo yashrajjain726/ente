@@ -11,18 +11,12 @@ import { ensureMasterKeyFromSession } from "ente-base/session";
 import { saveKeyAttributes } from "./accounts-db";
 import { putUserRecoveryKeyAttributes, type KeyAttributes } from "./user";
 
-// Mobile client library only supports English.
+// The wordlist must stay English since the BIP-39 library used by the mobile
+// clients only supports English.
 bip39.setDefaultWordlist("english");
 
-/**
- * Convert the provided BIP-39 mnemonic string into its base64 representation.
- *
- * @param recoveryKeyMnemonicOrHex The BIP-39 mnemonic (24 word) string
- * representing the recovery key. For legacy compatibility, the function also
- * works if provided the hex representation of the recovery key.
- *
- * @returns A base64 string representing the underlying bytes of the recovery key.
- */
+// For legacy compatibility, the hex representation of the recovery key is
+// accepted in addition to the 24 word BIP-39 mnemonic.
 export const recoveryKeyFromMnemonic = (recoveryKeyMnemonicOrHex: string) => {
     const trimmedInput = recoveryKeyMnemonicOrHex
         .trim()
@@ -32,7 +26,6 @@ export const recoveryKeyFromMnemonic = (recoveryKeyMnemonicOrHex: string) => {
         .join(" ");
 
     let recoveryKeyHex: string;
-    // Check if user is entering mnemonic recovery key.
     if (trimmedInput.indexOf(" ") > 0) {
         if (trimmedInput.split(" ").length != 24) {
             throw new Error("recovery code should have 24 words");
@@ -45,25 +38,9 @@ export const recoveryKeyFromMnemonic = (recoveryKeyMnemonicOrHex: string) => {
     return fromHex(recoveryKeyHex);
 };
 
-/**
- * Convert the provided base64 encoded recovery key into its BIP-39 mnemonic.
- *
- * @param recoveryKey The base64 encoded recovery key to mnemonize.
- *
- * @returns A 24-word mnemonic that serves as the user visible recovery key.
- */
 export const recoveryKeyToMnemonic = async (recoveryKey: string) =>
     bip39.entropyToMnemonic(await toHex(recoveryKey));
 
-/**
- * Return the (decrypted) recovery key of the logged in user, reading it from
- * local storage.
- *
- * As a fallback for old accounts that generated recovery keys on first view,
- * this function will also generate a new recovery key if needed.
- *
- * @returns The user's base64 encoded recovery key.
- */
 export const getUserRecoveryKey = async () => {
     const masterKey = await ensureMasterKeyFromSession();
 
@@ -84,15 +61,8 @@ export const getUserRecoveryKey = async () => {
     }
 };
 
-/**
- * Generate a new recovery key, tell remote about it, update our local state,
- * and then return it.
- *
- * This function is meant only for (very!) old accounts for whom the app did not
- * generate recovery keys on sign up but instead generated them on first view.
- *
- * @returns a new base64 encoded recovery key.
- */
+// Very old accounts did not get a recovery key at sign up; for them one is
+// generated lazily when it is first needed.
 const createNewRecoveryKey = async (
     masterKey: string,
     existingKeyAttributes: KeyAttributes,

@@ -26,7 +26,6 @@ void main() {
     controller.setRoleForSelection(CollectionParticipantRole.collaborator);
 
     expect(await controller.applySelection(), isTrue);
-    expect(repository.publicKeyRequests, 1);
     expect(repository.sharedIDs, [2]);
     expect(controller.activeRoleFor(1), CollectionParticipantRole.viewer);
     expect(controller.activeRoleFor(2), CollectionParticipantRole.collaborator);
@@ -102,11 +101,9 @@ void main() {
     controller.enterAddMode();
     controller.toggleSelection(repository.albums[0]);
 
-    await repository.shareAlbum(
-      collection: repository.albums[0],
-      email: librarySharingTestRecipient.email,
-      publicKey: 'public-key',
-      role: CollectionParticipantRole.viewer,
+    await repository.shareAlbums(
+      recipient: librarySharingTestRecipient,
+      roles: {repository.albums[0].id: CollectionParticipantRole.viewer},
     );
     await controller.load();
 
@@ -162,6 +159,26 @@ void main() {
     gate.complete();
     expect(await apply, isTrue);
     expect(repository.sharedRoles, [CollectionParticipantRole.viewer]);
+  });
+
+  test('keeps uncategorized sharing viewer-only', () async {
+    final repository = FakeLibrarySharingRepository([
+      librarySharingTestAlbum(1),
+      librarySharingTestAlbum(2, type: CollectionType.uncategorized),
+    ]);
+    final controller = LibrarySharingController(
+      recipient: librarySharingTestRecipient,
+      repository: repository,
+    );
+    await controller.load();
+    controller.selectAll();
+    controller.setRoleForSelection(CollectionParticipantRole.admin);
+
+    expect(controller.stagedRoleFor(1), CollectionParticipantRole.admin);
+    expect(controller.stagedRoleFor(2), CollectionParticipantRole.viewer);
+
+    controller.setRoleForAlbum(2, CollectionParticipantRole.collaborator);
+    expect(controller.stagedRoleFor(2), CollectionParticipantRole.viewer);
   });
 
   test(

@@ -1,9 +1,9 @@
 import "dart:math" as math;
 
 import "package:ente_components/ente_components.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:hugeicons/hugeicons.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/models/file_load_result.dart";
 import "package:photos/models/memories/memory.dart";
 import "package:photos/models/selected_files.dart";
@@ -90,7 +90,7 @@ class _MemoryShareSelectionSheetState
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
+    final l10n = context.strings;
     final colors = context.componentColors;
     final screenHeight = MediaQuery.sizeOf(context).height;
     final sheetHeight = math.min(
@@ -127,7 +127,7 @@ class _MemoryShareSelectionSheetState
     );
   }
 
-  Widget _buildHeader(BuildContext context, AppLocalizations l10n) {
+  Widget _buildHeader(BuildContext context, StringsLocalizations l10n) {
     final colors = context.componentColors;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: Spacing.xl),
@@ -161,7 +161,7 @@ class _MemoryShareSelectionSheetState
     );
   }
 
-  Widget _buildSelectionControls(AppLocalizations l10n) {
+  Widget _buildSelectionControls(StringsLocalizations l10n) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -209,7 +209,7 @@ class _MemoryShareSelectionSheetState
     );
   }
 
-  List<Widget> _buildActions(AppLocalizations l10n) {
+  List<Widget> _buildActions(StringsLocalizations l10n) {
     return [
       _MemoryShareSheetBoundary(
         position: BoundaryPosition.bottom,

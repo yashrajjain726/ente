@@ -69,16 +69,29 @@
             android:scaleType="fitCenter" />
 
         <TextView
+            android:id="@+id/widget_placeholder_title"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Albums"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:gravity="center_horizontal"
+            android:textColor="@color/widget_text_color"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp"
+            android:layout_marginTop="8dp"/>
+
+        <TextView
             android:id="@+id/widget_placeholder_text"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Go to Settings -> Widgets to customise the widget"
+            android:text="Click to customise"
             android:textSize="12sp"
             android:gravity="center_horizontal"
             android:textColor="@color/widget_text_color"
             android:paddingStart="8dp"
             android:paddingEnd="8dp"
-            android:layout_marginTop="12dp"/>
+            android:layout_marginTop="2dp"/>
     </LinearLayout>
 
 </FrameLayout>

@@ -1,7 +1,7 @@
 import "package:ente_components/ente_components.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:flutter/services.dart";
-import "package:photos/generated/l10n.dart";
 import "package:pro_image_editor/pro_image_editor.dart";
 
 class ContactPhotoAdjustPage extends StatefulWidget {
@@ -73,7 +73,7 @@ class _ContactPhotoAdjustPageState extends State<ContactPhotoAdjustPage> {
                         TextButton(
                           onPressed: () => Navigator.of(context).pop(),
                           child: Text(
-                            AppLocalizations.of(context).cancel,
+                            context.strings.cancel,
                             style: actionTextStyle,
                           ),
                         ),
@@ -88,7 +88,7 @@ class _ContactPhotoAdjustPageState extends State<ContactPhotoAdjustPage> {
                                   await editor.done();
                                 },
                           child: Text(
-                            AppLocalizations.of(context).useSelectedPhoto,
+                            context.strings.useSelectedPhoto,
                             style: actionTextStyle.copyWith(
                               color: _isReturningBytes
                                   ? colors.textLight

@@ -1,11 +1,11 @@
 import 'dart:ui';
 
-import 'package:ente_auth/l10n/l10n.dart';
 import 'package:ente_auth/models/code.dart';
 import 'package:ente_auth/services/preference_service.dart';
 import 'package:ente_auth/store/code_store.dart';
 import 'package:ente_auth/ui/code_widget.dart';
 import 'package:ente_components/ente_components.dart';
+import 'package:ente_strings/ente_strings.dart';
 import 'package:flutter/material.dart';
 import 'package:logging/logging.dart';
 
@@ -44,7 +44,7 @@ class _ReorderCodesPageState extends State<ReorderCodesPage> {
           thumbVisibility: true,
           interactive: true,
           child: AppBarComponent(
-            title: context.l10n.customOrder,
+            title: context.strings.customOrder,
             controller: _scrollController,
             actions: [
               Padding(
@@ -58,7 +58,7 @@ class _ReorderCodesPageState extends State<ReorderCodesPage> {
                       size: IconSizes.medium,
                     ),
                     variant: IconButtonComponentVariant.unfilled,
-                    tooltip: context.l10n.save,
+                    tooltip: context.strings.save,
                     onTap: hasChanged ? _save : null,
                   ),
                 ),

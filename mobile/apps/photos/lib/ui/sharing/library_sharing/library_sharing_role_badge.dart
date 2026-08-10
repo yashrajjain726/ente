@@ -1,7 +1,7 @@
 import 'package:ente_components/ente_components.dart';
+import 'package:ente_strings/ente_strings.dart';
 import 'package:flutter/material.dart';
 import 'package:hugeicons/hugeicons.dart';
-import 'package:photos/generated/l10n.dart';
 import 'package:photos/models/collection/collection.dart';
 import 'package:photos/services/library_sharing_service.dart';
 
@@ -65,11 +65,13 @@ class LibrarySharingRoleSelector extends StatelessWidget {
   const LibrarySharingRoleSelector({
     required this.role,
     this.fallbackLabel,
+    this.showChevron = true,
     super.key,
   }) : assert(role != null || fallbackLabel != null);
 
   final CollectionParticipantRole? role;
   final String? fallbackLabel;
+  final bool showChevron;
 
   @override
   Widget build(BuildContext context) {
@@ -99,11 +101,13 @@ class LibrarySharingRoleSelector extends StatelessWidget {
                 : librarySharingRoleLabel(context, role!),
             style: TextStyles.mini.copyWith(color: colors.textBase),
           ),
-          const SizedBox(width: Spacing.sm),
-          const HugeIcon(
-            icon: HugeIcons.strokeRoundedArrowDown01,
-            size: IconSizes.small,
-          ),
+          if (showChevron) ...[
+            const SizedBox(width: Spacing.sm),
+            const HugeIcon(
+              icon: HugeIcons.strokeRoundedArrowDown01,
+              size: IconSizes.small,
+            ),
+          ],
         ],
       ),
     );
@@ -122,7 +126,7 @@ String librarySharingRoleLabel(
   BuildContext context,
   CollectionParticipantRole role,
 ) {
-  final l10n = AppLocalizations.of(context);
+  final l10n = context.strings;
   return switch (role) {
     CollectionParticipantRole.admin => l10n.admin,
     CollectionParticipantRole.collaborator => l10n.collaborator,

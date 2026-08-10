@@ -50,11 +50,7 @@ export interface UseBrowserBackCloseOptions {
     enabled?: boolean;
 }
 
-/**
- * Adds a transient history entry while an overlay is open, so mobile browser
- * back gestures close the overlay before navigating away or closing a parent
- * viewer.
- */
+// Push a transient entry so browser back closes the overlay first.
 export const useBrowserBackClose = ({
     open,
     onClose,

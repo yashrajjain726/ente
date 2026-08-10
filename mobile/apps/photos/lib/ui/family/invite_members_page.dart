@@ -1,8 +1,8 @@
 import 'dart:math' as math;
 
 import 'package:email_validator/email_validator.dart';
+import 'package:ente_strings/ente_strings.dart';
 import 'package:flutter/material.dart';
-import 'package:photos/generated/l10n.dart';
 import 'package:photos/models/user_details.dart';
 import 'package:photos/services/account/user_service.dart';
 import 'package:photos/services/family_service.dart';
@@ -77,7 +77,7 @@ class _InviteMembersPageState extends State<InviteMembersPage> {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
+    final l10n = context.strings;
     final textTheme = getEnteTextTheme(context);
 
     return FamilyPageScaffold(
@@ -125,7 +125,7 @@ class _InviteMembersPageState extends State<InviteMembersPage> {
   Widget _buildInputRow(BuildContext context) {
     final colorScheme = getEnteColorScheme(context);
     final textTheme = getEnteTextTheme(context);
-    final l10n = AppLocalizations.of(context);
+    final l10n = context.strings;
     final hasError = _errorMessage != null;
 
     return Row(
@@ -204,11 +204,11 @@ class _InviteMembersPageState extends State<InviteMembersPage> {
     );
   }
 
-  String _sendInvitesLabel(AppLocalizations l10n) {
+  String _sendInvitesLabel(StringsLocalizations l10n) {
     return l10n.sendCountInvites(count: _emails.length);
   }
 
-  String? _fieldMessage(AppLocalizations l10n) {
+  String? _fieldMessage(StringsLocalizations l10n) {
     if (_errorMessage != null) {
       return _errorMessage;
     }
@@ -243,7 +243,7 @@ class _InviteMembersPageState extends State<InviteMembersPage> {
       return;
     }
 
-    final l10n = AppLocalizations.of(context);
+    final l10n = context.strings;
     final email = _emailController.text.trim().toLowerCase();
     if (!_canAddMore) {
       setState(() => _errorMessage = l10n.inviteLimitReached);
@@ -364,12 +364,8 @@ class _InviteMembersPageState extends State<InviteMembersPage> {
         showToast(
           context,
           failedEmails.length == 1
-              ? AppLocalizations.of(
-                  context,
-                ).failedToInvite(email: failedEmails.first)
-              : AppLocalizations.of(
-                  context,
-                ).failedToInviteCount(count: failedEmails.length),
+              ? context.strings.failedToInvite(email: failedEmails.first)
+              : context.strings.failedToInviteCount(count: failedEmails.length),
         );
       }
       throw const _HandledInviteActionException();
@@ -386,7 +382,7 @@ class _InviteMembersPageState extends State<InviteMembersPage> {
   }
 
   Future<void> _showInviteToEnteSheet(String email) {
-    final l10n = AppLocalizations.of(context);
+    final l10n = context.strings;
     return showBaseBottomSheet<void>(
       context,
       title: l10n.inviteToEnte,

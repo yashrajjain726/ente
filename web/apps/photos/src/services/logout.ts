@@ -1,3 +1,4 @@
+import exportService from "@/services/export";
 import {
     accountLogout,
     logoutClearStateAgain,
@@ -10,40 +11,25 @@ import { clearFilesDB } from "ente-gallery/services/files-db";
 import { resetUploadState } from "ente-gallery/services/upload";
 import { resetVideoState } from "ente-gallery/services/video";
 import { logoutAppLock } from "ente-new/photos/services/app-lock";
-import exportService from "ente-new/photos/services/export";
 import { logoutML, terminateMLWorker } from "ente-new/photos/services/ml";
 import { logoutSearch } from "ente-new/photos/services/search";
 import { logoutSettings } from "ente-new/photos/services/settings";
 import { logoutUserDetails } from "ente-new/photos/services/user-details";
 import { uploadManager } from "./upload-manager";
 
-/**
- * Logout sequence for the photos app.
- *
- * This function is guaranteed not to throw any errors.
- *
- * See: [Note: Do not throw during logout].
- */
+// Individual cleanup failures must not abort logout.
 export const photosLogout = async () => {
     const ignoreError = (label: string, e: unknown) =>
         log.error(`Ignoring error during logout (${label})`, e);
 
-    // - Workers
-
-    // Terminate any workers that might access the DB before clearing persistent
-    // state. See: [Note: Caching IDB instances in separate execution contexts].
-
+    // Stop workers before clearing databases they may still access.
     try {
         await terminateMLWorker();
     } catch (e) {
         ignoreError("ML/worker", e);
     }
 
-    // - Remote logout and clear state
-
     await accountLogout();
-
-    // - Photos specific logout
 
     log.info("logout (photos)");
 
@@ -107,8 +93,6 @@ export const photosLogout = async () => {
         ignoreError("File viewer", e);
     }
 
-    // - Desktop
-
     const electron = globalThis.electron;
     if (electron) {
         try {
@@ -136,9 +120,7 @@ export const photosLogout = async () => {
         }
     }
 
-    // Clear the DB again to discard any in-flight completions that might've
-    // happened since we started.
-
+    // Clear again after in-flight work has had a chance to finish.
     await logoutClearStateAgain();
 
     try {
@@ -147,10 +129,6 @@ export const photosLogout = async () => {
         ignoreError("Files DB", e);
     }
 
-    // [Note: Full reload on logout]
-    //
-    // Do a full reload to discard any in-flight requests that might still
-    // remain.
-
+    // Reload to discard any requests still in flight.
     window.location.replace("/");
 };

@@ -2,11 +2,10 @@ import "dart:async";
 
 import "package:ente_components/ente_components.dart";
 import "package:ente_pure_utils/ente_pure_utils.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:photos/core/event_bus.dart";
 import "package:photos/events/force_reload_home_gallery_event.dart";
-import "package:photos/generated/l10n.dart";
-import "package:photos/l10n/l10n.dart";
 import "package:photos/service_locator.dart";
 import "package:photos/ui/settings/gallery_settings_screen.dart";
 import "package:photos/ui/viewer/gallery/component/group/type.dart";
@@ -42,11 +41,11 @@ class _GalleryLayoutSettingsState extends State<GalleryLayoutSettings> {
   Widget build(BuildContext context) {
     final colors = context.componentColors;
     return BottomSheetComponent(
-      title: context.l10n.layout,
+      title: context.strings.layout,
       content: MenuGroupComponent(
         items: [
           MenuComponent(
-            title: context.l10n.day,
+            title: context.strings.day,
             leading: const Icon(Icons.grid_view_outlined),
             trailing: isDayLayout
                 ? Icon(Icons.check, color: colors.primary)
@@ -55,7 +54,7 @@ class _GalleryLayoutSettingsState extends State<GalleryLayoutSettings> {
             onTap: () => _applyLayout(GroupType.day, 3),
           ),
           MenuComponent(
-            title: context.l10n.month.capitalizeFirst(),
+            title: context.strings.month.capitalizeFirst(),
             leading: const Icon(Icons.grid_on_rounded),
             trailing: isMonthLayout
                 ? Icon(Icons.check, color: colors.primary)
@@ -64,7 +63,7 @@ class _GalleryLayoutSettingsState extends State<GalleryLayoutSettings> {
             onTap: () => _applyLayout(GroupType.month, 5),
           ),
           MenuComponent(
-            title: AppLocalizations.of(context).custom,
+            title: context.strings.custom,
             trailing: Row(
               mainAxisSize: MainAxisSize.min,
               children: [

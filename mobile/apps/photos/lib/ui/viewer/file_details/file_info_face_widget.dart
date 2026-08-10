@@ -2,12 +2,12 @@ import "dart:async";
 import "dart:typed_data";
 
 import "package:ente_components/ente_components.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/foundation.dart" show kDebugMode;
 import "package:flutter/material.dart";
 import "package:logging/logging.dart";
 import "package:photos/db/ml/db.dart";
 import "package:photos/db/offline_files_db.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/models/base/id.dart";
 import "package:photos/models/file/file.dart";
 import "package:photos/models/ml/face/face.dart";
@@ -161,7 +161,7 @@ class _FileInfoFaceWidgetState extends State<FileInfoFaceWidget> {
           child: Center(
             child: Text(
               widget.person!.data.isIgnored
-                  ? '(' + AppLocalizations.of(context).ignored + ')'
+                  ? '(' + context.strings.ignored + ')'
                   : widget.person!.data.name.trim(),
               style: TextStyles.body,
               overflow: TextOverflow.ellipsis,
@@ -288,7 +288,7 @@ class _FileInfoFaceWidgetState extends State<FileInfoFaceWidget> {
     }
 
     if (!mounted) return;
-    showShortToast(context, AppLocalizations.of(context).faceNotClusteredYet);
+    showShortToast(context, context.strings.faceNotClusteredYet);
     unawaited(MLService.instance.clusterAllImages(force: true));
     return;
   }
@@ -320,11 +320,11 @@ class _FileInfoFaceWidgetState extends State<FileInfoFaceWidget> {
     if (widget.person == null) return;
     final result = await showChoiceActionSheet(
       context,
-      title: AppLocalizations.of(context).removePersonLabel,
-      body: AppLocalizations.of(context).areYouSureRemoveThisFaceFromPerson,
-      firstButtonLabel: AppLocalizations.of(context).remove,
+      title: context.strings.removePersonLabel,
+      body: context.strings.areYouSureRemoveThisFaceFromPerson,
+      firstButtonLabel: context.strings.remove,
       firstButtonType: ButtonType.critical,
-      secondButtonLabel: AppLocalizations.of(context).cancel,
+      secondButtonLabel: context.strings.cancel,
       isCritical: true,
     );
     if (result?.action == ButtonAction.first) {

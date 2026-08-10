@@ -1,17 +1,18 @@
 import "dart:async";
 
 import "package:ente_icons/ente_icons.dart";
+import "package:ente_strings/ente_strings.dart";
+import "package:ente_ui/components/loading_widget.dart";
 import "package:flutter/material.dart";
 import "package:photos/core/configuration.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/models/api/collection/user.dart";
 import "package:photos/models/collection/collection.dart";
+import "package:photos/models/social/comment_author_utils.dart";
 import "package:photos/models/social/reaction.dart";
 import "package:photos/models/social/social_data_provider.dart";
 import "package:photos/services/collections_service.dart";
 import 'package:photos/services/social_notification_coordinator.dart';
 import "package:photos/theme/ente_theme.dart";
-import "package:photos/ui/common/loading_widget.dart";
 import "package:photos/ui/components/buttons/icon_button_widget.dart";
 import "package:photos/ui/sharing/user_avator_widget.dart";
 import "package:photos/ui/social/social_actor_contact_navigation.dart";
@@ -286,7 +287,7 @@ class _LikesHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
+    final l10n = context.strings;
     final textTheme = getEnteTextTheme(context);
 
     return Padding(
@@ -322,7 +323,7 @@ class _EmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
+    final l10n = context.strings;
     final textTheme = getEnteTextTheme(context);
 
     return Padding(
@@ -341,7 +342,7 @@ class _ErrorState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
+    final l10n = context.strings;
     final textTheme = getEnteTextTheme(context);
 
     return Padding(
@@ -372,18 +373,14 @@ class _LikesList extends StatelessWidget {
 
   User _getUserForReaction(Reaction reaction) {
     if (reaction.isAnonymous) {
-      final anonID = reaction.anonUserID;
-      final displayName = anonID != null
-          ? (anonDisplayNames[anonID] ?? anonID)
-          : "Anonymous";
-      return User(
-        id: reaction.userID,
-        email: "${anonID ?? "anonymous"}@unknown.com",
-        name: displayName,
+      return anonymousSocialUser(
+        userID: reaction.userID,
+        anonUserID: reaction.anonUserID,
+        anonDisplayNames: anonDisplayNames,
       );
     }
 
-    return CollectionsService.instance.getFileOwner(
+    return CollectionsService.instance.resolveUserIdentity(
       reaction.userID,
       selectedCollectionID,
     );
@@ -391,7 +388,7 @@ class _LikesList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
+    final l10n = context.strings;
 
     return ListView.builder(
       shrinkWrap: likes.length <= _shrinkWrapThreshold,
@@ -432,12 +429,7 @@ class _LikeListItem extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         children: [
-          UserAvatarWidget(
-            user,
-            currentUserID: currentUserID,
-            type: AvatarType.regular,
-            addStroke: false,
-          ),
+          UserAvatarWidget(user, type: AvatarType.regular),
           const SizedBox(width: 12),
           Expanded(
             child: user.id == currentUserID

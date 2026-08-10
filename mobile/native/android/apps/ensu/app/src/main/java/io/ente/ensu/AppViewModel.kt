@@ -14,7 +14,6 @@ import io.ente.ensu.config.loadConfigDefaults
 import io.ente.ensu.llm.LlmProvider
 import io.ente.ensu.assets.AssetStore
 import io.ente.ensu.llm.ModelSettingsState
-import io.ente.ensu.logging.FileLogRepository
 import io.ente.ensu.storage.CredentialStore
 import io.ente.ensu.logging.LogLevel
 import io.ente.ensu.AppStore
@@ -36,7 +35,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private val transcriber = (application as EnsuApplication).transcriber
     val configDefaults = loadConfigDefaults()
 
-    val logRepository = FileLogRepository(application)
+    val logRepository = (application as EnsuApplication).logRepository
     private val assetStore = (application as EnsuApplication).assetStore
     private val _isReady = MutableStateFlow(!assetStore.needsMigration())
     val isReady = _isReady.asStateFlow()

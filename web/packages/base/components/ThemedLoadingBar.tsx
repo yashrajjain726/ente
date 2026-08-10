@@ -7,10 +7,6 @@ interface ThemedLoadingBarProps {
     ref: React.Ref<LoadingBarController>;
 }
 
-/**
- * A wrapper over the {@link LoadingBar} library component that sets it to use
- * the main accent color from the theme.
- */
 export const ThemedLoadingBar: React.FC<ThemedLoadingBarProps> = ({ ref }) => {
     const theme = useTheme();
 

@@ -37,14 +37,12 @@ func (c *ClICtrl) writeAuthExport(ctx context.Context, account model.Account, da
 		return fmt.Errorf("export directory not set")
 	}
 	outputFile := fmt.Sprintf("%s/ente_auth.txt", exportDir)
-	// if outout file exists, create a backup with current datetime
 	if _, err := os.Stat(outputFile); err == nil {
 		backupFile := fmt.Sprintf("%s/ente_auth_%s.txt", exportDir, time.Now().Format("2006-01-02_15-04-05"))
 		if err := os.Rename(outputFile, backupFile); err != nil {
 			return fmt.Errorf("error creating backup file: %v", err)
 		}
 	}
-	// write the data to the output file, one line per entity
 	file, err := os.Create(outputFile)
 	if err != nil {
 		return fmt.Errorf("error creating output file: %v", err)

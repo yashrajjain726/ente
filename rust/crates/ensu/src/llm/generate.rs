@@ -240,7 +240,6 @@ struct DecodeStep {
     stop: bool,
 }
 
-/// Incremental UTF-8 streaming decoder with stop-sequence handling.
 struct StreamDecoder {
     generated_text: String,
     pending_bytes: Vec<u8>,
@@ -315,96 +314,102 @@ impl StreamDecoder {
     }
 }
 
-#[allow(clippy::too_many_arguments)]
-fn run_generation_loop(
-    ctx: &mut LlamaContext,
-    sampler: &mut LlamaSampler,
-    cancel_flag: &AtomicBool,
-    sink: &mut dyn EventSink,
+struct GenerationJob<'a> {
+    cancel_flag: &'a AtomicBool,
+    sink: &'a mut dyn EventSink,
     job_id: JobId,
     max_tokens: usize,
-    stop_sequences: &[String],
-    generated_tokens_count: &mut i32,
-    mut cached_tokens: Option<&mut Vec<LlamaToken>>,
-    mut pos: i32,
-    mut logits_index: i32,
-) -> Result<(), Error> {
-    let mut decoder = StreamDecoder::new(stop_sequences);
-    let mut stop_triggered = false;
-    let n_ctx = ctx.n_ctx();
+    stop_sequences: &'a [String],
+    prompt_tokens: i32,
+    generated_tokens: i32,
+}
 
-    for _ in 0..max_tokens {
-        if cancel_flag.load(Ordering::Relaxed) {
-            return Err(Error::Cancelled);
-        }
-        if pos >= n_ctx as i32 {
-            break;
-        }
+impl GenerationJob<'_> {
+    fn run(
+        &mut self,
+        ctx: &mut LlamaContext,
+        sampler: &mut LlamaSampler,
+        mut cached_tokens: Option<&mut Vec<LlamaToken>>,
+        mut pos: i32,
+        mut logits_index: i32,
+    ) -> Result<(), Error> {
+        let mut decoder = StreamDecoder::new(self.stop_sequences);
+        let mut stop_triggered = false;
+        let n_ctx = ctx.n_ctx();
 
-        let token = sampler.sample(ctx, logits_index);
-        sampler.accept(token);
-        *generated_tokens_count = generated_tokens_count.saturating_add(1);
+        for _ in 0..self.max_tokens {
+            if self.cancel_flag.load(Ordering::Relaxed) {
+                return Err(Error::Cancelled);
+            }
+            if pos >= n_ctx as i32 {
+                break;
+            }
 
-        if ctx.model.is_eog_token(token) {
-            break;
-        }
+            let token = sampler.sample(ctx, logits_index);
+            sampler.accept(token);
+            self.generated_tokens = self.generated_tokens.saturating_add(1);
 
-        let bytes = token_piece_bytes(ctx.model, token).map_err(|err| Error::Llama {
-            op: "Detokenize failed",
-            message: err.to_string(),
-        })?;
-        let step = decoder.push_bytes(&bytes);
+            if ctx.model.is_eog_token(token) {
+                break;
+            }
 
-        if let Some(text) = step.text {
-            sink.add(GenerationEvent::Text {
-                job_id,
-                text,
-                token_id: Some(token.0),
-            });
-        }
-
-        if step.stop {
-            stop_triggered = true;
-            break;
-        }
-
-        let mut step_batch = LlamaBatch::new(1, 1);
-        step_batch
-            .add(token, pos, &[0], true)
-            .map_err(|err| Error::Llama {
-                op: "Failed to add token",
+            let bytes = token_piece_bytes(ctx.model, token).map_err(|err| Error::Llama {
+                op: "Detokenize failed",
                 message: err.to_string(),
             })?;
-        if let Err(err) = ctx.decode(&mut step_batch) {
-            ctx.clear_kv_cache();
-            if let Some(cached) = cached_tokens.as_deref_mut() {
-                cached.clear();
+            let step = decoder.push_bytes(&bytes);
+
+            if let Some(text) = step.text {
+                self.emit_text(text, Some(token.0));
             }
-            return Err(Error::Llama {
-                op: "Decode failed",
-                message: err.to_string(),
-            });
-        }
-        if let Some(cached) = cached_tokens.as_deref_mut() {
-            cached.push(token);
+
+            if step.stop {
+                stop_triggered = true;
+                break;
+            }
+
+            let mut step_batch = LlamaBatch::new(1, 1);
+            step_batch
+                .add(token, pos, &[0], true)
+                .map_err(|err| Error::Llama {
+                    op: "Failed to add token",
+                    message: err.to_string(),
+                })?;
+            if let Err(err) = ctx.decode(&mut step_batch) {
+                ctx.clear_kv_cache();
+                if let Some(cached) = cached_tokens.as_deref_mut() {
+                    cached.clear();
+                }
+                return Err(Error::Llama {
+                    op: "Decode failed",
+                    message: err.to_string(),
+                });
+            }
+            if let Some(cached) = cached_tokens.as_deref_mut() {
+                cached.push(token);
+            }
+
+            logits_index = 0;
+            pos += 1;
         }
 
-        logits_index = 0;
-        pos += 1;
+        if !stop_triggered {
+            let step = decoder.flush();
+            if let Some(text) = step.text {
+                self.emit_text(text, None);
+            }
+        }
+
+        Ok(())
     }
 
-    if !stop_triggered {
-        let step = decoder.flush();
-        if let Some(text) = step.text {
-            sink.add(GenerationEvent::Text {
-                job_id,
-                text,
-                token_id: None,
-            });
-        }
+    fn emit_text(&mut self, text: String, token_id: Option<i32>) {
+        self.sink.add(GenerationEvent::Text {
+            job_id: self.job_id,
+            text,
+            token_id,
+        });
     }
-
-    Ok(())
 }
 
 fn build_sampler(model: &LlamaModel, request: &SamplingParams) -> Result<LlamaSampler, Error> {
@@ -516,8 +521,15 @@ fn generate_chat_stream(
     let max_tokens = usize::try_from(max_tokens.max(0)).unwrap_or(0);
     let stop_sequences = stop_sequences.unwrap_or_default();
 
-    let mut prompt_tokens_count: i32 = 0;
-    let mut generated_tokens_count: i32 = 0;
+    let mut job = GenerationJob {
+        cancel_flag: &cancel_flag,
+        sink,
+        job_id,
+        max_tokens,
+        stop_sequences: &stop_sequences,
+        prompt_tokens: 0,
+        generated_tokens: 0,
+    };
 
     let result = match catch_unwind(AssertUnwindSafe(|| {
         context.with_context_and_cache_mut(|ctx, cached_tokens| -> Result<(), Error> {
@@ -592,7 +604,7 @@ fn generate_chat_stream(
                         context_size: n_ctx,
                     });
                 }
-                prompt_tokens_count =
+                job.prompt_tokens =
                     i32::try_from(prompt_tokens.len()).map_err(|_| Error::PromptTooLong {
                         tokens: prompt_tokens.len(),
                         context_size: n_ctx,
@@ -649,19 +661,7 @@ fn generate_chat_stream(
                 sampler.accept_many(prompt_tokens.iter());
 
                 let pos = prompt_tokens.len() as i32;
-                run_generation_loop(
-                    ctx,
-                    &mut sampler,
-                    &cancel_flag,
-                    sink,
-                    job_id,
-                    max_tokens,
-                    &stop_sequences,
-                    &mut generated_tokens_count,
-                    Some(cached_tokens),
-                    pos,
-                    logits_index,
-                )?;
+                job.run(ctx, &mut sampler, Some(cached_tokens), pos, logits_index)?;
 
                 return Ok(());
             }
@@ -721,7 +721,7 @@ fn generate_chat_stream(
                     context_size: n_ctx,
                 });
             }
-            prompt_tokens_count =
+            job.prompt_tokens =
                 i32::try_from(chunks.total_tokens()).map_err(|_| Error::PromptTooLong {
                     tokens: chunks.total_tokens(),
                     context_size: n_ctx,
@@ -755,19 +755,7 @@ fn generate_chat_stream(
             }
             sampler.accept_many(prompt_tokens.iter());
 
-            run_generation_loop(
-                ctx,
-                &mut sampler,
-                &cancel_flag,
-                sink,
-                job_id,
-                max_tokens,
-                &stop_sequences,
-                &mut generated_tokens_count,
-                None,
-                n_past,
-                -1,
-            )?;
+            job.run(ctx, &mut sampler, None, n_past, -1)?;
 
             Ok(())
         })
@@ -782,8 +770,8 @@ fn generate_chat_stream(
 
     let summary = GenerationSummary {
         job_id,
-        prompt_tokens: Some(prompt_tokens_count),
-        generated_tokens: Some(generated_tokens_count),
+        prompt_tokens: Some(job.prompt_tokens),
+        generated_tokens: Some(job.generated_tokens),
         total_time_ms: Some(start.elapsed().as_millis() as i64),
     };
 

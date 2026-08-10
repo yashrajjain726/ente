@@ -27,7 +27,6 @@ export const MobileCover = memo<MobileCoverProps>(
             year: "numeric",
         });
 
-        // Count unique locations based on unique name+country combinations
         const uniqueLocations = new Set(
             journeyData
                 .filter((point) => point.name && point.country)

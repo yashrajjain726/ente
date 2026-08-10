@@ -55,7 +55,7 @@ class FlagService {
 
   bool get librarySharing => internalUser;
 
-  bool get webGPUEnabled => internalUser;
+  bool get webGPUEnabled => true;
 
   bool get cloudflareUploadWorker =>
       internalUser || _isInUserRollout(_cfUploadWorkerRolloutPercent);

@@ -1,9 +1,9 @@
 import "package:ente_components/ente_components.dart";
+import 'package:ente_strings/ente_strings.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import "package:hugeicons/hugeicons.dart";
 import "package:locker/extensions/collection_extension.dart";
-import 'package:locker/l10n/l10n.dart';
 import "package:locker/models/selected_files.dart";
 import 'package:locker/services/collections/collections_service.dart';
 import 'package:locker/services/collections/models/collection.dart';
@@ -184,7 +184,7 @@ class _RecentsSectionWidgetState extends State<RecentsSectionWidget> {
           ? EmptyStateWidget(
               key: const ValueKey('empty_state'),
               assetPath: "assets/empty_state.png",
-              subtitle: context.l10n.noItemsMatchSelectedFilters,
+              subtitle: context.strings.noItemsMatchSelectedFilters,
             )
           : ItemListView(
               key: const ValueKey('items_list'),
@@ -446,7 +446,7 @@ class _RecentsSectionWidgetState extends State<RecentsSectionWidget> {
   String _collectionLabel(BuildContext context, Collection collection) {
     final name = collection.displayName?.trim();
     if (name == null || name.isEmpty) {
-      return context.l10n.untitled;
+      return context.strings.untitled;
     }
     return name;
   }
@@ -485,7 +485,7 @@ class _FilterChipsRow extends StatelessWidget {
           icon: const HugeIcon(icon: HugeIcons.strokeRoundedFilterHorizontal),
           variant: IconButtonComponentVariant.primary,
           shouldSurfaceExecutionStates: false,
-          tooltip: context.l10n.filters,
+          tooltip: context.strings.filters,
           onTap: onFilterIconTapped,
         ),
         const SizedBox(width: 8),
@@ -552,13 +552,13 @@ class _FilterBottomSheet extends StatelessWidget {
           child: Row(
             children: [
               _ActionPillButton(
-                label: context.l10n.seeAllCollections,
+                label: context.strings.seeAllCollections,
                 onTap: onSeeAllCollections,
                 colors: colors,
               ),
               const Spacer(),
               _ActionPillButton(
-                label: context.l10n.clearAllFilters,
+                label: context.strings.clearAllFilters,
                 onTap: onClearAllFilters,
                 colors: colors,
               ),
@@ -566,7 +566,7 @@ class _FilterBottomSheet extends StatelessWidget {
           ),
         ),
         BottomSheetComponent(
-          title: context.l10n.filters,
+          title: context.strings.filters,
           content: ClipRRect(
             borderRadius: BorderRadius.circular(16),
             child: ConstrainedBox(

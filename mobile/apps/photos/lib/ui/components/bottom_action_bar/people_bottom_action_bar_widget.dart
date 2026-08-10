@@ -1,9 +1,9 @@
 import "package:ente_components/ente_components.dart" as components;
+import "package:ente_ui/components/divider_widget.dart";
 import "package:flutter/material.dart";
 import "package:photos/core/constants.dart";
 import "package:photos/models/selected_people.dart";
 import "package:photos/ui/components/bottom_action_bar/people_action_bar_widget.dart";
-import "package:photos/ui/components/divider_widget.dart";
 import "package:photos/ui/viewer/actions/people_selection_action_widget.dart";
 
 class PeopleBottomActionBarWidget extends StatelessWidget {

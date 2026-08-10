@@ -1,4 +1,6 @@
 // TODO: Audit this file.
+import { CollectionsSortOptions } from "@/components/CollectionsSortOptions";
+import { StarIcon } from "@/components/icons/StarIcon";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import CloseIcon from "@mui/icons-material/Close";
 import PushPinIcon from "@mui/icons-material/PushPin";
@@ -22,8 +24,6 @@ import {
 import { FilledIconButton } from "ente-base/components/mui";
 import { SingleInputDialog } from "ente-base/components/SingleInputDialog";
 import { useModalVisibility } from "ente-base/components/utils/modal";
-import { CollectionsSortOptions } from "ente-new/photos/components/CollectionsSortOptions";
-import { StarIcon } from "ente-new/photos/components/icons/StarIcon";
 import { SlideUpTransition } from "ente-new/photos/components/mui/SlideUpTransition";
 import {
     ItemCard,
@@ -40,7 +40,6 @@ import type {
     CollectionSummary,
 } from "ente-new/photos/services/collection-summary";
 import { usePhotosAppContext } from "ente-new/photos/types/context";
-import { enableV2 } from "ente-new/photos/utils/feature-flags";
 import { t } from "i18next";
 import memoize from "memoize-one";
 import React, { useEffect, useMemo, useRef, useState } from "react";
@@ -63,9 +62,6 @@ interface AllAlbums {
     onRemotePull: () => Promise<void>;
 }
 
-/**
- * A modal showing the list of all the albums.
- */
 export const AllAlbums: React.FC<AllAlbums> = ({
     collectionSummaries,
     open,
@@ -107,7 +103,6 @@ export const AllAlbums: React.FC<AllAlbums> = ({
                     : await createAlbum(albumName);
                 await onRemotePull();
 
-                // Show custom toast with both buttons
                 setAlbumCreatedToast({
                     open: true,
                     albumId: newAlbum.id,
@@ -173,13 +168,12 @@ export const AllAlbums: React.FC<AllAlbums> = ({
             </AllAlbumsDialog>
             <SingleInputDialog
                 {...albumNameInputVisibilityProps}
-                variant={enableV2 ? "v2" : "default"}
+                variant="v2"
                 title={t("new_album")}
                 label={t("album_name")}
                 submitButtonTitle={t("create")}
                 onSubmit={handleCreateAlbum}
             />
-            {/* Custom toast for album created notification */}
             <Snackbar
                 open={albumCreatedToast.open}
                 anchorOrigin={{ horizontal: "right", vertical: "bottom" }}
@@ -406,11 +400,6 @@ interface ItemData {
     onCreateAlbum: () => void;
 }
 
-// This helper function memoizes incoming props,
-// To avoid causing unnecessary re-renders pure Row components.
-// This is only needed since we are passing multiple props with a wrapper object.
-// If we were only passing a single, stable value (e.g. items),
-// We could just pass the value directly.
 const createItemData = memoize(
     (
         collectionRowList: (CollectionSummary | "create")[][],
@@ -419,10 +408,6 @@ const createItemData = memoize(
     ) => ({ collectionRowList, onCollectionClick, onCreateAlbum }),
 );
 
-//If list items are expensive to render,
-// Consider using React.memo or shouldComponentUpdate to avoid unnecessary re-renders.
-// https://reactjs.org/docs/react-api.html#reactmemo
-// https://reactjs.org/docs/react-api.html#reactpurecomponent
 const AlbumsRow = React.memo(
     ({
         data,
@@ -496,7 +481,6 @@ const AllAlbumsContent: React.FC<AllAlbumsContentProps> = ({
             const collectionRowList: (CollectionSummary | "create")[][] = [];
             let index = 0;
 
-            // Add create button as first item in first row if needed
             if (showCreateButton) {
                 const firstRow: (CollectionSummary | "create")[] = ["create"];
                 for (
@@ -509,7 +493,6 @@ const AllAlbumsContent: React.FC<AllAlbumsContentProps> = ({
                 collectionRowList.push(firstRow);
             }
 
-            // Add remaining collections
             while (index < collectionSummaries.length) {
                 const collectionRow: (CollectionSummary | "create")[] = [];
                 for (
@@ -531,16 +514,12 @@ const AllAlbumsContent: React.FC<AllAlbumsContentProps> = ({
         main();
     }, [collectionSummaries, columns, showCreateButton]);
 
-    // Bundle additional data to list items using the "itemData" prop.
-    // It will be accessible to item renderers as props.data.
-    // Memoize this data to avoid bypassing shouldComponentUpdate().
     const itemData = createItemData(
         collectionRowList,
         onCollectionClick,
         onCreateAlbum,
     );
 
-    // Show "no results" message if there's a search query but no results
     if (
         hasSearchQuery &&
         collectionSummaries.length === 0 &&

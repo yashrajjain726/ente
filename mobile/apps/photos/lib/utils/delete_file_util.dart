@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:math';
 
 import 'package:ente_components/ente_components.dart';
+import "package:ente_strings/ente_strings.dart";
 import 'package:flutter/material.dart';
 import 'package:logging/logging.dart';
 import 'package:photo_manager/photo_manager.dart';
@@ -14,8 +15,6 @@ import 'package:photos/events/files_updated_event.dart';
 import "package:photos/events/force_reload_trash_page_event.dart";
 import 'package:photos/events/local_photos_updated_event.dart';
 import 'package:photos/gateways/trash/models/trash_item_request.dart';
-import "package:photos/generated/l10n.dart";
-import "package:photos/l10n/l10n.dart";
 import "package:photos/models/button_result.dart";
 import 'package:photos/models/file/file.dart';
 import "package:photos/models/files_split.dart";
@@ -156,8 +155,8 @@ Future<void> deleteFilesFromEverywhere(
     );
     if (context.mounted) {
       final message = hasLocalOnlyFiles && deletedIDs.isNotEmpty
-          ? AppLocalizations.of(context).filesDeleted
-          : AppLocalizations.of(context).movedToTrash;
+          ? context.strings.filesDeleted
+          : context.strings.movedToTrash;
       showShortToast(context, message);
     }
   }
@@ -171,7 +170,7 @@ Future<void> deleteFilesFromRemoteOnly(
   BuildContext context,
   List<EnteFile> files,
 ) async {
-  final l10n = AppLocalizations.of(context);
+  final l10n = context.strings;
   files.removeWhere((element) => element.uploadedFileID == null);
   if (files.isEmpty) {
     showToast(context, l10n.selectedFilesAreNotOnEnte);
@@ -248,6 +247,7 @@ Future<List<EnteFile>> deleteFilesOnDeviceOnly(
     ..addAll(await _tryDeleteSharedMediaFiles(localSharedMediaIDs));
   final removedIDs = deletedIDs.union(result.trashedIDs);
   final List<EnteFile> deletedFiles = [];
+  final List<int> uploadedFileIDsToClear = [];
   for (final file in files) {
     // Handle only files deleted, moved to trash, or already missing.
     if (removedIDs.contains(file.localID) ||
@@ -256,10 +256,20 @@ Future<List<EnteFile>> deleteFilesOnDeviceOnly(
       if (localOnlyIDs.contains(file.localID)) {
         await FilesDB.instance.deleteLocalFile(file);
       } else {
+        final uploadedFileID = file.uploadedFileID;
         file.localID = null;
-        await FilesDB.instance.update(file);
+        if (uploadedFileID != null) {
+          uploadedFileIDsToClear.add(uploadedFileID);
+        } else {
+          await FilesDB.instance.update(file);
+        }
       }
     }
+  }
+  if (uploadedFileIDsToClear.isNotEmpty) {
+    await FilesDB.instance.clearLocalIDsForUploadedFileIDs(
+      uploadedFileIDsToClear,
+    );
   }
   if (deletedFiles.isNotEmpty || alreadyDeletedIDs.isNotEmpty) {
     Bus.instance.fire(
@@ -272,8 +282,8 @@ Future<List<EnteFile>> deleteFilesOnDeviceOnly(
   }
   if (removedIDs.isNotEmpty && context.mounted) {
     final message = deletedIDs.isNotEmpty
-        ? AppLocalizations.of(context).filesDeleted
-        : AppLocalizations.of(context).movedToTrash;
+        ? context.strings.filesDeleted
+        : context.strings.movedToTrash;
     showShortToast(context, message);
   }
   return deletedFiles;
@@ -281,7 +291,7 @@ Future<List<EnteFile>> deleteFilesOnDeviceOnly(
 
 Future<bool> deleteFromTrash(BuildContext context, List<EnteFile> files) async {
   bool didDeletionStart = false;
-  final l10n = AppLocalizations.of(context);
+  final l10n = context.strings;
   final actionResult = await showBottomSheetComponent<ButtonResult>(
     context: context,
     useRootNavigator: Platform.isIOS,
@@ -342,9 +352,9 @@ Future<bool> deleteFromTrash(BuildContext context, List<EnteFile> files) async {
 Future<bool> emptyTrash(BuildContext context) async {
   final actionResult = await showChoiceActionSheet(
     context,
-    title: AppLocalizations.of(context).emptyTrash,
-    body: AppLocalizations.of(context).permDeleteWarning,
-    firstButtonLabel: AppLocalizations.of(context).empty,
+    title: context.strings.emptyTrashQuestion,
+    body: context.strings.permDeleteWarning,
+    firstButtonLabel: context.strings.empty,
     isCritical: true,
     firstButtonOnTap: () async {
       try {
@@ -549,7 +559,7 @@ Future<bool> retryFreeUpSpaceAfterRemovingAssetsNonExistingInDisk(
 
   final dialog = createProgressDialog(
     context,
-    context.l10n.pleaseWaitThisWillTakeAWhile,
+    context.strings.pleaseWaitThisWillTakeAWhile,
   );
   await dialog.show();
   try {
@@ -785,7 +795,7 @@ Future<List<String>> _tryDeleteSharedMediaFiles(List<String> localIDs) {
 }
 
 Future<void> showMediaManagementHintSheet(BuildContext context) async {
-  final l10n = AppLocalizations.of(context);
+  final l10n = context.strings;
   if (!Platform.isAndroid) {
     return;
   }
@@ -854,7 +864,7 @@ Future<void> showDeleteSheet(
   Future<void> Function(BuildContext context, List<EnteFile> files)?
   deleteFromEverywhereOverride,
 }) async {
-  final l10n = AppLocalizations.of(context);
+  final l10n = context.strings;
   if (selectedFiles.files.length != filesSplit.count) {
     throw AssertionError(
       "Unexpected state, #{selectedFiles.files.length} != "
@@ -887,7 +897,9 @@ Future<void> showDeleteSheet(
       return;
     }
     var didDelete = false;
-    if (Platform.isAndroid && await PhotoManager.canManageMedia()) {
+    if (Platform.isAndroid &&
+        (await isAndroidSDKVersionLowerThan(android11SDKINT) ||
+            await PhotoManager.canManageMedia())) {
       if (!context.mounted) return;
       didDelete =
           await showBottomSheetComponent<bool>(
@@ -1011,7 +1023,7 @@ class _MoreOptionsButtonState extends State<_MoreOptionsButton> {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
+    final l10n = context.strings;
     final foreground = context.componentColors.textLight;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
@@ -1108,7 +1120,7 @@ class DeleteConfirmationSheetState extends State<DeleteConfirmationSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
+    final l10n = context.strings;
     final title = l10n.deleteItemsQuestion(count: widget.count);
     var body = l10n.selectedFilesSavedOnDeviceOnly;
     if (widget.count == 1 && widget.isLocal && widget.isRemote) {

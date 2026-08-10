@@ -1,10 +1,4 @@
-/* eslint-disable @typescript-eslint/ban-ts-comment */
-/* TODO: Split this file to deal with the ente-new/photos imports.
-1. Move common components into FileInfoComponents.tsx
-2. Move the rest out to files in the apps themselves:
-   - albums/SharedFileInfo
-  -  photos/FileInfo
-*/
+// TODO: Split this file to deal with the ente-new/photos imports.
 
 import CalendarTodayIcon from "@mui/icons-material/CalendarToday";
 import CameraOutlinedIcon from "@mui/icons-material/CameraOutlined";
@@ -94,9 +88,9 @@ import { t } from "i18next";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Trans } from "react-i18next";
 
-// Re-uses images from ~leaflet package.
 import "leaflet-defaulticon-compatibility/dist/leaflet-defaulticon-compatibility.webpack.css";
 import "leaflet/dist/leaflet.css";
+// Reuse Leaflet's bundled marker images.
 // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-unused-expressions
 haveWindow() && require("leaflet-defaulticon-compatibility");
 const leaflet = haveWindow()
@@ -104,99 +98,27 @@ const leaflet = haveWindow()
       (require("leaflet") as typeof import("leaflet"))
     : null;
 
-/**
- * Exif data for a file, in a form suitable for use by {@link FileInfo}.
- *
- * TODO: Indicate missing exif (e.g. videos) better, both in the data type, and
- * in the UI (e.g. by omitting the entire row).
- */
+// TODO: Indicate missing exif (e.g. videos) better, both in the data type, and
+// in the UI (e.g. by omitting the entire row).
 export interface FileInfoExif {
     tags: RawExifTags | undefined;
     parsed: ParsedMetadata | undefined;
 }
 
 export type FileInfoProps = ModalVisibilityProps & {
-    /**
-     * The file whose information we are showing.
-     */
     file: EnteFile;
-    /**
-     * Exif information for {@link file}.
-     */
     exif: FileInfoExif | undefined;
-    /**
-     * If set, then controls to edit the file's metadata (name, date, caption)
-     * will be shown.
-     */
     allowEdits?: boolean;
-    /**
-     * If set, then an inline map will be shown (if the user has enabled it)
-     * using the file's location.
-     */
     allowMap?: boolean;
-    /**
-     * If set, then a chip will be shown for each collection that this file is
-     * a part of.
-     *
-     * Uses {@link fileCollectionIDs}, {@link collectionNameByID} and
-     * {@link onSelectCollection}, so all of those props should also be set for
-     * this to have an effect.
-     */
     showCollections?: boolean;
-    /**
-     * A map from file IDs to the IDs of the collections that they're a part of.
-     *
-     * Used when {@link showCollections} is set.
-     */
     fileCollectionIDs?: Map<number, number[]>;
-    /**
-     * A map from collection IDs to their name.
-     *
-     * Used when {@link showCollections} is set.
-     */
     collectionNameByID?: Map<number, string>;
-    /**
-     * IDs of hidden collections.
-     *
-     * Used when {@link showCollections} is set.
-     */
     hiddenCollectionIDs?: Set<number>;
-    /**
-     * Called when the action on the file info drawer has changed some metadata
-     * for a file.
-     *
-     * It should return a promise that settles when the changes have been
-     * reflected locally. Until the promise settles the UI element that
-     * triggered the change will show an activity indicator to the user.
-     */
     onFileMetadataUpdate?: () => Promise<void>;
-    /**
-     * Called when an action on the file info drawer change the caption of the
-     * given {@link EnteFile}.
-     *
-     * This hook allows the file viewer to update the caption it is displaying
-     * for the given file. It is called in addition to, and after the settlement
-     * of, {@link onFileMetadataUpdate} since the caption update requires a
-     * special case refresh of the PhotoSwipe dialog.
-     *
-     * @param fileID The ID of the file whose caption was updated.
-     *
-     * @param newCaption The updated value of the file's caption.
-     */
+    // PhotoSwipe needs a separate refresh after caption metadata settles.
     onUpdateCaption: (fileID: number, newCaption: string) => void;
-    /**
-     * Called when the user selects a collection from among the collections that
-     * the file belongs to.
-     */
     onSelectCollection?: (collectionID: number) => void;
-    /**
-     * Called when the user selects a person in the file info panel.
-     */
     onSelectPerson?: (personID: string) => void;
-    /**
-     * Called when an edit surface owned by the file info panel is opened or
-     * closed, so the viewer can avoid navigating to another file underneath it.
-     */
     onNavigationLockChange?: (locked: boolean) => void;
 };
 
@@ -261,7 +183,6 @@ export const FileInfo: React.FC<FileInfoProps> = ({
 
     const canAddPerson = isMLEnabled() && assignablePeople.length > 0;
 
-    // Prefer the location in the EnteFile, then fall back to Exif.
     const fileLocationValue = fileLocation(file) ?? exif?.parsed?.location;
 
     const location = fileLocationValue;
@@ -271,19 +192,7 @@ export const FileInfo: React.FC<FileInfoProps> = ({
     useEffect(() => {
         if (!isMLEnabled()) return undefined;
 
-        // Take a dependency on open so that we refresh the list of people by
-        // calling `getAnnotatedFacesForFile` again when the file info dialog is
-        // closed and reopened.
-        //
-        // This covers a scenario like:
-        // - User opens file info panel
-        // - Selects one of the faces
-        // - Gives it a name
-        // - Then opens the same file again, and reopens the file info panel.
-        //
-        // Since the `file` hasn't changed, this hook wouldn't rerun. So we also
-        // take a dependency on the open state of the dialog, causing us to
-        // rerun whenever reopened (even if for the same file).
+        // Naming a face does not change file identity; reopening must refetch it.
         if (!open) return undefined;
 
         setAnnotatedFaces([]);
@@ -624,10 +533,6 @@ const NavigationHintSeparator: React.FC<React.PropsWithChildren> = ({
     </Typography>
 );
 
-/**
- * Some immediate fields of interest, in the form that we want to display on the
- * info panel for a file.
- */
 type AnnotatedExif = Required<FileInfoExif> & {
     resolution?: string;
     megaPixels?: string;
@@ -658,11 +563,10 @@ const annotateExif = (
         if (exif.Make && exif.Model)
             info.takenOnDevice = `${exif.Make.description} ${exif.Model.description}`;
 
-        if (exif.FNumber)
-            info.fNumber = exif.FNumber.description; /* e.g. "f/16" */
+        if (exif.FNumber) info.fNumber = exif.FNumber.description;
 
         if (exif.ExposureTime)
-            info.exposureTime = exif.ExposureTime.description; /* "1/10" */
+            info.exposureTime = exif.ExposureTime.description;
 
         if (exif.ISOSpeedRatings)
             info.iso = `ISO${tagNumericValue(exif.ISOSpeedRatings)}`;
@@ -676,25 +580,12 @@ const FileInfoSidebar = styled(
         <SidebarDrawer
             {...props}
             anchor="right"
-            // See: [Note: Workarounds for unactionable ARIA warnings], but this
-            // time with a different workaround.
-            //
-            // https://github.com/mui/material-ui/issues/43106#issuecomment-2514637251
+            // Avoid MUI's aria-hidden focus warning when this closes.
             disableRestoreFocus={true}
             closeAfterTransition={true}
         />
     ),
 )(({ theme }) => ({
-    // [Note: Lighter backdrop for overlays on photo viewer]
-    //
-    // The default backdrop color we use for the drawer in light mode is too
-    // "white" when used in the image gallery because unlike the rest of the app
-    // the gallery retains a black background irrespective of the mode. So use a
-    // lighter scrim when overlaying content directly atop the image gallery.
-    //
-    // We don't need to add this special casing for nested overlays (e.g.
-    // dialogs initiated from the file info drawer itself) since now there is
-    // enough "white" on the screen to warrant the stronger (default) backdrop.
     ...theme.applyStyles("light", {
         ".MuiBackdrop-root": {
             backgroundColor: theme.vars.palette.backdrop.faint,
@@ -712,32 +603,12 @@ const BottomAlignedFileInfoSidebar = styled(FileInfoSidebar)({
 });
 
 interface InfoItemProps {
-    /**
-     * The icon associated with the info entry.
-     */
     icon: React.ReactNode;
-    /**
-     * The primary content / title of the info entry.
-     *
-     * Only used if {@link children} are not specified.
-     */
     title?: string;
-    /**
-     * The secondary information / subtext associated with the info entry.
-     *
-     * Only used if {@link children} are not specified.
-     */
     caption?: React.ReactNode;
-    /**
-     * A component, usually a button (e.g. an "edit button"), shown at the
-     * trailing edge of the info entry.
-     */
     trailingButton?: React.ReactNode;
 }
 
-/**
- * An entry in the file info panel listing.
- */
 const InfoItem: React.FC<React.PropsWithChildren<InfoItemProps>> = ({
     icon,
     title,
@@ -779,12 +650,7 @@ const InfoItemIconContainer = styled("div")(
 `,
 );
 
-type EditButtonProps = ButtonishProps & {
-    /**
-     * If true, then an activity indicator is shown in place of the edit icon.
-     */
-    loading?: boolean;
-};
+type EditButtonProps = ButtonishProps & { loading?: boolean };
 
 const EditButton: React.FC<EditButtonProps> = ({ onClick, loading }) => (
     <IconButton onClick={onClick} disabled={!!loading} color="secondary">
@@ -846,8 +712,6 @@ const Caption: React.FC<CaptionProps> = ({
     }, [onNavigationLockChange, values.caption, caption, isSaving]);
 
     if (!caption.length && !allowEdits) {
-        // Visually take up some space, otherwise the info panel for the shared
-        // photos without a caption looks squished at the top.
         return <Box sx={{ minHeight: 2 }}></Box>;
     }
 
@@ -874,7 +738,6 @@ const Caption: React.FC<CaptionProps> = ({
                     <IconButton
                         type="submit"
                         disabled={isSaving}
-                        // Prevent layout shift when we're showing progress.
                         sx={{ minWidth: "48px" }}
                     >
                         {isSaving ? (
@@ -923,23 +786,12 @@ const CreationTime: React.FC<CreationTimeProps> = ({
 
         const { dateTime, timestamp: editedTime } = pickedTime;
         if (editedTime == originalDate.getTime()) {
-            // Same as before.
             return;
         }
 
         setIsSaving(true);
         try {
-            // [Note: Don't modify offsetTime when editing date via picker]
-            //
-            // Use the updated date time (both in its canonical dateTime form,
-            // and also as in the epoch timestamp), but don't use the offset.
-            //
-            // The offset here will be the offset of the computer where this
-            // user is making this edit, not the offset of the place where the
-            // photo was taken. In a future iteration of the date time editor,
-            // we can provide functionality for the user to edit the associated
-            // offset, but right now it is not even surfaced, so don't also
-            // potentially overwrite it.
+            // The picker reports this computer's offset, not the photo's.
             await updateFilePublicMagicMetadata(file, { dateTime, editedTime });
             await onFileMetadataUpdate?.();
         } catch (e) {
@@ -1046,25 +898,7 @@ const createMultipartCaption = (
 );
 
 type RenameFileDialogProps = ModalVisibilityProps & {
-    /**
-     * The current name of the file.
-     */
     fileName: string;
-    /**
-     * Called when the user makes a change to the existing name and activates the
-     * rename button on the dialog.
-     *
-     * @param newFileName The changed name. The extension currently cannot be
-     * modified, but it is guaranteed the name component of {@link newFileName}
-     * will be different from that of the {@link fileName} prop of the dialog.
-     *
-     * Until the promise settles, the dialog will show an activity indicator. If
-     * the promise rejects, it will also show an error. If the promise is
-     * fulfilled, then the dialog will also be closed.
-     *
-     * The dialog will also be closed if the user activates the rename button
-     * without changing the name.
-     */
     onRename: (newFileName: string) => Promise<void>;
 };
 
@@ -1100,7 +934,6 @@ const RenameFileDialog: React.FC<RenameFileDialogProps> = ({
                     onCancel={onClose}
                     slotProps={{
                         input: {
-                            // Align the adornment text to the input text.
                             sx: { alignItems: "baseline" },
                             endAdornment: extension && (
                                 <InputAdornment position="end">
@@ -1152,12 +985,9 @@ const MapBox: React.FC<MapBoxProps> = ({ location, mapEnabled }) => {
 
         const position: L.LatLngTuple = [location.latitude, location.longitude];
         if (!mapRef.current) {
-            // @ts-ignore
             const map = leaflet.map(mapContainer).setView(position, zoom);
             map.attributionControl.setPrefix(leafletAttributionPrefix);
-            // @ts-ignore
             leaflet.tileLayer(urlTemplate, { attribution }).addTo(map);
-            // @ts-ignore
             markerRef.current = leaflet.marker(position).addTo(map);
             mapRef.current = map;
         } else {

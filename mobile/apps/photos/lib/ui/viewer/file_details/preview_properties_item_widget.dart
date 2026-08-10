@@ -1,8 +1,8 @@
 import "package:ente_components/ente_components.dart";
 import "package:ente_pure_utils/ente_pure_utils.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:hugeicons/hugeicons.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/models/ffmpeg/ffprobe_props.dart";
 import 'package:photos/models/file/file.dart';
 import "package:photos/models/file/file_type.dart";
@@ -89,7 +89,7 @@ class _PreviewPropertiesItemWidgetState
         size: IconSizes.small,
         color: context.componentColors.textLight,
       ),
-      title: AppLocalizations.of(context).streamDetails,
+      title: context.strings.streamDetails,
       subtitleSection: Future.value(subSectionWidgets),
       useMenuStyle: true,
     );

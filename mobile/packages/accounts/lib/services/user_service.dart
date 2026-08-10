@@ -542,7 +542,10 @@ class UserService {
         await setEmail(email);
         Bus.instance.fire(UserDetailsChangedEvent());
         if (context.mounted) {
-          showShortToast(context, context.strings.emailChangedTo(email));
+          showShortToast(
+            context,
+            context.strings.emailChangedTo(newEmail: email),
+          );
           Navigator.of(context).popUntil((route) => route.isFirst);
         }
         return;
@@ -592,7 +595,6 @@ class UserService {
 
   Future<void> setAttributes(KeyGenResult result) async {
     try {
-      await registerOrUpdateSrp(result.loginKey);
       await _enteDio.put(
         "/users/attributes",
         data: {"keyAttributes": result.keyAttributes.toMap()},
@@ -600,6 +602,12 @@ class UserService {
       await _config.setKey(result.privateKeyAttributes.key);
       await _config.setSecretKey(result.privateKeyAttributes.secretKey);
       await _config.setKeyAttributes(result.keyAttributes);
+      try {
+        await registerOrUpdateSrp(result.loginKey);
+      } catch (_) {
+        // Keys are stored; password reentry after OTT login retries SRP setup.
+        _logger.warning("Continuing signup after SRP setup failure");
+      }
     } catch (e) {
       _logger.severe(e);
       rethrow;

@@ -1,7 +1,7 @@
 import 'package:ente_components/ente_components.dart';
+import "package:ente_strings/ente_strings.dart";
 import 'package:flutter/material.dart';
 import 'package:hugeicons/hugeicons.dart';
-import "package:photos/generated/l10n.dart";
 import "package:photos/models/api/collection/user.dart";
 import 'package:photos/models/collection/collection.dart';
 import 'package:photos/services/collections_service.dart';
@@ -30,66 +30,55 @@ class _ManageIndividualParticipantState
   final CollectionActions collectionActions = CollectionActions(
     CollectionsService.instance,
   );
+  late CollectionParticipantRole _role;
+
+  @override
+  void initState() {
+    super.initState();
+    _role = CollectionParticipantRoleExtn.fromString(widget.user.role);
+  }
+
+  Future<void> _changeRole(CollectionParticipantRole role) async {
+    final changed = await collectionActions.addEmailToCollection(
+      context,
+      widget.collection,
+      widget.user.email,
+      role,
+    );
+    if (changed && mounted) setState(() => _role = role);
+  }
 
   @override
   Widget build(BuildContext context) {
-    final isAdmin = widget.user.isAdmin;
-    final isCollaborator = widget.user.isCollaborator;
-    final isViewer = widget.user.isViewer;
+    final isAdmin = _role == CollectionParticipantRole.admin;
+    final isCollaborator = _role == CollectionParticipantRole.collaborator;
+    final isViewer = _role == CollectionParticipantRole.viewer;
     final resolvedName = resolveDisplayName(widget.user);
-    bool isConvertToViewSuccess = false;
     return ShareScaffold(
-      title: AppLocalizations.of(context).manage,
+      title: context.strings.manage,
       subtitle: resolvedName,
       children: [
-        ShareSectionTitle(AppLocalizations.of(context).addedAs),
+        ShareSectionTitle(context.strings.addedAs),
         ShareMenuGroup(
           items: [
             ShareMenuItem(
-              title: AppLocalizations.of(context).admin,
+              title: context.strings.admin,
               icon: HugeIcons.strokeRoundedCrown,
               trailing: isAdmin ? shareCheck(context) : null,
               onTap: isAdmin
                   ? null
-                  : () async {
-                      final result = await collectionActions
-                          .addEmailToCollection(
-                            context,
-                            widget.collection,
-                            widget.user.email,
-                            CollectionParticipantRole.admin,
-                          );
-                      if (result && mounted) {
-                        widget.user.role = CollectionParticipantRole.admin
-                            .toStringVal();
-                        setState(() => {});
-                      }
-                    },
+                  : () => _changeRole(CollectionParticipantRole.admin),
             ),
             ShareMenuItem(
-              title: AppLocalizations.of(context).collaborator,
+              title: context.strings.collaborator,
               icon: HugeIcons.strokeRoundedUserGroup,
               trailing: isCollaborator ? shareCheck(context) : null,
               onTap: isCollaborator
                   ? null
-                  : () async {
-                      final result = await collectionActions
-                          .addEmailToCollection(
-                            context,
-                            widget.collection,
-                            widget.user.email,
-                            CollectionParticipantRole.collaborator,
-                          );
-                      if (result && mounted) {
-                        widget.user.role = CollectionParticipantRole
-                            .collaborator
-                            .toStringVal();
-                        setState(() => {});
-                      }
-                    },
+                  : () => _changeRole(CollectionParticipantRole.collaborator),
             ),
             ShareMenuItem(
-              title: AppLocalizations.of(context).viewer,
+              title: context.strings.viewer,
               icon: HugeIcons.strokeRoundedView,
               trailing: isViewer ? shareCheck(context) : null,
               showOnlyLoadingState: true,
@@ -98,57 +87,40 @@ class _ManageIndividualParticipantState
                   : () async {
                       final actionResult = await showChoiceActionSheet(
                         context,
-                        title: AppLocalizations.of(context).changePermissions,
-                        firstButtonLabel: AppLocalizations.of(
-                          context,
-                        ).yesConvertToViewer,
-                        body: AppLocalizations.of(context)
+                        title: context.strings.changePermissionsQuestion,
+                        firstButtonLabel: context.strings.yesConvertToViewer,
+                        body: context.strings
                             .cannotAddMorePhotosAfterBecomingViewer(
                               user: resolvedName,
                             ),
                         isCritical: true,
                       );
-                      if (actionResult?.action != null) {
-                        if (actionResult!.action == ButtonAction.first) {
-                          try {
-                            if (!context.mounted) return;
-                            isConvertToViewSuccess = await collectionActions
-                                .addEmailToCollection(
-                                  context,
-                                  widget.collection,
-                                  widget.user.email,
-                                  CollectionParticipantRole.viewer,
-                                );
-                          } catch (e) {
-                            if (!context.mounted) return;
-                            await showGenericErrorDialog(
-                              context: context,
-                              error: e,
-                            );
-                          }
-                          if (isConvertToViewSuccess && mounted) {
-                            isConvertToViewSuccess = false;
-                            widget.user.role = CollectionParticipantRole.viewer
-                                .toStringVal();
-                            setState(() => {});
-                          }
-                        }
+                      if (actionResult?.action != ButtonAction.first ||
+                          !context.mounted) {
+                        return;
+                      }
+                      try {
+                        await _changeRole(CollectionParticipantRole.viewer);
+                      } catch (e) {
+                        if (!context.mounted) return;
+                        await showGenericErrorDialog(
+                          context: context,
+                          error: e,
+                        );
                       }
                     },
             ),
           ],
         ),
         ShareSectionDescription(
-          AppLocalizations.of(
-            context,
-          ).adminsAndCollaboratorsCanAddPhotosDescription,
+          context.strings.adminsAndCollaboratorsCanAddPhotosDescription,
         ),
         const SizedBox(height: Spacing.xxl),
-        ShareSectionTitle(AppLocalizations.of(context).removeParticipant),
+        ShareSectionTitle(context.strings.removeParticipant),
         ShareMenuGroup(
           items: [
             ShareMenuItem(
-              title: AppLocalizations.of(context).remove,
+              title: context.strings.remove,
               leading: const Icon(Icons.not_interested_outlined),
               isDestructive: true,
               onTap: () async {

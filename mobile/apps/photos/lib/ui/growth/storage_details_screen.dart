@@ -2,13 +2,12 @@ import "dart:math";
 
 import "package:ente_components/ente_components.dart";
 import "package:ente_pure_utils/ente_pure_utils.dart";
+import "package:ente_strings/ente_strings.dart";
+import "package:ente_ui/components/loading_widget.dart";
 import "package:flutter/material.dart";
 import "package:photos/gateways/storage_bonus/models/storage_bonus.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/models/user_details.dart";
 import "package:photos/service_locator.dart";
-import "package:photos/ui/common/loading_widget.dart";
-import "package:photos/ui/settings/components/settings_page_scaffold.dart";
 
 class StorageDetailsScreen extends StatefulWidget {
   final ReferralView referralView;
@@ -23,7 +22,7 @@ class StorageDetailsScreen extends StatefulWidget {
 class _StorageDetailsScreenState extends State<StorageDetailsScreen> {
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
+    final l10n = context.strings;
 
     return SettingsPageScaffold(
       title: l10n.referralStats,

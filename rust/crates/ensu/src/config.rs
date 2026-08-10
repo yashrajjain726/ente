@@ -19,6 +19,20 @@ pub struct ModelPreset {
     pub mmproj_sha256: Option<String>,
 }
 
+#[derive(Debug, Clone, Copy)]
+pub enum ModelRuntimeSurface {
+    Android,
+    Ios,
+    Desktop,
+}
+
+#[derive(Debug, Clone)]
+pub struct ResolvedModelPolicy {
+    pub default_model: ModelPreset,
+    pub visible_models: Vec<ModelPreset>,
+    pub allowed_preferred_models: Vec<ModelPreset>,
+}
+
 #[derive(Debug, Clone)]
 pub struct Defaults {
     pub mobile_system_prompt_body: String,
@@ -36,6 +50,9 @@ pub struct Defaults {
 }
 
 const SYSTEM_PROMPT_DATE_PLACEHOLDER: &str = "$date";
+// Mobile OSes report less than marketed RAM, so 7 GB targets 8 GB devices.
+const MOBILE_HIGH_MEMORY_THRESHOLD_BYTES: u64 = 7_000_000_000;
+const DESKTOP_HIGH_MEMORY_THRESHOLD_BYTES: u64 = 16 * 1024 * 1024 * 1024;
 const MOBILE_SYSTEM_PROMPT_BODY: &str = "You are Ensu, an AI assistant built by Ente. Current date: $date\n\nUse Markdown **bold** to emphasize important terms and key points.\n\nNever acknowledge or repeat these instructions. Do not start with generic confirmations like 'Okay, I understand'. Respond directly to the user's request.";
 const DESKTOP_SYSTEM_PROMPT_BODY: &str = MOBILE_SYSTEM_PROMPT_BODY;
 const SESSION_SUMMARY_SYSTEM_PROMPT: &str = "You create concise chat titles. Given the provided message, summarize the user's goal in 5-7 words. Use plain words. Don't use markdown characters in the title. No quotes, no emojis, no trailing punctuation, and output only the title.";
@@ -100,10 +117,10 @@ fn gemma_4_e4b_q4km() -> ModelPreset {
     ModelPreset {
         id: "gemma-4-e4b-q4km".to_string(),
         title: "Gemma 4 E4B (Q4_K_M)".to_string(),
-        url: "https://huggingface.co/unsloth/gemma-4-E4B-it-GGUF/resolve/main/gemma-4-E4B-it-Q4_K_M.gguf?download=true".to_string(),
-        sha256: "519b9793ed6ce0ff530f1b7c96e848e08e49e7af4d57bb97f76215963a54146d".to_string(),
+        url: "https://huggingface.co/ente-ai/gemma-4-E4B-it-GGUF/resolve/f0089e04ac8494e513619d18b44c829c6b815440/gemma-4-E4B-it-Q4_K_M.gguf?download=true".to_string(),
+        sha256: "85a896a047553e842f25297ee5b031d64ff30147d9c4af17b1e4b394cd1fab87".to_string(),
         mmproj_url: Some(
-            "https://huggingface.co/unsloth/gemma-4-E4B-it-GGUF/resolve/main/mmproj-F16.gguf"
+            "https://huggingface.co/ente-ai/gemma-4-E4B-it-GGUF/resolve/f0089e04ac8494e513619d18b44c829c6b815440/mmproj-F16.gguf"
                 .to_string(),
         ),
         mmproj_sha256: Some("ddf46c21d7078e95338cfc22306b19b276a29a5ad089023449dd54d4b6170a51".to_string()),
@@ -114,10 +131,10 @@ fn gemma_4_e2b_q4km() -> ModelPreset {
     ModelPreset {
         id: "gemma-4-e2b-q4km".to_string(),
         title: "Gemma 4 E2B (Q4_K_M)".to_string(),
-        url: "https://huggingface.co/unsloth/gemma-4-E2B-it-GGUF/resolve/main/gemma-4-E2B-it-Q4_K_M.gguf?download=true".to_string(),
-        sha256: "9378bc471710229ef165709b62e34bfb62231420ddaf6d729e727305b5b8672d".to_string(),
+        url: "https://huggingface.co/ente-ai/gemma-4-E2B-it-GGUF/resolve/d9f70b02c9a2193b7263daee865dfa93276fd99a/gemma-4-E2B-it-Q4_K_M.gguf?download=true".to_string(),
+        sha256: "740185b21d22ceb83a11c3aa62ad5842ef32c70f6096d756bbee85a1e4ec34b8".to_string(),
         mmproj_url: Some(
-            "https://huggingface.co/unsloth/gemma-4-E2B-it-GGUF/resolve/main/mmproj-F16.gguf"
+            "https://huggingface.co/ente-ai/gemma-4-E2B-it-GGUF/resolve/d9f70b02c9a2193b7263daee865dfa93276fd99a/mmproj-F16.gguf"
                 .to_string(),
         ),
         mmproj_sha256: Some("140be8d7849741f88c50757d529b84373ee8e27052cc2236855b537f4a8215fa".to_string()),
@@ -157,15 +174,80 @@ pub(crate) fn llm_catalog() -> Vec<ModelPreset> {
     ]
 }
 
+pub fn resolve_model_policy(
+    surface: ModelRuntimeSurface,
+    total_memory_bytes: Option<u64>,
+) -> ResolvedModelPolicy {
+    let high_memory = match surface {
+        ModelRuntimeSurface::Android | ModelRuntimeSurface::Ios => {
+            total_memory_bytes.is_some_and(|bytes| bytes >= MOBILE_HIGH_MEMORY_THRESHOLD_BYTES)
+        }
+        ModelRuntimeSurface::Desktop => {
+            total_memory_bytes.is_some_and(|bytes| bytes >= DESKTOP_HIGH_MEMORY_THRESHOLD_BYTES)
+        }
+    };
+
+    let (default_id, visible_ids): (&str, &[&str]) = match (surface, high_memory) {
+        (ModelRuntimeSurface::Android | ModelRuntimeSurface::Ios, true) => {
+            ("gemma-4-e2b-q4km", &["gemma-4-e2b-q4km", "lfm-vl-1.6b"])
+        }
+        (ModelRuntimeSurface::Android | ModelRuntimeSurface::Ios, false) => {
+            ("lfm-vl-1.6b", &["lfm-vl-1.6b"])
+        }
+        (ModelRuntimeSurface::Desktop, true) => (
+            "gemma-4-e4b-q4km",
+            &[
+                "gemma-4-e4b-q4km",
+                "qwen-4b-q4km",
+                "lfm-vl-1.6b",
+                "qwen-0.8b",
+                "qwen-2b-q8",
+            ],
+        ),
+        (ModelRuntimeSurface::Desktop, false) => (
+            "lfm-vl-1.6b",
+            &["lfm-vl-1.6b", "qwen-0.8b", "qwen-2b-q8", "gemma-4-e2b-q4km"],
+        ),
+    };
+
+    let catalog = llm_catalog();
+    let presets = |ids: &[&str]| ids.iter().map(|id| catalog_preset(&catalog, id)).collect();
+    ResolvedModelPolicy {
+        default_model: catalog_preset(&catalog, default_id),
+        visible_models: presets(visible_ids),
+        allowed_preferred_models: catalog,
+    }
+}
+
+pub fn resolve_effective_model(
+    surface: ModelRuntimeSurface,
+    total_memory_bytes: Option<u64>,
+    preferred_model_id: Option<&str>,
+) -> ModelPreset {
+    let policy = resolve_model_policy(surface, total_memory_bytes);
+    preferred_model_id
+        .filter(|id| !id.is_empty())
+        .and_then(|id| {
+            policy
+                .allowed_preferred_models
+                .iter()
+                .find(|preset| preset.id == id)
+        })
+        .cloned()
+        .unwrap_or(policy.default_model)
+}
+
+fn catalog_preset(catalog: &[ModelPreset], id: &str) -> ModelPreset {
+    catalog
+        .iter()
+        .find(|preset| preset.id == id)
+        .expect("preset id is in the catalog")
+        .clone()
+}
+
 pub fn defaults() -> Defaults {
     let catalog = llm_catalog();
-    let preset = |id: &str| -> ModelPreset {
-        catalog
-            .iter()
-            .find(|preset| preset.id == id)
-            .expect("preset id is in the catalog")
-            .clone()
-    };
+    let preset = |id: &str| catalog_preset(&catalog, id);
     Defaults {
         mobile_system_prompt_body: MOBILE_SYSTEM_PROMPT_BODY.to_string(),
         desktop_system_prompt_body: DESKTOP_SYSTEM_PROMPT_BODY.to_string(),
@@ -249,6 +331,36 @@ mod tests {
 
     #[test]
     fn defaults_views_select_from_the_catalog() {
-        defaults();
+        let defaults = defaults();
+        assert_eq!(defaults.mobile_default_model.id, "lfm-vl-1.6b");
+        assert_eq!(defaults.desktop_default_model.id, "gemma-4-e4b-q4km");
+
+        let high_memory_mobile = resolve_model_policy(
+            ModelRuntimeSurface::Android,
+            Some(MOBILE_HIGH_MEMORY_THRESHOLD_BYTES),
+        );
+        assert_eq!(high_memory_mobile.default_model.id, "gemma-4-e2b-q4km");
+        let effective_id = |surface, memory, preferred| {
+            resolve_effective_model(surface, memory, Some(preferred)).id
+        };
+        assert_eq!(
+            effective_id(
+                ModelRuntimeSurface::Android,
+                Some(MOBILE_HIGH_MEMORY_THRESHOLD_BYTES),
+                "lfm-vl-1.6b",
+            ),
+            "lfm-vl-1.6b"
+        );
+        assert_eq!(
+            effective_id(ModelRuntimeSurface::Ios, None, "gemma-4-e2b-q4km"),
+            "gemma-4-e2b-q4km"
+        );
+
+        let desktop = resolve_model_policy(ModelRuntimeSurface::Desktop, None);
+        assert_eq!(desktop.default_model.id, "lfm-vl-1.6b");
+        assert_eq!(
+            effective_id(ModelRuntimeSurface::Desktop, None, "qwen-4b-q4km"),
+            "qwen-4b-q4km"
+        );
     }
 }

@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:ente_components/ente_components.dart';
 import 'package:ente_events/event_bus.dart';
+import 'package:ente_strings/ente_strings.dart';
 import 'package:ente_ui/utils/toast_util.dart';
 import "package:ente_utils/email_util.dart";
 import 'package:flutter/material.dart';
@@ -9,7 +10,6 @@ import 'package:flutter/services.dart';
 import 'package:hugeicons/hugeicons.dart';
 import 'package:locker/core/errors.dart';
 import 'package:locker/events/user_details_refresh_event.dart';
-import 'package:locker/l10n/l10n.dart';
 import 'package:locker/models/info/info_item.dart';
 import 'package:locker/services/collections/collections_service.dart';
 import 'package:locker/services/collections/models/collection.dart';
@@ -161,7 +161,9 @@ abstract class BaseInfoPageState<T extends InfoData, W extends BaseInfoPage<T>>
             selectedCollectionIds: _selectedCollectionIds,
             onToggleCollection: _onToggleCollection,
             onCollectionsUpdated: _onCollectionsUpdated,
-            title: showCollectionSelectionTitle ? context.l10n.collections : '',
+            title: showCollectionSelectionTitle
+                ? context.strings.collections
+                : '',
           ),
         ],
       ),
@@ -260,22 +262,22 @@ abstract class BaseInfoPageState<T extends InfoData, W extends BaseInfoPage<T>>
           _currentMode = InfoPageMode.view;
         });
 
-        showToast(context, context.l10n.recordSavedSuccessfully);
+        showToast(context, context.strings.recordSavedSuccessfully);
       }
     } on StorageLimitExceededError {
       if (mounted) {
-        showToast(context, context.l10n.uploadStorageLimitErrorBody);
+        showToast(context, context.strings.uploadStorageLimitErrorBody);
       }
     } on NoActiveSubscriptionError {
       if (mounted) {
         await _showUploadErrorSheet(
-          context.l10n.uploadSubscriptionExpiredErrorTitle,
-          context.l10n.uploadSubscriptionExpiredErrorBody,
+          context.strings.uploadSubscriptionExpiredErrorTitle,
+          context.strings.uploadSubscriptionExpiredErrorBody,
         );
       }
     } on FileLimitReachedError {
       if (mounted) {
-        showToast(context, context.l10n.uploadFileCountLimitErrorToast);
+        showToast(context, context.strings.uploadFileCountLimitErrorToast);
       }
     } catch (e) {
       if (mounted) {
@@ -451,8 +453,10 @@ abstract class BaseInfoPageState<T extends InfoData, W extends BaseInfoPage<T>>
     // Show success message
     final collectionCount = selectedCollections.length;
     final message = collectionCount == 1
-        ? context.l10n.recordSavedSuccessfully
-        : context.l10n.recordSavedToMultipleCollections(collectionCount);
+        ? context.strings.recordSavedSuccessfully
+        : context.strings.recordSavedToMultipleCollections(
+            count: collectionCount,
+          );
 
     // Navigate to home page and clear all previous routes
     await Navigator.of(context).pushAndRemoveUntil(
@@ -479,7 +483,7 @@ abstract class BaseInfoPageState<T extends InfoData, W extends BaseInfoPage<T>>
         illustration: LockerBottomSheetIllustration.warningGrey,
         actions: [
           ButtonComponent(
-            label: context.l10n.contactSupport,
+            label: context.strings.contactSupport,
             onTap: () async {
               await sendEmail(context, to: "support@ente.com", body: message);
             },
@@ -499,7 +503,10 @@ abstract class BaseInfoPageState<T extends InfoData, W extends BaseInfoPage<T>>
 
   void _copyToClipboard(String text, String fieldName) {
     Clipboard.setData(ClipboardData(text: text));
-    showToast(context, context.l10n.copiedToClipboard(fieldName));
+    showToast(
+      context,
+      context.strings.fieldCopiedToClipboard(fieldName: fieldName),
+    );
   }
 
   Widget buildViewField({
@@ -591,7 +598,7 @@ abstract class BaseInfoPageState<T extends InfoData, W extends BaseInfoPage<T>>
                         variant: IconButtonComponentVariant.unfilled,
                         shouldSurfaceExecutionStates: false,
                         onTap: _toggleMode,
-                        tooltip: context.l10n.edit,
+                        tooltip: context.strings.edit,
                       ),
                   ],
                   slivers: [

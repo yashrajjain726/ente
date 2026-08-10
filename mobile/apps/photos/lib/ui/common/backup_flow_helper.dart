@@ -2,10 +2,10 @@ import "dart:async";
 import "dart:io";
 
 import "package:ente_pure_utils/ente_pure_utils.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:logging/logging.dart";
 import "package:photo_manager/photo_manager.dart";
-import "package:photos/l10n/l10n.dart";
 import "package:photos/service_locator.dart";
 import "package:photos/services/sync/local_sync_service.dart";
 import "package:photos/ui/home/loading_photos_widget.dart";
@@ -131,9 +131,9 @@ Future<bool?> _navigateToFolderSelection(
 Future<void> _showPermissionDeniedDialog(BuildContext context) =>
     showChoiceDialog(
       context,
-      title: context.l10n.allowPermTitle,
-      body: context.l10n.allowPermBody,
-      firstButtonLabel: context.l10n.openSettings,
+      title: context.strings.allowPermTitle,
+      body: context.strings.allowPermBody,
+      firstButtonLabel: context.strings.openSettings,
       firstButtonOnTap: () async => PhotoManager.openSetting(),
     );
 
@@ -142,13 +142,13 @@ Future<void> _showLimitedPermissionSheet(
   required bool hasGrantedLimit,
 }) => showChoiceActionSheet(
   context,
-  title: context.l10n.preserveMore,
-  body: context.l10n.grantFullAccessPrompt,
-  firstButtonLabel: context.l10n.openSettings,
+  title: context.strings.preserveMore,
+  body: context.strings.grantFullAccessPrompt,
+  firstButtonLabel: context.strings.openSettings,
   firstButtonOnTap: () async => PhotoManager.openSetting(),
   secondButtonLabel: hasGrantedLimit
-      ? context.l10n.selectMorePhotos
-      : context.l10n.cancel,
+      ? context.strings.selectMorePhotos
+      : context.strings.cancel,
   secondButtonOnTap: () async {
     if (hasGrantedLimit) await PhotoManager.presentLimited();
   },

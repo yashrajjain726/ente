@@ -2,9 +2,9 @@ import "dart:async";
 
 import "package:ente_components/theme/text_styles.dart";
 import "package:ente_pure_utils/ente_pure_utils.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:photos/events/event.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/models/file/file.dart";
 import "package:photos/models/ml/face/person.dart";
 import "package:photos/models/search/generic_search_result.dart";
@@ -323,7 +323,7 @@ class PersonSearchExample extends StatelessWidget {
                             child: Padding(
                               padding: const EdgeInsets.only(top: 6, bottom: 0),
                               child: Text(
-                                AppLocalizations.of(context).addName,
+                                context.strings.addName,
                                 maxLines: 1,
                                 textAlign: TextAlign.center,
                                 overflow: TextOverflow.ellipsis,

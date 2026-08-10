@@ -2294,13 +2294,14 @@ checksum = "66b7e2430c6dff6a955451e2cfc438f09cea1965a9d6f87f7e3b90decc014099"
 
 [[package]]
 name = "ensu-desktop"
-version = "0.1.18-beta"
+version = "0.1.20-beta"
 dependencies = [
  "ente-assets",
  "ente-core",
  "ente-ensu",
  "keyring",
  "libc",
+ "log",
  "serde",
  "serde_json",
  "tauri",
@@ -2359,6 +2360,7 @@ name = "ente-cast-uniffi"
 version = "0.0.0"
 dependencies = [
  "ente-core",
+ "ente-uniffi-log",
  "thiserror 2.0.18",
  "uniffi",
 ]
@@ -2445,9 +2447,18 @@ version = "0.0.0"
 dependencies = [
  "ente-assets",
  "ente-ensu",
+ "ente-uniffi-log",
  "thiserror 2.0.18",
  "uniffi",
  "uuid",
+]
+
+[[package]]
+name = "ente-frb-log"
+version = "0.0.0"
+dependencies = [
+ "flutter_rust_bridge",
+ "log",
 ]
 
 [[package]]
@@ -2547,6 +2558,7 @@ dependencies = [
  "ente-core",
  "ente-test-support",
  "futures-util",
+ "log",
  "md-5 0.11.0",
  "mockito",
  "reqwest 0.12.28",
@@ -2565,8 +2577,11 @@ version = "0.0.0"
 dependencies = [
  "ente-core",
  "ente-space",
+ "ente-wasm-log",
+ "log",
  "serde",
  "serde-wasm-bindgen",
+ "tokio",
  "wasm-bindgen",
  "wasm-bindgen-futures",
 ]
@@ -2582,12 +2597,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "ente-uniffi-log"
+version = "0.0.0"
+dependencies = [
+ "log",
+]
+
+[[package]]
 name = "ente-wasm"
 version = "0.0.0"
 dependencies = [
  "ente-accounts",
  "ente-contacts",
  "ente-core",
+ "ente-wasm-log",
  "js-sys",
  "md-5 0.11.0",
  "serde",
@@ -2601,7 +2624,18 @@ name = "ente-wasm-core"
 version = "0.0.0"
 dependencies = [
  "ente-core",
+ "ente-wasm-log",
  "wasm-bindgen",
+]
+
+[[package]]
+name = "ente-wasm-log"
+version = "0.0.0"
+dependencies = [
+ "js-sys",
+ "log",
+ "wasm-bindgen",
+ "web-sys",
 ]
 
 [[package]]
@@ -2610,6 +2644,7 @@ version = "0.0.0"
 dependencies = [
  "ente-assets",
  "ente-photos",
+ "log",
  "napi",
  "napi-build",
  "napi-derive",
@@ -2620,6 +2655,7 @@ dependencies = [
 name = "ente_photos_rust"
 version = "0.0.0"
 dependencies = [
+ "ente-frb-log",
  "ente-image",
  "ente-photos",
  "flutter_rust_bridge",
@@ -2632,6 +2668,7 @@ dependencies = [
  "ente-accounts",
  "ente-contacts",
  "ente-core",
+ "ente-frb-log",
  "flutter_rust_bridge",
 ]
 
@@ -3881,22 +3918,6 @@ dependencies = [
  "tokio-rustls",
  "tower-service",
  "webpki-roots",
-]
-
-[[package]]
-name = "hyper-tls"
-version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "70206fc6890eaca9fde8a0bf71caa2ddfc9fe045ac9e5c70df101a7dbde866e0"
-dependencies = [
- "bytes",
- "http-body-util",
- "hyper",
- "hyper-util",
- "native-tls",
- "tokio",
- "tokio-native-tls",
- "tower-service",
 ]
 
 [[package]]
@@ -6276,8 +6297,9 @@ dependencies = [
 
 [[package]]
 name = "ort"
-version = "2.0.0-rc.12"
-source = "git+https://github.com/pykeio/ort.git?rev=31c8f1443bb579bfddb82705288347697e468fb3#31c8f1443bb579bfddb82705288347697e468fb3"
+version = "2.0.0-rc.13"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4336a1e2b38848325241c72889086886004e589b7c74f335e60a8e8db5138a0b"
 dependencies = [
  "half",
  "libloading 0.9.0",
@@ -6290,8 +6312,9 @@ dependencies = [
 
 [[package]]
 name = "ort-sys"
-version = "2.0.0-rc.12"
-source = "git+https://github.com/pykeio/ort.git?rev=31c8f1443bb579bfddb82705288347697e468fb3#31c8f1443bb579bfddb82705288347697e468fb3"
+version = "2.0.0-rc.13"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cf211e3776eea6aec988552fa118dd746d70e1b1e5e244058d1c98015f3e5872"
 dependencies = [
  "glob",
  "hmac-sha256",
@@ -7267,12 +7290,10 @@ dependencies = [
  "http-body-util",
  "hyper",
  "hyper-rustls",
- "hyper-tls",
  "hyper-util",
  "js-sys",
  "log",
  "mime",
- "native-tls",
  "percent-encoding",
  "pin-project-lite",
  "quinn",
@@ -7284,7 +7305,6 @@ dependencies = [
  "serde_urlencoded",
  "sync_wrapper",
  "tokio",
- "tokio-native-tls",
  "tokio-rustls",
  "tokio-util",
  "tower",
@@ -9294,16 +9314,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "tokio-native-tls"
-version = "0.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bbae76ab933c85776efabc971569dd6119c580d8f5d448769dec1764bf796ef2"
-dependencies = [
- "native-tls",
- "tokio",
-]
-
-[[package]]
 name = "tokio-rustls"
 version = "0.26.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9571,8 +9581,7 @@ dependencies = [
 [[package]]
 name = "transcribe-rs"
 version = "0.3.11"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fb9d5cfb8e68a2a8fc27fb548987473221d3cc3776a331ccde46c8bd8b2eda0f"
+source = "git+https://github.com/cjpais/transcribe-rs.git?rev=efc66111d519a434e28d51d94740008a7ce29360#efc66111d519a434e28d51d94740008a7ce29360"
 dependencies = [
  "base64 0.22.1",
  "derive_builder",

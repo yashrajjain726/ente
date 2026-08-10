@@ -2,13 +2,13 @@ import 'dart:async';
 
 import 'package:email_validator/email_validator.dart';
 import "package:ente_components/ente_components.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/foundation.dart";
 import 'package:flutter/material.dart';
 import "package:logging/logging.dart";
 import 'package:photos/core/configuration.dart';
 import "package:photos/core/errors.dart";
 import "package:photos/gateways/users/models/srp.dart";
-import "package:photos/generated/l10n.dart";
 import 'package:photos/services/account/user_service.dart';
 import "package:photos/ui/account/email_entry_page.dart";
 import "package:photos/ui/account/login_pwd_verification_page.dart";
@@ -75,7 +75,7 @@ class _LoginPageState extends State<LoginPage> {
         title: DeveloperSettingsTapArea(
           behavior: HitTestBehavior.translucent,
           child: Text(
-            AppLocalizations.of(context).loginToEnte,
+            context.strings.loginToEnte,
             style: TextStyles.large.copyWith(color: colors.textBase),
           ),
         ),
@@ -86,7 +86,7 @@ class _LoginPageState extends State<LoginPage> {
         padding: const EdgeInsets.symmetric(horizontal: 16),
         child: ButtonComponent(
           key: const ValueKey("logInButton"),
-          label: AppLocalizations.of(context).continueLabel,
+          label: context.strings.continueLabel,
           isDisabled: !_emailIsValid,
           onTap: _emailIsValid ? _submitLoginEmail : null,
         ),
@@ -106,8 +106,8 @@ class _LoginPageState extends State<LoginPage> {
             const SizedBox(height: 20),
             TextInputComponent(
               key: const ValueKey("emailInputField"),
-              label: AppLocalizations.of(context).email,
-              hintText: AppLocalizations.of(context).enterYourEmailAddress,
+              label: context.strings.email,
+              hintText: context.strings.emailHint,
               controller: _emailController,
               keyboardType: TextInputType.emailAddress,
               autofillHints: const [AutofillHints.email],
@@ -118,7 +118,7 @@ class _LoginPageState extends State<LoginPage> {
               onSubmit: (_) => _submitLoginEmail(),
               onChanged: _onEmailChanged,
               message: _showValidationMessage && !_emailIsValid
-                  ? AppLocalizations.of(context).invalidEmailAddress
+                  ? context.strings.invalidEmailAddress
                   : null,
               messageType: _showValidationMessage && !_emailIsValid
                   ? TextInputComponentMessageType.alert
@@ -142,13 +142,13 @@ class _LoginPageState extends State<LoginPage> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Text(
-              AppLocalizations.of(context).dontHaveAnAccount,
+              context.strings.dontHaveAnAccount,
               style: TextStyles.body.copyWith(color: colors.textLight),
             ),
             const SizedBox(width: 4),
 
             ButtonComponent(
-              label: AppLocalizations.of(context).signUp,
+              label: context.strings.signUp,
               variant: ButtonComponentVariant.link,
               size: ButtonComponentSize.small,
               shouldSurfaceExecutionStates: false,

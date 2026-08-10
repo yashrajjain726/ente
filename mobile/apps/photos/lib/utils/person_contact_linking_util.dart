@@ -1,8 +1,7 @@
-import "package:collection/collection.dart";
 import "package:ente_pure_utils/ente_pure_utils.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/widgets.dart";
 import "package:photos/core/configuration.dart";
-import "package:photos/l10n/l10n.dart";
 import "package:photos/models/ml/face/person.dart";
 import "package:photos/services/machine_learning/face_ml/person/person_service.dart";
 import "package:photos/ui/viewer/people/people_page.dart";
@@ -36,19 +35,10 @@ Future<PersonEntity?> findPersonLinkedToContact({
   required String? email,
 }) async {
   final persons = await PersonService.instance.getPersons();
-  final PersonEntity? userIdMatch = persons.firstWhereOrNull(
-    (person) => person.data.userID == contactUserId,
-  );
-  if (userIdMatch != null) {
-    return userIdMatch;
-  }
-
-  final normalizedEmail = normalizeContactLinkEmail(email);
-  if (normalizedEmail == null) {
-    return null;
-  }
-  return persons.firstWhereOrNull(
-    (person) => contactLinkEmailMatches(person.data.email, normalizedEmail),
+  return PersonService.findPersonForUser(
+    persons,
+    userID: contactUserId,
+    email: email,
   );
 }
 
@@ -61,25 +51,11 @@ Future<PersonEntity?> findPersonLinkedToEmail(
     return null;
   }
   final persons = await PersonService.instance.getPersons();
-  bool includePerson(PersonEntity person) =>
-      person.remoteID != excludedPersonId;
-  if (isCurrentUserContactLinkEmail(normalizedEmail)) {
-    final currentUserMatch = persons.firstWhereOrNull(
-      (person) =>
-          includePerson(person) &&
-          isCurrentUserContactLink(
-            email: person.data.email,
-            userID: person.data.userID,
-          ),
-    );
-    if (currentUserMatch != null) {
-      return currentUserMatch;
-    }
-  }
-  return persons.firstWhereOrNull(
-    (person) =>
-        includePerson(person) &&
-        contactLinkEmailMatches(person.data.email, normalizedEmail),
+  return PersonService.findPersonForUser(
+    persons,
+    userID: currentUserIDForContactLinkEmail(normalizedEmail),
+    email: normalizedEmail,
+    excludedPersonID: excludedPersonId,
   );
 }
 
@@ -113,9 +89,11 @@ Future<void> showAlreadyLinkedEmailDialog(
   if (!context.mounted) return;
   await showChoiceActionSheet(
     context,
-    title: context.l10n.error,
-    body: context.l10n.editEmailAlreadyLinked(name: person.data.name),
-    firstButtonLabel: context.l10n.viewPersonToUnlink(name: person.data.name),
+    title: context.strings.error,
+    body: context.strings.editEmailAlreadyLinked(name: person.data.name),
+    firstButtonLabel: context.strings.viewPersonToUnlink(
+      name: person.data.name,
+    ),
     firstButtonOnTap: () async {
       await routeToPage(
         context,

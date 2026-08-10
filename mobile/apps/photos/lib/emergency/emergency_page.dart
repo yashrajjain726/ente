@@ -1,22 +1,20 @@
 import "dart:async";
 
+import "package:ente_strings/ente_strings.dart";
+import "package:ente_ui/components/divider_widget.dart";
+import "package:ente_ui/components/loading_widget.dart";
 import "package:flutter/foundation.dart";
 import "package:flutter/material.dart";
-import "package:photos/core/configuration.dart";
 import "package:photos/emergency/components/email_action_sheet.dart";
 import "package:photos/emergency/components/trusted_contact_sheet.dart";
 import "package:photos/emergency/emergency_service.dart";
 import "package:photos/emergency/model.dart";
 import "package:photos/emergency/other_contact_page.dart";
 import "package:photos/emergency/select_contact_page.dart";
-import "package:photos/generated/l10n.dart";
-import "package:photos/l10n/l10n.dart";
 import "package:photos/services/contacts/contact_identity_resolver.dart";
 import "package:photos/theme/ente_theme.dart";
-import "package:photos/ui/common/loading_widget.dart";
 import "package:photos/ui/components/alert_bottom_sheet.dart";
 import "package:photos/ui/components/buttons/button_widget_v2.dart";
-import "package:photos/ui/components/divider_widget.dart";
 import "package:photos/ui/components/menu_item_widget/menu_item_widget_new.dart";
 import "package:photos/ui/components/menu_section_title.dart";
 import "package:photos/ui/components/title_bar_title_widget.dart";
@@ -31,13 +29,11 @@ class EmergencyPage extends StatefulWidget {
 }
 
 class _EmergencyPageState extends State<EmergencyPage> {
-  late int currentUserID;
   EmergencyInfo? info;
 
   @override
   void initState() {
     super.initState();
-    currentUserID = Configuration.instance.getUserID()!;
     Future.delayed(const Duration(seconds: 0), () async {
       unawaited(_fetchData());
     });
@@ -53,7 +49,7 @@ class _EmergencyPageState extends State<EmergencyPage> {
       }
     } catch (e) {
       if (!mounted) return;
-      showShortToast(context, AppLocalizations.of(context).somethingWentWrong);
+      showShortToast(context, context.strings.somethingWentWrong);
     }
   }
 
@@ -61,7 +57,7 @@ class _EmergencyPageState extends State<EmergencyPage> {
   Widget build(BuildContext context) {
     final colorScheme = getEnteColorScheme(context);
     final textTheme = getEnteTextTheme(context);
-    final l10n = context.l10n;
+    final l10n = context.strings;
     final List<EmergencyContact> othersTrustedContacts =
         info?.othersEmergencyContact ?? [];
     final List<EmergencyContact> trustedContacts = info?.contacts ?? [];
@@ -123,7 +119,6 @@ class _EmergencyPageState extends State<EmergencyPage> {
                       leadingIconWidget: UserAvatarWidget(
                         emergencyUser,
                         type: AvatarType.medium,
-                        currentUserID: currentUserID,
                       ),
                       menuItemColor: colorScheme.fillFaint,
                       trailingWidget: _buildTrailingWidget(showWarning: false),
@@ -167,7 +162,6 @@ class _EmergencyPageState extends State<EmergencyPage> {
                         leadingIconWidget: UserAvatarWidget(
                           emergencyUser,
                           type: AvatarType.medium,
-                          currentUserID: currentUserID,
                         ),
                         menuItemColor: colorScheme.fillFaint,
                         trailingWidget: _buildTrailingWidget(
@@ -273,7 +267,6 @@ class _EmergencyPageState extends State<EmergencyPage> {
                         leadingIconWidget: UserAvatarWidget(
                           emergencyUser,
                           type: AvatarType.medium,
-                          currentUserID: currentUserID,
                         ),
                         menuItemColor: colorScheme.fillFaint,
                         trailingWidget: _buildTrailingWidget(
@@ -371,18 +364,18 @@ class _EmergencyPageState extends State<EmergencyPage> {
       final confirmed = await showAlertBottomSheet<bool>(
         context,
         title: isPending
-            ? context.l10n.cancelInvite
-            : context.l10n.removeContact,
+            ? context.strings.cancelInvite
+            : context.strings.removeContact,
         assetPath: "assets/warning-grey.png",
         message: isPending
-            ? context.l10n.cancelInviteDesc
-            : context.l10n.removeContactDesc,
+            ? context.strings.cancelInviteDesc
+            : context.strings.removeContactDesc,
         buttons: [
           ButtonWidgetV2(
             buttonType: ButtonTypeV2.critical,
             labelText: isPending
-                ? context.l10n.revokeInvite
-                : context.l10n.removeContact,
+                ? context.strings.revokeInvite
+                : context.strings.removeContact,
             onTap: () async => Navigator.of(context).pop(true),
             shouldSurfaceExecutionStates: false,
           ),
@@ -432,8 +425,8 @@ class _EmergencyPageState extends State<EmergencyPage> {
           if (!context.mounted) return;
           await showAlertBottomSheet(
             context,
-            title: context.l10n.cannotUpdateRecoveryTime,
-            message: context.l10n.cannotUpdateRecoveryTimeMessage,
+            title: context.strings.cannotUpdateRecoveryTime,
+            message: context.strings.cannotUpdateRecoveryTimeMessage,
             assetPath: "assets/warning-grey.png",
           );
         }
@@ -441,10 +434,7 @@ class _EmergencyPageState extends State<EmergencyPage> {
     } catch (e) {
       if (mounted) {
         if (!context.mounted) return;
-        showShortToast(
-          context,
-          AppLocalizations.of(context).somethingWentWrong,
-        );
+        showShortToast(context, context.strings.somethingWentWrong);
       }
     }
   }
@@ -456,19 +446,17 @@ class _EmergencyPageState extends State<EmergencyPage> {
     final result = await showEmailActionSheet<String>(
       context,
       email: contact.user.email,
-      message: AppLocalizations.of(
-        context,
-      ).legacyInvite(email: contact.user.email),
+      message: context.strings.legacyInvite(email: contact.user.email),
       buttons: [
         ButtonWidgetV2(
           buttonType: ButtonTypeV2.primary,
-          labelText: AppLocalizations.of(context).acceptTrustInvite,
+          labelText: context.strings.acceptTrustInvite,
           shouldSurfaceExecutionStates: false,
           onTap: () async => Navigator.of(context).pop("accept"),
         ),
         ButtonWidgetV2(
           buttonType: ButtonTypeV2.tertiaryCritical,
-          labelText: AppLocalizations.of(context).declineTrustInvite,
+          labelText: context.strings.declineTrustInvite,
           shouldSurfaceExecutionStates: false,
           onTap: () async => Navigator.of(context).pop("decline"),
         ),
@@ -509,11 +497,13 @@ class _EmergencyPageState extends State<EmergencyPage> {
     final confirmed = await showEmailActionSheet<bool>(
       context,
       email: emergencyContactEmail,
-      message: context.l10n.recoveryWarningBody(email: emergencyContactEmail),
+      message: context.strings.recoveryWarningBody(
+        email: emergencyContactEmail,
+      ),
       buttons: [
         ButtonWidgetV2(
           buttonType: ButtonTypeV2.critical,
-          labelText: context.l10n.rejectRecovery,
+          labelText: context.strings.rejectRecovery,
           shouldSurfaceExecutionStates: false,
           onTap: () async => Navigator.of(context).pop(true),
         ),

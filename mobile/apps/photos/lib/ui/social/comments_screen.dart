@@ -1,21 +1,22 @@
 import "dart:async";
 
+import "package:ente_strings/ente_strings.dart";
+import "package:ente_ui/components/loading_widget.dart";
 import "package:flutter/material.dart";
 import "package:logging/logging.dart";
 import "package:photos/core/configuration.dart";
 import "package:photos/core/event_bus.dart";
 import "package:photos/events/comment_deleted_event.dart";
-import "package:photos/generated/l10n.dart";
 import "package:photos/models/api/collection/user.dart";
 import "package:photos/models/collection/collection.dart";
 import "package:photos/models/social/comment.dart";
 import "package:photos/models/social/comment_author_utils.dart";
+import "package:photos/models/social/comment_draft_store.dart";
 import "package:photos/models/social/reaction.dart";
 import "package:photos/models/social/social_data_provider.dart";
 import "package:photos/services/collections_service.dart";
 import 'package:photos/services/social_notification_coordinator.dart';
 import "package:photos/theme/ente_theme.dart";
-import "package:photos/ui/common/loading_widget.dart";
 import "package:photos/ui/components/buttons/icon_button_widget.dart";
 import "package:photos/ui/social/comment_collection_selection.dart";
 import "package:photos/ui/social/social_actor_contact_navigation.dart";
@@ -23,18 +24,7 @@ import "package:photos/ui/social/widgets/collection_selector_widget.dart";
 import "package:photos/ui/social/widgets/comment_bubble_widget.dart";
 import "package:photos/ui/social/widgets/comment_input_widget.dart";
 
-typedef _CommentDraftFileKey = ({int fileID, int userID});
-typedef _CommentDraftKey = ({int collectionID, int fileID, int userID});
-
-final Map<_CommentDraftKey, _CommentDraft> _commentDrafts = {};
-final Map<_CommentDraftFileKey, int> _lastSelectedDraftCollectionIDs = {};
-
-class _CommentDraft {
-  final String text;
-  final Comment? replyingTo;
-
-  const _CommentDraft({required this.text, required this.replyingTo});
-}
+final _commentDraftStore = CommentDraftStore.instance;
 
 /// Shows the file comments bottom sheet
 Future<void> showFileCommentsBottomSheet(
@@ -196,7 +186,9 @@ class _FileCommentsBottomSheetState extends State<FileCommentsBottomSheet> {
     _currentUserID = Configuration.instance.getUserID()!;
     _selectedCollectionID = resolveInitialCommentsCollectionID(
       requestedCollectionID: widget.collectionID,
-      draftCollectionID: _lastSelectedDraftCollectionIDs[_draftFileKey],
+      draftCollectionID: _commentDraftStore.lastSelectedCollectionID(
+        _draftFileKey,
+      ),
       preferDraftCollection: widget.preferDraftCollection,
       hasHighlightedComment: widget.highlightCommentID != null,
     );
@@ -262,8 +254,8 @@ class _FileCommentsBottomSheetState extends State<FileCommentsBottomSheet> {
         return;
       }
 
-      final savedSelectedCollectionID =
-          _lastSelectedDraftCollectionIDs[_draftFileKey];
+      final savedSelectedCollectionID = _commentDraftStore
+          .lastSelectedCollectionID(_draftFileKey);
       final nextSelectedCollectionID =
           _shouldPreferDraftCollection &&
               savedSelectedCollectionID != null &&
@@ -554,7 +546,7 @@ class _FileCommentsBottomSheetState extends State<FileCommentsBottomSheet> {
       comment: comment,
       anonDisplayNames: _anonDisplayNames,
       registeredUserResolver: (userID) => CollectionsService.instance
-          .getFileOwner(userID, _selectedCollectionID),
+          .resolveUserIdentity(userID, _selectedCollectionID),
     );
   }
 
@@ -685,26 +677,26 @@ class _FileCommentsBottomSheetState extends State<FileCommentsBottomSheet> {
         .collection;
   }
 
-  _CommentDraftFileKey get _draftFileKey =>
+  CommentDraftFileKey get _draftFileKey =>
       (userID: _currentUserID, fileID: widget.fileID);
 
   bool get _shouldPreferDraftCollection =>
       widget.preferDraftCollection && widget.highlightCommentID == null;
 
-  _CommentDraftKey get _draftKey => (
+  CommentDraftKey get _draftKey => (
     userID: _currentUserID,
     fileID: widget.fileID,
     collectionID: _selectedCollectionID,
   );
 
-  _CommentDraftKey _draftKeyForCollection(int collectionID) => (
+  CommentDraftKey _draftKeyForCollection(int collectionID) => (
     userID: _currentUserID,
     fileID: widget.fileID,
     collectionID: collectionID,
   );
 
   void _restoreDraftForSelectedCollection() {
-    final draft = _commentDrafts[_draftKey];
+    final draft = _commentDraftStore.draftFor(_draftKey);
     final text = draft?.text ?? '';
     _replyingTo = draft?.replyingTo;
     _textController.value = TextEditingValue(
@@ -718,10 +710,9 @@ class _FileCommentsBottomSheetState extends State<FileCommentsBottomSheet> {
       _removeDraftForCollection(_selectedCollectionID);
       return;
     }
-    _lastSelectedDraftCollectionIDs[_draftFileKey] = _selectedCollectionID;
-    _commentDrafts[_draftKey] = _CommentDraft(
-      text: _textController.text,
-      replyingTo: _replyingTo,
+    _commentDraftStore.save(
+      _draftKey,
+      CommentDraft(text: _textController.text, replyingTo: _replyingTo),
     );
   }
 
@@ -730,28 +721,11 @@ class _FileCommentsBottomSheetState extends State<FileCommentsBottomSheet> {
   }
 
   void _removeDraftForCollection(int collectionID) {
-    _commentDrafts.remove(_draftKeyForCollection(collectionID));
-    if (_lastSelectedDraftCollectionIDs[_draftFileKey] == collectionID) {
-      final nextCollectionID = _firstDraftCollectionIDForFile();
-      if (nextCollectionID == null) {
-        _lastSelectedDraftCollectionIDs.remove(_draftFileKey);
-      } else {
-        _lastSelectedDraftCollectionIDs[_draftFileKey] = nextCollectionID;
-      }
-    }
-  }
-
-  int? _firstDraftCollectionIDForFile() {
-    for (final key in _commentDrafts.keys) {
-      if (key.userID == _currentUserID && key.fileID == widget.fileID) {
-        return key.collectionID;
-      }
-    }
-    return null;
+    _commentDraftStore.remove(_draftKeyForCollection(collectionID));
   }
 
   Widget _buildHeader(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
+    final l10n = context.strings;
     final textTheme = getEnteTextTheme(context);
     return SingleChildScrollView(
       controller: widget.dragController,

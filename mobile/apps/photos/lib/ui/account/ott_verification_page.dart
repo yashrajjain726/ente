@@ -1,6 +1,6 @@
 import "package:ente_components/ente_components.dart";
+import "package:ente_strings/ente_strings.dart";
 import 'package:flutter/material.dart';
-import "package:photos/generated/l10n.dart";
 import 'package:photos/services/account/user_service.dart';
 import "package:pinput/pinput.dart";
 
@@ -87,7 +87,7 @@ class _OTTVerificationPageState extends State<OTTVerificationPage> {
           },
         ),
         title: Text(
-          AppLocalizations.of(context).verifyEmail,
+          context.strings.verifyEmail,
           style: TextStyles.large.copyWith(color: colors.textBase),
         ),
         centerTitle: true,
@@ -97,7 +97,7 @@ class _OTTVerificationPageState extends State<OTTVerificationPage> {
         padding: const EdgeInsets.symmetric(horizontal: 16),
         child: ButtonComponent(
           key: const ValueKey("verifyOttButton"),
-          label: AppLocalizations.of(context).verify,
+          label: context.strings.verify,
           isDisabled: !isFormValid,
           onTap: isFormValid ? _onVerifyPressed : null,
         ),
@@ -142,17 +142,15 @@ class _OTTVerificationPageState extends State<OTTVerificationPage> {
             Center(child: Image.asset('assets/ott.png', height: 96)),
             const SizedBox(height: 24),
             Text(
-              AppLocalizations.of(
-                context,
-              ).weHaveSentCodeTo(email: widget.email),
+              context.strings.weHaveSentCodeTo(email: widget.email),
               style: TextStyles.body.copyWith(color: colors.textBase),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 8),
             Text(
               widget.isResetPasswordScreen
-                  ? AppLocalizations.of(context).toResetVerifyEmail
-                  : AppLocalizations.of(context).checkInboxAndSpamFolder,
+                  ? context.strings.toResetVerifyEmail
+                  : context.strings.checkInboxAndSpamFolder,
               style: TextStyles.body.copyWith(color: colors.textLight),
               textAlign: TextAlign.center,
             ),
@@ -183,7 +181,7 @@ class _OTTVerificationPageState extends State<OTTVerificationPage> {
             Align(
               alignment: Alignment.centerRight,
               child: ButtonComponent(
-                label: AppLocalizations.of(context).resendCode,
+                label: context.strings.resendCode,
                 variant: ButtonComponentVariant.link,
                 size: ButtonComponentSize.small,
                 onTap: () async {

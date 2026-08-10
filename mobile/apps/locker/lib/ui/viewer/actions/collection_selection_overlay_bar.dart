@@ -1,8 +1,8 @@
 import 'package:ente_components/ente_components.dart';
+import "package:ente_strings/ente_strings.dart";
 import "package:ente_ui/utils/toast_util.dart";
 import "package:flutter/material.dart";
 import "package:hugeicons/hugeicons.dart";
-import "package:locker/l10n/l10n.dart";
 import "package:locker/models/selected_collections.dart";
 import "package:locker/services/collections/models/collection.dart";
 import "package:locker/services/configuration.dart";
@@ -112,8 +112,8 @@ class _CollectionSelectionOverlayBarState
                                       widget.selectedCollections.count ==
                                       widget.collections.length;
                                   final buttonText = isAllSelected
-                                      ? context.l10n.deselectAll
-                                      : context.l10n.selectAll;
+                                      ? context.strings.deselectAll
+                                      : context.strings.selectAll;
                                   final iconData = isAllSelected
                                       ? Icons.remove_circle_outline
                                       : Icons.check_circle_outline_outlined;
@@ -237,13 +237,13 @@ class _CollectionSelectionOverlayBarState
       if (isSingleSelection && hasOwnedCollections)
         SelectionActionButton(
           hugeIcon: const HugeIcon(icon: HugeIcons.strokeRoundedNavigation06),
-          label: context.l10n.share,
+          label: context.strings.share,
           onTap: () => _shareCollection(collection!),
         ),
       if (isSingleSelection && hasOwnedCollections)
         SelectionActionButton(
           hugeIcon: const HugeIcon(icon: HugeIcons.strokeRoundedPencilEdit02),
-          label: context.l10n.edit,
+          label: context.strings.edit,
           onTap: () => _editCollection(collection!),
         ),
       if (hasSharedIncoming)
@@ -252,7 +252,7 @@ class _CollectionSelectionOverlayBarState
             icon: HugeIcons.strokeRoundedLogout02,
             color: colors.warning,
           ),
-          label: context.l10n.leaveCollection,
+          label: context.strings.leaveCollection,
           onTap: () => _leaveCollections(sharedIncomingCollections),
           isDestructive: true,
         ),
@@ -262,7 +262,7 @@ class _CollectionSelectionOverlayBarState
             icon: HugeIcons.strokeRoundedDelete02,
             color: colors.warning,
           ),
-          label: context.l10n.delete,
+          label: context.strings.delete,
           onTap: () {
             if (isSingleSelection) {
               _deleteCollection(collection!);
@@ -365,7 +365,7 @@ class _CollectionSelectionOverlayBarState
     }
 
     if (!collection.type.canShare) {
-      showToast(context, context.l10n.collectionCannotBeShared);
+      showToast(context, context.strings.collectionCannotBeShared);
       widget.selectedCollections.clearAll();
       return;
     }

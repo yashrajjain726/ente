@@ -1,6 +1,6 @@
 import "package:ente_lock_screen/local_authentication_service.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
-import "package:photos/l10n/l10n.dart";
 import "package:photos/models/rituals/ritual_models.dart";
 import "package:photos/service_locator.dart";
 import "package:photos/services/collections_service.dart";
@@ -37,7 +37,7 @@ Future<bool> requestHiddenRitualAccess(
   }
   return LocalAuthenticationService.instance.requestLocalAuthentication(
     context,
-    context.l10n.authToViewYourHiddenFiles,
+    context.strings.authToViewYourHiddenFiles,
   );
 }
 
@@ -50,6 +50,6 @@ Future<bool> requestHiddenRitualAccessForAlbumId(
   }
   return LocalAuthenticationService.instance.requestLocalAuthentication(
     context,
-    context.l10n.authToViewYourHiddenFiles,
+    context.strings.authToViewYourHiddenFiles,
   );
 }
