@@ -694,6 +694,7 @@ func (repo *FileRepository) GetFileAttributes(fileID int64) (*ente.File, error) 
 	return &file, nil
 }
 
+// GetUsage  gets the Storage usage of a user
 // Deprecated: GetUsage is deprecated, use UsageRepository.GetUsage
 func (repo *FileRepository) GetUsage(userID int64) (int64, error) {
 	return repo.UsageRepo.GetUsage(userID)
