@@ -2,11 +2,14 @@ package email
 
 import (
 	"bytes"
+	"crypto/rand"
 	"crypto/tls"
 	"fmt"
 	"html/template"
+	"mime"
 	"mime/quotedprintable"
 	"net"
+	"net/mail"
 	"net/smtp"
 	"path"
 	"slices"
@@ -116,13 +119,6 @@ func sendViaSMTP(toEmails []string, fromName string, fromEmail string, subject s
 		auth = smtp.PlainAuth("", smtpUsername, smtpPassword, smtpServer)
 	}
 
-	if containsCRLF(fromEmail) {
-		return stacktrace.Propagate(ente.ErrBadRequest, "invalid from email")
-	}
-	if slices.ContainsFunc(toEmails, containsCRLF) {
-		return stacktrace.Propagate(ente.ErrBadRequest, "invalid recipient email")
-	}
-
 	if smtpEmail != "" {
 		fromEmail = smtpEmail
 	}
@@ -130,9 +126,14 @@ func sendViaSMTP(toEmails []string, fromName string, fromEmail string, subject s
 		fromName = smtpSenderName
 	}
 
-	cleanFromName := sanitizeHeaderValue(fromName)
-	cleanFromEmail := sanitizeHeaderValue(fromEmail)
-	cleanSubject := sanitizeHeaderValue(subject)
+	if containsCRLF(fromEmail) {
+		return stacktrace.Propagate(ente.ErrBadRequest, "invalid from email")
+	}
+	if slices.ContainsFunc(toEmails, containsCRLF) {
+		return stacktrace.Propagate(ente.ErrBadRequest, "invalid recipient email")
+	}
+
+	cleanSubject := mime.QEncoding.Encode("utf-8", sanitizeHeaderValue(subject))
 
 	var emailAddresses string
 	for i, addr := range toEmails {
@@ -142,13 +143,14 @@ func sendViaSMTP(toEmails []string, fromName string, fromEmail string, subject s
 		emailAddresses += sanitizeHeaderValue(addr)
 	}
 
+	boundary := rand.Text()
 	header := "Date: " + time.Now().Format(time.RFC1123Z) + "\n" +
-		"From: " + cleanFromName + " <" + cleanFromEmail + ">\n" +
+		"From: " + (&mail.Address{Name: fromName, Address: fromEmail}).String() + "\n" +
 		"To: " + emailAddresses + "\n" +
 		"Subject: " + cleanSubject + "\n" +
 		"MIME-Version: 1.0\n" +
-		"Content-Type: multipart/related; boundary=boundary\n\n" +
-		"--boundary\n"
+		"Content-Type: multipart/related; boundary=" + boundary + "\n\n" +
+		"--" + boundary + "\n"
 	htmlContent, err := buildHTMLMIMEPart(htmlBody)
 	if err != nil {
 		return stacktrace.Propagate(err, "failed to encode html body")
@@ -157,11 +159,11 @@ func sendViaSMTP(toEmails []string, fromName string, fromEmail string, subject s
 	emailMessage = header + htmlContent
 
 	if inlineImages == nil {
-		emailMessage += "--boundary--"
+		emailMessage += "--" + boundary + "--"
 	} else {
 		for _, inlineImage := range inlineImages {
 
-			emailMessage += "--boundary\n"
+			emailMessage += "--" + boundary + "\n"
 			var mimeType = sanitizeHeaderValue(inlineImage["mime_type"].(string))
 			var contentID = sanitizeHeaderValue(inlineImage["cid"].(string))
 			var imgBase64Str = inlineImage["content"].(string)
@@ -174,7 +176,7 @@ func sendViaSMTP(toEmails []string, fromName string, fromEmail string, subject s
 
 			emailMessage += image
 		}
-		emailMessage += "--boundary--"
+		emailMessage += "--" + boundary + "--"
 	}
 
 	for _, toEmail := range toEmails {
@@ -363,8 +365,11 @@ func maskEmailSegment(segment string) string {
 
 func getMailBody(templateName string, templateData map[string]interface{}) (string, error) {
 	htmlbody := new(bytes.Buffer)
-	t := template.Must(template.New(templateName).ParseFiles("mail-templates/" + templateName))
-	err := t.Execute(htmlbody, templateData)
+	t, err := template.New(templateName).ParseFiles("mail-templates/" + templateName)
+	if err != nil {
+		return "", stacktrace.Propagate(err, "")
+	}
+	err = t.Execute(htmlbody, templateData)
 	if err != nil {
 		return "", stacktrace.Propagate(err, "")
 	}
