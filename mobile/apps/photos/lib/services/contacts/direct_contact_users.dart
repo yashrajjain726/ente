@@ -21,7 +21,7 @@ List<User> buildDirectContactUsers({
 
   void addUser(User user) {
     final userId = user.id;
-    if (userId == null || userId <= 0 || userId == ownerUserId) {
+    if (userId <= 0 || userId == ownerUserId) {
       return;
     }
     final normalizedEmail = normalizeContactLinkEmail(
@@ -45,8 +45,9 @@ List<User> buildDirectContactUsers({
   }
 
   for (final member in familyMembers) {
-    if (member.isActive) {
-      addUser(User(id: member.userID, email: member.email));
+    final userID = member.userID;
+    if (member.isActive && userID != null) {
+      addUser(User(id: userID, email: member.email));
     }
   }
 

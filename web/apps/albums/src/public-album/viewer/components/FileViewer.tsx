@@ -172,6 +172,30 @@ export const FileViewer: React.FC<FileViewerProps> = ({
     );
     const [publicSocialDataStatusByFileID, setPublicSocialDataStatusByFileID] =
         useState<Map<number, "loading" | "ready">>(new Map());
+    const publicSocialDataErrorReportedRef = useRef(false);
+    const anonProfilesErrorReportedRef = useRef(false);
+
+    const reportPublicSocialDataError = useCallback(
+        (e: unknown) => {
+            if (publicSocialDataErrorReportedRef.current) return;
+            publicSocialDataErrorReportedRef.current = true;
+            onGenericError(e);
+        },
+        [onGenericError],
+    );
+
+    const reportAnonProfilesError = useCallback(
+        (e: unknown) => {
+            if (anonProfilesErrorReportedRef.current) return;
+            anonProfilesErrorReportedRef.current = true;
+            onGenericError(e);
+        },
+        [onGenericError],
+    );
+
+    useEffect(() => {
+        anonProfilesErrorReportedRef.current = false;
+    }, [collectionKey]);
 
     useEffect(() => {
         if (!initialAnonUserNames?.size) return;
@@ -846,6 +870,8 @@ export const FileViewer: React.FC<FileViewerProps> = ({
         const file = files.find((f) => f.id === activeFileID);
         if (!file) return;
 
+        publicSocialDataErrorReportedRef.current = false;
+
         setPublicSocialDataStatusByFileID((prev) => {
             if (prev.get(activeFileID) === "ready") return prev;
 
@@ -856,11 +882,17 @@ export const FileViewer: React.FC<FileViewerProps> = ({
 
         void (async () => {
             try {
-                const { comments, reactions } = await getPublicSocialDiff(
-                    publicAlbumsCredentials,
-                    activeFileID,
-                    collectionKey,
-                );
+                const { comments, reactions, decryptionError } =
+                    await getPublicSocialDiff(
+                        publicAlbumsCredentials,
+                        activeFileID,
+                        collectionKey,
+                    );
+                if (decryptionError) {
+                    reportPublicSocialDataError(decryptionError);
+                } else {
+                    publicSocialDataErrorReportedRef.current = false;
+                }
 
                 const commentsForFile: Comment[] = comments.map((c) => ({
                     id: c.id,
@@ -909,10 +941,16 @@ export const FileViewer: React.FC<FileViewerProps> = ({
                 });
 
                 try {
-                    const anonProfiles = await getPublicAnonProfiles(
-                        publicAlbumsCredentials,
-                        collectionKey,
-                    );
+                    const { anonUserNames: anonProfiles, decryptionError } =
+                        await getPublicAnonProfiles(
+                            publicAlbumsCredentials,
+                            collectionKey,
+                        );
+                    if (decryptionError) {
+                        reportAnonProfilesError(decryptionError);
+                    } else {
+                        anonProfilesErrorReportedRef.current = false;
+                    }
                     setAnonUserNames((prev) => {
                         const next = new Map(prev);
                         for (const [id, name] of anonProfiles) {
@@ -920,8 +958,8 @@ export const FileViewer: React.FC<FileViewerProps> = ({
                         }
                         return next;
                     });
-                } catch {
-                    // Names are optional enrichment.
+                } catch (e) {
+                    reportAnonProfilesError(e);
                 }
 
                 try {
@@ -940,7 +978,7 @@ export const FileViewer: React.FC<FileViewerProps> = ({
                     // Names are optional enrichment.
                 }
             } catch (e) {
-                log.error("Failed to fetch public social data", e);
+                reportPublicSocialDataError(e);
             } finally {
                 setPublicSocialDataStatusByFileID((prev) => {
                     if (prev.get(activeFileID) === "ready") return prev;
@@ -958,6 +996,8 @@ export const FileViewer: React.FC<FileViewerProps> = ({
         publicAlbumsCredentials,
         collectionKey,
         files,
+        reportAnonProfilesError,
+        reportPublicSocialDataError,
     ]);
 
     useEffect(() => {
@@ -981,11 +1021,17 @@ export const FileViewer: React.FC<FileViewerProps> = ({
         if (!file) return;
 
         try {
-            const { comments, reactions } = await getPublicSocialDiff(
-                publicAlbumsCredentials,
-                activeFileID,
-                collectionKey,
-            );
+            const { comments, reactions, decryptionError } =
+                await getPublicSocialDiff(
+                    publicAlbumsCredentials,
+                    activeFileID,
+                    collectionKey,
+                );
+            if (decryptionError) {
+                reportPublicSocialDataError(decryptionError);
+            } else {
+                publicSocialDataErrorReportedRef.current = false;
+            }
 
             const commentsForFile: Comment[] = comments.map((c) => ({
                 id: c.id,
@@ -1032,10 +1078,16 @@ export const FileViewer: React.FC<FileViewerProps> = ({
             });
 
             try {
-                const anonProfiles = await getPublicAnonProfiles(
-                    publicAlbumsCredentials,
-                    collectionKey,
-                );
+                const { anonUserNames: anonProfiles, decryptionError } =
+                    await getPublicAnonProfiles(
+                        publicAlbumsCredentials,
+                        collectionKey,
+                    );
+                if (decryptionError) {
+                    reportAnonProfilesError(decryptionError);
+                } else {
+                    anonProfilesErrorReportedRef.current = false;
+                }
                 setAnonUserNames((prev) => {
                     const next = new Map(prev);
                     for (const [id, name] of anonProfiles) {
@@ -1043,12 +1095,12 @@ export const FileViewer: React.FC<FileViewerProps> = ({
                     }
                     return next;
                 });
-            } catch {
-                // Names are optional enrichment.
+            } catch (e) {
+                reportAnonProfilesError(e);
             }
             // Masked participant emails are stable enough to fetch only on open.
         } catch (e) {
-            log.error("Failed to refresh public social data", e);
+            reportPublicSocialDataError(e);
         }
     }, [
         activeFileID,
@@ -1056,6 +1108,8 @@ export const FileViewer: React.FC<FileViewerProps> = ({
         collectionKey,
         enableComment,
         files,
+        reportAnonProfilesError,
+        reportPublicSocialDataError,
     ]);
 
     useInterval(

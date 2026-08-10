@@ -30,14 +30,30 @@ class _ManageIndividualParticipantState
   final CollectionActions collectionActions = CollectionActions(
     CollectionsService.instance,
   );
+  late CollectionParticipantRole _role;
+
+  @override
+  void initState() {
+    super.initState();
+    _role = CollectionParticipantRoleExtn.fromString(widget.user.role);
+  }
+
+  Future<void> _changeRole(CollectionParticipantRole role) async {
+    final changed = await collectionActions.addEmailToCollection(
+      context,
+      widget.collection,
+      widget.user.email,
+      role,
+    );
+    if (changed && mounted) setState(() => _role = role);
+  }
 
   @override
   Widget build(BuildContext context) {
-    final isAdmin = widget.user.isAdmin;
-    final isCollaborator = widget.user.isCollaborator;
-    final isViewer = widget.user.isViewer;
+    final isAdmin = _role == CollectionParticipantRole.admin;
+    final isCollaborator = _role == CollectionParticipantRole.collaborator;
+    final isViewer = _role == CollectionParticipantRole.viewer;
     final resolvedName = resolveDisplayName(widget.user);
-    bool isConvertToViewSuccess = false;
     return ShareScaffold(
       title: context.strings.manage,
       subtitle: resolvedName,
@@ -51,20 +67,7 @@ class _ManageIndividualParticipantState
               trailing: isAdmin ? shareCheck(context) : null,
               onTap: isAdmin
                   ? null
-                  : () async {
-                      final result = await collectionActions
-                          .addEmailToCollection(
-                            context,
-                            widget.collection,
-                            widget.user.email,
-                            CollectionParticipantRole.admin,
-                          );
-                      if (result && mounted) {
-                        widget.user.role = CollectionParticipantRole.admin
-                            .toStringVal();
-                        setState(() => {});
-                      }
-                    },
+                  : () => _changeRole(CollectionParticipantRole.admin),
             ),
             ShareMenuItem(
               title: context.strings.collaborator,
@@ -72,21 +75,7 @@ class _ManageIndividualParticipantState
               trailing: isCollaborator ? shareCheck(context) : null,
               onTap: isCollaborator
                   ? null
-                  : () async {
-                      final result = await collectionActions
-                          .addEmailToCollection(
-                            context,
-                            widget.collection,
-                            widget.user.email,
-                            CollectionParticipantRole.collaborator,
-                          );
-                      if (result && mounted) {
-                        widget.user.role = CollectionParticipantRole
-                            .collaborator
-                            .toStringVal();
-                        setState(() => {});
-                      }
-                    },
+                  : () => _changeRole(CollectionParticipantRole.collaborator),
             ),
             ShareMenuItem(
               title: context.strings.viewer,
@@ -106,31 +95,18 @@ class _ManageIndividualParticipantState
                             ),
                         isCritical: true,
                       );
-                      if (actionResult?.action != null) {
-                        if (actionResult!.action == ButtonAction.first) {
-                          try {
-                            if (!context.mounted) return;
-                            isConvertToViewSuccess = await collectionActions
-                                .addEmailToCollection(
-                                  context,
-                                  widget.collection,
-                                  widget.user.email,
-                                  CollectionParticipantRole.viewer,
-                                );
-                          } catch (e) {
-                            if (!context.mounted) return;
-                            await showGenericErrorDialog(
-                              context: context,
-                              error: e,
-                            );
-                          }
-                          if (isConvertToViewSuccess && mounted) {
-                            isConvertToViewSuccess = false;
-                            widget.user.role = CollectionParticipantRole.viewer
-                                .toStringVal();
-                            setState(() => {});
-                          }
-                        }
+                      if (actionResult?.action != ButtonAction.first ||
+                          !context.mounted) {
+                        return;
+                      }
+                      try {
+                        await _changeRole(CollectionParticipantRole.viewer);
+                      } catch (e) {
+                        if (!context.mounted) return;
+                        await showGenericErrorDialog(
+                          context: context,
+                          error: e,
+                        );
                       }
                     },
             ),

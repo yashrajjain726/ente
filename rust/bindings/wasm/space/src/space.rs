@@ -1,5 +1,3 @@
-//! WASM bindings for Space flows.
-
 use std::collections::BTreeMap;
 
 use ente_core::{b64, http};
@@ -13,7 +11,6 @@ use serde::{Deserialize, Serialize};
 use serde_wasm_bindgen as swb;
 use wasm_bindgen::prelude::*;
 
-/// Space client error.
 #[wasm_bindgen]
 pub struct WasmSpaceError {
     code: String,
@@ -23,28 +20,32 @@ pub struct WasmSpaceError {
 
 #[wasm_bindgen]
 impl WasmSpaceError {
-    /// Machine-readable error code.
     #[wasm_bindgen(getter)]
     pub fn code(&self) -> String {
         self.code.clone()
     }
 
-    /// Human-readable error message.
     #[wasm_bindgen(getter)]
     pub fn message(&self) -> String {
         self.message.clone()
     }
 
-    /// HTTP status code when the error came from an HTTP response.
     #[wasm_bindgen(getter)]
     pub fn status(&self) -> Option<u16> {
         self.status
     }
 
-    /// Preserve the structured error when web logging stringifies this value.
+    // Preserve the structured error when web logging stringifies this value.
     #[wasm_bindgen(js_name = toString)]
     pub fn js_to_string(&self) -> String {
         format!("{}: {}", self.code, self.message)
+    }
+
+    fn is_content_error(&self) -> bool {
+        matches!(
+            self.code.as_str(),
+            "crypto" | "base64_decode" | "invalid_input" | "missing_friend_sealed_space_key"
+        )
     }
 }
 
@@ -173,6 +174,7 @@ struct PostJs {
     objects: Vec<PostObjectJs>,
     created_at: String,
     viewer_liked: bool,
+    is_unavailable: bool,
 }
 
 #[derive(Serialize)]
@@ -197,6 +199,7 @@ struct MessageJs {
     is_deleted: bool,
     created_at: String,
     updated_at: String,
+    is_unavailable: bool,
 }
 
 #[derive(Serialize)]
@@ -218,6 +221,7 @@ struct MessageConversationActivityJs {
     text: Option<String>,
     post_id: Option<i64>,
     post_space_id: Option<String>,
+    is_unavailable: bool,
 }
 
 #[derive(Serialize)]
@@ -308,7 +312,13 @@ fn created_space_to_js(value: CreatedSpace) -> CreatedSpaceJs {
 }
 
 fn profile_to_js(value: DecryptedSpaceProfile) -> Result<SpaceProfileJs, WasmSpaceError> {
-    let profile = utf8_field(value.profile, "profile")?;
+    let profile = String::from_utf8(value.profile).unwrap_or_else(|error| {
+        log::warn!(
+            "Space profile {} has invalid UTF-8: {error}",
+            value.space_id
+        );
+        String::new()
+    });
     Ok(SpaceProfileJs {
         space_id: value.space_id,
         space_slug: value.space_slug,
@@ -340,8 +350,24 @@ async fn account_actor_to_js(
     ctx: &AccountSpaceCtx,
     actor: SpaceActorResponse,
 ) -> Result<ActorJs, WasmSpaceError> {
-    let profile = ctx.decrypt_actor_profile(&actor).await?;
-    actor_to_js(actor, profile)
+    let fallback = actor.clone();
+    let converted = match ctx.decrypt_actor_profile(&actor).await {
+        Ok(profile) => actor_to_js(actor, profile),
+        Err(error) => Err(error.into()),
+    };
+    match converted {
+        Ok(actor) => Ok(actor),
+        Err(error) if error.is_content_error() => {
+            log::warn!(
+                "Space profile {} fell back to public fields: {}: {}",
+                fallback.space_id,
+                error.code,
+                error.message
+            );
+            public_actor_to_js(fallback)
+        }
+        Err(error) => Err(error),
+    }
 }
 
 fn public_actor_to_js(actor: SpaceActorResponse) -> Result<ActorJs, WasmSpaceError> {
@@ -396,6 +422,23 @@ async fn account_post_to_js(
         objects: post_objects_to_js(Some(&decrypted.post_key), post.objects)?,
         created_at: post.created_at,
         viewer_liked: post.viewer_liked,
+        is_unavailable: false,
+    })
+}
+
+fn unavailable_post_to_js(post: PostResponse) -> Result<PostJs, WasmSpaceError> {
+    Ok(PostJs {
+        post_id: post.post_id,
+        space_id: post.space_id,
+        space_slug: post.space_slug,
+        author: public_actor_to_js(post.author)?,
+        caption: None,
+        encrypted_post_key: post.encrypted_post_key,
+        key_version: post.key_version,
+        objects: Vec::new(),
+        created_at: post.created_at,
+        viewer_liked: post.viewer_liked,
+        is_unavailable: true,
     })
 }
 
@@ -405,8 +448,24 @@ async fn account_post_page_to_js(
 ) -> Result<PostPageJs, WasmSpaceError> {
     let mut items = Vec::with_capacity(page.items.len());
     for post in page.items {
-        let decrypted = ctx.decrypt_post_for_space(&post.space_id, &post).await?;
-        items.push(account_post_to_js(ctx, post, decrypted).await?);
+        let fallback = post.clone();
+        let converted = match ctx.decrypt_post_for_space(&post.space_id, &post).await {
+            Ok(decrypted) => account_post_to_js(ctx, post, decrypted).await,
+            Err(error) => Err(error.into()),
+        };
+        match converted {
+            Ok(post) => items.push(post),
+            Err(error) if error.is_content_error() => {
+                log::warn!(
+                    "Space post {} is unavailable: {}: {}",
+                    fallback.post_id,
+                    error.code,
+                    error.message
+                );
+                items.push(unavailable_post_to_js(fallback)?);
+            }
+            Err(error) => return Err(error),
+        }
     }
     Ok(PostPageJs {
         items,
@@ -426,6 +485,7 @@ fn link_post_to_js(post: PostResponse, decrypted: DecryptedPost) -> Result<PostJ
         objects: post_objects_to_js(Some(&decrypted.post_key), post.objects)?,
         created_at: post.created_at,
         viewer_liked: false,
+        is_unavailable: false,
     })
 }
 
@@ -450,6 +510,25 @@ fn message_to_js(message: MessageResponse, text: String) -> MessageJs {
         is_deleted: message.is_deleted,
         created_at: message.created_at,
         updated_at: message.updated_at,
+        is_unavailable: false,
+    }
+}
+
+fn unavailable_message_to_js(message: MessageResponse) -> MessageJs {
+    MessageJs {
+        message_id: message.message_id,
+        kind: message.kind,
+        sender_space_id: message.sender_space_id,
+        recipient_space_id: message.recipient_space_id,
+        text: String::new(),
+        reply_post_id: message.reply_post_id,
+        reply_message_id: message.reply_message_id,
+        liked: message.liked,
+        viewer_liked: message.viewer_liked,
+        is_deleted: message.is_deleted,
+        created_at: message.created_at,
+        updated_at: message.updated_at,
+        is_unavailable: true,
     }
 }
 
@@ -468,6 +547,27 @@ async fn account_message_response_to_js(
 
     let text = message.text.clone();
     Ok(message_to_js(message, text))
+}
+
+async fn resilient_account_message_response_to_js(
+    ctx: &AccountSpaceCtx,
+    viewer_space_id: &str,
+    message: MessageResponse,
+) -> Result<MessageJs, WasmSpaceError> {
+    let fallback = message.clone();
+    match account_message_response_to_js(ctx, viewer_space_id, message).await {
+        Ok(message) => Ok(message),
+        Err(error) if error.is_content_error() => {
+            log::warn!(
+                "Space message {} is unavailable: {}: {}",
+                fallback.message_id,
+                error.code,
+                error.message
+            );
+            Ok(unavailable_message_to_js(fallback))
+        }
+        Err(error) => Err(error),
+    }
 }
 
 async fn message_conversation_activity_text(
@@ -521,10 +621,47 @@ async fn message_conversation_activity_to_js(
         text,
         post_id: activity.post_id,
         post_space_id: activity.post_space_id,
+        is_unavailable: false,
     })
 }
 
-/// Open an authenticated space context for web.
+fn unavailable_message_conversation_activity_to_js(
+    activity: MessageConversationActivity,
+) -> MessageConversationActivityJs {
+    MessageConversationActivityJs {
+        id: activity.id,
+        activity_type: activity.activity_type,
+        created_at: activity.created_at,
+        outgoing: activity.outgoing,
+        message_id: activity.message_id,
+        text: None,
+        post_id: activity.post_id,
+        post_space_id: activity.post_space_id,
+        is_unavailable: true,
+    }
+}
+
+async fn resilient_message_conversation_activity_to_js(
+    ctx: &AccountSpaceCtx,
+    viewer_space_id: &str,
+    activity: MessageConversationActivity,
+) -> Result<MessageConversationActivityJs, WasmSpaceError> {
+    let fallback = activity.clone();
+    match message_conversation_activity_to_js(ctx, viewer_space_id, activity).await {
+        Ok(activity) => Ok(activity),
+        Err(error) if error.is_content_error() => {
+            log::warn!(
+                "Space conversation activity {} is unavailable: {}: {}",
+                fallback.id,
+                error.code,
+                error.message
+            );
+            Ok(unavailable_message_conversation_activity_to_js(fallback))
+        }
+        Err(error) => Err(error),
+    }
+}
+
 #[wasm_bindgen(js_name = spaceOpenAccountCtx)]
 pub async fn space_open_account_ctx(
     input: JsValue,
@@ -543,7 +680,6 @@ pub async fn space_open_account_ctx(
     Ok(SpaceAccountCtxHandle { inner: ctx })
 }
 
-/// Open a read-only Space context from a username and fragment secret.
 #[wasm_bindgen(js_name = spaceOpenLinkCtx)]
 pub async fn space_open_link_ctx(input: JsValue) -> Result<SpaceLinkCtxHandle, WasmSpaceError> {
     let input: OpenSpaceLinkCtxJsInput = swb::from_value(input)?;
@@ -559,7 +695,6 @@ pub async fn space_open_link_ctx(input: JsValue) -> Result<SpaceLinkCtxHandle, W
     Ok(SpaceLinkCtxHandle { inner })
 }
 
-/// Handle to a read-only Space link.
 #[wasm_bindgen]
 pub struct SpaceLinkCtxHandle {
     inner: SpaceLinkCtx,
@@ -567,7 +702,6 @@ pub struct SpaceLinkCtxHandle {
 
 #[wasm_bindgen]
 impl SpaceLinkCtxHandle {
-    /// Return the decrypted profile bundled into this validated link.
     #[wasm_bindgen(js_name = getProfile)]
     pub fn get_profile(&self) -> Result<JsValue, WasmSpaceError> {
         let mut profile = profile_to_js(self.inner.profile().clone())?;
@@ -575,14 +709,29 @@ impl SpaceLinkCtxHandle {
         swb::to_value(&profile).map_err(Into::into)
     }
 
-    /// List and decrypt posts exposed by this link.
     #[wasm_bindgen(js_name = listPosts)]
     pub async fn list_posts(&self) -> Result<JsValue, WasmSpaceError> {
         let page = self.inner.list_posts().await?;
         let mut items = Vec::with_capacity(page.items.len());
         for post in page.items {
-            let decrypted = self.inner.decrypt_post(&post)?;
-            items.push(link_post_to_js(post, decrypted)?);
+            let fallback = post.clone();
+            let converted = match self.inner.decrypt_post(&post) {
+                Ok(decrypted) => link_post_to_js(post, decrypted),
+                Err(error) => Err(error.into()),
+            };
+            match converted {
+                Ok(post) => items.push(post),
+                Err(error) if error.is_content_error() => {
+                    log::warn!(
+                        "Space post {} is unavailable: {}: {}",
+                        fallback.post_id,
+                        error.code,
+                        error.message
+                    );
+                    items.push(unavailable_post_to_js(fallback)?);
+                }
+                Err(error) => return Err(error),
+            }
         }
         swb::to_value(&PostPageJs {
             items,
@@ -591,7 +740,6 @@ impl SpaceLinkCtxHandle {
         .map_err(Into::into)
     }
 
-    /// Subscribe this browser to new posts from the linked Space.
     #[wasm_bindgen(js_name = subscribeWebPush)]
     pub async fn subscribe_web_push(
         &self,
@@ -605,7 +753,6 @@ impl SpaceLinkCtxHandle {
             .map_err(Into::into)
     }
 
-    /// Remove this linked Space from the browser's push targets.
     #[wasm_bindgen(js_name = unsubscribeWebPush)]
     pub async fn unsubscribe_web_push(&self, endpoint: String) -> Result<(), WasmSpaceError> {
         self.inner
@@ -614,7 +761,6 @@ impl SpaceLinkCtxHandle {
             .map_err(Into::into)
     }
 
-    /// Download and decrypt one post photo.
     #[wasm_bindgen(js_name = downloadPostAsset)]
     pub async fn download_post_asset(
         &self,
@@ -628,7 +774,6 @@ impl SpaceLinkCtxHandle {
             .map_err(Into::into)
     }
 
-    /// Download and decrypt the linked Space avatar.
     #[wasm_bindgen(js_name = downloadAvatar)]
     pub async fn download_avatar(
         &self,
@@ -641,7 +786,6 @@ impl SpaceLinkCtxHandle {
             .map_err(Into::into)
     }
 
-    /// Download and decrypt the linked Space cover.
     #[wasm_bindgen(js_name = downloadCover)]
     pub async fn download_cover(
         &self,
@@ -655,7 +799,6 @@ impl SpaceLinkCtxHandle {
     }
 }
 
-/// Handle to an authenticated space context.
 #[wasm_bindgen]
 pub struct SpaceAccountCtxHandle {
     inner: AccountSpaceCtx,
@@ -663,7 +806,6 @@ pub struct SpaceAccountCtxHandle {
 
 #[wasm_bindgen]
 impl SpaceAccountCtxHandle {
-    /// Return the active Space link or create it lazily.
     #[wasm_bindgen(js_name = getOrCreateSpaceLink)]
     pub async fn get_or_create_space_link(
         &self,
@@ -678,7 +820,6 @@ impl SpaceAccountCtxHandle {
         .map_err(Into::into)
     }
 
-    /// Replace the current Space link with a new fragment secret.
     #[wasm_bindgen(js_name = rotateSpaceLink)]
     pub async fn rotate_space_link(&self, space_id: String) -> Result<JsValue, WasmSpaceError> {
         let value = self.inner.rotate_space_link(&space_id).await?;
@@ -690,7 +831,6 @@ impl SpaceAccountCtxHandle {
         .map_err(Into::into)
     }
 
-    /// Create a space with an encrypted JSON profile payload.
     #[wasm_bindgen(js_name = createSpace)]
     pub async fn create_space(
         &self,
@@ -710,13 +850,11 @@ impl SpaceAccountCtxHandle {
         .map_err(Into::into)
     }
 
-    /// List spaces owned by the current account.
     #[wasm_bindgen(js_name = listOwnedSpaces)]
     pub async fn list_owned_spaces(&self) -> Result<JsValue, WasmSpaceError> {
         swb::to_value(&self.inner.list_owned_spaces().await?).map_err(Into::into)
     }
 
-    /// Fetch and decrypt a space profile.
     #[wasm_bindgen(js_name = getSpaceProfile)]
     pub async fn get_space_profile(
         &self,
@@ -725,13 +863,12 @@ impl SpaceAccountCtxHandle {
     ) -> Result<JsValue, WasmSpaceError> {
         swb::to_value(&profile_to_js(
             self.inner
-                .get_space_profile_decrypted(&space_id, viewer_space_id.as_deref(), None)
+                .get_space_profile_for_display(&space_id, viewer_space_id.as_deref(), None)
                 .await?,
         )?)
         .map_err(Into::into)
     }
 
-    /// Update a space's encrypted JSON profile payload.
     #[wasm_bindgen(js_name = updateSpaceProfile)]
     pub async fn update_space_profile(
         &self,
@@ -747,7 +884,6 @@ impl SpaceAccountCtxHandle {
         .map_err(Into::into)
     }
 
-    /// Update a space profile and replace its encrypted avatar asset.
     #[wasm_bindgen(js_name = updateSpaceProfileWithAvatar)]
     pub async fn update_space_profile_with_avatar(
         &self,
@@ -777,7 +913,6 @@ impl SpaceAccountCtxHandle {
         .map_err(Into::into)
     }
 
-    /// Update a space profile and replace its encrypted cover asset.
     #[wasm_bindgen(js_name = updateSpaceProfileWithCover)]
     pub async fn update_space_profile_with_cover(
         &self,
@@ -814,7 +949,6 @@ impl SpaceAccountCtxHandle {
         .map_err(Into::into)
     }
 
-    /// Update a space's slug.
     #[wasm_bindgen(js_name = updateSpaceSlug)]
     pub async fn update_space_slug(
         &self,
@@ -825,7 +959,6 @@ impl SpaceAccountCtxHandle {
             .map_err(Into::into)
     }
 
-    /// Lookup public space metadata by slug.
     #[wasm_bindgen(js_name = lookupSpaceBySlug)]
     pub async fn lookup_space_by_slug(
         &self,
@@ -834,7 +967,6 @@ impl SpaceAccountCtxHandle {
         swb::to_value(&self.inner.lookup_space_by_slug(&space_slug).await?).map_err(Into::into)
     }
 
-    /// Return whether the target space is self, friend, or neither.
     #[wasm_bindgen(js_name = getRelationship)]
     pub async fn get_relationship(
         &self,
@@ -850,7 +982,6 @@ impl SpaceAccountCtxHandle {
         .map_err(Into::into)
     }
 
-    /// Request to add a public username as a friend.
     #[wasm_bindgen(js_name = requestFriendByUsername)]
     pub async fn request_friend_by_username(
         &self,
@@ -866,7 +997,6 @@ impl SpaceAccountCtxHandle {
         .map_err(Into::into)
     }
 
-    /// List the current account feed with captions decrypted.
     #[wasm_bindgen(js_name = listFeed)]
     pub async fn list_feed(
         &self,
@@ -903,13 +1033,11 @@ impl SpaceAccountCtxHandle {
         .map_err(Into::into)
     }
 
-    /// Return whether the current account has unread notification activity.
     #[wasm_bindgen(js_name = unreadStatus)]
     pub async fn unread_status(&self, space_id: String) -> Result<JsValue, WasmSpaceError> {
         swb::to_value(&self.inner.unread_status(&space_id).await?).map_err(Into::into)
     }
 
-    /// Mark notification activity for one friend as read.
     #[wasm_bindgen(js_name = markNotificationsRead)]
     pub async fn mark_notifications_read(
         &self,
@@ -925,7 +1053,6 @@ impl SpaceAccountCtxHandle {
         .map_err(Into::into)
     }
 
-    /// List posts on a space with captions decrypted.
     #[wasm_bindgen(js_name = listPosts)]
     pub async fn list_posts(
         &self,
@@ -946,7 +1073,6 @@ impl SpaceAccountCtxHandle {
         .map_err(Into::into)
     }
 
-    /// Fetch one post with its caption decrypted.
     #[wasm_bindgen(js_name = getPost)]
     pub async fn get_post(
         &self,
@@ -965,7 +1091,6 @@ impl SpaceAccountCtxHandle {
         swb::to_value(&account_post_to_js(&self.inner, post, decrypted).await?).map_err(Into::into)
     }
 
-    /// Create a single-photo post with optional caption.
     #[wasm_bindgen(js_name = createPhotoPost)]
     pub async fn create_photo_post(
         &self,
@@ -1010,7 +1135,6 @@ impl SpaceAccountCtxHandle {
         swb::to_value(&account_post_to_js(&self.inner, post, decrypted).await?).map_err(Into::into)
     }
 
-    /// Download and decrypt one object from a space post.
     #[wasm_bindgen(js_name = downloadPostAsset)]
     pub async fn download_post_asset(
         &self,
@@ -1025,7 +1149,6 @@ impl SpaceAccountCtxHandle {
             .map_err(Into::into)
     }
 
-    /// Download and decrypt one object from an already fetched space post.
     #[wasm_bindgen(js_name = downloadPostAssetWithKey)]
     pub async fn download_post_asset_with_key(
         &self,
@@ -1047,7 +1170,6 @@ impl SpaceAccountCtxHandle {
             .map_err(Into::into)
     }
 
-    /// Download and decrypt a space avatar using an owned or friend space key.
     #[wasm_bindgen(js_name = downloadSpaceAvatar)]
     pub async fn download_space_avatar(
         &self,
@@ -1068,7 +1190,6 @@ impl SpaceAccountCtxHandle {
             .map_err(Into::into)
     }
 
-    /// Download and decrypt a space cover using an owned or friend space key.
     #[wasm_bindgen(js_name = downloadSpaceCover)]
     pub async fn download_space_cover(
         &self,
@@ -1089,7 +1210,6 @@ impl SpaceAccountCtxHandle {
             .map_err(Into::into)
     }
 
-    /// Like or unlike a post.
     #[wasm_bindgen(js_name = likePost)]
     pub async fn like_post(
         &self,
@@ -1100,7 +1220,6 @@ impl SpaceAccountCtxHandle {
         swb::to_value(&self.inner.like_post(&space_id, post_id, like).await?).map_err(Into::into)
     }
 
-    /// Send a regular 1:1 message to a friend space.
     #[wasm_bindgen(js_name = sendMessage)]
     pub async fn send_message(
         &self,
@@ -1119,7 +1238,6 @@ impl SpaceAccountCtxHandle {
         swb::to_value(&account_message_to_js(message, decrypted).await?).map_err(Into::into)
     }
 
-    /// Send a 1:1 reply to an existing message.
     #[wasm_bindgen(js_name = replyToMessage)]
     pub async fn reply_to_message(
         &self,
@@ -1139,7 +1257,6 @@ impl SpaceAccountCtxHandle {
         swb::to_value(&account_message_to_js(message, decrypted).await?).map_err(Into::into)
     }
 
-    /// Send a private post reply message to the post owner.
     #[wasm_bindgen(js_name = replyToPost)]
     pub async fn reply_to_post(
         &self,
@@ -1159,7 +1276,6 @@ impl SpaceAccountCtxHandle {
         swb::to_value(&account_message_to_js(message, decrypted).await?).map_err(Into::into)
     }
 
-    /// Like or unlike a message.
     #[wasm_bindgen(js_name = likeMessage)]
     pub async fn like_message(
         &self,
@@ -1176,7 +1292,6 @@ impl SpaceAccountCtxHandle {
         .map_err(Into::into)
     }
 
-    /// Delete a message sent by the current account.
     #[wasm_bindgen(js_name = deleteMessage)]
     pub async fn delete_message(
         &self,
@@ -1189,7 +1304,6 @@ impl SpaceAccountCtxHandle {
             .map_err(Into::into)
     }
 
-    /// List current friends, pending requests, and latest chat summaries.
     #[wasm_bindgen(js_name = listConversations)]
     pub async fn list_conversations(&self, space_id: String) -> Result<JsValue, WasmSpaceError> {
         let response = self.inner.list_conversations(&space_id).await?;
@@ -1216,13 +1330,14 @@ impl SpaceAccountCtxHandle {
             let mut unread_activities = Vec::with_capacity(summary.unread_activities.len());
             for activity in summary.unread_activities {
                 unread_activities.push(
-                    message_conversation_activity_to_js(&self.inner, &space_id, activity).await?,
+                    resilient_message_conversation_activity_to_js(&self.inner, &space_id, activity)
+                        .await?,
                 );
             }
             chat_summaries.insert(
                 friend_space_id,
                 ConversationChatSummaryJs {
-                    latest_activity: message_conversation_activity_to_js(
+                    latest_activity: resilient_message_conversation_activity_to_js(
                         &self.inner,
                         &space_id,
                         summary.latest_activity,
@@ -1241,7 +1356,6 @@ impl SpaceAccountCtxHandle {
         .map_err(Into::into)
     }
 
-    /// List a 1:1 message thread with decrypted messages.
     #[wasm_bindgen(js_name = listMessageThread)]
     pub async fn list_message_thread(
         &self,
@@ -1257,7 +1371,8 @@ impl SpaceAccountCtxHandle {
         let mut items = Vec::with_capacity(page.items.len());
         for message in page.items {
             items.push(
-                account_message_response_to_js(&self.inner, &viewer_space_id, message).await?,
+                resilient_account_message_response_to_js(&self.inner, &viewer_space_id, message)
+                    .await?,
             );
         }
         swb::to_value(&MessagePageJs {
@@ -1267,7 +1382,6 @@ impl SpaceAccountCtxHandle {
         .map_err(Into::into)
     }
 
-    /// Update a post caption.
     #[wasm_bindgen(js_name = updatePostCaption)]
     pub async fn update_post_caption(
         &self,
@@ -1294,7 +1408,6 @@ impl SpaceAccountCtxHandle {
             .map_err(Into::into)
     }
 
-    /// Delete a post.
     #[wasm_bindgen(js_name = deletePost)]
     pub async fn delete_post(&self, space_id: String, post_id: i64) -> Result<(), WasmSpaceError> {
         self.inner
@@ -1303,7 +1416,6 @@ impl SpaceAccountCtxHandle {
             .map_err(Into::into)
     }
 
-    /// List friends for a space.
     #[wasm_bindgen(js_name = listSpaceFriends)]
     pub async fn list_space_friends(&self, space_id: String) -> Result<JsValue, WasmSpaceError> {
         let friends = self.inner.list_space_friends(&space_id).await?;
@@ -1318,7 +1430,6 @@ impl SpaceAccountCtxHandle {
         swb::to_value(&items).map_err(Into::into)
     }
 
-    /// List incoming friend requests for the current account.
     #[wasm_bindgen(js_name = listFriendRequests)]
     pub async fn list_friend_requests(&self, space_id: String) -> Result<JsValue, WasmSpaceError> {
         let requests = self.inner.list_friend_requests(&space_id).await?;
@@ -1333,7 +1444,6 @@ impl SpaceAccountCtxHandle {
         swb::to_value(&items).map_err(Into::into)
     }
 
-    /// List outgoing friend requests for the current account.
     #[wasm_bindgen(js_name = listSentFriendRequests)]
     pub async fn list_sent_friend_requests(
         &self,
@@ -1351,7 +1461,6 @@ impl SpaceAccountCtxHandle {
         swb::to_value(&items).map_err(Into::into)
     }
 
-    /// Confirm an incoming friend request.
     #[wasm_bindgen(js_name = confirmFriendRequest)]
     pub async fn confirm_friend_request(
         &self,
@@ -1367,7 +1476,6 @@ impl SpaceAccountCtxHandle {
         .map_err(Into::into)
     }
 
-    /// Delete a pending friend request.
     #[wasm_bindgen(js_name = deleteFriendRequest)]
     pub async fn delete_friend_request(
         &self,
@@ -1380,7 +1488,6 @@ impl SpaceAccountCtxHandle {
             .map_err(Into::into)
     }
 
-    /// Remove a friend by their space ID.
     #[wasm_bindgen(js_name = removeFriendBySpace)]
     pub async fn remove_friend_by_space(
         &self,
@@ -1393,18 +1500,222 @@ impl SpaceAccountCtxHandle {
             .map_err(Into::into)
     }
 
-    /// List friend shares available to the current account.
     #[wasm_bindgen(js_name = listFriendShares)]
     pub async fn list_friend_shares(&self, space_id: String) -> Result<JsValue, WasmSpaceError> {
         swb::to_value(&self.inner.list_friend_shares(&space_id).await?).map_err(Into::into)
     }
 
-    /// Refresh friend shares for a rotated space key.
     #[wasm_bindgen(js_name = refreshFriendShares)]
     pub async fn refresh_friend_shares(&self, space_id: String) -> Result<usize, WasmSpaceError> {
         self.inner
             .refresh_friend_shares(&space_id)
             .await
             .map_err(Into::into)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use ente_core::crypto::{Key, SecretKey, sealed, secretbox};
+
+    use super::*;
+
+    fn post(post_id: i64, encrypted_post_key: String) -> PostResponse {
+        PostResponse {
+            post_id,
+            space_id: "space-1".into(),
+            space_slug: "alice".into(),
+            author: SpaceActorResponse {
+                space_id: "space-1".into(),
+                space_slug: "alice".into(),
+                ..Default::default()
+            },
+            encrypted_post_key,
+            caption_cipher: String::new(),
+            key_version: 1,
+            objects: Vec::new(),
+            created_at: format!("2026-08-0{post_id}T00:00:00Z"),
+            viewer_liked: false,
+        }
+    }
+
+    fn message(
+        message_id: &str,
+        encrypted_message_key: &str,
+        message_cipher: &str,
+    ) -> MessageResponse {
+        MessageResponse {
+            message_id: message_id.into(),
+            kind: "regular".into(),
+            sender_space_id: "space-2".into(),
+            recipient_space_id: "space-1".into(),
+            message_cipher: message_cipher.into(),
+            encrypted_message_key: encrypted_message_key.into(),
+            text: String::new(),
+            reply_post_id: None,
+            reply_message_id: None,
+            liked: false,
+            viewer_liked: false,
+            is_deleted: false,
+            created_at: "2026-08-01T00:00:00Z".into(),
+            updated_at: "2026-08-01T00:00:00Z".into(),
+        }
+    }
+
+    #[tokio::test]
+    async fn corrupt_post_does_not_reject_account_page() {
+        let root_key = Key::generate();
+        let space_key = Key::generate();
+        let wrapped_space_key = secretbox::encrypt_combined(space_key.as_bytes(), &root_key);
+        let valid_post_key = secretbox::encrypt_combined(Key::generate().as_bytes(), &space_key);
+        let ctx = AccountSpaceCtx::open(OpenAccountSpaceCtxInput {
+            base_url: "http://localhost".into(),
+            space_session_token: None,
+            space_root_key: root_key.as_bytes().to_vec(),
+            initial_owned_spaces: Some(vec![SpaceKeyResponse {
+                space_id: "space-1".into(),
+                space_slug: "alice".into(),
+                root_wrapped_space_key: b64::encode(&wrapped_space_key),
+                public_key: String::new(),
+                encrypted_secret_key: String::new(),
+                encrypted_profile: String::new(),
+                key_version: 1,
+            }]),
+            user_agent: None,
+            client_package: None,
+            client_version: None,
+        })
+        .unwrap();
+        let mut post_with_corrupt_actor_profile = post(1, b64::encode(&valid_post_key));
+        post_with_corrupt_actor_profile.author.key_version = 1;
+        post_with_corrupt_actor_profile.author.encrypted_profile = "not-base64".into();
+        let page = ente_space::PostPage {
+            items: vec![
+                post_with_corrupt_actor_profile,
+                post(2, "not-base64".into()),
+                post(3, b64::encode(&valid_post_key)),
+            ],
+            next_cursor: "next".into(),
+        };
+
+        let converted = match account_post_page_to_js(&ctx, page).await {
+            Ok(converted) => converted,
+            Err(error) => panic!("{}", error.js_to_string()),
+        };
+
+        assert_eq!(converted.items.len(), 3);
+        assert!(!converted.items[0].is_unavailable);
+        assert!(converted.items[1].is_unavailable);
+        assert!(!converted.items[2].is_unavailable);
+        assert_eq!(converted.next_cursor, "next");
+    }
+
+    #[tokio::test]
+    async fn corrupt_message_and_activity_become_unavailable() {
+        let root_key = Key::generate();
+        let secret_key = SecretKey::generate();
+        let public_key = secret_key.public_key();
+        let encrypted_secret_key = secretbox::encrypt_combined(secret_key.as_bytes(), &root_key);
+        let ctx = AccountSpaceCtx::open(OpenAccountSpaceCtxInput {
+            base_url: "http://localhost".into(),
+            space_session_token: None,
+            space_root_key: root_key.as_bytes().to_vec(),
+            initial_owned_spaces: Some(vec![SpaceKeyResponse {
+                space_id: "space-1".into(),
+                space_slug: "alice".into(),
+                root_wrapped_space_key: String::new(),
+                public_key: b64::encode(public_key.as_bytes()),
+                encrypted_secret_key: b64::encode(&encrypted_secret_key),
+                encrypted_profile: String::new(),
+                key_version: 1,
+            }]),
+            user_agent: None,
+            client_package: None,
+            client_version: None,
+        })
+        .unwrap();
+        let message_key = Key::generate();
+        let sealed_message_key = sealed::seal(message_key.as_bytes(), &public_key).unwrap();
+        let encrypted_message_key = b64::encode(&sealed_message_key);
+        let valid_cipher = b64::encode(&secretbox::encrypt_combined(
+            br#"{"version":1,"kind":"regular","text":"hello"}"#,
+            &message_key,
+        ));
+        let corrupt_cipher = b64::encode(&secretbox::encrypt_combined(b"not-json", &message_key));
+
+        let first = resilient_account_message_response_to_js(
+            &ctx,
+            "space-1",
+            message("message-1", &encrypted_message_key, &valid_cipher),
+        )
+        .await
+        .unwrap_or_else(|error| panic!("{}", error.js_to_string()));
+        let corrupt = resilient_account_message_response_to_js(
+            &ctx,
+            "space-1",
+            message("message-2", &encrypted_message_key, &corrupt_cipher),
+        )
+        .await
+        .unwrap_or_else(|error| panic!("{}", error.js_to_string()));
+        let last = resilient_account_message_response_to_js(
+            &ctx,
+            "space-1",
+            message("message-3", &encrypted_message_key, &valid_cipher),
+        )
+        .await
+        .unwrap_or_else(|error| panic!("{}", error.js_to_string()));
+
+        assert!(!first.is_unavailable);
+        assert!(corrupt.is_unavailable);
+        assert!(!last.is_unavailable);
+
+        let activity = MessageConversationActivity {
+            id: "activity-1".into(),
+            activity_type: "message".into(),
+            kind: "regular".into(),
+            created_at: "2026-08-01T00:00:00Z".into(),
+            outgoing: false,
+            message_id: Some("message-2".into()),
+            sender_space_id: "space-2".into(),
+            recipient_space_id: "space-1".into(),
+            message_cipher: corrupt_cipher,
+            encrypted_message_key,
+            reply_message_id: None,
+            post_id: None,
+            post_space_id: None,
+        };
+        let activity = resilient_message_conversation_activity_to_js(&ctx, "space-1", activity)
+            .await
+            .unwrap_or_else(|error| panic!("{}", error.js_to_string()));
+
+        assert!(activity.is_unavailable);
+    }
+
+    #[test]
+    fn http_errors_are_not_content_errors() {
+        let error = WasmSpaceError::from(ente_space::SpaceError::Http(http::Error::Http {
+            status: 500,
+            path: "/space".into(),
+        }));
+
+        assert!(!error.is_content_error());
+    }
+
+    #[test]
+    fn invalid_profile_utf8_uses_empty_payload() {
+        let profile = profile_to_js(DecryptedSpaceProfile {
+            space_id: "space-1".into(),
+            space_slug: "alice".into(),
+            version: 1,
+            friends: 2,
+            profile: vec![0xff],
+            avatar: None,
+            cover: None,
+            updated_at: None,
+        })
+        .unwrap_or_else(|error| panic!("{}", error.js_to_string()));
+
+        assert!(profile.profile.is_empty());
+        assert_eq!(profile.space_slug, "alice");
     }
 }

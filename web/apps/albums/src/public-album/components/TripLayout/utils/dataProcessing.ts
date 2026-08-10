@@ -20,6 +20,7 @@ export interface ProcessPhotosDataParams {
 export interface ProcessPhotosDataResult {
     photoData: JourneyPoint[];
     hasLocationData: boolean;
+    processingError?: unknown;
 }
 
 export const processPhotosData = ({
@@ -27,6 +28,7 @@ export const processPhotosData = ({
     locationDataRef,
 }: ProcessPhotosDataParams): ProcessPhotosDataResult => {
     const photoData: JourneyPoint[] = [];
+    let processingError: unknown;
 
     if (files.length === 0) {
         return { photoData, hasLocationData: false };
@@ -51,14 +53,18 @@ export const processPhotosData = ({
                     fileId: file.id,
                 });
             }
-        } catch {
-            // Silently ignore processing errors for individual files
+        } catch (e) {
+            processingError ??= e;
         }
     }
 
     photoData.sort((a, b) => a.timestamp - b.timestamp);
 
-    return { photoData, hasLocationData: photoData.length > 0 };
+    return {
+        photoData,
+        hasLocationData: photoData.length > 0,
+        processingError,
+    };
 };
 
 export interface FetchLocationNamesParams {
@@ -89,22 +95,17 @@ export const fetchLocationNames = async ({
         const representativePhoto = cluster[0];
         if (!representativePhoto) return null;
 
-        try {
-            const locationInfo = await getLocationName(
-                representativePhoto.lat,
-                representativePhoto.lng,
-            );
-            return { cluster, locationInfo };
-        } catch {
-            // Return null on error, will be filtered out
-            return null;
-        }
+        const locationInfo = await getLocationName(
+            representativePhoto.lat,
+            representativePhoto.lng,
+        );
+        return { cluster, locationInfo };
     });
 
     const results = await Promise.all(geocodingPromises);
 
     results.forEach((result) => {
-        if (!result) return; // Skip failed requests
+        if (!result) return;
 
         const { cluster, locationInfo } = result;
         cluster.forEach((photo) => {
@@ -129,6 +130,7 @@ export interface GenerateThumbnailsParams {
 
 export interface GenerateThumbnailsResult {
     thumbnailUpdates: Map<number, string>;
+    thumbnailError?: unknown;
 }
 
 export const generateNeededThumbnails = async ({
@@ -136,6 +138,7 @@ export const generateNeededThumbnails = async ({
     files,
 }: GenerateThumbnailsParams): Promise<GenerateThumbnailsResult> => {
     const thumbnailUpdates = new Map<number, string>();
+    let thumbnailError: unknown;
 
     if (photoClusters.length === 0) {
         return { thumbnailUpdates };
@@ -196,8 +199,8 @@ export const generateNeededThumbnails = async ({
                 if (thumbnailUrl) {
                     thumbnailUpdates.set(file.id, thumbnailUrl);
                 }
-            } catch {
-                // Silently ignore thumbnail generation errors
+            } catch (e) {
+                thumbnailError ??= e;
             }
         });
 
@@ -209,7 +212,7 @@ export const generateNeededThumbnails = async ({
         }
     }
 
-    return { thumbnailUpdates };
+    return { thumbnailUpdates, thumbnailError };
 };
 
 export interface LoadCoverImageParams {
@@ -218,12 +221,17 @@ export interface LoadCoverImageParams {
     collection?: { pubMagicMetadata?: { data: { coverID?: number } } };
 }
 
+export interface LoadCoverImageResult {
+    coverImageURL: string | null;
+    coverImageError?: unknown;
+}
+
 export const loadCoverImage = async ({
     journeyData,
     files,
     collection,
-}: LoadCoverImageParams): Promise<string | null> => {
-    if (journeyData.length === 0) return null;
+}: LoadCoverImageParams): Promise<LoadCoverImageResult> => {
+    if (journeyData.length === 0) return { coverImageURL: null };
 
     let coverFile: EnteFile | undefined;
 
@@ -234,21 +242,21 @@ export const loadCoverImage = async ({
 
     if (!coverFile) {
         const firstPhoto = journeyData[0];
-        if (!firstPhoto) return null;
+        if (!firstPhoto) return { coverImageURL: null };
         coverFile = files.find((f) => f.id === firstPhoto.fileId);
     }
 
-    if (!coverFile) return null;
+    if (!coverFile) return { coverImageURL: null };
 
     try {
         const sourceURLs =
             await downloadManager.renderableSourceURLs(coverFile);
         if (sourceURLs.type === "image") {
-            return sourceURLs.imageURL;
+            return { coverImageURL: sourceURLs.imageURL };
         }
-    } catch {
-        // Keep using thumbnail if high quality fails
+    } catch (e) {
+        return { coverImageURL: null, coverImageError: e };
     }
 
-    return null;
+    return { coverImageURL: null };
 };

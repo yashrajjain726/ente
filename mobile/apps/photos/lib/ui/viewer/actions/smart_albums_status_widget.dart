@@ -1,8 +1,8 @@
 import "dart:async";
 
 import "package:ente_strings/ente_strings.dart";
+import "package:ente_ui/components/fading_circle_progress_indicator.dart";
 import 'package:flutter/material.dart';
-import "package:flutter_spinkit/flutter_spinkit.dart";
 import "package:photos/core/event_bus.dart";
 import "package:photos/events/smart_album_syncing_event.dart";
 import 'package:photos/models/collection/collection.dart';
@@ -19,11 +19,9 @@ class SmartAlbumsStatusWidget extends StatefulWidget {
       _SmartAlbumsStatusWidgetState();
 }
 
-class _SmartAlbumsStatusWidgetState extends State<SmartAlbumsStatusWidget>
-    with SingleTickerProviderStateMixin {
+class _SmartAlbumsStatusWidgetState extends State<SmartAlbumsStatusWidget> {
   (int, bool)? _syncingCollection;
   StreamSubscription<SmartAlbumSyncingEvent>? subscription;
-  AnimationController? animationController;
 
   void updateData(SmartAlbumSyncingEvent event) {
     if (mounted) {
@@ -40,10 +38,6 @@ class _SmartAlbumsStatusWidgetState extends State<SmartAlbumsStatusWidget>
   @override
   void initState() {
     super.initState();
-    animationController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1200),
-    );
     _syncingCollection = smartAlbumsService.syncingCollection;
     subscription = Bus.instance.on<SmartAlbumSyncingEvent>().listen(updateData);
   }
@@ -51,7 +45,6 @@ class _SmartAlbumsStatusWidgetState extends State<SmartAlbumsStatusWidget>
   @override
   void dispose() {
     subscription?.cancel();
-    animationController?.dispose();
     super.dispose();
   }
 
@@ -85,14 +78,10 @@ class _SmartAlbumsStatusWidgetState extends State<SmartAlbumsStatusWidget>
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                SizedBox(
-                  child: SpinKitFadingCircle(
-                    size: 18,
-                    color: _syncingCollection?.$2 ?? true
-                        ? const Color(0xFF08C225)
-                        : const Color(0xFFF78426),
-                    controller: animationController,
-                  ),
+                FadingCircleProgressIndicator(
+                  color: _syncingCollection?.$2 ?? true
+                      ? const Color(0xFF08C225)
+                      : const Color(0xFFF78426),
                 ),
                 const SizedBox(width: 8),
                 Text(

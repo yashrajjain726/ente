@@ -136,7 +136,7 @@ export const UploaderNameInputForm: React.FC<
                 await onSubmit(value);
                 onClose();
             } catch (e) {
-                log.error(`Failed to submit input ${value}`, e);
+                log.error("Failed to submit uploader name", e);
                 setValueFieldError(t("generic_error"));
             }
         },

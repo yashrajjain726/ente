@@ -1,6 +1,3 @@
-// TODO: Audit this file
-/* eslint-disable @typescript-eslint/ban-ts-comment */
-
 import type { BytesOrB64 } from "ente-base/crypto/types";
 import {
     streamEncryptionChunkOverhead,
@@ -473,6 +470,7 @@ const fileTooLargeErrorMessage = "File too large";
 interface UploadContext {
     isCFUploadProxyDisabled: boolean;
     deferMultipartChecksums: boolean;
+    isInternalUser: boolean;
     skipDuplicateAddToUploadCollection?: boolean;
     includePartnerSharedFiles?: boolean;
     publicAlbumsCredentials?: PublicAlbumsCredentials;
@@ -525,7 +523,8 @@ export const upload = async (
 
         if (fileSize === 0) return { type: "zeroSize" };
 
-        const maxFileSize = 10 * 1024 * 1024 * 1024;
+        const maxFileSize =
+            (uploadContext.isInternalUser ? 20 : 10) * 1024 * 1024 * 1024;
         if (fileSize >= maxFileSize) return { type: "tooLarge" };
 
         abortIfCancelled();
@@ -727,10 +726,8 @@ const readAssetDetails = async ({
     uploadItem,
 }: UploadAsset): Promise<ReadAssetDetailsResult> =>
     isLivePhoto
-        ? // @ts-ignore
-          readLivePhotoDetails(livePhotoAssets)
-        : // @ts-ignore
-          readImageOrVideoDetails(uploadItem);
+        ? readLivePhotoDetails(livePhotoAssets!)
+        : readImageOrVideoDetails(uploadItem!);
 
 const readLivePhotoDetails = async ({ image, video }: LivePhotoAssets) => {
     const img = await readImageOrVideoDetails(image);
@@ -750,7 +747,6 @@ const readImageOrVideoDetails = async (uploadItem: UploadItem) => {
     const { stream, fileSize, lastModifiedMs } =
         await readUploadItem(uploadItem);
 
-    // @ts-ignore
     const fileTypeInfo = await detectFileTypeInfoFromChunk(async () => {
         const reader = stream.getReader();
         const chunk = (await reader.read()).value;
@@ -787,8 +783,7 @@ const extractAssetMetadata = async (
 ): Promise<ExtractAssetMetadataResult> =>
     isLivePhoto
         ? await extractLivePhotoMetadata(
-              // @ts-ignore
-              livePhotoAssets,
+              livePhotoAssets!,
               pathPrefix,
               lastModifiedMs,
               collectionID,
@@ -796,8 +791,7 @@ const extractAssetMetadata = async (
               worker,
           )
         : await extractImageOrVideoMetadata(
-              // @ts-ignore
-              uploadItem,
+              uploadItem!,
               pathPrefix,
               externalParsedMetadata,
               fileType,
@@ -1030,10 +1024,8 @@ const readAsset = async (
     { isLivePhoto, uploadItem, livePhotoAssets }: UploadAsset,
 ): Promise<ThumbnailedFile> =>
     isLivePhoto
-        ? // @ts-ignore
-          await readLivePhoto(livePhotoAssets, fileTypeInfo)
-        : // @ts-ignore
-          await readImageOrVideo(uploadItem, fileTypeInfo);
+        ? await readLivePhoto(livePhotoAssets!, fileTypeInfo)
+        : await readImageOrVideo(uploadItem!, fileTypeInfo);
 
 const readLivePhoto = async (
     livePhotoAssets: LivePhotoAssets,

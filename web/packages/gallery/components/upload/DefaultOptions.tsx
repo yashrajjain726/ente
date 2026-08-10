@@ -17,6 +17,7 @@ import { FocusVisibleButton } from "ente-base/components/mui/FocusVisibleButton"
 import { t } from "i18next";
 import React from "react";
 import type { UploadTypeSelectorIntent } from "../Upload";
+import { uploadSheetMediaQuery } from "../upload-progress/bottom-sheet";
 
 interface DefaultOptionsBaseProps {
     isFileSelectionPending: boolean;
@@ -50,30 +51,20 @@ export function DefaultOptions({
                 gap: usesUploadSpacing ? "20px" : "36px",
                 p: "20px",
                 pb: usesUploadSpacing ? "28px" : "20px",
+                [uploadSheetMediaQuery]: {
+                    p: "12px 16px",
+                    pb: "calc(28px + env(safe-area-inset-bottom, 0px))",
+                    overflowY: "auto",
+                },
             }}
         >
             <SpacedRow>
                 {intent == "collect" ? (
-                    <DialogTitle
-                        sx={{
-                            "&&": { p: 0 },
-                            fontFamily: "'Outfit Variable', sans-serif",
-                            fontSize: "24px",
-                            fontWeight: 600,
-                            lineHeight: "32px",
-                        }}
-                    >
+                    <DialogTitle sx={[{ "&&": { p: 0 } }, optionsTitleSx]}>
                         {t("select_photos")}
                     </DialogTitle>
                 ) : (
-                    <Typography
-                        sx={{
-                            fontFamily: "'Outfit Variable', sans-serif",
-                            fontSize: "24px",
-                            fontWeight: 600,
-                            lineHeight: "32px",
-                        }}
-                    >
+                    <Typography sx={optionsTitleSx}>
                         {t(intent == "import" ? "import_library" : "upload")}
                     </Typography>
                 )}
@@ -502,3 +493,10 @@ function DragAndDropHint({
 function PendingIndicator(): React.JSX.Element {
     return <CircularProgress size={18} sx={{ color: "stroke.muted" }} />;
 }
+
+const optionsTitleSx = {
+    fontFamily: "'Outfit Variable', sans-serif",
+    fontSize: "24px",
+    fontWeight: 600,
+    lineHeight: "32px",
+};

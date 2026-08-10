@@ -1,4 +1,5 @@
 import "package:ente_components/ente_components.dart" as components;
+import "package:ente_ui/components/divider_widget.dart";
 import 'package:flutter/material.dart';
 import 'package:photos/core/constants.dart';
 import 'package:photos/models/collection/collection.dart';
@@ -6,7 +7,6 @@ import "package:photos/models/gallery_type.dart";
 import "package:photos/models/ml/face/person.dart";
 import 'package:photos/models/selected_files.dart';
 import 'package:photos/ui/components/bottom_action_bar/action_bar_widget.dart';
-import "package:photos/ui/components/divider_widget.dart";
 import "package:photos/ui/viewer/actions/file_selection_actions_widget.dart";
 
 class BottomActionBarWidget extends StatelessWidget {

@@ -204,7 +204,6 @@ class FileListWidget extends StatelessWidget {
       child: UserAvatarWidget(
         owner,
         type: AvatarType.mini,
-        thumbnailView: true,
         config: Configuration.instance,
       ),
     );

@@ -5,6 +5,7 @@ import UnfoldMoreIcon from "@mui/icons-material/UnfoldMore";
 import {
     Box,
     IconButton,
+    keyframes,
     Paper,
     Snackbar,
     Stack,
@@ -14,6 +15,7 @@ import {
 import type { SystemStyleObject } from "@mui/system";
 import { t } from "i18next";
 import { useRef } from "react";
+import { uploadSheetMediaQuery } from "./bottom-sheet";
 import type { DragPosition } from "./context";
 import { useUploadProgressContext } from "./context";
 import {
@@ -41,6 +43,7 @@ export function MinimizedUploadProgress() {
         <Snackbar
             open
             anchorOrigin={{ horizontal: "right", vertical: "bottom" }}
+            sx={minimizedSnackbarSx}
         >
             <Paper
                 ref={setDragSurface}
@@ -101,6 +104,17 @@ const ellipsisSx = {
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
 };
+const minimizedRiseAnimation = keyframes`
+    from { transform: translateY(48px); opacity: 0.6; }
+    to { transform: translateY(0); opacity: 1; }
+`;
+const minimizedSnackbarSx = {
+    [uploadSheetMediaQuery]: {
+        left: "16px",
+        right: "16px",
+        bottom: "calc(16px + env(safe-area-inset-bottom, 0px))",
+    },
+};
 const minimizedPaperSx = (theme: Theme): SystemStyleObject<Theme> => ({
     width: "min(400px, calc(100svw - 32px))",
     p: "16px 16px 16px 12px",
@@ -110,6 +124,11 @@ const minimizedPaperSx = (theme: Theme): SystemStyleObject<Theme> => ({
     boxShadow: "0px 4px 4px rgba(0 0 0 / 0.16)",
     color: "text.base",
     overflow: "hidden",
+    [uploadSheetMediaQuery]: {
+        width: "calc(100svw - 32px)",
+        animation: `${minimizedRiseAnimation} 320ms cubic-bezier(0.2, 0.8, 0.2, 1)`,
+        "@media (prefers-reduced-motion: reduce)": { animation: "none" },
+    },
     ...theme.applyStyles("dark", { backgroundColor: "#2b2b2b" }),
 });
 const minimizedDragIconSx = {

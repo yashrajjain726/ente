@@ -15,11 +15,6 @@ use crate::{
     server,
 };
 
-/// A running Museum for integration tests, backed by a temporary Postgres.
-///
-/// Created with [`Museum::run`], which boots both, runs the test, and tears
-/// everything down on drop. The temporary directory is removed unless the test
-/// fails, in which case it is retained for inspection.
 pub struct Museum {
     _server: ChildProcess,
     _postgres: postgres::Postgres,
@@ -29,10 +24,6 @@ pub struct Museum {
 }
 
 impl Museum {
-    /// Boot a Museum, run `test` against it, then tear everything down.
-    ///
-    /// On failure the temporary directory is retained (its path is printed to
-    /// stderr) so the museum and Postgres logs can be inspected.
     pub fn run(test: impl FnOnce(&Self) -> TestResult) -> TestResult {
         let mut museum = Self::start()?;
         match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| test(&museum))) {
@@ -48,7 +39,6 @@ impl Museum {
         }
     }
 
-    /// Boot a Museum and run an asynchronous test on a Tokio runtime.
     pub fn run_async<F, Fut>(test: F) -> TestResult
     where
         F: FnOnce(String) -> Fut,
@@ -99,18 +89,15 @@ impl Museum {
         })
     }
 
-    /// The base URL of the running Museum, e.g. `http://127.0.0.1:1234`.
     pub fn endpoint(&self) -> &str {
         &self.endpoint
     }
 
-    /// A scratch directory tied to this Museum's lifetime, for test-local files.
     pub fn temp_dir(&self) -> &Path {
         self.temp_dir.path()
     }
 }
 
-/// The repository's `server/` directory, which Museum is run from.
 fn server_dir() -> TestResult<PathBuf> {
     let crate_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let repo_dir = crate_dir

@@ -1,11 +1,8 @@
 use crate::Result;
 use rusqlite::Connection;
 
-/// Create all database tables
 pub fn create_tables(conn: &Connection) -> Result<()> {
-    // Accounts table
-    // Note: user_id is globally unique across all users, and each user can have multiple apps
-    // So we use (user_id, app) as composite primary key
+    // A user can have accounts for multiple apps, so the key includes the app.
     conn.execute(
         "CREATE TABLE IF NOT EXISTS accounts (
             user_id INTEGER NOT NULL,
@@ -21,7 +18,6 @@ pub fn create_tables(conn: &Connection) -> Result<()> {
         [],
     )?;
 
-    // Secrets table (encrypted credentials)
     conn.execute(
         "CREATE TABLE IF NOT EXISTS secrets (
             user_id INTEGER NOT NULL,
@@ -37,7 +33,6 @@ pub fn create_tables(conn: &Connection) -> Result<()> {
         [],
     )?;
 
-    // Configuration table
     conn.execute(
         "CREATE TABLE IF NOT EXISTS config (
             key TEXT PRIMARY KEY,
@@ -47,9 +42,7 @@ pub fn create_tables(conn: &Connection) -> Result<()> {
         [],
     )?;
 
-    // Collections/Albums table
-    // Note: collection_id is globally unique across all users, so we use it as the primary key
-    // owner field contains the user_id who owns this collection
+    // Collection IDs are global; owner records the owning user.
     conn.execute(
         "CREATE TABLE IF NOT EXISTS collections (
             collection_id INTEGER PRIMARY KEY,
@@ -63,9 +56,7 @@ pub fn create_tables(conn: &Connection) -> Result<()> {
         [],
     )?;
 
-    // Files table (for caching remote file metadata)
-    // Note: file_id is globally unique across all users, so we use it as the primary key
-    // owner_id contains the user_id who owns this file
+    // File IDs are global; owner_id records the owning user.
     conn.execute(
         "CREATE TABLE IF NOT EXISTS files (
             file_id INTEGER PRIMARY KEY,
@@ -86,7 +77,6 @@ pub fn create_tables(conn: &Connection) -> Result<()> {
         [],
     )?;
 
-    // Album files mapping
     conn.execute(
         "CREATE TABLE IF NOT EXISTS album_files (
             album_id INTEGER NOT NULL,
@@ -100,7 +90,6 @@ pub fn create_tables(conn: &Connection) -> Result<()> {
         [],
     )?;
 
-    // Sync state table
     conn.execute(
         "CREATE TABLE IF NOT EXISTS sync_state (
             user_id INTEGER NOT NULL,
@@ -115,7 +104,6 @@ pub fn create_tables(conn: &Connection) -> Result<()> {
         [],
     )?;
 
-    // Collection sync state table - stores per-collection sync timestamps
     conn.execute(
         "CREATE TABLE IF NOT EXISTS collection_sync_state (
             user_id INTEGER NOT NULL,
@@ -128,7 +116,6 @@ pub fn create_tables(conn: &Connection) -> Result<()> {
         [],
     )?;
 
-    // Create indices for better performance
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_files_collection 
          ON files(collection_id)",
@@ -165,7 +152,6 @@ pub fn create_tables(conn: &Connection) -> Result<()> {
         [],
     )?;
 
-    // Create index for file deduplication
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_files_hash 
          ON files(owner_id, content_hash) 

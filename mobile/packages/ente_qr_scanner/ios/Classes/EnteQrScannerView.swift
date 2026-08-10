@@ -2,6 +2,18 @@ import AVFoundation
 import Flutter
 import UIKit
 
+private struct EnteQrScannerOverlay {
+  let cutOutSize: CGFloat
+
+  static func from(_ args: Any?) -> EnteQrScannerOverlay {
+    guard let map = args as? [String: Any] else {
+      return EnteQrScannerOverlay(cutOutSize: 260)
+    }
+    let cutOutSize = (map["cutOutSize"] as? NSNumber)?.doubleValue ?? 260
+    return EnteQrScannerOverlay(cutOutSize: CGFloat(cutOutSize))
+  }
+}
+
 private final class EnteQrScannerPreviewView: UIView {
   var onLayout: (() -> Void)?
 
@@ -14,11 +26,11 @@ private final class EnteQrScannerPreviewView: UIView {
 final class EnteQrScannerView: NSObject, FlutterPlatformView, AVCaptureMetadataOutputObjectsDelegate {
   private let containerView: EnteQrScannerPreviewView
   private let channel: FlutterMethodChannel
+  private let overlay: EnteQrScannerOverlay
   private let session = AVCaptureSession()
   private let sessionQueue = DispatchQueue(label: "io.ente.qr_scanner.session")
   private let metadataQueue = DispatchQueue(label: "io.ente.qr_scanner.metadata")
   private var previewLayer: AVCaptureVideoPreviewLayer?
-  private var metadataOutput: AVCaptureMetadataOutput?
   private var captureDevice: AVCaptureDevice?
   private var isConfigured = false
   private var isPaused = false
@@ -33,6 +45,7 @@ final class EnteQrScannerView: NSObject, FlutterPlatformView, AVCaptureMetadataO
     args: Any?,
     messenger: FlutterBinaryMessenger
   ) {
+    overlay = EnteQrScannerOverlay.from(args)
     containerView = EnteQrScannerPreviewView(frame: frame)
     channel = FlutterMethodChannel(
       name: "io.ente.qr_scanner/view_\(platformViewId)",
@@ -138,6 +151,7 @@ final class EnteQrScannerView: NSObject, FlutterPlatformView, AVCaptureMetadataO
       return
     }
     session.addOutput(output)
+    output.rectOfInterest = CGRect(x: 0, y: 0, width: 1, height: 1)
     output.setMetadataObjectsDelegate(self, queue: metadataQueue)
     let enabledMetadataTypes = supportedMetadataTypes.filter {
       output.availableMetadataObjectTypes.contains($0)
@@ -148,7 +162,6 @@ final class EnteQrScannerView: NSObject, FlutterPlatformView, AVCaptureMetadataO
       return
     }
     output.metadataObjectTypes = enabledMetadataTypes
-    metadataOutput = output
 
     session.commitConfiguration()
     isConfigured = true
@@ -221,7 +234,16 @@ final class EnteQrScannerView: NSObject, FlutterPlatformView, AVCaptureMetadataO
     }
 
     previewLayer?.frame = containerView.bounds
-    metadataOutput?.rectOfInterest = CGRect(x: 0, y: 0, width: 1, height: 1)
+  }
+
+  private func scanRect(in bounds: CGRect) -> CGRect {
+    let side = min(max(overlay.cutOutSize, 0), min(bounds.width, bounds.height))
+    return CGRect(
+      x: bounds.midX - side / 2,
+      y: bounds.midY - side / 2,
+      width: side,
+      height: side
+    )
   }
 
   private func pause() {
@@ -292,19 +314,48 @@ final class EnteQrScannerView: NSObject, FlutterPlatformView, AVCaptureMetadataO
     didOutput metadataObjects: [AVMetadataObject],
     from connection: AVCaptureConnection
   ) {
+    guard !isDisposed, !isPaused, !metadataObjects.isEmpty else {
+      return
+    }
+    DispatchQueue.main.async { [weak self] in
+      self?.handle(metadataObjects)
+    }
+  }
+
+  private func handle(_ metadataObjects: [AVMetadataObject]) {
     guard
       !isDisposed,
       !isPaused,
-      let readableObject = metadataObjects
-        .compactMap({ $0 as? AVMetadataMachineReadableCodeObject })
-        .first,
-      supportedMetadataTypes.contains(readableObject.type),
-      let payload = readableObject.stringValue,
-      !payload.isEmpty
+      let previewLayer = previewLayer
     else {
       return
     }
+
+    let scanRect = scanRect(in: containerView.bounds)
+    let scanCenter = CGPoint(x: scanRect.midX, y: scanRect.midY)
+    let readableObject = metadataObjects
+      .compactMap {
+        previewLayer.transformedMetadataObject(for: $0)
+          as? AVMetadataMachineReadableCodeObject
+      }
+      .filter {
+        supportedMetadataTypes.contains($0.type)
+          && scanRect.contains(CGPoint(x: $0.bounds.midX, y: $0.bounds.midY))
+      }
+      .min {
+        squaredDistance(from: $0.bounds, to: scanCenter)
+          < squaredDistance(from: $1.bounds, to: scanCenter)
+      }
+    guard let payload = readableObject?.stringValue, !payload.isEmpty else {
+      return
+    }
     emitCode(payload)
+  }
+
+  private func squaredDistance(from bounds: CGRect, to point: CGPoint) -> CGFloat {
+    let xDistance = bounds.midX - point.x
+    let yDistance = bounds.midY - point.y
+    return xDistance * xDistance + yDistance * yDistance
   }
 
   private func emitCode(_ text: String) {

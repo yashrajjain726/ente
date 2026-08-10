@@ -4,7 +4,6 @@ import {
     CollectionPrivateMagicMetadataData,
     CollectionPublicMagicMetadataData,
     CollectionShareeMagicMetadataData,
-    ignore,
     RemoteCollectionUser,
     RemotePublicURL,
 } from "ente-media/collection";
@@ -94,14 +93,6 @@ const LocalCollection = z
             isDeleted,
             ...rest
         } = c;
-        ignore([
-            encryptedKey,
-            keyDecryptionNonce,
-            encryptedName,
-            nameDecryptionNonce,
-            attributes,
-            isDeleted,
-        ]);
         return rest;
     });
 
@@ -123,39 +114,15 @@ export const LocalEnteFile = z.looseObject({
 
 export const LocalEnteFiles = z.array(LocalEnteFile);
 
-/**
- * Apply transformations when reading files from the DB.
- *
- * There are two parts to it -
- *
- * 1. the required part (patching old entries that might be present in the local
- *    database),
- * 2. the optional part (removing some unused fields).
- *
- * Part 1 ---
- *
- * Transform metadata in legacy files that might be present in the local
- * database. Note that this will not be needed for files that are fetched
- * afresh, since the corresponding transform is already done during
- * {@link decryptRemoteFile}; this is only for handling potentially items that
- * might've been already present locally.
- *
- * Part 2 ---
- *
- * Remove unused fields from the file objects when reading them.
- *
- * This is similar to the transformation we perform when reading collections
- * from the database, to discard fields that are no longer forwarded when we
- * parse the remote object, and thus will not be present in the local DB either
- * when going forward. They might be present for the existing entries in DB
- * though, which is why these functions are needed.
- *
- * However, since unlike collections, we don't route the files through Zod when
- * reading. So instead we do it using this function. Effectively, the end result
- * should be the same. In any case, doing this cleanup has no functional impact.
- *
- * Both parts added June 2025, 1.7.14-beta, prune eventually (tag: Migration).
- */
+// Two transforms when reading files from the DB, both added June 2025,
+// 1.7.14-beta, prune eventually (tag: Migration):
+//
+// 1. Patch metadata of legacy entries. Freshly fetched files get this
+//    transform in decryptRemoteFile; this handles items that were already
+//    present locally.
+// 2. Drop fields we no longer forward when parsing the remote object. The
+//    collections DB does this via its Zod read transform; files are not
+//    routed through Zod when reading, so it happens here instead.
 export const transformFilesIfNeeded = (files: EnteFile[]) =>
     isFilesTransformNeeded(files) ? files.map(transformFile) : files;
 
@@ -178,7 +145,6 @@ const transformFile = (file: EnteFile & { isDeleted?: unknown }) => {
         pubMagicMetadata,
         ...rest
     } = file;
-    ignore(isDeleted);
     const metadata = transformDecryptedMetadataJSON(
         file.id,
         origMetadata,

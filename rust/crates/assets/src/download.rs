@@ -1031,7 +1031,7 @@ async fn fetch_download_probe(client: &Client, url: &str) -> DownloadProbe {
         .content_length()
         .filter(|value| *value > 0)
         .or_else(|| {
-            // HEAD responses have no body, so reqwest can report a semantic length of 0.
+            // HEAD responses have no body, so reqwest can report length 0.
             response
                 .headers()
                 .get("Content-Length")

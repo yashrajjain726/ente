@@ -1,10 +1,5 @@
-//! Helpers for working with errors.
-
 use std::fmt::Write;
 
-/// Render an error and its chain of causes as one string.
-///
-/// The causes are appended, colon separated, to the error's own message.
 pub fn chain(error: &dyn std::error::Error) -> String {
     let mut message = error.to_string();
     let mut source = error.source();

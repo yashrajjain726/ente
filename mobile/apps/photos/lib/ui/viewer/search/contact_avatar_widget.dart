@@ -5,7 +5,6 @@ import "package:flutter/material.dart";
 import "package:photos/core/event_bus.dart";
 import "package:photos/events/contacts_changed_event.dart";
 import "package:photos/models/api/collection/user.dart";
-import "package:photos/services/contacts/contact_identity_resolver.dart";
 import "package:photos/services/photos_contacts_service.dart";
 import "package:photos/ui/sharing/user_avator_widget.dart";
 import "package:photos/ui/viewer/people/face_thumbnail_squircle.dart";
@@ -100,7 +99,9 @@ class _ContactAvatarWidgetState extends State<ContactAvatarWidget> {
             },
           );
         }
-        return UserInitialsAvatar(_fallbackUser());
+        return UserInitialsAvatar(
+          UserSuggestion(widget.email, userID: widget.contactUserId),
+        );
       },
     );
     return SizedBox(
@@ -121,16 +122,6 @@ class _ContactAvatarWidgetState extends State<ContactAvatarWidget> {
   Future<Uint8List?> _loadPhoto() {
     return PhotosContactsService.instance.getProfilePictureBytesByUserId(
       widget.contactUserId,
-    );
-  }
-
-  User _fallbackUser() {
-    final baseUser = User(id: widget.contactUserId, email: widget.email);
-    return User(
-      id: widget.contactUserId,
-      email: resolveKnownEmail(baseUser) ?? widget.email,
-      // ignore: deprecated_member_use_from_same_package
-      name: resolveDisplayName(baseUser),
     );
   }
 }

@@ -75,7 +75,7 @@ import "package:photos/ui/notification/update/change_log_page.dart";
 import "package:photos/ui/rituals/ritual_camera_page.dart";
 import "package:photos/ui/rituals/ritual_page.dart";
 import "package:photos/ui/rituals/ritual_privacy.dart";
-import "package:photos/ui/settings/app_update_dialog.dart";
+import "package:photos/ui/settings/app_update_sheet.dart";
 import "package:photos/ui/settings_page.dart";
 import "package:photos/ui/social/feed_screen.dart";
 import "package:photos/ui/tabs/albums_tab.dart";
@@ -275,14 +275,10 @@ class _HomeWidgetState extends State<HomeWidget> {
       Future.delayed(Duration.zero, () {
         if (value) {
           if (!mounted) return;
-          showDialog(
-            useRootNavigator: false,
-            context: context,
-            builder: (BuildContext context) {
-              return AppUpdateDialog(updateService.getLatestVersionInfo());
-            },
-            barrierColor: Colors.black.withValues(alpha: 0.85),
-          );
+          showAppUpdateSheet(
+            context,
+            latestVersionInfo: updateService.getLatestVersionInfo()!,
+          ).ignore();
           updateService.resetUpdateAvailableShownTime();
         }
       });

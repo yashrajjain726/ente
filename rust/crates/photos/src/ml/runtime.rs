@@ -64,9 +64,6 @@ struct ModelSlot {
     state: Mutex<ModelSlotState>,
 }
 
-/// Which accelerated execution providers were behind the sessions used through
-/// a [`MlRuntimeView`]. ORed over successful model executions so a result can be
-/// attributed to the providers that actually computed it.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(crate) struct UsedProviders {
     pub(crate) coreml: bool,
@@ -375,8 +372,6 @@ impl MlRuntime {
 }
 
 impl<'a> MlRuntimeView<'a> {
-    /// The accelerated providers behind every successful model execution
-    /// through this view so far.
     pub(crate) fn used_providers(&self) -> UsedProviders {
         self.used_providers.get()
     }

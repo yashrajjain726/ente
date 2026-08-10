@@ -218,7 +218,7 @@ const ffprobeOutput = async (
         } catch (e) {
             // Output file might not even exist if the command did not succeed,
             // so only log on success.
-            if (status !== 0 && status != -1) {
+            if (status === 0 || status == -1) {
                 log.error(`Failed to remove output ${outputPath}`, e);
             }
         }

@@ -1,13 +1,13 @@
 import "package:ente_components/ente_components.dart";
 import "package:ente_pure_utils/ente_pure_utils.dart";
 import "package:ente_strings/ente_strings.dart";
+import "package:ente_ui/components/loading_widget.dart";
 import "package:flutter/material.dart";
 import "package:hugeicons/hugeicons.dart";
 import "package:photos/gateways/storage_bonus/models/storage_bonus.dart";
 import "package:photos/models/user_details.dart";
 import "package:photos/service_locator.dart";
 import "package:photos/services/account/user_service.dart";
-import "package:photos/ui/common/loading_widget.dart";
 import "package:photos/ui/common/web_page.dart";
 import "package:photos/ui/growth/apply_code_sheet.dart";
 import "package:photos/ui/growth/referral_code_widget.dart";

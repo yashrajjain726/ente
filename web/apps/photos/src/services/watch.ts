@@ -35,7 +35,6 @@ class FolderWatcher {
     private debouncedRunNextEvent: () => void;
 
     constructor() {
-        // TODO:
         // eslint-disable-next-line @typescript-eslint/no-misused-promises
         this.debouncedRunNextEvent = debounce(() => this.runNextEvent(), 1000);
     }

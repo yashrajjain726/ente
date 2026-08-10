@@ -10,7 +10,11 @@ class CommentAuthorResolver {
     required User Function(int userID) registeredUserResolver,
   }) {
     if (comment.isAnonymous) {
-      return _anonymousUserForComment(comment, anonDisplayNames);
+      return anonymousSocialUser(
+        userID: comment.userID,
+        anonUserID: comment.anonUserID,
+        anonDisplayNames: anonDisplayNames,
+      );
     }
 
     return _registeredUserCache.putIfAbsent(
@@ -24,18 +28,19 @@ class CommentAuthorResolver {
   }
 }
 
-User _anonymousUserForComment(
-  Comment comment,
-  Map<String, String> anonDisplayNames,
-) {
-  final anonID = _normalizedAnonID(comment);
+User anonymousSocialUser({
+  required int userID,
+  required String? anonUserID,
+  required Map<String, String> anonDisplayNames,
+}) {
+  final anonID = _normalizeAnonID(anonUserID);
   final displayName = anonID != null
       ? (anonDisplayNames[anonID] ?? anonID)
       : "Anonymous";
   return User(
-    id: comment.userID,
+    id: userID,
     email: "${anonID ?? "anonymous"}@unknown.com",
-    name: displayName,
+    label: displayName,
   );
 }
 
@@ -80,6 +85,10 @@ String? _normalizedAnonID(Comment comment) {
   if (!comment.isAnonymous) {
     return null;
   }
-  final anonID = comment.anonUserID?.trim();
+  return _normalizeAnonID(comment.anonUserID);
+}
+
+String? _normalizeAnonID(String? value) {
+  final anonID = value?.trim();
   return anonID == null || anonID.isEmpty ? null : anonID;
 }

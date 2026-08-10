@@ -3,13 +3,33 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import CloseIcon from "@mui/icons-material/Close";
-import { Box, IconButton, Link, Stack, Typography } from "@mui/material";
+import {
+    Box,
+    CircularProgress,
+    IconButton,
+    Link,
+    Stack,
+    Typography,
+} from "@mui/material";
 import { isDesktop } from "ente-base/app";
 import { FocusVisibleButton } from "ente-base/components/mui/FocusVisibleButton";
+import {
+    uploadSheetMediaQuery,
+    useIsUploadSheet,
+} from "ente-gallery/components/upload-progress/bottom-sheet";
 import { t } from "i18next";
 import React from "react";
 
+const optionsTitleSx = {
+    fontFamily: "'Outfit Variable', sans-serif",
+    fontSize: "24px",
+    fontWeight: 600,
+    lineHeight: "32px",
+    [uploadSheetMediaQuery]: { fontFamily: '"Inter Variable", sans-serif' },
+};
+
 interface TakeoutOptionsProps {
+    isFolderSelectionPending?: boolean;
     onBack: () => void;
     onClose: () => void;
     onSelectFolder: () => void;
@@ -17,13 +37,27 @@ interface TakeoutOptionsProps {
 }
 
 export function TakeoutOptions({
+    isFolderSelectionPending,
     onBack,
     onClose,
     onSelectFolder,
     onSelectZips,
 }: TakeoutOptionsProps): React.JSX.Element {
+    const isSheet = useIsUploadSheet();
+
     return (
-        <Stack data-takeout-options sx={{ gap: "36px", p: "20px" }}>
+        <Stack
+            data-takeout-options
+            sx={{
+                gap: "36px",
+                p: "20px",
+                [uploadSheetMediaQuery]: {
+                    p: "12px 16px",
+                    pb: "calc(20px + env(safe-area-inset-bottom, 0px))",
+                    overflowY: "auto",
+                },
+            }}
+        >
             <Stack
                 direction="row"
                 sx={{ alignItems: "center", justifyContent: "space-between" }}
@@ -40,15 +74,12 @@ export function TakeoutOptions({
                     >
                         <ArrowBackIcon sx={{ fontSize: "24px" }} />
                     </IconButton>
-                    <Typography
-                        sx={{
-                            fontFamily: "'Outfit Variable', sans-serif",
-                            fontSize: "24px",
-                            fontWeight: 600,
-                            lineHeight: "32px",
-                        }}
-                    >
-                        {t("import_from_google_photos")}
+                    <Typography sx={optionsTitleSx}>
+                        {t(
+                            isSheet
+                                ? "google_takeout"
+                                : "import_from_google_photos",
+                        )}
                     </Typography>
                 </Stack>
                 <IconButton
@@ -74,6 +105,7 @@ export function TakeoutOptions({
                         icon={<HugeiconsIcon icon={Folder01Icon} size={18} />}
                         label={t("unzipped_folder")}
                         description={t("unzipped_folder_hint")}
+                        pending={isFolderSelectionPending}
                         onClick={onSelectFolder}
                     />
                     <TakeoutOptionButton
@@ -121,6 +153,7 @@ interface TakeoutOptionButtonProps {
     label: string;
     description: string;
     disabled?: boolean;
+    pending?: boolean;
     onClick: () => void;
 }
 
@@ -129,6 +162,7 @@ function TakeoutOptionButton({
     label,
     description,
     disabled,
+    pending,
     onClick,
 }: TakeoutOptionButtonProps): React.JSX.Element {
     return (
@@ -137,7 +171,7 @@ function TakeoutOptionButton({
             disabled={disabled}
             onClick={onClick}
             sx={(theme) => ({
-                height: "60px",
+                minHeight: "60px",
                 p: "12px",
                 borderRadius: "20px",
                 backgroundColor: "background.paper",
@@ -168,7 +202,14 @@ function TakeoutOptionButton({
                         color: "text.muted",
                     }}
                 >
-                    {icon}
+                    {pending ? (
+                        <CircularProgress
+                            size={18}
+                            sx={{ color: "stroke.muted" }}
+                        />
+                    ) : (
+                        icon
+                    )}
                 </Box>
                 <Stack
                     sx={{ flex: 1, minWidth: 0, textAlign: "left", gap: "4px" }}

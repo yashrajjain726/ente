@@ -75,7 +75,7 @@ pub struct RustClipResult {
 pub struct RustPetFaceDetectionResult {
     pub score: f64,
     pub box_xyxy: Vec<f64>,
-    /// 3 keypoints: [left_eye, right_eye, nose], each as [x, y]
+    // [left eye, right eye, nose], each as [x, y].
     pub keypoints: Vec<Vec<f64>>,
 }
 
@@ -90,7 +90,7 @@ pub struct RustPetAlignmentResult {
 pub struct RustPetFaceResult {
     pub detection: RustPetFaceDetectionResult,
     pub alignment: RustPetAlignmentResult,
-    /// 0 = dog, 1 = cat
+    // 0 = dog, 1 = cat.
     pub species: u8,
     pub face_embedding: Vec<f64>,
     pub pet_face_id: String,
@@ -100,7 +100,7 @@ pub struct RustPetFaceResult {
 pub struct RustPetBodyResult {
     pub box_xyxy: Vec<f64>,
     pub score: f64,
-    /// COCO class: 15 = cat, 16 = dog
+    // COCO class: 15 = cat, 16 = dog.
     pub coco_class: u8,
     pub pet_body_id: String,
     pub body_embedding: Vec<f64>,
@@ -114,8 +114,6 @@ pub struct AnalyzeImageResult {
     pub clip: Option<RustClipResult>,
     pub pet_faces: Option<Vec<RustPetFaceResult>>,
     pub pet_bodies: Option<Vec<RustPetBodyResult>>,
-    /// True when any model that contributed to this result ran on the
-    /// respective accelerated execution provider.
     pub used_coreml: bool,
     pub used_webgpu: bool,
 }
@@ -132,10 +130,8 @@ pub struct RunClipTextResult {
     pub embedding: Vec<f64>,
 }
 
-/// Configures process-wide ML execution behavior. `enable_webgpu` opts
-/// Android into the WebGPU execution provider (off by default, and only
-/// honored on Android 12+); it has no effect on other platforms. Call this
-/// before the runtime creates its first session.
+// This setting is process-wide. WebGPU is off by default and only used on
+// Android 12+. Enable it before creating the first session.
 pub fn set_ml_execution_config(enable_webgpu: bool) {
     indexing::set_ml_execution_config(enable_webgpu);
 }
@@ -186,17 +182,16 @@ pub fn tokenize_clip_text_rust(text: String, vocab_path: String) -> Result<Vec<i
     indexing::tokenize_clip_text(&text, &vocab_path).map_err(|e| e.to_string())
 }
 
-/// A notable ML runtime event (execution provider fallback, golden self-test
-/// failure) buffered by the Rust runtime for app-side logging. `severity` is
-/// one of "info", "warning", or "severe".
+// Execution-provider fallbacks and golden self-test failures are buffered for
+// app-side logging. Severity is "info", "warning", or "severe".
 #[derive(Clone, Debug)]
 pub struct RustMlRuntimeEvent {
     pub severity: String,
     pub message: String,
 }
 
-/// Drains buffered ML runtime events. The buffer is process-wide, so drain
-/// after ML operations and log each event at its severity.
+// Drain after ML operations and log each event at its severity. The buffer is
+// process-wide.
 pub fn take_ml_runtime_events() -> Vec<RustMlRuntimeEvent> {
     ente_photos::ml::events::take_events()
         .into_iter()

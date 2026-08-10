@@ -697,7 +697,6 @@
   "deleteSharedAlbumDialogBody": "El álbum se eliminará para todos\n\nPerderás el acceso a las fotos compartidas en este álbum que son propiedad de otros",
   "deleteShareLinkConfirmation": "Las personas con este enlace ya no podran acceder al elemento.",
   "deleteSuggestions": "Eliminar sugerencias",
-  "deleteSuggestionsDesc": "Revisar los archivos que se han sugerido para su eliminación.",
   "deleteSuggestionSent": "Eliminar sugerencia enviada",
   "deleteTagMessage": "¿Estás seguro de que quieres eliminar esta etiqueta? Esta acción es irreversible.",
   "deleteTagTitle": "¿Eliminar etiqueta?",
@@ -1187,11 +1186,6 @@
     }
   },
   "freeUpDeviceSpace": "Liberar espacio del dispositivo",
-  "freeUpDeviceSpaceDesc": "Libera espacio en tu dispositivo eliminando los archivos que ya se han respaldado.",
-  "freeUpDeviceSpaceDescICloud": "Los archivos de iCloud en álbumes compartidos no pueden ser eliminados.",
-  "@freeUpDeviceSpaceDescICloud": {
-    "description": "Here 'cleared' means 'deleted' from the device"
-  },
   "freeUpSpace": "Liberar espacio",
   "gallery": "Galería",
   "galleryMemoryLimitInfo": "Hasta 1000 memorias mostradas en la galería",
@@ -1527,7 +1521,6 @@
   },
   "manage": "Administrar",
   "manageDeviceStorage": "Gestionar almacenamiento caché del dispositivo",
-  "manageDeviceStorageDesc": "Revisar y borrar almacenamiento caché local.",
   "manageFamily": "Administrar familia",
   "manageLink": "Administrar enlace",
   "manageParticipants": "Administrar",
@@ -2167,8 +2160,6 @@
   "@removeContactDesc": {
     "description": "Description for remove contact confirmation dialog"
   },
-  "removeDuplicates": "Eliminar duplicados",
-  "removeDuplicatesDesc": "Revisar y eliminar archivos que son duplicados exactos.",
   "removeFromAlbum": "Eliminar del álbum",
   "removeFromAlbumTitle": "¿Eliminar del álbum?",
   "removeFromFamily": "Eliminar de la familia",
@@ -3086,7 +3077,6 @@
   "useAsCover": "Usar como cubierta",
   "usedSpace": "Espacio usado",
   "usedYourCode": "usó tu código",
-  "useMLToFindSimilarImages": "Revisar y eliminar imágenes que se parecen entre sí.",
   "useOffline": "Usar sin copias de seguridad",
   "useRecoveryKey": "Usar clave de recuperación",
   "@useRecoveryKey": {
@@ -3145,7 +3135,6 @@
   "viewAllExifData": "Ver todos los datos EXIF",
   "viewer": "Espectador",
   "viewLargeFiles": "Archivos grandes",
-  "viewLargeFilesDesc": "Ver los archivos que consumen la mayor cantidad de almacenamiento.",
   "viewLogs": "Ver Registros",
   "@viewLogs": {
     "description": "Button to view logs"

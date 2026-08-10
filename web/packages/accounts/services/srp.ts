@@ -136,7 +136,10 @@ const generateSRPClient = async (
 ) =>
     new Promise<SrpClient>((resolve, reject) => {
         SRP.genKey((err, clientKey) => {
-            if (err) reject(err);
+            if (err) {
+                reject(err);
+                return;
+            }
             resolve(
                 new SrpClient(
                     SRP.params["4096"],

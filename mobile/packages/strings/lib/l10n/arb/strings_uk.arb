@@ -1,6 +1,7 @@
 {
   "about": "Про застосунок",
   "acceptTrustInvite": "Прийняти запрошення",
+  "account": "Акаунт",
   "accountCredentials": "Секретний ключ",
   "accountCredentialsDescription": "Зберігайте облікові дані.",
   "accountIsAlreadyConfigured": "Обліковий запис уже налаштовано.",
@@ -1110,7 +1111,6 @@
   "machineLearning": "Машинне навчання",
   "manage": "Керування",
   "manageDeviceStorage": "Керування кешем пристрою",
-  "manageDeviceStorageDesc": "Переглянути та очистити локальне сховище кешу.",
   "manageFamily": "Керування сім'єю",
   "manageLink": "Керувати посиланням",
   "manageParticipants": "Керування",
@@ -1528,8 +1528,6 @@
       "userEmail": {}
     }
   },
-  "removeDuplicates": "Вилучити дублікати",
-  "removeDuplicatesDesc": "Перегляньте та вилучіть файли, які є точними дублікатами.",
   "removeFromAlbum": "Вилучити з альбому",
   "removeFromAlbumTitle": "Вилучити з альбому?",
   "removeFromFavorite": "Вилучити з улюбленого",
@@ -2187,7 +2185,6 @@
   "viewAllExifData": "Переглянути всі дані EXIF",
   "viewer": "Глядач",
   "viewLargeFiles": "Великі файли",
-  "viewLargeFilesDesc": "Перегляньте файли, які займають найбільше місця у сховищі.",
   "viewLogs": "Переглянути журнали",
   "@viewLogs": {
     "description": "Button to view logs"

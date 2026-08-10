@@ -2,9 +2,9 @@ import "dart:async";
 
 import "package:ente_pure_utils/ente_pure_utils.dart";
 import "package:ente_strings/ente_strings.dart";
+import "package:ente_ui/components/fading_circle_progress_indicator.dart";
 import "package:flutter/foundation.dart" show kDebugMode;
 import 'package:flutter/material.dart';
-import "package:flutter_spinkit/flutter_spinkit.dart" show SpinKitFadingCircle;
 import "package:flutter_svg/svg.dart";
 import "package:intl/intl.dart";
 import 'package:logging/logging.dart';
@@ -46,8 +46,7 @@ class SimilarImagesPage extends StatefulWidget {
   State<SimilarImagesPage> createState() => _SimilarImagesPageState();
 }
 
-class _SimilarImagesPageState extends State<SimilarImagesPage>
-    with SingleTickerProviderStateMixin {
+class _SimilarImagesPageState extends State<SimilarImagesPage> {
   static const crossAxisCount = 3;
   static const crossAxisSpacing = 12.0;
   static const double _similarThreshold = 0.02;
@@ -70,7 +69,6 @@ class _SimilarImagesPageState extends State<SimilarImagesPage>
   final ItemScrollController _itemScrollController = ItemScrollController();
   final ItemPositionsListener _itemPositionsListener =
       ItemPositionsListener.create();
-  late AnimationController deleteAnimationController;
 
   List<SimilarFiles> get _filteredGroups {
     final filteredGroups = <SimilarFiles>[];
@@ -105,10 +103,6 @@ class _SimilarImagesPageState extends State<SimilarImagesPage>
     super.initState();
     _selectedFiles = SelectedFiles();
     _deleteProgress = ValueNotifier("");
-    deleteAnimationController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1200),
-    );
 
     if (!widget.debugScreen) {
       _findSimilarImages();
@@ -120,7 +114,6 @@ class _SimilarImagesPageState extends State<SimilarImagesPage>
     _isDisposed = true;
     _selectedFiles.dispose();
     _deleteProgress.dispose();
-    deleteAnimationController.dispose();
     super.dispose();
   }
 
@@ -179,12 +172,8 @@ class _SimilarImagesPageState extends State<SimilarImagesPage>
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      SizedBox(
-                        child: SpinKitFadingCircle(
-                          size: 18,
-                          color: colorScheme.warning500,
-                          controller: deleteAnimationController,
-                        ),
+                      FadingCircleProgressIndicator(
+                        color: colorScheme.warning500,
                       ),
                       const SizedBox(width: 8),
                       Text(

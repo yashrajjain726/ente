@@ -1,14 +1,15 @@
 import "package:dio/dio.dart";
 import "package:ente_components/ente_components.dart";
 import "package:ente_strings/ente_strings.dart";
+import 'package:ente_ui/components/loading_widget.dart';
 import "package:flutter/foundation.dart";
 import 'package:flutter/material.dart';
 import "package:flutter/services.dart";
+import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:photos/models/button_result.dart';
 import 'package:photos/models/typedefs.dart';
 import "package:photos/module/download/manager.dart";
 import "package:photos/service_locator.dart";
-import 'package:photos/ui/common/loading_widget.dart';
 import 'package:photos/ui/common/progress_dialog.dart';
 import 'package:photos/ui/components/action_sheet_widget.dart';
 import "package:photos/ui/components/alert_bottom_sheet.dart";
@@ -125,6 +126,19 @@ String parseErrorForUI(
       }
     }
   }
+
+  if (error is WebResourceError) {
+    if (error.type == WebResourceErrorType.HOST_LOOKUP ||
+        error.type == WebResourceErrorType.NOT_CONNECTED_TO_INTERNET ||
+        error.type == WebResourceErrorType.NETWORK_CONNECTION_LOST ||
+        error.type == WebResourceErrorType.TIMEOUT) {
+      return context.strings.networkHostLookUpErr;
+    } else if (error.type == WebResourceErrorType.CANNOT_CONNECT_TO_HOST ||
+        error.type == WebResourceErrorType.SERVER_UNREACHABLE) {
+      return context.strings.networkConnectionRefusedErr;
+    }
+  }
+
   // return generic error if the user is not internal and the error is not in debug mode
   if (!(flagService.internalUser && kDebugMode)) {
     return genericError;

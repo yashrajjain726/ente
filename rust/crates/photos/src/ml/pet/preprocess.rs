@@ -5,7 +5,6 @@ use crate::ml::{
 
 use super::{PET_EMBEDDING_CHANNELS, PET_EMBEDDING_INPUT_SIZE, PET_SPECIES_CAT};
 
-// ImageNet normalization constants
 const IMAGENET_MEAN: [f32; 3] = [0.485, 0.456, 0.406];
 const IMAGENET_STD: [f32; 3] = [0.229, 0.224, 0.225];
 
@@ -59,7 +58,7 @@ pub(super) struct PixelCrop {
     pub(super) height: u32,
 }
 
-/// Mirrors the Python pet pipeline's ImageNet-normalized CHW preprocessing.
+// Match the Python pipeline's ImageNet-normalized CHW input.
 pub(super) struct PetEmbeddingPreprocessor {
     crop_resizer: RgbCropResizer,
 }

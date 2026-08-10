@@ -440,7 +440,7 @@ fn read_exif_orientation_from_bytes(image_bytes: &[u8]) -> Option<u8> {
         .filter(|value| (1..=8).contains(value))
 }
 
-/// jxl-oxide applies codestream orientation; ignore redundant container EXIF.
+// jxl-oxide applies codestream orientation; ignore redundant container EXIF.
 fn bytes_look_like_jxl(image_bytes: &[u8]) -> bool {
     const BARE_CODESTREAM_SIGNATURE: [u8; 2] = [0xFF, 0x0A];
     const CONTAINER_SIGNATURE: [u8; 12] = [

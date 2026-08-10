@@ -779,7 +779,6 @@
   "deleteSharedAlbum": "مشترکہ البم ڈیلیٹ کریں؟",
   "deleteSharedAlbumDialogBody": "یہ البم ہر ایک کے لیے ڈیلیٹ کر دیا جائے گا\n\nآپ اس البم میں موجود ان تصاویر تک رسائی کھو دیں گے جو دوسروں کی ملکیت ہیں",
   "deleteSuggestions": "ڈیلیٹ کرنے کی تجاویز",
-  "deleteSuggestionsDesc": "ڈیلیٹ کرنے کے لیے تجویز کردہ فائلوں کا جائزہ لیں.",
   "deleteSuggestionSent": "ڈیلیٹ کرنے کی تجویز بھیج دی گئی",
   "deleteTagMessage": "کیا آپ واقعی اس ٹیگ کو حذف کرنا چاہتے ہیں؟ یہ عمل واپس نہیں لیا جا سکتا۔",
   "deleteTagTitle": "ٹیگ حذف کریں؟",
@@ -1276,11 +1275,6 @@
     }
   },
   "freeUpDeviceSpace": "ڈیوائس کی جگہ خالی کریں",
-  "freeUpDeviceSpaceDesc": "پہلے سے بیک اپ کی گئی فائلوں کو صاف کرکے اپنی ڈیوائس پر جگہ بچائیں.",
-  "freeUpDeviceSpaceDescICloud": "آئی کلاؤڈ مشترکہ البمز میں موجود فائلیں صاف نہیں کی جا سکتیں.",
-  "@freeUpDeviceSpaceDescICloud": {
-    "description": "Here 'cleared' means 'deleted' from the device"
-  },
   "freeUpSpace": "جگہ خالی کریں",
   "gallery": "گیلری",
   "galleryMemoryLimitInfo": "گیلری میں ۱۰۰۰ تک یادیں دکھائی جاتی ہیں",
@@ -1642,7 +1636,6 @@
   },
   "manage": "انتظام کریں",
   "manageDeviceStorage": "ڈیوائس کیشے کا انتظام کریں",
-  "manageDeviceStorageDesc": "مقامی کیشے اسٹوریج کا جائزہ لیں اور صاف کریں.",
   "manageFamily": "فیملی کا انتظام کریں",
   "manageLink": "لنک کا انتظام کریں",
   "manageParticipants": "انتظام کریں",
@@ -2316,8 +2309,6 @@
   "@removeContactDesc": {
     "description": "Description for remove contact confirmation dialog"
   },
-  "removeDuplicates": "ڈپلیکیٹس ہٹائیں",
-  "removeDuplicatesDesc": "ان فائلوں کا جائزہ لیں اور جو ہو بہو نقل ہیں انہیں ہٹائیں.",
   "removeFromAlbum": "البم سے ہٹائیں",
   "removeFromAlbumTitle": "البم سے ہٹائیں؟",
   "removeFromFamily": "فیملی سے ہٹائیں",
@@ -3228,7 +3219,6 @@
   "useAsCover": "بطور کور استعمال کریں",
   "usedSpace": "استعمال شدہ جگہ",
   "usedYourCode": "نے آپ کا کوڈ استعمال کیا",
-  "useMLToFindSimilarImages": "ان تصاویر کا جائزہ لیں اور ہٹائیں جو ایک دوسرے سے ملتی جلتی نظر آتی ہیں.",
   "useOffline": "بیک اپ کے بغیر استعمال کریں",
   "useSelectedPhoto": "منتخب شدہ تصویر استعمال کریں",
   "usingStorage": "{amount} استعمال کر رہے ہیں",
@@ -3296,7 +3286,6 @@
     "description": "Number of viewers that were successfully added."
   },
   "viewLargeFiles": "بڑی فائلیں",
-  "viewLargeFilesDesc": "وہ فائلیں دیکھیں جو سب سے زیادہ اسٹوریج استعمال کر رہی ہیں.",
   "viewLogs": "لاگز دیکھیں",
   "@viewLogs": {
     "description": "Button to view logs"

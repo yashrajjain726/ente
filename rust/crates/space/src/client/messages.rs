@@ -1,10 +1,3 @@
-//! Space direct messages.
-//!
-//! Messages are sealed to a per-message key that is in turn sealed to both the
-//! sender's and recipient's Space identity public keys, so either party can
-//! open them. These methods list conversations and threads, send and reply to
-//! messages (including replies to a post), and decrypt, like, and delete them.
-
 use super::{
     AccountSpaceCtx, MESSAGE_KIND_POST_REPLY, MESSAGE_KIND_REGULAR, validate_message_payload,
 };

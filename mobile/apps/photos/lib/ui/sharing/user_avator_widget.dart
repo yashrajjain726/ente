@@ -23,35 +23,39 @@ Color getUserAvatarColor(BuildContext context, User user) {
 }
 
 AvatarIdentity getUserAvatarIdentity(User user) {
+  return getUserSuggestionAvatarIdentity(UserSuggestion.fromUser(user));
+}
+
+AvatarIdentity getUserSuggestionAvatarIdentity(UserSuggestion suggestion) {
+  final resolved = resolveSuggestionIdentity(suggestion);
   return AvatarIdentity.account(
-    label: resolveDisplayName(user),
-    email: resolveKnownEmail(user) ?? user.email,
-    userID: user.id,
+    label: resolved.displayName,
+    email: resolved.knownEmail ?? suggestion.email,
+    userID: suggestion.userID,
+    currentUserID: Configuration.instance.getUserID(),
     currentUserEmail: Configuration.instance.getEmail(),
   );
 }
 
 class UserAvatarWidget extends StatefulWidget {
-  final User user;
+  final UserSuggestion suggestion;
   final AvatarType type;
-  final int currentUserID;
-  final bool thumbnailView;
-  final bool addStroke;
-  final AvatarIdentity? fallbackIdentity;
 
-  const UserAvatarWidget(
-    this.user, {
+  UserAvatarWidget(User user, {super.key, this.type = AvatarType.medium})
+    : suggestion = UserSuggestion.fromUser(user);
+
+  const UserAvatarWidget.suggestion(
+    this.suggestion, {
     super.key,
-    this.currentUserID = -1,
     this.type = AvatarType.medium,
-    this.thumbnailView = false,
-    this.addStroke = true,
-    this.fallbackIdentity,
   });
+
+  int? get userID => suggestion.userID;
+  String get email => suggestion.email;
+  AvatarIdentity get identity => getUserSuggestionAvatarIdentity(suggestion);
 
   @override
   State<UserAvatarWidget> createState() => _UserAvatarWidgetState();
-  static const strokeWidth = 1.0;
 }
 
 class _UserAvatarWidgetState extends State<UserAvatarWidget> {
@@ -83,7 +87,7 @@ class _UserAvatarWidgetState extends State<UserAvatarWidget> {
     _contactsChangedSubscription = Bus.instance
         .on<ContactsChangedEvent>()
         .listen((event) {
-          if (event.matchesContactUserId(widget.user.id)) {
+          if (event.matchesContactUserId(widget.userID)) {
             _reload();
           }
         });
@@ -92,8 +96,7 @@ class _UserAvatarWidgetState extends State<UserAvatarWidget> {
   @override
   void didUpdateWidget(covariant UserAvatarWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.user.email != widget.user.email ||
-        oldWidget.user.id != widget.user.id) {
+    if (oldWidget.email != widget.email || oldWidget.userID != widget.userID) {
       _reload();
     }
   }
@@ -110,22 +113,22 @@ class _UserAvatarWidgetState extends State<UserAvatarWidget> {
     _debouncer.run(() async {
       if (!mounted) return;
       setState(() {
-        final data = PersonService.instance.getCachedPartialPersonData(
-          userID: widget.user.id,
-          email: widget.user.email,
+        final person = PersonService.instance.getCachedPersonForUser(
+          widget.userID,
+          widget.email,
         );
-        if (data != null && data.containsKey(PersonService.kPersonIDKey)) {
+        if (person != null) {
           _canUsePersonFaceWidget = true;
-          _personId = data[PersonService.kPersonIDKey] as String;
+          _personId = person.remoteID;
           lastSyncTimeForKey = PersonService.instance.lastRemoteSyncTime();
         } else {
           _canUsePersonFaceWidget = false;
           _personId = null;
         }
         _contactPhotoBytes = PhotosContactsService.instance
-            .getCachedProfilePictureBytesByUserId(widget.user.id);
+            .getCachedProfilePictureBytesByUserId(widget.userID);
       });
-      final userId = widget.user.id;
+      final userId = widget.userID;
       if (userId == null ||
           PhotosContactsService.instance.hasResolvedProfilePictureByUserId(
             userId,
@@ -137,7 +140,7 @@ class _UserAvatarWidgetState extends State<UserAvatarWidget> {
           .getProfilePictureBytesByUserId(userId);
       if (!mounted ||
           loadGeneration != _photoLoadGeneration ||
-          widget.user.id != userId) {
+          widget.userID != userId) {
         return;
       }
       setState(() {
@@ -184,35 +187,20 @@ class _UserAvatarWidgetState extends State<UserAvatarWidget> {
                         }
                       },
                     )
-                  : _InitialsCircularAvatar(
-                      user: widget.user,
-                      type: widget.type,
-                      fallbackIdentity: widget.fallbackIdentity,
-                    ),
+                  : AvatarIdentityWidget(widget.identity, widget.type),
             ),
           )
-        : _InitialsCircularAvatar(
-            user: widget.user,
-            type: widget.type,
-            fallbackIdentity: widget.fallbackIdentity,
-          );
+        : AvatarIdentityWidget(widget.identity, widget.type);
   }
 }
 
-class _InitialsCircularAvatar extends StatelessWidget {
-  final User user;
+class AvatarIdentityWidget extends StatelessWidget {
+  final AvatarIdentity identity;
   final AvatarType type;
-  final AvatarIdentity? fallbackIdentity;
-  const _InitialsCircularAvatar({
-    required this.user,
-    required this.type,
-    required this.fallbackIdentity,
-  });
+  const AvatarIdentityWidget(this.identity, this.type, {super.key});
 
   @override
   Widget build(BuildContext context) {
-    final identity = fallbackIdentity ?? getUserAvatarIdentity(user);
-
     final avatarStyle = getAvatarStyle(context, type);
     final double size = avatarStyle.item1;
     final TextStyle textStyle = avatarStyle.item2;
@@ -270,12 +258,12 @@ double getAvatarSize(AvatarType type) {
 }
 
 class UserInitialsAvatar extends StatelessWidget {
-  final User user;
-  const UserInitialsAvatar(this.user, {super.key});
+  final UserSuggestion suggestion;
+  const UserInitialsAvatar(this.suggestion, {super.key});
 
   @override
   Widget build(BuildContext context) {
-    final identity = getUserAvatarIdentity(user);
+    final identity = getUserSuggestionAvatarIdentity(suggestion);
     return Container(
       color: avatarBackgroundColor(context, identity),
       child: Center(

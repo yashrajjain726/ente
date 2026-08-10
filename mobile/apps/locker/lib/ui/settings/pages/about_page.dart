@@ -4,7 +4,7 @@ import "package:ente_ui/components/settings/about_settings_section.dart";
 import "package:ente_ui/utils/toast_util.dart";
 import "package:flutter/material.dart";
 import "package:locker/services/update_service.dart";
-import "package:locker/ui/settings/widgets/app_update_dialog.dart";
+import "package:locker/ui/settings/app_update_sheet.dart";
 
 class AboutPage extends StatelessWidget {
   const AboutPage({super.key});
@@ -40,6 +40,6 @@ class AboutPage extends StatelessWidget {
       showShortToast(context, l10n.youAreOnTheLatestVersion);
       return;
     }
-    await showAppUpdateBottomSheet(context, latestVersionInfo: latestVersion);
+    await showAppUpdateSheet(context, latestVersionInfo: latestVersion);
   }
 }

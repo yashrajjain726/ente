@@ -901,7 +901,6 @@
   "deleteSharedAlbumDialogBody": "Альбом будет удалён для всех\n\nВы потеряете доступ к общим фото в этом альбоме, принадлежащим другим",
   "deleteShareLinkConfirmation": "Люди с этой ссылкой больше не смогут получить доступ к элементу.",
   "deleteSuggestions": "Удалить предложенное",
-  "deleteSuggestionsDesc": "Просмотрите файлы, которые были предложены для удаления.",
   "deleteSuggestionSent": "Предложение для удаления отправлено",
   "deleteTagMessage": "Вы уверены, что хотите удалить эту метку? Это действие необратимо.",
   "deleteTagTitle": "Удалить метку?",
@@ -1452,11 +1451,6 @@
       "count": {}
     }
   },
-  "freeUpDeviceSpaceDesc": "Освободите место на устройстве, удалив файлы, которые уже сохранены в резервной копии.",
-  "freeUpDeviceSpaceDescICloud": "Файлы в общих альбомах iCloud нельзя очистить.",
-  "@freeUpDeviceSpaceDescICloud": {
-    "description": "Here 'cleared' means 'deleted' from the device"
-  },
   "freeUpSpace": "Освободить место",
   "gallery": "Галерея",
   "galleryMemoryLimitInfo": "В галерее отображается до 1000 воспоминаний",
@@ -1844,7 +1838,6 @@
   },
   "manage": "Управлять",
   "manageDeviceStorage": "Управление кэшем устройства",
-  "manageDeviceStorageDesc": "Ознакомиться и очистить локальный кэш.",
   "manageFamily": "Управление семьёй",
   "manageLink": "Управлять ссылкой",
   "manageParticipants": "Управлять",
@@ -2569,8 +2562,6 @@
   "@removeContactDesc": {
     "description": "Description for remove contact confirmation dialog"
   },
-  "removeDuplicates": "Удалить дубликаты",
-  "removeDuplicatesDesc": "Проверьте и удалите файлы, которые являются точными дубликатами.",
   "removeFromAlbum": "Удалить из альбома",
   "removeFromAlbumTitle": "Удалить из альбома?",
   "removeFromFamily": "Удалить из семьи",
@@ -3601,7 +3592,6 @@
   "useAsCover": "Использовать для обложки",
   "usedSpace": "Использовано места",
   "usedYourCode": "использовали ваш код",
-  "useMLToFindSimilarImages": "Просмотрите и удалите фотографии, которые кажутся похожими.",
   "useOffline": "Использовать без резервных копий",
   "useRecoveryKey": "Использовать ключ восстановления",
   "@useRecoveryKey": {
@@ -3672,7 +3662,6 @@
     "description": "Number of viewers that were successfully added."
   },
   "viewLargeFiles": "Большие файлы",
-  "viewLargeFilesDesc": "Узнайте, какие файлы занимают больше всего места.",
   "viewLogs": "Просмотреть логи",
   "@viewLogs": {
     "description": "Button to view logs"

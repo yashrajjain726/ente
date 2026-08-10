@@ -1,7 +1,7 @@
-//! Accelerated ONNX providers must reproduce CPU-generated golden outputs
-//! because drivers can return plausible but numerically corrupt results while
-//! reporting success. Deterministic inputs exercise the same kernels as real
-//! inputs because these models have no data-dependent control flow.
+// Accelerated ONNX providers must reproduce CPU-generated golden outputs
+// because drivers can return plausible but numerically corrupt results while
+// reporting success. Deterministic inputs exercise the same kernels as real
+// inputs because these models have no data-dependent control flow.
 
 use crate::ml::golden_data::GOLDEN_ENTRIES;
 
@@ -21,23 +21,17 @@ pub(crate) const CONFIDENCE_RELATIVE_L2_THRESHOLD: f64 = 2.0;
 const MAX_REFERENCE_SAMPLES: usize = 4096;
 
 pub enum GoldenInput {
-    SeededF32 {
-        seed: u64,
-    },
-    /// Pre-tokenized CLIP text token ids.
-    I32 {
-        data: &'static [i32],
-    },
+    SeededF32 { seed: u64 },
+    I32 { data: &'static [i32] },
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum GoldenMetric {
-    /// For embedding outputs, which downstream code consumes via cosine
-    /// similarity; scale differences are irrelevant there.
+    // Embeddings are consumed through cosine similarity, so scale is
+    // irrelevant.
     CosineDistance,
-    /// For detector rows whose confidence values are much smaller than their
-    /// coordinates. Confidence and all remaining values are compared
-    /// separately so coordinate magnitudes cannot hide score corruption.
+    // Compare confidence separately so larger coordinates cannot hide score
+    // corruption.
     DetectorRelativeL2 {
         row_len: usize,
         confidence_offset: usize,
@@ -61,9 +55,10 @@ impl GoldenMetric {
 }
 
 pub struct GoldenEntry {
-    /// A changed canonical name fails closed instead of reusing a stale golden.
+    // A changed canonical name must fail closed instead of reusing a stale
+    // golden.
     pub model_file: &'static str,
-    /// Checked against the asset lock in CI, not on device.
+    // Checked against the asset lock in CI, not on device.
     pub model_sha256: &'static str,
     pub input: GoldenInput,
     pub input_shape: &'static [i64],
@@ -79,9 +74,8 @@ pub fn lookup(model_path: &str) -> Option<&'static GoldenEntry> {
         .find(|entry| matches_model_file(file_name, entry.model_file))
 }
 
-/// Downloaded model names include a sanitized URL prefix, so canonical names
-/// match at an underscore boundary as well as exactly. This mirrors
-/// `RemoteAssetsService._urlToFileName` in the photos app.
+// Downloaded names include a sanitized URL prefix. Match canonical names at an
+// underscore boundary, as `RemoteAssetsService._urlToFileName` does.
 fn matches_model_file(file_name: &str, model_file: &str) -> bool {
     if file_name == model_file {
         return true;
@@ -142,9 +136,8 @@ pub fn prepare_input(entry: &GoldenEntry) -> Result<PreparedGoldenInput, String>
     }
 }
 
-/// Deterministic uniform [0, 1) noise shared by the on-device self-test and
-/// the golden generator. xorshift64*; must never change without regenerating
-/// `golden_data.rs`.
+// Shared by the device self-test and generator. Regenerate `golden_data.rs` if
+// this sequence changes.
 pub fn seeded_noise(seed: u64, len: usize) -> Vec<f32> {
     let mut state = seed.max(1);
     (0..len)
@@ -205,9 +198,8 @@ pub fn output_distance(entry: &GoldenEntry, output: &[f32]) -> Result<f64, Strin
     })
 }
 
-/// Validates the properties required of the zero-input warm-up output. The
-/// warm-up has no numeric golden, but it must still produce a complete finite
-/// tensor before the session can proceed to the golden comparison.
+// The zero-input warm-up has no numeric golden, but must return a complete
+// finite tensor before the golden run.
 pub fn validate_output(entry: &GoldenEntry, output: &[f32]) -> Result<(), String> {
     if output.len() != entry.output_len {
         return Err(format!(

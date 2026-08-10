@@ -5,6 +5,7 @@ import "package:ente_strings/ente_strings.dart";
 import "package:ente_ui/components/settings/app_engagement_section.dart";
 import "package:ente_ui/components/settings/app_version_widget.dart";
 import "package:ente_ui/components/settings/social_icons_row.dart";
+import "package:ente_ui/pages/settings_search_page.dart";
 import "package:flutter/foundation.dart";
 import "package:flutter/material.dart";
 import "package:hugeicons/hugeicons.dart";
@@ -32,7 +33,7 @@ import "package:photos/ui/settings/inherited_settings_state.dart";
 import "package:photos/ui/settings/memories_settings_screen.dart";
 import "package:photos/ui/settings/ml/machine_learning_settings_page.dart";
 import "package:photos/ui/settings/notification_settings_screen.dart";
-import "package:photos/ui/settings/search/settings_search_page.dart";
+import "package:photos/ui/settings/search/settings_search_registry.dart";
 import "package:photos/ui/settings/security/security_settings_page.dart";
 import "package:photos/ui/settings/storage_card_widget.dart";
 import "package:photos/ui/settings/streaming/video_streaming_settings_page.dart";
@@ -214,7 +215,16 @@ class _SettingsBody extends StatelessWidget {
         icon: const HugeIcon(icon: HugeIcons.strokeRoundedSearch01),
         onTap: () {
           Navigator.of(context).push(
-            MaterialPageRoute(builder: (context) => const SettingsSearchPage()),
+            MaterialPageRoute(
+              builder: (context) => SettingsSearchPage(
+                items: SettingsSearchRegistry.getSearchableItems(context),
+                suggestions: SettingsSearchRegistry.getSuggestions(context),
+                onNavigate: (context, routeBuilder) {
+                  Navigator.of(context).pop();
+                  routeToPage(context, routeBuilder(context));
+                },
+              ),
+            ),
           );
         },
       ),

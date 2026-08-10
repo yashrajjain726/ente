@@ -37,9 +37,11 @@ export default tseslint.config(
                 "error",
                 { allowConstantLoopConditions: true },
             ],
-            // Shared files are linted by workspaces with different configs, so
-            // a local disable can be required in one run and invalid in another.
-            // We also use `||` when a blank string should select the default.
+            "@typescript-eslint/no-unused-vars": [
+                "error",
+                { ignoreRestSiblings: true },
+            ],
+            // We use `||` where a blank string should select the default.
             "@typescript-eslint/prefer-nullish-coalescing": "off",
         },
     },

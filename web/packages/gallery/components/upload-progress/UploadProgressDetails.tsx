@@ -9,6 +9,7 @@ import {
     uploadStatColors,
     type UploadStatKind,
 } from "../uploadProgressStats";
+import { uploadSheetMediaQuery } from "./bottom-sheet";
 import { useUploadProgressContext } from "./context";
 import {
     doneStatConfigs,
@@ -329,8 +330,8 @@ const statsGridSx = (isDone: boolean) => ({
     display: "grid",
     gridTemplateColumns: `repeat(${isDone ? 3 : 4}, minmax(0, 1fr))`,
     gap: "10px",
-    "@media (max-width: 620px)": {
-        gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+    [uploadSheetMediaQuery]: {
+        gridTemplateColumns: `repeat(${isDone ? 3 : 2}, minmax(0, 1fr))`,
     },
 });
 const statTileSx = (theme: Theme): SystemStyleObject<Theme> => ({
@@ -346,6 +347,7 @@ const statTileSx = (theme: Theme): SystemStyleObject<Theme> => ({
     background: "transparent",
     textAlign: "left",
     cursor: "pointer",
+    [uploadSheetMediaQuery]: { px: 1 },
     "&:hover": { backgroundColor: "rgba(0 0 0 / 0.02)" },
     "&:hover .stat-underline": { backgroundColor: "stroke.base" },
     ...theme.applyStyles("dark", {

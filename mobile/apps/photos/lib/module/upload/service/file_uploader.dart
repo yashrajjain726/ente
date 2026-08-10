@@ -51,8 +51,9 @@ class FileUploader {
   static const kMaximumConcurrentUploads = 4;
   static const kMaximumConcurrentVideoUploads = 2;
   static const kMaxFileSize10Gib = 10737418240;
+  static const kMaxFileSize20Gib = 21474836480;
   static const kBlockedUploadsPollFrequency = Duration(seconds: 2);
-  static const kFileUploadTimeout = Duration(minutes: 50);
+  static const _longRunningUploadThreshold = Duration(minutes: 50);
   static const k20MBStorageBuffer = 20 * 1024 * 1024;
   static const _lastStaleFileCleanupTime = "lastStaleFileCleanupTime";
 
@@ -258,15 +259,15 @@ class FileUploader {
   }) async {
     final file = item.file;
     final collectionID = item.collectionID;
+    final stopwatch = Stopwatch()..start();
     try {
-      final uploadedFile = await _tryToUpload(file, collectionID, forcedUpload)
-          .timeout(
-            kFileUploadTimeout,
-            onTimeout: () {
-              final message = "Upload timed out for file " + file.toString();
-              throw TimeoutException(message);
-            },
-          );
+      final uploadedFile = await _tryToUpload(file, collectionID, forcedUpload);
+      stopwatch.stop();
+      if (stopwatch.elapsed >= _longRunningUploadThreshold) {
+        _logger.info(
+          "Long-running upload completed in ${stopwatch.elapsed} for ${file.tag}",
+        );
+      }
       _queue.complete(item, uploadedFile);
       return uploadedFile;
     } catch (e) {
@@ -904,13 +905,16 @@ class FileUploader {
         throw StorageLimitExceededError();
       }
       final estimatedEncryptedSize = CryptoUtil.estimateEncryptedSize(fileSize);
-      if (estimatedEncryptedSize > kMaxFileSize10Gib) {
+      final maxFileSize = flagService.flags.internalUser
+          ? kMaxFileSize20Gib
+          : kMaxFileSize10Gib;
+      if (estimatedEncryptedSize > maxFileSize) {
         _logger.warning(
-          'Encrypted file size exceeds 10GiB sourceSize $fileSize '
+          'Encrypted file size exceeds $maxFileSize sourceSize $fileSize '
           'estimatedEncryptedSize $estimatedEncryptedSize',
         );
         throw InvalidFileError(
-          'encrypted file size above 10GiB',
+          'encrypted file size above $maxFileSize',
           InvalidReason.tooLargeFile,
         );
       }

@@ -3,7 +3,7 @@
   "acceptTrustInvite": "Chấp nhận lời mời",
   "account": "Tài khoản",
   "accountCredentials": "Khóa bí mật",
-  "accountCredentialsDescription": "Luu tru thong tin dang nhap tai khoan.",
+  "accountCredentialsDescription": "Lưu trữ thông tin đăng nhập tài khoản.",
   "accountIsAlreadyConfigured": "Tài khoản đã được cấu hình.",
   "accountOwnerPersonAppbarTitle": "{title} (Tôi)",
   "@accountOwnerPersonAppbarTitle": {
@@ -14,10 +14,22 @@
       }
     }
   },
+  "accountRecovery": "Khôi phục tài khoản",
   "accountSetupIncompleteCreateAccount": "Thiết lập tài khoản chưa hoàn tất. Hãy tạo tài khoản để hoàn tất thiết lập.",
   "@accountSetupIncompleteCreateAccount": {
     "description": "Error shown when account exists but signup is incomplete"
   },
+  "actionNotSupportedForSharedFiles": "{count, plural, other{Hành động không áp dụng với {count} tệp đã chia sẻ}}",
+  "@actionNotSupportedForSharedFiles": {
+    "description": "Message when action is not supported for shared files",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "3"
+      }
+    }
+  },
+  "actionNotSupportedOnFavouritesAlbum": "Hành động không áp dụng trong album Đã thích",
   "activeLinksWillShowUpHere": "Các liên kết hoạt động sẽ hiện ở đây",
   "activeSessions": "Phiên hoạt động",
   "@activeSessions": {
@@ -40,6 +52,12 @@
   "addANewEmail": "Thêm một email mới",
   "addCode": "Thêm mã",
   "addCollaborator": "Thêm cộng tác viên",
+  "addCollaborators": "{count, plural, =0{Thêm cộng tác viên} other{Thêm cộng tác viên}}",
+  "@addCollaborators": {
+    "placeholders": {
+      "count": {}
+    }
+  },
   "addedAMemoryTo": "đã thêm một kỷ niệm vào {albumName}",
   "@addedAMemoryTo": {
     "description": "Social notification action text shown after a person's name, for example 'John added a memory to Recents'. Make sure the translation reads naturally with a name before it, and do not capitalize the first letter.",
@@ -98,7 +116,7 @@
     }
   },
   "addedToQueue": "Đã thêm vào hàng đợi",
-  "addEmail": "Them email",
+  "addEmail": "Thêm email",
   "addFamilyMember": "Thêm thành viên gia đình",
   "addFiles": "Thêm tệp",
   "addFromDevice": "Thêm từ thiết bị",
@@ -151,8 +169,15 @@
     "description": "Action label to add selected files to an existing person."
   },
   "addTrustedContact": "Thêm liên hệ tin cậy",
+  "addTrustedPerson": "Thêm một người tin cậy",
   "addUpTo5MembersFree": "Tối đa 5 thành viên miễn phí",
   "addViewer": "Thêm người xem",
+  "addViewers": "{count, plural, =0{Thêm người xem} other{Thêm người xem}}",
+  "@addViewers": {
+    "placeholders": {
+      "count": {}
+    }
+  },
   "addYourPhotosNow": "Thêm ảnh của bạn ngay bây giờ",
   "adjust": "Điều chỉnh",
   "admin": "Quản trị",
@@ -182,7 +207,10 @@
   "after1Month": "Sau 1 tháng",
   "after1Week": "Sau 1 tuần",
   "after1Year": "Sau 1 năm",
+  "albumDescriptionHint": "Nhập mô tả cho album này",
+  "albumEditsWillNotBeSaved": "Sửa đổi của bạn với album này sẽ không được lưu.",
   "albumLayout": "Bố cục album",
+  "albumName": "Tên album",
   "albumOwner": "Chủ sở hữu",
   "@albumOwner": {
     "description": "Role of the album owner"
@@ -277,6 +305,10 @@
   },
   "aNewVersionOfEnteIsAvailable": "Ente có phiên bản mới.",
   "aNewVersionOfEnteLockerIsAvailable": "Ente Locker có phiên bản mới.",
+  "anythingElse": "Còn gì nữa không?",
+  "@anythingElse": {
+    "description": "Label for optional account deletion feedback"
+  },
   "appearance": "Giao diện",
   "appIcon": "Biểu tượng ứng dụng",
   "appleId": "ID Apple",
@@ -287,6 +319,10 @@
   "appLock": "Khóa ứng dụng",
   "@appLock": {
     "description": "App lock setting title"
+  },
+  "appLockDescription": "Chọn giữa màn hình khóa mặc định của thiết bị và màn hình khóa tùy chỉnh với PIN hoặc mật khẩu.",
+  "@appLockDescription": {
+    "description": "Description of app lock feature"
   },
   "appLockNotEnabled": "Khóa ứng dụng chưa được bật",
   "appLockNotEnabledDescription": "Vui lòng bật khóa ứng dụng từ Bảo mật > Khóa ứng dụng",
@@ -349,13 +385,28 @@
   "@authenticationSuccessful": {
     "description": "Success message when authentication is successful"
   },
+  "authenticatorCodesCount": "{count, plural, other{{formattedCount} mã xác thực}}",
+  "@authenticatorCodesCount": {
+    "description": "Delete impact row for Auth data",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "formattedCount": {
+        "type": "String"
+      }
+    }
+  },
+  "authToChangeEmailVerificationSetting": "Vui lòng xác thực để đổi cài đặt xác minh email",
   "authToChangeLockscreenSetting": "Vui lòng xác thực để thay đổi cài đặt khóa màn hình",
+  "authToChangeYourEmail": "Vui lòng xác thực để đổi email",
   "authToChangeYourPassword": "Vui lòng xác thực để đổi mật khẩu",
   "authToConfigureTwofactorAuthentication": "Vui lòng xác thực để cấu hình xác thực 2 bước",
   "authToExportCodes": "Vui lòng xác thực để xuất mã",
   "authToInitiateAccountDeletion": "Mở khóa để xóa tài khoản của bạn",
   "authToInitiateSignIn": "Vui lòng xác thực để bắt đầu sao lưu",
   "authToManageLegacy": "Vui lòng xác thực để quản lý các liên hệ tin cậy",
+  "authToManageLegacyKit": "Xác thực để quản lý Legacy Kits",
   "authToSetBackupPassword": "Xác thực để đặt mật khẩu sao lưu",
   "authToUpdateBackupPassword": "Xác thực để cập nhật mật khẩu sao lưu",
   "authToViewPasskey": "Vui lòng xác thực để xem khóa truy cập",
@@ -431,6 +482,8 @@
   "birthday": "Sinh nhật",
   "birthdayJoy": "Niềm vui sinh nhật",
   "birthdays": "Sinh nhật",
+  "blockLegacyKitRecoveryMessage": "Chặn nỗ lực khôi phục hiện tại\nLưu ý rằng họ có thể bắt đầu một nỗ lực khôi phục mới",
+  "blog": "Blog",
   "bothIssuerAndAccountCanNotBeEmpty": "Không được để trống dịch vụ và tài khoản",
   "bringYourFamilyAlong": "Mang cả gia đình bạn theo",
   "browseHelpPages": "Duyệt các trang hỗ trợ",
@@ -521,6 +574,11 @@
     "description": "Change email button label"
   },
   "changeLocationOfSelectedItems": "Thay đổi vị trí của các mục đã chọn?",
+  "changePassword": "Đổi mật khẩu",
+  "changePasswordTitle": "Đổi mật khẩu",
+  "@changePasswordTitle": {
+    "description": "Change password title"
+  },
   "changePermissions": "Thay doi quyen",
   "changePermissionsQuestion": "Thay đổi quyền?",
   "changeYourReferralCode": "Thay đổi mã",
@@ -570,9 +628,10 @@
     "description": "Appears in the similar images page, to indicate that the images are close in terms of appearance"
   },
   "closeFamilyConfirmBody": "Tất cả thành viên sẽ mất quyền truy cập vào bộ nhớ dùng chung. Quyết định này không thể đảo ngược.",
-  "closeFamilyConfirmTitle": "Đóng gói gia đình?",
-  "closeFamilyPlan": "Đóng gói gia đình",
+  "closeFamilyConfirmTitle": "Hủy gói gia đình?",
+  "closeFamilyPlan": "Hủy gói gia đình",
   "closest": "Gần nhất",
+  "cloudOnly": "Xóa bản trên thiết bị",
   "clusteringProgress": "Tiến trình phân cụm",
   "coastalCliffs": "Vách đá bên bờ biển",
   "codeAppliedPageTitle": "Mã đã được áp dụng",
@@ -602,6 +661,16 @@
   "collectionLabel": "Bo suu tap",
   "collectionRenamedSuccessfully": "Đổi tên bộ sưu tập thành công",
   "collections": "Bộ sưu tập",
+  "collectionsDeletedSuccessfully": "{count, plural, other{{count} bộ sưu tập đã được xóa thành công}}",
+  "@collectionsDeletedSuccessfully": {
+    "description": "Success message when collections are deleted",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "3"
+      }
+    }
+  },
   "collectionUpdated": "Đã cập nhật bộ sưu tập",
   "collectPhotos": "Thu thập ảnh",
   "color": "Màu sắc",
@@ -670,6 +739,10 @@
       }
     }
   },
+  "confirmDeleteAccountAcrossApps": "Tôi hiểu rằng điều này sẽ xóa dữ liệu của tôi trên Ente Photos, Ente Auth và Ente Locker.",
+  "@confirmDeleteAccountAcrossApps": {
+    "description": "Checkbox label for final account deletion confirmation"
+  },
   "confirmPassword": "Xác nhận mật khẩu",
   "@confirmPassword": {
     "description": "Confirm password field label"
@@ -678,13 +751,14 @@
   "confirmRecoveryKey": "Xác nhận mã khôi phục",
   "confirmUpdatingkey": "Bạn có chắc muốn cập nhật khóa bí mật không?",
   "confirmYourRecoveryKey": "Xác nhận mã khôi phục của bạn",
+  "congratulations": "Chúc mừng!",
   "connectToDevice": "Kết nối với thiết bị",
-  "contactDetails": "Chi tiet lien he",
-  "contactDetailsHint": "So dien thoai, email, hoac thong tin lien lac khac",
-  "contactName": "Ten lien he",
-  "contactNameHint": "Ho ten day du cua nguoi lien he khan cap",
+  "contactDetails": "Chi tiết liên hệ",
+  "contactDetailsHint": "Số điện thoại, email hoặc thông tin liên hệ khác",
+  "contactName": "Tên liên hệ",
+  "contactNameHint": "Họ tên đầy đủ của người liên hệ khẩn cấp",
   "contactNotes": "Tin nhan cho nguoi lien he",
-  "contactNotesHint": "Thong tin quan trong de chia se voi nguoi nay khi ho duoc lien lac",
+  "contactNotesHint": "Thông tin quan trọng cần chia sẻ với người này khi họ được liên hệ",
   "contacts": "Liên hệ",
   "contactSupport": "Liên hệ hỗ trợ",
   "@contactSupport": {
@@ -754,10 +828,22 @@
   "createAlbum": "Tạo album",
   "createAlbumActionHint": "Nhấn giữ để chọn ảnh và nhấn + để tạo album",
   "createAnEnteAccount": "Tạo tài khoản Ente",
+  "createAnotherKit": "Tạo kit khác",
   "createBackupNow": "Sao lưu ngay",
   "createCollaborativeLink": "Tạo liên kết cộng tác",
   "createCollage": "Tạo ảnh ghép",
   "createCollection": "Tao bo suu tap",
+  "createdOn": "Đã tạo {date}",
+  "@createdOn": {
+    "placeholders": {
+      "date": {
+        "type": "String",
+        "example": "Apr 1, 2026"
+      }
+    }
+  },
+  "createKit": "Tạo kit",
+  "createLegacyKit": "Tạo legacy kit",
   "createNewTag": "Tạo thẻ mới",
   "createPublicLink": "Tạo liên kết công khai",
   "createStream": "Tạo stream",
@@ -766,8 +852,9 @@
   "credentialName": "Tài khoản",
   "credentialNameHint": "Ten dich vu",
   "credentialNotes": "Ghi chu bo sung",
-  "credentialNotesHint": "Phuong thuc khoi phuc, cau hoi bao mat, ...",
-  "crop": "Cắt xén",
+  "credentialNotesHint": "Phương thức khôi phục, câu hỏi bảo mật...",
+  "criticalUpdateAvailable": "Có bản cập nhật quan trọng",
+  "crop": "Cắt",
   "curatedMemories": "Kỷ niệm đáng nhớ",
   "currentBackupFolder": "Thư mục sao lưu hiện tại:",
   "currentlyRunning": "đang chạy",
@@ -821,7 +908,7 @@
   "deleteCodeAuthMessage": "Xác thực để xóa mã",
   "deleteCodeMessage": "Bạn có chắc muốn xóa mã này không? Hành động này không thể hoàn tác.",
   "deleteCodeTitle": "Xóa mã?",
-  "deleteCollectionDialogBody": "{collectionName} se bi xoa vinh vien.",
+  "deleteCollectionDialogBody": "{collectionName} sẽ bị xóa vĩnh viễn.",
   "@deleteCollectionDialogBody": {
     "description": "Confirmation message body for deleting a single collection",
     "placeholders": {
@@ -831,7 +918,7 @@
       }
     }
   },
-  "deleteCollectionFromEverywhere": "Cung xoa muc khoi moi noi",
+  "deleteCollectionFromEverywhere": "Đồng thời xóa các mục từ mọi nơi",
   "@deleteCollectionFromEverywhere": {
     "description": "Checkbox label asking whether to delete collection items everywhere"
   },
@@ -857,6 +944,10 @@
   "deleteDuplicates": "Xóa trùng lặp",
   "deleteEmptyAlbums": "Xóa album trống",
   "deleteEmptyAlbumsWithQuestionMark": "Xóa album trống?",
+  "deleteEnteAccount": "Xóa tài khoản Ente",
+  "@deleteEnteAccount": {
+    "description": "Final destructive button label for account deletion"
+  },
   "deleteFiles": "Xóa các tệp",
   "deleteFromBoth": "Xóa khỏi cả hai",
   "deleteFromDevice": "Xóa khỏi thiết bị",
@@ -879,6 +970,7 @@
       }
     }
   },
+  "deleteLegacyKitMessage": "Trang tính được chia sẻ không còn có thể được sử dụng để khôi phục",
   "deleteLink": "Xóa liên kết",
   "deleteLinkQuestion": "Xóa liên kết?",
   "deleteLocation": "Xóa vị trí",
@@ -910,11 +1002,27 @@
       "totalCount": {}
     }
   },
+  "deleteReasonBehaviour": "Ứng dụng hoặc tính năng không hoạt động như tôi mong đợi",
+  "@deleteReasonBehaviour": {
+    "description": "Account deletion reason option"
+  },
+  "deleteReasonFoundAnotherService": "Tôi tìm thấy một dịch vụ khác mà tôi thích hơn",
+  "@deleteReasonFoundAnotherService": {
+    "description": "Account deletion reason option"
+  },
+  "deleteReasonMissingFeature": "Thiếu một tính năng quan trọng mà tôi cần",
+  "@deleteReasonMissingFeature": {
+    "description": "Account deletion reason option"
+  },
+  "deleteReasonNotListed": "Lý do không có trong danh sách",
+  "@deleteReasonNotListed": {
+    "description": "Account deletion reason option"
+  },
   "deleteSharedAlbum": "Xóa album chia sẻ?",
   "deleteSharedAlbumDialogBody": "Album sẽ bị xóa với tất cả mọi người\n\nBạn sẽ mất quyền truy cập vào các ảnh chia sẻ trong album này mà thuộc sở hữu của người khác",
   "deleteShareLinkConfirmation": "Nhung nguoi co lien ket nay se khong con truy cap duoc muc nay.",
   "deleteSuggestions": "Gợi ý xóa",
-  "deleteSuggestionsDesc": "Xem các tệp được gợi ý xóa.",
+  "deleteSuggestionsDesc": "Xem những mục đề xuất xóa",
   "deleteSuggestionSent": "Xóa gợi ý đã gửi",
   "deleteTagMessage": "Bạn có chắc muốn xóa thẻ này không? Hành động này không thể hoàn tác.",
   "deleteTagTitle": "Xóa thẻ?",
@@ -1106,6 +1214,7 @@
   "editAutoAddPeople": "Sửa tự động thêm người",
   "editCodeAuthMessage": "Xác thực để sửa mã",
   "editContact": "Sửa liên hệ",
+  "editDetails": "Chỉnh sửa chi tiết",
   "editEmailAlreadyLinked": "Email này đã được liên kết với {name} trước.",
   "@editEmailAlreadyLinked": {
     "placeholders": {
@@ -1526,11 +1635,6 @@
       "count": {}
     }
   },
-  "freeUpDeviceSpaceDesc": "Tiết kiệm dung lượng thiết bị của bạn bằng cách xóa các tệp đã được sao lưu.",
-  "freeUpDeviceSpaceDescICloud": "Tệp trong album chia sẻ iCloud không thể xóa.",
-  "@freeUpDeviceSpaceDescICloud": {
-    "description": "Here 'cleared' means 'deleted' from the device"
-  },
   "freeUpSpace": "Giải phóng dung lượng",
   "gallery": "Thư viện",
   "galleryMemoryLimitInfo": "Mỗi thư viện chứa tối đa 1000 ảnh và video",
@@ -1606,6 +1710,15 @@
   "ignore": "Bỏ qua",
   "ignored": "bỏ qua",
   "ignorePerson": "Bỏ qua người",
+  "imageEditorBrightness": "Độ sáng",
+  "imageEditorContrast": "Tương phản",
+  "imageEditorExposure": "Phơi sáng",
+  "imageEditorFade": "Độ mờ",
+  "imageEditorHue": "Tông màu",
+  "imageEditorLuminance": "Độ chói",
+  "imageEditorSaturation": "Bão hòa",
+  "imageEditorSharpness": "Độ nét",
+  "imageEditorTemperature": "Nhiệt độ",
   "imageNotAnalyzed": "Hình ảnh chưa được phân tích",
   "immediately": "Lập tức",
   "@immediately": {
@@ -1954,7 +2067,6 @@
   },
   "manage": "Quản lý",
   "manageDeviceStorage": "Quản lý bộ nhớ đệm thiết bị",
-  "manageDeviceStorageDesc": "Xem và xóa bộ nhớ đệm trên thiết bị.",
   "manageFamily": "Quản lý gia đình",
   "manageLink": "Quản lý liên kết",
   "manageParticipants": "Quản lý",
@@ -2724,8 +2836,6 @@
     "description": "Description for remove contact confirmation dialog"
   },
   "removeContactPhoto": "Xóa ảnh liên hệ",
-  "removeDuplicates": "Xóa tệp trùng lặp",
-  "removeDuplicatesDesc": "Xem và xóa các tệp hoàn toàn giống nhau.",
   "removeFromAlbum": "Xóa khỏi album",
   "removeFromAlbumTitle": "Xóa khỏi album?",
   "removeFromFamily": "Xóa khỏi gia đình",
@@ -2918,6 +3028,8 @@
   "ritualSendReminderLabel": "Gửi lời nhắc",
   "ritualSetAlbumToLaunchCamera": "Thiết lập một album cho thói quen này để khởi động camera.",
   "ritualShareUnavailable": "Không thể chia sẻ. Vui lòng thử lại.",
+  "ritualStartNew": "Tạo thói quen mới",
+  "ritualStartNewDescription": "Tạo thói quen, duy trì chuỗi hành động và chia sẻ tiến trình của bạn.",
   "ritualsTitle": "Thói quen",
   "ritualUntitled": "Thói quen chưa đặt tên",
   "ritualUpdate": "Cập nhật thói quen",
@@ -2935,6 +3047,7 @@
     "description": "Label for save button"
   },
   "saveAsAnotherPerson": "Lưu như một người khác",
+  "saveChanges": "Lưu thay đổi",
   "saveChangesBeforeLeavingQuestion": "Lưu thay đổi trước khi rời?",
   "saveCode": "Lưu mã",
   "saveCollage": "Lưu ảnh ghép",
@@ -3812,7 +3925,6 @@
   "useAsCover": "Đặt làm ảnh bìa",
   "usedSpace": "Dung lượng đã dùng",
   "usedYourCode": "đã dùng mã của bạn",
-  "useMLToFindSimilarImages": "Xem lại và xóa những ảnh có vẻ giống nhau.",
   "useOffline": "Sử dụng mà không sao lưu",
   "useRecoveryKey": "Dùng mã khôi phục",
   "@useRecoveryKey": {
@@ -3890,7 +4002,6 @@
     "description": "Number of viewers that were successfully added."
   },
   "viewLargeFiles": "Xóa tệp dung lượng lớn",
-  "viewLargeFilesDesc": "Xem các tệp đang chiếm dung lượng nhiều nhất.",
   "viewLogs": "Xem nhật ký",
   "@viewLogs": {
     "description": "Button to view logs"
@@ -4023,5 +4134,23 @@
   "cameraPermissionRequired": "Cần truy cập camera để chụp ảnh.",
   "cameraPermissionSettings": "Truy cập camera bị tắt. Bật nó trong Cài đặt để tiếp tục.",
   "cameraPermissionRestricted": "Quyền truy cập camera bị hạn chế trên thiết bị này.",
+  "legacyKitSheetNameJoinerOr": " hoặc ",
+  "@legacyKitSheetNameJoinerOr": {
+    "description": "Joins the last two sheet holder names in legacyKitSheetStepGetAnother. Keep the surrounding spaces"
+  },
+  "legacyKitSheetNameJoinerList": ", ",
+  "@legacyKitSheetNameJoinerList": {
+    "description": "Joins all but the last two sheet holder names in legacyKitSheetStepGetAnother. Keep the trailing space"
+  },
+  "legacyKitSheetStepVisit": "Truy cập {url}",
+  "@legacyKitSheetStepVisit": {
+    "description": "Second recovery step",
+    "placeholders": {
+      "url": {
+        "type": "String",
+        "example": "legacy.ente.com"
+      }
+    }
+  },
   "grantAccess": "Cấp quyền truy cập"
 }

@@ -327,6 +327,7 @@ func main() {
 		ObjectCleanupRepo:     objectCleanupRepo,
 		TrashRepository:       trashRepo,
 		UserRepo:              userRepo,
+		RemoteStoreRepo:       remoteStoreRepository,
 		UsageCtrl:             usageController,
 		AccessCtrl:            accessCtrl,
 		CollectionRepo:        collectionRepo,

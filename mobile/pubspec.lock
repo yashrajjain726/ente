@@ -153,15 +153,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.1.3"
-  battery_info:
-    dependency: transitive
-    description:
-      path: "."
-      ref: "95c7a9f0400b968b3bfdc98c8c10a07fb4a62ea2"
-      resolved-ref: "95c7a9f0400b968b3bfdc98c8c10a07fb4a62ea2"
-      url: "https://github.com/ente/battery_info"
-    source: git
-    version: "1.1.1"
   bidi:
     dependency: transitive
     description:
@@ -659,14 +650,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "5.0.1"
-  expansion_tile_card:
-    dependency: transitive
-    description:
-      name: expansion_tile_card
-      sha256: "27ce4cb518f00e21d0f2309aaa6462b26b148e93cee2029a73088cecf42b1eb0"
-      url: "https://pub.dev"
-    source: hosted
-    version: "3.0.0"
   extended_image:
     dependency: transitive
     description:
@@ -880,14 +863,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "3.0.5"
-  flutter_email_sender:
-    dependency: transitive
-    description:
-      name: flutter_email_sender
-      sha256: d39eb5e91358fc19ec4050da69accec21f9d5b2b6bcf188aa246327b6ca2352c
-      url: "https://pub.dev"
-    source: hosted
-    version: "7.0.0"
   flutter_image_compress:
     dependency: transitive
     description:
@@ -1658,14 +1633,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "3.3.1"
-  maps_launcher:
-    dependency: transitive
-    description:
-      name: maps_launcher
-      sha256: dac4c609720211fa6336b5903d917fe45e545c6b5665978efc3db2a3f436b1ae
-      url: "https://pub.dev"
-    source: hosted
-    version: "3.0.0+1"
   matcher:
     dependency: transitive
     description:
@@ -1990,15 +1957,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.0.3"
-  open_mail_app:
-    dependency: transitive
-    description:
-      path: "."
-      ref: "13c0244db82b386ad1a53b2451bdfda8d2687cb6"
-      resolved-ref: "13c0244db82b386ad1a53b2451bdfda8d2687cb6"
-      url: "https://github.com/ente/open-mail-app-flutter.git"
-    source: git
-    version: "0.4.4"
   otp:
     dependency: transitive
     description:
@@ -2814,14 +2772,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "3.4.0"
-  system_info_plus:
-    dependency: transitive
-    description:
-      name: system_info_plus
-      sha256: df94187e95527f9cb459e6a9f6e0b1ea20c157d8029bc233de34b3c1e17e1c48
-      url: "https://pub.dev"
-    source: hosted
-    version: "0.0.6"
   term_glyph:
     dependency: transitive
     description:
@@ -2854,22 +2804,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.6.12"
-  thermal:
-    dependency: transitive
-    description:
-      name: thermal
-      sha256: c6275ebc609e75f1bbbfc354d56d6c559a0c6045a06a8e8c3939c03306a07e18
-      url: "https://pub.dev"
-    source: hosted
-    version: "1.1.11"
-  timeago:
-    dependency: transitive
-    description:
-      name: timeago
-      sha256: b05159406a97e1cbb2b9ee4faa9fb096fe0e2dfcd8b08fcd2a00553450d3422e
-      url: "https://pub.dev"
-    source: hosted
-    version: "3.7.1"
   timezone:
     dependency: transitive
     description:
@@ -2878,14 +2812,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.10.1"
-  transparent_image:
-    dependency: transitive
-    description:
-      name: transparent_image
-      sha256: e8991d955a2094e197ca24c645efec2faf4285772a4746126ca12875e54ca02f
-      url: "https://pub.dev"
-    source: hosted
-    version: "2.0.1"
   tray_manager:
     dependency: transitive
     description:
@@ -3054,15 +2980,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.2.0"
-  video_editor:
-    dependency: transitive
-    description:
-      path: "."
-      ref: "1eeb18e2b1ce36bd8ca70178c0d4b485e9982257"
-      resolved-ref: "1eeb18e2b1ce36bd8ca70178c0d4b485e9982257"
-      url: "https://github.com/ente/video_editor_fork.git"
-    source: git
-    version: "3.0.0"
   video_player:
     dependency: transitive
     description:
@@ -3104,14 +3021,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.4.0"
-  video_thumbnail:
-    dependency: transitive
-    description:
-      name: video_thumbnail
-      sha256: "181a0c205b353918954a881f53a3441476b9e301641688a581e0c13f00dc588b"
-      url: "https://pub.dev"
-    source: hosted
-    version: "0.5.6"
   visibility_detector:
     dependency: transitive
     description:

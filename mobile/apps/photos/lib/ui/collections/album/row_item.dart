@@ -188,7 +188,7 @@ class AlbumRowItemWidget extends StatelessWidget {
                                 child: SizedBox(
                                   height: getAvatarSize(AvatarType.xs),
                                   child: _AlbumRowSharePillContent(
-                                    sharees: c.getSharees(),
+                                    sharees: c.sharees,
                                     trailingWidget: linkIcon,
                                   ),
                                 ),
@@ -231,7 +231,6 @@ class AlbumRowItemWidget extends StatelessWidget {
                                   children: [
                                     UserAvatarWidget(
                                       c.owner,
-                                      thumbnailView: true,
                                       type: AvatarType.xs,
                                     ),
                                     Positioned.fill(
@@ -434,11 +433,7 @@ class _AlbumRowSharePillContent extends StatelessWidget {
       displayCount,
       (index) => Positioned(
         left: overlapPadding * index,
-        child: UserAvatarWidget(
-          sharees[index],
-          thumbnailView: true,
-          type: type,
-        ),
+        child: UserAvatarWidget(sharees[index], type: type),
       ),
     );
 

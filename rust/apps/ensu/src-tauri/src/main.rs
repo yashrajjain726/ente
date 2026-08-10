@@ -25,7 +25,6 @@ fn main() {
                 app.path().app_data_dir()?,
             ));
 
-            // Show the main window after setup is complete
             if let Some(window) = app.get_webview_window("main")
                 && let Err(err) = window.show()
             {
@@ -66,7 +65,7 @@ fn main() {
             commands::llm::llm_generate_chat_stream,
             commands::llm::llm_cancel,
             commands::system::system_info,
-            commands::config::config_defaults,
+            commands::config::desktop_model_policy,
             commands::llm::llm_model_status,
             commands::llm::llm_migrate_models,
             commands::llm::llm_download_model,
