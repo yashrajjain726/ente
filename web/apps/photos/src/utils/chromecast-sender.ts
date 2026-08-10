@@ -1,14 +1,5 @@
 /* eslint-disable @typescript-eslint/no-namespace */
-/**
- * The types for the sender are already available as
- * "@types/chromecast-caf-sender", however installing them breaks the types for
- * the cast receiver in apps/cast. Vice-versa, having those types for the
- * receiver ("@types/chromecast-caf-receiver") conflicts with the types that we
- * add for the sender.
- *
- * As a workaround, this file includes the handpicked interface from
- * "@types/chromecast-caf-sender" for only the parts that we use.
- */
+// Sender and receiver @types conflict, so declare only the sender APIs used here.
 
 declare global {
     interface Window {
@@ -18,18 +9,11 @@ declare global {
 }
 
 declare namespace chrome.cast {
-    /**
-     * @see https://developers.google.com/cast/docs/reference/chrome/chrome.cast#.AutoJoinPolicy
-     */
     export enum AutoJoinPolicy {
         ORIGIN_SCOPED = "origin_scoped",
     }
 }
 
-/**
- * Cast Application Framework
- * @see https://developers.google.com/cast/docs/reference/chrome/cast.framework
- */
 declare namespace cast.framework {
     interface CastOptions {
         autoJoinPolicy: chrome.cast.AutoJoinPolicy;
@@ -52,9 +36,6 @@ declare namespace cast.framework {
     }
 }
 
-/**
- * Load the Chromecast script, resolving with the global `cast` object.
- */
 export const loadCast = (() => {
     let promise: Promise<typeof cast> | undefined;
 

@@ -1,3 +1,6 @@
+import type { RemotePullOpts } from "@/components/gallery";
+import { StarIcon } from "@/components/icons/StarIcon";
+import { downloadAndSaveCollectionFiles } from "@/services/save";
 import {
     CleanIcon,
     Delete02Icon,
@@ -33,7 +36,6 @@ import { SingleInputDialog } from "ente-base/components/SingleInputDialog";
 import { useModalVisibility } from "ente-base/components/utils/modal";
 import { useBaseContext } from "ente-base/context";
 import type { AddSaveGroup } from "ente-gallery/components/utils/save-groups";
-import { downloadAndSaveCollectionFiles } from "ente-gallery/services/save";
 import { uniqueFilesByID } from "ente-gallery/utils/file";
 import {
     CollectionOrder,
@@ -42,12 +44,10 @@ import {
 } from "ente-media/collection";
 import type { EnteFile } from "ente-media/file";
 import { ItemVisibility } from "ente-media/file-metadata";
-import type { RemotePullOpts } from "ente-new/photos/components/gallery";
 import {
     GalleryItemsHeaderAdapter,
     GalleryItemsSummary,
 } from "ente-new/photos/components/gallery/ListHeader";
-import { StarIcon } from "ente-new/photos/components/icons/StarIcon";
 import { useSettingsSnapshot } from "ente-new/photos/components/utils/use-snapshot";
 import {
     cleanUncategorized,
@@ -99,10 +99,6 @@ export interface CollectionHeaderProps extends Pick<
     mapFileSource?: FileListWithViewerProps["mapFileSource"];
     setActiveCollectionID: (collectionID: number) => void;
     isActiveCollectionDownloadInProgress: () => boolean;
-    /**
-     * Called when an operation (e.g. renaming a collection) completes and wants
-     * to perform a full remote pull.
-     */
     onRemotePull: (opts?: RemotePullOpts) => Promise<void>;
     onCollectionShare: () => void;
     onCollectionManageLink: () => void;
@@ -110,17 +106,9 @@ export interface CollectionHeaderProps extends Pick<
     canSetAlbumCover: boolean;
     onSetAlbumCover: () => void;
     hasActiveFileSelection: boolean;
-    /**
-     * A function that can be used to create a UI notification to track the
-     * progress of user-initiated download, and to cancel it if needed.
-     */
     onAddSaveGroup: AddSaveGroup;
 }
 
-/**
- * A header shown at the top of the list of photos in the gallery, when the
- * gallery is showing a collection.
- */
 export const CollectionHeader: React.FC<CollectionHeaderProps> = (props) => {
     const { collectionSummary } = props;
 
@@ -202,11 +190,6 @@ const CollectionHeaderOptions: React.FC<CollectionHeaderProps> = ({
         activeCollection?.magicMetadata?.data.subType ==
         CollectionSubType.quicklink;
 
-    /**
-     * Return a new function by wrapping an async function in an error handler,
-     * showing the global loading bar when the function runs, and syncing with
-     * remote on completion.
-     */
     const wrap = useCallback(
         (f: () => Promise<void>) => {
             const wrapped = async () => {
@@ -488,9 +471,7 @@ const CollectionHeaderOptions: React.FC<CollectionHeaderProps> = ({
     }, [mapEnabled, onGenericError, showMapDialog]);
 
     let menuOptions: React.ReactNode[] = [];
-    // MUI doesn't let us use fragments to pass multiple menu items, so we need
-    // to instead put them in an array. This also necessitates giving each a
-    // unique key.
+    // MUI rejects fragments here, so return keyed arrays.
     switch (collectionSummaryType) {
         case "trash":
             menuOptions = fileCount
@@ -503,7 +484,6 @@ const CollectionHeaderOptions: React.FC<CollectionHeaderProps> = ({
             break;
 
         case "uncategorized":
-            // Quick options (download + clean) are shown instead of a menu
             break;
 
         case "hiddenItems":
@@ -530,7 +510,6 @@ const CollectionHeaderOptions: React.FC<CollectionHeaderProps> = ({
                         {t("map")}
                     </OverflowMenuOption>
                 ),
-                // Pin/Unpin for shared incoming collections
                 collectionSummary.attributes.has("shareePinned") ? (
                     <OverflowMenuOption
                         key="unpin"
@@ -825,7 +804,6 @@ const CollectionHeaderOptions: React.FC<CollectionHeaderProps> = ({
     );
 };
 
-/** Props for a generic option. */
 interface OptionProps {
     onClick: () => void;
 }
@@ -1008,33 +986,6 @@ const DownloadQuickOption: React.FC<DownloadQuickOptionProps> = ({
     </Tooltip>
 );
 
-export const FeedIcon: React.FC = () => (
-    <svg
-        width="23"
-        height="20"
-        viewBox="0 0 23 20"
-        fill="none"
-        xmlns="http://www.w3.org/2000/svg"
-    >
-        <path
-            d="M9.7998 0.5C10.2416 0.5 10.5996 0.857977 10.5996 1.2998C10.5996 1.74163 10.2416 2.09961 9.7998 2.09961H4.7998C3.03249 2.09961 1.59961 3.53249 1.59961 5.2998V14.2998C1.59961 16.0671 3.0325 17.5 4.7998 17.5H13.7998C15.5671 17.5 17 16.0671 17 14.2998V11.7998C17 11.358 17.358 11 17.7998 11C18.2416 11 18.5996 11.358 18.5996 11.7998V14.2998C18.5996 16.9507 16.4507 19.0996 13.7998 19.0996H4.7998C2.14883 19.0996 0 16.9507 0 14.2998V5.2998C0 2.64884 2.14884 0.5 4.7998 0.5H9.7998Z"
-            fill="currentColor"
-        />
-        <path
-            d="M13.2998 13.5C13.7416 13.5 14.0996 13.858 14.0996 14.2998C14.0996 14.7416 13.7416 15.0996 13.2998 15.0996H4.2998C3.85798 15.0996 3.5 14.7416 3.5 14.2998C3.5 13.858 3.85798 13.5 4.2998 13.5H13.2998Z"
-            fill="currentColor"
-        />
-        <path
-            d="M10.2998 10.5C10.7416 10.5 11.0996 10.858 11.0996 11.2998C11.0996 11.7416 10.7416 12.0996 10.2998 12.0996H4.2998C3.85798 12.0996 3.5 11.7416 3.5 11.2998C3.5 10.858 3.85798 10.5 4.2998 10.5H10.2998Z"
-            fill="currentColor"
-        />
-        <path
-            d="M20.6523 6.12012C21.3761 5.2635 22.0996 4.13144 22.0996 2.93848C22.0995 1.38141 20.9626 0 19.2998 0C18.621 0 17.9847 0.205224 17.2998 0.749023C16.6149 0.205224 15.9787 0 15.2998 0C13.637 0 12.5001 1.38141 12.5 2.93848C12.5 4.13144 13.2236 5.2635 13.9473 6.12012C14.698 7.00866 15.5878 7.76218 16.1758 8.21484C16.8431 8.72865 17.7565 8.72865 18.4238 8.21484C19.0119 7.76218 19.9016 7.00866 20.6523 6.12012Z"
-            fill="currentColor"
-        />
-    </svg>
-);
-
 const showShareQuickOption = ({ type, attributes }: CollectionSummary) =>
     type == "album" ||
     type == "folder" ||
@@ -1065,7 +1016,6 @@ const ShareIcon: React.FC = () => (
     </svg>
 );
 
-/** A smaller version of ShareIcon for use in the collection header summary. */
 const SmallShareIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
     <svg
         width="15"

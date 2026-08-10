@@ -53,6 +53,9 @@ class LibrarySharingController extends ChangeNotifier {
       _selectedRoles.keys.where(_isShared).length;
   bool get canStopSharing => selectedActiveShareCount > 0 && !_isMutating;
   bool get canApply => hasSelection && !_isMutating;
+  bool get canEditSelectedRoles =>
+      !_isMutating &&
+      selectedAlbums.any((album) => album.type != CollectionType.uncategorized);
 
   CollectionParticipantRole? get selectedRole {
     if (_selectedRoles.isEmpty) {
@@ -113,10 +116,16 @@ class LibrarySharingController extends ChangeNotifier {
   CollectionParticipantRole? activeRoleFor(int collectionID) =>
       _activeRoles[collectionID];
 
-  CollectionParticipantRole stagedRoleFor(int collectionID) =>
-      _selectedRoles[collectionID] ??
-      activeRoleFor(collectionID) ??
-      _defaultRole;
+  CollectionParticipantRole stagedRoleFor(int collectionID) {
+    final role =
+        _selectedRoles[collectionID] ??
+        activeRoleFor(collectionID) ??
+        _defaultRole;
+    return normalizeLibrarySharingRole(
+      _albums.firstWhere((album) => album.id == collectionID),
+      role,
+    );
+  }
 
   void toggleSelection(Collection collection) {
     if (_isMutating || !isSelecting || !_isVisible(collection)) {
@@ -125,7 +134,7 @@ class LibrarySharingController extends ChangeNotifier {
     final id = collection.id;
     _failedCount = 0;
     if (_selectedRoles.remove(id) == null) {
-      _selectedRoles[id] = activeRoleFor(id) ?? _defaultRole;
+      _selectedRoles[id] = stagedRoleFor(id);
     }
     _exitEmptyManageMode();
     _notifyListeners();
@@ -136,7 +145,7 @@ class LibrarySharingController extends ChangeNotifier {
       return;
     }
     for (final album in _albums.where(_isVisible)) {
-      _selectedRoles[album.id] ??= activeRoleFor(album.id) ?? _defaultRole;
+      _selectedRoles[album.id] ??= stagedRoleFor(album.id);
     }
     _failedCount = 0;
     _notifyListeners();
@@ -156,7 +165,9 @@ class LibrarySharingController extends ChangeNotifier {
       return;
     }
     _defaultRole = role;
-    _selectedRoles.updateAll((_, _) => role);
+    for (final album in selectedAlbums) {
+      _selectedRoles[album.id] = normalizeLibrarySharingRole(album, role);
+    }
     _notifyListeners();
   }
 
@@ -164,7 +175,8 @@ class LibrarySharingController extends ChangeNotifier {
     if (_isMutating || !_selectedRoles.containsKey(collectionID)) {
       return;
     }
-    _selectedRoles[collectionID] = role;
+    final album = _albums.firstWhere((album) => album.id == collectionID);
+    _selectedRoles[collectionID] = normalizeLibrarySharingRole(album, role);
     _notifyListeners();
   }
 
@@ -207,31 +219,33 @@ class LibrarySharingController extends ChangeNotifier {
     );
   }
 
-  Future<bool> enableAutomaticSharing(CollectionParticipantRole role) async {
+  Future<EnableAutomaticSharingResult?> enableAutomaticSharing(
+    CollectionParticipantRole role,
+  ) async {
     if (_isLoading || _isMutating || _isAutomaticSharingEnabled) {
-      return false;
+      return null;
     }
     _beginMutation();
     try {
-      final failedIDs = await _repository.enableAutomaticSharing(
+      final result = await _repository.enableAutomaticSharing(
         recipient: recipient,
         role: role,
       );
       await _reloadAfterMutation();
-      _failedCount = failedIDs.length;
-      _isAutomaticSharingEnabled = failedIDs.isEmpty;
-      if (failedIDs.isEmpty) {
+      _failedCount = result.failedIDs.length;
+      _isAutomaticSharingEnabled = result.failedIDs.isEmpty;
+      if (result.failedIDs.isEmpty) {
         _selectionMode = null;
         _clearSelectionState();
       }
-      return failedIDs.isEmpty;
+      return result;
     } catch (error, stackTrace) {
       _logger.warning(
         'Failed to enable automatic library sharing',
         error,
         stackTrace,
       );
-      return false;
+      return null;
     } finally {
       _isMutating = false;
       _notifyListeners();

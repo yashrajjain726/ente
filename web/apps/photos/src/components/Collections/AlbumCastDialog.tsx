@@ -22,14 +22,8 @@ import React, { useCallback, useEffect, useState } from "react";
 import { Trans } from "react-i18next";
 import { z } from "zod";
 
-type AlbumCastDialogProps = ModalVisibilityProps & {
-    /** The collection that we want to cast. */
-    collection: Collection;
-};
+type AlbumCastDialogProps = ModalVisibilityProps & { collection: Collection };
 
-/**
- * A dialog that shows various options that the user has for casting an album.
- */
 export const AlbumCastDialog: React.FC<AlbumCastDialogProps> = ({
     open,
     onClose,
@@ -40,33 +34,9 @@ export const AlbumCastDialog: React.FC<AlbumCastDialogProps> = ({
     </TitledMiniDialog>
 );
 
-/**
- * [Note: MUI dialog state]
- *
- * In some cases we keep the dialog contents in a separate component so that (a)
- * they get rendered only when the dialog is shown, and (b) they get rendered
- * afresh when the dialog is unmounted and then shown again.
- *
- * Keeping it separate both resets the state of the component, and also ensures
- * that the effects run again when the dialog is shown.
- *
- * Details:
- *
- * Any state we keep inside the React component that a MUI Dialog as a child
- * gets retained across visibility changes. For example, if the
- * {@link AlbumCastDialogContents} were inlined into {@link AlbumCastDialog},
- * then if we were to open the dialog, switch over to the "pin" view, then close
- * the dialog by clicking on the backdrop, and then reopen it again, then we'd
- * still remain on the "pin" view.
- *
- * This behaviour might be desirable or undesirable, depending on the
- * circumstance. If it is undesirable, there are multiple approaches:
- * https://github.com/mui/material-ui/issues/16325
- *
- * One of those approaches is to keep the dialog contents in a separate
- * component.
- */
-export const AlbumCastDialogContents: React.FC<AlbumCastDialogProps> = ({
+// MUI preserves a dialog child's state while hidden.
+// Keep contents separate so each open starts fresh and reruns effects.
+const AlbumCastDialogContents: React.FC<AlbumCastDialogProps> = ({
     open,
     onClose,
     collection,
@@ -79,15 +49,9 @@ export const AlbumCastDialogContents: React.FC<AlbumCastDialogProps> = ({
 
     const [browserCanCast, setBrowserCanCast] = useState(false);
 
-    // The link to the cast app is to the full URL, but in the link text only
-    // show the host (e.g. for "https://cast.ente.com", show "cast.ente.com").
     const castHost = new URL(castURL).host;
 
     useEffect(() => {
-        // Determine if Chromecast is supported by the current browser
-        // (effectively, only Chrome).
-        //
-        // Override, otherwise tsc complains about unknown property `chrome`.
         // @ts-expect-error TODO: why is this needed
         // eslint-disable-next-line @typescript-eslint/dot-notation
         setBrowserCanCast(typeof window["chrome"] != "undefined");
@@ -155,11 +119,8 @@ export const AlbumCastDialogContents: React.FC<AlbumCastDialogProps> = ({
     }, [onClose, view, collection]);
 
     useEffect(() => {
-        // Make API call to clear all previous sessions (if any) whenever the
-        // dialog is opened so that the user can start a new session.
-        //
-        // This is not going to have an effect on the current client, so we
-        // don't need to wait for it to finish (and can ignore errors).
+        // Start every open with new server-side sessions.
+        // Revocation cannot affect this client, so do not block on it.
         if (open) void revokeAllCastTokens();
     }, [open]);
 
@@ -249,7 +210,4 @@ export const AlbumCastDialogContents: React.FC<AlbumCastDialogProps> = ({
     );
 };
 
-/**
- * Zod schema for the "x-cast:pair-request" payload sent by the cast app.
- */
 const CastPairRequest = z.object({ code: z.string() });

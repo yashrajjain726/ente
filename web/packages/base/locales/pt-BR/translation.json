@@ -103,7 +103,7 @@
     "import_partner_shared_photos_hint": "Importe fotos compartilhadas pelo seu parceiro no Google Photos",
     "start_import": "Iniciar importação",
     "start_upload": "Iniciar envio",
-    "gallery_empty_state_v2_subtitle": "Armazene e compartilhe suas memórias com privacidade total",
+    "gallery_empty_state_subtitle": "",
     "upload_existing_library": "Enviar sua biblioteca existente",
     "memories_secured_since_arrival_one": "{{count, number}} memória assegurada desde sua vinda",
     "memories_secured_since_arrival": "{{count, number}} memórias asseguradas desde sua vinda",

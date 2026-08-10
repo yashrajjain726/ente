@@ -267,7 +267,6 @@ export const PasteCreatePanel = ({
                                 paddingTop: { xs: "12px", sm: "14px" },
                                 paddingRight: { xs: "12px", sm: "14px" },
                                 paddingLeft: { xs: "12px", sm: "14px" },
-                                // Keep only the minimum reserve needed for the footer row.
                                 paddingBottom: { xs: "50px", sm: "56px" },
                                 backdropFilter: "blur(9px) saturate(112%)",
                                 WebkitBackdropFilter:

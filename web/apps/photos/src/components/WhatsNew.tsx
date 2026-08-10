@@ -19,16 +19,10 @@ import { SlideUpTransition } from "ente-new/photos/components/mui/SlideUpTransit
 import React, { useEffect } from "react";
 
 interface WhatsNewProps {
-    /** If `true`, then the dialog is shown. */
     open: boolean;
-    /** Called when the dialog wants to be closed. */
     onClose: () => void;
 }
 
-/**
- * A dialog showing a short summary of interesting-for-the-user things since the
- * last time this dialog was shown.
- */
 export const WhatsNew: React.FC<WhatsNewProps> = ({ open, onClose }) => {
     const fullScreen = useIsSmallWidth();
 
@@ -73,8 +67,7 @@ export const WhatsNew: React.FC<WhatsNewProps> = ({ open, onClose }) => {
 };
 
 const ChangelogContent: React.FC = () => {
-    // NOTE: Remember to update changelogVersion when changing the content
-    // below.
+    // Update changelogVersion whenever this content changes.
 
     return (
         <Stack sx={{ gap: 2, mb: 1 }}>
@@ -93,8 +86,6 @@ const ChangelogContent: React.FC = () => {
 };
 
 const ButtonContents = styled("div")`
-    /* Make the button text fill the entire space so the endIcon shows at the
-       trailing edge of the button. */
     width: 100%;
     text-align: left;
 `;

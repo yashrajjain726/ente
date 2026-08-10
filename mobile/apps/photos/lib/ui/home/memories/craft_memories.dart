@@ -4,6 +4,7 @@ import "package:flutter/material.dart";
 import "package:hugeicons/hugeicons.dart";
 import "package:photos/service_locator.dart";
 import "package:photos/services/notification_service.dart";
+import "package:photos/ui/home/memories/horts.dart";
 import "package:photos/ui/home/memories/memory_cover_widget.dart";
 
 class CraftMemories extends StatelessWidget {
@@ -44,9 +45,7 @@ class CraftMemories extends StatelessWidget {
                   },
                   child: Stack(
                     children: [
-                      Positioned.fill(
-                        child: Image.asset("assets/memories.jpg", fit: .cover),
-                      ),
+                      const Positioned.fill(child: Horts()),
                       Padding(
                         padding: EdgeInsets.all(width * 0.125),
                         child: Column(
@@ -108,8 +107,8 @@ class CraftMemories extends StatelessWidget {
                 ),
               ),
               Positioned(
-                right: width * 0.02,
-                top: width * 0.02,
+                right: 0,
+                top: 0,
                 child: Tooltip(
                   message: l10n.close,
                   child: GestureDetector(
@@ -120,9 +119,9 @@ class CraftMemories extends StatelessWidget {
                       onNotificationsPermissionGranted?.call();
                     },
                     child: Padding(
-                      padding: const EdgeInsets.all(8),
+                      padding: EdgeInsets.all(width * 0.08),
                       child: SizedBox.square(
-                        dimension: 20,
+                        dimension: 16,
                         child: DecoratedBox(
                           decoration: const BoxDecoration(
                             color: Color(0x4AFFFFFF),

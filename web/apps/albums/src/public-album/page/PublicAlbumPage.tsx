@@ -177,7 +177,6 @@ export default function PublicAlbumPage() {
         useState(false);
     const publicFeedSidebarOpenRef = useRef(publicFeedVisibilityProps.open);
 
-    // Pending navigation from feed item click
     const [pendingFileNavigation, setPendingFileNavigation] = useState<{
         fileIndex: number;
         sidebar?: FileViewerInitialSidebar;
@@ -198,26 +197,19 @@ export default function PublicAlbumPage() {
         }
     }, []);
 
-    /**
-     * Handle clicks on feed items to navigate to the file and open sidebar.
-     */
     const handleFeedItemClick = (info: PublicFeedItemClickInfo) => {
         if (!publicFiles) return;
 
-        // Find the file index in publicFiles
         const fileIndex = publicFiles.findIndex((f) => f.id === info.fileID);
         if (fileIndex === -1) return;
 
-        // Close the feed sidebar
         publicFeedVisibilityProps.onClose();
 
-        // Determine which sidebar to open
         const sidebar: FileViewerInitialSidebar =
             info.type === "liked_photo" || info.type === "liked_video"
                 ? "likes"
                 : "comments";
 
-        // Set navigation state
         setPendingFileNavigation({
             fileIndex,
             sidebar,
@@ -248,11 +240,7 @@ export default function PublicAlbumPage() {
             cancel: false,
         });
 
-    /**
-     * Check if we need to redirect Trip albums from custom domains to albums.ente.com
-     * Returns true if a redirect was initiated, false otherwise.
-     * Reason: custom domains do not support the Trip layout fully
-     */
+    // Ente-hosted trip albums are only fully supported on albums.ente.com.
     const checkAndRedirectForTripAlbum = (collection: Collection): boolean => {
         if (
             isCustomAPIOrigin ||
@@ -279,10 +267,6 @@ export default function PublicAlbumPage() {
     };
 
     useEffect(() => {
-        /**
-         * Determine credentials, read the locally cached state, then start
-         * pulling the latest from remote.
-         */
         const main = async () => {
             let redirectingToWebsite = false;
             try {
@@ -302,7 +286,6 @@ export default function PublicAlbumPage() {
                 ]);
                 const ck = await extractCollectionKeyFromShareURL(currentURL);
                 if (!accessToken && !ck) {
-                    // Only redirect to ente.com if this is not a self-hosted instance.
                     if (!isCustomAPIOrigin) {
                         window.location.href = "https://ente.com";
                         redirectingToWebsite = true;
@@ -378,10 +361,6 @@ export default function PublicAlbumPage() {
         }
     }, [dragAndDropFiles.length, isUploadInProgress, uploadTypeSelectorView]);
 
-    /**
-     * Pull the latest data related to the public album from remote, updating
-     * both our local database and component state.
-     */
     const publicAlbumsRemotePull = useCallback(async () => {
         const accessToken = credentials.current!.accessToken;
         showLoadingBar();
@@ -425,8 +404,6 @@ export default function PublicAlbumPage() {
             setIsPasswordProtected(isPasswordProtected);
             setErrorMessage("");
 
-            // Remove the locally cached accessTokenJWT if the sharer has
-            // disabled password protection on the link.
             if (!isPasswordProtected && credentials.current?.accessTokenJWT) {
                 credentials.current.accessTokenJWT = undefined;
                 setPublicAlbumsCredentials(credentials.current);
@@ -446,16 +423,8 @@ export default function PublicAlbumPage() {
                             ),
                     );
                 } catch (e) {
-                    // If we reached the try block and attempted to pull files,
-                    // it means the accessToken itself is very likely valid
-                    // (since the `pullCollection` succeeded just a moment ago).
-                    //
-                    // So a 401 Unauthorized now indicates that the
-                    // accessTokenJWT is no longer valid since the sharer has
-                    // changed the password.
-                    //
-                    // Clear the locally cached accessTokenJWT and ask the user
-                    // to reenter the password.
+                    // Collection access already succeeded.
+                    // A 401 here means the password JWT is invalid.
                     if (isHTTP401Error(e)) {
                         credentials.current!.accessTokenJWT = undefined;
                         setPublicAlbumsCredentials(credentials.current);
@@ -466,15 +435,6 @@ export default function PublicAlbumPage() {
             }
         } catch (e) {
             const isDeviceLimitExceeded = await isDeviceLimitExceededError(e);
-            // The 410 Gone or device-limit failure can arise from either the
-            // collection pull or the files pull since they're part of the
-            // remote's access token check sequence.
-            //
-            // In practice, it almost always will be a consequence of the
-            // collection pull since it happens first.
-            //
-            // The 401 Unauthorized can only arise from the collection pull
-            // since we already handle that separately for the files pull.
             if (
                 isHTTPErrorWithStatus(e, 401) ||
                 isHTTPErrorWithStatus(e, 410) ||
@@ -492,15 +452,13 @@ export default function PublicAlbumPage() {
                         ? t("link_request_limit_exceeded")
                         : t("link_expired_message"),
                 );
-                // Sharing has been disabled. Clear out local cache.
                 await removePublicCollectionFileData(accessToken);
                 await removePublicCollectionByKey(collectionKey.current!);
                 setPublicCollection(undefined);
                 setPublicFiles(undefined);
             } else {
                 log.error("Public album remote pull failed", e);
-                // Don't use the `setErrorMessage`, show a dialog instead,
-                // because this might be a transient network error.
+                // Preserve cached state because this failure may be transient.
                 onGenericError(e);
             }
         } finally {
@@ -511,7 +469,7 @@ export default function PublicAlbumPage() {
         }
     }, [showLoadingBar, hideLoadingBar, onGenericError]);
 
-    // See: [Note: Visual feedback to acknowledge user actions]
+    // Briefly show the loading bar when an action has no other visible effect.
     const handleVisualFeedback = useCallback(() => {
         showLoadingBar();
         setTimeout(hideLoadingBar, 0);
@@ -885,10 +843,6 @@ export default function PublicAlbumPage() {
     );
 }
 
-/**
- * Sort the given {@link files} using {@link sortFiles}, using the ascending
- * ordering preference if specified in the given {@link collection}'s metadata.
- */
 const sortFilesForCollection = (files: EnteFile[], collection?: Collection) =>
     sortFiles(files, collection?.pubMagicMetadata?.data.asc ?? false);
 
@@ -1022,7 +976,6 @@ const LazyCollectDropZone: React.FC<LazyCollectDropZoneProps> = ({
 };
 
 const EnteLogoLink = styled("a")(({ theme }) => ({
-    // Remove the excess space at the top.
     svg: { verticalAlign: "middle" },
     color: theme.vars.palette.text.base,
     ":hover": { color: theme.vars.palette.accent.main },
@@ -1152,24 +1105,10 @@ interface FileListHeaderProps {
     showMobileMasonryCover: boolean;
 }
 
-/**
- * The fixed height (in px) of {@link FileListHeader}.
- */
 const fileListHeaderHeight = 84;
 
-/**
- * The height (in px) of {@link FileListHeader} on mobile.
- *
- * Keep this fixed so the virtualized list has a stable header row height.
- */
 const fileListHeaderHeightMobile = 132;
 
-/**
- * A header shown before the listing of files.
- *
- * It scrolls along with the content. It has a fixed height,
- * {@link fileListHeaderHeight}.
- */
 const FileListHeader: React.FC<FileListHeaderProps> = ({
     publicCollection,
     publicFiles,
@@ -1712,22 +1651,10 @@ const MobileMasonryCoverTitle = styled(Typography)({
     overflowWrap: "anywhere",
 });
 
-/**
- * The default height (in px) of {@link FileListFooter}.
- */
 const fileListFooterHeight = 24;
 
-/**
- * The compact trailing gap used after the final photo in the mobile masonry
- * cover layout.
- */
 const mobileMasonryFileListFooterHeight = thumbnailGap;
 
-/**
- * A footer shown after the listing of files.
- *
- * It scrolls along with the content.
- */
 const FileListFooter: React.FC<{ height: number }> = ({ height }) => (
     <Box sx={{ height }} />
 );

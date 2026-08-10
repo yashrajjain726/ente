@@ -308,15 +308,39 @@ Future<void> _downloadAndDecryptThumbnail(_ThumbnailDownload item) async {
       final headers = CollectionsService.instance.publicCollectionHeaders(
         file.collectionID!,
       );
+      final signedUrl = await FileUrl.tryGetV3Url(
+        NetworkClient.instance.enteDio,
+        file.uploadedFileID!,
+        FileUrlType.publicThumbnail,
+        headers: headers,
+      );
       encryptedThumbnail = (await NetworkClient.instance.downloadDio.get(
-        FileUrl.getUrl(file.uploadedFileID!, FileUrlType.publicThumbnail),
-        options: Options(headers: headers, responseType: ResponseType.bytes),
+        signedUrl ??
+            FileUrl.getLegacyUrl(
+              file.uploadedFileID!,
+              FileUrlType.publicThumbnail,
+            ),
+        options: Options(
+          headers: signedUrl == null ? headers : null,
+          responseType: ResponseType.bytes,
+        ),
       )).data;
     } else {
+      final headers = <String, dynamic>{
+        "X-Auth-Token": Configuration.instance.getToken(),
+      };
+      final signedUrl = await FileUrl.tryGetV3Url(
+        NetworkClient.instance.enteDio,
+        file.uploadedFileID!,
+        FileUrlType.thumbnail,
+        headers: headers,
+        cancelToken: item.cancelToken,
+      );
       encryptedThumbnail = (await NetworkClient.instance.downloadDio.get(
-        FileUrl.getUrl(file.uploadedFileID!, FileUrlType.thumbnail),
+        signedUrl ??
+            FileUrl.getLegacyUrl(file.uploadedFileID!, FileUrlType.thumbnail),
         options: Options(
-          headers: {"X-Auth-Token": Configuration.instance.getToken()},
+          headers: signedUrl == null ? headers : null,
           responseType: ResponseType.bytes,
         ),
         cancelToken: item.cancelToken,

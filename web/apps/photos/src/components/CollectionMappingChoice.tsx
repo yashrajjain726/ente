@@ -16,17 +16,9 @@ import { t } from "i18next";
 import React from "react";
 
 type CollectionMappingChoiceProps = ModalVisibilityProps & {
-    /**
-     * Callback invoked with the mapping choice selected by the user.
-     *
-     * The dialog is automatically closed before this callback is invoked.
-     */
     onSelect: (mapping: CollectionMapping) => void;
 };
 
-/**
- * A {@link Dialog} that allow the user to choose a collection mapping.
- */
 export const CollectionMappingChoice: React.FC<
     CollectionMappingChoiceProps
 > = ({ open, onClose, onSelect }) => (

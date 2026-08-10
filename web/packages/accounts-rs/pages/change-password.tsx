@@ -22,17 +22,11 @@ import {
 } from "../components/NewPasswordForm";
 import { savedLocalUser } from "../services/accounts-db";
 
-/**
- * A page that allows a user to reset or change their password.
- *
- * See: [Note: Login pages]
- */
 const Page: React.FC = () => {
     const [user, setUser] = useState<LocalUser | undefined>(undefined);
 
     const router = useRouter();
 
-    // We're invoked with the "?op=reset" query parameter in the recovery flow.
     const isReset = router.query.op == "reset";
 
     useEffect(() => {
@@ -56,9 +50,6 @@ export default Page;
 
 interface PageContentsProps {
     user: LocalUser;
-    /**
-     * True if the password is being reset during the account recovery flow.
-     */
     isReset: boolean;
 }
 

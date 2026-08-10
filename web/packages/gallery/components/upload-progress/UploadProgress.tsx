@@ -49,16 +49,6 @@ function UploadProgressBody({
     preUploadSkippedFiles = emptyPreUploadSkippedFiles,
     cancelUploads,
 }: UploadProgressProps) {
-    /**
-     * expanded: This variable decides whether the full upload progress
-     * modal should be shown or just the compact one is fine.
-     *
-     * dragPosition: For facilitating the drag of the compact upload widget
-     * across the screen.
-     *
-     * showStopConfirmation: If the user tries to close the upload, we show
-     * a confirmation modal, and this variable is the decider for that.
-     */
     const [expanded, setExpanded] = useState(false);
     const [dragPosition, setDragPosition] = useState<DragPosition>();
     const [showStopConfirmation, setShowStopConfirmation] = useState(false);

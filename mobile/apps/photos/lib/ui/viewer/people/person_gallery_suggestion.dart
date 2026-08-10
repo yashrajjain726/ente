@@ -45,6 +45,8 @@ class _PersonGallerySuggestionState extends State<PersonGallerySuggestion>
   bool isPreparingNext = false;
   bool hasCurrentSuggestion = false;
   Map<int, Map<int, Uint8List?>> precomputedFaceCrops = {};
+  late final StreamSubscription<PeopleChangedEvent> _peopleChangedEvent;
+  int _suggestionLoadID = 0;
 
   PersonEntity? person;
   bool get personPage => widget.person != null;
@@ -60,6 +62,13 @@ class _PersonGallerySuggestionState extends State<PersonGallerySuggestion>
     super.initState();
     person = widget.person;
     _initializeAnimations();
+    _peopleChangedEvent = Bus.instance.on<PeopleChangedEvent>().listen((event) {
+      if (personPage &&
+          event.type == PeopleEventType.reviewedSuggestion &&
+          event.person?.remoteID == widget.person!.remoteID) {
+        unawaited(_reloadSuggestions());
+      }
+    });
     _loadInitialSuggestion();
   }
 
@@ -87,6 +96,7 @@ class _PersonGallerySuggestionState extends State<PersonGallerySuggestion>
   }
 
   Future<void> _loadInitialSuggestion() async {
+    final loadID = ++_suggestionLoadID;
     try {
       late final List<ClusterSuggestion> suggestions;
       if (personPage) {
@@ -100,7 +110,7 @@ class _PersonGallerySuggestionState extends State<PersonGallerySuggestion>
         }
       }
 
-      if (suggestions.isNotEmpty && mounted) {
+      if (suggestions.isNotEmpty && mounted && loadID == _suggestionLoadID) {
         allSuggestions = suggestions;
         currentSuggestionIndex = 0;
 
@@ -109,7 +119,7 @@ class _PersonGallerySuggestionState extends State<PersonGallerySuggestion>
           allSuggestions[0].clusterIDToMerge,
         );
 
-        if (mounted) {
+        if (mounted && loadID == _suggestionLoadID) {
           setState(() {
             faceCrops = crops;
             isLoading = false;
@@ -117,23 +127,33 @@ class _PersonGallerySuggestionState extends State<PersonGallerySuggestion>
           });
         }
 
-        if (mounted && _fadeController != null && _slideController != null) {
+        if (mounted &&
+            loadID == _suggestionLoadID &&
+            _fadeController != null &&
+            _slideController != null) {
           unawaited(_fadeController?.forward());
           unawaited(_slideController?.forward());
         }
 
-        unawaited(_precomputeNextSuggestions());
+        unawaited(_precomputeNextSuggestions(loadID));
       } else {
         _logger.info("No suggestions found");
-        if (mounted) {
+        if (mounted && loadID == _suggestionLoadID) {
           setState(() {
+            allSuggestions = [];
+            currentSuggestionIndex = 0;
+            faceCrops = {};
+            precomputedFaceCrops = {};
             isLoading = false;
+            isProcessing = false;
+            isPreparingNext = false;
+            hasCurrentSuggestion = false;
           });
         }
       }
     } catch (e, s) {
       _logger.severe("Error loading suggestion", e, s);
-      if (mounted) {
+      if (mounted && loadID == _suggestionLoadID) {
         setState(() {
           isLoading = false;
         });
@@ -141,7 +161,26 @@ class _PersonGallerySuggestionState extends State<PersonGallerySuggestion>
     }
   }
 
-  Future<void> _precomputeNextSuggestions() async {
+  Future<void> _reloadSuggestions() async {
+    _slideController?.reset();
+    _fadeController?.reset();
+    if (mounted) {
+      setState(() {
+        isLoading = true;
+        isProcessing = false;
+        isPreparingNext = false;
+        hasCurrentSuggestion = false;
+        allSuggestions = [];
+        currentSuggestionIndex = 0;
+        faceCrops = {};
+        precomputedFaceCrops = {};
+      });
+    }
+    await _loadInitialSuggestion();
+  }
+
+  Future<void> _precomputeNextSuggestions([int? expectedLoadID]) async {
+    final loadID = expectedLoadID ?? _suggestionLoadID;
     try {
       // Precompute face crops for next two suggestions
       const maxPrecompute = 2;
@@ -151,7 +190,7 @@ class _PersonGallerySuggestionState extends State<PersonGallerySuggestion>
       );
 
       for (int i = currentSuggestionIndex + 1; i < endIndex; i++) {
-        if (!mounted) break;
+        if (!mounted || loadID != _suggestionLoadID) break;
 
         final suggestion = allSuggestions[i];
         final crops = await _generateFaceThumbnails(
@@ -159,7 +198,7 @@ class _PersonGallerySuggestionState extends State<PersonGallerySuggestion>
           suggestion.clusterIDToMerge,
         );
 
-        if (mounted) {
+        if (mounted && loadID == _suggestionLoadID) {
           precomputedFaceCrops[i] = crops;
         }
       }
@@ -421,6 +460,8 @@ class _PersonGallerySuggestionState extends State<PersonGallerySuggestion>
 
   @override
   void dispose() {
+    _suggestionLoadID++;
+    _peopleChangedEvent.cancel();
     _slideController?.dispose();
     _fadeController?.dispose();
     super.dispose();

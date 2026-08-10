@@ -83,7 +83,6 @@ export const fetchLocationNames = async ({
         return { updatedPhotos };
     }
 
-    // Create all geocoding promises at once for parallel execution
     const geocodingPromises = photoClusters.map(async (cluster) => {
         if (cluster.length === 0) return null;
 
@@ -102,10 +101,8 @@ export const fetchLocationNames = async ({
         }
     });
 
-    // Execute all geocoding requests in parallel
     const results = await Promise.all(geocodingPromises);
 
-    // Process results and update maps
     results.forEach((result) => {
         if (!result) return; // Skip failed requests
 
@@ -155,12 +152,8 @@ export const generateNeededThumbnails = async ({
         group.push(file);
     };
 
-    // Define priority groups with specific file collections
     const priorityGroups: EnteFile[][] = [];
 
-    // Priority 1: Cover image (handled separately in loadCoverImage, skip here)
-
-    // Priority 2: First 3 locations photosfans (first 3 photos from each)
     const firstLocationsFiles: EnteFile[] = [];
     photoClusters.slice(0, 3).forEach((cluster) => {
         cluster.slice(0, 3).forEach((photo) => {
@@ -171,7 +164,6 @@ export const generateNeededThumbnails = async ({
         priorityGroups.push(firstLocationsFiles);
     }
 
-    // Priority 3: Map marker photos (first photo from each cluster for markers)
     const mapMarkerFiles: EnteFile[] = [];
     photoClusters.forEach((cluster) => {
         if (cluster.length > 0 && cluster[0]) {
@@ -183,7 +175,6 @@ export const generateNeededThumbnails = async ({
         priorityGroups.push(mapMarkerFiles);
     }
 
-    // Priority 4: Rest of locations photosfans (remaining locations, first 3 from each)
     const remainingLocationFiles: EnteFile[] = [];
     photoClusters.slice(3).forEach((cluster) => {
         cluster.slice(0, 3).forEach((photo) => {
@@ -194,12 +185,10 @@ export const generateNeededThumbnails = async ({
         priorityGroups.push(remainingLocationFiles);
     }
 
-    // Process priority groups sequentially with delays
     for (let groupIndex = 0; groupIndex < priorityGroups.length; groupIndex++) {
         const group = priorityGroups[groupIndex];
         if (!group) continue;
 
-        // Process files in parallel within each priority group
         const groupPromises = group.map(async (file) => {
             try {
                 const thumbnailUrl =
@@ -214,7 +203,7 @@ export const generateNeededThumbnails = async ({
 
         await Promise.all(groupPromises);
 
-        // Add small delay between priority groups to allow UI updates
+        // Yield so thumbnails from this priority group can render.
         if (groupIndex < priorityGroups.length - 1) {
             await new Promise((resolve) => setTimeout(resolve, 50));
         }
@@ -238,13 +227,11 @@ export const loadCoverImage = async ({
 
     let coverFile: EnteFile | undefined;
 
-    // Priority 1: Use explicit cover ID if set
     const coverID = collection?.pubMagicMetadata?.data.coverID;
     if (coverID) {
         coverFile = files.find((f) => f.id === coverID);
     }
 
-    // Priority 2: Use first chronological photo as cover (highest priority)
     if (!coverFile) {
         const firstPhoto = journeyData[0];
         if (!firstPhoto) return null;
@@ -254,7 +241,6 @@ export const loadCoverImage = async ({
     if (!coverFile) return null;
 
     try {
-        // Load cover image at highest quality first (highest priority)
         const sourceURLs =
             await downloadManager.renderableSourceURLs(coverFile);
         if (sourceURLs.type === "image") {

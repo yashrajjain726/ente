@@ -2,6 +2,7 @@ import "dart:async";
 import "dart:io";
 
 import "package:ente_components/ente_components.dart";
+import "package:ente_lock_screen/local_authentication_service.dart";
 import "package:ente_pure_utils/ente_pure_utils.dart";
 import "package:ente_strings/ente_strings.dart";
 import "package:flutter/foundation.dart" show kDebugMode;
@@ -52,6 +53,12 @@ class _FreeUpSpaceOptionsScreenState extends State<FreeUpSpaceOptionsScreen> {
           subtitle: l10n.restoreOrPermanentlyDeleteItems,
           icon: HugeIcons.strokeRoundedDelete01,
           onTap: () async {
+            final hasAuthenticated = await LocalAuthenticationService.instance
+                .requestLocalAuthentication(
+                  context,
+                  l10n.authToViewTrashedFiles,
+                );
+            if (!hasAuthenticated || !context.mounted) return;
             await routeToPage(context, TrashPage());
           },
         ),

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:ente_pure_utils/ente_pure_utils.dart';
 import 'package:logging/logging.dart';
 import 'package:photos/core/configuration.dart';
+import 'package:photos/core/errors.dart';
 import 'package:photos/core/event_bus.dart';
 import 'package:photos/events/collection_updated_event.dart';
 import 'package:photos/events/user_details_changed_event.dart';
@@ -11,6 +12,7 @@ import 'package:photos/models/collection/collection.dart';
 import 'package:photos/models/library_sharing/library_sharing_recipient.dart';
 import 'package:photos/models/metadata/collection_magic.dart';
 import 'package:photos/models/metadata/common_keys.dart';
+import 'package:photos/models/user_details.dart';
 import 'package:photos/services/account/user_service.dart';
 import 'package:photos/services/collections_service.dart';
 import 'package:photos/services/library_sharing_local_store.dart';
@@ -30,6 +32,11 @@ const _reconcileEventSources = {
   'collection_visibility_changed',
 };
 
+typedef EnableAutomaticSharingResult = ({
+  Set<int> failedIDs,
+  Set<int> previouslyUnsharedIDs,
+});
+
 CollectionParticipantRole? librarySharingRoleFor(
   Collection collection,
   int userID,
@@ -42,6 +49,13 @@ CollectionParticipantRole? librarySharingRoleFor(
   }
   return null;
 }
+
+CollectionParticipantRole normalizeLibrarySharingRole(
+  Collection collection,
+  CollectionParticipantRole role,
+) => collection.type == CollectionType.uncategorized
+    ? CollectionParticipantRole.viewer
+    : role;
 
 abstract interface class LibrarySharingRepository {
   Future<List<Collection>> getEligibleAlbums();
@@ -58,7 +72,7 @@ abstract interface class LibrarySharingRepository {
 
   Future<bool> isAutomaticSharingEnabled(int recipientUserID);
 
-  Future<Set<int>> enableAutomaticSharing({
+  Future<EnableAutomaticSharingResult> enableAutomaticSharing({
     required LibrarySharingRecipient recipient,
     required CollectionParticipantRole role,
   });
@@ -104,9 +118,17 @@ class LibrarySharingService implements LibrarySharingRepository {
 
   @override
   Future<List<Collection>> getEligibleAlbums() async {
-    final albums = _eligibleAlbums().toList();
-    await _collectionsService.sortCollectionsByAlbumPreferences(albums);
-    return albums;
+    final collections = _eligibleAlbums().toList();
+    return [
+      ...await _collectionsService.orderCollectionsForAlbums(
+        collections.where(
+          (collection) => collection.type != CollectionType.uncategorized,
+        ),
+      ),
+      ...collections.where(
+        (collection) => collection.type == CollectionType.uncategorized,
+      ),
+    ];
   }
 
   @override
@@ -115,7 +137,7 @@ class LibrarySharingService implements LibrarySharingRepository {
     required Map<int, CollectionParticipantRole> roles,
   }) => _operationLock.synchronized(() async {
     final ownerUserID = _currentOwnerUserID();
-    final publicKey = await _requirePublicKey(recipient.userID);
+    final publicKey = await _requirePublicKey(recipient.email);
     final statuses = await _shareInBatches(
       ownerUserID: ownerUserID,
       recipientUserID: recipient.userID,
@@ -209,20 +231,20 @@ class LibrarySharingService implements LibrarySharingRepository {
   }
 
   @override
-  Future<Set<int>> enableAutomaticSharing({
+  Future<EnableAutomaticSharingResult> enableAutomaticSharing({
     required LibrarySharingRecipient recipient,
     required CollectionParticipantRole role,
   }) async {
-    final failedIDs = await _operationLock.synchronized(
+    final result = await _operationLock.synchronized(
       () => _enableAutomaticSharing(recipient, role),
     );
-    if (failedIDs.isEmpty) {
+    if (result.failedIDs.isEmpty) {
       await reconcile();
     }
-    return failedIDs;
+    return result;
   }
 
-  Future<Set<int>> _enableAutomaticSharing(
+  Future<EnableAutomaticSharingResult> _enableAutomaticSharing(
     LibrarySharingRecipient recipient,
     CollectionParticipantRole role,
   ) async {
@@ -230,7 +252,7 @@ class LibrarySharingService implements LibrarySharingRepository {
       throw ArgumentError.value(role, 'role');
     }
     final ownerUserID = _currentOwnerUserID();
-    final publicKey = await _requirePublicKey(recipient.userID);
+    final publicKey = await _requirePublicKey(recipient.email);
     final existing = await _localStore.read(ownerUserID, recipient.userID);
     var config =
         (existing ??
@@ -265,7 +287,16 @@ class LibrarySharingService implements LibrarySharingRepository {
       ownerUserID,
       config.copyWith(enabled: failedIDs.isEmpty),
     );
-    return failedIDs;
+    final previouslyUnsharedIDs = collections
+        .where(
+          (collection) =>
+              config.unsharedBefore.contains(collection.id) &&
+              !config.hidden.contains(collection.id) &&
+              librarySharingRoleFor(collection, recipient.userID) == null,
+        )
+        .map((collection) => collection.id)
+        .toSet();
+    return (failedIDs: failedIDs, previouslyUnsharedIDs: previouslyUnsharedIDs);
   }
 
   @override
@@ -315,7 +346,14 @@ class LibrarySharingService implements LibrarySharingRepository {
               !activeFamilyMemberUserIDs.contains(latest.recipientUserID)) {
             await _writeConfig(ownerUserID, latest.copyWith(enabled: false));
           } else {
-            await _reconcileConfig(ownerUserID, latest);
+            try {
+              await _reconcileConfig(ownerUserID, latest);
+            } on AutomaticShareRecipientNotEligibleError {
+              await _refreshFamilyAndHandleIneligibleRecipient(
+                ownerUserID,
+                latest,
+              );
+            }
           }
         });
       } catch (error, stackTrace) {
@@ -345,7 +383,7 @@ class LibrarySharingService implements LibrarySharingRepository {
         ownerUserID: ownerUserID,
         recipientUserID: config.recipientUserID,
         recipientEmail: recipientEmail,
-        publicKey: await _requirePublicKey(config.recipientUserID),
+        publicKey: await _requirePublicKey(recipientEmail),
         roles: roles,
         source: CollectionShareSource.automatic,
       );
@@ -381,9 +419,10 @@ class LibrarySharingService implements LibrarySharingRepository {
       if (!config.hidden.contains(collection.id) &&
           !config.unsharedBefore.contains(collection.id) &&
           librarySharingRoleFor(collection, config.recipientUserID) == null)
-        collection.id: collection.type == CollectionType.uncategorized
-            ? CollectionParticipantRole.viewer
-            : config.defaultRole,
+        collection.id: normalizeLibrarySharingRole(
+          collection,
+          config.defaultRole,
+        ),
   };
 
   LibrarySharingLocalConfig _applyAutomaticShareResults(
@@ -429,6 +468,10 @@ class LibrarySharingService implements LibrarySharingRepository {
             source: source,
           ),
         );
+      } on RecipientIdentityMismatchError {
+        rethrow;
+      } on AutomaticShareRecipientNotEligibleError {
+        rethrow;
       } catch (error, stackTrace) {
         _logger.warning('Bulk library share failed', error, stackTrace);
       }
@@ -463,8 +506,12 @@ class LibrarySharingService implements LibrarySharingRepository {
   }
 
   Iterable<Collection> _eligibleAlbums() => _collectionsService
-      .getCollectionsForUI(includeUncategorized: false)
-      .where(_isShareableAlbum);
+      .getCollectionsForUI(includeUncategorized: true)
+      .where(
+        (collection) =>
+            _isShareableAlbum(collection) ||
+            collection.type == CollectionType.uncategorized,
+      );
 
   Iterable<Collection> _automaticallyShareableOwnedCollections(
     int ownerUserID,
@@ -507,8 +554,8 @@ class LibrarySharingService implements LibrarySharingRepository {
     await _localStore.write(ownerUserID, config);
   }
 
-  Future<String> _requirePublicKey(int userID) async {
-    final publicKey = await _userService.getPublicKeyByUserID(userID);
+  Future<String> _requirePublicKey(String email) async {
+    final publicKey = await _userService.getPublicKey(email);
     if (publicKey == null || publicKey.isEmpty) {
       throw StateError('No Ente public key found for recipient');
     }
@@ -526,10 +573,38 @@ class LibrarySharingService implements LibrarySharingRepository {
         (throw StateError('No email found for library sharing recipient'));
   }
 
-  Set<int>? _activeFamilyMemberUserIDs() {
+  Future<void> _refreshFamilyAndHandleIneligibleRecipient(
+    int ownerUserID,
+    LibrarySharingLocalConfig config,
+  ) async {
+    UserDetails userDetails;
+    try {
+      userDetails = await _userService.getUserDetailsV2(memoryCount: false);
+    } catch (refreshError, refreshStackTrace) {
+      _logger.warning(
+        'Could not refresh family details after automatic share rejection for '
+        '${config.recipientUserID}',
+        refreshError,
+        refreshStackTrace,
+      );
+      return;
+    }
+    if (_activeFamilyMemberUserIDs(
+      userDetails,
+    )!.contains(config.recipientUserID)) {
+      _logger.warning(
+        'Automatic share rejected for active family member '
+        '${config.recipientUserID}',
+      );
+      return;
+    }
+    await _writeConfig(ownerUserID, config.copyWith(enabled: false));
+  }
+
+  Set<int>? _activeFamilyMemberUserIDs([UserDetails? userDetails]) {
     // Temporary best-effort guard while Library Sharing is family-scoped;
     // cached details can lag membership changes made on another client.
-    final userDetails = _userService.getCachedUserDetails();
+    userDetails ??= _userService.getCachedUserDetails();
     if (userDetails == null) {
       return null;
     }

@@ -24,57 +24,24 @@ import {
 import { t } from "i18next";
 import { useState } from "react";
 
-/** Maximum characters for album name before truncation */
 const MAX_ALBUM_NAME_LENGTH = 25;
 const SINGLE_FILE_SUCCESS_AUTO_CLOSE_DELAY_MS = 3000;
 
-/** Truncate album name with ellipsis if it exceeds max length */
 const truncateAlbumName = (name: string): string => {
     if (name.length <= MAX_ALBUM_NAME_LENGTH) return name;
     return name.slice(0, MAX_ALBUM_NAME_LENGTH) + "...";
 };
 
 export interface DownloadStatusNotificationsProps {
-    /**
-     * A list of user-initiated downloads for which a status should be shown.
-     *
-     * An entry is added to this list when the user initiates the download, and
-     * remains here until the user explicitly closes the corresponding
-     * {@link Notification} component that was showing the save group's status.
-     */
     saveGroups: SaveGroup[];
-    /**
-     * Called when the user closes the download status associated with the given
-     * {@link saveGroup}.
-     */
     onRemoveSaveGroup: (saveGroup: SaveGroup) => void;
-    /**
-     * Called when the collection summary with the given {@link collectionID}
-     * should be shown. If {@link isHiddenCollectionSummary} is set, then any
-     * reauthentication as appropriate before switching to the hidden section of
-     * the app is performed first.
-     *
-     * and hidden attribute should be shown.
-     *
-     * See the documentation of {@link SaveGroup}'s
-     * {@link collectionSummaryID} property for why we don't store the
-     * collection summary itself.
-     */
     onShowCollectionSummary?: (
         collectionSummaryID: number | undefined,
         isHiddenCollectionSummary: boolean | undefined,
     ) => void;
-    /**
-     * If true, make each notification full width on mobile phones (MUI "sm"
-     * and below). Tablet and desktop widths remain unchanged.
-     */
     fullWidthOnMobile?: boolean;
 }
 
-/**
- * A component that shows a list of notifications, one each for an active
- * user-initiated download.
- */
 export const DownloadStatusNotifications: React.FC<
     DownloadStatusNotificationsProps
 > = ({
@@ -149,7 +116,6 @@ export const DownloadStatusNotifications: React.FC<
                 const shouldAutoClose =
                     group.total === 1 && isComplete && !hasErrors;
 
-                // Determine if this is a ZIP download (web with multiple files or live photo)
                 const isZipDownload = !group.downloadDirPath && group.total > 1;
                 const shouldShowZipPart =
                     isZipDownload &&
@@ -157,10 +123,8 @@ export const DownloadStatusNotifications: React.FC<
                 const isDesktopOrSingleFile =
                     !!group.downloadDirPath || group.total === 1;
 
-                // Build the status text for the caption
                 let statusText: React.ReactNode;
                 if (hasErrors) {
-                    // Show specific error message based on failure reason
                     if (group.failureReason === "network_offline") {
                         statusText = t("download_failed_network_offline");
                     } else if (group.failureReason === "file_error") {
@@ -188,7 +152,6 @@ export const DownloadStatusNotifications: React.FC<
                     statusText = t("downloading");
                 }
 
-                // Build caption: "Status • X / Y files"
                 const completedCount = group.success + group.failed;
                 const progress =
                     group.total === 1
@@ -218,7 +181,6 @@ export const DownloadStatusNotifications: React.FC<
                     </Box>
                 );
 
-                // Determine the start icon based on state
                 let startIcon: React.ReactNode;
                 if (hasErrors) {
                     startIcon = <ErrorOutlinedIcon />;
@@ -229,10 +191,8 @@ export const DownloadStatusNotifications: React.FC<
                         </GlowingIconWrapper>
                     );
                 } else if (isZipDownload && !group.isDownloadingZip) {
-                    // Preparing state - use loading icon
                     startIcon = <SpinningIcon />;
                 } else {
-                    // Downloading state
                     startIcon = (
                         <DroppingIconWrapper>
                             <HugeiconsIcon icon={Download01Icon} size={28} />
@@ -240,7 +200,6 @@ export const DownloadStatusNotifications: React.FC<
                     );
                 }
 
-                // Title is always the album name (truncated)
                 const filesCountTitle = t("files_count", {
                     count: group.total,
                 });
@@ -447,44 +406,37 @@ const StopDownloadPrimaryButton = styled(Button)(({ theme }) => ({
     "&:hover": { backgroundColor: theme.vars.palette.critical.dark },
 }));
 
-/** CSS keyframes for spinning animation */
 const spinAnimation = keyframes`
     from { transform: rotate(0deg); }
     to { transform: rotate(360deg); }
 `;
 
-/** CSS keyframes for drop from top animation */
 const dropAnimation = keyframes`
     0% { transform: translateY(-100%); opacity: 0.15; }
     50% { transform: translateY(10%); opacity: 0.6; }
     100% { transform: translateY(0); opacity: 1; }
 `;
 
-/** CSS keyframes for green glow animation */
 const glowAnimation = keyframes`
     0% { color: var(--mui-palette-fixed-success); }
     100% { color: inherit; }
 `;
 
-/** CSS keyframes for fade in animation */
 const fadeInAnimation = keyframes`
     0% { opacity: 0; }
     100% { opacity: 1; }
 `;
 
-/** Drop animation icon wrapper */
 const DroppingIconWrapper = styled("span")`
     display: inline-flex;
     animation: ${dropAnimation} 0.8s ease-out forwards;
 `;
 
-/** Glowing icon wrapper for success state */
 const GlowingIconWrapper = styled("span")`
     display: inline-flex;
     animation: ${glowAnimation} 2s ease-out forwards;
 `;
 
-/** Spinning loading icon wrapper */
 const SpinningIconWrapper = styled("span")`
     display: inline-flex;
     animation:
@@ -492,7 +444,6 @@ const SpinningIconWrapper = styled("span")`
         ${spinAnimation} 3s linear infinite;
 `;
 
-/** Spinning loading icon */
 const SpinningIcon: React.FC = () => (
     <SpinningIconWrapper>
         <HugeiconsIcon icon={Loading03Icon} size={28} />

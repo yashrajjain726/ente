@@ -50,7 +50,7 @@ class LibrarySharingSelectionSheet extends StatelessWidget {
             isDisabled: !controller.canApply,
             onTap: onApply,
           ),
-          if (isExpanded && controller.canStopSharing) ...[
+          if (controller.canStopSharing) ...[
             const SizedBox(height: Spacing.md),
             ButtonComponent(
               label: LibrarySharingStrings.stopSharing,
@@ -148,10 +148,11 @@ class LibrarySharingSelectionSheet extends StatelessWidget {
 
   Widget _roleControl(BuildContext context) {
     final selectedRole = controller.selectedRole;
-    final canEditRole = controller.hasSelection && !controller.isMutating;
+    final canEditRole = controller.canEditSelectedRoles;
     final trailing = LibrarySharingRoleSelector(
       role: selectedRole,
       fallbackLabel: LibrarySharingStrings.mixed,
+      showChevron: canEditRole,
     );
     final menu = MenuComponent(
       title: LibrarySharingStrings.role,

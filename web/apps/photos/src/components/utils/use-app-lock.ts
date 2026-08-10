@@ -17,13 +17,7 @@ import { useEffect, useRef, useState } from "react";
 
 const hydrateSessionFromSafeStorageIfNeeded = async () => {
     try {
-        /**
-         * The current session's master key might already exist in the OS's safe
-         * storage, so if found then write it back into browser sessionStorage.
-         *
-         * Without this the user would need to re-enter the password on every
-         * desktop launch.
-         */
+        // Restore the master key before refreshing the lock state.
         await updateSessionFromElectronSafeStorageIfNeeded();
     } catch (e) {
         log.warn(
@@ -44,11 +38,6 @@ const bootstrapAppLock = async () => {
     await refreshAppLockStateFromSession();
 };
 
-/**
- * Initialize app lock and return its bootstrap state and retry callback.
- *
- * This is meant to be called once from the top-level `_app.tsx`.
- */
 export const useSetupAppLock = () => {
     const [status, setStatus] = useState<"loading" | "ready" | "error">(
         "loading",
@@ -85,20 +74,14 @@ export const useSetupAppLock = () => {
     };
 };
 
-/**
- * Start and clear auto-lock timers as the app moves between background and
- * foreground states.
- */
 export const useAutoLockWhenBackgrounded = (
     enabled: AppLockState["enabled"],
     isLocked: AppLockState["isLocked"],
     autoLockTimeMs: AppLockState["autoLockTimeMs"],
 ) => {
-    // Holds the current timeout handle for a scheduled auto-lock.
     const pendingAutoLockTimeoutRef = useRef<ReturnType<
         typeof setTimeout
     > | null>(null);
-    // Stores the exact timestamp when auto-lock should happen.
     const autoLockDueAtTimestampRef = useRef<number | null>(null);
 
     useEffect(() => {
@@ -113,8 +96,6 @@ export const useAutoLockWhenBackgrounded = (
         };
 
         const lockIfDeadlineElapsed = () => {
-            // Return early if the lock deadline has not been reached yet.
-            // If the deadline has passed, clear timer state and lock now.
             const deadline = autoLockDueAtTimestampRef.current;
             if (deadline === null) return false;
             if (Date.now() < deadline) return false;
@@ -124,8 +105,6 @@ export const useAutoLockWhenBackgrounded = (
             return true;
         };
 
-        // Called when the app is backgrounded.
-        // Starts auto-lock unless the app is already locked.
         const startAutoLockTimer = () => {
             if (isLocked) return;
             if (shouldSuppressAutoLockOnBlur()) return;
@@ -151,15 +130,12 @@ export const useAutoLockWhenBackgrounded = (
             }, autoLockTimeMs);
         };
 
-        // On foreground, lock immediately if the deadline passed; otherwise clear pending timer.
         const handleAppForegrounded = () => {
             clearAutoLockBlurSuppression();
             if (lockIfDeadlineElapsed()) return;
             clearAutoLockTimer();
         };
 
-        // Hidden means backgrounded, so start auto-lock countdown.
-        // Visible means foregrounded, so re-check deadline and clear timer if needed.
         const handleVisibilityChange = () => {
             if (document.hidden) {
                 startAutoLockTimer();
@@ -185,7 +161,6 @@ export const useAutoLockWhenBackgrounded = (
         document.addEventListener("visibilitychange", handleVisibilityChange);
         window.addEventListener("focus", handleWindowFocus);
 
-        // cleanup
         return () => {
             document.removeEventListener(
                 "visibilitychange",

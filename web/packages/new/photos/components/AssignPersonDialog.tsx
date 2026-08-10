@@ -20,24 +20,11 @@ import React, { useState } from "react";
 import { ItemCard, LargeTileButton, LargeTileTextOverlay } from "./Tiles";
 
 export type AssignPersonDialogProps = ModalVisibilityProps & {
-    /**
-     * Existing named people that can be selected.
-     */
     people: Person[];
-    /**
-     * Title to show on the dialog.
-     */
     title: string;
-    /**
-     * Called when the user selects a person.
-     */
     onSelectPerson: (personID: string) => void;
 };
 
-/**
- * A dialog that allows selecting an existing person (cgroup) to associate
- * something (e.g. file(s)) with.
- */
 export const AssignPersonDialog: React.FC<AssignPersonDialogProps> = ({
     open,
     onClose,

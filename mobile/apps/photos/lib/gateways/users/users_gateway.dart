@@ -88,21 +88,11 @@ class UsersGateway {
   /// Returns null if the email is not associated with an Ente account.
   ///
   /// Endpoint: GET /users/public-key
-  Future<String?> getPublicKey(String email) => _getPublicKey({"email": email});
-
-  /// Get the user's public key by user ID.
-  ///
-  /// Returns null if the user does not exist or has no public key.
-  ///
-  /// Endpoint: GET /users/public-key
-  Future<String?> getPublicKeyByUserID(int userID) =>
-      _getPublicKey({"userID": userID});
-
-  Future<String?> _getPublicKey(Map<String, Object> queryParameters) async {
+  Future<String?> getPublicKey(String email) async {
     try {
       final response = await _enteDio.get(
         "/users/public-key",
-        queryParameters: queryParameters,
+        queryParameters: {"email": email},
       );
       return response.data["publicKey"] as String?;
     } on DioException catch (e) {

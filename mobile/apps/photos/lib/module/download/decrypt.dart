@@ -53,10 +53,23 @@ Future<File?> _downloadAndDecryptPublicFile(
     final headers = CollectionsService.instance.publicCollectionHeaders(
       file.collectionID!,
     );
+    final signedUrl = await FileUrl.tryGetV3Url(
+      NetworkClient.instance.enteDio,
+      file.uploadedFileID!,
+      FileUrlType.publicDownload,
+      headers: headers,
+    );
     final response = await NetworkClient.instance.downloadDio.download(
-      FileUrl.getUrl(file.uploadedFileID!, FileUrlType.publicDownload),
+      signedUrl ??
+          FileUrl.getLegacyUrl(
+            file.uploadedFileID!,
+            FileUrlType.publicDownload,
+          ),
       encryptedFilePath,
-      options: Options(headers: headers, responseType: ResponseType.bytes),
+      options: Options(
+        headers: signedUrl == null ? headers : null,
+        responseType: ResponseType.bytes,
+      ),
       onReceiveProgress: (received, total) {
         progressCallback?.call(received, total);
       },
@@ -147,12 +160,19 @@ Future<File?> downloadAndDecrypt(
         return null;
       }
     } else {
+      final headers = <String, dynamic>{
+        'X-Auth-Token': Configuration.instance.getToken(),
+      };
+      final signedUrl = await FileUrl.tryGetV3Url(
+        NetworkClient.instance.enteDio,
+        file.uploadedFileID!,
+        FileUrlType.download,
+        headers: headers,
+      );
       final response = await NetworkClient.instance.downloadDio.download(
-        file.downloadUrl,
+        signedUrl ?? file.downloadUrl,
         encryptedFilePath,
-        options: Options(
-          headers: {'X-Auth-Token': Configuration.instance.getToken()},
-        ),
+        options: Options(headers: signedUrl == null ? headers : null),
         onReceiveProgress: (received, total) {
           progressCallback?.call(received, total);
         },

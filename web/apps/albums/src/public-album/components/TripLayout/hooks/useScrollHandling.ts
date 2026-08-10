@@ -41,7 +41,6 @@ export const useScrollHandling = ({
     setTargetZoom,
     isMobileOrTablet,
 }: UseScrollHandlingParams) => {
-    // Update location positions callback
     const updatePositions = useCallback(() => {
         updateLocationPositions({
             locationRefs: locationRefs.current,
@@ -49,7 +48,6 @@ export const useScrollHandling = ({
         });
     }, [locationRefs, setLocationPositions]);
 
-    // Timeline scroll handler
     const timelineScrollHandler = useCallback(() => {
         handleTimelineScroll({
             timelineRef,
@@ -76,13 +74,11 @@ export const useScrollHandling = ({
         setTargetZoom,
     ]);
 
-    // Throttled scroll handler
     const throttledTimelineScroll = useMemo(
         () => throttle(timelineScrollHandler, 16),
         [timelineScrollHandler],
     );
 
-    // Timeline scroll to location function
     const scrollToLocation = useCallback(
         (locationIndex: number) => {
             scrollTimelineToLocation({
@@ -96,7 +92,6 @@ export const useScrollHandling = ({
         [timelineRef, photoClusters, locationPositions, isMobileOrTablet],
     );
 
-    // Marker click handler
     const markerClickHandler = useCallback(
         (clusterIndex: number, clusterLat: number, clusterLng: number) => {
             handleMarkerClick({
@@ -129,7 +124,6 @@ export const useScrollHandling = ({
         ],
     );
 
-    // Update positions when locations render
     useEffect(() => {
         if (
             locationRefs.current.length === photoClusters.length &&
@@ -141,7 +135,6 @@ export const useScrollHandling = ({
         return undefined;
     }, [photoClusters, updatePositions, locationRefs]);
 
-    // Add scroll event listener
     useEffect(() => {
         const timelineContainer = timelineRef.current;
         if (!timelineContainer) return;
@@ -156,7 +149,6 @@ export const useScrollHandling = ({
         };
     }, [throttledTimelineScroll, timelineRef]);
 
-    // Cleanup timeout on unmount
     useEffect(() => {
         return () => {
             if (clusterClickTimeoutRef.current) {

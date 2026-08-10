@@ -1,6 +1,6 @@
 import type { CollectionSummary } from "ente-new/photos/services/collection-summary";
-import { getAvailableFileActions } from "ente-new/photos/utils/file-actions";
 import { describe, expect, test } from "vitest";
+import { getAvailableFileActions } from "../src/utils/file-actions";
 
 describe("getAvailableFileActions", () => {
     test("uses shared actions for an incoming uncategorized collection", () => {

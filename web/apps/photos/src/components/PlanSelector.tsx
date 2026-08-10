@@ -1,3 +1,4 @@
+import { useWrapAsyncOperation } from "@/components/utils/use-wrap-async";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import CloseIcon from "@mui/icons-material/Close";
@@ -30,7 +31,6 @@ import { useBaseContext } from "ente-base/context";
 import log from "ente-base/log";
 import { bytesInGB, formattedStorageByteSize } from "ente-gallery/utils/units";
 import { useUserDetailsSnapshot } from "ente-new/photos/components/utils/use-snapshot";
-import { useWrapAsyncOperation } from "ente-new/photos/components/utils/use-wrap-async";
 import type {
     Bonus,
     Plan,
@@ -85,17 +85,6 @@ export const PlanSelector: React.FC<PlanSelectorProps> = ({
                         [theme.breakpoints.down(360)]: { p: 0 },
                     }),
                 },
-                // [Note: Backdrop variant blur]
-                //
-                // What we wish for is creating a variant of Backdrop that
-                // instead of specifying the backdrop filter each time. But as
-                // of MUI v6.4, the TypeScript definition for Backdrop does not
-                // contain a variant, causing tsc to show an error when we try
-                // to specify a variant.
-                //
-                // Since the styling is trivial and used only infrequently, for
-                // now we copy paste it. If it gets needed more often, we can
-                // also make it into a palette var.
                 backdrop: { sx: { backdropFilter: "blur(30px) opacity(95%)" } },
             }}
         >
@@ -266,40 +255,24 @@ const PlanSelectorCard: React.FC<PlanSelectorCardProps> = ({
     );
 };
 
-/**
- * Return the outcome that should happen when the user selects a paid plan on
- * the plan selection screen.
- *
- * @param subscription Their current subscription details.
- */
 const planSelectionOutcome = (subscription: Subscription | undefined) => {
-    // This shouldn't happen, but we need this case to handle missing types.
     if (!subscription) return "buyPlan";
 
-    // The user is a on a free plan and can buy the plan they selected.
     if (subscription.productID == "free") return "buyPlan";
 
-    // Their existing subscription has expired. They can buy a new plan.
     if (subscription.expiryTime < Date.now() * 1000) return "buyPlan";
 
-    // -- The user already has an active subscription to a paid plan.
-
-    // Using Stripe.
     if (subscription.paymentProvider == "stripe") {
-        // Update their existing subscription to the new plan.
         return "updateSubscriptionToPlan";
     }
 
-    // Using one of the mobile app stores.
     if (
         subscription.paymentProvider == "appstore" ||
         subscription.paymentProvider == "playstore"
     ) {
-        // They need to cancel first on the mobile app stores.
         return "cancelOnMobile";
     }
 
-    // Some other bespoke case. They should contact support.
     return "contactSupport";
 };
 
@@ -720,11 +693,7 @@ const StripeSubscriptionOptions: React.FC<StripeSubscriptionOptionsProps> = ({
                 action: async () => {
                     await activateStripeSubscription();
                     onClose();
-                    // [Note: Chained MiniDialogs]
-                    //
-                    // The MiniDialog will automatically close when we the
-                    // action promise resolves, so if we want to show another
-                    // dialog, schedule it on the next run loop.
+                    // Wait for this action's dialog to close before showing another.
                     setTimeout(() => {
                         showMiniDialog({
                             title: t("success"),
@@ -751,7 +720,7 @@ const StripeSubscriptionOptions: React.FC<StripeSubscriptionOptionsProps> = ({
                 action: async () => {
                     await cancelStripeSubscription();
                     onClose();
-                    // See: [Note: Chained MiniDialogs]
+                    // Wait for this action's dialog to close before showing another.
                     setTimeout(() => {
                         showMiniDialog({
                             message: t("subscription_cancel_success"),

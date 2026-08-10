@@ -35,23 +35,10 @@ const leaflet = haveWindow()
     : null;
 
 export interface EditLocationDialogProps extends ModalVisibilityProps {
-    /**
-     * The files whose location we want to edit.
-     */
     files: EnteFile[];
-    /**
-     * Called when the user confirms the location update.
-     *
-     * @param location The new location to set for all selected files.
-     * @returns A promise that resolves when the update is complete.
-     */
     onConfirm: (location: Location) => Promise<void>;
 }
 
-/**
- * A full-screen dialog with an interactive map where users can drop a pin to
- * set the location for one or more photos.
- */
 export const EditLocationDialog: React.FC<EditLocationDialogProps> = ({
     open,
     onClose,
@@ -65,24 +52,21 @@ export const EditLocationDialog: React.FC<EditLocationDialogProps> = ({
     const [isLoading, setIsLoading] = useState(false);
     const [isSuccess, setIsSuccess] = useState(false);
 
-    // Get initial location only if a single file is selected
     const initialLocation = useMemo(() => {
         if (files.length !== 1) return undefined;
         const file = files[0];
         return file ? fileLocation(file) : undefined;
     }, [files]);
 
-    // Capture whether we're adding (vs editing) when dialog opens
     const [isAddingLocation, setIsAddingLocation] = useState(false);
 
-    // Reset selected location and states only when dialog opens
+    // File updates while open must not reset the user's edits.
     const prevOpenRef = useRef(false);
     useEffect(() => {
         if (open && !prevOpenRef.current) {
             setSelectedLocation(initialLocation);
             setIsLoading(false);
             setIsSuccess(false);
-            // Determine add vs edit based on whether any file has location at open time
             setIsAddingLocation(!files.some((file) => fileLocation(file)));
         }
         prevOpenRef.current = open;
@@ -97,7 +81,6 @@ export const EditLocationDialog: React.FC<EditLocationDialogProps> = ({
         );
     }, [selectedLocation, initialLocation]);
 
-    // Reset success state when user selects a new location
     const prevSelectedLocationRef = useRef(selectedLocation);
     useEffect(() => {
         const prevLoc = prevSelectedLocationRef.current;
@@ -263,10 +246,9 @@ const EditableMap: React.FC<EditableMapProps> = ({
     const mapRef = useRef<L.Map | null>(null);
     const markerRef = useRef<L.Marker | null>(null);
     const prevOpenRef = useRef(open);
-    // Capture initial location at mount time to avoid map reset on file updates
+    // File updates must not reset the map.
     const initialLocationRef = useRef(initialLocation);
 
-    // Search state
     const [searchQuery, setSearchQuery] = useState("");
     const [searchResults, setSearchResults] = useState<NominatimResult[]>([]);
     const [showResults, setShowResults] = useState(false);
@@ -275,11 +257,9 @@ const EditableMap: React.FC<EditableMapProps> = ({
     const searchRequestIdRef = useRef(0);
     const searchAbortRef = useRef<AbortController | null>(null);
 
-    // Manual coordinate input state
     const [manualLat, setManualLat] = useState<string | null>(null);
     const [manualLon, setManualLon] = useState<string | null>(null);
 
-    // Reset manual inputs when dialog opens or selectedLocation changes
     useEffect(() => {
         setManualLat(null);
         setManualLon(null);
@@ -361,11 +341,9 @@ const EditableMap: React.FC<EditableMapProps> = ({
         const lng = parseFloat(result.lon);
         onLocationSelect({ latitude: lat, longitude: lng });
 
-        // Update map view
         if (mapRef.current) {
             mapRef.current.setView([lat, lng], 12);
 
-            // Update or create marker
             if (markerRef.current) {
                 markerRef.current.setLatLng([lat, lng]);
             } else if (leaflet) {
@@ -443,16 +421,13 @@ const EditableMap: React.FC<EditableMapProps> = ({
         const mapContainer = mapContainerRef.current;
         if (!mapContainer || !leaflet) return;
 
-        // Don't recreate map if it already exists
         if (mapRef.current) return;
 
-        // Use the captured initial location from mount time
         const initLoc = initialLocationRef.current;
         const initialLat = initLoc?.latitude;
         const initialLng = initLoc?.longitude;
 
-        // Determine initial view
-        const defaultCenter: L.LatLngTuple = [20, 0]; // World view
+        const defaultCenter: L.LatLngTuple = [20, 0];
         const defaultZoom = 2;
 
         const hasInitialLocation =
@@ -462,14 +437,12 @@ const EditableMap: React.FC<EditableMapProps> = ({
             : defaultCenter;
         const zoom = hasInitialLocation ? 6 : defaultZoom;
 
-        // Create map with zoom control disabled (we add custom controls)
         const map = leaflet
             .map(mapContainer, { zoomControl: false })
             .setView(center, zoom);
         leaflet.tileLayer(urlTemplate, { attribution }).addTo(map);
         mapRef.current = map;
 
-        // Add initial marker if location exists
         if (hasInitialLocation) {
             const marker = leaflet
                 .marker([initialLat, initialLng], { draggable: true })
@@ -482,7 +455,6 @@ const EditableMap: React.FC<EditableMapProps> = ({
             });
         }
 
-        // Handle map clicks to place/move marker
         map.on("click", (e: L.LeafletMouseEvent) => {
             const { lat, lng } = e.latlng;
             onLocationSelect({ latitude: lat, longitude: lng });

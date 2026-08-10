@@ -1,6 +1,7 @@
 // TODO: Audit this file
 /* eslint-disable @typescript-eslint/no-unnecessary-condition */
 import Avatar from "@/components/Avatar";
+import type { RemotePullOpts } from "@/components/gallery";
 import { PublicLinkCreated } from "@/components/share/PublicLinkCreated";
 import { avatarTextColor } from "@/services/avatar";
 import AddIcon from "@mui/icons-material/Add";
@@ -60,7 +61,6 @@ import type {
     PublicURL,
 } from "ente-media/collection";
 import { CollectionSubType, type CollectionUser } from "ente-media/collection";
-import type { RemotePullOpts } from "ente-new/photos/components/gallery";
 import { useSettingsSnapshot } from "ente-new/photos/components/utils/use-snapshot";
 import {
     createPublicURL,
@@ -90,29 +90,13 @@ import { Trans } from "react-i18next";
 import { z } from "zod";
 
 export type CollectionShareProps = ModalVisibilityProps & {
-    /**
-     * The currently logged in user.
-     */
     user: LocalUser;
     collection: Collection;
     collectionSummary: CollectionSummary;
-    /**
-     * A map from known Ente user IDs to their emails
-     */
     emailByUserID: Map<number, string>;
-    /**
-     * A list of emails that can be served up as suggestions when the user is
-     * trying to share an album with another Ente user.
-     */
     shareSuggestionEmails: string[];
     setBlockingLoad: (value: boolean) => void;
-    /**
-     * Called when an operation in the share menu requires a full remote pull.
-     */
     onRemotePull: (opts?: RemotePullOpts) => Promise<void>;
-    /**
-     * When set, opens a specific nested share view directly.
-     */
     intent?: CollectionShareIntent;
 };
 
@@ -133,32 +117,20 @@ export const CollectionShare: React.FC<CollectionShareProps> = ({
     const { onGenericError } = useBaseContext();
     const { showLoadingBar, hideLoadingBar } = usePhotosAppContext();
 
-    // Use local state for collection to handle updates from fetch
     const [collection, setCollection] = useState(collectionProp);
-    // Track if we've fetched a collection with public URLs
     const hasFetchedPublicURLs = useRef(false);
 
-    // Update local collection when prop changes, but don't overwrite if we've fetched newer data
+    // Do not replace fetched public URLs with an older prop snapshot.
     useEffect(() => {
-        // Only update from prop if:
-        // 1. We haven't fetched public URLs yet, OR
-        // 2. The prop has public URLs (meaning it's been updated with the latest data)
         if (
             !hasFetchedPublicURLs.current ||
             collectionProp?.publicURLs?.length > 0
         ) {
             setCollection(collectionProp);
         }
-        // Skip the update if we've fetched public URLs but the prop doesn't have them
-        // This preserves the fetched data when parent component updates with outdated info
     }, [collectionProp]);
 
     // TODO: Duplicated from CollectionHeader.tsx
-    /**
-     * Return a new function by wrapping an async function in an error handler,
-     * showing the global loading bar when the function runs, and syncing with
-     * remote on completion.
-     */
     const wrap = useCallback(
         (f: () => Promise<void>) => {
             const wrapped = async () => {
@@ -190,10 +162,8 @@ export const CollectionShare: React.FC<CollectionShareProps> = ({
         collection?.type != "uncategorized" &&
         (isOwner || (isSharedIncoming && hasPublicLink));
 
-    // Use a ref to track if we've already fetched for this dialog session
     const hasFetchedForSession = useRef(false);
 
-    // Reset the fetch flags when dialog closes
     useEffect(() => {
         if (!open) {
             hasFetchedForSession.current = false;
@@ -201,8 +171,7 @@ export const CollectionShare: React.FC<CollectionShareProps> = ({
         }
     }, [open]);
 
-    // Fetch collection for non-owners when the share pane opens
-    // to ensure we have the latest public link information
+    // Fetch once per open; the remote pull can retrigger this effect.
     useEffect(() => {
         const refreshCollection = async () => {
             const shouldFetch =
@@ -215,17 +184,14 @@ export const CollectionShare: React.FC<CollectionShareProps> = ({
                 !hasFetchedForSession.current;
 
             if (shouldFetch) {
-                // Mark that we've fetched to prevent infinite loops
                 hasFetchedForSession.current = true;
                 try {
                     const latestCollection = await getCollectionByID(
                         collection.id,
                     );
-                    // If the fetched collection has public URLs, update local state
                     if (latestCollection.publicURLs.length > 0) {
                         hasFetchedPublicURLs.current = true;
                         setCollection(latestCollection);
-                        // Also trigger remote pull to sync with parent
                         await onRemotePull({ silent: true });
                     }
                 } catch (e) {
@@ -530,8 +496,6 @@ const EmailShare: React.FC<EmailShareProps> = ({
         useModalVisibility();
 
     const [participantRole, setParticipantRole] =
-        // Initial value is arbitrary, it always gets reset before
-        // `showAddParticipant` is called.
         useState<CollectionNewParticipantRole>("VIEWER");
 
     const showAddViewer = useCallback(() => {
@@ -758,8 +722,6 @@ const AddParticipant: React.FC<AddParticipantProps> = ({
     ) => {
         let emails: string[];
         if (typeof emailOrEmails == "string") {
-            // If email is a string, it means the user entered a custom email
-            // string, so validate it to skip self sharing and duplicate share.
             const email = emailOrEmails;
             if (email == user.email) {
                 setEmailFieldError(t("sharing_with_self"));
@@ -829,23 +791,8 @@ const AddParticipant: React.FC<AddParticipantProps> = ({
 };
 
 type AddParticipantFormProps = {
-    /**
-     * Title for the submit button.
-     */
     submitButtonTitle: string;
-    /**
-     * A list of emails the user can user to pick from.
-     */
     existingEmails: string[];
-    /**
-     * Submission handler. A callback invoked when the submit button is pressed.
-     *
-     * @param emailOrEmail Either the new email that the user entered, or the
-     * subset of {@link existingEmails} selected by the user.
-     *
-     * @param setEmailFieldError A function that can be called to set the error
-     * message shown below the email input field.
-     */
     onSubmit: (
         emailOrEmails: string | string[],
         setEmailFieldError: (message: string) => void,
@@ -1265,12 +1212,7 @@ const ManageEmailShare: React.FC<ManageEmailShareProps> = ({
 type ManageParticipantProps = ModalVisibilityProps & {
     onRootClose: () => void;
     wrap: (f: () => Promise<void>) => () => void;
-    /**
-     * The participant in the collection who we're trying to manage.
-     *
-     * The caller semantically guarantees that participant will always be set
-     * when {@link open} is `true`, but the types don't reflect this.
-     */
+    // open implies participant is set.
     participant: CollectionUser | undefined;
 } & Pick<CollectionShareProps, "collection" | "onRemotePull">;
 
@@ -1291,8 +1233,6 @@ const ManageParticipant: React.FC<ManageParticipantProps> = ({
     };
 
     const unshare = wrap(() =>
-        // We should have a participant (with a valid email) if this ends up
-        // being called.
         unshareCollection(collection.id, participant!.email!),
     );
 
@@ -1775,10 +1715,6 @@ type ManagePublicShareOptionsProps = ModalVisibilityProps & {
     onRootClose: () => void;
     publicURL: PublicURL;
     setPublicURL: (publicURL: PublicURL | undefined) => void;
-    /**
-     * The "resolved" publicURL, with both the full origin and the secret
-     * fragment appended to it.
-     */
     resolvedURL: string;
 } & Pick<
         CollectionShareProps,
@@ -1801,7 +1737,6 @@ const ManagePublicShareOptions: React.FC<ManagePublicShareOptionsProps> = ({
 
     const [copied, handleCopyLink] = useClipboardCopy(resolvedURL);
 
-    // For embeddable HTML copy
     const embedURL = resolvedURL
         ? resolvedURL.replace(
               new URL(resolvedURL).origin,
@@ -1955,19 +1890,11 @@ const ManagePublicShareOptions: React.FC<ManagePublicShareOptionsProps> = ({
     );
 };
 
-/**
- * The Prop type used by components that allow the use to modify some setting
- * related to a public link.
- */
 interface ManagePublicLinkSettingProps {
     publicURL: PublicURL;
     onUpdate: (req: UpdatePublicURLAttributes) => Promise<void>;
 }
 
-/**
- * An extension of {@link ManagePublicLinkSettingProps} for use when the
- * component shows update options in a (nested) drawer.
- */
 type ManagePublicLinkSettingDrawerProps = ManagePublicLinkSettingProps & {
     onRootClose: () => void;
 };
@@ -2261,13 +2188,8 @@ const SetPublicLinkPassword: React.FC<SetPublicLinkPasswordProps> = ({
         await enablePublicUrlPassword(password);
         publicURL.passwordEnabled = true;
         onClose();
-        // The onClose above will close the dialog, but if we return immediately
-        // from this function, then the dialog will be temporarily rendered
-        // without the activity indicator on the button (before the entire
-        // dialog disappears). This gives a ungainly visual flash, so add a wait
-        // long enough so that the form's activity indicator persists longer
-        // than it'll take for the dialog to get closed.
-        return wait(1000 /* 1 second */);
+        // Keep the submitting state through the close animation.
+        return wait(1000);
     };
 
     const enablePublicUrlPassword = async (password: string) => {
@@ -2280,17 +2202,13 @@ const SetPublicLinkPassword: React.FC<SetPublicLinkPasswordProps> = ({
         });
     };
 
+    // This dialog is nested inside the sidebar.
     return (
         <Dialog
             {...{ open, onClose }}
             disablePortal
             slotProps={{
-                // We're being shown within the sidebar drawer, so limit the
-                // backdrop to only cover the drawer.
                 backdrop: { sx: { position: "absolute" } },
-                // We're being shown within the sidebar drawer, and also the
-                // content of this dialog is lesser than what a normal dialog
-                // contains. Use a bespoke padding.
                 paper: { sx: { "&&": { padding: "4px" } } },
             }}
             sx={{ position: "absolute" }}

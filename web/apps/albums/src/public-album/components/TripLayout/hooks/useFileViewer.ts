@@ -18,15 +18,12 @@ export const useFileViewer = ({
 
     const handleOpenFileViewer = useCallback(
         (cluster: JourneyPoint[], clickedFileId: number) => {
-            // Get file IDs from the cluster
             const clusterFileIds = cluster.map((point) => point.fileId);
 
-            // Filter files to only include those from the cluster
             const clusterFiles = files.filter((file) =>
                 clusterFileIds.includes(file.id),
             );
 
-            // Sort cluster files by the local photo creation date shown in the UI.
             const sortTimeByFile = new Map<EnteFile, number>();
             const sortTimeForFile = (file: EnteFile) => {
                 const cached = sortTimeByFile.get(file);
@@ -39,13 +36,11 @@ export const useFileViewer = ({
                 (a, b) => sortTimeForFile(a) - sortTimeForFile(b),
             );
 
-            // Find the index of the clicked photo in the cluster files
             const clickedIndex = sortedClusterFiles.findIndex(
                 (f) => f.id === clickedFileId,
             );
 
             if (clickedIndex !== -1 && sortedClusterFiles.length > 0) {
-                // Batch state updates to avoid multiple re-renders
                 setViewerFiles(sortedClusterFiles);
                 setCurrentFileIndex(clickedIndex);
                 setOpenFileViewer(true);
@@ -56,17 +51,14 @@ export const useFileViewer = ({
     );
 
     const handleCloseFileViewer = useCallback(() => {
-        // Batch state updates
         setOpenFileViewer(false);
         onSetOpenFileViewer?.(false);
     }, [onSetOpenFileViewer]);
 
     return {
-        // State
         openFileViewer,
         currentFileIndex,
         viewerFiles,
-        // Handlers
         handleOpenFileViewer,
         handleCloseFileViewer,
     };

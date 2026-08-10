@@ -1,9 +1,6 @@
 import { z } from "zod";
 import { decryptBox, encryptBox, generateKey } from "./crypto";
 
-/**
- * Remove all data stored in session storage (data tied to the browser tab).
- */
 export const clearSessionStorage = () => sessionStorage.clear();
 
 const SessionKeyData = z.object({

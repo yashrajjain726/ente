@@ -1,0 +1,1 @@
+- Slowed the animation on the "Crafting memories" card.
