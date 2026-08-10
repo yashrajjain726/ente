@@ -14,7 +14,6 @@ import (
 	"github.com/lib/pq"
 )
 
-// Repository defines the methods for inserting, updating, and retrieving file data.
 type Repository struct {
 	DB                *sql.DB
 	ObjectCleanupRepo *repo.ObjectCleanupRepository

@@ -23,9 +23,7 @@ import (
 )
 
 const (
-	// MaxSessionTokenFetchLimit specifies the maximum number of requests a client can make to retrieve token data for a given session ID.
-	MaxSessionTokenFetchLimit = 2
-	// TokenFetchAllowedDurationInMin is the duration in minutes for which the token fetch is allowed after the session is verified.
+	MaxSessionTokenFetchLimit      = 2
 	TokenFetchAllowedDurationInMin = 2
 )
 
@@ -259,7 +257,6 @@ func (r *Repository) CreateBeginRegistrationData(user *ente.User) (options *prot
 		return
 	}
 
-	// save session data
 	marshalledSessionData, err := r.marshalSessionDataToWebAuthnSession(session, rpID)
 	if err != nil {
 		err = stacktrace.Propagate(err, "")
@@ -288,7 +285,6 @@ func (r *Repository) GetUserIDWithPasskeyTwoFactorSession(sessionID string) (use
 	return
 }
 
-// IsSessionAlreadyClaimed checks if the both token_data and verified_at are not null for a given session ID
 func (r *Repository) IsSessionAlreadyClaimed(sessionID string) (bool, error) {
 	var verifiedAt sql.NullInt64
 	err := r.DB.QueryRow(`SELECT verified_at FROM passkey_login_sessions WHERE session_id = $1`, sessionID).Scan(&verifiedAt)
@@ -301,7 +297,6 @@ func (r *Repository) IsSessionAlreadyClaimed(sessionID string) (bool, error) {
 	return verifiedAt.Valid, nil
 }
 
-// StoreTokenData takes a sessionID, and tokenData, and updates the tokenData in the database
 func (r *Repository) StoreTokenData(sessionID string, tokenData ente.TwoFactorAuthorizationResponse) error {
 	tokenDataJson, err := json.Marshal(tokenData)
 	if err != nil {
@@ -311,19 +306,6 @@ func (r *Repository) StoreTokenData(sessionID string, tokenData ente.TwoFactorAu
 	return stacktrace.Propagate(err, "")
 }
 
-// GetTokenData retrieves the token data associated with a given session ID.
-// The function will return the token data if the following conditions are met:
-// - The token data is not null.
-// - The session was verified less than 5 minutes ago.
-// - The token fetch count is less than 2.
-// If these conditions are met, the function will also increment the token fetch count by 1.
-//
-// Parameters:
-// - sessionID: The ID of the session for which to retrieve the token data.
-//
-// Returns:
-// - A pointer to a TwoFactorAuthorizationResponse object containing the token data, if the conditions are met.
-// - An error, if an error occurred while retrieving the token data or if the conditions are not met.
 func (r *Repository) GetTokenData(sessionID string) (*ente.TwoFactorAuthorizationResponse, error) {
 	var tokenDataJson []byte
 	var verifiedAt sql.NullInt64
@@ -361,7 +343,6 @@ func (r *Repository) GetTokenData(sessionID string) (*ente.TwoFactorAuthorizatio
 	if err != nil {
 		return nil, stacktrace.Propagate(err, "")
 	}
-	// update the token_fetch_count
 	_, err = r.DB.Exec(`UPDATE passkey_login_sessions SET token_fetch_cnt = token_fetch_cnt + 1 WHERE session_id = $1`, sessionID)
 	if err != nil {
 		return nil, stacktrace.Propagate(err, "")
@@ -402,7 +383,6 @@ func (r *Repository) CreateBeginAuthenticationData(user *ente.User) (options *pr
 		return
 	}
 
-	// save session data
 	marshalledSessionData, err := r.marshalSessionDataToWebAuthnSession(session, rpID)
 	if err != nil {
 		err = stacktrace.Propagate(err, "")
@@ -598,23 +578,19 @@ func (r *Repository) saveSessionData(id uuid.UUID, session *ente.WebAuthnSession
 }
 
 func (r *Repository) marshalCredentialToPasskeyCredential(cred *webauthn.Credential, passkeyID uuid.UUID, rpID string) (*ente.PasskeyCredential, error) {
-	// Convert the PublicKey to base64
 	publicKeyB64 := base64.StdEncoding.EncodeToString(cred.PublicKey)
 
-	// Convert the Transports slice to a comma-separated string
 	var transports []string
 	for _, t := range cred.Transport {
 		transports = append(transports, string(t))
 	}
 	authenticatorTransports := strings.Join(transports, ",")
 
-	// Marshal the Flags to JSON
 	credentialFlags, err := json.Marshal(cred.Flags)
 	if err != nil {
 		return nil, err
 	}
 
-	// Marshal the Authenticator to JSON and encode AAGUID to base64
 	authenticatorMap := map[string]interface{}{
 		"AAGUID":       base64.StdEncoding.EncodeToString(cred.Authenticator.AAGUID),
 		"SignCount":    cred.Authenticator.SignCount,
@@ -626,10 +602,8 @@ func (r *Repository) marshalCredentialToPasskeyCredential(cred *webauthn.Credent
 		return nil, err
 	}
 
-	// convert cred.ID into base64
 	credID := base64.StdEncoding.EncodeToString(cred.ID)
 
-	// Create the PasskeyCredential
 	passkeyCred := &ente.PasskeyCredential{
 		CredentialID:            credID,
 		PasskeyID:               passkeyID,

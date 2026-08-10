@@ -180,8 +180,6 @@ func (c *EmailNotificationController) OnSubscriptionCancelled(userID int64) {
 	}
 }
 
-// SayHelloToCustomers sends an email to check in with customers who upgraded 7
-// days ago.
 func (c *EmailNotificationController) SayHelloToCustomers() {
 	log.Info("Running SayHelloToCustomers")
 	lockStatus := c.LockController.TryLock(CustomerHelloMailLock, time.MicrosecondsAfterHours(24))

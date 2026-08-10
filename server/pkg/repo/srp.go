@@ -11,7 +11,6 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-// AddSRPSession inserts a SRPSession and returns the session id
 func (repo *UserAuthRepository) AddSRPSession(srpUserID uuid.UUID, serverKey string, srpA string) (uuid.UUID, error) {
 	id := uuid.New()
 	_, err := repo.DB.Exec(`
@@ -56,7 +55,6 @@ func (repo *UserAuthRepository) GetSRPAuthEntityBySRPUserID(ctx context.Context,
 
 }
 
-// IsSRPSetupDone returns true if the user has already set SRP attributes
 func (repo *UserAuthRepository) IsSRPSetupDone(ctx context.Context, userID int64) (bool, error) {
 	_, err := repo.GetSRPAuthEntity(ctx, userID)
 	if err != nil {
@@ -68,7 +66,6 @@ func (repo *UserAuthRepository) IsSRPSetupDone(ctx context.Context, userID int64
 	return true, nil
 }
 
-// UpdateEmailMFA updates the email MFA status of a user
 func (repo *UserAuthRepository) UpdateEmailMFA(ctx context.Context, userID int64, isEnabled bool) error {
 	_, err := repo.DB.ExecContext(ctx, `UPDATE users SET email_mfa = $1 WHERE user_id = $2`, isEnabled, userID)
 	if err != nil {
@@ -87,7 +84,6 @@ func (repo *UserAuthRepository) IsEmailMFAEnabled(ctx context.Context, userID in
 	return &isEnabled, nil
 }
 
-// InsertTempSRPSetup inserts an entry into the temp_srp_setup table. It also returns the ID of the inserted row
 func (repo *UserAuthRepository) InsertTempSRPSetup(ctx context.Context, req ente.SetupSRPRequest, userID int64, sessionID *uuid.UUID) (*uuid.UUID, error) {
 	id := uuid.New()
 	_, err := repo.DB.ExecContext(ctx, `
@@ -160,7 +156,6 @@ func (repo *UserAuthRepository) InsertOrUpdateSRPAuthAndKeyAttr(ctx context.Cont
 	return tx.Commit()
 }
 
-// GetSrpSessionEntity ...
 func (repo *UserAuthRepository) GetSrpSessionEntity(ctx context.Context, sessionID uuid.UUID) (*ente.SRPSessionEntity, error) {
 	result := ente.SRPSessionEntity{}
 	row := repo.DB.QueryRowContext(ctx, `SELECT id, srp_user_id, server_key, srp_a, has_verified, attempt_count, COALESCE(is_fake, false) FROM srp_sessions WHERE id = $1`, sessionID)
@@ -171,21 +166,17 @@ func (repo *UserAuthRepository) GetSrpSessionEntity(ctx context.Context, session
 	return &result, nil
 }
 
-// IncrementSrpSessionAttemptCount increments the verification attempt count of a session
 func (repo *UserAuthRepository) IncrementSrpSessionAttemptCount(ctx context.Context, sessionID uuid.UUID) error {
 	_, err := repo.DB.ExecContext(ctx, `UPDATE srp_sessions SET attempt_count = attempt_count + 1 WHERE id = $1`, sessionID)
 	return stacktrace.Propagate(err, "")
 }
 
-// SetSrpSessionVerified ..
 func (repo *UserAuthRepository) SetSrpSessionVerified(ctx context.Context, sessionID uuid.UUID) error {
 	_, err := repo.DB.ExecContext(ctx, `UPDATE srp_sessions SET has_verified = true WHERE id = $1`, sessionID)
 	return stacktrace.Propagate(err, "")
 }
 
-// CleanupOldFakeSessions removes fake sessions older than the specified duration
 func (repo *UserAuthRepository) CleanupOldFakeSessions(ctx context.Context) (int64, error) {
-	// Delete fake sessions older than specified microseconds
 	result, err := repo.DB.ExecContext(ctx, `
 		DELETE FROM srp_sessions
 		WHERE is_fake = true
@@ -200,7 +191,6 @@ func (repo *UserAuthRepository) CleanupOldFakeSessions(ctx context.Context) (int
 	return rowsAffected, nil
 }
 
-// GetSRPAttributes returns the srp attributes of a user
 func (repo *UserAuthRepository) GetSRPAttributes(userID int64) (*ente.GetSRPAttributesResponse, error) {
 	row := repo.DB.QueryRow(`SELECT  srp_user_id, salt, mem_limit, ops_limit, kek_salt, email_mfa FROM srp_auth left join key_attributes on srp_auth.user_id = key_attributes.user_id 
                                                                      left join users on users.user_id = srp_auth.user_id  WHERE srp_auth.user_id = $1`, userID)

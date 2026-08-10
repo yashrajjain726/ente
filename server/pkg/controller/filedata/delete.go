@@ -14,7 +14,6 @@ import (
 	"time"
 )
 
-// StartDataDeletion clears associated file data from the object store
 func (c *Controller) StartDataDeletion() {
 	go c.startDeleteWorkers(1)
 }
@@ -29,8 +28,6 @@ func (c *Controller) startDeleteWorkers(n int) {
 	}
 }
 
-// Entry point for the delete worker (goroutine)
-//
 // i is an arbitrary index of the current routine.
 func (c *Controller) delete(i int) {
 	// This is just
@@ -99,7 +96,6 @@ func (c *Controller) deleteFileRow(fileDataRow filedata.Row) error {
 		ctxLogger.WithError(err).Error("Failed to get bucketColumnMap")
 		return err
 	}
-	// Delete objects and remove buckets
 	for bucketID, columnName := range bucketColumnMap {
 		for _, objectKey := range objectKeys {
 			delErr := c.ObjectCleanupController.DeleteObjectFromDataCenter(objectKey, bucketID)
@@ -122,7 +118,6 @@ func (c *Controller) deleteFileRow(fileDataRow filedata.Row) error {
 
 		}
 	}
-	// Delete from Latest bucket
 	for k := range objectKeys {
 		err = c.ObjectCleanupController.DeleteObjectFromDataCenter(objectKeys[k], fileDataRow.LatestBucket)
 		if err != nil {
@@ -164,7 +159,6 @@ func (c *Controller) deleteFileRowV2(fileDataRow filedata.Row) error {
 		ctxLogger.WithError(err).Error("Failed to get bucketColumnMap")
 		return err
 	}
-	// Delete objects and remove buckets
 	for bucketID, columnName := range bucketColumnMap {
 		delErr := c.ObjectCleanupController.DeleteAllObjectsWithPrefix(delPrefix, bucketID)
 		if delErr != nil {
@@ -186,7 +180,6 @@ func (c *Controller) deleteFileRowV2(fileDataRow filedata.Row) error {
 
 		}
 	}
-	// Delete from Latest bucket
 	err = c.ObjectCleanupController.DeleteAllObjectsWithPrefix(delPrefix, fileDataRow.LatestBucket)
 	if err != nil {
 		ctxLogger.WithError(err).Error("Failed to delete object from datacenter")

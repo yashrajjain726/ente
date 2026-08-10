@@ -33,13 +33,10 @@ type ObjectCleanupController struct {
 	S3Config   *s3config.S3Config
 }
 
-// PreSignedRequestValidityDuration is the lifetime of a pre-signed URL
 const PreSignedRequestValidityDuration = 7 * 24 * stime.Hour
 
-// PreSignedPartUploadRequestDuration is the lifetime of a pre-signed multipart URL
 const PreSignedPartUploadRequestDuration = 7 * 24 * stime.Hour
 
-// Return a new instance of ObjectCleanupController
 func NewObjectCleanupController(
 	objectCleanupRepo *repo.ObjectCleanupRepository,
 	objectRepo *repo.ObjectRepository,
@@ -52,8 +49,6 @@ func NewObjectCleanupController(
 	}
 }
 
-// StartRemovingUnreportedObjects starts goroutines to cleanup deletes those
-// objects that were possibly uploaded but not reported to the database
 func (c *ObjectCleanupController) StartRemovingUnreportedObjects() {
 	// TODO: object_cleanup: This code is only currently tested for B2
 	if c.S3Config.GetHotDataCenter() != c.S3Config.GetHotBackblazeDC() {
@@ -73,8 +68,6 @@ func (c *ObjectCleanupController) StartRemovingUnreportedObjects() {
 	}
 }
 
-// Entry point for the worker goroutine to cleanup unreported objects.
-//
 // i is an arbitrary index for the current goroutine.
 func (c *ObjectCleanupController) removeUnreportedObjectsWorker(i int) {
 	for {
@@ -190,8 +183,6 @@ func (c *ObjectCleanupController) AddTempObjectKey(objectKey string, dc string) 
 	return c.addCleanupEntryForObjectKey(objectKey, dc, expiry)
 }
 
-// Add the object to a queue of "temporary" objects that are deleted (if they
-// exist) if this entry is not removed from the queue by expirationTime.
 func (c *ObjectCleanupController) addCleanupEntryForObjectKey(objectKey string, dc string, expirationTime int64) error {
 	err := c.Repo.AddTempObject(ente.TempObject{
 		ObjectKey:   objectKey,
@@ -201,10 +192,6 @@ func (c *ObjectCleanupController) addCleanupEntryForObjectKey(objectKey string, 
 	return stacktrace.Propagate(err, "")
 }
 
-// AddTempObjectMultipartKey creates a new temporary object entry for a
-// multlipart upload.
-//
-// See AddTempObjectKey for more details.
 func (c *ObjectCleanupController) AddMultipartTempObjectKey(objectKey string, uploadID string, dc string) error {
 	expiry := time.Microseconds() + (2 * PreSignedPartUploadRequestDuration.Microseconds())
 	err := c.Repo.AddTempObject(ente.TempObject{

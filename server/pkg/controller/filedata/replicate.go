@@ -16,8 +16,6 @@ import (
 	"time"
 )
 
-// StartReplication starts the replication process for file data.
-// If
 func (c *Controller) StartReplication() error {
 	workerURL := viper.GetString("replication.worker-url")
 	if workerURL == "" {
@@ -72,8 +70,6 @@ func (c *Controller) startWorkers(n int) {
 	}
 }
 
-// Entry point for the replication worker (goroutine)
-//
 // i is an arbitrary index of the current routine.
 func (c *Controller) replicate(i int) {
 	for {

@@ -50,14 +50,10 @@ type ReplicationController3 struct {
 	ObjectRepo        *repo.ObjectRepository
 	ObjectCopiesRepo  *repo.ObjectCopiesRepository
 	DiscordController *discord.DiscordController
-	// URL of the Cloudflare worker to use for downloading the source object
 	workerURL string
-	// Base directory for temporary storage
 	tempStorage string
-	// Prometheus Metrics
 	mUploadSuccess *prometheus.CounterVec
 	mUploadFailure *prometheus.CounterVec
-	// Cached S3 clients etc
 	b2Client   *s3.S3
 	b2Bucket   *string
 	wasabiDest *UploadDestination
@@ -69,11 +65,9 @@ type UploadDestination struct {
 	Client   *s3.S3
 	Uploader *s3manager.Uploader
 	Bucket   *string
-	// The label to use for reporting metrics for uploads to this destination
 	Label string
 	// If true, we should ignore Wasabi 403 errors. See "Reuploads".
 	HasComplianceHold bool
-	// If true, the object is uploaded to the GLACIER class.
 	IsGlacier bool
 }
 
@@ -84,9 +78,6 @@ type UploadDestination struct {
 // asynchronously, as and when it notices new files that have not yet been
 // replicated (it does this by querying the object_copies table).
 func (c *ReplicationController3) StartReplication() error {
-	// As a safety check, ensure that the current hot storage bucket is in b2.
-	// This is because the replication v3 code has not yet been tested for other
-	// scenarios (it'll likely work though, probably with minor modifications).
 	hotDC := c.S3Config.GetHotDataCenter()
 	if hotDC != c.S3Config.GetHotBackblazeDC() {
 		return fmt.Errorf("v3 replication can currently only run when the primary hot data center is Backblaze. Instead, it was %s", hotDC)
@@ -201,8 +192,6 @@ func (c *ReplicationController3) createDestinations() {
 	}
 }
 
-// Entry point for the replication worker (goroutine)
-//
 // i is an arbitrary index of the current routine.
 func (c *ReplicationController3) replicate(i int) {
 	// This is just
@@ -228,7 +217,6 @@ func (c *ReplicationController3) replicate(i int) {
 // A common and expected error is `sql.ErrNoRows`, which occurs if there are no
 // objects left to replicate currently.
 func (c *ReplicationController3) tryReplicate() error {
-	// Fetch an object to replicate
 	ctxWithTimeout, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	copies, err := c.ObjectCopiesRepo.GetAndLockUnreplicatedObject(ctxWithTimeout)
@@ -351,9 +339,6 @@ func (c *ReplicationController3) tryReplicate() error {
 	return done(err)
 }
 
-// Download the object for objectKey from B2 hot storage, writing it into file.
-//
-// Return the size of the downloaded file.
 func (c *ReplicationController3) downloadFromB2ViaWorker(objectKey string, file *os.File, logger *log.Entry) (int64, error) {
 	presignedURL, err := c.getPresignedB2URL(objectKey)
 	if err != nil {
@@ -404,7 +389,6 @@ func (c *ReplicationController3) downloadFromB2ViaWorker(objectKey string, file 
 	return n, nil
 }
 
-// Get a presigned URL to download the object with objectKey from the B2 bucket.
 func (c *ReplicationController3) getPresignedB2URL(objectKey string) (string, error) {
 	r, _ := c.b2Client.GetObjectRequest(&s3.GetObjectInput{
 		Bucket: c.b2Bucket,
@@ -424,7 +408,6 @@ type UploadInput struct {
 	Logger       *log.Entry
 }
 
-// Upload, verify and then update the DB to mark replication to dest.
 func (c *ReplicationController3) replicateFile(in *UploadInput, dest *UploadDestination, dbUpdateCopies func() error) error {
 	start := time.Now()
 	logger := in.Logger.WithFields(log.Fields{
@@ -442,7 +425,6 @@ func (c *ReplicationController3) replicateFile(in *UploadInput, dest *UploadDest
 	if err != nil {
 		return failure(stacktrace.Propagate(err, "Failed to upload object"))
 	}
-	// log if time taken is more than 2 seconds and speed is less than .5MB/s
 	if time.Since(start) > slowUploadThreshold {
 		elapsed := time.Since(start)
 		uploadSpeedMBps := float64(in.ExpectedSize) / (elapsed.Seconds() * 1024 * 1024)
@@ -498,8 +480,6 @@ func (c *ReplicationController3) replicateFile(in *UploadInput, dest *UploadDest
 	return nil
 }
 
-// Upload the given file to using uploader to the given bucket.
-//
 // # Reuploads
 //
 // It is possible that the object might already exist on remote. The known
@@ -517,7 +497,6 @@ func (c *ReplicationController3) replicateFile(in *UploadInput, dest *UploadDest
 // object verification using the HEAD request will act as a sanity check for
 // the object.
 func (c *ReplicationController3) uploadFile(in *UploadInput, dest *UploadDestination) error {
-	// Rewind the file pointer back to the start for the next upload.
 	in.File.Seek(0, io.SeekStart)
 
 	up := s3manager.UploadInput{
@@ -543,32 +522,6 @@ func (c *ReplicationController3) uploadFile(in *UploadInput, dest *UploadDestina
 	return nil
 }
 
-// Return true if the given error is because of an HTTP 403.
-//
-// See "Reuploads" for the scenario where these errors can arise.
-//
-// Specifically, this in an example of the HTTP 403 response we get when
-// trying to add an object to a Wasabi bucket that already has a compliance
-// locked object with the same key.
-//
-//		HTTP/1.1 403 Forbidden
-//		Content-Type: application/xml
-//		Date: Tue, 20 Dec 2022 10:23:33 GMT
-//		Server: WasabiS3/7.10.1193-2022-11-23-84c72037e8 (head2)
-//
-//		<?xml version="1.0" encoding="UTF-8"?>
-//		<Error>
-//		 	<Code>AccessDenied</Code>
-//		 	<Message>Access Denied</Message>
-//		 	<RequestId>yyy</RequestId>
-//		 	<HostId>zzz</HostId>
-//	    </Error>
-//
-// Printing the error type and details produces this:
-//
-//	type: *s3err.RequestFailure
-//	AccessDenied: Access Denied
-//	  status code: 403, request id: yyy, host id: zzz
 func (c *ReplicationController3) isRequestFailureAccessDenied(err error) bool {
 	if reqerr, ok := err.(s3.RequestFailure); ok {
 		if reqerr.Code() == "AccessDenied" {
@@ -578,7 +531,6 @@ func (c *ReplicationController3) isRequestFailureAccessDenied(err error) bool {
 	return false
 }
 
-// Verify the uploaded file by doing a HEAD check and comparing sizes
 func (c *ReplicationController3) verifyUploadedFileSize(in *UploadInput, dest *UploadDestination) error {
 	res, err := dest.Client.HeadObject(&s3.HeadObjectInput{
 		Bucket: dest.Bucket,

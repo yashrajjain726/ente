@@ -8,7 +8,6 @@ import (
 	"github.com/lib/pq"
 )
 
-// Repository defines the methods for managing emergency contacts and recovery process.
 type Repository struct {
 	DB *sql.DB
 }
@@ -48,7 +47,7 @@ func (r *Repository) AddEmergencyContact(ctx context.Context, userID int64, emer
 INSERT INTO  emergency_contact(user_id, emergency_contact_id, state, encrypted_key, notice_period_in_hrs) VALUES ($1,$2,$3,$4,$5)
 ON CONFLICT (user_id, emergency_contact_id) DO UPDATE SET state=$3, encrypted_key=$4, notice_period_in_hrs=$5 
 WHERE emergency_contact.user_id=$1 AND emergency_contact.emergency_contact_id=$2 AND emergency_contact.state = ANY($6)`,
-		userID, // $1 user_id
+		userID,
 		emergencyContactID,
 		ente.UserInvitedContact,
 		encKey,
@@ -87,7 +86,6 @@ func (r *Repository) GetActiveContactForUser(ctx context.Context, userID int64) 
 	return contacts, nil
 }
 
-// GetActiveEmergencyContact for a given userID and emergencyContactID in active state
 func (r *Repository) GetActiveEmergencyContact(ctx context.Context, userID int64, emergencyContactID int64) (*ContactRow, error) {
 	row := r.DB.QueryRowContext(ctx, `SELECT user_id, emergency_contact_id, state, notice_period_in_hrs, encrypted_key
                                                                        				FROM emergency_contact WHERE user_id=$1 and emergency_contact_id=$2 and state = $3`,
@@ -100,7 +98,6 @@ func (r *Repository) GetActiveEmergencyContact(ctx context.Context, userID int64
 	return &c, nil
 }
 
-// UpdateState will return true if the state was updated, false if the state was not updated
 func (r *Repository) UpdateState(ctx context.Context,
 	userID int64,
 	emergencyContactID int64,

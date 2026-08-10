@@ -10,7 +10,6 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-// GetFilesInfo returns map of fileIDs to ente.FileInfo for a given userID.
 func (repo *FileRepository) GetFilesInfo(ctx context.Context, fileIDs []int64, userID int64) (map[int64]*ente.FileInfo, error) {
 	rows, err := repo.DB.QueryContext(ctx, `SELECT file_id, info from files where file_id = ANY($1) and owner_id = $2`, pq.Array(fileIDs), userID)
 	if err != nil {
@@ -29,9 +28,7 @@ func (repo *FileRepository) GetFilesInfo(ctx context.Context, fileIDs []int64, u
 	return result, nil
 }
 
-// UpdateSizeInfo updates the size info for a given map of fileIDs to ente.FileInfo.
 func (repo *FileRepository) UpdateSizeInfo(ctx context.Context, sizeInfo map[int64]*ente.FileInfo) error {
-	// Update the size info for each file using a batched transaction.
 	tx, err := repo.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return stacktrace.Propagate(err, "")
@@ -49,7 +46,6 @@ func (repo *FileRepository) UpdateSizeInfo(ctx context.Context, sizeInfo map[int
 	return nil
 }
 
-// GetFileInfoFromObjectKeys returns the file info for a given list of fileIDs.
 func (repo *FileRepository) GetFileInfoFromObjectKeys(ctx context.Context, fileIDs []int64) (map[int64]*ente.FileInfo, error) {
 	rows, err := repo.DB.QueryContext(ctx, `SELECT file_id, size, o_type FROM object_keys WHERE file_id = ANY($1)`, pq.Array(fileIDs))
 	if err != nil {

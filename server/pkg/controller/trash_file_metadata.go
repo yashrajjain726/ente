@@ -10,7 +10,6 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-// DropFileMetadataCron removes the metadata for deleted files
 func (t *TrashController) DropFileMetadataCron() {
 	ctx := context.Background()
 	lockName := "dropTrashedFileMetadata"

@@ -15,14 +15,6 @@ import (
 	"github.com/spf13/viper"
 )
 
-// MailingListsController is used to keeping the external mailing lists in sync
-// with customer email changes.
-//
-// MailingListsController contains methods for keeping external mailing lists in
-// sync when new users sign up, or update their email, or delete their account.
-// Currently, these mailing lists are hosted on Zoho Campaigns.
-//
-// See also: Syncing emails with Zoho Campaigns
 type MailingListsController struct {
 	zohoAccessToken     string
 	zohoListKey         string
@@ -33,7 +25,6 @@ type MailingListsController struct {
 	discordController   *discord.DiscordController
 }
 
-// Return a new instance of MailingListsController
 func NewMailingListsController(discordController *discord.DiscordController) *MailingListsController {
 	zohoCredentials := zoho.Credentials{
 		ClientID:     viper.GetString("zoho.client-id"),
@@ -41,20 +32,8 @@ func NewMailingListsController(discordController *discord.DiscordController) *Ma
 		RefreshToken: viper.GetString("zoho.refresh-token"),
 	}
 
-	// The Zoho "List Key" identifies a particular list of email IDs that are
-	// stored in Zoho. All the actions that we perform (adding, removing and
-	// updating emails) are done on this list.
-	//
-	// https://www.zoho.com/campaigns/help/developers/list-management.html
 	zohoListKey := viper.GetString("zoho.list-key")
 
-	// List of topics to which emails are sent.
-	//
-	// Ostensibly, we can get them from their API
-	// https://www.zoho.com/campaigns/oldhelp/api/get-topics.html
-	//
-	// But that doesn't currently work, luckily we can get these IDs by looking
-	// at the HTML source of the topic update dashboard page.
 	zohoTopicIds := viper.GetString("zoho.topic-ids")
 
 	// Zoho has a rate limit on the number of access tokens that can created
@@ -69,8 +48,6 @@ func NewMailingListsController(discordController *discord.DiscordController) *Ma
 		Password: viper.GetString("listmonk.password"),
 	}
 
-	// An array of integer values indicating the id of listmonk campaign
-	// mailing list to which the subscriber needs to added
 	listmonkListIDs := viper.GetIntSlice("listmonk.list-ids")
 
 	return &MailingListsController{
@@ -120,13 +97,8 @@ func (c *MailingListsController) Subscribe(email string) error {
 	return nil
 }
 
-// Unsubscribe the given email address to our default Zoho Campaigns list
-// or Listmonk Campaigns List
-//
-// See: [Note: Syncing emails with Zoho Campaigns]
 func (c *MailingListsController) Unsubscribe(email string) error {
 	if !(c.shouldSkipZoho()) {
-		// https://www.zoho.com/campaigns/help/developers/contact-unsubscribe.html
 		err := c.doListActionZoho("listunsubscribe", email)
 		if err != nil {
 			return stacktrace.Propagate(err, "")
@@ -141,30 +113,18 @@ func (c *MailingListsController) Unsubscribe(email string) error {
 	return nil
 }
 
-// shouldSkipZoho() checks if the MailingListsController
-// should be skipped due to missing credentials.
 func (c *MailingListsController) shouldSkipZoho() bool {
 	return c.zohoCredentials.RefreshToken == ""
 }
 
-// shouldSkipListmonk() checks if the Listmonk mailing list
-// should be skipped due to missing credentials
-// listmonklistIDs value.
-//
-// ListmonkListIDs is an optional field for subscribing an email address
-// (user gets added to the default list),
-// but is a required field for unsubscribing an email address
 func (c *MailingListsController) shouldSkipListmonk() bool {
 	if c.listmonkCredentials.BaseURL == "" || c.listmonkCredentials.Username == "" ||
 		c.listmonkCredentials.Password == "" || len(c.listmonkListIDs) == 0 {
-		// Skip
 		return true
 	}
 	return false
 }
 
-// Both the listsubscribe and listunsubscribe Zoho Campaigns API endpoints work
-// similarly, so use this function to keep the common code.
 func (c *MailingListsController) doListActionZoho(action string, email string) error {
 	// Query escape the email so that any pluses get converted to %2B.
 	escapedEmail := url.QueryEscape(email)
@@ -210,7 +170,6 @@ func (c *MailingListsController) doListActionZoho(action string, email string) e
 	return stacktrace.Propagate(err, "")
 }
 
-// Subscribes an email address to a particular listmonk campaign mailing list
 func (c *MailingListsController) listmonkSubscribe(email string) error {
 	data := map[string]interface{}{
 		"email": email,
@@ -225,7 +184,6 @@ func (c *MailingListsController) listmonkSubscribe(email string) error {
 	return err
 }
 
-// Unsubscribes an email address to a particular listmonk campaign mailing list
 func (c *MailingListsController) listmonkUnsubscribe(email string) error {
 	// Listmonk doesn't provide an endpoint for unsubscribing users
 	// from a particular list directly via their email

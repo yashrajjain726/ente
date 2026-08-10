@@ -13,15 +13,12 @@ import (
 	"github.com/lib/pq"
 )
 
-// CollectionLinkRepo defines the methods for inserting, updating and
-// retrieving entities related to public collections
 type CollectionLinkRepo struct {
 	DB         *sql.DB
 	albumHost  string
 	lockerHost string
 }
 
-// NewCollectionLinkRepository ..
 func NewCollectionLinkRepository(db *sql.DB, albumHost string) *CollectionLinkRepo {
 	if albumHost == "" {
 		albumHost = "https://albums.ente.com"
@@ -132,7 +129,6 @@ func (pcr *CollectionLinkRepo) GetActiveCollectionLinkRow(ctx context.Context, c
                                                    public_collection_tokens WHERE collection_id = $1 and is_disabled = FALSE`,
 		collectionID)
 
-	//defer rows.Close()
 	ret := ente.CollectionLinkRow{}
 	var minRole sql.NullString
 	err := row.Scan(&ret.ID, &ret.CollectionID, &ret.Token, &ret.ValidTill, &ret.DeviceLimit,
@@ -148,7 +144,6 @@ func (pcr *CollectionLinkRepo) GetActiveCollectionLinkRow(ctx context.Context, c
 	return ret, nil
 }
 
-// UpdatePublicCollectionToken will update the row for corresponding public collection token
 func (pcr *CollectionLinkRepo) UpdatePublicCollectionToken(ctx context.Context, pct ente.CollectionLinkRow) error {
 	var minRole interface{}
 	if pct.MinRole != nil {
@@ -228,7 +223,6 @@ func (pcr *CollectionLinkRepo) GetActivePublicTokenForUser(ctx context.Context, 
 	return result, nil
 }
 
-// CleanupAccessHistory public_collection_access_history where public_collection_tokens is disabled and the last updated time is older than 30 days
 func (pcr *CollectionLinkRepo) CleanupAccessHistory(ctx context.Context) error {
 	_, err := pcr.DB.ExecContext(ctx, `DELETE FROM public_collection_access_history WHERE share_id IN (SELECT id FROM public_collection_tokens WHERE is_disabled = TRUE AND updated_at < (now_utc_micro_seconds() - (24::BIGINT * 30 * 60 * 60 * 1000 * 1000)))`)
 	if err != nil {

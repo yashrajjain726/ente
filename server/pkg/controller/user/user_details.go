@@ -106,9 +106,6 @@ func (c *UserController) GetDetailsV2(ctx *gin.Context, userID int64, fetchMemor
 		})
 	}
 
-	// g.Wait waits for all goroutines to complete
-	// and returns the first non-nil error returned
-	// by one of the goroutines.
 	if err := g.Wait(); err != nil {
 		return details.UserDetailsResponse{}, stacktrace.Propagate(err, "")
 	}

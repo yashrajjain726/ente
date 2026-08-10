@@ -13,15 +13,12 @@ import (
 	"github.com/ente/stacktrace"
 )
 
-// FileLinkRepository defines the methods for inserting, updating and
-// retrieving entities related to public file
 type FileLinkRepository struct {
 	DB         *sql.DB
 	photoHost  string
 	lockerHost string
 }
 
-// NewFileLinkRepo ..
 func NewFileLinkRepo(db *sql.DB) *FileLinkRepository {
 	albumHost := viper.GetString("apps.public-albums")
 	if albumHost == "" {
@@ -95,7 +92,6 @@ func (pcr *FileLinkRepository) Insert(
 	return id, nil
 }
 
-// UpdateLinkSecretIfEmpty updates link key metadata if it hasn't been set already.
 func (pcr *FileLinkRepository) UpdateLinkSecretIfEmpty(
 	ctx context.Context,
 	linkID string,
@@ -189,7 +185,6 @@ func (pcr *FileLinkRepository) DisableLinkForFiles(ctx context.Context, fileIDs 
 	return nil
 }
 
-// DisableLinksForUser will disable all public file links for the given user
 func (pcr *FileLinkRepository) DisableLinksForUser(ctx context.Context, userID int64) error {
 	_, err := pcr.DB.ExecContext(ctx, `UPDATE public_file_tokens SET is_disabled = TRUE WHERE owner_id = $1`, userID)
 	if err != nil {
@@ -263,7 +258,6 @@ func (pcr *FileLinkRepository) GetFileUrlRowByFileID(ctx context.Context, fileID
 	return &result, nil
 }
 
-// UpdateLink will update the row for corresponding public file token
 func (pcr *FileLinkRepository) UpdateLink(ctx context.Context, pct ente.FileLinkRow) error {
 	_, err := pcr.DB.ExecContext(ctx, `UPDATE public_file_tokens SET valid_till = $1, device_limit = $2, 
                                     pw_hash = $3, pw_nonce = $4, mem_limit = $5, ops_limit = $6, enable_download = $7  
@@ -302,7 +296,6 @@ func (pcr *FileLinkRepository) AccessedInPast(ctx context.Context, shareID strin
 	return true, stacktrace.Propagate(err, "failed to record access history")
 }
 
-// CleanupAccessHistory public_file_tokens_access_history where public_collection_tokens is disabled and the last updated time is older than 30 days
 func (pcr *FileLinkRepository) CleanupAccessHistory(ctx context.Context) error {
 	_, err := pcr.DB.ExecContext(ctx, `DELETE FROM public_file_tokens_access_history WHERE id IN (SELECT id FROM public_file_tokens WHERE is_disabled = TRUE AND updated_at < (now_utc_micro_seconds() - (24::BIGINT * 30 * 60 * 60 * 1000 * 1000)))`)
 	if err != nil {

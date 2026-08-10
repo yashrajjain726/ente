@@ -22,7 +22,6 @@ type ObjectCleanupRepository struct {
 	DB *sql.DB
 }
 
-// AddTempObject persists a given object identifier and it's expirationTime
 func (repo *ObjectCleanupRepository) AddTempObject(tempObject ente.TempObject, expirationTime int64) error {
 	var err error
 	if tempObject.IsMultipart {
@@ -35,13 +34,11 @@ func (repo *ObjectCleanupRepository) AddTempObject(tempObject ente.TempObject, e
 	return stacktrace.Propagate(err, "")
 }
 
-// RemoveTempObjectKey removes a TempObject identified by its key and datacenter
 func (repo *ObjectCleanupRepository) RemoveTempObjectKey(ctx context.Context, tx *sql.Tx, objectKey string, dc string) error {
 	_, err := tx.ExecContext(ctx, `DELETE FROM temp_objects WHERE object_key = $1`, objectKey)
 	return stacktrace.Propagate(err, "")
 }
 
-// RemoveTempObjectFromDC will also return how many rows were affected
 func (repo *ObjectCleanupRepository) RemoveTempObjectFromDC(ctx context.Context, tx *sql.Tx, objectKey string, dc string) error {
 	res, err := tx.ExecContext(ctx, `DELETE FROM temp_objects WHERE object_key = $1 and bucket_id = $2`, objectKey, dc)
 	if err != nil {
@@ -70,7 +67,6 @@ func (repo *ObjectCleanupRepository) DoesTempObjectExist(ctx context.Context, ob
 	return exists, nil
 }
 
-// GetExpiredObjects returns the list of object keys that have expired
 func (repo *ObjectCleanupRepository) GetAndLockExpiredObjects() (*sql.Tx, []ente.TempObject, error) {
 	tx, err := repo.DB.Begin()
 	if err != nil {
@@ -130,7 +126,6 @@ func (repo *ObjectCleanupRepository) GetAndLockExpiredObjects() (*sql.Tx, []ente
 	return tx, tempObjects, nil
 }
 
-// SetExpiryForTempObject sets the expiration_time for TempObject
 func (repo *ObjectCleanupRepository) SetExpiryForTempObject(tx *sql.Tx, tempObject ente.TempObject, expirationTime int64) error {
 	if tempObject.IsMultipart {
 		_, err := tx.Exec(`
@@ -145,7 +140,6 @@ func (repo *ObjectCleanupRepository) SetExpiryForTempObject(tx *sql.Tx, tempObje
 	}
 }
 
-// RemoveTempObject removes a given TempObject
 func (repo *ObjectCleanupRepository) RemoveTempObject(tx *sql.Tx, tempObject ente.TempObject) error {
 	if tempObject.IsMultipart {
 		_, err := tx.Exec(`

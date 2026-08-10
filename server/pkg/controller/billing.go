@@ -25,7 +25,6 @@ import (
 	"github.com/ente/museum/pkg/repo"
 )
 
-// BillingController provides abstractions for handling billing related queries
 type BillingController struct {
 	BillingPlansPerAccount ente.BillingPlansPerAccount
 	BillingRepo            *repo.BillingRepository
@@ -40,7 +39,6 @@ type BillingController struct {
 	CommonBillCtrl         *commonbilling.Controller
 }
 
-// Return a new instance of BillingController
 func NewBillingController(
 	plans ente.BillingPlansPerAccount,
 	appStoreController *AppStoreController,
@@ -69,7 +67,6 @@ func NewBillingController(
 	}
 }
 
-// GetPlansV2 returns the available subscription plans for the given country and stripe account
 func (c *BillingController) GetPlansV2(countryCode string, stripeAccountCountry ente.StripeAccountCountry) []ente.BillingPlan {
 	plans := c.getAllPlans(countryCode, stripeAccountCountry)
 	result := make([]ente.BillingPlan, 0)
@@ -90,14 +87,12 @@ func (c *BillingController) GetStripeAccountCountry(userID int64) (ente.StripeAc
 		return "", stacktrace.Propagate(err, "")
 	}
 	if subscription.PaymentProvider != ente.Stripe {
-		//if user doesn't have a stripe subscription, return the default stripe account country
 		return ente.DefaultStripeAccountCountry, nil
 	} else {
 		return subscription.Attributes.StripeAccountCountry, nil
 	}
 }
 
-// GetUserPlans returns the active plans for a user
 func (c *BillingController) GetUserPlans(ctx *gin.Context, userID int64) ([]ente.BillingPlan, error) {
 	stripeAccountCountry, err := c.GetStripeAccountCountry(userID)
 	if err != nil {
@@ -108,7 +103,6 @@ func (c *BillingController) GetUserPlans(ctx *gin.Context, userID int64) ([]ente
 
 }
 
-// GetSubscription returns the current subscription for a user if any
 func (c *BillingController) GetSubscription(ctx *gin.Context, userID int64) (ente.Subscription, error) {
 	s, err := c.BillingRepo.GetUserSubscription(userID)
 	if err != nil {
@@ -126,7 +120,7 @@ func (c *BillingController) GetSubscription(ctx *gin.Context, userID int64) (ent
 func (c *BillingController) GetRedirectURL(ctx *gin.Context) (string, error) {
 	whitelistedRedirectURLs := viper.GetStringSlice("stripe.whitelisted-redirect-urls")
 	redirectURL := ctx.Query("redirectURL")
-	if len(redirectURL) > 0 && redirectURL[len(redirectURL)-1:] == "/" { // Ignore the trailing slash
+	if len(redirectURL) > 0 && redirectURL[len(redirectURL)-1:] == "/" {
 		redirectURL = redirectURL[:len(redirectURL)-1]
 	}
 	for _, ar := range whitelistedRedirectURLs {
@@ -137,7 +131,6 @@ func (c *BillingController) GetRedirectURL(ctx *gin.Context) (string, error) {
 	return "", stacktrace.Propagate(ente.ErrBadRequest, "not a whitelistedRedirectURL- %s", redirectURL)
 }
 
-// GetActiveSubscription returns user's active subscription or throws a error if no active subscription
 func (c *BillingController) GetActiveSubscription(userID int64) (ente.Subscription, error) {
 	subscription, err := c.BillingRepo.GetUserSubscription(userID)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -156,7 +149,6 @@ func (c *BillingController) GetActiveSubscription(userID int64) (ente.Subscripti
 	return subscription, nil
 }
 
-// HasActiveSelfOrFamilySubscription validates if the user or user's family admin has active subscription
 func (c *BillingController) HasActiveSelfOrFamilySubscription(userID int64, mustBeOnPaidPlan bool) error {
 	var subscriptionUserID int64
 	familyAdminID, err := c.UserRepo.GetFamilyAdminID(userID)
@@ -193,7 +185,6 @@ func (c *BillingController) HasActiveSelfOrFamilySubscription(userID int64, must
 	return nil
 }
 
-// VerifySubscription verifies and returns the verified subscription
 func (c *BillingController) VerifySubscription(
 	userID int64,
 	paymentProvider ente.PaymentProvider,
@@ -277,7 +268,6 @@ func (c *BillingController) VerifySubscription(
 	newSubscription.ID = currentSubscription.ID
 	if paymentProvider == ente.PlayStore &&
 		newSubscription.OriginalTransactionID != currentSubscription.OriginalTransactionID {
-		// Acknowledge to PlayStore in case of upgrades/downgrades/renewals
 		err = c.PlayStoreController.AcknowledgeSubscription(newSubscription.ProductID, verificationData)
 		if err != nil {
 			log.Error("Error acknowledging subscription ", err)
@@ -366,7 +356,6 @@ func (c *BillingController) HandleAccountDeletion(ctx context.Context, userID in
 		"stripe_account_country": subscription.Attributes.StripeAccountCountry,
 	})
 	billingLogger.Info("subscription fetched")
-	// user on free plan, no action required
 	if subscription.ProductID == ente.FreePlanProductID {
 		billingLogger.Info("user on free plan")
 		return true, nil

@@ -50,7 +50,6 @@ func (r *Repository) GetAllDevices(ctx context.Context, userID int64) ([]cast.Ca
 	return devices, nil
 }
 
-// InsertCastData inserts the cast payload and returns the paired device ID.
 func (r *Repository) InsertCastData(ctx context.Context, castUserID int64, code string, collectionID int64, castToken string, encryptedPayload string) (uuid.UUID, error) {
 	code = strings.ToUpper(code)
 	var deviceID uuid.UUID
@@ -119,7 +118,6 @@ func (r *Repository) UpdateLastUsedAtForToken(ctx context.Context, token string)
 	return nil
 }
 
-// DeleteUnclaimedCodes that are not associated with a collection and are older than the given time
 func (r *Repository) DeleteUnclaimedCodes(ctx context.Context, expiryTime int64) error {
 	result, err := r.DB.ExecContext(ctx, "DELETE FROM casting WHERE last_used_at < $1 and is_deleted=false and collection_id is null", expiryTime)
 	if err != nil {
@@ -131,7 +129,6 @@ func (r *Repository) DeleteUnclaimedCodes(ctx context.Context, expiryTime int64)
 	return nil
 }
 
-// DeleteOldSessions where last used at is older than the given time
 func (r *Repository) DeleteOldSessions(ctx context.Context, expiryTime int64) error {
 	result, err := r.DB.ExecContext(ctx, "DELETE FROM casting WHERE last_used_at < $1", expiryTime)
 	if err != nil {
@@ -143,19 +140,16 @@ func (r *Repository) DeleteOldSessions(ctx context.Context, expiryTime int64) er
 	return nil
 }
 
-// RevokeTokenForUser code for given userID
 func (r *Repository) RevokeTokenForUser(ctx context.Context, userId int64) error {
 	_, err := r.DB.ExecContext(ctx, "UPDATE casting SET is_deleted=true where cast_user=$1", userId)
 	return stacktrace.Propagate(err, "")
 }
 
-// RevokeTokenForCollection code for given collectionID
 func (r *Repository) RevokeTokenForCollection(ctx context.Context, collectionID int64) error {
 	_, err := r.DB.ExecContext(ctx, "UPDATE casting SET is_deleted=true where collection_id=$1", collectionID)
 	return stacktrace.Propagate(err, "")
 }
 
-// RevokeForGivenUserAndCollection ..
 func (r *Repository) RevokeForGivenUserAndCollection(ctx context.Context, collectionID int64, userID int64) error {
 	_, err := r.DB.ExecContext(ctx, "UPDATE casting SET is_deleted=true where collection_id=$1 and cast_user=$2", collectionID, userID)
 	return stacktrace.Propagate(err, "")
