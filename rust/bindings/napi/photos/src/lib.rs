@@ -68,7 +68,7 @@ impl AssetStore {
         for warning in
             assets::migrate_desktop_models(&inner, std::path::Path::new(&legacy_models_dir))
         {
-            eprintln!("Photos model migration: {warning}");
+            ::log::warn!("Photos model migration: {warning}");
         }
         Self { inner }
     }
