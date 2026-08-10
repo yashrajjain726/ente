@@ -77,6 +77,7 @@ class _FileDetailsWidgetState extends State<FileDetailsWidget> {
   @override
   void initState() {
     debugPrint('file_details_sheet initState');
+    final isSystemTrashFile = widget.file.asTrashFile?.isSystemOnly ?? false;
     _currentUserID = Configuration.instance.getUserIDV2();
     hasLocationData.value = widget.file.hasLocation;
     _isImage =
@@ -103,24 +104,26 @@ class _FileDetailsWidgetState extends State<FileDetailsWidget> {
       }
     });
 
-    if (_isImage) {
-      _exifNotifier.addListener(() {
-        if (_exifNotifier.value != null) {
-          _generateExifForDetails(_exifNotifier.value!);
-        }
-        showExifListTile =
-            _exifData["focalLength"] != null ||
-            _exifData["fNumber"] != null ||
-            _exifData["takenOnDevice"] != null ||
-            _exifData["exposureTime"] != null ||
-            _exifData["ISO"] != null;
+    if (!isSystemTrashFile) {
+      if (_isImage) {
+        _exifNotifier.addListener(() {
+          if (_exifNotifier.value != null) {
+            _generateExifForDetails(_exifNotifier.value!);
+          }
+          showExifListTile =
+              _exifData["focalLength"] != null ||
+              _exifData["fNumber"] != null ||
+              _exifData["takenOnDevice"] != null ||
+              _exifData["exposureTime"] != null ||
+              _exifData["ISO"] != null;
+        });
+      } else if (flagService.internalUser && widget.file.isVideo) {
+        getMediaInfo();
+      }
+      getExif(widget.file).then((exif) {
+        _exifNotifier.value = exif;
       });
-    } else if (flagService.internalUser && widget.file.isVideo) {
-      getMediaInfo();
     }
-    getExif(widget.file).then((exif) {
-      _exifNotifier.value = exif;
-    });
 
     super.initState();
   }
@@ -150,6 +153,7 @@ class _FileDetailsWidgetState extends State<FileDetailsWidget> {
   @override
   Widget build(BuildContext context) {
     final file = widget.file;
+    final isSystemTrashFile = file.asTrashFile?.isSystemOnly ?? false;
     final bool isFileOwner =
         file.ownerID == null || file.ownerID == _currentUserID;
 
@@ -229,7 +233,7 @@ class _FileDetailsWidgetState extends State<FileDetailsWidget> {
       ]);
     }
 
-    if (_isImage) {
+    if (_isImage && !isSystemTrashFile) {
       fileDetailsTiles.addAll([
         MenuGroupComponent(
           items: [
@@ -258,7 +262,7 @@ class _FileDetailsWidgetState extends State<FileDetailsWidget> {
             _exifData,
             _currentUserID,
           ),
-        if (flagService.internalUser)
+        if (flagService.internalUser && !isSystemTrashFile)
           ValueListenableBuilder(
             valueListenable: _videoMetadataNotifier,
             builder: (context, value, _) => VideoExifRowItem(file, value),
