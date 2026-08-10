@@ -113,20 +113,30 @@ class _ShareCollectionSheetState extends State<ShareCollectionSheet> {
             borderRadius: BorderRadius.circular(20),
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxHeight: maxVisibleHeight),
-              child: ListView(
+              child: ListView.separated(
                 controller: _scrollController,
                 shrinkWrap: true,
                 padding: EdgeInsets.zero,
-                children: [
-                  MenuGroupComponent(
+                itemCount: allUsers.length,
+                separatorBuilder: (_, _) => ColoredBox(
+                  color: colors.fillLight,
+                  child: const DividerComponent(
+                    padding: EdgeInsets.only(left: 48),
+                  ),
+                ),
+                itemBuilder: (context, index) {
+                  final user = allUsers[index];
+                  final role = CollectionParticipantRoleExtn.fromString(
+                    user.role,
+                  );
+                  return MenuGroupComponent(
                     backgroundColor: colors.fillLight,
-                    showDividers: true,
-                    dividerPadding: const EdgeInsets.only(left: 48),
-                    items: allUsers.map((user) {
-                      final role = CollectionParticipantRoleExtn.fromString(
-                        user.role,
-                      );
-                      return MenuComponent(
+                    borderRadius: MenuGroupComponent.itemBorderRadius(
+                      index: index,
+                      itemCount: allUsers.length,
+                    ),
+                    items: [
+                      MenuComponent(
                         title: user.email,
                         leading: UserAvatarWidget(
                           user,
@@ -136,10 +146,10 @@ class _ShareCollectionSheetState extends State<ShareCollectionSheet> {
                         trailing: _isOwner
                             ? _buildRolePopupMenu(user)
                             : _buildRoleIcon(role),
-                      );
-                    }).toList(),
-                  ),
-                ],
+                      ),
+                    ],
+                  );
+                },
               ),
             ),
           ),
