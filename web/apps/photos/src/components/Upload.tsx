@@ -1,8 +1,4 @@
-// TODO: Audit this file
 // TODO: Too many null assertions in this file. The types need reworking.
-/* eslint-disable react-hooks/exhaustive-deps */
-/* eslint-disable @typescript-eslint/no-misused-promises */
-/* eslint-disable @typescript-eslint/no-floating-promises */
 import { CollectionMappingChoice } from "@/components/CollectionMappingChoice";
 import type { CollectionSelectorAttributes } from "@/components/CollectionSelector";
 import type { RemotePullOpts } from "@/components/gallery";
@@ -347,7 +343,7 @@ export const Upload: React.FC<UploadProps> = ({
                 () => void onRemotePull({ source: "watcher-upload" }),
             );
 
-            electron.pendingUploads().then((pending) => {
+            void electron.pendingUploads().then((pending) => {
                 if (!pending) return;
 
                 const {
@@ -373,6 +369,7 @@ export const Upload: React.FC<UploadProps> = ({
                 setPreUploadSkippedFiles(preUploadSkippedFiles ?? []);
             });
         }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     useEffect(() => {
@@ -397,7 +394,7 @@ export const Upload: React.FC<UploadProps> = ({
         }
 
         if (electron) {
-            desktopFilesAndZipItems(electron, files).then(
+            void desktopFilesAndZipItems(electron, files).then(
                 ({ fileAndPaths, zipItems, preUploadSkippedFiles }) => {
                     setDesktopFiles(fileAndPaths);
                     setDesktopZipItems(zipItems);
@@ -408,6 +405,7 @@ export const Upload: React.FC<UploadProps> = ({
             setPreUploadSkippedFiles([]);
             setWebFiles(files);
         }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [selectedInputFiles, dragAndDropFiles]);
 
     useEffect(() => {
@@ -505,7 +503,7 @@ export const Upload: React.FC<UploadProps> = ({
                 pendingDesktopUploadConfirmationOptions.current = {};
                 if (pendingDesktopUploadCollectionName.current) {
                     // Watch folders must match hidden albums instead of duplicating them.
-                    uploadFilesToNewCollections("root", {
+                    void uploadFilesToNewCollections("root", {
                         collectionName:
                             pendingDesktopUploadCollectionName.current,
                         includeHiddenCollections: true,
@@ -514,7 +512,7 @@ export const Upload: React.FC<UploadProps> = ({
                     });
                     pendingDesktopUploadCollectionName.current = undefined;
                 } else {
-                    uploadFilesToNewCollections("parent", {
+                    void uploadFilesToNewCollections("parent", {
                         includeHiddenCollections: true,
                         skipConfirmation: true,
                         ...confirmationOptions,
@@ -524,7 +522,7 @@ export const Upload: React.FC<UploadProps> = ({
             }
 
             if (electron && _selectedUploadType == "zips") {
-                uploadFilesToNewCollections("parent");
+                void uploadFilesToNewCollections("parent");
                 return;
             }
 
@@ -540,7 +538,7 @@ export const Upload: React.FC<UploadProps> = ({
                     (props.activeCollection.owner.id == user?.id ||
                         canAddFilesToCollection(props.activeCollection));
                 if (props.activeCollection && canUploadToActiveCollection) {
-                    uploadFilesToExistingCollection(
+                    void uploadFilesToExistingCollection(
                         props.activeCollection,
                         prunedItemAndPaths,
                     );
@@ -560,7 +558,7 @@ export const Upload: React.FC<UploadProps> = ({
                 activeCollectionID: props.activeCollection?.id,
                 showHiddenCollections: props.isInHiddenSection,
                 onSelectCollection: (collection) =>
-                    uploadFilesToExistingCollection(
+                    void uploadFilesToExistingCollection(
                         collection,
                         prunedItemAndPaths,
                     ),
@@ -568,6 +566,7 @@ export const Upload: React.FC<UploadProps> = ({
                 onCancel: handleCollectionSelectorCancel,
             });
         })();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [webFiles, desktopFiles, desktopFilePaths, desktopZipItems]);
 
     const preCollectionCreationAction = () => {
@@ -1021,7 +1020,7 @@ export const Upload: React.FC<UploadProps> = ({
                 !isPendingDesktopUpload.current &&
                 !watcher.isUploadRunning()
             ) {
-                setPendingUploads(
+                await setPendingUploads(
                     electron,
                     collections,
                     uploadItemsWithCollection
@@ -1114,7 +1113,8 @@ export const Upload: React.FC<UploadProps> = ({
                     captionFirst: true,
                     caption: t("subscription_expired"),
                     title: t("renew_now"),
-                    onClick: redirectToCustomerPortal,
+                    onClick: () =>
+                        void redirectToCustomerPortal().catch(onGenericError),
                 });
                 break;
             case storageLimitExceededErrorMessage:
@@ -1137,7 +1137,7 @@ export const Upload: React.FC<UploadProps> = ({
 
     const uploadToSingleNewCollection = (collectionName: string) => {
         didSubmitNewAlbumName.current = true;
-        uploadFilesToNewCollections("root", {
+        void uploadFilesToNewCollections("root", {
             collectionName,
             createHidden: props.isInHiddenSection,
         });
