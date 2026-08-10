@@ -9,7 +9,6 @@ import (
 
 var ValidCollectionTypes = []string{"album", "folder", "favorites", "uncategorized"}
 
-// Collection represents a collection
 type Collection struct {
 	ID                  int64                `json:"id"`
 	Owner               CollectionUser       `json:"owner"`
@@ -33,8 +32,6 @@ type Collection struct {
 	SharedMagicMetadata *MagicMetadata `json:"sharedMagicMetadata,omitempty"`
 }
 
-// AllowSharing indicates if this particular collection type can be shared
-// or not
 func (c *Collection) AllowSharing() bool {
 	if c == nil {
 		return false
@@ -45,14 +42,10 @@ func (c *Collection) AllowSharing() bool {
 	return true
 }
 
-// AllowParticipantSharing indicates whether a collection can be shared
-// directly with a participant in the given role.
 func (c *Collection) AllowParticipantSharing(role CollectionParticipantRole) bool {
 	return c != nil && (c.Type != "uncategorized" || role == VIEWER)
 }
 
-// AllowDelete indicates if this particular collection type can be deleted by the user
-// or not
 func (c *Collection) AllowDelete() bool {
 	if c == nil {
 		return false
@@ -63,7 +56,6 @@ func (c *Collection) AllowDelete() bool {
 	return true
 }
 
-// CollectionUser represents the owner of a collection
 type CollectionUser struct {
 	ID    int64  `json:"id"`
 	Email string `json:"email"`
@@ -72,21 +64,16 @@ type CollectionUser struct {
 	Role CollectionParticipantRole `json:"role"`
 }
 
-// CollectionAttributes represents a collection's attribtues
 type CollectionAttributes struct {
 	EncryptedPath       string `json:"encryptedPath,omitempty"`
 	PathDecryptionNonce string `json:"pathDecryptionNonce,omitempty"`
 	Version             int    `json:"version"`
 }
 
-// Value implements the driver.Valuer interface. This method
-// simply returns the JSON-encoded representation of the struct.
 func (ca CollectionAttributes) Value() (driver.Value, error) {
 	return json.Marshal(ca)
 }
 
-// Scan implements the sql.Scanner interface. This method
-// simply decodes a JSON-encoded value into the struct fields.
 func (ca *CollectionAttributes) Scan(value interface{}) error {
 	b, ok := value.([]byte)
 	if !ok {
@@ -96,7 +83,6 @@ func (ca *CollectionAttributes) Scan(value interface{}) error {
 	return json.Unmarshal(b, &ca)
 }
 
-// AlterShareRequest represents a share/unshare request
 type AlterShareRequest struct {
 	CollectionID int64                      `json:"collectionID" binding:"required"`
 	Email        string                     `json:"email" binding:"required"`
@@ -158,13 +144,11 @@ type JoinCollectionViaLinkRequest struct {
 	EncryptedKey string `json:"encryptedKey" binding:"required"`
 }
 
-// AddFilesRequest represents a request to add files to a collection
 type AddFilesRequest struct {
 	CollectionID int64                `json:"collectionID" binding:"required"`
 	Files        []CollectionFileItem `json:"files" binding:"required"`
 }
 
-// CopyFileSyncRequest is request object for creating copy of CollectionFileItems, and those copy to the destination collection
 type CopyFileSyncRequest struct {
 	SrcCollectionID     int64                `json:"srcCollectionID" binding:"required"`
 	DstCollection       int64                `json:"dstCollectionID" binding:"required"`
@@ -175,7 +159,6 @@ type CopyResponse struct {
 	OldToNewFileIDMap map[int64]int64 `json:"oldToNewFileIDMap"`
 }
 
-// RemoveFilesRequest represents a request to remove files from a collection
 type RemoveFilesRequest struct {
 	CollectionID int64 `json:"collectionID" binding:"required"`
 	// OtherFileIDs represents the files which don't belong the user trying to remove files
@@ -205,20 +188,17 @@ type RenameRequest struct {
 	NameDecryptionNonce string `json:"nameDecryptionNonce" binding:"required"`
 }
 
-// UpdateCollectionMagicMetadata payload for updating magic metadata for single file
 type UpdateCollectionMagicMetadata struct {
 	ID            int64         `json:"id" binding:"required"`
 	MagicMetadata MagicMetadata `json:"magicMetadata" binding:"required"`
 }
 
-// CollectionFileItem represents a file in an AddFilesRequest and MoveFilesRequest
 type CollectionFileItem struct {
 	ID                 int64  `json:"id" binding:"required"`
 	EncryptedKey       string `json:"encryptedKey"  binding:"required"`
 	KeyDecryptionNonce string `json:"keyDecryptionNonce"  binding:"required"`
 }
 
-// MoveFilesRequest represents movement of file between two collections
 type MoveFilesRequest struct {
 	FromCollectionID int64                `json:"fromCollectionID" binding:"required"`
 	ToCollectionID   int64                `json:"toCollectionID" binding:"required"`

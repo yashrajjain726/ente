@@ -1,6 +1,5 @@
 package ente
 
-// Trash indicates a trashed file in the system.
 type Trash struct {
 	File       File  `json:"file"`
 	IsDeleted  bool  `json:"isDeleted"`
@@ -10,14 +9,12 @@ type Trash struct {
 	UpdatedAt  int64 `json:"updatedAt"`
 }
 
-// DeleteTrashFilesRequest represents a request to delete a trashed files
 type DeleteTrashFilesRequest struct {
 	FileIDs []int64 `json:"fileIDs" binding:"required"`
 	// OwnerID will be set based on the authenticated user
 	OwnerID int64
 }
 
-// EmptyTrashRequest represents a request to empty items from user's trash
 type EmptyTrashRequest struct {
 	// LastUpdatedAt timestamp will be used to delete trashed files with updatedAt timestamp <= LastUpdatedAt
 	// User's trash will be cleaned up in an async manner. The timestamp is used to ensure that newly trashed files

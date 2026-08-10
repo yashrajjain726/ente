@@ -10,7 +10,6 @@ type Embedding struct {
 	Size               *int64
 }
 
-// IndexedFile ...
 type IndexedFile struct {
 	FileID    int64 `json:"fileID"`
 	UpdatedAt int64 `json:"updatedAt"`

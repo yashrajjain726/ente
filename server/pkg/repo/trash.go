@@ -16,11 +16,8 @@ import (
 )
 
 const (
-	// TrashDurationInDays number of days after which file will be removed from trash
 	TrashDurationInDays = 30
-	// TrashDiffLimit is the default limit for number of items server will attempt to return when clients
-	// ask for changes.
-	TrashDiffLimit = 2500
+	TrashDiffLimit      = 2500
 
 	TrashBatchSize = 1000
 
@@ -167,7 +164,6 @@ func (t *TrashRepository) TrashFiles(fileIDs []int64, userID int64, trash ente.T
 	return stacktrace.Propagate(err, "")
 }
 
-// CleanUpDeletedFilesFromCollection deletes the files from the collection if the files are deleted from the trash
 func (t *TrashRepository) CleanUpDeletedFilesFromCollection(ctx context.Context, fileIDs []int64, userID int64) error {
 	err := t.verifyFilesAreDeleted(ctx, userID, fileIDs)
 	if err != nil {
@@ -213,8 +209,6 @@ func (t *TrashRepository) Delete(ctx context.Context, userID int64, fileIDs []in
 	if len(fileIDs) > TrashDiffLimit {
 		return fmt.Errorf("can not delete more than %d in one go", TrashDiffLimit)
 	}
-	// find file_ids from the trash which belong to the user and can be deleted
-	// skip restored and already deleted files
 	fileIDsInTrash, _, err := t.GetFilesInTrashState(ctx, userID, fileIDs)
 	if err != nil {
 		return err
@@ -289,7 +283,6 @@ func (t *TrashRepository) GetFilesInTrashOrDeleted(ctx context.Context, userID i
 	return fileIDsInTrash, nil
 }
 
-// verifyFilesAreDeleted for a given userID and fileIDs, this method verifies that given files are actually deleted
 func (t *TrashRepository) verifyFilesAreDeleted(ctx context.Context, userID int64, fileIDs []int64) error {
 	rows, err := t.DB.QueryContext(ctx, `SELECT file_id FROM trash 
 			WHERE user_id = $1 AND file_id = ANY ($2) 
@@ -312,7 +305,6 @@ func (t *TrashRepository) verifyFilesAreDeleted(ctx context.Context, userID int6
 		return stacktrace.NewError("all file ids are not deleted from trash")
 	}
 
-	// get the size of file from object_keys table
 	row := t.DB.QueryRowContext(ctx, `SELECT coalesce(sum(size),0) FROM object_keys WHERE file_id = ANY($1) and is_deleted = FALSE`,
 		pq.Array(fileIDs))
 	var totalUsage int64
@@ -336,8 +328,6 @@ func (t *TrashRepository) verifyFilesAreDeleted(ctx context.Context, userID int6
 	return nil
 }
 
-// GetFilesIDsForDeletion for given userID and lastUpdateAt timestamp, returns the fileIDs which are in trash and
-// where last updated_at before lastUpdateAt timestamp.
 func (t *TrashRepository) GetFilesIDsForDeletion(userID int64, lastUpdatedAt int64, app ente.App) ([]int64, error) {
 	rows, err := t.DB.Query(`SELECT t.file_id FROM trash t
                 JOIN collections c ON c.collection_id = t.collection_id
@@ -352,7 +342,6 @@ func (t *TrashRepository) GetFilesIDsForDeletion(userID int64, lastUpdatedAt int
 	return fileIDs, nil
 }
 
-// GetTimeStampForLatestNonDeletedEntry returns the updated at timestamp for the latest,non-deleted entry in the trash
 func (t *TrashRepository) GetTimeStampForLatestNonDeletedEntry(userID int64) (*int64, error) {
 	row := t.DB.QueryRow(`SELECT max(updated_at) FROM trash WHERE user_id = $1 AND is_deleted = FALSE AND is_restored = FALSE`, userID)
 	var updatedAt *int64
@@ -363,7 +352,6 @@ func (t *TrashRepository) GetTimeStampForLatestNonDeletedEntry(userID int64) (*i
 	return updatedAt, stacktrace.Propagate(err, "")
 }
 
-// HasItems returns true if the user has any entries in trash.
 func (t *TrashRepository) HasItems(ctx context.Context, userID int64) (bool, error) {
 	row := t.DB.QueryRowContext(ctx, `
 		SELECT exists(
@@ -378,7 +366,6 @@ func (t *TrashRepository) HasItems(ctx context.Context, userID int64) (bool, err
 	return hasItems, stacktrace.Propagate(err, "")
 }
 
-// GetUserIDToFileIDsMapForDeletion returns map of userID to fileIds, where the file ids which should be deleted by now
 func (t *TrashRepository) GetUserIDToFileIDsMapForDeletion() (map[int64][]int64, error) {
 	rows, err := t.DB.Query(`SELECT user_id, file_id FROM trash 
 			WHERE delete_by <= $1  AND is_deleted IS FALSE AND is_restored IS FALSE limit $2`,
@@ -453,7 +440,6 @@ order by updated_at ASC limit $2
 	var i = len(fileWithUpdatedAt) - 1
 	for ; i >= 0; i-- {
 		if fileWithUpdatedAt[i].UpdatedAt != lastUpdatedAt {
-			// found index (from end) where file's version is different from given version
 			break
 		}
 	}

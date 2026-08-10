@@ -20,12 +20,9 @@ import (
 )
 
 const (
-	// Format for updated email_hash once the account is deleted
 	DELETED_EMAIL_HASH_FORMAT = "deleted+%d@ente.io"
 )
 
-// UserRepository defines the methods for inserting, updating and retrieving
-// user entities from the underlying repository
 type UserRepository struct {
 	DB                  *sql.DB
 	SecretEncryptionKey []byte
@@ -34,8 +31,6 @@ type UserRepository struct {
 	PasskeysRepository  *passkey.Repository
 }
 
-// UserInactivityCandidate captures the latest known activity timestamp for an
-// active (non-deleted) user account.
 type UserInactivityCandidate struct {
 	UserID       int64
 	LastActivity int64
@@ -45,7 +40,6 @@ type userMutationExecutor interface {
 	ExecContext(context.Context, string, ...any) (sql.Result, error)
 }
 
-// Get returns a user indicated by the userID
 func (repo *UserRepository) Get(userID int64) (ente.User, error) {
 	var user ente.User
 	var encryptedEmail, nonce []byte
@@ -115,7 +109,6 @@ func deleteUser(ctx context.Context, executor userMutationExecutor, userID int64
 	return stacktrace.Propagate(err, "")
 }
 
-// GetFamilyAdminID returns the *familyAdminID for the given userID
 func (repo *UserRepository) GetFamilyAdminID(userID int64) (*int64, error) {
 	row := repo.DB.QueryRow(`SELECT family_admin_id FROM users WHERE user_id = $1`, userID)
 	var familyAdminID *int64
@@ -139,7 +132,6 @@ func (repo *UserRepository) AreUsersInSameFamily(ctx context.Context, firstUserI
 	return sameFamily, stacktrace.Propagate(err, "")
 }
 
-// GetUserByEmailHash returns a user indicated by the emailHash
 func (repo *UserRepository) GetUserByEmailHash(emailHash string) (ente.User, error) {
 	var user ente.User
 	row := repo.DB.QueryRow(`SELECT user_id, email_hash, creation_time FROM users WHERE email_hash = $1`, emailHash)
@@ -150,7 +142,6 @@ func (repo *UserRepository) GetUserByEmailHash(emailHash string) (ente.User, err
 	return user, nil
 }
 
-// GetAll returns all users between sinceTime and tillTime (exclusive).
 func (repo *UserRepository) GetAll(sinceTime int64, tillTime int64) ([]ente.User, error) {
 	rows, err := repo.DB.Query(`SELECT user_id, encrypted_email, email_decryption_nonce, email_hash, creation_time FROM users WHERE creation_time > $1 AND creation_time < $2 AND encrypted_email IS NOT NULL ORDER BY creation_time`, sinceTime, tillTime)
 	if err != nil {
@@ -288,8 +279,6 @@ func (repo *UserRepository) GetLatestActivity(userID int64) (int64, bool, error)
 	return lastActivity, true, nil
 }
 
-// GetUserUsageWithSubData will return current storage usage & basic information about subscription for given list
-// of users. It's primarily used for fetching storage utilisation for a family/group of users
 func (repo *UserRepository) GetUserUsageWithSubData(ctx context.Context, userIds []int64) ([]ente.UserUsageWithSubData, error) {
 	rows, err := repo.DB.QueryContext(ctx, `select encrypted_email, email_decryption_nonce, u.user_id, coalesce(storage_consumed , 0) as storage_used, storage, expiry_time 
 	from users as u
@@ -322,8 +311,6 @@ func (repo *UserRepository) GetUserUsageWithSubData(ctx context.Context, userIds
 	return result, nil
 }
 
-// Create creates a user with a given email address and returns the generated
-// userID
 func (repo *UserRepository) Create(encryptedEmail ente.EncryptionResult, emailHash string, source *string) (int64, error) {
 	var userID int64
 	err := repo.DB.QueryRow(`INSERT INTO users(encrypted_email, email_decryption_nonce, email_hash, creation_time, source) VALUES($1, $2, $3, $4, $5) RETURNING user_id`,
@@ -334,19 +321,15 @@ func (repo *UserRepository) Create(encryptedEmail ente.EncryptionResult, emailHa
 	return userID, nil
 }
 
-// UpdateDeleteFeedback for a given user in the delete_feedback column of type jsonb
 func (repo *UserRepository) UpdateDeleteFeedback(userID int64, feedback map[string]string) error {
-	// Convert the feedback map into JSON
 	feedbackJSON, err := json.Marshal(feedback)
 	if err != nil {
 		return stacktrace.Propagate(err, "Failed to marshal feedback into JSON")
 	}
-	// Execute the update query with the JSON
 	_, err = repo.DB.Exec(`UPDATE users SET delete_feedback = $1 WHERE user_id = $2`, feedbackJSON, userID)
 	return stacktrace.Propagate(err, "Failed to update delete feedback")
 }
 
-// UpdateEmail updates the email address of a user
 func (repo *UserRepository) UpdateEmail(userID int64, encryptedEmail ente.EncryptionResult, emailHash string) error {
 	return updateEmail(context.Background(), repo.DB, userID, encryptedEmail, emailHash)
 }
@@ -378,7 +361,6 @@ func (repo *UserRepository) GetUserIDWithEmailUnrestricted(email string) (int64,
 	return userID, nil
 }
 
-// GetKeyAttributes gets the key attributes for a given user
 func (repo *UserRepository) GetKeyAttributes(userID int64) (ente.KeyAttributes, error) {
 	row := repo.DB.QueryRow(`SELECT kek_salt, kek_hash_bytes, encrypted_key, key_decryption_nonce, public_key, encrypted_secret_key, secret_key_decryption_nonce, mem_limit, ops_limit, master_key_encrypted_with_recovery_key, master_key_decryption_nonce, recovery_key_encrypted_with_master_key, recovery_key_decryption_nonce FROM key_attributes WHERE user_id = $1`, userID)
 	var (
@@ -423,7 +405,6 @@ func (repo *UserRepository) GetKeyAttributes(userID int64) (ente.KeyAttributes, 
 	return keyAttributes, nil
 }
 
-// SetKeyAttributes sets the key attributes for a given user
 func (repo *UserRepository) SetKeyAttributes(userID int64, keyAttributes ente.KeyAttributes) error {
 	_, err := repo.DB.Exec(`INSERT INTO key_attributes(user_id, kek_salt, kek_hash_bytes, encrypted_key, key_decryption_nonce, public_key, encrypted_secret_key, secret_key_decryption_nonce, mem_limit, ops_limit, master_key_encrypted_with_recovery_key, master_key_decryption_nonce, recovery_key_encrypted_with_master_key, recovery_key_decryption_nonce) VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
 		userID, keyAttributes.KEKSalt, []byte(keyAttributes.KEKHash),
@@ -435,14 +416,12 @@ func (repo *UserRepository) SetKeyAttributes(userID int64, keyAttributes ente.Ke
 	return stacktrace.Propagate(err, "")
 }
 
-// SetRecoveryKeyAttributes sets the recovery key and related attributes for a user
 func (repo *UserRepository) SetRecoveryKeyAttributes(userID int64, keys ente.SetRecoveryKeyRequest) error {
 	_, err := repo.DB.Exec(`UPDATE key_attributes SET master_key_encrypted_with_recovery_key = $1, master_key_decryption_nonce = $2, recovery_key_encrypted_with_master_key = $3, recovery_key_decryption_nonce = $4 WHERE user_id = $5`,
 		keys.MasterKeyEncryptedWithRecoveryKey, keys.MasterKeyDecryptionNonce, keys.RecoveryKeyEncryptedWithMasterKey, keys.RecoveryKeyDecryptionNonce, userID)
 	return stacktrace.Propagate(err, "")
 }
 
-// GetPublicKey returns the public key of a user
 func (repo *UserRepository) GetPublicKey(userID int64) (string, error) {
 	row := repo.DB.QueryRow(`SELECT public_key FROM key_attributes WHERE user_id = $1`, userID)
 	var publicKey string
@@ -450,8 +429,6 @@ func (repo *UserRepository) GetPublicKey(userID int64) (string, error) {
 	return publicKey, stacktrace.Propagate(err, "")
 }
 
-// GetUsersWithIndividualPlanWhoHaveExceededStorageQuota returns list of users who have consumed their storage quota
-// and they are not part of any family plan
 func (repo *UserRepository) GetUsersWithIndividualPlanWhoHaveExceededStorageQuota() ([]ente.User, error) {
 	rows, err := repo.DB.Query(`
 		SELECT users.user_id, users.encrypted_email, users.email_decryption_nonce, users.email_hash, usage.storage_consumed, subscriptions.storage
@@ -531,7 +508,6 @@ func (repo *UserRepository) GetUsersWhoUpgradedNDaysAgo(days int) ([]ente.User, 
 	return users, nil
 }
 
-// SetTwoFactorSecret sets the two factor secret for a user
 func (repo *UserRepository) SetTwoFactorSecret(userID int64, secret ente.EncryptionResult, secretHash string, recoveryEncryptedTwoFactorSecret string, recoveryTwoFactorSecretDecryptionNonce string) error {
 	_, err := repo.DB.Exec(`INSERT INTO two_factor(user_id,encrypted_two_factor_secret,two_factor_secret_decryption_nonce,two_factor_secret_hash,recovery_encrypted_two_factor_secret,recovery_two_factor_secret_decryption_nonce) 
 		VALUES($1, $2, $3, $4, $5, $6) 
@@ -546,7 +522,6 @@ func (repo *UserRepository) SetTwoFactorSecret(userID int64, secret ente.Encrypt
 	return stacktrace.Propagate(err, "")
 }
 
-// IsTwoFactorEnabled checks if a user's two factor is enabled or not
 func (repo *UserRepository) IsTwoFactorEnabled(userID int64) (bool, error) {
 	var twoFAStatus bool
 	row := repo.DB.QueryRow(`SELECT is_two_factor_enabled FROM users WHERE user_id = $1`, userID)
@@ -589,8 +564,6 @@ func (repo *UserRepository) GetEmailsFromHashes(hashes []string) ([]string, erro
 	return emails, nil
 }
 
-// CountActiveUsersByEmailHashes returns count of active users matching any of
-// the provided hashes.
 func (repo *UserRepository) CountActiveUsersByEmailHashes(hashes []string) (int, error) {
 	if len(hashes) == 0 {
 		return 0, nil
@@ -608,8 +581,6 @@ func (repo *UserRepository) CountActiveUsersByEmailHashes(hashes []string) (int,
 	return count, nil
 }
 
-// GetActiveUserEmailHashes returns active user email hashes present in the
-// provided list of hashes.
 func (repo *UserRepository) GetActiveUserEmailHashes(hashes []string) ([]string, error) {
 	if len(hashes) == 0 {
 		return []string{}, nil
@@ -639,7 +610,6 @@ func (repo *UserRepository) GetActiveUserEmailHashes(hashes []string) ([]string,
 	return matchedHashes, nil
 }
 
-// GetActiveUsersForIds  returns a map of users by their IDs, similar to GetUserByID
 func (repo *UserRepository) GetActiveUsersForIds(id []int64) (map[int64]*ente.User, error) {
 	result := make(map[int64]*ente.User)
 	rows, err := repo.DB.Query(`SELECT user_id, encrypted_email, email_decryption_nonce, email_hash, creation_time FROM users WHERE  encrypted_email IS NOT NULL and user_id = ANY($1)`, pq.Array(id))

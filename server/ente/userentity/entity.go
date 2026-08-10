@@ -50,7 +50,6 @@ type EntityKey struct {
 	CreatedAt    int64      `json:"createdAt" binding:"required"`
 }
 
-// EntityData represents a single UserEntity
 type EntityData struct {
 	ID            string     `json:"id" binding:"required"`
 	UserID        int64      `json:"userID" binding:"required"`
@@ -62,19 +61,16 @@ type EntityData struct {
 	UpdatedAt     int64      `json:"updatedAt" binding:"required"`
 }
 
-// EntityKeyRequest represents a request to create entity data encryption key for a given EntityType
 type EntityKeyRequest struct {
 	Type         EntityType `json:"type" binding:"required"`
 	EncryptedKey string     `json:"encryptedKey" binding:"required"`
 	Header       string     `json:"header" binding:"required"`
 }
 
-// GetEntityKeyRequest represents a request to get entity key for given EntityType
 type GetEntityKeyRequest struct {
 	Type EntityType `form:"type" binding:"required"`
 }
 
-// EntityDataRequest is used to create a new entity data of given EntityType
 type EntityDataRequest struct {
 	Type          EntityType `json:"type" binding:"required"`
 	EncryptedData string     `json:"encryptedData" binding:"required"`
@@ -91,7 +87,6 @@ func (edr *EntityDataRequest) IsValid(userID int64) error {
 		if edr.ID == nil {
 			return ente.NewBadRequestWithMessage("ID is required for SmartAlbum entity type")
 		}
-		// check if ID starts with sa_userid_ or not
 		if !strings.HasPrefix(*edr.ID, fmt.Sprintf("sa_%d_", userID)) {
 			return ente.NewBadRequestWithMessage(fmt.Sprintf("ID %s is not valid for SmartAlbum entity type", *edr.ID))
 		}
@@ -101,7 +96,6 @@ func (edr *EntityDataRequest) IsValid(userID int64) error {
 	}
 }
 
-// UpdateEntityDataRequest updates the current entity
 type UpdateEntityDataRequest struct {
 	ID            string     `json:"id" binding:"required"`
 	Type          EntityType `json:"type" binding:"required"`
@@ -109,7 +103,6 @@ type UpdateEntityDataRequest struct {
 	Header        string     `json:"header" binding:"required"`
 }
 
-// GetEntityDiffRequest returns the diff of entities since the given time
 type GetEntityDiffRequest struct {
 	Type EntityType `form:"type" binding:"required"`
 	// SinceTime *int64. Pointer allows us to pass 0 value otherwise binding fails for zero Value.

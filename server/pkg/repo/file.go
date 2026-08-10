@@ -17,8 +17,6 @@ import (
 	"github.com/lib/pq"
 )
 
-// FileRepository is an implementation of the FileRepo that
-// persists and retrieves data from disk.
 type FileRepository struct {
 	DB                *sql.DB
 	S3Config          *s3config.S3Config
@@ -29,7 +27,6 @@ type FileRepository struct {
 	UsageRepo         *UsageRepository
 }
 
-// Create creates an entry in the database for the given file
 func (repo *FileRepository) Create(
 	file ente.File,
 	fileSize int64,
@@ -126,7 +123,6 @@ func (repo *FileRepository) Create(
 	return file, usage, stacktrace.Propagate(err, "")
 }
 
-// CreateMetaFile creates an entry in the database for the given file
 func (repo *FileRepository) CreateMetaFile(
 	metaFile ente.MetaFile,
 	collectionOwnerID int64,
@@ -220,8 +216,6 @@ func (repo *FileRepository) markAsNeedingReplication(ctx context.Context, tx *sq
 		err = repo.ObjectCopiesRepo.CreateNewWasabiObject(ctx, tx, file.Thumbnail.ObjectKey, true, false)
 		return stacktrace.Propagate(err, "")
 	} else {
-		// Bail out if we're trying to add a new entry for a file but the
-		// primary hot DC is not one of the known types.
 		err := fmt.Errorf("only B2 and Wasabi DCs can be used for as the primary hot storage; instead, it was %s", hotDC)
 		return stacktrace.Propagate(err, "")
 	}
@@ -236,14 +230,11 @@ func (repo *FileRepository) markThumbnailAsNeedingReplication(ctx context.Contex
 		err := repo.ObjectCopiesRepo.CreateNewWasabiObject(ctx, tx, thumbnailObjectKey, true, false)
 		return stacktrace.Propagate(err, "")
 	} else {
-		// Bail out if we're trying to add a new entry for a file but the
-		// primary hot DC is not one of the known types.
 		err := fmt.Errorf("only B2 and Wasabi DCs can be used for as the primary hot storage; instead, it was %s", hotDC)
 		return stacktrace.Propagate(err, "")
 	}
 }
 
-// ResetNeedsReplication resets the replication status for an existing file
 func (repo *FileRepository) ResetNeedsReplication(file ente.File, hotDC string) error {
 	if hotDC == repo.S3Config.GetHotBackblazeDC() {
 		err := repo.ObjectCopiesRepo.ResetNeedsWasabiReplication(file.File.ObjectKey)
@@ -270,14 +261,11 @@ func (repo *FileRepository) ResetNeedsReplication(file ente.File, hotDC string) 
 		err = repo.ObjectCopiesRepo.ResetNeedsB2Replication(file.Thumbnail.ObjectKey)
 		return stacktrace.Propagate(err, "")
 	} else {
-		// Bail out if we're trying to update the replication flags but the
-		// primary hot DC is not one of the known types.
 		err := fmt.Errorf("only B2 and Wasabi DCs can be used for as the primary hot storage; instead, it was %s", hotDC)
 		return stacktrace.Propagate(err, "")
 	}
 }
 
-// Update updates the entry in the database for the given file
 func (repo *FileRepository) Update(file ente.File, fileSize int64, thumbnailSize int64, usageDiff int64, oldObjects []string, isDuplicateRequest bool) error {
 	hotDC := repo.S3Config.GetHotDataCenter()
 	dcsForNewEntry := pq.StringArray{hotDC}
@@ -444,7 +432,6 @@ func (repo *FileRepository) UpdateMagicAttributes(
 	return tx.Commit()
 }
 
-// Update updates the entry in the database for the given file
 func (repo *FileRepository) UpdateThumbnail(ctx context.Context, fileID int64, userID int64, thumbnail ente.FileAttributes, thumbnailSize int64, usageDiff int64, oldThumbnailObject *string) error {
 	hotDC := repo.S3Config.GetHotDataCenter()
 	dcsForNewEntry := pq.StringArray{hotDC}
@@ -527,7 +514,6 @@ func (repo *FileRepository) UpdateThumbnail(ctx context.Context, fileID int64, u
 	return stacktrace.Propagate(err, "")
 }
 
-// GetOwnerID returns the ownerID for a file
 func (repo *FileRepository) GetOwnerID(fileID int64) (int64, error) {
 	row := repo.DB.QueryRow(`SELECT owner_id FROM files WHERE file_id = $1`,
 		fileID)
@@ -536,7 +522,6 @@ func (repo *FileRepository) GetOwnerID(fileID int64) (int64, error) {
 	return ownerID, stacktrace.Propagate(err, "failed to get file owner")
 }
 
-// GetOwnerToFileCountMap will return a map of ownerId & number of files owned by that owner
 func (repo *FileRepository) GetOwnerToFileCountMap(ctx context.Context, fileIDs []int64) (map[int64]int64, error) {
 	rows, err := repo.DB.QueryContext(ctx, `SELECT owner_id, count(*) FROM files WHERE file_id = ANY($1) group by owner_id`,
 		pq.Array(fileIDs))
@@ -555,7 +540,6 @@ func (repo *FileRepository) GetOwnerToFileCountMap(ctx context.Context, fileIDs 
 	return result, nil
 }
 
-// GetOwnerToFileIDsMap will return a map of ownerId & number of files owned by that owner
 func (repo *FileRepository) GetOwnerToFileIDsMap(ctx context.Context, fileIDs []int64) (map[int64][]int64, error) {
 	rows, err := repo.DB.QueryContext(ctx, `SELECT owner_id, file_id FROM files WHERE file_id = ANY($1)`,
 		pq.Array(fileIDs))
@@ -607,7 +591,6 @@ func (repo *FileRepository) VerifyFileOwner(ctx context.Context, fileIDs []int64
 	}
 }
 
-// GetOwnerAndMagicMetadata returns the ownerID and magicMetadata for given file id
 func (repo *FileRepository) GetOwnerAndMagicMetadata(fileID int64, publicMetadata bool) (int64, *ente.MagicMetadata, error) {
 	var row *sql.Row
 	if publicMetadata {
@@ -623,7 +606,6 @@ func (repo *FileRepository) GetOwnerAndMagicMetadata(fileID int64, publicMetadat
 	return ownerID, magicMetadata, stacktrace.Propagate(err, "")
 }
 
-// GetSize returns the size of files indicated by fileIDs that are owned by the given userID.
 func (repo *FileRepository) GetSize(userID int64, fileIDs []int64) (int64, error) {
 	row := repo.DB.QueryRow(`
 			SELECT COALESCE(SUM(size), 0) FROM object_keys WHERE o_type = 'file' AND is_deleted = false AND file_id = ANY(SELECT file_id FROM files WHERE (file_id = ANY($1) AND owner_id = $2))`,
@@ -636,7 +618,6 @@ func (repo *FileRepository) GetSize(userID int64, fileIDs []int64) (int64, error
 	return size, nil
 }
 
-// GetFileCountForUser returns the total number of files in the system for a given user.
 func (repo *FileRepository) GetFileCountForUser(userID int64, app ente.App) (int64, error) {
 	row := repo.DB.QueryRow(`SELECT count(distinct files.file_id)  
 			FROM collection_files
@@ -715,7 +696,6 @@ func (repo *FileRepository) GetFileAttributes(fileID int64) (*ente.File, error) 
 	return &file, nil
 }
 
-// GetUsage  gets the Storage usage of a user
 // Deprecated: GetUsage is deprecated, use UsageRepository.GetUsage
 func (repo *FileRepository) GetUsage(userID int64) (int64, error) {
 	return repo.UsageRepo.GetUsage(userID)
@@ -752,7 +732,6 @@ func (repo *FileRepository) DropFilesMetadata(ctx context.Context, fileIDs []int
 	return stacktrace.Propagate(err, "")
 }
 
-// GetDuplicateFiles returns the list of files for a user that are of the same size
 func (repo *FileRepository) GetDuplicateFiles(userID int64) ([]ente.DuplicateFiles, error) {
 	rows, err := repo.DB.Query(`SELECT string_agg(o.file_id::character varying, ','), o.size FROM object_keys o JOIN files f ON f.file_id = o.file_id
 											WHERE f.owner_id = $1 AND o.o_type = 'file' AND o.is_deleted = false
@@ -830,7 +809,6 @@ func convertRowsToFiles(rows *sql.Rows) ([]ente.File, error) {
 	return files, nil
 }
 
-// scheduleDeletion added a list of files's object ids to delete queue for deletion from datastore
 func (repo *FileRepository) scheduleDeletion(ctx context.Context, tx *sql.Tx, fileIDs []int64, userID int64) error {
 	diff := int64(0)
 
@@ -847,7 +825,6 @@ func (repo *FileRepository) scheduleDeletion(ctx context.Context, tx *sql.Tx, fi
 	return stacktrace.Propagate(err, "")
 }
 
-// updateUsage updates the storage usage of a user and returns the updated value
 func (repo *FileRepository) updateUsage(ctx context.Context, tx *sql.Tx, userID int64, diff int64) (int64, error) {
 	row := tx.QueryRowContext(ctx, `SELECT storage_consumed FROM usage WHERE user_id = $1 FOR UPDATE`, userID)
 	var usage int64
