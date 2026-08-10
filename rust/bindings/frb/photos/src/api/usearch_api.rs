@@ -16,7 +16,7 @@ fn simsimd_dot_product(a: &[f32], b: &[f32]) -> f64 {
     let mut score = 0.0_f64;
     // SAFETY:
     // - `a` and `b` are valid, non-null slices for `a.len()` elements.
-    // - SimSIMD only reads from the input buffers and writes one f64 to `score`.
+    // - SimSIMD only reads the input buffers and writes one f64 to `score`.
     unsafe {
         simsimd_dot_f32(a.as_ptr(), b.as_ptr(), a.len() as u64, &mut score);
     }
@@ -345,8 +345,6 @@ impl VectorDB {
         self.inner.bulk_search_keys(potential_keys, count, exact)
     }
 
-    /// Check if a vector with the given key exists in the index.
-    /// `true` if the index contains the vector with the given key, `false` otherwise.
     pub fn contains_vector(&self, key: u64) -> bool {
         self.inner.contains_vector(key)
     }

@@ -8,8 +8,14 @@ import {
     Typography,
     type Theme,
 } from "@mui/material";
+import { SlideUpTransition } from "ente-new/photos/components/mui/SlideUpTransition";
 import { t } from "i18next";
 import { uploadCompletionCounts } from "../uploadProgressStats";
+import {
+    uploadSheetMediaQuery,
+    uploadSheetPaperSx,
+    useIsUploadSheet,
+} from "./bottom-sheet";
 import { useUploadProgressContext } from "./context";
 import { doneStatConfigs } from "./helpers";
 
@@ -26,6 +32,7 @@ export function StopUploadConfirmationDialog({
 }: StopUploadConfirmationDialogProps) {
     const { finishedUploads, preUploadSkippedFiles } =
         useUploadProgressContext();
+    const isSheet = useIsUploadSheet();
     const counts = uploadCompletionCounts(
         finishedUploads,
         preUploadSkippedFiles,
@@ -38,7 +45,10 @@ export function StopUploadConfirmationDialog({
             maxWidth={false}
             aria-labelledby="stop-upload-confirmation-title"
             aria-describedby="stop-upload-confirmation-message"
-            slotProps={{ paper: { sx: stopConfirmationPaperSx } }}
+            slots={isSheet ? { transition: SlideUpTransition } : undefined}
+            slotProps={{
+                paper: { sx: [stopConfirmationPaperSx, uploadSheetPaperSx] },
+            }}
         >
             <Stack sx={stopConfirmationContentSx}>
                 <Stack sx={stopConfirmationMessageSx}>
@@ -141,7 +151,16 @@ const stopConfirmationPaperSx = (theme: Theme) => ({
         backgroundColor: "#1b1b1b",
     }),
 });
-const stopConfirmationContentSx = { p: "20px", gap: 3, color: "text.base" };
+const stopConfirmationContentSx = {
+    p: "20px",
+    gap: 3,
+    color: "text.base",
+    [uploadSheetMediaQuery]: {
+        p: "12px 16px",
+        pb: "calc(20px + env(safe-area-inset-bottom, 0px))",
+        overflowY: "auto",
+    },
+};
 const stopConfirmationMessageSx = { alignItems: "center", gap: 1, minWidth: 0 };
 const stopConfirmationHeaderSx = {
     alignItems: "center",

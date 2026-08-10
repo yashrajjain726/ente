@@ -46,6 +46,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 final _logger = Logger("main");
 bool _isRustInitialized = false;
 Future<void>? _rustInitFuture;
+late final LogSinkGuard _rustLogSinkGuard;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -120,9 +121,26 @@ Future<void> _ensureRustInitialized() async {
   try {
     await initFuture;
     _isRustInitialized = true;
+    _attachRustLogStream();
   } finally {
     _rustInitFuture = null;
   }
+}
+
+void _attachRustLogStream() {
+  final logger = Logger("rust");
+  _rustLogSinkGuard = LogSinkGuard();
+  _rustLogSinkGuard.attachLogStream().listen((entry) {
+    final message = "[${entry.target}] ${entry.message}";
+    switch (entry.level) {
+      case LogLevel.error:
+        logger.severe(message);
+      case LogLevel.warn:
+        logger.warning(message);
+      case LogLevel.info:
+        logger.info(message);
+    }
+  });
 }
 
 ThemeMode _themeMode(AdaptiveThemeMode? savedThemeMode) {

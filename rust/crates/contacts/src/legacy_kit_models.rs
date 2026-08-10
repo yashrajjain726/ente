@@ -74,8 +74,7 @@ pub struct LegacyKitRecoverySession {
     #[serde(rename = "kitID")]
     pub kit_id: String,
     pub status: LegacyKitRecoveryStatus,
-    /// Remaining microseconds until recovery is ready, matching the existing
-    /// emergency legacy recovery API response contract.
+    // Remaining microseconds, as required by the legacy recovery API.
     pub wait_till: i64,
     pub created_at: i64,
 }

@@ -407,7 +407,6 @@
   "deleteSharedAlbumDialogBody": "Az album mindenki számára törlődik.\n\nElveszíti a hozzáférést az albumban található, mások tulajdonában lévő megosztott fotókhoz",
   "deleteShareLinkConfirmation": "Azok, akiknel megvan ez a link, tobbe nem ferhetnek hozza az elemhez.",
   "deleteSuggestions": "Javaslatok törlése",
-  "deleteSuggestionsDesc": "Tekintsd át a törlésre javasolt fájlokat.",
   "deleteTagMessage": "Biztosan törlöd ezt a címkét? Ez a művelet nem vonható vissza.",
   "deleteTagTitle": "Címke törlése?",
   "deleteUnparseableCodeMessage": "Ez véglegesen törli a kódot az Authból. Nem kerül a Kukába.",
@@ -717,11 +716,6 @@
   "freeStorageOfferDescription": "Használd az \"AUTH\" kódot, hogy 10% kedvezményt kapjon az első évben",
   "freeTrial": "Próbaverzió",
   "freeUpDeviceSpace": "Szabadítson fel tárhelyet",
-  "freeUpDeviceSpaceDesc": "Szabadíts fel helyet az eszközödön a már mentett fájlok törlésével.",
-  "freeUpDeviceSpaceDescICloud": "Az iCloud megosztott albumokban lévő fájlok nem törölhetők.",
-  "@freeUpDeviceSpaceDescICloud": {
-    "description": "Here 'cleared' means 'deleted' from the device"
-  },
   "general": "Általános",
   "getStarted": "Kezdjünk bele",
   "giveUsAStarOnGithub": "Adj nekünk egy csillagot a Githubon",
@@ -951,7 +945,6 @@
   },
   "manage": "Kezelés",
   "manageDeviceStorage": "Eszköz gyorsítótárának kezelése",
-  "manageDeviceStorageDesc": "Tekintse át és törölje a helyi gyorsítótárat.",
   "manageLink": "Hivatkozás kezelése",
   "manageParticipants": "Kezelés",
   "managePaymentMethod": "Fizetési módok kezelése",
@@ -1266,8 +1259,6 @@
       "userEmail": {}
     }
   },
-  "removeDuplicates": "Távolítsa el a duplikációkat",
-  "removeDuplicatesDesc": "Tekintse át és távolítsa el a pontos másolatokat tartalmazó fájlokat.",
   "removeFromAlbum": "Eltávolítás az albumból",
   "removeFromAlbumTitle": "Eltávolítás az albumból?",
   "removeFromFamily": "Eltávolítás a családból",
@@ -1748,7 +1739,6 @@
   "viewActiveSessions": "Aktív munkamenetek megtekintése",
   "viewer": "Néző",
   "viewLargeFiles": "Nagy fájlok",
-  "viewLargeFilesDesc": "Tekintse meg a legtöbb tárhelyet foglaló fájlokat.",
   "viewLogsAction": "Naplók megtekintése",
   "viewPlans": "Csomagok",
   "viewRawCodes": "Nyers kódok megtekintése",

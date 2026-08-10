@@ -6,6 +6,7 @@ import "package:ente_panorama_viewer/ente_panorama_viewer.dart";
 import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:flutter/services.dart";
+import "package:hugeicons/hugeicons.dart";
 import "package:logging/logging.dart";
 import "package:photos/src/rust/api/motion_photo_api.dart";
 import "package:photos/ui/viewer/file/panorama_view_data.dart";
@@ -202,12 +203,12 @@ class _PanoramaViewerScreenState extends State<PanoramaViewerScreen> {
                       backgroundColor: const Color(0xFF252525),
                       fixedSize: const Size(44, 44),
                     ),
-                    icon: Icon(
-                      !motionEnabled
-                          ? Icons.explore_outlined
-                          : Icons.explore_off_outlined,
+                    icon: HugeIcon(
+                      icon: !motionEnabled
+                          ? HugeIcons.strokeRoundedNavigation05
+                          : HugeIcons.strokeRoundedNavigationOff,
                       color: Colors.white,
-                      size: 26,
+                      size: 24,
                     ),
                     onPressed: () {
                       setState(() {

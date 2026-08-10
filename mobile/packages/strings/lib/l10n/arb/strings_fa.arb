@@ -1,26 +1,58 @@
 {
   "about": "درباره ما",
+  "acceptTrustInvite": "پذیرفتن دعوت",
   "account": "حساب کاربری",
+  "activeSessions": "نشست های فعال",
+  "@activeSessions": {
+    "description": "Title for active sessions page"
+  },
+  "add": "اضافه کردن",
+  "addAdmin": "اضافه کردن مدیر",
+  "addANameAndPhoto": "اضافه کردن یک نام و عکس",
   "addANewEmail": "افزودن ایمیل جدید",
   "addCode": "اضافه کردن کد",
   "addCollaborator": "افزودن همکار",
   "addedAs": "اضافه شده به عنوان",
+  "addLocationButton": "اضافه کردن",
+  "addMember": "افزودن عضو",
   "addMore": "افزودن بیشتر",
+  "addMoreAdmins": "اضافه کردن مدیر های بیشتر",
+  "addName": "افزودن نام",
   "addNew": "ایجاد جدید",
   "@addNew": {
     "description": "Text to add a new item (location tag, album, caption etc)"
   },
+  "addNewEmail": "افزودن ایمیل جدید",
+  "addOns": "افزونه‌ها",
+  "addParticipants": "افزودن شرکت‌‌کنندگان",
+  "addPerson": "اضافه کردن فرد",
+  "@addPerson": {
+    "description": "Title for the manual tagging flow where user selects a person to tag files with."
+  },
+  "addPhotos": "اضافه کردن عکس ها",
+  "addSelected": "اضافه کردن انتخاب شده",
   "addTag": "افزودن برچسب",
+  "addTo": "افزودن به",
+  "addToAlbum": "افزودن به آلبوم",
+  "addToCollection": "افزودن به مجموعه",
+  "addToEnte": "افزودن به Ente",
+  "addToHiddenAlbum": "افزودن به آلبوم پنهان",
   "addViewer": "افزودن بیننده",
   "advanced": "پیشرفته",
+  "after1Year": "بعد از 1 سال",
   "albumLayout": "چینش آلبوم",
+  "albumName": "نام آلبوم",
   "albumOwner": "مالک",
   "@albumOwner": {
     "description": "Role of the album owner"
   },
+  "albums": "آلبوم‌ها",
+  "albumsOnDevicePermissionCta": "دادن اجازه دسترسی",
   "albumUpdated": "آلبوم به‌روز شد",
   "algorithm": "الگوریتم",
   "all": "همه",
+  "allClear": "همه چیز عالیه ✨",
+  "allow": "اجازه",
   "allowAddingPhotos": "اجازه اضافه کردن عکس",
   "@allowAddingPhotos": {
     "description": "Switch button to enable uploading photos to a public link"
@@ -31,6 +63,11 @@
   "@allTabEmptyHint": {
     "description": "Shown when the All tab has no active codes but Trash contains codes"
   },
+  "almostDone": "تقریبا تمام شده...",
+  "alreadyAdded": "از قبل افزوده شده است",
+  "alreadyHaveAnAccount": "حساب کاربری دارید؟",
+  "analysis": "تجزیه و تحلیل",
+  "analyzingPhotosLocally": "در حال تجزیه و تحلیل عکس‌های شما روی دستگاه شما...",
   "androidBiometricHint": "تایید هویت",
   "@androidBiometricHint": {
     "description": "Hint message advising the user how to authenticate with biometrics. It is used on Android side. Maximum 60 characters."
@@ -44,6 +81,12 @@
     "description": "Message showed as a title in a dialog which indicates the user that they need to scan biometric to continue. It is used on Android side. Maximum 60 characters."
   },
   "aNewVersionOfEnteIsAvailable": "نسخه جدید Ente در دسترس است.",
+  "aNewVersionOfEnteLockerIsAvailable": "نسخه جدید Ente Locker در دسترس است.",
+  "anythingElse": "چیز دیگری هم هست؟",
+  "@anythingElse": {
+    "description": "Label for optional account deletion feedback"
+  },
+  "appearance": "ظاهر",
   "appIcon": "نماد اپلیکیشن",
   "appLock": "قفل برنامه",
   "@appLock": {
@@ -60,6 +103,11 @@
   "@archive": {
     "description": "Action of 'Archiving' an element"
   },
+  "archiveCollectionName": "بایگانی",
+  "@archiveCollectionName": {
+    "description": "Name of the 'Archive' collection"
+  },
+  "archiving": "در حال بایگانی...",
   "areYouSureThatYouWantToLeaveTheFamily": "آیا مطمئنید که میخواهید از طرح خانواده خارج شوید؟",
   "authenticateGeneric": "لطفا احراز هویت کنید",
   "authenticationFailedPleaseTryAgain": "احراز هویت ناموفق بود، لطفا دوباره تلاش کنید",
@@ -105,6 +153,8 @@
   "@cancel": {
     "description": "Cancel button label"
   },
+  "cancelRecovery": "لغو بازیابی",
+  "cancelSubscription": "لغو اشتراک",
   "cannotDeleteSharedFiles": "پرونده‌های به اشتراک گذاشته شده را نمی‌توان حذف کرد",
   "canNotOpenBody": "متأسفانه، این آلبوم در برنامه قابل باز شدن نیست.",
   "canNotOpenTitle": "نمی‌توان این آلبوم را باز کرد",
@@ -129,6 +179,7 @@
   },
   "chooseBackupLocation": "یک محل پشتیبان‌گیری انتخاب نمایید",
   "chooseIcon": "آیکون را انتخاب کنید",
+  "cleanupComplete": "پاکسازی کامل شد",
   "clearBackupFolder": "پاک کردن پوشهٔ پشتیبان",
   "clearBackupPassword": "پاک کردن رمز عبور نسخهٔ پشتیبان",
   "close": "بستن",
@@ -469,6 +520,9 @@
   "invalidProtonExportTitle": "فایل خروجی Proton نامعتبر می باشد",
   "invalidQRCode": "کد QR نامعتبر",
   "invalidRecoveryKey": "کلید بازیابی که وارد کرده‌اید نامعتبر است. لطفا مطمئن شوید که شامل ۲۴ کلمه است و همه کلمات را صحیح نوشته‌اید.\n\nاگر کد بازیابی قدیمی تری را وارد کرده‌اید، مطمئن شوید که شامل ۶۴ حرف است و همه حروف را صحیح نوشته‌اید.",
+  "invite": "دعوت",
+  "inviteMembers": "دعوت اعضا",
+  "inviteToEnte": "دعوت به Ente",
   "ok": "تأیید",
   "@ok": {
     "description": "Generic OK button label"
@@ -725,6 +779,11 @@
     "type": "text"
   },
   "reviewSuggestions": "مرور پیشنهادها",
+  "revokeInvite": "حذف دعوت",
+  "@revokeInvite": {
+    "description": "Button label to revoke a pending trusted contact invite"
+  },
+  "revokeInviteConfirmTitle": "حذف دعوت؟",
   "save": "ذخیره",
   "@save": {
     "description": "Label for save button"
@@ -775,6 +834,7 @@
   "@send": {
     "description": "Label for send button"
   },
+  "sendInvite": "ارسال دعوت",
   "sendLogsDescription": "این باعث ارسال لاگ‌ها می‌شود تا به ما در رفع مشکل شما کمک کند. هرچند ما اقداماتی را جهت جلوگیری از ثبت اطلاعات حساس در لاگ انجام می‌دهیم، اما به شما توصیه می‌کنیم قبل از اشتراک گذاری لاگ‌ها آن‌ها را مشاهده کنید.",
   "serverEndpoint": "نشانی سرور",
   "@serverEndpoint": {
@@ -910,6 +970,10 @@
     "placeholders": {
       "account": {}
     }
+  },
+  "trustedContactStatusPending": "در انتظار",
+  "@trustedContactStatusPending": {
+    "description": "Short status label shown for a pending trusted contact invite"
   },
   "tryAgain": "دوباره امتحان کنید",
   "@tryAgain": {

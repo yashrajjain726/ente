@@ -44,8 +44,8 @@ class PersonService {
   final PhotosContactsService _contactsService;
   final Future<Uint8List?> Function(PersonEntity) _contactPhotoBuilder;
   final int? Function() _currentUserIDProvider;
-  final _emailToPartialPersonDataMapCache = <String, Map<String, String>>{};
-  final _userIdToPartialPersonDataMapCache = <int, Map<String, String>>{};
+  final _personsByEmail = <String, PersonEntity>{};
+  final _personsByUserId = <int, PersonEntity>{};
   final _autoContactCreationsByUserId =
       <int, Future<contacts.ContactRecord?>>{};
 
@@ -64,8 +64,6 @@ class PersonService {
 
   // instance
   static PersonService? _instance;
-  static const kPersonIDKey = "person_id";
-  static const kNameKey = "name";
   static const double kDefaultAutoMergeThreshold = 0.24;
   static double autoMergeThreshold = kDefaultAutoMergeThreshold;
 
@@ -98,22 +96,63 @@ class PersonService {
     }
   }
 
-  Map<String, Map<String, String>> get emailToPartialPersonDataMapCache =>
-      _emailToPartialPersonDataMapCache;
+  Iterable<String> get cachedLinkedPersonEmails => _personsByEmail.values
+      .map((person) => person.data.email)
+      .whereType<String>();
 
-  Map<String, String>? getCachedPartialPersonData({
-    required int? userID,
-    required String email,
-  }) {
-    final userIdMatch = userID != null && userID > 0
-        ? _userIdToPartialPersonDataMapCache[userID]
+  /// Prefers an account ID link, then supports legacy email-only person links.
+  PersonEntity? getCachedPersonForUser(int? userID, String email) {
+    final requestedUserID = userID != null && userID > 0 ? userID : null;
+    final userIdMatch = requestedUserID == null
+        ? null
+        : _personsByUserId[requestedUserID];
+    if (userIdMatch != null) return userIdMatch;
+
+    final normalizedEmail = normalizeContactLinkEmail(email);
+    if (normalizedEmail == null) return null;
+    final emailMatch = _personsByEmail[normalizedEmail];
+    return emailMatch != null &&
+            _canUseEmailFallback(emailMatch, requestedUserID)
+        ? emailMatch
         : null;
-    return userIdMatch ?? _emailToPartialPersonDataMapCache[email];
+  }
+
+  static PersonEntity? findPersonForUser(
+    Iterable<PersonEntity> persons, {
+    required int? userID,
+    required String? email,
+    String? excludedPersonID,
+  }) {
+    bool include(PersonEntity person) => person.remoteID != excludedPersonID;
+    final requestedUserID = userID != null && userID > 0 ? userID : null;
+    if (requestedUserID != null) {
+      for (final person in persons) {
+        if (include(person) && person.data.userID == requestedUserID) {
+          return person;
+        }
+      }
+    }
+
+    final normalizedEmail = normalizeContactLinkEmail(email);
+    if (normalizedEmail == null) return null;
+    for (final person in persons) {
+      if (include(person) &&
+          _canUseEmailFallback(person, requestedUserID) &&
+          normalizeContactLinkEmail(person.data.email) == normalizedEmail) {
+        return person;
+      }
+    }
+    return null;
+  }
+
+  // Pre-userID Person entities are email-only; only positive IDs block fallback.
+  static bool _canUseEmailFallback(PersonEntity person, int? requestedUserID) {
+    return requestedUserID == null || (person.data.userID ?? 0) <= 0;
   }
 
   void clearCache() {
-    _emailToPartialPersonDataMapCache.clear();
-    _userIdToPartialPersonDataMapCache.clear();
+    _personsByEmail.clear();
+    _personsByUserId.clear();
     _invalidatePersonCache();
     _cachedRemoteSyncTime = 0;
   }
@@ -180,20 +219,16 @@ class PersonService {
     _cachedPersonsById = {
       for (final person in persons) person.remoteID: person,
     };
-    _emailToPartialPersonDataMapCache.clear();
-    _userIdToPartialPersonDataMapCache.clear();
+    _personsByEmail.clear();
+    _personsByUserId.clear();
     for (PersonEntity person in persons) {
-      final partialData = {
-        kPersonIDKey: person.remoteID,
-        kNameKey: person.data.name,
-      };
-      final email = person.data.email;
-      if (email != null && email.isNotEmpty) {
-        _emailToPartialPersonDataMapCache[email] = partialData;
+      final email = normalizeContactLinkEmail(person.data.email);
+      if (email != null) {
+        _personsByEmail[email] = person;
       }
       final userID = person.data.userID;
       if (userID != null && userID > 0) {
-        _userIdToPartialPersonDataMapCache[userID] = partialData;
+        _personsByUserId[userID] = person;
       }
     }
 

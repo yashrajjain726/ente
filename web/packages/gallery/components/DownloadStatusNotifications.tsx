@@ -155,10 +155,7 @@ export const DownloadStatusNotifications: React.FC<
                 const completedCount = group.success + group.failed;
                 const progress =
                     group.total === 1
-                        ? `${t("processed_counts", {
-                              count: completedCount,
-                              total: group.total,
-                          })} ${fileLabel}`
+                        ? undefined
                         : t("download_progress", {
                               count: completedCount,
                               total: group.total,
@@ -172,7 +169,7 @@ export const DownloadStatusNotifications: React.FC<
                         }}
                     >
                         {statusText}
-                        {!isComplete && (
+                        {!isComplete && progress !== undefined && (
                             <>
                                 {" "}
                                 {"\u2022"} {progress}
@@ -190,7 +187,10 @@ export const DownloadStatusNotifications: React.FC<
                             <HugeiconsIcon icon={Tick02Icon} size={28} />
                         </GlowingIconWrapper>
                     );
-                } else if (isZipDownload && !group.isDownloadingZip) {
+                } else if (
+                    group.total === 1 ||
+                    (isZipDownload && !group.isDownloadingZip)
+                ) {
                     startIcon = <SpinningIcon />;
                 } else {
                     startIcon = (

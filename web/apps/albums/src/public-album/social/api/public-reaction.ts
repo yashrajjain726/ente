@@ -212,53 +212,6 @@ export interface PublicReaction {
     updatedAt: number;
 }
 
-export const getPublicFileReactions = async (
-    credentials: PublicAlbumsCredentials,
-    fileID: number,
-    collectionKey: string,
-): Promise<PublicReaction[]> => {
-    const res = await fetch(
-        await apiURL("/public-collection/reactions/diff", {
-            fileID,
-            sinceTime: 0,
-            limit: 100,
-        }),
-        { headers: authenticatedPublicAlbumsRequestHeaders(credentials) },
-    );
-    ensureOk(res);
-    const { reactions } = GetPublicReactionsResponse.parse(await res.json());
-
-    const decryptedReactions: PublicReaction[] = [];
-    for (const reaction of reactions) {
-        if (reaction.isDeleted || !reaction.cipher || !reaction.nonce) continue;
-        try {
-            const decryptedB64 = await decryptBox(
-                { encryptedData: reaction.cipher, nonce: reaction.nonce },
-                collectionKey,
-            );
-            const reactionType = unpadReaction(
-                new TextDecoder().decode(
-                    Uint8Array.from(atob(decryptedB64), (c) => c.charCodeAt(0)),
-                ),
-            );
-            decryptedReactions.push({
-                id: reaction.id,
-                fileID: reaction.fileID ?? fileID,
-                commentID: reaction.commentID ?? undefined,
-                reactionType,
-                userID: reaction.userID,
-                anonUserID: reaction.anonUserID ?? undefined,
-                isDeleted: reaction.isDeleted,
-                createdAt: reaction.createdAt,
-                updatedAt: reaction.updatedAt,
-            });
-        } catch {
-            // Skip reactions that fail to decrypt
-        }
-    }
-    return decryptedReactions;
-};
-
 const RemotePublicReaction = z.object({
     id: z.string(),
     collectionID: z.number(),
@@ -273,20 +226,20 @@ const RemotePublicReaction = z.object({
     updatedAt: z.number(),
 });
 
-const GetPublicReactionsResponse = z.object({
-    reactions: z.array(RemotePublicReaction),
-    hasMore: z.boolean(),
-});
-
 export interface AnonProfile {
     anonUserID: string;
     userName: string;
 }
 
+export interface PublicAnonProfiles {
+    anonUserNames: Map<string, string>;
+    decryptionError: unknown;
+}
+
 export const getPublicAnonProfiles = async (
     credentials: PublicAlbumsCredentials,
     collectionKey: string,
-): Promise<Map<string, string>> => {
+): Promise<PublicAnonProfiles> => {
     const res = await fetch(await apiURL("/public-collection/anon-profiles"), {
         headers: authenticatedPublicAlbumsRequestHeaders(credentials),
     });
@@ -294,6 +247,7 @@ export const getPublicAnonProfiles = async (
     const { profiles } = GetAnonProfilesResponse.parse(await res.json());
 
     const anonUserNames = new Map<string, string>();
+    let decryptionError: unknown;
     for (const profile of profiles) {
         if (!profile.cipher || !profile.nonce) continue;
         try {
@@ -307,11 +261,11 @@ export const getPublicAnonProfiles = async (
             if (userName) {
                 anonUserNames.set(profile.anonUserID, userName);
             }
-        } catch {
-            // Skip profiles that fail to decrypt
+        } catch (e) {
+            decryptionError ??= e;
         }
     }
-    return anonUserNames;
+    return { anonUserNames, decryptionError };
 };
 
 const RemoteAnonProfile = z.object({
@@ -377,6 +331,7 @@ export interface PublicComment {
 export interface PublicSocialDiff {
     comments: PublicComment[];
     reactions: PublicReaction[];
+    decryptionError: unknown;
 }
 
 export const getPublicSocialDiff = async (
@@ -395,6 +350,7 @@ export const getPublicSocialDiff = async (
     ensureOk(res);
     const data = GetPublicSocialDiffResponse.parse(await res.json());
 
+    let decryptionError: unknown;
     const comments: PublicComment[] = [];
     for (const comment of data.comments) {
         if (comment.isDeleted || !comment.cipher || !comment.nonce) {
@@ -432,8 +388,8 @@ export const getPublicSocialDiff = async (
                 createdAt: comment.createdAt,
                 updatedAt: comment.updatedAt,
             });
-        } catch {
-            // Skip comments that fail to decrypt
+        } catch (e) {
+            decryptionError ??= e;
         }
     }
 
@@ -461,12 +417,12 @@ export const getPublicSocialDiff = async (
                 createdAt: reaction.createdAt,
                 updatedAt: reaction.updatedAt,
             });
-        } catch {
-            // Skip reactions that fail to decrypt
+        } catch (e) {
+            decryptionError ??= e;
         }
     }
 
-    return { comments, reactions };
+    return { comments, reactions, decryptionError };
 };
 
 const RemotePublicComment = z.object({
@@ -501,6 +457,7 @@ export interface PublicFeedReaction extends PublicReaction {
 export interface PublicAlbumFeed {
     comments: PublicFeedComment[];
     reactions: PublicFeedReaction[];
+    decryptionError: unknown;
 }
 
 export const getPublicAlbumFeed = async (
@@ -517,6 +474,7 @@ export const getPublicAlbumFeed = async (
     ensureOk(res);
     const data = GetPublicSocialDiffResponse.parse(await res.json());
 
+    let decryptionError: unknown;
     const commentParentMap = new Map<string, boolean>();
 
     const comments: PublicFeedComment[] = [];
@@ -561,8 +519,8 @@ export const getPublicAlbumFeed = async (
                 updatedAt: comment.updatedAt,
                 isReply,
             });
-        } catch {
-            // Skip comments that fail to decrypt
+        } catch (e) {
+            decryptionError ??= e;
         }
     }
 
@@ -597,10 +555,10 @@ export const getPublicAlbumFeed = async (
                 createdAt: reaction.createdAt,
                 updatedAt: reaction.updatedAt,
             });
-        } catch {
-            // Skip reactions that fail to decrypt
+        } catch (e) {
+            decryptionError ??= e;
         }
     }
 
-    return { comments, reactions };
+    return { comments, reactions, decryptionError };
 };

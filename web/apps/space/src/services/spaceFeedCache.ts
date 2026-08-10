@@ -26,6 +26,7 @@ const CachedSpacePost = z.object({
     friendID: z.string(),
     height: z.number().optional(),
     imageAsset: CachedSpacePostAsset.optional(),
+    isUnavailable: z.boolean().optional(),
     name: z.string(),
     postId: z.number(),
     spaceId: z.string(),

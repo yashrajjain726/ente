@@ -1,9 +1,4 @@
-/* eslint-disable @typescript-eslint/ban-ts-comment */
 // TODO: Split this file to deal with the ente-new/photos imports.
-// 1. Move common components into FileInfoComponents.tsx
-// 2. Move the rest out to files in the apps themselves:
-//    - albums/SharedFileInfo
-//    - photos/FileInfo
 
 import CalendarTodayIcon from "@mui/icons-material/CalendarToday";
 import CameraOutlinedIcon from "@mui/icons-material/CameraOutlined";
@@ -990,12 +985,9 @@ const MapBox: React.FC<MapBoxProps> = ({ location, mapEnabled }) => {
 
         const position: L.LatLngTuple = [location.latitude, location.longitude];
         if (!mapRef.current) {
-            // @ts-ignore
             const map = leaflet.map(mapContainer).setView(position, zoom);
             map.attributionControl.setPrefix(leafletAttributionPrefix);
-            // @ts-ignore
             leaflet.tileLayer(urlTemplate, { attribution }).addTo(map);
-            // @ts-ignore
             markerRef.current = leaflet.marker(position).addTo(map);
             mapRef.current = map;
         } else {

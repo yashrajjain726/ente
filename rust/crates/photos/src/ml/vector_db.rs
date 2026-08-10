@@ -30,9 +30,6 @@ impl VectorDB {
             dimensions,
             metric: MetricKind::IP,
             quantization: ScalarKind::F32,
-            connectivity: 0,     // auto
-            expansion_add: 0,    // auto
-            expansion_search: 0, // auto
             ..IndexOptions::default()
         };
 
@@ -66,7 +63,7 @@ impl VectorDB {
             })?;
         }
 
-        // Unique temp paths prevent concurrent saves from clobbering each other.
+        // Unique temp paths prevent concurrent saves from clobbering.
         let save_sequence = INDEX_SAVE_TEMP_COUNTER.fetch_add(1, Ordering::Relaxed);
         let temp_path =
             self.path

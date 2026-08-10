@@ -1,10 +1,10 @@
 import "package:ente_components/ente_components.dart" as components;
+import "package:ente_ui/components/divider_widget.dart";
 import "package:flutter/material.dart";
 import "package:photos/core/constants.dart";
 import "package:photos/models/selected_albums.dart";
 import "package:photos/ui/collections/collection_list_page.dart";
 import "package:photos/ui/components/bottom_action_bar/album_action_bar_widget.dart";
-import "package:photos/ui/components/divider_widget.dart";
 import "package:photos/ui/viewer/actions/album_selection_action_widget.dart";
 
 class AlbumBottomActionBarWidget extends StatelessWidget {

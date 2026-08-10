@@ -435,7 +435,6 @@
   "deleteSharedAlbumDialogBody": "Albumet kommer att raderas för alla\n\nDu kommer att förlora åtkomst till delade foton i detta album som ägs av andra",
   "deleteShareLinkConfirmation": "Personer med denna laenk kommer inte laengre att kunna komma aat objektet.",
   "deleteSuggestions": "Radera förslag",
-  "deleteSuggestionsDesc": "Granska filer som har markerats för att raderas.",
   "deleteTagMessage": "Vill du ta bort den här koden? Det går inte att ångra den här åtgärden.",
   "deleteTagTitle": "Radera tagg?",
   "deleteWithCount": "Ta bort ({count})",
@@ -1037,7 +1036,6 @@
   "machineLearning": "Maskininlärning",
   "manage": "Hantera",
   "manageDeviceStorage": "Hantera enhetscache",
-  "manageDeviceStorageDesc": "Granska och rensa lokal cachelagring.",
   "manageFamily": "Hantera familj",
   "manageLink": "Hantera länk",
   "manageParticipants": "Hantera",
@@ -1443,8 +1441,6 @@
       "userEmail": {}
     }
   },
-  "removeDuplicates": "Ta bort dubbletter",
-  "removeDuplicatesDesc": "Granska och ta bort filer som är exakta dubbletter.",
   "removeFromAlbum": "Ta bort från album",
   "removeFromAlbumTitle": "Ta bort från album?",
   "removeFromFavorite": "Ta bort från favoriter",
@@ -1971,7 +1967,6 @@
   "viewAllExifData": "Visa all EXIF-data",
   "viewer": "Bildvy",
   "viewLargeFiles": "Stora filer",
-  "viewLargeFilesDesc": "Visa filer som förbrukar mest lagringsutrymme.",
   "viewLogs": "Visa loggar",
   "@viewLogs": {
     "description": "Button to view logs"

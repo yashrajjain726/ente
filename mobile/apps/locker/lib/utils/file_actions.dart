@@ -1,5 +1,4 @@
 import "package:ente_strings/ente_strings.dart";
-import "package:ente_ui/components/buttons/button_widget.dart";
 import "package:ente_ui/utils/dialog_util.dart";
 import "package:ente_ui/utils/toast_util.dart";
 import "package:flutter/material.dart";
@@ -294,7 +293,7 @@ class FileActions {
       illustration: LockerBottomSheetIllustration.fileDelete,
     );
 
-    if (confirmation?.buttonResult.action != ButtonAction.first) {
+    if (confirmation == null) {
       return;
     }
 
@@ -349,7 +348,7 @@ class FileActions {
       illustration: LockerBottomSheetIllustration.fileDelete,
     );
 
-    if (confirmation?.buttonResult.action != ButtonAction.first) {
+    if (confirmation == null) {
       return;
     }
 

@@ -1,5 +1,3 @@
-//! Shared low-level account client.
-
 use ente_core::b64;
 use ente_core::{
     crypto::SecretVec,
@@ -42,14 +40,12 @@ fn require_srp_m2(auth_response: &AuthResponse) -> Result<&str> {
         .ok_or_else(|| Error::Srp("Missing server proof".to_string()))
 }
 
-/// Shared account client built on `ente_core::http::Api`.
 pub struct AccountsClient {
     api: Api,
     client_package: String,
 }
 
 impl AccountsClient {
-    /// Construct a client from a config.
     pub fn new(config: AccountsClientConfig) -> Result<Self> {
         let api = Api::new(
             Http::new()?,
@@ -67,17 +63,14 @@ impl AccountsClient {
         })
     }
 
-    /// Replace the auth token used for authenticated requests.
     pub fn set_auth_token(&self, auth_token: Option<String>) {
         self.api.set_auth(auth_token.map(Auth::User));
     }
 
-    /// Return the client package associated with this client.
     pub fn client_package(&self) -> &str {
         &self.client_package
     }
 
-    /// Get SRP attributes for a user by email.
     pub async fn get_srp_attributes(&self, email: &str) -> Result<SrpAttributes> {
         let query = [("email", email.to_string())];
         let response: GetSrpAttributesResponse = http::retry(|| async {
@@ -95,7 +88,6 @@ impl AccountsClient {
         Ok(response.attributes)
     }
 
-    /// Run the full SRP login handshake and return the auth response plus KEK.
     pub async fn login_with_srp(
         &self,
         email: &str,
@@ -130,7 +122,6 @@ impl AccountsClient {
         Ok((auth_response, creds.kek))
     }
 
-    /// Create an SRP session.
     pub async fn create_srp_session(
         &self,
         srp_user_id: &uuid::Uuid,
@@ -154,7 +145,6 @@ impl AccountsClient {
         .await?)
     }
 
-    /// Verify an SRP session.
     pub async fn verify_srp_session(
         &self,
         srp_user_id: &uuid::Uuid,
@@ -178,7 +168,6 @@ impl AccountsClient {
             .await?)
     }
 
-    /// Send an OTP/OTT.
     pub async fn send_otp(&self, email: &str, purpose: &str) -> Result<()> {
         let request = SendOtpRequest {
             email: email.to_string(),
@@ -197,7 +186,6 @@ impl AccountsClient {
         .await?)
     }
 
-    /// Verify email ownership with an OTT.
     pub async fn verify_email(
         &self,
         email: &str,
@@ -221,7 +209,6 @@ impl AccountsClient {
             .await?)
     }
 
-    /// Upload user key attributes.
     pub async fn set_user_key_attributes(&self, key_attributes: KeyAttributes) -> Result<()> {
         let request = SetUserAttributesRequest { key_attributes };
         Ok(http::retry(|| async {
@@ -237,7 +224,6 @@ impl AccountsClient {
         .await?)
     }
 
-    /// Upload recovery-key attributes.
     pub async fn set_recovery_key_attributes(&self, request: SetRecoveryKeyRequest) -> Result<()> {
         Ok(http::retry(|| async {
             self.api
@@ -252,7 +238,6 @@ impl AccountsClient {
         .await?)
     }
 
-    /// Start SRP setup for an authenticated user.
     pub async fn setup_srp(&self, request: &SetupSrpRequest) -> Result<SetupSrpResponse> {
         Ok(http::retry(|| async {
             self.api
@@ -268,7 +253,6 @@ impl AccountsClient {
         .await?)
     }
 
-    /// Complete SRP setup.
     pub async fn complete_srp_setup(
         &self,
         setup_id: &uuid::Uuid,
@@ -290,7 +274,6 @@ impl AccountsClient {
             .await?)
     }
 
-    /// Update SRP and key attributes after a password change.
     pub async fn update_srp_and_key_attributes(
         &self,
         request: &UpdateSrpAndKeysRequest,
@@ -307,7 +290,6 @@ impl AccountsClient {
             .await?)
     }
 
-    /// Get session validity and optional remote key attributes.
     pub async fn get_session_validity(&self) -> Result<SessionValidityResponse> {
         Ok(http::retry(|| async {
             self.api
@@ -322,7 +304,6 @@ impl AccountsClient {
         .await?)
     }
 
-    /// Change the authenticated user's email.
     pub async fn change_email(&self, email: &str, ott: &str) -> Result<()> {
         let body = serde_json::json!({ "email": email, "ott": ott });
         self.api
@@ -335,7 +316,6 @@ impl AccountsClient {
         Ok(())
     }
 
-    /// Logout the current authenticated session.
     pub async fn logout(&self) -> Result<()> {
         let body = serde_json::json!({});
         Ok(http::retry(|| async {
@@ -351,7 +331,6 @@ impl AccountsClient {
         .await?)
     }
 
-    /// Return whether two-factor is enabled.
     pub async fn get_two_factor_status(&self) -> Result<bool> {
         let response: TwoFactorStatusResponse = http::retry(|| async {
             self.api
@@ -367,7 +346,6 @@ impl AccountsClient {
         Ok(response.status)
     }
 
-    /// Start TOTP setup.
     pub async fn setup_two_factor(&self) -> Result<TwoFactorSecret> {
         let body = serde_json::json!({});
         Ok(self
@@ -382,7 +360,6 @@ impl AccountsClient {
             .await?)
     }
 
-    /// Enable TOTP two-factor with encrypted recovery material.
     pub async fn enable_two_factor(&self, request: &EnableTwoFactorRequest) -> Result<()> {
         self.api
             .post("/users/two-factor/enable")
@@ -394,7 +371,6 @@ impl AccountsClient {
         Ok(())
     }
 
-    /// Disable TOTP two-factor.
     pub async fn disable_two_factor(&self) -> Result<()> {
         let body = serde_json::json!({});
         Ok(http::retry(|| async {
@@ -410,7 +386,6 @@ impl AccountsClient {
         .await?)
     }
 
-    /// Verify a TOTP code during login.
     pub async fn verify_totp(&self, session_id: &str, code: &str) -> Result<AuthResponse> {
         let request = VerifyTotpRequest {
             session_id: session_id.to_string(),
@@ -428,7 +403,6 @@ impl AccountsClient {
             .await?)
     }
 
-    /// Fetch 2FA recovery information.
     pub async fn get_two_factor_recovery(
         &self,
         session_id: &str,
@@ -458,7 +432,6 @@ impl AccountsClient {
         .await?)
     }
 
-    /// Remove 2FA using the decrypted recovery secret.
     pub async fn remove_two_factor(
         &self,
         request: &RemoveTwoFactorRequest,
@@ -475,7 +448,6 @@ impl AccountsClient {
             .await?)
     }
 
-    /// Get passkey recovery status.
     pub async fn get_two_factor_recovery_status(&self) -> Result<TwoFactorRecoveryStatusResponse> {
         Ok(http::retry(|| async {
             self.api
@@ -490,7 +462,6 @@ impl AccountsClient {
         .await?)
     }
 
-    /// Configure passkey recovery.
     pub async fn configure_passkey_recovery(
         &self,
         request: &ConfigurePasskeyRecoveryRequest,
@@ -508,7 +479,6 @@ impl AccountsClient {
         .await?)
     }
 
-    /// Poll passkey verification completion.
     pub async fn check_passkey_status(&self, session_id: &str) -> Result<AuthResponse> {
         let query = [("sessionID", session_id.to_string())];
         Ok(http::retry(|| async {
@@ -525,7 +495,6 @@ impl AccountsClient {
         .await?)
     }
 
-    /// Fetch accounts-app broker token and URL.
     pub async fn get_accounts_token(&self) -> Result<AccountsTokenResponse> {
         Ok(http::retry(|| async {
             self.api

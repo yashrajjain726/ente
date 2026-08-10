@@ -20,8 +20,8 @@
         "dev-main": "tsc && electron .",
         "dev-renderer": "npm run check-web-deps && cross-env-shell _ENTE_IS_DESKTOP=1 \"cd ../web && npm exec --workspace photos -- next dev --webpack -p 3008\"",
         "postinstall": "node scripts/postinstall.mjs",
-        "lint": "prettier --check --log-level warn . && eslint && tsc",
-        "lint:fix": "prettier --write --log-level warn . && eslint && tsc"
+        "lint": "prettier --check --log-level warn . && eslint && tsc && tsc -p scripts",
+        "lint:fix": "prettier --write --log-level warn . && eslint && tsc && tsc -p scripts"
     },
     "dependencies": {
         "any-shell-escape": "0.1.1",

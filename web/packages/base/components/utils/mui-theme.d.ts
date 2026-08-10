@@ -38,7 +38,7 @@ declare module "@mui/material/styles" {
                 divider: string;
             };
         };
-        boxShadow: { paper: string; menu: string; button: string };
+        boxShadow: { paper: string; menu: string };
     }
 
     interface PaletteOptions {

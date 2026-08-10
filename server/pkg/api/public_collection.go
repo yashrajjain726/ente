@@ -163,6 +163,11 @@ func (h *PublicCollectionHandler) GetMultipartUploadURLV2(c *gin.Context) {
 		handler.Error(c, stacktrace.Propagate(err, ""))
 		return
 	}
+	// TODO: Remove once deferred multipart checksums are enabled for public uploads.
+	if len(req.PartMD5s) == 0 {
+		handler.Error(c, ente.ErrBadRequest)
+		return
+	}
 	collection, err := h.Controller.GetPublicCollection(c, true)
 	if err != nil {
 		handler.Error(c, stacktrace.Propagate(err, ""))

@@ -2,8 +2,10 @@
   "about": "Apie",
   "acceptTrustInvite": "Priimti kvietimą",
   "account": "Paskyra",
+  "accountCredentials": "Paslaptis",
+  "accountCredentialsDescription": "Išsaugokite paskyros kredencialus.",
   "accountIsAlreadyConfigured": "Paskyra jau sukonfigūruota.",
-  "accountOwnerPersonAppbarTitle": "{title} (Aš)",
+  "accountOwnerPersonAppbarTitle": "{title} (aš)",
   "@accountOwnerPersonAppbarTitle": {
     "description": "Title of appbar for account owner person",
     "placeholders": {
@@ -12,9 +14,20 @@
       }
     }
   },
+  "accountRecovery": "Paskyros atkūrimas",
   "accountSetupIncompleteCreateAccount": "Paskyros sąranka neužbaigta. Sukurkite paskyrą, kad užbaigtumėte sąranką.",
   "@accountSetupIncompleteCreateAccount": {
     "description": "Error shown when account exists but signup is incomplete"
+  },
+  "actionNotSupportedForSharedFiles": "{count, plural, one {Veiksmas nepalaikomas {count} bendrintam failui} few {Veiksmas nepalaikomas {count} bendrintiems failams} many {Veiksmas nepalaikomas {count} bendrintam failui} other {Veiksmas nepalaikomas {count} bendrintiems failams}}",
+  "@actionNotSupportedForSharedFiles": {
+    "description": "Message when action is not supported for shared files",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "3"
+      }
+    }
   },
   "actionNotSupportedOnFavouritesAlbum": "Veiksmas nepalaikomas Mėgstamų albume.",
   "activeLinksWillShowUpHere": "Čia bus rodomos aktyvios nuorodos.",
@@ -1355,7 +1368,6 @@
   "machineLearningBannerSubtitle": "Magiškai paieškai ir veidų atpažinimui",
   "manage": "Tvarkyti",
   "manageDeviceStorage": "Tvarkyti įrenginio podėlį",
-  "manageDeviceStorageDesc": "Peržiūrėkite ir išvalykite vietinę podėlį.",
   "manageFamily": "Tvarkyti šeimą",
   "manageLink": "Tvarkyti nuorodą",
   "manageParticipants": "Tvarkyti",
@@ -1938,8 +1950,6 @@
       "userEmail": {}
     }
   },
-  "removeDuplicates": "Šalinti dublikatus",
-  "removeDuplicatesDesc": "Peržiūrėkite ir pašalinkite failus, kurie yra tiksliai dublikatai.",
   "removeFromAlbum": "Šalinti iš albumo",
   "removeFromAlbumTitle": "Pašalinti iš albumo?",
   "removeFromFamily": "Šalinti iš šeimos",
@@ -2693,7 +2703,6 @@
   },
   "useAsCover": "Naudoti kaip viršelį",
   "usedSpace": "Naudojama vieta",
-  "useMLToFindSimilarImages": "Peržiūrėkite ir pašalinkite vaizdus, kurie atrodo panašūs vienas į kitą.",
   "useOffline": "Naudoti be atsarginių kopijų",
   "useRecoveryKey": "Naudoti atkūrimo raktą",
   "@useRecoveryKey": {
@@ -2743,7 +2752,6 @@
   "viewAllExifData": "Peržiūrėti visus EXIF duomenis",
   "viewer": "Žiūrėtojas",
   "viewLargeFiles": "Dideli failai",
-  "viewLargeFilesDesc": "Peržiūrėkite failus, kurie užima daugiausiai saugyklos vietos.",
   "viewLogs": "Peržiūrėti žurnalus",
   "@viewLogs": {
     "description": "Button to view logs"

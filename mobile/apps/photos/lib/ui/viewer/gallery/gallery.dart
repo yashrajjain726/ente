@@ -2,6 +2,7 @@ import 'dart:async';
 import "dart:io";
 
 import "package:ente_pure_utils/ente_pure_utils.dart";
+import 'package:ente_ui/components/loading_widget.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import "package:flutter/services.dart";
@@ -20,7 +21,6 @@ import "package:photos/models/gallery/gallery_groups.dart";
 import "package:photos/models/gallery_type.dart";
 import 'package:photos/models/selected_files.dart';
 import "package:photos/service_locator.dart" show localSettings;
-import 'package:photos/ui/common/loading_widget.dart';
 import "package:photos/ui/viewer/actions/file_selection_overlay_bar.dart";
 import "package:photos/ui/viewer/gallery/component/gallery_file_widget.dart";
 import "package:photos/ui/viewer/gallery/component/group/group_header_widget.dart";

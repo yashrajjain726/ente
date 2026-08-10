@@ -585,7 +585,6 @@
   "deleteSharedAlbumDialogBody": "Album zostanie usunięty dla wszystkich\n\nUtracisz dostęp do udostępnionych zdjęć w tym albumie, które są własnością innych osób",
   "deleteShareLinkConfirmation": "Osoby posiadające ten link nie będą już mogły uzyskać dostępu do elementu.",
   "deleteSuggestions": "Usuń podpowiedzi",
-  "deleteSuggestionsDesc": "Przejrzyj pliki zaproponowane do usunięcia.",
   "deleteTagMessage": "Czy na pewno chcesz usunąć tę etykietę? Ta akcja jest nieodwracalna.",
   "deleteTagTitle": "Usunąć etykietę?",
   "deleteUnparseableCodeMessage": "Spowoduje to trwałe usunięcie tego kodu z autoryzacji. Nie zostanie on przeniesiony do kosza.",
@@ -1015,11 +1014,6 @@
     }
   },
   "freeUpDeviceSpace": "Zwolnij miejsce na urządzeniu",
-  "freeUpDeviceSpaceDesc": "Oszczędzaj miejsce na swoim urządzeniu przez usunięcie plików już z kopią zapasową.",
-  "freeUpDeviceSpaceDescICloud": "Pliki w udostępnionych albumach iCloud nie mogą być usunięte.",
-  "@freeUpDeviceSpaceDescICloud": {
-    "description": "Here 'cleared' means 'deleted' from the device"
-  },
   "freeUpSpace": "Zwolnij miejsce",
   "gallery": "Galeria",
   "galleryMemoryLimitInfo": "W galerii wyświetlane jest do 1000 pamięci",
@@ -1366,7 +1360,6 @@
   },
   "manage": "Zarządzaj",
   "manageDeviceStorage": "Zarządzaj pamięcią podręczną urządzenia",
-  "manageDeviceStorageDesc": "Przejrzyj i wyczyść lokalną pamięć podręczną.",
   "manageFamily": "Zarządzaj rodziną",
   "manageLink": "Zarządzaj linkiem",
   "manageParticipants": "Zarządzaj",
@@ -1970,8 +1963,6 @@
       "userEmail": {}
     }
   },
-  "removeDuplicates": "Usuń duplikaty",
-  "removeDuplicatesDesc": "Przejrzyj i usuń pliki, które są dokładnymi duplikatami.",
   "removeFromAlbum": "Usuń z albumu",
   "removeFromAlbumTitle": "Usunąć z albumu?",
   "removeFromFamily": "Usuń z rodziny",
@@ -2734,7 +2725,6 @@
   "useAsCover": "Użyj jako okładki",
   "usedSpace": "Zajęta przestrzeń",
   "usedYourCode": "użyto Twojego kodu",
-  "useMLToFindSimilarImages": "Przejrzyj i usuń zdjęcia, które wyglądają podobnie.",
   "useOffline": "Używaj bez kopii zapasowych",
   "useRecoveryKey": "Użyj kodu odzyskiwania",
   "@useRecoveryKey": {
@@ -2785,7 +2775,6 @@
   "viewAllExifData": "Wyświetl wszystkie dane EXIF",
   "viewer": "Widz",
   "viewLargeFiles": "Duże pliki",
-  "viewLargeFilesDesc": "Wyświetl pliki zużywające największą ilość pamięci.",
   "viewLogs": "Wyświetl logi",
   "@viewLogs": {
     "description": "Button to view logs"

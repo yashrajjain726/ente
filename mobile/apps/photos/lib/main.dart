@@ -59,6 +59,7 @@ import 'package:photos/services/sync/local_sync_service.dart';
 import 'package:photos/services/sync/remote_sync_service.dart';
 import "package:photos/services/sync/sync_service.dart";
 import "package:photos/services/video_preview_service.dart";
+import "package:photos/src/rust/api/log.dart" as photos_rust_log;
 import "package:photos/src/rust/frb_generated.dart";
 import "package:photos/utils/device_info.dart";
 import "package:photos/utils/email_util.dart";
@@ -82,6 +83,8 @@ bool _stopHearBeat = false;
 bool _isSyncInitialized = false;
 bool _isRustInitialized = false;
 Future<void>? _rustInitFuture;
+late final LogSinkGuard _enteRustLogSinkGuard;
+late final photos_rust_log.LogSinkGuard _photosRustLogSinkGuard;
 
 enum ForegroundStartupMode { normal, picker }
 
@@ -558,8 +561,33 @@ Future<void> _ensureRustInitialized({required String via}) async {
   try {
     await initFuture;
     _isRustInitialized = true;
+    _attachRustLogStream();
   } finally {
     _rustInitFuture = null;
+  }
+}
+
+void _attachRustLogStream() {
+  final logger = Logger("rust");
+  _enteRustLogSinkGuard = LogSinkGuard();
+  _enteRustLogSinkGuard.attachLogStream().listen((entry) {
+    _logRustEntry(logger, entry.level.name, entry.target, entry.message);
+  });
+  _photosRustLogSinkGuard = photos_rust_log.LogSinkGuard();
+  _photosRustLogSinkGuard.attachLogStream().listen((entry) {
+    _logRustEntry(logger, entry.level.name, entry.target, entry.message);
+  });
+}
+
+void _logRustEntry(Logger logger, String level, String target, String body) {
+  final message = "[$target] $body";
+  switch (level) {
+    case "error":
+      logger.severe(message);
+    case "warn":
+      logger.warning(message);
+    case "info":
+      logger.info(message);
   }
 }
 

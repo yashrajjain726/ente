@@ -4,7 +4,6 @@ import {
     savedLocalUser,
     savedPartialLocalUser,
     saveKeyAttributes,
-    saveSRPAttributes,
     updateSavedLocalUser,
 } from "ente-accounts-rs/services/accounts-db";
 import {
@@ -21,7 +20,6 @@ import { ensureMasterKeyFromSession } from "ente-accounts-rs/services/session-st
 import {
     generateSRPSetupAttributes,
     getAndSaveSRPAttributes,
-    getSRPAttributes,
     updateSRPAndKeyAttributes,
     type UpdatedKeyAttr,
 } from "ente-accounts-rs/services/srp";
@@ -36,7 +34,6 @@ import {
     saveAuthToken,
     savedAuthToken,
 } from "ente-base/token";
-import { ensure } from "ente-utils/ensure";
 import { nullToUndefined } from "ente-utils/transform";
 import { z } from "zod";
 import { clearInflightPasskeySessionID } from "./passkey";
@@ -378,9 +375,6 @@ export const changePassword = async (password: string) => {
     );
 
     await getAndSaveSRPAttributes(user.email);
-
-    const srpAttributes = await getSRPAttributes(user.email);
-    saveSRPAttributes(ensure(srpAttributes));
 
     await generateAndSaveInteractiveKeyAttributes(
         password,

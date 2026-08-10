@@ -6,6 +6,7 @@ edition = "2024"
 crate-type = ["cdylib", "staticlib"]
 
 [dependencies]
+ente-frb-log.workspace = true
 ente-image.workspace = true
 ente-photos = { workspace = true, features = ["usearch"] }
 flutter_rust_bridge.workspace = true

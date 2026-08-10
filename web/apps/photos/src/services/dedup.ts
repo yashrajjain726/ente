@@ -140,8 +140,9 @@ export const removeSelectedDuplicateGroups = async (
     }
 
     let np = 0;
-    const ntotal = filesToAdd.size + filesToTrash.length ? 1 : 0 + /* sync */ 1;
-    const tickProgress = () => onProgress((np++ / ntotal) * 100);
+    const ntotal =
+        filesToAdd.size + (filesToTrash.length ? 1 : 0) + /* sync */ 1;
+    const tickProgress = () => onProgress((++np / ntotal) * 100);
 
     const collections = await savedNormalCollections();
     const collectionsByID = new Map(collections.map((c) => [c.id, c]));

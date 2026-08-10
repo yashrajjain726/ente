@@ -1,9 +1,9 @@
 import 'package:ente_accounts/ente_accounts.dart';
+import 'package:ente_components/ente_components.dart';
 import 'package:ente_configuration/base_configuration.dart';
 import 'package:ente_strings/ente_strings.dart';
 import "package:ente_ui/components/alert_bottom_sheet.dart";
 import 'package:ente_ui/components/buttons/dynamic_fab.dart';
-import "package:ente_ui/components/buttons/gradient_button.dart";
 import 'package:ente_ui/pages/base_home_page.dart';
 import 'package:ente_ui/theme/ente_theme.dart';
 import 'package:ente_ui/utils/dialog_util.dart';
@@ -176,14 +176,15 @@ class _RecoveryPageState extends State<RecoveryPage> {
                                   context.strings.noRecoveryKeyNoDecryption,
                               assetPath: 'assets/warning-grey.png',
                               buttons: [
-                                GradientButton(
-                                  text: context.strings.contactSupport,
+                                ButtonComponent(
+                                  label: context.strings.contactSupport,
                                   onTap: () async {
                                     await sendEmail(
                                       context,
                                       to: "support@ente.com",
                                     );
                                   },
+                                  shouldSurfaceExecutionStates: false,
                                 ),
                               ],
                             );

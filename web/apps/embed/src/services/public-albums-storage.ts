@@ -40,13 +40,6 @@ export const removePublicCollectionByKey = (collectionKey: string) => {
 
 const LocalString = z.string().nullish().transform(nullToUndefined);
 
-export const savedLastPublicCollectionReferralCode = () =>
-    LocalString.parse(inMemoryStorage.getItem("public-referral-code"));
-
-export const saveLastPublicCollectionReferralCode = (referralCode: string) => {
-    inMemoryStorage.setItem("public-referral-code", referralCode);
-};
-
 const LocalSavedPublicCollectionFilesEntry = z.object({
     collectionUID: z.string(),
     files: LocalEnteFiles,
@@ -140,25 +133,4 @@ export const savePublicCollectionLinkDeviceToken = (
         publicCollectionLinkDeviceTokenKey(apiOrigin, accessToken),
         linkDeviceToken,
     );
-};
-
-export const removePublicCollectionLinkDeviceToken = (
-    apiOrigin: string,
-    accessToken: string,
-) => {
-    inMemoryStorage.removeItem(
-        publicCollectionLinkDeviceTokenKey(apiOrigin, accessToken),
-    );
-};
-
-export const savedPublicCollectionUploaderName = (accessToken: string) =>
-    LocalString.parse(
-        inMemoryStorage.getItem(`public-${accessToken}-uploaderName`),
-    );
-
-export const savePublicCollectionUploaderName = (
-    accessToken: string,
-    uploaderName: string,
-) => {
-    inMemoryStorage.setItem(`public-${accessToken}-uploaderName`, uploaderName);
 };

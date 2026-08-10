@@ -2,6 +2,7 @@ import "dart:math";
 
 import "package:ente_components/ente_components.dart";
 import "package:ente_strings/ente_strings.dart";
+import "package:ente_ui/components/loading_widget.dart";
 import "package:ente_ui/utils/dialog_util.dart";
 import "package:flutter/material.dart";
 import "package:hugeicons/hugeicons.dart";
@@ -11,8 +12,7 @@ import "package:photos/gateways/cast/cast_gateway.dart";
 import "package:photos/service_locator.dart";
 import "package:photos/services/collections_service.dart";
 import "package:photos/theme/ente_theme.dart";
-import "package:photos/ui/common/loading_widget.dart";
-import 'package:timeago/timeago.dart' as timeago;
+import "package:photos/utils/relative_time_formatter.dart";
 
 class CastSettingsPage extends StatelessWidget {
   const CastSettingsPage({super.key});
@@ -179,7 +179,7 @@ class _CastSessionItem extends StatelessWidget {
     final title = collection?.displayName ?? session.collectionID.toString();
     return SettingsItem(
       title: "$title on ${session.deviceName ?? session.deviceIP}",
-      subtitle: timeago.format(session.lastUsedAt),
+      subtitle: formatTimeAgo(session.lastUsedAt),
       icon: HugeIcons.strokeRoundedTvSmart,
       showChevron: false,
       showOnlyLoadingState: true,

@@ -2301,6 +2301,7 @@ dependencies = [
  "ente-ensu",
  "keyring",
  "libc",
+ "log",
  "serde",
  "serde_json",
  "tauri",
@@ -2359,6 +2360,7 @@ name = "ente-cast-uniffi"
 version = "0.0.0"
 dependencies = [
  "ente-core",
+ "ente-uniffi-log",
  "thiserror 2.0.18",
  "uniffi",
 ]
@@ -2445,9 +2447,18 @@ version = "0.0.0"
 dependencies = [
  "ente-assets",
  "ente-ensu",
+ "ente-uniffi-log",
  "thiserror 2.0.18",
  "uniffi",
  "uuid",
+]
+
+[[package]]
+name = "ente-frb-log"
+version = "0.0.0"
+dependencies = [
+ "flutter_rust_bridge",
+ "log",
 ]
 
 [[package]]
@@ -2547,6 +2558,7 @@ dependencies = [
  "ente-core",
  "ente-test-support",
  "futures-util",
+ "log",
  "md-5 0.11.0",
  "mockito",
  "reqwest 0.12.28",
@@ -2565,8 +2577,11 @@ version = "0.0.0"
 dependencies = [
  "ente-core",
  "ente-space",
+ "ente-wasm-log",
+ "log",
  "serde",
  "serde-wasm-bindgen",
+ "tokio",
  "wasm-bindgen",
  "wasm-bindgen-futures",
 ]
@@ -2582,12 +2597,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "ente-uniffi-log"
+version = "0.0.0"
+dependencies = [
+ "log",
+]
+
+[[package]]
 name = "ente-wasm"
 version = "0.0.0"
 dependencies = [
  "ente-accounts",
  "ente-contacts",
  "ente-core",
+ "ente-wasm-log",
  "js-sys",
  "md-5 0.11.0",
  "serde",
@@ -2601,7 +2624,18 @@ name = "ente-wasm-core"
 version = "0.0.0"
 dependencies = [
  "ente-core",
+ "ente-wasm-log",
  "wasm-bindgen",
+]
+
+[[package]]
+name = "ente-wasm-log"
+version = "0.0.0"
+dependencies = [
+ "js-sys",
+ "log",
+ "wasm-bindgen",
+ "web-sys",
 ]
 
 [[package]]
@@ -2610,6 +2644,7 @@ version = "0.0.0"
 dependencies = [
  "ente-assets",
  "ente-photos",
+ "log",
  "napi",
  "napi-build",
  "napi-derive",
@@ -2620,6 +2655,7 @@ dependencies = [
 name = "ente_photos_rust"
 version = "0.0.0"
 dependencies = [
+ "ente-frb-log",
  "ente-image",
  "ente-photos",
  "flutter_rust_bridge",
@@ -2632,6 +2668,7 @@ dependencies = [
  "ente-accounts",
  "ente-contacts",
  "ente-core",
+ "ente-frb-log",
  "flutter_rust_bridge",
 ]
 

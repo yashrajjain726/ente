@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:collection';
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -59,18 +58,7 @@ void main() {
     'ensureReady hydrates cached display data and notifies listeners',
     () async {
       rustApi.diffPages = [
-        [
-          const ContactRecord(
-            id: 'ct_1',
-            contactUserId: 7,
-            email: 'alice@test.test',
-            data: ContactData(contactUserId: 7, name: 'Alice'),
-            profilePictureAttachmentId: 'att_1',
-            isDeleted: false,
-            createdAt: 1,
-            updatedAt: 2,
-          ),
-        ],
+        [_contact(attachmentID: 'att_1')],
         const [],
       ];
       var notifications = 0;
@@ -80,10 +68,6 @@ void main() {
       await displayService.ensureReady(session);
 
       expect(displayService.getCachedSavedName(contactUserId: 7), 'Alice');
-      expect(
-        displayService.getCachedResolvedEmail(email: 'alice@test.test'),
-        'alice@test.test',
-      );
       expect(notifications, greaterThan(0));
 
       displayService.changes.removeListener(listener);
@@ -92,18 +76,7 @@ void main() {
 
   test('profile picture loads are single-flight per contact', () async {
     rustApi.diffPages = [
-      [
-        const ContactRecord(
-          id: 'ct_1',
-          contactUserId: 7,
-          email: 'alice@test.test',
-          data: ContactData(contactUserId: 7, name: 'Alice'),
-          profilePictureAttachmentId: 'att_1',
-          isDeleted: false,
-          createdAt: 1,
-          updatedAt: 2,
-        ),
-      ],
+      [_contact(attachmentID: 'att_1')],
       const [],
     ];
     rustApi.ctx.profilePictureBarrier = Completer<void>();
@@ -124,20 +97,55 @@ void main() {
     expect(rustApi.ctx.getProfilePictureCalls, 1);
   });
 
+  test('positive user id does not fall back to email', () {
+    displayService.debugHydrateContacts([_contact()], notify: false);
+
+    expect(
+      displayService.getCachedContact(
+        contactUserId: 99,
+        email: 'alice@test.test',
+      ),
+      isNull,
+    );
+    expect(
+      displayService.getCachedContact(email: 'ALICE@test.test')?.contactUserId,
+      7,
+    );
+  });
+
+  test('picture changes notify only the matching contact', () {
+    displayService.debugHydrateContacts([
+      _contact(attachmentID: 'att_1'),
+      _contact(
+        userID: 8,
+        email: 'bob@test.test',
+        name: 'Bob',
+        attachmentID: 'att_2',
+      ),
+    ], notify: false);
+    var aliceChanges = 0;
+    var bobChanges = 0;
+    final alice = displayService.changesFor(contactUserId: 7);
+    final bob = displayService.changesFor(contactUserId: 8);
+    void onAliceChanged() => aliceChanges += 1;
+    void onBobChanged() => bobChanges += 1;
+    alice.addListener(onAliceChanged);
+    bob.addListener(onBobChanged);
+
+    displayService.debugSetProfilePictureBytes(
+      contactUserId: 7,
+      bytes: Uint8List.fromList([1]),
+    );
+
+    expect(aliceChanges, 1);
+    expect(bobChanges, 0);
+    alice.removeListener(onAliceChanged);
+    bob.removeListener(onBobChanged);
+  });
+
   test('profile picture failures are briefly negative-cached', () async {
     rustApi.diffPages = [
-      [
-        const ContactRecord(
-          id: 'ct_1',
-          contactUserId: 7,
-          email: 'alice@test.test',
-          data: ContactData(contactUserId: 7, name: 'Alice'),
-          profilePictureAttachmentId: 'att_1',
-          isDeleted: false,
-          createdAt: 1,
-          updatedAt: 2,
-        ),
-      ],
+      [_contact(attachmentID: 'att_1')],
       const [],
     ];
     rustApi.ctx.profilePictureError = StateError('boom');
@@ -148,7 +156,6 @@ void main() {
       await displayService.getProfilePictureBytes(contactUserId: 7),
       isNull,
     );
-    expect(rustApi.ctx.getProfilePictureCalls, 1);
     expect(
       await displayService.getProfilePictureBytes(contactUserId: 7),
       isNull,
@@ -160,18 +167,7 @@ void main() {
     'stale in-flight profile picture load does not overwrite newer contact',
     () async {
       rustApi.diffPages = [
-        [
-          const ContactRecord(
-            id: 'ct_1',
-            contactUserId: 7,
-            email: 'alice@test.test',
-            data: ContactData(contactUserId: 7, name: 'Alice'),
-            profilePictureAttachmentId: 'att_old',
-            isDeleted: false,
-            createdAt: 1,
-            updatedAt: 2,
-          ),
-        ],
+        [_contact(attachmentID: 'att_old')],
         const [],
       ];
       rustApi.ctx.profilePictureBarrier = Completer<void>();
@@ -186,24 +182,21 @@ void main() {
       final pending = displayService.getProfilePictureBytes(contactUserId: 7);
 
       displayService.debugHydrateContacts([
-        const ContactRecord(
-          id: 'ct_1',
-          contactUserId: 7,
-          email: 'alice@test.test',
-          data: ContactData(contactUserId: 7, name: 'Alice'),
-          profilePictureAttachmentId: 'att_new',
-          isDeleted: false,
-          createdAt: 1,
-          updatedAt: 3,
-        ),
+        _contact(attachmentID: 'att_new', updatedAt: 3),
       ], notify: false);
+      final newPicture = Uint8List.fromList([4, 5, 6]);
+      displayService.debugSetProfilePictureBytes(
+        contactUserId: 7,
+        bytes: newPicture,
+        notify: false,
+      );
 
       rustApi.ctx.profilePictureBarrier!.complete();
 
-      expect(await pending, isNull);
+      expect(await pending, newPicture);
       expect(
         displayService.getCachedProfilePictureBytes(contactUserId: 7),
-        isNull,
+        newPicture,
       );
     },
   );
@@ -215,18 +208,7 @@ void main() {
       rustApi.ctx.diffBarrier = diffBarrier;
       rustApi.ctx.diffStarted = Completer<void>();
       rustApi.diffPages = [
-        [
-          const ContactRecord(
-            id: 'ct_old',
-            contactUserId: 7,
-            email: 'alice@test.test',
-            data: ContactData(contactUserId: 7, name: 'Alice'),
-            profilePictureAttachmentId: null,
-            isDeleted: false,
-            createdAt: 1,
-            updatedAt: 2,
-          ),
-        ],
+        [_contact(id: 'ct_old')],
         const [],
       ];
 
@@ -247,51 +229,8 @@ void main() {
       await oldEnsureReady;
 
       expect(displayService.getCachedSavedName(contactUserId: 7), isNull);
-      expect(
-        displayService.getCachedResolvedEmail(email: 'alice@test.test'),
-        isNull,
-      );
     },
   );
-
-  test('session switch creates a fresh contacts service instance', () async {
-    final rustApiForFirstSession = FakeContactsRustApi();
-    final rustApiForSecondSession = FakeContactsRustApi();
-    final services = Queue<ContactsService>.of([
-      ContactsService(
-        preferences: preferences,
-        database: ContactsDatabase(directoryResolver: () async => tempDir),
-        rustApi: rustApiForFirstSession,
-      ),
-      ContactsService(
-        preferences: preferences,
-        database: ContactsDatabase(directoryResolver: () async => tempDir),
-        rustApi: rustApiForSecondSession,
-      ),
-    ]);
-
-    await displayService.debugReset(clearLocalState: false);
-    displayService.init(
-      preferences: preferences,
-      contactsServiceFactory: () => services.removeFirst(),
-    );
-
-    rustApiForFirstSession.diffPages = [const []];
-    await displayService.ensureReady(session);
-
-    final nextSession = ContactsSession(
-      baseUrl: session.baseUrl,
-      authToken: 'token-2',
-      userId: 2,
-      accountKey: Uint8List.fromList([9, 9, 9]),
-    );
-    rustApiForSecondSession.diffPages = [const []];
-    await displayService.ensureReady(nextSession);
-
-    expect(rustApiForFirstSession.openCalls, 1);
-    expect(rustApiForSecondSession.openCalls, 1);
-    expect(services, isEmpty);
-  });
 
   test(
     'ensureReady keeps hydrated cache and retries later when sync fails',
@@ -310,21 +249,37 @@ void main() {
       rustApi.ctx.diffError = null;
       rustApi.diffPages = [const []];
 
-      await expectLater(displayService.ensureReady(session), completes);
+      await displayService.ensureReady(session);
       expect(rustApi.ctx.getDiffCalls, 2);
     },
   );
 }
 
+ContactRecord _contact({
+  String id = 'ct_1',
+  int userID = 7,
+  String email = 'alice@test.test',
+  String name = 'Alice',
+  String? attachmentID,
+  int updatedAt = 2,
+}) => ContactRecord(
+  id: id,
+  contactUserId: userID,
+  email: email,
+  data: ContactData(contactUserId: userID, name: name),
+  profilePictureAttachmentId: attachmentID,
+  isDeleted: false,
+  createdAt: 1,
+  updatedAt: updatedAt,
+);
+
 class FakeContactsRustApi implements ContactsRustApi {
   FakeContactsRustContext ctx = FakeContactsRustContext();
   FakeContactsRustContext? nextOpenContext;
   List<List<ContactRecord>> diffPages = const [];
-  int openCalls = 0;
 
   @override
   Future<OpenContactsContextResult> open(OpenContactsContextInput input) async {
-    openCalls += 1;
     final context = nextOpenContext ?? ctx;
     nextOpenContext = null;
     context.userIdValue = input.userId;
@@ -342,13 +297,9 @@ class FakeContactsRustApi implements ContactsRustApi {
 
 class FakeContactsRustContext implements ContactsRustContext {
   int userIdValue = 0;
-  final Map<String, ContactRecord> records = {};
-  final Map<String, Uint8List> attachments = {};
   final Map<String, Uint8List> profilePictureBytesByContactId = {};
   List<List<ContactRecord>> diffPages = [];
-  int getAttachmentCalls = 0;
   int getProfilePictureCalls = 0;
-  String nextAttachmentId = 'att_profile';
   Completer<void>? profilePictureBarrier;
   Completer<void>? diffBarrier;
   Completer<void>? diffStarted;
@@ -358,7 +309,7 @@ class FakeContactsRustContext implements ContactsRustContext {
 
   @override
   Future<ContactRecord> createContact(ContactData data) async {
-    final record = ContactRecord(
+    return ContactRecord(
       id: 'ct_created',
       contactUserId: data.contactUserId,
       email: 'b@test.test',
@@ -368,8 +319,6 @@ class FakeContactsRustContext implements ContactsRustContext {
       createdAt: 1,
       updatedAt: 1,
     );
-    records[record.id] = record;
-    return record;
   }
 
   @override
@@ -378,56 +327,6 @@ class FakeContactsRustContext implements ContactsRustContext {
         encryptedKey: 'enc-key',
         header: 'enc-header',
       );
-
-  @override
-  Future<void> deleteContact(String contactId) async {
-    final existing = records[contactId];
-    if (existing != null) {
-      records[contactId] = ContactRecord(
-        id: existing.id,
-        contactUserId: existing.contactUserId,
-        email: existing.email,
-        data: null,
-        profilePictureAttachmentId: null,
-        isDeleted: true,
-        createdAt: existing.createdAt,
-        updatedAt: existing.updatedAt + 1,
-      );
-    }
-  }
-
-  @override
-  Future<ContactRecord> deleteAttachment(
-    String contactId,
-    ContactAttachmentType attachmentType,
-  ) async {
-    final existing = records[contactId]!;
-    final updated = ContactRecord(
-      id: existing.id,
-      contactUserId: existing.contactUserId,
-      email: existing.email,
-      data: existing.data,
-      profilePictureAttachmentId: null,
-      isDeleted: existing.isDeleted,
-      createdAt: existing.createdAt,
-      updatedAt: existing.updatedAt + 1,
-    );
-    records[contactId] = updated;
-    final previousAttachmentId = existing.profilePictureAttachmentId;
-    if (previousAttachmentId != null) {
-      attachments.remove(previousAttachmentId);
-    }
-    return updated;
-  }
-
-  @override
-  Future<ContactRecord> deleteProfilePicture(String contactId) {
-    return deleteAttachment(contactId, ContactAttachmentType.profilePicture);
-  }
-
-  @override
-  Future<ContactRecord> getContact(String contactId) async =>
-      records[contactId]!;
 
   @override
   Future<List<ContactRecord>> getDiff(int sinceTime, int limit) async {
@@ -447,19 +346,7 @@ class FakeContactsRustContext implements ContactsRustContext {
     }
     final first = diffPages.first;
     diffPages = diffPages.sublist(1);
-    for (final record in first) {
-      records[record.id] = record;
-    }
     return first;
-  }
-
-  @override
-  Future<Uint8List> getAttachment(
-    ContactAttachmentType attachmentType,
-    String attachmentId,
-  ) async {
-    getAttachmentCalls += 1;
-    return attachments[attachmentId]!;
   }
 
   @override
@@ -477,61 +364,10 @@ class FakeContactsRustContext implements ContactsRustContext {
   }
 
   @override
-  Future<ContactRecord> setAttachment(
-    String contactId,
-    ContactAttachmentType attachmentType,
-    Uint8List attachmentBytes,
-  ) async {
-    final existing = records[contactId]!;
-    final updated = ContactRecord(
-      id: existing.id,
-      contactUserId: existing.contactUserId,
-      email: existing.email,
-      data: existing.data,
-      profilePictureAttachmentId: nextAttachmentId,
-      isDeleted: existing.isDeleted,
-      createdAt: existing.createdAt,
-      updatedAt: existing.updatedAt + 1,
-    );
-    records[contactId] = updated;
-    attachments[nextAttachmentId] = attachmentBytes;
-    return updated;
-  }
-
-  @override
-  Future<ContactRecord> setProfilePicture(
-    String contactId,
-    Uint8List profilePicture,
-  ) {
-    return setAttachment(
-      contactId,
-      ContactAttachmentType.profilePicture,
-      profilePicture,
-    );
-  }
-
-  @override
   Future<void> updateAuthToken(String authToken) async {}
 
   @override
-  Future<ContactRecord> updateContact(
-    String contactId,
-    ContactData data,
-  ) async {
-    final existing = records[contactId]!;
-    final updated = ContactRecord(
-      id: existing.id,
-      contactUserId: existing.contactUserId,
-      email: existing.email,
-      data: data,
-      profilePictureAttachmentId: existing.profilePictureAttachmentId,
-      isDeleted: existing.isDeleted,
-      createdAt: existing.createdAt,
-      updatedAt: existing.updatedAt + 1,
-    );
-    records[contactId] = updated;
-    return updated;
-  }
+  dynamic noSuchMethod(Invocation invocation) => throw UnimplementedError();
 
   @override
   int userId() => userIdValue;

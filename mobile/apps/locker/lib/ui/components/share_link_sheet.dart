@@ -1,7 +1,5 @@
 import "package:ente_components/ente_components.dart";
 import "package:ente_strings/ente_strings.dart";
-import "package:ente_ui/components/buttons/button_widget.dart";
-import "package:ente_ui/components/buttons/models/button_result.dart";
 import "package:ente_ui/utils/dialog_util.dart";
 import "package:ente_ui/utils/toast_util.dart";
 import "package:ente_utils/share_utils.dart";
@@ -131,7 +129,7 @@ class _ShareLinkSheetState extends State<ShareLinkSheet> {
   Future<void> _deleteShareLink(BuildContext context) async {
     final l10n = context.strings;
 
-    final result = await showBottomSheetComponent<ButtonResult>(
+    final confirmed = await showBottomSheetComponent<bool>(
       context: context,
       builder: (_) => BottomSheetComponent(
         title: l10n.deleteLinkQuestion,
@@ -141,14 +139,13 @@ class _ShareLinkSheetState extends State<ShareLinkSheet> {
           ButtonComponent(
             label: l10n.delete,
             variant: ButtonComponentVariant.critical,
-            onTap: () =>
-                Navigator.of(context).pop(ButtonResult(ButtonAction.first)),
+            onTap: () => Navigator.of(context).pop(true),
           ),
         ],
       ),
     );
 
-    if (result?.action == ButtonAction.first && context.mounted) {
+    if (confirmed == true && context.mounted) {
       final dialog = createProgressDialog(
         context,
         l10n.deletingShareLink,

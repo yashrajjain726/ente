@@ -2,7 +2,6 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
 
-/// Decrypted file metadata
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FileMetadata {
@@ -23,12 +22,10 @@ pub struct FileMetadata {
 }
 
 impl FileMetadata {
-    /// Get the file title/name
     pub fn get_title(&self) -> Option<&str> {
         self.title.as_deref()
     }
 
-    /// Get the file type
     pub fn get_file_type(&self) -> FileType {
         match self.file_type {
             Some(0) => FileType::Image,
@@ -38,7 +35,6 @@ impl FileMetadata {
         }
     }
 
-    /// Check if this is a live photo
     pub fn is_live_photo(&self) -> bool {
         matches!(self.get_file_type(), FileType::LivePhoto)
     }
@@ -52,7 +48,6 @@ pub enum FileType {
     Unknown = 127,
 }
 
-/// Public metadata that can override certain fields
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PublicMetadata {
@@ -63,7 +58,6 @@ pub struct PublicMetadata {
     pub other: HashMap<String, Value>,
 }
 
-/// Private metadata
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PrivateMetadata {
     #[serde(flatten)]

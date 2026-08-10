@@ -1,5 +1,6 @@
 import 'package:email_validator/email_validator.dart';
 import "package:ente_strings/ente_strings.dart";
+import "package:ente_ui/components/divider_widget.dart";
 import 'package:flutter/material.dart';
 import "package:logging/logging.dart";
 import 'package:photos/core/configuration.dart';
@@ -14,7 +15,6 @@ import 'package:photos/theme/ente_theme.dart';
 import "package:photos/ui/components/alert_bottom_sheet.dart";
 import "package:photos/ui/components/base_bottom_sheet.dart";
 import "package:photos/ui/components/buttons/button_widget_v2.dart";
-import "package:photos/ui/components/divider_widget.dart";
 import "package:photos/ui/components/menu_item_widget/menu_item_widget_new.dart";
 import "package:photos/ui/components/text_input_widget_v2.dart";
 import 'package:photos/ui/sharing/user_avator_widget.dart';
@@ -67,7 +67,7 @@ class _AddContactSheetState extends State<AddContactSheet> {
   Widget build(BuildContext context) {
     final colorScheme = getEnteColorScheme(context);
     final textTheme = getEnteTextTheme(context);
-    final List<User> suggestedUsers = _getSuggestedUser();
+    final List<UserSuggestion> suggestedUsers = _getSuggestedUser();
     final List<String> emailsToAdd = _emailsToAdd;
     final bool canAdd = emailsToAdd.isNotEmpty;
     final String? emailForVerification = _emailForVerification;
@@ -124,12 +124,11 @@ class _AddContactSheetState extends State<AddContactSheet> {
                         listIndex: index,
                         isLastItem: isLastItem,
                         child: MenuItemWidgetNew(
-                          title: resolveDisplayName(user),
+                          title: resolveSuggestionDisplayName(user),
                           titleColor: colorScheme.textMuted,
-                          leadingIconWidget: UserAvatarWidget(
+                          leadingIconWidget: UserAvatarWidget.suggestion(
                             user,
                             type: AvatarType.medium,
-                            currentUserID: Configuration.instance.getUserID()!,
                           ),
                           leadingIconSize: 24,
                           menuItemColor: Colors.transparent,
@@ -292,46 +291,35 @@ class _AddContactSheetState extends State<AddContactSheet> {
     await showVerifyIdentitySheet(context, self: false, email: emailToAdd);
   }
 
-  List<User> _getSuggestedUser() {
-    final List<User> suggestedUsers = [];
-    final Set<String> existingEmails = {};
+  List<UserSuggestion> _getSuggestedUser() {
     final int ownerID = Configuration.instance.getUserID()!;
-    existingEmails.add(Configuration.instance.getEmail()!);
+    final suggestedUsers = <UserSuggestion>[];
+    final existingEmails = <String>{Configuration.instance.getEmail()!};
+
+    void add(String email, {int? userID}) {
+      if (email.isNotEmpty && existingEmails.add(email)) {
+        suggestedUsers.add(UserSuggestion(email, userID: userID));
+      }
+    }
 
     for (final contact in widget.emergencyInfo.othersEmergencyContact) {
-      if (!existingEmails.contains(contact.user.email)) {
-        existingEmails.add(contact.user.email);
-        suggestedUsers.add(contact.user);
-      }
+      add(contact.user.email, userID: contact.user.id);
     }
 
     for (final c in CollectionsService.instance.getActiveCollections()) {
       if (c.owner.id == ownerID) {
         for (final User u in c.sharees) {
-          if (u.id != null &&
-              u.email.isNotEmpty &&
-              !existingEmails.contains(u.email)) {
-            existingEmails.add(u.email);
-            suggestedUsers.add(u);
-          }
+          add(u.email, userID: u.id);
         }
-      } else if (c.owner.id != null &&
-          c.owner.email.isNotEmpty &&
-          !existingEmails.contains(c.owner.email)) {
-        existingEmails.add(c.owner.email);
-        suggestedUsers.add(c.owner);
+      } else {
+        add(c.owner.email, userID: c.owner.id);
       }
     }
 
-    final cachedUserDetails = UserService.instance.getCachedUserDetails();
-    if (cachedUserDetails != null &&
-        (cachedUserDetails.familyData?.members?.isNotEmpty ?? false)) {
-      for (final member in cachedUserDetails.familyData!.members!) {
-        if (!existingEmails.contains(member.email)) {
-          existingEmails.add(member.email);
-          suggestedUsers.add(User(email: member.email));
-        }
-      }
+    final familyMembers =
+        UserService.instance.getCachedUserDetails()?.familyData?.members ?? [];
+    for (final member in familyMembers) {
+      add(member.email, userID: member.userID);
     }
     if (_textController.text.trim().isNotEmpty) {
       suggestedUsers.removeWhere(

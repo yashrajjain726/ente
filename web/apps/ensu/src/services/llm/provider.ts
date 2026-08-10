@@ -13,7 +13,6 @@ const DEFAULT_WEB_CONTEXT_SIZE = 4096;
 const DEFAULT_TAURI_CONTEXT_SIZE = 12000;
 const DEFAULT_GENERATION_MAX_TOKENS = 8_192;
 const OVERFLOW_SAFETY_TOKENS = 256;
-const MIN_DESKTOP_DEFAULT_MEMORY_BYTES = 16 * 1024 * 1024 * 1024;
 
 // These fallback values must stay in sync with rust/crates/ensu/src/config.rs.
 export const DEFAULT_MODEL: ModelInfo = {
@@ -53,15 +52,10 @@ interface ConfigModelPreset {
     mmprojSha256?: string | null;
 }
 
-interface ConfigDefaults {
-    mobileSystemPromptBody: string;
-    desktopSystemPromptBody: string;
-    systemPromptDatePlaceholder: string;
-    sessionSummarySystemPrompt: string;
-    mobileDefaultModel: ConfigModelPreset;
-    mobileModelPresets: ConfigModelPreset[];
-    desktopDefaultModel: ConfigModelPreset;
-    desktopModelPresets: ConfigModelPreset[];
+interface ResolvedModelPolicy {
+    defaultModel: ConfigModelPreset;
+    visibleModels: ConfigModelPreset[];
+    allowedPreferredModels: ConfigModelPreset[];
 }
 
 interface TauriLlmModelDownloadProgress {
@@ -134,6 +128,11 @@ export const FALLBACK_DESKTOP_MODEL_PRESETS: ModelInfo[] = [
     ...FALLBACK_SHARED_MODEL_PRESETS,
 ];
 
+const MODEL_INFO_FALLBACKS = [
+    DESKTOP_DEFAULT_MODEL,
+    ...FALLBACK_DESKTOP_MODEL_PRESETS,
+];
+
 export class LlmProvider {
     private backend = createInferenceBackend({
         backend: "auto",
@@ -146,8 +145,7 @@ export class LlmProvider {
     private currentMmprojPath?: string;
     private currentContextKey?: string;
     private defaultModel = DEFAULT_MODEL;
-    private configDefaults?: ConfigDefaults;
-    private useDesktopRustDefaults = false;
+    private modelPolicy?: ResolvedModelPolicy;
 
     private downloadActive = false;
     private progressListeners = new Set<(progress: DownloadProgress) => void>();
@@ -180,19 +178,14 @@ export class LlmProvider {
         return this.defaultModel;
     }
 
-    public getConfigDefaults(): ConfigDefaults | undefined {
-        return this.configDefaults;
-    }
-
     public getResolvedModelPresets(): ResolvedModelPreset[] | undefined {
-        if (!this.configDefaults) {
+        const policy = this.modelPolicy;
+        if (!policy) {
             return undefined;
         }
-
-        const presets = this.useDesktopRustDefaults
-            ? this.configDefaults.desktopModelPresets
-            : this.configDefaults.mobileModelPresets;
-        return presets.map((preset) => ({ id: preset.id, name: preset.title }));
+        return policy.visibleModels
+            .filter((preset) => preset.id !== policy.defaultModel.id)
+            .map((preset) => ({ id: preset.id, name: preset.title }));
     }
 
     public getBackendKind() {
@@ -465,7 +458,7 @@ export class LlmProvider {
 
     private async resolveDefaultModelForDevice() {
         this.defaultModel = DEFAULT_MODEL;
-        this.useDesktopRustDefaults = false;
+        this.modelPolicy = undefined;
 
         if (this.backend.kind !== "tauri") {
             return;
@@ -481,37 +474,11 @@ export class LlmProvider {
             const platform = info.platform?.toLowerCase();
             const totalMemoryBytes = info.totalMemoryBytes ?? 0;
 
-            this.useDesktopRustDefaults =
-                totalMemoryBytes >= MIN_DESKTOP_DEFAULT_MEMORY_BYTES;
-
-            if (this.useDesktopRustDefaults) {
-                this.defaultModel = DESKTOP_DEFAULT_MODEL;
-            }
-
-            // The Rust config_defaults payload has no size fields, so the web
-            // values above remain as display fallbacks.
-            try {
-                const defaults =
-                    await invoke<ConfigDefaults>("config_defaults");
-                const rustPreset = this.useDesktopRustDefaults
-                    ? defaults.desktopDefaultModel
-                    : defaults.mobileDefaultModel;
-                this.defaultModel = {
-                    ...this.defaultModel,
-                    id: rustPreset.id,
-                    name: rustPreset.title,
-                    url: rustPreset.url,
-                    sha256: rustPreset.sha256,
-                    mmprojUrl: rustPreset.mmprojUrl ?? undefined,
-                    mmprojSha256: rustPreset.mmprojSha256 ?? undefined,
-                };
-                this.configDefaults = defaults;
-            } catch (defaultsError) {
-                log.warn(
-                    "Failed to fetch ensu defaults from Rust",
-                    defaultsError,
-                );
-            }
+            this.modelPolicy = await invoke<ResolvedModelPolicy>(
+                "desktop_model_policy",
+                { totalMemoryBytes: info.totalMemoryBytes },
+            );
+            this.defaultModel = this.modelInfo(this.modelPolicy.defaultModel);
 
             log.info("LLM default model resolved", {
                 platform,
@@ -524,40 +491,34 @@ export class LlmProvider {
     }
 
     private resolveTargetModel(settings: ModelSettings): ModelInfo {
-        const preset = this.resolveConfigPreset(settings.modelId);
-        if (preset) {
-            return {
-                id: preset.id,
-                name: preset.title,
-                url: preset.url,
-                sha256: preset.sha256,
-                mmprojUrl: preset.mmprojUrl ?? undefined,
-                mmprojSha256: preset.mmprojSha256 ?? undefined,
-            };
+        if (this.modelPolicy) {
+            const preset = settings.modelId
+                ? this.modelPolicy.allowedPreferredModels.find(
+                      (candidate) => candidate.id === settings.modelId,
+                  )
+                : undefined;
+            return preset ? this.modelInfo(preset) : this.defaultModel;
         }
-        if (settings.modelId && !this.configDefaults) {
-            const fallback = [
-                ...FALLBACK_DESKTOP_MODEL_PRESETS,
-                ...FALLBACK_MOBILE_MODEL_PRESETS,
-            ].find((preset) => preset.id === settings.modelId);
-            if (fallback) {
-                return fallback;
-            }
-        }
-        return this.defaultModel;
+        return (
+            FALLBACK_DESKTOP_MODEL_PRESETS.find(
+                (preset) => preset.id === settings.modelId,
+            ) ?? this.defaultModel
+        );
     }
 
-    private resolveConfigPreset(modelId: string | undefined) {
-        const defaults = this.configDefaults;
-        if (!defaults || !modelId) {
-            return undefined;
-        }
-        return [
-            defaults.mobileDefaultModel,
-            defaults.desktopDefaultModel,
-            ...defaults.mobileModelPresets,
-            ...defaults.desktopModelPresets,
-        ].find((preset) => preset.id == modelId);
+    private modelInfo(preset: ConfigModelPreset): ModelInfo {
+        const fallback = MODEL_INFO_FALLBACKS.find(
+            (candidate) => candidate.id === preset.id,
+        );
+        return {
+            ...fallback,
+            id: preset.id,
+            name: preset.title,
+            url: preset.url,
+            sha256: preset.sha256,
+            mmprojUrl: preset.mmprojUrl ?? undefined,
+            mmprojSha256: preset.mmprojSha256 ?? undefined,
+        };
     }
 
     private async modelStatus(modelId: string): Promise<TauriModelStatus> {

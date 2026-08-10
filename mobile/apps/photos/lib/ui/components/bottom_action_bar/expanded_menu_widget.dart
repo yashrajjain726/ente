@@ -1,6 +1,6 @@
+import 'package:ente_ui/components/divider_widget.dart';
 import 'package:flutter/material.dart';
 import 'package:photos/ui/components/blur_menu_item_widget.dart';
-import 'package:photos/ui/components/divider_widget.dart';
 
 class ExpandedMenuWidget extends StatelessWidget {
   final List<List<BlurMenuItemWidget>> items;

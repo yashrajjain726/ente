@@ -356,16 +356,12 @@ impl MlIndexingTestContext {
     }
 }
 
-/// A downloaded production model together with its content hash as pinned in
-/// the asset lock, for embedding into generated golden entries.
 #[allow(dead_code)]
 pub(crate) struct GoldenModelAsset {
     pub(crate) path: PathBuf,
     pub(crate) sha256: String,
 }
 
-/// Downloaded production model assets for the golden self-test tooling, with
-/// ONNX Runtime already initialized. Used by the ml_goldens developer tool only.
 #[allow(dead_code)]
 pub(crate) struct GoldenTestAssets {
     pub(crate) face_detection: GoldenModelAsset,
@@ -461,7 +457,6 @@ struct ModelAssets {
     face_detection: ModelAsset,
     face_embedding: ModelAsset,
     clip_image: ModelAsset,
-    // Used by the ml_goldens developer tool only.
     #[allow(dead_code)]
     clip_text: ModelAsset,
     #[allow(dead_code)]

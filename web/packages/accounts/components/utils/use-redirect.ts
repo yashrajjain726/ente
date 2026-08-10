@@ -11,5 +11,5 @@ export const useRedirectIfNeedsCredentials = (currentPageSlug: string) => {
             stashRedirect(currentPageSlug);
             void router.push("/");
         }
-    }, [router]);
+    }, [router, currentPageSlug]);
 };

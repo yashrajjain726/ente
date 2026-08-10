@@ -1,8 +1,4 @@
-"""Helpers shared by the parity report renderers.
-
-Stdlib-only: the renderers are invoked with the system `python3` by
-`run_ml_parity_tests.sh`.
-"""
+# This runs under system Python; keep it stdlib-only.
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone

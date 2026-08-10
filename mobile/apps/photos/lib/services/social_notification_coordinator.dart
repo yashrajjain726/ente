@@ -438,7 +438,6 @@ class SocialNotificationCoordinator {
       final ownerID = collection.owner.id;
       if (sharedAt == null ||
           sharedAt <= cutoffTime ||
-          ownerID == null ||
           hiddenCollectionIds.contains(collection.id)) {
         continue;
       }

@@ -2,13 +2,13 @@ import "dart:async";
 import "dart:io";
 
 import "package:ente_strings/ente_strings.dart";
+import "package:ente_ui/components/loading_widget.dart";
 import "package:flutter/material.dart";
 import "package:logging/logging.dart";
 import "package:media_kit/media_kit.dart";
 import "package:media_kit_video/media_kit_video.dart";
 import "package:photos/core/constants.dart";
 import "package:photos/core/event_bus.dart";
-import "package:photos/events/file_caption_updated_event.dart";
 import "package:photos/events/guest_view_event.dart";
 import "package:photos/events/pause_video_event.dart";
 import "package:photos/events/resume_video_event.dart";
@@ -25,7 +25,6 @@ import "package:photos/states/detail_page_state.dart";
 import "package:photos/theme/colors.dart";
 import "package:photos/theme/ente_theme.dart";
 import "package:photos/ui/actions/file/file_actions.dart";
-import "package:photos/ui/common/loading_widget.dart";
 import "package:photos/ui/notification/toast.dart";
 import "package:photos/ui/viewer/file/video_widget_media_kit_common.dart"
     as common;
@@ -74,8 +73,6 @@ class _VideoWidgetMediaKitState extends State<VideoWidgetMediaKit>
   bool _isGuestView = false;
   StreamSubscription<StreamSwitchedEvent>? _streamSwitchedSubscription;
   StreamSubscription<DownloadTask>? _downloadTaskSubscription;
-  late final StreamSubscription<FileCaptionUpdatedEvent>
-  _captionUpdatedSubscription;
   final _transformationController = TransformationController();
   bool _isZooming = false;
 
@@ -138,15 +135,6 @@ class _VideoWidgetMediaKitState extends State<VideoWidgetMediaKit>
       },
     );
 
-    _captionUpdatedSubscription = Bus.instance
-        .on<FileCaptionUpdatedEvent>()
-        .listen((event) {
-          if (event.fileGeneratedID == widget.file.generatedID) {
-            if (mounted) {
-              setState(() {});
-            }
-          }
-        });
     wakeLockService.updateWakeLock(
       enable: true,
       wakeLockFor: WakeLockFor.videoPlayback,
@@ -211,7 +199,6 @@ class _VideoWidgetMediaKitState extends State<VideoWidgetMediaKit>
       downloadManager.pause(widget.file.uploadedFileID!).ignore();
     }
     player.dispose();
-    _captionUpdatedSubscription.cancel();
     _transformationController.dispose();
     if (wakeLockService.shouldKeepAppAwakeAcrossSessions) {
       wakeLockService.updateWakeLock(

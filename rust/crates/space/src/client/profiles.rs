@@ -1,12 +1,4 @@
-//! Space profiles.
-//!
-//! A Space profile is an encrypted blob (display name, bio, and the like) plus
-//! optional avatar and cover assets, all keyed by the Space key for its
-//! version. These methods fetch the raw or decrypted profile and update it,
-//! re-using the cached owned-Space key via the spine in
-//! [`super`](super::AccountSpaceCtx).
-
-use super::{AccountSpaceCtx, decrypt_space_profile};
+use super::{AccountSpaceCtx, decrypt_space_profile, space_profile_without_payload};
 use crate::crypto::encrypt_secretbox_payload;
 use crate::error::{Result, SpaceError};
 use crate::models::DecryptedSpaceProfile;
@@ -65,6 +57,38 @@ impl AccountSpaceCtx {
             ))
         })?;
         decrypt_space_profile(&profile, &space_key)
+    }
+
+    pub async fn get_space_profile_for_display(
+        &self,
+        space_id: &str,
+        viewer_space_id: Option<&str>,
+        version: Option<i32>,
+    ) -> Result<DecryptedSpaceProfile> {
+        let profile = self
+            .get_space_profile_raw(space_id, viewer_space_id, version)
+            .await?;
+        let space_key = self
+            .resolve_space_key_for_version_for_viewer(
+                space_id,
+                viewer_space_id,
+                Some(profile.version),
+            )
+            .await?;
+        let space_key = space_key.ok_or_else(|| {
+            SpaceError::InvalidInput(format!(
+                "no key available for space {space_id} version {}",
+                profile.version
+            ))
+        })?;
+        match decrypt_space_profile(&profile, &space_key) {
+            Ok(decrypted) => Ok(decrypted),
+            Err(error) if error.is_content_error() => {
+                log::warn!("Space profile {space_id} fell back to public fields: {error}");
+                Ok(space_profile_without_payload(&profile))
+            }
+            Err(error) => Err(error),
+        }
     }
 
     pub async fn update_space_profile(

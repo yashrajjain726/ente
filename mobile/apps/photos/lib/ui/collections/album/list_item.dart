@@ -236,11 +236,10 @@ class AlbumListItemWidget extends StatelessWidget {
         key: const ValueKey("owner"),
         collection.owner,
         type: AvatarType.medium,
-        thumbnailView: true,
       );
     }
     if (collection.hasSharees) {
-      final sharees = collection.getSharees();
+      final sharees = collection.sharees;
       final int total = sharees.length;
       final int limit = total > 2 ? 1 : 2;
       final int displayCount = total.clamp(1, limit).toInt();

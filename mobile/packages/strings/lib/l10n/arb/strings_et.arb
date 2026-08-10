@@ -1,18 +1,70 @@
 {
+  "acceptTrustInvite": "Nõustu kutsega",
+  "account": "Kasutajakonto",
+  "accountCredentials": "Saladus",
+  "accountCredentialsDescription": "Säilita kasutajakonto autentimisandmed.",
+  "accountIsAlreadyConfigured": "Kasutajakonto on juba seadistatud.",
+  "accountOwnerPersonAppbarTitle": "{title} (mina)",
+  "@accountOwnerPersonAppbarTitle": {
+    "description": "Title of appbar for account owner person",
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "accountRecovery": "Kasutajakonto taastamine",
+  "accountSetupIncompleteCreateAccount": "Kasutajakonto seadistus on poolik. Selle lõpetamiseks loo kasutajakonto.",
+  "@accountSetupIncompleteCreateAccount": {
+    "description": "Error shown when account exists but signup is incomplete"
+  },
+  "actionNotSupportedOnFavouritesAlbum": "Tegevus pole lemmikute albumis toetatud",
+  "activeLinksWillShowUpHere": "Aktiivsed lingid saavad olema nähtavad siin",
   "activeSessions": "Aktiivsed sessioonid",
   "@activeSessions": {
     "description": "Title for active sessions page"
   },
+  "add": "Lisa",
+  "addAdmin": "Lisa peakasutaja",
+  "addANameAndPhoto": "Lisa nimi ja foto",
+  "addANewEmail": "Lisa uus e-posti aadress",
   "addCode": "Lisa kood",
   "addedAs": "Lisatud kui",
   "addLocation": "Lisa asukoht",
   "addLocationButton": "Lisa",
   "addMore": "Lisa veel",
+  "addName": "Lisa nimi",
+  "addNew": "Lisa uus",
+  "@addNew": {
+    "description": "Text to add a new item (location tag, album, caption etc)"
+  },
+  "addNewEmail": "Lisa uus e-posti aadress",
+  "addOnPageSubtitle": "Lisavõimaluste üksikasjad",
+  "addOns": "Lisavõimalused",
+  "addOnValidTill": "Sinu {storageAmount} lisapakett kehtib kuni {endDate}",
+  "@addOnValidTill": {
+    "placeholders": {
+      "endDate": {},
+      "storageAmount": {}
+    }
+  },
   "addTag": "Lisa silt",
+  "addToAlbum": "Lisa albumisse",
   "albumOwner": "Omanik",
   "@albumOwner": {
     "description": "Role of the album owner"
   },
+  "albums": "Albumid",
+  "albumsCount": "{count, plural, one{{count} album} other{{count} albumit}}",
+  "@albumsCount": {
+    "description": "Number of albums with pluralization",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "albumsOnDevicePermissionCta": "Luba ligipääs",
   "albumUpdated": "Albumit on uuendatud",
   "algorithm": "Algoritm",
   "all": "Kõik",
@@ -30,6 +82,10 @@
     "description": "Message showed as a title in a dialog which indicates the user that they need to scan biometric to continue. It is used on Android side. Maximum 60 characters."
   },
   "appleId": "Apple ID",
+  "appLockDescription": "Vali oma seadme vaikimisi lukustuvaate ning PIN-koodi või salasõnaga kaitstud kohandatud lukustusvaate vahel.",
+  "@appLockDescription": {
+    "description": "Description of app lock feature"
+  },
   "apply": "Rakenda",
   "areYouSureThatYouWantToLeaveTheFamily": "Kas oled kindel et soovid pere teenusepaketist lahkuda?",
   "areYouSureYouWantToLogout": "Kas oled kindel, et soovid välja logida?",
@@ -49,11 +105,16 @@
   "authToChangeYourPassword": "Oma salasõna aadressi muutmiseks palun tuvasta end",
   "authToExportCodes": "Oma koodide eksportimiseks palun tuvasta end",
   "authToInitiateSignIn": "Varukoopia loomiseks vajaliku sisselogimise kontekstis palun tuvasta end.",
+  "authToSetBackupPassword": "Varukoopia salasõna sisestamiseks pead end tuvastama",
+  "authToUpdateBackupPassword": "Varukoopia salasõna uuendamiseks pead end tuvastama",
   "authToViewSecrets": "Oma salakoodide vaatamiseks palun tuvasta end",
   "@authToViewSecrets": {
     "description": "Message prompting authentication to view secrets"
   },
   "authToViewYourActiveSessions": "Oma aktiivsete sessioonide vaatamiseks palun tuvasta end",
+  "backupPasswordCleared": "Varukoopia salasõna on eemaldatud",
+  "backupPasswordHint": "Sinu varukoopia krüptitakse selle salasõnaga.",
+  "backupSettings": "Varundamise seadistused",
   "blog": "Blogi",
   "bothIssuerAndAccountCanNotBeEmpty": "Nii kasutajakonto kui väljaandja ei tohi tühjaks jääda",
   "changePassword": "Muuda salasõna",
@@ -63,6 +124,7 @@
   },
   "changePermissionsQuestion": "Muuta õiguseid?",
   "checkForUpdates": "Kontrolli uuendusi",
+  "clearBackupPassword": "Eemalda varukoopia salasõna",
   "close": "Sulge",
   "codeIssuerHint": "Väljaandja",
   "collaborator": "Kaastööline",
@@ -72,6 +134,10 @@
   "confirm": "Kinnita",
   "@confirm": {
     "description": "Confirm button label"
+  },
+  "confirmPassword": "Korda/kinnita salasõna",
+  "@confirmPassword": {
+    "description": "Confirm password field label"
   },
   "confirmRecoveryKey": "Kinnita oma taastevõti uuesti",
   "confirmYourRecoveryKey": "Kinnita oma taastevõti uuesti",
@@ -210,6 +276,10 @@
   "@endpointUpdatedMessage": {
     "description": "Success message when endpoint is updated"
   },
+  "enterAppLockPassword": "Sisesta rakenduse lukustuse salasõna",
+  "@enterAppLockPassword": {
+    "description": "Enter App lock password prompt for lock screen"
+  },
   "enterCode": "Sisesta kood",
   "enterCodeHint": "Sisesta oma autentimisrakendusest\n6-numbriline kood",
   "@enterCodeHint": {
@@ -225,6 +295,11 @@
   "@enterNewPasswordToEncrypt": {
     "description": "Prompt to enter new password for encryption"
   },
+  "enterPassword": "Sisesta salasõna",
+  "@enterPassword": {
+    "description": "Enter password field label"
+  },
+  "enterPasswordToAegisVault": "Sisesta Aegise salasõnahoidla salasõna",
   "enterPasswordToDecrypt2FASBackup": "Sisesta salasõna 2FAS-i varukoopia dekrüptimiseks",
   "enterPasswordToDecryptAndOTP": "Sisesta salasõna andOTP varukoopia dekrüptimiseks",
   "enterPasswordToEncrypt": "Palun sisesta salasõna, mida me kasutame sinu andmete krüptimiseks",
@@ -235,8 +310,12 @@
   "@enterRecoveryKeyHint": {
     "description": "Hint for entering recovery key"
   },
+  "enterThePasswordFor": "Sisesta selel jaoks salasõna",
+  "@enterThePasswordFor": {
+    "description": "Text shown before email on login password verification page"
+  },
   "enterValidEmail": "Palun sisesta korrektne e-posti aadress.",
-  "enterYourPassword": "Sisesta oma parool",
+  "enterYourPassword": "Sisesta oma salasõna",
   "enterYourPasswordHint": "Sisesta oma salasõna",
   "@enterYourPasswordHint": {
     "description": "Hint for password field"
@@ -267,6 +346,16 @@
   "featureBackupCodes": "Läbivalt krüptitud varundus ja sünkroonimine",
   "featureOpenSource": "Avatud lähtekoodiga ja\nauditeeritud turvaekspertide poolt",
   "featureSearchEtc": "Otsing, sildid, jagamine,\njärgmine kood ja paljugi veel",
+  "fieldCopiedToClipboard": "{fieldName} on kopeeritud lõikelauale",
+  "@fieldCopiedToClipboard": {
+    "description": "Message when a field is copied to clipboard",
+    "placeholders": {
+      "fieldName": {
+        "type": "String",
+        "example": "Password"
+      }
+    }
+  },
   "flip": "Pööra ümber",
   "focusOnSearchBar": "Rakenduse käivitamisel säti fookus otsingule",
   "forgotPassword": "Unustasin salasõna",
@@ -285,6 +374,10 @@
   },
   "getStarted": "Alusta",
   "googlePlayId": "Google Play ID",
+  "hearUsWhereOptionalTitle": "Kust sa Entest kuulsid? (kui tahad lisada)",
+  "@hearUsWhereOptionalTitle": {
+    "description": "Title asking how user heard about Ente"
+  },
   "help": "Abiinfo",
   "hidden": "Peidetud",
   "hide": "Peida",
@@ -324,10 +417,15 @@
     "description": "Error message when code is incorrect"
   },
   "incorrectDetails": "Viga üksikasjades",
+  "incorrectPasswordTitle": "Vale salasõna",
+  "@incorrectPasswordTitle": {
+    "description": "Title for incorrect password error"
+  },
   "incorrectRecoveryKey": "Vigane taasetvõti",
   "@incorrectRecoveryKey": {
     "description": "Error message when recovery key is incorrect"
   },
+  "informationTypesDesc": "Dokumendid, märkmed, kaardid, salasõnad ja muud tüüpi objektid",
   "insecureDevice": "Ebaturvaline seade",
   "@insecureDevice": {
     "description": "Insecure device warning title"
@@ -364,6 +462,7 @@
   "lastUpdated": "Viimati uuendatud",
   "leaveFamily": "Lahku perekonnast",
   "leaveSharedAlbum": "Lahkuda jagatud albumist?",
+  "legacyPageDesc2": "Usaldusväärsed kontaktid saavad algatada kasutajakonto taastamise ning kui neid ei blokeerita 30 päeva jooksul, saavad nad sinu salasõna taastada ja sellega ka ligipääsu sinu kasutajakontole.",
   "linkDeviceLimit": "Seadme limit",
   "linkEnabled": "Sees",
   "linkExpired": "Aegunud",
@@ -416,6 +515,10 @@
   "@noDeviceLimit": {
     "description": "Text to indicate that there is limit on number of devices"
   },
+  "noRecoveryKeyNoDecryption": "Meie läbiva krüptimise protokolli olemusest tulenevalt ei ole teie andmeid võimalik dekrüptida ilma sinu salasõnata või taastamisvõtmeta",
+  "@noRecoveryKeyNoDecryption": {
+    "description": "Explanation that data cannot be decrypted without password or recovery key"
+  },
   "noRecoveryKeyTitle": "Sul pole taastevõtit?",
   "@noRecoveryKeyTitle": {
     "description": "No recovery key title"
@@ -434,18 +537,29 @@
       }
     }
   },
+  "offlineHomeSignupBannerAction": "Varunda kohe",
   "offlineModeWarning": "Sa oled otsustanud jätkata ilma varundust kasutamata. Tagamaks, et su andmed ei kao, plaun tee varukoopiaid käsitsi.",
+  "offlineSettingsBannerTitle": "Meie ei näe sinu fotosid. Ja seda mitte kunagi.",
   "oops": "Oih",
   "@oops": {
     "description": "Oops error title"
   },
   "oopsSomethingWentWrong": "Oih, midagi läks valesti",
+  "openSettings": "Ava seadistused",
+  "password": "Salasõna",
+  "@password": {
+    "description": "Password field label"
+  },
   "passwordChangedSuccessfully": "Salasõna muutmine õnnestus",
   "@passwordChangedSuccessfully": {
     "description": "Password changed successfully message"
   },
   "passwordEmptyError": "Salasõna väli ei saa olla tühi",
   "passwordForDecryptingExport": "Salasõna eksporditud andmete dekrüptimiseks",
+  "passwordHint": "Salasõna",
+  "passwordLock": "Salasõna lukustus",
+  "passwordsDontMatch": "Salasõnad ei klapi",
+  "passwordsMatch": "Salasõnad on samad",
   "passwordStrength": "Salasõna tugevus: {passwordStrengthValue}",
   "@passwordStrength": {
     "description": "Text to indicate the password strength",
@@ -458,6 +572,11 @@
     }
   },
   "passwordToEncryptExport": "Salasõna eksporditud andmete krüptimiseks",
+  "passwordTooShort": "Salasõna peab olema vähemalt 8 tähemärgi pikkune.",
+  "passwordWarning": "Seda salasõna me ei salvesta, seega, kui peaksid ta unustama, siis <underline>me ei saa sinu andmeid dekrüptida</underline>",
+  "@passwordWarning": {
+    "description": "Warning about password storage"
+  },
   "pendingSyncs": "Hoiatus",
   "pendingSyncsWarningBody": "Mõned sinu koodid on varundamata.\n\nEnne väljalogimist palun kontrolli, et sa oleksid nad varundanud.",
   "period": "Ajavahemik",
@@ -470,6 +589,7 @@
   "pinText": "Tõsta esile",
   "plainHTML": "Tavaline HTML",
   "plainText": "Vormindamata tekst",
+  "pleaseCheckPasswordAndTryAgain": "Palun kontrolli, kas sinu salasõna on õige ja proovi uuesti.",
   "pleaseLoginAgain": "Palun logi uuesti sisse",
   "pleaseSendTheLogsTo": "Palun saada logid e-posti aadressile \n{toEmail}",
   "@pleaseSendTheLogsTo": {
@@ -522,6 +642,20 @@
     "description": "Recovery key importance explanation"
   },
   "recoveryKeyVerified": "Taastevõti on kontrollitud",
+  "recoveryKeyVerifyReason": "Sinu taastevõti on ainus viis oma fotodele ligipääsu taastamiseks olukorras, kus unustad oma salasõna. Taastevõti asub menüüs „Seadistused“ > „Kasutajakonto“.\n\nPalun sisesta siia oma taastevõti, et veenduda, et oled selle õigesti salvestanud.",
+  "recoveryReady": "Sa võid taastada ligipääsu oma {email} aadressiga seotud kasutajakontole, kuid seadistad uue salasõna.",
+  "@recoveryReady": {
+    "placeholders": {
+      "email": {
+        "type": "String",
+        "example": "me@example.com"
+      }
+    }
+  },
+  "recreatePasswordBody": "Praegune seade ei ole piisavalt võimas, et sinu salasõna kinnitada, kuid saame selle uuesti genereerida nii, et see töötaks kõikides seadmetes.\n\nPalun logi sisse oma taastevõtme abil ja genereeri oma salasõna uuesti (soovi korral võid kasutada sama salasõna uuesti).",
+  "@recreatePasswordBody": {
+    "description": "Body text for recreate password dialog"
+  },
   "recreatePasswordTitle": "Loo salasõna uuesti",
   "@recreatePasswordTitle": {
     "description": "Title for recreate password dialog"
@@ -575,6 +709,7 @@
   "scanThisBarcodeWithnyourAuthenticatorApp": "Skaneeri seda QR koodi\noma autentimisrakendusega",
   "search": "Otsi",
   "searchHint": "Otsi...",
+  "searchSettings": "Otsinguseadistused",
   "secret": "Saladus",
   "secretCanNotBeEmpty": "Saladus ei tohi jääda tühjaks",
   "security": "Turvalisus",
@@ -595,7 +730,8 @@
   "@sessionExpired": {
     "description": "Error message when session has expired"
   },
-  "setAPassword": "Määra parool",
+  "setAPassword": "Sisesta salasõna",
+  "setBackupPassword": "Seadista varukoopia salasõna",
   "setCover": "Määra kaanepilt",
   "@setCover": {
     "description": "Text to set cover photo for an album"
@@ -624,6 +760,10 @@
   "showQRAuthMessage": "QR-koodi näitamiseks tuvasta end",
   "sigInBackupReminder": "Peale sisselogimist varundab Ente koode automaatselt.\n\nTäiendava varukoopia mõttes soovitame, et ka ekspordid oma koode.",
   "signInToBackup": "Oma koodide varindamiseks logi sisse",
+  "signOutOtherBody": "Kui arvad, et sinu salasõna on võõrastele teada, siis sa võid sundkorras kõik oma muud seadmed välja logida.",
+  "@signOutOtherBody": {
+    "description": "Sign out other devices explanation"
+  },
   "signUp": "Loo konto ja liitu",
   "singIn": "Logi sisse",
   "skip": "Jäta vahele",
@@ -652,6 +792,7 @@
   "@storageBreakupYou": {
     "description": "Label to indicate how much storage you are using when you are part of a family plan"
   },
+  "strongPassword": "Tugev salasõna",
   "strongStrength": "Tugev",
   "@strongStrength": {
     "description": "Strong password strength label"
@@ -730,6 +871,8 @@
   },
   "unpinText": "Lõpeta esiletõstmine",
   "updateAvailable": "Saadaval on uuendus",
+  "updateBackupPassword": "Uuenda varukoopia salasõna",
+  "updateSettings": "Uuenda seadistusi",
   "usedSpace": "Kasutatud kettaruum",
   "useOffline": "Kasuta ilma varunduseta",
   "useRecoveryKey": "Kasuta taastevõtit",
@@ -749,7 +892,12 @@
     "description": "Verify email title"
   },
   "verifyingRecoveryKey": "Kontrollin taastevõtit...",
+  "verifyPassword": "Korda salasõna",
+  "@verifyPassword": {
+    "description": "Verify password button label"
+  },
   "viewActiveSessions": "Vaata aktiivseid sessioone",
+  "viewAddOnButton": "Vaata lisavõimalusi",
   "viewer": "Vaataja",
   "viewLogsAction": "Vaata logisid",
   "viewRecoveryKey": "Vaata taastevõtit",
@@ -774,5 +922,6 @@
   "yourVerificationCodeHasExpired": "Sinu verifitseerimiskood on aegunud",
   "@yourVerificationCodeHasExpired": {
     "description": "Error message when verification code has expired"
-  }
+  },
+  "cameraPermissionSettings": "Ligipääs kaamerale on keelatud. Jätkamiseks lülita ta seadistustest sisse."
 }

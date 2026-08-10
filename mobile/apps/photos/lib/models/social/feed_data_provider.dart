@@ -1,14 +1,17 @@
 import "package:flutter/foundation.dart";
 import "package:logging/logging.dart";
 import "package:photos/core/configuration.dart";
+import "package:photos/core/event_bus.dart";
 import "package:photos/db/files_db.dart";
 import "package:photos/db/social_db.dart";
+import "package:photos/events/user_logged_out_event.dart";
 import "package:photos/models/collection/collection.dart";
 import "package:photos/models/file/extensions/file_props.dart";
 import "package:photos/models/file/file.dart";
 import "package:photos/models/file/file_type.dart";
 import "package:photos/models/social/comment.dart";
 import "package:photos/models/social/feed_item.dart";
+import "package:photos/models/social/feed_items_cache.dart";
 import "package:photos/models/social/reaction.dart";
 import "package:photos/service_locator.dart";
 import "package:photos/services/collections_service.dart";
@@ -20,7 +23,10 @@ import "package:photos/services/social_sync_service.dart";
 /// Aggregates social activity (comments, reactions) into feed items
 /// for display in the activity feed.
 class FeedDataProvider {
-  FeedDataProvider._();
+  FeedDataProvider._() {
+    Bus.instance.on<UserLoggedOutEvent>().listen((_) => _cache.clear());
+  }
+
   static final instance = FeedDataProvider._();
 
   final _logger = Logger('FeedDataProvider');
@@ -31,12 +37,7 @@ class FeedDataProvider {
   static const _kSharedPhotoFetchMaxRows =
       _kSharedPhotoFetchPageSize * _kSharedPhotoFetchMaxPages;
   static const _kSharedCollectionPreviewFileLimit = 30;
-  static const _kFeedItemsCacheTtlMs = 3000;
-  Future<List<FeedItem>>? _inFlightFeedItemsFuture;
-  String? _inFlightFeedItemsKey;
-  List<FeedItem>? _lastFeedItems;
-  String? _lastFeedItemsKey;
-  int? _lastFeedItemsAtMs;
+  final _cache = FeedItemsCache(ttl: const Duration(seconds: 3));
 
   /// Gets feed items aggregated from local database.
   ///
@@ -48,55 +49,38 @@ class FeedDataProvider {
     bool includeSharedPhotos = true,
     bool verifyFileExistence = true,
   }) async {
-    final requestKey = '$limit|$includeSharedPhotos|$verifyFileExistence';
-    final nowMs = DateTime.now().millisecondsSinceEpoch;
-
-    if (_inFlightFeedItemsFuture != null &&
-        _inFlightFeedItemsKey == requestKey) {
-      return _inFlightFeedItemsFuture!;
-    }
-
-    final lastAtMs = _lastFeedItemsAtMs;
-    if (_lastFeedItems != null &&
-        _lastFeedItemsKey == requestKey &&
-        lastAtMs != null &&
-        (nowMs - lastAtMs) <= _kFeedItemsCacheTtlMs) {
-      return List<FeedItem>.from(_lastFeedItems!);
-    }
-
-    final future = _computeFeedItems(
-      limit: limit,
-      includeSharedPhotos: includeSharedPhotos,
-      verifyFileExistence: verifyFileExistence,
-    );
-    _inFlightFeedItemsFuture = future;
-    _inFlightFeedItemsKey = requestKey;
-
-    try {
-      final items = await future;
-      _lastFeedItems = List<FeedItem>.from(items);
-      _lastFeedItemsKey = requestKey;
-      _lastFeedItemsAtMs = DateTime.now().millisecondsSinceEpoch;
-      return items;
-    } finally {
-      if (identical(_inFlightFeedItemsFuture, future)) {
-        _inFlightFeedItemsFuture = null;
-        _inFlightFeedItemsKey = null;
-      }
-    }
-  }
-
-  Future<List<FeedItem>> _computeFeedItems({
-    required int limit,
-    required bool includeSharedPhotos,
-    required bool verifyFileExistence,
-  }) async {
     final userID = Configuration.instance.getUserID();
     if (userID == null) {
       _logger.warning('No user ID found, returning empty feed');
       return [];
     }
+    final requestKey = (
+      userID: userID,
+      limit: limit,
+      includeSharedPhotos: includeSharedPhotos,
+      verifyFileExistence: verifyFileExistence,
+    );
+    final items = await _cache.getOrCompute(
+      requestKey,
+      () => _computeFeedItems(
+        userID: userID,
+        limit: limit,
+        includeSharedPhotos: includeSharedPhotos,
+        verifyFileExistence: verifyFileExistence,
+      ),
+    );
+    if (Configuration.instance.getUserID() != userID) {
+      return [];
+    }
+    return items;
+  }
 
+  Future<List<FeedItem>> _computeFeedItems({
+    required int userID,
+    required int limit,
+    required bool includeSharedPhotos,
+    required bool verifyFileExistence,
+  }) async {
     final feedItems = <FeedItem>[];
 
     // Fetch all activity types in parallel
@@ -626,9 +610,6 @@ class FeedDataProvider {
         .where((collection) => (collection.sharedAt ?? 0) > 0)
         .map((collection) {
           final ownerID = collection.owner.id;
-          if (ownerID == null) {
-            return null;
-          }
           final sharedFileIDs = initialSharedFileIDsByCollection[collection.id];
           return FeedItem(
             type: FeedItemType.sharedCollection,
@@ -644,7 +625,6 @@ class FeedDataProvider {
             collectionName: collectionNames[collection.id],
           );
         })
-        .whereType<FeedItem>()
         .toList();
   }
 

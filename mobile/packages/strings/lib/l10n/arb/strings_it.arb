@@ -1,5 +1,7 @@
 {
+  "about": "Info",
   "acceptTrustInvite": "Accetta l'invito",
+  "account": "Account",
   "accountCredentials": "Segreto",
   "accountCredentialsDescription": "Conserva le credenziali degli account.",
   "accountIsAlreadyConfigured": "L'account è già configurato.",
@@ -12,6 +14,7 @@
       }
     }
   },
+  "accountRecovery": "Recupero account",
   "accountSetupIncompleteCreateAccount": "Creazione dell'account incompleta. Crea un account per completare la configurazione.",
   "@accountSetupIncompleteCreateAccount": {
     "description": "Error shown when account exists but signup is incomplete"
@@ -166,6 +169,7 @@
     "description": "Action label to add selected files to an existing person."
   },
   "addTrustedContact": "Aggiungi contatto fidato",
+  "addTrustedPerson": "Aggiungi una persona fidata",
   "addUpTo5MembersFree": "Aggiungi fino a 5 membri gratis",
   "addViewer": "Aggiungi in sola lettura",
   "addViewers": "{count, plural, =0{Aggiungi visualizzatore} one{Aggiungi visualizzatore} other{Aggiungi visualizzatori}}\n",
@@ -203,7 +207,10 @@
   "after1Month": "Dopo un mese",
   "after1Week": "Dopo una settimana",
   "after1Year": "Dopo un anno",
+  "albumDescriptionHint": "Inserisci una descrizione per questo album",
+  "albumEditsWillNotBeSaved": "Le tue modifiche a questo album non verranno salvate.",
   "albumLayout": "Disposizione album",
+  "albumName": "Nome album",
   "albumOwner": "Proprietario",
   "@albumOwner": {
     "description": "Role of the album owner"
@@ -297,6 +304,10 @@
   },
   "aNewVersionOfEnteIsAvailable": "Una nuova versione di Ente è disponibile.",
   "aNewVersionOfEnteLockerIsAvailable": "Una nuova versione di Ente Locker",
+  "anythingElse": "Altro?",
+  "@anythingElse": {
+    "description": "Label for optional account deletion feedback"
+  },
   "appearance": "Aspetto",
   "appIcon": "Icona dell'app",
   "appleId": "Apple ID",
@@ -350,6 +361,10 @@
   "areYouSureYouWantToExit": "Vuoi davvero uscire?",
   "areYouSureYouWantToIgnoreThesePersons": "Vuoi davvero ignorare queste persone?",
   "areYouSureYouWantToIgnoreThisPerson": "Vuoi davvero ignorare questa persona?",
+  "areYouSureYouWantToLogout": "Vuoi davvero disconnetterti?",
+  "@areYouSureYouWantToLogout": {
+    "description": "Confirmation message before logout"
+  },
   "areYouSureYouWantToRenew": "Vuoi davvero rinnovare?",
   "areYouSureYouWantToResetThisPerson": "Vuoi davvero resettare questa persona?",
   "areYouSureYouWantToShowThesePeopleInPeopleSectionAgain": "Sei sicuro di voler mostrare nuovamente queste persone nella sezione Persone?",
@@ -361,10 +376,15 @@
   "attachLogsHelper": "Aiuta a diagnosticare il problema più velocemente",
   "authenticateGeneric": "Si prega di autenticarsi",
   "authenticating": "Autenticazione...",
+  "authenticationFailedPleaseTryAgain": "Autenticazione non riuscita, riprova",
+  "@authenticationFailedPleaseTryAgain": {
+    "description": "Error message when authentication fails"
+  },
   "authenticationSuccessful": "Autenticazione riuscita!",
   "@authenticationSuccessful": {
     "description": "Success message when authentication is successful"
   },
+  "authToChangeEmailVerificationSetting": "Autenticati per modificare la verifica email",
   "authToChangeLockscreenSetting": "Autenticati per modificare le impostazioni della schermata di blocco",
   "authToChangeYourEmail": "Autenticati per cambiare la tua email",
   "authToChangeYourPassword": "Autenticati per cambiare la tua password",
@@ -414,6 +434,7 @@
     }
   },
   "backingUpLastSevenDaysPhotos": "Backup delle foto degli ultimi 7 giorni",
+  "backup": "Backup",
   "backupAndSync": "Backup e sincronizzazione",
   "backupAndSyncDesc": "Backup automatico, stato di sincronizzazione e caricati",
   "backupCreated": "Backup creato!",
@@ -952,7 +973,6 @@
   "deleteSharedAlbumDialogBody": "L'album verrà eliminato per tutti\n\nPerderai l'accesso alle foto condivise in questo album che sono di proprietà di altri",
   "deleteShareLinkConfirmation": "Le persone con questo link non potranno piu accedere all'elemento.",
   "deleteSuggestions": "Suggerimenti di cancellazione",
-  "deleteSuggestionsDesc": "Verifica i file che sono stati suggeriti per la cancellazione.",
   "deleteSuggestionSent": "Suggerimento di eliminazione inviato",
   "deleteTagMessage": "Sei sicuro di voler eliminare questo tag? Questa azione è irreversibile.",
   "deleteTagTitle": "Eliminare il tag?",
@@ -1159,10 +1179,25 @@
   "editTag": "Modifica tag",
   "editTime": "Modifica orario",
   "eligible": "idoneo",
+  "email": "Email",
+  "@email": {
+    "description": "Email field label"
+  },
   "emailAddress": "Indirizzo email",
   "emailAlreadyRegistered": "Email già registrata.",
   "@emailAlreadyRegistered": {
     "description": "Error message when email is already registered"
+  },
+  "emailChangedTo": "Email modificata in {newEmail}",
+  "@emailChangedTo": {
+    "description": "Message when email has been changed",
+    "placeholders": {
+      "newEmail": {
+        "description": "The new email address",
+        "type": "String",
+        "example": "new@example.com"
+      }
+    }
   },
   "emailHint": "Inserisci il tuo indirizzo email",
   "emailNeedsEnteAccountForFamily": "{email} non ha un account Ente.\n\nInvitali e aggiungili alla tua famiglia quando avranno creato un account su Ente.",
@@ -1200,6 +1235,10 @@
   },
   "emailVerificationEnableWarning": "Se memorizzate il 2FA per accedere alla vostra email con noi, l'attivazione della verifica dell'email potrebbe provocare dei problemi. Se siete rimasti bloccati fuori da un servizio, potreste non essere in grado di accedere anche all'altro.",
   "emailVerificationToggle": "Verifica email",
+  "emailYourLogs": "Invia un'email con i tuoi log",
+  "@emailYourLogs": {
+    "description": "Title for emailing logs dialog"
+  },
   "embracingThem": "Abbracciando {name}",
   "@embracingThem": {
     "placeholders": {
@@ -1230,6 +1269,10 @@
   "ente": "Ente",
   "enteLocker": "Ente Locker",
   "@enteLocker": {
+    "description": "Product name"
+  },
+  "entePhotos": "Ente Photos",
+  "@entePhotos": {
     "description": "Product name"
   },
   "enterAlbumName": "Inserisci il nome dell'album",
@@ -1597,11 +1640,6 @@
       "count": {}
     }
   },
-  "freeUpDeviceSpaceDesc": "Risparmia spazio sul dispositivo eliminando file di cui è già stato eseguito il backup.",
-  "freeUpDeviceSpaceDescICloud": "I file negli album condivisi di iCloud non possono essere eliminati.",
-  "@freeUpDeviceSpaceDescICloud": {
-    "description": "Here 'cleared' means 'deleted' from the device"
-  },
   "freeUpSpace": "Libera spazio",
   "gallery": "Galleria",
   "galleryMemoryLimitInfo": "Fino a 1000 ricordi mostrati nella galleria",
@@ -1687,6 +1725,11 @@
   "ignore": "Ignora",
   "ignored": "ignorato",
   "ignorePerson": "Ignora persona",
+  "imageEditorBrightness": "Luminosità",
+  "imageEditorContrast": "Contrasto",
+  "imageEditorExposure": "Esposizione",
+  "imageEditorFade": "Dissolvenza",
+  "imageEditorHue": "Tonalità",
   "imageNotAnalyzed": "Immagine non analizzata",
   "immediately": "Immediatamente",
   "@immediately": {
@@ -1729,6 +1772,10 @@
   },
   "importSuccessTitle": "Evviva!",
   "importTypeEnteEncrypted": "Esportazione Ente criptata",
+  "incorrectCode": "Codice errato",
+  "@incorrectCode": {
+    "description": "Error message when code is incorrect"
+  },
   "incorrectDetails": "Dettagli errati",
   "incorrectPasswordTitle": "Password sbagliata",
   "@incorrectPasswordTitle": {
@@ -1741,6 +1788,7 @@
   "incorrectRecoveryKeyBody": "Il codice che hai inserito non è corretto",
   "incorrectRecoveryKeyTitle": "Chiave di recupero errata",
   "indexingPausedStatusDescription": "L'indicizzazione è in pausa. Riprenderà automaticamente quando il dispositivo è pronto. Il dispositivo è considerato pronto quando il suo livello di batteria, la salute della batteria e lo stato termico rientreranno nel intervallo sano.",
+  "info": "Info",
   "informationDescription": "Salva e condividi informazioni con i tuoi cari.",
   "informationTypes": "Tipi d'informazioni",
   "informationTypesDesc": "Documenti, note, carte, password e altri tipi di elementi",
@@ -1828,7 +1876,7 @@
   "kiloMeterUnit": "km",
   "lakeside": "Calma in riva al lago",
   "language": "Lingua",
-  "lastMonth": "Ultimo mese",
+  "lastMonth": "Mese scorso",
   "lastUpdated": "Ultimo aggiornamento",
   "lastWeek": "Settimana scorsa",
   "lastYearsTrip": "Viaggio dello scorso anno",
@@ -1840,6 +1888,7 @@
   "leaveAlbum": "Abbandona l'album",
   "leaveCollection": "Lascia raccolta",
   "leaveCollectionSuccessfully": "Hai lasciato la raccolta con successo",
+  "leaveFamily": "Abbandona la famiglia",
   "leaveFamilyPlan": "Abbandona il piano famiglia",
   "@leaveFamilyPlan": {
     "description": "Button label for leaving family plan",
@@ -2006,7 +2055,6 @@
   },
   "manage": "Gestisci",
   "manageDeviceStorage": "Gestisci cache dispositivo",
-  "manageDeviceStorageDesc": "Verifica e svuota la memoria cache locale.",
   "manageFamily": "Gestisci piano famiglia",
   "manageLink": "Gestisci link",
   "manageParticipants": "Gestisci",
@@ -2602,6 +2650,16 @@
   },
   "receiveRemindersOnBirthdays": "Promemoria quando è il compleanno di qualcuno",
   "recent": "Recenti",
+  "reclaimSpace": "Recupera {sizeInMBorGB}",
+  "@reclaimSpace": {
+    "description": "Heading that shows how much device storage can be reclaimed",
+    "placeholders": {
+      "sizeInMBorGB": {
+        "example": "2.28 GB",
+        "type": "String"
+      }
+    }
+  },
   "recordLocation": "Luogo",
   "recordLocationHint": "Dove si trova questo oggetto?",
   "recordNameHint": "Nome dell'oggetto fisico",
@@ -2763,8 +2821,7 @@
     "description": "Description for remove contact confirmation dialog"
   },
   "removeContactPhoto": "Rimuovi foto contatto",
-  "removeDuplicates": "Rimuovi i doppioni",
-  "removeDuplicatesDesc": "Verifica e rimuovi i file che sono esattamente duplicati.",
+  "removeDuplicates": "Duplicati",
   "removeFromAlbum": "Rimuovi dall'album",
   "removeFromAlbumTitle": "Rimuovi dall'album?",
   "removeFromFamily": "Rimuovi dalla famiglia",
@@ -2967,6 +3024,7 @@
     "description": "Label for save button"
   },
   "saveAsAnotherPerson": "Salva come un'altra persona",
+  "saveChanges": "Salva modifiche",
   "saveChangesBeforeLeavingQuestion": "Salvare le modifiche prima di uscire?",
   "saveCode": "Salva il codice",
   "saveCollage": "Salva il collage",
@@ -2996,6 +3054,8 @@
   "scanACode": "Scansiona un codice",
   "scanAQrCode": "Scansiona un codice QR",
   "scanCode": "Scansiona codice",
+  "scannerTorchOff": "Spegni la torcia",
+  "scannerTorchOn": "Attiva la torcia",
   "scanThisBarcodeWithnyourAuthenticatorApp": "Scansione questo codice QR\ncon la tua app di autenticazione",
   "scheduleShare": "Programma condivisione",
   "search": "Cerca",
@@ -3101,6 +3161,7 @@
   "@selectAlbumToLikeVideo": {
     "description": "Instruction for liking video"
   },
+  "selectAll": "Seleziona tutto",
   "selectAllShort": "Tutte",
   "@selectAllShort": {
     "description": "Text that appears in bottom right when you start to select multiple photos. When clicked, it selects all photos."
@@ -3171,12 +3232,17 @@
   "selectFoldersForBackup": "Seleziona cartelle per il backup",
   "selectFolderToContinue": "Seleziona una cartella per continuare",
   "selectItemsToAdd": "Seleziona gli elementi da aggiungere",
+  "selectLanguage": "Seleziona lingua",
   "selectMailApp": "Seleziona app email",
   "selectMorePhotos": "Seleziona più foto",
   "selectOneDateAndTime": "Seleziona data e orario",
   "selectOneDateAndTimeForAll": "Seleziona una data e un'ora per tutti",
   "selectPerson": "Seleziona persona",
   "selectPersonToLinkToThisContact": "Seleziona una persona per riempire automaticamente questo contatto",
+  "selectReason": "Seleziona un motivo",
+  "@selectReason": {
+    "description": "Placeholder for account deletion reason picker"
+  },
   "selectStartOfRange": "Seleziona inizio dell'intervallo",
   "selectTime": "Imposta ora",
   "selectYourFace": "Seleziona il tuo volto",
@@ -3416,9 +3482,14 @@
   "@somethingWentWrongPleaseTryAgain": {
     "description": "Generic error message"
   },
+  "sorry": "Siamo spiacenti",
   "sorryBackupFailedDesc": "Purtroppo non è stato possibile eseguire il backup del file in questo momento, riproveremo più tardi.",
   "sorryCouldNotAddToFavorites": "Spiacenti, non è stato possibile aggiungere ai preferiti!",
   "sorryCouldNotRemoveFromFavorites": "Siamo spiacenti, non è stato possibile rimuovere dai preferiti!",
+  "sorryTheCodeYouveEnteredIsIncorrect": "Spiacenti, il codice che hai inserito non è corretto",
+  "@sorryTheCodeYouveEnteredIsIncorrect": {
+    "description": "Detailed error message when code is incorrect"
+  },
   "sorryWeHadToPauseYourBackups": "Spiacenti, abbiamo dovuto mettere in pausa i backup",
   "sort": "Ordina",
   "sortAlbumsBy": "Ordina per",
@@ -3525,6 +3596,7 @@
   "suggestDeletionDescription": "Le foto selezionate saranno rimosse da questo album. I proprietari delle foto riceveranno anche un suggerimento per rivedere ed eliminare le foto.",
   "suggestions": "Suggerimenti",
   "sunrise": "All'orizzonte",
+  "support": "Assistenza",
   "supportEnte": "Supporta <bold-green>ente</bold-green>",
   "syncing": "Sincronizzazione in corso...",
   "syncProgress": "{completed}/{total} ricordi conservati",
@@ -3842,7 +3914,6 @@
   "useAsCover": "Usa come copertina",
   "usedSpace": "Spazio utilizzato",
   "usedYourCode": "hanno usato il tuo codice",
-  "useMLToFindSimilarImages": "Verifica e rimuovi le immagini che si assomigliano.",
   "useOffline": "Utilizzare senza backup",
   "useRecoveryKey": "Utilizza un codice di recupero",
   "@useRecoveryKey": {
@@ -3913,7 +3984,6 @@
     "description": "Number of viewers that were successfully added."
   },
   "viewLargeFiles": "File di grandi dimensioni",
-  "viewLargeFilesDesc": "Visualizza i file che stanno occupando la maggior parte dello spazio di archiviazione.",
   "viewLogs": "Visualizza i log",
   "@viewLogs": {
     "description": "Button to view logs"

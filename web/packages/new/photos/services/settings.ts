@@ -13,6 +13,7 @@ import {
 
 export interface Settings {
     isInternalUser: boolean;
+    deferredMultipartChecksumsEnabled: boolean;
     mapEnabled: boolean;
     cfUploadProxyDisabled: boolean;
     castURL: string;
@@ -23,6 +24,7 @@ export interface Settings {
 
 const createDefaultSettings = (): Settings => ({
     isInternalUser: false,
+    deferredMultipartChecksumsEnabled: false,
     mapEnabled: false,
     cfUploadProxyDisabled: false,
     castURL: "https://cast.ente.com",
@@ -85,10 +87,15 @@ const FeatureFlags = z.object({
 
 type FeatureFlags = z.infer<typeof FeatureFlags>;
 
+const deferredMultipartChecksumsFlag = 1 << 6;
+
 const syncSettingsSnapshotWithLocalStorage = () => {
     const flags = savedRemoteFeatureFlags();
     const settings = createDefaultSettings();
     settings.isInternalUser = flags?.internalUser || false;
+    settings.deferredMultipartChecksumsEnabled = !!(
+        (flags?.serverApiFlag ?? 0) & deferredMultipartChecksumsFlag
+    );
     settings.mapEnabled = flags?.mapEnabled || false;
     settings.cfUploadProxyDisabled = savedCFProxyDisabled();
     if (flags?.castUrl) settings.castURL = flags.castUrl;

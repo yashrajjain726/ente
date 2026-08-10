@@ -334,8 +334,6 @@ const Page: React.FC = () => {
                                       thumbHash: preparedImage.thumbHash,
                                       width: preparedImage.width,
                                   });
-                                  if (!post)
-                                      throw new Error("Couldn't create post.");
                                   confirmLocalFeedPost(
                                       setLocalFeedPosts,
                                       localPostId,

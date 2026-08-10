@@ -68,6 +68,8 @@ final class EnsuLogging {
             let launchMessage = self.buildAppLaunchMessage()
             self.log(level: .info, tag: "App", message: launchMessage)
         }
+
+        initRustLogging(sink: EnsuRustLogSink())
     }
 
     func logger(_ tag: String) -> EnsuLogger {
@@ -224,6 +226,20 @@ struct EnsuLogger {
 
     func error(_ message: String, _ error: Error? = nil, details: String? = nil) {
         EnsuLogging.shared.log(level: .error, tag: tag, message: message, details: details, error: error)
+    }
+}
+
+private final class EnsuRustLogSink: RustLogSink, @unchecked Sendable {
+    func log(level: RustLogLevel, target: String, message: String) {
+        let line = "[\(target)] \(message)"
+        switch level {
+        case .error:
+            EnsuLogging.shared.log(level: .error, tag: "rust", message: line)
+        case .warn:
+            EnsuLogging.shared.log(level: .warning, tag: "rust", message: line)
+        case .info:
+            EnsuLogging.shared.log(level: .info, tag: "rust", message: line)
+        }
     }
 }
 

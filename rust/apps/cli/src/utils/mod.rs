@@ -1,9 +1,7 @@
 use dirs;
 use std::path::PathBuf;
 
-/// Get the CLI configuration directory
 pub fn get_cli_config_dir() -> crate::Result<PathBuf> {
-    // Check environment variable first
     if let Ok(config_dir) = std::env::var("ENTE_CLI_CONFIG_DIR") {
         return Ok(PathBuf::from(config_dir));
     }
@@ -17,7 +15,6 @@ pub fn get_cli_config_dir() -> crate::Result<PathBuf> {
 
     let cli_path = config_dir.join("ente-cli");
 
-    // Create directory if it doesn't exist
     if !cli_path.exists() {
         std::fs::create_dir_all(&cli_path)?;
     }

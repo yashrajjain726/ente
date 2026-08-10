@@ -1,8 +1,8 @@
-// TODO: Audit this file
-/* eslint-disable @typescript-eslint/ban-ts-comment */
-
 import type { BytesOrB64 } from "ente-base/crypto/types";
-import { streamEncryptionChunkSize } from "ente-base/crypto/types";
+import {
+    streamEncryptionChunkOverhead,
+    streamEncryptionChunkSize,
+} from "ente-base/crypto/types";
 import type { CryptoWorker } from "ente-base/crypto/worker";
 import { ensureElectron } from "ente-base/electron";
 import { basename, nameAndExtension } from "ente-base/file-name";
@@ -233,6 +233,21 @@ class UploadService {
             throw translateURLFetchErrorIfNeeded(e);
         });
     }
+
+    async fetchMultipartUploadURLsWithoutChecksums(
+        contentLength: number,
+        partLength: number,
+    ) {
+        if (this.publicAlbumsCredentials) {
+            throw new Error("Public uploads require part checksums");
+        }
+        return fetchMultipartUploadURLsWithMetadata({
+            contentLength,
+            partLength,
+        }).catch((e: unknown) => {
+            throw translateURLFetchErrorIfNeeded(e);
+        });
+    }
 }
 
 const uploadService = new UploadService();
@@ -273,6 +288,7 @@ interface FileWithMetadata extends Omit<ThumbnailedFile, "hasStaticThumbnail"> {
 interface EncryptedFileStream {
     stream: ReadableStream<Uint8Array<ArrayBuffer>>;
     chunkCount: number;
+    encryptedSize: number;
 }
 
 interface EncryptedFilePieces {
@@ -453,6 +469,8 @@ const fileTooLargeErrorMessage = "File too large";
 
 interface UploadContext {
     isCFUploadProxyDisabled: boolean;
+    deferMultipartChecksums: boolean;
+    isInternalUser: boolean;
     skipDuplicateAddToUploadCollection?: boolean;
     includePartnerSharedFiles?: boolean;
     publicAlbumsCredentials?: PublicAlbumsCredentials;
@@ -505,7 +523,8 @@ export const upload = async (
 
         if (fileSize === 0) return { type: "zeroSize" };
 
-        const maxFileSize = 10 * 1024 * 1024 * 1024;
+        const maxFileSize =
+            (uploadContext.isInternalUser ? 20 : 10) * 1024 * 1024 * 1024;
         if (fileSize >= maxFileSize) return { type: "tooLarge" };
 
         abortIfCancelled();
@@ -707,10 +726,8 @@ const readAssetDetails = async ({
     uploadItem,
 }: UploadAsset): Promise<ReadAssetDetailsResult> =>
     isLivePhoto
-        ? // @ts-ignore
-          readLivePhotoDetails(livePhotoAssets)
-        : // @ts-ignore
-          readImageOrVideoDetails(uploadItem);
+        ? readLivePhotoDetails(livePhotoAssets!)
+        : readImageOrVideoDetails(uploadItem!);
 
 const readLivePhotoDetails = async ({ image, video }: LivePhotoAssets) => {
     const img = await readImageOrVideoDetails(image);
@@ -730,7 +747,6 @@ const readImageOrVideoDetails = async (uploadItem: UploadItem) => {
     const { stream, fileSize, lastModifiedMs } =
         await readUploadItem(uploadItem);
 
-    // @ts-ignore
     const fileTypeInfo = await detectFileTypeInfoFromChunk(async () => {
         const reader = stream.getReader();
         const chunk = (await reader.read()).value;
@@ -767,8 +783,7 @@ const extractAssetMetadata = async (
 ): Promise<ExtractAssetMetadataResult> =>
     isLivePhoto
         ? await extractLivePhotoMetadata(
-              // @ts-ignore
-              livePhotoAssets,
+              livePhotoAssets!,
               pathPrefix,
               lastModifiedMs,
               collectionID,
@@ -776,8 +791,7 @@ const extractAssetMetadata = async (
               worker,
           )
         : await extractImageOrVideoMetadata(
-              // @ts-ignore
-              uploadItem,
+              uploadItem!,
               pathPrefix,
               externalParsedMetadata,
               fileType,
@@ -1010,10 +1024,8 @@ const readAsset = async (
     { isLivePhoto, uploadItem, livePhotoAssets }: UploadAsset,
 ): Promise<ThumbnailedFile> =>
     isLivePhoto
-        ? // @ts-ignore
-          await readLivePhoto(livePhotoAssets, fileTypeInfo)
-        : // @ts-ignore
-          await readImageOrVideo(uploadItem, fileTypeInfo);
+        ? await readLivePhoto(livePhotoAssets!, fileTypeInfo)
+        : await readImageOrVideo(uploadItem!, fileTypeInfo);
 
 const readLivePhoto = async (
     livePhotoAssets: LivePhotoAssets,
@@ -1215,7 +1227,7 @@ const encryptBytesWithOptionalVerification = async (
 };
 
 const encryptFileStream = async (
-    { stream, chunkCount }: FileStream,
+    { stream, chunkCount, fileSize }: FileStream,
     fileKey: BytesOrB64,
     worker: CryptoWorker,
     shouldVerify: boolean,
@@ -1274,7 +1286,12 @@ const encryptFileStream = async (
     });
     return {
         decryptionHeader,
-        encryptedData: { stream: encryptedFileStream, chunkCount },
+        encryptedData: {
+            stream: encryptedFileStream,
+            chunkCount,
+            encryptedSize:
+                fileSize + chunkCount * streamEncryptionChunkOverhead,
+        },
     };
 };
 
@@ -1428,6 +1445,9 @@ const uploadStreamUsingMultipart = async (
         uploadContext;
     const shouldSendPartChecksums =
         checksumEnabled || !!uploadContext.publicAlbumsCredentials;
+    const deferPartChecksums =
+        uploadContext.deferMultipartChecksums &&
+        !uploadContext.publicAlbumsCredentials;
 
     const { stream } = dataStream;
     const streamReader = stream.getReader();
@@ -1436,7 +1456,7 @@ const uploadStreamUsingMultipart = async (
         dataStream.chunkCount / multipartChunksPerPart,
     );
 
-    if (shouldSendPartChecksums) {
+    if (shouldSendPartChecksums && !deferPartChecksums) {
         const parts: Uint8Array<ArrayBuffer>[] = [];
         const partMd5s: string[] = [];
         let fileSize = 0;
@@ -1518,8 +1538,20 @@ const uploadStreamUsingMultipart = async (
         return { objectKey: multipartUploadURLs.objectKey, fileSize };
     }
 
-    const multipartUploadURLs =
-        await uploadService.fetchMultipartUploadURLs(uploadPartCount);
+    const partLength = Math.min(
+        dataStream.encryptedSize,
+        multipartChunksPerPart *
+            (streamEncryptionChunkSize + streamEncryptionChunkOverhead),
+    );
+    const multipartUploadURLs = deferPartChecksums
+        ? await uploadService.fetchMultipartUploadURLsWithoutChecksums(
+              dataStream.encryptedSize,
+              partLength,
+          )
+        : await uploadService.fetchMultipartUploadURLs(uploadPartCount);
+    if (multipartUploadURLs.partURLs.length != uploadPartCount) {
+        throw new Error("Unexpected multipart upload URL count");
+    }
 
     const percentPerPart = maxPercent / uploadPartCount;
     let fileSize = 0;
@@ -1533,14 +1565,20 @@ const uploadStreamUsingMultipart = async (
         const partNumber = index + 1;
         const partData = await nextMultipartUploadPart(streamReader);
         fileSize += partData.length;
+        const checksum = deferPartChecksums
+            ? computeMd5Base64(partData)
+            : undefined;
 
         const eTag = !isCFUploadProxyDisabled
             ? await putFilePartViaWorker(
                   partUploadURL,
                   partData,
                   requestRetrier,
+                  { contentMd5: checksum },
               )
-            : await putFilePart(partUploadURL, partData, requestRetrier);
+            : await putFilePart(partUploadURL, partData, requestRetrier, {
+                  contentMd5: checksum,
+              });
         if (!eTag) throw new Error(eTagMissingErrorMessage);
 
         updateUploadProgress(fileLocalID, percentPerPart * partNumber);

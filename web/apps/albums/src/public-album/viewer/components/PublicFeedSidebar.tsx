@@ -21,6 +21,7 @@ import {
 import { useColorScheme } from "@mui/material/styles";
 import { useInterval } from "ente-base/components/utils/hooks";
 import type { ModalVisibilityProps } from "ente-base/components/utils/modal";
+import { useBaseContext } from "ente-base/context";
 import type { PublicAlbumsCredentials } from "ente-base/http";
 import log from "ente-base/log";
 import { getAvatarColor } from "ente-gallery/utils/avatar-colors";
@@ -529,6 +530,7 @@ export const PublicFeedSidebar: React.FC<PublicFeedSidebarProps> = ({
     onItemClick,
     onExited,
 }) => {
+    const { onGenericError } = useBaseContext();
     const { clearBrowserBackState } = useBrowserBackClose({
         open,
         onClose,
@@ -550,6 +552,7 @@ export const PublicFeedSidebar: React.FC<PublicFeedSidebarProps> = ({
         new Map(),
     );
     const [isLoading, setIsLoading] = useState(false);
+    const errorReportedRef = useRef(false);
     const thumbnailCacheRef = useRef(thumbnailCache);
     const thumbnailLoadsInFlightRef = useRef<Set<number>>(new Set());
     const canSetThumbnailCacheRef = useRef(open);
@@ -561,6 +564,15 @@ export const PublicFeedSidebar: React.FC<PublicFeedSidebarProps> = ({
     useEffect(() => {
         canSetThumbnailCacheRef.current = open;
     }, [open]);
+
+    const reportError = useCallback(
+        (e: unknown) => {
+            if (errorReportedRef.current) return;
+            errorReportedRef.current = true;
+            onGenericError(e);
+        },
+        [onGenericError],
+    );
 
     useEffect(
         () => () => {
@@ -645,14 +657,22 @@ export const PublicFeedSidebar: React.FC<PublicFeedSidebarProps> = ({
             ]);
             setComments(feedData.comments);
             setReactions(feedData.reactions);
-            setAnonUserNames(anonProfiles);
+            setAnonUserNames(anonProfiles.anonUserNames);
+            const decryptionError =
+                feedData.decryptionError ?? anonProfiles.decryptionError;
+            if (decryptionError) {
+                reportError(decryptionError);
+            } else {
+                errorReportedRef.current = false;
+            }
         } catch (e) {
-            log.error("Failed to refresh public album feed", e);
+            reportError(e);
         }
-    }, [credentials, collectionKey]);
+    }, [credentials, collectionKey, reportError]);
 
     useEffect(() => {
         if (!open) return;
+        errorReportedRef.current = false;
 
         const fetchInitialData = async () => {
             try {
@@ -664,16 +684,23 @@ export const PublicFeedSidebar: React.FC<PublicFeedSidebarProps> = ({
                     ]);
                 setComments(feedData.comments);
                 setReactions(feedData.reactions);
-                setAnonUserNames(anonProfiles);
+                setAnonUserNames(anonProfiles.anonUserNames);
                 setMaskedEmails(participantEmails);
+                const decryptionError =
+                    feedData.decryptionError ?? anonProfiles.decryptionError;
+                if (decryptionError) {
+                    reportError(decryptionError);
+                } else {
+                    errorReportedRef.current = false;
+                }
             } catch (e) {
-                log.error("Failed to fetch public album feed", e);
+                reportError(e);
             }
         };
 
         setIsLoading(true);
         void fetchInitialData().finally(() => setIsLoading(false));
-    }, [open, credentials, collectionKey]);
+    }, [open, credentials, collectionKey, reportError]);
 
     useInterval(
         refreshSocialData,

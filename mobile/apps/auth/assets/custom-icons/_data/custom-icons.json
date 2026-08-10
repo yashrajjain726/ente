@@ -20,6 +20,10 @@
       ]
     },
     {
+      "title": "ABB",
+      "slug": "abb"
+    },
+    {
       "title": "Accredible",
       "slug": "accredible",
       "altNames": [
@@ -1659,6 +1663,10 @@
     {
       "title": "NVIDIA"
     },
+        {
+      "title": "OCENSA",
+      "slug": "ocensa"
+    },
     {
       "title": "Odido"
     },
@@ -1667,6 +1675,13 @@
       "hex": "000000",
       "altNames": [
         "\u6b27\u6613"
+      ]
+    },
+    {
+      "title": "ONEROXE",
+      "hex": "000000",
+      "altNames": [
+        "Arcle"
       ]
     },
     {

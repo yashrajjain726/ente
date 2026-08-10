@@ -201,7 +201,6 @@ fn face_thumbnail_dimensions(width: u32, height: u32) -> MlResult<(u32, u32)> {
         (height, width, false)
     };
 
-    // Preserve the minimum short side when possible; otherwise cap the long side.
     let (target_short_side, target_long_side) = if u128::from(long_side)
         * u128::from(FACE_THUMBNAIL_MIN_DIMENSION)
         <= u128::from(short_side) * u128::from(FACE_THUMBNAIL_MAX_DIMENSION)

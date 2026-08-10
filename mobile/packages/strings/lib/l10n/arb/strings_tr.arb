@@ -19,12 +19,14 @@
     "description": "Error shown when account exists but signup is incomplete"
   },
   "actionNotSupportedOnFavouritesAlbum": "Favoriler albümünde eylem desteklenmiyor",
+  "activeLinksWillShowUpHere": "Aktif bağlantılar burada görünecektir",
   "activeSessions": "Aktif oturumlar",
   "@activeSessions": {
     "description": "Title for active sessions page"
   },
   "add": "Ekle",
   "addAdmin": "Yönetici ekle",
+  "addANameAndPhoto": "Bir isim ya da fotoğraf ekleyin",
   "addANewEmail": "Yeni e-posta ekle",
   "addCode": "Kod ekle",
   "addCollaborator": "Düzenleyici ekle",
@@ -43,6 +45,7 @@
   },
   "addedToQueue": "Sıraya ekle",
   "addEmail": "E-posta ekle",
+  "addFamilyMember": "Aile üyesi ekle",
   "addFiles": "Dosyaları ekle",
   "addFromDevice": "Cihazdan ekle",
   "addingPhotos": "Fotoğraflar ekleniyor",
@@ -83,6 +86,7 @@
   "@addToPerson": {
     "description": "Action label to add selected files to an existing person."
   },
+  "addTrustedContact": "Güvenilir kişi ekle",
   "addViewer": "Görüntüleyici ekle",
   "addYourPhotosNow": "Fotoğraflarınızı şimdi ekleyin",
   "adjust": "Ayarla",
@@ -102,7 +106,10 @@
   "after1Month": "1 ay sonra",
   "after1Week": "1 hafta sonra",
   "after1Year": "1 yıl sonra",
+  "albumDescriptionHint": "Bu albüm için bir açıklama girin",
+  "albumEditsWillNotBeSaved": "Bu albüme yaptığınız düzenlemeler kaydedilmeyecektir.",
   "albumLayout": "Albüm düzeni",
+  "albumName": "Albüm ismi",
   "albumOwner": "Sahip",
   "@albumOwner": {
     "description": "Role of the album owner"
@@ -134,6 +141,7 @@
   },
   "allWillShiftRangeBasedOnFirst": "Bu, gruptaki ilk fotoğraftır. Seçilen diğer fotoğraflar otomatik olarak bu yeni tarihe göre kaydırılacaktır",
   "almostDone": "Neredeyse tamam...",
+  "alreadyHaveAnAccount": "Zaten bir hesabınız mı var?",
   "analysis": "Analiz",
   "analyzingPhotosLocally": "Fotoğraflarınız yerel olarak analiz ediliyor...",
   "androidBiometricHint": "Kimliği doğrula",
@@ -542,7 +550,6 @@
   "deleteSharedAlbumDialogBody": "Albüm herkes için silinecek\n\nBu albümdeki başkalarına ait paylaşılan fotoğraflara erişiminizi kaybedeceksiniz",
   "deleteShareLinkConfirmation": "Bu bağlantıya sahip kişiler artık öğeye erişemeyecek.",
   "deleteSuggestions": "Silinmesi önerilen dosyalar",
-  "deleteSuggestionsDesc": "Silinmesi önerilen dosyaları gözden geçirin.",
   "deleteTagMessage": "Bu etiketi silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.",
   "deleteTagTitle": "Etiket silinsin mi?",
   "deleteUnparseableCodeMessage": "Bu işlem kodu kalıcı olarak silecektir. Kod çöp kutusuna taşınmayacak.",
@@ -934,11 +941,6 @@
     }
   },
   "freeUpDeviceSpace": "Cihaz alanını boşaltın",
-  "freeUpDeviceSpaceDesc": "Halihazırda yedeklenmiş dosyaları cihazınızdan temizleyerek yer açın.",
-  "freeUpDeviceSpaceDescICloud": "iCloud paylaşılan albümlerindeki dosyalar silinemedi.",
-  "@freeUpDeviceSpaceDescICloud": {
-    "description": "Here 'cleared' means 'deleted' from the device"
-  },
   "freeUpSpace": "Boş alan",
   "gallery": "Galeri",
   "galleryMemoryLimitInfo": "Galeride 1000'e kadar anı gösterilir",
@@ -1261,7 +1263,6 @@
   },
   "manage": "Yönet",
   "manageDeviceStorage": "Cihaz önbelleğini yönet",
-  "manageDeviceStorageDesc": "Yerel önbellek depolama alanını gözden geçirin ve temizleyin.",
   "manageFamily": "Aileyi yönet",
   "manageLink": "Bağlantıyı yönet",
   "manageParticipants": "Yönet",
@@ -1786,8 +1787,6 @@
       "userEmail": {}
     }
   },
-  "removeDuplicates": "Yinelenenleri kaldır",
-  "removeDuplicatesDesc": "Aynı olan dosyaları gözden geçirin ve kaldırın.",
   "removeFromAlbum": "Albümden çıkar",
   "removeFromAlbumTitle": "Albümden çıkarılsın mı?",
   "removeFromFavorite": "Favorilerden Kaldır",
@@ -2533,7 +2532,6 @@
   "viewAllExifData": "Tüm EXIF verilerini görüntüle",
   "viewer": "Görüntüleyici",
   "viewLargeFiles": "Büyük dosyalar",
-  "viewLargeFilesDesc": "En fazla depolama alanı kullanan dosyaları görüntüleyin.",
   "viewLogs": "Kayıtları görüntüle",
   "@viewLogs": {
     "description": "Button to view logs"

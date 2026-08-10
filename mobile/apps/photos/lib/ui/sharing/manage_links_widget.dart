@@ -7,6 +7,7 @@ import 'package:ente_crypto/ente_crypto.dart';
 import 'package:ente_pure_utils/ente_pure_utils.dart';
 import 'package:ente_qr_ui/ente_qr_ui.dart';
 import "package:ente_strings/ente_strings.dart";
+import 'package:ente_ui/components/date_time_picker.dart';
 import 'package:flutter/material.dart';
 import "package:flutter/services.dart";
 import 'package:hugeicons/hugeicons.dart';
@@ -23,7 +24,6 @@ import 'package:photos/ui/notification/toast.dart';
 import 'package:photos/ui/payment/subscription.dart';
 import 'package:photos/ui/sharing/pickers/layout_picker_page.dart';
 import 'package:photos/ui/sharing/share_components.dart';
-import 'package:photos/ui/viewer/date/date_time_picker.dart';
 import 'package:photos/utils/dialog_util.dart';
 import 'package:photos/utils/public_link_layout_util.dart';
 import "package:photos/utils/share_util.dart";
@@ -439,10 +439,10 @@ class _ManageSharedLinkWidgetState extends State<ManageSharedLinkWidget> {
 
   Future<void> _pickCustomExpiry(BuildContext context) async {
     final now = DateTime.now();
-    final DateTime? picked = await showDatePickerSheet(
+    final DateTime? picked = await showDateTimePickerSheet(
       context,
-      initialDate: now,
-      minDate: now,
+      initialDateTime: now,
+      minDateTime: now,
     );
     final timeInMicrosecondsFromEpoch = picked?.microsecondsSinceEpoch;
     if (timeInMicrosecondsFromEpoch == null) {

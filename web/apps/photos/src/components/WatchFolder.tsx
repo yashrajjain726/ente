@@ -83,7 +83,6 @@ export const WatchFolder: React.FC<ModalVisibilityProps> = ({
         return () => {
             removeEventListener("drop", handleWatchFolderDrop);
         };
-        // TODO:
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [open]);
 
