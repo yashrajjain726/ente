@@ -2,8 +2,8 @@ import type { Remote } from "comlink";
 import { inWorker } from "ente-base/env";
 import { ComlinkWorker } from "ente-base/worker/comlink-worker";
 import { loadCryptoReadyEnteWasm } from "ente-wasm/load";
-import * as kdf from "./kdf";
 import type { DerivedKey } from "./kdf";
+import * as kdf from "./kdf";
 import type { KDFWorker } from "./kdf.worker";
 
 export { deriveKeyInsufficientMemoryErrorMessage } from "./kdf";
@@ -51,28 +51,17 @@ export const fromB64URLSafeNoPadding = async (b64String: string) => {
     return fromB64(normalized);
 };
 
-let _kdfWorker: ComlinkWorker<typeof KDFWorker> | undefined;
-
-const createKDFWorker = () =>
-    new ComlinkWorker<typeof KDFWorker>(
-        "kdf",
-        new Worker(new URL("kdf.worker.ts", import.meta.url)),
-    );
-
 const withKDFWorker = async <T>(
     callback: (worker: Remote<KDFWorker>) => Promise<T>,
 ): Promise<T> => {
-    const worker = (_kdfWorker ??= createKDFWorker());
+    const worker = new ComlinkWorker<typeof KDFWorker>(
+        "kdf",
+        new Worker(new URL("kdf.worker.ts", import.meta.url)),
+    );
     try {
         return await callback(await worker.remote);
-    } catch (error) {
-        // Discard any failed worker so later calls start fresh; termination also
-        // reclaims a wasm heap grown by a failed Argon2 allocation.
-        if (_kdfWorker === worker) {
-            _kdfWorker = undefined;
-            worker.terminate();
-        }
-        throw error;
+    } finally {
+        worker.terminate();
     }
 };
 
@@ -88,16 +77,12 @@ export const deriveKey = (
               worker.deriveKey(password, saltB64, opsLimit, memLimit),
           );
 
-export const deriveSensitiveKey = (
-    password: string,
-): Promise<DerivedKey> =>
+export const deriveSensitiveKey = (password: string): Promise<DerivedKey> =>
     inWorker()
         ? kdf.deriveSensitiveKey(password)
         : withKDFWorker((worker) => worker.deriveSensitiveKey(password));
 
-export const deriveInteractiveKey = (
-    password: string,
-): Promise<DerivedKey> =>
+export const deriveInteractiveKey = (password: string): Promise<DerivedKey> =>
     inWorker()
         ? kdf.deriveInteractiveKey(password)
         : withKDFWorker((worker) => worker.deriveInteractiveKey(password));
