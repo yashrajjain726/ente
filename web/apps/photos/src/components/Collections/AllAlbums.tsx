@@ -385,11 +385,9 @@ export const AllAlbums: React.FC<AllAlbums> = ({
                                     : activeFilterTitle}
                             </Typography>
                             <Typography sx={bodyMutedSx}>
-                                {searchTerm
-                                    ? `${filteredCollectionSummaries.length} / ${collectionSummaries.length} ${t("albums")}`
-                                    : t("albums_count", {
-                                          count: filteredCollectionSummaries.length,
-                                      })}
+                                {t("albums_count", {
+                                    count: filteredCollectionSummaries.length,
+                                })}
                             </Typography>
                         </Stack>
                         <Stack direction="row" sx={headerActionsSx}>
