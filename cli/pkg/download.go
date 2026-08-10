@@ -45,11 +45,13 @@ func (c *ClICtrl) downloadAndDecrypt(
 func UnpackLive(src string) (imagePath, videoPath string, retErr error) {
 	var filenames []string
 	reader, err := zip.OpenReader(src)
+	if reader != nil {
+		defer reader.Close()
+	}
 	if err != nil {
 		retErr = err
 		return
 	}
-	defer reader.Close()
 
 	dest := filepath.Dir(src)
 
