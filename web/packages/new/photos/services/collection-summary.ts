@@ -20,6 +20,7 @@ export type CollectionSummaryAttribute =
     | "sharedIncomingAdmin"
     | "sharedViaLink"
     | "sharedOnlyViaLink"
+    | "quickLink"
     | "system"
     | "archived"
     | "hideFromCollectionBar"
@@ -87,6 +88,13 @@ export const canAddToCollection = ({ attributes }: CollectionSummary) =>
 
 export const canMoveToCollection = ({ attributes }: CollectionSummary) =>
     !attributes.has("system") && !attributes.has("sharedIncoming");
+
+export const isBulkDeletableEmptyAlbum = (cs: CollectionSummary) =>
+    cs.fileCount == 0 &&
+    (cs.type == "album" || cs.type == "folder") &&
+    !cs.attributes.has("system") &&
+    !cs.attributes.has("shared") &&
+    !cs.attributes.has("archived");
 
 export const sortCollectionSummaries = (
     collectionSummaries: CollectionSummary[],

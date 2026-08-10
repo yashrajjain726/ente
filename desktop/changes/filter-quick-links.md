@@ -1,0 +1,1 @@
+- parity: Added a filter for quick links in All Albums.

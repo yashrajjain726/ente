@@ -808,16 +808,25 @@ const Page: React.FC = () => {
     const remotePull = useCallback(
         async (opts?: RemotePullOpts) =>
             remotePullQueue.current.add(async () => {
-                const { silent, source } = opts ?? {};
+                const { silent, source, strict } = opts ?? {};
 
-                if (!navigator.onLine) return;
+                if (!navigator.onLine) {
+                    if (strict) throw new Error("Remote pull failed: offline");
+                    return;
+                }
                 if (await isSessionInvalid()) {
                     showSessionExpiredDialog();
+                    if (strict)
+                        throw new Error("Remote pull failed: invalid session");
                     return;
                 }
                 if (!(await masterKeyFromSession())) {
                     clearSessionStorage();
                     void router.push("/credentials");
+                    if (strict)
+                        throw new Error(
+                            "Remote pull failed: missing master key",
+                        );
                     return;
                 }
 
@@ -829,6 +838,7 @@ const Page: React.FC = () => {
                 } catch (e) {
                     // A later pull retries transient failures after remote mutations.
                     log.error("Remote pull failed", e);
+                    if (strict) throw e;
                 } finally {
                     dispatch({ type: "clearUnsyncedState" });
                     if (!silent) hideLoadingBar();

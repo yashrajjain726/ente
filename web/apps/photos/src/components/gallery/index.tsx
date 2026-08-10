@@ -30,6 +30,7 @@ export { GalleryEmptyState } from "./GalleryEmptyState";
 export interface RemotePullOpts {
     silent?: boolean;
     source?: string;
+    strict?: boolean;
 }
 export type SelectionContext =
     | {

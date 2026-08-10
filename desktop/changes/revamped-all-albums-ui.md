@@ -1,0 +1,1 @@
+- ui: Revamped the All Albums UI.
