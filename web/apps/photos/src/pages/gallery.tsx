@@ -1,7 +1,6 @@
 // TODO: Audit this file (the code here is mostly fine, but needs revisiting
 // the file it depends on have been audited and their interfaces fixed).
 /* eslint-disable react-hooks/exhaustive-deps */
-/* eslint-disable @typescript-eslint/no-floating-promises */
 import type { AddToAlbumPhase } from "@/components/AlbumAddedNotification";
 import { AlbumAddedNotification } from "@/components/AlbumAddedNotification";
 import { AuthenticateUser } from "@/components/AuthenticateUser";
@@ -488,7 +487,7 @@ const Page: React.FC = () => {
         void (async () => {
             if (!haveMasterKeyInSession() || !(await savedAuthToken())) {
                 stashRedirect("/gallery");
-                router.push("/");
+                void router.push("/");
                 return;
             }
 
@@ -571,7 +570,7 @@ const Page: React.FC = () => {
 
             if (electron) {
                 unsubscribeMainWindowFocus = subscribeMainWindowFocus(() => {
-                    remotePull({ silent: true, source: "desktop-focus" });
+                    void remotePull({ silent: true, source: "desktop-focus" });
                     void watcher.checkAccessibility();
                 });
                 if (await shouldShowWhatsNew(electron)) showWhatsNew();
@@ -600,12 +599,12 @@ const Page: React.FC = () => {
             collectionURL = `?collection=${activeCollectionID}`;
         }
         const href = `/gallery${collectionURL}`;
-        router.push(href, undefined, { shallow: true });
+        void router.push(href, undefined, { shallow: true });
     }, [activeCollectionID, router.isReady]);
 
     useEffect(() => {
         if (router.isReady && haveMasterKeyInSession()) {
-            handleSubscriptionCompletionRedirectIfNeeded(
+            void handleSubscriptionCompletionRedirectIfNeeded(
                 showMiniDialog,
                 showLoadingBar,
                 router,
@@ -658,7 +657,10 @@ const Page: React.FC = () => {
         const pendingSearchSuggestion = state.pendingSearchSuggestions.at(-1);
         if (!state.isRecomputingSearchResults && pendingSearchSuggestion) {
             dispatch({ type: "updatingSearchResults" });
-            filterSearchableFiles(pendingSearchSuggestion).then(
+            // TODO: A rejection leaves isRecomputingSearchResults stuck true,
+            // and search stops until it is exited. Recovery needs a reducer
+            // change.
+            void filterSearchableFiles(pendingSearchSuggestion).then(
                 (searchResults) => {
                     dispatch({ type: "setSearchResults", searchResults });
                 },
@@ -815,7 +817,7 @@ const Page: React.FC = () => {
                 }
                 if (!(await masterKeyFromSession())) {
                     clearSessionStorage();
-                    router.push("/credentials");
+                    void router.push("/credentials");
                     return;
                 }
 
