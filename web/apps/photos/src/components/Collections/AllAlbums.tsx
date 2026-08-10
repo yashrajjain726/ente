@@ -42,6 +42,7 @@ import {
     type SxProps,
     type Theme,
 } from "@mui/material";
+import { ensureLocalUser } from "ente-accounts/services/user";
 import { FilledIconButton } from "ente-base/components/mui";
 import { SingleInputDialog } from "ente-base/components/SingleInputDialog";
 import { useModalVisibility } from "ente-base/components/utils/modal";
@@ -52,6 +53,8 @@ import {
     createAlbum,
     createHiddenAlbum,
     deleteCollection,
+    isArchivedCollection,
+    isDefaultHiddenCollection,
 } from "ente-new/photos/services/collection";
 import {
     isBulkDeletableEmptyAlbum,
@@ -108,6 +111,29 @@ const albumFilters: {
         title: () => t("empty_albums_title"),
     },
 ];
+
+const matchesAlbumFilter = (
+    cs: CollectionSummary,
+    albumFilter: AlbumFilter,
+) => {
+    switch (albumFilter) {
+        case "all":
+            return true;
+        case "shared":
+            return (
+                !cs.attributes.has("sharedIncoming") &&
+                !cs.attributes.has("quickLink") &&
+                (cs.attributes.has("sharedOutgoing") ||
+                    cs.attributes.has("sharedViaLink"))
+            );
+        case "received":
+            return cs.attributes.has("sharedIncoming");
+        case "links":
+            return cs.attributes.has("quickLink");
+        case "empty-albums":
+            return isBulkDeletableEmptyAlbum(cs);
+    }
+};
 
 interface AllAlbums {
     open: boolean;
@@ -196,18 +222,15 @@ export const AllAlbums: React.FC<AllAlbums> = ({
     // A filter with nothing worth showing is not worth a pill.
     const visibleAlbumFilters = useMemo(
         () =>
-            albumFilters.filter(({ value }) => {
-                switch (value) {
-                    case "links":
-                        return collectionSummaries.some((cs) =>
-                            cs.attributes.has("quickLink"),
-                        );
-                    case "empty-albums":
-                        return hasEnoughEmptyAlbums;
-                    default:
-                        return true;
-                }
-            }),
+            albumFilters.filter(
+                ({ value }) =>
+                    value == "all" ||
+                    (value == "empty-albums"
+                        ? hasEnoughEmptyAlbums
+                        : collectionSummaries.some((cs) =>
+                              matchesAlbumFilter(cs, value),
+                          )),
+            ),
         [collectionSummaries, hasEnoughEmptyAlbums],
     );
 
@@ -229,41 +252,70 @@ export const AllAlbums: React.FC<AllAlbums> = ({
 
     const deleteEmptyAlbums = async (candidateIDs: number[]) => {
         let failedCount = 0;
+        let confirmedCandidateIDs: number[];
 
         try {
             await onRemotePull();
 
-            const collections = await savedCollections();
-            const existingCollectionIDs = new Set(
-                collections.map((collection) => collection.id),
-            );
-            const collectionFiles = await savedCollectionFiles();
+            const [collections, collectionFiles] = await Promise.all([
+                savedCollections(),
+                savedCollectionFiles(),
+            ]);
+            const candidateIDSet = new Set(candidateIDs);
             const nonEmptyCollectionIDs = new Set(
                 collectionFiles.map((file) => file.collectionID),
             );
-            const confirmedCandidateIDs = candidateIDs.filter(
-                (id) =>
-                    existingCollectionIDs.has(id) &&
-                    !nonEmptyCollectionIDs.has(id),
-            );
+            const userID = ensureLocalUser().id;
+            confirmedCandidateIDs = collections
+                .filter(
+                    (collection) =>
+                        candidateIDSet.has(collection.id) &&
+                        !nonEmptyCollectionIDs.has(collection.id) &&
+                        (collection.type == "album" ||
+                            collection.type == "folder") &&
+                        collection.owner.id == userID &&
+                        !collection.sharees.length &&
+                        !collection.publicURLs.length &&
+                        !isArchivedCollection(collection) &&
+                        !isDefaultHiddenCollection(collection),
+                )
+                .map((collection) => collection.id);
+        } catch {
+            showNotification({
+                color: "critical",
+                title: t("delete_empty_albums_failed", {
+                    count: candidateIDs.length,
+                }),
+            });
+            return;
+        }
 
-            for (const id of confirmedCandidateIDs) {
-                try {
-                    await deleteCollection(id, { keepFiles: true });
-                } catch {
-                    failedCount++;
-                }
+        if (!confirmedCandidateIDs.length) return;
+
+        for (const id of confirmedCandidateIDs) {
+            try {
+                await deleteCollection(id, { keepFiles: true });
+            } catch {
+                failedCount++;
             }
+        }
 
+        let refreshFailed = false;
+        try {
             await onRemotePull();
         } catch {
-            failedCount = candidateIDs.length;
+            refreshFailed = true;
         }
 
         if (failedCount > 0) {
             showNotification({
                 color: "critical",
                 title: t("delete_empty_albums_failed", { count: failedCount }),
+            });
+        } else if (refreshFailed) {
+            showNotification({
+                color: "critical",
+                title: t("delete_empty_albums_refresh_failed"),
             });
         }
     };
@@ -287,23 +339,9 @@ export const AllAlbums: React.FC<AllAlbums> = ({
         const albumFilteredCollectionSummaries =
             isInHiddenSection || albumFilter == "all"
                 ? collectionSummaries
-                : collectionSummaries.filter((cs) => {
-                      switch (albumFilter) {
-                          case "shared":
-                              return (
-                                  !cs.attributes.has("sharedIncoming") &&
-                                  !cs.attributes.has("quickLink") &&
-                                  (cs.attributes.has("sharedOutgoing") ||
-                                      cs.attributes.has("sharedViaLink"))
-                              );
-                          case "received":
-                              return cs.attributes.has("sharedIncoming");
-                          case "links":
-                              return cs.attributes.has("quickLink");
-                          case "empty-albums":
-                              return isBulkDeletableEmptyAlbum(cs);
-                      }
-                  });
+                : collectionSummaries.filter((cs) =>
+                      matchesAlbumFilter(cs, albumFilter),
+                  );
 
         if (!searchTerm.trim()) {
             return albumFilteredCollectionSummaries;
@@ -370,7 +408,7 @@ export const AllAlbums: React.FC<AllAlbums> = ({
                             </IconButton>
                         </Stack>
                     </Stack>
-                    {!isInHiddenSection && (
+                    {!isInHiddenSection && visibleAlbumFilters.length > 1 && (
                         <ToggleButtonGroup
                             exclusive
                             value={albumFilter}

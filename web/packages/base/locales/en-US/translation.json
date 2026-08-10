@@ -451,6 +451,7 @@
     "delete_empty_albums_message": "This will delete {{count, number}} empty albums shown in this list.",
     "delete_empty_albums_failed_one": "Could not delete 1 album",
     "delete_empty_albums_failed": "Could not delete {{count, number}} albums",
+    "delete_empty_albums_refresh_failed": "The albums were deleted, but the album list could not be refreshed.",
     "delete_photos": "Delete photos",
     "keep_photos": "Keep photos",
     "share_album": "Share album",
