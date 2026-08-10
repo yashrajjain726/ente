@@ -9,16 +9,11 @@ import (
 	"net/http"
 )
 
-// CastMiddleware intercepts and authenticates incoming requests
 type CastMiddleware struct {
 	Cache    *cache.Cache
 	CastCtrl *castCtrl.Controller
 }
 
-// CastAuthMiddleware returns a middle ware that extracts the `X-AuthToken`
-// within the header of a request and uses it to authenticate and insert the
-// authenticated user to the request's `X-Auth-User-ID` field.
-// If isJWT is true we use JWT token validation
 func (m *CastMiddleware) CastAuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		token := auth.GetCastToken(c)

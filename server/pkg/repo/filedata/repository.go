@@ -231,7 +231,6 @@ func (r *Repository) MoveBetweenBuckets(row filedata.Row, bucketID string, sourc
 // GetPendingSyncDataAndExtendLock in a transaction gets single file data row that has been deleted and pending sync is true and sync_lock_till is less than now_utc_micro_seconds() and extends the lock till newSyncLockTime
 // This is used to lock the file data row for deletion and extend
 func (r *Repository) GetPendingSyncDataAndExtendLock(ctx context.Context, newSyncLockTime int64, forDeletion bool) (*filedata.Row, error) {
-	// ensure newSyncLockTime is in the future
 	if newSyncLockTime < time.Now().Add(5*time.Minute).UnixMicro() {
 		return nil, stacktrace.NewError("newSyncLockTime should be at least 5min in the future")
 	}

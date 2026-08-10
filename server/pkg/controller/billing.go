@@ -98,7 +98,6 @@ func (c *BillingController) GetUserPlans(ctx *gin.Context, userID int64) ([]ente
 	if err != nil {
 		return []ente.BillingPlan{}, stacktrace.Propagate(err, "Failed to get user's country stripe account")
 	}
-	// always return the plans based on the user's country determined by the IP
 	return c.GetPlansV2(network.GetClientCountry(ctx), stripeAccountCountry), nil
 
 }
@@ -300,7 +299,6 @@ func (c *BillingController) getAllPlans(countryCode string, stripeAccountCountry
 	if plans, found := countryWisePlans[countryCode]; found {
 		return plans
 	}
-	// unable to find plans for given country code, return plans for default country
 	defaultCountry := billing.GetDefaultPlanCountry()
 	return countryWisePlans[defaultCountry]
 }
@@ -364,7 +362,6 @@ func (c *BillingController) HandleAccountDeletion(ctx context.Context, userID in
 		return false, stacktrace.NewError("unexpected product id %s", subscription.ProductID)
 	}
 	isCancelled = subscription.Attributes.IsCancelled
-	// delete customer data from Stripe if user is on paid plan.
 	if subscription.PaymentProvider == ente.Stripe {
 		err = c.StripeController.CancelSubAndDeleteCustomer(subscription, billingLogger)
 		if err != nil {

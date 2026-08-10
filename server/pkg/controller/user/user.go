@@ -195,7 +195,6 @@ func (c *UserController) UpdateEmailMFA(context *gin.Context, userID int64, isEn
 		if err != nil {
 			return stacktrace.Propagate(err, "")
 		}
-		// if SRP is not setup, then we can not disable email MFA
 		if !isSrpSetupDone {
 			return stacktrace.Propagate(ente.NewConflictError("SRP setup incomplete"), "can not disable email MFA before SRP is setup")
 		}

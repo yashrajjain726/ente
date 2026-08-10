@@ -364,8 +364,6 @@ func (repo *FileRepository) Update(file ente.File, fileSize int64, thumbnailSize
 	return stacktrace.Propagate(err, "")
 }
 
-// UpdateMagicAttributes updates the magic attributes for the list of files and update collection_files & collection
-// which have this file.
 func (repo *FileRepository) UpdateMagicAttributes(
 	ctx context.Context,
 	fileUpdates []ente.UpdateMagicMetadata,

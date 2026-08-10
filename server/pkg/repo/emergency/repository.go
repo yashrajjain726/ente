@@ -20,8 +20,6 @@ type ContactRow struct {
 	EncryptedKey       *string
 }
 
-// HasActiveLegacyContact returns true when the user has at least one accepted
-// legacy contact configured on their account.
 func (r *Repository) HasActiveLegacyContact(ctx context.Context, userID int64) (bool, error) {
 	var exists bool
 	err := r.DB.QueryRowContext(ctx,

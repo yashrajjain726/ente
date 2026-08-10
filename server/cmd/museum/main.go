@@ -415,7 +415,6 @@ func main() {
 		ReactionsRepo:         reactionsRepo,
 	}
 
-	// Pending actions' controller/handler
 	collectionActionsController := &controller.CollectionActionsController{
 		Repo: collectionActionRepo,
 	}
@@ -741,7 +740,6 @@ func main() {
 		Controller: collectionController,
 	}
 	storageAPI.POST("/collections", collectionHandler.Create)
-	// Collection actions (exposed for clients to fetch suggestions/removals)
 	storageAPI.GET("/collection-actions/pending-remove", collectionActionsHandler.ListPendingRemove)
 	storageAPI.GET("/collection-actions/delete-suggestions", collectionActionsHandler.ListDeleteSuggestions)
 	storageAPI.POST("/collection-actions/reject-delete-suggestions", collectionActionsHandler.RejectDeleteSuggestions)
@@ -1103,10 +1101,8 @@ func main() {
 		trashController, pushController, objectController, dataCleanupController, storageBonusCtrl, emergencyCtrl,
 		embeddingController, healthCheckHandler, castDb, inactiveUserOrchestrator, spaceDripController)
 
-	// Create new collectors, the names will be used as labels on the metrics
 	primaryDBCollector := sqlstats.NewStatsCollector("prod_db", db)
 	latencySensitiveDBCollector := sqlstats.NewStatsCollector("latency_sensitive_db", latencySensitiveDB)
-	// Register them with Prometheus
 	prometheus.MustRegister(primaryDBCollector, latencySensitiveDBCollector)
 
 	http.Handle("/metrics", promhttp.Handler())
@@ -1319,8 +1315,7 @@ func setupAndStartCrons(userAuthRepo *repo.UserAuthRepository, collectionLinkRep
 
 	schedule(c, "@every 1m", func() {
 		_ = twoFactorRepo.RemoveExpiredTwoFactorSessions()
-		// Clean up used OTP codes older than 90 seconds
-		_ = twoFactorRepo.RemoveExpiredUsedOTPCodes(90 * 1000 * 1000) // 90 seconds in microseconds
+		_ = twoFactorRepo.RemoveExpiredUsedOTPCodes(90 * 1000 * 1000)
 	})
 	schedule(c, "@every 1m", func() {
 		_ = twoFactorRepo.RemoveExpiredTempTwoFactorSecrets()
@@ -1378,7 +1373,6 @@ func setupAndStartCrons(userAuthRepo *repo.UserAuthRepository, collectionLinkRep
 	})
 
 	schedule(c, "@every 45m", func() {
-		// delete unclaimed codes older than 60 minutes
 		_ = castDb.DeleteUnclaimedCodes(context.Background(), timeUtil.MicrosecondsBeforeMinutes(60))
 		dataCleanupCtrl.DeleteDataCron()
 	})
@@ -1495,12 +1489,10 @@ func setKnownAPIs(routes []gin.RouteInfo) {
 	}
 }
 
-// Schedule a cron job
 func schedule(c *cron.Cron, spec string, cmd func()) (cron.EntryID, error) {
 	return c.AddFunc(spec, cmd)
 }
 
-// Schedule a cron job, and run it once immediately too.
 func scheduleAndRun(c *cron.Cron, spec string, cmd func()) (cron.EntryID, error) {
 	go cmd()
 	return schedule(c, spec, cmd)

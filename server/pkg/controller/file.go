@@ -748,7 +748,6 @@ func (c *FileController) UpdateThumbnail(ctx *gin.Context, fileID int64, newThum
 	}
 	var oldObject *string
 	if existingThumbnailObjectKey != newThumbnail.ObjectKey {
-		// delete old object only if newThumbnail object key different.
 		oldObject = &existingThumbnailObjectKey
 	}
 	err = c.FileRepo.UpdateThumbnail(ctx, fileID, userID, newThumbnail, newThumbnailSize, diff, oldObject)
@@ -831,7 +830,6 @@ func (c *FileController) validateUpdateMetadataRequest(ctx *gin.Context, req ent
 // cold storage (if replicated)
 func (c *FileController) CleanupDeletedFiles() {
 	log.Info("Cleaning up deleted files")
-	// If cleanup is already running, avoiding concurrent runs to avoid concurrent issues
 	if c.cleanupCronRunning {
 		log.Info("Skipping CleanupDeletedFiles cron run as another instance is still running")
 		return
@@ -966,7 +964,6 @@ func (c *FileController) sizeOf(objectKey string) (int64, error) {
 	bucket := c.S3Config.GetHotBucket()
 	var head *s3.HeadObjectOutput
 	var err error
-	// Retry twice with a delay of 500ms and 1000ms
 	for i := 0; i < 3; i++ {
 		head, err = s3Client.HeadObject(&s3.HeadObjectInput{
 			Key:    &objectKey,
@@ -995,11 +992,9 @@ func (c *FileController) onDuplicateObjectDetected(ctx *gin.Context, file ente.F
 		file.Metadata.EncryptedData == existing.Metadata.EncryptedData &&
 		file.Metadata.DecryptionHeader == existing.Metadata.DecryptionHeader &&
 		file.OwnerID == existing.OwnerID {
-		// Already uploaded file
 		file.ID = existing.ID
 		return file, nil
 	} else {
-		// Overwrote an existing file or thumbnail
 		go c.onExistingObjectsReplaced(ctx, file, hotDC)
 		return ente.File{}, ente.ErrBadRequest
 	}

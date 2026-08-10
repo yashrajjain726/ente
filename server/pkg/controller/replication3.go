@@ -50,14 +50,14 @@ type ReplicationController3 struct {
 	ObjectRepo        *repo.ObjectRepository
 	ObjectCopiesRepo  *repo.ObjectCopiesRepository
 	DiscordController *discord.DiscordController
-	workerURL string
-	tempStorage string
-	mUploadSuccess *prometheus.CounterVec
-	mUploadFailure *prometheus.CounterVec
-	b2Client   *s3.S3
-	b2Bucket   *string
-	wasabiDest *UploadDestination
-	scwDest    *UploadDestination
+	workerURL         string
+	tempStorage       string
+	mUploadSuccess    *prometheus.CounterVec
+	mUploadFailure    *prometheus.CounterVec
+	b2Client          *s3.S3
+	b2Bucket          *string
+	wasabiDest        *UploadDestination
+	scwDest           *UploadDestination
 }
 
 type UploadDestination struct {
@@ -65,10 +65,10 @@ type UploadDestination struct {
 	Client   *s3.S3
 	Uploader *s3manager.Uploader
 	Bucket   *string
-	Label string
+	Label    string
 	// If true, we should ignore Wasabi 403 errors. See "Reuploads".
 	HasComplianceHold bool
-	IsGlacier bool
+	IsGlacier         bool
 }
 
 // StartReplication starts the background replication process.
@@ -113,7 +113,6 @@ func (c *ReplicationController3) startWorkers(n int) {
 
 	for i := 0; i < n; i++ {
 		go c.replicate(i)
-		// Stagger the workers
 		time.Sleep(time.Duration(2*i+1) * time.Second)
 	}
 }
@@ -192,14 +191,7 @@ func (c *ReplicationController3) createDestinations() {
 	}
 }
 
-// i is an arbitrary index of the current routine.
 func (c *ReplicationController3) replicate(i int) {
-	// This is just
-	//
-	//    while (true) { replicate() }
-	//
-	// but with an extra sleep for a bit if nothing got replicated - both when
-	// something's wrong, or there's nothing to do.
 	for {
 		err := c.tryReplicate()
 		if err != nil {

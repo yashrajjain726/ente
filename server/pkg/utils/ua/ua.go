@@ -18,9 +18,6 @@ var (
 	detectorErr  error
 )
 
-// Returns the type of device based on the user agent.
-// Example: Desktop, Mobile, Tablet, TV, etc.
-// Returns empty string if the user agent is invalid or the device type is not found, or err is not nil.
 func GetDeviceType(userAgent string) (string, error) {
 	dd, err := getDetector()
 	if err != nil {

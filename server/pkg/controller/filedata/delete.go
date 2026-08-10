@@ -23,19 +23,11 @@ func (c *Controller) startDeleteWorkers(n int) {
 
 	for i := 0; i < n; i++ {
 		go c.delete(i)
-		// Stagger the workers
 		time.Sleep(time.Duration(2*i+1) * time.Minute)
 	}
 }
 
-// i is an arbitrary index of the current routine.
 func (c *Controller) delete(i int) {
-	// This is just
-	//
-	//    while (true) { delete() }
-	//
-	// but with an extra sleep for a bit if nothing got deleted - both when
-	// something's wrong, or there's nothing to do.
 	for {
 		err := c.tryDelete()
 		if err != nil {

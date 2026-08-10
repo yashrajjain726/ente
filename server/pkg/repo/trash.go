@@ -394,17 +394,6 @@ func (t *TrashRepository) GetUserIDToFileIDsMapForDeletion() (map[int64][]int64,
 // This delay ensures compliance with deletion locks.
 // The method orders the results by the 'updated_at' field in ascending order and limits the results to 'TrashDiffLimit' + 1.
 // If multiple files have the same 'updated_at' timestamp and are at the limit boundary, they are excluded to prevent partial scrubbing.
-//
-// Parameters:
-//
-//	sinceUpdatedAt: The timestamp (in microseconds) to filter files that were deleted after this time.
-//
-// Returns:
-//
-//	A slice of FileWithUpdatedAt: Each item contains a file ID and its corresponding 'updated_at' timestamp.
-//	error: If there is any issue in executing the query, an error is returned.
-//
-// Note: The method returns an empty slice if no matching files are found.
 func (t *TrashRepository) GetFileIdsForDroppingMetadata(sinceUpdatedAt int64) ([]FileWithUpdatedAt, error) {
 	rows, err := t.DB.Query(`
 		select file_id, updated_at from trash  where is_deleted=true AND updated_at > $1

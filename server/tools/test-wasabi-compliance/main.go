@@ -19,7 +19,6 @@ const (
 )
 
 func main() {
-	// Can be overridden on the command line with `--endpoint-url`
 	endpointURL := "https://s3.eu-central-2.wasabisys.com"
 
 	onlyDelete := false
@@ -45,17 +44,6 @@ func main() {
 	fmt.Println("Checklist completed successfully")
 }
 
-// # Sequence 1
-//
-//   - Get and print the current compliance settings for the test Wasabi bucket.
-//   - Update the compliance settings to set RetentionDays = 1.
-//   - Get and verify the updated settings.
-//   - Put an object into the bucket.
-//   - Ensure it cannot be deleted or overwritten.
-//   - Get and print the compliance settings for the test object in this bucket.
-//   - Disable the conditional hold for the object.
-//   - Ensure it still cannot be deleted (we'll need to wait for a day).
-//   - Print and verify the updated compliance settings.
 func sequence1(s3Client *s3.S3) error {
 	_, err := getAndPrintBucketCompliance(s3Client)
 	if err != nil {
@@ -110,10 +98,6 @@ func sequence1(s3Client *s3.S3) error {
 	return nil
 }
 
-// # Sequence 2
-//
-//   - Get and print the object's info.
-//   - Delete the object. This time it should succeed.
 func sequence2(s3Client *s3.S3) error {
 	_, err := getAndPrintObjectCompliance(s3Client)
 	if err != nil {
@@ -127,8 +111,6 @@ func sequence2(s3Client *s3.S3) error {
 
 	return nil
 }
-
-// Operations
 
 func getAndPrintBucketCompliance(s3Client *s3.S3) (*wasabi.GetBucketComplianceOutput, error) {
 	out, err := wasabi.GetBucketCompliance(s3Client, &wasabi.GetBucketComplianceInput{

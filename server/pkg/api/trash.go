@@ -49,7 +49,6 @@ func (t *TrashHandler) GetDiffV2(c *gin.Context) {
 	})
 }
 
-// Delete files permanently, queues up the file for deletion & free up the space based on file's object size
 func (t *TrashHandler) Delete(c *gin.Context) {
 	userID := auth.GetUserID(c.Request.Header)
 	var request ente.DeleteTrashFilesRequest

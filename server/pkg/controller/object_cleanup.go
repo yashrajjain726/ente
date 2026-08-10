@@ -68,7 +68,6 @@ func (c *ObjectCleanupController) StartRemovingUnreportedObjects() {
 	}
 }
 
-// i is an arbitrary index for the current goroutine.
 func (c *ObjectCleanupController) removeUnreportedObjectsWorker(i int) {
 	for {
 		count := c.removeUnreportedObjects()
@@ -310,25 +309,6 @@ func (c *ObjectCleanupController) abortMultipartUpload(objectKey string, uploadI
 	return nil
 }
 
-// The original code here checked for NoSuchUpload, presumably because that is
-// the error that B2 returns.
-//
-// Wasabi returns something similar:
-//
-//	<Error>
-//	  <Code>NoSuchUpload</Code>
-//	  <Message>The specified upload does not exist. The upload ID may be invalid,
-//	           or the upload may have been aborted or completed.</Message>
-//	...
-//
-// However, Scaleway returns a different error, NoSuchKey
-//
-//	<Error>
-//	  <Code>NoSuchKey</Code>
-//	  <Message>The specified key does not exist.</Message>
-//	...
-//
-// This method returns true if either of these occur.
 func isUnknownUploadError(err error) bool {
 	// B2, Wasabi
 	if strings.Contains(err.Error(), "NoSuchUpload") {

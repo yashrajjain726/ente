@@ -152,7 +152,6 @@ func (c *CollectionController) TrashV3(ctx *gin.Context, req ente.TrashCollectio
 	}
 
 	if *req.KeepFiles {
-		// Verify that all files from this particular collections have been removed.
 		count, err := c.CollectionRepo.GetCollectionsFilesCount(cID)
 		if err != nil {
 			return stacktrace.Propagate(err, "")

@@ -22,7 +22,6 @@ type EmptyTrashRequest struct {
 	LastUpdatedAt int64 `json:"lastUpdatedAt" binding:"required"`
 }
 
-// TrashCollectionV3Request represents the request for trashing/deleting a collection.
 // In V3, while trashing/deleting any album, the user can decide to either keep or delete the all files which are
 // present in to the trash. When user wants to keep the files, the clients are expected to move all the files from
 // the underlying collection to any other collection owned by the user, inlcuding uncategorized.

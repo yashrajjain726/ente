@@ -106,10 +106,8 @@ type MagicMetadata struct {
 	Version int `json:"version,omitempty" binding:"required"`
 	// Count indicates number of keys in the json presentation of magic attributes.
 	// On edit/update, this number should be >= previous version.
-	Count int `json:"count,omitempty" binding:"required"`
-	// Data represents the encrypted blob for jsonEncoded attributes using file key.
-	Data string `json:"data,omitempty" binding:"required"`
-	// Header used for decrypting the encrypted attr on the client.
+	Count  int    `json:"count,omitempty" binding:"required"`
+	Data   string `json:"data,omitempty" binding:"required"`
 	Header string `json:"header,omitempty" binding:"required"`
 }
 

@@ -173,7 +173,6 @@ func (c *UsageController) canUploadFile(ctx context.Context, userID int64, size 
 		}
 		var eligibleBonus = bonus.GetUsableBonus(subStorage)
 		if newUsage > (subStorage + eligibleBonus) {
-			// fetch lockerUsage if it's null. We need to discount locker usage while checking storage limit
 			if lockerUsage == nil && lUsageErr == nil {
 				lockerUsage, lUsageErr = c.UsageRepo.GetLockerUsage(ctx, subscriptionUserIDs)
 				if lUsageErr != nil {
@@ -186,8 +185,6 @@ func (c *UsageController) canUploadFile(ctx context.Context, userID int64, size 
 		}
 	}
 
-	// Get particular member's storage and check if the file size is larger than the size of the storage allocated
-	// to the Member and fail if it's too large.
 	if subscriptionAdminID != userID && memberStorageLimit != nil {
 		memberUsage, memberUsageErr := c.UsageRepo.GetUsage(userID)
 		if memberUsageErr != nil {
@@ -196,7 +193,6 @@ func (c *UsageController) canUploadFile(ctx context.Context, userID int64, size 
 		if size != nil {
 			memberUsage += *size
 		}
-		// Upload fail if memberStorageLimit > memberUsage ((fileSize + total Usage) + StorageOverflowAboveSubscriptionLimit (50mb))
 		if memberUsage > (*memberStorageLimit + StorageOverflowAboveSubscriptionLimit) {
 			return stacktrace.Propagate(ente.ErrStorageLimitExceeded, "member Storage Limit Exceeded (limit %d, usage %d)", *memberStorageLimit, memberUsage)
 

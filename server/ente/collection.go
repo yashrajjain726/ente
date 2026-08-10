@@ -165,7 +165,6 @@ type RemoveFilesRequest struct {
 	FileIDs []int64 `json:"fileIDs"`
 }
 
-// RemoveFilesV3Request represents request payload for v3 version of removing files from collection
 // In V3, only those files are allowed to be removed from collection which don't belong to the collection owner.
 // If collection owner wants to remove files owned by them, the client should move those files to other collections
 // owned by the collection user. Also, See [Collection Delete Versions] for additional context.
@@ -175,7 +174,6 @@ type RemoveFilesV3Request struct {
 	FileIDs []int64 `json:"fileIDs"  binding:"required"`
 }
 
-// SuggestDeleteRequest represents a request to suggest deletion of files in a shared collection.
 // Only collection owner or admins can suggest deletion for files owned by others (not the acting user).
 type SuggestDeleteRequest struct {
 	CollectionID int64   `json:"collectionID" binding:"required"`
