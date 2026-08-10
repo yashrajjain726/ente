@@ -3,6 +3,7 @@ import { CollectionsSortOptions } from "@/components/CollectionsSortOptions";
 import { StarIcon } from "@/components/icons/StarIcon";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import CloseIcon from "@mui/icons-material/Close";
+import DeleteOutlinedIcon from "@mui/icons-material/DeleteOutlined";
 import PushPinIcon from "@mui/icons-material/PushPin";
 import SearchIcon from "@mui/icons-material/Search";
 import {
@@ -24,6 +25,7 @@ import {
 import { FilledIconButton } from "ente-base/components/mui";
 import { SingleInputDialog } from "ente-base/components/SingleInputDialog";
 import { useModalVisibility } from "ente-base/components/utils/modal";
+import { useBaseContext } from "ente-base/context";
 import { SlideUpTransition } from "ente-new/photos/components/mui/SlideUpTransition";
 import {
     ItemCard,
@@ -34,11 +36,17 @@ import {
 import {
     createAlbum,
     createHiddenAlbum,
+    deleteCollection,
 } from "ente-new/photos/services/collection";
-import type {
-    CollectionsSortBy,
-    CollectionSummary,
+import {
+    isBulkDeletableEmptyAlbum,
+    type CollectionsSortBy,
+    type CollectionSummary,
 } from "ente-new/photos/services/collection-summary";
+import {
+    savedCollectionFiles,
+    savedCollections,
+} from "ente-new/photos/services/photos-fdb";
 import { usePhotosAppContext } from "ente-new/photos/types/context";
 import { t } from "i18next";
 import memoize from "memoize-one";
@@ -75,6 +83,7 @@ export const AllAlbums: React.FC<AllAlbums> = ({
 }) => {
     const fullScreen = useMediaQuery("(max-width: 428px)");
     const [searchTerm, setSearchTerm] = useState("");
+    const { showMiniDialog } = useBaseContext();
     const { showNotification } = usePhotosAppContext();
     const { show: showAlbumNameInput, props: albumNameInputVisibilityProps } =
         useModalVisibility();
@@ -117,6 +126,71 @@ export const AllAlbums: React.FC<AllAlbums> = ({
         })();
     };
 
+    const emptyAlbumCandidates = useMemo(
+        () => collectionSummaries.filter(isBulkDeletableEmptyAlbum),
+        [collectionSummaries],
+    );
+    const showDeleteEmptyAlbums =
+        !isInHiddenSection &&
+        !searchTerm.trim() &&
+        emptyAlbumCandidates.length >= 3;
+
+    const deleteEmptyAlbums = async (candidateIDs: number[]) => {
+        let failedCount = 0;
+
+        try {
+            await onRemotePull();
+
+            const collections = await savedCollections();
+            const existingCollectionIDs = new Set(
+                collections.map((collection) => collection.id),
+            );
+            const collectionFiles = await savedCollectionFiles();
+            const nonEmptyCollectionIDs = new Set(
+                collectionFiles.map((file) => file.collectionID),
+            );
+            const confirmedCandidateIDs = candidateIDs.filter(
+                (id) =>
+                    existingCollectionIDs.has(id) &&
+                    !nonEmptyCollectionIDs.has(id),
+            );
+
+            for (const id of confirmedCandidateIDs) {
+                try {
+                    await deleteCollection(id, { keepFiles: true });
+                } catch {
+                    failedCount++;
+                }
+            }
+
+            await onRemotePull();
+        } catch {
+            failedCount = candidateIDs.length;
+        }
+
+        if (failedCount > 0) {
+            showNotification({
+                color: "critical",
+                title: t("delete_empty_albums_failed", { count: failedCount }),
+            });
+        }
+    };
+
+    const handleDeleteEmptyAlbums = () => {
+        const candidateIDs = emptyAlbumCandidates.map((cs) => cs.id);
+        showMiniDialog({
+            title: t("delete_empty_albums_title"),
+            message: t("delete_empty_albums_message", {
+                count: candidateIDs.length,
+            }),
+            continue: {
+                text: t("delete"),
+                color: "critical",
+                action: () => deleteEmptyAlbums(candidateIDs),
+            },
+        });
+    };
+
     const filteredCollectionSummaries = useMemo(() => {
         if (!searchTerm.trim()) {
             return collectionSummaries;
@@ -156,6 +230,11 @@ export const AllAlbums: React.FC<AllAlbums> = ({
                     totalCount={collectionSummaries.length}
                     searchTerm={searchTerm}
                     onSearchChange={setSearchTerm}
+                    onDeleteEmptyAlbums={
+                        showDeleteEmptyAlbums
+                            ? handleDeleteEmptyAlbums
+                            : undefined
+                    }
                 />
                 <Divider />
                 <AllAlbumsContent
@@ -261,6 +340,7 @@ type TitleProps = {
     totalCount: number;
     searchTerm: string;
     onSearchChange: (value: string) => void;
+    onDeleteEmptyAlbums?: () => void;
 } & Pick<
     AllAlbums,
     | "onClose"
@@ -278,6 +358,7 @@ const Title: React.FC<TitleProps> = ({
     collectionsSortBy,
     onChangeCollectionsSortBy,
     isInHiddenSection,
+    onDeleteEmptyAlbums,
 }) => (
     <DialogTitle>
         <Stack sx={{ gap: 1.5 }}>
@@ -304,6 +385,13 @@ const Title: React.FC<TitleProps> = ({
                     onChangeSortBy={onChangeCollectionsSortBy}
                     nestedInDialog
                 />
+                {onDeleteEmptyAlbums ? (
+                    <Tooltip title={t("delete_empty_albums")}>
+                        <FilledIconButton onClick={onDeleteEmptyAlbums}>
+                            <DeleteOutlinedIcon />
+                        </FilledIconButton>
+                    </Tooltip>
+                ) : null}
                 <FilledIconButton onClick={onClose}>
                     <CloseIcon />
                 </FilledIconButton>
