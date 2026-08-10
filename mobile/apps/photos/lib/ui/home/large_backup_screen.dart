@@ -14,7 +14,6 @@ import "package:photos/service_locator.dart";
 import "package:photos/services/sync/large_backup_session_tracker.dart";
 import "package:photos/services/wake_lock_service.dart";
 import "package:photos/ui/components/alert_bottom_sheet.dart";
-import "package:photos/ui/settings/components/settings_page_scaffold.dart";
 import "package:rive/rive.dart" as rive;
 
 Future<void> showLargeBackupScreen(
