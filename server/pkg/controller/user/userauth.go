@@ -699,7 +699,7 @@ func (c *UserController) onVerificationSuccess(context *gin.Context, email strin
 		}
 	}
 	var encryptedToken string
-	encryptedToken, err = crypto.GetEncryptedTokenNative(token, keyAttributes.PublicKey)
+	encryptedToken, err = crypto.GetEncryptedToken(token, keyAttributes.PublicKey)
 	if err != nil {
 		return ente.EmailAuthorizationResponse{}, stacktrace.Propagate(err, "")
 	}
