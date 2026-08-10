@@ -808,14 +808,23 @@ const Page: React.FC = () => {
             remotePullQueue.current.add(async () => {
                 const { silent, source, strict } = opts ?? {};
 
-                if (!navigator.onLine) return;
+                if (!navigator.onLine) {
+                    if (strict) throw new Error("Remote pull failed: offline");
+                    return;
+                }
                 if (await isSessionInvalid()) {
                     showSessionExpiredDialog();
+                    if (strict)
+                        throw new Error("Remote pull failed: invalid session");
                     return;
                 }
                 if (!(await masterKeyFromSession())) {
                     clearSessionStorage();
                     router.push("/credentials");
+                    if (strict)
+                        throw new Error(
+                            "Remote pull failed: missing master key",
+                        );
                     return;
                 }
 
