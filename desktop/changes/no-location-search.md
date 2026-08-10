@@ -1,1 +1,1 @@
-- Added search for photos without location information.
+- parity: Added search for photos without location information.
