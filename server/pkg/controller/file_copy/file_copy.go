@@ -157,10 +157,8 @@ func (fc *FileCopyController) CopyFiles(c *gin.Context, req ente.CopyFileSyncReq
 		})
 	}
 
-	// Wait for all goroutines to finish
 	wg.Wait()
 
-	// Close the error channel and check if there were any errors
 	close(errChan)
 	if err, ok := <-errChan; ok {
 		return nil, err
@@ -169,7 +167,6 @@ func (fc *FileCopyController) CopyFiles(c *gin.Context, req ente.CopyFileSyncReq
 }
 
 func (fc *FileCopyController) createCopy(c *gin.Context, fcInternal fileCopyInternal, userID int64, app ente.App) (*ente.File, error) {
-	// using HotS3Client copy the File and Thumbnail
 	s3Client := fc.S3Config.GetHotS3Client()
 	hotBucket := fc.S3Config.GetHotBucket()
 	g := new(errgroup.Group)
@@ -190,7 +187,6 @@ func (fc *FileCopyController) createCopy(c *gin.Context, fcInternal fileCopyInte
 	return &newFile, nil
 }
 
-// Helper function for S3 object copying.
 func copyS3Object(s3Client *s3.S3, bucket *string, req *copyS3ObjectReq) error {
 	copySource := fmt.Sprintf("%s/%s", *bucket, req.SourceS3Object.ObjectKey)
 	copyInput := &s3.CopyObjectInput{

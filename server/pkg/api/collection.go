@@ -15,12 +15,10 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// CollectionHandler exposes request handlers for all collection related requests
 type CollectionHandler struct {
 	Controller *collections.CollectionController
 }
 
-// Create creates a collection
 func (h *CollectionHandler) Create(c *gin.Context) {
 	log.Info("Collection create")
 	var collection ente.Collection
@@ -42,7 +40,6 @@ func (h *CollectionHandler) Create(c *gin.Context) {
 	})
 }
 
-// GetCollectionByID returns the collection for given ID.
 func (h *CollectionHandler) GetCollectionByID(c *gin.Context) {
 	cID, err := strconv.ParseInt(c.Param("collectionID"), 10, 64)
 	if err != nil {
@@ -61,12 +58,10 @@ func (h *CollectionHandler) GetCollectionByID(c *gin.Context) {
 }
 
 // Deprecated: Remove once rps goes to 0.
-// Get returns the list of collections accessible to a user.
 func (h *CollectionHandler) Get(c *gin.Context) {
 	h.GetV2(c)
 }
 
-// GetV2 returns the list of collections accessible to a user
 func (h *CollectionHandler) GetV2(c *gin.Context) {
 	userID := auth.GetUserID(c.Request.Header)
 	sinceTime, _ := strconv.ParseInt(c.Query("sinceTime"), 10, 64)
@@ -86,7 +81,6 @@ func (h *CollectionHandler) GetV2(c *gin.Context) {
 	})
 }
 
-// GetWithLimit returns owned and shared collections accessible to a user
 func (h *CollectionHandler) GetWithLimit(c *gin.Context) {
 	userID := auth.GetUserID(c.Request.Header)
 	sinceTime, _ := strconv.ParseInt(c.Query("sinceTime"), 10, 64)
@@ -115,7 +109,6 @@ func (h *CollectionHandler) GetWithLimit(c *gin.Context) {
 	})
 }
 
-// Share shares a collection with a user
 func (h *CollectionHandler) Share(c *gin.Context) {
 	var request ente.AlterShareRequest
 	if err := handler.BindJSON(c, &request); err != nil {
@@ -132,7 +125,6 @@ func (h *CollectionHandler) Share(c *gin.Context) {
 	})
 }
 
-// BulkShare shares up to 100 collections with one user.
 func (h *CollectionHandler) BulkShare(c *gin.Context) {
 	var request ente.BulkCollectionShareRequest
 	if err := handler.BindJSON(c, &request); err != nil {
@@ -161,7 +153,6 @@ func (h *CollectionHandler) JoinLink(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{})
 }
 
-// ShareURL generates a publicly sharable url
 func (h *CollectionHandler) ShareURL(c *gin.Context) {
 	var request ente.CreatePublicAccessTokenRequest
 	if err := handler.BindJSON(c, &request); err != nil {
@@ -178,7 +169,6 @@ func (h *CollectionHandler) ShareURL(c *gin.Context) {
 	})
 }
 
-// UpdateShareURL generates a publicly sharable url
 func (h *CollectionHandler) UpdateShareURL(c *gin.Context) {
 	var req ente.UpdatePublicAccessTokenRequest
 	if err := handler.BindJSON(c, &req); err != nil {
@@ -195,7 +185,6 @@ func (h *CollectionHandler) UpdateShareURL(c *gin.Context) {
 	})
 }
 
-// UnShareURL disable all shared urls for the given collectionID
 func (h *CollectionHandler) UnShareURL(c *gin.Context) {
 	cID, err := strconv.ParseInt(c.Param("collectionID"), 10, 64)
 	if err != nil {
@@ -211,7 +200,6 @@ func (h *CollectionHandler) UnShareURL(c *gin.Context) {
 	c.Status(http.StatusOK)
 }
 
-// UnShare unshares a collection with a user
 func (h *CollectionHandler) UnShare(c *gin.Context) {
 	var request ente.AlterShareRequest
 	if err := handler.BindJSON(c, &request); err != nil {
@@ -228,7 +216,6 @@ func (h *CollectionHandler) UnShare(c *gin.Context) {
 	})
 }
 
-// BulkUnShare revokes one user's access to up to 100 collections.
 func (h *CollectionHandler) BulkUnShare(c *gin.Context) {
 	var request ente.BulkCollectionUnshareRequest
 	if err := handler.BindJSON(c, &request); err != nil {
@@ -243,7 +230,6 @@ func (h *CollectionHandler) BulkUnShare(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"results": results})
 }
 
-// Leave allows user to leave a shared collection, which is not owned by them
 func (h *CollectionHandler) Leave(c *gin.Context) {
 	cID, err := strconv.ParseInt(c.Param("collectionID"), 10, 64)
 	if err != nil {
@@ -258,7 +244,6 @@ func (h *CollectionHandler) Leave(c *gin.Context) {
 	c.Status(http.StatusOK)
 }
 
-// AddFiles adds files to a collection
 func (h *CollectionHandler) AddFiles(c *gin.Context) {
 	var request ente.AddFilesRequest
 	if err := handler.BindJSON(c, &request); err != nil {
@@ -277,7 +262,6 @@ func (h *CollectionHandler) AddFiles(c *gin.Context) {
 	c.Status(http.StatusOK)
 }
 
-// RestoreFiles adds files from trash to given collection
 func (h *CollectionHandler) RestoreFiles(c *gin.Context) {
 	var request ente.AddFilesRequest
 	if err := handler.BindJSON(c, &request); err != nil {
@@ -297,7 +281,6 @@ func (h *CollectionHandler) RestoreFiles(c *gin.Context) {
 	c.Status(http.StatusOK)
 }
 
-// Movefiles from one collection to another
 func (h *CollectionHandler) MoveFiles(c *gin.Context) {
 	var request ente.MoveFilesRequest
 	if err := handler.BindJSON(c, &request); err != nil {
@@ -320,7 +303,6 @@ func (h *CollectionHandler) MoveFiles(c *gin.Context) {
 	c.Status(http.StatusOK)
 }
 
-// RemoveFilesV3 allow removing files from a collection when files and collection belong to two different users
 func (h *CollectionHandler) RemoveFilesV3(c *gin.Context) {
 	var request ente.RemoveFilesV3Request
 	if err := handler.BindJSON(c, &request); err != nil {
@@ -358,7 +340,6 @@ func (h *CollectionHandler) SuggestDeleteInSharedCollection(c *gin.Context) {
 	c.Status(http.StatusOK)
 }
 
-// GetDiffV2 returns the diff within a collection since a timestamp
 func (h *CollectionHandler) GetDiffV2(c *gin.Context) {
 	userID := auth.GetUserID(c.Request.Header)
 	cID, _ := strconv.ParseInt(c.Query("collectionID"), 10, 64)
@@ -374,7 +355,6 @@ func (h *CollectionHandler) GetDiffV2(c *gin.Context) {
 	})
 }
 
-// GetFile returns the diff within a collection since a timestamp
 func (h *CollectionHandler) GetFile(c *gin.Context) {
 	cID, _ := strconv.ParseInt(c.Query("collectionID"), 10, 64)
 	fileID, _ := strconv.ParseInt(c.Query("fileID"), 10, 64)
@@ -388,7 +368,6 @@ func (h *CollectionHandler) GetFile(c *gin.Context) {
 	})
 }
 
-// GetSharees returns the list of users a collection has been shared with
 func (h *CollectionHandler) GetSharees(c *gin.Context) {
 	userID := auth.GetUserID(c.Request.Header)
 	cID, _ := strconv.ParseInt(c.Query("collectionID"), 10, 64)
@@ -418,7 +397,6 @@ func (h *CollectionHandler) TrashV3(c *gin.Context) {
 	c.Status(http.StatusOK)
 }
 
-// Rename updates the collection's name
 func (h *CollectionHandler) Rename(c *gin.Context) {
 	var request ente.RenameRequest
 	if err := handler.BindJSON(c, &request); err != nil {
@@ -432,7 +410,6 @@ func (h *CollectionHandler) Rename(c *gin.Context) {
 	c.Status(http.StatusOK)
 }
 
-// Updates the magic metadata for a collection
 func (h *CollectionHandler) PrivateMagicMetadataUpdate(c *gin.Context) {
 	var request ente.UpdateCollectionMagicMetadata
 	if err := handler.BindJSON(c, &request); err != nil {
@@ -446,7 +423,6 @@ func (h *CollectionHandler) PrivateMagicMetadataUpdate(c *gin.Context) {
 	c.Status(http.StatusOK)
 }
 
-// PublicMagicMetadataUpdate updates the public magic metadata for a collection
 func (h *CollectionHandler) PublicMagicMetadataUpdate(c *gin.Context) {
 	var request ente.UpdateCollectionMagicMetadata
 	if err := handler.BindJSON(c, &request); err != nil {
@@ -460,7 +436,6 @@ func (h *CollectionHandler) PublicMagicMetadataUpdate(c *gin.Context) {
 	c.Status(http.StatusOK)
 }
 
-// ShareeMagicMetadataUpdate updates sharees magic metadata for shared collection.
 func (h *CollectionHandler) ShareeMagicMetadataUpdate(c *gin.Context) {
 	var request ente.UpdateCollectionMagicMetadata
 	if err := handler.BindJSON(c, &request); err != nil {

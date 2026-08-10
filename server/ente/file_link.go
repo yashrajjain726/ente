@@ -5,7 +5,6 @@ import (
 	"github.com/ente/museum/pkg/utils/time"
 )
 
-// CreateFileUrl represents an encrypted file in the system
 type CreateFileUrl struct {
 	FileID                int64   `json:"fileID" binding:"required"`
 	App                   App     `json:"app" binding:"required"`
@@ -17,7 +16,6 @@ type CreateFileUrl struct {
 	EncryptedShareKey     *string `json:"encryptedShareKey,omitempty"`
 }
 
-// UpdateFileUrl ..
 type UpdateFileUrl struct {
 	LinkID          string `json:"linkID" binding:"required"`
 	FileID          int64  `json:"fileID" binding:"required"`

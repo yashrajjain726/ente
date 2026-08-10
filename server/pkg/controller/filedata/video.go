@@ -63,7 +63,6 @@ func (c *Controller) InsertVideoPreview(ctx *gin.Context, req *filedata.VidPrevi
 			isDuplicate, checkErr := c._checkIfDuplicateRequest(ctx, row, fileObjectKey)
 			if checkErr != nil {
 				logger.WithError(checkErr).Error("failed to check for duplicate request")
-				// continue with existing dbInsertErr
 			}
 			if isDuplicate {
 				logger.Info("duplicate put request detected, ignoring")

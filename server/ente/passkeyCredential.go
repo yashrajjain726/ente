@@ -28,7 +28,6 @@ type PasskeyCredential struct {
 	CreatedAt int64 `json:"createdAt"`
 }
 
-// de-serialization function into a webauthn.Credential
 func (c *PasskeyCredential) WebAuthnCredential() (cred *webauthn.Credential, err error) {
 
 	decodedID, err := base64.StdEncoding.DecodeString(c.CredentialID)
@@ -48,7 +47,6 @@ func (c *PasskeyCredential) WebAuthnCredential() (cred *webauthn.Credential, err
 
 	cred.Transport = transports
 
-	// decode b64 back to []byte
 	publicKeyByte, err := base64.StdEncoding.DecodeString(c.PublicKey)
 	if err != nil {
 		return
@@ -74,7 +72,6 @@ func (c *PasskeyCredential) WebAuthnCredential() (cred *webauthn.Credential, err
 		return
 	}
 
-	// decode the AAGUID base64 back to []byte
 	aaguidByte, err := base64.StdEncoding.DecodeString(
 		authenticatorMap["AAGUID"].(string),
 	)

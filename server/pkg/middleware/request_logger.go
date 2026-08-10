@@ -70,7 +70,6 @@ func shouldSkipBodyLog(method string, path string) bool {
 	return false
 }
 
-// Logger logs the details regarding an incoming request
 func Logger(urlSanitizer func(_ *gin.Context) string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		startTime := time.Now()
@@ -80,7 +79,6 @@ func Logger(urlSanitizer func(_ *gin.Context) string) gin.HandlerFunc {
 			handler.Error(c, err)
 		}
 		rdr1 := io.NopCloser(bytes.NewBuffer(buf))
-		// Creating a new Buffer, because rdr1 will be read
 		rdr2 := io.NopCloser(bytes.NewBuffer(buf))
 
 		userAgent := c.GetHeader("User-Agent")
@@ -116,7 +114,6 @@ func Logger(urlSanitizer func(_ *gin.Context) string) gin.HandlerFunc {
 		}
 		reqContextLogger.Info("incoming")
 		c.Request.Body = rdr2
-		// Processing request
 		c.Next()
 		statusCode := c.Writer.Status()
 		latencyTime := time.Since(startTime)

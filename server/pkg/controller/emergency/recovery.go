@@ -55,7 +55,6 @@ func (c *Controller) ChangePassword(ctx *gin.Context, userID int64, request ente
 	if err != nil {
 		return nil, err
 	}
-	// disable 2fa
 	if disableErr := c.UserCtrl.DisableTwoFactor(contact.UserID); disableErr != nil {
 		return nil, stacktrace.Propagate(disableErr, "failed to disable 2fa")
 	}
@@ -156,15 +155,12 @@ func (c *Controller) SendRecoveryReminder() {
 				shouldUpdate bool
 			)
 			if daysLeft > 9 {
-				// schedule another reminder after 7 days
 				nextReminder = row.NextReminderAt + int64(microsecondsInDay*7)
 				shouldUpdate = true
 			} else if daysLeft > 2 {
-				// schedule the final reminder two days before waitTill
 				nextReminder = row.WaitTill - int64(microsecondsInDay*2)
 				shouldUpdate = true
 			} else {
-				// final reminder already sent; wait until recovery becomes ready
 				nextReminder = row.WaitTill
 				shouldUpdate = true
 			}

@@ -21,13 +21,11 @@ import (
 	"github.com/google/uuid"
 )
 
-// UserHandler exposes request handlers for all user related requests
 type UserHandler struct {
 	UserController      *user.UserController
 	EmergencyController *emergency.Controller
 }
 
-// SendOTT generates and sends an OTT to the provided email address
 func (h *UserHandler) SendOTT(c *gin.Context) {
 	var request ente.SendOTTRequest
 	if err := handler.BindJSON(c, &request); err != nil {
@@ -48,7 +46,6 @@ func (h *UserHandler) SendOTT(c *gin.Context) {
 	}
 }
 
-// Logout removes the auth token from (instance) cache &  database.
 func (h *UserHandler) Logout(c *gin.Context) {
 	err := h.UserController.Logout(c)
 	if err != nil {
@@ -58,7 +55,6 @@ func (h *UserHandler) Logout(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{})
 }
 
-// GetDetailsV2 returns details about the requesting user
 func (h *UserHandler) GetDetailsV2(c *gin.Context) {
 	userID := auth.GetUserID(c.Request.Header)
 	fetchMemoryCount, _ := strconv.ParseBool(c.DefaultQuery("memoryCount", "true"))
@@ -73,7 +69,6 @@ func (h *UserHandler) GetDetailsV2(c *gin.Context) {
 	c.JSON(http.StatusOK, details)
 }
 
-// GetAccountDeletionSummary returns counts for data that will be deleted.
 func (h *UserHandler) GetAccountDeletionSummary(c *gin.Context) {
 	userID := auth.GetUserID(c.Request.Header)
 	summary, err := h.UserController.GetAccountDeletionSummary(c.Request.Context(), userID)
@@ -84,7 +79,6 @@ func (h *UserHandler) GetAccountDeletionSummary(c *gin.Context) {
 	c.JSON(http.StatusOK, summary)
 }
 
-// GetLockerUsage returns locker usage details for the requesting user.
 func (h *UserHandler) GetLockerUsage(c *gin.Context) {
 	userID := auth.GetUserID(c.Request.Header)
 
@@ -96,7 +90,6 @@ func (h *UserHandler) GetLockerUsage(c *gin.Context) {
 	c.JSON(http.StatusOK, lockerUsage)
 }
 
-// SetAttributes sets the attributes for a user
 func (h *UserHandler) SetAttributes(c *gin.Context) {
 	userID := auth.GetUserID(c.Request.Header)
 	var request ente.SetUserAttributesRequest
@@ -131,7 +124,6 @@ func (h *UserHandler) UpdateEmailMFA(c *gin.Context) {
 	c.Status(http.StatusOK)
 }
 
-// SetRecoveryKey sets the recovery key attributes for a user.
 func (h *UserHandler) SetRecoveryKey(c *gin.Context) {
 	userID := auth.GetUserID(c.Request.Header)
 	var request ente.SetRecoveryKeyRequest
@@ -147,7 +139,6 @@ func (h *UserHandler) SetRecoveryKey(c *gin.Context) {
 	c.Status(http.StatusOK)
 }
 
-// GetPublicKey returns the public key of a user
 func (h *UserHandler) GetPublicKey(c *gin.Context) {
 	publicKey, err := h.UserController.GetPublicKey(
 		auth.GetUserID(c.Request.Header),
@@ -162,7 +153,6 @@ func (h *UserHandler) GetPublicKey(c *gin.Context) {
 	})
 }
 
-// GetSessionValidityV2 verifies the user's session token and returns if the user has set their keys or not
 func (h *UserHandler) GetSessionValidityV2(c *gin.Context) {
 	userID := auth.GetUserID(c.Request.Header)
 	keyAttributes, err := h.UserController.GetAttributes(userID)
@@ -182,8 +172,6 @@ func (h *UserHandler) GetSessionValidityV2(c *gin.Context) {
 	}
 }
 
-// VerifyEmail validates that the OTT provided in the request is valid for the
-// provided email address and if yes returns the users credentials
 func (h *UserHandler) VerifyEmail(c *gin.Context) {
 	var request ente.EmailVerificationRequest
 	if err := handler.BindJSON(c, &request); err != nil {
@@ -198,8 +186,6 @@ func (h *UserHandler) VerifyEmail(c *gin.Context) {
 	c.JSON(http.StatusOK, response)
 }
 
-// ChangeEmail validates that the OTT provided in the request is valid for the
-// provided email address and if yes updates the user's existing email address
 func (h *UserHandler) ChangeEmail(c *gin.Context) {
 	var request ente.EmailVerificationRequest
 	if err := handler.BindJSON(c, &request); err != nil {
@@ -214,7 +200,6 @@ func (h *UserHandler) ChangeEmail(c *gin.Context) {
 	c.Status(http.StatusOK)
 }
 
-// GetTwoFactorStatus returns a user's two factor status
 func (h *UserHandler) GetTwoFactorStatus(c *gin.Context) {
 	userID := auth.GetUserID(c.Request.Header)
 	status, err := h.UserController.GetTwoFactorStatus(userID)
@@ -234,8 +219,6 @@ func (h *UserHandler) GetTwoFactorRecoveryStatus(c *gin.Context) {
 	c.JSON(http.StatusOK, res)
 }
 
-// ConfigurePasskeyRecovery configures the passkey skip challenge for a user. In case the user does not
-// have access to passkey, the user can bypass the passkey by providing the recovery key
 func (h *UserHandler) ConfigurePasskeyRecovery(c *gin.Context) {
 	var request ente.SetPasskeyRecoveryRequest
 	if err := handler.BindJSON(c, &request); err != nil {
@@ -250,7 +233,6 @@ func (h *UserHandler) ConfigurePasskeyRecovery(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{})
 }
 
-// SetupTwoFactor generates a two factor secret and sends it to user to setup his authenticator app with
 func (h *UserHandler) SetupTwoFactor(c *gin.Context) {
 	userID := auth.GetUserID(c.Request.Header)
 	response, err := h.UserController.SetupTwoFactor(userID)
@@ -261,7 +243,6 @@ func (h *UserHandler) SetupTwoFactor(c *gin.Context) {
 	c.JSON(http.StatusOK, response)
 }
 
-// EnableTwoFactor handles the two factor activation request after user has setup his two factor by validing a totp request
 func (h *UserHandler) EnableTwoFactor(c *gin.Context) {
 	userID := auth.GetUserID(c.Request.Header)
 	var request ente.TwoFactorEnableRequest
@@ -277,7 +258,6 @@ func (h *UserHandler) EnableTwoFactor(c *gin.Context) {
 	c.Status(http.StatusOK)
 }
 
-// VerifyTwoFactor handles the two factor validation request
 func (h *UserHandler) VerifyTwoFactor(c *gin.Context) {
 	var request ente.TwoFactorVerificationRequest
 	if err := handler.BindJSON(c, &request); err != nil {
@@ -292,7 +272,6 @@ func (h *UserHandler) VerifyTwoFactor(c *gin.Context) {
 	c.JSON(http.StatusOK, response)
 }
 
-// BeginPasskeyRegistrationCeremony handles the request to begin the passkey registration ceremony
 func (h *UserHandler) BeginPasskeyAuthenticationCeremony(c *gin.Context) {
 	var request ente.PasskeyTwoFactorBeginAuthenticationCeremonyRequest
 	if err := handler.BindJSON(c, &request); err != nil {
@@ -403,7 +382,6 @@ func (h *UserHandler) IsPasskeyRecoveryEnabled(c *gin.Context) {
 	c.JSON(http.StatusOK, response)
 }
 
-// DisableTwoFactor disables the two factor authentication for a user
 func (h *UserHandler) DisableTwoFactor(c *gin.Context) {
 	userID := auth.GetUserID(c.Request.Header)
 	err := h.UserController.DisableTwoFactor(userID)
@@ -414,8 +392,6 @@ func (h *UserHandler) DisableTwoFactor(c *gin.Context) {
 	c.Status(http.StatusOK)
 }
 
-// RecoverTwoFactor handles the two factor recovery request by sending the
-// recoveryKeyEncryptedTwoFactorSecret for the user to decrypt it and make twoFactor removal api call
 func (h *UserHandler) RecoverTwoFactor(c *gin.Context) {
 	sessionID := c.Query("sessionID")
 	twoFactorType := c.Query("twoFactorType")
@@ -433,8 +409,6 @@ func (h *UserHandler) RecoverTwoFactor(c *gin.Context) {
 	c.JSON(http.StatusOK, response)
 }
 
-// RemoveTwoFactor handles two factor deactivation request if user lost his device
-// by authenticating him using his twoFactorsessionToken and twoFactor secret
 func (h *UserHandler) RemoveTwoFactor(c *gin.Context) {
 	var request ente.TwoFactorRemovalRequest
 	if err := handler.BindJSON(c, &request); err != nil {
@@ -519,7 +493,6 @@ func (h *UserHandler) GetActiveSessions(c *gin.Context) {
 	})
 }
 
-// TerminateSession removes the auth token from (instance) cache & database.
 func (h *UserHandler) TerminateSession(c *gin.Context) {
 	userID := auth.GetUserID(c.Request.Header)
 	token := c.Query("token")
@@ -531,9 +504,6 @@ func (h *UserHandler) TerminateSession(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{})
 }
 
-// GetDeleteChallenge responds with flag to indicate if account deletion is enabled.
-// When enabled, it returns a challenge/encrypted token which clients need to decrypt
-// and send-back while confirming deletion
 func (h *UserHandler) GetDeleteChallenge(c *gin.Context) {
 	response, err := h.UserController.GetDeleteChallengeToken(c)
 	if err != nil {
@@ -543,7 +513,6 @@ func (h *UserHandler) GetDeleteChallenge(c *gin.Context) {
 	c.JSON(http.StatusOK, response)
 }
 
-// DeleteUser api for deleting a user
 func (h *UserHandler) DeleteUser(c *gin.Context) {
 	var request ente.DeleteAccountRequest
 	if err := handler.BindJSON(c, &request); err != nil {
@@ -615,7 +584,6 @@ func (h *UserHandler) RecoverSelfAccount(c *gin.Context) {
 	c.JSON(http.StatusOK, response)
 }
 
-// GetSRPAttributes returns the SRP attributes for a user
 func (h *UserHandler) GetSRPAttributes(c *gin.Context) {
 	var request ente.GetSRPAttributesRequest
 	if err := c.ShouldBindQuery(&request); err != nil {
@@ -635,7 +603,6 @@ func (h *UserHandler) GetSRPAttributes(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"attributes": response})
 }
 
-// SetupSRP sets the SRP attributes for a user
 func (h *UserHandler) SetupSRP(c *gin.Context) {
 	var request ente.SetupSRPRequest
 	if err := handler.BindJSON(c, &request); err != nil {
@@ -651,7 +618,6 @@ func (h *UserHandler) SetupSRP(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
-// CompleteSRPSetup completes the SRP setup for a user
 func (h *UserHandler) CompleteSRPSetup(c *gin.Context) {
 	var request ente.CompleteSRPSetupRequest
 	if err := handler.BindJSON(c, &request); err != nil {
@@ -666,7 +632,6 @@ func (h *UserHandler) CompleteSRPSetup(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
-// UpdateSrpAndKeyAttributes updates the SRP setup for a user and key attributes
 func (h *UserHandler) UpdateSrpAndKeyAttributes(c *gin.Context) {
 	var request ente.UpdateSRPAndKeysRequest
 	if err := handler.BindJSON(c, &request); err != nil {
@@ -674,7 +639,6 @@ func (h *UserHandler) UpdateSrpAndKeyAttributes(c *gin.Context) {
 		return
 	}
 	userID := auth.GetUserID(c.Request.Header)
-	// default to true
 	clearTokens := true
 	if request.LogOutOtherDevices != nil {
 		clearTokens = *request.LogOutOtherDevices
@@ -687,7 +651,6 @@ func (h *UserHandler) UpdateSrpAndKeyAttributes(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
-// CreateSRPSession set the SRP A value on the server and returns the SRP B value to the client
 func (h *UserHandler) CreateSRPSession(c *gin.Context) {
 	var request ente.CreateSRPSessionRequest
 	if err := handler.BindJSON(c, &request); err != nil {
@@ -702,7 +665,6 @@ func (h *UserHandler) CreateSRPSession(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
-// VerifySRPSession checks the M1 value to determine if user actually knows the password
 func (h *UserHandler) VerifySRPSession(c *gin.Context) {
 	var request ente.VerifySRPSessionRequest
 	if err := handler.BindJSON(c, &request); err != nil {

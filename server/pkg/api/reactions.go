@@ -14,7 +14,6 @@ import (
 
 const reactionCipherLength = 156
 
-// ReactionsHandler exposes authenticated reaction APIs.
 type ReactionsHandler struct {
 	Controller *social.ReactionsController
 }

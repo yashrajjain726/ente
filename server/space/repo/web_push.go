@@ -12,7 +12,6 @@ import (
 
 const spaceWebPushLinkSubscriptionLimit = 10000
 
-// ErrSpaceWebPushLinkSubscriptionLimit prevents an individual public link from growing without bound.
 var ErrSpaceWebPushLinkSubscriptionLimit = errors.New("space web push link subscription limit reached")
 
 func (r *WebPushRepository) UpsertAccountSubscription(

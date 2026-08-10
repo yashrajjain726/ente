@@ -6,7 +6,6 @@ import (
 	"time"
 )
 
-// GetEmailsFromHashesRequest represents a request to convert hashes
 type GetEmailsFromHashesRequest struct {
 	Hashes []string `json:"hashes"`
 }
@@ -62,13 +61,11 @@ type AdminOpsForUserRequest struct {
 	EmailMFA *bool `json:"emailMFA"`
 }
 
-// ReQueueItemRequest puts an item back into the queue for processing.
 type ReQueueItemRequest struct {
 	ID        int64  `json:"id" binding:"required"`
 	QueueName string `json:"queueName" binding:"required"`
 }
 
-// RecoverAccount is used to recover accounts which are in soft-delete state.
 type RecoverAccountRequest struct {
 	UserID  int64  `json:"userID" binding:"required"`
 	EmailID string `json:"emailID" binding:"required"`
@@ -83,7 +80,6 @@ type ScheduledDeletion struct {
 	AuthenticatorEntryCount int64 `json:"authenticatorEntryCount"`
 }
 
-// UpdateSubscriptionRequest is used to update a user's subscription
 type UpdateSubscriptionRequest struct {
 	AdminID         int64                  `json:"-"`
 	UserID          int64                  `json:"userID" binding:"required"`

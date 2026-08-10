@@ -82,8 +82,6 @@ type GetFilesDataResponse struct {
 	ErrFileIDs          []int64  `json:"errFileIDs"`
 }
 
-// S3FileMetadata stuck represents the metadata that is stored in the S3 bucket for non-file type metadata
-// that is stored in the S3 bucket.
 type S3FileMetadata struct {
 	Version          int    `json:"v"`
 	EncryptedData    string `json:"encryptedData"`
@@ -134,7 +132,6 @@ func (g *PreviewUploadUrlRequest) Validate() error {
 	return nil
 }
 
-// Row represents the data that is stored in the file_data table.
 type Row struct {
 	FileID int64
 	UserID int64
@@ -160,7 +157,6 @@ type Row struct {
 	UpdatedAt         int64
 }
 
-// S3FileMetadataObjectKey returns the object key for the metadata stored in the S3 bucket.
 func (r *Row) S3FileMetadataObjectKey() string {
 	if r.Type == ente.MlData || r.Type == ente.PreviewVideo {
 		return ObjectMetadataKey(r.FileID, r.UserID, r.Type, r.ObjectID)
@@ -168,7 +164,6 @@ func (r *Row) S3FileMetadataObjectKey() string {
 	panic(fmt.Sprintf("S3FileMetadata should not be written for %s type", r.Type))
 }
 
-// GetS3FileObjectKey returns the object key for the file data stored in the S3 bucket.
 func (r *Row) GetS3FileObjectKey() string {
 	if r.Type == ente.PreviewVideo || r.Type == ente.PreviewImage {
 		return ObjectKey(r.FileID, r.UserID, r.Type, r.ObjectID)

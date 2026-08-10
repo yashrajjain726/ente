@@ -9,7 +9,6 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-// AddFiles adds files to a collection
 func (c *CollectionController) AddFiles(ctx *gin.Context, userID int64, files []ente.CollectionFileItem, cID int64) error {
 	resp, err := c.AccessCtrl.GetCollection(ctx, &access.GetCollectionParams{
 		CollectionID:   cID,
@@ -30,7 +29,6 @@ func (c *CollectionController) AddFiles(ctx *gin.Context, userID int64, files []
 
 	collectionOwnerID := resp.Collection.Owner.ID
 	filesOwnerID := userID
-	// Verify that the user owns each file
 	fileIDs := make([]int64, 0)
 	for _, file := range files {
 		fileIDs = append(fileIDs, file.ID)
@@ -44,7 +42,6 @@ func (c *CollectionController) AddFiles(ctx *gin.Context, userID int64, files []
 		return stacktrace.Propagate(err, "Failed to verify fileOwnership")
 	}
 
-	// Verify that none of the files are in trash or permanently deleted
 	trashedOrDeletedFileIDs, err := c.TrashRepo.GetFilesInTrashOrDeleted(ctx, userID, fileIDs)
 	if err != nil {
 		return stacktrace.Propagate(err, "failed to check trash state")
@@ -65,7 +62,6 @@ func (c *CollectionController) AddFiles(ctx *gin.Context, userID int64, files []
 	return nil
 }
 
-// RestoreFiles restore files from trash and add to the collection
 func (c *CollectionController) RestoreFiles(ctx *gin.Context, userID int64, cID int64, files []ente.CollectionFileItem) error {
 	_, err := c.AccessCtrl.GetCollection(ctx, &access.GetCollectionParams{
 		CollectionID:   cID,
@@ -76,7 +72,6 @@ func (c *CollectionController) RestoreFiles(ctx *gin.Context, userID int64, cID 
 	if err != nil {
 		return stacktrace.Propagate(err, "failed to verify collection access")
 	}
-	// Verify that the user owns each file
 	for _, file := range files {
 		// todo #perf find owners of all files
 		ownerID, err := c.FileRepo.GetOwnerID(file.ID)
@@ -99,8 +94,6 @@ func (c *CollectionController) RestoreFiles(ctx *gin.Context, userID int64, cID 
 	return nil
 }
 
-// MoveFiles from one collection to another collection. Both the collections and files should belong to
-// single user
 func (c *CollectionController) MoveFiles(ctx *gin.Context, req ente.MoveFilesRequest) error {
 	userID := auth.GetUserID(ctx.Request.Header)
 	r1, err := c.AccessCtrl.GetCollection(ctx, &access.GetCollectionParams{
@@ -127,7 +120,6 @@ func (c *CollectionController) MoveFiles(ctx *gin.Context, req ente.MoveFilesReq
 		return stacktrace.Propagate(ente.ErrInvalidApp, "move across app not supported %s to %s", r1.Collection.App, r2.Collection.App)
 	}
 
-	// Verify that the user owns each file
 	fileIDs := make([]int64, 0)
 	for _, file := range req.Files {
 		fileIDs = append(fileIDs, file.ID)
@@ -140,7 +132,6 @@ func (c *CollectionController) MoveFiles(ctx *gin.Context, req ente.MoveFilesReq
 		return stacktrace.Propagate(err, "Failed to verify fileOwnership")
 	}
 
-	// Verify that none of the files are in trash or permanently deleted
 	trashedOrDeletedFileIDs, err := c.TrashRepo.GetFilesInTrashOrDeleted(ctx, userID, fileIDs)
 	if err != nil {
 		return stacktrace.Propagate(err, "failed to check trash state")
@@ -156,7 +147,7 @@ func (c *CollectionController) MoveFiles(ctx *gin.Context, req ente.MoveFilesReq
 	}
 
 	err = c.CollectionRepo.MoveFiles(ctx, req.ToCollectionID, req.FromCollectionID, req.Files, userID, userID)
-	return stacktrace.Propagate(err, "") // return nil if err is nil
+	return stacktrace.Propagate(err, "")
 }
 
 // RemoveFilesV3 enforces all removal rules for shared collections:
@@ -180,7 +171,6 @@ func (c *CollectionController) RemoveFilesV3(ctx *gin.Context, actorUserID int64
 	collectionOwnerID := accessResp.Collection.Owner.ID
 	role := accessResp.Role
 
-	// Validate requested files exist in the target collection and filter already-removed ones.
 	fileIDsToRemove, err := c.CollectionRepo.FilterActiveFileIDsInCollection(ctx, req.CollectionID, req.FileIDs)
 	if err != nil {
 		return stacktrace.Propagate(err, "file not found in collection")
@@ -190,7 +180,6 @@ func (c *CollectionController) RemoveFilesV3(ctx *gin.Context, actorUserID int64
 	}
 	req.FileIDs = fileIDsToRemove
 
-	// Partition fileIDs by owner
 	ownerToFilesMap, err := c.FileRepo.GetOwnerToFileIDsMap(ctx, req.FileIDs)
 	if err != nil {
 		return stacktrace.Propagate(err, "failed to get owner to fileIDs map")
@@ -200,7 +189,6 @@ func (c *CollectionController) RemoveFilesV3(ctx *gin.Context, actorUserID int64
 	}
 	filesOwnedByCollectionOwner := ownerToFilesMap[collectionOwnerID]
 
-	// Files owned by others (excluding owner)
 	ownerFilesSet := make(map[int64]struct{}, len(filesOwnedByCollectionOwner))
 	for _, fid := range filesOwnedByCollectionOwner {
 		ownerFilesSet[fid] = struct{}{}
@@ -212,10 +200,8 @@ func (c *CollectionController) RemoveFilesV3(ctx *gin.Context, actorUserID int64
 		}
 	}
 
-	// If admin is trying to remove owner's files
 	if len(filesOwnedByCollectionOwner) > 0 {
 		if role != nil && *role == ente.ADMIN && actorUserID != collectionOwnerID {
-			// Populate collection_files with action for owner's files
 			if err := c.CollectionRepo.SuggestAction(ctx, req.CollectionID, actorUserID, filesOwnedByCollectionOwner, ente.ActionRemove); err != nil {
 				return stacktrace.Propagate(err, "failed to set remove action for owner's files")
 			}
@@ -223,11 +209,9 @@ func (c *CollectionController) RemoveFilesV3(ctx *gin.Context, actorUserID int64
 				return stacktrace.Propagate(err, "failed to create collection action REMOVE")
 			}
 		} else {
-			// unless client is buggy, we should never reach here.
 			return stacktrace.NewError("actor %d with role %s is not allowed to remove files owned by collectionOwner %d", actorUserID, *role, collectionOwnerID)
 		}
 	}
-	// Remove files owned by others if allowed
 	if len(others) > 0 {
 		if err := c.CollectionRepo.RemoveFilesV3(ctx, req.CollectionID, collectionOwnerID, others); err != nil {
 			return stacktrace.Propagate(err, "failed to remove files")
@@ -255,11 +239,9 @@ func (c *CollectionController) SuggestDeleteInSharedCollection(ctx *gin.Context,
 	if err != nil {
 		return stacktrace.Propagate(err, "failed to verify collection access")
 	}
-	// Only owner or admin can suggest
 	if accessResp.Role == nil || (*accessResp.Role != ente.OWNER && *accessResp.Role != ente.ADMIN) {
 		return stacktrace.Propagate(ente.ErrPermissionDenied, "role not allowed to suggest delete")
 	}
-	// Validate fileIDs exist in the collection and filter already-removed ones.
 	fileIDsToRemove, err := c.CollectionRepo.FilterActiveFileIDsInCollection(ctx, req.CollectionID, req.FileIDs)
 	if err != nil {
 		return stacktrace.Propagate(err, "file not found in collection")
@@ -267,7 +249,6 @@ func (c *CollectionController) SuggestDeleteInSharedCollection(ctx *gin.Context,
 	if len(fileIDsToRemove) == 0 {
 		return nil
 	}
-	// Ensure none of the files belong to actor
 	ownerMap, err := c.FileRepo.GetOwnerToFileIDsMap(ctx, fileIDsToRemove)
 	if err != nil {
 		return stacktrace.Propagate(err, "failed to get owner map")
@@ -290,14 +271,12 @@ func (c *CollectionController) SuggestDeleteInSharedCollection(ctx *gin.Context,
 	return nil
 }
 
-// isRemoveAllowed verifies that given set of files can be removed from the collection or not
 func (c *CollectionController) isRemoveAllowed(ctx *gin.Context,
 	actorUserID int64,
 	collectionOwnerID int64,
 	role *ente.CollectionParticipantRole,
 	ownerToFilesMap map[int64][]int64) error {
 
-	// verify that none of the file belongs to the collection owner
 	if _, ok := ownerToFilesMap[collectionOwnerID]; ok {
 		if collectionOwnerID == actorUserID {
 			return stacktrace.Propagate(ente.NewBadRequestWithMessage("can not remove files owned collection owner, admins can perform remove suggestion"), "")
@@ -305,20 +284,15 @@ func (c *CollectionController) isRemoveAllowed(ctx *gin.Context,
 			return stacktrace.Propagate(ente.NewBadRequestWithMessage("can not remove files owned by album owner"), "role %s", *role)
 		}
 	}
-	// allow collection owner to remove files added by others
 	if collectionOwnerID == actorUserID {
 		return nil
 	}
-	// allow admins to remove files added by anyone else.
 	if role != nil && *role == ente.ADMIN {
 		return nil
 	}
-	// for collaborators and viewers, they should be only removing files added by themselfs.
-	// verify that user is only trying to remove files owned by them
 	if len(ownerToFilesMap) > 1 {
 		return stacktrace.Propagate(ente.ErrPermissionDenied, "can not remove files owned by others")
 	}
-	// verify that user is only trying to remove files owned by them
 	if _, ok := ownerToFilesMap[actorUserID]; !ok {
 		return stacktrace.Propagate(ente.ErrPermissionDenied, "can not remove files owned by others")
 	}
@@ -326,7 +300,6 @@ func (c *CollectionController) isRemoveAllowed(ctx *gin.Context,
 }
 
 func (c *CollectionController) IsCopyAllowed(ctx *gin.Context, actorUserID int64, req ente.CopyFileSyncRequest) error {
-	// verify that srcCollectionID is accessible by actorUserID
 	srcCollection, err := c.AccessCtrl.GetCollection(ctx, &access.GetCollectionParams{
 		CollectionID: req.SrcCollectionID,
 		ActorUserID:  actorUserID,
@@ -334,7 +307,6 @@ func (c *CollectionController) IsCopyAllowed(ctx *gin.Context, actorUserID int64
 	if err != nil {
 		return stacktrace.Propagate(err, "failed to verify srcCollection access")
 	}
-	// verify that dstCollectionID is owned by actorUserID
 	dstCollection, err := c.AccessCtrl.GetCollection(ctx, &access.GetCollectionParams{
 		CollectionID: req.DstCollection,
 		ActorUserID:  actorUserID,
@@ -346,7 +318,6 @@ func (c *CollectionController) IsCopyAllowed(ctx *gin.Context, actorUserID int64
 	if srcCollection.Collection.App != dstCollection.Collection.App {
 		return stacktrace.Propagate(ente.ErrInvalidApp, "copy across app not supported %s to %s", srcCollection.Collection.App, dstCollection.Collection.App)
 	}
-	// verify that all FileIDs exists in the srcCollection
 	fileIDs := make([]int64, len(req.CollectionFileItems))
 	for idx, file := range req.CollectionFileItems {
 		fileIDs[idx] = file.ID
@@ -358,7 +329,6 @@ func (c *CollectionController) IsCopyAllowed(ctx *gin.Context, actorUserID int64
 	if err != nil {
 		return err
 	}
-	// verify that none of the file belongs to actorUserID
 	if _, ok := dsMap[actorUserID]; ok {
 		return ente.NewBadRequestWithMessage("can not copy files owned by actor")
 	}

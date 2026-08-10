@@ -10,7 +10,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// ReactionsController orchestrates reactions operations.
 type ReactionsController struct {
 	Repo           *socialrepo.ReactionsRepository
 	CommentsRepo   *socialrepo.CommentsRepository
@@ -18,7 +17,6 @@ type ReactionsController struct {
 	AccessCtrl     access.Controller
 }
 
-// UpsertReactionRequest holds the payload for creating or updating a reaction.
 type UpsertReactionRequest struct {
 	Actor         Actor
 	ID            string
@@ -30,7 +28,6 @@ type UpsertReactionRequest struct {
 	RequireAccess bool
 }
 
-// ReactionDiffRequest describes paging for reactions.
 type ReactionDiffRequest struct {
 	Actor         Actor
 	CollectionID  int64
@@ -41,14 +38,12 @@ type ReactionDiffRequest struct {
 	RequireAccess bool
 }
 
-// ReactionDeleteRequest contains parameters to remove a reaction.
 type ReactionDeleteRequest struct {
 	Actor         Actor
 	ReactionID    string
 	RequireAccess bool
 }
 
-// Upsert creates or updates a reaction entry.
 func (c *ReactionsController) Upsert(ctx *gin.Context, req UpsertReactionRequest) (string, error) {
 	var err error
 	req.ID, err = NormalizeReactionID(req.ID)
@@ -126,7 +121,6 @@ func (c *ReactionsController) Upsert(ctx *gin.Context, req UpsertReactionRequest
 	return id, nil
 }
 
-// Diff returns reaction windows for the provided scope.
 func (c *ReactionsController) Diff(ctx *gin.Context, req ReactionDiffRequest) ([]socialentity.Reaction, bool, error) {
 	userID, hasUserID := req.Actor.UserIDValue()
 	if req.RequireAccess {
@@ -143,7 +137,6 @@ func (c *ReactionsController) Diff(ctx *gin.Context, req ReactionDiffRequest) ([
 	return c.Repo.GetDiff(ctx, req.CollectionID, req.Since, req.Limit, req.FileID, req.CommentID)
 }
 
-// Delete removes a reaction if the actor owns it.
 func (c *ReactionsController) Delete(ctx *gin.Context, req ReactionDeleteRequest) error {
 	userID, hasUserID := req.Actor.UserIDValue()
 	reaction, err := c.Repo.GetByID(ctx, req.ReactionID)

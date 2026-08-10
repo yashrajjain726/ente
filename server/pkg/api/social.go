@@ -12,7 +12,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// SocialHandler exposes unified diff and counts endpoints.
 type SocialHandler struct {
 	Controller *social.Controller
 }

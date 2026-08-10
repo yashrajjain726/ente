@@ -20,13 +20,11 @@ type potentialAbuseNotifier interface {
 	NotifyPotentialAbuse(message string)
 }
 
-// UserLookup applies the shared authenticated email-discovery policy.
 type UserLookup interface {
 	LookupUserID(requesterUserID int64, email string) (int64, error)
 	VerifyUserID(requesterUserID int64, email string, expectedUserID int64) error
 }
 
-// UserLookupController limits email discovery before querying the user repository.
 type UserLookupController struct {
 	userRepo    userLookupRepository
 	notifier    potentialAbuseNotifier
@@ -47,8 +45,6 @@ func (c *UserLookupController) LookupUserID(requesterUserID int64, email string)
 	return c.lookupUserID(requesterUserID, email, nil)
 }
 
-// VerifyUserID applies the shared lookup policy and verifies that email still
-// identifies expectedUserID.
 func (c *UserLookupController) VerifyUserID(
 	requesterUserID int64,
 	email string,

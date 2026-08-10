@@ -28,8 +28,6 @@ func jsonResponse(status int, body string) *http.Response {
 	}
 }
 
-// wireMsg mirrors the FCM HTTP v1 request body so tests can assert the exact
-// JSON we put on the wire.
 type wireMsg struct {
 	Message struct {
 		Token   string            `json:"token"`

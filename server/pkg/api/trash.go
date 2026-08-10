@@ -12,13 +12,10 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// TrashHandler handles endpoints related to trash/restore etc
 type TrashHandler struct {
 	Controller *controller.TrashController
 }
 
-// GetDiff returns the list of trashed files for the user that
-// have changed sinceTime.
 // Deprecated, shutdown when there's no traffic for 30 days
 func (t *TrashHandler) GetDiff(c *gin.Context) {
 	enteApp := auth.GetApp(c)
@@ -52,7 +49,6 @@ func (t *TrashHandler) GetDiffV2(c *gin.Context) {
 	})
 }
 
-// Delete files permanently, queues up the file for deletion & free up the space based on file's object size
 func (t *TrashHandler) Delete(c *gin.Context) {
 	userID := auth.GetUserID(c.Request.Header)
 	var request ente.DeleteTrashFilesRequest
@@ -69,7 +65,6 @@ func (t *TrashHandler) Delete(c *gin.Context) {
 	c.Status(http.StatusOK)
 }
 
-// Empty deletes eligible files from the trash
 func (t *TrashHandler) Empty(c *gin.Context) {
 	userID := auth.GetUserID(c.Request.Header)
 	enteApp := auth.GetApp(c)

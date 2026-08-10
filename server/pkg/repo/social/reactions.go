@@ -11,7 +11,6 @@ import (
 	"github.com/lib/pq"
 )
 
-// ReactionsRepository manages reaction records.
 type ReactionsRepository struct {
 	DB *sql.DB
 }
@@ -70,7 +69,6 @@ func (repo *ReactionsRepository) SoftDeleteByID(ctx context.Context, id string, 
 	return nil
 }
 
-// SoftDeleteByCollectionAndUser removes all reactions created by a user inside a collection.
 func (repo *ReactionsRepository) SoftDeleteByCollectionAndUser(ctx context.Context, collectionID int64, userID int64) error {
 	_, err := repo.DB.ExecContext(ctx, `
         UPDATE reactions
@@ -238,7 +236,6 @@ func (repo *ReactionsRepository) CountActiveByCollection(ctx context.Context, co
 	return counts, nil
 }
 
-// LatestUpdateByCollection returns the most recent updated_at timestamp for each collection.
 func (repo *ReactionsRepository) LatestUpdateByCollection(ctx context.Context, collectionIDs []int64) (map[int64]int64, error) {
 	results := make(map[int64]int64)
 	if len(collectionIDs) == 0 {

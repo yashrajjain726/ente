@@ -120,7 +120,6 @@ func (c *Controller) downloadObject(ctx context.Context, objectKey string, dc st
 	return obj, nil
 }
 
-// uploadObject uploads the embedding object to the object store and returns the object size
 func (c *Controller) uploadObject(obj fileData.S3FileMetadata, objectKey string, dc string) (int64, error) {
 	embeddingObj, _ := json.Marshal(obj)
 	s3Client := c.S3Config.GetS3Client(dc)
@@ -162,7 +161,6 @@ func (c *Controller) verifySize(bucketID string, objectKey string, expectedSize 
 	if *res.ContentLength != expectedSize {
 		err = fmt.Errorf("size of the uploaded file (%d) does not match the expected size (%d) in bucket %s",
 			*res.ContentLength, expectedSize, *bucket)
-		//c.notifyDiscord(fmt.Sprint(err))
 		return stacktrace.Propagate(err, "")
 	}
 	return nil
@@ -175,7 +173,6 @@ type ReplicateObjectReq struct {
 	ObjectSize   int64
 }
 
-// copyObject copies the object from srcObjectKey to destObjectKey in the same bucket and returns the object size
 func (c *Controller) replicateObject(ctx context.Context, req *ReplicateObjectReq) error {
 	if err := file.EnsureSufficientSpace(req.ObjectSize); err != nil {
 		return stacktrace.Propagate(err, "")
@@ -186,7 +183,6 @@ func (c *Controller) replicateObject(ctx context.Context, req *ReplicateObjectRe
 	}
 	defer os.Remove(filePath)
 	defer file.Close()
-	//s3Client := c.S3Config.GetS3Client(req.SrcBucketID)
 	bucket := c.S3Config.GetBucket(req.SrcBucketID)
 	downloader := c.downloadManagerCache[req.SrcBucketID]
 	_, err = downloader.DownloadWithContext(ctx, file, &s3.GetObjectInput{
@@ -212,7 +208,6 @@ func (c *Controller) replicateObject(ctx context.Context, req *ReplicateObjectRe
 		return stacktrace.Propagate(err, "Failed to upload object to bucket %s", req.DestBucketID)
 	}
 	log.Infof("Uploaded to bucket %s", result.Location)
-	// verify the size of the uploaded object
 	if err := c.verifySize(req.DestBucketID, req.ObjectKey, req.ObjectSize); err != nil {
 		return stacktrace.Propagate(err, "")
 	}

@@ -30,7 +30,6 @@ import (
 	gTime "time"
 )
 
-// _fetchConfig is the configuration for the fetching objects from S3
 type _fetchConfig struct {
 	RetryCount     int
 	InitialTimeout gTime.Duration
@@ -55,9 +54,8 @@ type Controller struct {
 	CollectionRepo          *repo.CollectionRepository
 	DiscordController       *discord.DiscordController
 	downloadManagerCache    map[string]*s3manager.Downloader
-	// for downloading objects from s3 for replication
-	workerURL   string
-	tempStorage string
+	workerURL               string
+	tempStorage             string
 }
 
 func New(repo *fileDataRepo.Repository,
@@ -116,8 +114,6 @@ func (c *Controller) InsertOrUpdateMetadata(ctx *gin.Context, req *fileData.PutF
 		DecryptionHeader: *req.DecryptionHeader,
 		Client:           network.GetClientInfo(ctx),
 	}
-	// Start a goroutine to handle the upload and insert operations
-	//go func() {
 	logger := log.WithField("objectKey", objectKey).WithField("fileID", req.FileID).WithField("type", req.Type)
 	size, uploadErr := c.uploadObject(obj, objectKey, bucketID)
 	if uploadErr != nil {
@@ -137,7 +133,6 @@ func (c *Controller) InsertOrUpdateMetadata(ctx *gin.Context, req *fileData.PutF
 		logger.WithError(dbInsertErr).Error("insert or update failed")
 		return stacktrace.Propagate(dbInsertErr, "failed to insert or update file data row")
 	}
-	//}()
 	return nil
 }
 
@@ -201,14 +196,12 @@ func (c *Controller) GetFilesData(ctx *gin.Context, req fileData.GetFilesData) (
 		}
 	}
 	pendingIndexFileIds := array.FindMissingElementsInSecondList(req.FileIDs, dbFileIds)
-	// Fetch missing doRows in parallel
 	s3MetaFetchResults, err := c.getS3FileMetadataParallel(ctx, activeRows)
 	if err != nil {
 		return nil, stacktrace.Propagate(err, "")
 	}
 	fetchedEmbeddings := make([]fileData.Entity, 0)
 
-	// Populate missing data in doRows from fetched objects
 	for _, obj := range s3MetaFetchResults {
 		if obj.err != nil {
 			errFileIds = append(errFileIds, obj.dbEntry.FileID)
@@ -236,9 +229,9 @@ func (c *Controller) getS3FileMetadataParallel(ctx *gin.Context, dbRows []fileDa
 	for i := range dbRows {
 		index := i
 		dbRow := dbRows[i]
-		globalFileFetchSemaphore <- struct{}{} // Acquire from global semaphore
+		globalFileFetchSemaphore <- struct{}{}
 		wg.Go(func() {
-			defer func() { <-globalFileFetchSemaphore }() // Release back to global semaphore
+			defer func() { <-globalFileFetchSemaphore }()
 
 			ctxLogger := log.WithFields(log.Fields{
 				"objectKey":     dbRow.S3FileMetadataObjectKey(),
@@ -293,18 +286,16 @@ func (c *Controller) fetchS3FileMetadata(ctx context.Context, row fileData.Row, 
 			return nil, stacktrace.Propagate(ctx.Err(), "")
 		default:
 			obj, err := c.downloadObject(fetchCtx, objectKey, dc)
-			cancel() // Ensure cancel is called to release resources
+			cancel()
 			if err == nil {
 				if i > 0 {
 					ctxLogger.WithField("dc", dc).Infof("Fetched object after %d attempts", i)
 				}
 				return &obj, nil
 			}
-			// Check if the error is due to context timeout or cancellation
 			if err == nil && fetchCtx.Err() != nil {
 				ctxLogger.WithField("dc", dc).Error("Fetch timed out or cancelled: ", fetchCtx.Err())
 			} else {
-				// check if the error is due to object not found
 				if s3Err, ok := err.(awserr.RequestFailure); ok {
 					if s3Err.Code() == s3.ErrCodeNoSuchKey {
 						return nil, stacktrace.Propagate(errors.New("object not found"), "")
@@ -359,7 +350,6 @@ func (c *Controller) _validateLastUpdatedAt(ctx *gin.Context, lastUpdatedAt *int
 	return nil
 }
 
-// _checkPreviewWritePerm is
 func (c *Controller) _checkPreviewWritePerm(ctx *gin.Context, fileID int64, actorID int64) error {
 	err := c.AccessCtrl.VerifyFileOwnership(ctx, &access.VerifyFileOwnershipParams{
 		ActorUserId: actorID,

@@ -14,7 +14,6 @@ import (
 
 const maxCommentPayloadBytes = 20 * 1024
 
-// CommentsHandler exposes authenticated comment APIs.
 type CommentsHandler struct {
 	Controller *social.CommentsController
 }

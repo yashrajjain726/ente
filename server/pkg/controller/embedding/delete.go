@@ -9,7 +9,6 @@ import (
 	"strconv"
 )
 
-// CleanupDeletedEmbeddings clears all embeddings for deleted files from the object store
 func (c *Controller) CleanupDeletedEmbeddings() {
 	log.Info("Cleaning up deleted embeddings")
 	if c.cleanupCronRunning {

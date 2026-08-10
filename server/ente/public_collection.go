@@ -8,7 +8,6 @@ import (
 	"github.com/ente/stacktrace"
 )
 
-// CreatePublicAccessTokenRequest payload for creating accessToken for public albums
 type CreatePublicAccessTokenRequest struct {
 	CollectionID  int64 `json:"collectionID" binding:"required"`
 	EnableCollect bool  `json:"enableCollect"`
@@ -74,7 +73,6 @@ type VerifyPasswordResponse struct {
 	JWTToken string `json:"jwtToken"`
 }
 
-// CollectionLinkRow represents row entity for public_collection_token table
 type CollectionLinkRow struct {
 	ID             int64
 	CollectionID   int64
@@ -109,16 +107,14 @@ func (p CollectionLinkRow) CanJoin() error {
 	return nil
 }
 
-// PublicURL represents information about non-disabled public url for a collection
 type PublicURL struct {
-	URL            string `json:"url"`
-	DeviceLimit    int    `json:"deviceLimit"`
-	ValidTill      int64  `json:"validTill"`
-	EnableDownload bool   `json:"enableDownload"`
-	// Enable collect indicates whether folks can upload files in a publicly shared url
-	EnableCollect   bool `json:"enableCollect"`
-	EnableComment   bool `json:"enableComment"`
-	PasswordEnabled bool `json:"passwordEnabled"`
+	URL             string `json:"url"`
+	DeviceLimit     int    `json:"deviceLimit"`
+	ValidTill       int64  `json:"validTill"`
+	EnableDownload  bool   `json:"enableDownload"`
+	EnableCollect   bool   `json:"enableCollect"`
+	EnableComment   bool   `json:"enableComment"`
+	PasswordEnabled bool   `json:"passwordEnabled"`
 	// Nonce contains the nonce value for the password if the link is password protected.
 	Nonce      *string                    `json:"nonce,omitempty"`
 	MemLimit   *int64                     `json:"memLimit,omitempty"`
@@ -148,7 +144,6 @@ func FilterPublicURLsForRole(urls []PublicURL, role CollectionParticipantRole) [
 	return result
 }
 
-// PublicCollectionSummary represents an information about a public collection
 type PublicCollectionSummary struct {
 	ID                int64
 	CollectionID      int64
@@ -188,14 +183,10 @@ type ReporterAddress struct {
 	Phone      string `json:"phone" binding:"required"`
 }
 
-// Value implements the driver.Valuer interface. This method
-// simply returns the JSON-encoded representation of the struct.
 func (ca AbuseReportDetails) Value() (driver.Value, error) {
 	return json.Marshal(ca)
 }
 
-// Scan implements the sql.Scanner interface. This method
-// simply decodes a JSON-encoded value into the struct fields.
 func (ca *AbuseReportDetails) Scan(value interface{}) error {
 	b, ok := value.([]byte)
 	if !ok {
@@ -205,14 +196,10 @@ func (ca *AbuseReportDetails) Scan(value interface{}) error {
 	return json.Unmarshal(b, &ca)
 }
 
-// Value implements the driver.Valuer interface. This method
-// simply returns the JSON-encoded representation of the struct.
 func (ca ReporterAddress) Value() (driver.Value, error) {
 	return json.Marshal(ca)
 }
 
-// Scan implements the sql.Scanner interface. This method
-// simply decodes a JSON-encoded value into the struct fields.
 func (ca *ReporterAddress) Scan(value interface{}) error {
 	b, ok := value.([]byte)
 	if !ok {

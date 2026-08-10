@@ -26,7 +26,6 @@ const (
 	videoStreamingRolloutNonce      = "video-streaming-v1"
 )
 
-// Controller is interface for exposing business logic related to for remote store
 type Controller struct {
 	Repo        *remotestore.Repository
 	BillingCtrl *controller.BillingController
@@ -34,7 +33,6 @@ type Controller struct {
 	FamilyRepo  *repo.FamilyRepository
 }
 
-// InsertOrUpdate the key's value
 func (c *Controller) InsertOrUpdate(ctx *gin.Context, request ente.UpdateKeyValueRequest) error {
 	userID := auth.GetUserID(ctx.Request.Header)
 	if err := c._validateRequest(userID, request.Key, request.Value, false); err != nil {
@@ -49,7 +47,6 @@ func (c *Controller) InsertOrUpdate(ctx *gin.Context, request ente.UpdateKeyValu
 	return c.Repo.InsertOrUpdate(ctx, userID, request.Key, *request.Value)
 }
 
-// RemoveKey removes the key from remote store
 func (c *Controller) RemoveKey(ctx *gin.Context, key string) error {
 	userID := auth.GetUserID(ctx.Request.Header)
 	if valid := ente.IsValidFlagKey(key); !valid {
@@ -104,7 +101,7 @@ func (c *Controller) GetFeatureFlags(ctx *gin.Context) (*ente.FeatureFlagRespons
 		return nil, stacktrace.Propagate(err, "")
 	}
 	response := &ente.FeatureFlagResponse{
-		EnableStripe:    true, // enable stripe for all
+		EnableStripe:    true,
 		DisableCFWorker: false,
 		// When true, users will see an option to enable multiple part upload in the app
 		// Changing it to false will hide the option and disable multi part upload for everyone

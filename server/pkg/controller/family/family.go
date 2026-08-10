@@ -18,11 +18,9 @@ import (
 )
 
 const (
-	// maxFamilyMemberLimit number of folks who can be part of a family
 	maxFamilyMemberLimit = 6
 )
 
-// Controller exposes functions to interact with family module
 type Controller struct {
 	BillingCtrl     *controller.BillingController
 	UserLookup      controller.UserLookup
@@ -33,7 +31,6 @@ type Controller struct {
 	RemoteStoreRepo *remoteStoreRepo.Repository
 }
 
-// FetchMembers return list of members who are part of a family plan
 func (c *Controller) FetchMembers(ctx context.Context, userID int64) (ente.FamilyMemberResponse, error) {
 	user, err := c.UserRepo.Get(userID)
 	if err != nil {
@@ -71,7 +68,6 @@ func (c *Controller) FetchMembersForAdminID(ctx context.Context, familyAdminID i
 		for _, userUsageData := range usersUsageWithSubData {
 			if member.MemberUserID == userUsageData.UserID {
 				member.Email = *userUsageData.Email
-				// return usage only if the member is part of family group
 				if member.Status == ente.ACCEPTED || member.Status == ente.SELF {
 					member.Usage = userUsageData.StorageConsumed
 				}
@@ -95,7 +91,7 @@ func (c *Controller) FetchMembersForAdminID(ctx context.Context, familyAdminID i
 
 	return ente.FamilyMemberResponse{
 		Members:    familyMembers,
-		Storage:    adminSubStorage, // family plan storage
+		Storage:    adminSubStorage,
 		ExpiryTime: adminSubExpiryTime,
 		AdminBonus: adminUsableBonus,
 	}, nil

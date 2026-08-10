@@ -11,7 +11,6 @@ import (
 	"github.com/lib/pq"
 )
 
-// FamilyRepository is an implementation of the FamilyRepo
 type FamilyRepository struct {
 	DB *sql.DB
 }
@@ -21,7 +20,6 @@ var (
 	ActiveOrInvitedFamilyMemberStatus = []ente.MemberStatus{ente.INVITED, ente.ACCEPTED, ente.SELF}
 )
 
-// CreateFamily add the current user as the admin member.
 func (repo *FamilyRepository) CreateFamily(ctx context.Context, adminID int64) error {
 	tx, err := repo.DB.BeginTx(ctx, nil)
 	if err != nil {
@@ -79,8 +77,6 @@ func (repo *FamilyRepository) CloseFamily(ctx context.Context, adminID int64) er
 	return stacktrace.Propagate(tx.Commit(), "failed to commit txn closing family")
 }
 
-// AddMemberInvite inserts a family invitation entry for this given pair of admin & member and return the active inviteToken
-// which can be used to accept the invite
 func (repo *FamilyRepository) AddMemberInvite(ctx context.Context, adminID int64, memberID int64, inviteToken string, storageLimit *int64) (string, error) {
 	if adminID == memberID {
 		return "", stacktrace.Propagate(errors.New("memberID and adminID can not be same"), "")
@@ -102,13 +98,11 @@ func (repo *FamilyRepository) AddMemberInvite(ctx context.Context, adminID int64
 	return activeInviteToken, stacktrace.Propagate(err, "")
 }
 
-// GetInvite returns information about family invitation for given token
 func (repo *FamilyRepository) GetInvite(token string) (ente.FamilyMember, error) {
 	row := repo.DB.QueryRow(`SELECT id, admin_id, member_id, status, storage_limit from families WHERE token = $1`, token)
 	return repo.convertRowToFamilyMember(row)
 }
 
-// GetMemberById returns information about a particular member in a family
 func (repo *FamilyRepository) GetMemberById(ctx context.Context, id uuid.UUID) (ente.FamilyMember, error) {
 	row := repo.DB.QueryRowContext(ctx, `SELECT id, admin_id, member_id, status, storage_limit from families WHERE id = $1`, id)
 	return repo.convertRowToFamilyMember(row)
@@ -124,7 +118,6 @@ func (repo *FamilyRepository) convertRowToFamilyMember(row *sql.Row) (ente.Famil
 	return member, nil
 }
 
-// GetMembersWithStatus returns all the members in a family managed by given inviter
 func (repo *FamilyRepository) GetMembersWithStatus(adminID int64, statuses []ente.MemberStatus) ([]ente.FamilyMember, error) {
 	rows, err := repo.DB.Query(`SELECT id, admin_id, member_id, status, storage_limit from families
 		WHERE admin_id = $1 and status = ANY($2)`, adminID, pq.Array(statuses))
@@ -135,7 +128,6 @@ func (repo *FamilyRepository) GetMembersWithStatus(adminID int64, statuses []ent
 	return convertRowsToFamilyMember(rows)
 }
 
-// AcceptInvite change the invitation status in the family db for the given invite token
 func (repo *FamilyRepository) AcceptInvite(ctx context.Context, adminID int64, memberID int64, token string) error {
 	tx, err := repo.DB.BeginTx(ctx, nil)
 	if err != nil {
@@ -163,7 +155,6 @@ func (repo *FamilyRepository) AcceptInvite(ctx context.Context, adminID int64, m
 	return stacktrace.Propagate(tx.Commit(), "failed to commit txn for accepting family invite")
 }
 
-// RemoveMember removes an existing member from the family plan
 func (repo *FamilyRepository) RemoveMember(ctx context.Context, adminID int64, memberID int64, removeReason ente.MemberStatus) error {
 	tx, err := repo.DB.BeginTx(ctx, nil)
 	if err != nil {
@@ -187,7 +178,6 @@ func (repo *FamilyRepository) RemoveMember(ctx context.Context, adminID int64, m
 	return stacktrace.Propagate(tx.Commit(), "failed to commit")
 }
 
-// UpdateStorage is used to set Pre-existing Members Storage Limit.
 func (repo *FamilyRepository) ModifyMemberStorage(ctx context.Context, adminID int64, id uuid.UUID, storageLimit *int64) error {
 	_, err := repo.DB.Exec(`UPDATE families SET storage_limit=$1 where id=$2`, storageLimit, id)
 	if err != nil {
@@ -197,7 +187,6 @@ func (repo *FamilyRepository) ModifyMemberStorage(ctx context.Context, adminID i
 	return stacktrace.Propagate(err, "Failed to Modify Members Storage Limit")
 }
 
-// RevokeInvite revokes the invitation invite
 func (repo *FamilyRepository) RevokeInvite(ctx context.Context, adminID int64, memberID int64) error {
 	tx, err := repo.DB.BeginTx(ctx, nil)
 	if err != nil {
@@ -211,7 +200,6 @@ func (repo *FamilyRepository) RevokeInvite(ctx context.Context, adminID int64, m
 	return stacktrace.Propagate(tx.Commit(), "failed to commit")
 }
 
-// DeclineAnyPendingInvite is used for removing any pending invite for the user when their account is deleted
 func (repo *FamilyRepository) DeclineAnyPendingInvite(ctx context.Context, memberID int64) error {
 	_, err := repo.DB.ExecContext(ctx, `UPDATE families set status=$1 WHERE member_id = $2 AND status = $3`, ente.DECLINED, memberID, ente.INVITED)
 	if err != nil {

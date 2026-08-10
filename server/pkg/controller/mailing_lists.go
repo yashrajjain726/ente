@@ -18,7 +18,6 @@ type MailingListsController struct {
 	discordController   *discord.DiscordController
 }
 
-// Return a new instance of MailingListsController
 func NewMailingListsController(discordController *discord.DiscordController) *MailingListsController {
 	listmonkCredentials := listmonk.Credentials{
 		BaseURL:  viper.GetString("listmonk.server-url"),
@@ -26,8 +25,6 @@ func NewMailingListsController(discordController *discord.DiscordController) *Ma
 		Password: viper.GetString("listmonk.password"),
 	}
 
-	// An array of integer values indicating the id of listmonk campaign
-	// mailing list to which the subscriber needs to added
 	listmonkListIDs := viper.GetIntSlice("listmonk.list-ids")
 
 	return &MailingListsController{
@@ -57,23 +54,14 @@ func (c *MailingListsController) Unsubscribe(email string) error {
 	return nil
 }
 
-// shouldSkipListmonk() checks if the Listmonk mailing list
-// should be skipped due to missing credentials
-// listmonklistIDs value.
-//
-// ListmonkListIDs is an optional field for subscribing an email address
-// (user gets added to the default list),
-// but is a required field for unsubscribing an email address
 func (c *MailingListsController) shouldSkipListmonk() bool {
 	if c.listmonkCredentials.BaseURL == "" || c.listmonkCredentials.Username == "" ||
 		c.listmonkCredentials.Password == "" || len(c.listmonkListIDs) == 0 {
-		// Skip
 		return true
 	}
 	return false
 }
 
-// Subscribes an email address to a particular listmonk campaign mailing list
 func (c *MailingListsController) listmonkSubscribe(email string) error {
 	data := map[string]interface{}{
 		"email": email,
@@ -88,7 +76,6 @@ func (c *MailingListsController) listmonkSubscribe(email string) error {
 	return err
 }
 
-// Unsubscribes an email address to a particular listmonk campaign mailing list
 func (c *MailingListsController) listmonkUnsubscribe(email string) error {
 	// Listmonk doesn't provide an endpoint for unsubscribing users
 	// from a particular list directly via their email

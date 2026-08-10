@@ -7,9 +7,6 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// PaymentUpgradeOrDowngradeCron cron which returns if CronRunning is true and if false,
-// it acquires a lock using the lock controller and sets CronRunning to true.
-// It then runs the cron and sets CronRunning to false.
 func (c *Controller) PaymentUpgradeOrDowngradeCron() {
 	cronName := "payment_upgrade_or_downgrade"
 	logger := logrus.WithField("cron", cronName)

@@ -10,7 +10,6 @@ type Embedding struct {
 	Size               *int64
 }
 
-// IndexedFile ...
 type IndexedFile struct {
 	FileID    int64 `json:"fileID"`
 	UpdatedAt int64 `json:"updatedAt"`
@@ -52,13 +51,9 @@ type GetFilesEmbeddingResponse struct {
 type Model string
 
 const (
-	OnnxClip Model = "onnx-clip"
-	GgmlClip Model = "ggml-clip"
-
-	// Derived inference from a file, including metadata are stored as this type
-	Derived = "derived"
-
-	// FileMlClipFace is a model for face embeddings, it is used in request validation.
+	OnnxClip       Model = "onnx-clip"
+	GgmlClip       Model = "ggml-clip"
+	Derived              = "derived"
 	FileMlClipFace Model = "file-ml-clip-face"
 )
 

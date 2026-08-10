@@ -23,7 +23,6 @@ const (
 	LinkDeviceTokenRefreshBefore = 30 * 24 * time.MicroSecondsInOneHour
 )
 
-// LinkDeviceClaim represents a signed browser admission token for public links.
 type LinkDeviceClaim struct {
 	Typ             string `json:"typ"`
 	Scope           string `json:"scope"`

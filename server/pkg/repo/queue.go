@@ -12,7 +12,6 @@ import (
 	"github.com/ente/stacktrace"
 )
 
-// QueueRepository defines methods to insert, delete items from queue
 type QueueRepository struct {
 	DB *sql.DB
 }
@@ -51,7 +50,6 @@ type QueueItem struct {
 	Item string
 }
 
-// InsertItem adds entry in the queue with given queueName and item. If entry already exists, it's no-op
 func (repo *QueueRepository) InsertItem(ctx context.Context, queueName string, item string) error {
 	_, err := repo.DB.ExecContext(ctx, `INSERT INTO queue(queue_name, item) VALUES($1, $2)
 		ON CONFLICT (queue_name, item) DO NOTHING`, queueName, item)
@@ -92,7 +90,6 @@ func (repo *QueueRepository) RequeueItem(ctx context.Context, queueName string, 
 	return nil
 }
 
-// AddItems adds a list of item against a specified queue
 func (repo *QueueRepository) AddItems(ctx context.Context, tx *sql.Tx, queueName string, items []string) error {
 	if len(items) == 0 {
 		return nil
@@ -126,7 +123,6 @@ func (repo *QueueRepository) DeleteItem(queueName string, item string) error {
 	return stacktrace.Propagate(err, "")
 }
 
-// GetItemsReadyForDeletion method, for a given queue name, returns a list of QueueItem  which are ready for deletion
 func (repo *QueueRepository) GetItemsReadyForDeletion(queueName string, count int) ([]QueueItem, error) {
 	delayInMin, ok := itemDeletionDelayInMinMap[queueName]
 	if !ok {

@@ -43,7 +43,6 @@ const (
 // DeleteObjectQueue delay (x days currently).
 func (c *ObjectController) RemoveComplianceHolds() {
 	if c.S3Config.WasabiComplianceDC() == "" {
-		// Wasabi compliance is currently disabled in config, nothing to do.
 		return
 	}
 	if c.complianceCronRunning {

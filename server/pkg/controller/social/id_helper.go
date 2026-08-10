@@ -14,12 +14,10 @@ const (
 	nanoidSuffixLength = 21
 )
 
-// NormalizeCommentID optionally generates or validates a comment ID.
 func NormalizeCommentID(id string) (string, error) {
 	return normalizeOrGenerateID(commentIDPrefix, id)
 }
 
-// NormalizeReactionID optionally generates or validates a reaction ID.
 func NormalizeReactionID(id string) (string, error) {
 	return normalizeOrGenerateID(reactionIDPrefix, id)
 }

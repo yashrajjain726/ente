@@ -40,11 +40,9 @@ func (repo *Repository) InsertIntoRecovery(ctx *gin.Context, contact ente.Contac
 		return false, ente.NewBadRequestWithMessage("notice period should be greater than 24 hours")
 	}
 	waitTime := time.MicrosecondsAfterHours(contactRow.NoticePeriodInHrs)
-	// remind after 7 days.
 	nextReminder := time.MicrosecondsAfterHours(24 * 7)
 	if nextReminder >= waitTime {
 		logrus.Warn("initial reminder is greater than wait time")
-		// remind in 1 day if notice period is less than 7 days.
 		nextReminder = time.MicrosecondsAfterHours(24 * 1)
 	}
 	result, err := repo.DB.ExecContext(ctx, `INSERT INTO emergency_recovery (id,user_id, emergency_contact_id, status, wait_till, next_reminder_at) VALUES ($1, $2, $3, $4, $5, $6) on conflict DO NOTHING`,

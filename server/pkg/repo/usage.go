@@ -9,7 +9,6 @@ import (
 	"github.com/lib/pq"
 )
 
-// UsageRepository defines the methods tracking and fetching usage related date
 type UsageRepository struct {
 	DB       *sql.DB
 	UserRepo *UserRepository
@@ -32,7 +31,6 @@ type StorageWarningCandidate struct {
 	IsFamilyPlan bool
 }
 
-// GetUsage  gets the Storage usage of a user
 func (repo *UsageRepository) GetUsage(userID int64) (int64, error) {
 	row := repo.DB.QueryRow(`SELECT storage_consumed FROM usage WHERE user_id = $1`,
 		userID)
@@ -44,16 +42,14 @@ func (repo *UsageRepository) GetUsage(userID int64) (int64, error) {
 	return usage, stacktrace.Propagate(err, "")
 }
 
-// Create inserts a new entry for the given user. If entry already exists, it doesn't nothing
 func (repo *UsageRepository) Create(userID int64) error {
 	_, err := repo.DB.Exec(`INSERT INTO usage(user_id, storage_consumed) VALUES ($1,$2) ON CONFLICT DO NOTHING;`,
-		userID, //$1 user_id
-		0,      // $2 initial value for storage consumed
+		userID,
+		0,
 	)
 	return stacktrace.Propagate(err, "failed to insert/update")
 }
 
-// GetCombinedUsage  gets the sum of Storage usage of the list of userIDS
 func (repo *UsageRepository) GetCombinedUsage(ctx context.Context, userIDs []int64) (int64, error) {
 	row := repo.DB.QueryRowContext(ctx, `SELECT coalesce(sum(storage_consumed),0) FROM usage WHERE user_id = ANY($1)`,
 		pq.Array(userIDs))
@@ -112,7 +108,6 @@ func (repo *UsageRepository) GetLockerUsage(ctx context.Context, userIDs []int64
 		return usage, nil
 	}
 
-	// Initialize map with all requested users
 	userMap := make(map[int64]*UserLockerUsage)
 	for _, userID := range userIDs {
 		userMap[userID] = &UserLockerUsage{
@@ -122,7 +117,6 @@ func (repo *UsageRepository) GetLockerUsage(ctx context.Context, userIDs []int64
 		}
 	}
 
-	// Query 1: Get file counts (non-deleted only)
 	countQuery := `
       SELECT 
          c.owner_id,
@@ -136,7 +130,6 @@ func (repo *UsageRepository) GetLockerUsage(ctx context.Context, userIDs []int64
       GROUP BY c.owner_id;
    `
 
-	// Query 2: Get total sizes (all files)
 	sizeQuery := `
       SELECT 
          unique_files.owner_id,
@@ -153,7 +146,6 @@ func (repo *UsageRepository) GetLockerUsage(ctx context.Context, userIDs []int64
       GROUP BY unique_files.owner_id;
    `
 
-	// Get counts
 	rows, err := repo.DB.QueryContext(ctx, countQuery, pq.Array(userIDs))
 	if err != nil {
 		return nil, stacktrace.Propagate(err, "")
@@ -171,7 +163,6 @@ func (repo *UsageRepository) GetLockerUsage(ctx context.Context, userIDs []int64
 	}
 	rows.Close()
 
-	// Get sizes
 	rows, err = repo.DB.QueryContext(ctx, sizeQuery, pq.Array(userIDs))
 	if err != nil {
 		return nil, stacktrace.Propagate(err, "")
@@ -188,7 +179,6 @@ func (repo *UsageRepository) GetLockerUsage(ctx context.Context, userIDs []int64
 		}
 	}
 
-	// Build result - now includes ALL requested users
 	for _, userID := range userIDs {
 		user := userMap[userID]
 		usage.Users = append(usage.Users, *user)
@@ -203,7 +193,6 @@ func (repo *UsageRepository) GetLockerUsage(ctx context.Context, userIDs []int64
 	return usage, nil
 }
 
-// StorageForFamilyAdmin calculates the total storage consumed by the family for a given adminID
 func (repo *UsageRepository) StorageForFamilyAdmin(adminID int64) (int64, error) {
 	query := `
 		SELECT COALESCE(SUM(storage_consumed), 0)

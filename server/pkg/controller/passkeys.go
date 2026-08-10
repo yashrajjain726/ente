@@ -53,7 +53,6 @@ func (c *PasskeyController) DeletePasskey(userID int64, passkeyID uuid.UUID) (er
 	return c.Repo.DeletePasskey(&user, passkeyID)
 }
 
-// RemovePasskey2FA removes all the user's passkeys to disable passkey 2FA and fall back to TOTP based 2FA if enabled.
 func (c *PasskeyController) RemovePasskey2FA(userID int64) (err error) {
 	passkeys, err := c.GetPasskeys(userID)
 	if err != nil {

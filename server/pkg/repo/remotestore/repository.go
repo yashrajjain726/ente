@@ -11,8 +11,6 @@ import (
 	"github.com/ente/stacktrace"
 )
 
-// Repository defines the methods for inserting, updating and retrieving
-// remote store key and values
 type Repository struct {
 	DB *sql.DB
 }
@@ -21,9 +19,9 @@ func (r *Repository) InsertOrUpdate(ctx context.Context, userID int64, key strin
 	_, err := r.DB.ExecContext(ctx, `INSERT INTO remote_store(user_id, key_name, key_value) VALUES ($1,$2,$3)
 						 ON CONFLICT (user_id, key_name) DO UPDATE SET key_value = $3;
 						 `,
-		userID, //$1 user_id
-		key,    // $2 key_name
-		value,  // $3 key_value
+		userID,
+		key,
+		value,
 	)
 
 	if err != nil {
@@ -42,18 +40,17 @@ func (r *Repository) InsertOrUpdate(ctx context.Context, userID int64, key strin
 func (r *Repository) RemoveKey(ctx context.Context, userID int64, key string) error {
 	_, err := r.DB.ExecContext(ctx, `DELETE FROM remote_store
 		WHERE user_id = $1 AND key_name = $2`,
-		userID, // $1
-		key,    // $2
+		userID,
+		key,
 	)
 	return stacktrace.Propagate(err, "failed to remove key")
 }
 
 func (r *Repository) DomainOwner(ctx context.Context, domain string) (*int64, error) {
-	// Check if the domain is already taken by another user
 	rows := r.DB.QueryRowContext(ctx, `SELECT user_id FROM remote_store
 	   WHERE key_name = $1 AND key_value = $2`,
-		ente.CustomDomain, // $1
-		domain,            // $2
+		ente.CustomDomain,
+		domain,
 	)
 	var userID int64
 	err := rows.Scan(&userID)
@@ -67,11 +64,10 @@ func (r *Repository) DomainOwner(ctx context.Context, domain string) (*int64, er
 }
 
 func (r *Repository) GetDomain(ctx context.Context, userID int64) (*string, error) {
-	// Fetch the custom domain for the user
 	rows := r.DB.QueryRowContext(ctx, `SELECT key_value FROM remote_store
 	   WHERE user_id = $1 AND key_name = $2`,
-		userID,            // $1
-		ente.CustomDomain, // $2
+		userID,
+		ente.CustomDomain,
 	)
 	var domain string
 	err := rows.Scan(&domain)
@@ -98,13 +94,12 @@ func (r *Repository) GetEffectiveDomain(ctx context.Context, userID int64) (*str
 	return &resolved, nil
 }
 
-// GetValue fetches and return the value for given user_id and key
 func (r *Repository) GetValue(ctx context.Context, userID int64, key string) (string, error) {
 	rows := r.DB.QueryRowContext(ctx, `SELECT key_value FROM remote_store
 	   WHERE user_id = $1
 	   and key_name = $2`,
-		userID, // $1
-		key,    // %2
+		userID,
+		key,
 	)
 	var keyValue string
 	err := rows.Scan(&keyValue)
@@ -114,11 +109,10 @@ func (r *Repository) GetValue(ctx context.Context, userID int64, key string) (st
 	return keyValue, nil
 }
 
-// GetAllValues fetches and return all the key value pairs for given user_id
 func (r *Repository) GetAllValues(ctx context.Context, userID int64) (map[string]string, error) {
 	rows, err := r.DB.QueryContext(ctx, `SELECT key_name, key_value FROM remote_store
 	   WHERE user_id = $1`,
-		userID, // $1
+		userID,
 	)
 	if err != nil {
 		return nil, stacktrace.Propagate(err, "reading value failed")

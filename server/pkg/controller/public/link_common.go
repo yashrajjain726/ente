@@ -42,7 +42,6 @@ func verifyPassword(secret []byte, expectedPassHash *string, req ente.VerifyPass
 		PassHash:   req.PassHash,
 		ExpiryTime: time.NDaysFromNow(30),
 	})
-	// Sign and get the complete encoded token as a string using the secret
 	tokenString, err := token.SignedString(secret)
 
 	if err != nil {

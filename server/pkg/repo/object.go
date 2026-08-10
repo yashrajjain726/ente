@@ -67,7 +67,6 @@ func (repo *ObjectRepository) GetObjectsForFileIDs(fileIDs []int64) ([]ente.S3Ob
 	return convertRowsToObjectKeys(rows)
 }
 
-// GetObject returns the ente.S3ObjectKey key for a file id and type
 func (repo *ObjectRepository) GetObject(fileID int64, objType ente.ObjectType) (ente.S3ObjectKey, error) {
 	// todo: handling of deleted objects
 	row := repo.objectLookupDB().QueryRow(`SELECT object_key, size, o_type FROM object_keys WHERE file_id = $1 AND o_type = $2 AND is_deleted=false`,
@@ -298,7 +297,6 @@ func (repo *ObjectRepository) RemoveDataCenterFromObject(objectKey string, datac
 	return stacktrace.Propagate(err, "")
 }
 
-// RemoveObjectsForKey removes the keys of a deleted object from our tables
 func (repo *ObjectRepository) RemoveObjectsForKey(objectKey string) error {
 	_, err := repo.DB.Exec(`DELETE FROM object_keys WHERE object_key = $1 AND is_deleted = TRUE`,
 		objectKey)
@@ -369,7 +367,6 @@ func convertRowsToObjectKeys(rows *sql.Rows) ([]ente.S3ObjectKey, error) {
 	return fileObjectKeys, nil
 }
 
-// DoesObjectExist returns the true if there is an entry for the object key.
 func (repo *ObjectRepository) DoesObjectExist(tx *sql.Tx, objectKey string) (bool, error) {
 	var exists bool
 	err := tx.QueryRow(
@@ -378,8 +375,6 @@ func (repo *ObjectRepository) DoesObjectExist(tx *sql.Tx, objectKey string) (boo
 	return exists, stacktrace.Propagate(err, "")
 }
 
-// DoesObjectOrTempObjectExist returns the true if there is an entry for the object key in
-// either the object_keys or in temp_objects table.
 func (repo *ObjectRepository) DoesObjectOrTempObjectExist(objectKey string) (bool, error) {
 	var exists bool
 	err := repo.DB.QueryRow(

@@ -12,7 +12,6 @@ import (
 	"github.com/golang-jwt/jwt/v4"
 )
 
-// jwt token validity = 1 day
 const ValidForDays = 1
 
 var errJWTExpired = &ente.ApiError{
@@ -35,10 +34,7 @@ func (c *UserController) GetJWTToken(userID int64, scope enteJWT.ClaimScope) (st
 }
 
 func (c *UserController) GetJWTTokenForClaim(claim *enteJWT.WebCommonJWTClaim) (string, error) {
-	// Create a new token object, specifying signing method and the claims
-	// you would like it to contain.
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claim)
-	// Sign and get the complete encoded token as a string using the secret
 	tokenString, err := token.SignedString(c.JwtSecret)
 
 	if err != nil {

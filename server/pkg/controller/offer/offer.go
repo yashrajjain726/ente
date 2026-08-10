@@ -24,7 +24,6 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-// OfferController controls all offer related operations
 type OfferController struct {
 	BlackFridayOffers ente.BlackFridayOfferPerCountry
 	UserRepo          repo.UserRepository
@@ -69,7 +68,6 @@ func (c *OfferController) GetBlackFridayOffers(countryCode string) []ente.BlackF
 	if offers, found := c.BlackFridayOffers[countryCode]; found {
 		return offers
 	}
-	// unable to find plans for given country code, return plans for default country
 	defaultCountry := billing.GetDefaultPlanCountry()
 	return c.BlackFridayOffers[defaultCountry]
 }

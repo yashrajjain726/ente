@@ -31,8 +31,7 @@ type AdminUpdateKeyValueRequest struct {
 }
 
 type FeatureFlagResponse struct {
-	EnableStripe bool `json:"enableStripe"`
-	// If true, the mobile client will stop using CF worker to download files
+	EnableStripe        bool    `json:"enableStripe"`
 	DisableCFWorker     bool    `json:"disableCFWorker"`
 	MapEnabled          bool    `json:"mapEnabled"`
 	FaceSearchEnabled   bool    `json:"faceSearchEnabled"`
@@ -49,19 +48,14 @@ type FeatureFlagResponse struct {
 }
 
 const (
-	// UploadV2 marks availability of the upload v2 APIs in the binary.
-	UploadV2 int64 = 1 << 0
-	// Comments marks availability of the comments feature.
-	Comments int64 = 1 << 1
-	// BackupOptions marks availability of backup option features for older clients.
-	BackupOptions int64 = 1 << 2
-	// VideoStreaming gates video streaming feature.
+	UploadV2       int64 = 1 << 0
+	Comments       int64 = 1 << 1
+	BackupOptions  int64 = 1 << 2
 	VideoStreaming int64 = 1 << 3
 	// 1 << 4 previously gated CastSessionsV2 for released clients. Reuse it
 	// only when those clients no longer need to be isolated from a new flag.
 	// CastSessionsV2 gates cast sessions v2 support.
-	CastSessionsV2 int64 = 1 << 5
-	// DeferredMultipartChecksums gates multipart URLs without precomputed checksums.
+	CastSessionsV2             int64 = 1 << 5
 	DeferredMultipartChecksums int64 = 1 << 6
 )
 
@@ -96,7 +90,6 @@ func (k FlagKey) String() string {
 	return string(k)
 }
 
-// UserEditable returns true if the key is user editable
 func (k FlagKey) UserEditable() bool {
 	switch k {
 	case RecoveryKeyVerified, MapEnabled, FaceSearchEnabled, PassKeyEnabled, CustomDomain:
@@ -132,7 +125,7 @@ func (k FlagKey) IsBoolType() bool {
 	case CustomDomain:
 		return false
 	default:
-		return false // Explicitly handle unexpected cases
+		return false
 	}
 }
 
@@ -188,7 +181,6 @@ func ParseFamilyCustomDomainPointer(value string) (int64, string, bool, error) {
 	return memberID, domain, true, nil
 }
 
-// ResolveCustomDomainValue returns the effective domain for a custom domain value.
 func ResolveCustomDomainValue(value string) (string, error) {
 	if value == "" {
 		return "", nil
@@ -215,13 +207,11 @@ func isValidDomainWithoutScheme(input string) error {
 		return NewBadRequestWithMessage("domain should not contain scheme (e.g., http:// or https://)")
 	}
 
-	// Convert IDN to ASCII (Punycode) for validation
 	asciiDomain, err := idna.ToASCII(trimmed)
 	if err != nil {
 		return NewBadRequestWithMessage(fmt.Sprintf("invalid idn domain format: %s", trimmed))
 	}
 
-	// Validate the ASCII version
 	if !domainRegex.MatchString(asciiDomain) {
 		return NewBadRequestWithMessage(fmt.Sprintf("invalid domain format: %s", trimmed))
 	}

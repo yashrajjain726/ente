@@ -11,12 +11,10 @@ import (
 	"net/http"
 )
 
-// EmergencyHandler contains handlers for managing emergency contacts
 type EmergencyHandler struct {
 	Controller *emergency.Controller
 }
 
-// AddContact adds a new emergency contact for current user
 func (h *EmergencyHandler) AddContact(c *gin.Context) {
 	var request ente.AddContact
 	if err := handler.BindJSON(c, &request); err != nil {

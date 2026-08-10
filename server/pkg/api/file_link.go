@@ -10,7 +10,6 @@ import (
 	"strconv"
 )
 
-// ShareUrl a sharable url for the file
 func (h *FileHandler) ShareUrl(c *gin.Context) {
 	var file ente.CreateFileUrl
 	if err := handler.BindJSON(c, &file); err != nil {
@@ -131,7 +130,6 @@ func (h *FileHandler) GetUrls(c *gin.Context) {
 	})
 }
 
-// VerifyPassword verifies the password for given link access token and return signed jwt token if it's valid
 func (h *FileHandler) VerifyPassword(c *gin.Context) {
 	var req ente.VerifyPasswordRequest
 	if err := handler.BindJSON(c, &req); err != nil {
@@ -146,7 +144,6 @@ func (h *FileHandler) VerifyPassword(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
-// UpdateFileURL updates the share URL for a file
 func (h *FileHandler) UpdateFileURL(c *gin.Context) {
 	var req ente.UpdateFileUrl
 	if err := handler.BindJSON(c, &req); err != nil {

@@ -19,7 +19,6 @@ func AllObjects(fileID int64, ownerID int64, oType ente.ObjectType) []string {
 		return []string{derivedMetaPath(fileID, ownerID)}
 
 	default:
-		// throw panic saying current object type is not supported
 		panic(fmt.Sprintf("object type %s is not supported", oType))
 	}
 }

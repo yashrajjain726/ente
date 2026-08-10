@@ -20,7 +20,6 @@ import (
 	"google.golang.org/api/androidpublisher/v3"
 )
 
-// PlayStoreController provides abstractions for handling billing on AppStore
 type PlayStoreController struct {
 	PlayStoreClient        *playstore.Client
 	BillingRepo            *repo.BillingRepository
@@ -31,10 +30,8 @@ type PlayStoreController struct {
 	CommonBillCtrl         *commonbilling.Controller
 }
 
-// PlayStorePackageName is the package name of the PlayStore item
 const PlayStorePackageName = "io.ente.photos"
 
-// Return a new instance of PlayStoreController
 func NewPlayStoreController(
 	plans ente.BillingPlansPerCountry,
 	billingRepo *repo.BillingRepository,
@@ -84,7 +81,6 @@ func newPlayStoreClient() (*playstore.Client, error) {
 	return playStoreClient, nil
 }
 
-// HandleNotification handles a PlayStore notification
 func (c *PlayStoreController) HandleNotification(notification playstore.DeveloperNotification) error {
 	transactionID := notification.SubscriptionNotification.PurchaseToken
 	productID := notification.SubscriptionNotification.SubscriptionID
@@ -113,7 +109,6 @@ func (c *PlayStoreController) HandleNotification(notification playstore.Develope
 			}
 			return stacktrace.Propagate(err, "")
 		}
-		// send deletion email for folks who are either on individual plan or admin of a family plan
 		if user.FamilyAdminID == nil || *user.FamilyAdminID == subscription.UserID {
 			storage, surpErr := c.StorageBonusRepo.GetPaidAddonSurplusStorage(context.Background(), subscription.UserID)
 			if surpErr != nil {
@@ -159,7 +154,7 @@ func (c *PlayStoreController) HandleNotification(notification playstore.Develope
 				break
 			}
 		}
-		if newPlan.Storage < subscription.Storage { // Downgrade
+		if newPlan.Storage < subscription.Storage {
 			canDowngrade, canDowngradeErr := c.CommonBillCtrl.CanDowngradeToGivenStorage(newPlan.Storage, subscription.UserID)
 			if canDowngradeErr != nil {
 				return stacktrace.Propagate(canDowngradeErr, "")
@@ -198,7 +193,6 @@ func (c *PlayStoreController) HandleNotification(notification playstore.Develope
 	return c.BillingRepo.LogPlayStorePush(subscription.UserID, notification, *purchase)
 }
 
-// GetVerifiedSubscription verifies and returns the verified subscription
 func (c *PlayStoreController) GetVerifiedSubscription(userID int64, productID string, verificationData string) (ente.Subscription, error) {
 	var s ente.Subscription
 	s.UserID = userID
@@ -221,14 +215,12 @@ func (c *PlayStoreController) GetVerifiedSubscription(userID int64, productID st
 	return s, nil
 }
 
-// AcknowledgeSubscription acknowledges a subscription to PlayStore
 func (c *PlayStoreController) AcknowledgeSubscription(subscriptionID string, token string) error {
 	req := &androidpublisher.SubscriptionPurchasesAcknowledgeRequest{}
 	context := context.Background()
 	return c.PlayStoreClient.AcknowledgeSubscription(context, PlayStorePackageName, subscriptionID, token, req)
 }
 
-// CancelSubscription cancels a PlayStore subscription
 func (c *PlayStoreController) CancelSubscription(subscriptionID string, verificationData string) error {
 	context := context.Background()
 	return c.PlayStoreClient.CancelSubscription(context, PlayStorePackageName, subscriptionID, verificationData)

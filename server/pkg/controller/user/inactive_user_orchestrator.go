@@ -181,8 +181,6 @@ func buildInactiveUserRunSummary(stats inactiveUserRunStats, runAt int64) string
 	return fmt.Sprintf("%s: %s", summary, strings.Join(parts, " | "))
 }
 
-// InactiveUserOrchestrator sends inactivity warning emails and final account
-// deletion notifications for users who stay inactive across all apps.
 type InactiveUserOrchestrator struct {
 	UserRepo                *repo.UserRepository
 	NotificationHistoryRepo *repo.NotificationHistoryRepository

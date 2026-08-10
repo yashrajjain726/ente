@@ -11,7 +11,6 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// Create inserts a new  entry
 func (r *Repository) Create(ctx context.Context, userID int64, entry model.EntityDataRequest) (string, error) {
 	var id string
 	if entry.ID != nil {
@@ -32,11 +31,11 @@ func (r *Repository) Create(ctx context.Context, userID int64, entry model.Entit
                          type,
                          encrypted_data,
                          header) VALUES ($1,$2,$3,$4,$5) RETURNING id`,
-		id,                  //$1 id
-		userID,              // $2 user_id
-		entry.Type,          // $3 type
-		entry.EncryptedData, // $4 encrypted_data
-		entry.Header).       // $5 header
+		id,
+		userID,
+		entry.Type,
+		entry.EncryptedData,
+		entry.Header).
 		Scan(&id)
 	if err != nil {
 		return id, stacktrace.Propagate(err, "failed to create enity data")
@@ -81,8 +80,8 @@ func (r *Repository) Get(ctx context.Context, userID int64, id string) (*model.E
 	FROM entity_data
 	WHERE  id = $1 AND
 	user_id = $2`,
-		id,     // $1
-		userID, // %2     // $3
+		id,
+		userID,
 	)
 	err := row.Scan(&res.ID, &res.UserID, &res.Type, &res.EncryptedData, &res.Header, &res.IsDeleted, &res.CreatedAt, &res.UpdatedAt)
 	if err != nil {
@@ -128,8 +127,6 @@ func (r *Repository) Update(ctx context.Context, userID int64, req model.UpdateE
 	return nil
 }
 
-// GetDiff returns the &{[]model.EntityData} which have been added or
-// modified after the given sinceTime
 func (r *Repository) GetDiff(ctx context.Context, userID int64, eType model.EntityType, sinceTime int64, limit int16) ([]model.EntityData, error) {
 	rows, err := r.DB.QueryContext(ctx, `SELECT
        id, user_id, type, encrypted_data, header, is_deleted, created_at, updated_at
@@ -139,9 +136,9 @@ func (r *Repository) GetDiff(ctx context.Context, userID int64, eType model.Enti
        ORDER BY updated_at
 	   LIMIT $4`,
 		userID,
-		eType,     // $2
-		sinceTime, // $3
-		limit,     // $4
+		eType,
+		sinceTime,
+		limit,
 	)
 	if err != nil {
 		return nil, stacktrace.Propagate(err, "GetDiff query failed")
