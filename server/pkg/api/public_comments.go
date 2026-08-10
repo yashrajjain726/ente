@@ -11,7 +11,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// PublicCommentsHandler handles public collection social APIs.
 type PublicCommentsHandler struct {
 	CommentsCtrl     *public.CommentsController
 	ReactionsCtrl    *public.ReactionsController
@@ -325,7 +324,6 @@ func (h *PublicCommentsHandler) AnonProfiles(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"profiles": profiles})
 }
 
-// SocialDiff returns both comments and reactions in a single response.
 func (h *PublicCommentsHandler) SocialDiff(c *gin.Context) {
 	if !ensurePublicCommentsEnabled(c) {
 		return

@@ -8,8 +8,7 @@ import (
 
 type GetCollectionParams struct {
 	CollectionID int64
-	// userID of the user trying to fetch the controller
-	ActorUserID int64
+	ActorUserID  int64
 	// IncludeDeleted defaults to false. If false and user is trying to fetch deletion collection
 	// then the request fails
 	IncludeDeleted bool
@@ -31,7 +30,6 @@ func (c controllerImpl) GetCollection(ctx *gin.Context, req *GetCollectionParams
 		return nil, stacktrace.Propagate(err, "")
 	}
 
-	// Perform permission related access check if user is not the owner of the collection
 	if req.VerifyOwner && req.ActorUserID != collection.Owner.ID {
 		return nil, stacktrace.Propagate(ente.ErrPermissionDenied, "actor doesn't owns the collection")
 	}

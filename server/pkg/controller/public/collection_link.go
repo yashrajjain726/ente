@@ -30,11 +30,9 @@ const (
 
 	DeviceLimitWarningThreshold = 2000
 
-	// FreeUserDeviceLimit is the hardcoded device limit for free users
 	FreeUserDeviceLimit = 5
 )
 
-// CollectionLinkController controls share collection operations
 type CollectionLinkController struct {
 	FileController        *controller.FileController
 	EmailNotificationCtrl *emailCtrl.EmailNotificationController
@@ -65,7 +63,6 @@ func (c *CollectionLinkController) CreateLink(ctx *gin.Context, req ente.CreateP
 						return publicUrls[0], nil
 					}
 				}
-				// ideally we should never reach here
 				return ente.PublicURL{}, stacktrace.NewError("Unexpected state")
 			}
 			return ente.PublicURL{}, stacktrace.Propagate(err, "")
@@ -118,7 +115,6 @@ func (c *CollectionLinkController) CreateFile(ctx *gin.Context, file ente.File, 
 	return createdFile, nil
 }
 
-// Disable all public accessTokens generated for the given cID till date.
 func (c *CollectionLinkController) Disable(ctx context.Context, cID int64) error {
 	err := c.CollectionLinkRepo.DisableSharing(ctx, cID)
 	return stacktrace.Propagate(err, "")
@@ -217,8 +213,6 @@ func (c *CollectionLinkController) HandleAccountDeletion(ctx context.Context, us
 	return c.FileLinkRepo.DisableLinksForUser(ctx, userID)
 }
 
-// GetPublicCollection will return collection info for a public url.
-// is mustAllowCollect is set to true but the underlying collection doesn't allow uploading
 func (c *CollectionLinkController) GetPublicCollection(ctx *gin.Context, mustAllowCollect bool) (ente.Collection, error) {
 	accessContext := auth.MustGetPublicAccessContext(ctx)
 	collection, err := c.CollectionRepo.Get(accessContext.CollectionID)

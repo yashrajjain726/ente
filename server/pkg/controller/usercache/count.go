@@ -8,7 +8,6 @@ import (
 )
 
 func (c *Controller) GetUserFileCountWithCache(userID int64, app ente.App) (int64, error) {
-	// Check if the value is present in the cache
 	if count, ok := c.UserCache.GetFileCount(userID, app); ok {
 		// Cache hit, update the cache asynchronously
 		go func() {

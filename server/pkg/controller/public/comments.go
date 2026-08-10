@@ -19,7 +19,6 @@ import (
 
 const maxCommentPayloadSize = 20 * 1024
 
-// CommentsController handles comments exposed via public collection links.
 type CommentsController struct {
 	CommentCtrl   *socialcontroller.CommentsController
 	CommentsRepo  *socialrepo.CommentsRepository
@@ -30,7 +29,6 @@ type CommentsController struct {
 	JwtSecret     []byte
 }
 
-// CommentRequest models incoming payload for creating a comment.
 type CommentRequest struct {
 	ID              string  `json:"id"`
 	FileID          *int64  `json:"fileID"`

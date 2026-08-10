@@ -11,7 +11,6 @@ import (
 
 const reactionCipherLength = 156
 
-// ReactionsController exposes reactions for public collections.
 type ReactionsController struct {
 	ReactionCtrl  *socialcontroller.ReactionsController
 	ReactionsRepo *socialrepo.ReactionsRepository

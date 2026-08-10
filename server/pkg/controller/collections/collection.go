@@ -25,7 +25,6 @@ const (
 	CollectionDiffLimit = 2500
 )
 
-// CollectionController encapsulates logic that deals with collections
 type CollectionController struct {
 	CollectionLinkCtrl    *public.CollectionLinkController
 	EmailCtrl             *email.EmailNotificationController
@@ -44,7 +43,6 @@ type CollectionController struct {
 	ReactionsRepo         *socialrepo.ReactionsRepository
 }
 
-// Create creates a collection
 func (c *CollectionController) Create(collection ente.Collection, ownerID int64) (ente.Collection, error) {
 	if err := validateOwnedCollectionKey(collection.EncryptedKey, collection.KeyDecryptionNonce); err != nil {
 		return ente.Collection{}, err
@@ -82,7 +80,6 @@ func (c *CollectionController) Create(collection ente.Collection, ownerID int64)
 	return collection, nil
 }
 
-// GetCollection returns the collection for given collectionID
 func (c *CollectionController) GetCollection(ctx *gin.Context, userID int64, cID int64) (ente.Collection, error) {
 	resp, err := c.AccessCtrl.GetCollection(ctx, &access.GetCollectionParams{
 		CollectionID:   cID,
@@ -128,8 +125,6 @@ func (c *CollectionController) GetFile(ctx *gin.Context, collectionID int64, fil
 	return &file, nil
 }
 
-// TrashV3 deletes a given collection and based on user input (TrashCollectionV3Request.KeepFiles as FALSE) , it will move all files present in the underlying collection
-// to trash.
 func (c *CollectionController) TrashV3(ctx *gin.Context, req ente.TrashCollectionV3Request) error {
 	if req.KeepFiles == nil {
 		return ente.ErrBadRequest
@@ -183,7 +178,6 @@ func (c *CollectionController) TrashV3(ctx *gin.Context, req ente.TrashCollectio
 	return nil
 }
 
-// Rename updates the collection's name
 func (c *CollectionController) Rename(userID int64, cID int64, encryptedName string, nameDecryptionNonce string) error {
 	if err := c.verifyOwnership(cID, userID); err != nil {
 		return stacktrace.Propagate(err, "")
@@ -195,7 +189,6 @@ func (c *CollectionController) Rename(userID int64, cID int64, encryptedName str
 	return nil
 }
 
-// UpdateMagicMetadata updates the magic metadata for given collection
 func (c *CollectionController) UpdateMagicMetadata(ctx *gin.Context, request ente.UpdateCollectionMagicMetadata, isPublicMetadata bool) error {
 	userID := auth.GetUserID(ctx.Request.Header)
 	if err := c.verifyOwnership(request.ID, userID); err != nil {
@@ -239,7 +232,6 @@ func (c *CollectionController) HandleAccountDeletion(ctx context.Context, userID
 	return c.ResetUserSharingAccess(ctx, userID, logger)
 }
 
-// Verify that user owns the collection
 func (c *CollectionController) verifyOwnership(cID int64, userID int64) error {
 	collection, err := c.CollectionRepo.Get(cID)
 	if err != nil {

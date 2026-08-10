@@ -14,7 +14,6 @@ import (
 	"github.com/lithammer/shortuuid/v3"
 )
 
-// FileLinkController controls share collection operations
 type FileLinkController struct {
 	FileController *controller.FileController
 	FileLinkRepo   *public.FileLinkRepository
@@ -66,7 +65,6 @@ func (c *FileLinkController) CreateLink(ctx *gin.Context, req ente.CreateFileUrl
 	return nil, stacktrace.Propagate(ente.ErrAccessTokenInUse, "failed to generate unique access token for file link")
 }
 
-// Disable all public accessTokens generated for the given fileID till date.
 func (c *FileLinkController) Disable(ctx *gin.Context, fileID int64) error {
 	userID := auth.GetUserID(ctx.Request.Header)
 	file, err := c.FileRepo.GetFileAttributes(fileID)

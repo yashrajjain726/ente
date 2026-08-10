@@ -11,12 +11,10 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// UserEntityHandler expose request handlers for various operations on user entity
 type UserEntityHandler struct {
 	Controller *userentity.Controller
 }
 
-// CreateKey...
 func (h *UserEntityHandler) CreateKey(c *gin.Context) {
 	var request model.EntityKeyRequest
 	if err := handler.BindJSON(c, &request); err != nil {
@@ -55,7 +53,6 @@ func (h *UserEntityHandler) EnsureKey(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
-// GetKey...
 func (h *UserEntityHandler) GetKey(c *gin.Context) {
 	var request model.GetEntityKeyRequest
 	if err := c.ShouldBindQuery(&request); err != nil {
@@ -71,7 +68,6 @@ func (h *UserEntityHandler) GetKey(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
-// CreateEntity...
 func (h *UserEntityHandler) CreateEntity(c *gin.Context) {
 	var request model.EntityDataRequest
 	if err := handler.BindJSON(c, &request); err != nil {
@@ -86,7 +82,6 @@ func (h *UserEntityHandler) CreateEntity(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
-// UpdateEntity...
 func (h *UserEntityHandler) UpdateEntity(c *gin.Context) {
 	var request model.UpdateEntityDataRequest
 	if err := handler.BindJSON(c, &request); err != nil {
@@ -101,7 +96,6 @@ func (h *UserEntityHandler) UpdateEntity(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
-// DeleteEntity...
 func (h *UserEntityHandler) DeleteEntity(c *gin.Context) {
 	id := c.Query("id")
 	_, err := h.Controller.Delete(c, id)
@@ -112,7 +106,6 @@ func (h *UserEntityHandler) DeleteEntity(c *gin.Context) {
 	c.Status(http.StatusOK)
 }
 
-// GetDiff...
 func (h *UserEntityHandler) GetDiff(c *gin.Context) {
 	var request model.GetEntityDiffRequest
 	if err := c.ShouldBindQuery(&request); err != nil {
