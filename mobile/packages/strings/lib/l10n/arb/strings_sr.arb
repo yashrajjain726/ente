@@ -711,7 +711,6 @@
   "machineLearning": "Машинско учење",
   "manage": "Управљај",
   "manageDeviceStorage": "Управљај кеш меморијом уређаја",
-  "manageDeviceStorageDesc": "Прегледај и очисти локалну кеш меморију.",
   "manageFamily": "Управљај породицом",
   "manageLink": "Управљај везом",
   "manageParticipants": "Управљај",
@@ -1026,8 +1025,6 @@
       "userEmail": {}
     }
   },
-  "removeDuplicates": "Уклони дупликате",
-  "removeDuplicatesDesc": "Прегледај и уклони фајлове који су дупликати.",
   "removeFromAlbum": "Уклони из албума",
   "removeFromAlbumTitle": "Уклони из албума?",
   "removeLink": "Уклони везу",
@@ -1400,7 +1397,6 @@
   "viewAddOnButton": "Погледај додатке",
   "viewer": "Посматрач",
   "viewLargeFiles": "Велики фајлови",
-  "viewLargeFilesDesc": "Погледај фајлове који заузимају највише простора.",
   "viewLogsAction": "Прегледај извештаје",
   "viewRawCodes": "Погледајте сирове кôдове",
   "visitWebToManage": "Претплатом можете управљати на страници {webUrl}",

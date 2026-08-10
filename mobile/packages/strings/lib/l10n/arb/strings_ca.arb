@@ -505,7 +505,6 @@
   "deleteSharedAlbum": "Esborrar àlbum compartit?",
   "deleteSharedAlbumDialogBody": "L'àlbum s'esborrarà per a tothom\n\nPerdràs l'accés a les fotos compartides en aquest àlbum que siguin propietat d'altres",
   "deleteSuggestions": "Eliminar els suggeriments",
-  "deleteSuggestionsDesc": "Revisa els fitxers que s'han suggerit per a la seva eliminació.",
   "deleteSuggestionSent": "Suggerència d'eliminació enviada",
   "deleteTagMessage": "Estàs segur que vols eliminar aquesta etiqueta? Aquesta acció és irreversible.",
   "deleteTagTitle": "Eliminar etiqueta?",
@@ -864,11 +863,6 @@
     }
   },
   "freeUpDeviceSpace": "Allibera espai al dispositiu",
-  "freeUpDeviceSpaceDesc": "Estalvia espai al teu dispositiu netejant fitxers dels quals ja s'ha fet còpia de seguretat.",
-  "freeUpDeviceSpaceDescICloud": "Els fitxers als àlbums compartits d'iCloud no es poden netejar.",
-  "@freeUpDeviceSpaceDescICloud": {
-    "description": "Here 'cleared' means 'deleted' from the device"
-  },
   "freeUpSpace": "Allibera espai",
   "gallery": "Galeria",
   "galleryMemoryLimitInfo": "Fins a 1000 records mostrats a la galeria",
@@ -1136,7 +1130,6 @@
   },
   "manage": "Gestiona",
   "manageDeviceStorage": "Gestiona la memòria cau del dispositiu",
-  "manageDeviceStorageDesc": "Revisa i neteja l'emmagatzematge de la memòria cau local.",
   "manageFamily": "Gestiona família",
   "manageLink": "Gestiona enllaç",
   "manageParticipants": "Gestiona",
@@ -1635,8 +1628,6 @@
       "userEmail": {}
     }
   },
-  "removeDuplicates": "Elimina duplicats",
-  "removeDuplicatesDesc": "Revisa i elimina fitxers que són duplicats exactes.",
   "removeFromAlbum": "Elimina de l'àlbum",
   "removeFromAlbumTitle": "Eliminar de l'àlbum?",
   "removeFromFavorite": "Elimina de favorits",
@@ -2320,7 +2311,6 @@
   "useAsCover": "Utilitza com a portada",
   "usedSpace": "Espai utilitzat",
   "usedYourCode": "han utilitzat el teu codi",
-  "useMLToFindSimilarImages": "Revisa i elimina imatges que semblen similars entre si.",
   "useOffline": "Usa sense còpies de seguretat",
   "useSelectedPhoto": "Utilitza foto seleccionada",
   "validTill": "Vàlid fins al {endDate}",
@@ -2365,7 +2355,6 @@
   "viewAllExifData": "Veure totes les dades EXIF",
   "viewer": "Visualitzador",
   "viewLargeFiles": "Fitxers grans",
-  "viewLargeFilesDesc": "Veure fitxers que estan consumint la major quantitat d'emmagatzematge.",
   "viewLogs": "Veure registres",
   "@viewLogs": {
     "description": "Button to view logs"

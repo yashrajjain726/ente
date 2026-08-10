@@ -542,7 +542,6 @@
   "deleteSharedAlbum": "要删除共享相册吗？",
   "deleteSharedAlbumDialogBody": "将为所有人删除相册\n\n您将无法访问此相册中他人拥有的共享照片",
   "deleteSuggestions": "删除建议",
-  "deleteSuggestionsDesc": "查看建议删除的文件。",
   "deleteTagMessage": "您确定要删除此标签吗？此操作是不可逆的。",
   "deleteTagTitle": "要删除标签吗？",
   "deleteUnparseableCodeMessage": "这将从 Auth 中永久删除此代码，不会将其移至回收站。",
@@ -985,11 +984,6 @@
     }
   },
   "freeUpDeviceSpace": "释放设备空间",
-  "freeUpDeviceSpaceDesc": "清理已备份的文件，为设备节省存储空间。",
-  "freeUpDeviceSpaceDescICloud": "iCloud 共享相册中的文件无法清理。",
-  "@freeUpDeviceSpaceDescICloud": {
-    "description": "Here 'cleared' means 'deleted' from the device"
-  },
   "freeUpSpace": "释放空间",
   "gallery": "图库",
   "galleryMemoryLimitInfo": "在图库中显示最多1000个回忆",
@@ -1305,7 +1299,6 @@
   },
   "manage": "管理",
   "manageDeviceStorage": "管理设备缓存",
-  "manageDeviceStorageDesc": "检查并清除本地缓存存储。",
   "manageFamily": "管理家庭计划",
   "manageLink": "管理链接",
   "manageParticipants": "管理",
@@ -1843,8 +1836,6 @@
       "userEmail": {}
     }
   },
-  "removeDuplicates": "移除重复内容",
-  "removeDuplicatesDesc": "检查并删除完全重复的文件。",
   "removeFromAlbum": "从相册中移除",
   "removeFromAlbumTitle": "要从相册中移除吗？",
   "removeFromFavorite": "从收藏中移除",
@@ -2589,7 +2580,6 @@
   "useAsCover": "用作封面",
   "usedSpace": "已用空间",
   "usedYourCode": "使用了您的邀请码",
-  "useMLToFindSimilarImages": "审查并删除看起来彼此相似的图像。",
   "useOffline": "无需备份即可使用",
   "useRecoveryKey": "使用恢复密钥",
   "@useRecoveryKey": {
@@ -2644,7 +2634,6 @@
   "viewAllHelpTopics": "查看所有帮助主题",
   "viewer": "查看者",
   "viewLargeFiles": "大文件",
-  "viewLargeFilesDesc": "查看占用存储空间最多的文件。",
   "viewLogs": "查看日志",
   "@viewLogs": {
     "description": "Button to view logs"

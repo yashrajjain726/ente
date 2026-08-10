@@ -14,6 +14,7 @@
       }
     }
   },
+  "accountRecovery": "Obnovení účtu",
   "accountSetupIncompleteCreateAccount": "Nastavení účtu je neúplné. Pro dokončení nastavení vytvořte účet.",
   "@accountSetupIncompleteCreateAccount": {
     "description": "Error shown when account exists but signup is incomplete"
@@ -749,7 +750,6 @@
   "deleteSharedAlbumDialogBody": "Album bude smazáno pro všechny\n\nZtratíte přístup ke sdíleným fotkám v tomto albu, které vlastní jiní uživatelé",
   "deleteShareLinkConfirmation": "Lidé s tímto odkazem již nebudou mít k danému obsahu přístup.",
   "deleteSuggestions": "Odstranit návrhy",
-  "deleteSuggestionsDesc": "Zkontrolovat soubory, které byly navrženy pro odstranění.",
   "deleteSuggestionSent": "Návrh k odstranění odeslán",
   "deleteTagMessage": "Jste si jistí, že chcete odstranit tento štítek? Tato akce je nevratná.",
   "deleteTagTitle": "Odstranit štítek?",
@@ -1293,11 +1293,6 @@
     }
   },
   "freeUpDeviceSpace": "Uvolnit místo na zařízení",
-  "freeUpDeviceSpaceDesc": "Uvolněte místo ve svém zařízení vymazáním souborů, které již byly zálohovány.",
-  "freeUpDeviceSpaceDescICloud": "Soubory v iCloud sdílených albech nelze vymazat.",
-  "@freeUpDeviceSpaceDescICloud": {
-    "description": "Here 'cleared' means 'deleted' from the device"
-  },
   "freeUpSpace": "Uvolnit místo",
   "gallery": "Galerie",
   "galleryMemoryLimitInfo": "Až 1000 vzpomínek zobrazených v galerii",
@@ -1678,7 +1673,6 @@
   },
   "manage": "Spravovat",
   "manageDeviceStorage": "Spravovat mezipaměť zařízení",
-  "manageDeviceStorageDesc": "Zkontrolovat a vymazat místní úložiště mezipaměti.",
   "manageFamily": "Spravovat rodinu",
   "manageLink": "Spravovat odkaz",
   "manageParticipants": "Spravovat",
@@ -2393,8 +2387,6 @@
   "@removeContactDesc": {
     "description": "Description for remove contact confirmation dialog"
   },
-  "removeDuplicates": "Odstranit duplikáty",
-  "removeDuplicatesDesc": "Zkontrolujte a odstraňte soubory, které jsou přesnými duplikáty.",
   "removeFromAlbum": "Odstranit z alba",
   "removeFromAlbumTitle": "Odstranit z alba?",
   "removeFromFamily": "Odebrat z rodiny",
@@ -3357,7 +3349,6 @@
   "useAsCover": "Použít jako úvodní fotku",
   "usedSpace": "Využité místo",
   "usedYourCode": "použil Váš kód",
-  "useMLToFindSimilarImages": "Zkontrolujte a odstraňte obrázky, které se navzájem podobají.",
   "useOffline": "Použít bez zálohování",
   "useRecoveryKey": "Použít obnovovací klíč",
   "@useRecoveryKey": {
@@ -3426,7 +3417,6 @@
   "viewAllHelpTopics": "Zobrazit všechna témata nápovědy",
   "viewer": "Divák",
   "viewLargeFiles": "Velké soubory",
-  "viewLargeFilesDesc": "Zobrazit soubory, které zabírají nejvíce místa v úložišti.",
   "viewLogs": "Zobrazit záznamy",
   "@viewLogs": {
     "description": "Button to view logs"

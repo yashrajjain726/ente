@@ -701,7 +701,6 @@
   },
   "manage": "관리",
   "manageDeviceStorage": "장비 cache 관리",
-  "manageDeviceStorageDesc": "내부 cache 저장 공간 검토 및 삭제.",
   "manageLink": "링크 관리",
   "manageParticipants": "관리",
   "manualSort": "사용자 정의",

@@ -290,6 +290,12 @@
   "apply": "Appliquer",
   "applyCodeTitle": "Utiliser le code",
   "appstoreSubscription": "Abonnement à l'AppStore",
+  "appVersion": "Version {versionValue}",
+  "@appVersion": {
+    "placeholders": {
+      "versionValue": {}
+    }
+  },
   "architecture": "Icônes design",
   "archive": "Archiver",
   "@archive": {
@@ -316,6 +322,10 @@
   "areYouSureYouWantToExit": "Êtes-vous sûr de vouloir quitter ?",
   "areYouSureYouWantToIgnoreThesePersons": "Êtes-vous sûr de vouloir ignorer ces personnes ?",
   "areYouSureYouWantToIgnoreThisPerson": "Êtes-vous sûr de vouloir ignorer cette personne ?",
+  "areYouSureYouWantToLogout": "Voulez-vous vraiment vous déconnecter ?",
+  "@areYouSureYouWantToLogout": {
+    "description": "Confirmation message before logout"
+  },
   "areYouSureYouWantToRenew": "Êtes-vous sûr de vouloir renouveler ?",
   "areYouSureYouWantToResetThisPerson": "Êtes-vous certain de vouloir réinitialiser cette personne ?",
   "areYouSureYouWantToShowThesePeopleInPeopleSectionAgain": "Êtes-vous sûr de vouloir réafficher ces personnes dans la section Personnes ?",
@@ -868,7 +878,6 @@
   "deleteSharedAlbumDialogBody": "L'album sera supprimé pour tout le monde\n\nVous perdrez l'accès aux photos partagées dans cet album qui sont détenues par d'autres personnes",
   "deleteShareLinkConfirmation": "Les personnes disposant de ce lien ne pourront plus acceder a l'element.",
   "deleteSuggestions": "Supprimer les suggestions",
-  "deleteSuggestionsDesc": "Examiner les fichiers qui ont été suggérés pour suppression.",
   "deleteSuggestionSent": "Suggestion de suppression envoyée",
   "deleteTagMessage": "Êtes-vous sûr de vouloir supprimer ce tag ? Cette action est irréversible.",
   "deleteTagTitle": "Supprimer le tag ?",
@@ -1425,11 +1434,6 @@
       "count": {}
     }
   },
-  "freeUpDeviceSpaceDesc": "Économisez de l'espace sur votre appareil en effaçant les fichiers qui ont déjà été sauvegardés.",
-  "freeUpDeviceSpaceDescICloud": "Les fichiers dans les albums partagés iCloud ne peuvent pas être effacés.",
-  "@freeUpDeviceSpaceDescICloud": {
-    "description": "Here 'cleared' means 'deleted' from the device"
-  },
   "freeUpSpace": "Libérer de l'espace",
   "gallery": "Galerie",
   "galleryMemoryLimitInfo": "Jusqu'à 1000 souvenirs affichés dans la galerie",
@@ -1824,7 +1828,6 @@
   },
   "manage": "Gérer",
   "manageDeviceStorage": "Gérer le cache de l'appareil",
-  "manageDeviceStorageDesc": "Examiner et vider le cache.",
   "manageFamily": "Gérer la famille",
   "manageLink": "Gérer le lien",
   "manageParticipants": "Gérer",
@@ -2530,8 +2533,6 @@
   "@removeContactDesc": {
     "description": "Description for remove contact confirmation dialog"
   },
-  "removeDuplicates": "Supprimer les doublons",
-  "removeDuplicatesDesc": "Examinez et supprimez les fichiers étant des doublons exacts.",
   "removeFromAlbum": "Retirer de l'album",
   "removeFromAlbumTitle": "Retirer de l'album ?",
   "removeFromFamily": "Enlever de la famille",
@@ -3543,7 +3544,6 @@
   "useAsCover": "Utiliser comme couverture",
   "usedSpace": "Stockage utilisé",
   "usedYourCode": "a utilisé votre code",
-  "useMLToFindSimilarImages": "Examinez et supprimez les images qui se ressemblent entre elles.",
   "useOffline": "Utiliser sans sauvegardes",
   "username": "Nom d'utilisateur",
   "usernameHint": "Identifiant ou e-mail",
@@ -3617,7 +3617,6 @@
     "description": "Number of viewers that were successfully added."
   },
   "viewLargeFiles": "Fichiers volumineux",
-  "viewLargeFilesDesc": "Affichez les fichiers qui consomment le plus de stockage.",
   "viewLogs": "Afficher les journaux",
   "@viewLogs": {
     "description": "Button to view logs"

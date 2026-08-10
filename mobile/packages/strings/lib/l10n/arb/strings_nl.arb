@@ -665,7 +665,6 @@
   "deleteSharedAlbumDialogBody": "Het album wordt verwijderd voor iedereen\n\nJe verliest de toegang tot gedeelde foto's in dit album die eigendom zijn van anderen",
   "deleteShareLinkConfirmation": "Mensen met deze link hebben dan geen toegang meer tot het item.",
   "deleteSuggestions": "Suggesties verwijderen",
-  "deleteSuggestionsDesc": "Bekijk bestanden die zijn voorgesteld om te verwijderen.",
   "deleteTagMessage": "Weet je zeker dat je deze label wilt verwijderen? Deze actie is onomkeerbaar.",
   "deleteTagTitle": "Label verwijderen?",
   "deleteWithCount": "Verwijder ({count})",
@@ -1491,7 +1490,6 @@
   },
   "manage": "Beheren",
   "manageDeviceStorage": "Apparaatcache beheren",
-  "manageDeviceStorageDesc": "Bekijk en wis lokale cache opslag.",
   "manageFamily": "Familie abonnement beheren",
   "manageLink": "Beheer link",
   "manageParticipants": "Beheren",
@@ -2113,8 +2111,6 @@
   "@removeContactDesc": {
     "description": "Description for remove contact confirmation dialog"
   },
-  "removeDuplicates": "Duplicaten verwijderen",
-  "removeDuplicatesDesc": "Controleer en verwijder bestanden die exacte kopieën zijn.",
   "removeFromAlbum": "Verwijder uit album",
   "removeFromAlbumTitle": "Uit album verwijderen?",
   "removeFromFamily": "Verwijder uit familie",
@@ -2985,7 +2981,6 @@
   "useAsCover": "Als cover gebruiken",
   "usedSpace": "Gebruikte ruimte",
   "usedYourCode": "heeft je code gebruikt",
-  "useMLToFindSimilarImages": "Controleer en verwijder afbeeldingen die op elkaar lijken.",
   "useOffline": "Gebruik zonder back-ups",
   "username": "Gebruikersnaam",
   "usernameHint": "Login-ID of e-mail",
@@ -3037,7 +3032,6 @@
   "viewAllExifData": "Bekijk alle EXIF gegevens",
   "viewer": "Kijker",
   "viewLargeFiles": "Grote bestanden",
-  "viewLargeFilesDesc": "Bekijk bestanden die de meeste opslagruimte verbruiken.",
   "viewLogs": "Logboeken bekijken",
   "@viewLogs": {
     "description": "Button to view logs"

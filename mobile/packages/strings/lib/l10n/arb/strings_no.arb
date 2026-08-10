@@ -796,7 +796,6 @@
   "machineLearning": "Maskinlæring",
   "manage": "Administrer",
   "manageDeviceStorage": "Behandle enhetens hurtigbuffer",
-  "manageDeviceStorageDesc": "Gjennomgå og fjern lokal hurtigbuffer.",
   "manageFamily": "Administrer familie",
   "manageLink": "Administrer lenke",
   "manageParticipants": "Administrer",
@@ -1191,8 +1190,6 @@
       "userEmail": {}
     }
   },
-  "removeDuplicates": "Fjern duplikater",
-  "removeDuplicatesDesc": "Gjennomgå og fjern filer som er eksakte duplikater.",
   "removeFromAlbum": "Fjern fra album",
   "removeFromAlbumTitle": "Fjern fra album?",
   "removeFromFavorite": "Fjern fra favoritter",
@@ -1702,7 +1699,6 @@
   "viewAllExifData": "Vis alle EXIF-data",
   "viewer": "Seer",
   "viewLargeFiles": "Store filer",
-  "viewLargeFilesDesc": "Vis filer som bruker mest lagringsplass.",
   "viewLogs": "Se logger",
   "@viewLogs": {
     "description": "Button to view logs"

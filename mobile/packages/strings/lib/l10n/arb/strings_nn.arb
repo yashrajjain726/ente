@@ -290,8 +290,6 @@
   "@recreatePasswordTitle": {
     "description": "Title for recreate password dialog"
   },
-  "removeDuplicates": "Fjern duplikat",
-  "removeDuplicatesDesc": "Sjå gjennom og fjern duplikate filer.",
   "removeLink": "Fjern lenkje",
   "removingFromFavorites": "Fjernar frå favorittar …",
   "rename": "Endra namn",
@@ -425,7 +423,6 @@
     "description": "Verify password button label"
   },
   "viewLargeFiles": "Store filer",
-  "viewLargeFilesDesc": "Vis filer som tek opp mest plass.",
   "viewRecoveryKey": "Vis gjenopprettingsnøkkel",
   "waitingForWifi": "Ventar på Wi-Fi …",
   "weakStrength": "Svakt",
