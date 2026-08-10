@@ -7,6 +7,24 @@ description: Release notes of recent updates to Ente Photos mobile and desktop a
 
 A short summary list of changes to the Ente Photos mobile and desktop apps. For a more descriptive list with screenshots and blog post links, see the [news](https://ente.com/news).
 
+## v1.3.60 (mobile) - Aug 2026
+
+- Improved Cast device discovery on Android and added automatic Cast pairing on iOS.
+- Improved handling of device out-of-storage errors.
+- Made the favorite icon's stroke width consistent with the rest of the icon set.
+- Fixed cropped panoramas sometimes opening blank (@agarwalrahul2702).
+- Tapping an unconfigured home screen widget now opens its customization screen (@r4khul).
+- Improved app lock screens and fixed password setup edge cases.
+- Made panoramic photos open faster and improved panning, zooming, and motion controls.
+- Fixed uploading photos to multiple albums at once (@nuit-dhiver).
+- Fixed the no-op when a user tries to enable notifications from Settings → Notifications after denying permission.
+- Improved photo viewer responsiveness while swiping through photos.
+- Fixed picking SD card media from Ente in other Android apps (@wangwillian0).
+- Added Traditional Chinese as a selectable language.
+- Adjusted SVG icon sizing in the video editor bottom bar for better visibility (@r4khul).
+- Added a mute button to the video player that remembers your preference. (@r4khul).
+- Fix a black screen flash while loading videos on Android. This issue only affected video stream playback.
+
 ## v1.7.27 (desktop) - Jul 2026
 
 - Added Close button to the download notification toast.
