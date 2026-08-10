@@ -169,8 +169,9 @@ class _TrashPageState extends State<_TrashPage> {
       files.add(
         TrashFile.fromEnteFile(
           fileFromAsset(trash.deviceFolder, asset),
-          createdAt: trash.deleteBy - 30 * 86400,
-          updateAt: trash.deleteBy - 30 * 86400,
+          createdAt:
+              trash.deleteBy - const Duration(days: 30).inMicroseconds,
+          updateAt: trash.deleteBy - const Duration(days: 30).inMicroseconds,
           deleteBy: trash.deleteBy,
           isSystemOnly: true,
           systemTrashID: trash.localID,
