@@ -4238,6 +4238,7 @@
   },
   "unpinPerson": "Unpin person",
   "unpinText": "Unpin",
+  "unsavedChangesDescription": "You have unsaved changes. If you go back now, they will be lost.",
   "unsavedNoteChangesDescription": "You have unsaved changes in this note. If you go back now, they will be lost.",
   "unsavedNoteChangesTitle": "Discard changes?",
   "unselectAll": "Unselect all",
