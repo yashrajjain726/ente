@@ -82,7 +82,7 @@ const ExportSettings = z.object({
 
 const savedExportSettings = () => {
     const jsonString = localStorage.getItem("export");
-    const json = jsonString ? JSON.parse(jsonString) : undefined;
+    const json = jsonString ? (JSON.parse(jsonString) as unknown) : undefined;
     return json ? ExportSettings.parse(json) : undefined;
 };
 
@@ -134,13 +134,11 @@ interface CancellationStatus {
 
 class ExportService {
     private exportSettings: ExportSettings | undefined;
-    // @ts-ignore
     private exportInProgress: RequestCanceller | null = null;
     private resync = true;
     private reRunNeeded = false;
     private exportRecordUpdater = new PromiseQueue<ExportRecord>();
-    // @ts-ignore
-    private continuousExportEventHandler: () => void;
+    private continuousExportEventHandler: (() => void) | null = null;
     private uiUpdater: ExportUIUpdaters = {
         setExportProgress: () => {},
         setExportStage: () => {},
@@ -153,8 +151,7 @@ class ExportService {
         failed: 0,
     };
     private currentExportStage: ExportStage = ExportStage.init;
-    // @ts-ignore
-    private cachedMetadataDateTimeFormatter: Intl.DateTimeFormat;
+    private cachedMetadataDateTimeFormatter: Intl.DateTimeFormat | undefined;
 
     getExportSettings(): ExportSettings | undefined {
         try {
@@ -223,7 +220,6 @@ class ExportService {
     }
 
     enableContinuousExport() {
-        // @ts-ignore
         if (this.continuousExportEventHandler) {
             log.warn("Continuous export already enabled");
             return;
@@ -239,7 +235,6 @@ class ExportService {
             log.warn("Continuous export already disabled");
             return;
         }
-        // @ts-ignore
         this.continuousExportEventHandler = null;
     }
 
@@ -291,7 +286,6 @@ class ExportService {
         try {
             log.info("user requested export cancellation");
             this.exportInProgress?.exec();
-            // @ts-ignore
             this.exportInProgress = null;
             this.reRunNeeded = false;
             await this.postExport();
@@ -334,7 +328,6 @@ class ExportService {
                 } else {
                     await this.postExport();
                     log.info("resetting export in progress after completion");
-                    // @ts-ignore
                     this.exportInProgress = null;
                     if (this.reRunNeeded) {
                         this.reRunNeeded = false;
