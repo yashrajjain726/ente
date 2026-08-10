@@ -93,9 +93,9 @@ pub(crate) fn check_adapter() -> AdapterCheck {
     *VERDICT.get_or_init(|| match probe_vulkan_vendor_ids() {
         Ok(vendor_ids) => {
             let allowed = vendors_allowlisted(&vendor_ids);
-            crate::ml::runtime::rt_log(&format!(
+            log::info!(
                 "Vulkan adapter vendor IDs {vendor_ids:#06x?}; WebGPU allowlisted: {allowed}"
-            ));
+            );
             if allowed {
                 AdapterCheck::Allowed
             } else {
@@ -103,7 +103,7 @@ pub(crate) fn check_adapter() -> AdapterCheck {
             }
         }
         Err(error) => {
-            crate::ml::runtime::rt_log(&format!("Vulkan adapter probe failed: {error}"));
+            log::warn!("Vulkan adapter probe failed: {error}");
             AdapterCheck::Failed
         }
     })
@@ -174,10 +174,10 @@ pub(crate) fn arm_canary(model_path: &str, model_namespace: &str) -> io::Result<
 impl ArmedCanary {
     pub(crate) fn disarm(self) {
         if let Err(error) = remove_file_durably(&self.path) {
-            crate::ml::runtime::rt_log(&format!(
+            log::warn!(
                 "failed to disarm WebGPU crash canary at '{}': {error}",
                 self.path.display()
-            ));
+            );
         }
     }
 }

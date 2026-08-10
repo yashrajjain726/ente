@@ -84,7 +84,7 @@ fn postprocess_pet_face_tensor<T: onnx::FloatTensorData>(
         *output_shape.last().unwrap() as usize
     } else if output_shape.len() == 1 {
         let total = output_data.len();
-        let inferred = if total.is_multiple_of(13) {
+        if total.is_multiple_of(13) {
             13
         } else if total.is_multiple_of(12) {
             12
@@ -95,19 +95,7 @@ fn postprocess_pet_face_tensor<T: onnx::FloatTensorData>(
                 "unexpected pet face detector output size: {} (shape: {:?})",
                 total, output_shape
             )));
-        };
-        let candidates = [11usize, 12, 13];
-        let valid_count = candidates
-            .iter()
-            .filter(|&&c| total.is_multiple_of(c))
-            .count();
-        if valid_count > 1 {
-            eprintln!(
-                "[ml][pet] WARNING: flat output len={total} is divisible by {valid_count} row-length candidates; using {inferred}. \
-                 Prefer a model with 2D output shape for reliability."
-            );
         }
-        inferred
     } else {
         return Err(MlError::Postprocess(
             "pet face detector output shape is empty".to_string(),

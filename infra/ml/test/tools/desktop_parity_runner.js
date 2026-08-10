@@ -162,6 +162,9 @@ const main = async () => {
     const args = parseCLIArgs();
 
     const native = loadMLAddon();
+    native.initLogging((level, target, message) =>
+        console.log(`[${level}][${target}] ${message}`),
+    );
     native.initOrt(await onnxRuntimeLibraryPath());
     // Match the app's configuration (see ml-worker.ts); a no-op on macOS.
     native.setMlExecutionConfig(true);
@@ -211,8 +214,6 @@ const main = async () => {
         }
     } finally {
         native.releaseMlRuntime();
-        for (const { severity, message } of native.takeMlRuntimeEvents())
-            console.log(`[ml-rt] ${severity}: ${message}`);
     }
 
     await fsp.mkdir(path.dirname(args.output), { recursive: true });

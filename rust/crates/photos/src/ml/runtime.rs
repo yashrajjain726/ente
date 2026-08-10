@@ -11,29 +11,6 @@ use crate::ml::{
     onnx,
 };
 
-pub(crate) fn rt_log(msg: &str) {
-    #[cfg(target_os = "android")]
-    {
-        unsafe extern "C" {
-            unsafe fn __android_log_write(
-                prio: std::ffi::c_int,
-                tag: *const std::ffi::c_char,
-                text: *const std::ffi::c_char,
-            ) -> std::ffi::c_int;
-        }
-        use std::ffi::CString;
-        let tag = CString::new("ml_rt").unwrap();
-        let cmsg = CString::new(msg).unwrap_or_else(|_| CString::new("(invalid)").unwrap());
-        unsafe {
-            __android_log_write(4, tag.as_ptr(), cmsg.as_ptr());
-        }
-    }
-    #[cfg(not(target_os = "android"))]
-    {
-        eprintln!("[ml][rt] {msg}");
-    }
-}
-
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ModelPaths {
     pub face_detection: String,
@@ -206,12 +183,8 @@ impl ModelSlot {
             return false;
         }
 
-        crate::ml::events::record(
-            crate::ml::events::Severity::Warning,
-            format!(
-                "execution provider failed, retrying model with the next provider fallback: \
-                 {error}"
-            ),
+        log::warn!(
+            "execution provider failed, retrying model with the next provider fallback: {error}"
         );
         true
     }
@@ -254,13 +227,11 @@ impl ModelSlot {
 
         let execution_mode = self.effective_execution_mode(state);
         let model_name = state.path.rsplit('/').next().unwrap_or(&state.path);
-        rt_log(&format!(
-            "loading {model_name} with {execution_mode:?} execution"
-        ));
+        log::info!("loading {model_name} with {execution_mode:?} execution");
         let t = std::time::Instant::now();
         let (session, execution_provider) =
             onnx::build_session(&state.path, execution_mode, self.coreml_cache_namespace)?;
-        rt_log(&format!("loaded {model_name} in {:?}", t.elapsed()));
+        log::info!("loaded {model_name} in {:?}", t.elapsed());
         state.execution_provider = Some(execution_provider);
         state.session = Some(session);
         Ok(())

@@ -26,16 +26,7 @@ use ort::ep::{
 use std::num::NonZeroUsize;
 
 use crate::ml::error::{MlError, MlResult};
-use crate::ml::events;
 use crate::ml::golden;
-#[cfg(any(
-    target_os = "android",
-    target_os = "ios",
-    target_os = "linux",
-    target_os = "macos",
-    target_os = "windows"
-))]
-use crate::ml::runtime::rt_log;
 #[cfg(any(target_os = "android", target_os = "linux", target_os = "windows"))]
 use crate::ml::webgpu;
 
@@ -173,12 +164,9 @@ pub(crate) fn build_session(
                 if let Some(cache_dir) = coreml_cache_dir
                     && let Err(cleanup_error) = invalidate_coreml_cache(&cache_dir)
                 {
-                    events::record(
-                        events::Severity::Warning,
-                        format!(
-                            "failed to invalidate CoreML cache for '{}' after session construction failed: {cleanup_error}",
-                            model_file_label(model_path)
-                        ),
+                    log::warn!(
+                        "failed to invalidate CoreML cache for '{}' after session construction failed: {cleanup_error}",
+                        model_file_label(model_path)
                     );
                 }
                 errors.push(format!("{error}"));
@@ -314,7 +302,7 @@ fn record_provider_attempt_failure(
     error: &MlError,
 ) {
     if let Some(message) = provider_attempt_failure_message(provider, model_path, stage, error) {
-        events::record(events::Severity::Warning, message);
+        log::warn!("{message}");
     }
 }
 
@@ -375,31 +363,23 @@ fn run_session_self_test(
     let zero_output = match run_golden_tensor(session, entry.input_shape, &zero_input) {
         Ok(output) => output,
         Err(error) => {
-            events::record(
-                events::Severity::Warning,
-                format!(
-                    "{provider_label} zero-input warm-up inference failed for '{model_file}': \
-                     {error}; falling back to the next execution provider"
-                ),
+            log::warn!(
+                "{provider_label} zero-input warm-up inference failed for '{model_file}': \
+                 {error}; falling back to the next execution provider"
             );
             return Err(error);
         }
     };
     if let Err(reason) = golden::validate_output(entry, &zero_output) {
-        events::record(
-            events::Severity::Severe,
-            format!(
-                "{provider_label} zero-input warm-up failed for '{model_file}': {reason}; \
-                 falling back to the next execution provider"
-            ),
+        log::error!(
+            "{provider_label} zero-input warm-up failed for '{model_file}': {reason}; \
+             falling back to the next execution provider"
         );
         return Err(MlError::Ort(format!(
             "zero-input warm-up failed for '{model_file}': {reason}"
         )));
     }
-    rt_log(&format!(
-        "{provider_label} zero-input warm-up for '{model_file}' passed"
-    ));
+    log::info!("{provider_label} zero-input warm-up for '{model_file}' passed");
 
     let golden_output = match run_golden_tensor(session, entry.input_shape, &golden_input) {
         Ok(output) => output,
@@ -407,32 +387,26 @@ fn run_session_self_test(
             // Surface inference failures too: without this, a provider that
             // cannot execute the golden input would fall back invisibly (the
             // session-build error is swallowed once the next attempt succeeds).
-            events::record(
-                events::Severity::Warning,
-                format!(
-                    "{provider_label} golden self-test inference failed for '{model_file}': \
-                     {error}; falling back to the next execution provider"
-                ),
+            log::warn!(
+                "{provider_label} golden self-test inference failed for '{model_file}': \
+                 {error}; falling back to the next execution provider"
             );
             return Err(error);
         }
     };
     match golden::compare_output(entry, &golden_output) {
         Ok(distance) => {
-            rt_log(&format!(
+            log::info!(
                 "{provider_label} golden self-test for '{model_file}' passed \
                  ({} {distance:.2e})",
                 entry.metric.label()
-            ));
+            );
             Ok(())
         }
         Err(reason) => {
-            events::record(
-                events::Severity::Severe,
-                format!(
-                    "{provider_label} golden self-test failed for '{model_file}': {reason}; \
-                     falling back to the next execution provider"
-                ),
+            log::error!(
+                "{provider_label} golden self-test failed for '{model_file}': {reason}; \
+                 falling back to the next execution provider"
             );
             Err(MlError::Ort(format!(
                 "golden self-test failed for '{model_file}': {reason}"
@@ -573,12 +547,9 @@ fn coreml_provider(
                 prepared_cache_dir = Some(cache_dir);
             }
             Err(error) => {
-                events::record(
-                    events::Severity::Warning,
-                    format!(
-                        "failed to prepare persistent CoreML cache for '{}'; continuing without it: {error}",
-                        model_file_label(model_path)
-                    ),
+                log::warn!(
+                    "failed to prepare persistent CoreML cache for '{}'; continuing without it: {error}",
+                    model_file_label(model_path)
                 );
             }
         }
@@ -599,15 +570,9 @@ fn remove_persistent_coreml_cache(model_path: &str) {
         return;
     };
     match std::fs::remove_dir_all(&coreml_root) {
-        Ok(()) => events::record(
-            events::Severity::Info,
-            "removed persistent CoreML cache (feature disabled)".to_string(),
-        ),
+        Ok(()) => log::info!("removed persistent CoreML cache (feature disabled)"),
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
-        Err(error) => events::record(
-            events::Severity::Warning,
-            format!("failed to remove disabled persistent CoreML cache: {error}"),
-        ),
+        Err(error) => log::warn!("failed to remove disabled persistent CoreML cache: {error}"),
     }
 }
 
@@ -672,12 +637,9 @@ fn golden_entry_required(model_path: &str, provider_label: &str) -> bool {
     if golden::lookup(model_path).is_some() {
         return true;
     }
-    events::record(
-        events::Severity::Severe,
-        format!(
-            "no golden self-test entry for '{}'; {provider_label} disabled for this model",
-            model_file_label(model_path)
-        ),
+    log::error!(
+        "no golden self-test entry for '{}'; {provider_label} disabled for this model",
+        model_file_label(model_path)
     );
     false
 }
@@ -718,16 +680,10 @@ fn prepare_coreml_cache_directory(
         match prune_stale_coreml_schema_directories(coreml_root, COREML_CACHE_SCHEMA) {
             Ok(removed) => {
                 for schema in removed {
-                    events::record(
-                        events::Severity::Info,
-                        format!("removed stale CoreML cache schema '{schema}'"),
-                    );
+                    log::info!("removed stale CoreML cache schema '{schema}'");
                 }
             }
-            Err(error) => events::record(
-                events::Severity::Warning,
-                format!("failed to prune stale CoreML cache schemas: {error}"),
-            ),
+            Err(error) => log::warn!("failed to prune stale CoreML cache schemas: {error}"),
         }
     }
 
@@ -756,30 +712,21 @@ fn prepare_coreml_cache_entry(cache_dir: &Path) -> std::io::Result<()> {
 fn finalize_coreml_cache(cache_dir: &Path, model_path: &str) {
     match trim_coreml_cache_weights(cache_dir) {
         Ok(0) => {}
-        Ok(reclaimed) => events::record(
-            events::Severity::Info,
-            format!(
-                "primed CoreML cache for '{}': trimmed {} MiB of generated package weights",
-                model_file_label(model_path),
-                reclaimed / (1024 * 1024)
-            ),
+        Ok(reclaimed) => log::info!(
+            "primed CoreML cache for '{}': trimmed {} MiB of generated package weights",
+            model_file_label(model_path),
+            reclaimed / (1024 * 1024)
         ),
-        Err(error) => events::record(
-            events::Severity::Warning,
-            format!(
-                "failed to trim CoreML cache weights for '{}': {error}",
-                model_file_label(model_path)
-            ),
+        Err(error) => log::warn!(
+            "failed to trim CoreML cache weights for '{}': {error}",
+            model_file_label(model_path)
         ),
     }
 
     if let Err(error) = mark_coreml_cache_complete(cache_dir) {
-        events::record(
-            events::Severity::Warning,
-            format!(
-                "failed to mark CoreML cache complete for '{}': {error}",
-                model_file_label(model_path)
-            ),
+        log::warn!(
+            "failed to mark CoreML cache complete for '{}': {error}",
+            model_file_label(model_path)
         );
     }
 }

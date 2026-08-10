@@ -41,13 +41,11 @@ impl VectorDB {
         let db = Self { index, path };
 
         if file_exists {
-            println!("Loading index from disk.");
             // `view` is immutable, but the reloaded index must remain writable.
             db.index
                 .load(file_path)
                 .map_err(|e| format!("Failed to load index from {file_path}: {e}"))?;
         } else {
-            println!("Creating new index.");
             db.save_index()?;
         }
         Ok(db)
@@ -90,7 +88,6 @@ impl VectorDB {
             ));
         }
 
-        println!("Successfully saved index atomically");
         Ok(())
     }
 
@@ -428,8 +425,6 @@ impl VectorDB {
         if self.path.exists() {
             std::fs::remove_file(&self.path)
                 .map_err(|e| format!("Failed to delete index file {}: {e}", self.path.display()))?;
-        } else {
-            println!("Index file does not exist.");
         }
         Ok(())
     }
