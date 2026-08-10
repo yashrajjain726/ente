@@ -93,6 +93,7 @@ class GalleryAppBarWidget extends StatefulWidget {
         context,
         subtitle: subtitle,
         description: collection?.displayDescription,
+        bottomHeight: bottom?.preferredSize.height,
       ),
     );
   }
@@ -101,13 +102,14 @@ class GalleryAppBarWidget extends StatefulWidget {
     BuildContext context, {
     String? subtitle,
     String? description,
+    double? bottomHeight,
   }) {
     final inheritedSearchFilterData = InheritedSearchFilterData.maybeOf(
       context,
     );
     final isHierarchicalSearchable =
         inheritedSearchFilterData?.isHierarchicalSearchable ?? false;
-    final bottomHeight = isHierarchicalSearchable
+    bottomHeight ??= isHierarchicalSearchable
         ? AppBarFilterChips.preferredHeight(context)
         : 0.0;
     final collapsibleBottomHeight = AlbumDescriptionHeader.preferredHeight(
@@ -288,6 +290,7 @@ class _GalleryAppBarWidgetState extends State<GalleryAppBarWidget> {
         subtitle: widget.subtitle,
         actions: _getDefaultActions(context),
         collapsibleBottom: descriptionHeader,
+        bottom: widget.bottom,
       );
     }
 
