@@ -103,10 +103,9 @@ impl<B: Backend> ChatDb<B> {
 
     pub fn update_session_title(&self, uuid: Uuid, title: &str) -> Result<()> {
         let affected = self.backend.execute(
-            "UPDATE sessions SET title = ?, updated_at = ? WHERE session_uuid = ?",
+            "UPDATE sessions SET title = ? WHERE session_uuid = ?",
             &[
                 Value::Blob(crypto::encrypt_string(title, &self.key)?),
-                Value::Integer(self.clock.now_us()),
                 Value::Text(uuid.to_string()),
             ],
         )?;
@@ -147,7 +146,7 @@ impl<B: Backend> ChatDb<B> {
              VALUES (?, ?, ?, ?)
              ON CONFLICT(session_uuid) DO UPDATE SET
                title = CASE
-                 WHEN excluded.updated_at >= sessions.updated_at THEN excluded.title
+                 WHEN excluded.updated_at > sessions.updated_at THEN excluded.title
                  ELSE sessions.title
                END,
                created_at = MIN(sessions.created_at, excluded.created_at),

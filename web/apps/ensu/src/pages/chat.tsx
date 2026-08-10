@@ -1844,16 +1844,13 @@ const Page: React.FC = () => {
 
     const updateSessionTitleInState = useCallback(
         (sessionUuid: string, title: string) => {
-            const updatedAt = Date.now() * 1000;
-            setSessions((prev) => {
-                const next = prev.map((session) =>
+            setSessions((prev) =>
+                prev.map((session) =>
                     session.sessionUuid === sessionUuid
-                        ? { ...session, title, updatedAt }
+                        ? { ...session, title }
                         : session,
-                );
-                next.sort((a, b) => b.updatedAt - a.updatedAt);
-                return next;
-            });
+                ),
+            );
         },
         [],
     );
