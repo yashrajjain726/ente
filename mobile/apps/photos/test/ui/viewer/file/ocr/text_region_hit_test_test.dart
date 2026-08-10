@@ -53,6 +53,32 @@ void main() {
     );
   });
 
+  test("keeps interactive selection controls tappable outside the image", () {
+    expect(
+      shouldCaptureOcrGesture(
+        pointOnInteractiveSelectionUi: true,
+        pointEligibleForOcr: false,
+        textRegionsOnly: false,
+        pointOnSelectableText: false,
+        pointInDetectedTextRegion: false,
+      ),
+      isTrue,
+    );
+  });
+
+  test("does not capture non-interactive points outside the image", () {
+    expect(
+      shouldCaptureOcrGesture(
+        pointOnInteractiveSelectionUi: false,
+        pointEligibleForOcr: false,
+        textRegionsOnly: false,
+        pointOnSelectableText: false,
+        pointInDetectedTextRegion: false,
+      ),
+      isFalse,
+    );
+  });
+
   test("applies hit slop in viewport pixels", () {
     expect(
       isViewportPointInTextRegions(
