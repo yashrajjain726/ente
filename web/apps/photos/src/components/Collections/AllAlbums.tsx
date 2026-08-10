@@ -213,15 +213,14 @@ export const AllAlbums: React.FC<AllAlbums> = ({
 
     const visibleAlbumFilters = useMemo(
         () =>
-            albumFilters.filter(
-                ({ value }) =>
-                    value == "all" ||
-                    (value == "empty-albums"
-                        ? hasEnoughEmptyAlbums
-                        : collectionSummaries.some((cs) =>
-                              matchesAlbumFilter(cs, value),
-                          )),
-            ),
+            albumFilters.filter(({ value }) => {
+                if (value == "all") return true;
+                if (value == "empty-albums") return hasEnoughEmptyAlbums;
+
+                return collectionSummaries.some((cs) =>
+                    matchesAlbumFilter(cs, value),
+                );
+            }),
         [collectionSummaries, hasEnoughEmptyAlbums],
     );
 
