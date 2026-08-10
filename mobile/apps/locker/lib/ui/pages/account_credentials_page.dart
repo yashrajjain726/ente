@@ -22,27 +22,28 @@ class _AccountCredentialsPageState
   final TextEditingController _usernameController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _notesController = TextEditingController();
+  String _initialName = '';
+  String _initialUsername = '';
+  String _initialPassword = '';
+  String _initialNotes = '';
 
   @override
-  void initState() {
-    super.initState();
-    _loadExistingData();
-  }
-
-  void _loadExistingData() {
+  void loadExistingData() {
     final data = currentData;
-    if (data != null) {
-      _nameController.text = data.name;
-      _usernameController.text = data.username;
-      _passwordController.text = data.password;
-      _notesController.text = data.notes ?? '';
-    }
+    _nameController.text = data?.name ?? '';
+    _usernameController.text = data?.username ?? '';
+    _passwordController.text = data?.password ?? '';
+    _notesController.text = data?.notes ?? '';
+    _initialName = _nameController.text;
+    _initialUsername = _usernameController.text;
+    _initialPassword = _passwordController.text;
+    _initialNotes = _notesController.text;
   }
 
   @override
   void refreshUIWithCurrentData() {
     super.refreshUIWithCurrentData();
-    _loadExistingData();
+    loadExistingData();
   }
 
   @override
@@ -87,6 +88,14 @@ class _AccountCredentialsPageState
     return _nameController.text.trim().isNotEmpty &&
         _usernameController.text.trim().isNotEmpty &&
         _passwordController.text.trim().isNotEmpty;
+  }
+
+  @override
+  bool get hasUnsavedChanges {
+    return _nameController.text.trim() != _initialName.trim() ||
+        _usernameController.text.trim() != _initialUsername.trim() ||
+        _passwordController.text.trim() != _initialPassword.trim() ||
+        _notesController.text.trim() != _initialNotes.trim();
   }
 
   @override

@@ -5,6 +5,7 @@ import 'package:ente_events/event_bus.dart';
 import 'package:ente_strings/ente_strings.dart';
 import 'package:ente_ui/utils/toast_util.dart';
 import "package:ente_utils/email_util.dart";
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hugeicons/hugeicons.dart';
@@ -59,6 +60,7 @@ abstract class BaseInfoPageState<T extends InfoData, W extends BaseInfoPage<T>>
   // Collection selection state
   List<Collection> _availableCollections = [];
   Set<int> _selectedCollectionIds = {};
+  Set<int> _initialSelectedCollectionIds = {};
   bool _hasLoadedCollectionSelection = false;
 
   // Getter for current data - prioritizes updated data over existing file data
@@ -93,6 +95,13 @@ abstract class BaseInfoPageState<T extends InfoData, W extends BaseInfoPage<T>>
   List<Widget> buildViewFields();
   bool validateForm();
 
+  @protected
+  bool get hasUnsavedChanges;
+
+  @protected
+  String get discardChangesDescription =>
+      context.strings.unsavedChangesDescription;
+
   bool get showCollectionSelectionTitle => true;
   double get collectionSpacing => 24;
   double get viewModeBottomPadding => 20;
@@ -124,6 +133,20 @@ abstract class BaseInfoPageState<T extends InfoData, W extends BaseInfoPage<T>>
 
   @protected
   Future<bool> onEditModeBackPressed() async {
+    final hasCollectionChanges = !setEquals(
+      _selectedCollectionIds,
+      _initialSelectedCollectionIds,
+    );
+    if (!hasUnsavedChanges && !hasCollectionChanges) {
+      return true;
+    }
+
+    final shouldDiscard = await _showDiscardChangesDialog();
+    if (!shouldDiscard) {
+      return false;
+    }
+
+    _restoreEditSession();
     return true;
   }
 
@@ -211,6 +234,7 @@ abstract class BaseInfoPageState<T extends InfoData, W extends BaseInfoPage<T>>
       setState(() {
         _availableCollections = filteredCollections;
         _selectedCollectionIds = initialSelection;
+        _initialSelectedCollectionIds = Set<int>.of(initialSelection);
         _hasLoadedCollectionSelection = true;
       });
     } catch (e) {
@@ -257,6 +281,8 @@ abstract class BaseInfoPageState<T extends InfoData, W extends BaseInfoPage<T>>
       }
 
       if (mounted && widget.existingFile != null) {
+        _captureEditSessionState();
+
         // Switch to view mode with updated data
         setState(() {
           _currentMode = InfoPageMode.view;
@@ -494,6 +520,10 @@ abstract class BaseInfoPageState<T extends InfoData, W extends BaseInfoPage<T>>
   }
 
   void _toggleMode() {
+    if (isInViewMode) {
+      _captureEditSessionState();
+    }
+
     setState(() {
       _currentMode = _currentMode == InfoPageMode.view
           ? InfoPageMode.edit
@@ -507,6 +537,37 @@ abstract class BaseInfoPageState<T extends InfoData, W extends BaseInfoPage<T>>
       context,
       context.strings.fieldCopiedToClipboard(fieldName: fieldName),
     );
+  }
+
+  void _captureEditSessionState() {
+    _initialSelectedCollectionIds = Set<int>.of(_selectedCollectionIds);
+  }
+
+  void _restoreEditSession() {
+    loadExistingData();
+    setState(() {
+      _selectedCollectionIds = Set<int>.of(_initialSelectedCollectionIds);
+    });
+  }
+
+  Future<bool> _showDiscardChangesDialog() async {
+    final result = await showBottomSheetComponent<bool>(
+      context: context,
+      builder: (_) => BottomSheetComponent(
+        title: context.strings.unsavedNoteChangesTitle,
+        message: discardChangesDescription,
+        illustration: LockerBottomSheetIllustration.warningGrey,
+        actions: [
+          ButtonComponent(
+            label: context.strings.discardChanges,
+            variant: ButtonComponentVariant.critical,
+            onTap: () => Navigator.of(context).pop(true),
+          ),
+        ],
+      ),
+    );
+
+    return result ?? false;
   }
 
   Widget buildViewField({
