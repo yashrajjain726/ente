@@ -96,8 +96,28 @@ class _PaymentWebPageState extends State<PaymentWebPage> {
                 onLoadStart: (controller, navigationAction) async {
                   _logger.info("onLoadStart $navigationAction");
                 },
-                onReceivedError: (controller, navigationAction, code) async {
-                  _logger.severe("onLoadError $navigationAction $code");
+                onReceivedError: (controller, navigationAction, error) async {
+                  _logger.severe("onLoadError $navigationAction $error");
+                  final networkErrorTypes = {
+                    WebResourceErrorType.HOST_LOOKUP,
+                    WebResourceErrorType.NOT_CONNECTED_TO_INTERNET,
+                    WebResourceErrorType.NETWORK_CONNECTION_LOST,
+                    WebResourceErrorType.TIMEOUT,
+                    WebResourceErrorType.CANNOT_CONNECT_TO_HOST,
+                    WebResourceErrorType.SERVER_UNREACHABLE,
+                  };
+                  final isNetworkError = networkErrorTypes.contains(error.type);
+                  if (navigationAction.isForMainFrame == true &&
+                      isNetworkError) {
+                    if (!mounted) return;
+                    final navigator = Navigator.of(context);
+                    navigator.pop(false);
+                    if (!navigator.mounted) return;
+                    await showGenericErrorDialog(
+                      context: navigator.context,
+                      error: error,
+                    );
+                  }
                 },
                 onReceivedHttpError:
                     (controller, navigationAction, code) async {
