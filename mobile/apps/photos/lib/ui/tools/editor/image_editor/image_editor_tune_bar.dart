@@ -450,7 +450,7 @@ class _TuneAdjustWidget extends StatelessWidget {
                 overlayShape: const RoundSliderOverlayShape(overlayRadius: 0),
                 activeTrackColor: colors.primary,
                 inactiveTrackColor: colors.fillLight,
-                trackShape: const _CenterBasedTrackShape(),
+                trackShape: _CenterBasedTrackShape(isBipolar: min < 0),
                 trackHeight: 24,
               ),
               child: Slider(
@@ -502,6 +502,8 @@ class _TuneAdjustWidget extends StatelessWidget {
 class _ColorPickerThumbShape extends SliderComponentShape {
   const _ColorPickerThumbShape();
 
+  static const double thumbRadius = 15.0;
+
   @override
   Size getPreferredSize(bool isEnabled, bool isDiscrete) {
     return const Size(20, 20);
@@ -533,7 +535,10 @@ class _ColorPickerThumbShape extends SliderComponentShape {
     );
 
     final constrainedCenter = Offset(
-      center.dx.clamp(trackRect.left + 15, trackRect.right - 15),
+      center.dx.clamp(
+        trackRect.left + thumbRadius,
+        trackRect.right - thumbRadius,
+      ),
       center.dy,
     );
 
@@ -541,7 +546,7 @@ class _ColorPickerThumbShape extends SliderComponentShape {
       ..color = Colors.white
       ..style = PaintingStyle.fill;
 
-    canvas.drawCircle(constrainedCenter, 15, paint);
+    canvas.drawCircle(constrainedCenter, thumbRadius, paint);
 
     final innerPaint = Paint()
       ..color = const Color.fromRGBO(8, 194, 37, 1)
@@ -551,9 +556,11 @@ class _ColorPickerThumbShape extends SliderComponentShape {
 }
 
 class _CenterBasedTrackShape extends SliderTrackShape {
-  const _CenterBasedTrackShape();
+  const _CenterBasedTrackShape({this.isBipolar = true});
 
   static const double horizontalPadding = 6.0;
+
+  final bool isBipolar;
 
   @override
   Rect getPreferredRect({
@@ -597,9 +604,11 @@ class _CenterBasedTrackShape extends SliderTrackShape {
     final double centerX = trackRect.left + trackRect.width / 2;
 
     final double clampedThumbDx = thumbCenter.dx.clamp(
-      trackRect.left,
-      trackRect.right,
+      trackRect.left + _ColorPickerThumbShape.thumbRadius,
+      trackRect.right - _ColorPickerThumbShape.thumbRadius,
     );
+
+    final double activeStartDx = isBipolar ? centerX : trackRect.left;
 
     final Paint inactivePaint = Paint()
       ..color = sliderTheme.inactiveTrackColor!
@@ -612,22 +621,23 @@ class _CenterBasedTrackShape extends SliderTrackShape {
 
     canvas.drawRRect(inactiveRRect, inactivePaint);
 
-    if (clampedThumbDx != centerX) {
+    if ((clampedThumbDx - activeStartDx).abs() >
+        _ColorPickerThumbShape.thumbRadius) {
       final Paint activePaint = Paint()
         ..color = sliderTheme.activeTrackColor!
         ..style = PaintingStyle.fill;
 
-      final Rect activeRect = clampedThumbDx >= centerX
+      final Rect activeRect = clampedThumbDx >= activeStartDx
           ? Rect.fromLTWH(
-              centerX,
+              activeStartDx,
               trackRect.top,
-              clampedThumbDx - centerX,
+              clampedThumbDx - activeStartDx,
               trackRect.height,
             )
           : Rect.fromLTWH(
               clampedThumbDx,
               trackRect.top,
-              centerX - clampedThumbDx,
+              activeStartDx - clampedThumbDx,
               trackRect.height,
             );
 
