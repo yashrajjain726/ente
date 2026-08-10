@@ -822,12 +822,11 @@ const Page: React.FC = () => {
                 }
                 if (!(await masterKeyFromSession())) {
                     clearSessionStorage();
-                    router.push("/credentials");
+                    void router.push("/credentials");
                     if (strict)
                         throw new Error(
                             "Remote pull failed: missing master key",
                         );
-                    void router.push("/credentials");
                     return;
                 }
 
