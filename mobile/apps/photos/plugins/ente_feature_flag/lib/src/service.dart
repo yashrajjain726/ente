@@ -53,6 +53,8 @@ class FlagService {
     return (flags.internalUser || kDebugMode) && !isDisabled;
   }
 
+  bool get largeBackupStandby => internalUser;
+
   bool get librarySharing => internalUser;
 
   bool get webGPUEnabled => true;

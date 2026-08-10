@@ -28,6 +28,8 @@ PODS:
     - Flutter
   - ente_rust (0.0.1):
     - Flutter
+  - ente_screen_brightness (0.0.1):
+    - Flutter
   - ente_screen_cover (0.0.1):
     - Flutter
   - EnteOnnxRuntime (1.28.0-r3)
@@ -256,6 +258,7 @@ DEPENDENCIES:
   - ente_photos_rust (from `.symlinks/plugins/ente_photos_rust/ios`)
   - ente_qr (from `.symlinks/plugins/ente_qr/ios`)
   - ente_rust (from `.symlinks/plugins/ente_rust/ios`)
+  - ente_screen_brightness (from `.symlinks/plugins/ente_screen_brightness/ios`)
   - ente_screen_cover (from `.symlinks/plugins/ente_screen_cover/ios`)
   - EnteOnnxRuntime (from `../../../native/apple/packages/EnteOnnxRuntime/EnteOnnxRuntime.podspec`)
   - ffmpeg_kit_flutter (from `.symlinks/plugins/ffmpeg_kit_flutter/ios`)
@@ -351,6 +354,8 @@ EXTERNAL SOURCES:
     :path: ".symlinks/plugins/ente_qr/ios"
   ente_rust:
     :path: ".symlinks/plugins/ente_rust/ios"
+  ente_screen_brightness:
+    :path: ".symlinks/plugins/ente_screen_brightness/ios"
   ente_screen_cover:
     :path: ".symlinks/plugins/ente_screen_cover/ios"
   EnteOnnxRuntime:
@@ -455,6 +460,7 @@ SPEC CHECKSUMS:
   ente_photos_rust: 2db1f31cbe3f13ef0f52909a52b1f885b880a6ec
   ente_qr: 86beaf5d2644705db9b565b32dd8b82c05fb36af
   ente_rust: d0197ebd5460e8f67576579452b073d698404abe
+  ente_screen_brightness: 7dd13c361508ee6098a2578908ebf35e9f567e28
   ente_screen_cover: 6792566774f1c83939f9c1d03ed0a1f1ded45ae4
   EnteOnnxRuntime: c994300f7ef809dd318664cfd85868ca69b3cd1a
   ffmpeg_kit_custom: 682b4f2f1ff1f8abae5a92f6c3540f2441d5be99

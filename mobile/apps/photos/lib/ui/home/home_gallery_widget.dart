@@ -17,6 +17,7 @@ import 'package:photos/models/selected_files.dart';
 import "package:photos/service_locator.dart";
 import 'package:photos/services/collections_service.dart';
 import "package:photos/services/filter/db_filters.dart";
+import "package:photos/services/sync/sync_service.dart";
 import 'package:photos/ui/viewer/actions/file_selection_overlay_bar.dart';
 import "package:photos/ui/viewer/gallery/component/group/type.dart";
 import 'package:photos/ui/viewer/gallery/gallery.dart';
@@ -79,6 +80,7 @@ class _HomeGalleryWidgetState extends State<HomeGalleryWidget> {
 
   @override
   Widget build(BuildContext context) {
+    final largeBackupSession = SyncService.instance.largeBackupSessionTracker;
     final gallery = Gallery(
       key: ValueKey(_shouldHideSharedItems),
       asyncLoader: (creationStartTime, creationEndTime, {limit, asc}) async {
@@ -118,7 +120,9 @@ class _HomeGalleryWidgetState extends State<HomeGalleryWidget> {
 
         return result;
       },
-      reloadEvent: Bus.instance.on<LocalPhotosUpdatedEvent>(),
+      reloadEvent: Bus.instance.on<LocalPhotosUpdatedEvent>().where(
+        (_) => !largeBackupSession.isStandbyScreenActive,
+      ),
       removalEventTypes: const {
         EventType.deletedFromRemote,
         EventType.deletedFromEverywhere,
@@ -126,8 +130,12 @@ class _HomeGalleryWidgetState extends State<HomeGalleryWidget> {
         EventType.hide,
       },
       forceReloadEvents: [
-        Bus.instance.on<BackupFoldersUpdatedEvent>(),
-        Bus.instance.on<ForceReloadHomeGalleryEvent>(),
+        Bus.instance.on<BackupFoldersUpdatedEvent>().where(
+          (_) => !largeBackupSession.isStandbyScreenActive,
+        ),
+        Bus.instance.on<ForceReloadHomeGalleryEvent>().where(
+          (_) => !largeBackupSession.isStandbyScreenActive,
+        ),
       ],
       tagPrefix: "home_gallery",
       selectedFiles: widget.selectedFiles,

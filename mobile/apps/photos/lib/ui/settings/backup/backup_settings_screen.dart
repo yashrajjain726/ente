@@ -3,14 +3,16 @@ import "dart:io";
 import "package:ente_components/ente_components.dart";
 import "package:ente_pure_utils/ente_pure_utils.dart";
 import "package:ente_strings/ente_strings.dart";
+import "package:ente_ui/utils/dialog_util.dart";
 import "package:flutter/material.dart";
+import "package:hugeicons/hugeicons.dart";
 import "package:photo_manager/photo_manager.dart";
 import "package:photos/service_locator.dart";
 import "package:photos/services/sync/local_sync_service.dart";
 import "package:photos/services/sync/sync_service.dart";
 import "package:photos/services/wake_lock_service.dart";
 import "package:photos/ui/common/backup_flow_helper.dart";
-import "package:photos/utils/dialog_util.dart";
+import "package:photos/ui/home/large_backup_screen.dart";
 
 class BackupSettingsScreen extends StatelessWidget {
   const BackupSettingsScreen({super.key});
@@ -90,6 +92,23 @@ class BackupSettingsScreen extends StatelessWidget {
         ],
         if (Platform.isIOS) ...[
           const SizedBox(height: 24),
+          if (flagService.largeBackupStandby) ...[
+            SettingsItem(
+              title: pendingTranslation("(i) Backup mode"),
+              subtitle: pendingTranslation(
+                "Keep Ente awake while your backup finishes",
+              ),
+              icon: HugeIcons.strokeRoundedMoon02,
+              showOnlyLoadingState: true,
+              onTap: () {
+                return showLargeBackupScreen(
+                  context,
+                  SyncService.instance.largeBackupSessionTracker,
+                );
+              },
+            ),
+            const SizedBox(height: 8),
+          ],
           _toggleItem(
             context,
             title: l10n.disableAutoLock,

@@ -19,6 +19,7 @@ import 'package:photos/module/upload/service/file_uploader.dart';
 import 'package:photos/service_locator.dart';
 import 'package:photos/services/language_service.dart';
 import 'package:photos/services/notification_service.dart';
+import 'package:photos/services/sync/large_backup_session_tracker.dart';
 import 'package:photos/services/sync/local_sync_service.dart';
 import 'package:photos/services/sync/offline_import_metadata_service.dart';
 import 'package:photos/services/sync/remote_sync_service.dart';
@@ -26,6 +27,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class SyncService {
   final _logger = Logger("SyncService");
+  final largeBackupSessionTracker = LargeBackupSessionTracker();
   final _localSyncService = LocalSyncService.instance;
   final _remoteSyncService = RemoteSyncService.instance;
   final _uploader = FileUploader.instance;
@@ -98,6 +100,7 @@ class SyncService {
     });
 
     Bus.instance.on<SyncStatusUpdate>().listen((event) {
+      largeBackupSessionTracker.update(event);
       _logger.info("Sync status received " + event.toString());
       _lastSyncStatusEvent = event;
     });

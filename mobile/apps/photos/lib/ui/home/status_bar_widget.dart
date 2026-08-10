@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import "package:ente_components/ente_components.dart";
 import 'package:ente_pure_utils/ente_pure_utils.dart';
@@ -14,6 +15,7 @@ import 'package:photos/events/christmas_banner_event.dart';
 import 'package:photos/events/notification_event.dart';
 import 'package:photos/events/sync_status_update_event.dart';
 import "package:photos/service_locator.dart";
+import "package:photos/services/sync/large_backup_session_tracker.dart";
 import 'package:photos/services/sync/sync_service.dart';
 import "package:photos/theme/ente_theme.dart";
 import 'package:photos/ui/account/verify_recovery_page.dart';
@@ -21,6 +23,7 @@ import 'package:photos/ui/components/home_header_widget.dart';
 import 'package:photos/ui/home/christmas/christmas_lights_banner.dart';
 import 'package:photos/ui/home/christmas/christmas_utils.dart';
 import 'package:photos/ui/home/header_error_widget.dart';
+import "package:photos/ui/home/large_backup_screen.dart";
 import "package:photos/ui/settings/backup/backup_settings_screen.dart";
 import "package:photos/ui/settings/backup/backup_status_screen.dart";
 import "package:photos/ui/settings/ml/machine_learning_settings_page.dart";
@@ -47,6 +50,8 @@ class _StatusBarWidgetState extends State<StatusBarWidget> {
       !hasGrantedMLConsent &&
       (isLocalGalleryMode || flagService.hasSyncedAccountFlags()) &&
       !localSettings.hasSeenMLEnablingBanner;
+  final LargeBackupSessionTracker _largeBackupSession =
+      SyncService.instance.largeBackupSessionTracker;
   Error? _syncError;
 
   @override
@@ -142,9 +147,34 @@ class _StatusBarWidgetState extends State<StatusBarWidget> {
             ? Divider(height: 8, color: getEnteColorScheme(context).strokeFaint)
             : const SizedBox.shrink(),
         if (_showErrorBanner) HeaderErrorWidget(error: _syncError),
+        if (_shouldShowLargeBackupBanner) _largeBackupBanner(context),
         if (_showMlBanner && !_showErrorBanner) _mlBanner(context),
         if (_showVerificationBanner()) _recoveryKeyBanner(context),
       ],
+    );
+  }
+
+  bool get _shouldShowLargeBackupBanner =>
+      flagService.largeBackupStandby &&
+      Platform.isIOS &&
+      !_showErrorBanner &&
+      _largeBackupSession.isActive;
+
+  Widget _largeBackupBanner(BuildContext context) {
+    return _bannerPadding(
+      BannerComponent(
+        key: const ValueKey("large-backup-standby-banner"),
+        leadingIcon: HugeIcons.strokeRoundedMoon02,
+        title: pendingTranslation("Finish your backup"),
+        subtitle: pendingTranslation("Keep Ente open with the screen dimmed"),
+        state: BannerComponentState.success,
+        onTap: () async {
+          if (!_largeBackupSession.isActive) {
+            return;
+          }
+          await showLargeBackupScreen(context, _largeBackupSession);
+        },
+      ),
     );
   }
 
