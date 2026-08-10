@@ -806,7 +806,7 @@ const Page: React.FC = () => {
     const remotePull = useCallback(
         async (opts?: RemotePullOpts) =>
             remotePullQueue.current.add(async () => {
-                const { silent, source } = opts ?? {};
+                const { silent, source, strict } = opts ?? {};
 
                 if (!navigator.onLine) return;
                 if (await isSessionInvalid()) {
@@ -827,6 +827,7 @@ const Page: React.FC = () => {
                 } catch (e) {
                     // A later pull retries transient failures after remote mutations.
                     log.error("Remote pull failed", e);
+                    if (strict) throw e;
                 } finally {
                     dispatch({ type: "clearUnsyncedState" });
                     if (!silent) hideLoadingBar();

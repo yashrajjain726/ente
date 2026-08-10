@@ -20,6 +20,7 @@ import {
     collectionDialogTitleSx as titleSx,
 } from "@/components/CollectionDialog/styles";
 import { CollectionsSortOptions } from "@/components/CollectionsSortOptions";
+import type { RemotePullOpts } from "@/components/gallery";
 import { StarIcon } from "@/components/icons/StarIcon";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import CloseIcon from "@mui/icons-material/Close";
@@ -138,7 +139,7 @@ interface AllAlbums {
     onChangeCollectionsSortBy: (by: CollectionsSortBy) => void;
     isInHiddenSection: boolean;
     canCreateAlbum: boolean;
-    onRemotePull: () => Promise<void>;
+    onRemotePull: (opts?: RemotePullOpts) => Promise<void>;
 }
 
 export const AllAlbums: React.FC<AllAlbums> = ({
@@ -240,7 +241,7 @@ export const AllAlbums: React.FC<AllAlbums> = ({
         let confirmedCandidateIDs: number[];
 
         try {
-            await onRemotePull();
+            await onRemotePull({ strict: true });
 
             const [collections, collectionFiles] = await Promise.all([
                 savedCollections(),
@@ -287,7 +288,7 @@ export const AllAlbums: React.FC<AllAlbums> = ({
 
         let refreshFailed = false;
         try {
-            await onRemotePull();
+            await onRemotePull({ strict: true });
         } catch {
             refreshFailed = true;
         }
