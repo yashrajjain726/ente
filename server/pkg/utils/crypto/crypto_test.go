@@ -51,7 +51,7 @@ func TestErrorCases(t *testing.T) {
 }
 
 func generateTestKey() []byte {
-	key := make([]byte, SecretBoxKeyBytes)
+	key := make([]byte, secretBoxKeyBytes)
 	for i := range key {
 		key[i] = byte(i)
 	}

@@ -24,35 +24,35 @@ func TestSealedBoxRoundTrip(t *testing.T) {
 
 	sealed, err := base64.StdEncoding.DecodeString(sealedBase64)
 	require.NoError(t, err)
-	require.Len(t, sealed, BoxPublicKeyBytes+box.Overhead+len(message))
+	require.Len(t, sealed, boxPublicKeyBytes+box.Overhead+len(message))
 
 	decrypted, err := openSealedBox(sealed, publicKey, privateKey)
 	require.NoError(t, err)
 	require.Equal(t, message, decrypted)
 }
 
-func openSealedBox(sealed []byte, publicKey, privateKey *[BoxPublicKeyBytes]byte) ([]byte, error) {
-	if len(sealed) < BoxPublicKeyBytes+box.Overhead {
+func openSealedBox(sealed []byte, publicKey, privateKey *[boxPublicKeyBytes]byte) ([]byte, error) {
+	if len(sealed) < boxPublicKeyBytes+box.Overhead {
 		return nil, errors.New("invalid sealed box length")
 	}
 
-	var ephemeralPublicKey [BoxPublicKeyBytes]byte
-	copy(ephemeralPublicKey[:], sealed[:BoxPublicKeyBytes])
+	var ephemeralPublicKey [boxPublicKeyBytes]byte
+	copy(ephemeralPublicKey[:], sealed[:boxPublicKeyBytes])
 
-	nonceInput := make([]byte, BoxPublicKeyBytes*2)
-	copy(nonceInput[:BoxPublicKeyBytes], ephemeralPublicKey[:])
-	copy(nonceInput[BoxPublicKeyBytes:], publicKey[:])
+	nonceInput := make([]byte, boxPublicKeyBytes*2)
+	copy(nonceInput[:boxPublicKeyBytes], ephemeralPublicKey[:])
+	copy(nonceInput[boxPublicKeyBytes:], publicKey[:])
 
-	hash, err := blake2b.New(SecretBoxNonceBytes, nil)
+	hash, err := blake2b.New(boxNonceBytes, nil)
 	if err != nil {
 		return nil, err
 	}
 	hash.Write(nonceInput)
 
-	var nonce [SecretBoxNonceBytes]byte
+	var nonce [boxNonceBytes]byte
 	copy(nonce[:], hash.Sum(nil))
 
-	decrypted, ok := box.Open(nil, sealed[BoxPublicKeyBytes:], &nonce, &ephemeralPublicKey, privateKey)
+	decrypted, ok := box.Open(nil, sealed[boxPublicKeyBytes:], &nonce, &ephemeralPublicKey, privateKey)
 	if !ok {
 		return nil, errors.New("failed to open sealed box")
 	}

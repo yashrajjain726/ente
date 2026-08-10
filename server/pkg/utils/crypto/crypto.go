@@ -14,34 +14,24 @@ import (
 	"golang.org/x/crypto/nacl/secretbox"
 )
 
-// Exported constants matching libsodium
 const (
-	SecretBoxKeyBytes   = 32 // crypto_secretbox_KEYBYTES in libsodium
-	SecretBoxNonceBytes = 24 // crypto_secretbox_NONCEBYTES in libsodium
-	GenericHashBytes    = 32 // crypto_generichash_BYTES in libsodium (BLAKE2b-256)
-	BoxPublicKeyBytes   = 32 // crypto_box_publickeybytes in lib-sodium
+	secretBoxKeyBytes   = 32 // crypto_secretbox_KEYBYTES in libsodium
+	secretBoxNonceBytes = 24 // crypto_secretbox_NONCEBYTES in libsodium
+	boxPublicKeyBytes   = 32 // crypto_box_publickeybytes in lib-sodium
+	boxNonceBytes       = 24 // crypto_box_NONCEBYTES in libsodium
 )
 
 func Encrypt(data string, encryptionKey []byte) (ente.EncryptionResult, error) {
-	return encryptWithNonce(data, encryptionKey, auth.GenerateRandomBytes(SecretBoxNonceBytes))
-}
-
-func encryptWithNonce(data string, encryptionKey []byte, nonce []byte) (ente.EncryptionResult, error) {
-	// Convert key to array
-	if len(encryptionKey) != SecretBoxKeyBytes {
+	nonce := auth.GenerateRandomBytes(secretBoxNonceBytes)
+	if len(encryptionKey) != secretBoxKeyBytes {
 		return ente.EncryptionResult{}, stacktrace.NewError("invalid key length")
 	}
-	var key [SecretBoxKeyBytes]byte
+	var key [secretBoxKeyBytes]byte
 	copy(key[:], encryptionKey)
 
-	// Convert nonce to array
-	if len(nonce) != SecretBoxNonceBytes {
-		return ente.EncryptionResult{}, stacktrace.NewError("invalid nonce length")
-	}
-	var nonceArray [SecretBoxNonceBytes]byte
+	var nonceArray [secretBoxNonceBytes]byte
 	copy(nonceArray[:], nonce)
 
-	// Encrypt using secretbox (XSalsa20-Poly1305)
 	encrypted := secretbox.Seal(nil, []byte(data), &nonceArray, &key)
 
 	return ente.EncryptionResult{
@@ -51,21 +41,18 @@ func encryptWithNonce(data string, encryptionKey []byte, nonce []byte) (ente.Enc
 }
 
 func Decrypt(cipher []byte, encryptionKey []byte, nonce []byte) (string, error) {
-	// Convert key to array
-	if len(encryptionKey) != SecretBoxKeyBytes {
+	if len(encryptionKey) != secretBoxKeyBytes {
 		return "", stacktrace.NewError("invalid key length")
 	}
-	var key [SecretBoxKeyBytes]byte
+	var key [secretBoxKeyBytes]byte
 	copy(key[:], encryptionKey)
 
-	// Convert nonce to array
-	if len(nonce) != SecretBoxNonceBytes {
+	if len(nonce) != secretBoxNonceBytes {
 		return "", stacktrace.NewError("invalid nonce length")
 	}
-	var nonceArray [SecretBoxNonceBytes]byte
+	var nonceArray [secretBoxNonceBytes]byte
 	copy(nonceArray[:], nonce)
 
-	// Decrypt using secretbox
 	decrypted, ok := secretbox.Open(nil, cipher, &nonceArray, &key)
 	if !ok {
 		return "", stacktrace.NewError("decryption failed")
@@ -75,7 +62,6 @@ func Decrypt(cipher []byte, encryptionKey []byte, nonce []byte) (string, error) 
 }
 
 func GetHash(data string, hashKey []byte) (string, error) {
-	// BLAKE2b-256 hash with optional key
 	hash, err := blake2b.New256(hashKey)
 	if err != nil {
 		return "", stacktrace.Propagate(err, "failed to create blake2b hasher")
@@ -87,15 +73,13 @@ func GetHash(data string, hashKey []byte) (string, error) {
 	return base64.StdEncoding.EncodeToString(hashBytes), nil
 }
 
-// GetEncryptedToken encrypts the given token using the recipient's public key.
-// Format matches lib-sodium: https://libsodium.gitbook.io/doc/public-key_cryptography/sealed_boxes#algorithm-details
-// ephemeral_pk ‖ box(m, recipient_pk, ephemeral_sk, nonce=blake2b(ephemeral_pk ‖ recipient_pk))
+// Wire-compatible with libsodium's crypto_box_seal.
 func GetEncryptedToken(token string, publicKey string) (string, error) {
 	publicKeyBytes, err := base64.StdEncoding.DecodeString(publicKey)
 	if err != nil {
 		return "", stacktrace.Propagate(err, "")
 	}
-	if len(publicKeyBytes) != BoxPublicKeyBytes {
+	if len(publicKeyBytes) != boxPublicKeyBytes {
 		return "", stacktrace.NewError("invalid public key length")
 	}
 
@@ -104,32 +88,29 @@ func GetEncryptedToken(token string, publicKey string) (string, error) {
 		return "", stacktrace.Propagate(err, "")
 	}
 
-	// Convert slice to array for nacl/box
-	var recipientPublicKey [BoxPublicKeyBytes]byte
+	var recipientPublicKey [boxPublicKeyBytes]byte
 	copy(recipientPublicKey[:], publicKeyBytes)
 
-	// Generate ephemeral keypair
 	ephemeralPublicKey, ephemeralPrivateKey, err := box.GenerateKey(rand.Reader)
 	if err != nil {
 		return "", stacktrace.Propagate(err, "failed to generate ephemeral keypair")
 	}
 
-	// Derive nonce deterministically like libsodium's crypto_box_seal
-	// nonce = BLAKE2b-192(ephemeral_pk || recipient_pk)
-	nonceInput := make([]byte, 64)
-	copy(nonceInput[:32], ephemeralPublicKey[:])
-	copy(nonceInput[32:], recipientPublicKey[:])
+	// crypto_box_seal derives the nonce from both public keys.
+	nonceInput := make([]byte, boxPublicKeyBytes*2)
+	copy(nonceInput[:boxPublicKeyBytes], ephemeralPublicKey[:])
+	copy(nonceInput[boxPublicKeyBytes:], recipientPublicKey[:])
 
-	hash, err := blake2b.New(24, nil) // 24 bytes = 192 bits for nonce
+	hash, err := blake2b.New(boxNonceBytes, nil)
 	if err != nil {
 		return "", stacktrace.Propagate(err, "failed to create blake2b hasher")
 	}
 	hash.Write(nonceInput)
-	var nonce [24]byte
+	var nonce [boxNonceBytes]byte
 	copy(nonce[:], hash.Sum(nil))
 
-	// Encrypt the message (ephemeral public key + ciphertext)
-	out := make([]byte, BoxPublicKeyBytes) // just ephemeral public key
+	// crypto_box_seal prefixes the ciphertext with the ephemeral public key.
+	out := make([]byte, boxPublicKeyBytes)
 	copy(out, ephemeralPublicKey[:])
 	encrypted := box.Seal(out, tokenBytes, &nonce, &recipientPublicKey, ephemeralPrivateKey)
 	return base64.StdEncoding.EncodeToString(encrypted), nil
@@ -145,7 +126,7 @@ func decodeAndValidateSealedBoxPublicKey(publicKey string) ([]byte, error) {
 	if err != nil {
 		return nil, stacktrace.Propagate(err, "failed to decode public key")
 	}
-	if len(publicKeyBytes) != BoxPublicKeyBytes {
+	if len(publicKeyBytes) != boxPublicKeyBytes {
 		return nil, stacktrace.NewError("invalid public key length")
 	}
 
