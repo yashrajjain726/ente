@@ -526,7 +526,7 @@ where
         self.client.get_accounts_token().await
     }
 
-    pub async fn check_passkey_status(&self, session_id: &str) -> Result<AuthResponse> {
+    pub async fn check_passkey_status(&self, session_id: &str) -> Result<Option<AuthResponse>> {
         self.client.check_passkey_status(session_id).await
     }
 
@@ -727,10 +727,8 @@ where
 
         loop {
             self.ui.wait_for_passkey_verification()?;
-            match self.client.check_passkey_status(passkey_session_id).await {
-                Ok(result) => return Ok(result),
-                Err(Error::PasskeyVerificationPending) => {}
-                Err(error) => return Err(error),
+            if let Some(response) = self.client.check_passkey_status(passkey_session_id).await? {
+                return Ok(response);
             }
         }
     }

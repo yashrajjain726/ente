@@ -503,9 +503,9 @@ impl AccountsClient {
         .await?)
     }
 
-    pub async fn check_passkey_status(&self, session_id: &str) -> Result<AuthResponse> {
+    pub async fn check_passkey_status(&self, session_id: &str) -> Result<Option<AuthResponse>> {
         let query = [("sessionID", session_id.to_string())];
-        http::retry(|| async {
+        match http::retry(|| async {
             self.api
                 .get("/users/two-factor/passkeys/get-token")
                 .query(&query)
@@ -517,11 +517,14 @@ impl AccountsClient {
                 .await
         })
         .await
-        .map_err(|error| match error.status_code() {
-            Some(400) => Error::PasskeyVerificationPending,
-            Some(404 | 410) => Error::SecondFactorSessionExpired,
-            _ => error.into(),
-        })
+        {
+            Ok(response) => Ok(Some(response)),
+            Err(error) => match error.status_code() {
+                Some(400) => Ok(None),
+                Some(404 | 410) => Err(Error::SecondFactorSessionExpired),
+                _ => Err(error.into()),
+            },
+        }
     }
 
     pub async fn get_accounts_token(&self) -> Result<AccountsTokenResponse> {

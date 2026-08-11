@@ -59,9 +59,6 @@ pub enum Error {
     #[error("Second factor session expired. Please restart login.")]
     SecondFactorSessionExpired,
 
-    #[error("Passkey verification is pending")]
-    PasskeyVerificationPending,
-
     #[error("Session is invalid")]
     SessionInvalid,
 

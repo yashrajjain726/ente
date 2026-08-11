@@ -45,7 +45,6 @@ impl From<ente_accounts::Error> for AccountsError {
             E::IncorrectTotp => "incorrect_totp",
             E::TotpRateLimited => "totp_rate_limited",
             E::SecondFactorSessionExpired => "second_factor_session_expired",
-            E::PasskeyVerificationPending => "passkey_verification_pending",
             E::SessionInvalid => "session_invalid",
             E::MissingKeyAttributes => "missing_key_attributes",
             E::AccountAlreadyExists => "account_already_exists",
