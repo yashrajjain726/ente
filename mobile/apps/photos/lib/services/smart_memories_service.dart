@@ -4,6 +4,7 @@ import "dart:math" show Random, max, min;
 
 import "package:computer/computer.dart";
 import "package:ente_pure_utils/ente_pure_utils.dart";
+import "package:ente_strings/ente_strings.dart";
 import "package:flutter/foundation.dart" show kDebugMode;
 import "package:flutter/material.dart";
 import "package:intl/intl.dart";
@@ -62,6 +63,12 @@ class MemoriesResult {
 
   bool get isEmpty => memories.isEmpty;
 }
+
+typedef _PreparedMemoriesData = ({
+  List<PersonEntity> persons,
+  Map<String, String> faceIDsToPersonID,
+  Map<int, EmbeddingVector> fileIDToImageEmbedding,
+});
 
 class SmartMemoriesService {
   final _logger = Logger("SmartMemoriesService");
@@ -146,139 +153,19 @@ class SmartMemoriesService {
         'calcMemories called with time: $now at ${DateTime.now()} '
         '(mlEnabled: $mlEnabled) $t',
       );
-
-      final allFileIdsToFile = await _getFilesAndMapForMemories(
-        useLocalIntIds: isLocalGalleryMode,
-        requireLocalId: isLocalGalleryMode,
+      final computationContext = await _loadComputationContext(
+        now,
+        oldCache,
+        debugSurfaceAll: debugSurfaceAll,
+        mlEnabled: mlEnabled,
+        timeLogger: t,
       );
-      _logger.info("All files length: ${allFileIdsToFile.length} $t");
-
-      final collectionIDsToExclude = await getCollectionIDsToExclude();
-      _logger.info(
-        'collectionIDsToExclude length: ${collectionIDsToExclude.length} $t',
-      );
-
-      final seenTimes = await _memoriesDB.getSeenTimes();
-      _logger.info('seenTimes has ${seenTimes.length} entries $t');
-
-      final mlDataDB = isLocalGalleryMode
-          ? MLDataDB.localGalleryInstance
-          : MLDataDB.instance;
-      final allPersons = (!mlEnabled || isLocalGalleryMode)
-          ? const <PersonEntity>[]
-          : await PersonService.instance.getPersons();
-      final persons = allPersons
-          .where((person) => !person.data.hideFromMemories)
-          .toList();
-      _logger.info('gotten all ${persons.length} persons after filtering $t');
-      final bool unnamedPeopleFallbackEnabled =
-          mlEnabled && localSettings.showLocalGalleryModeOption;
-      final amountOfNonIgnoredPersons = persons
-          .where((person) => !person.data.isIgnored)
-          .length;
-      final canUseUnnamedFallback =
-          unnamedPeopleFallbackEnabled &&
-          (isLocalGalleryMode ||
-              amountOfNonIgnoredPersons <
-                  _minimumNamedPeopleBeforeDisablingUnnamedFallback);
-      final shouldLoadUnnamedClusterData =
-          unnamedPeopleFallbackEnabled &&
-          (canUseUnnamedFallback ||
-              debugSurfaceAll ||
-              _debugForceUnnamedClustersOnly);
-      final unnamedClusterData = await _loadUnnamedClusterData(
-        mlDataDB: mlDataDB,
-        allPersons: allPersons,
-        shouldLoadUnnamedClusterData: shouldLoadUnnamedClusterData,
-        t: t,
-      );
-      final assignedClusterIDs = unnamedClusterData.assignedClusterIDs;
-      final clusterIdToFaceCount = unnamedClusterData.clusterIdToFaceCount;
-      final clusterIdToFaceIDs = unnamedClusterData.clusterIdToFaceIDs;
-
-      final currentUserEmail = isLocalGalleryMode
-          ? null
-          : Configuration.instance.getEmail();
-      _logger.info('currentUserEmail: $currentUserEmail $t');
-
-      final cities = await locationService.getCities();
-      _logger.info('cities has ${cities.length} entries $t');
-
-      final Map<int, List<FaceWithoutEmbedding>> fileIdToFaces = mlEnabled
-          ? await mlDataDB.getFileIDsToFacesWithoutEmbedding()
-          : <int, List<FaceWithoutEmbedding>>{};
-      _logger.info('fileIdToFaces has ${fileIdToFaces.length} entries $t');
-
-      final allImageEmbeddings = mlEnabled
-          ? await mlDataDB.getAllClipVectors()
-          : const <EmbeddingVector>[];
-      _logger.info(
-        'allImageEmbeddings has ${allImageEmbeddings.length} entries $t',
-      );
-
-      final Vector clipPositiveTextVector;
-      final Map<PeopleActivity, Vector> clipPeopleActivityVectors;
-      final Map<ClipMemoryType, Vector> clipMemoryTypeVectors;
-      if (mlEnabled) {
-        _logger.info('Loading text embeddings via cache service');
-        clipPositiveTextVector = Vector.fromList(
-          await textEmbeddingsCacheService.getEmbedding(
-            "Photo of a precious and nostalgic memory radiating warmth, vibrant energy, or quiet beauty — alive with color, light, or emotion",
-          ),
-        );
-
-        clipPeopleActivityVectors = <PeopleActivity, Vector>{};
-        for (final activity in PeopleActivity.values) {
-          final query = activityQuery(activity);
-          clipPeopleActivityVectors[activity] = Vector.fromList(
-            await textEmbeddingsCacheService.getEmbedding(query),
-          );
-        }
-
-        clipMemoryTypeVectors = <ClipMemoryType, Vector>{};
-        for (final memoryType in ClipMemoryType.values) {
-          final query = clipQuery(memoryType);
-          clipMemoryTypeVectors[memoryType] = Vector.fromList(
-            await textEmbeddingsCacheService.getEmbedding(query),
-          );
-        }
-        _logger.info('Text embeddings loaded via cache service');
-      } else {
-        _logger.info('ML disabled, skipping text embedding loads');
-        clipPositiveTextVector = Vector.fromList(const [0.0]);
-        clipPeopleActivityVectors = const <PeopleActivity, Vector>{};
-        clipMemoryTypeVectors = const <ClipMemoryType, Vector>{};
-      }
 
       final local = await getLocale();
       final languageCode = local?.languageCode ?? "en";
       final s = await LanguageService.locals;
 
       _logger.info('get locale and S $t');
-
-      _logger.info('all data fetched $t at ${DateTime.now()}, to computer');
-      final computationContext = MemoriesComputationContext(
-        allFileIdsToFile: allFileIdsToFile,
-        collectionIDsToExclude: collectionIDsToExclude,
-        isLocalGalleryMode: isLocalGalleryMode,
-        mlEnabled: mlEnabled,
-        now: now,
-        oldCache: oldCache,
-        debugSurfaceAll: debugSurfaceAll,
-        canUseUnnamedFallback: canUseUnnamedFallback,
-        seenTimes: seenTimes,
-        persons: persons,
-        currentUserEmail: currentUserEmail,
-        cities: cities,
-        fileIdToFaces: fileIdToFaces,
-        clusterIdToFaceCount: clusterIdToFaceCount,
-        clusterIdToFaceIDs: clusterIdToFaceIDs,
-        assignedClusterIDs: assignedClusterIDs,
-        allImageEmbeddings: allImageEmbeddings,
-        clipPositiveTextVector: clipPositiveTextVector,
-        clipPeopleActivityVectors: clipPeopleActivityVectors,
-        clipMemoryTypeVectors: clipMemoryTypeVectors,
-      );
       final memoriesResult =
           await Computer.shared().compute(
                 _allMemoriesCalculations,
@@ -288,7 +175,84 @@ class SmartMemoriesService {
       _logger.info(
         '${memoriesResult.memories.length} memories computed in computer $t',
       );
+      return _finalizeMemoriesResult(memoriesResult, s, languageCode, t);
+    } catch (e, s) {
+      _logger.severe("Error calculating smart memories", e, s);
+      return _fallbackAfterCalculationError();
+    }
+  }
 
+  Future<({MemoriesResult current, MemoriesResult next})>
+  calcCurrentAndNextSmartMemories(
+    DateTime current,
+    DateTime next,
+    MemoriesCache oldCache, {
+    required bool mlEnabled,
+  }) async {
+    try {
+      final TimeLogger t = TimeLogger(context: "calcCurrentAndNextMemories");
+      _logger.info(
+        'calcCurrentAndNextMemories called with times: $current and $next at '
+        '${DateTime.now()} (mlEnabled: $mlEnabled) $t',
+      );
+      final computationContext = await _loadComputationContext(
+        current,
+        oldCache,
+        debugSurfaceAll: false,
+        mlEnabled: mlEnabled,
+        timeLogger: t,
+      );
+
+      final local = await getLocale();
+      final languageCode = local?.languageCode ?? "en";
+      final s = await LanguageService.locals;
+      _logger.info('get locale and S $t');
+
+      final args = computationContext.toIsolateArgs()..["next"] = next;
+      final results =
+          (await Computer.shared().compute(
+                    _allMemoriesCalculationsForPeriods,
+                    param: args,
+                  )
+                  as List)
+              .cast<MemoriesResult>();
+      final currentResult = await _finalizeMemoriesResult(
+        results[0],
+        s,
+        languageCode,
+        t,
+      );
+      final nextResult = await _finalizeMemoriesResult(
+        results[1],
+        s,
+        languageCode,
+        t,
+      );
+      _logger.info(
+        '${currentResult.memories.length} current and '
+        '${nextResult.memories.length} next memories computed in computer $t',
+      );
+      return (current: currentResult, next: nextResult);
+    } catch (e, s) {
+      _logger.severe("Error calculating current and next smart memories", e, s);
+      final currentResult = await _fallbackAfterCalculationError();
+      if (currentResult.failed) {
+        return (current: currentResult, next: MemoriesResult.failed());
+      }
+      return (
+        current: currentResult,
+        next: await _fallbackAfterCalculationError(),
+      );
+    }
+  }
+
+  Future<MemoriesResult> _finalizeMemoriesResult(
+    MemoriesResult memoriesResult,
+    StringsLocalizations s,
+    String languageCode,
+    TimeLogger t,
+  ) async {
+    try {
       if (isLocalGalleryMode && memoriesResult.isEmpty) {
         _logger.severe(
           "Smart memories returned empty in local gallery mode, falling back to simple memories",
@@ -296,35 +260,177 @@ class SmartMemoriesService {
         final fallbackMemories = await calcSimpleMemories();
         return MemoriesResult(fallbackMemories, <BaseLocation>[]);
       }
-
       if (memoriesResult.failed) {
         return memoriesResult;
       }
-
       for (final memory in memoriesResult.memories) {
         memory.title = memory.createTitle(s, languageCode);
       }
       _logger.info('titles created for all memories $t');
       return memoriesResult;
     } catch (e, s) {
-      _logger.severe("Error calculating smart memories", e, s);
-      if (isLocalGalleryMode) {
-        try {
-          _logger.warning(
-            "Falling back to simple memories after smart memories failure in local gallery mode",
-          );
-          final fallbackMemories = await calcSimpleMemories();
-          return MemoriesResult(fallbackMemories, <BaseLocation>[]);
-        } catch (fallbackError, fallbackStackTrace) {
-          _logger.severe(
-            "Offline fallback to simple memories failed",
-            fallbackError,
-            fallbackStackTrace,
-          );
-        }
-      }
-      return MemoriesResult.failed();
+      _logger.severe("Error finalizing smart memories", e, s);
+      return _fallbackAfterCalculationError();
     }
+  }
+
+  Future<MemoriesResult> _fallbackAfterCalculationError() async {
+    if (isLocalGalleryMode) {
+      try {
+        _logger.warning(
+          "Falling back to simple memories after smart memories failure in local gallery mode",
+        );
+        final fallbackMemories = await calcSimpleMemories();
+        return MemoriesResult(fallbackMemories, <BaseLocation>[]);
+      } catch (fallbackError, fallbackStackTrace) {
+        _logger.severe(
+          "Offline fallback to simple memories failed",
+          fallbackError,
+          fallbackStackTrace,
+        );
+      }
+    }
+    return MemoriesResult.failed();
+  }
+
+  Future<MemoriesComputationContext> _loadComputationContext(
+    DateTime now,
+    MemoriesCache oldCache, {
+    required bool debugSurfaceAll,
+    required bool mlEnabled,
+    required TimeLogger timeLogger,
+  }) async {
+    final allFileIdsToFile = await _getFilesAndMapForMemories(
+      useLocalIntIds: isLocalGalleryMode,
+      requireLocalId: isLocalGalleryMode,
+    );
+    _logger.info("All files length: ${allFileIdsToFile.length} $timeLogger");
+
+    final collectionIDsToExclude = await getCollectionIDsToExclude();
+    _logger.info(
+      'collectionIDsToExclude length: ${collectionIDsToExclude.length} '
+      '$timeLogger',
+    );
+
+    final seenTimes = await _memoriesDB.getSeenTimes();
+    _logger.info('seenTimes has ${seenTimes.length} entries $timeLogger');
+
+    final mlDataDB = isLocalGalleryMode
+        ? MLDataDB.localGalleryInstance
+        : MLDataDB.instance;
+    final allPersons = (!mlEnabled || isLocalGalleryMode)
+        ? const <PersonEntity>[]
+        : await PersonService.instance.getPersons();
+    final persons = allPersons
+        .where((person) => !person.data.hideFromMemories)
+        .toList();
+    _logger.info(
+      'gotten all ${persons.length} persons after filtering $timeLogger',
+    );
+    final bool unnamedPeopleFallbackEnabled =
+        mlEnabled && localSettings.showLocalGalleryModeOption;
+    final amountOfNonIgnoredPersons = persons
+        .where((person) => !person.data.isIgnored)
+        .length;
+    final canUseUnnamedFallback =
+        unnamedPeopleFallbackEnabled &&
+        (isLocalGalleryMode ||
+            amountOfNonIgnoredPersons <
+                _minimumNamedPeopleBeforeDisablingUnnamedFallback);
+    final shouldLoadUnnamedClusterData =
+        unnamedPeopleFallbackEnabled &&
+        (canUseUnnamedFallback ||
+            debugSurfaceAll ||
+            _debugForceUnnamedClustersOnly);
+    final unnamedClusterData = await _loadUnnamedClusterData(
+      mlDataDB: mlDataDB,
+      allPersons: allPersons,
+      shouldLoadUnnamedClusterData: shouldLoadUnnamedClusterData,
+      t: timeLogger,
+    );
+
+    final currentUserEmail = isLocalGalleryMode
+        ? null
+        : Configuration.instance.getEmail();
+    _logger.info('currentUserEmail: $currentUserEmail $timeLogger');
+
+    final cities = await locationService.getCities();
+    _logger.info('cities has ${cities.length} entries $timeLogger');
+
+    final Map<int, List<FaceWithoutEmbedding>> fileIdToFaces = mlEnabled
+        ? await mlDataDB.getFileIDsToFacesWithoutEmbedding()
+        : <int, List<FaceWithoutEmbedding>>{};
+    _logger.info(
+      'fileIdToFaces has ${fileIdToFaces.length} entries $timeLogger',
+    );
+
+    final allImageEmbeddings = mlEnabled
+        ? await mlDataDB.getAllClipVectors()
+        : const <EmbeddingVector>[];
+    _logger.info(
+      'allImageEmbeddings has ${allImageEmbeddings.length} entries '
+      '$timeLogger',
+    );
+
+    final Vector clipPositiveTextVector;
+    final Map<PeopleActivity, Vector> clipPeopleActivityVectors;
+    final Map<ClipMemoryType, Vector> clipMemoryTypeVectors;
+    if (mlEnabled) {
+      _logger.info('Loading text embeddings via cache service');
+      clipPositiveTextVector = Vector.fromList(
+        await textEmbeddingsCacheService.getEmbedding(
+          "Photo of a precious and nostalgic memory radiating warmth, vibrant energy, or quiet beauty — alive with color, light, or emotion",
+        ),
+      );
+
+      clipPeopleActivityVectors = <PeopleActivity, Vector>{};
+      for (final activity in PeopleActivity.values) {
+        final query = activityQuery(activity);
+        clipPeopleActivityVectors[activity] = Vector.fromList(
+          await textEmbeddingsCacheService.getEmbedding(query),
+        );
+      }
+
+      clipMemoryTypeVectors = <ClipMemoryType, Vector>{};
+      for (final memoryType in ClipMemoryType.values) {
+        final query = clipQuery(memoryType);
+        clipMemoryTypeVectors[memoryType] = Vector.fromList(
+          await textEmbeddingsCacheService.getEmbedding(query),
+        );
+      }
+      _logger.info('Text embeddings loaded via cache service');
+    } else {
+      _logger.info('ML disabled, skipping text embedding loads');
+      clipPositiveTextVector = Vector.fromList(const [0.0]);
+      clipPeopleActivityVectors = const <PeopleActivity, Vector>{};
+      clipMemoryTypeVectors = const <ClipMemoryType, Vector>{};
+    }
+
+    _logger.info(
+      'all data fetched $timeLogger at ${DateTime.now()}, to computer',
+    );
+    return MemoriesComputationContext(
+      allFileIdsToFile: allFileIdsToFile,
+      collectionIDsToExclude: collectionIDsToExclude,
+      isLocalGalleryMode: isLocalGalleryMode,
+      mlEnabled: mlEnabled,
+      now: now,
+      oldCache: oldCache,
+      debugSurfaceAll: debugSurfaceAll,
+      canUseUnnamedFallback: canUseUnnamedFallback,
+      seenTimes: seenTimes,
+      persons: persons,
+      currentUserEmail: currentUserEmail,
+      cities: cities,
+      fileIdToFaces: fileIdToFaces,
+      clusterIdToFaceCount: unnamedClusterData.clusterIdToFaceCount,
+      clusterIdToFaceIDs: unnamedClusterData.clusterIdToFaceIDs,
+      assignedClusterIDs: unnamedClusterData.assignedClusterIDs,
+      allImageEmbeddings: allImageEmbeddings,
+      clipPositiveTextVector: clipPositiveTextVector,
+      clipPeopleActivityVectors: clipPeopleActivityVectors,
+      clipMemoryTypeVectors: clipMemoryTypeVectors,
+    );
   }
 
   static List<EmbeddingVector> _getEmbeddingsForFileIDs(
@@ -676,25 +782,120 @@ class SmartMemoriesService {
     Map<String, dynamic> args,
   ) async {
     try {
-      final TimeLogger t = TimeLogger(context: "_allMemoriesCalculations");
       final computationContext = MemoriesComputationContext.fromIsolateArgs(
         args,
       );
+      return _calculateMemories(
+        computationContext,
+        _prepareMemoriesData(computationContext),
+      );
+    } catch (e, s) {
+      dev.log("Error in _allMemoriesCalculations \n Error:$e \n Stacktrace:$s");
+      return MemoriesResult.failed();
+    }
+  }
+
+  static Future<List<MemoriesResult>> _allMemoriesCalculationsForPeriods(
+    Map<String, dynamic> args,
+  ) async {
+    try {
+      final computationContext = MemoriesComputationContext.fromIsolateArgs(
+        args,
+      );
+      final preparedData = _prepareMemoriesData(computationContext);
+      final currentResult = await _calculateMemories(
+        computationContext,
+        preparedData,
+      );
+      if (currentResult.failed && !computationContext.isLocalGalleryMode) {
+        return <MemoriesResult>[currentResult, MemoriesResult.failed()];
+      }
+      final nextCache = _cacheWithCurrentTrips(
+        computationContext.oldCache,
+        currentResult,
+        computationContext.now,
+      );
+      final nextResult = await _calculateMemories(
+        computationContext,
+        preparedData,
+        period: args["next"] as DateTime,
+        periodCache: nextCache,
+      );
+      return <MemoriesResult>[currentResult, nextResult];
+    } catch (e, s) {
+      dev.log(
+        "Error in _allMemoriesCalculationsForPeriods "
+        "\n Error:$e \n Stacktrace:$s",
+      );
+      return <MemoriesResult>[MemoriesResult.failed(), MemoriesResult.failed()];
+    }
+  }
+
+  static _PreparedMemoriesData _prepareMemoriesData(
+    MemoriesComputationContext computationContext,
+  ) {
+    final persons = computationContext.persons
+        .where((person) => !person.data.hideFromMemories)
+        .toList();
+    final faceIDsToPersonID = <String, String>{};
+    for (final person in persons) {
+      for (final cluster in person.data.assigned) {
+        for (final faceID in cluster.faces) {
+          faceIDsToPersonID[faceID] = person.remoteID;
+        }
+      }
+    }
+    final fileIDToImageEmbedding = <int, EmbeddingVector>{};
+    for (final embedding in computationContext.allImageEmbeddings) {
+      fileIDToImageEmbedding[embedding.fileID] = embedding;
+    }
+    return (
+      persons: persons,
+      faceIDsToPersonID: faceIDsToPersonID,
+      fileIDToImageEmbedding: fileIDToImageEmbedding,
+    );
+  }
+
+  static MemoriesCache _cacheWithCurrentTrips(
+    MemoriesCache oldCache,
+    MemoriesResult currentResult,
+    DateTime current,
+  ) {
+    return MemoriesCache(
+      toShowMemories: <ToShowMemory>[
+        ...oldCache.toShowMemories,
+        ...currentResult.memories.whereType<TripMemory>().map(
+          (memory) => ToShowMemory.fromSmartMemory(memory, current),
+        ),
+      ],
+      peopleShownLogs: oldCache.peopleShownLogs,
+      clipShownLogs: oldCache.clipShownLogs,
+      tripsShownLogs: oldCache.tripsShownLogs,
+      baseLocations: oldCache.baseLocations,
+    );
+  }
+
+  static Future<MemoriesResult> _calculateMemories(
+    MemoriesComputationContext computationContext,
+    _PreparedMemoriesData preparedData, {
+    DateTime? period,
+    MemoriesCache? periodCache,
+  }) async {
+    try {
+      final TimeLogger t = TimeLogger(context: "_allMemoriesCalculations");
       final Map<int, EnteFile> allFileIdsToFile =
           computationContext.allFileIdsToFile;
       final Set<int> collectionIDsToExclude =
           computationContext.collectionIDsToExclude;
       final bool isLocalGalleryMode = computationContext.isLocalGalleryMode;
       final bool mlEnabled = computationContext.mlEnabled;
-      final DateTime now = computationContext.now;
-      final MemoriesCache oldCache = computationContext.oldCache;
+      final DateTime now = period ?? computationContext.now;
+      final MemoriesCache oldCache = periodCache ?? computationContext.oldCache;
       final bool debugSurfaceAll = computationContext.debugSurfaceAll;
       final bool canUseUnnamedFallback =
           computationContext.canUseUnnamedFallback;
       final Map<int, int> seenTimes = computationContext.seenTimes;
-      final List<PersonEntity> persons = computationContext.persons
-          .where((person) => !person.data.hideFromMemories)
-          .toList();
+      final List<PersonEntity> persons = preparedData.persons;
       final String? currentUserEmail = computationContext.currentUserEmail;
       final List<City> cities = computationContext.cities;
       final Map<int, List<FaceWithoutEmbedding>> fileIdToFaces =
@@ -705,8 +906,6 @@ class SmartMemoriesService {
           computationContext.clusterIdToFaceIDs;
       final Set<String> assignedClusterIDs =
           computationContext.assignedClusterIDs;
-      final List<EmbeddingVector> allImageEmbeddings =
-          computationContext.allImageEmbeddings;
       final Vector clipPositiveTextVector =
           computationContext.clipPositiveTextVector;
       final Map<PeopleActivity, Vector> clipPeopleActivityVectors =
@@ -714,19 +913,8 @@ class SmartMemoriesService {
       final Map<ClipMemoryType, Vector> clipMemoryTypeVectors =
           computationContext.clipMemoryTypeVectors;
       dev.log('All arguments (direct data) unwrapped $t');
-
-      final Map<String, String> faceIDsToPersonID = {};
-      for (final person in persons) {
-        for (final cluster in person.data.assigned) {
-          for (final faceID in cluster.faces) {
-            faceIDsToPersonID[faceID] = person.remoteID;
-          }
-        }
-      }
-      final Map<int, EmbeddingVector> fileIDToImageEmbedding = {};
-      for (final embedding in allImageEmbeddings) {
-        fileIDToImageEmbedding[embedding.fileID] = embedding;
-      }
+      final faceIDsToPersonID = preparedData.faceIDsToPersonID;
+      final fileIDToImageEmbedding = preparedData.fileIDToImageEmbedding;
       dev.log('arguments from indirect data calculated $t');
       dev.log('starting actual memory calculations ${DateTime.now()}');
       dev.log("All files length at start: ${allFileIdsToFile.length} $t");
