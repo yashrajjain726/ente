@@ -240,6 +240,7 @@ const v2BaseActionSx = {
     fontSize: 14,
     lineHeight: "20px",
     fontWeight: 500,
+    fontFamily: "inherit",
     "&.Mui-disabled": { opacity: 0.7 },
 };
 const v2CancelButtonSx = (theme: Theme) => ({

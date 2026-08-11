@@ -112,7 +112,7 @@ const minimizedSnackbarSx = {
     [uploadSheetMediaQuery]: {
         left: "16px",
         right: "16px",
-        bottom: "calc(16px + env(safe-area-inset-bottom, 0px))",
+        bottom: "calc(32px + env(safe-area-inset-bottom, 0px))",
     },
 };
 const minimizedPaperSx = (theme: Theme): SystemStyleObject<Theme> => ({

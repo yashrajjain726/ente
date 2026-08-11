@@ -15,15 +15,5 @@ export const uploadSheetPaperSx = {
         maxHeight: "calc(100dvh - 72px)",
         borderRadius: "20px 20px 0 0",
         borderBottom: "none",
-        "&::before": {
-            content: '""',
-            width: 36,
-            height: 4,
-            flexShrink: 0,
-            alignSelf: "center",
-            mt: 1,
-            borderRadius: "100px",
-            backgroundColor: "fill.muted",
-        },
     },
 };
