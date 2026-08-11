@@ -1,7 +1,13 @@
+import type { Remote } from "comlink";
+import { inWorker } from "ente-base/env";
+import { ComlinkWorker } from "ente-base/worker/comlink-worker";
 import { loadCryptoReadyEnteWasm } from "ente-wasm/load";
+import type { DerivedKey } from "./kdf";
+import * as kdf from "./kdf";
+import type { KDFWorker } from "./kdf.worker";
 
-export const deriveKeyInsufficientMemoryErrorMessage =
-    "Failed to derive key (insufficient memory)";
+export { deriveKeyInsufficientMemoryErrorMessage } from "./kdf";
+export type { DerivedKey } from "./kdf";
 
 export interface EncryptedBox {
     encryptedData: string;
@@ -11,20 +17,6 @@ export interface EncryptedBox {
 export interface KeyPair {
     publicKey: string;
     privateKey: string;
-}
-
-export interface DerivedKey {
-    key: string;
-    salt: string;
-    opsLimit: number;
-    memLimit: number;
-}
-
-interface WasmDerivedKey {
-    key: string;
-    salt: string;
-    ops_limit: number;
-    mem_limit: number;
 }
 
 interface WasmGeneratedSRPSetup {
@@ -59,65 +51,41 @@ export const fromB64URLSafeNoPadding = async (b64String: string) => {
     return fromB64(normalized);
 };
 
-const normalizeDerivedKeyError = (error: unknown): Error => {
-    const code =
-        typeof error === "object" && error && "code" in error
-            ? String(error.code)
-            : undefined;
-    if (error instanceof Error) {
-        if (
-            code === "insufficient_memory" ||
-            error.message.includes("insufficient memory") ||
-            error.message.includes("KeyDerivationFailed") ||
-            error.message.includes("key_derivation_failed")
-        ) {
-            return new Error(deriveKeyInsufficientMemoryErrorMessage);
-        }
-        return error;
+const withKDFWorker = async <T>(
+    callback: (worker: Remote<KDFWorker>) => Promise<T>,
+): Promise<T> => {
+    const worker = new ComlinkWorker<typeof KDFWorker>(
+        "kdf",
+        new Worker(new URL("kdf.worker.ts", import.meta.url)),
+    );
+    try {
+        return await callback(await worker.remote);
+    } finally {
+        worker.terminate();
     }
-    return new Error(deriveKeyInsufficientMemoryErrorMessage);
 };
 
-export const deriveKey = async (
+export const deriveKey = (
     password: string,
     saltB64: string,
     opsLimit: number,
     memLimit: number,
-) => {
-    const wasm = await loadCryptoReadyEnteWasm();
-    return wasm.auth_derive_kek(password, saltB64, memLimit, opsLimit);
-};
+): Promise<string> =>
+    inWorker()
+        ? kdf.deriveKey(password, saltB64, opsLimit, memLimit)
+        : withKDFWorker((worker) =>
+              worker.deriveKey(password, saltB64, opsLimit, memLimit),
+          );
 
-const normalizeDerivedKey = (result: WasmDerivedKey): DerivedKey => ({
-    key: result.key,
-    salt: result.salt,
-    opsLimit: result.ops_limit,
-    memLimit: result.mem_limit,
-});
+export const deriveSensitiveKey = (password: string): Promise<DerivedKey> =>
+    inWorker()
+        ? kdf.deriveSensitiveKey(password)
+        : withKDFWorker((worker) => worker.deriveSensitiveKey(password));
 
-export const deriveSensitiveKey = async (
-    password: string,
-): Promise<DerivedKey> => {
-    const wasm = await loadCryptoReadyEnteWasm();
-    try {
-        return normalizeDerivedKey(wasm.auth_generate_sensitive_kek(password));
-    } catch (error) {
-        throw normalizeDerivedKeyError(error);
-    }
-};
-
-export const deriveInteractiveKey = async (
-    password: string,
-): Promise<DerivedKey> => {
-    const wasm = await loadCryptoReadyEnteWasm();
-    try {
-        return normalizeDerivedKey(
-            wasm.auth_generate_interactive_kek(password),
-        );
-    } catch (error) {
-        throw normalizeDerivedKeyError(error);
-    }
-};
+export const deriveInteractiveKey = (password: string): Promise<DerivedKey> =>
+    inWorker()
+        ? kdf.deriveInteractiveKey(password)
+        : withKDFWorker((worker) => worker.deriveInteractiveKey(password));
 
 export const generateKey = async (): Promise<string> => {
     const wasm = await loadCryptoReadyEnteWasm();
