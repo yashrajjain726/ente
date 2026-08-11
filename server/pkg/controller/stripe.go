@@ -637,6 +637,9 @@ func (c *StripeController) getStripeSubscriptionFromSession(userID int64, checko
 	if err != nil {
 		return stripe.Subscription{}, stacktrace.Propagate(err, "")
 	}
+	if checkoutSession.ClientReferenceID != strconv.FormatInt(userID, 10) {
+		return stripe.Subscription{}, stacktrace.Propagate(ente.ErrPermissionDenied, "")
+	}
 	if (*checkoutSession.Subscription).Status != stripe.SubscriptionStatusActive {
 		return stripe.Subscription{}, stacktrace.Propagate(&stripe.InvalidRequestError{}, "")
 	}
