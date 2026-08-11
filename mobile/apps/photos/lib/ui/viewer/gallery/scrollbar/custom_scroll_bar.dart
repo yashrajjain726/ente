@@ -67,7 +67,6 @@ class _CustomScrollBarState extends State<CustomScrollBar> {
   }
 
   void _init() {
-    _logger.info("Initializing CustomScrollBar2");
     if (widget.galleryGroups.groupType.showScrollbarDivisions() &&
         widget.galleryGroups.groupLayouts.last.maxOffset >
             widget.heighOfViewport * 8) {
