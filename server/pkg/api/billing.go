@@ -82,14 +82,6 @@ func (h *BillingHandler) GetStripeAccountCountry(c *gin.Context) {
 	})
 }
 
-// Deprecated:
-// GetUsage returns the storage usage for the requesting user
-func (h *BillingHandler) GetUsage(c *gin.Context) {
-	c.JSON(http.StatusGone, gin.H{
-		"message": "This endpoint is deprecated.",
-	})
-}
-
 func (h *BillingHandler) GetSubscription(c *gin.Context) {
 	userID := auth.GetUserID(c.Request.Header)
 	subscription, err := h.Controller.GetSubscription(c, userID)

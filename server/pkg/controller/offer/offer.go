@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"slices"
 
 	"github.com/ente/museum/pkg/controller/usercache"
 
@@ -16,7 +15,6 @@ import (
 	"github.com/ente/museum/pkg/controller/discord"
 	"github.com/ente/museum/pkg/repo"
 	"github.com/ente/museum/pkg/repo/storagebonus"
-	"github.com/ente/museum/pkg/utils/billing"
 	"github.com/ente/museum/pkg/utils/config"
 	emailUtil "github.com/ente/museum/pkg/utils/email"
 	"github.com/ente/museum/pkg/utils/time"
@@ -58,18 +56,6 @@ func NewOfferController(
 		StorageBonusRepo:  storageBonusRepo,
 		UserCacheCtrl:     userCacheCtrl,
 	}
-}
-
-func (c *OfferController) GetBlackFridayOffers(countryCode string) []ente.BlackFridayOffer {
-	if slices.Contains(billing.CountriesInEU, countryCode) {
-		countryCode = "EU"
-	}
-
-	if offers, found := c.BlackFridayOffers[countryCode]; found {
-		return offers
-	}
-	defaultCountry := billing.GetDefaultPlanCountry()
-	return c.BlackFridayOffers[defaultCountry]
 }
 
 func (c *OfferController) ApplyOffer(email string, productID string) error {

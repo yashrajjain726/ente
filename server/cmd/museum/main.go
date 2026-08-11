@@ -645,7 +645,6 @@ func main() {
 	trashHandler := &api.TrashHandler{
 		Controller: trashController,
 	}
-	storageAPI.GET("/trash/diff", trashHandler.GetDiff)
 	storageAPI.GET("/trash/v2/diff", trashHandler.GetDiffV2)
 	storageAPI.POST("/trash/delete", trashHandler.Delete)
 	storageAPI.POST("/trash/empty", trashHandler.Empty)
@@ -927,7 +926,6 @@ func main() {
 	}
 	publicAPI.GET("/billing/plans/v2", billingHandler.GetPlansV2)
 	privateAPI.GET("/billing/user-plans", billingHandler.GetUserPlans)
-	privateAPI.GET("/billing/usage", billingHandler.GetUsage)
 	privateAPI.GET("/billing/subscription", billingHandler.GetSubscription)
 	privateAPI.POST("/billing/verify-subscription", billingHandler.VerifySubscription)
 	publicAPI.POST("/billing/notify/android", billingHandler.AndroidNotificationHandler)
@@ -1078,9 +1076,6 @@ func main() {
 	privateAPI.POST("/push/token", pushHandler.AddToken)
 
 	embeddingController := embeddingCtrl.New(embeddingRepo, objectCleanupController, queueRepo, taskLockingRepo, fileRepo, hostName)
-
-	offerHandler := &api.OfferHandler{Controller: offerController}
-	publicAPI.GET("/offers/black-friday", offerHandler.GetBlackFridayOffers)
 
 	discountCouponRepository := &discountCouponRepo.Repository{DB: db}
 	discountCouponController := &discountCouponCtrl.Controller{
