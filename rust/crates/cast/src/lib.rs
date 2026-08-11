@@ -1,5 +1,5 @@
-use ente_core::b64;
 use ente_core::crypto::{self, PublicKey, SecretKey};
+use ente_core::{b64, id};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -60,10 +60,7 @@ pub fn prepare_payload(
     collection_id: i64,
     collection_key: &str,
 ) -> Result<PreparedCastPayload> {
-    let cast_token = format!(
-        "cast_{}",
-        b64::encode_url_safe_no_padding(&crypto::random_bytes(16))
-    );
+    let cast_token = id::random("cast");
     let encrypted_payload = seal_payload(
         public_key,
         &CastPayload {
