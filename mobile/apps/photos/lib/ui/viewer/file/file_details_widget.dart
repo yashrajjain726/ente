@@ -77,7 +77,6 @@ class _FileDetailsWidgetState extends State<FileDetailsWidget> {
   @override
   void initState() {
     debugPrint('file_details_sheet initState');
-    final isSystemTrashFile = widget.file.asTrashFile?.isSystemOnly ?? false;
     _currentUserID = Configuration.instance.getUserIDV2();
     hasLocationData.value = widget.file.hasLocation;
     _isImage =
@@ -104,7 +103,7 @@ class _FileDetailsWidgetState extends State<FileDetailsWidget> {
       }
     });
 
-    if (!isSystemTrashFile) {
+    if (!widget.file.isSystemOnlyTrashFile) {
       if (_isImage) {
         _exifNotifier.addListener(() {
           if (_exifNotifier.value != null) {
@@ -153,7 +152,6 @@ class _FileDetailsWidgetState extends State<FileDetailsWidget> {
   @override
   Widget build(BuildContext context) {
     final file = widget.file;
-    final isSystemTrashFile = file.asTrashFile?.isSystemOnly ?? false;
     final bool isFileOwner =
         file.ownerID == null || file.ownerID == _currentUserID;
 
@@ -233,7 +231,7 @@ class _FileDetailsWidgetState extends State<FileDetailsWidget> {
       ]);
     }
 
-    if (_isImage && !isSystemTrashFile) {
+    if (_isImage && !file.isSystemOnlyTrashFile) {
       fileDetailsTiles.addAll([
         MenuGroupComponent(
           items: [
@@ -262,7 +260,7 @@ class _FileDetailsWidgetState extends State<FileDetailsWidget> {
             _exifData,
             _currentUserID,
           ),
-        if (flagService.internalUser && !isSystemTrashFile)
+        if (flagService.internalUser && !file.isSystemOnlyTrashFile)
           ValueListenableBuilder(
             valueListenable: _videoMetadataNotifier,
             builder: (context, value, _) => VideoExifRowItem(file, value),

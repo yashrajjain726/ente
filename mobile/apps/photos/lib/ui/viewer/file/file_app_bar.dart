@@ -290,7 +290,7 @@ class FileAppBarState extends State<FileAppBar> {
     }
 
     if (!isFileUploaded &&
-        widget.file.asTrashFile == null &&
+        !widget.file.isTrashFile &&
         !isLocalGalleryMode) {
       _actions.add(
         UploadIconWidget(file: widget.file, key: ValueKey(widget.file.tag)),

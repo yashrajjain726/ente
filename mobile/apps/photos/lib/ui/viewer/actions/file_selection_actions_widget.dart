@@ -1093,7 +1093,7 @@ class _FileSelectionActionsWidgetState
 
   void _restore() {
     final isSystemOnly = widget.selectedFiles.files.every(
-      (f) => f.asTrashFile!.isSystemOnly,
+      (f) => f.isSystemOnlyTrashFile,
     );
     if (isSystemOnly) {
       _restoreFilesFromSystemTrash(widget.selectedFiles).onError((e, s) {
@@ -1111,7 +1111,7 @@ class _FileSelectionActionsWidgetState
 
   Future<void> _permanentlyDeleteFromTrash() async {
     final isSystemOnly = widget.selectedFiles.files.every(
-      (f) => f.asTrashFile!.isSystemOnly,
+      (f) => f.isSystemOnlyTrashFile,
     );
     if (isSystemOnly) {
       await permanentlyDeleteFromSystemTrash(context, widget.selectedFiles);
