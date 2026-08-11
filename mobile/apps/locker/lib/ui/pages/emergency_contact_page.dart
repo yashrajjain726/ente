@@ -22,26 +22,25 @@ class _EmergencyContactPageState
   final TextEditingController _contactDetailsController =
       TextEditingController();
   final TextEditingController _notesController = TextEditingController();
+  String _initialName = '';
+  String _initialContactDetails = '';
+  String _initialNotes = '';
 
   @override
-  void initState() {
-    super.initState();
-    _loadExistingData();
-  }
-
-  void _loadExistingData() {
+  void loadExistingData() {
     final data = currentData;
-    if (data != null) {
-      _nameController.text = data.name;
-      _contactDetailsController.text = data.contactDetails;
-      _notesController.text = data.notes ?? '';
-    }
+    _nameController.text = data?.name ?? '';
+    _contactDetailsController.text = data?.contactDetails ?? '';
+    _notesController.text = data?.notes ?? '';
+    _initialName = _nameController.text;
+    _initialContactDetails = _contactDetailsController.text;
+    _initialNotes = _notesController.text;
   }
 
   @override
   void refreshUIWithCurrentData() {
     super.refreshUIWithCurrentData();
-    _loadExistingData();
+    loadExistingData();
   }
 
   @override
@@ -65,6 +64,14 @@ class _EmergencyContactPageState
   bool validateForm() {
     return _nameController.text.trim().isNotEmpty &&
         _contactDetailsController.text.trim().isNotEmpty;
+  }
+
+  @override
+  bool get hasUnsavedChanges {
+    return _nameController.text.trim() != _initialName.trim() ||
+        _contactDetailsController.text.trim() !=
+            _initialContactDetails.trim() ||
+        _notesController.text.trim() != _initialNotes.trim();
   }
 
   @override

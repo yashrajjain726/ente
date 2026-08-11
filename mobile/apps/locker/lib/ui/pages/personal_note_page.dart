@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:locker/models/info/info_item.dart';
 import 'package:locker/ui/components/collection_selection_widget.dart';
 import 'package:locker/ui/pages/base_info_page.dart';
-import "package:locker/utils/bottom_sheet_illustration.dart";
 
 class PersonalNotePage extends BaseInfoPage<PersonalNoteData> {
   const PersonalNotePage({
@@ -205,43 +204,13 @@ class _PersonalNotePageState
     onFieldChanged();
   }
 
-  bool get _hasUnsavedChanges {
+  @override
+  bool get hasUnsavedChanges {
     return _contentController.text.trim() != _initialContent.trim() ||
         _nameController.text.trim() != _initialTitle.trim();
   }
 
   @override
-  Future<bool> onEditModeBackPressed() async {
-    if (!_hasUnsavedChanges) {
-      return true;
-    }
-
-    final shouldDiscard = await _showDiscardChangesDialog();
-    if (!shouldDiscard) {
-      return false;
-    }
-
-    _syncControllers(triggerSetState: true, updateInitial: false);
-    return true;
-  }
-
-  Future<bool> _showDiscardChangesDialog() async {
-    final result = await showBottomSheetComponent<bool>(
-      context: context,
-      builder: (_) => BottomSheetComponent(
-        title: context.strings.unsavedNoteChangesTitle,
-        message: context.strings.unsavedNoteChangesDescription,
-        illustration: LockerBottomSheetIllustration.warningGrey,
-        actions: [
-          ButtonComponent(
-            label: context.strings.discardChanges,
-            variant: ButtonComponentVariant.critical,
-            onTap: () => Navigator.of(context).pop(true),
-          ),
-        ],
-      ),
-    );
-
-    return result ?? false;
-  }
+  String get discardChangesDescription =>
+      context.strings.unsavedNoteChangesDescription;
 }

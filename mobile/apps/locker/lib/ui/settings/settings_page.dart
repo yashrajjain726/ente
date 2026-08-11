@@ -104,7 +104,7 @@ class SettingsWidget extends StatelessWidget {
 
     contents.addAll([
       const SizedBox(height: 24),
-      const SocialIconsRow(),
+      const Center(child: SocialIconsRow()),
       const AppVersionWidget(),
     ]);
 
