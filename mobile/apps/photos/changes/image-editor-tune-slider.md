@@ -1,0 +1,1 @@
+- Fixed image editor tune slider showing an active track at the neutral position. (@r4khul)
