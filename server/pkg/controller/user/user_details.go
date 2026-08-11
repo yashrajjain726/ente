@@ -84,7 +84,7 @@ func (c *UserController) GetDetailsV2(ctx *gin.Context, userID int64, fetchMemor
 	})
 
 	g.Go(func() error {
-		return recover.Int64ToInt64RecoverWrapper(userID, c.FileRepo.GetUsage, &usage)
+		return recover.Int64ToInt64RecoverWrapper(userID, c.UsageRepo.GetUsage, &usage)
 	})
 	g.Go(func() error {
 		cnt, err := c.PasskeyRepo.GetPasskeyCount(userID)

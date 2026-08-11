@@ -1161,13 +1161,3 @@ func (repo *CollectionRepository) UpdateMagicMetadata(ctx context.Context,
 	}
 	return stacktrace.Propagate(err, "")
 }
-
-func (repo *CollectionRepository) GetSharedCollectionsCount(userID int64) (int64, error) {
-	row := repo.DB.QueryRow(`SELECT count(*) FROM collection_shares WHERE from_user_id = $1`, userID)
-	var count int64 = 0
-	err := row.Scan(&count)
-	if err != nil {
-		return -1, stacktrace.Propagate(err, "")
-	}
-	return count, nil
-}
