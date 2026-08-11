@@ -1,1 +1,1 @@
-- Collection maps resetting after returning to the desktop app.
+- Fixed CollectionMapDialog resetting after returning to the desktop app.
