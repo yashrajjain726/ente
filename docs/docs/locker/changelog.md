@@ -9,11 +9,11 @@ A short summary list of changes to Ente Locker.
 
 ## v1.0.8 (mobile) - Aug 2026
 
-- Show the impact across Ente Photos, Auth, and Locker before account deletion
-- Upload items to the Uncategorized collection
-- Prompt users to set up Legacy recovery
-- Improve app lock, onboarding, and recovery key screens
-- Fix logout cleanup and improve file and collection action reliability
+- Bug fixes and improvements
+- Update the account deletion flow with clearer deletion impact details and confirmation.
+- Allow uploading to uncategorized collection
+- Added a Legacy setup prompt to Locker.
+- Updated Locker bottom sheets to use the new component styling.
 
 ## v1.0.6 (mobile) - Jun 2026
 
