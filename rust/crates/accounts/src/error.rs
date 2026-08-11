@@ -41,14 +41,26 @@ pub enum Error {
     #[error("Invalid input: {0}")]
     InvalidInput(String),
 
+    #[error("Incorrect email verification code")]
+    IncorrectEmailVerificationCode,
+
+    #[error("Email verification code has expired")]
+    EmailVerificationCodeExpired,
+
     #[error("Too many incorrect email verification attempts. Please wait and request a new code.")]
     EmailVerificationRateLimited,
+
+    #[error("Incorrect TOTP code")]
+    IncorrectTotp,
 
     #[error("Too many incorrect TOTP attempts. Please restart login.")]
     TotpRateLimited,
 
     #[error("Second factor session expired. Please restart login.")]
     SecondFactorSessionExpired,
+
+    #[error("Session is invalid")]
+    SessionInvalid,
 
     #[error("Account key attributes are not available")]
     MissingKeyAttributes,
@@ -63,20 +75,6 @@ pub enum Error {
 
     #[error(transparent)]
     Ui(Box<dyn std::error::Error + Send + Sync>),
-}
-
-impl Error {
-    pub fn status_code(&self) -> Option<u16> {
-        match self {
-            Error::Http(error) => error.status_code(),
-            _ => None,
-        }
-    }
-
-    pub fn is_http_status(&self, statuses: &[u16]) -> bool {
-        self.status_code()
-            .is_some_and(|status| statuses.contains(&status))
-    }
 }
 
 impl From<b64::DecodeError> for Error {

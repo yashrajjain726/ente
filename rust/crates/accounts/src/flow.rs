@@ -316,7 +316,7 @@ where
                         recovery_key,
                     });
                 }
-                Err(error) if error.is_http_status(&[400, 401]) => {
+                Err(Error::IncorrectTotp) => {
                     self.ui.report_retryable_error(
                         "Incorrect TOTP code. Enter the current code from your authenticator app and try again.",
                     )?;
@@ -397,7 +397,7 @@ where
     ) -> Result<SessionValidity> {
         let remote = match self.client.get_session_validity().await {
             Ok(remote) => remote,
-            Err(error) if error.is_http_status(&[401]) => return Ok(SessionValidity::Invalid),
+            Err(Error::SessionInvalid) => return Ok(SessionValidity::Invalid),
             Err(error) => return Err(error),
         };
 
@@ -526,7 +526,7 @@ where
         self.client.get_accounts_token().await
     }
 
-    pub async fn check_passkey_status(&self, session_id: &str) -> Result<AuthResponse> {
+    pub async fn check_passkey_status(&self, session_id: &str) -> Result<Option<AuthResponse>> {
         self.client.check_passkey_status(session_id).await
     }
 
@@ -650,15 +650,12 @@ where
             let otp = self.ui.read_email_otp(email, purpose, resent)?;
             match self.client.verify_email(email, &otp, source).await {
                 Ok(response) => return Ok(response),
-                Err(error) if error.is_http_status(&[400, 401]) => {
+                Err(Error::IncorrectEmailVerificationCode) => {
                     self.ui
                         .report_retryable_error("Incorrect email verification code. Try again.")?;
                     resent = false;
                 }
-                Err(error) if error.is_http_status(&[429]) => {
-                    return Err(Error::EmailVerificationRateLimited);
-                }
-                Err(error) if error.is_http_status(&[410]) => {
+                Err(Error::EmailVerificationCodeExpired) => {
                     self.client
                         .send_otp(email, purpose.as_api_purpose())
                         .await?;
@@ -697,15 +694,9 @@ where
             let code = self.ui.read_totp_code(TotpPurpose::Login)?;
             match self.client.verify_totp(session_id, &code).await {
                 Ok(response) => return Ok(response),
-                Err(error) if error.is_http_status(&[400, 401]) => {
+                Err(Error::IncorrectTotp) => {
                     self.ui
                         .report_retryable_error("Incorrect TOTP code. Try again.")?;
-                }
-                Err(error) if error.is_http_status(&[429]) => {
-                    return Err(Error::TotpRateLimited);
-                }
-                Err(error) if error.is_http_status(&[404, 410]) => {
-                    return Err(Error::SecondFactorSessionExpired);
                 }
                 Err(error) => return Err(error),
             }
@@ -736,13 +727,8 @@ where
 
         loop {
             self.ui.wait_for_passkey_verification()?;
-            match self.client.check_passkey_status(passkey_session_id).await {
-                Ok(result) => return Ok(result),
-                Err(error) if error.is_http_status(&[400]) => {}
-                Err(error) if error.is_http_status(&[404, 410]) => {
-                    return Err(Error::SecondFactorSessionExpired);
-                }
-                Err(error) => return Err(error),
+            if let Some(response) = self.client.check_passkey_status(passkey_session_id).await? {
+                return Ok(response);
             }
         }
     }

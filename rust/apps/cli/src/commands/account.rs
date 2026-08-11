@@ -248,7 +248,7 @@ async fn add_account(storage: &Storage, args: AddArgs) -> Result<()> {
             .await
         {
             Ok(authenticated) => break authenticated,
-            Err(error) if interactive_password && is_retryable_password_error(&error) => {
+            Err(ente_accounts::Error::IncorrectPassword) if interactive_password => {
                 println!("\nIncorrect password. Try again.");
                 password = Zeroizing::new(prompt_password(None, "Re-enter your password")?);
             }
@@ -535,10 +535,6 @@ fn new_accounts_client(endpoint: &str, app: App) -> Result<AccountsClient> {
             .with_user_agent(USER_AGENT),
     )
     .map_err(Error::from)
-}
-
-fn is_retryable_password_error(error: &ente_accounts::Error) -> bool {
-    matches!(error, ente_accounts::Error::IncorrectPassword) || error.is_http_status(&[401])
 }
 
 fn can_open_automatically(url: &str) -> bool {
