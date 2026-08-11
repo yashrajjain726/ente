@@ -1,1 +1,0 @@
-- Fixed remote photos not loading on older self-hosted Ente servers.
