@@ -389,6 +389,7 @@ class WasmInference implements InferenceBackend {
         const start = Date.now();
         const controller = new AbortController();
         this.abortControllers.set(jobId, controller);
+        onEvent?.({ type: "text", job_id: jobId, text: "" });
 
         let generatedTokens = 0;
         let promptTokens: number | null;

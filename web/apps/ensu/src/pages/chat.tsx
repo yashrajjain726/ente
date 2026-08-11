@@ -2817,6 +2817,11 @@ const Page: React.FC = () => {
                         },
                         (event: GenerateEvent) => {
                             if (!isActiveGeneration()) {
+                                const jobId =
+                                    event.type === "text"
+                                        ? event.job_id
+                                        : event.summary.job_id;
+                                provider.cancelGeneration(jobId);
                                 return;
                             }
                             if (event.type === "text") {
