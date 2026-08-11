@@ -7,6 +7,10 @@ description: Release notes of recent updates to Ente Photos mobile and desktop a
 
 A short summary list of changes to the Ente Photos mobile and desktop apps. For a more descriptive list with screenshots and blog post links, see the [news](https://ente.com/news).
 
+## v1.3.61 (mobile) - Aug 2026
+
+- Fixed remote photos not loading on older self-hosted Ente servers.
+
 ## v1.3.60 (mobile) - Aug 2026
 
 - Improved Cast device discovery on Android and added automatic Cast pairing on iOS.
