@@ -114,6 +114,8 @@ jobs:
 
             - run: npm run build:wasm
 
+            - run: npm run build:cast-wasm
+
             - run: npm run build:space-wasm
 
     photos-desktop-ensu-android:

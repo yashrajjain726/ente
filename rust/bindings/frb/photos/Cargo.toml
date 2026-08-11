@@ -6,6 +6,7 @@ edition = "2024"
 crate-type = ["cdylib", "staticlib"]
 
 [dependencies]
+ente-cast.workspace = true
 ente-frb-log.workspace = true
 ente-image.workspace = true
 ente-photos = { workspace = true, features = ["usearch"] }

@@ -343,7 +343,7 @@ class RealSlideshowService: ObservableObject {
     }
     
     private func fetchFilesBatch(castPayload: CastPayload, sinceTime: Int64) async throws -> (files: [[String: Any]], hasMore: Bool, latestUpdateTime: Int64) {
-        let url = URL(string: "\(baseURL)/cast/diff?collectionID=\(castPayload.collectionID)&sinceTime=\(sinceTime)")!
+        let url = URL(string: "\(baseURL)/cast/diff?collectionID=\(castPayload.collectionId)&sinceTime=\(sinceTime)")!
         
         
         var request = URLRequest(url: url)

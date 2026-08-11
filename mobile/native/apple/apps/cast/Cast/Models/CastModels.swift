@@ -105,16 +105,9 @@ enum CastSessionState: Equatable {
     case error(String)
 }
 
-struct CastPayload: Codable, Equatable {
-    let collectionID: Int
-    let collectionKey: String
-    let castToken: String
-}
-
 struct CastDevice {
     let deviceCode: String
-    let publicKey: Data
-    let privateKey: Data
+    let receiver: CastReceiver
 }
 
 // MARK: - Server Response Models

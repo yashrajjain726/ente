@@ -1,4 +1,3 @@
-import { boxSeal } from "ente-base/crypto";
 import { authenticatedRequestHeaders, ensureOk } from "ente-base/http";
 import { newID } from "ente-base/id";
 import { apiURL } from "ente-base/origins";
@@ -35,12 +34,13 @@ export const publishCastPayload = async (
 
     const castToken = newID("cast_");
 
-    const payload = JSON.stringify({
+    const { sealPayload } = await import("ente-cast-wasm");
+    const encryptedPayload = sealPayload(
+        publicKey,
+        BigInt(collection.id),
         castToken,
-        collectionID: collection.id,
-        collectionKey: collection.key,
-    });
-    const encryptedPayload = await boxSeal(btoa(payload), publicKey);
+        collection.key,
+    );
     const res = await fetch(await apiURL("/cast/cast-data"), {
         method: "POST",
         headers: await authenticatedRequestHeaders(),

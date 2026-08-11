@@ -10,6 +10,7 @@ on:
             - "rust/bindings/frb/**"
             - "rust/Cargo.lock"
             - "rust/Cargo.toml"
+            - "rust/crates/cast/**"
             - "rust/crates/contacts/**"
             - "rust/crates/core/**"
             - "rust/crates/image/**"
