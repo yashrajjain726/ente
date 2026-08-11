@@ -142,7 +142,7 @@ If you have multiple empty albums cluttering your album list, you can bulk delet
 3. Tap the button
 4. Confirm the deletion
 
-On mobile, this feature appears after the initial sync is complete and when you have more than 2 empty albums.
+This will delete all empty albums from your library. The feature only appears after your initial sync is complete and when you have more than 2 empty albums.
 
 **On web / desktop:**
 
