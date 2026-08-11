@@ -343,13 +343,11 @@ class RealSlideshowService: ObservableObject {
     }
     
     private func fetchFilesBatch(castPayload: CastPayload, sinceTime: Int64) async throws -> (files: [[String: Any]], hasMore: Bool, latestUpdateTime: Int64) {
-        let url = URL(string: "\(baseURL)/cast/diff?collectionID=\(castPayload.collectionID)&sinceTime=\(sinceTime)")!
+        let url = URL(string: "\(baseURL)/cast/diff?sinceTime=\(sinceTime)")!
         
         
         var request = URLRequest(url: url)
         request.setValue(castPayload.castToken, forHTTPHeaderField: "X-Cast-Access-Token")
-        // Include collection key in headers for server-side decryption if needed
-        request.setValue(castPayload.collectionKey, forHTTPHeaderField: "X-Collection-Key")
         
         let (data, response) = try await URLSession.shared.data(for: request)
         
@@ -957,9 +955,7 @@ class RealSlideshowService: ObservableObject {
         let url = URL(string: "\(castDownloadURL)/?fileID=\(fileID)")!
         
         var request = URLRequest(url: url)
-        // Use cast-specific headers like in the diff endpoint
         request.setValue(castPayload.castToken, forHTTPHeaderField: "X-Cast-Access-Token")
-        request.setValue(castPayload.collectionKey, forHTTPHeaderField: "X-Collection-Key")
         
         
         let (data, response) = try await URLSession.shared.data(for: request)

@@ -2356,13 +2356,33 @@ dependencies = [
 ]
 
 [[package]]
+name = "ente-cast"
+version = "0.0.0"
+dependencies = [
+ "ente-core",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+]
+
+[[package]]
 name = "ente-cast-uniffi"
 version = "0.0.0"
 dependencies = [
+ "ente-cast",
  "ente-core",
  "ente-uniffi-log",
  "thiserror 2.0.18",
  "uniffi",
+]
+
+[[package]]
+name = "ente-cast-wasm"
+version = "0.0.0"
+dependencies = [
+ "ente-cast",
+ "ente-wasm-log",
+ "wasm-bindgen",
 ]
 
 [[package]]
@@ -2656,6 +2676,7 @@ dependencies = [
 name = "ente_photos_rust"
 version = "0.0.0"
 dependencies = [
+ "ente-cast",
  "ente-frb-log",
  "ente-image",
  "ente-photos",

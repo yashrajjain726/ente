@@ -111,7 +111,7 @@ AutoCastService get autoCastService {
   _autoCastService ??= AutoCastService(
     transport: castService,
     gateway: CastGateway(ServiceLocator.instance.enteDio),
-    encodePayload: collectionsService.getCastData,
+    encodePayload: collectionsService.prepareCastPayloadForCollection,
   );
   return _autoCastService!;
 }

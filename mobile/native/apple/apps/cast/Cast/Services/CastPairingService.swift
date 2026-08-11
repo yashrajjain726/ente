@@ -64,8 +64,7 @@ class RealCastPairingService {
     }
     
     func registerDevice() async throws -> CastDevice {
-        let keys = generateKeyPair()
-        let publicKeyBase64 = keys.publicKey.base64EncodedString()
+        let receiver = CastReceiver()
         
         print("POST \(baseURL)/cast/device-info")
         
@@ -74,7 +73,7 @@ class RealCastPairingService {
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         
-        let requestBody = ["publicKey": publicKeyBase64]
+        let requestBody = ["publicKey": receiver.publicKey()]
         request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
         
         let (data, response) = try await URLSession.shared.data(for: request)
@@ -93,8 +92,7 @@ class RealCastPairingService {
         
         return CastDevice(
             deviceCode: deviceResponse.deviceCode,
-            publicKey: keys.publicKey,
-            privateKey: keys.privateKey
+            receiver: receiver
         )
     }
     
@@ -155,11 +153,7 @@ class RealCastPairingService {
             }
             
             
-            let payload = try await decryptPayload(
-                encryptedData: encryptedData,
-                publicKey: device.publicKey,
-                privateKey: device.privateKey
-            )
+            let payload = try device.receiver.openPayload(encryptedPayload: encryptedData)
             
             hasDeliveredPayload = true
             stopPolling()
@@ -173,36 +167,6 @@ class RealCastPairingService {
             await MainActor.run {
                 onError(error)
             }
-        }
-    }
-    
-    private func decryptPayload(encryptedData: String, publicKey: Data, privateKey: Data) async throws -> CastPayload {
-        do {
-            guard let encryptedBytes = Data(base64Encoded: encryptedData) else {
-                throw CastError.decryptionError("Invalid encrypted cast payload")
-            }
-
-            let decryptedData = try openSealedBox(
-                ciphertext: encryptedBytes,
-                publicKey: publicKey,
-                privateKey: privateKey
-            )
-            
-            // Handle potential base64 preprocessing from mobile client
-            let finalData: Data
-            if let base64String = String(data: decryptedData, encoding: .utf8),
-               let jsonData = Data(base64Encoded: base64String) {
-                finalData = jsonData
-            } else {
-                finalData = decryptedData
-            }
-            
-            let payload = try JSONDecoder().decode(CastPayload.self, from: finalData)
-            return payload
-        } catch {
-            throw CastError.decryptionError(
-                "Cast payload decryption failed: \(error.localizedDescription)"
-            )
         }
     }
     

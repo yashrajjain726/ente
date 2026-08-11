@@ -15,6 +15,7 @@
         "debounce": "2.2.0",
         "ente-accounts": "*",
         "ente-base": "*",
+        "ente-cast-wasm": "*",
         "ente-contacts-web": "*",
         "ente-gallery": "*",
         "ente-media": "*",
