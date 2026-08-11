@@ -219,12 +219,6 @@ From `ente/server`,
 go run cmd/museum/main.go
 ```
 
-For live reloads, install [air](https://github.com/cosmtrek/air#installation). Then you can just call `air` after declaring the required environment variables. For example,
-
-```sh
-air
-```
-
 ### Testing
 
 For quick local iteration without Postgres-backed tests, run `go test ./...` or a narrower package like `go test ./pkg/controller/email`. Tests that require Postgres skip unless the test environment is explicitly enabled.
