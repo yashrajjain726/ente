@@ -653,29 +653,29 @@ class _InlineTextDetectionState extends State<InlineTextDetection> {
         final Size viewportSize = constraints.biggest;
         return _OcrGestureHitTestBox(
           hitTest: (localPosition, globalPosition) {
-            if (textRegionsOnly &&
-                _detectorController.isPointOnInteractiveSelectionUi(
-                  globalPosition,
-                )) {
-              return true;
-            }
             final zoomTransform = InheritedDetailPageState.of(
               context,
             ).zoomTransformNotifier.value;
-            if (!_isLocalPointEligibleForOcrGesture(
-              localPosition,
-              viewportSize,
-              zoomTransform,
-            )) {
-              return false;
-            }
-            return !textRegionsOnly ||
-                _detectorController.isPointOnSelectableText(globalPosition) ||
-                _isLocalPointInDetectedTextRegion(
-                  localPosition,
-                  viewportSize,
-                  zoomTransform,
-                );
+            return shouldCaptureOcrGesture(
+              pointOnInteractiveSelectionUi: _detectorController
+                  .isPointOnInteractiveSelectionUi(globalPosition),
+              pointEligibleForOcr: _isLocalPointEligibleForOcrGesture(
+                localPosition,
+                viewportSize,
+                zoomTransform,
+              ),
+              textRegionsOnly: textRegionsOnly,
+              pointOnSelectableText:
+                  textRegionsOnly &&
+                  _detectorController.isPointOnSelectableText(globalPosition),
+              pointInDetectedTextRegion:
+                  textRegionsOnly &&
+                  _isLocalPointInDetectedTextRegion(
+                    localPosition,
+                    viewportSize,
+                    zoomTransform,
+                  ),
+            );
           },
           child: child,
         );

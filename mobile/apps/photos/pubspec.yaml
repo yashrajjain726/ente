@@ -166,7 +166,7 @@ dependencies:
   mobile_ocr:
     git:
       url: https://github.com/ente/mobile_ocr
-      ref: 37aee4c4ff77c59a4ab46e272e31a53a035f628e
+      ref: 0c68f88f20607cfcb10286422860350ccb024acd
   modal_bottom_sheet: 3.0.0
   motionphoto:
     git:

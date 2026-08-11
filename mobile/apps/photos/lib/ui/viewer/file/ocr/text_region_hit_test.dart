@@ -1,6 +1,18 @@
 import "package:flutter/widgets.dart";
 import "package:mobile_ocr/models/text_region.dart";
 
+bool shouldCaptureOcrGesture({
+  required bool pointOnInteractiveSelectionUi,
+  required bool pointEligibleForOcr,
+  required bool textRegionsOnly,
+  required bool pointOnSelectableText,
+  required bool pointInDetectedTextRegion,
+}) {
+  if (pointOnInteractiveSelectionUi) return true;
+  if (!pointEligibleForOcr) return false;
+  return !textRegionsOnly || pointOnSelectableText || pointInDetectedTextRegion;
+}
+
 Offset viewportPointBeforeZoom({
   required Offset point,
   required Size viewportSize,
