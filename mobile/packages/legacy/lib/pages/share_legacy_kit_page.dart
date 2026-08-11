@@ -11,6 +11,7 @@ import "package:ente_legacy/pages/legacy_congratulations_page.dart";
 import "package:ente_legacy/services/legacy_kit_local_settings.dart";
 import "package:ente_legacy/services/legacy_kit_pdf_service.dart";
 import "package:ente_legacy/services/legacy_kit_service.dart";
+import "package:ente_legacy/services/legacy_kit_share_file_service.dart";
 import "package:ente_rust/ente_rust.dart" as rust;
 import "package:ente_strings/ente_strings.dart";
 import "package:ente_ui/components/alert_bottom_sheet.dart";
@@ -386,7 +387,7 @@ class _ShareLegacyKitPageState extends State<ShareLegacyKitPage> {
       try {
         temporaryDirectory = await getTemporaryDirectory();
         shareDirectory = await temporaryDirectory.createTemp(
-          "ente_legacy_kit_share_",
+          legacyKitShareDirectoryPrefix,
         );
         final pdf = File("${shareDirectory.path}/$fileName");
         await pdf.writeAsBytes(bytes, flush: true);
@@ -676,7 +677,7 @@ class _ShareLegacyKitPageState extends State<ShareLegacyKitPage> {
         .replaceAll(RegExp(r"-+"), "-")
         .replaceAll(RegExp(r"^-+|-+$"), "");
     final name = sanitized.isEmpty ? "part-${part.index}" : sanitized;
-    return "ente-legacy-kit-$name";
+    return "$legacyKitShareFilePrefix$name";
   }
 }
 
@@ -685,20 +686,14 @@ Future<void> _deleteSharedPdf(
   File sharePlusCopy,
   int? shareGeneration,
 ) async {
-  await Future<void>.delayed(const Duration(minutes: 5));
+  await Future<void>.delayed(legacyKitShareRetention);
   for (final entity in <FileSystemEntity>[
     shareDirectory,
     if (shareGeneration != null &&
         shareGeneration == _latestLegacyKitShareGeneration)
       sharePlusCopy,
   ]) {
-    try {
-      if (await entity.exists()) {
-        await entity.delete(recursive: entity is Directory);
-      }
-    } catch (_) {
-      // Best-effort cleanup must not surface after the share flow completes.
-    }
+    await deleteLegacyKitShareFile(entity);
   }
 }
 
