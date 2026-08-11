@@ -15,8 +15,7 @@ class UsageCardWidget extends StatelessWidget {
     final colors = context.componentColors;
     final inheritedDetails = InheritedUserDetails.of(context);
     final userDetails = inheritedDetails?.userDetails;
-    final isCached = inheritedDetails?.isCached ?? false;
-    final isLoading = userDetails is! UserDetails || isCached;
+    final isLoading = userDetails is! UserDetails;
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(20),
