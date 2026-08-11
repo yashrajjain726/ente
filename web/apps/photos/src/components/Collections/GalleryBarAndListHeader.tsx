@@ -297,6 +297,7 @@ export const GalleryBarAndListHeader: React.FC<
                 collectionSummaries={sortedCollectionSummaries.filter(
                     (cs) =>
                         !cs.attributes.has("hideFromCollectionBar") &&
+                        !cs.attributes.has("quickLink") &&
                         (mode != "albums" || !cs.attributes.has("archived")),
                 )}
             />
