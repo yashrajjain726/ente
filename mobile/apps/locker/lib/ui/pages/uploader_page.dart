@@ -39,7 +39,7 @@ abstract class UploaderPageState<T extends UploaderPage> extends State<T> {
 
   /// Opens a file picker dialog and uploads the selected file
   Future<bool> addFile() async {
-    final FilePickerResult? result = await FilePicker.platform.pickFiles(
+    final FilePickerResult? result = await FilePicker.pickFiles(
       type: FileType.any,
       allowMultiple: true,
     );
