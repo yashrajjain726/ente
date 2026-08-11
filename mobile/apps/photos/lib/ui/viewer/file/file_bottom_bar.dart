@@ -111,11 +111,11 @@ class FileBottomBarState extends State<FileBottomBar> {
         widget.file.isOwner &&
         widget.file.isUploaded &&
         (collection?.isHidden() ?? false);
-    if (widget.file is TrashFile) {
+    if (widget.file.isTrashFile) {
       _addTrashOptions(children);
     }
 
-    if (widget.file is! TrashFile) {
+    if (!widget.file.isTrashFile) {
       if (isOwnedByUser) {
         children.add(
           Tooltip(

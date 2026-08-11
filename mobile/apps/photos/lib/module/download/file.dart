@@ -84,9 +84,7 @@ Future<File?> _getLocalDiskFile(
       return exist ? localFile : null;
     });
   } else if (file.fileType == FileType.livePhoto && liveVideo) {
-    return Motionphoto.getLivePhotoFile(
-      (file.asTrashFile?.systemTrashID?.toString() ?? file.localID)!,
-    );
+    return Motionphoto.getLivePhotoFile(file.localID!);
   } else {
     return file.getAsset.then((asset) async {
       if (asset == null || !(await asset.exists)) {

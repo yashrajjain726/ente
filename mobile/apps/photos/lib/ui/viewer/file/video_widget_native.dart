@@ -202,8 +202,7 @@ class _VideoWidgetNativeState extends State<VideoWidgetNative>
     } else {
       await widget.file.getAsset.then((asset) async {
         if (asset == null ||
-            !(await asset.exists ||
-                widget.file.asTrashFile?.systemTrashID != null)) {
+            !(await asset.exists || widget.file.isSystemOnlyTrashFile)) {
           if (widget.file.uploadedFileID != null) {
             _loadNetworkVideo(update);
           }

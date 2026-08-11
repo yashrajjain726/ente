@@ -9,7 +9,6 @@ class TrashFile extends EnteFile {
     required this.updateAt,
     required this.deleteBy,
     required this.isSystemOnly,
-    required this.systemTrashID,
   }) : super.from();
 
   // time when file was put in the trash for first time
@@ -23,9 +22,6 @@ class TrashFile extends EnteFile {
   // will go down
   late int deleteBy;
 
-  // This file is not present on Ente's trash because it was never uploaded, systemTrashID will not not null.
+  // This file is not present in Ente's trash because it was never uploaded.
   bool isSystemOnly = false;
-
-  // The local file ID of this file if there is a corresponding entry in the system trash on this device, this may be != localID
-  int? systemTrashID;
 }

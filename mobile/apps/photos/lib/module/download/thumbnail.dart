@@ -17,9 +17,9 @@ import 'package:photos/core/configuration.dart';
 import 'package:photos/core/constants.dart';
 import 'package:photos/core/errors.dart';
 import 'package:photos/core/network/network.dart';
+import "package:photos/models/file/extensions/file_props.dart";
 import 'package:photos/models/file/file.dart';
 import 'package:photos/models/file/file_type.dart';
-import "package:photos/models/file/trash_file.dart";
 import 'package:photos/module/download/file.dart';
 import "package:photos/module/download/file_url.dart";
 import "package:photos/services/collections_service.dart";
@@ -206,8 +206,7 @@ Future<Uint8List?> getThumbnailFromLocal(
   } else {
     return file.getAsset.then((asset) async {
       if (asset == null ||
-          !(await asset.exists ||
-              (file is TrashFile && file.systemTrashID != null))) {
+          !(await asset.exists || file.isSystemOnlyTrashFile)) {
         return null;
       }
       return asset

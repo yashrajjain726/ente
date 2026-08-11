@@ -159,8 +159,7 @@ class _VideoWidgetMediaKitState extends State<VideoWidgetMediaKit>
     } else {
       widget.file.getAsset.then((asset) async {
         if (asset == null ||
-            !(await asset.exists ||
-                (widget.file.asTrashFile?.systemTrashID != null))) {
+            !(await asset.exists || widget.file.isSystemOnlyTrashFile)) {
           if (widget.file.uploadedFileID != null) {
             _loadNetworkVideo();
           }
