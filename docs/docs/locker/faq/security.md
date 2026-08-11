@@ -97,11 +97,13 @@ Yes. Ente Locker, Ente Photos, and Ente Auth use the same account. Your password
 
 Your data in each product remains separate.
 
-### How do I delete my Ente account? {#locker-delete-account}
+### How can I delete my account? {#locker-delete-account}
 
-In the Locker mobile app, open `Settings > Account > Delete account`. Unlock the app when prompted, select a reason, and continue to the confirmation screen.
+You can delete your account at any time by using the "Delete account" option in the settings. For security reasons, we request you to delete your account on your own instead of contacting support to ask them to delete your account.
 
-Before you confirm, Locker shows the number of photos and videos, Auth codes, and Locker records that will be affected. Account deletion is permanent and applies across Ente Photos, Ente Auth, and Ente Locker, not only to Locker. Review the summary carefully and confirm only if you want to delete the entire Ente account.
+Note that Ente Photos, Ente Auth, and Ente Locker data will be deleted when you delete your account (irrespective of which app you delete it from) since Photos, Auth, and Locker use the same underlying account.
+
+To know details of how your data is deleted, including when you delete your account, please see https://ente.com/blog/how-ente-deletes-data/.
 
 ## Lock Screen
 
