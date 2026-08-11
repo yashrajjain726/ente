@@ -17,7 +17,7 @@ interface WasmDerivedKey {
     mem_limit: number;
 }
 
-export const normalizeDerivedKeyError = (error: unknown): Error => {
+const normalizeDerivedKeyError = (error: unknown): Error => {
     const code =
         typeof error === "object" && error && "code" in error
             ? String(error.code)
