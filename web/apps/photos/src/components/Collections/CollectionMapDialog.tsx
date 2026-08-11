@@ -311,7 +311,8 @@ const buildMapIndexPoints = async (files: EnteFile[]) => {
     let latestFileId: number | undefined;
 
     for (let index = 0; index < files.length; index += 1) {
-        const file = files[index]!;
+        const file = files[index];
+        if (!file) continue;
         const loc = fileLocation(file);
         if (!loc) continue;
 

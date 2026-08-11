@@ -287,6 +287,7 @@ const Page: React.FC = () => {
     } = useModalVisibility();
     const { show: showCollectionMap, props: collectionMapVisibilityProps } =
         useModalVisibility();
+    const closeCollectionMap = collectionMapVisibilityProps.onClose;
 
     const handleShowCollectionMap = useCallback(() => {
         void (async () => {
@@ -621,6 +622,15 @@ const Page: React.FC = () => {
         const href = `/gallery${collectionURL}`;
         void router.push(href, undefined, { shallow: true });
     }, [activeCollectionID, router.isReady]);
+
+    // The map dialog is only mounted when there is an active collection
+    // summary, and MUI only invokes onClose for escape / backdrop dismissal,
+    // so if the user navigates somewhere without one (e.g. to a person) while
+    // the map is open, the open flag would stay latched and the map would
+    // reopen on the next visit to an albums view unless we reset it here.
+    useEffect(() => {
+        if (!activeCollectionSummary) closeCollectionMap();
+    }, [activeCollectionSummary, closeCollectionMap]);
 
     useEffect(() => {
         if (router.isReady && haveMasterKeyInSession()) {
@@ -1468,18 +1478,26 @@ const Page: React.FC = () => {
         [],
     );
 
+    // These can be invoked from the file viewer hosted by the map dialog, so
+    // close the map (if open) to land the user in the gallery grid instead of
+    // silently swapping the contents of the still open map.
     const handleSelectCollection = useCallback(
-        (collectionID: number) =>
+        (collectionID: number) => {
+            closeCollectionMap();
             dispatch({
                 type: "showCollectionSummary",
                 collectionSummaryID: collectionID,
-            }),
-        [],
+            });
+        },
+        [closeCollectionMap],
     );
 
     const handleSelectPerson = useCallback(
-        (personID: string) => dispatch({ type: "showPerson", personID }),
-        [],
+        (personID: string) => {
+            closeCollectionMap();
+            dispatch({ type: "showPerson", personID });
+        },
+        [closeCollectionMap],
     );
 
     const handleOpenCollectionSelector = useCallback(
