@@ -8,7 +8,7 @@ Run the "Release (Server)" workflow from GitHub Actions or with:
 gh workflow run server-release.yml
 ```
 
-It publishes the current commit to our Scaleway registry. See [deploy/README](../scripts/deploy/README.md) for deployment instructions.
+By default, it publishes the latest `main` commit to our Scaleway registry. See [deploy/README](../scripts/deploy/README.md) for deployment instructions.
 
 ## GHCR
 
