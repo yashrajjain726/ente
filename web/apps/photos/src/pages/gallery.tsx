@@ -8,6 +8,7 @@ import {
     CollectionSelector,
     type CollectionSelectorAttributes,
 } from "@/components/CollectionSelector";
+import { CollectionMapDialog } from "@/components/Collections/CollectionMapDialog";
 import { GalleryBarAndListHeader } from "@/components/Collections/GalleryBarAndListHeader";
 import { PickCoverPhotoDialog } from "@/components/Collections/PickCoverPhotoDialog";
 import { Export } from "@/components/Export";
@@ -153,7 +154,10 @@ import type {
     SearchOption,
     SidebarActionID,
 } from "ente-new/photos/services/search/types";
-import { initSettings } from "ente-new/photos/services/settings";
+import {
+    initSettings,
+    updateMapEnabled,
+} from "ente-new/photos/services/settings";
 import {
     redirectToCustomerPortal,
     savedUserDetailsOrTriggerPull,
@@ -224,7 +228,7 @@ const Page: React.FC = () => {
     const [collectionSelectorAttributes, setCollectionSelectorAttributes] =
         useState<CollectionSelectorAttributes | undefined>();
 
-    const { customDomain } = useSettingsSnapshot();
+    const { customDomain, mapEnabled } = useSettingsSnapshot();
     const userDetails = useUserDetailsSnapshot();
     const peopleState = usePeopleStateSnapshot();
 
@@ -281,6 +285,22 @@ const Page: React.FC = () => {
         show: showPickCoverPhotoDialog,
         props: pickCoverPhotoDialogVisibilityProps,
     } = useModalVisibility();
+    const { show: showCollectionMap, props: collectionMapVisibilityProps } =
+        useModalVisibility();
+
+    const handleShowCollectionMap = useCallback(() => {
+        void (async () => {
+            if (!mapEnabled) {
+                try {
+                    await updateMapEnabled(true);
+                } catch (e) {
+                    onGenericError(e);
+                    return;
+                }
+            }
+            showCollectionMap();
+        })();
+    }, [mapEnabled, onGenericError, showCollectionMap]);
 
     const [addToAlbumProgress, setAddToAlbumProgress] = useState<{
         open: boolean;
@@ -1907,24 +1927,14 @@ const Page: React.FC = () => {
                     // component need to be updated.
                     activeCollection: activeCollection!,
                     activeCollectionID: activeCollectionID!,
-                    files: activeCollection
-                        ? activeCollectionFiles
-                        : filteredFiles,
-                    mapFileSource,
                     activePerson,
                     setFileListHeader,
                     saveGroups,
                     canCreateAlbum: !isInArchiveSection,
                     onAddSaveGroup,
-                    onMarkTempDeleted: handleMarkTempDeleted,
-                    onAddFileToCollection: handleAddSingleFileToCollection,
-                    onRemoteFilesPull: remoteFilesPull,
-                    onVisualFeedback: handleVisualFeedback,
-                    fileNormalCollectionIDs,
-                    collectionNameByID,
-                    onSelectCollection: handleSelectCollection,
                     canSetAlbumCover: isOwnedAlbumEligibleForCover,
                     onSetAlbumCover: handleOpenPickCoverPhotoDialog,
+                    onShowMap: handleShowCollectionMap,
                 }}
                 mode={barMode}
                 shouldHide={isInSearchMode}
@@ -2017,7 +2027,7 @@ const Page: React.FC = () => {
                     footer={fileListFooter}
                     user={user}
                     files={filteredFiles}
-                    mapFileSource={mapFileSource}
+                    onShowMap={handleShowCollectionMap}
                     enableDownload={true}
                     disableGrouping={state.searchSuggestion?.type == "clip"}
                     enableSelect={true}
@@ -2026,7 +2036,6 @@ const Page: React.FC = () => {
                     // TODO: Incorrect assertion, need to update the type
                     activeCollectionID={activeCollectionID!}
                     activeCollectionSummary={activeCollectionSummary}
-                    activeCollection={activeCollection}
                     activePersonID={activePerson?.id}
                     isInIncomingSharedCollection={activeCollectionSummary?.attributes.has(
                         "sharedIncoming",
@@ -2068,6 +2077,27 @@ const Page: React.FC = () => {
                     onPendingNavigationConsumed={
                         handlePendingNavigationConsumed
                     }
+                />
+            )}
+            {activeCollectionSummary && (
+                <CollectionMapDialog
+                    {...collectionMapVisibilityProps}
+                    collectionSummary={activeCollectionSummary}
+                    files={
+                        activeCollection ? activeCollectionFiles : filteredFiles
+                    }
+                    mapFileSource={mapFileSource}
+                    onRemotePull={remotePull}
+                    onAddSaveGroup={onAddSaveGroup}
+                    onMarkTempDeleted={handleMarkTempDeleted}
+                    onAddFileToCollection={handleAddSingleFileToCollection}
+                    onRemoteFilesPull={remoteFilesPull}
+                    onVisualFeedback={handleVisualFeedback}
+                    fileNormalCollectionIDs={fileNormalCollectionIDs}
+                    collectionNameByID={collectionNameByID}
+                    emailByUserID={state.emailByUserID}
+                    onSelectCollection={handleSelectCollection}
+                    onSelectPerson={handleSelectPerson}
                 />
             )}
             {activeCollection && (
