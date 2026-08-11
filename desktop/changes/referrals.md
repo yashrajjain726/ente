@@ -1,1 +1,1 @@
-- parity: Added functionality for sharing and applying referral codes.
+- Added functionality for sharing and applying referral codes.

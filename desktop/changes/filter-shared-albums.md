@@ -1,1 +1,0 @@
-- parity: Added a filter for shared albums in All Albums.

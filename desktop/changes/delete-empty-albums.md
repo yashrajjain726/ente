@@ -1,1 +1,0 @@
-- parity: Added an option to delete all empty albums from the albums list.
