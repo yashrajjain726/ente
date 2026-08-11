@@ -25,6 +25,7 @@ import 'package:photos/module/download/file.dart';
 import "package:photos/service_locator.dart";
 import "package:photos/services/files_service.dart";
 import "package:photos/services/free_space/deletion_batch_runner.dart";
+import "package:photos/services/native_service.dart";
 import "package:photos/services/sync/local_sync_service.dart";
 import 'package:photos/services/sync/remote_sync_service.dart';
 import 'package:photos/services/sync/sync_service.dart';
@@ -337,7 +338,7 @@ Future<bool> deleteFromEnteTrash(
   }
 }
 
-Future<bool> emptyTrash(BuildContext context) async {
+Future<bool> emptyTrash(BuildContext context, bool isOnEnteTrash) async {
   final actionResult = await showChoiceActionSheet(
     context,
     title: context.strings.emptyTrashQuestion,
@@ -346,7 +347,11 @@ Future<bool> emptyTrash(BuildContext context) async {
     isCritical: true,
     firstButtonOnTap: () async {
       try {
-        await trashSyncService.emptyTrash();
+        if (isOnEnteTrash) {
+          await trashSyncService.emptyTrash();
+        } else {
+          await _emptyDeviceTrash(context);
+        }
       } catch (e, s) {
         _logger.info("failed empty trash", e, s);
         rethrow;
@@ -1404,11 +1409,30 @@ Future<(Set<String>, Object?)> _deleteFromDeviceTrash(
     for (final batch in fileIDs.chunks(batchSize)) {
       final result = await PhotoManager.editor.deleteWithIds(batch);
       deletedIDs.addAll(result);
+      if (result.length != batch.length) break;
     }
     return (deletedIDs, null);
   } catch (e, s) {
     _logger.severe("failed to delete from device trash:", e, s);
     return (deletedIDs, e);
+  } finally {
+    if (deletedIDs.isNotEmpty) {
+      Bus.instance.fire(ForceReloadTrashPageEvent());
+    }
+  }
+}
+
+Future<void> _emptyDeviceTrash(BuildContext context) async {
+  final trash = (await NativeService.getTrash())
+      .map((f) => f.localID.toString())
+      .toList();
+  final deletedIDs = <String>{};
+  try {
+    for (final batch in trash.chunks(batchSize)) {
+      final result = await PhotoManager.editor.deleteWithIds(batch);
+      deletedIDs.addAll(result);
+      if (result.length != batch.length) break;
+    }
   } finally {
     if (deletedIDs.isNotEmpty) {
       Bus.instance.fire(ForceReloadTrashPageEvent());
