@@ -1,12 +1,14 @@
 import "dart:io";
 
 import "package:collection/collection.dart";
+import "package:ente_components/components/buttons/fab_component.dart";
 import "package:ente_components/ente_components.dart";
 import "package:ente_photos_platform/ente_photos_platform.dart"
     show DeviceTrashClient;
 import "package:ente_pure_utils/ente_pure_utils.dart";
 import "package:ente_strings/extensions.dart";
 import 'package:flutter/material.dart';
+import "package:hugeicons/hugeicons.dart";
 import "package:photo_manager/photo_manager.dart";
 import "package:photos/core/constants.dart";
 import "package:photos/core/event_bus.dart";
@@ -27,6 +29,7 @@ import "package:photos/ui/viewer/gallery/gallery_app_bar_widget.dart";
 import "package:photos/ui/viewer/gallery/state/gallery_boundaries_provider.dart";
 import "package:photos/ui/viewer/gallery/state/gallery_files_inherited_widget.dart";
 import "package:photos/ui/viewer/gallery/state/selection_state.dart";
+import "package:photos/utils/delete_file_util.dart";
 import "package:photos/utils/device_info.dart";
 
 Future<void> showTrashPage(BuildContext context) async {
@@ -140,6 +143,23 @@ class _TrashPageState extends State<_TrashPage> {
               ],
             ),
           ),
+          floatingActionButton: Padding(
+            padding: const EdgeInsets.only(bottom: 4),
+            child: FABComponent(
+              label: l10n.deleteAll,
+              icon: const HugeIcon(icon: HugeIcons.strokeRoundedDelete02),
+              shouldShowSuccessConfirmation: false,
+              shouldShowSuccessState: false,
+              shouldSurfaceExecutionStates: false,
+              onTap: () async {
+                await emptyTrash(context, _isOnEnteTrash);
+              },
+            ),
+          ),
+          floatingActionButtonLocation:
+              FloatingActionButtonLocation.centerFloat,
+          floatingActionButtonAnimator:
+              FloatingActionButtonAnimator.noAnimation,
         ),
       ),
     );
