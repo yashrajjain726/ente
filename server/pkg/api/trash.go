@@ -16,29 +16,12 @@ type TrashHandler struct {
 	Controller *controller.TrashController
 }
 
-// Deprecated, shutdown when there's no traffic for 30 days
-func (t *TrashHandler) GetDiff(c *gin.Context) {
-	enteApp := auth.GetApp(c)
-
-	userID := auth.GetUserID(c.Request.Header)
-	sinceTime, _ := strconv.ParseInt(c.Query("sinceTime"), 10, 64)
-	diff, hasMore, err := t.Controller.GetDiff(userID, sinceTime, false, enteApp)
-	if err != nil {
-		handler.Error(c, stacktrace.Propagate(err, ""))
-		return
-	}
-	c.JSON(http.StatusOK, gin.H{
-		"diff":    diff,
-		"hasMore": hasMore,
-	})
-}
-
 func (t *TrashHandler) GetDiffV2(c *gin.Context) {
 	enteApp := auth.GetApp(c)
 
 	userID := auth.GetUserID(c.Request.Header)
 	sinceTime, _ := strconv.ParseInt(c.Query("sinceTime"), 10, 64)
-	diff, hasMore, err := t.Controller.GetDiff(userID, sinceTime, true, enteApp)
+	diff, hasMore, err := t.Controller.GetDiff(userID, sinceTime, enteApp)
 	if err != nil {
 		handler.Error(c, stacktrace.Propagate(err, ""))
 		return

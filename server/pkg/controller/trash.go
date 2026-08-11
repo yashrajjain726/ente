@@ -27,20 +27,18 @@ type TrashController struct {
 	deleteAgedTrashRunning  bool
 }
 
-func (t *TrashController) GetDiff(userID int64, sinceTime int64, stripMetadata bool, app ente.App) ([]ente.Trash, bool, error) {
+func (t *TrashController) GetDiff(userID int64, sinceTime int64, app ente.App) ([]ente.Trash, bool, error) {
 	trashFilesDiff, hasMore, err := t.getDiff(userID, sinceTime, repo.TrashDiffLimit, app)
 	if err != nil {
 		return nil, false, err
 	}
 	// hide private metadata before returning files info in diff
-	if stripMetadata {
-		for _, trashFile := range trashFilesDiff {
-			if trashFile.IsDeleted {
-				trashFile.File.MagicMetadata = nil
-				trashFile.File.PubicMagicMetadata = nil
-				trashFile.File.Metadata = ente.FileAttributes{}
-				trashFile.File.Info = nil
-			}
+	for _, trashFile := range trashFilesDiff {
+		if trashFile.IsDeleted {
+			trashFile.File.MagicMetadata = nil
+			trashFile.File.PubicMagicMetadata = nil
+			trashFile.File.Metadata = ente.FileAttributes{}
+			trashFile.File.Info = nil
 		}
 	}
 	return trashFilesDiff, hasMore, err
