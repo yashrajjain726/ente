@@ -1,1 +1,1 @@
-- fix: collection maps resetting after returning to the desktop app.
+- Collection maps resetting after returning to the desktop app.
