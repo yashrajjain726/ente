@@ -143,18 +143,26 @@ class _TrashPageState extends State<_TrashPage> {
               ],
             ),
           ),
-          floatingActionButton: Padding(
-            padding: const EdgeInsets.only(bottom: 4),
-            child: FABComponent(
-              label: l10n.deleteAll,
-              icon: const HugeIcon(icon: HugeIcons.strokeRoundedDelete02),
-              shouldShowSuccessConfirmation: false,
-              shouldShowSuccessState: false,
-              shouldSurfaceExecutionStates: false,
-              onTap: () async {
-                await emptyTrash(context, _isOnEnteTrash);
-              },
-            ),
+          floatingActionButton: ListenableBuilder(
+            listenable: _selectedFiles,
+            builder: (context, _) {
+              if (_selectedFiles.files.isNotEmpty) {
+                return const SizedBox.shrink();
+              }
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: FABComponent(
+                  label: l10n.deleteAll,
+                  icon: const HugeIcon(icon: HugeIcons.strokeRoundedDelete02),
+                  shouldShowSuccessConfirmation: false,
+                  shouldShowSuccessState: false,
+                  shouldSurfaceExecutionStates: false,
+                  onTap: () async {
+                    await emptyTrash(context, _isOnEnteTrash);
+                  },
+                ),
+              );
+            },
           ),
           floatingActionButtonLocation:
               FloatingActionButtonLocation.centerFloat,
