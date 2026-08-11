@@ -245,6 +245,7 @@ class _PinInputComponentState extends State<PinInputComponent> {
       enableIMEPersonalizedLearning: false,
       obscureText: widget.obscureText,
       obscuringCharacter: widget.obscuringCharacter,
+      maxLength: widget.length,
       inputFormatters: [
         FilteringTextInputFormatter.digitsOnly,
         LengthLimitingTextInputFormatter(widget.length),
