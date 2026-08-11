@@ -199,7 +199,7 @@ func main() {
 	usageRepo := &repo.UsageRepository{DB: db, UserRepo: userRepo}
 	fileRepo := &repo.FileRepository{DB: db, S3Config: s3Config, QueueRepo: queueRepo,
 		ObjectRepo: objectRepo, ObjectCleanupRepo: objectCleanupRepo,
-		ObjectCopiesRepo: objectCopiesRepo, UsageRepo: usageRepo}
+		ObjectCopiesRepo: objectCopiesRepo}
 	fileLinkRepo := public.NewFileLinkRepo(db)
 	pasteRepo := public.NewPasteRepository(db)
 	fileDataRepo := &fileDataRepo.Repository{DB: db, ObjectCleanupRepo: objectCleanupRepo}
