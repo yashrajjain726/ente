@@ -6,7 +6,7 @@ use flutter_rust_bridge::frb;
 #[frb]
 pub enum ContactsError {
     Network { message: String },
-    Http { status: u16, message: String },
+    Http { message: String },
     Parse { message: String },
     Crypto { message: String },
     Auth { message: String },
@@ -23,10 +23,7 @@ impl From<ente_contacts::Error> for ContactsError {
         let message = ente_core::error::chain(&e);
         match e.kind() {
             K::Network => Self::Network { message },
-            K::Http => Self::Http {
-                status: e.status().unwrap_or_default(),
-                message,
-            },
+            K::Http => Self::Http { message },
             K::Parse => Self::Parse { message },
             K::Crypto => Self::Crypto { message },
             K::Auth => Self::Auth { message },

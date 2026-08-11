@@ -61,13 +61,6 @@ impl Error {
             Error::ActiveRecoverySession => ErrorKind::ActiveRecoverySession,
         }
     }
-
-    pub fn status(&self) -> Option<u16> {
-        match self {
-            Error::Http(error) => error.status_code(),
-            _ => None,
-        }
-    }
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

@@ -163,7 +163,11 @@ impl AccountsClient {
             .send()
             .await?
             .error_for_code()
-            .await?
+            .await
+            .map_err(|error| match error.status_code() {
+                Some(401) => Error::IncorrectPassword,
+                _ => error.into(),
+            })?
             .json()
             .await?)
     }
@@ -204,7 +208,13 @@ impl AccountsClient {
             .send()
             .await?
             .error_for_code()
-            .await?
+            .await
+            .map_err(|error| match error.status_code() {
+                Some(400 | 401) => Error::IncorrectEmailVerificationCode,
+                Some(410) => Error::EmailVerificationCodeExpired,
+                Some(429) => Error::EmailVerificationRateLimited,
+                _ => error.into(),
+            })?
             .json()
             .await?)
     }
@@ -291,7 +301,7 @@ impl AccountsClient {
     }
 
     pub async fn get_session_validity(&self) -> Result<SessionValidityResponse> {
-        Ok(http::retry(|| async {
+        http::retry(|| async {
             self.api
                 .get("/users/session-validity/v2")
                 .send()
@@ -301,7 +311,11 @@ impl AccountsClient {
                 .json()
                 .await
         })
-        .await?)
+        .await
+        .map_err(|error| match error.status_code() {
+            Some(401) => Error::SessionInvalid,
+            _ => error.into(),
+        })
     }
 
     pub async fn change_email(&self, email: &str, ott: &str) -> Result<()> {
@@ -367,7 +381,11 @@ impl AccountsClient {
             .send()
             .await?
             .error_for_code()
-            .await?;
+            .await
+            .map_err(|error| match error.status_code() {
+                Some(400 | 401) => Error::IncorrectTotp,
+                _ => error.into(),
+            })?;
         Ok(())
     }
 
@@ -398,7 +416,13 @@ impl AccountsClient {
             .send()
             .await?
             .error_for_code()
-            .await?
+            .await
+            .map_err(|error| match error.status_code() {
+                Some(400 | 401) => Error::IncorrectTotp,
+                Some(404 | 410) => Error::SecondFactorSessionExpired,
+                Some(429) => Error::TotpRateLimited,
+                _ => error.into(),
+            })?
             .json()
             .await?)
     }
@@ -481,7 +505,7 @@ impl AccountsClient {
 
     pub async fn check_passkey_status(&self, session_id: &str) -> Result<AuthResponse> {
         let query = [("sessionID", session_id.to_string())];
-        Ok(http::retry(|| async {
+        http::retry(|| async {
             self.api
                 .get("/users/two-factor/passkeys/get-token")
                 .query(&query)
@@ -492,7 +516,12 @@ impl AccountsClient {
                 .json()
                 .await
         })
-        .await?)
+        .await
+        .map_err(|error| match error.status_code() {
+            Some(400) => Error::PasskeyVerificationPending,
+            Some(404 | 410) => Error::SecondFactorSessionExpired,
+            _ => error.into(),
+        })
     }
 
     pub async fn get_accounts_token(&self) -> Result<AccountsTokenResponse> {
@@ -566,7 +595,7 @@ mod tests {
             .await
             .unwrap_err();
 
-        assert_eq!(error.status_code(), Some(500));
+        assert!(matches!(&error, Error::Http(e) if e.status_code() == Some(500)));
         verify.assert_async().await;
     }
 
@@ -609,7 +638,7 @@ mod tests {
             .await
             .unwrap_err();
 
-        assert_eq!(error.status_code(), Some(429));
+        assert!(matches!(error, Error::EmailVerificationRateLimited));
         verify.assert_async().await;
     }
 }
