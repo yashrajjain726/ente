@@ -57,6 +57,8 @@ Displays photos featuring selected people from your library. This widget helps y
 
 ## Configuring Widgets
 
+If a widget has not been configured yet, tap it on your home screen to open its customization screen directly in Ente. You can also configure widgets from the app settings.
+
 ### Widget Settings
 
 Open `Settings > Widgets` in the Ente app to configure your widgets.
