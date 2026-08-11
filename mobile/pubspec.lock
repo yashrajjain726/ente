@@ -1774,9 +1774,9 @@ packages:
     dependency: transitive
     description:
       path: "."
-      ref: "09fc9b7e9366e568de0047a369ac4c852529f748"
-      resolved-ref: "09fc9b7e9366e568de0047a369ac4c852529f748"
-      url: "https://github.com/laurens-pilot/mobile_ocr"
+      ref: "0c68f88f20607cfcb10286422860350ccb024acd"
+      resolved-ref: "0c68f88f20607cfcb10286422860350ccb024acd"
+      url: "https://github.com/ente/mobile_ocr"
     source: git
     version: "1.0.0"
   mockito:
