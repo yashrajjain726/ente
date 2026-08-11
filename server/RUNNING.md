@@ -6,7 +6,7 @@ You can also run museum directly on your machine if you wish - it is a single st
 
 This document describes these different approaches (you can choose any one), and also outlines configuration.
 
-- [Run using pre-built Docker images](quickstart/README.md)
+- [Run using pre-built Docker images](docs/quickstart.md)
 - [Run using Docker, building image from source](#build-and-run-using-docker)
 - [Run with Docker, à la carte](#pre-built-images)
 - [Run without Docker](#running-without-docker)
