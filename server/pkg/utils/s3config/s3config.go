@@ -31,6 +31,15 @@ type S3Config struct {
 	attachmentConfig AttachmentConfig
 }
 
+// The primary object-replication path uses three provider-specific roles:
+//
+// Backblaze is primary hot storage. It is versioned, and the server rolls back
+// client overwrites by deleting the newest object version.
+//
+// Wasabi is secondary hot storage. Compliance prevents overwrites and deletion
+// for 21 days. Permanent deletion releases the hold before scheduled cleanup.
+//
+// Scaleway is cold storage. Replication uploads use the GLACIER storage class.
 var (
 	dcB2EuropeCentral                 string = "b2-eu-cen"
 	dcSCWEuropeFranceDeprecated       string = "scw-eu-fr"

@@ -14,7 +14,8 @@ var MaxPasskeys = 10
 
 type SetPasskeyRecoveryRequest struct {
 	Secret string `json:"secret" binding:"required"`
-	// SkipSecret encrypted with the user's recovery key.
+	// The skip secret encrypted with the recovery key. Decrypting it during MFA
+	// recovery proves possession of that key.
 	UserSecretCipher string `json:"userSecretCipher" binding:"required"`
 	UserSecretNonce  string `json:"userSecretNonce" binding:"required"`
 }
