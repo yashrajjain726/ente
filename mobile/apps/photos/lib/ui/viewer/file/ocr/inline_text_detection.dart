@@ -1,7 +1,6 @@
 import "dart:async";
 import "dart:io";
 
-import "package:ente_strings/ente_strings.dart";
 import "package:flutter/gestures.dart";
 import "package:flutter/material.dart";
 import "package:flutter/rendering.dart";
@@ -12,13 +11,7 @@ import "package:mobile_ocr/mobile_ocr.dart"
         DisplayImageHelper,
         MobileOcr,
         OcrModelComponent,
-        TextDetectorController,
-        TextDetectorStrings,
-        TextDetectorWidget,
-        TextRegionDetectionResult,
-        ZoomedInteractionPolicy;
-import "package:photos/core/event_bus.dart";
-import "package:photos/events/reset_zoom_of_photo_view_event.dart";
+        TextRegionDetectionResult;
 import "package:photos/models/file/extensions/file_props.dart";
 import "package:photos/models/file/file.dart";
 import "package:photos/models/file/file_type.dart";
@@ -26,6 +19,7 @@ import "package:photos/models/file/trash_file.dart";
 import "package:photos/module/download/file.dart";
 import "package:photos/states/detail_page_state.dart";
 import "package:photos/ui/viewer/file/ocr/ocr_dot_wave_overlay.dart";
+import "package:photos/ui/viewer/file/ocr/text_detector_widget.dart";
 import "package:photos/ui/viewer/file/ocr/text_region_hit_test.dart";
 import "package:photos/utils/image_util.dart";
 
@@ -865,7 +859,6 @@ class _InlineTextDetectionState extends State<InlineTextDetection> {
     double uiScale = 1.0,
     Offset uiOffset = Offset.zero,
   }) {
-    final l10n = context.strings;
     return ListenableBuilder(
       listenable: _detectorController,
       builder: (context, child) {
@@ -887,42 +880,12 @@ class _InlineTextDetectionState extends State<InlineTextDetection> {
       child: TextDetectorWidget(
         key: ValueKey("ocr_$_localFilePath"),
         imagePath: _localFilePath!,
-        autoDetect: true,
-        backgroundColor: Colors.transparent,
-        showUnselectedBoundaries: false,
-        overlayOnly: true,
-        showProcessingOverlay: false,
-        showScanAnimation: false,
-        showEditorHint: false,
-        showNoTextMessageOnAutoDetect: false,
         initialInteractionPosition: _pendingLongPressPosition,
         controller: _detectorController,
         isImageZoomed: isZoomed,
-        onDoubleTapWhenZoomed: isZoomed
-            ? () {
-                Bus.instance.fire(
-                  ResetZoomOfPhotoView(
-                    uploadedFileID: widget.file.uploadedFileID,
-                    localID: widget.file.localID,
-                  ),
-                );
-              }
-            : null,
         uiScale: uiScale,
         uiOffset: uiOffset,
-        zoomedInteractionPolicy: ZoomedInteractionPolicy.panFirst,
-        strings: TextDetectorStrings(
-          processingOverlayMessage: l10n.ocrProcessingOverlayMessage,
-          selectionHint: l10n.ocrSelectionHint,
-          noTextDetected: l10n.ocrNoTextDetected,
-          retryButtonLabel: l10n.retry,
-          modelsNetworkRequiredError: l10n.ocrModelsNetworkRequiredError,
-          modelsPrepareFailed: l10n.ocrModelsPrepareFailed,
-          imageNotFoundError: l10n.ocrImageNotFoundError,
-          imageDecodeFailedError: l10n.ocrImageDecodeFailedError,
-          genericDetectError: l10n.ocrGenericDetectError,
-        ),
-        onTextCopied: (text) {
+        onTextCopied: () {
           HapticFeedback.lightImpact();
         },
       ),
