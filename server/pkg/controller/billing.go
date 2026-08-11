@@ -79,8 +79,6 @@ func (c *BillingController) GetPlansV2(countryCode string, stripeAccountCountry 
 	return result
 }
 
-// GetStripeAccountCountry returns the stripe account country the user's existing plan is from
-// if he doesn't have a stripe subscription then ente.DefaultStripeAccountCountry is returned
 func (c *BillingController) GetStripeAccountCountry(userID int64) (ente.StripeAccountCountry, error) {
 	subscription, err := c.BillingRepo.GetUserSubscription(userID)
 	if err != nil {
@@ -216,8 +214,6 @@ func (c *BillingController) VerifySubscription(
 	hasChangedProductID := currentSubscription.ProductID != newSubscription.ProductID
 	isOutdatedPurchase := !isUpgradingFromFreePlan && !hasChangedProductID && newSubscriptionExpiresSooner
 	if isOutdatedPurchase {
-		// User is reporting an outdated purchase that was already verified
-		// no-op
 		log.Info("Outdated purchase reported")
 		return currentSubscription, nil
 	}
@@ -367,7 +363,6 @@ func (c *BillingController) HandleAccountDeletion(ctx context.Context, userID in
 		if err != nil {
 			return false, stacktrace.Propagate(err, "")
 		}
-		// on customer deletion, subscription is automatically cancelled
 		isCancelled = true
 	} else if subscription.PaymentProvider == ente.AppStore || subscription.PaymentProvider == ente.PlayStore {
 		logger.Info("Updating originalTransactionID for app/playStore provider")
@@ -430,8 +425,7 @@ func (c *BillingController) getPlanForCountry(s ente.Subscription, countryCode s
 		return ente.BillingPlan{Period: ente.PeriodYear}, nil
 	}
 
-	// If request has a different `countryCode` because the user is traveling, and we're unable to find a plan for that country,
-	// fallback to the previous logic for finding a plan.
+	// The request country may differ from the subscription country while traveling.
 	plan, _, err := c.getPlanWithCountry(s)
 	if err != nil {
 		return ente.BillingPlan{}, stacktrace.Propagate(err, "")

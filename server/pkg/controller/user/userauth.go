@@ -133,7 +133,6 @@ func (c *UserController) SendEmailOTT(context *gin.Context, email string, purpos
 	if err != nil {
 		return stacktrace.Propagate(err, "")
 	}
-	// for hard-coded ott, adding  same OTT in db can throw error
 	hasHardcodedOTT := false
 	if purpose != ente.ChangeEmailOTTPurpose {
 		hardCodedOTT := hardcodedOTTForEmail(c.HardCodedOTT, email)
@@ -145,8 +144,8 @@ func (c *UserController) SendEmailOTT(context *gin.Context, email string, purpos
 	}
 
 	err = c.UserAuthRepo.AddOTT(emailHash, app, ott, time.Microseconds()+OTTValidityDurationInMicroSeconds)
+	// Reused hard-coded OTTs may violate the database uniqueness check.
 	if !hasHardcodedOTT {
-		// ignore error for AddOTT for hardcode OTT. This is to avoid error when unique OTT check fails at db layer
 		if err != nil {
 			return stacktrace.Propagate(err, "")
 		}
@@ -199,7 +198,6 @@ func (c *UserController) validateSendOTT(ctx *gin.Context, email string, purpose
 			disclosureErr = stacktrace.Propagate(ente.ErrUserSignupIncomplete, "user has not completed sign up process")
 		}
 	}
-	// If there is no state-disclosing error, allow the OTT request.
 	if disclosureErr == nil {
 		return true, nil
 	}
@@ -228,8 +226,7 @@ func (c *UserController) shouldSwallowSendOTTDisclosureError(ctx *gin.Context) b
 	return true
 }
 
-// getSignUpState returns the signup state for an email.
-// Signup is complete only when both email and key attributes exist.
+// Signup requires both an account row and key attributes.
 func (c *UserController) getSignUpState(email string) (signUpState, error) {
 	userID, err := c.UserRepo.GetUserIDWithEmailUnrestricted(email)
 	if err != nil && errors.Is(err, sql.ErrNoRows) {

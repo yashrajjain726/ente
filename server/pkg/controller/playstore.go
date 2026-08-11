@@ -44,9 +44,7 @@ func NewPlayStoreController(
 	if err != nil {
 		log.Fatal(err)
 	}
-	// We don't do nil checks for playStoreClient in the definitions of these
-	// methods - if they're getting called, that means we're not in a test
-	// environment and so playStoreClient really should've been there.
+	// Callers assume the client is configured outside local and test environments.
 
 	return &PlayStoreController{
 		PlayStoreClient:        playStoreClient,
@@ -65,7 +63,6 @@ func newPlayStoreClient() (*playstore.Client, error) {
 		return nil, stacktrace.Propagate(err, "")
 	}
 	if playStoreCredentialsFile == "" {
-		// Can happen when running locally
 		return nil, nil
 	}
 
