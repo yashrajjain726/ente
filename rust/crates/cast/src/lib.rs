@@ -26,6 +26,12 @@ pub struct CastPayload {
     pub collection_key: String,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PreparedCastPayload {
+    pub cast_token: String,
+    pub encrypted_payload: String,
+}
+
 pub struct ReceiverCredentials {
     secret_key: SecretKey,
 }
@@ -49,7 +55,30 @@ impl ReceiverCredentials {
     }
 }
 
-pub fn seal_payload(public_key: &str, payload: &CastPayload) -> Result<String> {
+pub fn prepare_payload(
+    public_key: &str,
+    collection_id: i64,
+    collection_key: &str,
+) -> Result<PreparedCastPayload> {
+    let cast_token = format!(
+        "cast_{}",
+        b64::encode_url_safe_no_padding(&crypto::random_bytes(16))
+    );
+    let encrypted_payload = seal_payload(
+        public_key,
+        &CastPayload {
+            collection_id,
+            cast_token: cast_token.clone(),
+            collection_key: collection_key.to_owned(),
+        },
+    )?;
+    Ok(PreparedCastPayload {
+        cast_token,
+        encrypted_payload,
+    })
+}
+
+fn seal_payload(public_key: &str, payload: &CastPayload) -> Result<String> {
     let public_key = PublicKey::try_from_slice(&b64::decode(public_key)?)?;
     let plaintext = serde_json::to_vec(payload)?;
     Ok(b64::encode(&crypto::sealed::seal(&plaintext, &public_key)?))
@@ -70,8 +99,19 @@ mod tests {
     #[test]
     fn round_trip() {
         let receiver = ReceiverCredentials::generate();
-        let encrypted = seal_payload(&receiver.public_key(), &payload()).unwrap();
-        assert_eq!(receiver.open_payload(&encrypted).unwrap(), payload());
+        let prepared = prepare_payload(
+            &receiver.public_key(),
+            payload().collection_id,
+            &payload().collection_key,
+        )
+        .unwrap();
+        assert_eq!(
+            receiver.open_payload(&prepared.encrypted_payload).unwrap(),
+            CastPayload {
+                cast_token: prepared.cast_token,
+                ..payload()
+            }
+        );
     }
 
     #[test]
@@ -99,10 +139,21 @@ mod tests {
 
     #[test]
     fn rejects_invalid_inputs() {
-        assert!(seal_payload("not base64", &payload()).is_err());
+        assert!(prepare_payload("not base64", 42, "collection_key").is_err());
 
         let receiver = ReceiverCredentials::generate();
         assert!(receiver.open_payload("not base64").is_err());
         assert!(receiver.open_payload(&b64::encode(&[0; 48])).is_err());
+    }
+
+    #[test]
+    fn generates_cast_token() {
+        let receiver = ReceiverCredentials::generate();
+        let first = prepare_payload(&receiver.public_key(), 42, "collection_key").unwrap();
+        let second = prepare_payload(&receiver.public_key(), 42, "collection_key").unwrap();
+
+        assert_eq!(first.cast_token.len(), 27);
+        assert!(first.cast_token.starts_with("cast_"));
+        assert_ne!(first.cast_token, second.cast_token);
     }
 }

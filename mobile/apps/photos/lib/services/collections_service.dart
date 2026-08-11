@@ -821,15 +821,13 @@ class CollectionsService {
     unawaited(_db.insert([updatedCollection]));
   }
 
-  String getCastData(
-    String castToken,
+  PreparedCastPayload prepareCastPayloadForCollection(
     Collection collection,
     String publicKey,
   ) {
-    return sealCastPayload(
+    return prepareCastPayload(
       publicKey: publicKey,
       collectionId: collection.id,
-      castToken: castToken,
       collectionKey: CryptoUtil.bin2base64(getCollectionKey(collection.id)),
     );
   }

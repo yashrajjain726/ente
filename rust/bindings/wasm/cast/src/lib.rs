@@ -63,19 +63,35 @@ impl CastPayload {
     }
 }
 
-#[wasm_bindgen(js_name = sealPayload)]
-pub fn seal_payload(
+#[wasm_bindgen]
+pub struct PreparedCastPayload {
+    inner: ente_cast::PreparedCastPayload,
+}
+
+impl From<ente_cast::PreparedCastPayload> for PreparedCastPayload {
+    fn from(inner: ente_cast::PreparedCastPayload) -> Self {
+        Self { inner }
+    }
+}
+
+#[wasm_bindgen]
+impl PreparedCastPayload {
+    #[wasm_bindgen(getter, js_name = castToken)]
+    pub fn cast_token(&self) -> String {
+        self.inner.cast_token.clone()
+    }
+
+    #[wasm_bindgen(getter, js_name = encryptedPayload)]
+    pub fn encrypted_payload(&self) -> String {
+        self.inner.encrypted_payload.clone()
+    }
+}
+
+#[wasm_bindgen(js_name = preparePayload)]
+pub fn prepare_payload(
     public_key: &str,
     collection_id: i64,
-    cast_token: String,
-    collection_key: String,
-) -> Result<String, JsError> {
-    Ok(ente_cast::seal_payload(
-        public_key,
-        &ente_cast::CastPayload {
-            collection_id,
-            cast_token,
-            collection_key,
-        },
-    )?)
+    collection_key: &str,
+) -> Result<PreparedCastPayload, JsError> {
+    Ok(ente_cast::prepare_payload(public_key, collection_id, collection_key)?.into())
 }

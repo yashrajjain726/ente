@@ -1,5 +1,4 @@
 import { authenticatedRequestHeaders, ensureOk } from "ente-base/http";
-import { newID } from "ente-base/id";
 import { apiURL } from "ente-base/origins";
 import type { Collection } from "ente-media/collection";
 import { z } from "zod";
@@ -32,13 +31,10 @@ export const publishCastPayload = async (
     const publicKey = await publicKeyForPairingCode(deviceCode);
     if (!publicKey) throw new Error(unknownDeviceCodeErrorMessage);
 
-    const castToken = newID("cast_");
-
-    const { sealPayload } = await import("ente-cast-wasm");
-    const encryptedPayload = sealPayload(
+    const { preparePayload } = await import("ente-cast-wasm");
+    const { castToken, encryptedPayload } = preparePayload(
         publicKey,
         BigInt(collection.id),
-        castToken,
         collection.key,
     );
     const res = await fetch(await apiURL("/cast/cast-data"), {
