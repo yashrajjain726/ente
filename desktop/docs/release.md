@@ -18,7 +18,7 @@ Nightly and RC builds go to [ente/nightly](https://github.com/ente/nightly) like
 
 ## In-app "What's new"
 
-Separate from the GitHub and help-site notes: for a release with user-facing changes, update [WhatsNew.tsx](../../web/packages/new/photos/components/WhatsNew.tsx) and bump `changelogVersion` in [changelog.ts](../../web/packages/new/photos/services/changelog.ts) on `main` before cutting the RC.
+Separate from the GitHub and help-site notes: for a release with user-facing changes, update [WhatsNew.tsx](../../web/apps/photos/src/components/WhatsNew.tsx) and bump `changelogVersion` in [changelog.ts](../../web/apps/photos/src/services/changelog.ts) on `main` before cutting the RC.
 
 The dialog shows once when the installed `changelogVersion` is newer than the one the user last saw.
 
