@@ -142,7 +142,17 @@ If you have multiple empty albums cluttering your album list, you can bulk delet
 3. Tap the button
 4. Confirm the deletion
 
-This will delete all empty albums from your library. The feature only appears after your initial sync is complete and when you have more than 2 empty albums.
+On mobile, this feature appears after the initial sync is complete and when you have more than 2 empty albums.
+
+**On web / desktop:**
+
+1. Open **All Albums**
+2. Select the **Empty** filter
+3. Make sure the album search field is empty
+4. Click **Delete empty albums** at the bottom of the dialog
+5. Confirm the deletion
+
+The **Empty** filter appears when you have at least 3 eligible empty albums. Only empty albums that you own and that are not shared or archived are deleted.
 
 ## Uploading nested folders from desktop {#preserving-folder-structure}
 
