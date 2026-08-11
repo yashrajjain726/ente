@@ -36,7 +36,8 @@ class WindowListenerService with WindowListener, TrayListener {
     // but must not reroute window behavior until restart, since the
     // startup-only window setup (title bar, size, activation policy) only
     // runs for the mode active at launch.
-    _launchMenubarMode = Platform.isMacOS &&
+    _launchMenubarMode =
+        Platform.isMacOS &&
         (_preferences.getBool(PreferenceService.kMenubarMode) ?? false);
     if (_isListening) return;
     windowManager.addListener(this);
@@ -138,17 +139,16 @@ class WindowListenerService with WindowListener, TrayListener {
     final anchor = cursor ?? tray?.center;
     if (anchor != null) {
       final displayBounds = _nearestDisplayBounds(anchor, displays);
-      final trayOnSameDisplay = tray != null &&
+      final trayOnSameDisplay =
+          tray != null &&
           displayBounds != null &&
           _nearestDisplayBounds(tray.center, displays) == displayBounds;
       double x = (trayOnSameDisplay ? tray.center.dx : anchor.dx) - w / 2;
-      final double y =
-          trayOnSameDisplay ? tray.bottom + 4 : (displayBounds?.top ?? 0) + 4;
+      final double y = trayOnSameDisplay
+          ? tray.bottom + 4
+          : (displayBounds?.top ?? 0) + 4;
       if (displayBounds != null) {
-        x = x.clamp(
-          displayBounds.left + 8.0,
-          displayBounds.right - w - 8.0,
-        );
+        x = x.clamp(displayBounds.left + 8.0, displayBounds.right - w - 8.0);
       }
       await windowManager.setBounds(Rect.fromLTWH(x, y, w, h));
     }
@@ -182,8 +182,12 @@ class WindowListenerService with WindowListener, TrayListener {
       final position = display.visiblePosition;
       final size = display.visibleSize ?? display.size;
       if (position == null) continue;
-      final bounds =
-          Rect.fromLTWH(position.dx, position.dy, size.width, size.height);
+      final bounds = Rect.fromLTWH(
+        position.dx,
+        position.dy,
+        size.width,
+        size.height,
+      );
       final dx = point.dx < bounds.left
           ? bounds.left - point.dx
           : (point.dx > bounds.right ? point.dx - bounds.right : 0.0);
@@ -216,8 +220,7 @@ class WindowListenerService with WindowListener, TrayListener {
     // only hide when focus actually moved to another app.
     Future.delayed(const Duration(milliseconds: 150), () async {
       if (_isQuitting) return;
-      if (WidgetsBinding.instance.lifecycleState ==
-          AppLifecycleState.resumed) {
+      if (WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed) {
         return;
       }
       await _hideWindow();
@@ -277,7 +280,9 @@ class WindowListenerService with WindowListener, TrayListener {
     );
     await windowManager.setTitleBarStyle(TitleBarStyle.normal);
     await windowManager.setMinimumSize(const Size(200, 400));
-    await windowManager.setMaximumSize(const Size(maxWindowWidth, maxWindowHeight));
+    await windowManager.setMaximumSize(
+      const Size(maxWindowWidth, maxWindowHeight),
+    );
     await windowManager.setResizable(true);
     await windowManager.setSize(_savedWindowSize());
     await windowManager.center();
