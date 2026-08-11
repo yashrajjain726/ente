@@ -1,7 +1,6 @@
 import "dart:async";
 import "dart:io";
 
-import "package:ente_strings/ente_strings.dart";
 import "package:flutter/gestures.dart";
 import "package:flutter/material.dart";
 import "package:flutter/rendering.dart";
@@ -860,7 +859,6 @@ class _InlineTextDetectionState extends State<InlineTextDetection> {
     double uiScale = 1.0,
     Offset uiOffset = Offset.zero,
   }) {
-    final l10n = context.strings;
     return ListenableBuilder(
       listenable: _detectorController,
       builder: (context, child) {
@@ -887,15 +885,6 @@ class _InlineTextDetectionState extends State<InlineTextDetection> {
         isImageZoomed: isZoomed,
         uiScale: uiScale,
         uiOffset: uiOffset,
-        strings: TextDetectorStrings(
-          noTextDetected: l10n.ocrNoTextDetected,
-          retryButtonLabel: l10n.retry,
-          modelsNetworkRequiredError: l10n.ocrModelsNetworkRequiredError,
-          modelsPrepareFailed: l10n.ocrModelsPrepareFailed,
-          imageNotFoundError: l10n.ocrImageNotFoundError,
-          imageDecodeFailedError: l10n.ocrImageDecodeFailedError,
-          genericDetectError: l10n.ocrGenericDetectError,
-        ),
         onTextCopied: () {
           HapticFeedback.lightImpact();
         },

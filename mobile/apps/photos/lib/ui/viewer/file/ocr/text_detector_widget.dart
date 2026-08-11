@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:ente_strings/ente_strings.dart';
 import 'package:flutter/material.dart';
 import 'package:mobile_ocr/mobile_ocr.dart'
     show DisplayImageHelper, MobileOcr, TextBlock;
@@ -9,27 +10,6 @@ import 'package:photos/theme/ente_theme.dart';
 import 'package:photos/ui/viewer/file/ocr/text_overlay_widget.dart';
 
 const double _enteSelectionHighlightOpacity = 0.28;
-
-/// Collection of user-facing strings used by [TextDetectorWidget].
-class TextDetectorStrings {
-  final String noTextDetected;
-  final String retryButtonLabel;
-  final String modelsNetworkRequiredError;
-  final String modelsPrepareFailed;
-  final String imageNotFoundError;
-  final String imageDecodeFailedError;
-  final String genericDetectError;
-
-  const TextDetectorStrings({
-    required this.noTextDetected,
-    required this.retryButtonLabel,
-    required this.modelsNetworkRequiredError,
-    required this.modelsPrepareFailed,
-    required this.imageNotFoundError,
-    required this.imageDecodeFailedError,
-    required this.genericDetectError,
-  });
-}
 
 /// Controller that surfaces imperative actions for [TextDetectorWidget].
 class TextDetectorController extends ChangeNotifier {
@@ -93,7 +73,6 @@ class TextDetectorController extends ChangeNotifier {
 class TextDetectorWidget extends StatefulWidget {
   final String imagePath;
   final VoidCallback? onTextCopied;
-  final TextDetectorStrings strings;
   final TextDetectorController controller;
   final Offset? initialInteractionPosition;
   final bool isImageZoomed;
@@ -103,7 +82,6 @@ class TextDetectorWidget extends StatefulWidget {
   const TextDetectorWidget({
     super.key,
     required this.imagePath,
-    required this.strings,
     required this.controller,
     required this.isImageZoomed,
     required this.uiScale,
@@ -197,7 +175,7 @@ class _TextDetectorWidgetState extends State<TextDetectorWidget> {
       }
       setState(() {
         _resolvedImagePath = null;
-        _errorMessage = widget.strings.imageDecodeFailedError;
+        _errorMessage = context.strings.ocrImageDecodeFailedError;
         _isProcessing = false;
       });
     }
@@ -214,6 +192,8 @@ class _TextDetectorWidgetState extends State<TextDetectorWidget> {
   Future<void> _ensureModelsReady() async {
     if (_modelsReady) return;
 
+    // Captured before the async gap; the callback may run after dispose.
+    final strings = context.strings;
     _modelPreparation ??= _ocr
         .prepareModels()
         .then((status) {
@@ -229,9 +209,9 @@ class _TextDetectorWidgetState extends State<TextDetectorWidget> {
               errorStr.contains('http');
 
           if (_isNetworkError) {
-            _errorMessage = widget.strings.modelsNetworkRequiredError;
+            _errorMessage = strings.ocrModelsNetworkRequiredError;
           } else {
-            _errorMessage = widget.strings.modelsPrepareFailed;
+            _errorMessage = strings.ocrModelsPrepareFailed;
           }
           debugPrint('Model preparation error: $error');
         })
@@ -257,7 +237,7 @@ class _TextDetectorWidgetState extends State<TextDetectorWidget> {
     }
     if (imagePath == null) {
       setState(() {
-        _errorMessage = widget.strings.imageDecodeFailedError;
+        _errorMessage = context.strings.ocrImageDecodeFailedError;
         _isProcessing = false;
       });
       _notifyController();
@@ -316,11 +296,11 @@ class _TextDetectorWidgetState extends State<TextDetectorWidget> {
           if (errorStr.contains('image') &&
               errorStr.contains('not') &&
               errorStr.contains('exist')) {
-            _errorMessage = widget.strings.imageNotFoundError;
+            _errorMessage = context.strings.ocrImageNotFoundError;
           } else if (errorStr.contains('failed to decode')) {
-            _errorMessage = widget.strings.imageDecodeFailedError;
+            _errorMessage = context.strings.ocrImageDecodeFailedError;
           } else {
-            _errorMessage = widget.strings.genericDetectError;
+            _errorMessage = context.strings.ocrGenericDetectError;
           }
         });
         _notifyController();
@@ -477,7 +457,7 @@ class _TextDetectorWidgetState extends State<TextDetectorWidget> {
               unawaited(_detectText());
             },
             icon: const Icon(Icons.refresh, size: 18),
-            label: Text(widget.strings.retryButtonLabel),
+            label: Text(context.strings.retry),
             style: OutlinedButton.styleFrom(
               foregroundColor: cautionColor,
               side: BorderSide(color: cautionColor),
@@ -506,7 +486,7 @@ class _TextDetectorWidgetState extends State<TextDetectorWidget> {
           ),
           const SizedBox(width: 8),
           Text(
-            widget.strings.noTextDetected,
+            context.strings.ocrNoTextDetected,
             style: getEnteTextTheme(
               context,
             ).small.copyWith(color: textBaseDark.withValues(alpha: 0.8)),
