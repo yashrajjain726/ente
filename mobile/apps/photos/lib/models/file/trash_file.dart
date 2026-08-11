@@ -8,7 +8,7 @@ class TrashFile extends EnteFile {
     required this.createdAt,
     required this.updateAt,
     required this.deleteBy,
-    required this.isSystemOnly,
+    required this.isDeviceOnly,
   }) : super.from();
 
   // time when file was put in the trash for first time
@@ -22,7 +22,7 @@ class TrashFile extends EnteFile {
   // will go down
   late int deleteBy;
 
-  // This object represents the file in the device's system trash. The same file
+  // This object represents the file in the device trash. The same file
   // may also have a separate entry in Ente's trash.
-  bool isSystemOnly = false;
+  bool isDeviceOnly = false;
 }

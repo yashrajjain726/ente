@@ -78,9 +78,9 @@ Future<File?> _getLocalDiskFile(
   bool liveVideo = false,
   bool isOrigin = false,
 }) async {
-  // Return null because reading a system trash file by its file system path
+  // Return null because reading a device trash file by its file system path
   // fails with a permission-denied error.
-  if (file.isSystemOnlyTrashFile) {
+  if (file.isDeviceOnlyTrashFile) {
     return null;
   }
 

@@ -44,7 +44,7 @@ extension FilePropsExtn on EnteFile {
 
   bool get isTrashFile => this is TrashFile;
 
-  bool get isSystemOnlyTrashFile => asTrashFile?.isSystemOnly ?? false;
+  bool get isDeviceOnlyTrashFile => asTrashFile?.isDeviceOnly ?? false;
 
   TrashFile? get asTrashFile => (this is TrashFile) ? this as TrashFile : null;
 

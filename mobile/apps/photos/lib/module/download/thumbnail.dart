@@ -206,7 +206,7 @@ Future<Uint8List?> getThumbnailFromLocal(
   } else {
     return file.getAsset.then((asset) async {
       if (asset == null ||
-          !(await asset.exists || file.isSystemOnlyTrashFile)) {
+          !(await asset.exists || file.isDeviceOnlyTrashFile)) {
         return null;
       }
       return asset
