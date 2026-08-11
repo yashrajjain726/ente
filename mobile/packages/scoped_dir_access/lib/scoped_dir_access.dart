@@ -140,7 +140,7 @@ class DirUtils {
   Future<PickedDirectory?> _pickDirectoryMacOS() async {
     try {
       // Use file_picker to pick the directory
-      final path = await FilePicker.platform.getDirectoryPath();
+      final path = await FilePicker.getDirectoryPath();
       if (path == null) return null;
 
       // Create a security-scoped bookmark from the picked path
@@ -173,7 +173,7 @@ class DirUtils {
 
   Future<PickedDirectory?> _pickDirectoryOther() async {
     try {
-      final path = await FilePicker.platform.getDirectoryPath();
+      final path = await FilePicker.getDirectoryPath();
       if (path == null) return null;
 
       return PickedDirectory(path: path);

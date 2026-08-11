@@ -153,7 +153,7 @@ Future<GalleryImportResult?> pickCodeFromImage(
 
   try {
     if (!context.mounted) return null;
-    final FilePickerResult? result = await FilePicker.platform.pickFiles(
+    final FilePickerResult? result = await FilePicker.pickFiles(
       type: pickFromFiles ? FileType.custom : FileType.image,
       allowedExtensions: pickFromFiles
           ? const ['png', 'jpg', 'jpeg', 'webp', 'heic']
