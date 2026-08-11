@@ -124,7 +124,7 @@ class _TextOverlayWidgetState extends State<TextOverlayWidget> {
     unicode: true,
   );
 
-  final GlobalKey _interactiveViewerKey = GlobalKey();
+  final GlobalKey _overlayCoordinateKey = GlobalKey();
 
   Size? _displaySize;
   Offset? _displayOffset;
@@ -195,7 +195,7 @@ class _TextOverlayWidgetState extends State<TextOverlayWidget> {
         // are consistent. Text boundaries are in IgnorePointer; selection
         // handles and copy button are outside it so they can be touched.
         final Widget visualLayer = KeyedSubtree(
-          key: _interactiveViewerKey,
+          key: _overlayCoordinateKey,
           child: Stack(
             clipBehavior: Clip.none,
             children: [
@@ -263,7 +263,7 @@ class _TextOverlayWidgetState extends State<TextOverlayWidget> {
 
   Offset? _sceneFromGlobal(Offset globalPoint) {
     final renderBox =
-        _interactiveViewerKey.currentContext?.findRenderObject() as RenderBox?;
+        _overlayCoordinateKey.currentContext?.findRenderObject() as RenderBox?;
     if (renderBox == null || !renderBox.hasSize) {
       return null;
     }
@@ -2489,9 +2489,6 @@ class _EditableBlockPainter extends CustomPainter {
   }
 }
 
-/// A [LongPressGestureRecognizer] that only accepts when the press
-/// position is on a text region. If not on text, it rejects so that
-/// competing recognizers (e.g. motion photo playback) can win.
 /// A [SingleChildRenderObjectWidget] whose render object only reports a hit
 /// when the touch position passes the provided [hitTest] callback. This lets
 /// the overlay be invisible to Flutter's hit-test tree for most of the screen
@@ -2530,6 +2527,9 @@ class _RenderTextRegionHitTestBox extends RenderProxyBox {
   }
 }
 
+/// A [LongPressGestureRecognizer] that only accepts when the press
+/// position is on a text region. If not on text, it rejects so that
+/// competing recognizers (e.g. motion photo playback) can win.
 class _TextRegionLongPressRecognizer extends LongPressGestureRecognizer {
   bool Function(Offset globalPosition) hitTestBlock;
 

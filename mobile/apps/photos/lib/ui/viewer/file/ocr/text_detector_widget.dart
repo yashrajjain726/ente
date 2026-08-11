@@ -277,7 +277,8 @@ class _TextDetectorWidgetState extends State<TextDetectorWidget> {
     try {
       await _ensureModelsReady();
       if (_errorMessage != null) {
-        throw Exception(_errorMessage);
+        // Model-prep error; the finally block rebuilds to show the banner.
+        return;
       }
 
       if (!mounted || widget.imagePath != requestedPath) {
