@@ -22,6 +22,7 @@ class TrashFile extends EnteFile {
   // will go down
   late int deleteBy;
 
-  // This file is not present in Ente's trash because it was never uploaded.
+  // This object represents the file in the device's system trash. The same file
+  // may also have a separate entry in Ente's trash.
   bool isSystemOnly = false;
 }
