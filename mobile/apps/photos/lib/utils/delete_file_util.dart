@@ -17,7 +17,6 @@ import "package:photos/events/force_reload_trash_page_event.dart";
 import 'package:photos/events/local_photos_updated_event.dart';
 import 'package:photos/gateways/trash/models/trash_item_request.dart';
 import "package:photos/models/button_result.dart";
-import "package:photos/models/file/extensions/file_props.dart";
 import 'package:photos/models/file/file.dart';
 import "package:photos/models/file/trash_file.dart";
 import "package:photos/models/files_split.dart";
@@ -1390,18 +1389,18 @@ Future<void> permanentlyDeleteFromSystemTrash(
 
 Future<void> _deleteFromSystemTrash(SelectedFiles selectedFiles) async {
   final fileIDs = selectedFiles.files
-      .map((f) => f.asTrashFile!.systemTrashID!.toString())
+      .map((f) => f.localID!)
       .toList();
-  final deletedIDs = <int>{};
+  final deletedIDs = <String>{};
   try {
     for (final batch in fileIDs.chunks(batchSize)) {
       final result = await PhotoManager.editor.deleteWithIds(batch);
-      deletedIDs.addAll(result.map(int.parse));
+      deletedIDs.addAll(result);
     }
   } finally {
     if (deletedIDs.isNotEmpty) {
       final deletedFiles = selectedFiles.files.where(
-        (f) => deletedIDs.contains(f.asTrashFile!.systemTrashID!),
+        (f) => deletedIDs.contains(f.localID),
       );
       selectedFiles.unSelectAll(deletedFiles.toSet());
       Bus.instance.fire(ForceReloadTrashPageEvent());

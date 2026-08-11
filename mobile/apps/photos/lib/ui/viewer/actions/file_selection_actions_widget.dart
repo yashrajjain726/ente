@@ -1309,16 +1309,16 @@ class _FileSelectionActionsWidgetState
 
 Future<void> _restoreFilesFromSystemTrash(SelectedFiles selectedFiles) async {
   final files = selectedFiles.files.map(trashFileToAssetEntity).toList();
-  final restoredIDs = <int>{};
+  final restoredIDs = <String>{};
   try {
     for (final batch in files.chunks(batchSize)) {
       final result = await PhotoManager.editor.android.restoreFromTrash(batch);
-      restoredIDs.addAll(result.map(int.parse));
+      restoredIDs.addAll(result);
     }
   } finally {
     if (restoredIDs.isNotEmpty) {
       final restoredFiles = selectedFiles.files.where(
-        (f) => restoredIDs.contains(f.asTrashFile!.systemTrashID!),
+        (f) => restoredIDs.contains(f.localID),
       );
       selectedFiles.unSelectAll(restoredFiles.toSet());
       Bus.instance.fire(ForceReloadTrashPageEvent());

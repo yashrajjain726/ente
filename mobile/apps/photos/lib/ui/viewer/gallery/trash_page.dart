@@ -173,7 +173,6 @@ class _TrashPageState extends State<_TrashPage> {
           updateAt: trash.deleteBy - const Duration(days: 30).inMicroseconds,
           deleteBy: trash.deleteBy,
           isSystemOnly: true,
-          systemTrashID: trash.localID,
         ),
       );
     }
