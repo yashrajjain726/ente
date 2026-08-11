@@ -158,6 +158,10 @@ func (c *ReplicationController3) createDestinations() {
 	// > The Uploader structure that calls Upload(). It is safe to call Upload()
 	//   on this structure for multiple objects and across concurrent goroutines.
 	//   Mutating the Uploader's properties is not safe to be done concurrently.
+	// Scaleway limits multipart uploads to 1,000 parts.
+	limitUploadParts := func(u *s3manager.Uploader) {
+		u.MaxUploadParts = 1000
+	}
 
 	config := c.S3Config
 
@@ -171,7 +175,7 @@ func (c *ReplicationController3) createDestinations() {
 	c.wasabiDest = &UploadDestination{
 		DC:                wasabiDC,
 		Client:            &wasabiClient,
-		Uploader:          s3manager.NewUploaderWithClient(&wasabiClient),
+		Uploader:          s3manager.NewUploaderWithClient(&wasabiClient, limitUploadParts),
 		Bucket:            config.GetBucket(wasabiDC),
 		Label:             "wasabi",
 		HasComplianceHold: config.WasabiComplianceDC() == wasabiDC,
@@ -182,7 +186,7 @@ func (c *ReplicationController3) createDestinations() {
 	c.scwDest = &UploadDestination{
 		DC:       scwDC,
 		Client:   &scwClient,
-		Uploader: s3manager.NewUploaderWithClient(&scwClient),
+		Uploader: s3manager.NewUploaderWithClient(&scwClient, limitUploadParts),
 		Bucket:   config.GetBucket(scwDC),
 		Label:    "scaleway",
 		// should be true, except when running in a local cluster (since minio doesn't
