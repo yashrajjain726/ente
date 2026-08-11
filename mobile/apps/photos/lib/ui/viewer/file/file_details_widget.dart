@@ -103,7 +103,7 @@ class _FileDetailsWidgetState extends State<FileDetailsWidget> {
       }
     });
 
-    if (!widget.file.isSystemOnlyTrashFile) {
+    if (!widget.file.isDeviceOnlyTrashFile) {
       if (_isImage) {
         _exifNotifier.addListener(() {
           if (_exifNotifier.value != null) {
@@ -231,7 +231,7 @@ class _FileDetailsWidgetState extends State<FileDetailsWidget> {
       ]);
     }
 
-    if (_isImage && !file.isSystemOnlyTrashFile) {
+    if (_isImage && !file.isDeviceOnlyTrashFile) {
       fileDetailsTiles.addAll([
         MenuGroupComponent(
           items: [
@@ -260,7 +260,7 @@ class _FileDetailsWidgetState extends State<FileDetailsWidget> {
             _exifData,
             _currentUserID,
           ),
-        if (flagService.internalUser && !file.isSystemOnlyTrashFile)
+        if (flagService.internalUser && !file.isDeviceOnlyTrashFile)
           ValueListenableBuilder(
             valueListenable: _videoMetadataNotifier,
             builder: (context, value, _) => VideoExifRowItem(file, value),

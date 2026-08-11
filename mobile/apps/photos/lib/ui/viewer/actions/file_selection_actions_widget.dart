@@ -1092,11 +1092,11 @@ class _FileSelectionActionsWidgetState
   }
 
   void _restore() {
-    final isSystemOnly = widget.selectedFiles.files.every(
-      (f) => f.isSystemOnlyTrashFile,
+    final isDeviceOnly = widget.selectedFiles.files.every(
+      (f) => f.isDeviceOnlyTrashFile,
     );
-    if (isSystemOnly) {
-      _restoreFilesFromSystemTrash(widget.selectedFiles).onError((e, s) {
+    if (isDeviceOnly) {
+      _restoreFilesFromDeviceTrash(widget.selectedFiles).onError((e, s) {
         if (!mounted) return;
         showGenericErrorDialog(context: context, error: e).ignore();
       });
@@ -1110,11 +1110,11 @@ class _FileSelectionActionsWidgetState
   }
 
   Future<void> _permanentlyDeleteFromTrash() async {
-    final isSystemOnly = widget.selectedFiles.files.every(
-      (f) => f.isSystemOnlyTrashFile,
+    final isDeviceOnly = widget.selectedFiles.files.every(
+      (f) => f.isDeviceOnlyTrashFile,
     );
-    if (isSystemOnly) {
-      await permanentlyDeleteFromSystemTrash(context, widget.selectedFiles);
+    if (isDeviceOnly) {
+      await permanentlyDeleteFromDeviceTrash(context, widget.selectedFiles);
       return;
     }
     if (await deleteFromEnteTrash(
@@ -1307,7 +1307,7 @@ class _FileSelectionActionsWidgetState
   }
 }
 
-Future<void> _restoreFilesFromSystemTrash(SelectedFiles selectedFiles) async {
+Future<void> _restoreFilesFromDeviceTrash(SelectedFiles selectedFiles) async {
   final files = selectedFiles.files.map(trashFileToAssetEntity).toList();
   final restoredIDs = <String>{};
   try {

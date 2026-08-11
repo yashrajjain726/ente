@@ -37,9 +37,9 @@ Future<void> showTrashPage(BuildContext context) async {
 }
 
 class _TrashPage extends StatefulWidget {
-  final bool _isSystemTrashSupported;
+  final bool _isDeviceTrashSupported;
 
-  const _TrashPage(this._isSystemTrashSupported);
+  const _TrashPage(this._isDeviceTrashSupported);
 
   @override
   State<_TrashPage> createState() => _TrashPageState();
@@ -52,7 +52,7 @@ class _TrashPageState extends State<_TrashPage> {
   @override
   Widget build(BuildContext context) {
     final l10n = context.strings;
-    final header = (isLocalGalleryMode || !widget._isSystemTrashSupported)
+    final header = (isLocalGalleryMode || !widget._isDeviceTrashSupported)
         ? null
         : Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -172,7 +172,7 @@ class _TrashPageState extends State<_TrashPage> {
           createdAt: trash.deleteBy - const Duration(days: 30).inMicroseconds,
           updateAt: trash.deleteBy - const Duration(days: 30).inMicroseconds,
           deleteBy: trash.deleteBy,
-          isSystemOnly: true,
+          isDeviceOnly: true,
         ),
       );
     }

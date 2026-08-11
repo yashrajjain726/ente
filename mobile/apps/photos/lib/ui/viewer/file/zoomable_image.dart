@@ -391,7 +391,7 @@ class _ZoomableImageState extends State<ZoomableImage> {
 
     if (!_loadingFinalImage &&
         !_loadedFinalImage &&
-        !_photo.isSystemOnlyTrashFile) {
+        !_photo.isDeviceOnlyTrashFile) {
       _loadingFinalImage = true;
       getFile(
         _photo,

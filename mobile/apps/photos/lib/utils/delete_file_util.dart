@@ -1355,13 +1355,13 @@ class _DeleteConfirmationSheetState extends State<_DeleteConfirmationSheet> {
   }
 }
 
-Future<void> permanentlyDeleteFromSystemTrash(
+Future<void> permanentlyDeleteFromDeviceTrash(
   BuildContext context,
   SelectedFiles selectedFiles,
 ) async {
   if (!await PhotoManager.canManageMedia()) {
     try {
-      await _deleteFromSystemTrash(selectedFiles);
+      await _deleteFromDeviceTrash(selectedFiles);
     } catch (e) {
       if (context.mounted) {
         await showGenericErrorDialog(context: context, error: e);
@@ -1372,7 +1372,7 @@ Future<void> permanentlyDeleteFromSystemTrash(
     final actionResult = await showBottomSheetComponent<ButtonResult>(
       context: context,
       builder: (_) => PermanentlyDeleteConfirmationSheet(
-        onDelete: () => _deleteFromSystemTrash(selectedFiles),
+        onDelete: () => _deleteFromDeviceTrash(selectedFiles),
       ),
     );
     if (actionResult?.action == ButtonAction.error && context.mounted) {
@@ -1387,7 +1387,7 @@ Future<void> permanentlyDeleteFromSystemTrash(
   }
 }
 
-Future<void> _deleteFromSystemTrash(SelectedFiles selectedFiles) async {
+Future<void> _deleteFromDeviceTrash(SelectedFiles selectedFiles) async {
   final fileIDs = selectedFiles.files.map((f) => f.localID!).toList();
   final deletedIDs = <String>{};
   try {

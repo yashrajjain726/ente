@@ -242,8 +242,8 @@ class FileBottomBarState extends State<FileBottomBar> {
           child: IconButton(
             icon: const Icon(CupertinoIcons.gobackward, color: Colors.white),
             onPressed: () {
-              if (widget.file.isSystemOnlyTrashFile) {
-                _restoreFromSystemTrash().onError((e, s) {
+              if (widget.file.isDeviceOnlyTrashFile) {
+                _restoreFromDeviceTrash().onError((e, s) {
                   if (!mounted) return;
                   showGenericErrorDialog(context: context, error: e).ignore();
                 });
@@ -276,7 +276,7 @@ class FileBottomBarState extends State<FileBottomBar> {
               if (widget.file.isDeviceTrash) {
                 final selectedFiles = SelectedFiles()
                   ..toggleSelection(widget.file);
-                await permanentlyDeleteFromSystemTrash(context, selectedFiles);
+                await permanentlyDeleteFromDeviceTrash(context, selectedFiles);
                 if (selectedFiles.files.isEmpty) {
                   await widget.onFileRemoved(widget.file);
                 }
@@ -328,7 +328,7 @@ class FileBottomBarState extends State<FileBottomBar> {
     );
   }
 
-  Future<void> _restoreFromSystemTrash() async {
+  Future<void> _restoreFromDeviceTrash() async {
     final asset = trashFileToAssetEntity(widget.file);
     final restoredIDs = await PhotoManager.editor.android.restoreFromTrash([
       asset,
