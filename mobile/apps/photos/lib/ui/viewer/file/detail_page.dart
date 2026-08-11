@@ -37,7 +37,7 @@ import "package:photos/ui/tools/editor/video_editor_page.dart";
 import "package:photos/ui/viewer/file/file_app_bar.dart";
 import "package:photos/ui/viewer/file/file_bottom_bar.dart";
 import 'package:photos/ui/viewer/file/file_widget.dart';
-import "package:photos/ui/viewer/file/inline_text_detection.dart";
+import "package:photos/ui/viewer/file/ocr/inline_text_detection.dart";
 import "package:photos/ui/viewer/file/panorama_viewer_screen.dart";
 import "package:photos/ui/viewer/file/qr_code_detection_helper.dart";
 import "package:photos/ui/viewer/file/qr_code_highlight_overlay.dart";

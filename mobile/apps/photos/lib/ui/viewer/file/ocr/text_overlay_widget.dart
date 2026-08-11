@@ -6,6 +6,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:mobile_ocr/mobile_ocr.dart' show CharacterBox, TextBlock;
+import 'package:photos/theme/colors.dart';
+import 'package:photos/theme/ente_theme.dart';
 import 'package:photos/ui/viewer/file/ocr/text_reading_order.dart';
 
 // OCR character boxes tend to overhang slightly on the left edge, so keep the
@@ -553,6 +555,9 @@ class _TextOverlayWidgetState extends State<TextOverlayWidget> {
     );
   }
 
+  TextStyle get _toolbarButtonTextStyle =>
+      getEnteTextTheme(context).small.copyWith(color: textBaseDark);
+
   Size _measureToolbarScreenSize(
     MaterialLocalizations localizations,
     TextStyle buttonTextStyle,
@@ -606,11 +611,7 @@ class _TextOverlayWidgetState extends State<TextOverlayWidget> {
     final MaterialLocalizations localizations = MaterialLocalizations.of(
       context,
     );
-    const TextStyle buttonTextStyle = TextStyle(
-      color: Colors.white,
-      fontSize: 14,
-      fontWeight: FontWeight.w500,
-    );
+    final TextStyle buttonTextStyle = _toolbarButtonTextStyle;
 
     final Size screenSize = _measureToolbarScreenSize(
       localizations,
@@ -856,11 +857,7 @@ class _TextOverlayWidgetState extends State<TextOverlayWidget> {
       context,
     );
 
-    const TextStyle buttonTextStyle = TextStyle(
-      color: Colors.white,
-      fontSize: 14,
-      fontWeight: FontWeight.w500,
-    );
+    final TextStyle buttonTextStyle = _toolbarButtonTextStyle;
 
     final Widget toolbar = Container(
       decoration: BoxDecoration(

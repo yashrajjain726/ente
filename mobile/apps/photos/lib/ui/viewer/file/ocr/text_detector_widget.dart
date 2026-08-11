@@ -4,9 +4,10 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:mobile_ocr/mobile_ocr.dart'
     show DisplayImageHelper, MobileOcr, TextBlock;
+import 'package:photos/theme/colors.dart';
+import 'package:photos/theme/ente_theme.dart';
 import 'package:photos/ui/viewer/file/ocr/text_overlay_widget.dart';
 
-const Color _entePrimaryColor = Color(0xFF1DB954);
 const double _enteSelectionHighlightOpacity = 0.28;
 
 /// Collection of user-facing strings used by [TextDetectorWidget].
@@ -393,12 +394,13 @@ class _TextDetectorWidgetState extends State<TextDetectorWidget> {
     final TextSelectionThemeData baseSelectionTheme = TextSelectionTheme.of(
       context,
     );
+    final Color primaryColor = getEnteColorScheme(context).primary500;
     final TextSelectionThemeData overlaySelectionTheme = baseSelectionTheme
         .copyWith(
-          selectionColor: _entePrimaryColor.withValues(
+          selectionColor: primaryColor.withValues(
             alpha: _enteSelectionHighlightOpacity,
           ),
-          selectionHandleColor: _entePrimaryColor,
+          selectionHandleColor: primaryColor,
         );
 
     return TextSelectionTheme(
@@ -419,34 +421,33 @@ class _TextDetectorWidgetState extends State<TextDetectorWidget> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
       decoration: BoxDecoration(
-        color: Colors.red.withValues(alpha: 0.9),
+        color: getEnteColorScheme(context).warning500.withValues(alpha: 0.9),
         borderRadius: BorderRadius.circular(16),
       ),
       child: Text(
         message,
         textAlign: TextAlign.center,
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 14,
-          fontWeight: FontWeight.w600,
-        ),
+        style: getEnteTextTheme(
+          context,
+        ).smallBold.copyWith(color: textBaseDark),
       ),
     );
   }
 
   Widget _buildNetworkErrorBanner(String message) {
+    final Color cautionColor = getEnteColorScheme(context).caution500;
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.black.withValues(alpha: 0.85),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: Colors.orange.withValues(alpha: 0.3),
+          color: cautionColor.withValues(alpha: 0.3),
           width: 1,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.orange.withValues(alpha: 0.2),
+            color: cautionColor.withValues(alpha: 0.2),
             blurRadius: 20,
             spreadRadius: 2,
           ),
@@ -455,21 +456,14 @@ class _TextDetectorWidgetState extends State<TextDetectorWidget> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            Icons.cloud_download_outlined,
-            color: Colors.orange.shade300,
-            size: 40,
-          ),
+          Icon(Icons.cloud_download_outlined, color: cautionColor, size: 40),
           const SizedBox(height: 12),
           Text(
             message,
             textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 15,
-              fontWeight: FontWeight.w500,
-              height: 1.4,
-            ),
+            style: getEnteTextTheme(
+              context,
+            ).small.copyWith(color: textBaseDark),
           ),
           const SizedBox(height: 16),
           OutlinedButton.icon(
@@ -485,8 +479,8 @@ class _TextDetectorWidgetState extends State<TextDetectorWidget> {
             icon: const Icon(Icons.refresh, size: 18),
             label: Text(widget.strings.retryButtonLabel),
             style: OutlinedButton.styleFrom(
-              foregroundColor: Colors.orange.shade300,
-              side: BorderSide(color: Colors.orange.shade300),
+              foregroundColor: cautionColor,
+              side: BorderSide(color: cautionColor),
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
             ),
           ),
@@ -507,17 +501,15 @@ class _TextDetectorWidgetState extends State<TextDetectorWidget> {
         children: [
           Icon(
             Icons.search_off,
-            color: Colors.white.withValues(alpha: 0.7),
+            color: textBaseDark.withValues(alpha: 0.7),
             size: 16,
           ),
           const SizedBox(width: 8),
           Text(
             widget.strings.noTextDetected,
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.8),
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-            ),
+            style: getEnteTextTheme(
+              context,
+            ).small.copyWith(color: textBaseDark.withValues(alpha: 0.8)),
           ),
         ],
       ),
