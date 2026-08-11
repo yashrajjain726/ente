@@ -1,4 +1,5 @@
 import "dart:async";
+import "dart:io";
 import "dart:typed_data";
 
 import "package:collection/collection.dart";
@@ -19,10 +20,13 @@ import "package:flutter/material.dart";
 import "package:flutter_svg/flutter_svg.dart";
 import "package:hugeicons/hugeicons.dart";
 import "package:intl/intl.dart";
+import "package:path_provider/path_provider.dart";
 import "package:share_plus/share_plus.dart";
 
 typedef LegacyKitAuthenticator =
     Future<bool> Function(BuildContext context, String reason);
+
+int _latestLegacyKitShareGeneration = 0;
 
 const _partNameStyle = TextStyle(
   fontFamily: TextStyles.outfitFontFamily,
@@ -373,13 +377,23 @@ class _ShareLegacyKitPageState extends State<ShareLegacyKitPage> {
       if (!mounted) {
         return;
       }
+      final fileName = "${_fileNameForPart(part)}.pdf";
       final size = MediaQuery.sizeOf(context);
       final ShareResult result;
+      Directory? temporaryDirectory;
+      Directory? shareDirectory;
+      int? shareGeneration;
       try {
+        temporaryDirectory = await getTemporaryDirectory();
+        shareDirectory = await temporaryDirectory.createTemp(
+          "ente_legacy_kit_share_",
+        );
+        final pdf = File("${shareDirectory.path}/$fileName");
+        await pdf.writeAsBytes(bytes, flush: true);
+        shareGeneration = ++_latestLegacyKitShareGeneration;
         result = await SharePlus.instance.share(
           ShareParams(
-            files: [XFile.fromData(bytes, mimeType: "application/pdf")],
-            fileNameOverrides: ["${_fileNameForPart(part)}.pdf"],
+            files: [XFile(pdf.path, mimeType: "application/pdf")],
             sharePositionOrigin: Offset.zero & size,
           ),
         );
@@ -388,6 +402,17 @@ class _ShareLegacyKitPageState extends State<ShareLegacyKitPage> {
           showShortToast(context, context.strings.somethingWentWrong);
         }
         return;
+      } finally {
+        if (temporaryDirectory != null && shareDirectory != null) {
+          unawaited(
+            _deleteSharedPdf(
+              shareDirectory,
+              // share_plus copies path-backed files here on Android.
+              File("${temporaryDirectory.path}/share_plus/$fileName"),
+              shareGeneration,
+            ),
+          );
+        }
       }
       if (result.status == ShareResultStatus.dismissed || !mounted) {
         return;
@@ -652,6 +677,28 @@ class _ShareLegacyKitPageState extends State<ShareLegacyKitPage> {
         .replaceAll(RegExp(r"^-+|-+$"), "");
     final name = sanitized.isEmpty ? "part-${part.index}" : sanitized;
     return "ente-legacy-kit-$name";
+  }
+}
+
+Future<void> _deleteSharedPdf(
+  Directory shareDirectory,
+  File sharePlusCopy,
+  int? shareGeneration,
+) async {
+  await Future<void>.delayed(const Duration(minutes: 5));
+  for (final entity in <FileSystemEntity>[
+    shareDirectory,
+    if (shareGeneration != null &&
+        shareGeneration == _latestLegacyKitShareGeneration)
+      sharePlusCopy,
+  ]) {
+    try {
+      if (await entity.exists()) {
+        await entity.delete(recursive: entity is Directory);
+      }
+    } catch (_) {
+      // Best-effort cleanup must not surface after the share flow completes.
+    }
   }
 }
 
