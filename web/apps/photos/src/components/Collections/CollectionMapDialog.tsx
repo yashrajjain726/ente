@@ -1305,20 +1305,30 @@ function CollectionSidebar({
         (collectionSummary.coverFile &&
             thumbByFileID.get(collectionSummary.coverFile.id)) ||
         (latestFileId ? thumbByFileID.get(latestFileId) : undefined);
-    const coverHeader = shouldShowCover
-        ? {
-              component: (
-                  <MapCover
-                      name={collectionSummary.name}
-                      coverImageUrl={coverImageUrl}
-                      totalCount={collectionSummary.fileCount}
-                      onClose={onClose}
-                  />
-              ),
-              height: COVER_HEADER_HEIGHT,
-              extendToInlineEdges: true,
-          }
-        : undefined;
+    const coverHeader = useMemo(
+        () =>
+            shouldShowCover
+                ? {
+                      component: (
+                          <MapCover
+                              name={collectionSummary.name}
+                              coverImageUrl={coverImageUrl}
+                              totalCount={collectionSummary.fileCount}
+                              onClose={onClose}
+                          />
+                      ),
+                      height: COVER_HEADER_HEIGHT,
+                      extendToInlineEdges: true,
+                  }
+                : undefined,
+        [
+            shouldShowCover,
+            collectionSummary.name,
+            collectionSummary.fileCount,
+            coverImageUrl,
+            onClose,
+        ],
+    );
 
     const showStickyHeader =
         !shouldShowCover ||

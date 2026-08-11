@@ -623,11 +623,6 @@ const Page: React.FC = () => {
         void router.push(href, undefined, { shallow: true });
     }, [activeCollectionID, router.isReady]);
 
-    // The map dialog is only mounted when there is an active collection
-    // summary, and MUI only invokes onClose for escape / backdrop dismissal,
-    // so if the user navigates somewhere without one (e.g. to a person) while
-    // the map is open, the open flag would stay latched and the map would
-    // reopen on the next visit to an albums view unless we reset it here.
     useEffect(() => {
         if (!activeCollectionSummary) closeCollectionMap();
     }, [activeCollectionSummary, closeCollectionMap]);
@@ -1478,9 +1473,6 @@ const Page: React.FC = () => {
         [],
     );
 
-    // These can be invoked from the file viewer hosted by the map dialog, so
-    // close the map (if open) to land the user in the gallery grid instead of
-    // silently swapping the contents of the still open map.
     const handleSelectCollection = useCallback(
         (collectionID: number) => {
             closeCollectionMap();
