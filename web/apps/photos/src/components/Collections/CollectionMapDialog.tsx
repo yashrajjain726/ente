@@ -1,4 +1,5 @@
 import type { RemotePullOpts } from "@/components/gallery";
+import type { SelectedState } from "@/utils/file";
 import AddIcon from "@mui/icons-material/Add";
 import CloseIcon from "@mui/icons-material/Close";
 import LocationOnIcon from "@mui/icons-material/LocationOn";
@@ -1301,6 +1302,17 @@ function CollectionSidebar({
     const isDarkMode = theme.palette.mode === "dark";
     const isMobile = useMediaQuery(theme.breakpoints.down("md"));
 
+    const emptySelected = useMemo<SelectedState>(
+        () => ({
+            ownCount: 0,
+            count: 0,
+            context: undefined,
+            collectionID: collectionSummary.id,
+        }),
+        [collectionSummary.id],
+    );
+    const noOpSetSelected = useCallback(() => undefined, []);
+
     const coverImageUrl =
         (collectionSummary.coverFile &&
             thumbByFileID.get(collectionSummary.coverFile.id)) ||
@@ -1406,13 +1418,8 @@ function CollectionSidebar({
                             enableImageEditing={false}
                             enableDownload={true}
                             activeCollectionID={collectionSummary.id}
-                            selected={{
-                                ownCount: 0,
-                                count: 0,
-                                context: undefined,
-                                collectionID: collectionSummary.id,
-                            }}
-                            setSelected={() => undefined}
+                            selected={emptySelected}
+                            setSelected={noOpSetSelected}
                             onSetOpenFileViewer={onSetOpenFileViewer}
                             listBorderRadius={isMobile ? "0" : "0 0 32px 32px"}
                             header={coverHeader}
