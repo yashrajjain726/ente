@@ -40,6 +40,7 @@ func shouldSkipBodyLog(method string, path string) bool {
 			"/users/two-factor/remove",
 			"/users/two-factor/passkeys/configure-recovery",
 			"/emergency-contacts/init-change-password",
+			"/legacy-kits/recovery/open",
 			"/legacy-kits/recovery/session",
 			"/legacy-kits/recovery/info",
 			"/legacy-kits/recovery/init-change-password",
