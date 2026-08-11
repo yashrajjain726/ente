@@ -120,11 +120,17 @@ const parseFFmpegExtractedMetadata = (ffmpegOutput: Uint8Array) => {
 
     const result: ParsedMetadata = {};
 
-    // Prefer QuickTime metadata because it retains the time-zone offset.
-    const creationDate =
-        parseFFMetadataDate(kv.get("com.apple.quicktime.creationdate")) ??
-        parseFFMetadataDate(kv.get("creation_time"));
-    if (creationDate) result.creationDate = creationDate;
+    const creationDate = parseFFMetadataDate(
+        kv.get("com.apple.quicktime.creationdate"),
+    );
+    if (creationDate) {
+        result.creationDate = creationDate;
+    } else {
+        const creationTime = parseFFMetadataDate(
+            kv.get("creation_time"),
+        )?.timestamp;
+        if (creationTime) result.creationTime = creationTime;
+    }
 
     const location =
         parseFFMetadataLocation(
