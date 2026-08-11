@@ -10,17 +10,12 @@ const legacyKitShareRetention = Duration(minutes: 5);
 final _logger = Logger("LegacyKitShareFiles");
 
 Future<void> cleanStaleLegacyKitShareFiles() async {
-  final cleanupStartedAt = DateTime.now();
-  await Future<void>.delayed(legacyKitShareRetention);
   try {
     final temporaryDirectory = await getTemporaryDirectory();
     await for (final entity in temporaryDirectory.list(followLinks: false)) {
       if (entity is Directory &&
           _entityName(entity).startsWith(legacyKitShareDirectoryPrefix)) {
-        await deleteLegacyKitShareFile(
-          entity,
-          modifiedBefore: cleanupStartedAt,
-        );
+        await deleteLegacyKitShareFile(entity);
       }
     }
 
@@ -35,10 +30,7 @@ Future<void> cleanStaleLegacyKitShareFiles() async {
       if (entity is File &&
           name.startsWith(legacyKitShareFilePrefix) &&
           name.endsWith(".pdf")) {
-        await deleteLegacyKitShareFile(
-          entity,
-          modifiedBefore: cleanupStartedAt,
-        );
+        await deleteLegacyKitShareFile(entity);
       }
     }
   } catch (e, s) {
@@ -46,23 +38,9 @@ Future<void> cleanStaleLegacyKitShareFiles() async {
   }
 }
 
-Future<void> deleteLegacyKitShareFile(
-  FileSystemEntity entity, {
-  DateTime? modifiedBefore,
-}) async {
+Future<void> deleteLegacyKitShareFile(FileSystemEntity entity) async {
   try {
-    if (!await entity.exists()) {
-      return;
-    }
-    final modified = (await entity.stat()).modified;
-    if (modifiedBefore != null && modified.isAfter(modifiedBefore)) {
-      return;
-    }
     if (await entity.exists()) {
-      if (modifiedBefore != null &&
-          (await entity.stat()).modified.isAfter(modifiedBefore)) {
-        return;
-      }
       await entity.delete(recursive: entity is Directory);
     }
   } catch (e, s) {

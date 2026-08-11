@@ -1,5 +1,3 @@
-import "dart:async";
-
 import "package:ente_base/models/key_attributes.dart" as base;
 import "package:ente_configuration/base_configuration.dart";
 import "package:ente_contacts/contacts.dart" as contacts;
@@ -35,7 +33,7 @@ class LegacyKitService {
   }) async {
     _config = config;
     _sessionProvider = sessionProvider;
-    unawaited(cleanStaleLegacyKitShareFiles());
+    await cleanStaleLegacyKitShareFiles();
   }
 
   Future<List<LegacyKit>> getKits() async {

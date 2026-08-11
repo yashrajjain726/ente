@@ -27,7 +27,7 @@ import "package:share_plus/share_plus.dart";
 typedef LegacyKitAuthenticator =
     Future<bool> Function(BuildContext context, String reason);
 
-int _latestLegacyKitShareGeneration = 0;
+final _legacyKitShareTokens = <String, Object>{};
 
 const _partNameStyle = TextStyle(
   fontFamily: TextStyles.outfitFontFamily,
@@ -383,7 +383,8 @@ class _ShareLegacyKitPageState extends State<ShareLegacyKitPage> {
       final ShareResult result;
       Directory? temporaryDirectory;
       Directory? shareDirectory;
-      int? shareGeneration;
+      File? sharePlusCopy;
+      Object? shareToken;
       try {
         temporaryDirectory = await getTemporaryDirectory();
         shareDirectory = await temporaryDirectory.createTemp(
@@ -391,7 +392,10 @@ class _ShareLegacyKitPageState extends State<ShareLegacyKitPage> {
         );
         final pdf = File("${shareDirectory.path}/$fileName");
         await pdf.writeAsBytes(bytes, flush: true);
-        shareGeneration = ++_latestLegacyKitShareGeneration;
+        // share_plus copies path-backed files here on Android.
+        sharePlusCopy = File("${temporaryDirectory.path}/share_plus/$fileName");
+        shareToken = Object();
+        _legacyKitShareTokens[sharePlusCopy.path] = shareToken;
         result = await SharePlus.instance.share(
           ShareParams(
             files: [XFile(pdf.path, mimeType: "application/pdf")],
@@ -406,12 +410,7 @@ class _ShareLegacyKitPageState extends State<ShareLegacyKitPage> {
       } finally {
         if (temporaryDirectory != null && shareDirectory != null) {
           unawaited(
-            _deleteSharedPdf(
-              shareDirectory,
-              // share_plus copies path-backed files here on Android.
-              File("${temporaryDirectory.path}/share_plus/$fileName"),
-              shareGeneration,
-            ),
+            _deleteSharedPdf(shareDirectory, sharePlusCopy, shareToken),
           );
         }
       }
@@ -683,17 +682,18 @@ class _ShareLegacyKitPageState extends State<ShareLegacyKitPage> {
 
 Future<void> _deleteSharedPdf(
   Directory shareDirectory,
-  File sharePlusCopy,
-  int? shareGeneration,
+  File? sharePlusCopy,
+  Object? shareToken,
 ) async {
   await Future<void>.delayed(legacyKitShareRetention);
-  for (final entity in <FileSystemEntity>[
-    shareDirectory,
-    if (shareGeneration != null &&
-        shareGeneration == _latestLegacyKitShareGeneration)
-      sharePlusCopy,
-  ]) {
-    await deleteLegacyKitShareFile(entity);
+  await deleteLegacyKitShareFile(shareDirectory);
+  if (sharePlusCopy != null &&
+      shareToken != null &&
+      identical(_legacyKitShareTokens[sharePlusCopy.path], shareToken)) {
+    await deleteLegacyKitShareFile(sharePlusCopy);
+    if (identical(_legacyKitShareTokens[sharePlusCopy.path], shareToken)) {
+      _legacyKitShareTokens.remove(sharePlusCopy.path);
+    }
   }
 }
 
