@@ -64,9 +64,10 @@ const _makeGenThumbnailCommand = (seekTime: number, forHDR: boolean) => [
     "1",
     "-vf",
     [
-        // Scale it to a maximum height of 720 keeping aspect ratio, ensuring
-        // that the dimensions are even (subsequent filters require this).
-        "scale=-2:720",
+        // Scale it down to a maximum height of 720 keeping aspect ratio,
+        // ensuring that the dimensions are even (subsequent filters require
+        // this).
+        "scale=-2:'min(720,trunc(ih/2)*2)'",
         forHDR
             ? // Tone-map HDR frames so thumbnails are not washed out.
               [
