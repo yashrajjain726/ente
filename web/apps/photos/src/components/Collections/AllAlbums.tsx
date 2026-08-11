@@ -22,9 +22,10 @@ import {
 import { CollectionsSortOptions } from "@/components/CollectionsSortOptions";
 import type { RemotePullOpts } from "@/components/gallery";
 import { StarIcon } from "@/components/icons/StarIcon";
+import { Delete02Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import CloseIcon from "@mui/icons-material/Close";
-import DeleteSweepOutlinedIcon from "@mui/icons-material/DeleteSweepOutlined";
 import PushPinIcon from "@mui/icons-material/PushPin";
 import {
     Box,
@@ -426,7 +427,13 @@ export const AllAlbums: React.FC<AllAlbums> = ({
                 {showDeleteEmptyAlbums && (
                     <Box sx={sweepFooterSx}>
                         <Button
-                            startIcon={<DeleteSweepOutlinedIcon />}
+                            startIcon={
+                                <HugeiconsIcon
+                                    icon={Delete02Icon}
+                                    size={22}
+                                    strokeWidth={1.5}
+                                />
+                            }
                             onClick={handleDeleteEmptyAlbums}
                             sx={sweepButtonSx}
                         >
@@ -507,15 +514,20 @@ export const AllAlbums: React.FC<AllAlbums> = ({
     );
 };
 
+const sweepInset = 12;
+const sweepButtonRadius = 20;
 const dialogSx: SxProps<Theme> = {
     "& .MuiDialog-container": { justifyContent: "flex-end" },
+    "& .MuiDialog-paper": {
+        borderRadius: `${sweepButtonRadius + sweepInset}px`,
+        [`@media ${collectionDialogFullScreenQuery}`]: { borderRadius: 0 },
+    },
 };
-
 const sweepFooterSx = {
     position: "absolute",
     insetInline: 0,
-    bottom: "20px",
-    px: "20px",
+    bottom: `${sweepInset}px`,
+    px: `${sweepInset}px`,
     display: "flex",
     pointerEvents: "none",
 };
@@ -523,7 +535,7 @@ const sweepButtonSx: SxProps<Theme> = (theme) => ({
     pointerEvents: "auto",
     flex: 1,
     height: 52,
-    borderRadius: "20px",
+    borderRadius: `${sweepButtonRadius}px`,
     border: `1px solid ${surfaceStroke}`,
     backgroundColor: "fixed.white",
     color: "fixed.black",
@@ -531,7 +543,7 @@ const sweepButtonSx: SxProps<Theme> = (theme) => ({
     lineHeight: "20px",
     fontWeight: 500,
     letterSpacing: "inherit",
-    boxShadow: "0 4px 17.5px rgba(0 0 0 / 0.25)",
+    boxShadow: "0 2px 8px rgba(0 0 0 / 0.08)",
     "&:hover": { backgroundColor: "#eaeaea" },
     ...theme.applyStyles("dark", { borderColor: surfaceStrokeDark }),
 });

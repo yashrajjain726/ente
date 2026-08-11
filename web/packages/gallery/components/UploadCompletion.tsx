@@ -209,10 +209,11 @@ const completionStatSx = (theme: Theme) => ({
     minWidth: 0,
     minHeight: 64,
     p: "12px 20px",
+    pl: "24px",
     gap: "4px",
     borderRadius: "16px",
     backgroundColor: "background.paper",
-    [uploadSheetMediaQuery]: { px: 1 },
+    [uploadSheetMediaQuery]: { px: 1, pl: 2 },
     ...theme.applyStyles("dark", { backgroundColor: "#282828" }),
 });
 

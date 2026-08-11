@@ -222,6 +222,7 @@ const stopConfirmationCountTileSx = (theme: Theme) => ({
     flex: "1 1 0",
     minWidth: 0,
     px: { xs: 1.5, sm: "20px" },
+    pl: { xs: 2, sm: "24px" },
     py: 1.5,
     gap: 0.5,
     borderRadius: "16px",
