@@ -22,6 +22,7 @@ class PinInputComponent extends StatefulWidget {
     this.length = 6,
     this.autofocus = false,
     this.useNativeKeyboard = true,
+    this.closeKeyboardWhenCompleted = true,
     this.obscureText = false,
     this.obscuringCharacter = '•',
     this.isError = false,
@@ -37,6 +38,7 @@ class PinInputComponent extends StatefulWidget {
   final TextEditingController controller;
   final bool autofocus;
   final bool useNativeKeyboard;
+  final bool closeKeyboardWhenCompleted;
   final bool obscureText;
   final String obscuringCharacter;
   final bool isError;
@@ -152,6 +154,9 @@ class _PinInputComponentState extends State<PinInputComponent> {
     }
     _lastCompletedValue = controllerText;
     widget.onCompleted?.call(controllerText);
+    if (widget.closeKeyboardWhenCompleted && mounted) {
+      _focusNode.unfocus();
+    }
   }
 
   String _sanitizeValue(String value) {

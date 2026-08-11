@@ -172,6 +172,7 @@ class _OTTVerificationPageState extends State<OTTVerificationPage> {
                 length: 6,
                 controller: _pinController,
                 autofocus: true,
+                autofillHints: const [AutofillHints.oneTimeCode],
                 onCompleted: (value) {
                   if (value.length == 6) {
                     onPressed();

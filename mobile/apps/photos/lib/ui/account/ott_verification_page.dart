@@ -134,6 +134,7 @@ class _OTTVerificationPageState extends State<OTTVerificationPage> {
                 length: 6,
                 controller: _pinController,
                 autofocus: true,
+                autofillHints: const [AutofillHints.oneTimeCode],
                 onChanged: (String pin) {
                   setState(() {
                     _code = pin;
