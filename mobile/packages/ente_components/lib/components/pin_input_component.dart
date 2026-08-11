@@ -98,12 +98,30 @@ class _PinInputComponentState extends State<PinInputComponent> {
   }
 
   void _synchronizeController() {
-    final sanitizedText = _sanitizeValue(widget.controller.text);
-    _lastControllerText = sanitizedText;
+    final controller = widget.controller;
+    final controllerText = controller.text;
+    final sanitizedText = _sanitizeValue(controllerText);
+    _lastControllerText = controllerText;
     _value = sanitizedText;
-    if (widget.controller.text != sanitizedText) {
-      _replaceControllerText(sanitizedText);
+    if (controllerText == sanitizedText) {
+      return;
     }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || widget.controller != controller) {
+        return;
+      }
+      final currentText = controller.text;
+      final sanitizedCurrentText = _sanitizeValue(currentText);
+      if (currentText == sanitizedCurrentText) {
+        return;
+      }
+      _lastControllerText = sanitizedCurrentText;
+      if (_value != sanitizedCurrentText) {
+        setState(() => _value = sanitizedCurrentText);
+      }
+      _replaceControllerText(sanitizedCurrentText);
+    });
   }
 
   void _handleControllerChanged() {
@@ -121,6 +139,9 @@ class _PinInputComponentState extends State<PinInputComponent> {
       setState(() => _value = controllerText);
     }
     widget.onChanged?.call(controllerText);
+    if (widget.controller.text != controllerText) {
+      return;
+    }
 
     if (controllerText.length != widget.length) {
       _lastCompletedValue = null;
@@ -221,6 +242,7 @@ class _PinInputComponentState extends State<PinInputComponent> {
       autofillHints: widget.autofillHints,
       autocorrect: false,
       enableSuggestions: false,
+      enableIMEPersonalizedLearning: false,
       obscureText: widget.obscureText,
       obscuringCharacter: widget.obscuringCharacter,
       inputFormatters: [
