@@ -339,21 +339,6 @@ fn validate_request_model_paths(req: &AnalyzeImageRequest) -> MlResult<()> {
 mod tests {
     use super::*;
 
-    fn empty_model_paths() -> ModelPaths {
-        ModelPaths {
-            face_detection: String::new(),
-            face_embedding: String::new(),
-            clip_image: String::new(),
-            clip_text: String::new(),
-            pet_face_detection: String::new(),
-            pet_face_embedding_dog: String::new(),
-            pet_face_embedding_cat: String::new(),
-            pet_body_detection: String::new(),
-            pet_body_embedding_dog: String::new(),
-            pet_body_embedding_cat: String::new(),
-        }
-    }
-
     fn png_bytes(width: u32, height: u32) -> Vec<u8> {
         let img =
             image::RgbImage::from_fn(width, height, |x, y| image::Rgb([x as u8, y as u8, 128]));
@@ -373,7 +358,7 @@ mod tests {
             run_clip: false,
             run_pets: false,
             generate_face_crops: false,
-            model_paths: empty_model_paths(),
+            model_paths: ModelPaths::default(),
         };
 
         let result = analyze_image(req).expect("analysis without models succeeds");
@@ -393,7 +378,7 @@ mod tests {
             run_clip: false,
             run_pets: false,
             generate_face_crops: false,
-            model_paths: empty_model_paths(),
+            model_paths: ModelPaths::default(),
         };
 
         match analyze_image(req) {

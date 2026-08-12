@@ -1,5 +1,6 @@
 use std::{
     cell::Cell,
+    path::Path,
     sync::{Mutex, MutexGuard},
 };
 
@@ -11,7 +12,7 @@ use crate::ml::{
     onnx,
 };
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct ModelPaths {
     pub face_detection: String,
     pub face_embedding: String,
@@ -26,18 +27,22 @@ pub struct ModelPaths {
 }
 
 #[derive(Debug)]
+struct LoadedSession {
+    session: Session,
+    execution_provider: onnx::ExecutionProvider,
+}
+
+#[derive(Debug)]
 struct ModelSlotState {
     path: String,
     fallback_execution_mode: Option<onnx::ExecutionMode>,
-    execution_provider: Option<onnx::ExecutionProvider>,
-    pin_count: usize,
-    session: Option<Session>,
+    loaded: Option<LoadedSession>,
 }
 
 #[derive(Debug)]
 struct ModelSlot {
     default_execution_mode: onnx::ExecutionMode,
-    coreml_cache_namespace: &'static str,
+    model_namespace: &'static str,
     state: Mutex<ModelSlotState>,
 }
 
@@ -64,19 +69,14 @@ pub(crate) struct MlRuntimeView<'a> {
 }
 
 impl ModelSlot {
-    fn new(
-        default_execution_mode: onnx::ExecutionMode,
-        coreml_cache_namespace: &'static str,
-    ) -> Self {
+    fn new(default_execution_mode: onnx::ExecutionMode, model_namespace: &'static str) -> Self {
         Self {
             default_execution_mode,
-            coreml_cache_namespace,
+            model_namespace,
             state: Mutex::new(ModelSlotState {
                 path: String::new(),
                 fallback_execution_mode: None,
-                execution_provider: None,
-                pin_count: 0,
-                session: None,
+                loaded: None,
             }),
         }
     }
@@ -104,17 +104,11 @@ impl ModelSlot {
         }
 
         Self::set_config_locked(&mut state, path);
-        state.pin_count = 1;
     }
 
     fn release_residency(&self) {
         let mut state = self.lock_state();
-        if state.pin_count > 0 {
-            state.pin_count -= 1;
-        }
-        if state.pin_count == 0 {
-            Self::clear_transient_runtime_state_locked(&mut state);
-        }
+        Self::clear_transient_runtime_state_locked(&mut state);
     }
 
     fn advance_provider_fallback_locked(&self, state: &mut ModelSlotState) -> bool {
@@ -126,8 +120,7 @@ impl ModelSlot {
         };
 
         state.fallback_execution_mode = Some(fallback_mode);
-        state.execution_provider = None;
-        state.session = None;
+        state.loaded = None;
         true
     }
 
@@ -151,15 +144,12 @@ impl ModelSlot {
                 return Err(error);
             }
 
-            let execution_provider = state
-                .execution_provider
-                .expect("a loaded session must record its execution provider");
-            let result = operation(
-                state
-                    .session
-                    .as_mut()
-                    .expect("session must be loaded before model execution"),
-            );
+            let loaded = state
+                .loaded
+                .as_mut()
+                .expect("session must be loaded before model execution");
+            let execution_provider = loaded.execution_provider;
+            let result = operation(&mut loaded.session);
             match result {
                 Ok(value) => return Ok((value, execution_provider)),
                 Err(error) => {
@@ -195,19 +185,16 @@ impl ModelSlot {
         }
         state.path = path.to_string();
         state.fallback_execution_mode = None;
-        state.execution_provider = None;
-        state.session = None;
+        state.loaded = None;
     }
 
     fn clear_transient_runtime_state_locked(state: &mut ModelSlotState) {
         state.fallback_execution_mode = None;
-        state.execution_provider = None;
-        state.session = None;
+        state.loaded = None;
     }
 
     fn reset_slot_locked(state: &mut ModelSlotState) {
         state.path.clear();
-        state.pin_count = 0;
         Self::clear_transient_runtime_state_locked(state);
     }
 
@@ -221,19 +208,24 @@ impl ModelSlot {
         if state.path.trim().is_empty() {
             return Err(MlError::InvalidRequest(error_msg.to_string()));
         }
-        if state.session.is_some() {
+        if state.loaded.is_some() {
             return Ok(());
         }
 
         let execution_mode = self.effective_execution_mode(state);
-        let model_name = state.path.rsplit('/').next().unwrap_or(&state.path);
+        let model_name = Path::new(&state.path)
+            .file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or(&state.path);
         log::info!("loading {model_name} with {execution_mode:?} execution");
         let t = std::time::Instant::now();
         let (session, execution_provider) =
-            onnx::build_session(&state.path, execution_mode, self.coreml_cache_namespace)?;
+            onnx::build_session(&state.path, execution_mode, self.model_namespace)?;
         log::info!("loaded {model_name} in {:?}", t.elapsed());
-        state.execution_provider = Some(execution_provider);
-        state.session = Some(session);
+        state.loaded = Some(LoadedSession {
+            session,
+            execution_provider,
+        });
         Ok(())
     }
 }
@@ -536,33 +528,18 @@ fn is_execution_provider_failure(error: &MlError) -> bool {
 mod tests {
     use super::*;
 
-    fn empty_paths() -> ModelPaths {
-        ModelPaths {
-            face_detection: String::new(),
-            face_embedding: String::new(),
-            clip_image: String::new(),
-            clip_text: String::new(),
-            pet_face_detection: String::new(),
-            pet_face_embedding_dog: String::new(),
-            pet_face_embedding_cat: String::new(),
-            pet_body_detection: String::new(),
-            pet_body_embedding_dog: String::new(),
-            pet_body_embedding_cat: String::new(),
-        }
-    }
-
     #[test]
     fn configure_requested_models_preserves_unrequested_slots() {
         let runtime = MlRuntime::new();
 
         runtime.configure_requested_models(&ModelPaths {
             clip_text: "clip_text.onnx".to_string(),
-            ..empty_paths()
+            ..ModelPaths::default()
         });
 
         runtime.configure_requested_models(&ModelPaths {
             face_detection: "face.onnx".to_string(),
-            ..empty_paths()
+            ..ModelPaths::default()
         });
 
         let clip_text = runtime.clip_text.lock_state();
@@ -575,7 +552,7 @@ mod tests {
         let model_paths = ModelPaths {
             face_detection: "face.onnx".to_string(),
             clip_image: "clip.onnx".to_string(),
-            ..empty_paths()
+            ..ModelPaths::default()
         };
         runtime.configure_requested_models(&model_paths);
 
@@ -601,7 +578,7 @@ mod tests {
     fn runtime_accepts_single_use_operation() {
         let value = String::from("once");
 
-        let result = with_runtime(&empty_paths(), move |_| Ok(value));
+        let result = with_runtime(&ModelPaths::default(), move |_| Ok(value));
 
         assert_eq!(result.unwrap(), "once");
     }
@@ -613,13 +590,11 @@ mod tests {
         {
             let mut clip_text = runtime.clip_text.lock_state();
             clip_text.path = "clip_text.onnx".to_string();
-            clip_text.pin_count = 0;
             clip_text.fallback_execution_mode = Some(onnx::ExecutionMode::CpuOnly);
         }
         {
             let mut face_detection = runtime.face_detection.lock_state();
             face_detection.path = "face.onnx".to_string();
-            face_detection.pin_count = 1;
             face_detection.fallback_execution_mode = Some(onnx::ExecutionMode::CpuOnly);
         }
 
@@ -627,39 +602,37 @@ mod tests {
 
         let clip_text = runtime.clip_text.lock_state();
         assert_eq!(clip_text.path, "clip_text.onnx");
-        assert_eq!(clip_text.pin_count, 0);
         assert_eq!(
             clip_text.fallback_execution_mode,
             Some(onnx::ExecutionMode::CpuOnly)
         );
 
         let face_detection = runtime.face_detection.lock_state();
-        assert_eq!(face_detection.pin_count, 0);
         assert_eq!(face_detection.fallback_execution_mode, None);
     }
 
     #[test]
-    fn prepare_indexing_models_pins_without_loading_sessions() {
+    fn prepare_indexing_models_configures_without_loading_sessions() {
         let runtime = MlRuntime::new();
 
         runtime.prepare_indexing_models(&ModelPaths {
             face_detection: "face.onnx".to_string(),
             face_embedding: "embed.onnx".to_string(),
             clip_image: "clip.onnx".to_string(),
-            ..empty_paths()
+            ..ModelPaths::default()
         });
 
         let face_detection = runtime.face_detection.lock_state();
-        assert_eq!(face_detection.pin_count, 1);
-        assert!(face_detection.session.is_none());
+        assert_eq!(face_detection.path, "face.onnx");
+        assert!(face_detection.loaded.is_none());
 
         let face_embedding = runtime.face_embedding.lock_state();
-        assert_eq!(face_embedding.pin_count, 1);
-        assert!(face_embedding.session.is_none());
+        assert_eq!(face_embedding.path, "embed.onnx");
+        assert!(face_embedding.loaded.is_none());
 
         let clip_image = runtime.clip_image.lock_state();
-        assert_eq!(clip_image.pin_count, 1);
-        assert!(clip_image.session.is_none());
+        assert_eq!(clip_image.path, "clip.onnx");
+        assert!(clip_image.loaded.is_none());
     }
 
     #[test]
@@ -669,7 +642,6 @@ mod tests {
         {
             let mut state = slot.lock_state();
             state.path = "pet.onnx".to_string();
-            state.pin_count = 1;
             state.fallback_execution_mode = Some(onnx::ExecutionMode::CpuOnly);
         }
 
@@ -677,9 +649,8 @@ mod tests {
 
         let state = slot.lock_state();
         assert!(state.path.is_empty());
-        assert_eq!(state.pin_count, 0);
         assert_eq!(state.fallback_execution_mode, None);
-        assert!(state.session.is_none());
+        assert!(state.loaded.is_none());
     }
 
     #[test]
@@ -689,16 +660,14 @@ mod tests {
         {
             let mut state = slot.lock_state();
             state.path = "clip_text.onnx".to_string();
-            state.pin_count = 1;
             state.fallback_execution_mode = Some(onnx::ExecutionMode::CpuOnly);
         }
 
         slot.release_residency();
 
         let state = slot.lock_state();
-        assert_eq!(state.pin_count, 0);
         assert_eq!(state.fallback_execution_mode, None);
-        assert!(state.session.is_none());
+        assert!(state.loaded.is_none());
     }
 
     #[test]

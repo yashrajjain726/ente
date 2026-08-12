@@ -1,14 +1,8 @@
 use ort::{
     ep::{CPU, ExecutionProviderDispatch},
     session::{Session, builder::GraphOptimizationLevel},
-    value::{Tensor, TensorElementType, TensorRef, ValueType},
 };
-use std::{
-    cell::OnceCell,
-    path::{Path, PathBuf},
-};
-
-use half::prelude::{HalfFloatSliceExt, HalfFloatVecExt};
+use std::path::{Path, PathBuf};
 
 #[cfg(target_os = "android")]
 use ort::ep::XNNPACK;
@@ -30,70 +24,16 @@ use crate::ml::golden;
 #[cfg(any(target_os = "android", target_os = "linux", target_os = "windows"))]
 use crate::ml::webgpu;
 
-#[cfg(any(target_os = "ios", target_os = "macos", test))]
-const COREML_CACHE_SCHEMA: &str = "ort-1_28-mlprogram-all-default-v1";
-const COREML_CACHE_COMPLETE_MARKER: &str = ".ente-cache-complete";
-// The name ONNX Runtime's CoreML EP gives the compiled model it stores
-// inside each generated MLProgram package directory in the cache
-// (`model.mm` `CompileOrReadCachedModel`).
-const COREML_CACHE_COMPILED_MODEL: &str = "compiled_model.mlmodelc";
-// The weight blob file name inside an ORT-generated `.mlpackage`
-// (`model_builder.cc` writes `@model_path/weights/weight.bin`).
-const COREML_PACKAGE_WEIGHT_BLOB: &str = "weight.bin";
+mod coreml_cache;
+mod tensor;
+
+pub(crate) use tensor::{
+    BorrowedFloatTensor, FloatTensorData, PreparedF32Input, run_f32, run_golden_tensor,
+    run_i32_f32, with_prepared_float_output,
+};
+
 #[cfg(any(target_os = "ios", target_os = "macos"))]
 const ENABLE_PERSISTENT_COREML_CACHE: bool = true;
-
-pub(crate) struct PreparedF32Input {
-    f32_data: Vec<f32>,
-    f16_data: OnceCell<Vec<half::f16>>,
-}
-
-#[derive(Clone, Copy)]
-pub(crate) enum BorrowedFloatTensor<'a> {
-    F32(&'a [f32]),
-    F16(&'a [half::f16]),
-}
-
-pub(crate) trait FloatTensorData: Copy {
-    fn len(self) -> usize;
-    fn value(self, index: usize) -> f32;
-}
-
-impl FloatTensorData for &[f32] {
-    fn len(self) -> usize {
-        <[f32]>::len(self)
-    }
-
-    #[inline]
-    fn value(self, index: usize) -> f32 {
-        self[index]
-    }
-}
-
-impl FloatTensorData for &[half::f16] {
-    fn len(self) -> usize {
-        <[half::f16]>::len(self)
-    }
-
-    #[inline]
-    fn value(self, index: usize) -> f32 {
-        self[index].to_f32()
-    }
-}
-
-impl PreparedF32Input {
-    pub(crate) fn new(data: Vec<f32>) -> Self {
-        Self {
-            f32_data: data,
-            f16_data: OnceCell::new(),
-        }
-    }
-
-    fn f16_data(&self) -> &[half::f16] {
-        self.f16_data
-            .get_or_init(|| Vec::<half::f16>::from_f32_slice(&self.f32_data))
-    }
-}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum ExecutionMode {
@@ -131,9 +71,9 @@ impl ExecutionMode {
 pub(crate) fn build_session(
     model_path: &str,
     mode: ExecutionMode,
-    coreml_cache_namespace: &str,
+    model_namespace: &str,
 ) -> MlResult<(Session, ExecutionProvider)> {
-    let attempts = provider_attempts(mode, model_path, coreml_cache_namespace);
+    let attempts = provider_attempts(mode, model_path, model_namespace);
 
     let mut errors = Vec::new();
     for attempt in attempts {
@@ -141,8 +81,7 @@ pub(crate) fn build_session(
         if attempt.uses_webgpu {
             #[cfg(any(target_os = "android", target_os = "linux", target_os = "windows"))]
             {
-                match build_webgpu_session_with_canary(model_path, coreml_cache_namespace, attempt)
-                {
+                match build_webgpu_session_with_canary(model_path, model_namespace, attempt) {
                     Ok(session) => return Ok((session, execution_provider)),
                     Err(error) => errors.push(format!("{error}")),
                 }
@@ -156,13 +95,13 @@ pub(crate) fn build_session(
         match build_and_validate_session(model_path, attempt) {
             Ok(session) => {
                 if let Some(cache_dir) = coreml_cache_dir {
-                    finalize_coreml_cache(&cache_dir, model_path);
+                    coreml_cache::finalize(&cache_dir, model_path);
                 }
                 return Ok((session, execution_provider));
             }
             Err(error) => {
                 if let Some(cache_dir) = coreml_cache_dir
-                    && let Err(cleanup_error) = invalidate_coreml_cache(&cache_dir)
+                    && let Err(cleanup_error) = coreml_cache::invalidate(&cache_dir)
                 {
                     log::warn!(
                         "failed to invalidate CoreML cache for '{}' after session construction failed: {cleanup_error}",
@@ -422,46 +361,6 @@ fn model_file_label(model_path: &str) -> &str {
         .unwrap_or(model_path)
 }
 
-// Shared with the generator so its inference path stays identical to devices.
-pub(crate) fn run_golden_tensor(
-    session: &mut Session,
-    input_shape: &[i64],
-    input: &golden::PreparedGoldenInput,
-) -> MlResult<Vec<f32>> {
-    let outputs = match input {
-        golden::PreparedGoldenInput::F32(data) => {
-            if session_expects_f16(session) {
-                let input_tensor = Tensor::<half::f16>::from_array((
-                    input_shape,
-                    Vec::<half::f16>::from_f32_slice(data),
-                ))?;
-                session.run(ort::inputs![input_tensor])?
-            } else {
-                let input_tensor =
-                    TensorRef::<f32>::from_array_view((input_shape, data.as_slice()))?;
-                session.run(ort::inputs![input_tensor])?
-            }
-        }
-        golden::PreparedGoldenInput::I32(data) => {
-            let input_tensor = TensorRef::<i32>::from_array_view((input_shape, data.as_slice()))?;
-            session.run(ort::inputs![input_tensor])?
-        }
-    };
-
-    if outputs.len() == 0 {
-        return Err(MlError::Ort("missing first output tensor".to_string()));
-    }
-    let output = &outputs[0];
-    if let Ok((_, tensor_data)) = output.try_extract_tensor::<f32>() {
-        Ok(tensor_data.to_vec())
-    } else {
-        let (_, tensor_data) = output.try_extract_tensor::<half::f16>()?;
-        let mut data = vec![0.0; tensor_data.len()];
-        tensor_data.convert_to_f32_slice(&mut data);
-        Ok(data)
-    }
-}
-
 fn has_protobuf_parse_failure(errors: &[String]) -> bool {
     errors.iter().any(|error| {
         error
@@ -493,12 +392,10 @@ impl ProviderAttempt {
 fn provider_attempts(
     mode: ExecutionMode,
     model_path: &str,
-    coreml_cache_namespace: &str,
+    model_namespace: &str,
 ) -> Vec<ProviderAttempt> {
     match mode {
-        ExecutionMode::PlatformDefault => {
-            platform_default_attempts(model_path, coreml_cache_namespace)
-        }
+        ExecutionMode::PlatformDefault => platform_default_attempts(model_path, model_namespace),
         #[cfg(target_os = "android")]
         ExecutionMode::Xnnpack => vec![xnnpack_attempt(), ProviderAttempt::cpu_only()],
         ExecutionMode::CpuOnly => vec![ProviderAttempt::cpu_only()],
@@ -506,14 +403,10 @@ fn provider_attempts(
 }
 
 #[cfg(any(target_os = "ios", target_os = "macos"))]
-fn platform_default_attempts(
-    model_path: &str,
-    coreml_cache_namespace: &str,
-) -> Vec<ProviderAttempt> {
+fn platform_default_attempts(model_path: &str, model_namespace: &str) -> Vec<ProviderAttempt> {
     let mut attempts = Vec::new();
     if golden_entry_required(model_path, "CoreML") {
-        let (coreml_provider, coreml_cache_dir) =
-            coreml_provider(model_path, coreml_cache_namespace);
+        let (coreml_provider, coreml_cache_dir) = coreml_provider(model_path, model_namespace);
         attempts.push(ProviderAttempt {
             providers: vec![
                 coreml_provider,
@@ -532,7 +425,7 @@ fn platform_default_attempts(
 #[cfg(any(target_os = "ios", target_os = "macos"))]
 fn coreml_provider(
     model_path: &str,
-    cache_namespace: &str,
+    model_namespace: &str,
 ) -> (ExecutionProviderDispatch, Option<PathBuf>) {
     let mut provider = CoreML::default()
         .with_model_format(ModelFormat::MLProgram)
@@ -541,7 +434,7 @@ fn coreml_provider(
 
     let mut prepared_cache_dir = None;
     if ENABLE_PERSISTENT_COREML_CACHE {
-        match prepare_coreml_cache_directory(model_path, cache_namespace) {
+        match coreml_cache::prepare_directory(model_path, model_namespace) {
             Ok(cache_dir) => {
                 provider = provider.with_model_cache_dir(cache_dir.to_string_lossy());
                 prepared_cache_dir = Some(cache_dir);
@@ -554,33 +447,14 @@ fn coreml_provider(
             }
         }
     } else {
-        remove_persistent_coreml_cache(model_path);
+        coreml_cache::remove(model_path);
     }
 
     (provider.build().error_on_failure(), prepared_cache_dir)
 }
 
-// Disabling the feature must also reclaim caches created by earlier releases.
-#[cfg(any(target_os = "ios", target_os = "macos"))]
-fn remove_persistent_coreml_cache(model_path: &str) {
-    let Some(coreml_root) = coreml_cache_root(Path::new(model_path))
-        .parent()
-        .map(Path::to_path_buf)
-    else {
-        return;
-    };
-    match std::fs::remove_dir_all(&coreml_root) {
-        Ok(()) => log::info!("removed persistent CoreML cache (feature disabled)"),
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
-        Err(error) => log::warn!("failed to remove disabled persistent CoreML cache: {error}"),
-    }
-}
-
 #[cfg(target_os = "android")]
-fn platform_default_attempts(
-    model_path: &str,
-    _coreml_cache_namespace: &str,
-) -> Vec<ProviderAttempt> {
+fn platform_default_attempts(model_path: &str, _model_namespace: &str) -> Vec<ProviderAttempt> {
     let mut attempts = Vec::new();
     if webgpu::attempt_permitted(model_path) && golden_entry_required(model_path, "WebGPU") {
         attempts.push(ProviderAttempt {
@@ -603,10 +477,7 @@ fn platform_default_attempts(
 }
 
 #[cfg(any(target_os = "linux", target_os = "windows"))]
-fn platform_default_attempts(
-    model_path: &str,
-    _coreml_cache_namespace: &str,
-) -> Vec<ProviderAttempt> {
+fn platform_default_attempts(model_path: &str, _model_namespace: &str) -> Vec<ProviderAttempt> {
     let mut attempts = Vec::new();
     if webgpu::attempt_permitted(model_path) && golden_entry_required(model_path, "WebGPU") {
         attempts.push(ProviderAttempt {
@@ -661,237 +532,8 @@ fn webgpu_provider() -> ExecutionProviderDispatch {
     target_os = "macos",
     target_os = "windows"
 )))]
-fn platform_default_attempts(
-    _model_path: &str,
-    _coreml_cache_namespace: &str,
-) -> Vec<ProviderAttempt> {
+fn platform_default_attempts(_model_path: &str, _model_namespace: &str) -> Vec<ProviderAttempt> {
     vec![ProviderAttempt::cpu_only()]
-}
-
-#[cfg(any(target_os = "ios", target_os = "macos"))]
-fn prepare_coreml_cache_directory(
-    model_path: &str,
-    cache_namespace: &str,
-) -> std::io::Result<PathBuf> {
-    let model_path = Path::new(model_path);
-    let schema_root = coreml_cache_root(model_path);
-
-    if let Some(coreml_root) = schema_root.parent() {
-        match prune_stale_coreml_schema_directories(coreml_root, COREML_CACHE_SCHEMA) {
-            Ok(removed) => {
-                for schema in removed {
-                    log::info!("removed stale CoreML cache schema '{schema}'");
-                }
-            }
-            Err(error) => log::warn!("failed to prune stale CoreML cache schemas: {error}"),
-        }
-    }
-
-    let model_cache_root = schema_root.join(sanitize_cache_component(cache_namespace));
-    std::fs::create_dir_all(&model_cache_root)?;
-
-    let cache_key = coreml_model_cache_key(model_path)?;
-    prune_superseded_coreml_cache_directories(&model_cache_root, &cache_key)?;
-
-    let cache_dir = model_cache_root.join(cache_key);
-    prepare_coreml_cache_entry(&cache_dir)?;
-    Ok(cache_dir)
-}
-
-// Rebuild unmarked entries so ORT cannot reuse a package interrupted mid-build.
-#[cfg(any(target_os = "ios", target_os = "macos", test))]
-fn prepare_coreml_cache_entry(cache_dir: &Path) -> std::io::Result<()> {
-    if cache_dir.exists() && !coreml_cache_complete_marker(cache_dir).is_file() {
-        std::fs::remove_dir_all(cache_dir)?;
-    }
-    std::fs::create_dir_all(cache_dir)
-}
-
-// Trim before marking complete so a crash mid-trim forces a clean rebuild.
-// Trim failures only waste disk space and therefore do not fail the load.
-fn finalize_coreml_cache(cache_dir: &Path, model_path: &str) {
-    match trim_coreml_cache_weights(cache_dir) {
-        Ok(0) => {}
-        Ok(reclaimed) => log::info!(
-            "primed CoreML cache for '{}': trimmed {} MiB of generated package weights",
-            model_file_label(model_path),
-            reclaimed / (1024 * 1024)
-        ),
-        Err(error) => log::warn!(
-            "failed to trim CoreML cache weights for '{}': {error}",
-            model_file_label(model_path)
-        ),
-    }
-
-    if let Err(error) = mark_coreml_cache_complete(cache_dir) {
-        log::warn!(
-            "failed to mark CoreML cache complete for '{}': {error}",
-            model_file_label(model_path)
-        );
-    }
-}
-
-// On a warm cache hit ONNX Runtime 1.28 only checks that the generated
-// package directory and loads `compiled_model.mlmodelc`, making the package's
-// own weights redundant. Uncompiled packages remain intact; incompatible
-// future runtimes will fail construction and trigger cache invalidation.
-fn trim_coreml_cache_weights(cache_dir: &Path) -> std::io::Result<u64> {
-    let mut reclaimed = 0;
-    // ORT 1.28 stores the compiled MLProgram inside
-    // <cache_dir>/<model_hash>/<partition>/model/compiled_model.mlmodelc.
-    for model_hash_entry in std::fs::read_dir(cache_dir)? {
-        let model_hash_entry = model_hash_entry?;
-        if !model_hash_entry.file_type()?.is_dir() {
-            continue;
-        }
-        for partition_entry in std::fs::read_dir(model_hash_entry.path())? {
-            let partition_entry = partition_entry?;
-            if !partition_entry.file_type()?.is_dir() {
-                continue;
-            }
-            let package_dir = partition_entry.path().join("model");
-            if !package_dir.is_dir() || !package_dir.join(COREML_CACHE_COMPILED_MODEL).exists() {
-                continue;
-            }
-            reclaimed += truncate_weight_blobs(&package_dir)?;
-        }
-    }
-    Ok(reclaimed)
-}
-
-// Truncates `weight.bin` files under `dir`, never descending into
-// `.mlmodelc` bundles: the compiled model keeps its own `weights/weight.bin`
-// copy, and that one is exactly what warm loads read, so it must survive.
-fn truncate_weight_blobs(dir: &Path) -> std::io::Result<u64> {
-    let mut reclaimed = 0;
-    for entry in std::fs::read_dir(dir)? {
-        let entry = entry?;
-        let file_type = entry.file_type()?;
-        if file_type.is_dir() {
-            if entry.path().extension() == Some(std::ffi::OsStr::new("mlmodelc")) {
-                continue;
-            }
-            reclaimed += truncate_weight_blobs(&entry.path())?;
-        } else if file_type.is_file() && entry.file_name() == COREML_PACKAGE_WEIGHT_BLOB {
-            let size = entry.metadata()?.len();
-            if size > 0 {
-                std::fs::write(entry.path(), [])?;
-                reclaimed += size;
-            }
-        }
-    }
-    Ok(reclaimed)
-}
-
-fn mark_coreml_cache_complete(cache_dir: &Path) -> std::io::Result<()> {
-    std::fs::write(coreml_cache_complete_marker(cache_dir), [])
-}
-
-fn invalidate_coreml_cache(cache_dir: &Path) -> std::io::Result<()> {
-    match std::fs::remove_dir_all(cache_dir) {
-        Ok(()) => Ok(()),
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
-        Err(error) => Err(error),
-    }
-}
-
-fn coreml_cache_complete_marker(cache_dir: &Path) -> PathBuf {
-    cache_dir.join(COREML_CACHE_COMPLETE_MARKER)
-}
-
-// Use Library/Caches for eviction and backup exclusion, or temp for unusual
-// layouts.
-#[cfg(any(target_os = "ios", target_os = "macos", test))]
-fn coreml_cache_root(model_path: &Path) -> PathBuf {
-    let cache_base = model_path
-        .ancestors()
-        .find(|ancestor| ancestor.file_name().is_some_and(|name| name == "Library"))
-        .map(|library| library.join("Caches"))
-        .unwrap_or_else(std::env::temp_dir);
-
-    cache_base
-        .join("ente")
-        .join("ml")
-        .join("coreml")
-        .join(COREML_CACHE_SCHEMA)
-}
-
-// Include the filename and file metadata in the directory name because ONNX
-// Runtime's internal CoreML cache key does not necessarily change when only
-// model weights change.
-#[cfg(any(target_os = "ios", target_os = "macos", test))]
-fn coreml_model_cache_key(model_path: &Path) -> std::io::Result<String> {
-    use std::time::UNIX_EPOCH;
-
-    let metadata = std::fs::metadata(model_path)?;
-    let modified = metadata
-        .modified()?
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default();
-    Ok(format!(
-        "{}-{}-{}-{}",
-        sanitize_cache_component(
-            model_path
-                .file_name()
-                .and_then(|name| name.to_str())
-                .unwrap_or("model")
-        ),
-        metadata.len(),
-        modified.as_secs(),
-        modified.subsec_nanos()
-    ))
-}
-
-#[cfg(any(target_os = "ios", target_os = "macos", test))]
-fn sanitize_cache_component(value: &str) -> String {
-    value
-        .chars()
-        .map(|character| {
-            if character.is_ascii_alphanumeric() || matches!(character, '-' | '_' | '.') {
-                character
-            } else {
-                '_'
-            }
-        })
-        .collect()
-}
-
-// Schema bumps must not orphan the previous version's large cache trees.
-#[cfg(any(target_os = "ios", target_os = "macos", test))]
-fn prune_stale_coreml_schema_directories(
-    coreml_root: &Path,
-    current_schema: &str,
-) -> std::io::Result<Vec<String>> {
-    let mut removed = Vec::new();
-    let entries = match std::fs::read_dir(coreml_root) {
-        Ok(entries) => entries,
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(removed),
-        Err(error) => return Err(error),
-    };
-    for entry in entries {
-        let entry = entry?;
-        if entry.file_name() == current_schema || !entry.file_type()?.is_dir() {
-            continue;
-        }
-        std::fs::remove_dir_all(entry.path())?;
-        removed.push(entry.file_name().to_string_lossy().into_owned());
-    }
-    Ok(removed)
-}
-
-#[cfg(any(target_os = "ios", target_os = "macos", test))]
-fn prune_superseded_coreml_cache_directories(
-    model_cache_root: &Path,
-    current_cache_key: &str,
-) -> std::io::Result<()> {
-    for entry in std::fs::read_dir(model_cache_root)? {
-        let entry = entry?;
-        if entry.file_name() == current_cache_key || !entry.file_type()?.is_dir() {
-            continue;
-        }
-        std::fs::remove_dir_all(entry.path())?;
-    }
-    Ok(())
 }
 
 #[cfg(target_os = "android")]
@@ -931,148 +573,9 @@ fn build_session_with_providers(model_path: &str, attempt: ProviderAttempt) -> M
     Ok(session)
 }
 
-// Guard against execution providers that return NaN or infinity instead of
-// failing. The error message matches `is_execution_provider_failure` so the
-// runtime advances to the next execution provider fallback.
-fn ensure_finite_f32(data: &[f32]) -> MlResult<()> {
-    if data.iter().copied().all(f32::is_finite) {
-        return Ok(());
-    }
-    Err(MlError::Ort(
-        "model produced non-finite output values".to_string(),
-    ))
-}
-
-fn ensure_finite_f16(data: &[half::f16]) -> MlResult<()> {
-    if data.iter().all(|value| value.is_finite()) {
-        return Ok(());
-    }
-    Err(MlError::Ort(
-        "model produced non-finite output values".to_string(),
-    ))
-}
-
-fn session_expects_f16(session: &Session) -> bool {
-    session
-        .inputs()
-        .first()
-        .and_then(|i| match i.dtype() {
-            ValueType::Tensor { ty, .. } => Some(*ty == TensorElementType::Float16),
-            _ => None,
-        })
-        .unwrap_or(false)
-}
-
-pub(crate) fn run_f32<const N: usize>(
-    session: &mut Session,
-    input: &PreparedF32Input,
-    input_shape: [i64; N],
-) -> MlResult<(Vec<i64>, Vec<f32>)> {
-    let outputs = if session_expects_f16(session) {
-        let input_tensor =
-            TensorRef::<half::f16>::from_array_view((input_shape, input.f16_data()))?;
-        session.run(ort::inputs![input_tensor])?
-    } else {
-        let input_tensor =
-            TensorRef::<f32>::from_array_view((input_shape, input.f32_data.as_slice()))?;
-        session.run(ort::inputs![input_tensor])?
-    };
-
-    if outputs.len() == 0 {
-        return Err(MlError::Ort("missing first output tensor".to_string()));
-    }
-    let output = &outputs[0];
-
-    if let Ok((tensor_shape, tensor_data)) = output.try_extract_tensor::<f32>() {
-        let shape = tensor_shape.iter().copied().collect::<Vec<_>>();
-        let data = tensor_data.to_vec();
-        ensure_finite_f32(&data)?;
-        Ok((shape, data))
-    } else {
-        let (tensor_shape, tensor_data) = output.try_extract_tensor::<half::f16>()?;
-        let shape = tensor_shape.iter().copied().collect::<Vec<_>>();
-        let mut data = vec![0.0; tensor_data.len()];
-        tensor_data.convert_to_f32_slice(&mut data);
-        ensure_finite_f32(&data)?;
-        Ok((shape, data))
-    }
-}
-
-pub(crate) fn with_prepared_float_output<const N: usize, T>(
-    session: &mut Session,
-    input: &PreparedF32Input,
-    input_shape: [i64; N],
-    consume: impl FnOnce(&[i64], BorrowedFloatTensor<'_>) -> MlResult<T>,
-) -> MlResult<T> {
-    let outputs = if session_expects_f16(session) {
-        let input_tensor =
-            TensorRef::<half::f16>::from_array_view((input_shape, input.f16_data()))?;
-        session.run(ort::inputs![input_tensor])?
-    } else {
-        let input_tensor =
-            TensorRef::<f32>::from_array_view((input_shape, input.f32_data.as_slice()))?;
-        session.run(ort::inputs![input_tensor])?
-    };
-
-    if outputs.len() == 0 {
-        return Err(MlError::Ort("missing first output tensor".to_string()));
-    }
-    let output = &outputs[0];
-    if let Ok((tensor_shape, tensor_data)) = output.try_extract_tensor::<f32>() {
-        ensure_finite_f32(tensor_data)?;
-        consume(tensor_shape, BorrowedFloatTensor::F32(tensor_data))
-    } else {
-        let (tensor_shape, tensor_data) = output.try_extract_tensor::<half::f16>()?;
-        ensure_finite_f16(tensor_data)?;
-        consume(tensor_shape, BorrowedFloatTensor::F16(tensor_data))
-    }
-}
-
-pub(crate) fn run_i32_f32<const N: usize>(
-    session: &mut Session,
-    input: &[i32],
-    input_shape: [i64; N],
-) -> MlResult<(Vec<i64>, Vec<f32>)> {
-    let input_tensor = TensorRef::<i32>::from_array_view((input_shape, input))?;
-    let outputs = session.run(ort::inputs![input_tensor])?;
-    if outputs.len() == 0 {
-        return Err(MlError::Ort("missing first output tensor".to_string()));
-    }
-    let output = &outputs[0];
-    let (tensor_shape, tensor_data) = output.try_extract_tensor::<f32>()?;
-    let shape = tensor_shape.iter().copied().collect::<Vec<_>>();
-    let data = tensor_data.to_vec();
-    ensure_finite_f32(&data)?;
-    Ok((shape, data))
-}
-
 #[cfg(test)]
 mod tests {
-    use std::{io::Write, path::Path};
-
-    use super::{
-        ExecutionProvider, coreml_cache_root, coreml_model_cache_key, ensure_finite_f16,
-        ensure_finite_f32, has_protobuf_parse_failure, invalidate_coreml_cache,
-        mark_coreml_cache_complete, prepare_coreml_cache_entry, provider_attempt_failure_message,
-        prune_stale_coreml_schema_directories, prune_superseded_coreml_cache_directories,
-        sanitize_cache_component, trim_coreml_cache_weights,
-    };
-
-    #[test]
-    fn accepts_finite_model_outputs() {
-        assert!(ensure_finite_f32(&[0.0, -1.5, f32::MAX]).is_ok());
-        assert!(ensure_finite_f16(&[half::f16::from_f32(0.25)]).is_ok());
-    }
-
-    #[test]
-    fn rejects_non_finite_model_outputs() {
-        for bad in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY] {
-            let error = ensure_finite_f32(&[1.0, bad]).unwrap_err();
-            assert!(error.to_string().contains("non-finite"));
-        }
-        let error = ensure_finite_f16(&[half::f16::NAN]).unwrap_err();
-        assert!(error.to_string().contains("non-finite"));
-    }
+    use super::{ExecutionProvider, has_protobuf_parse_failure, provider_attempt_failure_message};
 
     #[test]
     fn detects_protobuf_parse_failure() {
@@ -1118,187 +621,5 @@ mod tests {
             )
             .is_none()
         );
-    }
-
-    #[test]
-    fn places_coreml_cache_in_library_caches() {
-        let model = Path::new(
-            "/var/mobile/Containers/Data/Application/APP/Library/Application Support/assets/model.onnx",
-        );
-
-        assert_eq!(
-            coreml_cache_root(model),
-            Path::new(
-                "/var/mobile/Containers/Data/Application/APP/Library/Caches/ente/ml/coreml/ort-1_28-mlprogram-all-default-v1"
-            )
-        );
-    }
-
-    #[test]
-    fn coreml_cache_key_changes_when_model_file_changes() {
-        let mut model = tempfile::NamedTempFile::new().unwrap();
-        model.write_all(b"first").unwrap();
-        model.flush().unwrap();
-        let first_key = coreml_model_cache_key(model.path()).unwrap();
-
-        model.write_all(b" version").unwrap();
-        model.flush().unwrap();
-        let second_key = coreml_model_cache_key(model.path()).unwrap();
-
-        assert_ne!(first_key, second_key);
-    }
-
-    #[test]
-    fn sanitizes_coreml_cache_component() {
-        assert_eq!(
-            sanitize_cache_component("model name.onnx"),
-            "model_name.onnx"
-        );
-    }
-
-    #[test]
-    fn prunes_only_superseded_directories_for_one_model() {
-        let root = tempfile::tempdir().unwrap();
-        let old_cache = root.path().join("old");
-        let current_cache = root.path().join("current");
-        std::fs::create_dir(&old_cache).unwrap();
-        std::fs::create_dir(&current_cache).unwrap();
-        std::fs::write(root.path().join("marker"), b"keep").unwrap();
-
-        prune_superseded_coreml_cache_directories(root.path(), "current").unwrap();
-
-        assert!(!old_cache.exists());
-        assert!(current_cache.exists());
-        assert!(root.path().join("marker").exists());
-    }
-
-    #[test]
-    fn prunes_stale_schema_directories_keeping_current_and_files() {
-        let coreml_root = tempfile::tempdir().unwrap();
-        let stale = coreml_root.path().join("ort-1_27-mlprogram-all-default-v1");
-        let current = coreml_root.path().join("ort-1_28-mlprogram-all-default-v1");
-        std::fs::create_dir(&stale).unwrap();
-        std::fs::write(stale.join("cached"), b"stale").unwrap();
-        std::fs::create_dir(&current).unwrap();
-        std::fs::write(coreml_root.path().join("stray-file"), b"keep").unwrap();
-
-        let removed = prune_stale_coreml_schema_directories(
-            coreml_root.path(),
-            "ort-1_28-mlprogram-all-default-v1",
-        )
-        .unwrap();
-
-        assert_eq!(removed, vec!["ort-1_27-mlprogram-all-default-v1"]);
-        assert!(!stale.exists());
-        assert!(current.exists());
-        assert!(coreml_root.path().join("stray-file").exists());
-    }
-
-    #[test]
-    fn schema_pruning_treats_a_missing_root_as_empty() {
-        let parent = tempfile::tempdir().unwrap();
-        let removed =
-            prune_stale_coreml_schema_directories(&parent.path().join("missing"), "current")
-                .unwrap();
-        assert!(removed.is_empty());
-    }
-
-    fn write_cache_partition(
-        cache_dir: &Path,
-        partition: &str,
-        compiled: bool,
-    ) -> std::path::PathBuf {
-        let package_dir = cache_dir.join("modelhash").join(partition).join("model");
-        let weights_dir = package_dir
-            .join("Data")
-            .join("com.microsoft.OnnxRuntime")
-            .join("weights");
-        std::fs::create_dir_all(&weights_dir).unwrap();
-        let weight_blob = weights_dir.join("weight.bin");
-        std::fs::write(&weight_blob, b"weights").unwrap();
-        std::fs::write(package_dir.join("Manifest.json"), b"manifest").unwrap();
-        if compiled {
-            let compiled_weights_dir = package_dir.join("compiled_model.mlmodelc").join("weights");
-            std::fs::create_dir_all(&compiled_weights_dir).unwrap();
-            std::fs::write(compiled_weights_dir.join("weight.bin"), b"compiled-weights").unwrap();
-        }
-        weight_blob
-    }
-
-    #[test]
-    fn trims_package_weights_only_where_a_compiled_model_exists() {
-        let cache_dir = tempfile::tempdir().unwrap();
-        let compiled_blob = write_cache_partition(cache_dir.path(), "0_static_mlprogram", true);
-        let uncompiled_blob = write_cache_partition(cache_dir.path(), "1_static_mlprogram", false);
-        mark_coreml_cache_complete(cache_dir.path()).unwrap();
-
-        let reclaimed = trim_coreml_cache_weights(cache_dir.path()).unwrap();
-
-        assert_eq!(reclaimed, b"weights".len() as u64);
-        assert!(compiled_blob.exists());
-        assert_eq!(std::fs::metadata(&compiled_blob).unwrap().len(), 0);
-        let package_dir = compiled_blob.ancestors().nth(4).unwrap();
-        assert!(package_dir.ends_with("model"));
-        assert!(package_dir.is_dir());
-        assert_eq!(
-            std::fs::read(
-                package_dir
-                    .join("compiled_model.mlmodelc")
-                    .join("weights")
-                    .join("weight.bin")
-            )
-            .unwrap(),
-            b"compiled-weights".to_vec()
-        );
-        assert_eq!(std::fs::read(uncompiled_blob).unwrap(), b"weights".to_vec());
-    }
-
-    #[test]
-    fn trimming_an_already_trimmed_cache_reclaims_nothing() {
-        let cache_dir = tempfile::tempdir().unwrap();
-        write_cache_partition(cache_dir.path(), "0_static_mlprogram", true);
-
-        assert!(trim_coreml_cache_weights(cache_dir.path()).unwrap() > 0);
-        assert_eq!(trim_coreml_cache_weights(cache_dir.path()).unwrap(), 0);
-    }
-
-    #[test]
-    fn replaces_an_incomplete_coreml_cache_entry() {
-        let root = tempfile::tempdir().unwrap();
-        let cache_dir = root.path().join("current");
-        std::fs::create_dir(&cache_dir).unwrap();
-        let partial_artifact = cache_dir.join("partial.mlmodelc");
-        std::fs::write(&partial_artifact, b"partial").unwrap();
-
-        prepare_coreml_cache_entry(&cache_dir).unwrap();
-
-        assert!(cache_dir.is_dir());
-        assert!(!partial_artifact.exists());
-    }
-
-    #[test]
-    fn preserves_a_completed_coreml_cache_entry() {
-        let root = tempfile::tempdir().unwrap();
-        let cache_dir = root.path().join("current");
-        std::fs::create_dir(&cache_dir).unwrap();
-        let artifact = cache_dir.join("model.mlmodelc");
-        std::fs::write(&artifact, b"complete").unwrap();
-        mark_coreml_cache_complete(&cache_dir).unwrap();
-
-        prepare_coreml_cache_entry(&cache_dir).unwrap();
-
-        assert!(artifact.exists());
-    }
-
-    #[test]
-    fn invalidates_a_failed_coreml_cache_entry() {
-        let root = tempfile::tempdir().unwrap();
-        let cache_dir = root.path().join("current");
-        std::fs::create_dir(&cache_dir).unwrap();
-
-        invalidate_coreml_cache(&cache_dir).unwrap();
-
-        assert!(!cache_dir.exists());
-        invalidate_coreml_cache(&cache_dir).unwrap();
     }
 }
