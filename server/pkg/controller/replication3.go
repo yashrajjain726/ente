@@ -48,11 +48,11 @@ type ReplicationController3 struct {
 }
 
 type UploadDestination struct {
-	DC       string
-	Client   *s3.S3
-	Uploader *s3manager.Uploader
-	Bucket   *string
-	Label    string
+	DC                string
+	Client            *s3.S3
+	Uploader          *s3manager.Uploader
+	Bucket            *string
+	Label             string
 	HasComplianceHold bool
 	IsGlacier         bool
 }
@@ -172,7 +172,6 @@ func (c *ReplicationController3) replicate(i int) {
 	for {
 		err := c.tryReplicate()
 		if err != nil {
-			// Stagger retries across workers.
 			time.Sleep(time.Duration(i+1) * time.Minute)
 		}
 	}

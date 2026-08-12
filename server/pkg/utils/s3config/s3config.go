@@ -27,7 +27,7 @@ type S3Config struct {
 	// debugging workarounds; not tested/intended for production.
 	areLocalBuckets bool
 
-	fileDataConfig FileDataConfig
+	fileDataConfig   FileDataConfig
 	attachmentConfig AttachmentConfig
 }
 

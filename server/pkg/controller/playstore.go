@@ -101,7 +101,6 @@ func (c *PlayStoreController) HandleNotification(notification playstore.Develope
 		user, err := c.UserRepo.Get(subscription.UserID)
 		if err != nil {
 			if errors.Is(err, ente.ErrUserDeleted) {
-				// no-op user has already been deleted
 				return nil
 			}
 			return stacktrace.Propagate(err, "")

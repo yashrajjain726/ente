@@ -21,7 +21,7 @@ import (
 )
 
 const (
-	Srp4096Params = 4096
+	Srp4096Params                = 4096
 	MaxUnverifiedSessionInAnHour = 10
 	// Used for nonexistent users to preserve SRP timing and prevent enumeration.
 	FakeVerifier = "RNYLOgdzKsbhRWN8OoD05kNpfbqb9uASHYpaLrYLYVemCV0pf4fBgo+25jeu8SaVMQhlkyIF2BgGXX4uzy8Pmwq1ocqt8DsGk0DrlOE1AV9ogaY3myoTjXTQG5dU/hTywylKJYdpWSEyzMMLbWcuO8ldS6uzYXqK+jbfEDDj8k4PqLx1715BPgigNydCbD7/VtwaMhQ8MEygiW/2PbieeqUzuCqEWfwu0uytPM9LiuHH7DT3k2fELFOoPWs3KQAhk6rmM17JOLm8Qvt+xGU6nJZKzTNPxw9o4H4FvlGmsEYUdTP+WPdWpzcton6BowCXKN9G3hZx10OUzBuePHFNKjDlaSLpJXVclLWmza6aDBpjKahayW2UvdQw1tSonyFUjJOanocrPEoHthHUjUGXkeRqcaU4CV9KLQFaHqnHTYc9uJKuYl/tcYoWXuHrZ0cFYRpc6qf/gBCuuwkhTXXsJxTlepe5x0gqgQb7mD5y+dvINks/gpO/3x4T4RkQcyoonsOZv2uLIBr3D6Ede9/aJstIkMh3dTEpDWdw8tEaO7ZjqEwKXVA+/fquJ7P8B3fcIvPy8UZOpwAYtWSPh3OYzijG7WFXu+ajPBqkVI1OBSCYOlTQlPXyrv7myiD8/FXJep5IDPeuJsmGrLPJXBZjPKWR0ISBWol5KTYWE2EllYQ="

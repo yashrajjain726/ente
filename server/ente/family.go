@@ -65,7 +65,7 @@ type FamilyMemberResponse struct {
 }
 
 type UserUsageWithSubData struct {
-	UserID int64
+	UserID          int64
 	StorageConsumed int64
 	ExpiryTime      int64
 	Storage         int64

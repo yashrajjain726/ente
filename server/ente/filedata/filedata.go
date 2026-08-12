@@ -128,8 +128,8 @@ type Row struct {
 	Size         int64
 	LatestBucket string
 	ObjectID     *string
-	// For HLS video object, there's no object nonce, all relevant data
-	// is stored in the metadata object that primarily contains the playlist.
+	// HLS video uses the default nonce with a one-time key stored in the playlist
+	// metadata, so no object nonce is stored.
 	ObjectNonce *string
 	// Size of the object that is stored in the S3 bucket.
 	// In case of HLS video, this points to the size of the encrypted video.

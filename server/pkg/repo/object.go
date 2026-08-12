@@ -92,6 +92,7 @@ func (repo *ObjectRepository) GetAccessibleObject(ctx context.Context, fileID in
 	return s3ObjectKey, err
 }
 
+// Keep access validation and object lookup in one latency-sensitive query.
 func (repo *ObjectRepository) GetAccessibleObjectWithDCs(ctx context.Context, fileID int64, actorUserID int64, objType ente.ObjectType) (ente.S3ObjectKey, []string, error) {
 	row := repo.objectLookupDB().QueryRowContext(ctx, `
 		SELECT
@@ -154,6 +155,7 @@ func (repo *ObjectRepository) GetOwnedObject(ctx context.Context, fileID int64, 
 	return s3ObjectKey, err
 }
 
+// Keep ownership validation and object lookup in one latency-sensitive query.
 func (repo *ObjectRepository) GetOwnedObjectWithDCs(ctx context.Context, fileID int64, ownerID int64, objType ente.ObjectType) (ente.S3ObjectKey, []string, error) {
 	row := repo.objectLookupDB().QueryRowContext(ctx, `
 		SELECT
@@ -205,6 +207,8 @@ func (repo *ObjectRepository) GetCollectionObject(ctx context.Context, collectio
 	return s3ObjectKey, err
 }
 
+// Keep collection access validation and object lookup in one latency-sensitive
+// query.
 func (repo *ObjectRepository) GetCollectionObjectWithDCs(ctx context.Context, collectionID int64, fileID int64, objType ente.ObjectType) (ente.S3ObjectKey, []string, error) {
 	row := repo.objectLookupDB().QueryRowContext(ctx, `
 		SELECT

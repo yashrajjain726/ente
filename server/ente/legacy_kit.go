@@ -90,9 +90,9 @@ type LegacyKitRecoveryInitiator struct {
 	// Share indexes reported by the recovery client as the shares used to
 	// reconstruct the kit secret. This is an audit hint, not an authorization
 	// primitive.
-	UsedPartIndexes []int `json:"usedPartIndexes,omitempty"`
-	IP        string `json:"ip"`
-	UserAgent string `json:"userAgent"`
+	UsedPartIndexes []int  `json:"usedPartIndexes,omitempty"`
+	IP              string `json:"ip"`
+	UserAgent       string `json:"userAgent"`
 }
 
 type LegacyKitOwnerRecoverySessionResponse struct {
