@@ -980,6 +980,7 @@ class _LocalBackupExperienceState extends State<LocalBackupExperience> {
     ).showSnackBar(SnackBar(content: Text(message)));
   }
 
+  // The "On My iPhone" root cannot store files; require a subfolder.
   bool _isInvalidIosPath(String path) {
     if (!Platform.isIOS) return false;
     if (path.isEmpty) return true;

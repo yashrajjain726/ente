@@ -23,7 +23,9 @@ import 'package:synchronized/synchronized.dart';
 
 enum WidgetStatus {
   notSynced,
+  // Some data was cached before the sync stopped or without a widget installed.
   syncedPartially,
+  // A widget that previously had data was deliberately cleared.
   syncedEmpty,
   syncedAll,
 }

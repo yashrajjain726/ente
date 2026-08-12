@@ -30,6 +30,7 @@ class PinInputComponent extends StatefulWidget {
   final int length;
   final TextEditingController controller;
   final bool autofocus;
+  // When false, the caller must update the controller from its own keypad.
   final bool useNativeKeyboard;
   final bool closeKeyboardWhenCompleted;
   final bool obscureText;

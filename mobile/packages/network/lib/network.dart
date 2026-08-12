@@ -26,7 +26,7 @@ class Network {
     final version = packageInfo.version;
     String packageName = packageInfo.packageName;
 
-    // Desktop Auth reports names that must be normalized for production.
+    // Linux reports ente_auth; Windows reports Ente Auth.
     if (Platform.isWindows || Platform.isLinux) {
       if (packageName == 'ente_auth' || packageName == 'Ente Auth') {
         packageName = 'io.ente.auth';

@@ -217,8 +217,7 @@ class DateParseService {
 
       if (p1 >= 1 && p1 <= 31 && p2 >= 1 && p2 <= 12) {
         return PartialDate(day: p1, month: p2, year: year);
-      }
-      else if (p1 >= 1 && p1 <= 12 && p2 >= 1 && p2 <= 31) {
+      } else if (p1 >= 1 && p1 <= 12 && p2 >= 1 && p2 <= 31) {
         return PartialDate(day: p2, month: p1, year: year);
       }
       return PartialDate.empty;

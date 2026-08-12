@@ -1,7 +1,1 @@
-enum SqliteAsyncConflictAlgorithm {
-  rollback,
-  abort,
-  fail,
-  ignore,
-  replace,
-}
+enum SqliteAsyncConflictAlgorithm { rollback, abort, fail, ignore, replace }

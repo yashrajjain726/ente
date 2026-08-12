@@ -545,6 +545,7 @@ class CollectionService {
         keepFiles: true,
         skipEventFiring: isBulkDelete,
       );
+      // Bulk deletion syncs once after the loop.
       if (!isBulkDelete) {
         await sync();
         await TrashService.instance.syncTrash();

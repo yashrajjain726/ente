@@ -1611,7 +1611,7 @@ class SearchService {
           );
         }
       }
-      // TODO: Add named base locations to search results.
+      // TODO: lau: Add base location names
 
       if (limit == null || tagSearchResults.length < limit) {
         final results = await locationService.getFilesInCity(
@@ -1703,8 +1703,7 @@ class SearchService {
           ),
         );
       }
-    }
-    else if (parsedDate.day != null && parsedDate.month != null) {
+    } else if (parsedDate.day != null && parsedDate.month != null) {
       final int day = parsedDate.day!;
       final int month = parsedDate.month!;
       final int? year = parsedDate.year; // nullable for generic dates

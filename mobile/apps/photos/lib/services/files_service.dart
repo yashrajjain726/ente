@@ -218,6 +218,8 @@ class FilesService {
     }
   }
 
+  // Note: this method is not used anywhere, but it is kept for future
+  // reference when we add bulk EditTime feature
   Future<void> bulkEditTime(List<EnteFile> files, EditTimeSource source) async {
     final ListMatch<EnteFile> result = files.splitMatch(
       (element) => element.isUploaded,
@@ -277,9 +279,4 @@ class FilesService {
   }
 }
 
-enum EditTimeSource {
-  fileName,
-  exif,
-  manualFix,
-  manualAdjusted,
-}
+enum EditTimeSource { fileName, exif, manualFix, manualAdjusted }

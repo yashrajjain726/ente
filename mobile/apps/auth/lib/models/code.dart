@@ -33,7 +33,7 @@ class Code {
   final Object? err;
   bool get hasError => err != null;
 
-  // Unsaved codes use rawData until sync assigns generatedID.
+  // Unsaved codes use rawData until the first save assigns generatedID.
   String get selectionKey => generatedID?.toString() ?? rawData;
 
   String get issuerAccount =>

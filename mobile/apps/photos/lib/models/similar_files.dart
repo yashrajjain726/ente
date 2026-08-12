@@ -75,6 +75,7 @@ class SimilarFilesCache {
   final bool exact;
 
   List<SimilarFiles>? _similarFilesList;
+  // Milliseconds since epoch.
   final int cachedTime;
 
   SimilarFilesCache({

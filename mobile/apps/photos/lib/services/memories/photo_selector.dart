@@ -10,21 +10,11 @@ import "package:photos/models/ml/face/face_with_embedding.dart";
 import "package:photos/models/ml/vector.dart";
 import "package:photos/services/location_service.dart";
 
-enum SelectionDistribution {
-  none,
-  timeBuckets,
-  yearRoundRobin,
-}
+enum SelectionDistribution { none, timeBuckets, yearRoundRobin }
 
-enum SelectionPick {
-  ranked,
-  geographicFarthest,
-}
+enum SelectionPick { ranked, geographicFarthest }
 
-enum SelectionSort {
-  chronological,
-  reverseChronological,
-}
+enum SelectionSort { chronological, reverseChronological }
 
 class SelectionConfig {
   final int targetSize;
@@ -37,6 +27,7 @@ class SelectionConfig {
   final SelectionPick pick;
   final SelectionSort sort;
 
+  // Fraction of each bucket to retain; 0.3 means 30%.
   final double? preNarrowTopPercent;
 
   final bool skipDuplicateCheckOnFirstRound;
@@ -307,8 +298,7 @@ class PhotoSelector {
       });
     }
 
-    final years = yearToFiles.keys.toList()
-      ..sort((a, b) => b.compareTo(a));
+    final years = yearToFiles.keys.toList()..sort((a, b) => b.compareTo(a));
 
     final selected = <Memory>[];
     final selectedCreationTimes = <int>[];

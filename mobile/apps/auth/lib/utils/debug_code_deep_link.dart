@@ -9,7 +9,7 @@ class DebugCodeDeepLink {
   final String codeUri;
 }
 
-// iOS routes otpauth:// to Passwords, so debug automation wraps it in Ente
+// iOS may route otpauth:// to Passwords, so debug automation wraps it in Ente
 // Auth's own scheme.
 DebugCodeDeepLink? parseDebugCodeDeepLink(String link) {
   if (!kDebugMode) return null;

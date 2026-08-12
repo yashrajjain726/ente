@@ -87,6 +87,7 @@ class _TripSurfaceCandidate {
 class TripMemoriesCalculatorV2 {
   static const _maxTemporalGapDays = 15;
 
+  // Spatial distance constants in this class use kilometers.
   static const _tripClusterRadius = 25.0;
 
   static const _chainHopDistance = 800.0;

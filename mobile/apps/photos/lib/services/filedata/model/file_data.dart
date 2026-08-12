@@ -92,6 +92,7 @@ class RemoteFaceEmbedding {
   final int height;
   final int width;
 
+  // Bits are defined in ml_versions.dart; absent on the wire means legacy 0.
   final int flags;
 
   RemoteFaceEmbedding(
@@ -131,6 +132,7 @@ class RemoteClipEmbedding {
   final String client;
   final List<double> embedding;
 
+  // Bits are defined in ml_versions.dart; absent on the wire means legacy 0.
   final int flags;
 
   RemoteClipEmbedding(

@@ -228,6 +228,7 @@ class _VideoWidgetMediaKitState extends State<VideoWidgetMediaKit>
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
+      // During zoom, keep this recognizer out of multi-touch gesture arenas.
       onVerticalDragUpdate: _isGuestView || _isZooming
           ? null
           : (d) {

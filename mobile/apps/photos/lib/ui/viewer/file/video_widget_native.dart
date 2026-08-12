@@ -251,6 +251,7 @@ class _VideoWidgetNativeState extends State<VideoWidgetNative>
       _logger.info("Clearing cache");
       final file = File(_filePath!);
 
+      // Avoid an observed PathNotFoundException.
       if (file.existsSync()) {
         file.delete().then((value) {
           _logger.info("Cache cleared");
@@ -302,6 +303,7 @@ class _VideoWidgetNativeState extends State<VideoWidgetNative>
           }
         },
         child: GestureDetector(
+          // During zoom, keep this recognizer out of multi-touch gesture arenas.
           onVerticalDragUpdate: _isGuestView || _isZooming
               ? null
               : (d) {

@@ -130,6 +130,7 @@ class LocalSettings {
 
   AppMode? _cachedAppMode;
 
+  // Session-only so the get-started banner waits until the next launch.
   bool localGalleryModeEnabledThisSession = false;
 
   // Carries first-import completion from local-gallery mode into account setup.

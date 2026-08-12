@@ -95,6 +95,7 @@ class TextInputComponent extends StatefulWidget {
   final IconData? messageIcon;
   final bool isDisabled;
 
+  // Unlike isDisabled, this keeps enabled styling and selectable text.
   final bool readOnly;
   final Iterable<String>? autofillHints;
   final int? maxLines;

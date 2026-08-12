@@ -37,7 +37,7 @@ class CodeDisplayStore {
     isSelectionModeActive.value = false;
   }
 
-  // Preserve selections when sync replaces rawData keys with generated IDs.
+  // Preserve selections when rawData keys are replaced by generated IDs.
   void reconcileSelections(Iterable<Code> codes) {
     final currentSelection = selectedCodeIds.value;
     if (currentSelection.isEmpty) {

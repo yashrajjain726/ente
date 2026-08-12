@@ -2,6 +2,7 @@ import "package:flutter/material.dart";
 import "package:flutter/services.dart";
 import "package:photos/models/file/file.dart";
 
+// Scale is relative to the contained image; offset is in logical pixels.
 @immutable
 class ZoomTransform {
   static const ZoomTransform identity = ZoomTransform(

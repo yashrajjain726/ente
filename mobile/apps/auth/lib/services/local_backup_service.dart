@@ -32,6 +32,7 @@ class LocalBackupService {
     });
   }
 
+  // Clear any backup password left in secure storage by an earlier install.
   Future<void> _clearBackupPasswordIfFreshInstall(
     bool hasOptedForOfflineMode,
   ) async {

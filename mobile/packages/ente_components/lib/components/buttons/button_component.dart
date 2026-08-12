@@ -55,6 +55,7 @@ class ButtonComponent extends StatefulWidget {
   final ValueListenable<String>? progressStatus;
   final Widget? leading;
 
+  // Only popup routes such as dialogs and sheets are dismissed.
   final bool dismissModalOnSuccess;
 
   @override

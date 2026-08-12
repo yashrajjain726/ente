@@ -77,6 +77,7 @@ class LogConfig {
 
   Duration sentryRetryDelay;
 
+  // Null disables file logging; empty uses the default directory.
   String? logDirPath;
 
   int maxLogFiles;
