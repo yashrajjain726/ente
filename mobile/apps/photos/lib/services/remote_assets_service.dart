@@ -63,7 +63,6 @@ class RemoteAssetsService {
     return file.path;
   }
 
-  ///Returns asset if the remote asset is new compared to the local copy of it
   Future<File?> getAssetIfUpdated(
     String remotePath, {
     String? expectedSha256,
@@ -125,14 +124,9 @@ class RemoteAssetsService {
   }
 
   String _urlToFileName(String url) {
-    // Remove the protocol part (http:// or https://)
     String fileName = url
         .replaceAll(RegExp(r'https?://'), '')
-        // Replace all non-alphanumeric characters except for underscores and periods with an underscore
         .replaceAll(RegExp(r'[^\w\.]'), '_');
-    // Optionally, you might want to trim the resulting string to a certain length
-
-    // Replace periods with underscores for better readability, if desired
     fileName = fileName.replaceAll('.', '_');
 
     return fileName;

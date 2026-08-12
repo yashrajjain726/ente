@@ -6,7 +6,6 @@ import "package:photos/models/ml/face/landmark.dart";
 import 'package:photos/services/machine_learning/face_ml/face_filtering/face_filtering_constants.dart';
 import "package:photos/services/machine_learning/ml_result.dart";
 
-// FileInfo contains the image width and height of the image the face was detected in.
 class FileInfo {
   int? imageWidth;
   int? imageHeight;
@@ -20,12 +19,8 @@ class Face {
   final double score;
   final double blur;
 
-  ///#region Local DB fields
-  // This is not stored on the server, using it for local DB row
   FileInfo? fileInfo;
   final int fileID;
-
-  ///#endregion
 
   bool get isBlurry => blur < kLaplacianHardThreshold;
 
@@ -93,7 +88,6 @@ class Face {
       parseAsDoubleList(json['embedding'] as List),
       parseIntOrDoubleAsDouble(json['score'])!,
       Detection.fromJson(json['detection'] as Map<String, dynamic>),
-      // high value means t
       parseIntOrDoubleAsDouble(json['blur']) ?? kLapacianDefault,
     );
   }

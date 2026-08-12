@@ -151,11 +151,9 @@ class _NativeVideoProgressControlsState
   void _listen(PlaybackEvent playerData) {
     switch (playerData) {
       case PlaybackStatusChangedEvent():
-        // Emitted when playback status changes (playing, paused, or stopped)
         _onPlaybackStatusChanged();
         break;
       case PlaybackPositionChangedEvent():
-        // Emitted when playback position changes
         _onPlaybackPositionChanged();
         break;
       case PlaybackEndedEvent():

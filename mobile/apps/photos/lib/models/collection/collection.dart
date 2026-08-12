@@ -14,7 +14,7 @@ class Collection {
   final String encryptedKey;
   final String? keyDecryptionNonce;
 
-  /// WARNING: use collectionName instead of name! Name is deprecated but can't be removed because of old accounts.
+  // Deprecated but required for old accounts. Use collectionName.
   String? name;
 
   // encryptedName & nameDecryptionNonce will be null for collections
@@ -121,8 +121,7 @@ class Collection {
     return (sharedMagicMetadata.order ?? 0) != 0;
   }
 
-  // hasLink returns true if there's any link attached to the collection
-  // including expired links
+  // Includes expired links.
   bool get hasLink => publicURLs.isNotEmpty;
 
   bool get hasCover => (pubMagicMetadata.coverID ?? 0) > 0;
@@ -132,7 +131,6 @@ class Collection {
     return description == null || description.isEmpty ? null : description;
   }
 
-  // hasSharees returns true if the collection is shared with other ente users
   bool get hasSharees => sharees.isNotEmpty;
 
   bool get isPinned => (magicMetadata.order ?? 0) != 0;
@@ -143,10 +141,8 @@ class Collection {
     }
     final userID = Configuration.instance.getUserID();
     if (userID != null && isOwner(userID)) {
-      // Owner: check owner's magic metadata
       return mMdVersion > 0 && magicMetadata.visibility == hiddenVisibility;
     } else {
-      // Sharee: check sharee's magic metadata
       return hasShareeHidden();
     }
   }
@@ -231,9 +227,7 @@ class Collection {
     return CollectionParticipantRole.unknown;
   }
 
-  // canLinkToDevicePath returns true if the collection can be linked to local
-  // device album based on path. The path is nothing but the name of the device
-  // album.
+  // The encrypted path names the linked device album.
   bool canLinkToDevicePath(int userID) {
     return isOwner(userID) && !isDeleted && attributes.encryptedPath != null;
   }

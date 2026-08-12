@@ -92,9 +92,6 @@ class RemoteFaceEmbedding {
   final int height;
   final int width;
 
-  /// Bitmask describing properties of this index (e.g. which runtime produced
-  /// it). Bits are defined in `ml_versions.dart`. Absent on the wire => 0
-  /// (legacy).
   final int flags;
 
   RemoteFaceEmbedding(
@@ -106,7 +103,6 @@ class RemoteFaceEmbedding {
     this.flags = 0,
   });
 
-  // toJson
   Map<String, dynamic> toJson() => {
     'faces': faces.map((x) => x.toJson()).toList(),
     'version': version,
@@ -116,7 +112,6 @@ class RemoteFaceEmbedding {
     if (flags != 0) 'flags': flags,
   };
 
-  // fromJson
   factory RemoteFaceEmbedding.fromJson(Map<String, dynamic> json) {
     return RemoteFaceEmbedding(
       List<Face>.from(
@@ -136,9 +131,6 @@ class RemoteClipEmbedding {
   final String client;
   final List<double> embedding;
 
-  /// Bitmask describing properties of this index (e.g. which runtime produced
-  /// it). Bits are defined in `ml_versions.dart`. Absent on the wire => 0
-  /// (legacy).
   final int flags;
 
   RemoteClipEmbedding(
@@ -148,7 +140,6 @@ class RemoteClipEmbedding {
     this.flags = 0,
   });
 
-  // toJson
   Map<String, dynamic> toJson() => {
     'embedding': embedding,
     'version': version,
@@ -156,7 +147,6 @@ class RemoteClipEmbedding {
     if (flags != 0) 'flags': flags,
   };
 
-  // fromJson
   factory RemoteClipEmbedding.fromJson(Map<String, dynamic> json) {
     return RemoteClipEmbedding(
       parseAsDoubleList(json['embedding'] as List),
@@ -167,7 +157,6 @@ class RemoteClipEmbedding {
   }
 }
 
-// FDStatus represents the status of a file data entry.
 class FDStatus {
   final int fileID;
   final int userID;
