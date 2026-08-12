@@ -1153,8 +1153,6 @@ class _DeleteConfirmationSheet extends StatefulWidget {
   final Future<bool> Function() onDeleteFromRemote;
   final Future<bool> Function() onDeleteFromBoth;
 
-  const DeleteConfirmationSheet({super.key});
-
   const _DeleteConfirmationSheet({
     required this.isLocal,
     required this.isRemote,
