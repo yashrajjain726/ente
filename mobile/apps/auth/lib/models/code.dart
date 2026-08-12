@@ -18,7 +18,7 @@ class Code {
   final Algorithm algorithm;
   final Type type;
 
-  /// otpauth url in the code
+  // Original otpauth URL.
   final String rawData;
   final int counter;
   bool? hasSynced;
@@ -33,18 +33,7 @@ class Code {
   final Object? err;
   bool get hasError => err != null;
 
-  /// Stable identifier for UI selection state and other transient UI features.
-  ///
-  /// This key ensures selection consistency across sync operations and local changes:
-  /// - Uses [generatedID] when available (after code is persisted to database)
-  /// - Falls back to [rawData] for unpersisted codes (before first save)
-  ///
-  /// The fallback strategy ensures that:
-  /// 1. Selections survive the transition from local-only to synced codes
-  /// 2. Each persisted code has a unique, stable identifier
-  /// 3. UI state reconciliation can map old keys to new keys during sync
-  ///
-  /// See [CodeDisplayStore.reconcileSelections] for selection state management.
+  // Unsaved codes use rawData until sync assigns generatedID.
   String get selectionKey => generatedID?.toString() ?? rawData;
 
   String get issuerAccount =>

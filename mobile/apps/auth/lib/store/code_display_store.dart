@@ -37,30 +37,7 @@ class CodeDisplayStore {
     isSelectionModeActive.value = false;
   }
 
-  /// Reconciles current selections with the provided list of codes.
-  ///
-  /// This ensures selection state remains valid when:
-  /// - Codes transition from local to synced (rawData → generatedID)
-  /// - Codes are deleted or removed from the list
-  /// - Codes are marked with errors and become invalid for selection
-  ///
-  /// **How it works:**
-  /// 1. Builds a set of valid selection keys from non-error codes
-  /// 2. Creates a remapping table for old keys (rawData, old generatedID) → new keys
-  /// 3. Updates current selection by keeping valid keys and remapping changed keys
-  /// 4. Removes selections for codes that no longer exist or have errors
-  ///
-  /// **Performance:** O(n + m) where n = number of codes, m = number of selected items
-  ///
-  /// **Example scenario:**
-  /// ```dart
-  /// // User selects code with rawData="abc123" (not yet synced)
-  /// selectedCodeIds = {"abc123"}
-  ///
-  /// // After sync, code gets generatedID=42
-  /// // reconcileSelections maps "abc123" → "42"
-  /// selectedCodeIds = {"42"}  // Selection preserved!
-  /// ```
+  // Preserve selections when sync replaces rawData keys with generated IDs.
   void reconcileSelections(Iterable<Code> codes) {
     final currentSelection = selectedCodeIds.value;
     if (currentSelection.isEmpty) {

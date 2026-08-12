@@ -32,8 +32,6 @@ class LocalBackupService {
     });
   }
 
-  /// Clear backup password on fresh install (like lock screen does).
-  /// Only clears if not logged in and not in offline mode.
   Future<void> _clearBackupPasswordIfFreshInstall(
     bool hasOptedForOfflineMode,
   ) async {
@@ -92,8 +90,7 @@ class LocalBackupService {
     return triggerAutomaticBackup();
   }
 
-  /// Write backup to a directory that we already have scoped access to.
-  /// Used on iOS where security-scoped access is held by caller.
+  // The caller must hold security-scoped access on iOS.
   Future<bool> writeBackupToDirectory(String directoryPath) async {
     try {
       final String? password = await _readPassword();

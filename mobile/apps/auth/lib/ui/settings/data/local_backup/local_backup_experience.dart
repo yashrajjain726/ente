@@ -794,7 +794,6 @@ class _LocalBackupExperienceState extends State<LocalBackupExperience> {
     }
   }
 
-  /// iOS/macOS: Persist location with pre-created bookmark
   Future<bool> _persistLocationWithBookmark(
     String path,
     String bookmark, {
@@ -981,11 +980,6 @@ class _LocalBackupExperienceState extends State<LocalBackupExperience> {
     ).showSnackBar(SnackBar(content: Text(message)));
   }
 
-  /// Check if the selected iOS path is the device root ("On My iPhone").
-  ///
-  /// "On My iPhone" root cannot store files directly - user must select
-  /// or create a folder inside it. Only the actual iOS File Provider Storage
-  /// root (AppGroup/UUID/File Provider Storage) is invalid.
   bool _isInvalidIosPath(String path) {
     if (!Platform.isIOS) return false;
     if (path.isEmpty) return true;

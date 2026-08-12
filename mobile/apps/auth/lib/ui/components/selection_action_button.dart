@@ -4,7 +4,6 @@ import "package:ente_auth/theme/ente_theme.dart";
 import "package:flutter/material.dart";
 import "package:flutter_svg/svg.dart";
 
-/// Pass icon or asset path of svg
 class SelectionActionButton extends StatelessWidget {
   final String labelText;
   final IconData? icon;

@@ -151,8 +151,7 @@ Future<int?> _processAndOTPFile(
   return saveImportedCodes(parsedCodes);
 }
 
-/// Top-level function for decrypting andOTP backup in a separate isolate.
-/// Must be top-level (not a method or closure) to work with compute().
+// Must remain top-level for compute().
 String _decryptAndOTPBackup(_DecryptParams params) {
   final Uint8List fileBytes = params.fileBytes;
   final String password = params.password;
