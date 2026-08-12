@@ -22,32 +22,42 @@ class PersonFeedbackService {
   }
 
   bool _shouldReconcilePeople = false;
-  bool _isSyncing = false;
+  bool _syncRequested = false;
+  Future<void>? _syncFuture;
 
-  Future<void> syncPersonFeedback() async {
-    if (_isSyncing) {
-      return;
+  Future<void> syncPersonFeedback() {
+    _syncRequested = true;
+    return _syncFuture ??= _runPendingSyncs();
+  }
+
+  Future<void> _runPendingSyncs() async {
+    try {
+      do {
+        _syncRequested = false;
+        await _syncPersonFeedbackInternal();
+      } while (_syncRequested);
+    } finally {
+      _syncFuture = null;
     }
+  }
+
+  Future<void> _syncPersonFeedbackInternal() async {
     if (isLocalGalleryMode) {
       _logger.finest("Skipping person feedback sync in local gallery mode");
       return;
     }
-    _isSyncing = true;
-    try {
-      if (_shouldReconcilePeople) {
-        await PersonService.instance.reconcileClusters();
+
+    if (_shouldReconcilePeople) {
+      await PersonService.instance.reconcileClusters();
+      Bus.instance.fire(PeopleChangedEvent(type: PeopleEventType.syncDone));
+      _shouldReconcilePeople = false;
+    } else {
+      final didChange = await PersonService.instance
+          .fetchRemoteClusterFeedback();
+      if (didChange) {
+        _logger.info("people: got remote data update");
         Bus.instance.fire(PeopleChangedEvent(type: PeopleEventType.syncDone));
-        _shouldReconcilePeople = false;
-      } else {
-        final didChange = await PersonService.instance
-            .fetchRemoteClusterFeedback();
-        if (didChange) {
-          _logger.info("people: got remote data update");
-          Bus.instance.fire(PeopleChangedEvent(type: PeopleEventType.syncDone));
-        }
       }
-    } finally {
-      _isSyncing = false;
     }
   }
 }

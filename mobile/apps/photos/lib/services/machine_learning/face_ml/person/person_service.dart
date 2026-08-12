@@ -38,6 +38,8 @@ typedef PersonAvatarUpdateResult = ({
 
 class PersonService {
   static const Object _attributeNotProvided = Object();
+  static const String _appliedCGroupSyncTimeKeyPrefix =
+      "person_feedback_applied_cgroup_sync_time";
   final EntityService entityService;
   final MLDataDB faceMLDataDB;
   final SharedPreferences prefs;
@@ -191,6 +193,9 @@ class PersonService {
   int lastRemoteSyncTime() {
     return entityService.lastSyncTime(EntityType.cgroup);
   }
+
+  String get _appliedCGroupSyncTimeKey =>
+      "${_appliedCGroupSyncTimeKeyPrefix}_${_currentUserIDProvider() ?? 0}";
 
   Future<List<PersonEntity>> getPersons() async {
     final remoteSyncTime = lastRemoteSyncTime();
@@ -531,7 +536,7 @@ class PersonService {
     Bus.instance.fire(PeopleChangedEvent());
   }
 
-  // fetchRemoteClusterFeedback returns true if remote data has changed
+  // Returns true when remote feedback was downloaded or newly applied locally.
   Future<bool> fetchRemoteClusterFeedback({
     bool skipClusterUpdateIfNoChange = true,
   }) async {
@@ -543,7 +548,10 @@ class PersonService {
       EntityType.cgroup,
     );
     final bool changed = changedEntities > 0;
-    if (changed == false && skipClusterUpdateIfNoChange) {
+    final downloadedSyncTime = lastRemoteSyncTime();
+    final appliedSyncTime = prefs.getInt(_appliedCGroupSyncTimeKey) ?? 0;
+    final hasUnappliedChanges = downloadedSyncTime != appliedSyncTime;
+    if (!changed && !hasUnappliedChanges && skipClusterUpdateIfNoChange) {
       return false;
     }
 
@@ -668,7 +676,8 @@ class PersonService {
       }
     }
 
-    return changed;
+    await prefs.setInt(_appliedCGroupSyncTimeKey, downloadedSyncTime);
+    return changed || hasUnappliedChanges;
   }
 
   Future<PersonAvatarUpdateResult> updateAvatar(
