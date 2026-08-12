@@ -22,6 +22,13 @@ struct ModelSlotState {
     session: Option<Session>,
 }
 
+#[cfg(test)]
+#[derive(Debug, PartialEq, Eq)]
+struct ModelSlotSnapshot {
+    path: String,
+    session_loaded: bool,
+}
+
 #[derive(Debug)]
 struct ModelSlot {
     model: Model,
@@ -68,6 +75,15 @@ impl ModelSlot {
         match self.state.lock() {
             Ok(guard) => guard,
             Err(poisoned) => poisoned.into_inner(),
+        }
+    }
+
+    #[cfg(test)]
+    fn snapshot(&self) -> ModelSlotSnapshot {
+        let state = self.lock_state();
+        ModelSlotSnapshot {
+            path: state.path.clone(),
+            session_loaded: state.session.is_some(),
         }
     }
 
@@ -328,8 +344,14 @@ mod tests {
             ..ModelPaths::default()
         });
 
-        let clip_text = runtime.slot(Model::ClipText).lock_state();
-        assert_eq!(clip_text.path, "clip_text.onnx");
+        assert_eq!(
+            runtime.slot(Model::ClipText).snapshot().path,
+            "clip_text.onnx"
+        );
+        assert_eq!(
+            runtime.slot(Model::FaceDetection).snapshot().path,
+            "face.onnx"
+        );
     }
 
     #[test]
@@ -342,34 +364,31 @@ mod tests {
     }
 
     #[test]
-    fn release_indexing_models_keeps_clip_text_state() {
+    fn release_indexing_models_preserves_clip_text_configuration() {
         let runtime = MlRuntime::new();
+        let model_paths = ModelPaths {
+            face_detection: "face.onnx".to_string(),
+            clip_text: "clip_text.onnx".to_string(),
+            ..ModelPaths::default()
+        };
 
-        {
-            let mut clip_text = runtime.slot(Model::ClipText).lock_state();
-            clip_text.path = "clip_text.onnx".to_string();
-            clip_text.provider_plan = Some(onnx::ProviderPlan::new(
-                onnx::ExecutionMode::CpuOnly,
-                "clip_text.onnx",
-            ));
-        }
-        {
-            let mut face_detection = runtime.slot(Model::FaceDetection).lock_state();
-            face_detection.path = "face.onnx".to_string();
-            face_detection.provider_plan = Some(onnx::ProviderPlan::new(
-                onnx::ExecutionMode::CpuOnly,
-                "face.onnx",
-            ));
-        }
-
+        runtime.configure_requested_models(&model_paths);
         runtime.release_indexing_models();
 
-        let clip_text = runtime.slot(Model::ClipText).lock_state();
-        assert_eq!(clip_text.path, "clip_text.onnx");
-        assert!(clip_text.provider_plan.is_some());
-
-        let face_detection = runtime.slot(Model::FaceDetection).lock_state();
-        assert!(face_detection.provider_plan.is_none());
+        assert_eq!(
+            runtime.slot(Model::ClipText).snapshot(),
+            ModelSlotSnapshot {
+                path: "clip_text.onnx".to_string(),
+                session_loaded: false,
+            }
+        );
+        assert_eq!(
+            runtime.slot(Model::FaceDetection).snapshot(),
+            ModelSlotSnapshot {
+                path: "face.onnx".to_string(),
+                session_loaded: false,
+            }
+        );
     }
 
     #[test]
@@ -383,116 +402,54 @@ mod tests {
             ..ModelPaths::default()
         });
 
-        let face_detection = runtime.slot(Model::FaceDetection).lock_state();
-        assert_eq!(face_detection.path, "face.onnx");
-        assert!(face_detection.session.is_none());
-
-        let face_embedding = runtime.slot(Model::FaceEmbedding).lock_state();
-        assert_eq!(face_embedding.path, "embed.onnx");
-        assert!(face_embedding.session.is_none());
-
-        let clip_image = runtime.slot(Model::ClipImage).lock_state();
-        assert_eq!(clip_image.path, "clip.onnx");
-        assert!(clip_image.session.is_none());
+        assert_eq!(
+            runtime.slot(Model::FaceDetection).snapshot(),
+            unloaded_snapshot("face.onnx")
+        );
+        assert_eq!(
+            runtime.slot(Model::FaceEmbedding).snapshot(),
+            unloaded_snapshot("embed.onnx")
+        );
+        assert_eq!(
+            runtime.slot(Model::ClipImage).snapshot(),
+            unloaded_snapshot("clip.onnx")
+        );
     }
 
     #[test]
-    fn sync_indexing_residency_clears_disabled_slots() {
-        let slot = ModelSlot::new(Model::ClipImage);
+    fn disabling_an_indexing_model_resets_its_slot() {
+        let runtime = MlRuntime::new();
+        runtime.prepare_indexing_models(&ModelPaths {
+            clip_image: "clip.onnx".to_string(),
+            ..ModelPaths::default()
+        });
 
-        {
-            let mut state = slot.lock_state();
-            state.path = "pet.onnx".to_string();
-            state.provider_plan = Some(onnx::ProviderPlan::new(
-                onnx::ExecutionMode::CpuOnly,
-                "pet.onnx",
-            ));
-        }
+        runtime.prepare_indexing_models(&ModelPaths::default());
 
-        slot.sync_indexing_residency("");
-
-        let state = slot.lock_state();
-        assert!(state.path.is_empty());
-        assert!(state.provider_plan.is_none());
-        assert!(state.session.is_none());
-    }
-
-    #[test]
-    fn release_residency_resets_transient_cpu_fallback_for_any_slot() {
-        let slot = ModelSlot::new(Model::ClipImage);
-
-        {
-            let mut state = slot.lock_state();
-            state.path = "clip_text.onnx".to_string();
-            state.provider_plan = Some(onnx::ProviderPlan::new(
-                onnx::ExecutionMode::CpuOnly,
-                "clip_text.onnx",
-            ));
-        }
-
-        slot.release_residency();
-
-        let state = slot.lock_state();
-        assert!(state.provider_plan.is_none());
-        assert!(state.session.is_none());
+        assert_eq!(
+            runtime.slot(Model::ClipImage).snapshot(),
+            unloaded_snapshot("")
+        );
     }
 
     #[test]
     fn model_execution_modes_match_platform_policy() {
-        let runtime = MlRuntime::new();
-        let expected_pet_mode = onnx::ExecutionMode::CpuOnly;
+        let accelerated = [Model::FaceDetection, Model::FaceEmbedding, Model::ClipImage];
 
         for model in Model::ALL {
-            assert_eq!(runtime.slot(model).model, model);
+            let expected = if accelerated.contains(&model) {
+                onnx::ExecutionMode::PlatformDefault
+            } else {
+                onnx::ExecutionMode::CpuOnly
+            };
+            assert_eq!(default_execution_mode(model), expected, "{model:?}");
         }
+    }
 
-        assert_eq!(
-            runtime.slot(Model::FaceDetection).default_execution_mode,
-            onnx::ExecutionMode::PlatformDefault
-        );
-        assert_eq!(
-            runtime.slot(Model::FaceEmbedding).default_execution_mode,
-            onnx::ExecutionMode::PlatformDefault
-        );
-        assert_eq!(
-            runtime.slot(Model::ClipImage).default_execution_mode,
-            onnx::ExecutionMode::PlatformDefault
-        );
-        assert_eq!(
-            runtime.slot(Model::ClipText).default_execution_mode,
-            onnx::ExecutionMode::CpuOnly
-        );
-        assert_eq!(
-            runtime.slot(Model::PetFaceDetection).default_execution_mode,
-            expected_pet_mode
-        );
-        assert_eq!(
-            runtime
-                .slot(Model::PetFaceEmbeddingDog)
-                .default_execution_mode,
-            expected_pet_mode
-        );
-        assert_eq!(
-            runtime
-                .slot(Model::PetFaceEmbeddingCat)
-                .default_execution_mode,
-            expected_pet_mode
-        );
-        assert_eq!(
-            runtime.slot(Model::PetBodyDetection).default_execution_mode,
-            expected_pet_mode
-        );
-        assert_eq!(
-            runtime
-                .slot(Model::PetBodyEmbeddingDog)
-                .default_execution_mode,
-            expected_pet_mode
-        );
-        assert_eq!(
-            runtime
-                .slot(Model::PetBodyEmbeddingCat)
-                .default_execution_mode,
-            expected_pet_mode
-        );
+    fn unloaded_snapshot(path: &str) -> ModelSlotSnapshot {
+        ModelSlotSnapshot {
+            path: path.to_string(),
+            session_loaded: false,
+        }
     }
 }

@@ -194,20 +194,94 @@ mod tests {
     use super::*;
 
     #[test]
-    fn model_catalog_is_array_indexed_and_unique() {
+    fn model_catalog_order_and_metadata_are_stable() {
+        let expected = [
+            (
+                Model::FaceDetection,
+                "faceDetectionModelPath",
+                "face-detection",
+            ),
+            (
+                Model::FaceEmbedding,
+                "faceEmbeddingModelPath",
+                "face-embedding",
+            ),
+            (Model::ClipImage, "clipImageModelPath", "clip-image"),
+            (Model::ClipText, "clipTextModelPath", "clip-text"),
+            (
+                Model::PetFaceDetection,
+                "petFaceDetectionModelPath",
+                "pet-face-detection",
+            ),
+            (
+                Model::PetFaceEmbeddingDog,
+                "petFaceEmbeddingDogModelPath",
+                "pet-face-embedding-dog",
+            ),
+            (
+                Model::PetFaceEmbeddingCat,
+                "petFaceEmbeddingCatModelPath",
+                "pet-face-embedding-cat",
+            ),
+            (
+                Model::PetBodyDetection,
+                "petBodyDetectionModelPath",
+                "pet-body-detection",
+            ),
+            (
+                Model::PetBodyEmbeddingDog,
+                "petBodyEmbeddingDogModelPath",
+                "pet-body-embedding-dog",
+            ),
+            (
+                Model::PetBodyEmbeddingCat,
+                "petBodyEmbeddingCatModelPath",
+                "pet-body-embedding-cat",
+            ),
+        ];
         let mut path_labels = HashSet::new();
         let mut namespaces = HashSet::new();
 
-        for (index, model) in Model::ALL.into_iter().enumerate() {
+        for (index, (model, path_label, namespace)) in expected.into_iter().enumerate() {
+            assert_eq!(Model::ALL[index], model);
             assert_eq!(model.index(), index);
-            assert!(path_labels.insert(model.path_label()));
-            assert!(namespaces.insert(model.namespace()));
+            assert_eq!(model.path_label(), path_label);
+            assert_eq!(model.namespace(), namespace);
+            assert!(path_labels.insert(path_label));
+            assert!(namespaces.insert(namespace));
         }
     }
 
     #[test]
     fn model_paths_are_addressable_by_model() {
-        let mut paths = ModelPaths::default();
+        let mut paths = ModelPaths {
+            face_detection: "face-detection.onnx".to_string(),
+            face_embedding: "face-embedding.onnx".to_string(),
+            clip_image: "clip-image.onnx".to_string(),
+            clip_text: "clip-text.onnx".to_string(),
+            pet_face_detection: "pet-face-detection.onnx".to_string(),
+            pet_face_embedding_dog: "pet-face-embedding-dog.onnx".to_string(),
+            pet_face_embedding_cat: "pet-face-embedding-cat.onnx".to_string(),
+            pet_body_detection: "pet-body-detection.onnx".to_string(),
+            pet_body_embedding_dog: "pet-body-embedding-dog.onnx".to_string(),
+            pet_body_embedding_cat: "pet-body-embedding-cat.onnx".to_string(),
+        };
+        let expected = [
+            (Model::FaceDetection, "face-detection.onnx"),
+            (Model::FaceEmbedding, "face-embedding.onnx"),
+            (Model::ClipImage, "clip-image.onnx"),
+            (Model::ClipText, "clip-text.onnx"),
+            (Model::PetFaceDetection, "pet-face-detection.onnx"),
+            (Model::PetFaceEmbeddingDog, "pet-face-embedding-dog.onnx"),
+            (Model::PetFaceEmbeddingCat, "pet-face-embedding-cat.onnx"),
+            (Model::PetBodyDetection, "pet-body-detection.onnx"),
+            (Model::PetBodyEmbeddingDog, "pet-body-embedding-dog.onnx"),
+            (Model::PetBodyEmbeddingCat, "pet-body-embedding-cat.onnx"),
+        ];
+
+        for (model, path) in expected {
+            assert_eq!(paths.get(model), path);
+        }
 
         for model in Model::ALL {
             *paths.get_mut(model) = model.namespace().to_string();
@@ -219,7 +293,7 @@ mod tests {
     }
 
     #[test]
-    fn indexing_catalog_contains_every_model_except_clip_text() {
+    fn indexing_catalog_contains_every_model_except_clip_text_once() {
         let indexes = Model::INDEXING
             .into_iter()
             .map(Model::index)
@@ -236,7 +310,10 @@ mod tests {
                 .collect::<HashSet<_>>(),
             indexes
         );
+    }
 
+    #[test]
+    fn enabled_indexing_models_follow_request_flags() {
         assert_eq!(
             enabled_indexing_models(true, false, false).collect::<Vec<_>>(),
             [Model::FaceDetection, Model::FaceEmbedding]
@@ -252,17 +329,6 @@ mod tests {
                 Model::PetFaceEmbeddingDog,
                 Model::PetFaceEmbeddingCat,
                 Model::PetBodyDetection,
-                Model::PetBodyEmbeddingDog,
-                Model::PetBodyEmbeddingCat,
-            ]
-        );
-        assert_eq!(
-            required_indexing_models(false, false, true).collect::<Vec<_>>(),
-            [
-                Model::PetFaceDetection,
-                Model::PetBodyDetection,
-                Model::PetFaceEmbeddingDog,
-                Model::PetFaceEmbeddingCat,
                 Model::PetBodyEmbeddingDog,
                 Model::PetBodyEmbeddingCat,
             ]

@@ -301,6 +301,25 @@ fn validate_request_model_paths(req: &AnalyzeImageRequest) -> MlResult<()> {
 mod tests {
     use super::*;
 
+    fn request_with_models(run_faces: bool, run_clip: bool, run_pets: bool) -> AnalyzeImageRequest {
+        AnalyzeImageRequest {
+            file_id: 1,
+            source: ImageSource::Bytes(Vec::new()),
+            run_faces,
+            run_clip,
+            run_pets,
+            generate_face_crops: false,
+            model_paths: ModelPaths::default(),
+        }
+    }
+
+    fn validation_error(req: &AnalyzeImageRequest) -> String {
+        match validate_request_model_paths(req) {
+            Err(MlError::InvalidRequest(message)) => message,
+            other => panic!("expected an invalid request, got {other:?}"),
+        }
+    }
+
     fn png_bytes(width: u32, height: u32) -> Vec<u8> {
         let img =
             image::RgbImage::from_fn(width, height, |x, y| image::Rgb([x as u8, y as u8, 128]));
@@ -347,5 +366,46 @@ mod tests {
             Err(MlError::Decode(_)) => {}
             other => panic!("expected a decode error, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn request_validation_reports_required_models_in_catalog_order() {
+        let req = request_with_models(true, true, true);
+
+        assert_eq!(
+            validation_error(&req),
+            "missing required model paths: faceDetectionModelPath, faceEmbeddingModelPath, \
+             clipImageModelPath, petFaceDetectionModelPath, petBodyDetectionModelPath, \
+             petFaceEmbeddingDogModelPath, petFaceEmbeddingCatModelPath, \
+             petBodyEmbeddingDogModelPath, petBodyEmbeddingCatModelPath"
+        );
+    }
+
+    #[test]
+    fn request_validation_uses_only_enabled_model_groups() {
+        assert_eq!(
+            validation_error(&request_with_models(true, false, false)),
+            "missing required model paths: faceDetectionModelPath, faceEmbeddingModelPath"
+        );
+        assert_eq!(
+            validation_error(&request_with_models(false, true, false)),
+            "missing required model paths: clipImageModelPath"
+        );
+        assert_eq!(
+            validation_error(&request_with_models(false, false, true)),
+            "missing required model paths: petFaceDetectionModelPath, petBodyDetectionModelPath, \
+             petFaceEmbeddingDogModelPath, petFaceEmbeddingCatModelPath, \
+             petBodyEmbeddingDogModelPath, petBodyEmbeddingCatModelPath"
+        );
+    }
+
+    #[test]
+    fn request_validation_accepts_all_required_model_paths() {
+        let mut req = request_with_models(true, true, true);
+        for model in Model::INDEXING {
+            *req.model_paths.get_mut(model) = format!("{}.onnx", model.namespace());
+        }
+
+        validate_request_model_paths(&req).unwrap();
     }
 }

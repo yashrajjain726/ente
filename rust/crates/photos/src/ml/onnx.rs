@@ -68,6 +68,10 @@ impl ProviderPlan {
             ExecutionMode::PlatformDefault => platform_default_providers(model_path),
             ExecutionMode::CpuOnly => vec![ExecutionProvider::Cpu],
         };
+        Self::from_providers(providers)
+    }
+
+    fn from_providers(providers: Vec<ExecutionProvider>) -> Self {
         Self {
             providers,
             next: 0,
@@ -97,6 +101,27 @@ impl ProviderPlan {
         self.selected = None;
         self.next = self.providers.len().saturating_sub(1);
     }
+}
+
+fn run_provider_plan<T, E>(
+    plan: &mut ProviderPlan,
+    mut attempt: impl FnMut(ExecutionProvider) -> Result<T, E>,
+) -> Result<T, Vec<E>> {
+    plan.selected = None;
+
+    let mut errors = Vec::new();
+    while let Some(provider) = plan.next_provider() {
+        match attempt(provider) {
+            Ok(value) => {
+                plan.select(provider);
+                return Ok(value);
+            }
+            Err(error) => errors.push(error),
+        }
+    }
+
+    plan.retain_last_provider_for_retry();
+    Err(errors)
 }
 
 #[derive(Debug)]
@@ -159,22 +184,13 @@ pub(crate) fn build_session(
     plan: &mut ProviderPlan,
     model_namespace: &str,
 ) -> MlResult<Session> {
-    plan.selected = None;
-
-    let mut errors = Vec::new();
-    while let Some(execution_provider) = plan.next_provider() {
+    let result = run_provider_plan(plan, |execution_provider| {
         let attempt = provider_attempt(execution_provider, model_path, model_namespace);
         if attempt.uses_webgpu {
             #[cfg(any(target_os = "android", target_os = "linux", target_os = "windows"))]
             {
-                match build_webgpu_session_with_canary(model_path, model_namespace, attempt) {
-                    Ok(session) => {
-                        plan.select(execution_provider);
-                        return Ok(session);
-                    }
-                    Err(error) => errors.push(format!("{error}")),
-                }
-                continue;
+                return build_webgpu_session_with_canary(model_path, model_namespace, attempt)
+                    .map_err(|error| format!("{error}"));
             }
             #[cfg(not(any(target_os = "android", target_os = "linux", target_os = "windows")))]
             unreachable!("WebGPU provider attempts are not constructed on this platform");
@@ -186,8 +202,7 @@ pub(crate) fn build_session(
                 if let Some(cache_dir) = coreml_cache_dir {
                     coreml_cache::finalize(&cache_dir, model_path);
                 }
-                plan.select(execution_provider);
-                return Ok(session);
+                Ok(session)
             }
             Err(error) => {
                 if let Some(cache_dir) = coreml_cache_dir
@@ -198,12 +213,15 @@ pub(crate) fn build_session(
                         model_file_label(model_path)
                     );
                 }
-                errors.push(format!("{error}"));
+                Err(format!("{error}"))
             }
         }
-    }
+    });
 
-    plan.retain_last_provider_for_retry();
+    let errors = match result {
+        Ok(session) => return Ok(session),
+        Err(errors) => errors,
+    };
 
     if has_protobuf_parse_failure(&errors) {
         return Err(MlError::CorruptModel(model_path.to_string()));
@@ -695,62 +713,105 @@ fn build_session_with_providers(model_path: &str, attempt: ProviderAttempt) -> M
 #[cfg(test)]
 mod tests {
     use super::{
-        ExecutionMode, ExecutionProvider, ProviderPlan, has_protobuf_parse_failure,
-        is_execution_provider_run_failure, provider_attempt_failure_message,
+        ExecutionMode, ExecutionProvider, ProviderPlan, SessionRunError,
+        has_protobuf_parse_failure, is_execution_provider_run_failure,
+        provider_attempt_failure_message, run_provider_plan,
     };
 
     #[test]
-    fn provider_plan_resumes_after_the_concrete_selected_provider() {
-        let mut plan = ProviderPlan {
-            providers: vec![
-                ExecutionProvider::WebGpu,
-                ExecutionProvider::Xnnpack,
-                ExecutionProvider::Cpu,
-            ],
-            next: 0,
-            selected: None,
-        };
+    fn construction_falls_through_and_selects_the_successful_provider() {
+        let mut plan = accelerated_provider_plan();
+        let mut attempted = Vec::new();
 
-        assert_eq!(plan.next_provider(), Some(ExecutionProvider::WebGpu));
-        assert_eq!(plan.next_provider(), Some(ExecutionProvider::Xnnpack));
-        plan.select(ExecutionProvider::Xnnpack);
+        let result = run_provider_plan(&mut plan, |provider| {
+            attempted.push(provider);
+            match provider {
+                ExecutionProvider::Xnnpack => Ok("session"),
+                _ => Err(provider),
+            }
+        });
 
+        assert_eq!(result, Ok("session"));
+        assert_eq!(
+            attempted,
+            [ExecutionProvider::WebGpu, ExecutionProvider::Xnnpack]
+        );
         assert_eq!(plan.selected_provider(), Some(ExecutionProvider::Xnnpack));
         assert!(plan.has_fallback());
-        assert_eq!(plan.next_provider(), Some(ExecutionProvider::Cpu));
+    }
+
+    #[test]
+    fn retry_resumes_strictly_after_the_provider_that_was_selected() {
+        let mut plan = accelerated_provider_plan();
+        run_provider_plan(&mut plan, |provider| match provider {
+            ExecutionProvider::Xnnpack => Ok(()),
+            _ => Err(()),
+        })
+        .unwrap();
+
+        let mut attempted = Vec::new();
+        let result = run_provider_plan(&mut plan, |provider| {
+            attempted.push(provider);
+            Ok::<_, ()>("fallback session")
+        });
+
+        assert_eq!(result, Ok("fallback session"));
+        assert_eq!(attempted, [ExecutionProvider::Cpu]);
+        assert_eq!(plan.selected_provider(), Some(ExecutionProvider::Cpu));
         assert!(!plan.has_fallback());
     }
 
     #[test]
-    fn cpu_only_provider_plan_is_bounded() {
-        let mut plan = ProviderPlan::new(ExecutionMode::CpuOnly, "model.onnx");
+    fn provider_attempts_are_bounded_and_preserve_each_failure() {
+        let mut plan = accelerated_provider_plan();
+        let mut attempted = Vec::new();
 
-        assert_eq!(plan.next_provider(), Some(ExecutionProvider::Cpu));
-        assert_eq!(plan.next_provider(), None);
-        assert!(!plan.has_fallback());
-    }
+        let errors = run_provider_plan::<(), _>(&mut plan, |provider| {
+            attempted.push(provider);
+            Err(provider)
+        })
+        .unwrap_err();
 
-    #[test]
-    fn exhausted_provider_plan_retries_only_the_final_provider() {
-        let mut plan = ProviderPlan {
-            providers: vec![
+        assert_eq!(
+            attempted,
+            [
                 ExecutionProvider::WebGpu,
                 ExecutionProvider::Xnnpack,
                 ExecutionProvider::Cpu,
-            ],
-            next: 0,
-            selected: None,
-        };
-
-        while plan.next_provider().is_some() {}
-        plan.retain_last_provider_for_retry();
-
-        assert_eq!(plan.next_provider(), Some(ExecutionProvider::Cpu));
-        assert_eq!(plan.next_provider(), None);
+            ]
+        );
+        assert_eq!(errors, attempted);
+        assert_eq!(plan.selected_provider(), None);
     }
 
     #[test]
-    fn classifies_only_provider_related_ort_run_failures_as_retryable() {
+    fn exhausted_cpu_is_retained_as_the_only_construction_retry() {
+        let mut plan = ProviderPlan::new(ExecutionMode::CpuOnly, "model.onnx");
+        let mut attempts = 0;
+
+        let first = run_provider_plan::<(), _>(&mut plan, |provider| {
+            attempts += 1;
+            Err(provider)
+        });
+
+        assert_eq!(first, Err(vec![ExecutionProvider::Cpu]));
+        assert_eq!(attempts, 1);
+        assert_eq!(plan.selected_provider(), None);
+        assert!(plan.has_fallback());
+
+        let retry = run_provider_plan(&mut plan, |provider| {
+            attempts += 1;
+            Ok::<_, ExecutionProvider>(provider)
+        });
+
+        assert_eq!(retry, Ok(ExecutionProvider::Cpu));
+        assert_eq!(attempts, 2);
+        assert_eq!(plan.selected_provider(), Some(ExecutionProvider::Cpu));
+        assert!(!plan.has_fallback());
+    }
+
+    #[test]
+    fn provider_failure_detection_is_limited_to_ort_execution_errors() {
         assert!(is_execution_provider_run_failure(&super::MlError::Ort(
             "WebGPU EP error: VK_ERROR_DEVICE_LOST".to_string()
         )));
@@ -760,8 +821,15 @@ mod tests {
         assert!(!is_execution_provider_run_failure(
             &super::MlError::Postprocess("WebGPU".to_string())
         ));
+    }
 
-        let terminal = super::SessionRunError::from(super::MlError::Ort(
+    #[test]
+    fn typed_run_errors_control_retryability() {
+        let retryable =
+            SessionRunError::retryable(super::MlError::Ort("non-finite output".to_string()));
+        assert!(retryable.is_retryable());
+
+        let terminal = SessionRunError::from(super::MlError::Ort(
             "WebGPU text from a typed terminal error".to_string(),
         ));
         assert!(!terminal.is_retryable());
@@ -811,5 +879,13 @@ mod tests {
             )
             .is_none()
         );
+    }
+
+    fn accelerated_provider_plan() -> ProviderPlan {
+        ProviderPlan::from_providers(vec![
+            ExecutionProvider::WebGpu,
+            ExecutionProvider::Xnnpack,
+            ExecutionProvider::Cpu,
+        ])
     }
 }
