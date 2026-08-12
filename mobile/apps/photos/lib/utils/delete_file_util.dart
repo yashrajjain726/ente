@@ -17,6 +17,7 @@ import 'package:photos/events/local_photos_updated_event.dart';
 import 'package:photos/gateways/trash/models/trash_item_request.dart';
 import "package:photos/models/button_result.dart";
 import 'package:photos/models/file/file.dart';
+import "package:photos/models/file/trash_file.dart";
 import "package:photos/models/files_split.dart";
 import "package:photos/models/freeable_space_info.dart";
 import 'package:photos/models/selected_files.dart';
@@ -292,7 +293,11 @@ Future<List<EnteFile>> deleteFilesOnDeviceOnly(
   return deletedFiles;
 }
 
-Future<bool> deleteFromTrash(BuildContext context, List<EnteFile> files) async {
+Future<bool> deleteFromTrash(
+  BuildContext context,
+  List<EnteFile> files,
+) async {
+  final trashFiles = files.map((file) => file as EnteTrashFile).toList();
   bool didDeletionStart = false;
   final l10n = context.strings;
   final actionResult = await showBottomSheetComponent<ButtonResult>(
@@ -314,15 +319,15 @@ Future<bool> deleteFromTrash(BuildContext context, List<EnteFile> files) async {
             () async {
               try {
                 didDeletionStart = true;
-                await trashSyncService.deleteFromTrash(files);
+                await trashSyncService.deleteFromTrash(trashFiles);
                 Bus.instance.fire(
                   FilesUpdatedEvent(
-                    files,
+                    trashFiles,
                     type: EventType.deletedFromEverywhere,
                     source: "deleteFromTrash",
                   ),
                 );
-                //the FilesUpdateEvent is not reloading trash on premanently removing
+                //the FilesUpdateEvent is not reloading trash on permanently removing
                 //files, so need to fire ForceReloadTrashPageEvent
                 Bus.instance.fire(ForceReloadTrashPageEvent());
               } catch (e, s) {
