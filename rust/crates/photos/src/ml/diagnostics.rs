@@ -107,21 +107,29 @@ impl AnalysisOperation {
         let completed_at = Instant::now();
         let active = ANALYSIS_MONITOR.complete(self.id);
         self.finished = true;
+        let elapsed = completed_at.duration_since(self.started_at);
+        let watchdog_reported = active.is_some_and(|analysis| analysis.slow_reported);
 
         if let Err(error) = result {
             log_analysis_error(
                 "analyze_image",
                 Some(self.context),
                 Some(self.stage),
-                completed_at.duration_since(self.started_at),
+                elapsed,
                 error,
             );
-        } else if active.is_some_and(|analysis| analysis.slow_reported) {
-            log::info!(
+        } else if elapsed >= SLOW_ANALYSIS_THRESHOLD {
+            let level = if watchdog_reported {
+                log::Level::Info
+            } else {
+                log::Level::Warn
+            };
+            log::log!(
+                level,
                 "Rust ML slow operation: operation=analyze_image event=completed file_id={} stage={} elapsed_ms={} run_faces={} run_clip={} run_pets={}",
                 self.context.file_id,
                 self.stage.label(),
-                completed_at.duration_since(self.started_at).as_millis(),
+                elapsed.as_millis(),
                 self.context.run_faces,
                 self.context.run_clip,
                 self.context.run_pets,
@@ -135,15 +143,14 @@ impl Drop for AnalysisOperation {
         if self.finished {
             return;
         }
-        let Some(active) = ANALYSIS_MONITOR.complete(self.id) else {
-            return;
-        };
-        if active.slow_reported {
+        ANALYSIS_MONITOR.complete(self.id);
+        let elapsed = self.started_at.elapsed();
+        if elapsed >= SLOW_ANALYSIS_THRESHOLD {
             log::warn!(
                 "Rust ML slow operation: operation=analyze_image event=ended_without_result file_id={} stage={} elapsed_ms={} run_faces={} run_clip={} run_pets={}",
                 self.context.file_id,
                 self.stage.label(),
-                self.started_at.elapsed().as_millis(),
+                elapsed.as_millis(),
                 self.context.run_faces,
                 self.context.run_clip,
                 self.context.run_pets,
