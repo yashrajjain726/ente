@@ -339,38 +339,49 @@ Future<bool> deleteFromEnteTrash(
   }
 }
 
-Future<bool> emptyTrash(BuildContext context, bool isOnEnteTrash) async {
-  final actionResult = await showChoiceActionSheet(
-    context,
-    title: context.strings.emptyTrashQuestion,
-    body: context.strings.permDeleteWarning,
-    firstButtonLabel: context.strings.empty,
-    isCritical: true,
-    firstButtonOnTap: () async {
-      try {
-        if (isOnEnteTrash) {
-          await trashSyncService.emptyTrash();
-        } else {
-          await _emptyDeviceTrash(context);
-        }
-      } catch (e, s) {
-        _logger.info("failed empty trash", e, s);
-        rethrow;
+Future<void> showConfirmDeleteAllTrashSheet(
+  BuildContext context,
+  bool isOnEnteTrash,
+) async {
+  var didDeleteDeviceTrash = false;
+
+  Future<void> emptyTrash() async {
+    try {
+      if (isOnEnteTrash) {
+        await trashSyncService.emptyTrash();
+      } else {
+        didDeleteDeviceTrash = await _emptyDeviceTrash();
       }
-    },
+    } catch (e, s) {
+      final trashKind = isOnEnteTrash ? "Ente" : "device";
+      _logger.severe("failed to empty $trashKind trash", e, s);
+      if (context.mounted) {
+        await showGenericErrorDialog(context: context, error: e);
+      }
+      rethrow;
+    }
+  }
+
+  await showBottomSheetComponent<void>(
+    context: context,
+    useRootNavigator: Platform.isIOS,
+    builder: (sheetContext) => BottomSheetComponent(
+      title: sheetContext.strings.emptyTrashQuestion,
+      message: sheetContext.strings.permDeleteWarning,
+      closeTooltip: sheetContext.strings.close,
+      actions: [
+        ButtonComponent(
+          label: sheetContext.strings.empty,
+          variant: ButtonComponentVariant.critical,
+          dismissModalOnSuccess: true,
+          onTap: emptyTrash,
+        ),
+      ],
+    ),
   );
-  if (actionResult?.action == null ||
-      actionResult!.action == ButtonAction.cancel) {
-    return false;
-  } else if (actionResult.action == ButtonAction.error) {
-    if (!context.mounted) return false;
-    await showGenericErrorDialog(
-      context: context,
-      error: actionResult.exception,
-    );
-    return false;
-  } else {
-    return true;
+
+  if (didDeleteDeviceTrash && context.mounted) {
+    await showMediaManagementHintSheet(context);
   }
 }
 
@@ -1421,7 +1432,7 @@ Future<(Set<String>, Object?)> _deleteFromDeviceTrash(
   }
 }
 
-Future<void> _emptyDeviceTrash(BuildContext context) async {
+Future<bool> _emptyDeviceTrash() async {
   final trash = (await NativeService.getTrash())
       .map((f) => f.localID.toString())
       .toList();
@@ -1432,6 +1443,7 @@ Future<void> _emptyDeviceTrash(BuildContext context) async {
       deletedIDs.addAll(result);
       if (result.length != batch.length) break;
     }
+    return deletedIDs.isNotEmpty;
   } finally {
     if (deletedIDs.isNotEmpty) {
       Bus.instance.fire(ForceReloadTrashPageEvent());

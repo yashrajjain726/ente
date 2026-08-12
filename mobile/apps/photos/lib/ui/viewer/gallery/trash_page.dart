@@ -153,9 +153,10 @@ class _TrashPageState extends State<_TrashPage> {
                 child: FABComponent(
                   label: l10n.deleteAll,
                   icon: const HugeIcon(icon: HugeIcons.strokeRoundedDelete02),
-                  onTap: () async {
-                    await emptyTrash(context, _isOnEnteTrash);
-                  },
+                  onTap: () => showConfirmDeleteAllTrashSheet(
+                    context,
+                    _isOnEnteTrash,
+                  ),
                 ),
               );
             },
