@@ -3,7 +3,7 @@ import { Stack, Typography } from "@mui/material";
 import {
     savedPartialLocalUser,
     updateSavedLocalUser,
-} from "ente-accounts/services/accounts-db";
+} from "ente-accounts-rs/services/accounts-db";
 import {
     RowButton,
     RowButtonGroup,

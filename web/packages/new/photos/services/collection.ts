@@ -1,4 +1,4 @@
-import { ensureLocalUser } from "ente-accounts/services/user";
+import { ensureLocalUser } from "ente-accounts-rs/services/user";
 import { blobCache } from "ente-base/blob-cache";
 import {
     boxSeal,

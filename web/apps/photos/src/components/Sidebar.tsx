@@ -36,8 +36,8 @@ import {
     useColorScheme,
 } from "@mui/material";
 import Typography from "@mui/material/Typography";
-import { RecoveryKey } from "ente-accounts/components/RecoveryKey";
-import { openAccountsManagePasskeysPage } from "ente-accounts/services/passkey";
+import { RecoveryKey } from "ente-accounts-rs/components/RecoveryKey";
+import { openAccountsManagePasskeysPage } from "ente-accounts-rs/services/passkey";
 import { isDesktop } from "ente-base/app";
 import { EnteLogo, EnteLogoBox } from "ente-base/components/EnteLogo";
 import { LinkButton } from "ente-base/components/LinkButton";
