@@ -101,7 +101,7 @@ class PersonService {
     _instance = PersonService(entityService, faceMLDataDB, prefs);
     if (isFirstInit) {
       Bus.instance.on<DiffSyncCompleteEvent>().listen((event) {
-        unawaited(instance.syncPersonFeedback());
+        unawaited(instance.sync());
       });
       Bus.instance.on<PeopleChangedEvent>().listen((event) {
         if (event.type != PeopleEventType.syncDone) {
@@ -289,7 +289,7 @@ class PersonService {
         {for (final person in persons) person.remoteID: person};
   }
 
-  Future<void> syncPersonFeedback() {
+  Future<void> sync() {
     _syncRequested = true;
     return _syncFuture ??= _runPendingSyncs();
   }
@@ -298,14 +298,14 @@ class PersonService {
     try {
       do {
         _syncRequested = false;
-        await _syncPersonFeedbackInternal();
+        await _syncOnce();
       } while (_syncRequested);
     } finally {
       _syncFuture = null;
     }
   }
 
-  Future<void> _syncPersonFeedbackInternal() async {
+  Future<void> _syncOnce() async {
     if (isLocalGalleryMode) {
       logger.finest("Skipping person feedback sync in local gallery mode");
       return;
@@ -321,7 +321,7 @@ class PersonService {
       }
       Bus.instance.fire(PeopleChangedEvent(type: PeopleEventType.syncDone));
     } else {
-      final didChange = await _pullAndApplyRemoteFeedback();
+      final didChange = await _pullAndApplyRemotePersons();
       if (didChange) {
         logger.info("people: got remote data update");
         Bus.instance.fire(PeopleChangedEvent(type: PeopleEventType.syncDone));
@@ -332,7 +332,7 @@ class PersonService {
   Future<void> _reconcileClusters() async {
     final EnteWatch? w = kDebugMode ? EnteWatch("reconcileClusters") : null;
     w?.start();
-    await _pullAndApplyRemoteFeedback(skipClusterUpdateIfNoChange: false);
+    await _pullAndApplyRemotePersons(skipClusterUpdateIfNoChange: false);
     w?.log("Stored remote feedback");
     final dbPersonClusterInfo = await faceMLDataDB
         .getPersonToClusterIdToFaceIds();
@@ -594,8 +594,8 @@ class PersonService {
     Bus.instance.fire(PeopleChangedEvent());
   }
 
-  // Returns true when remote feedback was downloaded or newly applied locally.
-  Future<bool> _pullAndApplyRemoteFeedback({
+  // Returns true when remote changes were downloaded or newly applied locally.
+  Future<bool> _pullAndApplyRemotePersons({
     bool skipClusterUpdateIfNoChange = true,
   }) async {
     if (isLocalGalleryMode) {
