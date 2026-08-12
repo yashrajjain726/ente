@@ -10,6 +10,7 @@ import "package:logging/logging.dart";
 import "package:photos/core/configuration.dart";
 import "package:photos/core/event_bus.dart";
 import "package:photos/db/ml/db.dart";
+import "package:photos/events/diff_sync_complete_event.dart";
 import "package:photos/events/people_changed_event.dart";
 import "package:photos/gateways/entity/models/type.dart";
 import "package:photos/models/file/file.dart";
@@ -74,6 +75,12 @@ class PersonService {
   int _personCacheGeneration = 0;
   int _cachedRemoteSyncTime = 0;
 
+  // Static so the feedback-sync state machine survives init() re-creating the
+  // instance; an in-flight sync must keep serializing new requests.
+  static bool _shouldReconcilePeople = false;
+  static bool _syncRequested = false;
+  static Future<void>? _syncFuture;
+
   static PersonService get instance {
     if (_instance == null) {
       throw Exception("PersonService not initialized");
@@ -90,7 +97,18 @@ class PersonService {
     MLDataDB faceMLDataDB,
     SharedPreferences prefs,
   ) {
+    final bool isFirstInit = _instance == null;
     _instance = PersonService(entityService, faceMLDataDB, prefs);
+    if (isFirstInit) {
+      Bus.instance.on<DiffSyncCompleteEvent>().listen((event) {
+        unawaited(instance.sync());
+      });
+      Bus.instance.on<PeopleChangedEvent>().listen((event) {
+        if (event.type != PeopleEventType.syncDone) {
+          _shouldReconcilePeople = true;
+        }
+      });
+    }
     final settings = LocalSettings(prefs);
     final savedAutoMerge = settings.autoMergeThresholdOverride;
     if (savedAutoMerge != null) {
@@ -271,10 +289,50 @@ class PersonService {
         {for (final person in persons) person.remoteID: person};
   }
 
-  Future<void> reconcileClusters() async {
+  Future<void> sync() {
+    _syncRequested = true;
+    return _syncFuture ??= _runPendingSyncs();
+  }
+
+  Future<void> _runPendingSyncs() async {
+    try {
+      do {
+        _syncRequested = false;
+        await _syncOnce();
+      } while (_syncRequested);
+    } finally {
+      _syncFuture = null;
+    }
+  }
+
+  Future<void> _syncOnce() async {
+    if (isLocalGalleryMode) {
+      logger.finest("Skipping person feedback sync in local gallery mode");
+      return;
+    }
+
+    if (_shouldReconcilePeople) {
+      _shouldReconcilePeople = false;
+      try {
+        await _reconcileClusters();
+      } catch (_) {
+        _shouldReconcilePeople = true;
+        rethrow;
+      }
+      Bus.instance.fire(PeopleChangedEvent(type: PeopleEventType.syncDone));
+    } else {
+      final didChange = await _pullAndApplyRemotePersons();
+      if (didChange) {
+        logger.info("people: got remote data update");
+        Bus.instance.fire(PeopleChangedEvent(type: PeopleEventType.syncDone));
+      }
+    }
+  }
+
+  Future<void> _reconcileClusters() async {
     final EnteWatch? w = kDebugMode ? EnteWatch("reconcileClusters") : null;
     w?.start();
-    await fetchRemoteClusterFeedback(skipClusterUpdateIfNoChange: false);
+    await _pullAndApplyRemotePersons(skipClusterUpdateIfNoChange: false);
     w?.log("Stored remote feedback");
     final dbPersonClusterInfo = await faceMLDataDB
         .getPersonToClusterIdToFaceIds();
@@ -536,8 +594,8 @@ class PersonService {
     Bus.instance.fire(PeopleChangedEvent());
   }
 
-  // Returns true when remote feedback was downloaded or newly applied locally.
-  Future<bool> fetchRemoteClusterFeedback({
+  // Returns true when remote changes were downloaded or newly applied locally.
+  Future<bool> _pullAndApplyRemotePersons({
     bool skipClusterUpdateIfNoChange = true,
   }) async {
     if (isLocalGalleryMode) {
