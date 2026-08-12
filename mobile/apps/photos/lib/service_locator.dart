@@ -33,7 +33,6 @@ import "package:photos/services/library_sharing_local_store.dart";
 import "package:photos/services/library_sharing_service.dart";
 import "package:photos/services/location_service.dart";
 import "package:photos/services/machine_learning/compute_controller.dart";
-import "package:photos/services/machine_learning/face_ml/person/person_feedback_service.dart";
 import "package:photos/services/magic_cache_service.dart";
 import "package:photos/services/memories_cache_service.dart";
 import "package:photos/services/permission/service.dart";
@@ -245,12 +244,6 @@ ComputeController? _computeController;
 ComputeController get computeController {
   _computeController ??= ComputeController(localSettings);
   return _computeController!;
-}
-
-PersonFeedbackService? _personFeedbackService;
-PersonFeedbackService get personFeedbackService {
-  _personFeedbackService ??= PersonFeedbackService();
-  return _personFeedbackService!;
 }
 
 PermissionService? _permissionService;

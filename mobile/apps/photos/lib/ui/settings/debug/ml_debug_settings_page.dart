@@ -791,7 +791,7 @@ class _MLDebugSettingsPageState extends State<MLDebugSettingsPage> {
 
   Future<void> _onTriggerClustering(BuildContext context) async {
     try {
-      await PersonService.instance.fetchRemoteClusterFeedback();
+      await PersonService.instance.syncPersonFeedback();
       MLService.instance.debugIndexingDisabled = false;
       await MLService.instance.clusterAllImages();
       Bus.instance.fire(PeopleChangedEvent());
@@ -836,7 +836,7 @@ class _MLDebugSettingsPageState extends State<MLDebugSettingsPage> {
 
   Future<void> _onSyncPersonMappings(BuildContext context) async {
     try {
-      await personFeedbackService.syncPersonFeedback();
+      await PersonService.instance.syncPersonFeedback();
       if (!context.mounted) return;
       showShortToast(context, "Done");
     } catch (e, s) {
