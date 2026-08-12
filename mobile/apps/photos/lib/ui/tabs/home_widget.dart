@@ -1359,12 +1359,18 @@ class _HomeWidgetState extends State<HomeWidget> {
       return;
     }
     _personSyncTriggered = true;
-    unawaited(
-      entityService.syncEntities().then((_) async {
-        await PersonService.instance.sync();
-        await PersonService.instance.refreshPersonCache();
-      }),
-    );
+    unawaited(_syncPersons());
+  }
+
+  Future<void> _syncPersons() async {
+    try {
+      await entityService.syncEntities();
+      await PersonService.instance.sync();
+      await PersonService.instance.refreshPersonCache();
+    } catch (e, s) {
+      _logger.warning("Failed to sync persons", e, s);
+      _personSyncTriggered = false;
+    }
   }
 
   void _ensureCollectionsSync() {
