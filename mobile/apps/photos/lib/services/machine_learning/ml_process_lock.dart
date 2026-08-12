@@ -34,14 +34,12 @@ class MlProcessLock {
   /// diagnostics only — never use this to skip [tryRunExclusive].
   bool get isBusy => _activeOperation != null;
 
-  /// The operation currently holding the funnel, if any. For derived status
-  /// and diagnostics only.
   MlOperation? get activeOperation => _activeOperation;
 
   /// Runs [body] while holding the funnel and the native `ml` lock. The lock
-  /// is released only after [body] completes, so [body] must drain any work
-  /// it started before returning. Errors from [body] propagate after release.
-  /// [background] labels this engine's origin for diagnostics.
+  /// is released only after [body] completes, so [body] must drain any
+  /// protected ML work it started before returning. Errors from [body]
+  /// propagate after release. [background] labels this engine's origin.
   Future<MlLockAttempt> tryRunExclusive(
     MlOperation operation,
     Future<void> Function() body, {

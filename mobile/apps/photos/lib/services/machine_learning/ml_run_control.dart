@@ -19,7 +19,6 @@ class MlRunControl {
   bool get stopRequested => _stopRequested;
   MlStopReason? get stopReason => _stopReason;
 
-  /// Idempotent; the first reason wins.
   void requestStop(MlStopReason reason) {
     if (_stopRequested) return;
     _stopRequested = true;

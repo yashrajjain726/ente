@@ -255,10 +255,7 @@ Future<void> runBackgroundTask(
   );
 
   try {
-    // Check if foreground is recently active to avoid conflicts
     final isRunningInFG = await isForegroundEngineActive();
-
-    // If FG was active in the last 5 seconds, skip BG work
     if (isRunningInFG) {
       _logger.info(
         "[BG TASK] Foreground recently active, skipping background work",
@@ -375,20 +372,16 @@ Future<void> _runMinimally(
           "[BG TASK] skipping ML, compute requirements not satisfied",
         );
       } else {
-        bool mlRunStarted = false;
         try {
           await MLService.instance.init();
           PersonService.init(entityService, MLDataDB.instance, prefs);
-          mlRunStarted = true;
           final disposition = await MLService.instance.runAllML(
             force: false,
             control: mlRunControl,
           );
           _logger.info("[BG TASK] ML run disposition: ${disposition.name}");
         } finally {
-          if (!mlRunStarted) {
-            controller.releaseCompute(ml: true);
-          }
+          controller.releaseCompute(ml: true);
         }
       }
     }

@@ -1,6 +1,5 @@
 import 'package:flutter/services.dart';
 
-/// Diagnostic state of a named process lock.
 class ProcessLockState {
   const ProcessLockState({
     required this.origin,
@@ -64,8 +63,6 @@ class ProcessLockClient {
     return result;
   }
 
-  /// Releases [name] if this engine holds it. Returns whether a release
-  /// occurred.
   Future<bool> release({required String name}) async {
     final result = await _methodChannel.invokeMethod<bool>(
       'processLock.release',
@@ -77,7 +74,6 @@ class ProcessLockClient {
     return result;
   }
 
-  /// Returns the current holder of [name], or null when the lock is free.
   Future<ProcessLockState?> state({required String name}) async {
     final result = await _methodChannel.invokeMethod<Map<dynamic, dynamic>>(
       'processLock.state',

@@ -366,6 +366,7 @@ class MLService {
     }
     if (_isRunningML) {
       _logger.info("runAllML called while already running, skipping");
+      _scheduleDeniedRunRetry();
       return MlRunDisposition.denied;
     }
     if (!hasGrantedMLConsent) {
@@ -423,6 +424,10 @@ class MLService {
     _deniedRunRetryTimer = Timer(_kDeniedRunRetryDelay, () {
       _deniedRunRetryTimer = null;
       if (!hasGrantedMLConsent) return;
+      if (MlProcessLock.instance.isBusy) {
+        _scheduleDeniedRunRetry();
+        return;
+      }
       triggerML();
     });
   }
@@ -461,8 +466,8 @@ class MLService {
           _logger.info("App mode changed during ML run, stopping");
           return MlRunDisposition.stopped;
         }
-        // Refresh discover/memories caches before indexing using the same
-        // path in foreground and background runs.
+        // Cache refreshes only read ML stores, so they may safely outlive
+        // this run and the process lock.
         magicCacheService.updateCache(forced: force).ignore();
         memoriesCacheService.updateCache(forced: force).ignore();
       }

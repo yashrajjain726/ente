@@ -26,7 +26,12 @@ final class ProcessLockChannelAdapter: NSObject {
     }
 
     private func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
-        guard isAttached else { return }
+        guard isAttached else {
+            result(
+                FlutterError(code: "detached", message: "adapter detached", details: nil)
+            )
+            return
+        }
         switch call.method {
         case "processLock.tryAcquire":
             handleTryAcquire(call, result: result)
