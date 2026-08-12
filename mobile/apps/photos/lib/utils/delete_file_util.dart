@@ -293,10 +293,7 @@ Future<List<EnteFile>> deleteFilesOnDeviceOnly(
   return deletedFiles;
 }
 
-Future<bool> deleteFromTrash(
-  BuildContext context,
-  List<EnteFile> files,
-) async {
+Future<bool> deleteFromTrash(BuildContext context, List<EnteFile> files) async {
   final trashFiles = files.map((file) => file as EnteTrashFile).toList();
   bool didDeletionStart = false;
   final l10n = context.strings;
