@@ -13,7 +13,6 @@ import "package:ente_ui/theme/effects.dart";
 import 'package:ente_ui/theme/ente_theme.dart';
 import 'package:flutter/material.dart';
 
-///Will return null if dismissed by tapping outside
 Future<ButtonResult?> showDialogWidget({
   required BuildContext context,
   required String title,

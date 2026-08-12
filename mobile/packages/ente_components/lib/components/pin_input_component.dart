@@ -6,15 +6,8 @@ import 'package:ente_components/theme/theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-/// A fixed-length numeric input rendered as individual code boxes.
-///
-/// The caller owns [controller]; the component manages its focus internally.
-/// Set [useNativeKeyboard] to false when a caller-managed keypad updates the
-/// controller directly.
-///
-/// Figma:
-/// https://www.figma.com/design/BuBNPPytxlVnqfmCUW0mgz/Ente-Visual-Design?node-id=2275-11846&m=dev
-/// https://www.figma.com/design/BuBNPPytxlVnqfmCUW0mgz/Ente-Visual-Design?node-id=7634-53618&m=dev
+// Figma: https://www.figma.com/design/BuBNPPytxlVnqfmCUW0mgz/Ente-Visual-Design?node-id=2275-11846&m=dev
+// Figma: https://www.figma.com/design/BuBNPPytxlVnqfmCUW0mgz/Ente-Visual-Design?node-id=7634-53618&m=dev
 class PinInputComponent extends StatefulWidget {
   const PinInputComponent({
     super.key,

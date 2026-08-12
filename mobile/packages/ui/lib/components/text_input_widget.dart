@@ -18,8 +18,6 @@ class TextInputWidget extends StatefulWidget {
   final bool? autoFocus;
   final int? maxLength;
 
-  ///TextInputWidget will listen to this notifier and executes onSubmit when
-  ///notified.
   final ValueNotifier? submitNotifier;
   final bool alwaysShowSuccessState;
   final bool showOnlyLoadingState;
@@ -69,8 +67,6 @@ class _TextInputWidgetState extends State<TextInputWidget> {
   final _debouncer = Debouncer(const Duration(milliseconds: 300));
   late final ValueNotifier<bool> _obscureTextNotifier;
 
-  ///This is to pass if the TextInputWidget is in a dialog and an error is
-  ///thrown in executing onSubmit by passing it as arg in Navigator.pop()
   Exception? _exception;
   bool _incorrectPassword = false;
   @override
