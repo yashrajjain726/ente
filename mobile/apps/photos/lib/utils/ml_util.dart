@@ -31,7 +31,7 @@ import "package:photos/services/machine_learning/face_ml/face_detection/detectio
 import "package:photos/services/machine_learning/ml_exceptions.dart";
 import "package:photos/services/machine_learning/ml_result.dart";
 import "package:photos/services/search_service.dart";
-import "package:photos/services/sync/local_sync_service.dart";
+import "package:photos/services/sync/origin_fetch_tracker.dart";
 import "package:photos/src/rust/api/ml_indexing_api.dart" as rust_ml;
 import "package:photos/utils/network_util.dart";
 
@@ -740,8 +740,11 @@ Future<String> getImagePathForML(EnteFile enteFile) async {
       );
     }
     try {
-      if (Platform.isIOS && enteFile.localID != null) {
-        trackOriginFetchForUploadOrML.put(enteFile.localID!, true);
+      if (Platform.isIOS) {
+        originFetchTracker.record(
+          localID: enteFile.localID,
+          modificationTime: enteFile.modificationTime,
+        );
       }
       file = await getFile(enteFile, isOrigin: true);
     } catch (e, s) {
