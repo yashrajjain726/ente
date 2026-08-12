@@ -1,5 +1,6 @@
 use crate::ml::{
     error::{MlError, MlResult},
+    model::Model,
     onnx,
     postprocess::l2_normalize,
     runtime::MlRuntimeView,
@@ -38,7 +39,7 @@ pub(crate) fn run_face_embedding(
         }
 
         let input = onnx::PreparedF32Input::new(aligned);
-        let (shape, mut embedding) = runtime.with_face_embedding_session(|session| {
+        let (shape, mut embedding) = runtime.run(Model::FaceEmbedding, |session| {
             onnx::run_f32(
                 session,
                 &input,

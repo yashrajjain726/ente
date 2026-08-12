@@ -3,7 +3,9 @@ use std::path::{Path, PathBuf};
 
 use ente_assets::{Asset, AssetFile, AssetStore};
 
-use super::runtime::ModelPaths;
+use super::model::{self, ModelPaths};
+
+pub use super::model::Model;
 
 const MODELS: &str = "models";
 
@@ -20,33 +22,6 @@ const RETIRED_LEGACY_MODEL_FILES: &[&str] = &[
     "yolov5s_face_opset18_rgba_opt.onnx",
     "yolov5s_face_opset18_rgba_opt_nosplits.onnx",
     "mobilefacenet_opset15.onnx",
-];
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Model {
-    FaceDetection,
-    FaceEmbedding,
-    ClipImage,
-    ClipText,
-    PetFaceDetection,
-    PetFaceEmbeddingDog,
-    PetFaceEmbeddingCat,
-    PetBodyDetection,
-    PetBodyEmbeddingDog,
-    PetBodyEmbeddingCat,
-}
-
-const ALL_MODELS: [Model; 10] = [
-    Model::FaceDetection,
-    Model::FaceEmbedding,
-    Model::ClipImage,
-    Model::ClipText,
-    Model::PetFaceDetection,
-    Model::PetFaceEmbeddingDog,
-    Model::PetFaceEmbeddingCat,
-    Model::PetBodyDetection,
-    Model::PetBodyEmbeddingDog,
-    Model::PetBodyEmbeddingCat,
 ];
 
 pub struct ClipTextPaths {
@@ -71,24 +46,7 @@ pub fn model_asset(model: Model) -> Asset {
 }
 
 pub fn indexing_models(run_faces: bool, run_clip: bool, run_pets: bool) -> Vec<Model> {
-    let mut models = Vec::new();
-    if run_faces {
-        models.extend([Model::FaceDetection, Model::FaceEmbedding]);
-    }
-    if run_clip {
-        models.push(Model::ClipImage);
-    }
-    if run_pets {
-        models.extend([
-            Model::PetFaceDetection,
-            Model::PetFaceEmbeddingDog,
-            Model::PetFaceEmbeddingCat,
-            Model::PetBodyDetection,
-            Model::PetBodyEmbeddingDog,
-            Model::PetBodyEmbeddingCat,
-        ]);
-    }
-    models
+    model::enabled_indexing_models(run_faces, run_clip, run_pets).collect()
 }
 
 pub fn indexing_model_paths(
@@ -97,18 +55,11 @@ pub fn indexing_model_paths(
     run_clip: bool,
     run_pets: bool,
 ) -> ModelPaths {
-    ModelPaths {
-        face_detection: model_path_if(store, Model::FaceDetection, run_faces),
-        face_embedding: model_path_if(store, Model::FaceEmbedding, run_faces),
-        clip_image: model_path_if(store, Model::ClipImage, run_clip),
-        clip_text: String::new(),
-        pet_face_detection: model_path_if(store, Model::PetFaceDetection, run_pets),
-        pet_face_embedding_dog: model_path_if(store, Model::PetFaceEmbeddingDog, run_pets),
-        pet_face_embedding_cat: model_path_if(store, Model::PetFaceEmbeddingCat, run_pets),
-        pet_body_detection: model_path_if(store, Model::PetBodyDetection, run_pets),
-        pet_body_embedding_dog: model_path_if(store, Model::PetBodyEmbeddingDog, run_pets),
-        pet_body_embedding_cat: model_path_if(store, Model::PetBodyEmbeddingCat, run_pets),
+    let mut model_paths = ModelPaths::default();
+    for model in model::enabled_indexing_models(run_faces, run_clip, run_pets) {
+        *model_paths.get_mut(model) = model_path(store, model);
     }
+    model_paths
 }
 
 pub fn clip_text_paths(store: &AssetStore) -> ClipTextPaths {
@@ -127,7 +78,7 @@ pub fn clip_text_paths(store: &AssetStore) -> ClipTextPaths {
 pub fn migrate_desktop_models(store: &AssetStore, legacy_dir: &Path) -> Vec<String> {
     let mut warnings = Vec::new();
     if legacy_dir.exists() {
-        for model in ALL_MODELS {
+        for model in Model::ALL {
             if let Err(error) = migrate_desktop_model(store, legacy_dir, model) {
                 warnings.push(format!("Failed to migrate {}: {error}", model.spec().key));
             }
@@ -255,10 +206,7 @@ struct ModelFileSpec {
     sha256: &'static str,
 }
 
-fn model_path_if(store: &AssetStore, model: Model, enabled: bool) -> String {
-    if !enabled {
-        return String::new();
-    }
+fn model_path(store: &AssetStore, model: Model) -> String {
     let asset = model_asset(model);
     store
         .file_path(&asset, model.spec().files[0].name)
@@ -332,7 +280,7 @@ mod tests {
     fn catalog_keys_are_unique_and_prefix_free() {
         let root = Path::new("assets");
         let store = AssetStore::new(root);
-        let paths = ALL_MODELS
+        let paths = Model::ALL
             .map(|model| store.asset_dir(&model_asset(model)))
             .to_vec();
         for (index, path) in paths.iter().enumerate() {
@@ -348,7 +296,7 @@ mod tests {
     #[test]
     fn retired_keys_are_not_in_the_catalog() {
         for key in RETIRED_MODEL_KEYS {
-            assert!(ALL_MODELS.iter().all(|model| model.spec().key != *key));
+            assert!(Model::ALL.iter().all(|model| model.spec().key != *key));
         }
     }
 
@@ -361,7 +309,7 @@ mod tests {
         for model in lock["models"].as_object().unwrap().values() {
             let name = model["file_name"].as_str().unwrap();
             let sha256 = model["sha256"].as_str().unwrap();
-            let catalog_file = ALL_MODELS
+            let catalog_file = Model::ALL
                 .iter()
                 .flat_map(|model| model.spec().files)
                 .find(|file| file.name == name)
@@ -384,7 +332,7 @@ mod tests {
         let asset = model_asset(Model::FaceEmbedding);
         assert!(store.is_downloaded(&asset));
         assert_eq!(
-            fs::metadata(model_path_if(&store, Model::FaceEmbedding, true))
+            fs::metadata(model_path(&store, Model::FaceEmbedding))
                 .unwrap()
                 .len(),
             Model::FaceEmbedding.spec().files[0].size

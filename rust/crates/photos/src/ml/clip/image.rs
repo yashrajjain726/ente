@@ -1,5 +1,6 @@
 use crate::ml::{
     error::MlResult,
+    model::Model,
     onnx, preprocess,
     runtime::MlRuntimeView,
     types::{ClipResult, DecodedImage},
@@ -12,7 +13,7 @@ pub(crate) fn run_clip_image(
     decoded: &DecodedImage,
 ) -> MlResult<ClipResult> {
     let input = onnx::PreparedF32Input::new(preprocess::preprocess_clip(decoded)?);
-    let (shape, output) = runtime.with_clip_image_session(|session| {
+    let (shape, output) = runtime.run(Model::ClipImage, |session| {
         onnx::run_f32(
             session,
             &input,

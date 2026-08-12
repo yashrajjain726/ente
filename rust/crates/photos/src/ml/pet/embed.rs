@@ -1,5 +1,6 @@
 use crate::ml::{
     error::{MlError, MlResult},
+    model::Model,
     onnx,
     postprocess::l2_normalize,
     runtime::MlRuntimeView,
@@ -52,15 +53,13 @@ pub(crate) fn run_pet_face_embedding(
             PET_EMBEDDING_INPUT_SIZE as i64,
             PET_EMBEDDING_INPUT_SIZE as i64,
         ];
-        let (shape, output) = if species == PET_SPECIES_DOG {
-            runtime.with_pet_face_embedding_dog_session(|session| {
-                onnx::run_f32(session, &input, input_shape)
-            })?
+        let model = if species == PET_SPECIES_DOG {
+            Model::PetFaceEmbeddingDog
         } else {
-            runtime.with_pet_face_embedding_cat_session(|session| {
-                onnx::run_f32(session, &input, input_shape)
-            })?
+            Model::PetFaceEmbeddingCat
         };
+        let (shape, output) =
+            runtime.run(model, |session| onnx::run_f32(session, &input, input_shape))?;
 
         let embedding_size =
             validate_embedding_batch_output("face", &shape, output.len(), batch.indices.len())?;
@@ -134,15 +133,13 @@ pub(crate) fn run_pet_body_embedding(
             PET_EMBEDDING_INPUT_SIZE as i64,
             PET_EMBEDDING_INPUT_SIZE as i64,
         ];
-        let (shape, output) = if is_cat {
-            runtime.with_pet_body_embedding_cat_session(|session| {
-                onnx::run_f32(session, &input, input_shape)
-            })?
+        let model = if is_cat {
+            Model::PetBodyEmbeddingCat
         } else {
-            runtime.with_pet_body_embedding_dog_session(|session| {
-                onnx::run_f32(session, &input, input_shape)
-            })?
+            Model::PetBodyEmbeddingDog
         };
+        let (shape, output) =
+            runtime.run(model, |session| onnx::run_f32(session, &input, input_shape))?;
 
         let embedding_size =
             validate_embedding_batch_output("body", &shape, output.len(), batch.indices.len())?;

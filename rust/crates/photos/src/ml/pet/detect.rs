@@ -1,5 +1,6 @@
 use crate::ml::{
     error::{MlError, MlResult},
+    model::Model,
     onnx,
     postprocess::{NmsDetection, greedy_non_max_suppression},
     preprocess::{YOLO_INPUT_SIZE, YoloInput},
@@ -48,7 +49,7 @@ pub(crate) fn run_pet_face_detection(
     runtime: &MlRuntimeView<'_>,
     input: &YoloInput,
 ) -> MlResult<Vec<PetFaceDetection>> {
-    runtime.with_pet_face_detection_session(|session| {
+    runtime.run(Model::PetFaceDetection, |session| {
         onnx::with_prepared_float_output(
             session,
             &input.tensor,
@@ -182,7 +183,7 @@ pub(crate) fn run_pet_body_detection(
     runtime: &MlRuntimeView<'_>,
     input: &YoloInput,
 ) -> MlResult<Vec<PetBodyDetection>> {
-    runtime.with_pet_body_detection_session(|session| {
+    runtime.run(Model::PetBodyDetection, |session| {
         onnx::with_prepared_float_output(
             session,
             &input.tensor,

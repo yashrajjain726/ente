@@ -6,6 +6,7 @@ use crate::ml::{
         run_face_alignment, run_face_detection, run_face_embedding,
         thumbnail::{FaceBox, generate_face_thumbnails},
     },
+    model::{self, Model},
     pet::{
         run_pet_body_detection, run_pet_body_embedding, run_pet_face_alignment,
         run_pet_face_detection, run_pet_face_embedding,
@@ -240,9 +241,10 @@ pub fn run_clip_text(req: RunClipTextRequest) -> MlResult<RunClipTextResult> {
         } = req;
 
         if model_path.trim().is_empty() {
-            return Err(MlError::InvalidRequest(
-                "missing model path: clipTextModelPath".to_string(),
-            ));
+            return Err(MlError::InvalidRequest(format!(
+                "missing model path: {}",
+                Model::ClipText.path_label()
+            )));
         }
         if vocab_path.trim().is_empty() {
             return Err(MlError::InvalidRequest(
@@ -250,18 +252,8 @@ pub fn run_clip_text(req: RunClipTextRequest) -> MlResult<RunClipTextResult> {
             ));
         }
 
-        let model_paths = ModelPaths {
-            face_detection: String::new(),
-            face_embedding: String::new(),
-            clip_image: String::new(),
-            clip_text: model_path,
-            pet_face_detection: String::new(),
-            pet_face_embedding_dog: String::new(),
-            pet_face_embedding_cat: String::new(),
-            pet_body_detection: String::new(),
-            pet_body_embedding_dog: String::new(),
-            pet_body_embedding_cat: String::new(),
-        };
+        let mut model_paths = ModelPaths::default();
+        *model_paths.get_mut(Model::ClipText) = model_path;
 
         runtime::with_runtime(&model_paths, |runtime| {
             let clip = run_clip_text_query(runtime, &text, &vocab_path)?;
@@ -291,40 +283,10 @@ pub fn tokenize_clip_text(text: &str, vocab_path: &str) -> MlResult<Vec<i32>> {
 }
 
 fn validate_request_model_paths(req: &AnalyzeImageRequest) -> MlResult<()> {
-    let model_paths = &req.model_paths;
-
-    let mut missing = Vec::new();
-    if req.run_faces {
-        if model_paths.face_detection.trim().is_empty() {
-            missing.push("faceDetectionModelPath");
-        }
-        if model_paths.face_embedding.trim().is_empty() {
-            missing.push("faceEmbeddingModelPath");
-        }
-    }
-    if req.run_clip && model_paths.clip_image.trim().is_empty() {
-        missing.push("clipImageModelPath");
-    }
-    if req.run_pets {
-        if model_paths.pet_face_detection.trim().is_empty() {
-            missing.push("petFaceDetectionModelPath");
-        }
-        if model_paths.pet_body_detection.trim().is_empty() {
-            missing.push("petBodyDetectionModelPath");
-        }
-        if model_paths.pet_face_embedding_dog.trim().is_empty() {
-            missing.push("petFaceEmbeddingDogModelPath");
-        }
-        if model_paths.pet_face_embedding_cat.trim().is_empty() {
-            missing.push("petFaceEmbeddingCatModelPath");
-        }
-        if model_paths.pet_body_embedding_dog.trim().is_empty() {
-            missing.push("petBodyEmbeddingDogModelPath");
-        }
-        if model_paths.pet_body_embedding_cat.trim().is_empty() {
-            missing.push("petBodyEmbeddingCatModelPath");
-        }
-    }
+    let missing = model::required_indexing_models(req.run_faces, req.run_clip, req.run_pets)
+        .filter(|&model| req.model_paths.get(model).trim().is_empty())
+        .map(Model::path_label)
+        .collect::<Vec<_>>();
     if missing.is_empty() {
         return Ok(());
     }

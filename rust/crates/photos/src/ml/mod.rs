@@ -7,6 +7,7 @@ pub mod golden;
 mod golden_data;
 pub mod golden_tooling;
 pub mod indexing;
+mod model;
 mod onnx;
 mod pet;
 mod postprocess;

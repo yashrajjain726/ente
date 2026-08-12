@@ -1,6 +1,7 @@
 use crate::ml::{
     clip::tokenizer,
     error::{MlError, MlResult},
+    model::Model,
     onnx,
     runtime::MlRuntimeView,
     types::ClipResult,
@@ -16,7 +17,7 @@ fn run_clip_text(runtime: &MlRuntimeView<'_>, token_ids: &[i32]) -> MlResult<Cli
         )));
     }
 
-    let (shape, output) = runtime.with_clip_text_session(|session| {
+    let (shape, output) = runtime.run(Model::ClipText, |session| {
         onnx::run_i32_f32(session, token_ids, [1, CLIP_TEXT_TOKEN_COUNT as i64])
     })?;
 
