@@ -27,16 +27,10 @@ pub struct ModelPaths {
 }
 
 #[derive(Debug)]
-struct LoadedSession {
-    session: Session,
-    execution_provider: onnx::ExecutionProvider,
-}
-
-#[derive(Debug)]
 struct ModelSlotState {
     path: String,
-    fallback_execution_mode: Option<onnx::ExecutionMode>,
-    loaded: Option<LoadedSession>,
+    provider_plan: Option<onnx::ProviderPlan>,
+    session: Option<Session>,
 }
 
 #[derive(Debug)]
@@ -75,8 +69,8 @@ impl ModelSlot {
             model_namespace,
             state: Mutex::new(ModelSlotState {
                 path: String::new(),
-                fallback_execution_mode: None,
-                loaded: None,
+                provider_plan: None,
+                session: None,
             }),
         }
     }
@@ -111,24 +105,11 @@ impl ModelSlot {
         Self::clear_transient_runtime_state_locked(&mut state);
     }
 
-    fn advance_provider_fallback_locked(&self, state: &mut ModelSlotState) -> bool {
-        let current_mode = state
-            .fallback_execution_mode
-            .unwrap_or(self.default_execution_mode);
-        let Some(fallback_mode) = current_mode.fallback() else {
-            return false;
-        };
-
-        state.fallback_execution_mode = Some(fallback_mode);
-        state.loaded = None;
-        true
-    }
-
     fn run<T>(
         &self,
         path: &str,
         error_msg: &str,
-        mut operation: impl FnMut(&mut Session) -> MlResult<T>,
+        mut operation: impl FnMut(&mut Session) -> onnx::SessionRunResult<T>,
     ) -> MlResult<(T, onnx::ExecutionProvider)> {
         if path.trim().is_empty() {
             return Err(MlError::InvalidRequest(error_msg.to_string()));
@@ -137,26 +118,25 @@ impl ModelSlot {
         loop {
             let mut state = self.lock_state();
             Self::set_config_locked(&mut state, path);
-            if let Err(error) = self.ensure_loaded_locked(&mut state, error_msg) {
-                if self.retry_after_provider_failure_locked(&mut state, &error) {
-                    continue;
-                }
-                return Err(error);
-            }
+            self.ensure_loaded_locked(&mut state, error_msg)?;
 
-            let loaded = state
-                .loaded
+            let execution_provider = state
+                .provider_plan
+                .as_ref()
+                .and_then(onnx::ProviderPlan::selected_provider)
+                .expect("loaded session must have a selected execution provider");
+            let session = state
+                .session
                 .as_mut()
                 .expect("session must be loaded before model execution");
-            let execution_provider = loaded.execution_provider;
-            let result = operation(&mut loaded.session);
+            let result = operation(session);
             match result {
                 Ok(value) => return Ok((value, execution_provider)),
                 Err(error) => {
                     if self.retry_after_provider_failure_locked(&mut state, &error) {
                         continue;
                     }
-                    return Err(error);
+                    return Err(error.into_ml_error());
                 }
             }
         }
@@ -165,14 +145,18 @@ impl ModelSlot {
     fn retry_after_provider_failure_locked(
         &self,
         state: &mut ModelSlotState,
-        error: &MlError,
+        error: &onnx::SessionRunError,
     ) -> bool {
-        if !should_retry_execution_provider_runtime(error)
-            || !self.advance_provider_fallback_locked(state)
+        if !error.is_retryable()
+            || !state
+                .provider_plan
+                .as_ref()
+                .is_some_and(onnx::ProviderPlan::has_fallback)
         {
             return false;
         }
 
+        state.session = None;
         log::warn!(
             "execution provider failed, retrying model with the next provider fallback: {error}"
         );
@@ -184,13 +168,13 @@ impl ModelSlot {
             return;
         }
         state.path = path.to_string();
-        state.fallback_execution_mode = None;
-        state.loaded = None;
+        state.provider_plan = None;
+        state.session = None;
     }
 
     fn clear_transient_runtime_state_locked(state: &mut ModelSlotState) {
-        state.fallback_execution_mode = None;
-        state.loaded = None;
+        state.provider_plan = None;
+        state.session = None;
     }
 
     fn reset_slot_locked(state: &mut ModelSlotState) {
@@ -198,34 +182,35 @@ impl ModelSlot {
         Self::clear_transient_runtime_state_locked(state);
     }
 
-    fn effective_execution_mode(&self, state: &ModelSlotState) -> onnx::ExecutionMode {
-        state
-            .fallback_execution_mode
-            .unwrap_or(self.default_execution_mode)
-    }
-
     fn ensure_loaded_locked(&self, state: &mut ModelSlotState, error_msg: &str) -> MlResult<()> {
         if state.path.trim().is_empty() {
             return Err(MlError::InvalidRequest(error_msg.to_string()));
         }
-        if state.loaded.is_some() {
+        if state.session.is_some() {
             return Ok(());
         }
 
-        let execution_mode = self.effective_execution_mode(state);
+        let provider_plan = state.provider_plan.get_or_insert_with(|| {
+            onnx::ProviderPlan::new(self.default_execution_mode, &state.path)
+        });
         let model_name = Path::new(&state.path)
             .file_name()
             .and_then(|name| name.to_str())
             .unwrap_or(&state.path);
-        log::info!("loading {model_name} with {execution_mode:?} execution");
+        log::info!(
+            "loading {model_name} with {:?} execution",
+            self.default_execution_mode
+        );
         let t = std::time::Instant::now();
-        let (session, execution_provider) =
-            onnx::build_session(&state.path, execution_mode, self.model_namespace)?;
-        log::info!("loaded {model_name} in {:?}", t.elapsed());
-        state.loaded = Some(LoadedSession {
-            session,
-            execution_provider,
-        });
+        let session = onnx::build_session(&state.path, provider_plan, self.model_namespace)?;
+        let execution_provider = provider_plan
+            .selected_provider()
+            .expect("successful session build must select an execution provider");
+        log::info!(
+            "loaded {model_name} with {execution_provider:?} in {:?}",
+            t.elapsed()
+        );
+        state.session = Some(session);
         Ok(())
     }
 }
@@ -344,7 +329,7 @@ impl<'a> MlRuntimeView<'a> {
         slot: &ModelSlot,
         path: &str,
         error_msg: &str,
-        operation: impl FnMut(&mut Session) -> MlResult<T>,
+        operation: impl FnMut(&mut Session) -> onnx::SessionRunResult<T>,
     ) -> MlResult<T> {
         let (value, execution_provider) = slot.run(path, error_msg, operation)?;
         let mut used = self.used_providers.get();
@@ -355,7 +340,7 @@ impl<'a> MlRuntimeView<'a> {
 
     pub(crate) fn with_face_detection_session<T>(
         &self,
-        operation: impl FnMut(&mut Session) -> MlResult<T>,
+        operation: impl FnMut(&mut Session) -> onnx::SessionRunResult<T>,
     ) -> MlResult<T> {
         self.run_tracked(
             &self.runtime.face_detection,
@@ -367,7 +352,7 @@ impl<'a> MlRuntimeView<'a> {
 
     pub(crate) fn with_face_embedding_session<T>(
         &self,
-        operation: impl FnMut(&mut Session) -> MlResult<T>,
+        operation: impl FnMut(&mut Session) -> onnx::SessionRunResult<T>,
     ) -> MlResult<T> {
         self.run_tracked(
             &self.runtime.face_embedding,
@@ -379,7 +364,7 @@ impl<'a> MlRuntimeView<'a> {
 
     pub(crate) fn with_clip_image_session<T>(
         &self,
-        operation: impl FnMut(&mut Session) -> MlResult<T>,
+        operation: impl FnMut(&mut Session) -> onnx::SessionRunResult<T>,
     ) -> MlResult<T> {
         self.run_tracked(
             &self.runtime.clip_image,
@@ -391,7 +376,7 @@ impl<'a> MlRuntimeView<'a> {
 
     pub(crate) fn with_clip_text_session<T>(
         &self,
-        operation: impl FnMut(&mut Session) -> MlResult<T>,
+        operation: impl FnMut(&mut Session) -> onnx::SessionRunResult<T>,
     ) -> MlResult<T> {
         self.run_tracked(
             &self.runtime.clip_text,
@@ -403,7 +388,7 @@ impl<'a> MlRuntimeView<'a> {
 
     pub(crate) fn with_pet_face_detection_session<T>(
         &self,
-        operation: impl FnMut(&mut Session) -> MlResult<T>,
+        operation: impl FnMut(&mut Session) -> onnx::SessionRunResult<T>,
     ) -> MlResult<T> {
         self.run_tracked(
             &self.runtime.pet_face_detection,
@@ -415,7 +400,7 @@ impl<'a> MlRuntimeView<'a> {
 
     pub(crate) fn with_pet_face_embedding_dog_session<T>(
         &self,
-        operation: impl FnMut(&mut Session) -> MlResult<T>,
+        operation: impl FnMut(&mut Session) -> onnx::SessionRunResult<T>,
     ) -> MlResult<T> {
         self.run_tracked(
             &self.runtime.pet_face_embedding_dog,
@@ -427,7 +412,7 @@ impl<'a> MlRuntimeView<'a> {
 
     pub(crate) fn with_pet_face_embedding_cat_session<T>(
         &self,
-        operation: impl FnMut(&mut Session) -> MlResult<T>,
+        operation: impl FnMut(&mut Session) -> onnx::SessionRunResult<T>,
     ) -> MlResult<T> {
         self.run_tracked(
             &self.runtime.pet_face_embedding_cat,
@@ -439,7 +424,7 @@ impl<'a> MlRuntimeView<'a> {
 
     pub(crate) fn with_pet_body_detection_session<T>(
         &self,
-        operation: impl FnMut(&mut Session) -> MlResult<T>,
+        operation: impl FnMut(&mut Session) -> onnx::SessionRunResult<T>,
     ) -> MlResult<T> {
         self.run_tracked(
             &self.runtime.pet_body_detection,
@@ -451,7 +436,7 @@ impl<'a> MlRuntimeView<'a> {
 
     pub(crate) fn with_pet_body_embedding_dog_session<T>(
         &self,
-        operation: impl FnMut(&mut Session) -> MlResult<T>,
+        operation: impl FnMut(&mut Session) -> onnx::SessionRunResult<T>,
     ) -> MlResult<T> {
         self.run_tracked(
             &self.runtime.pet_body_embedding_dog,
@@ -463,7 +448,7 @@ impl<'a> MlRuntimeView<'a> {
 
     pub(crate) fn with_pet_body_embedding_cat_session<T>(
         &self,
-        operation: impl FnMut(&mut Session) -> MlResult<T>,
+        operation: impl FnMut(&mut Session) -> onnx::SessionRunResult<T>,
     ) -> MlResult<T> {
         self.run_tracked(
             &self.runtime.pet_body_embedding_cat,
@@ -496,34 +481,6 @@ pub(crate) fn release_runtime() {
     GLOBAL_RUNTIME.release_indexing_models();
 }
 
-fn should_retry_execution_provider_runtime(error: &MlError) -> bool {
-    cfg!(any(
-        target_os = "ios",
-        target_os = "android",
-        target_os = "linux",
-        target_os = "macos",
-        target_os = "windows"
-    )) && is_execution_provider_failure(error)
-}
-
-fn is_execution_provider_failure(error: &MlError) -> bool {
-    let MlError::Ort(message) = error else {
-        return false;
-    };
-    let normalized = message.to_ascii_lowercase();
-    normalized.contains("executionprovider")
-        || normalized.contains("unknown allocation device")
-        || normalized.contains("xnnpackexecutionprovider")
-        || normalized.contains("coremlexecutionprovider")
-        || normalized.contains("webgpu")
-        || normalized.contains("wgpu")
-        || normalized.contains("dawn")
-        || normalized.contains("vulkan")
-        || normalized.contains("vk_error")
-        || normalized.contains("non-finite")
-        || normalized.contains("ep error")
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -547,34 +504,6 @@ mod tests {
     }
 
     #[test]
-    fn provider_fallback_advances_only_the_selected_model_slot() {
-        let runtime = MlRuntime::new();
-        let model_paths = ModelPaths {
-            face_detection: "face.onnx".to_string(),
-            clip_image: "clip.onnx".to_string(),
-            ..ModelPaths::default()
-        };
-        runtime.configure_requested_models(&model_paths);
-
-        {
-            let mut face_detection = runtime.face_detection.lock_state();
-            assert!(
-                runtime
-                    .face_detection
-                    .advance_provider_fallback_locked(&mut face_detection)
-            );
-        }
-
-        let face_detection = runtime.face_detection.lock_state();
-        assert_eq!(
-            face_detection.fallback_execution_mode,
-            onnx::ExecutionMode::PlatformDefault.fallback()
-        );
-        let clip_image = runtime.clip_image.lock_state();
-        assert_eq!(clip_image.fallback_execution_mode, None);
-    }
-
-    #[test]
     fn runtime_accepts_single_use_operation() {
         let value = String::from("once");
 
@@ -590,25 +519,28 @@ mod tests {
         {
             let mut clip_text = runtime.clip_text.lock_state();
             clip_text.path = "clip_text.onnx".to_string();
-            clip_text.fallback_execution_mode = Some(onnx::ExecutionMode::CpuOnly);
+            clip_text.provider_plan = Some(onnx::ProviderPlan::new(
+                onnx::ExecutionMode::CpuOnly,
+                "clip_text.onnx",
+            ));
         }
         {
             let mut face_detection = runtime.face_detection.lock_state();
             face_detection.path = "face.onnx".to_string();
-            face_detection.fallback_execution_mode = Some(onnx::ExecutionMode::CpuOnly);
+            face_detection.provider_plan = Some(onnx::ProviderPlan::new(
+                onnx::ExecutionMode::CpuOnly,
+                "face.onnx",
+            ));
         }
 
         runtime.release_indexing_models();
 
         let clip_text = runtime.clip_text.lock_state();
         assert_eq!(clip_text.path, "clip_text.onnx");
-        assert_eq!(
-            clip_text.fallback_execution_mode,
-            Some(onnx::ExecutionMode::CpuOnly)
-        );
+        assert!(clip_text.provider_plan.is_some());
 
         let face_detection = runtime.face_detection.lock_state();
-        assert_eq!(face_detection.fallback_execution_mode, None);
+        assert!(face_detection.provider_plan.is_none());
     }
 
     #[test]
@@ -624,15 +556,15 @@ mod tests {
 
         let face_detection = runtime.face_detection.lock_state();
         assert_eq!(face_detection.path, "face.onnx");
-        assert!(face_detection.loaded.is_none());
+        assert!(face_detection.session.is_none());
 
         let face_embedding = runtime.face_embedding.lock_state();
         assert_eq!(face_embedding.path, "embed.onnx");
-        assert!(face_embedding.loaded.is_none());
+        assert!(face_embedding.session.is_none());
 
         let clip_image = runtime.clip_image.lock_state();
         assert_eq!(clip_image.path, "clip.onnx");
-        assert!(clip_image.loaded.is_none());
+        assert!(clip_image.session.is_none());
     }
 
     #[test]
@@ -642,15 +574,18 @@ mod tests {
         {
             let mut state = slot.lock_state();
             state.path = "pet.onnx".to_string();
-            state.fallback_execution_mode = Some(onnx::ExecutionMode::CpuOnly);
+            state.provider_plan = Some(onnx::ProviderPlan::new(
+                onnx::ExecutionMode::CpuOnly,
+                "pet.onnx",
+            ));
         }
 
         slot.sync_indexing_residency("");
 
         let state = slot.lock_state();
         assert!(state.path.is_empty());
-        assert_eq!(state.fallback_execution_mode, None);
-        assert!(state.loaded.is_none());
+        assert!(state.provider_plan.is_none());
+        assert!(state.session.is_none());
     }
 
     #[test]
@@ -660,52 +595,17 @@ mod tests {
         {
             let mut state = slot.lock_state();
             state.path = "clip_text.onnx".to_string();
-            state.fallback_execution_mode = Some(onnx::ExecutionMode::CpuOnly);
+            state.provider_plan = Some(onnx::ProviderPlan::new(
+                onnx::ExecutionMode::CpuOnly,
+                "clip_text.onnx",
+            ));
         }
 
         slot.release_residency();
 
         let state = slot.lock_state();
-        assert_eq!(state.fallback_execution_mode, None);
-        assert!(state.loaded.is_none());
-    }
-
-    #[test]
-    fn execution_provider_fallback_order_matches_platform_policy() {
-        #[cfg(target_os = "android")]
-        {
-            assert_eq!(
-                onnx::ExecutionMode::PlatformDefault.fallback(),
-                Some(onnx::ExecutionMode::Xnnpack)
-            );
-            assert_eq!(
-                onnx::ExecutionMode::Xnnpack.fallback(),
-                Some(onnx::ExecutionMode::CpuOnly)
-            );
-        }
-        #[cfg(not(target_os = "android"))]
-        assert_eq!(
-            onnx::ExecutionMode::PlatformDefault.fallback(),
-            Some(onnx::ExecutionMode::CpuOnly)
-        );
-        assert_eq!(onnx::ExecutionMode::CpuOnly.fallback(), None);
-    }
-
-    #[test]
-    fn model_slot_provider_fallback_is_bounded() {
-        let slot = ModelSlot::new(onnx::ExecutionMode::PlatformDefault, "test-model");
-        let mut state = slot.lock_state();
-        let mut advances = 0;
-
-        while slot.advance_provider_fallback_locked(&mut state) {
-            advances += 1;
-            assert!(advances <= 2);
-        }
-
-        #[cfg(target_os = "android")]
-        assert_eq!(advances, 2);
-        #[cfg(not(target_os = "android"))]
-        assert_eq!(advances, 1);
+        assert!(state.provider_plan.is_none());
+        assert!(state.session.is_none());
     }
 
     #[test]

@@ -11,6 +11,8 @@ use crate::ml::{
     golden,
 };
 
+use super::{SessionRunError, SessionRunResult};
+
 pub(crate) struct PreparedF32Input {
     f32_data: Vec<f32>,
     f16_data: OnceCell<Vec<half::f16>>,
@@ -67,7 +69,7 @@ pub(crate) fn run_golden_tensor(
     session: &mut Session,
     input_shape: &[i64],
     input: &golden::PreparedGoldenInput,
-) -> MlResult<Vec<f32>> {
+) -> SessionRunResult<Vec<f32>> {
     let outputs = match input {
         golden::PreparedGoldenInput::F32(data) => {
             if session_expects_f16(session) {
@@ -89,7 +91,7 @@ pub(crate) fn run_golden_tensor(
     };
 
     if outputs.len() == 0 {
-        return Err(MlError::Ort("missing first output tensor".to_string()));
+        return Err(MlError::Ort("missing first output tensor".to_string()).into());
     }
     let output = &outputs[0];
     if let Ok((_, tensor_data)) = output.try_extract_tensor::<f32>() {
@@ -102,23 +104,22 @@ pub(crate) fn run_golden_tensor(
     }
 }
 
-fn ensure_finite_f32(data: &[f32]) -> MlResult<()> {
+fn ensure_finite_f32(data: &[f32]) -> SessionRunResult<()> {
     if data.iter().copied().all(f32::is_finite) {
         return Ok(());
     }
-    // Runtime classifies this message as a retryable provider failure.
-    Err(MlError::Ort(
+    Err(SessionRunError::retryable(MlError::Ort(
         "model produced non-finite output values".to_string(),
-    ))
+    )))
 }
 
-fn ensure_finite_f16(data: &[half::f16]) -> MlResult<()> {
+fn ensure_finite_f16(data: &[half::f16]) -> SessionRunResult<()> {
     if data.iter().all(|value| value.is_finite()) {
         return Ok(());
     }
-    Err(MlError::Ort(
+    Err(SessionRunError::retryable(MlError::Ort(
         "model produced non-finite output values".to_string(),
-    ))
+    )))
 }
 
 fn session_expects_f16(session: &Session) -> bool {
@@ -136,7 +137,7 @@ pub(crate) fn run_f32<const N: usize>(
     session: &mut Session,
     input: &PreparedF32Input,
     input_shape: [i64; N],
-) -> MlResult<(Vec<i64>, Vec<f32>)> {
+) -> SessionRunResult<(Vec<i64>, Vec<f32>)> {
     let outputs = if session_expects_f16(session) {
         let input_tensor =
             TensorRef::<half::f16>::from_array_view((input_shape, input.f16_data()))?;
@@ -148,7 +149,7 @@ pub(crate) fn run_f32<const N: usize>(
     };
 
     if outputs.len() == 0 {
-        return Err(MlError::Ort("missing first output tensor".to_string()));
+        return Err(MlError::Ort("missing first output tensor".to_string()).into());
     }
     let output = &outputs[0];
 
@@ -172,7 +173,7 @@ pub(crate) fn with_prepared_float_output<const N: usize, T>(
     input: &PreparedF32Input,
     input_shape: [i64; N],
     consume: impl FnOnce(&[i64], BorrowedFloatTensor<'_>) -> MlResult<T>,
-) -> MlResult<T> {
+) -> SessionRunResult<T> {
     let outputs = if session_expects_f16(session) {
         let input_tensor =
             TensorRef::<half::f16>::from_array_view((input_shape, input.f16_data()))?;
@@ -184,16 +185,16 @@ pub(crate) fn with_prepared_float_output<const N: usize, T>(
     };
 
     if outputs.len() == 0 {
-        return Err(MlError::Ort("missing first output tensor".to_string()));
+        return Err(MlError::Ort("missing first output tensor".to_string()).into());
     }
     let output = &outputs[0];
     if let Ok((tensor_shape, tensor_data)) = output.try_extract_tensor::<f32>() {
         ensure_finite_f32(tensor_data)?;
-        consume(tensor_shape, BorrowedFloatTensor::F32(tensor_data))
+        consume(tensor_shape, BorrowedFloatTensor::F32(tensor_data)).map_err(Into::into)
     } else {
         let (tensor_shape, tensor_data) = output.try_extract_tensor::<half::f16>()?;
         ensure_finite_f16(tensor_data)?;
-        consume(tensor_shape, BorrowedFloatTensor::F16(tensor_data))
+        consume(tensor_shape, BorrowedFloatTensor::F16(tensor_data)).map_err(Into::into)
     }
 }
 
@@ -201,11 +202,11 @@ pub(crate) fn run_i32_f32<const N: usize>(
     session: &mut Session,
     input: &[i32],
     input_shape: [i64; N],
-) -> MlResult<(Vec<i64>, Vec<f32>)> {
+) -> SessionRunResult<(Vec<i64>, Vec<f32>)> {
     let input_tensor = TensorRef::<i32>::from_array_view((input_shape, input))?;
     let outputs = session.run(ort::inputs![input_tensor])?;
     if outputs.len() == 0 {
-        return Err(MlError::Ort("missing first output tensor".to_string()));
+        return Err(MlError::Ort("missing first output tensor".to_string()).into());
     }
     let output = &outputs[0];
     let (tensor_shape, tensor_data) = output.try_extract_tensor::<f32>()?;
@@ -230,8 +231,10 @@ mod tests {
         for bad in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY] {
             let error = ensure_finite_f32(&[1.0, bad]).unwrap_err();
             assert!(error.to_string().contains("non-finite"));
+            assert!(error.is_retryable());
         }
         let error = ensure_finite_f16(&[half::f16::NAN]).unwrap_err();
         assert!(error.to_string().contains("non-finite"));
+        assert!(error.is_retryable());
     }
 }

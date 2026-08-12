@@ -198,8 +198,8 @@ fn model_file_name(model_path: &str) -> Result<&str, String> {
 }
 
 fn build_cpu_session(model_path: &str) -> Result<ort::session::Session, String> {
-    onnx::build_session(model_path, onnx::ExecutionMode::CpuOnly, "golden-tooling")
-        .map(|(session, _)| session)
+    let mut plan = onnx::ProviderPlan::new(onnx::ExecutionMode::CpuOnly, model_path);
+    onnx::build_session(model_path, &mut plan, "golden-tooling")
         .map_err(|error| format!("building CPU session for '{model_path}': {error}"))
 }
 

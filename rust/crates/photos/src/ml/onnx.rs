@@ -2,7 +2,10 @@ use ort::{
     ep::{CPU, ExecutionProviderDispatch},
     session::{Session, builder::GraphOptimizationLevel},
 };
-use std::path::{Path, PathBuf};
+use std::{
+    fmt,
+    path::{Path, PathBuf},
+};
 
 #[cfg(target_os = "android")]
 use ort::ep::XNNPACK;
@@ -38,8 +41,6 @@ const ENABLE_PERSISTENT_COREML_CACHE: bool = true;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum ExecutionMode {
     PlatformDefault,
-    #[cfg(target_os = "android")]
-    Xnnpack,
     CpuOnly,
 }
 
@@ -54,35 +55,123 @@ pub(crate) enum ExecutionProvider {
     Cpu,
 }
 
-impl ExecutionMode {
-    pub(crate) fn fallback(self) -> Option<Self> {
+#[derive(Debug)]
+pub(crate) struct ProviderPlan {
+    providers: Vec<ExecutionProvider>,
+    next: usize,
+    selected: Option<ExecutionProvider>,
+}
+
+impl ProviderPlan {
+    pub(crate) fn new(mode: ExecutionMode, model_path: &str) -> Self {
+        let providers = match mode {
+            ExecutionMode::PlatformDefault => platform_default_providers(model_path),
+            ExecutionMode::CpuOnly => vec![ExecutionProvider::Cpu],
+        };
+        Self {
+            providers,
+            next: 0,
+            selected: None,
+        }
+    }
+
+    fn next_provider(&mut self) -> Option<ExecutionProvider> {
+        let provider = self.providers.get(self.next).copied()?;
+        self.next += 1;
+        Some(provider)
+    }
+
+    fn select(&mut self, provider: ExecutionProvider) {
+        self.selected = Some(provider);
+    }
+
+    pub(crate) fn selected_provider(&self) -> Option<ExecutionProvider> {
+        self.selected
+    }
+
+    pub(crate) fn has_fallback(&self) -> bool {
+        self.next < self.providers.len()
+    }
+
+    fn retain_last_provider_for_retry(&mut self) {
+        self.selected = None;
+        self.next = self.providers.len().saturating_sub(1);
+    }
+}
+
+#[derive(Debug)]
+pub(crate) enum SessionRunError {
+    Retryable(MlError),
+    Terminal(MlError),
+}
+
+pub(crate) type SessionRunResult<T> = Result<T, SessionRunError>;
+
+impl SessionRunError {
+    pub(crate) fn retryable(error: MlError) -> Self {
+        Self::Retryable(error)
+    }
+
+    pub(crate) fn is_retryable(&self) -> bool {
+        matches!(self, Self::Retryable(_))
+    }
+
+    pub(crate) fn into_ml_error(self) -> MlError {
         match self {
-            #[cfg(target_os = "android")]
-            Self::PlatformDefault => Some(Self::Xnnpack),
-            #[cfg(not(target_os = "android"))]
-            Self::PlatformDefault => Some(Self::CpuOnly),
-            #[cfg(target_os = "android")]
-            Self::Xnnpack => Some(Self::CpuOnly),
-            Self::CpuOnly => None,
+            Self::Retryable(error) | Self::Terminal(error) => error,
+        }
+    }
+}
+
+impl fmt::Display for SessionRunError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Retryable(error) | Self::Terminal(error) => error.fmt(formatter),
+        }
+    }
+}
+
+impl From<MlError> for SessionRunError {
+    fn from(error: MlError) -> Self {
+        Self::Terminal(error)
+    }
+}
+
+impl From<SessionRunError> for MlError {
+    fn from(error: SessionRunError) -> Self {
+        error.into_ml_error()
+    }
+}
+
+impl<R> From<ort::Error<R>> for SessionRunError {
+    fn from(error: ort::Error<R>) -> Self {
+        let error = MlError::Ort(error.to_string());
+        if is_execution_provider_run_failure(&error) {
+            Self::Retryable(error)
+        } else {
+            Self::Terminal(error)
         }
     }
 }
 
 pub(crate) fn build_session(
     model_path: &str,
-    mode: ExecutionMode,
+    plan: &mut ProviderPlan,
     model_namespace: &str,
-) -> MlResult<(Session, ExecutionProvider)> {
-    let attempts = provider_attempts(mode, model_path, model_namespace);
+) -> MlResult<Session> {
+    plan.selected = None;
 
     let mut errors = Vec::new();
-    for attempt in attempts {
-        let execution_provider = attempt.execution_provider;
+    while let Some(execution_provider) = plan.next_provider() {
+        let attempt = provider_attempt(execution_provider, model_path, model_namespace);
         if attempt.uses_webgpu {
             #[cfg(any(target_os = "android", target_os = "linux", target_os = "windows"))]
             {
                 match build_webgpu_session_with_canary(model_path, model_namespace, attempt) {
-                    Ok(session) => return Ok((session, execution_provider)),
+                    Ok(session) => {
+                        plan.select(execution_provider);
+                        return Ok(session);
+                    }
                     Err(error) => errors.push(format!("{error}")),
                 }
                 continue;
@@ -97,7 +186,8 @@ pub(crate) fn build_session(
                 if let Some(cache_dir) = coreml_cache_dir {
                     coreml_cache::finalize(&cache_dir, model_path);
                 }
-                return Ok((session, execution_provider));
+                plan.select(execution_provider);
+                return Ok(session);
             }
             Err(error) => {
                 if let Some(cache_dir) = coreml_cache_dir
@@ -113,6 +203,8 @@ pub(crate) fn build_session(
         }
     }
 
+    plan.retain_last_provider_for_retry();
+
     if has_protobuf_parse_failure(&errors) {
         return Err(MlError::CorruptModel(model_path.to_string()));
     }
@@ -121,6 +213,23 @@ pub(crate) fn build_session(
         "failed to create ONNX session for model '{model_path}' across EP fallbacks: {}",
         errors.join(" | ")
     )))
+}
+
+fn is_execution_provider_run_failure(error: &MlError) -> bool {
+    let MlError::Ort(message) = error else {
+        return false;
+    };
+    let normalized = message.to_ascii_lowercase();
+    normalized.contains("executionprovider")
+        || normalized.contains("unknown allocation device")
+        || normalized.contains("xnnpackexecutionprovider")
+        || normalized.contains("coremlexecutionprovider")
+        || normalized.contains("webgpu")
+        || normalized.contains("wgpu")
+        || normalized.contains("dawn")
+        || normalized.contains("vulkan")
+        || normalized.contains("vk_error")
+        || normalized.contains("ep error")
 }
 
 // A CoreML self-test failure is treated as construction failure so the caller
@@ -306,7 +415,7 @@ fn run_session_self_test(
                 "{provider_label} zero-input warm-up inference failed for '{model_file}': \
                  {error}; falling back to the next execution provider"
             );
-            return Err(error);
+            return Err(error.into());
         }
     };
     if let Err(reason) = golden::validate_output(entry, &zero_output) {
@@ -330,7 +439,7 @@ fn run_session_self_test(
                 "{provider_label} golden self-test inference failed for '{model_file}': \
                  {error}; falling back to the next execution provider"
             );
-            return Err(error);
+            return Err(error.into());
         }
     };
     match golden::compare_output(entry, &golden_output) {
@@ -389,37 +498,51 @@ impl ProviderAttempt {
     }
 }
 
-fn provider_attempts(
-    mode: ExecutionMode,
-    model_path: &str,
-    model_namespace: &str,
-) -> Vec<ProviderAttempt> {
-    match mode {
-        ExecutionMode::PlatformDefault => platform_default_attempts(model_path, model_namespace),
+fn provider_attempt(
+    provider: ExecutionProvider,
+    _model_path: &str,
+    _model_namespace: &str,
+) -> ProviderAttempt {
+    match provider {
+        ExecutionProvider::Cpu => ProviderAttempt::cpu_only(),
+        #[cfg(any(target_os = "ios", target_os = "macos"))]
+        ExecutionProvider::CoreMl => {
+            let (coreml_provider, coreml_cache_dir) =
+                coreml_provider(_model_path, _model_namespace);
+            ProviderAttempt {
+                providers: vec![
+                    coreml_provider,
+                    CPU::default().with_arena_allocator(true).build(),
+                ],
+                disable_intra_op_spinning: false,
+                coreml_cache_dir,
+                uses_webgpu: false,
+                execution_provider: ExecutionProvider::CoreMl,
+            }
+        }
+        #[cfg(any(target_os = "android", target_os = "linux", target_os = "windows"))]
+        ExecutionProvider::WebGpu => ProviderAttempt {
+            providers: webgpu_attempt_providers(),
+            disable_intra_op_spinning: true,
+            coreml_cache_dir: None,
+            uses_webgpu: true,
+            execution_provider: ExecutionProvider::WebGpu,
+        },
         #[cfg(target_os = "android")]
-        ExecutionMode::Xnnpack => vec![xnnpack_attempt(), ProviderAttempt::cpu_only()],
-        ExecutionMode::CpuOnly => vec![ProviderAttempt::cpu_only()],
+        ExecutionProvider::Xnnpack => xnnpack_attempt(),
+        #[allow(unreachable_patterns)]
+        _ => unreachable!("provider is not available on this platform"),
     }
 }
 
 #[cfg(any(target_os = "ios", target_os = "macos"))]
-fn platform_default_attempts(model_path: &str, model_namespace: &str) -> Vec<ProviderAttempt> {
-    let mut attempts = Vec::new();
+fn platform_default_providers(model_path: &str) -> Vec<ExecutionProvider> {
+    let mut providers = Vec::new();
     if golden_entry_required(model_path, "CoreML") {
-        let (coreml_provider, coreml_cache_dir) = coreml_provider(model_path, model_namespace);
-        attempts.push(ProviderAttempt {
-            providers: vec![
-                coreml_provider,
-                CPU::default().with_arena_allocator(true).build(),
-            ],
-            disable_intra_op_spinning: false,
-            coreml_cache_dir,
-            uses_webgpu: false,
-            execution_provider: ExecutionProvider::CoreMl,
-        });
+        providers.push(ExecutionProvider::CoreMl);
     }
-    attempts.push(ProviderAttempt::cpu_only());
-    attempts
+    providers.push(ExecutionProvider::Cpu);
+    providers
 }
 
 #[cfg(any(target_os = "ios", target_os = "macos"))]
@@ -454,45 +577,24 @@ fn coreml_provider(
 }
 
 #[cfg(target_os = "android")]
-fn platform_default_attempts(model_path: &str, _model_namespace: &str) -> Vec<ProviderAttempt> {
-    let mut attempts = Vec::new();
+fn platform_default_providers(model_path: &str) -> Vec<ExecutionProvider> {
+    let mut providers = Vec::new();
     if webgpu::attempt_permitted(model_path) && golden_entry_required(model_path, "WebGPU") {
-        attempts.push(ProviderAttempt {
-            // EP priority follows registration order. Unsupported WebGPU nodes
-            // fall through to XNNPACK and then CPU in the same session.
-            providers: vec![
-                webgpu_provider(),
-                xnnpack_provider().fail_silently(),
-                CPU::default().with_arena_allocator(true).build(),
-            ],
-            disable_intra_op_spinning: true,
-            coreml_cache_dir: None,
-            uses_webgpu: true,
-            execution_provider: ExecutionProvider::WebGpu,
-        });
+        providers.push(ExecutionProvider::WebGpu);
     }
-    attempts.push(xnnpack_attempt());
-    attempts.push(ProviderAttempt::cpu_only());
-    attempts
+    providers.push(ExecutionProvider::Xnnpack);
+    providers.push(ExecutionProvider::Cpu);
+    providers
 }
 
 #[cfg(any(target_os = "linux", target_os = "windows"))]
-fn platform_default_attempts(model_path: &str, _model_namespace: &str) -> Vec<ProviderAttempt> {
-    let mut attempts = Vec::new();
+fn platform_default_providers(model_path: &str) -> Vec<ExecutionProvider> {
+    let mut providers = Vec::new();
     if webgpu::attempt_permitted(model_path) && golden_entry_required(model_path, "WebGPU") {
-        attempts.push(ProviderAttempt {
-            providers: vec![
-                webgpu_provider(),
-                CPU::default().with_arena_allocator(true).build(),
-            ],
-            disable_intra_op_spinning: true,
-            coreml_cache_dir: None,
-            uses_webgpu: true,
-            execution_provider: ExecutionProvider::WebGpu,
-        });
+        providers.push(ExecutionProvider::WebGpu);
     }
-    attempts.push(ProviderAttempt::cpu_only());
-    attempts
+    providers.push(ExecutionProvider::Cpu);
+    providers
 }
 
 // Missing goldens fail closed, usually indicating they were not regenerated
@@ -525,6 +627,23 @@ fn webgpu_provider() -> ExecutionProviderDispatch {
     provider.build().error_on_failure()
 }
 
+#[cfg(target_os = "android")]
+fn webgpu_attempt_providers() -> Vec<ExecutionProviderDispatch> {
+    vec![
+        webgpu_provider(),
+        xnnpack_provider().fail_silently(),
+        CPU::default().with_arena_allocator(true).build(),
+    ]
+}
+
+#[cfg(any(target_os = "linux", target_os = "windows"))]
+fn webgpu_attempt_providers() -> Vec<ExecutionProviderDispatch> {
+    vec![
+        webgpu_provider(),
+        CPU::default().with_arena_allocator(true).build(),
+    ]
+}
+
 #[cfg(not(any(
     target_os = "ios",
     target_os = "android",
@@ -532,8 +651,8 @@ fn webgpu_provider() -> ExecutionProviderDispatch {
     target_os = "macos",
     target_os = "windows"
 )))]
-fn platform_default_attempts(_model_path: &str, _model_namespace: &str) -> Vec<ProviderAttempt> {
-    vec![ProviderAttempt::cpu_only()]
+fn platform_default_providers(_model_path: &str) -> Vec<ExecutionProvider> {
+    vec![ExecutionProvider::Cpu]
 }
 
 #[cfg(target_os = "android")]
@@ -575,7 +694,78 @@ fn build_session_with_providers(model_path: &str, attempt: ProviderAttempt) -> M
 
 #[cfg(test)]
 mod tests {
-    use super::{ExecutionProvider, has_protobuf_parse_failure, provider_attempt_failure_message};
+    use super::{
+        ExecutionMode, ExecutionProvider, ProviderPlan, has_protobuf_parse_failure,
+        is_execution_provider_run_failure, provider_attempt_failure_message,
+    };
+
+    #[test]
+    fn provider_plan_resumes_after_the_concrete_selected_provider() {
+        let mut plan = ProviderPlan {
+            providers: vec![
+                ExecutionProvider::WebGpu,
+                ExecutionProvider::Xnnpack,
+                ExecutionProvider::Cpu,
+            ],
+            next: 0,
+            selected: None,
+        };
+
+        assert_eq!(plan.next_provider(), Some(ExecutionProvider::WebGpu));
+        assert_eq!(plan.next_provider(), Some(ExecutionProvider::Xnnpack));
+        plan.select(ExecutionProvider::Xnnpack);
+
+        assert_eq!(plan.selected_provider(), Some(ExecutionProvider::Xnnpack));
+        assert!(plan.has_fallback());
+        assert_eq!(plan.next_provider(), Some(ExecutionProvider::Cpu));
+        assert!(!plan.has_fallback());
+    }
+
+    #[test]
+    fn cpu_only_provider_plan_is_bounded() {
+        let mut plan = ProviderPlan::new(ExecutionMode::CpuOnly, "model.onnx");
+
+        assert_eq!(plan.next_provider(), Some(ExecutionProvider::Cpu));
+        assert_eq!(plan.next_provider(), None);
+        assert!(!plan.has_fallback());
+    }
+
+    #[test]
+    fn exhausted_provider_plan_retries_only_the_final_provider() {
+        let mut plan = ProviderPlan {
+            providers: vec![
+                ExecutionProvider::WebGpu,
+                ExecutionProvider::Xnnpack,
+                ExecutionProvider::Cpu,
+            ],
+            next: 0,
+            selected: None,
+        };
+
+        while plan.next_provider().is_some() {}
+        plan.retain_last_provider_for_retry();
+
+        assert_eq!(plan.next_provider(), Some(ExecutionProvider::Cpu));
+        assert_eq!(plan.next_provider(), None);
+    }
+
+    #[test]
+    fn classifies_only_provider_related_ort_run_failures_as_retryable() {
+        assert!(is_execution_provider_run_failure(&super::MlError::Ort(
+            "WebGPU EP error: VK_ERROR_DEVICE_LOST".to_string()
+        )));
+        assert!(!is_execution_provider_run_failure(&super::MlError::Ort(
+            "invalid tensor shape".to_string()
+        )));
+        assert!(!is_execution_provider_run_failure(
+            &super::MlError::Postprocess("WebGPU".to_string())
+        ));
+
+        let terminal = super::SessionRunError::from(super::MlError::Ort(
+            "WebGPU text from a typed terminal error".to_string(),
+        ));
+        assert!(!terminal.is_retryable());
+    }
 
     #[test]
     fn detects_protobuf_parse_failure() {
