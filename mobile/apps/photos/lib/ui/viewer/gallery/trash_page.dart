@@ -1,7 +1,6 @@
 import "dart:io";
 
 import "package:collection/collection.dart";
-import "package:ente_components/components/buttons/fab_component.dart";
 import "package:ente_components/ente_components.dart";
 import "package:ente_photos_platform/ente_photos_platform.dart"
     show DeviceTrashClient;
@@ -154,9 +153,6 @@ class _TrashPageState extends State<_TrashPage> {
                 child: FABComponent(
                   label: l10n.deleteAll,
                   icon: const HugeIcon(icon: HugeIcons.strokeRoundedDelete02),
-                  shouldShowSuccessConfirmation: false,
-                  shouldShowSuccessState: false,
-                  shouldSurfaceExecutionStates: false,
                   onTap: () async {
                     await emptyTrash(context, _isOnEnteTrash);
                   },

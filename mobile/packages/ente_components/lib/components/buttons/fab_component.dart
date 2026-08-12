@@ -1,12 +1,10 @@
 import "dart:async";
 
-import "package:ente_components/models/component_execution_state.dart";
 import "package:ente_components/theme/icon_sizes.dart";
 import "package:ente_components/theme/motion.dart";
 import "package:ente_components/theme/text_styles.dart";
 import "package:ente_components/theme/theme.dart";
 import "package:flutter/material.dart";
-import "package:hugeicons/hugeicons.dart";
 
 enum FABComponentVariant { primary, secondary }
 
@@ -35,41 +33,18 @@ class FABComponent extends StatefulWidget {
     this.onTap,
     this.variant = FABComponentVariant.primary,
     this.isDisabled = false,
-    this.shouldSurfaceExecutionStates = true,
-    this.shouldShowSuccessState = true,
-    this.shouldShowSuccessConfirmation = false,
-  });
-
-  final bool shouldSurfaceExecutionStates;
-
-  final bool shouldShowSuccessState;
-
-  final bool shouldShowSuccessConfirmation;
+  }) : assert(
+         icon != null || label != null,
+         "Either icon or label is required",
+       );
 
   @override
   State<FABComponent> createState() => _FABComponentState();
 }
 
-class _FABComponentState extends State<FABComponent>
-    with SingleTickerProviderStateMixin {
-  static const Duration _loadingDelay = Duration(milliseconds: 300);
-  static const Duration _successDisplayDuration = Duration(seconds: 1);
-
-  late final AnimationController _loadingController;
+class _FABComponentState extends State<FABComponent> {
+  bool _isExecuting = false;
   bool _isPressed = false;
-  Timer? _loadingTimer;
-  Timer? _successResetTimer;
-  bool _loadingVisible = false;
-  ComponentExecutionState _executionState = ComponentExecutionState.idle;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadingController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 800),
-    );
-  }
 
   @override
   void didUpdateWidget(covariant FABComponent oldWidget) {
@@ -77,24 +52,12 @@ class _FABComponentState extends State<FABComponent>
     if (widget.isDisabled && !oldWidget.isDisabled) {
       _isPressed = false;
     }
-    _syncLoadingController();
-  }
-
-  @override
-  void dispose() {
-    _loadingTimer?.cancel();
-    _successResetTimer?.cancel();
-    _loadingController.dispose();
-    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final isEnabled =
-        !widget.isDisabled &&
-        widget.onTap != null &&
-        !_isExecuting &&
-        !_isSuccessful;
+        !widget.isDisabled && widget.onTap != null && !_isExecuting;
     final colors = context.componentColors;
     final backgroundColor = switch (widget.variant) {
       FABComponentVariant.primary =>
@@ -124,16 +87,34 @@ class _FABComponentState extends State<FABComponent>
             borderRadius: BorderRadius.circular(9999),
           ),
           child: ConstrainedBox(
-            constraints: const BoxConstraints(minWidth: 56, minHeight: 56),
+            constraints: const BoxConstraints(minWidth: 52, minHeight: 52),
             child: Padding(
-              padding: EdgeInsets.symmetric(
-                horizontal: widget.label == null ? 0 : 24,
-              ),
-              child: AnimatedSwitcher(
-                duration: Motion.quick,
-                switchInCurve: Curves.easeOutCubic,
-                switchOutCurve: Curves.easeInCubic,
-                child: _content(foregroundColor),
+              padding: switch ((widget.icon, widget.label)) {
+                (_, null) => EdgeInsets.zero,
+                (null, _) => const EdgeInsets.symmetric(horizontal: 24),
+                (_, _) => const EdgeInsets.only(left: 20, right: 24),
+              },
+              child: Row(
+                spacing: 8,
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  if (widget.icon != null)
+                    IconTheme.merge(
+                      data: IconThemeData(
+                        color: foregroundColor,
+                        size: IconSizes.small,
+                      ),
+                      child: widget.icon!,
+                    ),
+                  if (widget.label != null)
+                    Text(
+                      widget.label!,
+                      style: TextStyles.bodyBold.copyWith(
+                        color: foregroundColor,
+                      ),
+                    ),
+                ],
               ),
             ),
           ),
@@ -147,171 +128,22 @@ class _FABComponentState extends State<FABComponent>
     setState(() => _isPressed = value);
   }
 
-  Widget _content(Color foreground) {
-    if (_showLoading) {
-      return _executionContent(
-        key: const ValueKey("loading"),
-        child: RotationTransition(
-          turns: _loadingController,
-          child: HugeIcon(
-            icon: HugeIcons.strokeRoundedLoading03,
-            size: IconSizes.small,
-            color: foreground,
-          ),
-        ),
-      );
-    }
-    if (_showSuccess) {
-      return _executionContent(
-        key: const ValueKey("success"),
-        child: HugeIcon(
-          icon: HugeIcons.strokeRoundedTick02,
-          size: IconSizes.small,
-          color: foreground,
-        ),
-      );
-    }
-    return _idleContent(foreground);
-  }
-
-  Widget _idleContent(Color foreground) {
-    return Row(
-      key: const ValueKey("content"),
-      spacing: 8,
-      mainAxisSize: MainAxisSize.min,
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        if (widget.icon != null)
-          IconTheme.merge(
-            data: IconThemeData(color: foreground, size: IconSizes.small),
-            child: widget.icon!,
-          ),
-        if (widget.label != null)
-          Text(
-            widget.label!,
-            overflow: TextOverflow.ellipsis,
-            maxLines: 1,
-            style: TextStyles.bodyBold.copyWith(color: foreground),
-          ),
-      ],
-    );
-  }
-
-  Widget _executionContent({required Key key, required Widget child}) {
-    return Stack(
-      key: key,
-      alignment: Alignment.center,
-      children: [
-        Visibility(
-          visible: false,
-          maintainAnimation: true,
-          maintainSize: true,
-          maintainState: true,
-          child: _idleContent(Colors.transparent),
-        ),
-        child,
-      ],
-    );
-  }
-
-  bool get _isExecuting =>
-      _executionState == ComponentExecutionState.inProgress;
-
-  bool get _isSuccessful =>
-      _executionState == ComponentExecutionState.successful;
-
-  bool get _showLoading =>
-      widget.shouldSurfaceExecutionStates && _isExecuting && _loadingVisible;
-
-  bool get _showSuccess =>
-      widget.shouldSurfaceExecutionStates &&
-      widget.shouldShowSuccessState &&
-      _isSuccessful;
-
-  void _syncLoadingController() {
-    if (_showLoading) {
-      if (!_loadingController.isAnimating) {
-        _loadingController.repeat();
-      }
-      return;
-    }
-
-    if (_loadingController.isAnimating || _loadingController.value != 0) {
-      _loadingController.stop();
-      _loadingController.reset();
-    }
-  }
-
   Future<void> _handleTap() async {
     final callback = widget.onTap;
-    if (callback == null) return;
+    if (callback == null || _isExecuting) return;
 
-    _successResetTimer?.cancel();
-    var loadingSurfaced = false;
-    _loadingTimer?.cancel();
     setState(() {
-      _executionState = ComponentExecutionState.inProgress;
-      _loadingVisible = false;
+      _isExecuting = true;
       _isPressed = false;
-    });
-    _loadingTimer = Timer(_loadingDelay, () {
-      if (!mounted) return;
-      loadingSurfaced = true;
-      setState(() {
-        _loadingVisible = true;
-        _isPressed = false;
-      });
-      _syncLoadingController();
     });
 
     try {
       await Future.sync(callback);
-      if (!mounted) return;
-
-      final loadingPending = _loadingTimer?.isActive ?? false;
-      _loadingTimer?.cancel();
-      _loadingTimer = null;
-
-      final shouldShowSuccess =
-          widget.shouldSurfaceExecutionStates &&
-          widget.shouldShowSuccessState &&
-          (loadingSurfaced ||
-              (loadingPending && widget.shouldShowSuccessConfirmation));
-
-      if (shouldShowSuccess) {
-        _showSuccessForDuration();
-      } else {
-        _clearExecutionState();
-      }
     } catch (_) {
-      _loadingTimer?.cancel();
-      _loadingTimer = null;
+    } finally {
       if (mounted) {
-        _clearExecutionState();
+        setState(() => _isExecuting = false);
       }
     }
-  }
-
-  void _clearExecutionState() {
-    setState(() {
-      _executionState = ComponentExecutionState.idle;
-      _loadingVisible = false;
-      _isPressed = false;
-    });
-    _syncLoadingController();
-  }
-
-  void _showSuccessForDuration() {
-    setState(() {
-      _executionState = ComponentExecutionState.successful;
-      _loadingVisible = false;
-      _isPressed = false;
-    });
-    _syncLoadingController();
-    _successResetTimer?.cancel();
-    _successResetTimer = Timer(_successDisplayDuration, () {
-      if (!mounted) return;
-      _clearExecutionState();
-    });
   }
 }
