@@ -7,10 +7,12 @@ import io.ente.photos.platform.devicehealth.DeviceHealthService
 import io.ente.photos.platform.devicehealth.DeviceHealthSnapshot
 import io.ente.photos.platform.devicehealth.DeviceSignal
 import io.ente.photos.platform.devicehealth.ThermalState
+import io.ente.photos.platform.processlock.ProcessLockRegistry
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
+import java.util.UUID
 
 class PhotosPlatformPlugin :
     FlutterPlugin,
@@ -20,6 +22,7 @@ class PhotosPlatformPlugin :
     private lateinit var eventChannel: EventChannel
     private lateinit var healthService: DeviceHealthService
     private var eventSink: EventChannel.EventSink? = null
+    private val processLockInstanceId = UUID.randomUUID().toString()
 
     override fun onAttachedToEngine(binding: FlutterPlugin.FlutterPluginBinding) {
         healthService = DeviceHealthService(binding.applicationContext)
@@ -34,6 +37,43 @@ class PhotosPlatformPlugin :
             "deviceHealth.getSnapshot" -> result.success(healthService.snapshot().toChannelMap())
             "deviceHealth.getMemorySnapshot" ->
                 result.success(healthService.memorySnapshot().toMemoryChannelMap())
+            "processLock.tryAcquire" -> {
+                val name = call.argument<String>("name")
+                val origin = call.argument<String>("origin")
+                val operation = call.argument<String>("operation")
+                if (name.isNullOrEmpty() || origin.isNullOrEmpty() || operation.isNullOrEmpty()) {
+                    result.error(
+                        "invalidArguments",
+                        "name, origin and operation are required",
+                        null,
+                    )
+                } else {
+                    result.success(
+                        ProcessLockRegistry.tryAcquire(
+                            name,
+                            processLockInstanceId,
+                            origin,
+                            operation,
+                        ),
+                    )
+                }
+            }
+            "processLock.release" -> {
+                val name = call.argument<String>("name")
+                if (name.isNullOrEmpty()) {
+                    result.error("invalidArguments", "name is required", null)
+                } else {
+                    result.success(ProcessLockRegistry.release(name, processLockInstanceId))
+                }
+            }
+            "processLock.state" -> {
+                val name = call.argument<String>("name")
+                if (name.isNullOrEmpty()) {
+                    result.error("invalidArguments", "name is required", null)
+                } else {
+                    result.success(ProcessLockRegistry.state(name))
+                }
+            }
             else -> result.notImplemented()
         }
     }
@@ -51,6 +91,7 @@ class PhotosPlatformPlugin :
     }
 
     override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
+        ProcessLockRegistry.releaseAllForInstance(processLockInstanceId)
         eventSink = null
         healthService.stopObserving()
         methodChannel.setMethodCallHandler(null)

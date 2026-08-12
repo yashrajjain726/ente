@@ -7,6 +7,7 @@ public final class PhotosPlatformPlugin: NSObject, @preconcurrency FlutterPlugin
     private let eventChannel: FlutterEventChannel
     private let healthService = DeviceHealthService()
     private var eventSink: FlutterEventSink?
+    private let processLockInstanceId = UUID().uuidString
 
     private init(registrar: FlutterPluginRegistrar) {
         methodChannel = FlutterMethodChannel(
@@ -33,12 +34,85 @@ public final class PhotosPlatformPlugin: NSObject, @preconcurrency FlutterPlugin
             result(healthService.snapshot().channelValue)
         case "deviceHealth.getMemorySnapshot":
             result(healthService.memorySnapshot().memoryChannelValue)
+        case "processLock.tryAcquire":
+            handleProcessLockTryAcquire(call, result: result)
+        case "processLock.release":
+            handleProcessLockRelease(call, result: result)
+        case "processLock.state":
+            handleProcessLockState(call, result: result)
         default:
             result(FlutterMethodNotImplemented)
         }
     }
 
+    private func handleProcessLockTryAcquire(
+        _ call: FlutterMethodCall,
+        result: FlutterResult
+    ) {
+        guard let args = call.arguments as? [String: Any],
+              let name = args["name"] as? String, !name.isEmpty,
+              let origin = args["origin"] as? String, !origin.isEmpty,
+              let operation = args["operation"] as? String, !operation.isEmpty
+        else {
+            result(
+                FlutterError(
+                    code: "invalidArguments",
+                    message: "name, origin and operation are required",
+                    details: nil
+                )
+            )
+            return
+        }
+        result(
+            ProcessLockRegistry.shared.tryAcquire(
+                name: name,
+                instanceId: processLockInstanceId,
+                origin: origin,
+                operation: operation
+            )
+        )
+    }
+
+    private func handleProcessLockRelease(
+        _ call: FlutterMethodCall,
+        result: FlutterResult
+    ) {
+        guard let args = call.arguments as? [String: Any],
+              let name = args["name"] as? String, !name.isEmpty
+        else {
+            result(
+                FlutterError(
+                    code: "invalidArguments",
+                    message: "name is required",
+                    details: nil
+                )
+            )
+            return
+        }
+        result(ProcessLockRegistry.shared.release(name: name, instanceId: processLockInstanceId))
+    }
+
+    private func handleProcessLockState(
+        _ call: FlutterMethodCall,
+        result: FlutterResult
+    ) {
+        guard let args = call.arguments as? [String: Any],
+              let name = args["name"] as? String, !name.isEmpty
+        else {
+            result(
+                FlutterError(
+                    code: "invalidArguments",
+                    message: "name is required",
+                    details: nil
+                )
+            )
+            return
+        }
+        result(ProcessLockRegistry.shared.state(name: name))
+    }
+
     public func detachFromEngine(for registrar: FlutterPluginRegistrar) {
+        ProcessLockRegistry.shared.releaseAll(instanceId: processLockInstanceId)
         eventSink = nil
         healthService.stopObserving()
         methodChannel.setMethodCallHandler(nil)
