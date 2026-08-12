@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:ente_components/components/buttons/fab_component.dart';
 import 'package:ente_components/ente_components.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
