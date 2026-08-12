@@ -19,7 +19,6 @@ import (
 
 const MaxSendCount = 10
 
-// AllowedProviders is a set of valid provider names for discount coupons.
 // While adding new providers, consider adding customized templates in email package.
 var AllowedProviders = map[string]bool{
 	"Kagi":         true,

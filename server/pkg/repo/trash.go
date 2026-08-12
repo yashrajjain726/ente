@@ -239,8 +239,6 @@ func (t *TrashRepository) Delete(ctx context.Context, userID int64, fileIDs []in
 	return tx.Commit()
 }
 
-// GetFilesInTrashState for a given userID and fileIDs, return the list of fileIDs which are actually present in
-// trash and is not deleted or restored yet.
 func (t *TrashRepository) GetFilesInTrashState(ctx context.Context, userID int64, fileIDs []int64) ([]int64, bool, error) {
 	rows, err := t.DB.Query(`SELECT file_id FROM trash
 			WHERE user_id = $1 AND file_id = ANY ($2)
@@ -264,11 +262,6 @@ func (t *TrashRepository) GetFilesInTrashState(ctx context.Context, userID int64
 	return fileIDsInTrash, canRestoreOrDeleteAllFiles, nil
 }
 
-// GetFilesInTrashOrDeleted returns the subset of fileIDs that are either in trash (not restored)
-// or have been permanently deleted. This is useful for validation checks to prevent operations
-// on files that are no longer in an active state.
-// Unlike GetFilesInTrashState, this method does not log warnings when files are not found,
-// making it suitable for validation checks where files are expected to NOT be in trash.
 func (t *TrashRepository) GetFilesInTrashOrDeleted(ctx context.Context, userID int64, fileIDs []int64) ([]int64, error) {
 	rows, err := t.DB.QueryContext(ctx, `SELECT file_id FROM trash
 			WHERE user_id = $1 AND file_id = ANY ($2)
@@ -389,11 +382,8 @@ func (t *TrashRepository) GetUserIDToFileIDsMapForDeletion() (map[int64][]int64,
 	return result, nil
 }
 
-// GetFileIdsForDroppingMetadata retrieves file IDs of deleted files for metadata scrubbing.
-// It returns files that were deleted after the provided timestamp (sinceUpdatedAt) and have been in the trash for at least 50 days.
-// This delay ensures compliance with deletion locks.
-// The method orders the results by the 'updated_at' field in ascending order and limits the results to 'TrashDiffLimit' + 1.
-// If multiple files have the same 'updated_at' timestamp and are at the limit boundary, they are excluded to prevent partial scrubbing.
+// Wait 50 days for compliance deletion locks, and never split an updated_at
+// group across batches.
 func (t *TrashRepository) GetFileIdsForDroppingMetadata(sinceUpdatedAt int64) ([]FileWithUpdatedAt, error) {
 	rows, err := t.DB.Query(`
 		select file_id, updated_at from trash  where is_deleted=true AND updated_at > $1
@@ -422,9 +412,6 @@ order by updated_at ASC limit $2
 		return fileWithUpdatedAt, nil
 	}
 
-	// from the end ignore the fileIds from fileWithUpdatedAt that have the same updatedAt.
-	// this is to avoid scrubbing partial list of files that have same updatedAt as due to the limit not
-	// all files with the same updatedAt are returned.
 	lastUpdatedAt := fileWithUpdatedAt[len(fileWithUpdatedAt)-1].UpdatedAt
 	var i = len(fileWithUpdatedAt) - 1
 	for ; i >= 0; i-- {
