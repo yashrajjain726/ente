@@ -24,7 +24,7 @@ import "package:photos/module/metadata/exif.dart";
 import 'package:photos/module/metadata/location.dart';
 import "package:photos/module/metadata/video.dart";
 import 'package:photos/module/upload/model/media_upload_data.dart';
-import "package:photos/services/sync/local_sync_service.dart";
+import "package:photos/services/sync/origin_fetch_tracker.dart";
 import "package:photos/src/rust/api/motion_photo_api.dart";
 import "package:photos/utils/apple_photos_errors.dart";
 import "package:photos/utils/device_storage_error.dart";
@@ -174,7 +174,13 @@ Future<AssetEntity> _getAsset(EnteFile file) async {
 
 Future<File> _getOriginFile(AssetEntity asset, EnteFile file) async {
   if (Platform.isIOS) {
-    trackOriginFetchForUploadOrML.put(file.localID!, true);
+    final modifiedDateSecond = asset.modifiedDateSecond;
+    originFetchTracker.record(
+      localID: file.localID,
+      modificationTime: modifiedDateSecond == null
+          ? null
+          : modifiedDateSecond * Duration.microsecondsPerSecond,
+    );
   }
   File? sourceFile;
   try {
