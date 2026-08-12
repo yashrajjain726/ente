@@ -95,11 +95,6 @@ Future<File?> _getLocalDiskFile(
 
   final asset = await file.getAsset;
   if (asset == null || !(await asset.exists)) {
-    if (isOrigin && file.isVideo) {
-      _logger.warning(
-        "Failed to get file for assetID: ${file.localID}, is asset null: ${asset == null}",
-      );
-    }
     return null;
   }
   return isOrigin ? await asset.originFile : await asset.file;
