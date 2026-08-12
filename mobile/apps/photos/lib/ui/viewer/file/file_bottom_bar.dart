@@ -114,7 +114,7 @@ class FileBottomBarState extends State<FileBottomBar> {
         widget.file.isOwner &&
         widget.file.isUploaded &&
         (collection?.isHidden() ?? false);
-    if (widget.file.isEnteTrash) {
+    if (widget.file.isTrash) {
       _addTrashOptions(children);
     }
 
