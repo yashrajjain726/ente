@@ -1,0 +1,115 @@
+import "dart:async";
+
+import "package:ente_photos_platform/ente_photos_platform.dart";
+import "package:logging/logging.dart";
+import "package:synchronized/synchronized.dart";
+
+enum MlOperation { fullRun, indexing, clustering, startupRemoteHydration }
+
+enum MlLockAttempt {
+  ran,
+  deniedFunnelBusy,
+  deniedByOtherEngine,
+  deniedChannelError,
+}
+
+enum MlRunDisposition { completed, denied, stopped, failed }
+
+/// Per-engine funnel plus the process-global `ml` lock.
+///
+/// All top-level ML operations must run through [tryRunExclusive]: the funnel
+/// serializes operations within this engine, and the native lock excludes the
+/// other engine. Single attempt, no waiting — callers defer to their normal
+/// triggers on denial.
+class MlProcessLock {
+  MlProcessLock._();
+  static final instance = MlProcessLock._();
+
+  static const _lockName = "ml";
+  final _logger = Logger("MlProcessLock");
+  final Lock _funnel = Lock();
+  MlOperation? _activeOperation;
+
+  /// Whether an operation currently holds the funnel. For asserts and
+  /// diagnostics only — never use this to skip [tryRunExclusive].
+  bool get isBusy => _activeOperation != null;
+
+  /// The operation currently holding the funnel, if any. For derived status
+  /// and diagnostics only.
+  MlOperation? get activeOperation => _activeOperation;
+
+  /// Runs [body] while holding the funnel and the native `ml` lock. The lock
+  /// is released only after [body] completes, so [body] must drain any work
+  /// it started before returning. Errors from [body] propagate after release.
+  /// [background] labels this engine's origin for diagnostics.
+  Future<MlLockAttempt> tryRunExclusive(
+    MlOperation operation,
+    Future<void> Function() body, {
+    required bool background,
+  }) async {
+    if (_funnel.locked) {
+      _logger.info(
+        "Funnel busy with ${_activeOperation?.name}, denying ${operation.name}",
+      );
+      return MlLockAttempt.deniedFunnelBusy;
+    }
+    return _funnel.synchronized(() async {
+      _activeOperation = operation;
+      try {
+        final origin = background ? "bg" : "fg";
+        final bool acquired;
+        try {
+          acquired = await ProcessLockClient.instance.tryAcquire(
+            name: _lockName,
+            origin: origin,
+            operation: operation.name,
+          );
+        } catch (e, s) {
+          // Fail closed: no protected ML without the lock.
+          _logger.severe(
+            "Process lock channel failure for ${operation.name}",
+            e,
+            s,
+          );
+          return MlLockAttempt.deniedChannelError;
+        }
+        if (!acquired) {
+          unawaited(_logOwner(operation));
+          return MlLockAttempt.deniedByOtherEngine;
+        }
+        _logger.info("Acquired ml lock ($origin/${operation.name})");
+        final heldSince = DateTime.now();
+        try {
+          await body();
+          return MlLockAttempt.ran;
+        } finally {
+          try {
+            await ProcessLockClient.instance.release(name: _lockName);
+            final heldFor = DateTime.now().difference(heldSince);
+            _logger.info(
+              "Released ml lock ($origin/${operation.name}) after "
+              "${heldFor.inSeconds}s",
+            );
+          } catch (e, s) {
+            _logger.severe(
+              "Failed to release ml lock after ${operation.name}",
+              e,
+              s,
+            );
+          }
+        }
+      } finally {
+        _activeOperation = null;
+      }
+    });
+  }
+
+  Future<void> _logOwner(MlOperation denied) async {
+    try {
+      final owner = await ProcessLockClient.instance.state(name: _lockName);
+      _logger.info("ml lock denied for ${denied.name}, current owner: $owner");
+    } catch (e) {
+      _logger.warning("Could not fetch ml lock state after denial: $e");
+    }
+  }
+}
