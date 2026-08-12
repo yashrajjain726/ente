@@ -354,7 +354,7 @@ class _BodyState extends State<_Body> {
                   builder: (BuildContext context, int selectedIndex, _) {
                     if (widget.config.mode == DetailPageMode.minimalistic ||
                         isGuestView ||
-                        _files![selectedIndex].isTrashFile) {
+                        _files![selectedIndex].isTrash) {
                       return const SizedBox.shrink();
                     }
                     return ValueListenableBuilder(
@@ -532,7 +532,7 @@ class _BodyState extends State<_Body> {
   void _evaluateQrIfEligible(EnteFile file) {
     _qrHelper?.evaluateFile(
       file,
-      isGuestView || file.isTrashFile ? null : _renderedFiles[file.tag],
+      isGuestView || file.isTrash ? null : _renderedFiles[file.tag],
     );
   }
 
@@ -815,9 +815,7 @@ class _GallerySocialOverlay extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (mode == DetailPageMode.minimalistic ||
-        isGuestView ||
-        file.isTrashFile) {
+    if (mode == DetailPageMode.minimalistic || isGuestView || file.isTrash) {
       return const SizedBox.shrink();
     }
 

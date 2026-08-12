@@ -42,11 +42,14 @@ extension FilePropsExtn on EnteFile {
 
   bool get canEditMetaInfo => isUploaded && isOwner;
 
-  bool get isTrashFile => this is TrashFile;
-
-  bool get isDeviceOnlyTrashFile => asTrashFile?.isDeviceOnly ?? false;
-
+  bool get isTrash => this is TrashFile;
+  bool get isEnteTrash => this is EnteTrashFile;
+  bool get isDeviceTrash => this is DeviceTrashFile;
   TrashFile? get asTrashFile => (this is TrashFile) ? this as TrashFile : null;
+  EnteTrashFile? get asEnteTrashFile =>
+      (this is EnteTrashFile) ? this as EnteTrashFile : null;
+  DeviceTrashFile? get asDeviceTrashFile =>
+      (this is DeviceTrashFile) ? this as DeviceTrashFile : null;
 
   // Return true if the file was uploaded via collect photos workflow
   bool get isCollect => uploaderName != null;

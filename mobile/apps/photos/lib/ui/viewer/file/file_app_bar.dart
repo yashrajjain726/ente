@@ -285,7 +285,7 @@ class FileAppBarState extends State<FileAppBar> {
         ),
       );
     }
-    if (!isFileHidden && isFileUploaded && !widget.file.isTrashFile) {
+    if (!isFileHidden && isFileUploaded && !widget.file.isTrash) {
       _actions.add(
         Center(
           child: FavoriteWidget(widget.file, iconSize: 24, tapTargetSize: 48),
@@ -300,7 +300,7 @@ class FileAppBarState extends State<FileAppBar> {
 
     final List<EntePopupMenuOption<int>> items = [];
     final bool restrictFileActions =
-        widget.mode == DetailPageMode.minimalistic || widget.file.isTrashFile;
+        widget.mode == DetailPageMode.minimalistic || widget.file.isTrash;
 
     if (restrictFileActions) {
       items.add(

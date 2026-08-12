@@ -48,7 +48,7 @@ class _FilePropertiesItemWidgetState extends State<FilePropertiesItemWidget> {
       editOnTap:
           widget.file.uploadedFileID == null ||
               widget.file.ownerID != widget.currentUserID ||
-              widget.file.isTrashFile
+              widget.file.isTrash
           ? null
           : () async {
               await editFilename(context, widget.file);

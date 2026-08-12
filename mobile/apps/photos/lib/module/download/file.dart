@@ -80,7 +80,7 @@ Future<File?> _getLocalDiskFile(
 }) async {
   // Return null because reading a device trash file by its file system path
   // fails with a permission-denied error.
-  if (file.isDeviceOnlyTrashFile) {
+  if (file.isDeviceTrash) {
     return null;
   }
 
