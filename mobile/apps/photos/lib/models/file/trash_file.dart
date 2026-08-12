@@ -34,6 +34,8 @@ class EnteTrashFile extends TrashFile {
 
 class DeviceTrashFile extends TrashFile {
   DeviceTrashFile();
+
+  DeviceTrashFile.from(super.file, {required super.deleteBy}) : super.from();
 }
 
 AssetEntity trashFileToAssetEntity(EnteFile file) {

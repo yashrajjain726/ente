@@ -242,7 +242,7 @@ class FileBottomBarState extends State<FileBottomBar> {
           child: IconButton(
             icon: const Icon(CupertinoIcons.gobackward, color: Colors.white),
             onPressed: () {
-              if (widget.file.isDeviceOnlyTrashFile) {
+              if (widget.file.isDeviceTrash) {
                 _restoreFromDeviceTrash().onError((e, s) {
                   if (!mounted) return;
                   showGenericErrorDialog(context: context, error: e).ignore();

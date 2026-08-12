@@ -167,12 +167,9 @@ class _TrashPageState extends State<_TrashPage> {
       final asset = deviceTrashAssets[i];
       if (asset == null) continue;
       files.add(
-        TrashFile.fromEnteFile(
+        DeviceTrashFile.from(
           fileFromAsset(trash.deviceFolder, asset),
-          createdAt: trash.deleteBy - const Duration(days: 30).inMicroseconds,
-          updateAt: trash.deleteBy - const Duration(days: 30).inMicroseconds,
           deleteBy: trash.deleteBy,
-          isDeviceOnly: true,
         ),
       );
     }

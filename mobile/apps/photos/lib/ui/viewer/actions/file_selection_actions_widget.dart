@@ -1093,7 +1093,7 @@ class _FileSelectionActionsWidgetState
 
   void _restore() {
     final isDeviceOnly = widget.selectedFiles.files.every(
-      (f) => f.isDeviceOnlyTrashFile,
+      (f) => f.isDeviceTrash,
     );
     if (isDeviceOnly) {
       _restoreFilesFromDeviceTrash(widget.selectedFiles).onError((e, s) {
@@ -1111,7 +1111,7 @@ class _FileSelectionActionsWidgetState
 
   Future<void> _permanentlyDeleteFromTrash() async {
     final isDeviceOnly = widget.selectedFiles.files.every(
-      (f) => f.isDeviceOnlyTrashFile,
+      (f) => f.isDeviceTrash,
     );
     if (isDeviceOnly) {
       await permanentlyDeleteFromDeviceTrash(context, widget.selectedFiles);
@@ -1119,7 +1119,7 @@ class _FileSelectionActionsWidgetState
     }
     if (await deleteFromEnteTrash(
       context,
-      widget.selectedFiles.files.toList(),
+      widget.selectedFiles.files.whereType<EnteTrashFile>().toList(),
     )) {
       widget.selectedFiles.clearAll();
     }

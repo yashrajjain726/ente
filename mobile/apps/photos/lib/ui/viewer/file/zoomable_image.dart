@@ -389,9 +389,7 @@ class _ZoomableImageState extends State<ZoomableImage> {
       });
     }
 
-    if (!_loadingFinalImage &&
-        !_loadedFinalImage &&
-        !_photo.isDeviceOnlyTrashFile) {
+    if (!_loadingFinalImage && !_loadedFinalImage && !_photo.isDeviceTrash) {
       _loadingFinalImage = true;
       getFile(
         _photo,
