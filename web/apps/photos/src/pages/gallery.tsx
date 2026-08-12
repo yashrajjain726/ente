@@ -49,21 +49,21 @@ import {
 import { useIsOffline } from "@/components/utils/use-is-offline";
 import { shouldShowWhatsNew } from "@/services/changelog";
 import exportService from "@/services/export";
+import { processPendingAlbumJoin } from "@/services/join-album";
 import { Upload01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import MenuIcon from "@mui/icons-material/Menu";
 import { IconButton, Link, Stack, Typography } from "@mui/material";
-import { sessionExpiredDialogAttributes } from "ente-accounts/components/utils/dialog";
+import { sessionExpiredDialogAttributes } from "ente-accounts-rs/components/utils/dialog";
 import {
     getAndClearIsFirstLogin,
     getAndClearJustSignedUp,
-} from "ente-accounts/services/accounts-db";
-import { processPendingAlbumJoin } from "ente-accounts/services/join-album";
-import { stashRedirect } from "ente-accounts/services/redirect";
-import { isSessionInvalid } from "ente-accounts/services/session";
-import { ensureLocalUser } from "ente-accounts/services/user";
+} from "ente-accounts-rs/services/accounts-db";
+import { stashRedirect } from "ente-accounts-rs/services/redirect";
+import { isSessionInvalid } from "ente-accounts-rs/services/session";
+import { ensureLocalUser } from "ente-accounts-rs/services/user";
 import { isDesktop } from "ente-base/app";
 import type { MiniDialogAttributes } from "ente-base/components/MiniDialog";
 import { NavbarBase } from "ente-base/components/Navbar";

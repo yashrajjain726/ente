@@ -348,7 +348,7 @@ class MLService {
 
   Future<void> sync() async {
     await fileDataService.syncFDStatus();
-    await personFeedbackService.syncPersonFeedback();
+    await PersonService.instance.sync();
   }
 
   Future<MlRunDisposition> runAllML({
@@ -736,7 +736,7 @@ class MLService {
     final faceIdNotToCluster = <String, List<String>>{};
     if (!isLocalGalleryMode) {
       _logger.info('Pulling remote feedback before actually clustering');
-      await PersonService.instance.fetchRemoteClusterFeedback();
+      await PersonService.instance.sync();
       final persons = await PersonService.instance.getPersons();
       for (final person in persons) {
         if (person.data.rejectedFaceIDs.isNotEmpty) {

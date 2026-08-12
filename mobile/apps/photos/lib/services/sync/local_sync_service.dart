@@ -5,7 +5,6 @@ import "package:ente_pure_utils/ente_pure_utils.dart";
 import "package:flutter/foundation.dart";
 import "package:logging/logging.dart";
 import "package:photo_manager/photo_manager.dart";
-import "package:photos/core/cache/lru_map.dart";
 import "package:photos/core/configuration.dart";
 import "package:photos/core/errors.dart";
 import "package:photos/core/event_bus.dart";
@@ -26,14 +25,10 @@ import "package:photos/services/ignored_files_service.dart";
 import "package:photos/services/sync/import/diff.dart";
 import "package:photos/services/sync/import/local_assets.dart";
 import "package:photos/services/sync/import/model.dart";
+import "package:photos/services/sync/origin_fetch_tracker.dart";
 import "package:shared_preferences/shared_preferences.dart";
 import "package:synchronized/synchronized.dart";
 import "package:tuple/tuple.dart";
-
-// This map is used to track if a iOS origin file is being fetched for uploading
-// or ML processing. In such cases, we want to ignore these files if they come in response
-// from the local sync service. When a file is download
-final LRUMap<String, bool> trackOriginFetchForUploadOrML = LRUMap(200);
 
 class LocalSyncService {
   final _logger = Logger("LocalSyncService");
@@ -397,10 +392,7 @@ class LocalSyncService {
     if (allFiles.isEmpty) return;
     final bool discoveredNewFiles = newlyInsertedFiles.isNotEmpty;
     if (!discoveredNewFiles) {
-      allFiles.removeWhere(
-        (file) =>
-            trackOriginFetchForUploadOrML.get(file.localID ?? '') ?? false,
-      );
+      allFiles.removeWhere(originFetchTracker.isUnchangedSinceFetch);
       if (allFiles.isEmpty) {
         _logger.info("skipping firing LocalPhotosUpdatedEvent as no new files");
         return;
@@ -431,26 +423,36 @@ class LocalSyncService {
     List<EnteFile> files,
     Set<String> existingLocalFileIDs,
   ) async {
-    final List<String> updatedLocalIDs = files
+    final List<EnteFile> updatedFiles = files
         .where(
           (file) =>
               file.localID != null &&
               existingLocalFileIDs.contains(file.localID),
         )
-        .map((e) => e.localID!)
         .toList();
 
-    if (updatedLocalIDs.isNotEmpty) {
-      final int updateCount = updatedLocalIDs.length;
-      updatedLocalIDs.removeWhere(
-        (x) => trackOriginFetchForUploadOrML.get(x) ?? false,
-      );
+    if (updatedFiles.isNotEmpty) {
+      final int updateCount = updatedFiles.length;
+      updatedFiles.removeWhere((file) {
+        final comparison = originFetchTracker.comparisonFor(file);
+        if (comparison == null) return false;
+
+        final title = file.title;
+        _logger.info(
+          "Origin fetch update decision for localID=${file.localID}"
+          "${title == null || title.isEmpty ? '' : ', title=$title'}, "
+          "modificationTime=${comparison.modificationTimeAtFetch} -> "
+          "${comparison.observedModificationTime}, "
+          "skipped=${comparison.shouldSkip}",
+        );
+        return comparison.shouldSkip;
+      });
       _logger.info(
-        "track ${updatedLocalIDs.length}/ $updateCount files due to modification change",
+        "track ${updatedFiles.length}/ $updateCount files due to modification change",
       );
-      if (updatedLocalIDs.isNotEmpty) {
+      if (updatedFiles.isNotEmpty) {
         await FileUpdationDB.instance.insertMultiple(
-          updatedLocalIDs,
+          updatedFiles.map((file) => file.localID!).toList(),
           FileUpdationDB.modificationTimeUpdated,
         );
       }

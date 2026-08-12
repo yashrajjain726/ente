@@ -125,8 +125,7 @@ func (pcr *FileLinkRepository) UpdateLinkSecretIfEmpty(
 	return stacktrace.Propagate(err, "failed to update link secret metadata")
 }
 
-// GetActiveFileUrlToken will return ente.CollectionLinkRow for given collection ID
-// Note: The token could be expired or deviceLimit is already reached
+// "Active" only means not disabled; the link may be expired or over its limit.
 func (pcr *FileLinkRepository) GetActiveFileUrlToken(ctx context.Context, fileID int64) (*ente.FileLinkRow, error) {
 	row := pcr.DB.QueryRowContext(ctx, `SELECT id, file_id, owner_id, access_token, valid_till, device_limit, 
        is_disabled, pw_hash, pw_nonce, mem_limit, ops_limit, enable_download,
@@ -284,7 +283,6 @@ func (pcr *FileLinkRepository) RecordAccessHistory(ctx context.Context, shareID 
 	return stacktrace.Propagate(err, "failed to record access history")
 }
 
-// AccessedInPast returns true if the given ip, ua agent combination has accessed the url in the past
 func (pcr *FileLinkRepository) AccessedInPast(ctx context.Context, shareID string, ip string, ua string) (bool, error) {
 	row := pcr.DB.QueryRowContext(ctx, `select id from public_file_tokens_access_history where id =$1 and ip = $2 and user_agent = $3`,
 		shareID, ip, ua)
