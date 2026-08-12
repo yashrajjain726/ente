@@ -338,6 +338,13 @@ Future<void> _runMinimally(String taskId, TimeLogger tlog) async {
       _logger.info(
         "[BG TASK] person service initialized for memories recompute",
       );
+      // The DiffSyncCompleteEvent fired during _sync predates PersonService
+      // init in this isolate, so sync explicitly before consuming person data.
+      try {
+        await PersonService.instance.sync();
+      } catch (e, s) {
+        _logger.warning("[BG TASK] person sync failed", e, s);
+      }
     }
     await _homeWidgetSync(true);
 
