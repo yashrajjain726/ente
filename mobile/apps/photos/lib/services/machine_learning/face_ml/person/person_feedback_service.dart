@@ -48,9 +48,14 @@ class PersonFeedbackService {
     }
 
     if (_shouldReconcilePeople) {
-      await PersonService.instance.reconcileClusters();
-      Bus.instance.fire(PeopleChangedEvent(type: PeopleEventType.syncDone));
       _shouldReconcilePeople = false;
+      try {
+        await PersonService.instance.reconcileClusters();
+      } catch (_) {
+        _shouldReconcilePeople = true;
+        rethrow;
+      }
+      Bus.instance.fire(PeopleChangedEvent(type: PeopleEventType.syncDone));
     } else {
       final didChange = await PersonService.instance
           .fetchRemoteClusterFeedback();
