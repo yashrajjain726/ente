@@ -176,7 +176,6 @@ class GalleryState extends State<Gallery> {
     _automationScrollIdentifier = _buildAutomationScrollIdentifier(
       widget.tagPrefix,
     );
-    // Avoid a trailing "." in the logger name.
     _logTag =
         "Gallery_${widget.tagPrefix}${kDebugMode ? "_" + widget.albumName! : ""}_x";
     _logger = Logger(_logTag);
@@ -1046,7 +1045,6 @@ class _PinnedGroupHeaderState extends State<PinnedGroupHeader>
     } else {
       final groupScrollOffsets = widget.galleryGroups.groupScrollOffsets;
 
-      // Find the last group whose offset is at or before the viewport.
       int low = 0;
       int high = groupScrollOffsets.length - 1;
       int floorIndex = 0;

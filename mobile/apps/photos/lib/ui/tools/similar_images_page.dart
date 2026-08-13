@@ -141,7 +141,6 @@ class _SimilarImagesPageState extends State<SimilarImagesPage> {
     return Stack(
       children: [
         content,
-        // Progress overlay
         ValueListenableBuilder(
           valueListenable: _deleteProgress,
           builder: (context, value, child) {
@@ -1097,7 +1096,6 @@ class _SimilarImagesPageState extends State<SimilarImagesPage> {
         if (!mounted) {
           return;
         }
-        // Check permission before attempting to add symlinks
         final collection = CollectionsService.instance.getCollectionByID(
           collectionID,
         );
@@ -1140,7 +1138,6 @@ class _SimilarImagesPageState extends State<SimilarImagesPage> {
     if (!mounted) return;
     await deleteFilesFromRemoteOnly(context, allDeleteFiles.toList());
 
-    // Show congratulations popup
     if (allDeleteFiles.length > 100 && mounted && showUIFeedback) {
       final int totalSize = allDeleteFiles.fold<int>(
         0,
@@ -1285,7 +1282,6 @@ class _LoadingScreenState extends State<_LoadingScreen> {
             _currentTextIndex++;
           });
         }
-        // Stop the timer when we reach the last text
         if (_currentTextIndex >= _loadingTexts.length - 1) {
           timer.cancel();
         }

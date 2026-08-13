@@ -219,45 +219,6 @@ class _FileDetailsWidgetState extends State<FileDetailsWidget> {
                 )
               : const SizedBox.shrink();
 
-          ///To be used when state issues are fixed when location is updated.
-          //
-          //  file.fileType != FileType.video &&
-          //         file.ownerID == _currentUserID
-          //     ? Column(
-          //         children: [
-          //           InfoItemWidget(
-          //             leadingIcon: Icons.pin_drop_outlined,
-          //             title: "No location data",
-          //             subtitleSection: Future.value(
-          //               [
-          //                 Text(
-          //                   "Add location data",
-          //                   style: getEnteTextTheme(context).miniBoldMuted,
-          //                 ),
-          //               ],
-          //             ),
-          //             hasChipButtons: false,
-          //             onTap: () async {
-          //               await showBarModalBottomSheet(
-          //                 shape: const RoundedRectangleBorder(
-          //                   borderRadius: BorderRadius.vertical(
-          //                     top: Radius.circular(5),
-          //                   ),
-          //                 ),
-          //                 backgroundColor: getEnteColorScheme(context)
-          //                     .backgroundElevated,
-          //                 barrierColor: backdropFaintDark,
-          //                 context: context,
-          //                 builder: (context) {
-          //                   return UpdateLocationDataWidget([file]);
-          //                 },
-          //               );
-          //             },
-          //           ),
-          //           const FileDetailsDivider(),
-          //         ],
-          //       )
-          //     : const SizedBox.shrink();
         },
       ),
     ]);
