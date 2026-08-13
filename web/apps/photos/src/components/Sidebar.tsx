@@ -948,7 +948,7 @@ const Account: React.FC<AccountProps> = ({
     pendingAction,
     onActionHandled,
 }) => {
-    const { showMiniDialog, onGenericError } = useBaseContext();
+    const { showMiniDialog } = useBaseContext();
     const userDetails = useUserDetailsSnapshot();
 
     const router = useRouter();
@@ -1033,14 +1033,9 @@ const Account: React.FC<AccountProps> = ({
         showSessions();
     }, [onAuthenticateUser, showSessions]);
 
-    const handleDeleteAccount = useCallback(async () => {
-        try {
-            await onAuthenticateUser();
-            showDeleteAccount();
-        } catch (error) {
-            if (!isReauthenticationCancellation(error)) onGenericError(error);
-        }
-    }, [onAuthenticateUser, onGenericError, showDeleteAccount]);
+    const handleDeleteAccount = useCallback(() => {
+        showDeleteAccount();
+    }, [showDeleteAccount]);
 
     useEffect(() => {
         if (!open || !pendingAction) return;
@@ -1065,7 +1060,7 @@ const Account: React.FC<AccountProps> = ({
                 handleChangeEmail();
                 break;
             case "account.deleteAccount":
-                void handleDeleteAccount();
+                handleDeleteAccount();
                 break;
             case "account.sessions":
                 void handleActiveSessions();
@@ -1133,7 +1128,7 @@ const Account: React.FC<AccountProps> = ({
                     <RowButton
                         color="critical"
                         label={t("delete_account")}
-                        onClick={() => void handleDeleteAccount()}
+                        onClick={handleDeleteAccount}
                     />
                 </RowButtonGroup>
             </Stack>
@@ -1155,7 +1150,10 @@ const Account: React.FC<AccountProps> = ({
                 {...sessionsVisibilityProps}
                 onRootClose={onRootClose}
             />
-            <DeleteAccount {...deleteAccountVisibilityProps} />
+            <DeleteAccount
+                {...deleteAccountVisibilityProps}
+                {...{ onAuthenticateUser }}
+            />
         </TitledNestedSidebarDrawer>
     );
 };

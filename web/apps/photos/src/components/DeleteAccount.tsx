@@ -46,7 +46,9 @@ import { t } from "i18next";
 import React, { useState } from "react";
 import { Trans } from "react-i18next";
 
-type DeleteAccountProps = ModalVisibilityProps;
+type DeleteAccountProps = ModalVisibilityProps & {
+    onAuthenticateUser: () => Promise<void>;
+};
 
 const surfaceRadius = "20px";
 const fieldRadius = "16px";
@@ -75,6 +77,7 @@ const lightDisabledFill = "#eaeaea";
 export const DeleteAccount: React.FC<DeleteAccountProps> = ({
     open,
     onClose,
+    onAuthenticateUser,
 }) => {
     const isSheet = useIsUploadSheet();
 
@@ -98,14 +101,14 @@ export const DeleteAccount: React.FC<DeleteAccountProps> = ({
                 },
             }}
         >
-            <DeleteAccountDialogContents {...{ onClose }} />
+            <DeleteAccountDialogContents {...{ onClose, onAuthenticateUser }} />
         </Dialog>
     );
 };
 
 const DeleteAccountDialogContents: React.FC<
     Omit<DeleteAccountProps, "open">
-> = ({ onClose }) => {
+> = ({ onClose, onAuthenticateUser }) => {
     const { logout, showMiniDialog, onGenericError } = useBaseContext();
 
     const [step, setStep] = useState<"reason" | "confirmation">("reason");
@@ -156,6 +159,7 @@ const DeleteAccountDialogContents: React.FC<
                     await getAccountDeleteChallenge();
 
                 if (allowDelete && encryptedChallenge) {
+                    await onAuthenticateUser();
                     const decryptedChallenge =
                         await decryptDeleteAccountChallenge(encryptedChallenge);
                     await deleteAccount(
