@@ -249,11 +249,14 @@ class MLService {
       );
       return existing;
     }
-    final attempt = await MlProcessLock.instance.tryRunExclusive(
+    final control = MlRunControl();
+    final attempt = await _runExclusiveWithControl(
       MlOperation.startupRemoteHydration,
+      control,
       () async {
         final future = _runOwnedRemoteHydrationSafely(
           reason: reason,
+          control: control,
           skipHydrationIfCandidateFileCountAtMost:
               skipHydrationIfCandidateFileCountAtMost,
         );
@@ -266,7 +269,6 @@ class MLService {
           }
         }
       },
-      background: isProcessBg,
     );
     if (attempt != MlLockAttempt.ran) {
       _logger.info(
@@ -278,12 +280,14 @@ class MLService {
 
   Future<void> _runOwnedRemoteHydrationSafely({
     required String reason,
+    required MlRunControl control,
     int? skipHydrationIfCandidateFileCountAtMost,
   }) async {
     assert(MlProcessLock.instance.isBusy, "ml funnel must be held");
     try {
       await _hydrateRemoteEmbeddingsForOwnedFilesInternal(
         reason: reason,
+        control: control,
         skipHydrationIfCandidateFileCountAtMost:
             skipHydrationIfCandidateFileCountAtMost,
       );
@@ -294,10 +298,12 @@ class MLService {
 
   Future<void> _hydrateRemoteEmbeddingsForOwnedFilesInternal({
     required String reason,
+    required MlRunControl control,
     int? skipHydrationIfCandidateFileCountAtMost,
   }) async {
     final summary = await hydrateOwnedRemoteMLData(
       mlDataDB: MLDataDB.instance,
+      control: control,
       skipHydrationIfCandidateFileCountAtMost:
           skipHydrationIfCandidateFileCountAtMost,
     );
@@ -388,8 +394,9 @@ class MLService {
     }
     var disposition = MlRunDisposition.completed;
     try {
-      final attempt = await MlProcessLock.instance.tryRunExclusive(
+      final attempt = await _runExclusiveWithControl(
         MlOperation.fullRun,
+        runControl,
         () async {
           disposition = await _runAllMLProtected(
             mode: mode,
@@ -398,7 +405,6 @@ class MLService {
             control: runControl,
           );
         },
-        background: isProcessBg,
       );
       if (attempt != MlLockAttempt.ran) {
         _logger.info("runAllML denied the ml process lock (${attempt.name})");
@@ -439,7 +445,6 @@ class MLService {
     required MlRunControl control,
   }) async {
     assert(MlProcessLock.instance.isBusy, "ml funnel must be held");
-    _installRunControl(control);
     try {
       await sync();
       if (control.stopRequested) {
@@ -503,7 +508,6 @@ class MLService {
       return MlRunDisposition.completed;
     } finally {
       _logger.info("ML finished running");
-      _clearRunControl(control);
       if (!isProcessBg) {
         VideoPreviewService.instance.queueFiles();
       }
@@ -513,6 +517,21 @@ class MLService {
   MlRunDisposition _stoppedDisposition(MlRunControl control, String where) {
     _logger.info("ML run stopped $where (${control.stopReason?.name})");
     return MlRunDisposition.stopped;
+  }
+
+  Future<MlLockAttempt> _runExclusiveWithControl(
+    MlOperation operation,
+    MlRunControl control,
+    Future<void> Function() body,
+  ) {
+    return MlProcessLock.instance.tryRunExclusive(operation, () async {
+      _installRunControl(control);
+      try {
+        await body();
+      } finally {
+        _clearRunControl(control);
+      }
+    }, background: isProcessBg);
   }
 
   void _installRunControl(MlRunControl control) {
@@ -563,17 +582,10 @@ class MLService {
   /// with the lastest faceMlVersion and stored on remote or local database. If so, it skips the image.
   Future<void> fetchAndIndexAllImages({required MLMode mode}) async {
     final control = MlRunControl();
-    final attempt = await MlProcessLock.instance.tryRunExclusive(
+    final attempt = await _runExclusiveWithControl(
       MlOperation.indexing,
-      () async {
-        _installRunControl(control);
-        try {
-          await _fetchAndIndexAllImages(mode: mode, control: control);
-        } finally {
-          _clearRunControl(control);
-        }
-      },
-      background: isProcessBg,
+      control,
+      () => _fetchAndIndexAllImages(mode: mode, control: control),
     );
     if (attempt != MlLockAttempt.ran) {
       _logger.info(
@@ -694,21 +706,14 @@ class MLService {
     bool force = false,
   }) async {
     final control = MlRunControl();
-    final attempt = await MlProcessLock.instance.tryRunExclusive(
+    final attempt = await _runExclusiveWithControl(
       MlOperation.clustering,
-      () async {
-        _installRunControl(control);
-        try {
-          await _clusterAllImages(
-            clusterInBuckets: clusterInBuckets,
-            force: force,
-            control: control,
-          );
-        } finally {
-          _clearRunControl(control);
-        }
-      },
-      background: isProcessBg,
+      control,
+      () => _clusterAllImages(
+        clusterInBuckets: clusterInBuckets,
+        force: force,
+        control: control,
+      ),
     );
     if (attempt != MlLockAttempt.ran) {
       _logger.info(

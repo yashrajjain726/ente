@@ -30,6 +30,7 @@ import "package:photos/services/machine_learning/face_ml/face_alignment/alignmen
 import "package:photos/services/machine_learning/face_ml/face_detection/detection.dart";
 import "package:photos/services/machine_learning/ml_exceptions.dart";
 import "package:photos/services/machine_learning/ml_result.dart";
+import "package:photos/services/machine_learning/ml_run_control.dart";
 import "package:photos/services/search_service.dart";
 import "package:photos/services/sync/origin_fetch_tracker.dart";
 import "package:photos/src/rust/api/ml_indexing_api.dart" as rust_ml;
@@ -462,6 +463,7 @@ Stream<List<FileMLInstruction>> fetchEmbeddingsAndInstructions(
 
 Future<RemoteMLHydrationSummary> hydrateOwnedRemoteMLData({
   required MLDataDB mlDataDB,
+  MlRunControl? control,
   int? skipHydrationIfCandidateFileCountAtMost,
 }) async {
   final candidateSplit = await _getOnlineFilesForMlIndexingCandidates();
@@ -489,6 +491,9 @@ Future<RemoteMLHydrationSummary> hydrateOwnedRemoteMLData({
     start < ownedCandidates.length;
     start += embeddingFetchLimit
   ) {
+    if (control?.stopRequested ?? false) {
+      break;
+    }
     final end = math.min(start + embeddingFetchLimit, ownedCandidates.length);
     final chunk = ownedCandidates.sublist(start, end);
     final facePendingBefore = chunk.where((i) => i.shouldRunFaces).length;

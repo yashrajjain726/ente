@@ -39,9 +39,9 @@ class MlProcessLock {
   final Lock _funnel = Lock();
   MlOperation? _activeOperation;
 
-  /// Whether an operation currently holds the funnel. For asserts and
+  /// Whether the funnel is held or has queued waiters. For asserts and
   /// diagnostics only — never use this to skip [tryRunExclusive].
-  bool get isBusy => _activeOperation != null;
+  bool get isBusy => _funnel.locked;
 
   MlOperation? get activeOperation => _activeOperation;
 
