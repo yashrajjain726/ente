@@ -1317,6 +1317,9 @@ Future<void> _restoreFilesFromDeviceTrash(SelectedFiles selectedFiles) async {
       final result = await PhotoManager.editor.android.restoreFromTrash(batch);
       restoredIDs.addAll(result);
     }
+  } catch (e, s) {
+    Logger("_restoreFilesFromDeviceTrash").severe(e, s);
+    rethrow;
   } finally {
     if (restoredIDs.isNotEmpty) {
       final restoredFiles = selectedFiles.files.where(
