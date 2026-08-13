@@ -572,10 +572,6 @@ class _GalleryAppBarWidgetState extends State<GalleryAppBarWidget> {
       return actions;
     }
 
-    if (galleryType == GalleryType.trash) {
-      return actions;
-    }
-
     actions.add(
       galleryAppBarPopupMenuAction<AlbumPopupAction>(
         tooltip: strings.more,
@@ -705,7 +701,6 @@ class _GalleryAppBarWidgetState extends State<GalleryAppBarWidget> {
         (!isArchived && galleryType.canHide()) ||
         widget.collection != null ||
         galleryType.canDelete() ||
-        galleryType == GalleryType.trash ||
         galleryType == GalleryType.sharedCollection ||
         (galleryType == GalleryType.localFolder && !_isICloudSharedAlbum) ||
         _canDisableDeviceFolderBackup ||
