@@ -12,18 +12,18 @@ use data::GOLDEN_ENTRIES;
 // deliberately loose pending accelerated-hardware measurements. Healthy fp16
 // cosine and coordinate divergence is around 1e-3; corrupt output is around
 // 1.0 or higher.
-pub(crate) const COSINE_DISTANCE_THRESHOLD: f64 = 0.025;
+const COSINE_DISTANCE_THRESHOLD: f64 = 0.025;
 
-pub(crate) const RELATIVE_L2_THRESHOLD: f64 = 0.1;
+const RELATIVE_L2_THRESHOLD: f64 = 0.1;
 
 // Background confidence samples are <= ~2e-3, making healthy fp16 relative
 // error O(0.1..1); full flush-to-zero is 1.0, while inflated confidences are
 // >= ~45.
-pub(crate) const CONFIDENCE_RELATIVE_L2_THRESHOLD: f64 = 2.0;
+const CONFIDENCE_RELATIVE_L2_THRESHOLD: f64 = 2.0;
 
 const MAX_REFERENCE_SAMPLES: usize = 4096;
 
-pub enum GoldenInput {
+enum GoldenInput {
     SeededF32 { seed: u64 },
     I32 { data: &'static [i32] },
 }
@@ -42,14 +42,14 @@ pub enum GoldenMetric {
 }
 
 impl GoldenMetric {
-    pub fn label(self) -> &'static str {
+    pub(super) fn label(self) -> &'static str {
         match self {
             Self::CosineDistance => "cosine distance",
             Self::DetectorRelativeL2 { .. } => "detector channel relative L2 error",
         }
     }
 
-    pub fn threshold(self) -> f64 {
+    fn threshold(self) -> f64 {
         match self {
             Self::CosineDistance => COSINE_DISTANCE_THRESHOLD,
             Self::DetectorRelativeL2 { .. } => CONFIDENCE_RELATIVE_L2_THRESHOLD,
@@ -57,20 +57,20 @@ impl GoldenMetric {
     }
 }
 
-pub struct GoldenEntry {
+pub(super) struct GoldenEntry {
     // A changed canonical name must fail closed instead of reusing a stale
     // golden.
-    pub model_file: &'static str,
+    model_file: &'static str,
     // Checked against the asset lock in CI, not on device.
-    pub model_sha256: &'static str,
-    pub input: GoldenInput,
-    pub input_shape: &'static [i64],
-    pub metric: GoldenMetric,
-    pub output_len: usize,
-    pub expected_sample: &'static [f32],
+    model_sha256: &'static str,
+    input: GoldenInput,
+    pub(super) input_shape: &'static [i64],
+    pub(super) metric: GoldenMetric,
+    output_len: usize,
+    expected_sample: &'static [f32],
 }
 
-pub fn lookup(model_path: &str) -> Option<&'static GoldenEntry> {
+pub(super) fn lookup(model_path: &str) -> Option<&'static GoldenEntry> {
     let file_name = std::path::Path::new(model_path).file_name()?.to_str()?;
     GOLDEN_ENTRIES
         .iter()
@@ -104,13 +104,13 @@ fn sanitize_file_name(value: &str) -> String {
         .collect()
 }
 
-pub enum PreparedGoldenInput {
+pub(super) enum PreparedGoldenInput {
     F32(Vec<f32>),
     I32(Vec<i32>),
 }
 
 impl PreparedGoldenInput {
-    pub fn zeroed(&self) -> Self {
+    pub(super) fn zeroed(&self) -> Self {
         match self {
             Self::F32(data) => Self::F32(vec![0.0; data.len()]),
             Self::I32(data) => Self::I32(vec![0; data.len()]),
@@ -118,7 +118,7 @@ impl PreparedGoldenInput {
     }
 }
 
-pub fn prepare_input(entry: &GoldenEntry) -> Result<PreparedGoldenInput, String> {
+pub(super) fn prepare_input(entry: &GoldenEntry) -> Result<PreparedGoldenInput, String> {
     let element_count: i64 = entry.input_shape.iter().product();
     let element_count = usize::try_from(element_count)
         .map_err(|_| format!("invalid golden input shape {:?}", entry.input_shape))?;
@@ -141,7 +141,7 @@ pub fn prepare_input(entry: &GoldenEntry) -> Result<PreparedGoldenInput, String>
 
 // Shared by the device self-test and generator. Regenerate the golden data if
 // this sequence changes.
-pub fn seeded_noise(seed: u64, len: usize) -> Vec<f32> {
+fn seeded_noise(seed: u64, len: usize) -> Vec<f32> {
     let mut state = seed.max(1);
     (0..len)
         .map(|_| {
@@ -155,7 +155,7 @@ pub fn seeded_noise(seed: u64, len: usize) -> Vec<f32> {
         .collect()
 }
 
-pub fn sample_output(output: &[f32]) -> Vec<f32> {
+fn sample_output(output: &[f32]) -> Vec<f32> {
     let stride = sample_stride(output.len());
     output.iter().copied().step_by(stride).collect()
 }
@@ -164,7 +164,7 @@ fn sample_stride(output_len: usize) -> usize {
     output_len.div_ceil(MAX_REFERENCE_SAMPLES).max(1)
 }
 
-pub fn compare_output(entry: &GoldenEntry, output: &[f32]) -> Result<f64, String> {
+pub(super) fn compare_output(entry: &GoldenEntry, output: &[f32]) -> Result<f64, String> {
     let distances = measure_output(entry, output)?;
     match distances {
         OutputDistances::Cosine(distance) => ensure_within_threshold(
@@ -191,7 +191,7 @@ pub fn compare_output(entry: &GoldenEntry, output: &[f32]) -> Result<f64, String
     }
 }
 
-pub fn output_distance(entry: &GoldenEntry, output: &[f32]) -> Result<f64, String> {
+fn output_distance(entry: &GoldenEntry, output: &[f32]) -> Result<f64, String> {
     Ok(match measure_output(entry, output)? {
         OutputDistances::Cosine(distance) => distance,
         OutputDistances::Detector {
@@ -203,7 +203,7 @@ pub fn output_distance(entry: &GoldenEntry, output: &[f32]) -> Result<f64, Strin
 
 // The zero-input warm-up has no numeric golden, but must return a complete
 // finite tensor before the golden run.
-pub fn validate_output(entry: &GoldenEntry, output: &[f32]) -> Result<(), String> {
+pub(super) fn validate_output(entry: &GoldenEntry, output: &[f32]) -> Result<(), String> {
     if output.len() != entry.output_len {
         return Err(format!(
             "output length {} does not match golden length {}",

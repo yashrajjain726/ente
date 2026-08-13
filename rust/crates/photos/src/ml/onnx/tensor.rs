@@ -62,7 +62,7 @@ impl PreparedF32Input {
     }
 }
 
-pub(crate) fn run_golden_tensor(
+pub(super) fn run_golden_tensor(
     session: &mut Session,
     input_shape: &[i64],
     input: &golden_test::PreparedGoldenInput,

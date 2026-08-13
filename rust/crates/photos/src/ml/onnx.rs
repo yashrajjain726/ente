@@ -4,7 +4,8 @@ use std::{fmt, path::Path};
 use crate::ml::error::{MlError, MlResult};
 
 mod coreml_cache;
-pub mod golden_test;
+mod golden_test;
+pub use golden_test::tooling as golden_tooling;
 mod providers;
 mod tensor;
 mod webgpu;
@@ -15,9 +16,10 @@ pub(crate) fn set_webgpu_enabled(enabled: bool) {
 
 pub(crate) use ort::session::Session as SessionHandle;
 pub(crate) use providers::ExecutionMode;
+use tensor::run_golden_tensor;
 pub(crate) use tensor::{
-    BorrowedFloatTensor, FloatTensorData, PreparedF32Input, run_f32, run_golden_tensor,
-    run_i32_f32, with_prepared_float_output,
+    BorrowedFloatTensor, FloatTensorData, PreparedF32Input, run_f32, run_i32_f32,
+    with_prepared_float_output,
 };
 
 use providers::{ExecutionProvider, ProviderPlan};
@@ -252,7 +254,7 @@ fn build_next_session(
     )))
 }
 
-pub(crate) fn build_cpu_session(model_path: &str) -> MlResult<Session> {
+fn build_cpu_session(model_path: &str) -> MlResult<Session> {
     let mut plan = ProviderPlan::new(ExecutionMode::CpuOnly, model_path);
     build_next_session(model_path, &mut plan, "golden-tooling")
 }

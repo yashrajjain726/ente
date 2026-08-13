@@ -8,7 +8,7 @@
 
 use super::{GoldenEntry, GoldenInput, GoldenMetric};
 
-pub(crate) static GOLDEN_ENTRIES: &[GoldenEntry] = &[
+pub(super) static GOLDEN_ENTRIES: &[GoldenEntry] = &[
     GoldenEntry {
         model_file: "yolov5s_face_640_640_static_b1.onnx",
         model_sha256: "e047647409403d52696035ecd445792173e50d7fbdcccac97b958a585db9aa3d",
