@@ -6,14 +6,13 @@ use crate::ml::{
         run_face_alignment, run_face_detection, run_face_embedding,
         thumbnail::{FaceBox, generate_face_thumbnails},
     },
-    model::{self, Model},
+    models::{self, Model, ModelPaths},
     onnx,
     pet::{
         run_pet_body_detection, run_pet_body_embedding, run_pet_face_alignment,
         run_pet_face_detection, run_pet_face_embedding,
     },
-    preprocess,
-    runtime::{self, ModelPaths},
+    preprocess, runtime,
     types::{self, ClipResult, Dimensions, FaceResult, PetBodyResult, PetFaceResult},
 };
 use ente_image::decode::{decode_image_from_bytes, decode_image_from_path};
@@ -283,7 +282,7 @@ pub fn tokenize_clip_text(text: &str, vocab_path: &str) -> MlResult<Vec<i32>> {
 }
 
 fn validate_request_model_paths(req: &AnalyzeImageRequest) -> MlResult<()> {
-    let missing = model::required_indexing_models(req.run_faces, req.run_clip, req.run_pets)
+    let missing = models::required_indexing_models(req.run_faces, req.run_clip, req.run_pets)
         .filter(|&model| req.model_paths.get(model).trim().is_empty())
         .map(Model::path_label)
         .collect::<Vec<_>>();

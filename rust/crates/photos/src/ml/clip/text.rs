@@ -1,7 +1,7 @@
 use crate::ml::{
     clip::tokenizer,
     error::{MlError, MlResult},
-    model::Model,
+    models::Model,
     onnx,
     runtime::MlRuntimeView,
     types::ClipResult,

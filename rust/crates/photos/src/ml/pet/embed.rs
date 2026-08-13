@@ -1,6 +1,6 @@
 use crate::ml::{
     error::{MlError, MlResult},
-    model::Model,
+    models::Model,
     onnx,
     postprocess::l2_normalize,
     runtime::MlRuntimeView,

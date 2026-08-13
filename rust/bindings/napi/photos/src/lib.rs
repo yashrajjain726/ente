@@ -1,5 +1,5 @@
 use ente_photos::ml::{
-    assets, error::MlError, indexing as shared_indexing, runtime::ModelPaths as SharedModelPaths,
+    ModelPaths as SharedModelPaths, assets, error::MlError, indexing as shared_indexing,
     types as shared_types,
 };
 use napi::bindgen_prelude::*;
@@ -80,12 +80,7 @@ impl AssetStore {
         run_clip: bool,
         run_pets: bool,
     ) -> Result<ModelPaths> {
-        let models = assets::indexing_models(run_faces, run_clip, run_pets);
-        let model_assets = models
-            .iter()
-            .copied()
-            .map(assets::model_asset)
-            .collect::<Vec<_>>();
+        let model_assets = assets::indexing_assets(run_faces, run_clip, run_pets);
         self.inner
             .download(
                 &model_assets,
@@ -104,7 +99,7 @@ impl AssetStore {
 
     #[napi]
     pub async fn clip_text_model_paths(&self) -> Result<ClipTextModelPaths> {
-        let asset = assets::model_asset(assets::Model::ClipText);
+        let asset = assets::clip_text_asset();
         self.inner
             .download(
                 std::slice::from_ref(&asset),

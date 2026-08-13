@@ -1,4 +1,4 @@
-use ente_photos::ml::{error::MlError, indexing, runtime::ModelPaths, types};
+use ente_photos::ml::{ModelPaths, error::MlError, indexing, types};
 
 #[derive(Clone, Debug)]
 pub struct RustModelPaths {

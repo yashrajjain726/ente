@@ -7,11 +7,9 @@ use once_cell::sync::Lazy;
 
 use crate::ml::{
     error::{MlError, MlResult},
-    model::Model,
+    models::{Model, ModelPaths},
     onnx,
 };
-
-pub use crate::ml::model::ModelPaths;
 
 #[derive(Debug)]
 struct ModelSlotState {

@@ -7,12 +7,12 @@ use std::{
 use anyhow::{Context, Result, bail};
 use ente_assets::{Asset, AssetFile, AssetStore, download};
 use ente_photos::ml::{
+    ModelPaths,
     error::MlError,
     indexing::{
         AnalyzeImageRequest, AnalyzeImageResult, ImageSource, analyze_image, init_ml_runtime,
         release_ml_runtime,
     },
-    runtime::ModelPaths,
     types::FaceResult as RustFaceResult,
 };
 use flate2::read::GzDecoder;

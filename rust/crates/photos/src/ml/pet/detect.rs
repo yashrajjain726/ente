@@ -1,6 +1,6 @@
 use crate::ml::{
     error::{MlError, MlResult},
-    model::Model,
+    models::Model,
     onnx,
     postprocess::{NmsDetection, greedy_non_max_suppression},
     preprocess::{YOLO_INPUT_SIZE, YoloInput},

@@ -1,6 +1,6 @@
 use crate::ml::{
     error::MlResult,
-    model::Model,
+    models::Model,
     onnx, preprocess,
     runtime::MlRuntimeView,
     types::{ClipResult, DecodedImage},

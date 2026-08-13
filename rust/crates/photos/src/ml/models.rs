@@ -1,6 +1,6 @@
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(usize)]
-pub enum Model {
+pub(crate) enum Model {
     FaceDetection,
     FaceEmbedding,
     ClipImage,
