@@ -1114,7 +1114,15 @@ class _FileSelectionActionsWidgetState
       (f) => f.isDeviceTrash,
     );
     if (isDeviceOnly) {
-      await permanentlyDeleteFromDeviceTrash(context, widget.selectedFiles);
+      final deletedIDs = await permanentlyDeleteFromDeviceTrash(
+        context,
+        widget.selectedFiles.files.map((f) => f.localID!).toList(),
+      );
+      widget.selectedFiles.unSelectAll(
+        widget.selectedFiles.files
+            .where((f) => deletedIDs.contains(f.localID))
+            .toSet(),
+      );
       return;
     }
     if (await deleteFromEnteTrash(

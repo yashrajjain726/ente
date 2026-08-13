@@ -273,10 +273,11 @@ class FileBottomBarState extends State<FileBottomBar> {
             ),
             onPressed: () async {
               if (widget.file.isDeviceTrash) {
-                final selectedFiles = SelectedFiles()
-                  ..toggleSelection(widget.file);
-                await permanentlyDeleteFromDeviceTrash(context, selectedFiles);
-                if (selectedFiles.files.isEmpty) {
+                final deletedIDs = await permanentlyDeleteFromDeviceTrash(
+                  context,
+                  [widget.file.localID!],
+                );
+                if (deletedIDs.isNotEmpty) {
                   await widget.onFileRemoved(widget.file);
                 }
                 return;

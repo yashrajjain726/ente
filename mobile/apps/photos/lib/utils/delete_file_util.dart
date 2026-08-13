@@ -1355,54 +1355,51 @@ class _DeleteConfirmationSheetState extends State<_DeleteConfirmationSheet> {
   }
 }
 
-Future<void> permanentlyDeleteFromDeviceTrash(
+Future<Set<String>> permanentlyDeleteFromDeviceTrash(
   BuildContext context,
-  SelectedFiles selectedFiles,
+  List<String> fileIDs,
 ) async {
+  (Set<String>, Object?) result = (<String>{}, null);
   if (!await PhotoManager.canManageMedia()) {
-    try {
-      final didDelete = await _deleteFromDeviceTrash(selectedFiles);
-      if (didDelete && context.mounted) {
-        await showMediaManagementHintSheet(context);
-      }
-      return;
-    } catch (e) {
-      if (context.mounted) {
-        await showGenericErrorDialog(context: context, error: e);
-      }
-      return;
+    result = await _deleteFromDeviceTrash(fileIDs);
+    if (result.$1.isNotEmpty && context.mounted) {
+      await showMediaManagementHintSheet(context);
     }
+  } else {
+    if (!context.mounted) return result.$1;
+    await showBottomSheetComponent<ButtonResult>(
+      context: context,
+      builder: (_) => PermanentlyDeleteConfirmationSheet(
+        onDelete: () async {
+          result = await _deleteFromDeviceTrash(fileIDs);
+          if (result.$2 != null) {
+            throw result.$2!;
+          }
+        },
+      ),
+    );
   }
-  if (!context.mounted) return;
-  final result = await showBottomSheetComponent<ButtonResult>(
-    context: context,
-    builder: (_) => PermanentlyDeleteConfirmationSheet(
-      onDelete: () => _deleteFromDeviceTrash(selectedFiles),
-    ),
-  );
-  if (result?.action == ButtonAction.error && context.mounted) {
-    await showGenericErrorDialog(context: context, error: result!.exception);
+  if (result.$2 != null && context.mounted) {
+    await showGenericErrorDialog(context: context, error: result.$2!);
   }
+  return result.$1;
 }
 
-Future<bool> _deleteFromDeviceTrash(SelectedFiles selectedFiles) async {
-  final fileIDs = selectedFiles.files.map((f) => f.localID!).toList();
+Future<(Set<String>, Object?)> _deleteFromDeviceTrash(
+  List<String> fileIDs,
+) async {
   final deletedIDs = <String>{};
   try {
     for (final batch in fileIDs.chunks(batchSize)) {
       final result = await PhotoManager.editor.deleteWithIds(batch);
       deletedIDs.addAll(result);
     }
-    return deletedIDs.isNotEmpty;
+    return (deletedIDs, null);
   } catch (e, s) {
     _logger.severe("failed to delete from device trash:", e, s);
-    rethrow;
+    return (deletedIDs, e);
   } finally {
     if (deletedIDs.isNotEmpty) {
-      final deletedFiles = selectedFiles.files.where(
-        (f) => deletedIDs.contains(f.localID),
-      );
-      selectedFiles.unSelectAll(deletedFiles.toSet());
       Bus.instance.fire(ForceReloadTrashPageEvent());
     }
   }
