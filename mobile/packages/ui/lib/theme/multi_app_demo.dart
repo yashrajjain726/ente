@@ -6,7 +6,6 @@ import 'package:ente_ui/theme/ente_theme.dart';
 import 'package:ente_ui/theme/ente_theme_data.dart';
 import 'package:flutter/material.dart';
 
-/// App 1: E-commerce app with blue theme
 class ECommerceApp {
   static const Color brandBlue = Color(0xFF1976D2);
 
@@ -23,7 +22,6 @@ class ECommerceApp {
   );
 }
 
-/// App 2: Social media app with purple theme
 class SocialMediaApp {
   static const Color brandPurple = Color(0xFF9C27B0);
 
@@ -40,7 +38,6 @@ class SocialMediaApp {
   );
 }
 
-/// App 3: Finance app with green theme
 class FinanceApp {
   static final schemes = ColorSchemeBuilder.fromCustomColors(
     primary700: const Color(0xFF388E3C),
@@ -65,7 +62,6 @@ class FinanceApp {
   );
 }
 
-/// App 4: Gaming app with orange theme
 class GamingApp {
   static final customLightScheme = EnteColorScheme.light(
     primary700: const Color(0xFFE65100),
@@ -106,7 +102,6 @@ class GamingApp {
   );
 }
 
-/// Demo widget that shows how UI components adapt to different app themes
 class MultiAppThemeDemo extends StatefulWidget {
   const MultiAppThemeDemo({super.key});
 

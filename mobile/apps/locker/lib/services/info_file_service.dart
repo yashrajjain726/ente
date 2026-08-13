@@ -13,7 +13,6 @@ class InfoFileService {
 
   final _logger = Logger('InfoFileService');
 
-  /// Creates and uploads an info file
   Future<EnteFile> createAndUploadInfoFile({
     required InfoItem infoItem,
     required Collection collection,
@@ -52,7 +51,6 @@ class InfoFileService {
     }
   }
 
-  /// Updates an existing info file with new data
   Future<bool> updateInfoFile({
     required EnteFile existingFile,
     required InfoItem updatedInfoItem,
@@ -95,7 +93,6 @@ class InfoFileService {
     }
   }
 
-  /// Extracts info data from a file
   InfoItem? extractInfoFromFile(EnteFile file) {
     try {
       final infoData = file.pubMagicMetadata.info;
@@ -143,7 +140,6 @@ class InfoFileService {
     }
   }
 
-  /// Checks if a file is an info file
   bool isInfoFile(EnteFile file) {
     if (file.fileType == FileType.info) {
       return true;
@@ -154,7 +150,6 @@ class InfoFileService {
     return file.pubMagicMetadata.info != null;
   }
 
-  /// Gets the display title for an info file based on its content
   String getInfoFileTitle(InfoItem infoItem) {
     switch (infoItem.type) {
       case InfoType.note:
@@ -174,13 +169,11 @@ class InfoFileService {
     }
   }
 
-  /// Gets the display title directly from an EnteFile (convenience method)
   String? getFileTitleFromFile(EnteFile file) {
     final infoItem = extractInfoFromFile(file);
     return infoItem != null ? getInfoFileTitle(infoItem) : null;
   }
 
-  /// Special upload method for info files that don't require physical file content
   Future<EnteFile> _uploadInfoFile(
     EnteFile enteFile,
     Collection collection,

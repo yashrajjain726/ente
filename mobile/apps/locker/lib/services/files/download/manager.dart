@@ -24,7 +24,6 @@ class DownloadManager {
 
   DownloadManager(this._dio);
 
-  /// Subscribe to download progress updates for a specific file ID
   Stream<DownloadTask> watchDownload(int fileId) {
     _streams[fileId] ??= StreamController<DownloadTask>.broadcast();
     return _streams[fileId]!.stream;
@@ -36,8 +35,6 @@ class DownloadManager {
     return size > downloadChunkSize;
   }
 
-  /// Start download and return a Future that completes when download finishes
-  /// If download was paused, calling this again will resume it
   Future<DownloadResult> download(
     int fileId,
     String filename,
@@ -89,7 +86,6 @@ class DownloadManager {
     return completer.future;
   }
 
-  /// Pause download
   Future<void> pause(int fileId) async {
     final token = _cancelTokens[fileId];
     if (token != null && !token.isCancelled) {
@@ -109,7 +105,6 @@ class DownloadManager {
     }
   }
 
-  /// Cancel and delete download
   Future<void> cancel(int fileId) async {
     final token = _cancelTokens[fileId];
     if (token != null && !token.isCancelled) {
@@ -125,10 +120,8 @@ class DownloadManager {
     _cleanup(fileId);
   }
 
-  /// Get current download status
   Future<DownloadTask?> getDownload(int fileId) async => _tasks[fileId];
 
-  /// Get all downloads
   Future<List<DownloadTask>> getAllDownloads() async => _tasks.values.toList();
 
   Future<void> _startDownload(

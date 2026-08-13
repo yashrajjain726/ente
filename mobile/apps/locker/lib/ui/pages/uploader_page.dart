@@ -20,9 +20,6 @@ import "package:locker/utils/bottom_sheet_illustration.dart";
 import "package:locker/utils/error_sheet.dart";
 import 'package:logging/logging.dart';
 
-/// Abstract base class that provides file upload functionality.
-/// Contains common file picking and uploading logic that can be reused
-/// across different pages like HomePage and CollectionPage.
 abstract class UploaderPage extends BaseHomePage {
   const UploaderPage({super.key});
 }
@@ -30,14 +27,10 @@ abstract class UploaderPage extends BaseHomePage {
 abstract class UploaderPageState<T extends UploaderPage> extends State<T> {
   final _logger = Logger('UploaderPage');
 
-  /// Returns the collection that should be pre-selected in the upload dialog.
-  /// Return null to default to uncategorized collection.
   Collection? get selectedCollection => null;
 
-  /// Called after a successful file upload to refresh the UI
   void onFileUploadComplete();
 
-  /// Opens a file picker dialog and uploads the selected file
   Future<bool> addFile() async {
     final FilePickerResult? result = await FilePicker.pickFiles(
       type: FileType.any,

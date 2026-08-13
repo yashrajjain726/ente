@@ -23,11 +23,9 @@ import "package:locker/utils/bottom_sheet_illustration.dart";
 import "package:locker/utils/error_sheet.dart";
 import 'package:logging/logging.dart';
 
-/// Utility class for common collection actions like edit and delete
 class CollectionActions {
   static final _logger = Logger('CollectionActions');
 
-  /// Shows a dialog sheet to create a new collection
   static Future<Collection?> createCollection(
     BuildContext context, {
     bool autoSelectInParent = false,
@@ -231,7 +229,6 @@ class CollectionActions {
     }
   }
 
-  /// Shows a confirmation dialog and deletes a collection
   static Future<void> deleteCollection(
     BuildContext context,
     Collection collection, {

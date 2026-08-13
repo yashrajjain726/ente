@@ -21,7 +21,6 @@ class FFProbeProps {
   int? _rotation;
   Duration? duration;
 
-  // dot separated bitrate, fps, codecWidth, codecHeight. Ignore null value
   String get videoInfo {
     final List<String> info = [];
     if (bitrate != null) info.add('$bitrate');
@@ -47,8 +46,6 @@ class FFProbeProps {
     return finalWidth;
   }
 
-  /// To know more, read about Sample Aspect Ratio (SAR), Display Aspect Ratio (DAR)
-  /// and Pixel Aspect Ratio (PAR)
   int _calculateWidthConsideringSAR(int width) {
     final List<String> sar = propData![FFProbeKeys.sampleAspectRatio]
         .toString()
@@ -85,7 +82,6 @@ class FFProbeProps {
 
   int? get rotation => _rotation;
 
-  // toString() method
   @override
   String toString() {
     final buffer = StringBuffer();
@@ -166,7 +162,6 @@ class FFProbeProps {
           parsedData[stringKey] = json[key];
       }
     }
-    // iterate through the streams
     final List<dynamic> streams = json["streams"];
     final List<dynamic> newStreams = [];
     final Map<String, dynamic> metadata = {};
@@ -264,7 +259,6 @@ class FFProbeProps {
       ? null
       : _codecNames[value] ?? value.toUpperCase().replaceAll('_', ' ');
 
-  // input example: '2021-04-12T09:14:37.000000Z'
   static String? _formatDate(String value) {
     final dateInUtc = DateTime.tryParse(value);
     if (dateInUtc == null) return value;
@@ -286,7 +280,6 @@ class FFProbeProps {
     );
   }
 
-  // input example: '00:00:05.408000000' or '5.408000'
   static Duration? _parseDuration(String? value) {
     if (value == null) return null;
 
@@ -318,7 +311,6 @@ class FFProbeProps {
     return null;
   }
 
-  // input example: '00:00:05.408000000' or '5.408000'
   static String? _formatDuration(String? value) {
     if (value == null) return null;
     final duration = _parseDuration(value);
@@ -337,8 +329,6 @@ class FFProbeProps {
     final int? t = int.tryParse(value.split('/')[0]);
     final int? b = int.tryParse(value.split('/')[1]);
     if (t != null && b != null && b != 0) {
-      // return the value upto 2 decimal places. ignore even two decimal places
-      // if t is perfectly divisible by b
       return (t % b == 0)
           ? (t / b).toStringAsFixed(0)
           : (t / b).toStringAsFixed(2);

@@ -12,7 +12,6 @@ enum CollectionViewType {
   favorite,
 }
 
-/// Extension methods to determine which actions are available for each view type
 extension CollectionViewTypeActions on CollectionViewType {
   bool get isIncomingShare =>
       this == CollectionViewType.sharedCollectionViewer ||
