@@ -1,4 +1,4 @@
-// Generated file. Do not edit by hand.
+// Generated golden-test data. Do not edit by hand.
 //
 // Regenerate with:
 //   cargo run -p ente-photos --example ml_goldens -- generate
@@ -6,9 +6,9 @@
 // TODO: Pet models have no golden entries because they are CPU-only. Add
 // entries before moving them off CPU (see `MlRuntime::new` in runtime.rs).
 
-use crate::ml::golden::{GoldenEntry, GoldenInput, GoldenMetric};
+use super::{GoldenEntry, GoldenInput, GoldenMetric};
 
-pub(crate) static GOLDEN_ENTRIES: &[GoldenEntry] = &[
+pub(super) static GOLDEN_ENTRIES: &[GoldenEntry] = &[
     GoldenEntry {
         model_file: "yolov5s_face_640_640_static_b1.onnx",
         model_sha256: "e047647409403d52696035ecd445792173e50d7fbdcccac97b958a585db9aa3d",

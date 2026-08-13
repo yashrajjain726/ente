@@ -3,14 +3,15 @@ use std::path::Path;
 
 use ort::value::ValueType;
 
-use crate::ml::{clip, golden, golden_data::GOLDEN_ENTRIES, onnx};
+use crate::ml::{clip, onnx};
 
-pub use crate::ml::golden::GoldenMetric;
+pub use super::GoldenMetric;
+use super::data::GOLDEN_ENTRIES;
 
 const GOLDEN_NOISE_SEED: u64 = 0x0060_1DE2_5EED_2026;
 
 const GENERATED_FILE_HEADER: &str = "\
-// Generated file. Do not edit by hand.
+// Generated golden-test data. Do not edit by hand.
 //
 // Regenerate with:
 //   cargo run -p ente-photos --example ml_goldens -- generate
@@ -18,7 +19,7 @@ const GENERATED_FILE_HEADER: &str = "\
 // TODO: Pet models have no golden entries because they are CPU-only. Add
 // entries before moving them off CPU (see `MlRuntime::new` in runtime.rs).
 
-use crate::ml::golden::{GoldenEntry, GoldenInput, GoldenMetric};
+use super::{GoldenEntry, GoldenInput, GoldenMetric};
 
 pub(crate) static GOLDEN_ENTRIES: &[GoldenEntry] = &[
 ";
@@ -54,23 +55,23 @@ pub fn render_golden_data(models: &[GoldenModelSpec]) -> Result<String, String> 
 
 pub fn measure_zero_golden_separation(model_path: &str) -> Result<ZeroGoldenSeparation, String> {
     let model_file = model_file_name(model_path)?;
-    let entry = golden::lookup(model_path)
+    let entry = super::lookup(model_path)
         .ok_or_else(|| format!("{model_file}: no committed golden entry"))?;
     let mut session = build_cpu_session(model_path)?;
-    let golden_input = golden::prepare_input(entry)
+    let golden_input = super::prepare_input(entry)
         .map_err(|error| format!("{model_file}: preparing golden input: {error}"))?;
     let zero_input = golden_input.zeroed();
 
     let zero_output = onnx::run_golden_tensor(&mut session, entry.input_shape, &zero_input)
         .map_err(|error| format!("{model_file}: zero-input CPU inference failed: {error}"))?;
-    golden::validate_output(entry, &zero_output)
+    super::validate_output(entry, &zero_output)
         .map_err(|error| format!("{model_file}: invalid zero-input output: {error}"))?;
 
     let golden_output = onnx::run_golden_tensor(&mut session, entry.input_shape, &golden_input)
         .map_err(|error| format!("{model_file}: golden CPU inference failed: {error}"))?;
-    let golden_distance = golden::compare_output(entry, &golden_output)
+    let golden_distance = super::compare_output(entry, &golden_output)
         .map_err(|error| format!("{model_file}: golden output rejected: {error}"))?;
-    let zero_distance = golden::output_distance(entry, &zero_output)
+    let zero_distance = super::output_distance(entry, &zero_output)
         .map_err(|error| format!("{model_file}: measuring zero-input output: {error}"))?;
 
     Ok(ZeroGoldenSeparation {
@@ -103,11 +104,11 @@ pub fn verify_goldens_against_pins(pins: &[PinnedModel]) -> Vec<String> {
     for (file_name, pinned_sha) in &pinned {
         match committed.get(file_name) {
             None => failures.push(format!(
-                "{file_name}: no committed golden entry; regenerate golden_data.rs"
+                "{file_name}: no committed golden entry; regenerate ONNX golden-test data"
             )),
             Some(committed_sha) if committed_sha != pinned_sha => failures.push(format!(
                 "{file_name}: model content changed (pinned sha256 {pinned_sha}, golden \
-                 generated from {committed_sha}); regenerate golden_data.rs"
+                 generated from {committed_sha}); regenerate ONNX golden-test data"
             )),
             Some(_) => {}
         }
@@ -116,7 +117,7 @@ pub fn verify_goldens_against_pins(pins: &[PinnedModel]) -> Vec<String> {
         if !pinned.contains_key(file_name) {
             failures.push(format!(
                 "{file_name}: committed golden entry does not correspond to any pinned \
-                 production model; regenerate golden_data.rs"
+                 production model; regenerate ONNX golden-test data"
             ));
         }
     }
@@ -135,10 +136,7 @@ fn render_entry(spec: &GoldenModelSpec) -> Result<String, String> {
     let (input_source, prepared_input) = match &spec.input {
         GoldenSpecInput::SeededNoise => (
             format!("GoldenInput::SeededF32 {{ seed: {GOLDEN_NOISE_SEED:#x} }}"),
-            golden::PreparedGoldenInput::F32(golden::seeded_noise(
-                GOLDEN_NOISE_SEED,
-                element_count,
-            )),
+            super::PreparedGoldenInput::F32(super::seeded_noise(GOLDEN_NOISE_SEED, element_count)),
         ),
         GoldenSpecInput::ClipText { phrase, vocab_path } => {
             let token_ids = clip::tokenize_clip_text(phrase, vocab_path)
@@ -152,7 +150,7 @@ fn render_entry(spec: &GoldenModelSpec) -> Result<String, String> {
             }
             (
                 format!("GoldenInput::I32 {{ data: &{token_ids:?} }}"),
-                golden::PreparedGoldenInput::I32(token_ids),
+                super::PreparedGoldenInput::I32(token_ids),
             )
         }
     };
@@ -167,7 +165,7 @@ fn render_entry(spec: &GoldenModelSpec) -> Result<String, String> {
             "{file_name}: CPU output contains non-finite values; cannot be used as a golden"
         ));
     }
-    let sample = golden::sample_output(&output);
+    let sample = super::sample_output(&output);
 
     let mut entry = String::new();
     entry.push_str("    GoldenEntry {\n");
@@ -198,8 +196,7 @@ fn model_file_name(model_path: &str) -> Result<&str, String> {
 }
 
 fn build_cpu_session(model_path: &str) -> Result<ort::session::Session, String> {
-    onnx::build_session(model_path, onnx::ExecutionMode::CpuOnly, "golden-tooling")
-        .map(|(session, _)| session)
+    onnx::build_cpu_session(model_path)
         .map_err(|error| format!("building CPU session for '{model_path}': {error}"))
 }
 
@@ -227,8 +224,8 @@ fn static_input_shape(
 
 #[cfg(test)]
 mod tests {
+    use super::super::data::GOLDEN_ENTRIES;
     use super::{PinnedModel, verify_goldens_against_pins};
-    use crate::ml::golden_data::GOLDEN_ENTRIES;
 
     fn pinned_production_models() -> Vec<PinnedModel> {
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))

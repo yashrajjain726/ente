@@ -44,7 +44,7 @@ const MAX_CONSECUTIVE_FAILURES: u32 = 3;
 #[cfg(any(target_os = "android", target_os = "linux", target_os = "windows"))]
 static WEBGPU_ENABLED: AtomicBool = AtomicBool::new(false);
 
-pub(crate) fn set_enabled(enabled: bool) {
+pub(super) fn set_enabled(enabled: bool) {
     #[cfg(any(target_os = "android", target_os = "linux", target_os = "windows"))]
     WEBGPU_ENABLED.store(enabled, Ordering::Relaxed);
     #[cfg(not(any(target_os = "android", target_os = "linux", target_os = "windows")))]
@@ -53,7 +53,7 @@ pub(crate) fn set_enabled(enabled: bool) {
 
 // Adapter probing touches Vulkan and therefore happens after arming, not here.
 #[cfg(any(target_os = "android", target_os = "linux", target_os = "windows"))]
-pub(crate) fn attempt_permitted(model_path: &str) -> bool {
+pub(super) fn attempt_permitted(model_path: &str) -> bool {
     WEBGPU_ENABLED.load(Ordering::Relaxed)
         && model_dir(model_path).is_some_and(|dir| !quarantined(&dir))
 }
@@ -78,7 +78,7 @@ fn vendors_allowlisted(vendor_ids: &[u32]) -> bool {
 
 #[cfg(target_os = "android")]
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub(crate) enum AdapterCheck {
+pub(super) enum AdapterCheck {
     Allowed,
     Denied,
     // Probe failures count toward quarantine; policy denials do not.
@@ -88,7 +88,7 @@ pub(crate) enum AdapterCheck {
 // Must run inside an armed canary because this is the first Vulkan driver
 // access.
 #[cfg(target_os = "android")]
-pub(crate) fn check_adapter() -> AdapterCheck {
+pub(super) fn check_adapter() -> AdapterCheck {
     static VERDICT: OnceLock<AdapterCheck> = OnceLock::new();
     *VERDICT.get_or_init(|| match probe_vulkan_vendor_ids() {
         Ok(vendor_ids) => {
@@ -142,7 +142,7 @@ fn probe_vulkan_vendor_ids() -> Result<Vec<u32>, String> {
     target_os = "windows",
     test
 ))]
-pub(crate) struct ArmedCanary {
+pub(super) struct ArmedCanary {
     path: PathBuf,
 }
 
@@ -152,7 +152,7 @@ pub(crate) struct ArmedCanary {
     target_os = "windows",
     test
 ))]
-pub(crate) fn arm_canary(model_path: &str, model_namespace: &str) -> io::Result<ArmedCanary> {
+pub(super) fn arm_canary(model_path: &str, model_namespace: &str) -> io::Result<ArmedCanary> {
     let dir = model_dir(model_path).ok_or_else(|| {
         io::Error::new(
             io::ErrorKind::InvalidInput,
@@ -172,7 +172,7 @@ pub(crate) fn arm_canary(model_path: &str, model_namespace: &str) -> io::Result<
     test
 ))]
 impl ArmedCanary {
-    pub(crate) fn disarm(self) {
+    pub(super) fn disarm(self) {
         if let Err(error) = remove_file_durably(&self.path) {
             log::warn!(
                 "failed to disarm WebGPU crash canary at '{}': {error}",

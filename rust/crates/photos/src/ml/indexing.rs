@@ -6,14 +6,14 @@ use crate::ml::{
         run_face_alignment, run_face_detection, run_face_embedding,
         thumbnail::{FaceBox, generate_face_thumbnails},
     },
+    models::{self, Model, ModelPaths},
+    onnx,
     pet::{
         run_pet_body_detection, run_pet_body_embedding, run_pet_face_alignment,
         run_pet_face_detection, run_pet_face_embedding,
     },
-    preprocess,
-    runtime::{self, ModelPaths},
+    preprocess, runtime,
     types::{self, ClipResult, Dimensions, FaceResult, PetBodyResult, PetFaceResult},
-    webgpu,
 };
 use ente_image::decode::{decode_image_from_bytes, decode_image_from_path};
 
@@ -61,7 +61,7 @@ pub struct RunClipTextResult {
 
 // Call before creating sessions; existing sessions keep their configuration.
 pub fn set_ml_execution_config(enable_webgpu: bool) {
-    webgpu::set_enabled(enable_webgpu);
+    onnx::set_webgpu_enabled(enable_webgpu);
 }
 
 pub fn init_ml_runtime(model_paths: ModelPaths) {
@@ -216,7 +216,7 @@ fn analyze_image_inner(
         };
 
         operation.set_stage(AnalysisStage::Finalize);
-        let used_providers = runtime.used_providers();
+        let provider_usage = runtime.provider_usage();
         Ok(AnalyzeImageResult {
             file_id,
             decoded_image_size: dims,
@@ -225,8 +225,8 @@ fn analyze_image_inner(
             clip,
             pet_faces,
             pet_bodies,
-            used_coreml: used_providers.coreml,
-            used_webgpu: used_providers.webgpu,
+            used_coreml: provider_usage.coreml,
+            used_webgpu: provider_usage.webgpu,
         })
     })
 }
@@ -240,9 +240,10 @@ pub fn run_clip_text(req: RunClipTextRequest) -> MlResult<RunClipTextResult> {
         } = req;
 
         if model_path.trim().is_empty() {
-            return Err(MlError::InvalidRequest(
-                "missing model path: clipTextModelPath".to_string(),
-            ));
+            return Err(MlError::InvalidRequest(format!(
+                "missing model path: {}",
+                Model::ClipText.path_label()
+            )));
         }
         if vocab_path.trim().is_empty() {
             return Err(MlError::InvalidRequest(
@@ -250,18 +251,8 @@ pub fn run_clip_text(req: RunClipTextRequest) -> MlResult<RunClipTextResult> {
             ));
         }
 
-        let model_paths = ModelPaths {
-            face_detection: String::new(),
-            face_embedding: String::new(),
-            clip_image: String::new(),
-            clip_text: model_path,
-            pet_face_detection: String::new(),
-            pet_face_embedding_dog: String::new(),
-            pet_face_embedding_cat: String::new(),
-            pet_body_detection: String::new(),
-            pet_body_embedding_dog: String::new(),
-            pet_body_embedding_cat: String::new(),
-        };
+        let mut model_paths = ModelPaths::default();
+        *model_paths.get_mut(Model::ClipText) = model_path;
 
         runtime::with_runtime(&model_paths, |runtime| {
             let clip = run_clip_text_query(runtime, &text, &vocab_path)?;
@@ -291,40 +282,10 @@ pub fn tokenize_clip_text(text: &str, vocab_path: &str) -> MlResult<Vec<i32>> {
 }
 
 fn validate_request_model_paths(req: &AnalyzeImageRequest) -> MlResult<()> {
-    let model_paths = &req.model_paths;
-
-    let mut missing = Vec::new();
-    if req.run_faces {
-        if model_paths.face_detection.trim().is_empty() {
-            missing.push("faceDetectionModelPath");
-        }
-        if model_paths.face_embedding.trim().is_empty() {
-            missing.push("faceEmbeddingModelPath");
-        }
-    }
-    if req.run_clip && model_paths.clip_image.trim().is_empty() {
-        missing.push("clipImageModelPath");
-    }
-    if req.run_pets {
-        if model_paths.pet_face_detection.trim().is_empty() {
-            missing.push("petFaceDetectionModelPath");
-        }
-        if model_paths.pet_body_detection.trim().is_empty() {
-            missing.push("petBodyDetectionModelPath");
-        }
-        if model_paths.pet_face_embedding_dog.trim().is_empty() {
-            missing.push("petFaceEmbeddingDogModelPath");
-        }
-        if model_paths.pet_face_embedding_cat.trim().is_empty() {
-            missing.push("petFaceEmbeddingCatModelPath");
-        }
-        if model_paths.pet_body_embedding_dog.trim().is_empty() {
-            missing.push("petBodyEmbeddingDogModelPath");
-        }
-        if model_paths.pet_body_embedding_cat.trim().is_empty() {
-            missing.push("petBodyEmbeddingCatModelPath");
-        }
-    }
+    let missing = models::selected_indexing_models(req.run_faces, req.run_clip, req.run_pets)
+        .filter(|&model| req.model_paths.get(model).trim().is_empty())
+        .map(Model::path_label)
+        .collect::<Vec<_>>();
     if missing.is_empty() {
         return Ok(());
     }
@@ -339,18 +300,22 @@ fn validate_request_model_paths(req: &AnalyzeImageRequest) -> MlResult<()> {
 mod tests {
     use super::*;
 
-    fn empty_model_paths() -> ModelPaths {
-        ModelPaths {
-            face_detection: String::new(),
-            face_embedding: String::new(),
-            clip_image: String::new(),
-            clip_text: String::new(),
-            pet_face_detection: String::new(),
-            pet_face_embedding_dog: String::new(),
-            pet_face_embedding_cat: String::new(),
-            pet_body_detection: String::new(),
-            pet_body_embedding_dog: String::new(),
-            pet_body_embedding_cat: String::new(),
+    fn request_with_models(run_faces: bool, run_clip: bool, run_pets: bool) -> AnalyzeImageRequest {
+        AnalyzeImageRequest {
+            file_id: 1,
+            source: ImageSource::Bytes(Vec::new()),
+            run_faces,
+            run_clip,
+            run_pets,
+            generate_face_crops: false,
+            model_paths: ModelPaths::default(),
+        }
+    }
+
+    fn validation_error(req: &AnalyzeImageRequest) -> String {
+        match validate_request_model_paths(req) {
+            Err(MlError::InvalidRequest(message)) => message,
+            other => panic!("expected an invalid request, got {other:?}"),
         }
     }
 
@@ -373,7 +338,7 @@ mod tests {
             run_clip: false,
             run_pets: false,
             generate_face_crops: false,
-            model_paths: empty_model_paths(),
+            model_paths: ModelPaths::default(),
         };
 
         let result = analyze_image(req).expect("analysis without models succeeds");
@@ -393,12 +358,53 @@ mod tests {
             run_clip: false,
             run_pets: false,
             generate_face_crops: false,
-            model_paths: empty_model_paths(),
+            model_paths: ModelPaths::default(),
         };
 
         match analyze_image(req) {
             Err(MlError::Decode(_)) => {}
             other => panic!("expected a decode error, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn request_validation_reports_required_models_in_catalog_order() {
+        let req = request_with_models(true, true, true);
+
+        assert_eq!(
+            validation_error(&req),
+            "missing required model paths: faceDetectionModelPath, faceEmbeddingModelPath, \
+             clipImageModelPath, petFaceDetectionModelPath, petBodyDetectionModelPath, \
+             petFaceEmbeddingDogModelPath, petFaceEmbeddingCatModelPath, \
+             petBodyEmbeddingDogModelPath, petBodyEmbeddingCatModelPath"
+        );
+    }
+
+    #[test]
+    fn request_validation_uses_only_enabled_model_groups() {
+        assert_eq!(
+            validation_error(&request_with_models(true, false, false)),
+            "missing required model paths: faceDetectionModelPath, faceEmbeddingModelPath"
+        );
+        assert_eq!(
+            validation_error(&request_with_models(false, true, false)),
+            "missing required model paths: clipImageModelPath"
+        );
+        assert_eq!(
+            validation_error(&request_with_models(false, false, true)),
+            "missing required model paths: petFaceDetectionModelPath, petBodyDetectionModelPath, \
+             petFaceEmbeddingDogModelPath, petFaceEmbeddingCatModelPath, \
+             petBodyEmbeddingDogModelPath, petBodyEmbeddingCatModelPath"
+        );
+    }
+
+    #[test]
+    fn request_validation_accepts_all_required_model_paths() {
+        let mut req = request_with_models(true, true, true);
+        for model in Model::INDEXING {
+            *req.model_paths.get_mut(model) = format!("{}.onnx", model.namespace());
+        }
+
+        validate_request_model_paths(&req).unwrap();
     }
 }
