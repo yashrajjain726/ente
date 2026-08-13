@@ -968,11 +968,6 @@ export const updateCollectionSortOrder = async (
     asc: boolean,
 ) => updateCollectionPublicMagicMetadata(collection, { asc });
 
-export const updateCollectionCover = async (
-    collection: Collection,
-    coverID: number,
-) => updateCollectionDetails(collection, { coverID });
-
 const albumDescriptionSegmenter =
     typeof Intl !== "undefined" && "Segmenter" in Intl
         ? new Intl.Segmenter(undefined, { granularity: "grapheme" })
@@ -983,19 +978,9 @@ export const albumDescriptionGraphemeCount = (description: string) =>
         ? Array.from(albumDescriptionSegmenter.segment(description)).length
         : Array.from(description).length;
 
-export const updateCollectionDescription = async (
-    collection: Collection,
-    description: string,
-) => updateCollectionDetails(collection, { description });
-
-interface CollectionDetailsUpdates {
-    description?: string;
-    coverID?: number;
-}
-
 export const updateCollectionDetails = async (
     collection: Collection,
-    { description, coverID }: CollectionDetailsUpdates,
+    { description, coverID }: { description?: string; coverID?: number },
 ) => {
     const updates: CollectionPublicMagicMetadataData = {};
     if (description !== undefined) {
