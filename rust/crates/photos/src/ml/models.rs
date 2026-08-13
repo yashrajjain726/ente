@@ -34,18 +34,6 @@ impl Model {
         Self::FaceEmbedding,
         Self::ClipImage,
         Self::PetFaceDetection,
-        Self::PetFaceEmbeddingDog,
-        Self::PetFaceEmbeddingCat,
-        Self::PetBodyDetection,
-        Self::PetBodyEmbeddingDog,
-        Self::PetBodyEmbeddingCat,
-    ];
-
-    const INDEXING_PATH_VALIDATION: [Self; 9] = [
-        Self::FaceDetection,
-        Self::FaceEmbedding,
-        Self::ClipImage,
-        Self::PetFaceDetection,
         Self::PetBodyDetection,
         Self::PetFaceEmbeddingDog,
         Self::PetFaceEmbeddingCat,
@@ -148,22 +136,12 @@ impl ModelPaths {
     }
 }
 
-pub(crate) fn enabled_indexing_models(
+pub(crate) fn selected_indexing_models(
     run_faces: bool,
     run_clip: bool,
     run_pets: bool,
 ) -> impl Iterator<Item = Model> {
     Model::INDEXING
-        .into_iter()
-        .filter(move |&model| indexing_model_is_enabled(model, run_faces, run_clip, run_pets))
-}
-
-pub(crate) fn required_indexing_models(
-    run_faces: bool,
-    run_clip: bool,
-    run_pets: bool,
-) -> impl Iterator<Item = Model> {
-    Model::INDEXING_PATH_VALIDATION
         .into_iter()
         .filter(move |&model| indexing_model_is_enabled(model, run_faces, run_clip, run_pets))
 }
@@ -194,7 +172,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn model_catalog_order_and_metadata_are_stable() {
+    fn model_order_and_labels_are_stable() {
         let expected = [
             (
                 Model::FaceDetection,
@@ -303,32 +281,25 @@ mod tests {
         for model in Model::ALL {
             assert_eq!(indexes.contains(&model.index()), model != Model::ClipText);
         }
-        assert_eq!(
-            Model::INDEXING_PATH_VALIDATION
-                .into_iter()
-                .map(Model::index)
-                .collect::<HashSet<_>>(),
-            indexes
-        );
     }
 
     #[test]
-    fn enabled_indexing_models_follow_request_flags() {
+    fn selected_indexing_models_follow_request_flags() {
         assert_eq!(
-            enabled_indexing_models(true, false, false).collect::<Vec<_>>(),
+            selected_indexing_models(true, false, false).collect::<Vec<_>>(),
             [Model::FaceDetection, Model::FaceEmbedding]
         );
         assert_eq!(
-            enabled_indexing_models(false, true, false).collect::<Vec<_>>(),
+            selected_indexing_models(false, true, false).collect::<Vec<_>>(),
             [Model::ClipImage]
         );
         assert_eq!(
-            enabled_indexing_models(false, false, true).collect::<Vec<_>>(),
+            selected_indexing_models(false, false, true).collect::<Vec<_>>(),
             [
                 Model::PetFaceDetection,
+                Model::PetBodyDetection,
                 Model::PetFaceEmbeddingDog,
                 Model::PetFaceEmbeddingCat,
-                Model::PetBodyDetection,
                 Model::PetBodyEmbeddingDog,
                 Model::PetBodyEmbeddingCat,
             ]

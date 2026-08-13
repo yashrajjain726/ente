@@ -282,7 +282,7 @@ pub fn tokenize_clip_text(text: &str, vocab_path: &str) -> MlResult<Vec<i32>> {
 }
 
 fn validate_request_model_paths(req: &AnalyzeImageRequest) -> MlResult<()> {
-    let missing = models::required_indexing_models(req.run_faces, req.run_clip, req.run_pets)
+    let missing = models::selected_indexing_models(req.run_faces, req.run_clip, req.run_pets)
         .filter(|&model| req.model_paths.get(model).trim().is_empty())
         .map(Model::path_label)
         .collect::<Vec<_>>();

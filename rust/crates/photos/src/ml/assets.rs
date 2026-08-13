@@ -44,7 +44,7 @@ fn model_asset(model: Model) -> Asset {
 }
 
 pub fn indexing_assets(run_faces: bool, run_clip: bool, run_pets: bool) -> Vec<Asset> {
-    models::enabled_indexing_models(run_faces, run_clip, run_pets)
+    models::selected_indexing_models(run_faces, run_clip, run_pets)
         .map(model_asset)
         .collect()
 }
@@ -56,7 +56,7 @@ pub fn indexing_model_paths(
     run_pets: bool,
 ) -> ModelPaths {
     let mut model_paths = ModelPaths::default();
-    for model in models::enabled_indexing_models(run_faces, run_clip, run_pets) {
+    for model in models::selected_indexing_models(run_faces, run_clip, run_pets) {
         *model_paths.get_mut(model) = model_path(store, model);
     }
     model_paths
