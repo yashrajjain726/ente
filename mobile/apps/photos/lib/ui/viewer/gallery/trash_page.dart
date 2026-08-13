@@ -2,7 +2,8 @@ import "dart:io";
 
 import "package:collection/collection.dart";
 import "package:ente_components/ente_components.dart";
-import "package:ente_photos_platform/ente_photos_platform.dart";
+import "package:ente_photos_platform/ente_photos_platform.dart"
+    show DeviceTrashClient;
 import "package:ente_pure_utils/ente_pure_utils.dart";
 import "package:ente_strings/extensions.dart";
 import 'package:flutter/material.dart';
@@ -30,6 +31,7 @@ import "package:photos/utils/device_info.dart";
 
 Future<void> showTrashPage(BuildContext context) async {
   final isDeviceTrashSupported =
+      flagService.internalUser &&
       Platform.isAndroid &&
       !await isAndroidSDKVersionLowerThan(android11SDKINT);
   if (!context.mounted) return;
