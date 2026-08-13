@@ -261,7 +261,13 @@ class FileUploader {
     final collectionID = item.collectionID;
     final stopwatch = Stopwatch()..start();
     try {
-      final uploadedFile = await _tryToUpload(file, collectionID, forcedUpload);
+      final uploadedFile = await _tryToUpload(
+        file,
+        collectionID,
+        forcedUpload,
+        onSendProgress: (sent, total) =>
+            _queue.updateBackupProgress(item, file.localID!, sent, total),
+      );
       stopwatch.stop();
       if (stopwatch.elapsed >= _longRunningUploadThreshold) {
         _logger.info(
@@ -338,7 +344,19 @@ class FileUploader {
         _queue.markBackupUploading(backupOwner, localID);
       }
       try {
-        final result = await _tryToUpload(file, collectionID, true);
+        final result = await _tryToUpload(
+          file,
+          collectionID,
+          true,
+          onSendProgress: backupOwner == null
+              ? null
+              : (sent, total) => _queue.updateBackupProgress(
+                  backupOwner,
+                  localID,
+                  sent,
+                  total,
+                ),
+        );
         if (backupOwner != null) {
           _queue.markBackupUploaded(backupOwner, localID);
         }
@@ -355,8 +373,9 @@ class FileUploader {
   Future<EnteFile> _tryToUpload(
     EnteFile file,
     int collectionID,
-    bool forcedUpload,
-  ) async {
+    bool forcedUpload, {
+    ProgressCallback? onSendProgress,
+  }) async {
     await checkNetworkForUpload(isForceUpload: forcedUpload);
     if (!forcedUpload) {
       final fileOnDisk = await FilesDB.instance.getFile(file.generatedID!);
@@ -583,6 +602,7 @@ class FileUploader {
           encryptedFile,
           encFileSize,
           contentMd5: singlePartFileMd5,
+          onSendProgress: onSendProgress,
         );
       } else {
         isMultipartUpload = true;
@@ -596,6 +616,7 @@ class FileUploader {
             mediaUploadData.fileHash,
             collectionID,
             existingMultipartEncFileName,
+            onSendProgress: onSendProgress,
           );
         } else {
           if (partMd5s == null || partMd5s.isEmpty) {
@@ -630,6 +651,7 @@ class FileUploader {
             encFileSize,
             fileMd5: fileMd5,
             partMd5s: partMd5s,
+            onSendProgress: onSendProgress,
           );
         }
         // in case of multipart, upload the thumbnail towards the end to avoid
