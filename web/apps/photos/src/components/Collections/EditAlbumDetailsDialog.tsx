@@ -83,7 +83,7 @@ export const EditAlbumDetailsDialog: React.FC<EditAlbumDetailsDialogProps> = ({
     const descriptionLength = albumDescriptionGraphemeCount(trimmedDescription);
     const isDescriptionTooLong = descriptionLength > maxAlbumDescriptionLength;
     const hasChanges =
-        trimmedName != initialName ||
+        trimmedName != initialName.trim() ||
         trimmedDescription != initialDescription.trim() ||
         pendingCoverID !== undefined;
     const isSaveDisabled =
@@ -119,18 +119,19 @@ export const EditAlbumDetailsDialog: React.FC<EditAlbumDetailsDialogProps> = ({
         return Promise.resolve(true);
     };
 
-    const hasSelectableCover = files.some(
+    const canShowCoverEditor = files.some(
         (file) => file.metadata.fileType !== FileType.video,
     );
-    const existingCoverID = collection.pubMagicMetadata?.data.coverID ?? 0;
-    const canShowCoverEditor = hasSelectableCover || existingCoverID > 0;
-    const effectiveCoverID = pendingCoverID ?? existingCoverID;
+    const effectiveCoverID =
+        pendingCoverID ?? collection.pubMagicMetadata?.data.coverID ?? 0;
     const effectiveCoverFile =
         pendingCoverID === undefined
             ? initialCoverFile
             : pendingCoverID > 0
               ? files.find(({ id }) => id === pendingCoverID)
-              : files[0];
+              : collection.pubMagicMetadata?.data.asc
+                ? files.at(-1)
+                : files[0];
 
     return (
         <>
