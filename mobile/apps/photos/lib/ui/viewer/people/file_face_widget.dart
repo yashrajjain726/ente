@@ -24,6 +24,7 @@ class FileFaceWidget extends StatefulWidget {
   final bool useFullFile;
   final bool thumbnailFallback;
 
+  // Physical pixels; null or non-positive decodes at full resolution.
   final int? cachedPixelWidth;
 
   const FileFaceWidget(

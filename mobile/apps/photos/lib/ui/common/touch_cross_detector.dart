@@ -4,6 +4,7 @@ import 'package:flutter/widgets.dart';
 
 // Flutter sends a drag only to the widget where it began. Track the pointer
 // globally so widgets can detect it crossing their boundaries.
+// Pressing inside reports enter and hover; releasing inside reports exit.
 class TouchCrossDetector extends SingleChildRenderObjectWidget {
   const TouchCrossDetector({
     super.key,

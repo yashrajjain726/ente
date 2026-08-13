@@ -1,15 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:photos/theme/colors.dart';
 
-enum TextInputMessageType {
-  guide,
-
-  error,
-
-  alert,
-
-  success,
-}
+enum TextInputMessageType { guide, error, alert, success }
 
 class TextInputTheme {
   final Color defaultBg;

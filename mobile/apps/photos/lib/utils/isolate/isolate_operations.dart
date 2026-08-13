@@ -259,7 +259,6 @@ Future<dynamic> isolateFunction(
       }
       _isolateCache.clear();
       return true;
-
   }
 }
 

@@ -84,6 +84,7 @@ class Gallery extends StatefulWidget {
 
   final bool addHeaderOrFooterEmptyState;
 
+  // Enables tap-to-select; it does not indicate whether files are selected.
   final bool inSelectionMode;
   final bool showSelectAll;
 
@@ -176,6 +177,7 @@ class GalleryState extends State<Gallery> {
     _automationScrollIdentifier = _buildAutomationScrollIdentifier(
       widget.tagPrefix,
     );
+    // Keep the logger name from ending in a dot.
     _logTag =
         "Gallery_${widget.tagPrefix}${kDebugMode ? "_" + widget.albumName! : ""}_x";
     _logger = Logger(_logTag);

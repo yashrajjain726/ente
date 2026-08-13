@@ -53,6 +53,7 @@ class SwipeToSelectHelper {
     _selecting = null;
   }
 
+  // Reversing the drag undoes changes outside the new start-to-pointer range.
   void _toggleSelectionToIndex(int toIndex) {
     if (_fromIndex == null || _lastToIndex == null || _selecting == null) {
       return;
@@ -62,7 +63,6 @@ class SwipeToSelectHelper {
     final lastToIndex = _lastToIndex!;
     final selecting = _selecting!;
 
-    // Reversing the drag undoes changes outside the new start-to-pointer range.
     Set<EnteFile> getRange(int start, int end) {
       if (start < end && start >= 0 && end <= allFiles.length) {
         return allFiles.getRange(start, end).toSet();

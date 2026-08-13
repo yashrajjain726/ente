@@ -1292,10 +1292,7 @@ class _MemoryLaneCard extends StatelessWidget {
 
     final cardShadow = _shadowForCard(distance);
     final double emphasisDistance = distance.abs();
-    final double activation = (1 - (emphasisDistance * 1.8)).clamp(
-      0.0,
-      1.0,
-    );
+    final double activation = (1 - (emphasisDistance * 1.8)).clamp(0.0, 1.0);
     final double emphasis = Curves.easeOutQuad.transform(activation);
     final double dateOpacity = emphasis;
     final double gradientAlpha = 0.6 * emphasis;

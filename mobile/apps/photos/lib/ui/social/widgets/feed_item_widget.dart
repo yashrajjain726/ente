@@ -147,9 +147,7 @@ class FeedItemWidget extends StatelessWidget {
               _FeedTypeIconWithTimeline(
                 type: feedItem.type,
                 showTimeline: !isLastItem,
-                timelineExtensionHeight: hasSharedPhotos
-                    ? 400
-                    : 95,
+                timelineExtensionHeight: hasSharedPhotos ? 400 : 95,
               ),
               const SizedBox(width: 10),
               Expanded(

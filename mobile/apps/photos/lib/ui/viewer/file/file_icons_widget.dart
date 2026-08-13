@@ -210,9 +210,9 @@ class FileOverlayText extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 5),
       child: Text(
         text,
-        style: Theme.of(context).textTheme.titleSmall!.copyWith(
-          color: Colors.white,
-        ),
+        style: Theme.of(
+          context,
+        ).textTheme.titleSmall!.copyWith(color: Colors.white),
       ),
     );
   }

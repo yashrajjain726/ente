@@ -22,11 +22,10 @@ int getNextMemoryIndex(List<Memory> memories) {
   return lastSeenIndex + 1;
 }
 
-// Cap on how many memory covers to warm on a single pass. Sized against a
-// typical above-the-fold strip; prevents runaway bandwidth when there is a
-// large backlog of unseen memories.
+// Limit warming to above-the-fold covers to avoid runaway downloads.
 const int kMemoryCoverWarmCap = 20;
 
+// Warm originals so opening a memory does not fall back to its thumbnail.
 Future<void> warmMemoryCovers(
   List<List<Memory>> memoryLists, {
   required bool Function() stillActive,

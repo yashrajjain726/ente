@@ -34,6 +34,7 @@ class PersonFaceWidget extends StatefulWidget {
   final VoidCallback? onErrorCallback;
   final bool keepAlive;
 
+  // Physical pixels; null or non-positive decodes at full resolution.
   final int? cachedPixelWidth;
 
   const PersonFaceWidget({

@@ -343,6 +343,7 @@ class _ZoomableImageState extends State<ZoomableImage> {
             if (file != null) {
               _onFileLoaded(file);
             } else {
+              // Most network failures return null; retry them like exceptions.
               _onFinalImageFetchFailed();
             }
           })

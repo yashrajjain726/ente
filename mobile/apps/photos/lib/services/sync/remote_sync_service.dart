@@ -988,8 +988,8 @@ class RemoteSyncService {
     });
   }
 
-  // For each iOS background slot, check up to four candidates for a local
-  // file. If none is local, use the next iCloud-only file.
+  // Prefer a local file in each iOS background slot; otherwise use the next
+  // file in line.
   Future<List<EnteFile>> _buildBgUploadQueue(List<EnteFile> files) async {
     const maxChecksPerSlot = kMaximumPermissibleUploadsInThrottledMode;
     const slots = kMaximumPermissibleUploadsInThrottledMode;

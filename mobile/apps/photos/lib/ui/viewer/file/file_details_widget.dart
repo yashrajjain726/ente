@@ -218,7 +218,6 @@ class _FileDetailsWidgetState extends State<FileDetailsWidget> {
                   ],
                 )
               : const SizedBox.shrink();
-
         },
       ),
     ]);

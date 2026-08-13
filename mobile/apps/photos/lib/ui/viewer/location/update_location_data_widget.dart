@@ -262,11 +262,7 @@ class _UpdateLocationInfoState extends State<UpdateLocationInfo> {
         return Stack(
           alignment: Alignment.center,
           children: [
-            Positioned(
-              top: 0,
-              key: bottomChildKey,
-              child: bottomChild,
-            ),
+            Positioned(top: 0, key: bottomChildKey, child: bottomChild),
             Positioned(key: topChildKey, child: topChild),
           ],
         );

@@ -178,9 +178,7 @@ class FileAppBarState extends State<FileAppBar> {
               child: AppBar(
                 clipBehavior: Clip.none,
                 key: ValueKey(isGuestView),
-                iconTheme: const IconThemeData(
-                  color: Colors.white,
-                ), //same for both themes
+                iconTheme: const IconThemeData(color: Colors.white),
                 leading: IconButton(
                   icon: const Icon(Icons.arrow_back),
                   onPressed: () {
