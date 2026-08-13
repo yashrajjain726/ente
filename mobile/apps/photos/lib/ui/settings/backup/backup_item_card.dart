@@ -183,13 +183,9 @@ class _BackupItemCardState extends State<BackupItemCard> {
               width: 48,
               child: Center(
                 child: switch (widget.item.status) {
-                  BackupItemStatus.uploading => SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2.0,
-                      color: colorScheme.primary700,
-                    ),
+                  BackupItemStatus.uploading => _UploadProgressIndicator(
+                    progressPercent: widget.item.progressPercent,
+                    color: colorScheme.primary700,
                   ),
                   BackupItemStatus.uploaded => const SizedBox(
                     width: 24,
@@ -226,6 +222,63 @@ class _BackupItemCardState extends State<BackupItemCard> {
                     ),
                   ),
                 },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _UploadProgressIndicator extends StatelessWidget {
+  const _UploadProgressIndicator({
+    required this.progressPercent,
+    required this.color,
+  });
+
+  static const _finalizingIndicatorValue = 0.995;
+
+  final int? progressPercent;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    final percent = progressPercent;
+    if (percent == null) {
+      return SizedBox(
+        width: 16,
+        height: 16,
+        child: CircularProgressIndicator(strokeWidth: 2, color: color),
+      );
+    }
+    return Semantics(
+      value: "$percent%",
+      excludeSemantics: true,
+      child: SizedBox(
+        width: 40,
+        height: 40,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            SizedBox(
+              width: 36,
+              height: 36,
+              child: CircularProgressIndicator(
+                value: percent == 99
+                    ? _finalizingIndicatorValue
+                    : percent / 100,
+                strokeWidth: 2,
+                color: color,
+              ),
+            ),
+            Text(
+              "$percent%",
+              textScaler: TextScaler.noScaling,
+              style: TextStyle(
+                color: color,
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
               ),
             ),
           ],
