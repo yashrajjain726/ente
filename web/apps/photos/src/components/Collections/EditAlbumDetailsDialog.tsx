@@ -119,19 +119,18 @@ export const EditAlbumDetailsDialog: React.FC<EditAlbumDetailsDialogProps> = ({
         return Promise.resolve(true);
     };
 
-    const canShowCoverEditor = files.some(
+    const hasSelectableCover = files.some(
         (file) => file.metadata.fileType !== FileType.video,
     );
-    const effectiveCoverID =
-        pendingCoverID ?? collection.pubMagicMetadata?.data.coverID ?? 0;
+    const existingCoverID = collection.pubMagicMetadata?.data.coverID ?? 0;
+    const canShowCoverEditor = hasSelectableCover || existingCoverID > 0;
+    const effectiveCoverID = pendingCoverID ?? existingCoverID;
     const effectiveCoverFile =
         pendingCoverID === undefined
             ? initialCoverFile
             : pendingCoverID > 0
               ? files.find(({ id }) => id === pendingCoverID)
-              : collection.pubMagicMetadata?.data.asc
-                ? files.at(-1)
-                : files[0];
+              : files[0];
 
     return (
         <>
