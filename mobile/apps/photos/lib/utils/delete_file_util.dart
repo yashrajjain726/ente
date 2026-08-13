@@ -1361,33 +1361,31 @@ Future<void> permanentlyDeleteFromDeviceTrash(
 ) async {
   if (!await PhotoManager.canManageMedia()) {
     try {
-      await _deleteFromDeviceTrash(selectedFiles);
+      final didDelete = await _deleteFromDeviceTrash(selectedFiles);
+      if (didDelete && context.mounted) {
+        await showMediaManagementHintSheet(context);
+      }
+      return;
     } catch (e) {
       if (context.mounted) {
         await showGenericErrorDialog(context: context, error: e);
       }
-    }
-  } else {
-    if (!context.mounted) return;
-    final actionResult = await showBottomSheetComponent<ButtonResult>(
-      context: context,
-      builder: (_) => PermanentlyDeleteConfirmationSheet(
-        onDelete: () => _deleteFromDeviceTrash(selectedFiles),
-      ),
-    );
-    if (actionResult?.action == ButtonAction.error && context.mounted) {
-      await showGenericErrorDialog(
-        context: context,
-        error: actionResult!.exception,
-      );
+      return;
     }
   }
-  if (context.mounted) {
-    await showMediaManagementHintSheet(context);
+  if (!context.mounted) return;
+  final result = await showBottomSheetComponent<ButtonResult>(
+    context: context,
+    builder: (_) => PermanentlyDeleteConfirmationSheet(
+      onDelete: () => _deleteFromDeviceTrash(selectedFiles),
+    ),
+  );
+  if (result?.action == ButtonAction.error && context.mounted) {
+    await showGenericErrorDialog(context: context, error: result!.exception);
   }
 }
 
-Future<void> _deleteFromDeviceTrash(SelectedFiles selectedFiles) async {
+Future<bool> _deleteFromDeviceTrash(SelectedFiles selectedFiles) async {
   final fileIDs = selectedFiles.files.map((f) => f.localID!).toList();
   final deletedIDs = <String>{};
   try {
@@ -1395,6 +1393,10 @@ Future<void> _deleteFromDeviceTrash(SelectedFiles selectedFiles) async {
       final result = await PhotoManager.editor.deleteWithIds(batch);
       deletedIDs.addAll(result);
     }
+    return deletedIDs.isNotEmpty;
+  } catch (e, s) {
+    _logger.severe("failed to delete from device trash:", e, s);
+    rethrow;
   } finally {
     if (deletedIDs.isNotEmpty) {
       final deletedFiles = selectedFiles.files.where(
