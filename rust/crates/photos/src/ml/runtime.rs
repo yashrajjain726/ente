@@ -101,7 +101,7 @@ impl ModelSlot {
 
     fn release_residency(&self) {
         let mut state = self.lock_state();
-        Self::clear_transient_runtime_state_locked(&mut state);
+        state.onnx_session.clear();
     }
 
     fn run<T>(
@@ -127,13 +127,9 @@ impl ModelSlot {
         state.onnx_session.clear();
     }
 
-    fn clear_transient_runtime_state_locked(state: &mut ModelSlotState) {
-        state.onnx_session.clear();
-    }
-
     fn reset_slot_locked(state: &mut ModelSlotState) {
         state.path.clear();
-        Self::clear_transient_runtime_state_locked(state);
+        state.onnx_session.clear();
     }
 }
 
@@ -172,14 +168,6 @@ impl MlRuntime {
     fn release_indexing_models(&self) {
         for model in Model::INDEXING {
             self.slot(model).release_residency();
-        }
-    }
-
-    fn view<'a>(&'a self, model_paths: &'a ModelPaths) -> MlRuntimeView<'a> {
-        MlRuntimeView {
-            runtime: self,
-            model_paths,
-            used_providers: Cell::new(UsedProviders::default()),
         }
     }
 }
@@ -222,10 +210,6 @@ fn default_execution_mode(model: Model) -> onnx::ExecutionMode {
     }
 }
 
-pub(crate) fn ensure_runtime(model_paths: &ModelPaths) {
-    GLOBAL_RUNTIME.configure_requested_models(model_paths);
-}
-
 pub(crate) fn prepare_runtime(model_paths: &ModelPaths) {
     GLOBAL_RUNTIME.prepare_indexing_models(model_paths);
 }
@@ -234,9 +218,13 @@ pub(crate) fn with_runtime<R>(
     model_paths: &ModelPaths,
     func: impl FnOnce(&MlRuntimeView<'_>) -> MlResult<R>,
 ) -> MlResult<R> {
-    ensure_runtime(model_paths);
+    GLOBAL_RUNTIME.configure_requested_models(model_paths);
 
-    let runtime_view = GLOBAL_RUNTIME.view(model_paths);
+    let runtime_view = MlRuntimeView {
+        runtime: &GLOBAL_RUNTIME,
+        model_paths,
+        used_providers: Cell::new(UsedProviders::default()),
+    };
     func(&runtime_view)
 }
 
