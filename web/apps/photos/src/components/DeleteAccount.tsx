@@ -133,11 +133,9 @@ const DeleteAccountDialogContents: React.FC<
         },
         onSubmit: async ({ reason, feedback }) => {
             if (step == "reason") {
+                setStep("confirmation");
+                setSummaryLoading(true);
                 try {
-                    setLoading(true);
-                    await onAuthenticateUser();
-                    setStep("confirmation");
-                    setSummaryLoading(true);
                     setSummary(await getAccountDeletionSummary());
                 } catch (e) {
                     if (isHTTPErrorWithStatus(e, 404)) {
@@ -148,7 +146,6 @@ const DeleteAccountDialogContents: React.FC<
                         onGenericError(e);
                     }
                 } finally {
-                    setLoading(false);
                     setSummaryLoading(false);
                 }
                 return;
@@ -162,6 +159,7 @@ const DeleteAccountDialogContents: React.FC<
                     await getAccountDeleteChallenge();
 
                 if (allowDelete && encryptedChallenge) {
+                    await onAuthenticateUser();
                     const decryptedChallenge =
                         await decryptDeleteAccountChallenge(encryptedChallenge);
                     await deleteAccount(
