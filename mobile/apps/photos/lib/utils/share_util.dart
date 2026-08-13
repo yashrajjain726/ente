@@ -165,8 +165,14 @@ Future<List<EnteFile>> convertIncomingSharedMediaToFile(
     }
     final enteFile = EnteFile();
     final fileExtension = extension(media.path);
-    final sharedLocalId =
-        const Uuid().v4() + (fileExtension.length <= 16 ? fileExtension : '');
+    final isValidExtension =
+        fileExtension.isEmpty ||
+        RegExp(r'^\.[A-Za-z0-9]{1,15}$').stringMatch(fileExtension) ==
+            fileExtension;
+    if (!isValidExtension) {
+      throw const FormatException('Invalid shared media file extension');
+    }
+    final sharedLocalId = const Uuid().v4() + fileExtension;
     // fileName: img_x.jpg
     enteFile.title = basename(media.path);
     var ioFile = File(media.path);
