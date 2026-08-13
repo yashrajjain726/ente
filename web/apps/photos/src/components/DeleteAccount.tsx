@@ -5,6 +5,7 @@ import {
     EntePhotosIcon,
 } from "@/components/EnteAppIcon";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
+import ErrorOutlinedIcon from "@mui/icons-material/ErrorOutlined";
 import {
     Box,
     Checkbox,
@@ -25,7 +26,6 @@ import { LoadingButton } from "ente-base/components/mui/LoadingButton";
 import type { ModalVisibilityProps } from "ente-base/components/utils/modal";
 import { useBaseContext } from "ente-base/context";
 import { isHTTPErrorWithStatus } from "ente-base/http";
-import { formattedNumber } from "ente-base/i18n";
 import log from "ente-base/log";
 import {
     uploadSheetMediaQuery,
@@ -49,6 +49,8 @@ import { Trans } from "react-i18next";
 type DeleteAccountProps = ModalVisibilityProps & {
     onAuthenticateUser: () => Promise<void>;
 };
+
+type SummaryPhase = "loading" | "ready" | "failed";
 
 const surfaceRadius = "20px";
 const fieldRadius = "16px";
@@ -114,8 +116,27 @@ const DeleteAccountDialogContents: React.FC<
     const [step, setStep] = useState<"reason" | "confirmation">("reason");
     const [acceptDataDeletion, setAcceptDataDeletion] = useState(false);
     const [loading, setLoading] = useState(false);
-    const [summaryLoading, setSummaryLoading] = useState(false);
+    const [summaryPhase, setSummaryPhase] = useState<SummaryPhase>("loading");
     const [summary, setSummary] = useState<AccountDeletionSummary>();
+
+    const canConfirmDeletion = summaryPhase == "ready";
+
+    const loadSummary = async () => {
+        setSummaryPhase("loading");
+        try {
+            setSummary(await getAccountDeletionSummary());
+            setSummaryPhase("ready");
+        } catch (e) {
+            setSummary(undefined);
+            if (isHTTPErrorWithStatus(e, 404)) {
+                log.info("Account deletion summary is not supported by museum");
+                setSummaryPhase("ready");
+            } else {
+                log.warn("Failed to load account deletion summary", e);
+                setSummaryPhase("failed");
+            }
+        }
+    };
 
     const formik = useFormik<{ reason: DeleteReason | ""; feedback: string }>({
         initialValues: { reason: "", feedback: "" },
@@ -133,25 +154,19 @@ const DeleteAccountDialogContents: React.FC<
         },
         onSubmit: async ({ reason, feedback }) => {
             if (step == "reason") {
-                setStep("confirmation");
-                setSummaryLoading(true);
                 try {
-                    setSummary(await getAccountDeletionSummary());
+                    setLoading(true);
+                    setStep("confirmation");
+                    await loadSummary();
                 } catch (e) {
-                    if (isHTTPErrorWithStatus(e, 404)) {
-                        log.info(
-                            "Account deletion summary is not supported by museum",
-                        );
-                    } else {
-                        onGenericError(e);
-                    }
+                    onGenericError(e);
                 } finally {
-                    setSummaryLoading(false);
+                    setLoading(false);
                 }
                 return;
             }
 
-            if (summaryLoading || !acceptDataDeletion) return;
+            if (!canConfirmDeletion || !acceptDataDeletion) return;
 
             try {
                 setLoading(true);
@@ -430,7 +445,7 @@ const DeleteAccountDialogContents: React.FC<
                         </Stack>
                     ) : (
                         <Stack sx={{ gap: "12px" }}>
-                            {summaryLoading ? (
+                            {summaryPhase == "loading" ? (
                                 <Box
                                     sx={{
                                         height: "196px",
@@ -444,31 +459,119 @@ const DeleteAccountDialogContents: React.FC<
                                         sx={{ color: "text.base" }}
                                     />
                                 </Box>
+                            ) : summaryPhase == "failed" ? (
+                                <Stack sx={{ gap: "12px" }}>
+                                    <SummaryRow
+                                        icon={
+                                            <Stack
+                                                direction="row"
+                                                sx={{ gap: "4px" }}
+                                            >
+                                                <EntePhotosIcon size={20} />
+                                                <EnteAuthIcon size={20} />
+                                                <EnteLockerIcon size={20} />
+                                            </Stack>
+                                        }
+                                        unit={t(
+                                            "delete_account_summary_count_unavailable",
+                                        )}
+                                        app={t("delete_account_summary_apps")}
+                                        disabled
+                                    />
+                                    <Stack
+                                        direction="row"
+                                        role="alert"
+                                        sx={(theme) => ({
+                                            gap: "12px",
+                                            alignItems: "center",
+                                            padding: "12px",
+                                            borderRadius: fieldRadius,
+                                            backgroundColor: "fill.faint",
+                                            ...theme.applyStyles("dark", {
+                                                backgroundColor:
+                                                    sheetGrey.fieldFill,
+                                            }),
+                                        })}
+                                    >
+                                        <ErrorOutlinedIcon
+                                            sx={{
+                                                color: "critical.main",
+                                                flexShrink: 0,
+                                            }}
+                                        />
+                                        <Stack sx={{ gap: "2px", flex: 1 }}>
+                                            <Typography
+                                                variant="small"
+                                                sx={bodyFont}
+                                            >
+                                                {t(
+                                                    "delete_account_summary_error_title",
+                                                )}
+                                            </Typography>
+                                            <Typography
+                                                variant="mini"
+                                                sx={(theme) => ({
+                                                    ...miniFont,
+                                                    color: "text.muted",
+                                                    ...theme.applyStyles(
+                                                        "dark",
+                                                        {
+                                                            color: sheetGrey.subtitle,
+                                                        },
+                                                    ),
+                                                })}
+                                            >
+                                                {t(
+                                                    "delete_account_summary_error_description",
+                                                )}
+                                            </Typography>
+                                        </Stack>
+                                        <LoadingButton
+                                            color="secondary"
+                                            onClick={() => void loadSummary()}
+                                            sx={{
+                                                ...bodyFont,
+                                                minWidth: "auto",
+                                                paddingInline: "16px",
+                                                borderRadius: "12px",
+                                                flexShrink: 0,
+                                            }}
+                                        >
+                                            {t("try_again")}
+                                        </LoadingButton>
+                                    </Stack>
+                                </Stack>
                             ) : (
                                 <Stack sx={{ gap: "8px" }}>
                                     <SummaryRow
                                         icon={<EntePhotosIcon />}
                                         unit={t(
                                             "delete_account_summary_photos_and_videos",
+                                            summary && {
+                                                count: summary.photosAndVideosCount,
+                                            },
                                         )}
                                         app={t("title_photos")}
-                                        count={summary?.photosAndVideosCount}
                                     />
                                     <SummaryRow
                                         icon={<EnteAuthIcon />}
                                         unit={t(
                                             "delete_account_summary_authenticator_codes",
+                                            summary && {
+                                                count: summary.authenticatorCodesCount,
+                                            },
                                         )}
                                         app={t("title_auth")}
-                                        count={summary?.authenticatorCodesCount}
                                     />
                                     <SummaryRow
                                         icon={<EnteLockerIcon />}
                                         unit={t(
                                             "delete_account_summary_records",
+                                            summary && {
+                                                count: summary.lockerRecordsCount,
+                                            },
                                         )}
                                         app={t("title_locker")}
-                                        count={summary?.lockerRecordsCount}
                                     />
                                 </Stack>
                             )}
@@ -478,12 +581,13 @@ const DeleteAccountDialogContents: React.FC<
                                     gap: "12px",
                                     alignItems: "flex-start",
                                     paddingBlock: "8px",
+                                    opacity: canConfirmDeletion ? 1 : 0.45,
                                 }}
                                 control={
                                     <Checkbox
                                         size="small"
                                         checked={acceptDataDeletion}
-                                        disabled={summaryLoading}
+                                        disabled={!canConfirmDeletion}
                                         onChange={(e) =>
                                             setAcceptDataDeletion(
                                                 e.target.checked,
@@ -521,7 +625,7 @@ const DeleteAccountDialogContents: React.FC<
                         disabled={
                             isReasonStep
                                 ? !formik.values.reason
-                                : summaryLoading || !acceptDataDeletion
+                                : !canConfirmDeletion || !acceptDataDeletion
                         }
                         loading={loading}
                         sx={(theme) => ({
@@ -541,6 +645,8 @@ const DeleteAccountDialogContents: React.FC<
                             ...(!loading && {
                                 "&.Mui-disabled": {
                                     backgroundColor: lightDisabledFill,
+                                    opacity: 0.45,
+                                    boxShadow: "none",
                                     ...theme.applyStyles("dark", {
                                         backgroundColor: sheetGrey.disabledFill,
                                         color: sheetGrey.disabledText,
@@ -563,12 +669,18 @@ interface SummaryRowProps {
     icon: React.ReactNode;
     unit: string;
     app: string;
-    count?: number | undefined;
+    disabled?: boolean;
 }
 
-const SummaryRow: React.FC<SummaryRowProps> = ({ icon, unit, app, count }) => (
+const SummaryRow: React.FC<SummaryRowProps> = ({
+    icon,
+    unit,
+    app,
+    disabled,
+}) => (
     <Stack
         direction="row"
+        aria-disabled={disabled || undefined}
         sx={(theme) => ({
             gap: "12px",
             alignItems: "center",
@@ -579,14 +691,13 @@ const SummaryRow: React.FC<SummaryRowProps> = ({ icon, unit, app, count }) => (
             ...theme.applyStyles("dark", {
                 backgroundColor: sheetGrey.fieldFill,
             }),
+            ...(disabled && { opacity: 0.45, filter: "grayscale(1)" }),
         })}
     >
         <Box sx={{ lineHeight: 0, flexShrink: 0 }}>{icon}</Box>
         <Stack sx={{ gap: "4px" }}>
             <Typography variant="small" sx={bodyFont}>
-                {count == undefined
-                    ? unit
-                    : `${formattedNumber(count)} ${unit}`}
+                {unit}
             </Typography>
             <Typography
                 variant="mini"
