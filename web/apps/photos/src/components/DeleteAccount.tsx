@@ -19,6 +19,7 @@ import {
     Typography,
 } from "@mui/material";
 import { SpacedRow } from "ente-base/components/containers";
+import { ActivityIndicator } from "ente-base/components/mui/ActivityIndicator";
 import { DialogCloseIconButton } from "ente-base/components/mui/DialogCloseIconButton";
 import { LoadingButton } from "ente-base/components/mui/LoadingButton";
 import type { ModalVisibilityProps } from "ente-base/components/utils/modal";
@@ -110,6 +111,7 @@ const DeleteAccountDialogContents: React.FC<
     const [step, setStep] = useState<"reason" | "confirmation">("reason");
     const [acceptDataDeletion, setAcceptDataDeletion] = useState(false);
     const [loading, setLoading] = useState(false);
+    const [summaryLoading, setSummaryLoading] = useState(false);
     const [summary, setSummary] = useState<AccountDeletionSummary>();
 
     const formik = useFormik<{ reason: DeleteReason | ""; feedback: string }>({
@@ -117,25 +119,25 @@ const DeleteAccountDialogContents: React.FC<
         validate: ({ reason }) => (reason ? {} : { reason: t("required") }),
         onSubmit: async ({ reason, feedback }) => {
             if (step == "reason") {
-                setLoading(true);
+                setStep("confirmation");
+                setSummaryLoading(true);
                 try {
                     setSummary(await getAccountDeletionSummary());
-                    setStep("confirmation");
                 } catch (e) {
                     if (isHTTPErrorWithStatus(e, 404)) {
                         log.info(
                             "Account deletion summary is not supported by museum",
                         );
-                        setStep("confirmation");
                     } else {
                         onGenericError(e);
                     }
+                } finally {
+                    setSummaryLoading(false);
                 }
-                setLoading(false);
                 return;
             }
 
-            if (!acceptDataDeletion) return;
+            if (summaryLoading || !acceptDataDeletion) return;
 
             try {
                 setLoading(true);
@@ -387,26 +389,42 @@ const DeleteAccountDialogContents: React.FC<
                         </Stack>
                     ) : (
                         <Stack sx={{ gap: "12px" }}>
-                            <Stack sx={{ gap: "8px" }}>
-                                <SummaryRow
-                                    icon={<EntePhotosIcon />}
-                                    unit={pt("photos & videos")}
-                                    app={pt("Ente Photos")}
-                                    count={summary?.photosAndVideosCount}
-                                />
-                                <SummaryRow
-                                    icon={<EnteAuthIcon />}
-                                    unit={pt("authenticator codes")}
-                                    app={pt("Ente Auth")}
-                                    count={summary?.authenticatorCodesCount}
-                                />
-                                <SummaryRow
-                                    icon={<EnteLockerIcon />}
-                                    unit={pt("records")}
-                                    app={pt("Ente Locker")}
-                                    count={summary?.lockerRecordsCount}
-                                />
-                            </Stack>
+                            {summaryLoading ? (
+                                <Box
+                                    sx={{
+                                        height: "196px",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                    }}
+                                >
+                                    <ActivityIndicator
+                                        thickness={5}
+                                        sx={{ color: "common.white" }}
+                                    />
+                                </Box>
+                            ) : (
+                                <Stack sx={{ gap: "8px" }}>
+                                    <SummaryRow
+                                        icon={<EntePhotosIcon />}
+                                        unit={pt("photos & videos")}
+                                        app={pt("Ente Photos")}
+                                        count={summary?.photosAndVideosCount}
+                                    />
+                                    <SummaryRow
+                                        icon={<EnteAuthIcon />}
+                                        unit={pt("authenticator codes")}
+                                        app={pt("Ente Auth")}
+                                        count={summary?.authenticatorCodesCount}
+                                    />
+                                    <SummaryRow
+                                        icon={<EnteLockerIcon />}
+                                        unit={pt("records")}
+                                        app={pt("Ente Locker")}
+                                        count={summary?.lockerRecordsCount}
+                                    />
+                                </Stack>
+                            )}
                             <FormControlLabel
                                 sx={{
                                     margin: 0,
@@ -418,6 +436,7 @@ const DeleteAccountDialogContents: React.FC<
                                     <Checkbox
                                         size="small"
                                         checked={acceptDataDeletion}
+                                        disabled={summaryLoading}
                                         onChange={(e) =>
                                             setAcceptDataDeletion(
                                                 e.target.checked,
@@ -455,7 +474,7 @@ const DeleteAccountDialogContents: React.FC<
                         disabled={
                             isReasonStep
                                 ? !formik.values.reason
-                                : !acceptDataDeletion
+                                : summaryLoading || !acceptDataDeletion
                         }
                         loading={loading}
                         sx={(theme) => ({
