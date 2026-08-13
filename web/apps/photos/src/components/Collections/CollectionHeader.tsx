@@ -97,7 +97,7 @@ export interface CollectionHeaderProps {
 }
 
 export const CollectionHeader: React.FC<CollectionHeaderProps> = (props) => {
-    const { activeCollection, collectionSummary } = props;
+    const { collectionSummary } = props;
 
     const { name, type, attributes, fileCount } = collectionSummary;
 
@@ -121,9 +121,6 @@ export const CollectionHeader: React.FC<CollectionHeaderProps> = (props) => {
                 <GalleryItemsSummary
                     name={name}
                     fileCount={fileCount}
-                    description={
-                        activeCollection?.pubMagicMetadata?.data.caption
-                    }
                     endIcon={<EndIcon />}
                 />
                 {shouldShowOptions(type) && (
