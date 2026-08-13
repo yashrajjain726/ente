@@ -251,16 +251,16 @@ class LocalSyncService {
       final newlyMappedLocalIDs =
           localDiffResult.newPathToLocalIDs?.values.expand((ids) => ids) ??
           const Iterable<String>.empty();
-      final canAddNewFilesWithoutReload =
+      final hasOnlyNewFiles =
           hasUnsyncedFiles &&
           (localDiffResult.deletePathToLocalIDs?.isEmpty ?? true) &&
           newlyMappedLocalIDs.every(newlyDiscoveredLocalIDs.contains);
       Bus.instance.fire(
-        LocalPhotosUpdatedEvent(
-          newlyDiscoveredFiles,
+        _localPhotosUpdatedEvent(
+          updatedFiles: newlyDiscoveredFiles,
+          newlyInsertedFiles: newlyDiscoveredFiles,
           source: "syncAllChange",
-          newlyDiscoveredFiles: newlyDiscoveredFiles,
-          canAddNewFilesWithoutReload: canAddNewFilesWithoutReload,
+          hasOnlyNewFiles: hasOnlyNewFiles,
         ),
       );
     }
@@ -414,13 +414,39 @@ class LocalSyncService {
     }
 
     Bus.instance.fire(
-      LocalPhotosUpdatedEvent(
-        allFiles,
+      _localPhotosUpdatedEvent(
+        updatedFiles: allFiles,
+        newlyInsertedFiles: newlyInsertedFiles,
         source: "loadedPhoto",
-        newlyDiscoveredFiles: newlyInsertedFiles,
-        canAddNewFilesWithoutReload:
+        hasOnlyNewFiles:
             discoveredNewFiles && allFiles.length == newlyInsertedFiles.length,
       ),
+    );
+  }
+
+  LocalPhotosUpdatedEvent _localPhotosUpdatedEvent({
+    required List<EnteFile> updatedFiles,
+    required List<EnteFile> newlyInsertedFiles,
+    required String source,
+    required bool hasOnlyNewFiles,
+  }) {
+    final sevenDaysAgo = DateTime.now()
+        .subtract(const Duration(days: 7))
+        .microsecondsSinceEpoch;
+    final hasRecentNewLocalDiscovery = newlyInsertedFiles.any(
+      (file) => (file.creationTime ?? 0) > sevenDaysAgo,
+    );
+    if (hasOnlyNewFiles) {
+      return LocalPhotosAddedEvent(
+        newlyInsertedFiles,
+        source: source,
+        hasRecentNewLocalDiscovery: hasRecentNewLocalDiscovery,
+      );
+    }
+    return LocalPhotosUpdatedEvent(
+      updatedFiles,
+      source: source,
+      hasRecentNewLocalDiscovery: hasRecentNewLocalDiscovery,
     );
   }
 

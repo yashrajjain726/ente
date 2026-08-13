@@ -68,9 +68,9 @@ class _HomeGalleryWidgetState extends State<HomeGalleryWidget> {
   );
 
   Future<List<EnteFile>?> _resolveNewLocalFiles(
-    LocalPhotosUpdatedEvent event,
+    LocalPhotosAddedEvent event,
   ) async {
-    final files = event.newlyDiscoveredFiles;
+    final files = event.updatedFiles;
     final filterOptions = _filterOptions;
     if (files.any(
       (file) =>

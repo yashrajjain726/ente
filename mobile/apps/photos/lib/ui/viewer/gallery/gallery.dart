@@ -52,7 +52,7 @@ typedef GalleryLoader =
 typedef SortAscFn = bool Function();
 
 typedef NewLocalFilesResolver =
-    Future<List<EnteFile>?> Function(LocalPhotosUpdatedEvent event);
+    Future<List<EnteFile>?> Function(LocalPhotosAddedEvent event);
 
 class Gallery extends StatefulWidget {
   final GalleryLoader asyncLoader;
@@ -222,7 +222,7 @@ class GalleryState extends State<Gallery> {
           return;
         }
 
-        if (event is LocalPhotosUpdatedEvent &&
+        if (event is LocalPhotosAddedEvent &&
             await _tryAddNewLocalFiles(event)) {
           return;
         }
@@ -546,12 +546,9 @@ class GalleryState extends State<Gallery> {
     return false;
   }
 
-  Future<bool> _tryAddNewLocalFiles(LocalPhotosUpdatedEvent event) async {
+  Future<bool> _tryAddNewLocalFiles(LocalPhotosAddedEvent event) async {
     final resolver = widget.newLocalFilesResolver;
-    if (resolver == null ||
-        !event.canAddNewFilesWithoutReload ||
-        !_allFilesLoaded ||
-        _activeFileLoads > 0) {
+    if (resolver == null || !_allFilesLoaded || _activeFileLoads > 0) {
       return false;
     }
 
