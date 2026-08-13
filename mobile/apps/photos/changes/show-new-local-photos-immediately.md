@@ -1,1 +1,1 @@
-- Show newly added device photos in the home gallery without waiting for a full reload.
+- Show newly added device photos immediately and keep local photos visible when hiding shared items.
