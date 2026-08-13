@@ -1359,30 +1359,34 @@ Future<Set<String>> permanentlyDeleteFromDeviceTrash(
   BuildContext context,
   List<String> fileIDs,
 ) async {
-  (Set<String>, Object?) result = (<String>{}, null);
+  Set<String> deletedIDs = {};
+  Object? error;
   if (!await PhotoManager.canManageMedia()) {
-    result = await _deleteFromDeviceTrash(fileIDs);
-    if (result.$1.isNotEmpty && context.mounted) {
+    final (deletedIDs, error) = await _deleteFromDeviceTrash(fileIDs);
+    if (deletedIDs.isNotEmpty && context.mounted) {
       await showMediaManagementHintSheet(context);
     }
-  } else {
-    if (!context.mounted) return result.$1;
-    await showBottomSheetComponent<ButtonResult>(
-      context: context,
-      builder: (_) => PermanentlyDeleteConfirmationSheet(
-        onDelete: () async {
-          result = await _deleteFromDeviceTrash(fileIDs);
-          if (result.$2 != null) {
-            throw result.$2!;
-          }
-        },
-      ),
-    );
+    if (error != null && context.mounted) {
+      await showGenericErrorDialog(context: context, error: error);
+    }
+    return deletedIDs;
   }
-  if (result.$2 != null && context.mounted) {
-    await showGenericErrorDialog(context: context, error: result.$2!);
+  if (!context.mounted) return deletedIDs;
+  await showBottomSheetComponent<ButtonResult>(
+    context: context,
+    builder: (_) => PermanentlyDeleteConfirmationSheet(
+      onDelete: () async {
+        (deletedIDs, error) = await _deleteFromDeviceTrash(fileIDs);
+        if (error != null) {
+          throw error!;
+        }
+      },
+    ),
+  );
+  if (context.mounted && error != null) {
+    await showGenericErrorDialog(context: context, error: error!);
   }
-  return result.$1;
+  return deletedIDs;
 }
 
 Future<(Set<String>, Object?)> _deleteFromDeviceTrash(
