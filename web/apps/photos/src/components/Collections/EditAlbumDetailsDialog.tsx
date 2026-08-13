@@ -42,7 +42,6 @@ import { PickCoverPhotoDialog } from "./PickCoverPhotoDialog";
 export interface AlbumDetails {
     name: string;
     description: string;
-    /** Undefined when untouched; zero resets to the default cover. */
     coverID?: number;
 }
 
@@ -67,7 +66,9 @@ export const EditAlbumDetailsDialog: React.FC<EditAlbumDetailsDialogProps> = ({
     const isSheet = useIsUploadSheet();
     const titleID = useId();
     const nameID = useId();
+    const nameHelperID = useId();
     const descriptionID = useId();
+    const descriptionHelperID = useId();
     const { show: showPickCoverPhoto, props: pickCoverPhotoVisibilityProps } =
         useModalVisibility();
     const [pendingCoverID, setPendingCoverID] = useState<number>();
@@ -212,6 +213,7 @@ export const EditAlbumDetailsDialog: React.FC<EditAlbumDetailsDialogProps> = ({
                                 <InputBase
                                     id={nameID}
                                     name="name"
+                                    aria-describedby={nameHelperID}
                                     value={formik.values.name}
                                     onChange={formik.handleChange}
                                     autoFocus
@@ -220,8 +222,10 @@ export const EditAlbumDetailsDialog: React.FC<EditAlbumDetailsDialogProps> = ({
                                     error={!trimmedName}
                                     sx={inputSx}
                                 />
-                                {/* The empty string reserves the helper height. */}
-                                <Typography sx={helperSx(!trimmedName)}>
+                                <Typography
+                                    id={nameHelperID}
+                                    sx={helperSx(!trimmedName)}
+                                >
                                     {trimmedName ? "" : t("required")}
                                 </Typography>
                             </Stack>
@@ -237,6 +241,7 @@ export const EditAlbumDetailsDialog: React.FC<EditAlbumDetailsDialogProps> = ({
                             <InputBase
                                 id={descriptionID}
                                 name="description"
+                                aria-describedby={descriptionHelperID}
                                 value={formik.values.description}
                                 onChange={formik.handleChange}
                                 placeholder={t("caption_placeholder")}
@@ -248,6 +253,7 @@ export const EditAlbumDetailsDialog: React.FC<EditAlbumDetailsDialogProps> = ({
                                 sx={multilineInputSx}
                             />
                             <Typography
+                                id={descriptionHelperID}
                                 sx={[
                                     helperSx(isDescriptionTooLong),
                                     { textAlign: "right" },
