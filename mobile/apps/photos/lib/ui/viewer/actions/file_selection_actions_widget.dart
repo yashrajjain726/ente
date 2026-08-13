@@ -1305,28 +1305,30 @@ class _FileSelectionActionsWidgetState
       widget.selectedFiles.replaceSelection(skippedFiles.toSet());
     }
   }
-}
 
-Future<void> _restoreFilesFromDeviceTrash(SelectedFiles selectedFiles) async {
-  final files = selectedFiles.files
-      .map((f) => f.asDeviceTrashFile!.toAssetEntity())
-      .toList();
-  final restoredIDs = <String>{};
-  try {
-    for (final batch in files.chunks(batchSize)) {
-      final result = await PhotoManager.editor.android.restoreFromTrash(batch);
-      restoredIDs.addAll(result);
-    }
-  } catch (e, s) {
-    Logger("_restoreFilesFromDeviceTrash").severe(e, s);
-    rethrow;
-  } finally {
-    if (restoredIDs.isNotEmpty) {
-      final restoredFiles = selectedFiles.files.where(
-        (f) => restoredIDs.contains(f.localID),
-      );
-      selectedFiles.unSelectAll(restoredFiles.toSet());
-      Bus.instance.fire(ForceReloadTrashPageEvent());
+  Future<void> _restoreFilesFromDeviceTrash(SelectedFiles selectedFiles) async {
+    final files = selectedFiles.files
+        .map((f) => f.asDeviceTrashFile!.toAssetEntity())
+        .toList();
+    final restoredIDs = <String>{};
+    try {
+      for (final batch in files.chunks(batchSize)) {
+        final result = await PhotoManager.editor.android.restoreFromTrash(
+          batch,
+        );
+        restoredIDs.addAll(result);
+      }
+    } catch (e, s) {
+      _logger.warning("_restoreFilesFromDeviceTrash failed:", e, s);
+      rethrow;
+    } finally {
+      if (restoredIDs.isNotEmpty) {
+        final restoredFiles = selectedFiles.files.where(
+          (f) => restoredIDs.contains(f.localID),
+        );
+        selectedFiles.unSelectAll(restoredFiles.toSet());
+        Bus.instance.fire(ForceReloadTrashPageEvent());
+      }
     }
   }
 }
