@@ -164,7 +164,7 @@ Future<List<EnteFile>> convertIncomingSharedMediaToFile(
       continue;
     }
     final enteFile = EnteFile();
-    final sharedLocalId = const Uuid().v4();
+    final sharedLocalId = const Uuid().v4() + extension(media.path);
     // fileName: img_x.jpg
     enteFile.title = basename(media.path);
     var ioFile = File(media.path);
