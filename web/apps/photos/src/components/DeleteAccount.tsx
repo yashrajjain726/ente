@@ -116,7 +116,18 @@ const DeleteAccountDialogContents: React.FC<
 
     const formik = useFormik<{ reason: DeleteReason | ""; feedback: string }>({
         initialValues: { reason: "", feedback: "" },
-        validate: ({ reason }) => (reason ? {} : { reason: t("required") }),
+        validate: ({ reason, feedback }) => {
+            if (!reason) return { reason: t("required") };
+            if (!feedback.trim().length) {
+                return {
+                    feedback:
+                        reason == "found_another_service"
+                            ? t("feedback_required_found_another_service")
+                            : t("feedback_required"),
+                };
+            }
+            return {};
+        },
         onSubmit: async ({ reason, feedback }) => {
             if (step == "reason") {
                 setStep("confirmation");
@@ -344,10 +355,23 @@ const DeleteAccountDialogContents: React.FC<
                                     )}
                             </Stack>
                             <Stack sx={{ gap: "8px" }}>
-                                <Typography variant="small" sx={bodyFont}>
+                                <Typography
+                                    variant="small"
+                                    sx={{
+                                        ...bodyFont,
+                                        display: "flex",
+                                        gap: "2px",
+                                    }}
+                                >
                                     {t(
                                         "delete_account_additional_feedback_label",
                                     )}
+                                    <Box
+                                        component="span"
+                                        sx={{ color: "critical.main" }}
+                                    >
+                                        {"*"}
+                                    </Box>
                                 </Typography>
                                 <TextField
                                     variant="standard"
@@ -385,6 +409,19 @@ const DeleteAccountDialogContents: React.FC<
                                         },
                                     })}
                                 />
+                                {formik.touched.feedback &&
+                                    formik.errors.feedback && (
+                                        <Typography
+                                            variant="small"
+                                            sx={{
+                                                ...bodyFont,
+                                                px: 1,
+                                                color: "critical.main",
+                                            }}
+                                        >
+                                            {formik.errors.feedback}
+                                        </Typography>
+                                    )}
                             </Stack>
                         </Stack>
                     ) : (
