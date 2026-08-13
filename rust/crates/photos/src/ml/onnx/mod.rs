@@ -10,11 +10,111 @@ mod coreml_cache;
 mod providers;
 mod tensor;
 
-pub(crate) use providers::{ExecutionMode, ExecutionProvider, ProviderPlan};
+pub(crate) use ort::session::Session as SessionHandle;
+pub(crate) use providers::{ExecutionMode, ExecutionProvider};
 pub(crate) use tensor::{
     BorrowedFloatTensor, FloatTensorData, PreparedF32Input, run_f32, run_golden_tensor,
     run_i32_f32, with_prepared_float_output,
 };
+
+use providers::ProviderPlan;
+
+#[derive(Debug)]
+pub(crate) struct OnnxSession {
+    mode: ExecutionMode,
+    provider_plan: Option<ProviderPlan>,
+    session: Option<Session>,
+}
+
+impl OnnxSession {
+    pub(crate) fn new(mode: ExecutionMode) -> Self {
+        Self {
+            mode,
+            provider_plan: None,
+            session: None,
+        }
+    }
+
+    pub(crate) fn clear(&mut self) {
+        self.provider_plan = None;
+        self.session = None;
+    }
+
+    #[cfg(test)]
+    pub(crate) fn is_loaded(&self) -> bool {
+        self.session.is_some()
+    }
+
+    pub(crate) fn run<T>(
+        &mut self,
+        model_path: &str,
+        model_namespace: &str,
+        mut operation: impl FnMut(&mut Session) -> SessionRunResult<T>,
+    ) -> MlResult<(T, ExecutionProvider)> {
+        loop {
+            self.ensure_loaded(model_path, model_namespace)?;
+
+            let execution_provider = self
+                .provider_plan
+                .as_ref()
+                .and_then(ProviderPlan::selected_provider)
+                .expect("loaded session must have a selected execution provider");
+            let session = self
+                .session
+                .as_mut()
+                .expect("session must be loaded before model execution");
+            match operation(session) {
+                Ok(value) => return Ok((value, execution_provider)),
+                Err(error) => {
+                    if self.retry_after_provider_failure(&error) {
+                        continue;
+                    }
+                    return Err(error.into_ml_error());
+                }
+            }
+        }
+    }
+
+    fn ensure_loaded(&mut self, model_path: &str, model_namespace: &str) -> MlResult<()> {
+        if self.session.is_some() {
+            return Ok(());
+        }
+
+        let provider_plan = self
+            .provider_plan
+            .get_or_insert_with(|| ProviderPlan::new(self.mode, model_path));
+        let model_name = model_file_label(model_path);
+        log::info!("loading {model_name} with {:?} execution", self.mode);
+        let started_at = std::time::Instant::now();
+        let session = build_next_session(model_path, provider_plan, model_namespace)?;
+        let execution_provider = provider_plan
+            .selected_provider()
+            .expect("successful session build must select an execution provider");
+        log::info!(
+            "loaded {model_name} with {execution_provider:?} in {:?}",
+            started_at.elapsed()
+        );
+        self.session = Some(session);
+        Ok(())
+    }
+
+    fn retry_after_provider_failure(&mut self, error: &SessionRunError) -> bool {
+        if !error.is_retryable()
+            || !self
+                .provider_plan
+                .as_ref()
+                .is_some_and(ProviderPlan::has_fallback)
+        {
+            return false;
+        }
+
+        self.session = None;
+        log::warn!(
+            "execution provider failed, retrying model with the next provider fallback: {error}"
+        );
+        true
+    }
+}
 
 #[derive(Debug)]
 pub(crate) enum SessionRunError {
@@ -25,15 +125,15 @@ pub(crate) enum SessionRunError {
 pub(crate) type SessionRunResult<T> = Result<T, SessionRunError>;
 
 impl SessionRunError {
-    pub(crate) fn retryable(error: MlError) -> Self {
+    fn retryable(error: MlError) -> Self {
         Self::Retryable(error)
     }
 
-    pub(crate) fn is_retryable(&self) -> bool {
+    fn is_retryable(&self) -> bool {
         matches!(self, Self::Retryable(_))
     }
 
-    pub(crate) fn into_ml_error(self) -> MlError {
+    fn into_ml_error(self) -> MlError {
         match self {
             Self::Retryable(error) | Self::Terminal(error) => error,
         }
@@ -71,7 +171,7 @@ impl<R> From<ort::Error<R>> for SessionRunError {
     }
 }
 
-pub(crate) fn build_session(
+fn build_next_session(
     model_path: &str,
     plan: &mut ProviderPlan,
     model_namespace: &str,
@@ -123,6 +223,11 @@ pub(crate) fn build_session(
         "failed to create ONNX session for model '{model_path}' across EP fallbacks: {}",
         errors.join(" | ")
     )))
+}
+
+pub(crate) fn build_cpu_session(model_path: &str) -> MlResult<Session> {
+    let mut plan = ProviderPlan::new(ExecutionMode::CpuOnly, model_path);
+    build_next_session(model_path, &mut plan, "golden-tooling")
 }
 
 fn is_execution_provider_run_failure(error: &MlError) -> bool {

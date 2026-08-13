@@ -63,14 +63,14 @@ pub(crate) enum ExecutionProvider {
 }
 
 #[derive(Debug)]
-pub(crate) struct ProviderPlan {
+pub(super) struct ProviderPlan {
     providers: Vec<ExecutionProvider>,
     next: usize,
     selected: Option<ExecutionProvider>,
 }
 
 impl ProviderPlan {
-    pub(crate) fn new(mode: ExecutionMode, model_path: &str) -> Self {
+    pub(super) fn new(mode: ExecutionMode, model_path: &str) -> Self {
         let providers = match mode {
             ExecutionMode::PlatformDefault => platform_default_providers(model_path),
             ExecutionMode::CpuOnly => vec![ExecutionProvider::Cpu],
@@ -96,11 +96,11 @@ impl ProviderPlan {
         self.selected = Some(provider);
     }
 
-    pub(crate) fn selected_provider(&self) -> Option<ExecutionProvider> {
+    pub(super) fn selected_provider(&self) -> Option<ExecutionProvider> {
         self.selected
     }
 
-    pub(crate) fn has_fallback(&self) -> bool {
+    pub(super) fn has_fallback(&self) -> bool {
         self.next < self.providers.len()
     }
 

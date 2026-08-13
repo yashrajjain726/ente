@@ -1,11 +1,9 @@
 use std::{
     cell::Cell,
-    path::Path,
     sync::{Mutex, MutexGuard},
 };
 
 use once_cell::sync::Lazy;
-use ort::session::Session;
 
 use crate::ml::{
     error::{MlError, MlResult},
@@ -18,8 +16,7 @@ pub use crate::ml::model::ModelPaths;
 #[derive(Debug)]
 struct ModelSlotState {
     path: String,
-    provider_plan: Option<onnx::ProviderPlan>,
-    session: Option<Session>,
+    onnx_session: onnx::OnnxSession,
 }
 
 #[cfg(test)]
@@ -32,7 +29,6 @@ struct ModelSlotSnapshot {
 #[derive(Debug)]
 struct ModelSlot {
     model: Model,
-    default_execution_mode: onnx::ExecutionMode,
     state: Mutex<ModelSlotState>,
 }
 
@@ -62,11 +58,9 @@ impl ModelSlot {
     fn new(model: Model) -> Self {
         Self {
             model,
-            default_execution_mode: default_execution_mode(model),
             state: Mutex::new(ModelSlotState {
                 path: String::new(),
-                provider_plan: None,
-                session: None,
+                onnx_session: onnx::OnnxSession::new(default_execution_mode(model)),
             }),
         }
     }
@@ -83,7 +77,7 @@ impl ModelSlot {
         let state = self.lock_state();
         ModelSlotSnapshot {
             path: state.path.clone(),
-            session_loaded: state.session.is_some(),
+            session_loaded: state.onnx_session.is_loaded(),
         }
     }
 
@@ -113,58 +107,16 @@ impl ModelSlot {
     fn run<T>(
         &self,
         path: &str,
-        mut operation: impl FnMut(&mut Session) -> onnx::SessionRunResult<T>,
+        operation: impl FnMut(&mut onnx::SessionHandle) -> onnx::SessionRunResult<T>,
     ) -> MlResult<(T, onnx::ExecutionProvider)> {
         if path.trim().is_empty() {
             return Err(MlError::InvalidRequest(self.model.missing_path_error()));
         }
 
-        loop {
-            let mut state = self.lock_state();
-            Self::set_config_locked(&mut state, path);
-            self.ensure_loaded_locked(&mut state)?;
-
-            let execution_provider = state
-                .provider_plan
-                .as_ref()
-                .and_then(onnx::ProviderPlan::selected_provider)
-                .expect("loaded session must have a selected execution provider");
-            let session = state
-                .session
-                .as_mut()
-                .expect("session must be loaded before model execution");
-            let result = operation(session);
-            match result {
-                Ok(value) => return Ok((value, execution_provider)),
-                Err(error) => {
-                    if self.retry_after_provider_failure_locked(&mut state, &error) {
-                        continue;
-                    }
-                    return Err(error.into_ml_error());
-                }
-            }
-        }
-    }
-
-    fn retry_after_provider_failure_locked(
-        &self,
-        state: &mut ModelSlotState,
-        error: &onnx::SessionRunError,
-    ) -> bool {
-        if !error.is_retryable()
-            || !state
-                .provider_plan
-                .as_ref()
-                .is_some_and(onnx::ProviderPlan::has_fallback)
-        {
-            return false;
-        }
-
-        state.session = None;
-        log::warn!(
-            "execution provider failed, retrying model with the next provider fallback: {error}"
-        );
-        true
+        let mut state = self.lock_state();
+        Self::set_config_locked(&mut state, path);
+        let ModelSlotState { path, onnx_session } = &mut *state;
+        onnx_session.run(path, self.model.namespace(), operation)
     }
 
     fn set_config_locked(state: &mut ModelSlotState, path: &str) {
@@ -172,50 +124,16 @@ impl ModelSlot {
             return;
         }
         state.path = path.to_string();
-        state.provider_plan = None;
-        state.session = None;
+        state.onnx_session.clear();
     }
 
     fn clear_transient_runtime_state_locked(state: &mut ModelSlotState) {
-        state.provider_plan = None;
-        state.session = None;
+        state.onnx_session.clear();
     }
 
     fn reset_slot_locked(state: &mut ModelSlotState) {
         state.path.clear();
         Self::clear_transient_runtime_state_locked(state);
-    }
-
-    fn ensure_loaded_locked(&self, state: &mut ModelSlotState) -> MlResult<()> {
-        if state.path.trim().is_empty() {
-            return Err(MlError::InvalidRequest(self.model.missing_path_error()));
-        }
-        if state.session.is_some() {
-            return Ok(());
-        }
-
-        let provider_plan = state.provider_plan.get_or_insert_with(|| {
-            onnx::ProviderPlan::new(self.default_execution_mode, &state.path)
-        });
-        let model_name = Path::new(&state.path)
-            .file_name()
-            .and_then(|name| name.to_str())
-            .unwrap_or(&state.path);
-        log::info!(
-            "loading {model_name} with {:?} execution",
-            self.default_execution_mode
-        );
-        let t = std::time::Instant::now();
-        let session = onnx::build_session(&state.path, provider_plan, self.model.namespace())?;
-        let execution_provider = provider_plan
-            .selected_provider()
-            .expect("successful session build must select an execution provider");
-        log::info!(
-            "loaded {model_name} with {execution_provider:?} in {:?}",
-            t.elapsed()
-        );
-        state.session = Some(session);
-        Ok(())
     }
 }
 
@@ -274,7 +192,7 @@ impl<'a> MlRuntimeView<'a> {
     pub(crate) fn run<T>(
         &self,
         model: Model,
-        operation: impl FnMut(&mut Session) -> onnx::SessionRunResult<T>,
+        operation: impl FnMut(&mut onnx::SessionHandle) -> onnx::SessionRunResult<T>,
     ) -> MlResult<T> {
         let (value, execution_provider) = self
             .runtime
