@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:math';
 
 import 'package:ente_components/ente_components.dart';
+import "package:ente_photos_platform/ente_photos_platform.dart";
 import "package:ente_pure_utils/ente_pure_utils.dart";
 import "package:ente_strings/ente_strings.dart";
 import 'package:flutter/material.dart';
@@ -26,7 +27,6 @@ import 'package:photos/module/download/file.dart';
 import "package:photos/service_locator.dart";
 import "package:photos/services/files_service.dart";
 import "package:photos/services/free_space/deletion_batch_runner.dart";
-import "package:photos/services/native_service.dart";
 import "package:photos/services/sync/local_sync_service.dart";
 import 'package:photos/services/sync/remote_sync_service.dart';
 import 'package:photos/services/sync/sync_service.dart';
@@ -1433,7 +1433,7 @@ Future<(Set<String>, Object?)> _deleteFromDeviceTrash(
 }
 
 Future<bool> _emptyDeviceTrash() async {
-  final trash = (await NativeService.getTrash())
+  final trash = (await DeviceTrashClient.instance.getFiles())
       .map((f) => f.localID.toString())
       .toList();
   final deletedIDs = <String>{};
