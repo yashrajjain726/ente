@@ -117,7 +117,6 @@ export const AlbumDescription: React.FC<AlbumDescriptionProps> = ({
                     WebkitBoxOrient: "vertical",
                     WebkitLineClamp: expanded ? "unset" : 1,
                     overflowWrap: "anywhere",
-                    whiteSpace: "pre-wrap",
                     textWrap: "pretty",
                     width: "100%",
                     border: 0,
