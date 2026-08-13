@@ -4,7 +4,14 @@ import "package:ente_photos_platform/ente_photos_platform.dart";
 import "package:logging/logging.dart";
 import "package:synchronized/synchronized.dart";
 
-enum MlOperation { fullRun, indexing, clustering, startupRemoteHydration }
+enum MlOperation {
+  fullRun,
+  indexing,
+  clustering,
+  startupRemoteHydration,
+  clipVectorMigration,
+  clusterCentroidVectorMigration,
+}
 
 enum MlLockAttempt {
   ran,
@@ -19,13 +26,14 @@ enum MlRunDisposition { completed, denied, stopped, failed }
 ///
 /// All top-level ML operations must run through [tryRunExclusive]: the funnel
 /// serializes operations within this engine, and the native lock excludes the
-/// other engine. Single attempt, no waiting — callers defer to their normal
-/// triggers on denial.
+/// other engine. Calls make a single attempt unless [waitForAvailability] is
+/// set for maintenance work that must complete before its caller continues.
 class MlProcessLock {
   MlProcessLock._();
   static final instance = MlProcessLock._();
 
   static const _lockName = "ml";
+  static const _availabilityPollInterval = Duration(milliseconds: 500);
   final _logger = Logger("MlProcessLock");
   final Lock _funnel = Lock();
   MlOperation? _activeOperation;
@@ -40,12 +48,15 @@ class MlProcessLock {
   /// is released only after [body] completes, so [body] must drain any
   /// protected ML work it started before returning. Errors from [body]
   /// propagate after release. [background] labels this engine's origin.
+  /// [waitForAvailability] waits for both the local funnel and the other
+  /// engine instead of returning a busy denial.
   Future<MlLockAttempt> tryRunExclusive(
     MlOperation operation,
     Future<void> Function() body, {
     required bool background,
+    bool waitForAvailability = false,
   }) async {
-    if (_funnel.locked) {
+    if (!waitForAvailability && _funnel.locked) {
       _logger.info(
         "Funnel busy with ${_activeOperation?.name}, denying ${operation.name}",
       );
@@ -55,25 +66,29 @@ class MlProcessLock {
       _activeOperation = operation;
       try {
         final origin = background ? "bg" : "fg";
-        final bool acquired;
-        try {
-          acquired = await ProcessLockClient.instance.tryAcquire(
-            name: _lockName,
-            origin: origin,
-            operation: operation.name,
-          );
-        } catch (e, s) {
-          // Fail closed: no protected ML without the lock.
-          _logger.severe(
-            "Process lock channel failure for ${operation.name}",
-            e,
-            s,
-          );
-          return MlLockAttempt.deniedChannelError;
-        }
-        if (!acquired) {
-          unawaited(_logOwner(operation));
-          return MlLockAttempt.deniedByOtherEngine;
+        while (true) {
+          final bool acquired;
+          try {
+            acquired = await ProcessLockClient.instance.tryAcquire(
+              name: _lockName,
+              origin: origin,
+              operation: operation.name,
+            );
+          } catch (e, s) {
+            // Fail closed: no protected ML without the lock.
+            _logger.severe(
+              "Process lock channel failure for ${operation.name}",
+              e,
+              s,
+            );
+            return MlLockAttempt.deniedChannelError;
+          }
+          if (acquired) break;
+          if (!waitForAvailability) {
+            unawaited(_logOwner(operation));
+            return MlLockAttempt.deniedByOtherEngine;
+          }
+          await Future<void>.delayed(_availabilityPollInterval);
         }
         _logger.info("Acquired ml lock ($origin/${operation.name})");
         final heldSince = DateTime.now();

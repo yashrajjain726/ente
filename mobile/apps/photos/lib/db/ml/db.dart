@@ -18,6 +18,7 @@ import "package:photos/db/ml/pet_vector_db.dart";
 import 'package:photos/db/ml/schema.dart';
 import "package:photos/events/embedding_updated_event.dart";
 import "package:photos/generated/protos/ente/common/vector.pb.dart";
+import "package:photos/main.dart" show isProcessBg;
 import "package:photos/models/ml/clip.dart";
 import "package:photos/models/ml/face/face.dart";
 import "package:photos/models/ml/face/face_with_embedding.dart";
@@ -27,6 +28,7 @@ import "package:photos/service_locator.dart";
 import "package:photos/services/machine_learning/compute_controller.dart";
 import "package:photos/services/machine_learning/face_ml/face_clustering/face_db_info_for_clustering.dart";
 import 'package:photos/services/machine_learning/face_ml/face_filtering/face_filtering_constants.dart';
+import "package:photos/services/machine_learning/ml_process_lock.dart";
 import "package:photos/services/machine_learning/ml_result.dart";
 import "package:photos/utils/ml_util.dart";
 import 'package:sqlite_async/sqlite_async.dart';
@@ -1854,6 +1856,18 @@ class MLDataDB with SqlDbBase implements IMLDataDB<int> {
   Future<void> checkMigrateFillClusterCentroidVectorDB({
     bool force = false,
   }) async {
+    if (!force && await _clusterCentroidVectorDB.checkIfMigrationDone()) {
+      return;
+    }
+    await _runVectorMigrationExclusive(
+      MlOperation.clusterCentroidVectorMigration,
+      () => _checkMigrateFillClusterCentroidVectorDB(force: force),
+    );
+  }
+
+  Future<void> _checkMigrateFillClusterCentroidVectorDB({
+    required bool force,
+  }) async {
     await _clusterCentroidVectorMigrationLock.synchronized(() async {
       final migrationDone = await _clusterCentroidVectorDB
           .checkIfMigrationDone();
@@ -2151,6 +2165,16 @@ class MLDataDB with SqlDbBase implements IMLDataDB<int> {
   }
 
   Future<void> checkMigrateFillClipVectorDB({bool force = false}) async {
+    if (!force && await _clipVectorDB.checkIfMigrationDone()) {
+      return;
+    }
+    await _runVectorMigrationExclusive(
+      MlOperation.clipVectorMigration,
+      () => _checkMigrateFillClipVectorDB(force: force),
+    );
+  }
+
+  Future<void> _checkMigrateFillClipVectorDB({required bool force}) async {
     await _clipVectorMigrationLock.synchronized(() async {
       final migrationDone = await _clipVectorDB.checkIfMigrationDone();
       if (migrationDone && !force) {
@@ -2293,6 +2317,24 @@ class MLDataDB with SqlDbBase implements IMLDataDB<int> {
         computeController.unblockCompute(blocker: migrationKey);
       }
     });
+  }
+
+  Future<void> _runVectorMigrationExclusive(
+    MlOperation operation,
+    Future<void> Function() migration,
+  ) async {
+    final attempt = await MlProcessLock.instance.tryRunExclusive(
+      operation,
+      migration,
+      background: isProcessBg,
+      waitForAvailability: true,
+    );
+    if (attempt != MlLockAttempt.ran) {
+      throw StateError(
+        "${operation.name} could not acquire the ML process lock "
+        "(${attempt.name})",
+      );
+    }
   }
 
   Future<void> _withClipVectorWriteRecovery({
