@@ -11,7 +11,7 @@
     "module": "./index.ts",
     "types": "./index.ts",
     "scripts": {
-        "build": "wasm-pack build ../../../../rust/bindings/wasm/cast --target bundler --out-dir ../../../../web/packages/wasm/cast/pkg"
+        "build": "cd ../../../../rust/bindings/wasm/cast && CARGO_ENCODED_RUSTFLAGS=-Ctarget-feature=-reference-types wasm-pack build . --target bundler --out-dir ../../../../web/packages/wasm/cast/pkg --no-pack -- -Z build-std=panic_abort,std"
     },
     "devDependencies": {
         "ente-build-config": "*",
