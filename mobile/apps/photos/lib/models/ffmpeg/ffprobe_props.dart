@@ -328,7 +328,7 @@ class FFProbeProps {
     if (value == null) return null;
     final int? t = int.tryParse(value.split('/')[0]);
     final int? b = int.tryParse(value.split('/')[1]);
-    if (t != null && b != null) {
+    if (t != null && b != null && b != 0) {
       return (t % b == 0)
           ? (t / b).toStringAsFixed(0)
           : (t / b).toStringAsFixed(2);
