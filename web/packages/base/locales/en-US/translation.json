@@ -438,6 +438,7 @@
     "mail_to_manage_subscription": "Please contact us at <a>{{emailID}}</a> to manage your subscription",
     "rename": "Rename",
     "rename_file": "Rename file",
+    "album_cover": "Album cover",
     "set_cover": "Set cover",
     "select_cover_photo": "Select cover photo",
     "reset_to_default": "Reset to default",
