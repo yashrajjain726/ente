@@ -243,10 +243,24 @@ class LocalSyncService {
       "unSyncedFiles: $hasUnsyncedFiles",
     );
     if (hasAnyMappingChanged || hasUnsyncedFiles) {
+      final newlyDiscoveredFiles = localDiffResult.uniqueLocalFiles ?? [];
+      final newlyDiscoveredLocalIDs = newlyDiscoveredFiles
+          .map((file) => file.localID)
+          .nonNulls
+          .toSet();
+      final newlyMappedLocalIDs =
+          localDiffResult.newPathToLocalIDs?.values.expand((ids) => ids) ??
+          const Iterable<String>.empty();
+      final canAddNewFilesWithoutReload =
+          hasUnsyncedFiles &&
+          (localDiffResult.deletePathToLocalIDs?.isEmpty ?? true) &&
+          newlyMappedLocalIDs.every(newlyDiscoveredLocalIDs.contains);
       Bus.instance.fire(
         LocalPhotosUpdatedEvent(
-          localDiffResult.uniqueLocalFiles ?? [],
+          newlyDiscoveredFiles,
           source: "syncAllChange",
+          newlyDiscoveredFiles: newlyDiscoveredFiles,
+          canAddNewFilesWithoutReload: canAddNewFilesWithoutReload,
         ),
       );
     }
@@ -399,22 +413,13 @@ class LocalSyncService {
       }
     }
 
-    // Check if any NEWLY INSERTED files were created in the last 7 days
-    bool hasRecentNewLocalDiscovery = false;
-    if (discoveredNewFiles) {
-      final sevenDaysAgo = DateTime.now()
-          .subtract(const Duration(days: 7))
-          .microsecondsSinceEpoch;
-      hasRecentNewLocalDiscovery = newlyInsertedFiles.any(
-        (file) => (file.creationTime ?? 0) > sevenDaysAgo,
-      );
-    }
-
     Bus.instance.fire(
       LocalPhotosUpdatedEvent(
         allFiles,
         source: "loadedPhoto",
-        hasRecentNewLocalDiscovery: hasRecentNewLocalDiscovery,
+        newlyDiscoveredFiles: newlyInsertedFiles,
+        canAddNewFilesWithoutReload:
+            discoveredNewFiles && allFiles.length == newlyInsertedFiles.length,
       ),
     );
   }

@@ -1,0 +1,1 @@
+- Show newly added device photos in the home gallery without waiting for a full reload.

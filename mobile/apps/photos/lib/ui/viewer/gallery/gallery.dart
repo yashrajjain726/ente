@@ -51,6 +51,9 @@ typedef GalleryLoader =
 
 typedef SortAscFn = bool Function();
 
+typedef NewLocalFilesResolver =
+    Future<List<EnteFile>?> Function(LocalPhotosUpdatedEvent event);
+
 class Gallery extends StatefulWidget {
   final GalleryLoader asyncLoader;
   final List<EnteFile>? initialFiles;
@@ -72,6 +75,9 @@ class Gallery extends StatefulWidget {
   final Duration priorityReloadDebounceTime;
   final GalleryType? galleryType;
   final bool showGallerySettingsCTA;
+
+  /// Returns eligible additions, or null when the gallery must reload.
+  final NewLocalFilesResolver? newLocalFilesResolver;
 
   /// When true, selection will be limited to one item. Tapping on any item
   /// will select even when no other item is selected.
@@ -128,6 +134,7 @@ class Gallery extends StatefulWidget {
     this.disableVerticalPaddingForScrollbar = false,
     this.showGallerySettingsCTA = false,
     this.fileToJumpTo,
+    this.newLocalFilesResolver,
     super.key,
   });
 
@@ -155,6 +162,7 @@ class GalleryState extends State<Gallery> {
   final _forceReloadEventSubscriptions = <StreamSubscription<Event>>[];
   late String _logTag;
   bool _sortOrderAsc = false;
+  int _activeFileLoads = 0;
   List<EnteFile> _allGalleryFiles = [];
   final _scrollController = ScrollController();
   final _headerKey = GlobalKey();
@@ -211,6 +219,11 @@ class GalleryState extends State<Gallery> {
           _logger.info(
             'Skip softRefresh from DB on ${event.reason}, processed updated in memory with setStateReload $hasCalledSetState',
           );
+          return;
+        }
+
+        if (event is LocalPhotosUpdatedEvent &&
+            await _tryAddNewLocalFiles(event)) {
           return;
         }
 
@@ -533,6 +546,76 @@ class GalleryState extends State<Gallery> {
     return false;
   }
 
+  Future<bool> _tryAddNewLocalFiles(LocalPhotosUpdatedEvent event) async {
+    final resolver = widget.newLocalFilesResolver;
+    if (resolver == null ||
+        !event.canAddNewFilesWithoutReload ||
+        !_allFilesLoaded ||
+        _activeFileLoads > 0) {
+      return false;
+    }
+
+    List<EnteFile>? resolvedFiles;
+    try {
+      resolvedFiles = await resolver(event);
+    } catch (e, s) {
+      _logger.warning('Failed to resolve new local files', e, s);
+      return false;
+    }
+    if (resolvedFiles == null) return false;
+    if (!mounted) return true;
+    if (_activeFileLoads > 0) return false;
+
+    final visibleLocalIDs = _allGalleryFiles
+        .map((file) => file.localID)
+        .nonNulls
+        .toSet();
+    final filesToAdd =
+        resolvedFiles
+            .where(
+              (file) =>
+                  file.localID != null && visibleLocalIDs.add(file.localID!),
+            )
+            .toList()
+          ..sort(_compareGalleryFiles);
+    if (filesToAdd.isNotEmpty) {
+      _setFilesAndReload(_mergeGalleryFiles(filesToAdd));
+    }
+    _logger.info('Added ${filesToAdd.length} new local files in memory');
+    return true;
+  }
+
+  List<EnteFile> _mergeGalleryFiles(List<EnteFile> filesToAdd) {
+    final merged = <EnteFile>[];
+    var currentIndex = 0;
+    var addedIndex = 0;
+    while (currentIndex < _allGalleryFiles.length &&
+        addedIndex < filesToAdd.length) {
+      if (_compareGalleryFiles(
+            filesToAdd[addedIndex],
+            _allGalleryFiles[currentIndex],
+          ) <
+          0) {
+        merged.add(filesToAdd[addedIndex++]);
+      } else {
+        merged.add(_allGalleryFiles[currentIndex++]);
+      }
+    }
+    merged.addAll(_allGalleryFiles.skip(currentIndex));
+    merged.addAll(filesToAdd.skip(addedIndex));
+    return merged;
+  }
+
+  int _compareGalleryFiles(EnteFile first, EnteFile second) {
+    var result = (first.creationTime ?? 0).compareTo(second.creationTime ?? 0);
+    if (result == 0) {
+      result = (first.modificationTime ?? 0).compareTo(
+        second.modificationTime ?? 0,
+      );
+    }
+    return _sortOrderAsc ? result : -result;
+  }
+
   void _updateSwipeHelper() {
     if (widget.selectedFiles != null && _allFilesWithDummies.isNotEmpty) {
       // Dispose existing helper if present
@@ -549,6 +632,7 @@ class GalleryState extends State<Gallery> {
 
   Future<FileLoadResult> _loadFiles({int? limit}) async {
     _logger.info("Loading ${limit ?? "all"} files");
+    _activeFileLoads++;
     try {
       final startTime = DateTime.now().microsecondsSinceEpoch;
       final result = await widget.asyncLoader(
@@ -589,6 +673,8 @@ class GalleryState extends State<Gallery> {
     } catch (e, s) {
       _logger.severe("failed to load files", e, s);
       rethrow;
+    } finally {
+      _activeFileLoads--;
     }
   }
 
