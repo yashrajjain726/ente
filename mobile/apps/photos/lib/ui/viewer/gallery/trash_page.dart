@@ -2,6 +2,7 @@ import "dart:io";
 
 import "package:collection/collection.dart";
 import "package:ente_components/ente_components.dart";
+import "package:ente_photos_platform/ente_photos_platform.dart";
 import "package:ente_pure_utils/ente_pure_utils.dart";
 import "package:ente_strings/extensions.dart";
 import 'package:flutter/material.dart';
@@ -18,7 +19,6 @@ import "package:photos/models/gallery_type.dart";
 import "package:photos/models/selected_files.dart";
 import "package:photos/module/metadata/local_file.dart";
 import "package:photos/service_locator.dart";
-import "package:photos/services/native_service.dart";
 import "package:photos/ui/components/empty_state_component.dart";
 import "package:photos/ui/viewer/actions/file_selection_overlay_bar.dart";
 import "package:photos/ui/viewer/gallery/gallery.dart";
@@ -157,7 +157,7 @@ class _TrashPageState extends State<_TrashPage> {
         asc: asc,
       );
     }
-    final deviceTrash = await NativeService.getTrash();
+    final deviceTrash = await SystemTrashClient.instance.getFiles();
     final deviceTrashAssets = await Future.wait(
       deviceTrash.map((t) => AssetEntity.fromId(t.localID.toString())),
     );

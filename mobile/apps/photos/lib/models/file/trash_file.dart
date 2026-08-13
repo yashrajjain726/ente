@@ -19,11 +19,7 @@ class EnteTrashFile extends TrashFile {
     required super.deleteBy,
     required this.createdAt,
     required this.updateAt,
-  }) : super.from() {
-    if (localID != null) {
-      generatedID = -int.parse(localID!);
-    }
-  }
+  }) : super.from();
 
   // Time first moved to Trash.
   late int createdAt;
@@ -36,17 +32,17 @@ class DeviceTrashFile extends TrashFile {
   DeviceTrashFile();
 
   DeviceTrashFile.from(super.file, {required super.deleteBy}) : super.from();
-}
 
-AssetEntity trashFileToAssetEntity(EnteFile file) {
-  return AssetEntity(
-    id: file.localID!,
-    typeInt: switch (file.fileType) {
-      FileType.image || FileType.livePhoto => AssetType.image.index,
-      FileType.video => AssetType.video.index,
-      FileType.other => AssetType.other.index,
-    },
-    width: 0,
-    height: 0,
-  );
+  AssetEntity toAssetEntity() {
+    return AssetEntity(
+      id: localID!,
+      typeInt: switch (fileType) {
+        FileType.image || FileType.livePhoto => AssetType.image.index,
+        FileType.video => AssetType.video.index,
+        FileType.other => AssetType.other.index,
+      },
+      width: 0,
+      height: 0,
+    );
+  }
 }

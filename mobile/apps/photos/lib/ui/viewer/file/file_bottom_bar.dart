@@ -13,7 +13,6 @@ import "package:photos/events/guest_view_event.dart";
 import "package:photos/models/collection/collection.dart";
 import "package:photos/models/file/extensions/file_props.dart";
 import "package:photos/models/file/file.dart";
-import "package:photos/models/file/trash_file.dart";
 import "package:photos/models/selected_files.dart";
 import 'package:photos/module/metadata/panorama.dart';
 import "package:photos/service_locator.dart";
@@ -329,9 +328,8 @@ class FileBottomBarState extends State<FileBottomBar> {
   }
 
   Future<void> _restoreFromDeviceTrash() async {
-    final asset = trashFileToAssetEntity(widget.file);
     final restoredIDs = await PhotoManager.editor.android.restoreFromTrash([
-      asset,
+      widget.file.asDeviceTrashFile!.toAssetEntity(),
     ]);
     if (restoredIDs.isEmpty) return;
     Bus.instance.fire(ForceReloadTrashPageEvent());

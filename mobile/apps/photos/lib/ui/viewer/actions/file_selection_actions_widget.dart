@@ -1308,7 +1308,9 @@ class _FileSelectionActionsWidgetState
 }
 
 Future<void> _restoreFilesFromDeviceTrash(SelectedFiles selectedFiles) async {
-  final files = selectedFiles.files.map(trashFileToAssetEntity).toList();
+  final files = selectedFiles.files
+      .map((f) => f.asDeviceTrashFile!.toAssetEntity())
+      .toList();
   final restoredIDs = <String>{};
   try {
     for (final batch in files.chunks(batchSize)) {
