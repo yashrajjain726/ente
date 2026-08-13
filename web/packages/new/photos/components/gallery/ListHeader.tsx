@@ -12,15 +12,25 @@ interface GalleryItemsSummaryProps {
     name: string;
     nameProps?: TypographyProps;
     fileCount: number;
+    description?: string;
     endIcon?: React.ReactNode;
     // This cannot be the only way to invoke the action; it is mouse-only.
     onNameClick?: () => void;
 }
 
+const descriptionMaxLines = 3;
+const descriptionLineHeight = 17;
+const descriptionTopSpacing = 8;
+
+// ponytail: fixed 3-line reserve, measure if short descriptions leave visible slack.
+export const galleryItemsSummaryDescriptionHeight =
+    descriptionTopSpacing + descriptionMaxLines * descriptionLineHeight;
+
 export const GalleryItemsSummary: React.FC<GalleryItemsSummaryProps> = ({
     name,
     nameProps,
     fileCount,
+    description,
     endIcon,
     onNameClick,
 }) => (
@@ -46,6 +56,24 @@ export const GalleryItemsSummary: React.FC<GalleryItemsSummaryProps> = ({
                 </Box>
             )}
         </Stack>
+        {description?.trim() && (
+            <Typography
+                variant="small"
+                sx={{
+                    color: "text.muted",
+                    mt: `${descriptionTopSpacing}px`,
+                    height: `${descriptionMaxLines * descriptionLineHeight}px`,
+                    lineHeight: `${descriptionLineHeight}px`,
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    display: "-webkit-box",
+                    WebkitLineClamp: descriptionMaxLines,
+                    WebkitBoxOrient: "vertical",
+                }}
+            >
+                {description.trim()}
+            </Typography>
+        )}
     </div>
 );
 

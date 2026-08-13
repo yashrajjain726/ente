@@ -23,6 +23,7 @@ import type { Collection } from "ente-media/collection";
 import {
     GalleryItemsHeaderAdapter,
     GalleryItemsSummary,
+    galleryItemsSummaryDescriptionHeight,
 } from "ente-new/photos/components/gallery/ListHeader";
 import {
     collectionsSortBy,
@@ -209,7 +210,12 @@ export const GalleryBarAndListHeader: React.FC<
             ) : (
                 <></>
             ),
-            height: 68,
+            height:
+                68 +
+                (shouldRenderCollectionHeader &&
+                activeCollection?.pubMagicMetadata?.data.caption?.trim()
+                    ? galleryItemsSummaryDescriptionHeight
+                    : 0),
         });
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [

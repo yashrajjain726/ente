@@ -250,12 +250,16 @@ export interface CollectionPublicMagicMetadataData {
     asc?: boolean;
     coverID?: number;
     layout?: string;
+    caption?: string;
 }
+
+export const maxAlbumDescriptionLength = 200;
 
 export const CollectionPublicMagicMetadataData = z.looseObject({
     asc: z.boolean().nullish().transform(nullToUndefined),
     coverID: z.number().nullish().transform(nullToUndefined),
     layout: z.string().nullish().transform(nullToUndefined),
+    caption: z.string().nullish().transform(nullToUndefined),
 });
 
 export interface CollectionShareeMagicMetadataData {

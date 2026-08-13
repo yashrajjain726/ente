@@ -16,6 +16,7 @@ import {
     CollectionSubType,
     decryptRemoteCollection,
     findUserUncategorizedCollection,
+    maxAlbumDescriptionLength,
     RemoteCollection,
     RemotePublicURL,
     type Collection,
@@ -971,6 +972,34 @@ export const updateCollectionCover = async (
     collection: Collection,
     coverID: number,
 ) => updateCollectionPublicMagicMetadata(collection, { coverID });
+
+const albumDescriptionSegmenter =
+    typeof Intl !== "undefined" && "Segmenter" in Intl
+        ? new Intl.Segmenter(undefined, { granularity: "grapheme" })
+        : null;
+
+export const albumDescriptionGraphemeCount = (description: string) =>
+    albumDescriptionSegmenter
+        ? Array.from(albumDescriptionSegmenter.segment(description)).length
+        : Array.from(description).length;
+
+export const updateCollectionDescription = async (
+    collection: Collection,
+    description: string,
+) => {
+    const normalizedDescription = description.trim();
+    if (
+        albumDescriptionGraphemeCount(normalizedDescription) >
+        maxAlbumDescriptionLength
+    ) {
+        throw new Error(
+            `Album descriptions cannot exceed ${maxAlbumDescriptionLength} characters`,
+        );
+    }
+    return updateCollectionPublicMagicMetadata(collection, {
+        caption: normalizedDescription,
+    });
+};
 
 export const updateCollectionLayout = async (
     collection: Collection,
