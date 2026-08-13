@@ -5,6 +5,7 @@ import {
     EntePhotosIcon,
 } from "@/components/EnteAppIcon";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
+import ErrorOutlinedIcon from "@mui/icons-material/ErrorOutlined";
 import {
     Box,
     Checkbox,
@@ -18,7 +19,6 @@ import {
     TextField,
     Typography,
 } from "@mui/material";
-import { ActivityErrorIndicator } from "ente-base/components/ErrorIndicator";
 import { SpacedRow } from "ente-base/components/containers";
 import { ActivityIndicator } from "ente-base/components/mui/ActivityIndicator";
 import { DialogCloseIconButton } from "ente-base/components/mui/DialogCloseIconButton";
@@ -460,21 +460,86 @@ const DeleteAccountDialogContents: React.FC<
                                     />
                                 </Box>
                             ) : summaryPhase == "failed" ? (
-                                <Stack
-                                    sx={{
-                                        height: "196px",
-                                        gap: "12px",
-                                        alignItems: "center",
-                                        justifyContent: "center",
-                                    }}
-                                >
-                                    <ActivityErrorIndicator />
-                                    <LoadingButton
-                                        color="secondary"
-                                        onClick={() => void loadSummary()}
+                                <Stack sx={{ gap: "12px" }}>
+                                    <SummaryRow
+                                        icon={
+                                            <Stack
+                                                direction="row"
+                                                sx={{ gap: "4px" }}
+                                            >
+                                                <EntePhotosIcon size={20} />
+                                                <EnteAuthIcon size={20} />
+                                                <EnteLockerIcon size={20} />
+                                            </Stack>
+                                        }
+                                        unit={t(
+                                            "delete_account_summary_count_unavailable",
+                                        )}
+                                        app={t("delete_account_summary_apps")}
+                                        disabled
+                                    />
+                                    <Stack
+                                        direction="row"
+                                        role="alert"
+                                        sx={(theme) => ({
+                                            gap: "12px",
+                                            alignItems: "center",
+                                            padding: "12px",
+                                            borderRadius: fieldRadius,
+                                            backgroundColor: "fill.faint",
+                                            ...theme.applyStyles("dark", {
+                                                backgroundColor:
+                                                    sheetGrey.fieldFill,
+                                            }),
+                                        })}
                                     >
-                                        {t("try_again")}
-                                    </LoadingButton>
+                                        <ErrorOutlinedIcon
+                                            sx={{
+                                                color: "critical.main",
+                                                flexShrink: 0,
+                                            }}
+                                        />
+                                        <Stack sx={{ gap: "2px", flex: 1 }}>
+                                            <Typography
+                                                variant="small"
+                                                sx={bodyFont}
+                                            >
+                                                {t(
+                                                    "delete_account_summary_error_title",
+                                                )}
+                                            </Typography>
+                                            <Typography
+                                                variant="mini"
+                                                sx={(theme) => ({
+                                                    ...miniFont,
+                                                    color: "text.muted",
+                                                    ...theme.applyStyles(
+                                                        "dark",
+                                                        {
+                                                            color: sheetGrey.subtitle,
+                                                        },
+                                                    ),
+                                                })}
+                                            >
+                                                {t(
+                                                    "delete_account_summary_error_description",
+                                                )}
+                                            </Typography>
+                                        </Stack>
+                                        <LoadingButton
+                                            color="secondary"
+                                            onClick={() => void loadSummary()}
+                                            sx={{
+                                                ...bodyFont,
+                                                minWidth: "auto",
+                                                paddingInline: "16px",
+                                                borderRadius: "12px",
+                                                flexShrink: 0,
+                                            }}
+                                        >
+                                            {t("try_again")}
+                                        </LoadingButton>
+                                    </Stack>
                                 </Stack>
                             ) : (
                                 <Stack sx={{ gap: "8px" }}>
@@ -516,6 +581,7 @@ const DeleteAccountDialogContents: React.FC<
                                     gap: "12px",
                                     alignItems: "flex-start",
                                     paddingBlock: "8px",
+                                    opacity: canConfirmDeletion ? 1 : 0.45,
                                 }}
                                 control={
                                     <Checkbox
@@ -579,6 +645,8 @@ const DeleteAccountDialogContents: React.FC<
                             ...(!loading && {
                                 "&.Mui-disabled": {
                                     backgroundColor: lightDisabledFill,
+                                    opacity: 0.45,
+                                    boxShadow: "none",
                                     ...theme.applyStyles("dark", {
                                         backgroundColor: sheetGrey.disabledFill,
                                         color: sheetGrey.disabledText,
@@ -601,11 +669,18 @@ interface SummaryRowProps {
     icon: React.ReactNode;
     unit: string;
     app: string;
+    disabled?: boolean;
 }
 
-const SummaryRow: React.FC<SummaryRowProps> = ({ icon, unit, app }) => (
+const SummaryRow: React.FC<SummaryRowProps> = ({
+    icon,
+    unit,
+    app,
+    disabled,
+}) => (
     <Stack
         direction="row"
+        aria-disabled={disabled || undefined}
         sx={(theme) => ({
             gap: "12px",
             alignItems: "center",
@@ -616,6 +691,7 @@ const SummaryRow: React.FC<SummaryRowProps> = ({ icon, unit, app }) => (
             ...theme.applyStyles("dark", {
                 backgroundColor: sheetGrey.fieldFill,
             }),
+            ...(disabled && { opacity: 0.45, filter: "grayscale(1)" }),
         })}
     >
         <Box sx={{ lineHeight: 0, flexShrink: 0 }}>{icon}</Box>
