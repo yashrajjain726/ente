@@ -156,7 +156,6 @@ const DeleteAccountDialogContents: React.FC<
             if (step == "reason") {
                 try {
                     setLoading(true);
-                    await onAuthenticateUser();
                     setStep("confirmation");
                     await loadSummary();
                 } catch (e) {
@@ -175,6 +174,7 @@ const DeleteAccountDialogContents: React.FC<
                     await getAccountDeleteChallenge();
 
                 if (allowDelete && encryptedChallenge) {
+                    await onAuthenticateUser();
                     const decryptedChallenge =
                         await decryptDeleteAccountChallenge(encryptedChallenge);
                     await deleteAccount(
