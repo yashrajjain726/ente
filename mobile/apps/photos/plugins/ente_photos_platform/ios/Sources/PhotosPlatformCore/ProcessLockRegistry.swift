@@ -60,7 +60,8 @@ final class ProcessLockRegistry: @unchecked Sendable {
         defer { lock.unlock() }
         let released = holders.filter { $0.value.instanceId == instanceId }
         if !released.isEmpty {
-            let description = released
+            let description =
+                released
                 .map { "\($0.key) (\($0.value.origin)/\($0.value.operation))" }
                 .joined(separator: ", ")
             NSLog(

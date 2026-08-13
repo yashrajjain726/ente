@@ -46,9 +46,9 @@ final class ProcessLockChannelAdapter: NSObject {
 
     private func handleTryAcquire(_ call: FlutterMethodCall, result: FlutterResult) {
         guard let args = call.arguments as? [String: Any],
-              let name = args["name"] as? String, !name.isEmpty,
-              let origin = args["origin"] as? String, !origin.isEmpty,
-              let operation = args["operation"] as? String, !operation.isEmpty
+            let name = args["name"] as? String, !name.isEmpty,
+            let origin = args["origin"] as? String, !origin.isEmpty,
+            let operation = args["operation"] as? String, !operation.isEmpty
         else {
             result(
                 FlutterError(
@@ -71,7 +71,7 @@ final class ProcessLockChannelAdapter: NSObject {
 
     private func handleRelease(_ call: FlutterMethodCall, result: FlutterResult) {
         guard let args = call.arguments as? [String: Any],
-              let name = args["name"] as? String, !name.isEmpty
+            let name = args["name"] as? String, !name.isEmpty
         else {
             result(
                 FlutterError(
@@ -87,7 +87,7 @@ final class ProcessLockChannelAdapter: NSObject {
 
     private func handleState(_ call: FlutterMethodCall, result: FlutterResult) {
         guard let args = call.arguments as? [String: Any],
-              let name = args["name"] as? String, !name.isEmpty
+            let name = args["name"] as? String, !name.isEmpty
         else {
             result(
                 FlutterError(

@@ -63,6 +63,7 @@ class MLService {
   bool debugIndexingDisabled = false;
   bool _clusteringIsHappening = false;
   bool _mlControllerStatus = false;
+  final Set<MlRunControl> _runControls = {};
   MlRunControl? _activeRunControl;
   Timer? _bgYieldPollTimer;
   Timer? _deniedRunRetryTimer;
@@ -280,6 +281,10 @@ class MLService {
     int? skipHydrationIfCandidateFileCountAtMost,
   }) async {
     assert(MlProcessLock.instance.isBusy, "ml funnel must be held");
+    if (control.stopRequested) {
+      _logRunStopped(control, "before owned remote hydration started");
+      return;
+    }
     try {
       final summary = await hydrateOwnedRemoteMLData(
         mlDataDB: MLDataDB.instance,
@@ -425,6 +430,10 @@ class MLService {
     required MlRunControl control,
   }) async {
     assert(MlProcessLock.instance.isBusy, "ml funnel must be held");
+    if (control.stopRequested) {
+      _logRunStopped(control, "before sync");
+      return MlRunDisposition.stopped;
+    }
     final mlDataDB = _dbForMode(mode);
     try {
       await _sync();
@@ -492,15 +501,20 @@ class MLService {
     MlOperation operation,
     MlRunControl control,
     Future<void> Function() body,
-  ) {
-    return MlProcessLock.instance.tryRunExclusive(operation, () async {
-      _installRunControl(control);
-      try {
-        await body();
-      } finally {
-        _clearRunControl(control);
-      }
-    }, background: isProcessBg);
+  ) async {
+    _runControls.add(control);
+    try {
+      return await MlProcessLock.instance.tryRunExclusive(operation, () async {
+        _installRunControl(control);
+        try {
+          await body();
+        } finally {
+          _clearRunControl(control);
+        }
+      }, background: isProcessBg);
+    } finally {
+      _runControls.remove(control);
+    }
   }
 
   void _installRunControl(MlRunControl control) {
@@ -538,11 +552,13 @@ class MLService {
     }
   }
 
-  /// Requests a durable stop of the active ML run, if any. The run drains
-  /// already-started work and does not begin further stages; a new run may
+  /// Requests a durable stop of all acquiring or active ML runs. Active runs
+  /// drain already-started work and do not begin further stages; a new run may
   /// start later through the normal triggers.
   void stopActiveRun(MlStopReason reason) {
-    _activeRunControl?.requestStop(reason);
+    for (final control in _runControls.toList(growable: false)) {
+      control.requestStop(reason);
+    }
   }
 
   /// Analyzes all the images in the user library with the latest ml version and stores the results in the database.
@@ -569,11 +585,11 @@ class MLService {
     required MlRunControl control,
   }) async {
     assert(MlProcessLock.instance.isBusy, "ml funnel must be held");
-    if (!_canRunMLFunction(function: "Indexing")) return;
     if (control.stopRequested) {
       _logRunStopped(control, "before indexing started");
       return;
     }
+    if (!_canRunMLFunction(function: "Indexing")) return;
 
     bool rustRuntimePrepared = false;
     try {
