@@ -157,7 +157,7 @@ class _TrashPageState extends State<_TrashPage> {
         asc: asc,
       );
     }
-    final deviceTrash = await SystemTrashClient.instance.getFiles();
+    final deviceTrash = await DeviceTrashClient.instance.getFiles();
     final deviceTrashAssets = await Future.wait(
       deviceTrash.map((t) => AssetEntity.fromId(t.localID.toString())),
     );
