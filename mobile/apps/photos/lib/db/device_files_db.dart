@@ -202,7 +202,6 @@ extension DeviceFiles on FilesDB {
         UPDATE device_collections SET name = ? WHERE id = ?;
       ''', parameterSetsForUpdate);
 
-      // add the mappings for localIDs
       if (pathIDToLocalIDsMap.isNotEmpty) {
         await insertPathIDToLocalIDMapping(pathIDToLocalIDsMap);
       }
@@ -257,7 +256,6 @@ extension DeviceFiles on FilesDB {
           hasUpdated = true;
         }
       }
-      // delete existing pathIDs which are missing on device
       existingPathIds.removeAll(devicePathInfo.map((e) => e.item1.id).toSet());
       if (existingPathIds.isNotEmpty) {
         _logger.info(
@@ -293,8 +291,6 @@ extension DeviceFiles on FilesDB {
     }
   }
 
-  // getDeviceSyncCollectionIDs returns the collectionIDs for the
-  // deviceCollections which are marked for auto-backup
   Future<Set<int>> getDeviceSyncCollectionIDs() async {
     final db = await sqliteAsyncDB;
     final rows = await db.getAll('''

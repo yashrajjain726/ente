@@ -266,7 +266,6 @@ class _UpdateLocationInfoState extends State<UpdateLocationInfo> {
               top: 0,
               key: bottomChildKey,
               child: bottomChild,
-              // top: 0,
             ),
             Positioned(key: topChildKey, child: topChild),
           ],

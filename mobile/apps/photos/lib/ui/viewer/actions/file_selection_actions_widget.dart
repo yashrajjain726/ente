@@ -80,9 +80,7 @@ class _FileSelectionActionsWidgetState
   late FilesSplit split;
   late CollectionActions collectionActions;
   late bool isCollectionOwner;
-  // _cachedCollectionForSharedLink is primarily used to avoid creating duplicate
-  // links if user keeps on creating Create link button after selecting
-  // few files. This link is reset on any selection changed;
+  // Reuse the link while the selection is unchanged.
   Collection? _cachedCollectionForSharedLink;
   final GlobalKey shareButtonKey = GlobalKey();
   final GlobalKey sendLinkButtonKey = GlobalKey();
@@ -98,7 +96,6 @@ class _FileSelectionActionsWidgetState
   @override
   void initState() {
     super.initState();
-    //User ID will be null if the user is not logged in (links-in-app)
     currentUserID = Configuration.instance.getUserID() ?? -1;
 
     split = FilesSplit.split(<EnteFile>[], currentUserID);
@@ -164,9 +161,7 @@ class _FileSelectionActionsWidgetState
         isCollectionOwnerOrAdmin &&
         split.ownedByOtherUsers.isNotEmpty;
 
-    //To animate adding and removing of [SelectedActionButton], add all items
-    //and set [shouldShow] to false for items that should not be shown and true
-    //for items that should be shown.
+    // Hidden items remain in the list so their removal can animate.
     final List<SelectionActionButton> items = [];
     if (widget.type == GalleryType.trash) {
       items.add(
@@ -571,7 +566,6 @@ class _FileSelectionActionsWidgetState
       topControl: Stack(
         alignment: Alignment.bottomCenter,
         children: [
-          // This container is for increasing the tap area
           Container(
             width: double.infinity,
             height: 36,

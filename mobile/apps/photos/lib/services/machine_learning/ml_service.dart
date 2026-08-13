@@ -40,7 +40,6 @@ import "package:photos/utils/ram_check_util.dart";
 class MLService {
   final _logger = Logger("MLService");
 
-  // Singleton pattern
   MLService._privateConstructor();
   static final instance = MLService._privateConstructor();
   factory MLService() => instance;
@@ -92,7 +91,6 @@ class MLService {
         mode;
   }
 
-  /// Only call this function once at app startup, after that you can directly call [runAllML]
   Future<void> init() async {
     if (_isInitialized) {
       _schedulePredownloadLocalModels();
@@ -101,17 +99,14 @@ class MLService {
     }
     _logger.info("init called");
 
-    // Check if the device has enough RAM to run local indexing
     await checkDeviceTotalRAM();
 
     FaceClusteringService.init(localSettings);
 
-    // Get client name
     final packageInfo = ServiceLocator.instance.packageInfo;
     client = "${packageInfo.packageName}/${packageInfo.version}";
     _logger.info("client: $client");
 
-    // Listen on ComputeController
     Bus.instance.on<ComputeControlEvent>().listen((event) {
       if (!hasGrantedMLConsent) {
         if (!isProcessBg && event.shouldRun) {
@@ -452,10 +447,6 @@ class MLService {
     MLIndexingIsolate.instance.shouldPauseIndexingAndClustering = false;
   }
 
-  /// Analyzes all the images in the user library with the latest ml version and stores the results in the database.
-  ///
-  /// This function first fetches from remote and checks if the image has already been analyzed
-  /// with the lastest faceMlVersion and stored on remote or local database. If so, it skips the image.
   Future<void> fetchAndIndexAllImages({required MLMode mode}) async {
     if (!_canRunMLFunction(function: "Indexing")) return;
     if (mode == MLMode.enteGallery && !isLocalGalleryMode) {
@@ -584,13 +575,11 @@ class MLService {
     }
 
     try {
-      // Get a sense of the total number of faces in the database
       final int totalFaces = await _mlDataDB.getTotalFaceCount();
       final fileIDToCreationTime = isLocalGalleryMode
           ? await _getLocalGalleryFileIdToCreationTime()
           : await FilesDB.instance.getFileIDToCreationTime();
       final startEmbeddingFetch = DateTime.now();
-      // read all embeddings
       final result = await _mlDataDB.getFaceInfoForClustering(
         maxFaces: totalFaces,
       );
@@ -606,7 +595,6 @@ class MLService {
           allFaceInfoForClustering.add(faceInfo);
         }
       }
-      // sort the embeddings based on file creation time, newest first
       allFaceInfoForClustering.sort((b, a) {
         return fileIDToCreationTime[a.fileID]!.compareTo(
           fileIDToCreationTime[b.fileID]!,
@@ -617,7 +605,6 @@ class MLService {
         'and ${missingFileIDs.length} missing fileIDs',
       );
 
-      // Get the current cluster statistics
       final Map<String, (Uint8List, int)> oldClusterSummaries = await _mlDataDB
           .getAllClusterSummary();
 
@@ -705,7 +692,6 @@ class MLService {
         }
       } else {
         final clusterStartTime = DateTime.now();
-        // Cluster the embeddings using the linear clustering algorithm, returning a map from faceID to clusterID
         final clusteringResult = await FaceClusteringService.instance
             .predictLinearIsolate(
               allFaceInfoForClustering.toSet(),
@@ -721,7 +707,6 @@ class MLService {
           'done with clustering ${allFaceInfoForClustering.length} in ${clusterDoneTime.difference(clusterStartTime).inSeconds} seconds ',
         );
 
-        // Store the updated clusterIDs in the database
         _logger.info(
           'Updating ${clusteringResult.newFaceIdToCluster.length} FaceIDs with clusterIDs in the DB',
         );
@@ -768,7 +753,6 @@ class MLService {
         instruction,
         filePath,
       );
-      // Check if there's no result simply because MLController paused indexing
       if (result == null) {
         if (!_shouldPauseIndexingAndClustering &&
             !MLIndexingIsolate.instance.shouldPauseIndexingAndClustering) {
@@ -778,11 +762,9 @@ class MLService {
         }
         return actuallyRanML;
       }
-      // Check anything actually ran
       actuallyRanML = result.ranML;
       if (!actuallyRanML) return actuallyRanML;
       final bool isLocalGallery = instruction.isLocalGallery;
-      // Prepare storing data on remote (online mode only)
       final FileDataEntity? dataEntity = isLocalGallery
           ? null
           : (instruction.existingRemoteFileML ??
@@ -790,7 +772,6 @@ class MLService {
                   instruction.file.uploadedFileID!,
                   DataType.mlData,
                 ));
-      // Faces results
       final List<Face> faces = [];
       if (result.facesRan) {
         if (result.faces!.isEmpty) {
@@ -820,7 +801,6 @@ class MLService {
           );
         }
       }
-      // Clip results
       if (result.clipRan) {
         if (!isLocalGallery) {
           dataEntity!.putClip(
@@ -834,10 +814,8 @@ class MLService {
         }
       }
       if (!isLocalGallery && (result.facesRan || result.clipRan)) {
-        // Storing results on remote
         await fileDataService.putFileData(instruction.file, dataEntity!);
       }
-      // Storing results locally
       if (result.facesRan) await mlDataDB.bulkInsertFaces(faces);
       if (result.clipRan) {
         if (isLocalGallery) {
@@ -855,8 +833,8 @@ class MLService {
         }
       }
 
-      // Pet results locally — delete stale rows before writing so
-      // re-indexing with fewer detections doesn't leave old data behind.
+      // Delete stale pet rows first so re-indexing with fewer detections does
+      // not leave old data behind.
       final rustPets = result.petFaces != null || result.petBodies != null;
       if (rustPets) {
         await mlDataDB.deletePetDataForFiles([result.fileId]);
@@ -1041,7 +1019,6 @@ class MLService {
       return false;
     }
     if (_shouldPauseIndexingAndClustering) {
-      // This should ideally not be triggered, because one of the above should be triggered instead.
       _logger.warning(
         "Cannot run $function because indexing and clustering is being paused",
       );
