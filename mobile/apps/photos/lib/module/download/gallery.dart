@@ -22,10 +22,6 @@ import "package:photos/utils/gallery_save_title.dart";
 
 final _logger = Logger("file_download_util");
 
-/// Use this instead of `file.displayName` directly for skip toasts.
-///
-/// Rationale:
-/// 1. We prefer the original title for stable, filename-like copy in the toast.
 String getDownloadSkipToastFileName(EnteFile file) {
   final title = (file.title ?? "").trim();
   final displayName = file.displayName.trim();

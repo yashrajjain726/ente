@@ -17,7 +17,6 @@ class FaceThumbnailGenerator extends SuperIsolate {
   @override
   bool get shouldAutomaticDispose => true;
 
-  // Singleton pattern
   FaceThumbnailGenerator._privateConstructor();
   static final FaceThumbnailGenerator instance =
       FaceThumbnailGenerator._privateConstructor();

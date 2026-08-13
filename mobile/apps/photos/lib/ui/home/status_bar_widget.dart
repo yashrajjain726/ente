@@ -221,7 +221,6 @@ class _StatusBarWidgetState extends State<StatusBarWidget> {
     );
   }
 
-  // _showVerificationBanner after 3 days of installation
   bool _showVerificationBanner() {
     if (_showErrorBanner ||
         _showErrorBanner ||

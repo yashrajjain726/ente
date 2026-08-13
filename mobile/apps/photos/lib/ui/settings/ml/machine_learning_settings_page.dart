@@ -426,7 +426,6 @@ class _ModelLoadingStateState extends State<ModelLoadingState> {
             );
           },
         ),
-        // show the progress map if in debug mode
         ..._progressMap.entries.map((entry) {
           return Padding(
             padding: const EdgeInsets.only(top: 8),

@@ -22,8 +22,6 @@ EnteFile fileFromAsset(String deviceFolder, AssetEntity asset) {
     ..metadataVersion = -1;
 }
 
-/// Applies creation-time precedence without fetching or decoding more media.
-/// Offline import runs this in batches and persists only this derived field.
 void applyCreationTimeMetadata(EnteFile file, ParsedExifDateTime? exifTime) {
   final hasExifTime = exifTime != null;
   if (exifTime != null) {

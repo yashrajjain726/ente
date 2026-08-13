@@ -99,7 +99,6 @@ class _RequestPasswordVerificationPageState
         CryptoUtil.base642bin(attributes.keyDecryptionNonce),
       );
       await dialog.show();
-      // pop
       await widget.onPasswordVerified(keyEncryptionKey);
       await dialog.hide();
       if (!mounted) return;

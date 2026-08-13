@@ -1,7 +1,3 @@
-//
-//  EntePeopleWidget.swift
-//  EntePeopleWidget
-
 import SwiftUI
 import UIKit
 import WidgetKit
