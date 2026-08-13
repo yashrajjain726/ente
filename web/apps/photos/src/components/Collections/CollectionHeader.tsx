@@ -118,7 +118,6 @@ export const CollectionHeader: React.FC<CollectionHeaderProps> = (props) => {
                     name={name}
                     description={description}
                     descriptionMaxWidth={480}
-                    descriptionOpacity={0.9}
                     fileCount={fileCount}
                     endIcon={<EndIcon />}
                     onDescriptionHeightChange={onDescriptionHeightChange}

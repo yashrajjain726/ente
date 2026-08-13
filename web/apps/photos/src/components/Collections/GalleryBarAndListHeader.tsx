@@ -21,7 +21,6 @@ import {
 } from "ente-gallery/components/utils/save-groups";
 import type { Collection } from "ente-media/collection";
 import {
-    galleryItemsDescriptionHeight,
     GalleryItemsHeaderAdapter,
     GalleryItemsSummary,
 } from "ente-new/photos/components/gallery/ListHeader";
@@ -35,13 +34,7 @@ import {
 } from "ente-new/photos/services/collection-summary";
 import type { Person } from "ente-new/photos/services/ml/people";
 import { includes } from "ente-utils/type-guards";
-import React, {
-    useCallback,
-    useEffect,
-    useLayoutEffect,
-    useMemo,
-    useState,
-} from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { AlbumCastDialog } from "./AlbumCastDialog";
 import {
     CollectionHeader,
@@ -169,12 +162,6 @@ export const GalleryBarAndListHeader: React.FC<
     const [descriptionHeight, setDescriptionHeight] = useState(0);
 
     useEffect(() => {
-        setDescriptionHeight(
-            albumDescription ? galleryItemsDescriptionHeight : 0,
-        );
-    }, [albumDescription]);
-
-    useLayoutEffect(() => {
         if (shouldHide) return;
 
         const collectionSummary = toShowCollectionSummaries.get(
@@ -221,7 +208,7 @@ export const GalleryBarAndListHeader: React.FC<
             ) : (
                 <></>
             ),
-            height: 68 + descriptionHeight,
+            height: 68 + (albumDescription ? descriptionHeight : 0),
         });
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [
@@ -241,6 +228,7 @@ export const GalleryBarAndListHeader: React.FC<
         onAddSaveGroup,
         onShowMap,
         onEditAlbumDetails,
+        albumDescription,
         descriptionHeight,
         // TODO: Cluster
         // This causes a loop since it is an array dep

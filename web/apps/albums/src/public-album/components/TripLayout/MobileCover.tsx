@@ -73,9 +73,7 @@ export const MobileCover = memo<MobileCoverProps>(
                                 locations
                             </TripSubtitle>
                             <AlbumDescription
-                                key={albumDescription}
                                 description={albumDescription}
-                                expandable
                                 sx={{
                                     mt: "4px",
                                     pb: "20px",

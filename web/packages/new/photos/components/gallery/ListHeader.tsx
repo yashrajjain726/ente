@@ -13,7 +13,6 @@ interface GalleryItemsSummaryProps {
     name: string;
     description?: string;
     descriptionMaxWidth?: number;
-    descriptionOpacity?: number;
     nameProps?: TypographyProps;
     fileCount: number;
     endIcon?: React.ReactNode;
@@ -26,7 +25,6 @@ export const GalleryItemsSummary: React.FC<GalleryItemsSummaryProps> = ({
     name,
     description,
     descriptionMaxWidth,
-    descriptionOpacity,
     nameProps,
     fileCount,
     endIcon,
@@ -57,120 +55,76 @@ export const GalleryItemsSummary: React.FC<GalleryItemsSummaryProps> = ({
         </Stack>
 
         <AlbumDescription
-            key={description}
             description={description}
-            expandable={Boolean(onDescriptionHeightChange)}
             sx={{
                 pt: "4px",
                 maxWidth: descriptionMaxWidth ?? 420,
-                color: "text.muted",
-                opacity: descriptionOpacity,
+                color: "text.faint",
             }}
             onHeightChange={onDescriptionHeightChange}
         />
     </Box>
 );
 
-export const galleryItemsDescriptionHeight = 24;
-
 interface AlbumDescriptionProps {
     description?: string;
-    expandable?: boolean;
     sx?: TypographyProps["sx"];
     onHeightChange?: (height: number) => void;
 }
 
 export const AlbumDescription: React.FC<AlbumDescriptionProps> = ({
     description,
-    expandable,
     sx,
     onHeightChange,
 }) => {
-    const [expansionState, setExpansionState] = useState<
-        "collapsed" | "expanded" | "collapsing"
-    >("collapsed");
-    const [expandedHeight, setExpandedHeight] = useState(
-        galleryItemsDescriptionHeight,
-    );
-    const textRef = useRef<HTMLElement>(null);
+    const [expandedDescription, setExpandedDescription] = useState<string>();
+    const expanded = expandedDescription === description;
+    const textRef = useRef<HTMLButtonElement>(null);
 
     useEffect(() => {
-        const text = textRef.current;
-        if (!text || (!expandable && !onHeightChange)) return;
+        if (!onHeightChange) return;
 
-        const report = () => {
-            setExpandedHeight(text.scrollHeight);
-            onHeightChange?.(text.offsetHeight);
-        };
+        const text = textRef.current;
+        if (!text) {
+            onHeightChange(0);
+            return;
+        }
+
+        const report = () => onHeightChange(text.offsetHeight);
         report();
         const observer = new ResizeObserver(report);
         observer.observe(text);
         return () => observer.disconnect();
-    }, [description, expandable, onHeightChange]);
+    }, [description, onHeightChange]);
 
-    if (!description) return <></>;
+    if (!description) return null;
 
-    const handleToggle = () => {
-        if (expansionState == "collapsed") {
-            setExpansionState("expanded");
-        } else if (expansionState == "expanded") {
-            setExpansionState(
-                matchMedia("(prefers-reduced-motion: reduce)").matches
-                    ? "collapsed"
-                    : "collapsing",
-            );
-        }
-    };
-
-    const handleTransitionEnd: React.TransitionEventHandler<HTMLElement> = (
-        event,
-    ) => {
-        if (
-            event.propertyName == "max-height" &&
-            expansionState == "collapsing"
-        )
-            setExpansionState("collapsed");
-    };
+    const handleClick = () =>
+        setExpandedDescription(expanded ? undefined : description);
 
     return (
         <Typography
-            component={expandable ? "button" : "p"}
-            ref={(element: HTMLElement | null) => {
-                textRef.current = element;
-            }}
-            type={expandable ? "button" : undefined}
-            aria-expanded={
-                expandable ? expansionState == "expanded" : undefined
-            }
-            onClick={expandable ? handleToggle : undefined}
-            onTransitionEnd={expandable ? handleTransitionEnd : undefined}
+            component="button"
+            type="button"
+            variant="small"
+            ref={textRef}
+            aria-expanded={expanded}
+            onClick={handleClick}
             sx={[
                 {
                     display: "-webkit-box",
                     overflow: "hidden",
                     WebkitBoxOrient: "vertical",
-                    WebkitLineClamp:
-                        expansionState == "collapsed" ? 1 : "unset",
+                    WebkitLineClamp: expanded ? "unset" : 1,
                     overflowWrap: "anywhere",
                     textWrap: "pretty",
-                    fontSize: "14px",
-                    lineHeight: "20px",
-                    ...(expandable && {
-                        border: 0,
-                        p: 0,
-                        background: "none",
-                        color: "inherit",
-                        textAlign: "left",
-                        cursor: "pointer",
-                        maxHeight:
-                            expansionState == "expanded"
-                                ? `${expandedHeight}px`
-                                : `${galleryItemsDescriptionHeight}px`,
-                        transition: "max-height 140ms ease-out",
-                        "@media (prefers-reduced-motion: reduce)": {
-                            transition: "none",
-                        },
-                    }),
+                    width: "100%",
+                    border: 0,
+                    p: 0,
+                    background: "none",
+                    color: "inherit",
+                    textAlign: "left",
+                    cursor: "pointer",
                 },
                 ...(sx ? (isSxArray(sx) ? sx : [sx]) : []),
             ]}

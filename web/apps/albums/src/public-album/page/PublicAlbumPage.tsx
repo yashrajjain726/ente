@@ -75,7 +75,6 @@ import { fileCreationTime, fileFileName } from "ente-media/file-metadata";
 import { FileType } from "ente-media/file-type";
 import {
     AlbumDescription,
-    galleryItemsDescriptionHeight,
     GalleryItemsHeaderAdapter,
     GalleryItemsSummary,
 } from "ente-new/photos/components/gallery/ListHeader";
@@ -605,18 +604,13 @@ export default function PublicAlbumPage() {
     const hasSummaryDescription = !!albumDescription && !showMobileMasonryCover;
     const [descriptionHeight, setDescriptionHeight] = useState(0);
 
-    useEffect(() => {
-        setDescriptionHeight(
-            hasSummaryDescription ? galleryItemsDescriptionHeight : 0,
-        );
-    }, [hasSummaryDescription, albumDescription]);
-
     const fileListHeaderHeightForViewport =
         (isMobileHeaderLayout
             ? showMobileMasonryCover
                 ? mobileMasonryFileListHeaderHeight(viewportWidth)
                 : fileListHeaderHeightMobile
-            : fileListHeaderHeight) + descriptionHeight;
+            : fileListHeaderHeight) +
+        (hasSummaryDescription ? descriptionHeight : 0);
 
     const fileListHeader = useMemo<FileListHeaderOrFooter | undefined>(
         () =>
@@ -1544,9 +1538,7 @@ const PublicAlbumCoverHero: React.FC<PublicAlbumCoverHeroProps> = ({
             <MobileMasonryCoverContent>
                 <MobileMasonryCoverTitle>{title}</MobileMasonryCoverTitle>
                 <AlbumDescription
-                    key={description}
                     description={description}
-                    expandable
                     sx={{ maxWidth: "100%", mt: "-6px", opacity: 0.8 }}
                 />
                 <Typography

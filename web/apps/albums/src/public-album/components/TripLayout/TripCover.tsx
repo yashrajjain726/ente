@@ -77,9 +77,7 @@ export const TripCover = memo<TripCoverProps>(
                                     {locationCount} locations
                                 </TripSubtitle>
                                 <AlbumDescription
-                                    key={albumDescription}
                                     description={albumDescription}
-                                    expandable
                                     sx={{
                                         maxWidth: "420px",
                                         mt: "4px",
