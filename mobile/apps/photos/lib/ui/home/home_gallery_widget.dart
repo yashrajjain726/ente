@@ -88,13 +88,19 @@ class _HomeGalleryWidgetState extends State<HomeGalleryWidget> {
         return null;
       }
       if (!backupPreferenceService.hasSelectedAllFoldersForBackup) {
-        final localIDs = files.map((file) => file.localID!).toSet();
+        final onlyNewSince = backupPreferenceService.onlyNewSinceEpoch;
+        if (onlyNewSince != null) {
+          candidates = candidates
+              .where((file) => file.creationTime! >= onlyNewSince)
+              .toList(growable: false);
+        }
+        final localIDs = candidates.map((file) => file.localID!).toSet();
         final selectedLocalIDs = await FilesDB.instance
             .getLocalIDsInBackupFolders(
               localIDs,
               filterOptions.ignoredCollectionIDs ?? {},
             );
-        candidates = files
+        candidates = candidates
             .where((file) => selectedLocalIDs.contains(file.localID))
             .toList(growable: false);
       }
