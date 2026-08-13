@@ -63,11 +63,7 @@ type GalleryBarAndListHeaderProps = Omit<
     canCreateAlbum: boolean;
 } & Pick<
         CollectionHeaderProps,
-        | "onRemotePull"
-        | "onAddSaveGroup"
-        | "canSetAlbumCover"
-        | "onSetAlbumCover"
-        | "onShowMap"
+        "onRemotePull" | "onAddSaveGroup" | "onEditAlbumDetails" | "onShowMap"
     > &
     Pick<
         CollectionShareProps,
@@ -97,8 +93,7 @@ export const GalleryBarAndListHeader: React.FC<
     emailByUserID,
     shareSuggestionEmails,
     onRemotePull,
-    canSetAlbumCover,
-    onSetAlbumCover,
+    onEditAlbumDetails,
     onAddSaveGroup,
     onShowMap,
     setFileListHeader,
@@ -190,8 +185,7 @@ export const GalleryBarAndListHeader: React.FC<
                     onCollectionShare={openCollectionShare}
                     onCollectionManageLink={openCollectionManageLink}
                     onCollectionCast={showCollectionCast}
-                    canSetAlbumCover={canSetAlbumCover}
-                    onSetAlbumCover={onSetAlbumCover}
+                    onEditAlbumDetails={onEditAlbumDetails}
                     hasActiveFileSelection={hasActiveFileSelection}
                 />
             ) : mode != "people" && collectionSummary ? (
@@ -228,8 +222,7 @@ export const GalleryBarAndListHeader: React.FC<
         onRemotePull,
         onAddSaveGroup,
         onShowMap,
-        canSetAlbumCover,
-        onSetAlbumCover,
+        onEditAlbumDetails,
         // TODO: Cluster
         // This causes a loop since it is an array dep
         // people,
