@@ -19,6 +19,7 @@ enum MlLockAttempt {
   deniedFunnelBusy,
   deniedByOtherEngine,
   deniedChannelError,
+  deniedTimeout,
 }
 
 enum MlRunDisposition { completed, denied, stopped, failed }
@@ -50,12 +51,14 @@ class MlProcessLock {
   /// protected ML work it started before returning. Errors from [body]
   /// propagate after release. [background] labels this engine's origin.
   /// [waitForAvailability] waits for both the local funnel and the other
-  /// engine instead of returning a busy denial.
+  /// engine instead of returning a busy denial, bounded by [waitDeadline]
+  /// per wait when given.
   Future<MlLockAttempt> tryRunExclusive(
     MlOperation operation,
     Future<void> Function() body, {
     required bool background,
     bool waitForAvailability = false,
+    Duration? waitDeadline,
   }) async {
     if (!waitForAvailability && _funnel.locked) {
       _logger.info(
@@ -63,7 +66,33 @@ class MlProcessLock {
       );
       return MlLockAttempt.deniedFunnelBusy;
     }
-    return _funnel.synchronized(() async {
+    final nativeDeadline = waitDeadline == null
+        ? null
+        : DateTime.now().add(waitDeadline);
+    try {
+      return await _runSynchronized(
+        operation,
+        body,
+        background: background,
+        waitForAvailability: waitForAvailability,
+        nativeDeadline: nativeDeadline,
+        funnelTimeout: waitForAvailability ? waitDeadline : null,
+      );
+    } on TimeoutException {
+      _logger.warning("Timed out waiting for the funnel (${operation.name})");
+      return MlLockAttempt.deniedTimeout;
+    }
+  }
+
+  Future<MlLockAttempt> _runSynchronized(
+    MlOperation operation,
+    Future<void> Function() body, {
+    required bool background,
+    required bool waitForAvailability,
+    required DateTime? nativeDeadline,
+    required Duration? funnelTimeout,
+  }) {
+    return _funnel.synchronized(timeout: funnelTimeout, () async {
       _activeOperation = operation;
       try {
         final origin = background ? "bg" : "fg";
@@ -88,6 +117,14 @@ class MlProcessLock {
           if (!waitForAvailability) {
             unawaited(_logOwner(operation));
             return MlLockAttempt.deniedByOtherEngine;
+          }
+          if (nativeDeadline != null &&
+              DateTime.now().isAfter(nativeDeadline)) {
+            _logger.warning(
+              "Timed out waiting for the ml lock (${operation.name})",
+            );
+            unawaited(_logOwner(operation));
+            return MlLockAttempt.deniedTimeout;
           }
           await Future<void>.delayed(_availabilityPollInterval);
         }
@@ -116,6 +153,20 @@ class MlProcessLock {
         _activeOperation = null;
       }
     });
+  }
+
+  Future<String> describeState() async {
+    String native;
+    try {
+      final owner = await ProcessLockClient.instance.state(name: _lockName);
+      native = owner == null
+          ? "free"
+          : "held by ${owner.origin}/${owner.operation} "
+                "for ${owner.heldFor.inSeconds}s";
+    } catch (e) {
+      native = "unavailable ($e)";
+    }
+    return "Lock: $native · funnel: ${_activeOperation?.name ?? 'idle'}";
   }
 
   Future<void> _logOwner(MlOperation denied) async {

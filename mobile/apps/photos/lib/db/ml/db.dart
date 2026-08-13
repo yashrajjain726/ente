@@ -50,6 +50,9 @@ import "package:synchronized/synchronized.dart";
 class MLDataDB with SqlDbBase implements IMLDataDB<int> {
   static final Logger _logger = Logger("MLDataDB");
   static const int _maxSqlBindParamsPerQuery = 10000;
+  // Migrations are opportunistic and retried by their callers; logout's
+  // clearData intentionally waits unbounded because it must complete.
+  static const _kMigrationLockWaitDeadline = Duration(minutes: 2);
 
   static Logger get logger => _logger;
 
@@ -1865,6 +1868,7 @@ class MLDataDB with SqlDbBase implements IMLDataDB<int> {
     await _runMlOperationExclusive(
       MlOperation.clusterCentroidVectorMigration,
       () => _checkMigrateFillClusterCentroidVectorDB(force: force),
+      waitDeadline: _kMigrationLockWaitDeadline,
     );
   }
 
@@ -2174,6 +2178,7 @@ class MLDataDB with SqlDbBase implements IMLDataDB<int> {
     await _runMlOperationExclusive(
       MlOperation.clipVectorMigration,
       () => _checkMigrateFillClipVectorDB(force: force),
+      waitDeadline: _kMigrationLockWaitDeadline,
     );
   }
 
@@ -2324,13 +2329,15 @@ class MLDataDB with SqlDbBase implements IMLDataDB<int> {
 
   Future<void> _runMlOperationExclusive(
     MlOperation operation,
-    Future<void> Function() body,
-  ) async {
+    Future<void> Function() body, {
+    Duration? waitDeadline,
+  }) async {
     final attempt = await MlProcessLock.instance.tryRunExclusive(
       operation,
       body,
       background: isProcessBg,
       waitForAvailability: true,
+      waitDeadline: waitDeadline,
     );
     if (attempt != MlLockAttempt.ran) {
       throw StateError(

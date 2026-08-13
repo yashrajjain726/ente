@@ -11,6 +11,7 @@ import "package:photos/db/files_db.dart";
 import "package:photos/db/ml/db.dart";
 import "package:photos/db/ml/db_pet_model_mappers.dart";
 import "package:photos/db/offline_files_db.dart";
+import "package:photos/events/app_mode_changed_event.dart";
 import "package:photos/events/compute_control_event.dart";
 import "package:photos/events/people_changed_event.dart";
 import "package:photos/main.dart";
@@ -96,11 +97,6 @@ class MLService {
         : MLDataDB.instance;
   }
 
-  bool _hasModeChanged(MLMode mode) {
-    return (isLocalGalleryMode ? MLMode.localGallery : MLMode.enteGallery) !=
-        mode;
-  }
-
   /// Only call this function once at app startup, after that you can directly call [runAllML]
   Future<void> init() async {
     if (_isInitialized) {
@@ -145,6 +141,11 @@ class MLService {
         );
         stopActiveRun(MlStopReason.controller);
       }
+    });
+    // Every setAppMode call site fires this event, so a latched stop fully
+    // replaces polled mode checks inside the pipeline.
+    Bus.instance.on<AppModeChangedEvent>().listen((_) {
+      stopActiveRun(MlStopReason.modeChanged);
     });
     _syncMlControllerStatusForBg();
 
@@ -450,10 +451,6 @@ class MLService {
       if (control.stopRequested) {
         return _stoppedDisposition(control, "after sync");
       }
-      if (_hasModeChanged(mode)) {
-        _logger.info("App mode changed during ML run, stopping");
-        return MlRunDisposition.stopped;
-      }
 
       final int unclusteredFacesCount = await mlDataDB
           .getUnclusteredFaceCount();
@@ -467,10 +464,6 @@ class MLService {
         return _stoppedDisposition(control, "after initial clustering");
       }
       if (_mlControllerStatus == true) {
-        if (_hasModeChanged(mode)) {
-          _logger.info("App mode changed during ML run, stopping");
-          return MlRunDisposition.stopped;
-        }
         // Cache refreshes only read ML stores, so they may safely outlive
         // this run and the process lock.
         magicCacheService.updateCache(forced: force).ignore();
@@ -482,10 +475,6 @@ class MLService {
       if (canFetch()) {
         await _fetchAndIndexAllImages(mode: mode, control: control);
       }
-      if (_hasModeChanged(mode)) {
-        _logger.info("App mode changed during ML run, stopping");
-        return MlRunDisposition.stopped;
-      }
       if (control.stopRequested) {
         return _stoppedDisposition(control, "before final clustering");
       }
@@ -496,10 +485,6 @@ class MLService {
         return _stoppedDisposition(control, "before post-run cache scheduling");
       }
       if (_mlControllerStatus == true) {
-        if (_hasModeChanged(mode)) {
-          _logger.info("App mode changed during ML run, stopping");
-          return MlRunDisposition.stopped;
-        }
         // Persist refreshed caches after ML so foreground can pick them up
         // on the next resume, even when the work ran headlessly in background.
         magicCacheService.updateCache().ignore();
@@ -580,7 +565,7 @@ class MLService {
   ///
   /// This function first fetches from remote and checks if the image has already been analyzed
   /// with the lastest faceMlVersion and stored on remote or local database. If so, it skips the image.
-  Future<void> fetchAndIndexAllImages({required MLMode mode}) async {
+  Future<MlLockAttempt> fetchAndIndexAllImages({required MLMode mode}) async {
     final control = MlRunControl();
     final attempt = await _runExclusiveWithControl(
       MlOperation.indexing,
@@ -592,6 +577,7 @@ class MLService {
         "fetchAndIndexAllImages denied the ml process lock (${attempt.name})",
       );
     }
+    return attempt;
   }
 
   Future<void> _fetchAndIndexAllImages({
@@ -622,12 +608,6 @@ class MLService {
 
       bool stopRun = false;
       await for (final chunk in instructionStream) {
-        if (_hasModeChanged(mode)) {
-          _logger.info(
-            "App mode changed during indexing, stopping current ML run",
-          );
-          break;
-        }
         if (control.stopRequested) {
           _stoppedDisposition(control, "between indexing chunks");
           break;
@@ -655,13 +635,6 @@ class MLService {
         }
         final futures = <Future<bool>>[];
         for (final instruction in chunk) {
-          if (_hasModeChanged(mode)) {
-            _logger.info(
-              "App mode changed during indexing, stopping current ML run",
-            );
-            stopRun = true;
-            break;
-          }
           if (control.stopRequested) {
             _stoppedDisposition(control, "between indexing instructions");
             stopRun = true;
@@ -701,7 +674,7 @@ class MLService {
     }
   }
 
-  Future<void> clusterAllImages({
+  Future<MlLockAttempt> clusterAllImages({
     bool clusterInBuckets = true,
     bool force = false,
   }) async {
@@ -720,6 +693,7 @@ class MLService {
         "clusterAllImages denied the ml process lock (${attempt.name})",
       );
     }
+    return attempt;
   }
 
   Future<void> _clusterAllImages({

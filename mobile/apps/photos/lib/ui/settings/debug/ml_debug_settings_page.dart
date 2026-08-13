@@ -1,6 +1,5 @@
 import "dart:async";
 
-import "package:ente_photos_platform/ente_photos_platform.dart";
 import "package:ente_pure_utils/ente_pure_utils.dart";
 import "package:flutter/material.dart";
 import "package:hugeicons/hugeicons.dart";
@@ -804,14 +803,9 @@ class _MLDebugSettingsPageState extends State<MLDebugSettingsPage> {
 
   Future<void> _onShowProcessLockState(BuildContext context) async {
     try {
-      final owner = await ProcessLockClient.instance.state(name: "ml");
-      final funnelOp = MlProcessLock.instance.activeOperation?.name;
-      final native = owner == null
-          ? "free"
-          : "held by ${owner.origin}/${owner.operation} "
-                "for ${owner.heldFor.inSeconds}s";
+      final description = await MlProcessLock.instance.describeState();
       if (!context.mounted) return;
-      showShortToast(context, "Lock: $native · funnel: ${funnelOp ?? 'idle'}");
+      showShortToast(context, description);
     } catch (e, s) {
       logger.warning('fetching ml process lock state failed', e, s);
       if (!context.mounted) return;
@@ -823,9 +817,13 @@ class _MLDebugSettingsPageState extends State<MLDebugSettingsPage> {
     try {
       await PersonService.instance.sync();
       MLService.instance.debugIndexingDisabled = false;
-      await MLService.instance.clusterAllImages();
-      Bus.instance.fire(PeopleChangedEvent());
+      final attempt = await MLService.instance.clusterAllImages();
       if (!context.mounted) return;
+      if (attempt != MlLockAttempt.ran) {
+        showShortToast(context, "Denied (${attempt.name})");
+        return;
+      }
+      Bus.instance.fire(PeopleChangedEvent());
       showShortToast(context, "Done");
     } catch (e, s) {
       logger.warning('clustering failed ', e, s);

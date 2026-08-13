@@ -39,7 +39,7 @@ import "package:photos/services/account/user_service.dart";
 import 'package:photos/services/collections_service.dart';
 import 'package:photos/services/file_magic_service.dart';
 import "package:photos/services/process_activity.dart"
-    show kLastBGTaskHeartBeatTime;
+    show isBackgroundEngineActive;
 import 'package:photos/services/sync/local_sync_service.dart';
 import 'package:photos/services/sync/sync_service.dart';
 import "package:photos/utils/device_storage_error.dart";
@@ -72,7 +72,6 @@ class FileUploader {
   );
   final _existingUploadResolver = ExistingUploadResolver.forApp();
   final kSafeBufferForLockExpiry = const Duration(hours: 4).inMicroseconds;
-  final kBGTaskDeathTimeout = const Duration(seconds: 5).inMicroseconds;
   Map<String, BackupItem> get allBackups => _queue.backupItems;
 
   /// Returns true if any file uploads are currently in progress
@@ -106,11 +105,7 @@ class FileUploader {
       currentTime - kSafeBufferForLockExpiry,
     );
     if (!isBackground) {
-      await _prefs.reload();
-      final lastBGTaskHeartBeatTime =
-          _prefs.getInt(kLastBGTaskHeartBeatTime) ?? 0;
-      final isBGTaskDead =
-          lastBGTaskHeartBeatTime < (currentTime - kBGTaskDeathTimeout);
+      final isBGTaskDead = !await isBackgroundEngineActive();
       if (isBGTaskDead) {
         await _uploadLocks.releaseLocksAcquiredByOwnerBefore(
           ProcessType.background.toString(),
@@ -118,9 +113,7 @@ class FileUploader {
         );
         _logger.info("BG task was found dead, cleared all locks");
       } else {
-        _logger.info(
-          "BG task is alive, not clearing locks ${DateTime.fromMicrosecondsSinceEpoch(lastBGTaskHeartBeatTime)}",
-        );
+        _logger.info("BG task is alive, not clearing locks");
       }
       if (!_hasStartedBackgroundUploadPolling) {
         _hasStartedBackgroundUploadPolling = true;
