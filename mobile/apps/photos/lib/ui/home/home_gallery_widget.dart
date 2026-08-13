@@ -6,7 +6,6 @@ import 'package:photos/core/configuration.dart';
 import 'package:photos/core/event_bus.dart';
 import "package:photos/core/user_config.dart";
 import 'package:photos/db/files_db.dart';
-import 'package:photos/events/backup_folders_updated_event.dart';
 import 'package:photos/events/files_updated_event.dart';
 import 'package:photos/events/force_reload_home_gallery_event.dart';
 import "package:photos/events/hide_shared_items_from_home_gallery_event.dart";
@@ -130,9 +129,6 @@ class _HomeGalleryWidgetState extends State<HomeGalleryWidget> {
         EventType.hide,
       },
       forceReloadEvents: [
-        Bus.instance.on<BackupFoldersUpdatedEvent>().where(
-          (_) => !largeBackupSession.isStandbyScreenActive,
-        ),
         Bus.instance.on<ForceReloadHomeGalleryEvent>().where(
           (_) => !largeBackupSession.isStandbyScreenActive,
         ),
