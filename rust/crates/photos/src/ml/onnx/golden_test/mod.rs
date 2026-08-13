@@ -1,4 +1,4 @@
-// Accelerated ONNX providers must reproduce CPU-generated golden outputs
+// Accelerated ONNX providers must pass golden tests against CPU-generated outputs
 // because drivers can return plausible but numerically corrupt results while
 // reporting success. Deterministic inputs exercise the same kernels as real
 // inputs because these models have no data-dependent control flow.

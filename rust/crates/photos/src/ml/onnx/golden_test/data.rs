@@ -1,4 +1,4 @@
-// Generated file. Do not edit by hand.
+// Generated golden-test data. Do not edit by hand.
 //
 // Regenerate with:
 //   cargo run -p ente-photos --example ml_goldens -- generate

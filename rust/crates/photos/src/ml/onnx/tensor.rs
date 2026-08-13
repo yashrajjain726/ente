@@ -8,7 +8,7 @@ use ort::{
 
 use crate::ml::error::{MlError, MlResult};
 
-use super::{SessionRunError, SessionRunResult, golden};
+use super::{SessionRunError, SessionRunResult, golden_test};
 
 pub(crate) struct PreparedF32Input {
     f32_data: Vec<f32>,
@@ -65,10 +65,10 @@ impl PreparedF32Input {
 pub(crate) fn run_golden_tensor(
     session: &mut Session,
     input_shape: &[i64],
-    input: &golden::PreparedGoldenInput,
+    input: &golden_test::PreparedGoldenInput,
 ) -> SessionRunResult<Vec<f32>> {
     let outputs = match input {
-        golden::PreparedGoldenInput::F32(data) => {
+        golden_test::PreparedGoldenInput::F32(data) => {
             if session_expects_f16(session) {
                 let input_tensor = Tensor::<half::f16>::from_array((
                     input_shape,
@@ -81,7 +81,7 @@ pub(crate) fn run_golden_tensor(
                 session.run(ort::inputs![input_tensor])?
             }
         }
-        golden::PreparedGoldenInput::I32(data) => {
+        golden_test::PreparedGoldenInput::I32(data) => {
             let input_tensor = TensorRef::<i32>::from_array_view((input_shape, data.as_slice()))?;
             session.run(ort::inputs![input_tensor])?
         }

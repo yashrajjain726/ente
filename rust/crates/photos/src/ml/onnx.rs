@@ -4,7 +4,7 @@ use std::{fmt, path::Path};
 use crate::ml::error::{MlError, MlResult};
 
 mod coreml_cache;
-pub mod golden;
+pub mod golden_test;
 mod providers;
 mod tensor;
 mod webgpu;
@@ -438,12 +438,12 @@ fn run_session_self_test(
     provider_label: &str,
 ) -> MlResult<()> {
     let model_file = model_file_label(model_path);
-    let Some(entry) = golden::lookup(model_path) else {
+    let Some(entry) = golden_test::lookup(model_path) else {
         return Err(MlError::Ort(format!(
             "golden self-test entry missing for '{model_file}'"
         )));
     };
-    let golden_input = golden::prepare_input(entry).map_err(|reason| {
+    let golden_input = golden_test::prepare_input(entry).map_err(|reason| {
         MlError::Ort(format!(
             "golden self-test input invalid for '{model_file}': {reason}"
         ))
@@ -463,7 +463,7 @@ fn run_session_self_test(
             return Err(error.into());
         }
     };
-    if let Err(reason) = golden::validate_output(entry, &zero_output) {
+    if let Err(reason) = golden_test::validate_output(entry, &zero_output) {
         log::error!(
             "{provider_label} zero-input warm-up failed for '{model_file}': {reason}; \
              falling back to the next execution provider"
@@ -487,7 +487,7 @@ fn run_session_self_test(
             return Err(error.into());
         }
     };
-    match golden::compare_output(entry, &golden_output) {
+    match golden_test::compare_output(entry, &golden_output) {
         Ok(distance) => {
             log::info!(
                 "{provider_label} golden self-test for '{model_file}' passed \

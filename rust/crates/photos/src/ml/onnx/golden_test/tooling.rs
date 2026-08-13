@@ -11,7 +11,7 @@ use super::data::GOLDEN_ENTRIES;
 const GOLDEN_NOISE_SEED: u64 = 0x0060_1DE2_5EED_2026;
 
 const GENERATED_FILE_HEADER: &str = "\
-// Generated file. Do not edit by hand.
+// Generated golden-test data. Do not edit by hand.
 //
 // Regenerate with:
 //   cargo run -p ente-photos --example ml_goldens -- generate
@@ -104,11 +104,11 @@ pub fn verify_goldens_against_pins(pins: &[PinnedModel]) -> Vec<String> {
     for (file_name, pinned_sha) in &pinned {
         match committed.get(file_name) {
             None => failures.push(format!(
-                "{file_name}: no committed golden entry; regenerate ONNX golden data"
+                "{file_name}: no committed golden entry; regenerate ONNX golden-test data"
             )),
             Some(committed_sha) if committed_sha != pinned_sha => failures.push(format!(
                 "{file_name}: model content changed (pinned sha256 {pinned_sha}, golden \
-                 generated from {committed_sha}); regenerate ONNX golden data"
+                 generated from {committed_sha}); regenerate ONNX golden-test data"
             )),
             Some(_) => {}
         }
@@ -117,7 +117,7 @@ pub fn verify_goldens_against_pins(pins: &[PinnedModel]) -> Vec<String> {
         if !pinned.contains_key(file_name) {
             failures.push(format!(
                 "{file_name}: committed golden entry does not correspond to any pinned \
-                 production model; regenerate ONNX golden data"
+                 production model; regenerate ONNX golden-test data"
             ));
         }
     }

@@ -28,7 +28,7 @@ use super::coreml_cache;
     target_os = "macos",
     target_os = "windows"
 ))]
-use super::golden;
+use super::golden_test;
 #[cfg(any(
     target_os = "android",
     target_os = "ios",
@@ -266,7 +266,7 @@ fn platform_default_providers(_model_path: &str) -> Vec<ExecutionProvider> {
     target_os = "windows"
 ))]
 fn golden_entry_required(model_path: &str, provider_label: &str) -> bool {
-    if golden::lookup(model_path).is_some() {
+    if golden_test::lookup(model_path).is_some() {
         return true;
     }
     log::error!(
