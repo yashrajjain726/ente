@@ -6,7 +6,7 @@
 // TODO: Pet models have no golden entries because they are CPU-only. Add
 // entries before moving them off CPU (see `MlRuntime::new` in runtime.rs).
 
-use crate::ml::golden::{GoldenEntry, GoldenInput, GoldenMetric};
+use super::{GoldenEntry, GoldenInput, GoldenMetric};
 
 pub(crate) static GOLDEN_ENTRIES: &[GoldenEntry] = &[
     GoldenEntry {

@@ -2,9 +2,9 @@ use ort::session::Session;
 use std::{fmt, path::Path};
 
 use crate::ml::error::{MlError, MlResult};
-use crate::ml::golden;
 
 mod coreml_cache;
+pub mod golden;
 mod providers;
 mod tensor;
 mod webgpu;

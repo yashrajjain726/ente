@@ -6,12 +6,9 @@ use ort::{
     value::{Tensor, TensorElementType, TensorRef, ValueType},
 };
 
-use crate::ml::{
-    error::{MlError, MlResult},
-    golden,
-};
+use crate::ml::error::{MlError, MlResult};
 
-use super::{SessionRunError, SessionRunResult};
+use super::{SessionRunError, SessionRunResult, golden};
 
 pub(crate) struct PreparedF32Input {
     f32_data: Vec<f32>,

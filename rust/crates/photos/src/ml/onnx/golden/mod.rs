@@ -3,7 +3,10 @@
 // reporting success. Deterministic inputs exercise the same kernels as real
 // inputs because these models have no data-dependent control flow.
 
-use crate::ml::golden_data::GOLDEN_ENTRIES;
+mod data;
+pub mod tooling;
+
+use data::GOLDEN_ENTRIES;
 
 // False rejections fall back to CPU, so these unvalidated thresholds are
 // deliberately loose pending accelerated-hardware measurements. Healthy fp16
@@ -136,7 +139,7 @@ pub fn prepare_input(entry: &GoldenEntry) -> Result<PreparedGoldenInput, String>
     }
 }
 
-// Shared by the device self-test and generator. Regenerate `golden_data.rs` if
+// Shared by the device self-test and generator. Regenerate the golden data if
 // this sequence changes.
 pub fn seeded_noise(seed: u64, len: usize) -> Vec<f32> {
     let mut state = seed.max(1);

@@ -401,7 +401,7 @@ impl GoldenTestAssets {
     }
 
     pub(crate) fn golden_data_path() -> Result<PathBuf> {
-        Ok(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("src/ml/golden_data.rs"))
+        Ok(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("src/ml/onnx/golden/data.rs"))
     }
 }
 

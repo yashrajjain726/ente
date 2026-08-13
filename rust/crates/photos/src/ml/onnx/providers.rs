@@ -28,10 +28,7 @@ use super::coreml_cache;
     target_os = "macos",
     target_os = "windows"
 ))]
-use super::model_file_label;
-#[cfg(any(target_os = "android", target_os = "linux", target_os = "windows"))]
-use super::webgpu;
-use crate::ml::error::MlResult;
+use super::golden;
 #[cfg(any(
     target_os = "android",
     target_os = "ios",
@@ -39,7 +36,10 @@ use crate::ml::error::MlResult;
     target_os = "macos",
     target_os = "windows"
 ))]
-use crate::ml::golden;
+use super::model_file_label;
+#[cfg(any(target_os = "android", target_os = "linux", target_os = "windows"))]
+use super::webgpu;
+use crate::ml::error::MlResult;
 
 #[cfg(any(target_os = "ios", target_os = "macos"))]
 const ENABLE_PERSISTENT_COREML_CACHE: bool = true;
