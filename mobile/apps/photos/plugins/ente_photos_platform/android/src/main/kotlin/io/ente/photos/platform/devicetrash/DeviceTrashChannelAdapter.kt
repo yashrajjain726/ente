@@ -1,11 +1,11 @@
-package io.ente.photos.platform.systemtrash
+package io.ente.photos.platform.devicetrash
 
 import android.os.Handler
 import android.os.Looper
 import io.flutter.plugin.common.MethodChannel
 import java.util.concurrent.Executors
 
-class SystemTrashChannelAdapter(private val service: SystemTrashService) {
+class DeviceTrashChannelAdapter(private val service: DeviceTrashService) {
     private val mainHandler = Handler(Looper.getMainLooper())
     private val executor = Executors.newSingleThreadExecutor()
 
@@ -15,7 +15,7 @@ class SystemTrashChannelAdapter(private val service: SystemTrashService) {
     fun getFiles(result: MethodChannel.Result) {
         executor.execute {
             try {
-                val files = service.getFiles().map { it.toChannelMap() }
+                val files = service.getFiles().map { it.toChannelTuple() }
                 mainHandler.post {
                     if (!closed) result.success(files)
                 }
@@ -39,10 +39,6 @@ class SystemTrashChannelAdapter(private val service: SystemTrashService) {
         executor.shutdownNow()
     }
 
-    private fun SystemTrashFile.toChannelMap(): Map<String, Any> =
-        mapOf(
-            "localID" to localID,
-            "deleteBy" to deleteBy,
-            "deviceFolder" to deviceFolder,
-        )
+    private fun DeviceTrashFile.toChannelTuple(): List<Any> =
+        listOf(localID, deleteBy, deviceFolder)
 }
