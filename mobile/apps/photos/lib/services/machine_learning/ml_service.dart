@@ -47,11 +47,10 @@ class MLService {
   // Singleton pattern
   MLService._privateConstructor();
   static final instance = MLService._privateConstructor();
-  factory MLService() => instance;
 
   bool _isInitialized = false;
 
-  int? lastRemoteFetch;
+  int? _lastRemoteFetch;
   static const int _kRemoteFetchCooldownOnLite = 1000 * 60 * 5;
   static const int _kStartupOwnedRemoteHydrationMissingFileThreshold = 200;
   Future<void>? _ownedRemoteHydrationFuture;
@@ -282,47 +281,34 @@ class MLService {
   }) async {
     assert(MlProcessLock.instance.isBusy, "ml funnel must be held");
     try {
-      await _hydrateRemoteEmbeddingsForOwnedFilesInternal(
-        reason: reason,
+      final summary = await hydrateOwnedRemoteMLData(
+        mlDataDB: MLDataDB.instance,
         control: control,
         skipHydrationIfCandidateFileCountAtMost:
             skipHydrationIfCandidateFileCountAtMost,
       );
+      if (summary.candidateFiles == 0) {
+        _logger.info(
+          "Skipping owned remote ML hydration ($reason): no owned files need remote hydration",
+        );
+        return;
+      }
+      if (summary.skippedDueToCandidateThreshold) {
+        _logger.info(
+          "Skipping owned remote ML hydration ($reason): only ${summary.candidateFiles} "
+          "owned files are missing remote ML data (threshold: > "
+          "$skipHydrationIfCandidateFileCountAtMost)",
+        );
+        return;
+      }
+      _logger.info(
+        "Owned remote ML hydration ($reason) finished for ${summary.candidateFiles} files "
+        "(faces hydrated: ${summary.hydratedFaces}, clip hydrated: ${summary.hydratedClips}, "
+        "still pending local ML: ${summary.remainingLocalMl})",
+      );
     } catch (e, s) {
       _logger.warning("Owned remote ML hydration ($reason) failed", e, s);
     }
-  }
-
-  Future<void> _hydrateRemoteEmbeddingsForOwnedFilesInternal({
-    required String reason,
-    required MlRunControl control,
-    int? skipHydrationIfCandidateFileCountAtMost,
-  }) async {
-    final summary = await hydrateOwnedRemoteMLData(
-      mlDataDB: MLDataDB.instance,
-      control: control,
-      skipHydrationIfCandidateFileCountAtMost:
-          skipHydrationIfCandidateFileCountAtMost,
-    );
-    if (summary.candidateFiles == 0) {
-      _logger.info(
-        "Skipping owned remote ML hydration ($reason): no owned files need remote hydration",
-      );
-      return;
-    }
-    if (summary.skippedDueToCandidateThreshold) {
-      _logger.info(
-        "Skipping owned remote ML hydration ($reason): only ${summary.candidateFiles} "
-        "owned files are missing remote ML data (threshold: > "
-        "$skipHydrationIfCandidateFileCountAtMost)",
-      );
-      return;
-    }
-    _logger.info(
-      "Owned remote ML hydration ($reason) finished for ${summary.candidateFiles} files "
-      "(faces hydrated: ${summary.hydratedFaces}, clip hydrated: ${summary.hydratedClips}, "
-      "still pending local ML: ${summary.remainingLocalMl})",
-    );
   }
 
   void _schedulePredownloadLocalModels() {
@@ -337,19 +323,19 @@ class MLService {
 
   bool canFetch() {
     if (localSettings.isMLLocalIndexingEnabled) return true;
-    if (lastRemoteFetch == null) {
-      lastRemoteFetch = DateTime.now().millisecondsSinceEpoch;
+    if (_lastRemoteFetch == null) {
+      _lastRemoteFetch = DateTime.now().millisecondsSinceEpoch;
       return true;
     }
-    final intDiff = DateTime.now().millisecondsSinceEpoch - lastRemoteFetch!;
+    final intDiff = DateTime.now().millisecondsSinceEpoch - _lastRemoteFetch!;
     final bool canFetch = intDiff > _kRemoteFetchCooldownOnLite;
     if (canFetch) {
-      lastRemoteFetch = DateTime.now().millisecondsSinceEpoch;
+      _lastRemoteFetch = DateTime.now().millisecondsSinceEpoch;
     }
     return canFetch;
   }
 
-  Future<void> sync() async {
+  Future<void> _sync() async {
     await fileDataService.syncFDStatus();
     await PersonService.instance.sync();
   }
@@ -441,7 +427,7 @@ class MLService {
     assert(MlProcessLock.instance.isBusy, "ml funnel must be held");
     final mlDataDB = _dbForMode(mode);
     try {
-      await sync();
+      await _sync();
       if (control.stopRequested) {
         _logRunStopped(control, "after sync");
         return MlRunDisposition.stopped;
@@ -703,6 +689,7 @@ class MLService {
       return;
     }
     if (!_canRunMLFunction(function: "Clustering") && !force) return;
+    final mlDataDB = _mlDataDB;
     _logger.info("`clusterAllImages()` called");
     _clusteringIsHappening = true;
     final clusterAllImagesTime = DateTime.now();
@@ -726,13 +713,13 @@ class MLService {
 
     try {
       // Get a sense of the total number of faces in the database
-      final int totalFaces = await _mlDataDB.getTotalFaceCount();
+      final int totalFaces = await mlDataDB.getTotalFaceCount();
       final fileIDToCreationTime = isLocalGalleryMode
           ? await _getLocalGalleryFileIdToCreationTime()
           : await FilesDB.instance.getFileIDToCreationTime();
       final startEmbeddingFetch = DateTime.now();
       // read all embeddings
-      final result = await _mlDataDB.getFaceInfoForClustering(
+      final result = await mlDataDB.getFaceInfoForClustering(
         maxFaces: totalFaces,
       );
       final Set<int> missingFileIDs = {};
@@ -759,7 +746,7 @@ class MLService {
       );
 
       // Get the current cluster statistics
-      final Map<String, (Uint8List, int)> oldClusterSummaries = await _mlDataDB
+      final Map<String, (Uint8List, int)> oldClusterSummaries = await mlDataDB
           .getAllClusterSummary();
 
       if (clusterInBuckets) {
@@ -817,10 +804,10 @@ class MLService {
             return;
           }
 
-          await _mlDataDB.updateFaceIdToClusterId(
+          await mlDataDB.updateFaceIdToClusterId(
             clusteringResult.newFaceIdToCluster,
           );
-          await _mlDataDB.clusterSummaryUpdate(
+          await mlDataDB.clusterSummaryUpdate(
             clusteringResult.newClusterSummaries,
           );
           Bus.instance.fire(PeopleChangedEvent());
@@ -864,10 +851,10 @@ class MLService {
         _logger.info(
           'Updating ${clusteringResult.newFaceIdToCluster.length} FaceIDs with clusterIDs in the DB',
         );
-        await _mlDataDB.updateFaceIdToClusterId(
+        await mlDataDB.updateFaceIdToClusterId(
           clusteringResult.newFaceIdToCluster,
         );
-        await _mlDataDB.clusterSummaryUpdate(
+        await mlDataDB.clusterSummaryUpdate(
           clusteringResult.newClusterSummaries,
         );
         Bus.instance.fire(PeopleChangedEvent());
