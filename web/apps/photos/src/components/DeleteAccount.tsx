@@ -25,7 +25,7 @@ import { LoadingButton } from "ente-base/components/mui/LoadingButton";
 import type { ModalVisibilityProps } from "ente-base/components/utils/modal";
 import { useBaseContext } from "ente-base/context";
 import { isHTTPErrorWithStatus } from "ente-base/http";
-import { formattedNumber, pt } from "ente-base/i18n";
+import { formattedNumber } from "ente-base/i18n";
 import log from "ente-base/log";
 import {
     uploadSheetMediaQuery,
@@ -220,7 +220,7 @@ const DeleteAccountDialogContents: React.FC<
                         >
                             {!isReasonStep && (
                                 <IconButton
-                                    aria-label={pt("Back")}
+                                    aria-label={t("delete_account_back")}
                                     color="primary"
                                     onClick={handleBack}
                                     disabled={loading}
@@ -237,10 +237,8 @@ const DeleteAccountDialogContents: React.FC<
                             )}
                             <Typography variant="h3" sx={titleFont}>
                                 {isReasonStep
-                                    ? pt("Why are you leaving?")
-                                    : pt(
-                                          "Permanently delete your Ente account?",
-                                      )}
+                                    ? t("delete_account_reason_title")
+                                    : t("delete_account_confirmation_title")}
                             </Typography>
                         </Stack>
                         <DialogCloseIconButton {...{ onClose }} />
@@ -256,10 +254,8 @@ const DeleteAccountDialogContents: React.FC<
                         })}
                     >
                         {isReasonStep
-                            ? pt("This helps us improve Ente.")
-                            : pt(
-                                  "One account across Photos, Auth, and Locker.",
-                              )}
+                            ? t("delete_account_reason_description")
+                            : t("delete_account_confirmation_description")}
                     </Typography>
                 </Stack>
             </DialogTitle>
@@ -286,7 +282,7 @@ const DeleteAccountDialogContents: React.FC<
                                         gap: "2px",
                                     }}
                                 >
-                                    {pt("Reason for leaving")}
+                                    {t("delete_account_reason_short_label")}
                                     <Box
                                         component="span"
                                         sx={{ color: "critical.main" }}
@@ -349,7 +345,9 @@ const DeleteAccountDialogContents: React.FC<
                             </Stack>
                             <Stack sx={{ gap: "8px" }}>
                                 <Typography variant="small" sx={bodyFont}>
-                                    {pt("Anything else?")}
+                                    {t(
+                                        "delete_account_additional_feedback_label",
+                                    )}
                                 </Typography>
                                 <TextField
                                     variant="standard"
@@ -358,7 +356,9 @@ const DeleteAccountDialogContents: React.FC<
                                     rows={5}
                                     value={formik.values.feedback}
                                     onChange={formik.handleChange("feedback")}
-                                    placeholder={pt("Share your feedback here")}
+                                    placeholder={t(
+                                        "delete_account_feedback_input_placeholder",
+                                    )}
                                     sx={(theme) => ({
                                         backgroundColor: "fill.faint",
                                         borderRadius: fieldRadius,
@@ -407,20 +407,26 @@ const DeleteAccountDialogContents: React.FC<
                                 <Stack sx={{ gap: "8px" }}>
                                     <SummaryRow
                                         icon={<EntePhotosIcon />}
-                                        unit={pt("photos & videos")}
-                                        app={pt("Ente Photos")}
+                                        unit={t(
+                                            "delete_account_summary_photos_and_videos",
+                                        )}
+                                        app={t("title_photos")}
                                         count={summary?.photosAndVideosCount}
                                     />
                                     <SummaryRow
                                         icon={<EnteAuthIcon />}
-                                        unit={pt("authenticator codes")}
-                                        app={pt("Ente Auth")}
+                                        unit={t(
+                                            "delete_account_summary_authenticator_codes",
+                                        )}
+                                        app={t("title_auth")}
                                         count={summary?.authenticatorCodesCount}
                                     />
                                     <SummaryRow
                                         icon={<EnteLockerIcon />}
-                                        unit={pt("records")}
-                                        app={pt("Ente Locker")}
+                                        unit={t(
+                                            "delete_account_summary_records",
+                                        )}
+                                        app={t("title_locker")}
                                         count={summary?.lockerRecordsCount}
                                     />
                                 </Stack>
@@ -459,8 +465,8 @@ const DeleteAccountDialogContents: React.FC<
                                 }
                                 label={
                                     <Typography variant="small" sx={bodyFont}>
-                                        {pt(
-                                            "I understand this deletes my data across Photos, Auth, and Locker.",
+                                        {t(
+                                            "delete_account_confirmation_acknowledgement",
                                         )}
                                     </Typography>
                                 }
@@ -503,8 +509,8 @@ const DeleteAccountDialogContents: React.FC<
                         })}
                     >
                         {isReasonStep
-                            ? pt("Continue")
-                            : pt("Delete Ente account")}
+                            ? t("delete_account_continue")
+                            : t("delete_ente_account")}
                     </LoadingButton>
                 </Stack>
             </DialogContent>

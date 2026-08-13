@@ -18,7 +18,6 @@ interface DropdownInputProps<T> {
     selected: T | undefined;
     onSelect: (selectedValue: T) => void;
     placeholder?: string;
-    /** Additional styling, applied on top of the defaults. */
     sx?: SxProps<Theme>;
 }
 
