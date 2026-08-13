@@ -65,10 +65,13 @@ import {
     useSaveGroupsActions,
     type AddSaveGroup,
 } from "ente-gallery/components/utils/save-groups";
-import { quickLinkDateRangeForFiles } from "ente-gallery/utils/quick-link";
+import {
+    isPossibleSingleFileQuickLinkName,
+    quickLinkDateRangeForFiles,
+} from "ente-gallery/utils/quick-link";
 import type { Collection } from "ente-media/collection";
 import type { EnteFile } from "ente-media/file";
-import { fileFileName } from "ente-media/file-metadata";
+import { fileCreationTime, fileFileName } from "ente-media/file-metadata";
 import { FileType } from "ente-media/file-type";
 import {
     GalleryItemsHeaderAdapter,
@@ -683,10 +686,16 @@ export default function PublicAlbumPage() {
 
     const layout = publicAlbumLayout;
     const quickLinkDateRange = quickLinkDateRangeForFiles(publicFiles);
+    const isSingleFileAlbum = publicFiles.length === 1;
     const isQuickLinkAlbum =
         quickLinkDateRange !== undefined &&
-        publicCollection?.name === quickLinkDateRange;
-    const isSingleFileAlbum = publicFiles.length === 1;
+        (publicCollection?.name === quickLinkDateRange ||
+            (isSingleFileAlbum &&
+                publicCollection !== undefined &&
+                isPossibleSingleFileQuickLinkName(
+                    publicCollection.name,
+                    fileCreationTime(publicFiles[0]!),
+                )));
     const shouldShowSingleFileViewer = isQuickLinkAlbum && isSingleFileAlbum;
 
     if (shouldShowSingleFileViewer) {
