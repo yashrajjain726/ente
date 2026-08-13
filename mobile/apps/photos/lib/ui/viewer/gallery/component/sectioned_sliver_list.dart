@@ -1,6 +1,4 @@
 import 'dart:math' as math;
-
-import 'package:collection/collection.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -44,9 +42,7 @@ class SectionedListSliver<T> extends StatelessWidget {
       delegate: SliverChildBuilderDelegate(
         (context, index) {
           if (index >= childCount) return null;
-          final sectionLayout = sectionLayouts.firstWhereOrNull(
-            (section) => section.hasChild(index),
-          );
+          final sectionLayout = sectionLayouts.sectionForIndex(index);
           return sectionLayout?.builder(context, index) ?? const SizedBox();
         },
         childCount: childCount,
@@ -100,13 +96,10 @@ class _RenderSliverKnownExtentBoxAdaptor extends RenderSliverMultiBoxAdaptor {
   }) : _sectionLayouts = sectionLayouts;
 
   FixedExtentSectionLayout? sectionAtIndex(int index) =>
-      sectionLayouts.firstWhereOrNull((section) => section.hasChild(index));
+      sectionLayouts.sectionForIndex(index);
 
   FixedExtentSectionLayout? sectionAtOffset(double scrollOffset) =>
-      sectionLayouts.firstWhereOrNull(
-        (section) => section.hasChildAtOffset(scrollOffset),
-      ) ??
-      sectionLayouts.lastOrNull;
+      sectionLayouts.sectionForOffset(scrollOffset);
 
   double indexToLayoutOffset(int index) {
     return (sectionAtIndex(index) ?? sectionLayouts.lastOrNull)
