@@ -698,7 +698,7 @@ class FilesDB with SqlDbBase {
     args.add(visibility);
 
     if (filterOptions?.ignoreSharedItems ?? false) {
-      subQueries.add(' AND $columnOwnerID = ?');
+      subQueries.add(' AND ($columnOwnerID IS NULL OR $columnOwnerID = ?)');
       args.add(ownerID);
     }
 
@@ -743,7 +743,7 @@ class FilesDB with SqlDbBase {
     );
 
     if (filterOptions.ignoreSharedItems) {
-      subQueries.add(' AND $columnOwnerID = ?');
+      subQueries.add(' AND ($columnOwnerID IS NULL OR $columnOwnerID = ?)');
       args.add(ownerID);
     }
 

@@ -1,7 +1,6 @@
 import 'package:photos/events/files_updated_event.dart';
 
 class LocalPhotosUpdatedEvent extends FilesUpdatedEvent {
-  // "Recent" means created within the last seven days.
   final bool hasRecentNewLocalDiscovery;
 
   LocalPhotosUpdatedEvent(
@@ -10,4 +9,12 @@ class LocalPhotosUpdatedEvent extends FilesUpdatedEvent {
     required source,
     this.hasRecentNewLocalDiscovery = false,
   }) : super(type: type ?? EventType.addedOrUpdated, source: source ?? "");
+}
+
+class LocalPhotosAddedEvent extends LocalPhotosUpdatedEvent {
+  LocalPhotosAddedEvent(
+    super.updatedFiles, {
+    required super.source,
+    required super.hasRecentNewLocalDiscovery,
+  });
 }

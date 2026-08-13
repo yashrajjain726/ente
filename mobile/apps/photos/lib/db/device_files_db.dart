@@ -133,6 +133,27 @@ extension DeviceFiles on FilesDB {
     return names.toList(growable: false);
   }
 
+  Future<Set<String>> getLocalIDsInBackupFolders(
+    Set<String> localIDs,
+    Set<int> excludedCollectionIDs,
+  ) async {
+    if (localIDs.isEmpty) return {};
+
+    final db = await sqliteAsyncDB;
+    final localIDPlaceholders = List.filled(localIDs.length, '?').join(',');
+    final rows = await db.getAll('''
+      SELECT DISTINCT df.id, dc.collection_id
+      FROM device_files df
+      INNER JOIN device_collections dc ON dc.id = df.path_id
+      WHERE dc.should_backup = $_sqlBoolTrue
+        AND df.id IN ($localIDPlaceholders)
+      ''', localIDs.toList(growable: false));
+    return rows
+        .where((row) => !excludedCollectionIDs.contains(row['collection_id']))
+        .map((row) => row['id'] as String)
+        .toSet();
+  }
+
   Future<Set<String>> getDevicePathIDs() async {
     final db = await sqliteAsyncDB;
     final rows = await db.getAll('''
