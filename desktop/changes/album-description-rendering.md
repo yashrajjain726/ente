@@ -1,0 +1,1 @@
+- Added album descriptions across the Photos app, public albums, embeds, and trip layouts.

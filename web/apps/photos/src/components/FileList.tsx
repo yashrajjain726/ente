@@ -52,6 +52,7 @@ import React, {
     useCallback,
     useDeferredValue,
     useEffect,
+    useLayoutEffect,
     useMemo,
     useRef,
     useState,
@@ -327,9 +328,9 @@ export const FileList: React.FC<FileListProps> = ({
         layoutParams,
     ]);
 
-    useEffect(() => {
+    useLayoutEffect(() => {
         listRef.current?.resetAfterIndex(0);
-    }, [items]);
+    }, [items, header?.height]);
 
     useEffect(() => {
         const notSelectedFiles = annotatedFiles.filter(
@@ -731,8 +732,11 @@ export const FileList: React.FC<FileListProps> = ({
     );
 
     const itemSize = useCallback(
-        (index: number) => itemData.items[index]!.height,
-        [itemData],
+        (index: number) =>
+            index == 0 && header && itemData.items[0]?.type == "span"
+                ? header.height
+                : itemData.items[index]!.height,
+        [header, itemData],
     );
 
     const itemKey = useCallback((index: number, itemData: FileListItemData) => {

@@ -21,6 +21,7 @@ import {
 } from "ente-gallery/components/utils/save-groups";
 import type { Collection } from "ente-media/collection";
 import {
+    galleryItemsDescriptionHeight,
     GalleryItemsHeaderAdapter,
     GalleryItemsSummary,
 } from "ente-new/photos/components/gallery/ListHeader";
@@ -34,7 +35,13 @@ import {
 } from "ente-new/photos/services/collection-summary";
 import type { Person } from "ente-new/photos/services/ml/people";
 import { includes } from "ente-utils/type-guards";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, {
+    useCallback,
+    useEffect,
+    useLayoutEffect,
+    useMemo,
+    useState,
+} from "react";
 import { AlbumCastDialog } from "./AlbumCastDialog";
 import {
     CollectionHeader,
@@ -157,7 +164,17 @@ export const GalleryBarAndListHeader: React.FC<
         return !!group && !isSaveComplete(group) && !isSaveCancelled(group);
     }, [saveGroups, activeCollectionID]);
 
+    const albumDescription =
+        activeCollection?.pubMagicMetadata?.data.caption?.trim();
+    const [descriptionHeight, setDescriptionHeight] = useState(0);
+
     useEffect(() => {
+        setDescriptionHeight(
+            albumDescription ? galleryItemsDescriptionHeight : 0,
+        );
+    }, [albumDescription]);
+
+    useLayoutEffect(() => {
         if (shouldHide) return;
 
         const collectionSummary = toShowCollectionSummaries.get(
@@ -187,6 +204,7 @@ export const GalleryBarAndListHeader: React.FC<
                     onCollectionCast={showCollectionCast}
                     onEditAlbumDetails={onEditAlbumDetails}
                     hasActiveFileSelection={hasActiveFileSelection}
+                    onDescriptionHeightChange={setDescriptionHeight}
                 />
             ) : mode != "people" && collectionSummary ? (
                 <GalleryItemsHeaderAdapter>
@@ -203,7 +221,7 @@ export const GalleryBarAndListHeader: React.FC<
             ) : (
                 <></>
             ),
-            height: 68,
+            height: 68 + descriptionHeight,
         });
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [
@@ -223,6 +241,7 @@ export const GalleryBarAndListHeader: React.FC<
         onAddSaveGroup,
         onShowMap,
         onEditAlbumDetails,
+        descriptionHeight,
         // TODO: Cluster
         // This causes a loop since it is an array dep
         // people,
