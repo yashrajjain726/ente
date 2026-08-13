@@ -188,11 +188,10 @@ const CollectionHeaderOptions: React.FC<CollectionHeaderProps> = ({
         async ({ name, description }: AlbumDetails) => {
             if (!activeCollection) return;
 
-            let didMutate = false;
-            let failure: { error: unknown } | undefined;
+            let didAttemptWrite = false;
             try {
-                if (activeCollection.name.trim() != name) {
-                    didMutate = true;
+                if (activeCollection.name != name) {
+                    didAttemptWrite = true;
                     await renameCollection(activeCollection, name);
                 }
                 if (
@@ -200,25 +199,15 @@ const CollectionHeaderOptions: React.FC<CollectionHeaderProps> = ({
                         activeCollection.pubMagicMetadata?.data.caption ?? ""
                     ).trim() != description
                 ) {
-                    didMutate = true;
+                    didAttemptWrite = true;
                     await updateCollectionDescription(
                         activeCollection,
                         description,
                     );
                 }
-            } catch (error) {
-                failure = { error };
+            } finally {
+                if (didAttemptWrite) void onRemotePull({ silent: true });
             }
-
-            if (didMutate) {
-                try {
-                    await onRemotePull({ silent: true, strict: true });
-                } catch (error) {
-                    failure ??= { error };
-                }
-            }
-
-            if (failure) throw failure.error;
         },
         [activeCollection, onRemotePull],
     );

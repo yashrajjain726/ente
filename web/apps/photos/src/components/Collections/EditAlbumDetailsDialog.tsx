@@ -60,7 +60,7 @@ export const EditAlbumDetailsDialog: React.FC<EditAlbumDetailsDialogProps> = ({
     const descriptionLength = albumDescriptionGraphemeCount(trimmedDescription);
     const isDescriptionTooLong = descriptionLength > maxAlbumDescriptionLength;
     const hasChanges =
-        trimmedName != initialName.trim() ||
+        trimmedName != initialName ||
         trimmedDescription != initialDescription.trim();
     const isSaveDisabled =
         !trimmedName ||
