@@ -161,7 +161,7 @@ const DeleteAccountDialogContents: React.FC<
                     await deleteAccount(
                         decryptedChallenge,
                         reason,
-                        feedback.trim() || undefined,
+                        feedback.trim(),
                     );
                     logout();
                 } else {

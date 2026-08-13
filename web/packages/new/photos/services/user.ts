@@ -85,17 +85,13 @@ export const decryptDeleteAccountChallenge = async (
 
 export const deleteAccount = async (
     challenge: string,
-    reasonCategory: string,
-    feedback?: string,
+    reason: string,
+    feedback: string,
 ) =>
     ensureOk(
         await fetch(await apiURL("/users/delete"), {
             method: "DELETE",
             headers: await authenticatedRequestHeaders(),
-            body: JSON.stringify({
-                challenge,
-                reasonCategory,
-                ...(feedback && { feedback }),
-            }),
+            body: JSON.stringify({ challenge, reason, feedback }),
         }),
     );
