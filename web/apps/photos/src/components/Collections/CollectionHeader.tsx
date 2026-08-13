@@ -32,7 +32,6 @@ import {
     OverflowMenu,
     OverflowMenuOption,
 } from "ente-base/components/OverflowMenu";
-import { SingleInputDialog } from "ente-base/components/SingleInputDialog";
 import { useModalVisibility } from "ente-base/components/utils/modal";
 import { useBaseContext } from "ente-base/context";
 import type { AddSaveGroup } from "ente-gallery/components/utils/save-groups";
@@ -56,6 +55,7 @@ import {
     isHiddenCollection,
     leaveSharedCollection,
     renameCollection,
+    updateCollectionDescription,
     updateCollectionOrder,
     updateCollectionSortOrder,
     updateCollectionVisibility,
@@ -75,6 +75,10 @@ import { usePhotosAppContext } from "ente-new/photos/types/context";
 import { t } from "i18next";
 import React, { useCallback, useRef } from "react";
 import { Trans } from "react-i18next";
+import {
+    EditAlbumDetailsDialog,
+    type AlbumDetails,
+} from "./EditAlbumDetailsDialog";
 
 export interface CollectionHeaderProps {
     collectionSummary: CollectionSummary;
@@ -152,8 +156,10 @@ const CollectionHeaderOptions: React.FC<CollectionHeaderProps> = ({
 
     const { show: showSortOrderMenu, props: sortOrderMenuVisibilityProps } =
         useModalVisibility();
-    const { show: showAlbumNameInput, props: albumNameInputVisibilityProps } =
-        useModalVisibility();
+    const {
+        show: showEditAlbumDetails,
+        props: editAlbumDetailsVisibilityProps,
+    } = useModalVisibility();
 
     const { type: collectionSummaryType, fileCount } = collectionSummary;
     const isQuickLinkAlbum =
@@ -178,12 +184,29 @@ const CollectionHeaderOptions: React.FC<CollectionHeaderProps> = ({
         [showLoadingBar, hideLoadingBar, onGenericError, onRemotePull],
     );
 
-    const handleRenameCollection = useCallback(
-        async (newName: string) => {
+    const handleEditAlbumDetails = useCallback(
+        async ({ name, description }: AlbumDetails) => {
             if (!activeCollection) return;
-            if (activeCollection.name !== newName) {
-                await renameCollection(activeCollection, newName);
-                void onRemotePull({ silent: true });
+
+            let didAttemptWrite = false;
+            try {
+                if (activeCollection.name != name) {
+                    didAttemptWrite = true;
+                    await renameCollection(activeCollection, name);
+                }
+                if (
+                    (
+                        activeCollection.pubMagicMetadata?.data.caption ?? ""
+                    ).trim() != description
+                ) {
+                    didAttemptWrite = true;
+                    await updateCollectionDescription(
+                        activeCollection,
+                        description,
+                    );
+                }
+            } finally {
+                if (didAttemptWrite) void onRemotePull({ silent: true });
             }
         },
         [activeCollection, onRemotePull],
@@ -582,13 +605,15 @@ const CollectionHeaderOptions: React.FC<CollectionHeaderProps> = ({
                 break;
             }
             menuOptions = [
-                <OverflowMenuOption
-                    key="rename"
-                    onClick={showAlbumNameInput}
-                    startIcon={<EditIcon />}
-                >
-                    {t("rename_album")}
-                </OverflowMenuOption>,
+                activeCollection && (
+                    <OverflowMenuOption
+                        key="edit-details"
+                        onClick={showEditAlbumDetails}
+                        startIcon={<EditIcon />}
+                    >
+                        {t("edit_details")}
+                    </OverflowMenuOption>
+                ),
                 canSetAlbumCover && (
                     <OverflowMenuOption
                         key="set-cover"
@@ -731,15 +756,17 @@ const CollectionHeaderOptions: React.FC<CollectionHeaderProps> = ({
                 onAscClick={changeSortOrderAsc}
                 onDescClick={changeSortOrderDesc}
             />
-            <SingleInputDialog
-                {...albumNameInputVisibilityProps}
-                title={t("rename_album")}
-                label={t("album_name")}
-                initialValue={activeCollection?.name}
-                submitButtonColor="primary"
-                submitButtonTitle={t("rename")}
-                onSubmit={handleRenameCollection}
-            />
+            {activeCollection && editAlbumDetailsVisibilityProps.open && (
+                <EditAlbumDetailsDialog
+                    key={activeCollection.id}
+                    {...editAlbumDetailsVisibilityProps}
+                    initialName={activeCollection.name}
+                    initialDescription={
+                        activeCollection.pubMagicMetadata?.data.caption ?? ""
+                    }
+                    onSubmit={handleEditAlbumDetails}
+                />
+            )}
         </Box>
     );
 };
