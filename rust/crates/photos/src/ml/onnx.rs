@@ -3,12 +3,15 @@ use std::{fmt, path::Path};
 
 use crate::ml::error::{MlError, MlResult};
 use crate::ml::golden;
-#[cfg(any(target_os = "android", target_os = "linux", target_os = "windows"))]
-use crate::ml::webgpu;
 
 mod coreml_cache;
 mod providers;
 mod tensor;
+mod webgpu;
+
+pub(crate) fn set_webgpu_enabled(enabled: bool) {
+    webgpu::set_enabled(enabled);
+}
 
 pub(crate) use ort::session::Session as SessionHandle;
 pub(crate) use providers::ExecutionMode;

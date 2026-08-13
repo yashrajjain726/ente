@@ -7,6 +7,7 @@ use crate::ml::{
         thumbnail::{FaceBox, generate_face_thumbnails},
     },
     model::{self, Model},
+    onnx,
     pet::{
         run_pet_body_detection, run_pet_body_embedding, run_pet_face_alignment,
         run_pet_face_detection, run_pet_face_embedding,
@@ -14,7 +15,6 @@ use crate::ml::{
     preprocess,
     runtime::{self, ModelPaths},
     types::{self, ClipResult, Dimensions, FaceResult, PetBodyResult, PetFaceResult},
-    webgpu,
 };
 use ente_image::decode::{decode_image_from_bytes, decode_image_from_path};
 
@@ -62,7 +62,7 @@ pub struct RunClipTextResult {
 
 // Call before creating sessions; existing sessions keep their configuration.
 pub fn set_ml_execution_config(enable_webgpu: bool) {
-    webgpu::set_enabled(enable_webgpu);
+    onnx::set_webgpu_enabled(enable_webgpu);
 }
 
 pub fn init_ml_runtime(model_paths: ModelPaths) {

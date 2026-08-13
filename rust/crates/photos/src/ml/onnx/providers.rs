@@ -19,18 +19,6 @@ use ort::ep::{
 #[cfg(target_os = "android")]
 use std::num::NonZeroUsize;
 
-use crate::ml::error::MlResult;
-#[cfg(any(
-    target_os = "android",
-    target_os = "ios",
-    target_os = "linux",
-    target_os = "macos",
-    target_os = "windows"
-))]
-use crate::ml::golden;
-#[cfg(any(target_os = "android", target_os = "linux", target_os = "windows"))]
-use crate::ml::webgpu;
-
 #[cfg(any(target_os = "ios", target_os = "macos"))]
 use super::coreml_cache;
 #[cfg(any(
@@ -41,6 +29,17 @@ use super::coreml_cache;
     target_os = "windows"
 ))]
 use super::model_file_label;
+#[cfg(any(target_os = "android", target_os = "linux", target_os = "windows"))]
+use super::webgpu;
+use crate::ml::error::MlResult;
+#[cfg(any(
+    target_os = "android",
+    target_os = "ios",
+    target_os = "linux",
+    target_os = "macos",
+    target_os = "windows"
+))]
+use crate::ml::golden;
 
 #[cfg(any(target_os = "ios", target_os = "macos"))]
 const ENABLE_PERSISTENT_COREML_CACHE: bool = true;
