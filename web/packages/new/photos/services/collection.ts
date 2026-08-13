@@ -971,7 +971,7 @@ export const updateCollectionSortOrder = async (
 export const updateCollectionCover = async (
     collection: Collection,
     coverID: number,
-) => updateCollectionPublicMagicMetadata(collection, { coverID });
+) => updateCollectionDetails(collection, { coverID });
 
 const albumDescriptionSegmenter =
     typeof Intl !== "undefined" && "Segmenter" in Intl
@@ -986,19 +986,33 @@ export const albumDescriptionGraphemeCount = (description: string) =>
 export const updateCollectionDescription = async (
     collection: Collection,
     description: string,
+) => updateCollectionDetails(collection, { description });
+
+interface CollectionDetailsUpdates {
+    description?: string;
+    coverID?: number;
+}
+
+export const updateCollectionDetails = async (
+    collection: Collection,
+    { description, coverID }: CollectionDetailsUpdates,
 ) => {
-    const normalizedDescription = description.trim();
-    if (
-        albumDescriptionGraphemeCount(normalizedDescription) >
-        maxAlbumDescriptionLength
-    ) {
-        throw new Error(
-            `Album descriptions cannot exceed ${maxAlbumDescriptionLength} characters`,
-        );
+    const updates: CollectionPublicMagicMetadataData = {};
+    if (description !== undefined) {
+        const normalizedDescription = description.trim();
+        if (
+            albumDescriptionGraphemeCount(normalizedDescription) >
+            maxAlbumDescriptionLength
+        ) {
+            throw new Error(
+                `Album descriptions cannot exceed ${maxAlbumDescriptionLength} characters`,
+            );
+        }
+        updates.caption = normalizedDescription;
     }
-    return updateCollectionPublicMagicMetadata(collection, {
-        caption: normalizedDescription,
-    });
+    if (coverID !== undefined) updates.coverID = coverID;
+
+    return updateCollectionPublicMagicMetadata(collection, updates);
 };
 
 export const updateCollectionLayout = async (

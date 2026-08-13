@@ -116,8 +116,7 @@ import {
     removeFromCollection,
     removeFromFavoritesCollection,
     renameCollection,
-    updateCollectionCover,
-    updateCollectionDescription,
+    updateCollectionDetails,
 } from "ente-new/photos/services/collection";
 import {
     haveOnlySystemCollections,
@@ -1499,20 +1498,18 @@ const Page: React.FC = () => {
                     didAttemptWrite = true;
                     await renameCollection(activeCollection, name);
                 }
-                if (
+                const descriptionChanged =
                     (
                         activeCollection.pubMagicMetadata?.data.caption ?? ""
-                    ).trim() != description
-                ) {
+                    ).trim() != description;
+                if (descriptionChanged || coverID !== undefined) {
                     didAttemptWrite = true;
-                    await updateCollectionDescription(
-                        activeCollection,
-                        description,
-                    );
-                }
-                if (coverID !== undefined) {
-                    didAttemptWrite = true;
-                    await updateCollectionCover(activeCollection, coverID);
+                    await updateCollectionDetails(activeCollection, {
+                        description: descriptionChanged
+                            ? description
+                            : undefined,
+                        coverID,
+                    });
                 }
             } finally {
                 if (didAttemptWrite) {
