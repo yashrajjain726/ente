@@ -11,13 +11,35 @@ mod providers;
 mod tensor;
 
 pub(crate) use ort::session::Session as SessionHandle;
-pub(crate) use providers::{ExecutionMode, ExecutionProvider};
+pub(crate) use providers::ExecutionMode;
 pub(crate) use tensor::{
     BorrowedFloatTensor, FloatTensorData, PreparedF32Input, run_f32, run_golden_tensor,
     run_i32_f32, with_prepared_float_output,
 };
 
-use providers::ProviderPlan;
+use providers::{ExecutionProvider, ProviderPlan};
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(crate) struct ProviderUsage {
+    pub(crate) coreml: bool,
+    pub(crate) webgpu: bool,
+}
+
+impl ProviderUsage {
+    fn from_provider(provider: ExecutionProvider) -> Self {
+        Self {
+            coreml: provider == ExecutionProvider::CoreMl,
+            webgpu: provider == ExecutionProvider::WebGpu,
+        }
+    }
+
+    pub(crate) fn merge(self, other: Self) -> Self {
+        Self {
+            coreml: self.coreml || other.coreml,
+            webgpu: self.webgpu || other.webgpu,
+        }
+    }
+}
 
 #[derive(Debug)]
 pub(crate) struct OnnxSession {
@@ -50,7 +72,7 @@ impl OnnxSession {
         model_path: &str,
         model_namespace: &str,
         mut operation: impl FnMut(&mut Session) -> SessionRunResult<T>,
-    ) -> MlResult<(T, ExecutionProvider)> {
+    ) -> MlResult<(T, ProviderUsage)> {
         loop {
             self.ensure_loaded(model_path, model_namespace)?;
 
@@ -64,7 +86,9 @@ impl OnnxSession {
                 .as_mut()
                 .expect("session must be loaded before model execution");
             match operation(session) {
-                Ok(value) => return Ok((value, execution_provider)),
+                Ok(value) => {
+                    return Ok((value, ProviderUsage::from_provider(execution_provider)));
+                }
                 Err(error) => {
                     if self.retry_after_provider_failure(&error) {
                         continue;

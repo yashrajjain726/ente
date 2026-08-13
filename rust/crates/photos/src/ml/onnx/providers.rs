@@ -55,7 +55,7 @@ pub(crate) enum ExecutionMode {
 // fallback providers, for result attribution.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[allow(dead_code)] // Accelerated variants are constructed only on their target OS.
-pub(crate) enum ExecutionProvider {
+pub(super) enum ExecutionProvider {
     CoreMl,
     WebGpu,
     Xnnpack,

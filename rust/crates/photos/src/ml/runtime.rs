@@ -32,26 +32,10 @@ struct ModelSlot {
     state: Mutex<ModelSlotState>,
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub(crate) struct UsedProviders {
-    pub(crate) coreml: bool,
-    pub(crate) webgpu: bool,
-}
-
-impl UsedProviders {
-    fn record(&mut self, provider: onnx::ExecutionProvider) {
-        match provider {
-            onnx::ExecutionProvider::CoreMl => self.coreml = true,
-            onnx::ExecutionProvider::WebGpu => self.webgpu = true,
-            onnx::ExecutionProvider::Xnnpack | onnx::ExecutionProvider::Cpu => {}
-        }
-    }
-}
-
 pub(crate) struct MlRuntimeView<'a> {
     runtime: &'a MlRuntime,
     model_paths: &'a ModelPaths,
-    used_providers: Cell<UsedProviders>,
+    provider_usage: Cell<onnx::ProviderUsage>,
 }
 
 impl ModelSlot {
@@ -108,7 +92,7 @@ impl ModelSlot {
         &self,
         path: &str,
         operation: impl FnMut(&mut onnx::SessionHandle) -> onnx::SessionRunResult<T>,
-    ) -> MlResult<(T, onnx::ExecutionProvider)> {
+    ) -> MlResult<(T, onnx::ProviderUsage)> {
         if path.trim().is_empty() {
             return Err(MlError::InvalidRequest(self.model.missing_path_error()));
         }
@@ -173,8 +157,8 @@ impl MlRuntime {
 }
 
 impl<'a> MlRuntimeView<'a> {
-    pub(crate) fn used_providers(&self) -> UsedProviders {
-        self.used_providers.get()
+    pub(crate) fn provider_usage(&self) -> onnx::ProviderUsage {
+        self.provider_usage.get()
     }
 
     pub(crate) fn run<T>(
@@ -182,13 +166,12 @@ impl<'a> MlRuntimeView<'a> {
         model: Model,
         operation: impl FnMut(&mut onnx::SessionHandle) -> onnx::SessionRunResult<T>,
     ) -> MlResult<T> {
-        let (value, execution_provider) = self
+        let (value, provider_usage) = self
             .runtime
             .slot(model)
             .run(self.model_paths.get(model), operation)?;
-        let mut used = self.used_providers.get();
-        used.record(execution_provider);
-        self.used_providers.set(used);
+        self.provider_usage
+            .set(self.provider_usage.get().merge(provider_usage));
         Ok(value)
     }
 }
@@ -223,7 +206,7 @@ pub(crate) fn with_runtime<R>(
     let runtime_view = MlRuntimeView {
         runtime: &GLOBAL_RUNTIME,
         model_paths,
-        used_providers: Cell::new(UsedProviders::default()),
+        provider_usage: Cell::new(onnx::ProviderUsage::default()),
     };
     func(&runtime_view)
 }

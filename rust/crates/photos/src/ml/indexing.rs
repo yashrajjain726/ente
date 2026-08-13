@@ -217,7 +217,7 @@ fn analyze_image_inner(
         };
 
         operation.set_stage(AnalysisStage::Finalize);
-        let used_providers = runtime.used_providers();
+        let provider_usage = runtime.provider_usage();
         Ok(AnalyzeImageResult {
             file_id,
             decoded_image_size: dims,
@@ -226,8 +226,8 @@ fn analyze_image_inner(
             clip,
             pet_faces,
             pet_bodies,
-            used_coreml: used_providers.coreml,
-            used_webgpu: used_providers.webgpu,
+            used_coreml: provider_usage.coreml,
+            used_webgpu: provider_usage.webgpu,
         })
     })
 }
