@@ -18,6 +18,7 @@ import {
     TextField,
     Typography,
 } from "@mui/material";
+import { ActivityErrorIndicator } from "ente-base/components/ErrorIndicator";
 import { SpacedRow } from "ente-base/components/containers";
 import { ActivityIndicator } from "ente-base/components/mui/ActivityIndicator";
 import { DialogCloseIconButton } from "ente-base/components/mui/DialogCloseIconButton";
@@ -25,7 +26,6 @@ import { LoadingButton } from "ente-base/components/mui/LoadingButton";
 import type { ModalVisibilityProps } from "ente-base/components/utils/modal";
 import { useBaseContext } from "ente-base/context";
 import { isHTTPErrorWithStatus } from "ente-base/http";
-import { formattedNumber } from "ente-base/i18n";
 import log from "ente-base/log";
 import {
     uploadSheetMediaQuery,
@@ -49,6 +49,8 @@ import { Trans } from "react-i18next";
 type DeleteAccountProps = ModalVisibilityProps & {
     onAuthenticateUser: () => Promise<void>;
 };
+
+type SummaryPhase = "loading" | "ready" | "failed";
 
 const surfaceRadius = "20px";
 const fieldRadius = "16px";
@@ -114,8 +116,27 @@ const DeleteAccountDialogContents: React.FC<
     const [step, setStep] = useState<"reason" | "confirmation">("reason");
     const [acceptDataDeletion, setAcceptDataDeletion] = useState(false);
     const [loading, setLoading] = useState(false);
-    const [summaryLoading, setSummaryLoading] = useState(false);
+    const [summaryPhase, setSummaryPhase] = useState<SummaryPhase>("loading");
     const [summary, setSummary] = useState<AccountDeletionSummary>();
+
+    const canConfirmDeletion = summaryPhase == "ready";
+
+    const loadSummary = async () => {
+        setSummaryPhase("loading");
+        try {
+            setSummary(await getAccountDeletionSummary());
+            setSummaryPhase("ready");
+        } catch (e) {
+            setSummary(undefined);
+            if (isHTTPErrorWithStatus(e, 404)) {
+                log.info("Account deletion summary is not supported by museum");
+                setSummaryPhase("ready");
+            } else {
+                log.warn("Failed to load account deletion summary", e);
+                setSummaryPhase("failed");
+            }
+        }
+    };
 
     const formik = useFormik<{ reason: DeleteReason | ""; feedback: string }>({
         initialValues: { reason: "", feedback: "" },
@@ -133,25 +154,20 @@ const DeleteAccountDialogContents: React.FC<
         },
         onSubmit: async ({ reason, feedback }) => {
             if (step == "reason") {
-                setStep("confirmation");
-                setSummaryLoading(true);
                 try {
-                    setSummary(await getAccountDeletionSummary());
+                    setLoading(true);
+                    await onAuthenticateUser();
+                    setStep("confirmation");
+                    await loadSummary();
                 } catch (e) {
-                    if (isHTTPErrorWithStatus(e, 404)) {
-                        log.info(
-                            "Account deletion summary is not supported by museum",
-                        );
-                    } else {
-                        onGenericError(e);
-                    }
+                    onGenericError(e);
                 } finally {
-                    setSummaryLoading(false);
+                    setLoading(false);
                 }
                 return;
             }
 
-            if (summaryLoading || !acceptDataDeletion) return;
+            if (!canConfirmDeletion || !acceptDataDeletion) return;
 
             try {
                 setLoading(true);
@@ -159,7 +175,6 @@ const DeleteAccountDialogContents: React.FC<
                     await getAccountDeleteChallenge();
 
                 if (allowDelete && encryptedChallenge) {
-                    await onAuthenticateUser();
                     const decryptedChallenge =
                         await decryptDeleteAccountChallenge(encryptedChallenge);
                     await deleteAccount(
@@ -430,7 +445,7 @@ const DeleteAccountDialogContents: React.FC<
                         </Stack>
                     ) : (
                         <Stack sx={{ gap: "12px" }}>
-                            {summaryLoading ? (
+                            {summaryPhase == "loading" ? (
                                 <Box
                                     sx={{
                                         height: "196px",
@@ -444,31 +459,54 @@ const DeleteAccountDialogContents: React.FC<
                                         sx={{ color: "text.base" }}
                                     />
                                 </Box>
+                            ) : summaryPhase == "failed" ? (
+                                <Stack
+                                    sx={{
+                                        height: "196px",
+                                        gap: "12px",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                    }}
+                                >
+                                    <ActivityErrorIndicator />
+                                    <LoadingButton
+                                        color="secondary"
+                                        onClick={() => void loadSummary()}
+                                    >
+                                        {t("try_again")}
+                                    </LoadingButton>
+                                </Stack>
                             ) : (
                                 <Stack sx={{ gap: "8px" }}>
                                     <SummaryRow
                                         icon={<EntePhotosIcon />}
                                         unit={t(
                                             "delete_account_summary_photos_and_videos",
+                                            summary && {
+                                                count: summary.photosAndVideosCount,
+                                            },
                                         )}
                                         app={t("title_photos")}
-                                        count={summary?.photosAndVideosCount}
                                     />
                                     <SummaryRow
                                         icon={<EnteAuthIcon />}
                                         unit={t(
                                             "delete_account_summary_authenticator_codes",
+                                            summary && {
+                                                count: summary.authenticatorCodesCount,
+                                            },
                                         )}
                                         app={t("title_auth")}
-                                        count={summary?.authenticatorCodesCount}
                                     />
                                     <SummaryRow
                                         icon={<EnteLockerIcon />}
                                         unit={t(
                                             "delete_account_summary_records",
+                                            summary && {
+                                                count: summary.lockerRecordsCount,
+                                            },
                                         )}
                                         app={t("title_locker")}
-                                        count={summary?.lockerRecordsCount}
                                     />
                                 </Stack>
                             )}
@@ -483,7 +521,7 @@ const DeleteAccountDialogContents: React.FC<
                                     <Checkbox
                                         size="small"
                                         checked={acceptDataDeletion}
-                                        disabled={summaryLoading}
+                                        disabled={!canConfirmDeletion}
                                         onChange={(e) =>
                                             setAcceptDataDeletion(
                                                 e.target.checked,
@@ -521,7 +559,7 @@ const DeleteAccountDialogContents: React.FC<
                         disabled={
                             isReasonStep
                                 ? !formik.values.reason
-                                : summaryLoading || !acceptDataDeletion
+                                : !canConfirmDeletion || !acceptDataDeletion
                         }
                         loading={loading}
                         sx={(theme) => ({
@@ -563,10 +601,9 @@ interface SummaryRowProps {
     icon: React.ReactNode;
     unit: string;
     app: string;
-    count?: number | undefined;
 }
 
-const SummaryRow: React.FC<SummaryRowProps> = ({ icon, unit, app, count }) => (
+const SummaryRow: React.FC<SummaryRowProps> = ({ icon, unit, app }) => (
     <Stack
         direction="row"
         sx={(theme) => ({
@@ -584,9 +621,7 @@ const SummaryRow: React.FC<SummaryRowProps> = ({ icon, unit, app, count }) => (
         <Box sx={{ lineHeight: 0, flexShrink: 0 }}>{icon}</Box>
         <Stack sx={{ gap: "4px" }}>
             <Typography variant="small" sx={bodyFont}>
-                {count == undefined
-                    ? unit
-                    : `${formattedNumber(count)} ${unit}`}
+                {unit}
             </Typography>
             <Typography
                 variant="mini"
