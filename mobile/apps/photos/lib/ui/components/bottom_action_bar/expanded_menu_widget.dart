@@ -21,7 +21,6 @@ class ExpandedMenuWidget extends StatelessWidget {
     double combinedHeightOfItems = 0.0;
 
     for (List<BlurMenuItemWidget> group in items) {
-      //no divider if there is only one item in the section/group
       if (group.length != 1) {
         numberOfDividers += (group.length - 1);
       }

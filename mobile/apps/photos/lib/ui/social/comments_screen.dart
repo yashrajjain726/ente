@@ -26,7 +26,6 @@ import "package:photos/ui/social/widgets/comment_input_widget.dart";
 
 final _commentDraftStore = CommentDraftStore.instance;
 
-/// Shows the file comments bottom sheet
 Future<void> showFileCommentsBottomSheet(
   BuildContext context, {
   required int collectionID,
@@ -112,17 +111,12 @@ class FileCommentsBottomSheet extends StatefulWidget {
   final int fileID;
   final List<Collection>? sharedCollections;
 
-  /// Optional comment ID to scroll to and highlight.
   final String? highlightCommentID;
 
-  /// Whether an unsent draft in another collection may override
-  /// [collectionID] when the sheet opens.
   final bool preferDraftCollection;
 
-  /// Scroll controller for the drag handle (from DraggableScrollableSheet).
   final ScrollController dragController;
 
-  /// Controller to programmatically expand/collapse the sheet.
   final DraggableScrollableController sheetController;
 
   const FileCommentsBottomSheet({
@@ -229,7 +223,6 @@ class _FileCommentsBottomSheetState extends State<FileCommentsBottomSheet> {
           includeHidden: _isOpenedFromHiddenCollection(),
         );
 
-    // Fetch data in parallel
     final sharedCollections = await Future.wait(
       sharedCollectionsList.map((collection) async {
         final commentCount = await SocialDataProvider.instance
@@ -282,7 +275,6 @@ class _FileCommentsBottomSheetState extends State<FileCommentsBottomSheet> {
   Future<void> _loadInitialComments() async {
     setState(() => _isLoading = true);
 
-    // Load local data first for immediate display
     final results = await Future.wait([
       SocialDataProvider.instance.getCommentsForFilePaginated(
         widget.fileID,
@@ -307,10 +299,8 @@ class _FileCommentsBottomSheetState extends State<FileCommentsBottomSheet> {
     });
     unawaited(_syncMissingAnonDisplayNamesFor(comments));
 
-    // Scroll to highlighted comment if specified
     _scrollToHighlightedComment();
 
-    // Sync in background and refresh if there are changes
     unawaited(_syncAndRefresh());
   }
 
@@ -323,7 +313,6 @@ class _FileCommentsBottomSheetState extends State<FileCommentsBottomSheet> {
 
       if (!mounted) return;
 
-      // Reload comments and any already-synced anonymous names after sync.
       final results = await Future.wait([
         SocialDataProvider.instance.getCommentsForFilePaginated(
           widget.fileID,
@@ -447,7 +436,6 @@ class _FileCommentsBottomSheetState extends State<FileCommentsBottomSheet> {
     _scrollTargetCommentID =
         parentCommentID; // Set immediately for race detection
 
-    // Check if already loaded
     int index = _comments.indexWhere((c) => c.id == parentCommentID);
 
     if (index != -1) {
@@ -455,7 +443,6 @@ class _FileCommentsBottomSheetState extends State<FileCommentsBottomSheet> {
       return;
     }
 
-    // Parent not in loaded comments - need to load more
     while (_hasMoreComments) {
       await _loadMoreComments();
 
@@ -471,8 +458,6 @@ class _FileCommentsBottomSheetState extends State<FileCommentsBottomSheet> {
         return;
       }
     }
-
-    // Parent not found (deleted) - do nothing silently
   }
 
   void _performScrollToIndex(int index, String commentID) {
@@ -503,7 +488,6 @@ class _FileCommentsBottomSheetState extends State<FileCommentsBottomSheet> {
             curve: Curves.easeOutExpo,
           );
         }
-        // Clear scroll target and trigger highlight
         _scrollTargetCommentID = null;
         _scrollTargetKey = null;
         if (mounted) {
@@ -586,7 +570,6 @@ class _FileCommentsBottomSheetState extends State<FileCommentsBottomSheet> {
         return;
       }
 
-      // Update UI only after successful persistence
       _clearDraftForCollection(collectionID);
       if (mounted) {
         setState(() {
@@ -598,7 +581,6 @@ class _FileCommentsBottomSheetState extends State<FileCommentsBottomSheet> {
             }
           }
 
-          // Update comment count in shared collections list
           final index = _sharedCollections.indexWhere(
             (c) => c.collection.id == collectionID,
           );
@@ -615,7 +597,6 @@ class _FileCommentsBottomSheetState extends State<FileCommentsBottomSheet> {
           _textController.clear();
         }
 
-        // Scroll to the newly added comment (position 0 in reversed list)
         if (_selectedCollectionID == collectionID &&
             _scrollController.hasClients) {
           unawaited(
@@ -650,7 +631,6 @@ class _FileCommentsBottomSheetState extends State<FileCommentsBottomSheet> {
     setState(() {
       _comments.removeWhere((c) => c.id == commentId);
 
-      // Decrement comment count in shared collections list
       final index = _sharedCollections.indexWhere(
         (c) => c.collection.id == _selectedCollectionID,
       );

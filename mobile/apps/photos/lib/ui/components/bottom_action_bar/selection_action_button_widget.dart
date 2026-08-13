@@ -2,7 +2,6 @@ import "package:ente_components/ente_components.dart" as components;
 import "package:flutter/material.dart";
 import "package:hugeicons/hugeicons.dart";
 
-/// Pass [hugeIcon], or [iconWidget] for custom assets.
 class SelectionActionButton extends StatelessWidget {
   final String labelText;
   final List<List<dynamic>>? hugeIcon;

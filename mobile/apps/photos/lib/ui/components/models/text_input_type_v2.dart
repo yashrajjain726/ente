@@ -1,18 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:photos/theme/colors.dart';
 
-/// Message types for TextInputWidgetV2 helper text
 enum TextInputMessageType {
-  /// Muted helper text, no icon (default)
   guide,
 
-  /// Red error text, no icon
   error,
 
-  /// Red alert text with warning icon
   alert,
 
-  /// Green success text with checkmark icon
   success,
 }
 
