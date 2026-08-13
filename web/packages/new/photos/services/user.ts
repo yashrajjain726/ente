@@ -47,6 +47,22 @@ const DeleteChallengeResponse = z.object({
     encryptedChallenge: z.string().nullish().transform(nullToUndefined),
 });
 
+const AccountDeletionSummary = z.object({
+    photosAndVideosCount: z.number().int(),
+    authenticatorCodesCount: z.number().int(),
+    lockerRecordsCount: z.number().int(),
+});
+
+export type AccountDeletionSummary = z.infer<typeof AccountDeletionSummary>;
+
+export const getAccountDeletionSummary = async () => {
+    const res = await fetch(await apiURL("/users/deletion-summary"), {
+        headers: await authenticatedRequestHeaders(),
+    });
+    ensureOk(res);
+    return AccountDeletionSummary.parse(await res.json());
+};
+
 export const getAccountDeleteChallenge = async () => {
     const res = await fetch(await apiURL("/users/delete-challenge"), {
         headers: await authenticatedRequestHeaders(),
@@ -64,13 +80,17 @@ export const decryptDeleteAccountChallenge = async (
 
 export const deleteAccount = async (
     challenge: string,
-    reason: string,
-    feedback: string,
+    reasonCategory: string,
+    feedback?: string,
 ) =>
     ensureOk(
         await fetch(await apiURL("/users/delete"), {
             method: "DELETE",
             headers: await authenticatedRequestHeaders(),
-            body: JSON.stringify({ challenge, reason, feedback }),
+            body: JSON.stringify({
+                challenge,
+                reasonCategory,
+                ...(feedback && { feedback }),
+            }),
         }),
     );

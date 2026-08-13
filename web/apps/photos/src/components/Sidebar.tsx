@@ -948,7 +948,7 @@ const Account: React.FC<AccountProps> = ({
     pendingAction,
     onActionHandled,
 }) => {
-    const { showMiniDialog } = useBaseContext();
+    const { showMiniDialog, onGenericError } = useBaseContext();
     const userDetails = useUserDetailsSnapshot();
 
     const router = useRouter();
@@ -1033,6 +1033,15 @@ const Account: React.FC<AccountProps> = ({
         showSessions();
     }, [onAuthenticateUser, showSessions]);
 
+    const handleDeleteAccount = useCallback(async () => {
+        try {
+            await onAuthenticateUser();
+            showDeleteAccount();
+        } catch (error) {
+            if (!isReauthenticationCancellation(error)) onGenericError(error);
+        }
+    }, [onAuthenticateUser, onGenericError, showDeleteAccount]);
+
     useEffect(() => {
         if (!open || !pendingAction) return;
         switch (pendingAction) {
@@ -1056,7 +1065,7 @@ const Account: React.FC<AccountProps> = ({
                 handleChangeEmail();
                 break;
             case "account.deleteAccount":
-                showDeleteAccount();
+                void handleDeleteAccount();
                 break;
             case "account.sessions":
                 void handleActiveSessions();
@@ -1068,12 +1077,12 @@ const Account: React.FC<AccountProps> = ({
         handleActiveSessions,
         handleChangeEmail,
         handleChangePassword,
+        handleDeleteAccount,
         handleRecoveryKey,
         handlePasskeys,
         open,
         onActionHandled,
         pendingAction,
-        showDeleteAccount,
         showTwoFactor,
     ]);
 
@@ -1124,7 +1133,7 @@ const Account: React.FC<AccountProps> = ({
                     <RowButton
                         color="critical"
                         label={t("delete_account")}
-                        onClick={showDeleteAccount}
+                        onClick={() => void handleDeleteAccount()}
                     />
                 </RowButtonGroup>
             </Stack>
@@ -1146,10 +1155,7 @@ const Account: React.FC<AccountProps> = ({
                 {...sessionsVisibilityProps}
                 onRootClose={onRootClose}
             />
-            <DeleteAccount
-                {...deleteAccountVisibilityProps}
-                {...{ onAuthenticateUser }}
-            />
+            <DeleteAccount {...deleteAccountVisibilityProps} />
         </TitledNestedSidebarDrawer>
     );
 };
