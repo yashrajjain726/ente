@@ -239,7 +239,6 @@ extension DeviceFiles on FilesDB {
       // delete existing pathIDs which are missing on device
       existingPathIds.removeAll(devicePathInfo.map((e) => e.item1.id).toSet());
       if (existingPathIds.isNotEmpty) {
-        hasUpdated = true;
         _logger.info(
           'Deleting non-backed up pathIds from local '
           '$existingPathIds',
@@ -250,12 +249,14 @@ extension DeviceFiles on FilesDB {
           // feature, where we delete files which are backed up. Deleting such
           // entries here result in us losing out on the information that
           // those folders were marked for automatic backup.
-          await db.execute(
+          final deletedRows = await db.execute(
             '''
-            DELETE FROM device_collections WHERE id = ? AND should_backup = $_sqlBoolFalse;
+            DELETE FROM device_collections WHERE id = ? AND should_backup = $_sqlBoolFalse
+            RETURNING id;
           ''',
             [pathID],
           );
+          hasUpdated |= deletedRows.isNotEmpty;
           await db.execute(
             '''
             DELETE FROM device_files WHERE path_id = ?;
