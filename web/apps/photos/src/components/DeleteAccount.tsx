@@ -400,7 +400,7 @@ const DeleteAccountDialogContents: React.FC<
                                 >
                                     <ActivityIndicator
                                         thickness={5}
-                                        sx={{ color: "common.white" }}
+                                        sx={{ color: "text.base" }}
                                     />
                                 </Box>
                             ) : (
@@ -483,6 +483,14 @@ const DeleteAccountDialogContents: React.FC<
                             height: "48px",
                             padding: "14px 24px",
                             borderRadius: surfaceRadius,
+                            ...(isReasonStep &&
+                                theme.applyStyles("light", {
+                                    backgroundColor: "critical.main",
+                                    color: "critical.contrastText",
+                                    "&:hover": {
+                                        backgroundColor: "critical.dark",
+                                    },
+                                })),
                             ...(!loading && {
                                 "&.Mui-disabled": {
                                     backgroundColor: lightDisabledFill,
