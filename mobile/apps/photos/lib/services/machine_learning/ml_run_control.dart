@@ -4,6 +4,7 @@ enum MlStopReason {
   foregroundActive,
   backgroundDeadline,
   controller,
+  logout,
   manual,
   corruptModel,
 }

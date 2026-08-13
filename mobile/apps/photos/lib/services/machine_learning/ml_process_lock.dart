@@ -11,6 +11,7 @@ enum MlOperation {
   startupRemoteHydration,
   clipVectorMigration,
   clusterCentroidVectorMigration,
+  clearData,
 }
 
 enum MlLockAttempt {

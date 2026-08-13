@@ -598,7 +598,10 @@ class MLDataDB with SqlDbBase implements IMLDataDB<int> {
   }
 
   @override
-  Future<void> clearTable() async {
+  Future<void> clearTable() =>
+      _runMlOperationExclusive(MlOperation.clearData, _clearTable);
+
+  Future<void> _clearTable() async {
     final db = await asyncDB;
 
     await db.execute(deleteFacesTable);
@@ -1859,7 +1862,7 @@ class MLDataDB with SqlDbBase implements IMLDataDB<int> {
     if (!force && await _clusterCentroidVectorDB.checkIfMigrationDone()) {
       return;
     }
-    await _runVectorMigrationExclusive(
+    await _runMlOperationExclusive(
       MlOperation.clusterCentroidVectorMigration,
       () => _checkMigrateFillClusterCentroidVectorDB(force: force),
     );
@@ -2168,7 +2171,7 @@ class MLDataDB with SqlDbBase implements IMLDataDB<int> {
     if (!force && await _clipVectorDB.checkIfMigrationDone()) {
       return;
     }
-    await _runVectorMigrationExclusive(
+    await _runMlOperationExclusive(
       MlOperation.clipVectorMigration,
       () => _checkMigrateFillClipVectorDB(force: force),
     );
@@ -2319,13 +2322,13 @@ class MLDataDB with SqlDbBase implements IMLDataDB<int> {
     });
   }
 
-  Future<void> _runVectorMigrationExclusive(
+  Future<void> _runMlOperationExclusive(
     MlOperation operation,
-    Future<void> Function() migration,
+    Future<void> Function() body,
   ) async {
     final attempt = await MlProcessLock.instance.tryRunExclusive(
       operation,
-      migration,
+      body,
       background: isProcessBg,
       waitForAvailability: true,
     );
