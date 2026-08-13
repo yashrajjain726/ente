@@ -20,6 +20,11 @@ import {
 } from "ente-base/components/utils/modal";
 import { useBaseContext } from "ente-base/context";
 import {
+    uploadSheetMediaQuery,
+    uploadSheetPaperSx,
+    useIsUploadSheet,
+} from "ente-gallery/components/upload-progress/bottom-sheet";
+import {
     maxAlbumDescriptionLength,
     type Collection,
 } from "ente-media/collection";
@@ -27,6 +32,7 @@ import type { EnteFile } from "ente-media/file";
 import { FileType } from "ente-media/file-type";
 import { ItemCard } from "ente-new/photos/components/Tiles";
 import { FocusVisibleUnstyledButton } from "ente-new/photos/components/UnstyledButton";
+import { SlideUpTransition } from "ente-new/photos/components/mui/SlideUpTransition";
 import { albumDescriptionGraphemeCount } from "ente-new/photos/services/collection";
 import { useFormik } from "formik";
 import { t } from "i18next";
@@ -58,6 +64,7 @@ export const EditAlbumDetailsDialog: React.FC<EditAlbumDetailsDialogProps> = ({
     onSubmit,
 }) => {
     const { showMiniDialog, onGenericError } = useBaseContext();
+    const isSheet = useIsUploadSheet();
     const titleID = useId();
     const nameID = useId();
     const descriptionID = useId();
@@ -150,12 +157,13 @@ export const EditAlbumDetailsDialog: React.FC<EditAlbumDetailsDialogProps> = ({
                 }
                 aria-labelledby={titleID}
                 maxWidth={false}
-                slotProps={{ paper: { sx: paperSx } }}
+                slots={isSheet ? { transition: SlideUpTransition } : undefined}
+                slotProps={{ paper: { sx: [paperSx, uploadSheetPaperSx] } }}
             >
                 <Stack
                     component="form"
                     onSubmit={formik.handleSubmit}
-                    sx={{ p: "20px", gap: "36px" }}
+                    sx={contentSx}
                 >
                     <Stack direction="row" sx={headerSx}>
                         <Typography id={titleID} sx={titleSx}>
@@ -320,7 +328,7 @@ const green = "#08c225";
 const greenHover = "#07ad21";
 const errorColor = "#fa1336";
 
-const paperSx: SxProps<Theme> = (theme) => ({
+const paperSx = (theme: Theme) => ({
     width: "min(520px, calc(100svw - 32px))",
     maxWidth: "520px",
     m: 2,
@@ -335,6 +343,16 @@ const paperSx: SxProps<Theme> = (theme) => ({
         backgroundColor: "#1b1b1b",
     }),
 });
+
+const contentSx = {
+    p: "20px",
+    gap: "36px",
+    [uploadSheetMediaQuery]: {
+        p: "12px 16px",
+        pb: "calc(20px + env(safe-area-inset-bottom, 0px))",
+        overflowY: "auto",
+    },
+};
 
 const headerSx = {
     alignItems: "center",
