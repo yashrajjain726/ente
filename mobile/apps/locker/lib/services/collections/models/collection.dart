@@ -81,13 +81,10 @@ class Collection {
         sharedMagicMetadata.visibility == archiveVisibility;
   }
 
-  // hasLink returns true if there's any link attached to the collection
-  // including expired links
   bool get hasLink => publicURLs.isNotEmpty;
 
   bool get hasCover => (pubMagicMetadata.coverID ?? 0) > 0;
 
-  // hasSharees returns true if the collection is shared with other ente users
   bool get hasSharees => sharees.isNotEmpty;
 
   bool get isPinned => (magicMetadata.order ?? 0) != 0;

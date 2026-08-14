@@ -33,7 +33,6 @@ final lightThemeData = ThemeData(
     iconTheme: const IconThemeData(color: Colors.black),
     elevation: 0,
   ),
-  //https://api.flutter.dev/flutter/material/TextTheme-class.html
   textTheme: _buildTextTheme(const Color.fromRGBO(0, 0, 0, 1)),
   primaryTextTheme: const TextTheme().copyWith(
     bodyMedium: const TextStyle(color: Colors.yellow),
@@ -496,7 +495,6 @@ ElevatedButtonThemeData buildElevatedButtonThemeData({
   );
 }
 
-// Helper function to create ThemeData that works with the new color system
 ThemeData createAppThemeData({
   required Brightness brightness,
   EnteColorScheme? colorScheme,
@@ -509,7 +507,6 @@ ThemeData createAppThemeData({
       ? lightThemeData
       : darkThemeData;
 
-  // Create platform-specific typography to ensure consistent font sizes
   final typography = Typography.material2021(
     platform:
         TargetPlatform.android, // Force Android typography for consistency

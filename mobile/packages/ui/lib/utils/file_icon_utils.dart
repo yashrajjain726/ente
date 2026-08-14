@@ -13,7 +13,6 @@ class FileIconConfig {
 }
 
 class FileIconUtils {
-  // Centralized configuration - change icons and colors here only
   static const Map<String, FileIconConfig> _fileTypeConfigs = {
     'pdf': FileIconConfig(
       extensions: {'.pdf'},

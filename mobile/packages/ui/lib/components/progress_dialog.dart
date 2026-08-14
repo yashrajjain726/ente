@@ -268,7 +268,6 @@ class _BodyState extends State<_Body> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
-              // row body
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: <Widget>[

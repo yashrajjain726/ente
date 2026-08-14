@@ -238,10 +238,8 @@ class _HomePageState extends UploaderPageState<HomePage>
 
     _loadCollections();
 
-    // Initialize sharing functionality to handle shared files
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
-        // Add a small delay to ensure the app is fully loaded
         Future.delayed(const Duration(milliseconds: 1000), () {
           if (mounted) {
             initializeSharing();
@@ -252,11 +250,9 @@ class _HomePageState extends UploaderPageState<HomePage>
 
     _initDeepLinks();
 
-    // Activate search if initial query is provided (after collections are loaded)
     if (widget.initialSearchQuery != null &&
         widget.initialSearchQuery!.isNotEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        // Wait a bit more to ensure collections are loaded
         Future.delayed(const Duration(milliseconds: 100), () {
           if (mounted) {
             activateSearchWithQuery(widget.initialSearchQuery!);
@@ -494,7 +490,6 @@ class _HomePageState extends UploaderPageState<HomePage>
       if (collections.isEmpty && hasCompletedFirstSync) {
         _logger.info("No collections found after sync, setting up defaults");
         await CollectionService.instance.ensureDefaultCollections();
-        // Reload collections after setup
         collections = await CollectionService.instance.getCollections();
         await _loadRecentFiles(collections);
       }
@@ -571,7 +566,6 @@ class _HomePageState extends UploaderPageState<HomePage>
   }
 
   void _handleClearSearch() {
-    // Clear text and unfocus before dismissing search
     searchController.clear();
     searchFocusNode.unfocus();
 

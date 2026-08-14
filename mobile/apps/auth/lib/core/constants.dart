@@ -31,10 +31,8 @@ const thumbnailServerLoadDeferDuration = Duration(milliseconds: 80);
 // https://github.com/bitcoin/bips/blob/master/bip-0039.mediawiki#Generating_the_mnemonic
 const mnemonicKeyWordCount = 24;
 
-// https://stackoverflow.com/a/61162219
 const dragSensitivity = 8;
 
-// Default values for various feature flags
 class FFDefault {
   static const bool enableStripe = true;
   static const bool disableCFWorker = false;

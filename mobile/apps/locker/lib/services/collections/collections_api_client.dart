@@ -245,7 +245,6 @@ class CollectionApiClient {
     params["fromCollectionID"] = fromCollection.id;
     params["toCollectionID"] = toCollection.id;
 
-    // Process files in batches
     const batchSize = 100;
     final batchedFiles = <List<EnteFile>>[];
     for (int i = 0; i < files.length; i += batchSize) {
@@ -268,7 +267,6 @@ class CollectionApiClient {
           fileCollectionKey,
         );
 
-        // Update file's collectionID to the destination (like Photos does)
         file.collectionID = toCollection.id;
 
         // Re-encrypt the file key with the destination collection's key
@@ -552,7 +550,6 @@ class CollectionApiClient {
       collection.id,
       prop,
     );
-    // remove existing url information
     collection.publicURLs.clear();
     collection.publicURLs.add(PublicURL.fromMap(response.data["result"]));
     await _updateCollectionInDB(collection);

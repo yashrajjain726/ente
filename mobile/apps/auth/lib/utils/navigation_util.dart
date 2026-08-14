@@ -54,7 +54,6 @@ class SwipeableRouteBuilder<T> extends PageRoute<T> {
   final RoutePageBuilder pageBuilder;
   final PageTransitionsBuilder matchingBuilder =
       const CupertinoPageTransitionsBuilder(); // Default iOS/macOS (to get the swipe right to go back gesture)
-  // final PageTransitionsBuilder matchingBuilder = const FadeUpwardsPageTransitionsBuilder(); // Default Android/Linux/Windows
 
   SwipeableRouteBuilder({required this.pageBuilder});
 

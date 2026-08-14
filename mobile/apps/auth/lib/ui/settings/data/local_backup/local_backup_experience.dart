@@ -192,7 +192,6 @@ class _LocalBackupExperienceState extends State<LocalBackupExperience> {
             if (!mounted) return;
             _showSnackBar(context.strings.selectFolderToContinue);
           }
-          // Clear the path and prompt user to re-select
           await prefs.remove('autoBackupPath');
           if (mounted) {
             setState(() {
@@ -568,7 +567,6 @@ class _LocalBackupExperienceState extends State<LocalBackupExperience> {
       );
 
       if (result?.action == ButtonAction.second) {
-        // Use our native picker that creates bookmark immediately
         final pickResult = await SecurityBookmarkService.instance
             .pickDirectoryAndCreateBookmark();
         if (!mounted) return false;
@@ -588,7 +586,6 @@ class _LocalBackupExperienceState extends State<LocalBackupExperience> {
     }
 
     if (Platform.isMacOS) {
-      // On macOS, use DirUtils which creates a security-scoped bookmark
       final picked = await DirUtils.instance.pickDirectory();
       if (picked != null && picked.path.isNotEmpty && picked.bookmark != null) {
         if (!mounted) return false;
@@ -601,7 +598,6 @@ class _LocalBackupExperienceState extends State<LocalBackupExperience> {
       return false;
     }
 
-    // Other platforms (Windows, Linux, etc.)
     final picked = await DirUtils.instance.pickDirectory();
     if (picked != null && picked.path.isNotEmpty) {
       if (!mounted) return false;
@@ -725,7 +721,6 @@ class _LocalBackupExperienceState extends State<LocalBackupExperience> {
       }
       return saved;
     } else if (Platform.isIOS) {
-      // On iOS, use our native picker that creates bookmark immediately
       final result = await SecurityBookmarkService.instance
           .pickDirectoryAndCreateBookmark();
       if (result != null) {
@@ -749,7 +744,6 @@ class _LocalBackupExperienceState extends State<LocalBackupExperience> {
       }
       return false;
     } else if (Platform.isMacOS) {
-      // On macOS, use DirUtils which creates a security-scoped bookmark
       final picked = await DirUtils.instance.pickDirectory();
       if (picked != null && picked.path.isNotEmpty && picked.bookmark != null) {
         if (!mounted) return false;
@@ -767,7 +761,6 @@ class _LocalBackupExperienceState extends State<LocalBackupExperience> {
       }
       return false;
     } else {
-      // Other platforms (Windows, Linux, etc.)
       final picked = await DirUtils.instance.pickDirectory();
 
       if (picked != null && picked.path.isNotEmpty) {
@@ -804,7 +797,6 @@ class _LocalBackupExperienceState extends State<LocalBackupExperience> {
     final pickedDir = PickedDirectory(path: path, bookmark: bookmark);
 
     try {
-      // Start accessing using the bookmark
       final accessResult = await dirUtils.startAccess(pickedDir);
       if (accessResult == null || !accessResult.success) {
         _logger.severe(
@@ -814,7 +806,6 @@ class _LocalBackupExperienceState extends State<LocalBackupExperience> {
       }
 
       try {
-        // Write backup directly to the selected directory
         await LocalBackupService.instance.writeBackupToDirectory(path);
       } finally {
         await dirUtils.stopAccess(pickedDir);
@@ -849,15 +840,12 @@ class _LocalBackupExperienceState extends State<LocalBackupExperience> {
     Future<bool> savePath(String target) async {
       try {
         if (Platform.isIOS || Platform.isMacOS) {
-          // On iOS/macOS, use native picker with bookmark via _persistLocationWithBookmark.
-          // This path is only for non-native picker which won't have scoped access.
           _logger.warning(
             '${Platform.operatingSystem}: _persistLocation called without bookmark. '
             'Use native picker for ${Platform.operatingSystem}.',
           );
           return false;
         } else {
-          // Non-iOS: just save the path directly
           await Directory(target).create(recursive: true);
           await prefs.setString('autoBackupPath', target);
           await prefs.remove(_treeUriKey);
@@ -985,7 +973,6 @@ class _LocalBackupExperienceState extends State<LocalBackupExperience> {
     if (!Platform.isIOS) return false;
     if (path.isEmpty) return true;
 
-    // Normalize the path
     var normalized = path;
     if (normalized.startsWith('file://')) {
       normalized = normalized.substring(7);
@@ -1003,7 +990,6 @@ class _LocalBackupExperienceState extends State<LocalBackupExperience> {
       return true;
     }
 
-    // All other paths are valid (including user-created "File Provider Storage" folders)
     return false;
   }
 }

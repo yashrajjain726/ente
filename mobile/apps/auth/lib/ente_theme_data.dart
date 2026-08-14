@@ -33,7 +33,6 @@ final lightThemeData = ThemeData(
     iconTheme: const IconThemeData(color: Colors.black),
     elevation: 0,
   ),
-  //https://api.flutter.dev/flutter/material/TextTheme-class.html
   textTheme: _buildTextTheme(const Color.fromRGBO(0, 0, 0, 1)),
   primaryTextTheme: const TextTheme().copyWith(
     bodyMedium: const TextStyle(color: Colors.yellow),

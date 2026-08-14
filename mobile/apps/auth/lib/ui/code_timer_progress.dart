@@ -24,7 +24,6 @@ class _CodeTimerProgressState extends State<CodeTimerProgress> {
   late final ValueNotifier<double> _progress;
   late final int _periodInMilii;
 
-  // Reduce update frequency
   final int _updateIntervalMs = (Platform.isAndroid || Platform.isIOS)
       ? 16
       : 500; // approximately 60 FPS
@@ -43,7 +42,6 @@ class _CodeTimerProgressState extends State<CodeTimerProgress> {
   }
 
   void _updateTimeRemaining(int currentMilliSeconds) {
-    // More efficient time calculation using modulo
     final elapsed =
         (currentMilliSeconds + widget.timeOffsetInMilliseconds) %
         _periodInMilii;

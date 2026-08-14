@@ -14,10 +14,8 @@ class IconUtils {
 
   static final IconUtils instance = IconUtils._privateConstructor();
 
-  // Map of icon-title to the color code in HEX
   final Map<String, SimpleIconData> _simpleIcons = {};
   final Map<String, CustomIconData> _customIcons = {};
-  // Map of icon-color to its luminance
   final Map<Color, double> _colorLuminance = {};
   final List<String> _titleSplitCharacters = ['(', '.'];
 

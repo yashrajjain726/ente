@@ -18,27 +18,22 @@ class InfoFileService {
     required Collection collection,
   }) async {
     try {
-      // Create EnteFile object directly without a physical file
       final enteFile = EnteFile();
       enteFile.fileType = FileType.info;
       enteFile.collectionID = collection.id;
 
-      // Set the title based on info type and data
       enteFile.title = getInfoFileTitle(infoItem);
 
-      // Set creation and modification times
       final now = DateTime.now().millisecondsSinceEpoch;
       enteFile.creationTime = now;
       enteFile.modificationTime = now;
 
-      // Create public magic metadata with info data
       final pubMagicMetadata = PubMagicMetadata(
         info: {'type': infoItem.type.name, 'data': infoItem.data.toJson()},
-        noThumb: true, // No thumbnail for info files
+        noThumb: true,
       );
       enteFile.pubMagicMetadata = pubMagicMetadata;
 
-      // Upload the file using the special info file upload method
       final uploadedFile = await _uploadInfoFile(enteFile, collection);
 
       _logger.info(
@@ -56,13 +51,11 @@ class InfoFileService {
     required InfoItem updatedInfoItem,
   }) async {
     try {
-      // Prepare the info data structure
       final infoData = {
         'type': updatedInfoItem.type.name,
         'data': updatedInfoItem.data.toJson(),
       };
 
-      // Prepare metadata updates - only update info and name/time if needed
       final Map<String, dynamic> metadataUpdates = {infoKey: infoData};
 
       // Update title if it's different from current display name
@@ -73,7 +66,6 @@ class InfoFileService {
         metadataUpdates[editTimeKey] = DateTime.now().millisecondsSinceEpoch;
       }
 
-      // Update metadata using the simple metadata updater service
       final success = await MetadataUpdaterService.instance.updateFileMetadata(
         existingFile,
         metadataUpdates,
@@ -178,7 +170,6 @@ class InfoFileService {
     EnteFile enteFile,
     Collection collection,
   ) async {
-    // Use the FileUploader's special method for info files
     return await FileUploader.instance.uploadInfoFile(enteFile, collection);
   }
 }

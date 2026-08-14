@@ -28,7 +28,6 @@ class CodeDisplay {
 
   bool get isCustomIcon => (iconSrc != '' && iconID != '');
 
-  // copyWith
   CodeDisplay copyWith({
     bool? pinned,
     bool? trashed,
