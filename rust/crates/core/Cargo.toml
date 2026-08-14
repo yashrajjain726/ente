@@ -13,7 +13,7 @@ crypto_secretstream = "=0.2.0"
 getrandom = { version = "0.4", features = ["wasm_js"] }
 log.workspace = true
 md-5.workspace = true
-rand_core_06 = { package = "rand_core", version = "0.6" }
+rand_core_06 = { package = "rand_core", version = "0.6", features = ["getrandom"] }
 reqwest = { workspace = true, features = ["http2", "charset", "system-proxy", "json", "rustls-tls-native-roots", "rustls-tls-webpki-roots"] }
 salsa20 = "0.10"
 serde.workspace = true
