@@ -464,6 +464,7 @@
     "link_edit_disabled_for_free_accounts": "",
     "sharing_user_does_not_exist": "Bu e-posta adresine sahip bir kullanıcı bulunamadı",
     "search": "Ara",
+    "people_search_hint": "",
     "search_results": "Arama sonuçları",
     "no_results": "Hiçbir sonuç bulunamadı",
     "no_photos_found_here": "",

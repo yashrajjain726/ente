@@ -464,6 +464,7 @@
     "link_edit_disabled_for_free_accounts": "Sie benötigen ein kostenpflichtiges Abonnement, um diese Link-Einstellung zu ändern",
     "sharing_user_does_not_exist": "Kein Benutzer mit dieser E-Mail gefunden",
     "search": "Suchen",
+    "people_search_hint": "",
     "search_results": "Ergebnisse durchsuchen",
     "no_results": "Keine Ergebnisse gefunden",
     "no_photos_found_here": "Hier wurden keine Fotos gefunden",

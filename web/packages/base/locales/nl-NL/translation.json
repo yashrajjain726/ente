@@ -464,6 +464,7 @@
     "link_edit_disabled_for_free_accounts": "Je hebt een betaald abonnement nodig om deze linkinstelling te wijzigen",
     "sharing_user_does_not_exist": "Kan geen gebruiker met dat e-mailadres vinden",
     "search": "Zoeken",
+    "people_search_hint": "",
     "search_results": "Zoekresultaten",
     "no_results": "Geen resultaten gevonden",
     "no_photos_found_here": "Geen foto's gevonden",

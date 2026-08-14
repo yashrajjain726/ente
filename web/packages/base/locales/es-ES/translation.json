@@ -464,6 +464,7 @@
     "link_edit_disabled_for_free_accounts": "Necesitas una suscripción de pago para cambiar la configuración de este enlace",
     "sharing_user_does_not_exist": "No se pudo encontrar un usuario con ese email",
     "search": "Buscar",
+    "people_search_hint": "",
     "search_results": "Buscar resultados",
     "no_results": "No se han encontrado resultados",
     "no_photos_found_here": "No se encontraron fotos",

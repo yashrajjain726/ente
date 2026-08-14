@@ -464,6 +464,7 @@
     "link_edit_disabled_for_free_accounts": "Pro změnu nastavení odkazu potřebujete placené předplatné",
     "sharing_user_does_not_exist": "Nepodařilo se najít uživatele s tímto e-mailem",
     "search": "Hledat",
+    "people_search_hint": "",
     "search_results": "Výsledky hledání",
     "no_results": "Nebyly nalezeny žádné výsledky",
     "no_photos_found_here": "Zde nebyly nalezeny žádné fotografie",

@@ -464,6 +464,7 @@
     "link_edit_disabled_for_free_accounts": "Necessiteu una subscripció de pagament per canviar aquesta configuració d'enllaç",
     "sharing_user_does_not_exist": "No s'ha pogut trobar un usuari amb aquest correu",
     "search": "Cerca",
+    "people_search_hint": "",
     "search_results": "Resultats de la cerca",
     "no_results": "Sense resultats",
     "no_photos_found_here": "No s'han trobat fotos aquí",

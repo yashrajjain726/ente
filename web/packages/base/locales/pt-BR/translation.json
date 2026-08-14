@@ -464,6 +464,7 @@
     "link_edit_disabled_for_free_accounts": "É necessária uma assinatura paga para alterar a opção deste link",
     "sharing_user_does_not_exist": "Não foi possível encontrar um usuário com aquele e-mail",
     "search": "Buscar",
+    "people_search_hint": "",
     "search_results": "Resultados da busca",
     "no_results": "Nenhum resultado encontrado",
     "no_photos_found_here": "Nenhuma foto encontrada aqui",

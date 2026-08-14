@@ -464,6 +464,7 @@
     "link_edit_disabled_for_free_accounts": "É necessária uma subscrição paga para mudar esta definição",
     "sharing_user_does_not_exist": "Não foi possível encontrar utilizador com esse endereço",
     "search": "Pesquisar",
+    "people_search_hint": "",
     "search_results": "Resultados de pesquisa",
     "no_results": "Nenhum resultado encontrado",
     "no_photos_found_here": "Nenhuma foto encontrada aqui",

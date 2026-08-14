@@ -464,6 +464,7 @@
     "link_edit_disabled_for_free_accounts": "Reikia mokamos prenumeratos, kad pakeistumėte šį nuorodos nustatymą.",
     "sharing_user_does_not_exist": "Nepavyko rasti naudotojo su šiuo el. paštu.",
     "search": "Ieškoti",
+    "people_search_hint": "",
     "search_results": "Paieškos rezultatai",
     "no_results": "Rezultatų nerasta.",
     "no_photos_found_here": "Nuotraukų čia nerasta.",

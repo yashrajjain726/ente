@@ -464,6 +464,7 @@
     "link_edit_disabled_for_free_accounts": "Serve un abbonamento per cambiare le impostazioni di questo link",
     "sharing_user_does_not_exist": "Non abbiamo trovato nessun utente con questa email",
     "search": "Ricerca",
+    "people_search_hint": "",
     "search_results": "Risultati della ricerca",
     "no_results": "Nessun risultato trovato",
     "no_photos_found_here": "Nessuna foto trovata",

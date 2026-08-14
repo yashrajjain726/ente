@@ -464,6 +464,7 @@
     "link_edit_disabled_for_free_accounts": "",
     "sharing_user_does_not_exist": "Nie można znaleźć użytkownika z tym adresem e-mail",
     "search": "Szukaj",
+    "people_search_hint": "",
     "search_results": "Wyniki wyszukiwania",
     "no_results": "Nie znaleziono wyników",
     "no_photos_found_here": "",

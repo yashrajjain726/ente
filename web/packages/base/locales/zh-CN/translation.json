@@ -464,6 +464,7 @@
     "link_edit_disabled_for_free_accounts": "您需要付费订阅才能更改此链接设置",
     "sharing_user_does_not_exist": "找不到拥有该电子邮件的用户",
     "search": "搜索",
+    "people_search_hint": "",
     "search_results": "搜索结果",
     "no_results": "未找到任何结果",
     "no_photos_found_here": "",

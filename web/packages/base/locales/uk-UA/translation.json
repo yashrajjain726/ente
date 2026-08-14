@@ -464,6 +464,7 @@
     "link_edit_disabled_for_free_accounts": "Вам потрібна платна підписка, щоб змінити це посилання",
     "sharing_user_does_not_exist": "Не вдалося знайти користувача з такою поштовою адресою",
     "search": "Пошук",
+    "people_search_hint": "",
     "search_results": "Результати пошуку",
     "no_results": "Нічого не знайдено",
     "no_photos_found_here": "Тут немає фотографій",
