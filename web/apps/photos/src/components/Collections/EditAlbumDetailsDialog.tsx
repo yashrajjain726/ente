@@ -12,7 +12,7 @@ import {
     type SxProps,
     type Theme,
 } from "@mui/material";
-import type { LocalUser } from "ente-accounts-rs/services/user";
+import type { LocalUser } from "ente-accounts/services/user";
 import { LoadingButton } from "ente-base/components/mui/LoadingButton";
 import {
     useModalVisibility,
