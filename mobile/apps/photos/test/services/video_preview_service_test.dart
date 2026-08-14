@@ -46,10 +46,7 @@ void main() {
       ];
 
       final previewIds = <int, PreviewInfo>{
-        2: PreviewInfo(
-          objectId: 'obj2',
-          objectSize: 1000,
-        ), // Only file 2 is processed
+        2: PreviewInfo(objectId: 'obj2', objectSize: 1000),
       };
 
       final status = await videoPreviewService.calcStatus(files, previewIds);
@@ -91,7 +88,7 @@ void main() {
           ..pubMagicMetadata = PubMagicMetadata(),
       ];
 
-      final previewIds = <int, PreviewInfo>{}; // No files processed
+      final previewIds = <int, PreviewInfo>{};
 
       final status = await videoPreviewService.calcStatus(files, previewIds);
 
@@ -107,14 +104,14 @@ void main() {
         EnteFile()
           ..uploadedFileID = 2
           ..fileType = FileType.video
-          ..pubMagicMetadata = PubMagicMetadata(sv: 1), // Should be skipped
+          ..pubMagicMetadata = PubMagicMetadata(sv: 1),
         EnteFile()
           ..uploadedFileID = 3
           ..fileType = FileType.video
           ..pubMagicMetadata = PubMagicMetadata(),
       ];
 
-      final previewIds = <int, PreviewInfo>{}; // No files processed
+      final previewIds = <int, PreviewInfo>{};
 
       final status = await videoPreviewService.calcStatus(files, previewIds);
 
@@ -130,9 +127,7 @@ void main() {
         EnteFile()
           ..uploadedFileID = 2
           ..fileType = FileType.video
-          ..pubMagicMetadata = PubMagicMetadata(
-            sv: 1,
-          ), // Processed but with sv=1
+          ..pubMagicMetadata = PubMagicMetadata(sv: 1),
         EnteFile()
           ..uploadedFileID = 3
           ..fileType = FileType.video
@@ -140,10 +135,7 @@ void main() {
       ];
 
       final previewIds = <int, PreviewInfo>{
-        2: PreviewInfo(
-          objectId: 'obj2',
-          objectSize: 1000,
-        ), // File 2 is processed
+        2: PreviewInfo(objectId: 'obj2', objectSize: 1000),
       };
 
       final status = await videoPreviewService.calcStatus(files, previewIds);
@@ -165,36 +157,29 @@ void main() {
         EnteFile()
           ..uploadedFileID = 1
           ..fileType = FileType.video
-          ..pubMagicMetadata = PubMagicMetadata(), // Regular file
+          ..pubMagicMetadata = PubMagicMetadata(),
         EnteFile()
           ..uploadedFileID = 2
           ..fileType = FileType.video
-          ..pubMagicMetadata = PubMagicMetadata(
-            sv: 1,
-          ), // Skip from total (sv=1)
+          ..pubMagicMetadata = PubMagicMetadata(sv: 1),
         EnteFile()
           ..uploadedFileID = 3
           ..fileType = FileType.video
-          ..pubMagicMetadata = PubMagicMetadata(), // Regular file
+          ..pubMagicMetadata = PubMagicMetadata(),
         EnteFile()
           ..uploadedFileID = 4
           ..fileType = FileType.video
-          ..pubMagicMetadata = PubMagicMetadata(), // Regular file
+          ..pubMagicMetadata = PubMagicMetadata(),
         EnteFile()
           ..uploadedFileID = 5
           ..fileType = FileType.video
-          ..pubMagicMetadata = PubMagicMetadata(
-            sv: 1,
-          ), // Skip from total (sv=1)
+          ..pubMagicMetadata = PubMagicMetadata(sv: 1),
       ];
 
       final previewIds = <int, PreviewInfo>{
-        1: PreviewInfo(objectId: 'obj1', objectSize: 1000), // File 1 processed
-        3: PreviewInfo(objectId: 'obj3', objectSize: 1000), // File 3 processed
-        5: PreviewInfo(
-          objectId: 'obj5',
-          objectSize: 1000,
-        ), // File 5 processed (but has sv=1)
+        1: PreviewInfo(objectId: 'obj1', objectSize: 1000),
+        3: PreviewInfo(objectId: 'obj3', objectSize: 1000),
+        5: PreviewInfo(objectId: 'obj5', objectSize: 1000),
       };
 
       final status = await videoPreviewService.calcStatus(files, previewIds);
@@ -207,7 +192,7 @@ void main() {
         EnteFile()
           ..uploadedFileID = 1
           ..fileType = FileType.video
-          ..pubMagicMetadata = null, // null metadata
+          ..pubMagicMetadata = null,
         EnteFile()
           ..uploadedFileID = 2
           ..fileType = FileType.video

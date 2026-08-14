@@ -75,9 +75,7 @@ Future<P?> _decodeJsonFile<P>(Map<String, dynamic> args) async {
       log("Successfully decoded JSON file as UTF-8");
     } catch (e, s) {
       log("Failed to decode bytes as UTF-8, trying UTF-16 $e \n $s");
-      final jsonString = String.fromCharCodes(
-        bytes,
-      ); // Fallback to UTF-16 decoding
+      final jsonString = String.fromCharCodes(bytes);
       decodedData = jsonDecodeMethod(jsonString);
       log("Successfully decoded JSON file as UTF-16");
     }

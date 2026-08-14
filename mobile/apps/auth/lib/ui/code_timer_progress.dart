@@ -26,7 +26,7 @@ class _CodeTimerProgressState extends State<CodeTimerProgress> {
 
   final int _updateIntervalMs = (Platform.isAndroid || Platform.isIOS)
       ? 16
-      : 500; // approximately 60 FPS
+      : 500;
 
   @override
   void initState() {
@@ -74,7 +74,7 @@ class _CodeTimerProgressState extends State<CodeTimerProgress> {
         valueListenable: _progress,
         builder: (context, progress, _) {
           return CustomPaint(
-            key: Key(progress.toString()), // Add key here
+            key: Key(progress.toString()),
             painter: _ProgressPainter(
               progress: progress,
               color: progress > 0.4

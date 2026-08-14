@@ -832,14 +832,14 @@ const List<Color> avatarLight = [
   Color.fromRGBO(148, 180, 159, 1),
   Color.fromRGBO(135, 162, 251, 1),
   Color.fromRGBO(198, 137, 198, 1),
-  Color.fromRGBO(147, 125, 194, 1), // Fixed duplicate
+  Color.fromRGBO(147, 125, 194, 1),
   Color.fromRGBO(50, 82, 136, 1),
   Color.fromRGBO(133, 180, 224, 1),
   Color.fromRGBO(193, 163, 163, 1),
-  Color.fromRGBO(225, 160, 89, 1), // Fixed duplicate
+  Color.fromRGBO(225, 160, 89, 1),
   Color.fromRGBO(66, 97, 101, 1),
-  Color.fromRGBO(107, 119, 178, 1), // Fixed duplicate
-  Color.fromRGBO(149, 127, 239, 1), // Fixed duplicate
+  Color.fromRGBO(107, 119, 178, 1),
+  Color.fromRGBO(149, 127, 239, 1),
   Color.fromRGBO(221, 157, 226, 1),
   Color.fromRGBO(130, 171, 139, 1),
   Color.fromRGBO(155, 187, 232, 1),

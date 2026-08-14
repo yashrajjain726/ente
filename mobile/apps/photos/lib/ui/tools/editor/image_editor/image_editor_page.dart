@@ -151,8 +151,6 @@ class _ImageEditorPageState extends State<ImageEditorPage> {
       _logger.info("Saved edits to file " + newFile.toString());
       final files = List<ente.EnteFile>.of(widget.detailPageConfig.files);
 
-      // the index could be -1 if the files fetched doesn't contain the newly
-      // edited files
       int selectionIndex = files.indexWhere(
         (file) => file.generatedID == newFile.generatedID,
       );

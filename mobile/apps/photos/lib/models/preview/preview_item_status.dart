@@ -5,6 +5,5 @@ enum PreviewItemStatus {
   inQueue,
   retry,
   uploaded,
-  // paused (e.g., due to uploads in progress)
   paused,
 }

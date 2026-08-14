@@ -40,7 +40,7 @@ final lightThemeData = ThemeData(
   ),
   cardColor: const Color.fromRGBO(250, 250, 250, 1.0),
   dialogTheme: const DialogThemeData().copyWith(
-    backgroundColor: const Color.fromRGBO(250, 250, 250, 1.0), //
+    backgroundColor: const Color.fromRGBO(250, 250, 250, 1.0),
     titleTextStyle: const TextStyle(
       color: Colors.black,
       fontSize: 24,
@@ -472,9 +472,9 @@ OutlinedButtonThemeData buildOutlinedButtonThemeData({
 }
 
 ElevatedButtonThemeData buildElevatedButtonThemeData({
-  required Color onPrimary, // text button color
+  required Color onPrimary,
   required Color primary,
-  double elevation = 2, // background color of button
+  double elevation = 2,
 }) {
   return ElevatedButtonThemeData(
     style: ElevatedButton.styleFrom(

@@ -776,8 +776,7 @@ class _SimilarImagesPageState extends State<SimilarImagesPage> {
 
               return Wrap(
                 spacing: crossAxisSpacing,
-                runSpacing:
-                    0, // No additional vertical spacing - items have internal bottom padding
+                runSpacing: 0,
                 children: similarFiles.files.asMap().entries.map((entry) {
                   return SizedBox(
                     width: itemWidth,

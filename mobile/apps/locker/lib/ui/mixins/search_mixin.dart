@@ -221,8 +221,7 @@ mixin SearchMixin<T extends StatefulWidget> on State<T> {
           }
           return true;
         }
-      }
-      else if (event.logicalKey == LogicalKeyboardKey.keyF &&
+      } else if (event.logicalKey == LogicalKeyboardKey.keyF &&
           (HardwareKeyboard.instance.isMetaPressed ||
               HardwareKeyboard.instance.isControlPressed)) {
         if (!_isSearchActive) {

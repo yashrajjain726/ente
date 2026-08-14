@@ -106,20 +106,18 @@ void main() {
 
     test('isTooCloseInTime detects gap < 10 minutes', () {
       expect(
-        PhotoSelector.isTooCloseInTime(
-          _baseTime,
-          [_baseTime + 5 * 60 * 1000000], // 5 minutes apart
-        ),
+        PhotoSelector.isTooCloseInTime(_baseTime, [
+          _baseTime + 5 * 60 * 1000000,
+        ]),
         isTrue,
       );
     });
 
     test('isTooCloseInTime allows gap >= 10 minutes', () {
       expect(
-        PhotoSelector.isTooCloseInTime(
-          _baseTime,
-          [_baseTime + 15 * 60 * 1000000], // 15 minutes apart
-        ),
+        PhotoSelector.isTooCloseInTime(_baseTime, [
+          _baseTime + 15 * 60 * 1000000,
+        ]),
         isFalse,
       );
     });
@@ -160,7 +158,7 @@ void main() {
       final ids = result.map((m) => m.file.uploadedFileID).toList();
       expect(ids, contains(1));
       expect(ids, contains(3));
-      expect(ids, isNot(contains(2))); // near-duplicate of 1
+      expect(ids, isNot(contains(2)));
     });
 
     test('filterByTimeSpacing removes memories too close in time', () {
@@ -168,7 +166,7 @@ void main() {
         _mem(_file(uploadedFileID: 1, creationTime: _baseTime)),
         _mem(
           _file(uploadedFileID: 2, creationTime: _baseTime + 5 * 60 * 1000000),
-        ), // 5 min later
+        ),
         _mem(_file(uploadedFileID: 3, creationTime: _baseTime + _hour)),
       ];
       final result = PhotoSelector.filterByTimeSpacing(memories);

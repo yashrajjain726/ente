@@ -158,9 +158,7 @@ class ContentContainerWidget extends StatelessWidget {
             ? const SizedBox.shrink()
             : Text(
                 title!,
-                style: textTheme.largeBold.copyWith(
-                  color: textBaseDark,
-                ), //constant color
+                style: textTheme.largeBold.copyWith(color: textBaseDark),
               ),
         title == null || bodyMissing
             ? const SizedBox.shrink()
@@ -174,7 +172,7 @@ class ContentContainerWidget extends StatelessWidget {
                             body!,
                             style: textTheme.body.copyWith(
                               color: textMutedDark,
-                            ), //constant color
+                            ),
                           ))
             : Icon(
                 Icons.check_outlined,
@@ -189,9 +187,7 @@ class ContentContainerWidget extends StatelessWidget {
                 padding: const EdgeInsets.only(top: 19.0),
                 child: Text(
                   bodyHighlight!,
-                  style: textTheme.body.copyWith(
-                    color: textBaseDark,
-                  ), //constant color
+                  style: textTheme.body.copyWith(color: textBaseDark),
                 ),
               )
             : const SizedBox.shrink(),

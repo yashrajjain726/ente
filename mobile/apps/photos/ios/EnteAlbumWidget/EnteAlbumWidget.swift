@@ -126,7 +126,7 @@ struct EnteAlbumWidgetEntryView: View {
                                     VStack(alignment: .leading, spacing: 2) {
                                         Text(entry.title ?? "").font(
                                             .custom("Inter", size: 14, relativeTo: .caption)
-                                        )  // Custom with fallback
+                                        )
                                         .bold()
                                         .foregroundStyle(.white)
                                         .shadow(radius: 20)
@@ -170,7 +170,7 @@ struct EnteAlbumWidgetEntryView: View {
                                         VStack(alignment: .leading, spacing: 2) {
                                             Text(entry.title ?? "").font(
                                                 .custom("Inter", size: 14, relativeTo: .caption)
-                                            )  // Custom with fallback
+                                            )
                                             .bold()
                                             .foregroundStyle(.white)
                                             .shadow(radius: 20)
@@ -207,7 +207,7 @@ struct EnteAlbumWidgetEntryView: View {
 
                         Text("Click to customise")
                             .font(.custom("Inter", size: 12, relativeTo: .caption2))
-                            .foregroundStyle(.white)  // Tint-aware color
+                            .foregroundStyle(.white)
                             .multilineTextAlignment(.center)
                             .padding(.bottom, 12)
                             .padding(.horizontal, 8)

@@ -308,28 +308,25 @@ Future<bool> deleteFromTrash(BuildContext context, List<EnteFile> files) async {
         ButtonComponent(
           label: l10n.yesDelete,
           variant: ButtonComponentVariant.critical,
-          onTap: () => _runDeleteAction(
-            sheetContext,
-            ButtonAction.first,
-            () async {
-              try {
-                didDeletionStart = true;
-                await trashSyncService.deleteFromTrash(trashFiles);
-                Bus.instance.fire(
-                  FilesUpdatedEvent(
-                    trashFiles,
-                    type: EventType.deletedFromEverywhere,
-                    source: "deleteFromTrash",
-                  ),
-                );
-                // FilesUpdatedEvent does not reload Trash here.
-                Bus.instance.fire(ForceReloadTrashPageEvent());
-              } catch (e, s) {
-                _logger.info("failed to delete from trash", e, s);
-                rethrow;
-              }
-            },
-          ),
+          onTap: () =>
+              _runDeleteAction(sheetContext, ButtonAction.first, () async {
+                try {
+                  didDeletionStart = true;
+                  await trashSyncService.deleteFromTrash(trashFiles);
+                  Bus.instance.fire(
+                    FilesUpdatedEvent(
+                      trashFiles,
+                      type: EventType.deletedFromEverywhere,
+                      source: "deleteFromTrash",
+                    ),
+                  );
+                  // FilesUpdatedEvent does not reload Trash here.
+                  Bus.instance.fire(ForceReloadTrashPageEvent());
+                } catch (e, s) {
+                  _logger.info("failed to delete from trash", e, s);
+                  rethrow;
+                }
+              }),
         ),
       ],
     ),
@@ -1265,8 +1262,7 @@ class DeleteConfirmationSheetState extends State<DeleteConfirmationSheet> {
                       ),
                     ],
                   )
-                :
-                  ButtonComponent(
+                : ButtonComponent(
                     label: switch (deletePreference) {
                       DeletePreference.DeleteFromRemoteOnly =>
                         l10n.deleteFromEnte,

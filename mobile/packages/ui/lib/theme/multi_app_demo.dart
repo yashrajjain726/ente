@@ -71,7 +71,7 @@ class GamingApp {
       Color(0xFFFF9800),
       Color(0xFFFFB74D),
     ],
-    warning500: const Color(0xFFF44336), // Custom warning for gaming
+    warning500: const Color(0xFFF44336),
   );
 
   static final customDarkScheme = EnteColorScheme.dark(

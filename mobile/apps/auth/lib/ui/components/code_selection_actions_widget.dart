@@ -36,7 +36,6 @@ class _CodeSelectionActionsWidgetState
     extends State<CodeSelectionActionsWidget> {
   late final scrollController = ScrollController();
 
-
   @override
   void dispose() {
     scrollController.dispose();

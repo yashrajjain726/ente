@@ -1,8 +1,4 @@
-enum UploadStrategy {
-  ifMissing,
-  always,
-  other,
-}
+enum UploadStrategy { ifMissing, always, other }
 
 int getInt(UploadStrategy uploadType) {
   switch (uploadType) {

@@ -275,7 +275,6 @@ class EnteQrPlugin: FlutterPlugin, MethodCallHandler {
         if (py > maxY) maxY = py
       }
 
-      // Add padding around finder patterns
       val padX = (maxX - minX) * 0.15f
       val padY = (maxY - minY) * 0.15f
       minX = (minX - padX).coerceAtLeast(0f)

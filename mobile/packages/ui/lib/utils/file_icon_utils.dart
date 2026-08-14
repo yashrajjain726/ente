@@ -47,7 +47,7 @@ class FileIconUtils {
     final lastDotIndex = lowerFileName.lastIndexOf('.');
 
     if (lastDotIndex == -1) {
-      return _defaultConfig; // No extension found
+      return _defaultConfig;
     }
 
     final extension = lowerFileName.substring(lastDotIndex);

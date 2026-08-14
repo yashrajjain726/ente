@@ -17,7 +17,7 @@ class Collection {
   // Deprecated but required for old accounts. Use collectionName.
   String? name;
 
-  // Legacy collections may have only the plaintext name.
+  // Collections created before public launch may have only the plaintext name.
   final String? encryptedName;
   final String? nameDecryptionNonce;
   final CollectionType type;
@@ -28,7 +28,7 @@ class Collection {
   final int? sharedAt;
   final bool isDeleted;
 
-  // Falls back to the legacy plaintext name.
+  // Falls back to name for those pre-launch collections.
   String? decryptedName;
 
   // Links a user-owned remote collection to its on-device album.

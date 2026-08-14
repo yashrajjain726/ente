@@ -181,9 +181,7 @@ class Code {
       if (path.startsWith('$issuer:')) {
         return path.substring(issuer.length + 1);
       }
-      return path.substring(
-        path.indexOf(':') + 1,
-      ); // return data after first colon
+      return path.substring(path.indexOf(':') + 1);
     } catch (e, s) {
       Logger('_getAccount').severe('Error while parsing account', e, s);
       return "";
@@ -266,7 +264,9 @@ class Code {
       } else if (algorithm == "sha512" || "algorithm.sha512" == algorithm) {
         return Algorithm.sha512;
       }
-    } catch (e) {}
+    } catch (e) {
+      // nothing
+    }
     return Algorithm.sha1;
   }
 

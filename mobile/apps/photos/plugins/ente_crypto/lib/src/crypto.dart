@@ -114,7 +114,7 @@ Future<FileEncryptResult> chachaEncryptFileV2(Map<String, dynamic> args) async {
     while (buffer.length < chunkSize) {
       final remainingBytes = chunkSize - buffer.length;
       final readBytes = await inputFile.read(remainingBytes);
-      if (readBytes.isEmpty) break; // EOF reached unexpectedly
+      if (readBytes.isEmpty) break;
       buffer.add(readBytes);
     }
 
@@ -531,9 +531,7 @@ Future<void> chachaVerifyFile(Map<String, dynamic> args) async {
 
       final int chunkLimit = args["chunkLimit"] ?? 1;
       final bool verifyEntireFile = chunkLimit == -1;
-      final chunksToVerify = verifyEntireFile
-          ? 999999999
-          : chunkLimit;
+      final chunksToVerify = verifyEntireFile ? 999999999 : chunkLimit;
 
       var bytesRead = 0;
       var chunksVerified = 0;

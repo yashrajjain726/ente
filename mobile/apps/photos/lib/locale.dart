@@ -51,11 +51,7 @@ Locale localResolutionCallBack(
   return autoDetectedLocale ?? const Locale('en');
 }
 
-// This is used to get locale that should be used for various formatting
-// operations like date, time, number etc. For common languages like english, different
-// locale might have different formats. For example, en_US and en_GB have different
-// formats for date and time. Use this method to find the best locale for formatting
-// operations. This is not used for displaying text in the app.
+// Preserve the device region for dates, times, and numbers.
 Future<Locale> getFormatLocale() async {
   final Locale locale = (await getLocale())!;
   Locale? firstLanguageMatch;

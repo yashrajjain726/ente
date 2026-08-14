@@ -447,7 +447,7 @@ class _FileCommentsBottomSheetState extends State<FileCommentsBottomSheet> {
 
       if (_scrollTargetCommentID != null &&
           _scrollTargetCommentID != parentCommentID) {
-        return; // Abort, another scroll is in progress
+        return;
       }
 
       index = _comments.indexWhere((c) => c.id == parentCommentID);

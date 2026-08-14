@@ -408,10 +408,7 @@ Future<Map<String, Uint8List>?> _getFaceCrops(
     faceBoxes.add(e.value);
   }
   final List<Uint8List> faceCrop = await FaceThumbnailGenerator.instance
-      .generateFaceThumbnails(
-        imagePath,
-        faceBoxes,
-      );
+      .generateFaceThumbnails(imagePath, faceBoxes);
   final Map<String, Uint8List> result = {};
   for (int i = 0; i < faceCrop.length; i++) {
     result[faceIds[i]] = faceCrop[i];

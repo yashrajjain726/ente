@@ -36,7 +36,7 @@ class _ThumbnailDownload {
   final EnteFile file;
   final Completer<Uint8List> completer;
   final CancelToken cancelToken;
-  int counter = 0; // number of times file download was requested
+  int counter = 0;
 
   _ThumbnailDownload(this.file, this.completer, this.cancelToken, this.counter);
 }
@@ -378,7 +378,7 @@ Future<void> _downloadAndDecryptThumbnail(_ThumbnailDownload item) async {
   }
   ThumbnailInMemoryLruCache.put(item.file, data);
   final cachedThumbnail = cachedThumbnailPath(item.file);
-  // The in-memory cache makes the disk write non-blocking.
+  // Readers can use the in-memory copy while this is written to disk.
   unawaited(_writeCachedThumbnail(cachedThumbnail, data));
   if (!item.completer.isCompleted) {
     item.completer.complete(data);

@@ -854,13 +854,10 @@ class RemoteSyncService {
               .map((e) => e.modificationTime ?? 0)
               .reduce(max);
 
-          /* Note: In case of iOS, we will miss any asset modification in
-            between of two installation. This is done to avoid fetching assets
-            from iCloud when modification time could have changed for number of
-            reasons. To fix this, we need to identify a way to store version
-            for the adjustments or just if the asset has been modified ever.
-            https://stackoverflow.com/a/50093266/546896
-            */
+          // Do not use modification time to detect iOS edits. It can change for
+          // other reasons, and detecting adjustments can fetch the asset from
+          // iCloud. Edits made between installs can therefore be missed.
+          // https://stackoverflow.com/a/50093266/546896
           if (maxModificationTime > remoteFile.modificationTime! &&
               Platform.isAndroid) {
             localButUpdatedOnDevice++;

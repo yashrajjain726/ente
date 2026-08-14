@@ -356,7 +356,7 @@ class _ButtonChildWidgetState extends State<ButtonChildWidget> {
                         color: checkIconColor,
                       ),
                     )
-                  : const SizedBox.shrink(), //fallback
+                  : const SizedBox.shrink(),
             ),
           ),
         ),

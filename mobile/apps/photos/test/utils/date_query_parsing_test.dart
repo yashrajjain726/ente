@@ -240,8 +240,8 @@ void main() {
       'should parse short MM/DD format "02/25" (no year, handled by tokenized)',
       () {
         final PartialDate parsedDate = dateParseService.parse('02/25');
-        expect(parsedDate.day, 25); // value 25 is assigned to day first
-        expect(parsedDate.month, 2); // value 02 is assigned to month
+        expect(parsedDate.day, 25);
+        expect(parsedDate.month, 2);
         expect(parsedDate.year, isNull);
       },
     );
@@ -260,21 +260,21 @@ void main() {
       final PartialDate parsedDate = dateParseService.parse('25/02/25');
       expect(parsedDate.day, 25);
       expect(parsedDate.month, 2);
-      expect(parsedDate.year, 2025); // Based on _convertTwoDigitYear pivot
+      expect(parsedDate.year, 2025);
     });
 
     test('should parse two-digit year "01/01/01" as 2001', () {
       final PartialDate parsedDate = dateParseService.parse('01/01/01');
       expect(parsedDate.day, 1);
       expect(parsedDate.month, 1);
-      expect(parsedDate.year, 2001); // 01 < _TWO_DIGIT_YEAR_PIVOT
+      expect(parsedDate.year, 2001);
     });
 
     test('should parse two-digit year "01/01/99" as 1999', () {
       final PartialDate parsedDate = dateParseService.parse('01/01/99');
       expect(parsedDate.day, 1);
       expect(parsedDate.month, 1);
-      expect(parsedDate.year, 1999); // 99 > _TWO_DIGIT_YEAR_PIVOT
+      expect(parsedDate.year, 1999);
     });
   });
 
