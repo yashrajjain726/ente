@@ -290,6 +290,7 @@ func shouldSkipVerifiedSubscriptionReplacement(currentSubscription ente.Subscrip
 		(currentSubscription.ProductID != ente.FreePlanProductID &&
 			currentSubscription.PaymentProvider == verifiedSubscription.PaymentProvider &&
 			currentSubscription.OriginalTransactionID == verifiedSubscription.OriginalTransactionID &&
+			currentSubscription.ProductID == verifiedSubscription.ProductID &&
 			verifiedSubscription.ExpiryTime < currentSubscription.ExpiryTime)
 }
 

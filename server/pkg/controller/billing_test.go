@@ -52,6 +52,15 @@ func TestShouldSkipVerifiedSubscriptionReplacement(t *testing.T) {
 			verified: paid(ente.AppStore, "apple", now+30),
 			want:     true,
 		},
+		{
+			name: "accepts App Store product change with earlier expiry",
+			current: ente.Subscription{
+				ProductID: "old", PaymentProvider: ente.AppStore, OriginalTransactionID: "apple", ExpiryTime: now + 45,
+			},
+			verified: ente.Subscription{
+				ProductID: "new", PaymentProvider: ente.AppStore, OriginalTransactionID: "apple", ExpiryTime: now + 30,
+			},
+		},
 	}
 
 	for _, test := range tests {
