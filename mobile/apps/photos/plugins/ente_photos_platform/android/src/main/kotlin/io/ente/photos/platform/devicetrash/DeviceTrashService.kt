@@ -2,7 +2,6 @@ package io.ente.photos.platform.devicetrash
 
 import android.content.ContentResolver
 import android.content.Context
-import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -22,16 +21,20 @@ internal class DeviceTrashService(context: Context) {
     @Volatile
     private var isClosed = false
 
-    fun getFiles(callback: (Result<List<DeviceTrashFile>>) -> Unit) {
+    fun getFiles(
+        onSuccess: (List<DeviceTrashFile>) -> Unit,
+        onFailure: (Exception) -> Unit,
+    ) {
         executor.execute {
-            val result =
-                try {
-                    Result.success(queryFiles())
-                } catch (error: Exception) {
-                    Result.failure(error)
+            try {
+                val files = queryFiles()
+                mainHandler.post {
+                    if (!isClosed) onSuccess(files)
                 }
-            mainHandler.post {
-                if (!isClosed) callback(result)
+            } catch (error: Exception) {
+                mainHandler.post {
+                    if (!isClosed) onFailure(error)
+                }
             }
         }
     }
@@ -43,10 +46,6 @@ internal class DeviceTrashService(context: Context) {
     }
 
     private fun queryFiles(): List<DeviceTrashFile> {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
-            throw UnsupportedOperationException("Device trash requires Android 11 or newer")
-        }
-
         val projection =
             arrayOf(
                 MediaStore.Files.FileColumns._ID,

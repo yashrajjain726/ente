@@ -23,27 +23,23 @@ class DeviceTrashFile {
   final String deviceFolder;
 }
 
-abstract interface class DeviceTrashSource {
-  Future<List<DeviceTrashFile>> getFiles();
-}
-
-class DeviceTrashClient implements DeviceTrashSource {
-  DeviceTrashClient({MethodChannel? methodChannel})
-    : _methodChannel = methodChannel ?? const MethodChannel(_methodChannelName);
-
+class DeviceTrashClient {
   static final instance = DeviceTrashClient();
-  static const _methodChannelName = 'io.ente.photos.platform';
+  static const _methodChannel = MethodChannel('io.ente.photos.platform');
 
-  final MethodChannel _methodChannel;
-
-  @override
   Future<List<DeviceTrashFile>> getFiles() async {
     if (!Platform.isAndroid) {
       throw UnsupportedError('Device trash is only supported on Android');
     }
-    final result = await _methodChannel.invokeListMethod<Map<dynamic, dynamic>>(
-      'deviceTrash.getFiles',
-    );
-    return List.unmodifiable(result!.map(DeviceTrashFile.fromMap));
+    try {
+      final result = await _methodChannel
+          .invokeListMethod<Map<dynamic, dynamic>>('deviceTrash.getFiles');
+      return List.unmodifiable(result!.map(DeviceTrashFile.fromMap));
+    } on PlatformException catch (error) {
+      if (error.code == 'device_trash_unsupported') {
+        throw UnsupportedError('Device trash requires Android 11 or newer');
+      }
+      rethrow;
+    }
   }
 }
