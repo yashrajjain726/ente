@@ -3,7 +3,7 @@ use fast_image_resize::{
     images::{Image as FirImage, ImageRef as FirImageRef},
 };
 
-use crate::ml::{
+use crate::{
     clip::CLIP_IMAGE_INPUT_SIZE,
     error::{MlError, MlResult},
     onnx::PreparedF32Input,
@@ -202,7 +202,7 @@ mod tests {
     };
 
     use super::{YOLO_INPUT_SIZE, YoloInput, preprocess_clip, preprocess_yolo};
-    use crate::ml::{
+    use crate::{
         clip::CLIP_IMAGE_INPUT_SIZE,
         error::{MlError, MlResult},
         onnx::PreparedF32Input,

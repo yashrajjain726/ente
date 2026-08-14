@@ -1,4 +1,4 @@
-use crate::ml::{
+use crate::{
     error::MlResult,
     models::Model,
     onnx, preprocess,

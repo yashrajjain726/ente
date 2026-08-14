@@ -14,6 +14,7 @@ on:
             - "rust/crates/contacts/**"
             - "rust/crates/core/**"
             - "rust/crates/image/**"
+            - "rust/crates/ml/**"
             - "rust/crates/photos/**"
     workflow_dispatch:
 

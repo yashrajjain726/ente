@@ -2,7 +2,7 @@ use image::{ImageBuffer, Rgb, RgbImage};
 use imageproc::geometric_transformations::{Interpolation, Projection, warp_into};
 use nalgebra::{Matrix2, Matrix3, Vector2};
 
-use crate::ml::{
+use crate::{
     error::{MlError, MlResult},
     types::{AlignmentResult, DecodedImage, FaceDetection, FaceResult, to_face_id},
 };
@@ -405,7 +405,7 @@ fn variance_2d(matrix: &[i32], rows: usize, cols: usize) -> f32 {
 #[cfg(test)]
 mod tests {
     use super::run_face_alignment;
-    use crate::ml::{
+    use crate::{
         error::MlError,
         types::{DecodedImage, Dimensions, FaceDetection},
     };

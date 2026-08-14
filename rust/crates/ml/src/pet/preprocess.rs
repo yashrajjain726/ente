@@ -1,4 +1,4 @@
-use crate::ml::{
+use crate::{
     error::{MlError, MlResult},
     types::DecodedImage,
 };
@@ -317,7 +317,7 @@ mod tests {
     };
 
     use super::{PixelCrop, RgbCropResizer};
-    use crate::ml::types::{DecodedImage, Dimensions};
+    use crate::types::{DecodedImage, Dimensions};
 
     #[test]
     fn crop_resize_matches_a_materialized_crop() {

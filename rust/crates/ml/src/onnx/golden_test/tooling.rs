@@ -3,7 +3,7 @@ use std::path::Path;
 
 use ort::value::ValueType;
 
-use crate::ml::{clip, onnx};
+use crate::{clip, onnx};
 
 pub use super::GoldenMetric;
 use super::data::GOLDEN_ENTRIES;
@@ -14,7 +14,7 @@ const GENERATED_FILE_HEADER: &str = "\
 // Generated golden-test data. Do not edit by hand.
 //
 // Regenerate with:
-//   cargo run -p ente-photos --example ml_goldens -- generate
+//   cargo run -p ente-ml --example ml_goldens -- generate
 //
 // TODO: Pet models have no golden entries because they are CPU-only. Add
 // entries before moving them off CPU (see `MlRuntime::new` in runtime.rs).

@@ -6,7 +6,7 @@ pub(super) use image::run_clip_image;
 pub(super) use text::run_clip_text_query;
 pub(super) use tokenizer::tokenize_clip_text;
 
-use crate::ml::{
+use crate::{
     error::{MlError, MlResult},
     postprocess::l2_normalize,
     types::ClipResult,

@@ -1,4 +1,4 @@
-use crate::ml::{
+use crate::{
     error::{MlError, MlResult},
     models::Model,
     onnx,
@@ -287,7 +287,7 @@ fn winning_pet_body_class<T: onnx::FloatTensorData>(
 
 #[cfg(test)]
 mod tests {
-    use crate::ml::postprocess::{MAX_DETECTIONS_PER_IMAGE, greedy_non_max_suppression};
+    use crate::postprocess::{MAX_DETECTIONS_PER_IMAGE, greedy_non_max_suppression};
 
     use super::{
         BODY_IOU_THRESHOLD, BODY_MIN_SCORE, COCO_CAT, COCO_DOG, PET_FACE_IOU_THRESHOLD,

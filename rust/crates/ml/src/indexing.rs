@@ -1,4 +1,4 @@
-use crate::ml::{
+use crate::{
     clip::{run_clip_image, run_clip_text_query, tokenize_clip_text as tokenize_clip_text_impl},
     diagnostics::{AnalysisContext, AnalysisOperation, AnalysisStage, log_public_ml_error},
     error::{MlError, MlResult},

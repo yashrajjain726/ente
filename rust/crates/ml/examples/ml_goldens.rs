@@ -3,7 +3,7 @@
 mod support;
 
 use anyhow::{Context, Result, bail};
-use ente_photos::ml::golden_tooling::{
+use ente_ml::golden_tooling::{
     GoldenMetric, GoldenModelSpec, GoldenSpecInput, measure_zero_golden_separation,
     render_golden_data,
 };
@@ -35,7 +35,7 @@ async fn main() -> Result<()> {
 }
 
 fn usage() -> &'static str {
-    "usage: cargo run -p ente-photos --example ml_goldens -- \
+    "usage: cargo run -p ente-ml --example ml_goldens -- \
      <generate|validate-zero-separation>"
 }
 

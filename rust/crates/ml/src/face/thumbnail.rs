@@ -7,7 +7,7 @@ use ente_image::image_compression::{
     EncodedImageFormat, FACE_THUMBNAIL_JPEG_QUALITY, FACE_THUMBNAIL_MIN_DIMENSION, encode_rgb,
 };
 
-use crate::ml::{
+use crate::{
     error::{MlError, MlResult},
     types::DecodedImage,
 };
@@ -250,7 +250,7 @@ mod tests {
         FaceBox, compute_crop_rect, face_thumbnail_dimensions, generate_face_thumbnails,
         select_resize_filter,
     };
-    use crate::ml::{
+    use crate::{
         error::MlError,
         types::{DecodedImage, Dimensions},
     };

@@ -1,4 +1,4 @@
-use crate::ml::{
+use crate::{
     error::{MlError, MlResult},
     models::Model,
     onnx,
@@ -117,7 +117,7 @@ fn postprocess_face_tensor<T: onnx::FloatTensorData>(
 
 #[cfg(test)]
 mod tests {
-    use crate::ml::postprocess::MAX_DETECTIONS_PER_IMAGE;
+    use crate::postprocess::MAX_DETECTIONS_PER_IMAGE;
 
     use super::{FaceDetection, IOU_THRESHOLD, greedy_non_max_suppression};
 

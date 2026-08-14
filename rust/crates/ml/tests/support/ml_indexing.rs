@@ -6,7 +6,7 @@ use std::{
 
 use anyhow::{Context, Result, bail};
 use ente_assets::{Asset, AssetFile, AssetStore, download};
-use ente_photos::ml::{
+use ente_ml::{
     ModelPaths,
     error::MlError,
     indexing::{
@@ -401,7 +401,7 @@ impl GoldenTestAssets {
     }
 
     pub(crate) fn golden_data_path() -> Result<PathBuf> {
-        Ok(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("src/ml/onnx/golden_test/data.rs"))
+        Ok(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("src/onnx/golden_test/data.rs"))
     }
 }
 
