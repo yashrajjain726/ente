@@ -38,7 +38,7 @@ Build and run on the simulator:
 ```sh
 open -a Simulator
 
-cd mobile/native/apple/apps/ensu
+cd apple/apps/ensu
 xcodebuild -scheme Ensu -destination 'platform=iOS Simulator,name=iPhone 17'
 
 xcrun simctl install booted \
