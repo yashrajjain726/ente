@@ -359,7 +359,7 @@ class _FileSelectionActionsWidgetState
           SelectionActionButton(
             hugeIcon: HugeIcons.strokeRoundedDelete01,
             labelText: context.strings.permanentlyDelete,
-            onTap: _permanentlyDelete,
+            onTap: _permanentlyDeleteFromTrash,
             isCritical: true,
           ),
         );
