@@ -55,7 +55,7 @@ func (c *CollectionController) AddFiles(ctx *gin.Context, userID int64, files []
 		return stacktrace.Propagate(&ente.ErrFileInTrash, "")
 	}
 
-	err = c.CollectionRepo.AddFiles(cID, collectionOwnerID, files, filesOwnerID)
+	err = c.CollectionRepo.AddFiles(ctx.Request.Context(), cID, collectionOwnerID, files, filesOwnerID)
 	if err != nil {
 		return stacktrace.Propagate(err, "")
 	}

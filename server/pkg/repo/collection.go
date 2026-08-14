@@ -674,45 +674,83 @@ func (repo *CollectionRepository) UnShareContext(
 }
 
 func (repo *CollectionRepository) AddFiles(
+	ctx context.Context,
 	collectionID int64,
 	collectionOwnerID int64,
 	files []ente.CollectionFileItem,
 	fileOwnerID int64,
 ) error {
 	updationTime := time.Microseconds()
-	context := context.Background()
-	tx, err := repo.DB.BeginTx(context, nil)
+	tx, err := repo.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return stacktrace.Propagate(err, "")
 	}
-	for _, file := range files {
-		_, err := tx.ExecContext(context, `INSERT INTO collection_files
-            (collection_id, file_id, encrypted_key, key_decryption_nonce, is_deleted, updation_time, c_owner_id, f_owner_id)
-            VALUES($1, $2, $3, $4, $5, $6, $7, $8)
-            ON CONFLICT ON CONSTRAINT unique_collection_files_cid_fid
-            DO UPDATE SET
-                is_deleted = EXCLUDED.is_deleted,
-                updation_time = EXCLUDED.updation_time,
-                action_user = NULL,
-                action = NULL,
-                created_at = CASE
-                    WHEN collection_files.is_deleted = TRUE AND EXCLUDED.is_deleted = FALSE
-                        THEN now_utc_micro_seconds()
-                    ELSE collection_files.created_at
-                END`, collectionID, file.ID, file.EncryptedKey,
-			file.KeyDecryptionNonce, false, updationTime, collectionOwnerID, fileOwnerID)
-		if err != nil {
-			tx.Rollback()
-			return stacktrace.Propagate(err, "")
-		}
+	if err := upsertCollectionFiles(ctx, tx, collectionID, collectionOwnerID, files, fileOwnerID, updationTime); err != nil {
+		tx.Rollback()
+		return stacktrace.Propagate(err, "")
 	}
-	_, err = tx.ExecContext(context, `UPDATE collections SET updation_time = $1
+	_, err = tx.ExecContext(ctx, `UPDATE collections SET updation_time = $1
 		 WHERE collection_id = $2`, updationTime, collectionID)
 	if err != nil {
 		tx.Rollback()
 		return stacktrace.Propagate(err, "")
 	}
 	err = tx.Commit()
+	return stacktrace.Propagate(err, "")
+}
+
+func upsertCollectionFiles(
+	ctx context.Context,
+	tx *sql.Tx,
+	collectionID int64,
+	collectionOwnerID int64,
+	files []ente.CollectionFileItem,
+	fileOwnerID int64,
+	updationTime int64,
+) error {
+	if len(files) == 0 {
+		return nil
+	}
+
+	fileIDs := make([]int64, 0, len(files))
+	encryptedKeys := make([]string, 0, len(files))
+	keyDecryptionNonces := make([]string, 0, len(files))
+	seenFileIDs := make(map[int64]struct{}, len(files))
+	for _, file := range files {
+		if _, ok := seenFileIDs[file.ID]; ok {
+			continue
+		}
+		seenFileIDs[file.ID] = struct{}{}
+		fileIDs = append(fileIDs, file.ID)
+		encryptedKeys = append(encryptedKeys, file.EncryptedKey)
+		keyDecryptionNonces = append(keyDecryptionNonces, file.KeyDecryptionNonce)
+	}
+
+	_, err := tx.ExecContext(ctx, `INSERT INTO collection_files
+			(collection_id, file_id, encrypted_key, key_decryption_nonce, is_deleted, updation_time, c_owner_id, f_owner_id)
+		SELECT $1, input.file_id, input.encrypted_key, input.key_decryption_nonce, FALSE, $2, $3, $4
+		FROM unnest($5::bigint[], $6::text[], $7::text[])
+			AS input(file_id, encrypted_key, key_decryption_nonce)
+		ORDER BY input.file_id
+		ON CONFLICT ON CONSTRAINT unique_collection_files_cid_fid
+		DO UPDATE SET
+			is_deleted = EXCLUDED.is_deleted,
+			updation_time = EXCLUDED.updation_time,
+			action_user = NULL,
+			action = NULL,
+			created_at = CASE
+				WHEN collection_files.is_deleted = TRUE AND EXCLUDED.is_deleted = FALSE
+					THEN now_utc_micro_seconds()
+				ELSE collection_files.created_at
+			END`,
+		collectionID,
+		updationTime,
+		collectionOwnerID,
+		fileOwnerID,
+		pq.Array(fileIDs),
+		pq.Array(encryptedKeys),
+		pq.Array(keyDecryptionNonces),
+	)
 	return stacktrace.Propagate(err, "")
 }
 
@@ -735,26 +773,9 @@ func (repo *CollectionRepository) RestoreFiles(ctx context.Context, userID int64
 		return stacktrace.Propagate(err, "")
 	}
 
-	for _, file := range newCollectionFiles {
-		_, err := tx.ExecContext(ctx, `INSERT INTO collection_files
-            (collection_id, file_id, encrypted_key, key_decryption_nonce, is_deleted, updation_time, c_owner_id, f_owner_id)
-            VALUES($1, $2, $3, $4, $5, $6, $7, $8)
-            ON CONFLICT ON CONSTRAINT unique_collection_files_cid_fid
-            DO UPDATE SET
-                is_deleted = EXCLUDED.is_deleted,
-                updation_time = EXCLUDED.updation_time,
-                action_user = NULL,
-                action = NULL,
-                created_at = CASE
-                    WHEN collection_files.is_deleted = TRUE AND EXCLUDED.is_deleted = FALSE
-                        THEN now_utc_micro_seconds()
-                    ELSE collection_files.created_at
-                END`, collectionID, file.ID, file.EncryptedKey,
-			file.KeyDecryptionNonce, false, updationTime, userID, userID)
-		if err != nil {
-			tx.Rollback()
-			return stacktrace.Propagate(err, "")
-		}
+	if err := upsertCollectionFiles(ctx, tx, collectionID, userID, newCollectionFiles, userID, updationTime); err != nil {
+		tx.Rollback()
+		return stacktrace.Propagate(err, "")
 	}
 	_, err = tx.ExecContext(ctx, `UPDATE collections SET updation_time = $1
 		 WHERE collection_id = $2`, updationTime, collectionID)
@@ -845,28 +866,13 @@ func (repo *CollectionRepository) MoveFiles(ctx context.Context,
 	fileIDs := make([]int64, 0)
 	for _, file := range fileItems {
 		fileIDs = append(fileIDs, file.ID)
-		_, err := tx.ExecContext(ctx, `INSERT INTO collection_files
-            (collection_id, file_id, encrypted_key, key_decryption_nonce, is_deleted, updation_time, c_owner_id, f_owner_id)
-            VALUES($1, $2, $3, $4, $5, $6, $7, $8)
-            ON CONFLICT ON CONSTRAINT unique_collection_files_cid_fid
-            DO UPDATE SET
-                is_deleted = EXCLUDED.is_deleted,
-                updation_time = EXCLUDED.updation_time,
-                action_user = NULL,
-                action = NULL,
-                created_at = CASE
-                    WHEN collection_files.is_deleted = TRUE AND EXCLUDED.is_deleted = FALSE
-                        THEN now_utc_micro_seconds()
-                    ELSE collection_files.created_at
-                END`, toCollectionID, file.ID, file.EncryptedKey,
-			file.KeyDecryptionNonce, false, updationTime, collectionOwner, fileOwner)
-		if err != nil {
-			if rollbackErr := tx.Rollback(); rollbackErr != nil {
-				logrus.WithError(rollbackErr).Error("transaction rollback failed")
-				return stacktrace.Propagate(rollbackErr, "")
-			}
-			return stacktrace.Propagate(err, "")
+	}
+	if err := upsertCollectionFiles(ctx, tx, toCollectionID, collectionOwner, fileItems, fileOwner, updationTime); err != nil {
+		if rollbackErr := tx.Rollback(); rollbackErr != nil {
+			logrus.WithError(rollbackErr).Error("transaction rollback failed")
+			return stacktrace.Propagate(rollbackErr, "")
 		}
+		return stacktrace.Propagate(err, "")
 	}
 	_, err = tx.ExecContext(ctx, `UPDATE collection_files 
 		SET is_deleted = $1, updation_time = $2 WHERE collection_id = $3 AND file_id = ANY($4)`,
