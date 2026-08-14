@@ -209,12 +209,9 @@ func (c *BillingController) VerifySubscription(
 	if err != nil {
 		return ente.Subscription{}, stacktrace.Propagate(err, "")
 	}
-	newSubscriptionExpiresSooner := newSubscription.ExpiryTime < currentSubscription.ExpiryTime
 	isUpgradingFromFreePlan := currentSubscription.ProductID == ente.FreePlanProductID
-	hasChangedProductID := currentSubscription.ProductID != newSubscription.ProductID
-	isOutdatedPurchase := !isUpgradingFromFreePlan && !hasChangedProductID && newSubscriptionExpiresSooner
-	if isOutdatedPurchase {
-		log.Info("Outdated purchase reported")
+	if shouldSkipVerifiedSubscriptionReplacement(currentSubscription, newSubscription, time.Microseconds()) {
+		log.Info("Outdated or expired purchase reported")
 		return currentSubscription, nil
 	}
 	if newSubscription.Storage < currentSubscription.Storage {
@@ -285,6 +282,15 @@ func (c *BillingController) VerifySubscription(
 	}
 	log.Info("Returning new subscription with ID " + strconv.FormatInt(newSubscription.ID, 10))
 	return newSubscription, nil
+}
+
+func shouldSkipVerifiedSubscriptionReplacement(currentSubscription ente.Subscription, verifiedSubscription ente.Subscription, now int64) bool {
+	effectiveExpiry := verifiedSubscription.ExpiryTime + billing.ProviderToExpiryGracePeriodMap[verifiedSubscription.PaymentProvider]
+	return effectiveExpiry < now ||
+		(currentSubscription.ProductID != ente.FreePlanProductID &&
+			currentSubscription.PaymentProvider == verifiedSubscription.PaymentProvider &&
+			currentSubscription.OriginalTransactionID == verifiedSubscription.OriginalTransactionID &&
+			verifiedSubscription.ExpiryTime < currentSubscription.ExpiryTime)
 }
 
 func (c *BillingController) getAllPlans(countryCode string, stripeAccountCountry ente.StripeAccountCountry) []ente.BillingPlan {
