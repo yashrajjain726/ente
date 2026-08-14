@@ -9,12 +9,6 @@ import "package:flutter/material.dart";
 enum FABComponentVariant { primary, secondary }
 
 /// Figma: https://www.figma.com/design/BuBNPPytxlVnqfmCUW0mgz/Ente-Visual-Design?node-id=21843-6537&m=dev
-/// Section: Buttons / Floating action button
-/// Specs: Extended is 56px high with 20px leading padding, 24px trailing
-/// padding, an 8px gap, and a 999px radius. Icon is 52px square with a 30px
-/// radius.
-/// Types: Extended, Icon.
-/// States: Extended has default and pressed. Icon has default.
 class FABComponent extends StatefulWidget {
   final String? label;
 
