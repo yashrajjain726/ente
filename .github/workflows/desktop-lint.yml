@@ -8,7 +8,6 @@ on:
             - "rust/bindings/napi/**"
             - "rust/crates/image/**"
             - "rust/crates/ml/**"
-            - "rust/crates/photos/**"
             - "rust/apps/codegen/**"
             - "rust/Cargo.toml"
             - "rust/Cargo.lock"
