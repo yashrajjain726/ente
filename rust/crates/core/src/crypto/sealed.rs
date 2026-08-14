@@ -1,11 +1,11 @@
 use blake2b_simd::Params as Blake2bParams;
+use crypto_secretbox::XSalsa20Poly1305;
+use crypto_secretbox::aead::generic_array::GenericArray;
+use crypto_secretbox::aead::{Aead, KeyInit};
 use rand_core::{OsRng, RngCore};
 use salsa20::hsalsa;
 use subtle::ConstantTimeEq;
 use x25519_dalek::StaticSecret;
-use xsalsa20poly1305::XSalsa20Poly1305;
-use xsalsa20poly1305::aead::generic_array::GenericArray;
-use xsalsa20poly1305::aead::{Aead, KeyInit};
 use zeroize::Zeroize;
 
 use crate::crypto::{Error, PublicKey, Result, SecretKey};
