@@ -57,7 +57,6 @@ class PubMagicMetadata {
   String? cameraMake;
   String? cameraModel;
 
-  // Indicates streaming version of the file.
   // If this is set, then the file is a streaming version of the original file.
   int? sv;
 

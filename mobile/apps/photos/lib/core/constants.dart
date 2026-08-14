@@ -24,7 +24,6 @@ const photoGridSizeMin = 2;
 const photoGridSizeMax = 6;
 const subGalleryMultiplier = 10;
 
-// used to identify which ente file are available in app cache
 const String sharedMediaIdentifier = 'ente-shared-media://';
 
 const galleryThumbnailDiskLoadDeferDuration = Duration(milliseconds: 80);
@@ -36,7 +35,6 @@ const mediaManagementHintDeleteAttemptThreshold = 3;
 // https://github.com/bitcoin/bips/blob/master/bip-0039.mediawiki#Generating_the_mnemonic
 const mnemonicKeyWordCount = 24;
 
-// https://stackoverflow.com/a/61162219
 const dragSensitivity = 8;
 
 const supportEmail = 'support@ente.com';

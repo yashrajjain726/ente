@@ -20,7 +20,6 @@ import "package:uuid/uuid.dart";
 
 final _logger = Logger("ShareUtil");
 
-/// share is used to share media/files from ente to other apps
 Future<void> share(
   BuildContext context,
   List<EnteFile> files, {
@@ -98,8 +97,6 @@ Future<void> share(
   }
 }
 
-/// Returns the rect of button if context and key are not null
-/// If key is null, returned rect will be at the center of the screen
 Rect shareButtonRect(BuildContext context, GlobalKey? shareButtonKey) {
   Size size = MediaQuery.sizeOf(context);
   final RenderObject? renderObject = shareButtonKey?.currentContext
@@ -139,7 +136,6 @@ Future<ShareResult> shareText(
 String formatMemoryShareText(String title, String shareUrl) =>
     '$title: $shareUrl';
 
-/// Shares URL first with description below
 Future<ShareResult> shareLinkWithDescription(
   String url, {
   String? description,
@@ -165,7 +161,6 @@ Future<List<EnteFile>> convertIncomingSharedMediaToFile(
     }
     final enteFile = EnteFile();
     final sharedLocalId = const Uuid().v4();
-    // fileName: img_x.jpg
     enteFile.title = basename(media.path);
     var ioFile = File(media.path);
     try {
@@ -174,10 +169,7 @@ Future<List<EnteFile>> convertIncomingSharedMediaToFile(
       );
     } catch (e) {
       if (e is FileSystemException) {
-        //from renameSync docs:
-        //On some platforms, a rename operation cannot move a file between
-        //different file systems. If that is the case, instead copySync the
-        //file to the new location and then deleteSync the original.
+        // renameSync may not move files across filesystems.
         _logger.info("Creating new copy of file in path ${ioFile.path}");
         final newIoFile = ioFile.copySync(
           Configuration.instance.getSharedMediaDirectory() +
@@ -238,10 +230,8 @@ Future<List<EnteFile>> convertPicketAssets(
 
 DateTime? parseDateFromFileNam1e(String fileName) {
   if (fileName.startsWith('IMG-') || fileName.startsWith('VID-')) {
-    // Whatsapp media files
     return DateTime.tryParse(fileName.split('-')[1]);
   } else if (fileName.startsWith("Screenshot_")) {
-    // Screenshots on droid
     return DateTime.tryParse(
       (fileName).replaceAll('Screenshot_', '').replaceAll('-', 'T'),
     );
@@ -272,10 +262,7 @@ Future<void> shareAlbumLink(
   await shareLinkWithDescription(url, context: context, key: key);
 }
 
-/// required for ipad https://github.com/flutter/flutter/issues/47220#issuecomment-608453383
-/// This returns the position of the share button if context and key are not null
-/// and if not, it returns a default position so that the share sheet on iPad has
-/// some position to show up.
+// iPad share sheets require a source rectangle.
 Rect _sharePosOrigin(BuildContext? context, GlobalKey? key) {
   late final Rect rect;
   if (context != null) {

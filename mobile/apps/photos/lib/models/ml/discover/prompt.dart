@@ -9,7 +9,6 @@ class Prompt {
   final bool showVideo;
   final bool recentFirst;
 
-  // fromJson
   Prompt.fromJson(Map<String, dynamic> json)
     : id = json['id'] ?? json['title'],
       query = json['query'] ?? json['prompt'],

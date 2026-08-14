@@ -9,9 +9,6 @@ final _computer = Computer.shared();
 
 final _logger = Logger("CacheUtil");
 
-/// Writes data to a JSON file at the specified path using the provided method, inside computer.
-/// The method should convert the data to a JSON string.
-/// The JSON string is then UTF-8 encoded and written to the file.
 Future<void> writeToJsonFile<P>(
   String filePath,
   P data,
@@ -44,9 +41,6 @@ Future<void> _writeToJsonFile<P>(Map<String, dynamic> args) async {
   }
 }
 
-/// Reads a JSON file from the specified path using the provided method, inside computer.
-/// The method should decode the JSON string into an object.
-/// The JSON string is expected to be UTF-8 encoded.
 Future<P?> decodeJsonFile<P>(
   String filePath,
   P Function(String) jsonDecodeMethod,

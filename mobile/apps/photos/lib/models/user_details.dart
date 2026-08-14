@@ -86,9 +86,6 @@ class UserDetails {
     );
   }
 
-  // getFamilyOrPersonalUsage will return total usage for family if user
-  // belong to family group. Otherwise, it will return storage consumed by
-  // current user
   int getFamilyOrPersonalUsage() {
     return isPartOfFamily() ? familyData!.getTotalUsage() : usage;
   }
@@ -101,15 +98,11 @@ class UserDetails {
     return max(getTotalStorage() - getFamilyOrPersonalUsage(), 0);
   }
 
-  // getTotalStorage will return total storage available including the
-  // storage bonus
   int getTotalStorage() {
     return (isPartOfFamily() ? familyData!.storage : subscription.storage) +
         storageBonus;
   }
 
-  // return the member storage limit if user is part of family and the admin
-  // has set the storage limit for the user.
   int? familyMemberStorageLimit() {
     if (isPartOfFamily()) {
       final FamilyMember? currentUserMember = currentFamilyMember();
@@ -218,14 +211,12 @@ class ProfileData {
   bool isEmailMFAEnabled;
   bool isTwoFactorEnabled;
 
-  // Constructor with default values
   ProfileData({
     this.canDisableEmailMFA = false,
     this.isEmailMFAEnabled = false,
     this.isTwoFactorEnabled = false,
   });
 
-  // Factory method to create ProfileData instance from JSON
   factory ProfileData.fromJson(Map<String, dynamic>? json) {
     return ProfileData(
       canDisableEmailMFA: json?['canDisableEmailMFA'] ?? false,
@@ -234,7 +225,6 @@ class ProfileData {
     );
   }
 
-  // Method to convert ProfileData instance to JSON
   Map<String, dynamic> toJson() {
     return {
       'canDisableEmailMFA': canDisableEmailMFA,

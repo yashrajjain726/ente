@@ -62,7 +62,6 @@ class MoreCountWidget extends StatelessWidget {
             scale: 0.85,
             child: Text(
               displayChar.toUpperCase(),
-              // fixed color
               style: textStyle,
             ),
           ),

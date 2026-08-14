@@ -2,11 +2,9 @@ import 'dart:convert';
 
 import "package:photos/models/metadata/common_keys.dart";
 
-// Collection SubType Constants
 const subTypeDefaultHidden = 1;
 const subTypeSharedFilesCollection = 2;
 
-// key for collection subType
 const subTypeKey = 'subType';
 
 const muteKey = "mute";
@@ -62,16 +60,13 @@ class CollectionMagicMetadata {
 }
 
 class CollectionPubMagicMetadata {
-  // sort order while showing collection
   bool? asc;
 
-  // cover photo id for the collection
   int? coverID;
 
   // layout for public link sharing (masonry, grouped, continuous, trip)
   String? layout;
 
-  // description shown below the album name
   String? description;
 
   CollectionPubMagicMetadata({

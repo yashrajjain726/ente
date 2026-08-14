@@ -1,7 +1,6 @@
 import "package:flutter/widgets.dart";
 import "package:shared_preferences/shared_preferences.dart";
 
-// list of locales which are enabled for photos app.
 // Add more language to the list only when at least 90% of the strings are
 // translated in the corresponding language.
 const List<Locale> appSupportedLocales = <Locale>[
@@ -60,7 +59,6 @@ Locale localResolutionCallBack(
 Future<Locale> getFormatLocale() async {
   final Locale locale = (await getLocale())!;
   Locale? firstLanguageMatch;
-  // see if exact matche is present in the device locales
   for (Locale deviceLocale in _onDeviceLocales) {
     if (deviceLocale.languageCode == locale.languageCode &&
         deviceLocale.countryCode == locale.countryCode) {

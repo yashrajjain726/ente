@@ -8,7 +8,6 @@ class WebPage extends StatefulWidget {
   final String title;
   final String url;
 
-  // if true, show open in browser  icon in appBar
   final bool canOpenInBrowser;
 
   const WebPage(

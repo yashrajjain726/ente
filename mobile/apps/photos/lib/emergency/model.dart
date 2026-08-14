@@ -58,7 +58,6 @@ class EmergencyContact {
     this.recoveryNoticeInDays,
   );
 
-  // copyWith
   EmergencyContact copyWith({
     User? user,
     User? emergencyContact,
@@ -73,7 +72,6 @@ class EmergencyContact {
     );
   }
 
-  // fromJson
   EmergencyContact.fromJson(Map<String, dynamic> json)
     : user = User.fromMap(json['user']),
       emergencyContact = User.fromMap(json['emergencyContact']),
@@ -109,7 +107,6 @@ class EmergencyInfo {
     this.othersRecoverySession,
   );
 
-  // from json
   EmergencyInfo.fromJson(Map<String, dynamic> json)
     : contacts = (json['contacts'] as List)
           .map((contact) => EmergencyContact.fromJson(contact))
@@ -142,7 +139,6 @@ class RecoverySessions {
     this.createdAt,
   );
 
-  // fromJson
   RecoverySessions.fromJson(Map<String, dynamic> json)
     : id = json['id'],
       user = User.fromMap(json['user']),

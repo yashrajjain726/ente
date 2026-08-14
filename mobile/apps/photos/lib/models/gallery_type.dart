@@ -81,8 +81,6 @@ extension GalleyTypeExtension on GalleryType {
     }
   }
 
-  // showDeleteTopOption indicates whether we should show
-  // delete icon as iconButton
   bool showDeleteIconOption() {
     switch (this) {
       case GalleryType.ownedCollection:

@@ -15,7 +15,7 @@ abstract class MlModelAsset {
 
   final _downloadModelLock = Lock();
 
-  /// WARNING: If [downloadModel] was not first called, this method will download the model first using high bandwidth.
+  // Downloads over high bandwidth if downloadModel was not called first.
   Future<String> getModelPath() async {
     return _downloadModelLock.synchronized(() async {
       return RemoteAssetsService.instance.getAssetPath(

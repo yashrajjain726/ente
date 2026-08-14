@@ -56,7 +56,7 @@ class _SimilarImagesPageState extends State<SimilarImagesPage> {
   bool _isDisposed = false;
 
   SimilarImagesPageState _pageState = SimilarImagesPageState.setup;
-  double _distanceThreshold = 0.04; // Default value
+  double _distanceThreshold = 0.04;
   List<SimilarFiles> _similarFilesList = [];
 
   SortKey _sortKey = SortKey.size;
@@ -793,7 +793,7 @@ class _SimilarImagesPageState extends State<SimilarImagesPage> {
               );
             },
           ),
-          const SizedBox(height: 16), // Add spacing between groups
+          const SizedBox(height: 16),
         ],
       ),
     );

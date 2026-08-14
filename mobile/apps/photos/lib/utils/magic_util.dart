@@ -246,8 +246,7 @@ Future<void> updateShareeOrder(
   }
 }
 
-// changeCoverPhoto is used to change cover photo for a collection. To reset to
-// default cover photo, pass uploadedFileID as 0
+// Pass 0 to restore the default cover.
 Future<void> changeCoverPhoto(
   BuildContext context,
   Collection collection,

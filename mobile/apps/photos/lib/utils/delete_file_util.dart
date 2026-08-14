@@ -523,7 +523,7 @@ Future<LocalDeletionResult> deleteLocalFilesAfterRemovingAlreadyDeletedIDs(
   return combineDeletionResults(sharedMediaResult, platformResult);
 }
 
-/// Only to be used on Android
+// Only use on Android.
 Future<LocalDeletionResult>
 retryFreeUpSpaceAfterRemovingAssetsNonExistingInDisk(
   BuildContext context, {
@@ -1206,7 +1206,6 @@ class DeleteConfirmationSheetState extends State<DeleteConfirmationSheet> {
         ),
       ),
       actions: [
-        // Expanded target choices
         AnimatedSize(
           duration: const Duration(milliseconds: 200),
           curve: Curves.easeOut,
@@ -1270,7 +1269,6 @@ class DeleteConfirmationSheetState extends State<DeleteConfirmationSheet> {
                     ],
                   )
                 :
-                  // Preferred target shortcut
                   ButtonComponent(
                     label: switch (deletePreference) {
                       DeletePreference.DeleteFromRemoteOnly =>
@@ -1293,7 +1291,6 @@ class DeleteConfirmationSheetState extends State<DeleteConfirmationSheet> {
                   ),
           ),
         ),
-        // Preference control
         if (widget.isLocal && widget.isRemote)
           ConstrainedBox(
             constraints: const BoxConstraints(minHeight: 48),

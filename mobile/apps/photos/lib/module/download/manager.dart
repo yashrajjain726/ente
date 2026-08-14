@@ -168,7 +168,7 @@ class DownloadManager {
             'Existing file size mismatch for ${task.filename}: '
             'expected ${task.totalBytes}, but got $existingSize',
           );
-          await baseFile.delete(); // Remove corrupted file
+          await baseFile.delete();
         }
       }
 

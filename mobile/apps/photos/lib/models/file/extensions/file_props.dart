@@ -51,7 +51,6 @@ extension FilePropsExtn on EnteFile {
   DeviceTrashFile? get asDeviceTrashFile =>
       (this is DeviceTrashFile) ? this as DeviceTrashFile : null;
 
-  // Return true if the file was uploaded via collect photos workflow
   bool get isCollect => uploaderName != null;
 
   String? get uploaderName => pubMagicMetadata?.uploaderName;

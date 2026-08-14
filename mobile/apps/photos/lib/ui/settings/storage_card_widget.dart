@@ -304,7 +304,6 @@ class _StorageCardWidgetState extends State<StorageCardWidget> {
     late num currentUsage, totalStorage;
     late String currentUsageUnit, totalStorageUnit;
 
-    // Determine the appropriate usage and units
     if (shouldShowUsedStorageInTBs) {
       currentUsage = usedStorageInTB;
       currentUsageUnit = "TB";
@@ -316,7 +315,6 @@ class _StorageCardWidgetState extends State<StorageCardWidget> {
       currentUsageUnit = "GB";
     }
 
-    // Determine the appropriate total storage and units
     if (shouldShowTotalStorageInTBs) {
       totalStorage = totalStorageInTB;
       totalStorageUnit = "TB";
