@@ -15,7 +15,9 @@ import "package:workmanager/workmanager.dart" as workmanager;
 void callbackDispatcher() {
   workmanager.Workmanager().executeTask((taskName, inputData) async {
     final TimeLogger tlog = TimeLogger();
-    Future<bool> result = Future.error("Task didn't run");
+    // Deferred error construction: an eagerly created Future.error with no
+    // listener surfaces as an unhandled exception even on success.
+    String? failure = "Task didn't run";
     final prefs = await SharedPreferences.getInstance();
 
     await runWithLogs(() async {
@@ -31,18 +33,22 @@ void callbackDispatcher() {
           },
         );
         BgTaskUtils.$.info('Task run successful $tlog');
-        result = Future.value(true);
+        failure = null;
       } catch (e) {
         BgTaskUtils.$.warning('Task error: $e');
         await BgTaskUtils.releaseResourcesForKill(taskName, prefs);
-        result = Future.error(e.toString());
+        failure = e.toString();
       }
     }, prefix: "[bg]").onError((_, _) {
-      result = Future.error("Didn't finished correctly!");
+      failure = "Didn't finished correctly!";
       return;
     });
 
-    return result;
+    final error = failure;
+    if (error != null) {
+      return Future.error(error);
+    }
+    return true;
   });
 }
 
