@@ -37,9 +37,8 @@ Future<void> share(
   try {
     final List<Future<String?>> pathFutures = [];
     for (EnteFile file in files) {
-      // Note: We are requesting the origin file for performance reasons on iOS.
-      // This will eat up storage, which will be reset only when the app restarts.
-      // We could have cleared the cache had there been a callback to the share API.
+      // iOS origin files are faster to share but remain cached until restart;
+      // the share API has no completion callback for cleanup.
       pathFutures.add(
         getFile(file, isOrigin: true).then((fetchedFile) {
           final path = fetchedFile?.path;

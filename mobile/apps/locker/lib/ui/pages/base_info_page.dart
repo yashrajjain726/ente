@@ -318,8 +318,6 @@ abstract class BaseInfoPageState<T extends InfoData, W extends BaseInfoPage<T>>
     });
 
     refreshUIWithCurrentData();
-
-    // The info file service already performs a sync, so we don't need to sync again
   }
 
   Future<void> _updateCollectionMembership() async {
@@ -347,10 +345,8 @@ abstract class BaseInfoPageState<T extends InfoData, W extends BaseInfoPage<T>>
       await FavoritesService.instance.addToFavorites(widget.existingFile!);
     }
 
-    // Only favorites is special-cased; Uncategorized is treated as a normal
-    // collection. A file can belong to multiple collections (incl.
-    // Uncategorized), so it is only removed from Uncategorized when the user
-    // explicitly deselects it.
+    // Only Favorites is special. Uncategorized changes only when selected or
+    // deselected like any other collection.
     final regularCurrentIds = currentCollectionIds
         .where((id) => id != favoriteCollection.id)
         .toSet();

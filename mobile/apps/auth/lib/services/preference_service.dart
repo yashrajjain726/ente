@@ -147,7 +147,7 @@ class PreferenceService {
     }
   }
 
-  // This is used to adjust the time for TOTP calculations when device local time is not in sync with actual time.
+  // Offset TOTP calculations when the device clock is wrong.
   int timeOffsetInMilliSeconds() {
     return _prefs.getInt(kLocalTimeOffsetKey) ?? 0;
   }

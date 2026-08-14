@@ -77,7 +77,7 @@ Future<List<EnteFile>> deleteFilesFromEverywhere(
   _logger.info("Trying to deleteFilesFromEverywhere " + files.toString());
   final List<String> localAssetIDs = [];
   final List<String> localSharedMediaIDs = [];
-  final List<String> alreadyDeletedIDs = []; // Files already missing from disk.
+  final List<String> alreadyDeletedIDs = [];
   bool hasLocalOnlyFiles = false;
   for (final file in files) {
     if (file.localID != null) {
@@ -228,7 +228,7 @@ Future<List<EnteFile>> deleteFilesOnDeviceOnly(
   _logger.info("Trying to deleteFilesOnDeviceOnly" + files.toString());
   final List<String> localAssetIDs = [];
   final List<String> localSharedMediaIDs = [];
-  final List<String> alreadyDeletedIDs = []; // Files already missing from disk.
+  final List<String> alreadyDeletedIDs = [];
   final localOnlyIDs = <String?>{};
   for (final file in files) {
     if (file.localID != null) {

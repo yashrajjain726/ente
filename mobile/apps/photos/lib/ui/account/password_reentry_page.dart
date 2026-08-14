@@ -198,8 +198,7 @@ class _PasswordReentryPageState extends State<PasswordReentryPage> {
             children: [
               const SizedBox(height: 12),
               Visibility(
-                // hidden textForm for suggesting auto-fill service for saving
-                // password
+                // A hidden password field prompts autofill to save the password.
                 visible: false,
                 child: TextFormField(
                   autofillHints: const [AutofillHints.email],

@@ -502,7 +502,6 @@ class FileUploader {
     String encryptedFilePath,
     String encryptedThumbnailPath,
   ) async {
-    // Note: Consider removing source file if upload has completed / failed
     if (File(encryptedFilePath).existsSync()) {
       await File(encryptedFilePath).delete();
     }
@@ -642,7 +641,6 @@ class FileUploader {
       } else if (statusCode == 426) {
         _onStorageLimitExceeded();
       } else if (attempt < kMaximumUploadAttempts && statusCode == -1) {
-        // retry when DioException contains no response/status code
         _logger.info("Upload failed, will retry in 3 seconds");
         await Future.delayed(const Duration(seconds: 3));
         return _uploadFile(

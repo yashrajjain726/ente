@@ -88,16 +88,12 @@ class EmergencyContact {
 }
 
 class EmergencyInfo {
-  // List of emergency contacts added by the user
   final List<EmergencyContact> contacts;
 
-  // List of recovery sessions that are created to recover current user account
   final List<RecoverySessions> recoverSessions;
 
-  // List of emergency contacts that have added current user as their emergency contact
   final List<EmergencyContact> othersEmergencyContact;
 
-  // List of recovery sessions that are created to recover grantor's account
   final List<RecoverySessions> othersRecoverySession;
 
   EmergencyInfo(

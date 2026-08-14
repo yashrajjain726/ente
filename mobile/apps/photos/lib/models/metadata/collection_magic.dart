@@ -15,20 +15,12 @@ const albumDescriptionKey = "caption";
 const maxAlbumDescriptionLength = 200;
 
 class CollectionMagicMetadata {
-  // 0 -> visible
-  // 1 -> archived
-  // 2 -> hidden
+  // 0 = visible, 1 = archived, 2 = hidden.
   int visibility;
 
-  // null/0 value -> no subType
-  // 1 -> DEFAULT_HIDDEN COLLECTION for files hidden individually
-  // 2 -> Collections created for sharing selected files
   int? subType;
 
-  /* order is initially just used for pinned collections.
-  Later it can be used for custom sort order for if needed.
-  Higher the value, higher the preference of the collection to show up first.
-  */
+  // Higher values give a collection higher display priority.
   int? order;
 
   CollectionMagicMetadata({required this.visibility, this.subType, this.order});
@@ -107,17 +99,12 @@ class CollectionPubMagicMetadata {
 }
 
 class ShareeMagicMetadata {
-  // 0 -> visible
-  // 1 -> archived
-  // 2 -> hidden etc?
+  // 0 = visible, 1 = archived, 2 = hidden.
   int visibility;
 
-  // null/false value -> no mute
   bool? mute;
 
-  /* order is used for pinned collections for sharees.
-  Higher the value, higher the preference of the collection to show up first.
-  */
+  // Higher values give a collection higher display priority.
   int? order;
 
   ShareeMagicMetadata({required this.visibility, this.mute, this.order});

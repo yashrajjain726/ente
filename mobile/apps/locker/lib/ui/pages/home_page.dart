@@ -481,10 +481,7 @@ class _HomePageState extends UploaderPageState<HomePage>
       var collections = await CollectionService.instance.getCollections();
       await _loadRecentFiles(collections);
 
-      // If collections are empty and first sync is complete, ensure default
-      // collections are created. This handles the case where default collections
-      // setup was skipped during initialization due to the master key not being
-      // available yet.
+      // Create defaults if initialization ran before the master key was ready.
       final hasCompletedFirstSync = CollectionService.instance
           .hasCompletedFirstSync();
       if (collections.isEmpty && hasCompletedFirstSync) {

@@ -588,9 +588,7 @@ class CollectionService {
     final Map<int, List<EnteFile>> collectionToFilesMap = await _db
         .getAllFilesGroupByCollectionID(uploadedIDs);
 
-    // Find and map the files from current collection to to entries in other
-    // collections. This mapping is done to avoid moving all the files to
-    // uncategorized during remove from album.
+    // Preserve another album membership instead of moving to Uncategorized.
     for (MapEntry<int, List<EnteFile>> entry in collectionToFilesMap.entries) {
       if (!await _isAutoMoveCandidate(
         collection.id,

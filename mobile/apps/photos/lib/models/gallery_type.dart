@@ -5,8 +5,7 @@ enum GalleryType {
   homepage,
   archive,
   uncategorized,
-  // hidden section shows all the files that are present in the defaultHidden
-  // collections.
+  // Files from every default-hidden collection.
   hiddenSection,
   hiddenOwnedCollection,
   favorite,

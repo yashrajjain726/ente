@@ -8,8 +8,7 @@ class HolidayData {
   HolidayData(this.name, {required this.month, required this.day});
 }
 
-// Based on the locale, this return holidays that have fixed date as per the
-// Gregorian calendar. For example, Christmas is always on December 25th.
+// Returns locale-specific holidays with fixed Gregorian dates.
 List<HolidayData> getHolidays(BuildContext context) {
   final locale = Localizations.localeOf(context);
   if (localeToHolidays.containsKey(locale.toLanguageTag())) {

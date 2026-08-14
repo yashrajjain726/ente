@@ -22,9 +22,6 @@ class Collection {
   final int updationTime;
   final bool isDeleted;
 
-  // decryptedPath will be null for collections now owned by user, deleted
-  // collections, && collections which don't have a path. The path is used
-  // to map local on-device album on mobile to remote collection on ente.
   String? decryptedPath;
   String? mMdEncodedJson;
   String? mMdPubEncodedJson;

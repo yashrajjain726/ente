@@ -263,11 +263,7 @@ extension DeviceFiles on FilesDB {
           '$existingPathIds',
         );
         for (String pathID in existingPathIds) {
-          // do not delete device collection entries for paths which are
-          // marked for backup. This is to handle "Free up space"
-          // feature, where we delete files which are backed up. Deleting such
-          // entries here result in us losing out on the information that
-          // those folders were marked for automatic backup.
+          // Keep folder backup settings after Free up space deletes their files.
           final deletedRows = await db.execute(
             '''
             DELETE FROM device_collections WHERE id = ? AND should_backup = $_sqlBoolFalse

@@ -105,8 +105,7 @@ Future<void> changeCollectionVisibility(
         update,
       );
     }
-    // Force reload home gallery to pull in/remove the now visibility changed
-    // files
+    // Reload so the home gallery adds or removes the collection's files.
     Bus.instance.fire(
       ForceReloadHomeGalleryEvent(
         "CollectionVisibilityChange: $visibilityAction",

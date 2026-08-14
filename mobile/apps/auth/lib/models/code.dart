@@ -154,8 +154,7 @@ class Code {
       );
       return code;
     } catch (e) {
-      // if account name contains # without encoding,
-      // rest of the url are treated as url fragment
+      // Retry after encoding an unescaped # in the account name.
       if (rawData.contains("#")) {
         return Code.fromOTPAuthUrl(
           rawData.replaceAll("#", '%23'),

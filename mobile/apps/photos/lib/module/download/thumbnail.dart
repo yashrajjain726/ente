@@ -101,8 +101,7 @@ preloadThumbnailWithPendingRequestRef(EnteFile file) async {
   );
 }
 
-// Note: This method should only be called for files that have been uploaded
-// since cachedThumbnailPath depends on the file's uploadedID
+// cachedThumbnailPath requires an uploaded file ID.
 Future<File?> getThumbnailForUploadedFile(EnteFile file) async {
   final cachedThumbnail = cachedThumbnailPath(file);
   if (await cachedThumbnail.exists()) {
@@ -111,7 +110,7 @@ Future<File?> getThumbnailForUploadedFile(EnteFile file) async {
   }
   final thumbnail = await getThumbnail(file);
   if (thumbnail != null) {
-    // it might be already written to this path during `getThumbnail(file)`
+    // getThumbnail may have already written this path.
     if (!await cachedThumbnail.exists()) {
       final didWrite = await _writeCachedThumbnail(
         cachedThumbnail,
@@ -379,7 +378,7 @@ Future<void> _downloadAndDecryptThumbnail(_ThumbnailDownload item) async {
   }
   ThumbnailInMemoryLruCache.put(item.file, data);
   final cachedThumbnail = cachedThumbnailPath(item.file);
-  // data is already cached in-memory, no need to await on disk write
+  // The in-memory cache makes the disk write non-blocking.
   unawaited(_writeCachedThumbnail(cachedThumbnail, data));
   if (!item.completer.isCompleted) {
     item.completer.complete(data);
