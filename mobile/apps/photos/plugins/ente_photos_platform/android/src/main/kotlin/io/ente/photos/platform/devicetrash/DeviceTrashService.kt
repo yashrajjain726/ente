@@ -53,16 +53,15 @@ internal class DeviceTrashService(context: Context) {
                 MediaStore.MediaColumns.DATE_EXPIRES,
                 MediaStore.Images.Media.BUCKET_DISPLAY_NAME,
             )
-        val selection =
-            "${MediaStore.MediaColumns.IS_TRASHED} = ? AND " +
-                "${MediaStore.Files.FileColumns.MEDIA_TYPE} IN (?, ?)"
         val queryArgs =
             Bundle().apply {
-                putString(ContentResolver.QUERY_ARG_SQL_SELECTION, selection)
+                putString(
+                    ContentResolver.QUERY_ARG_SQL_SELECTION,
+                    "${MediaStore.Files.FileColumns.MEDIA_TYPE} IN (?, ?)",
+                )
                 putStringArray(
                     ContentResolver.QUERY_ARG_SQL_SELECTION_ARGS,
                     arrayOf(
-                        "1",
                         MediaStore.Files.FileColumns.MEDIA_TYPE_IMAGE.toString(),
                         MediaStore.Files.FileColumns.MEDIA_TYPE_VIDEO.toString(),
                     ),
