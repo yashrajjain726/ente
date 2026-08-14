@@ -1,3 +1,5 @@
+import "dart:io";
+
 import "package:ente_pure_utils/ente_pure_utils.dart";
 import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
@@ -75,7 +77,9 @@ class _AlbumSelectionActionWidgetState
       items.add(
         SelectionActionButton(
           labelText: context.strings.share,
-          hugeIcon: HugeIcons.strokeRoundedShare03,
+          hugeIcon: Platform.isIOS
+              ? HugeIcons.strokeRoundedShare03
+              : HugeIcons.strokeRoundedShare08,
           onTap: _shareCollection,
         ),
       );
