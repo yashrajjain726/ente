@@ -12,7 +12,9 @@ import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 
-internal class DeviceHealthChannelAdapter : EventChannel.StreamHandler {
+internal class DeviceHealthChannelAdapter :
+    MethodChannel.MethodCallHandler,
+    EventChannel.StreamHandler {
     private lateinit var eventChannel: EventChannel
     private lateinit var service: DeviceHealthService
     private var eventSink: EventChannel.EventSink? = null
@@ -23,19 +25,14 @@ internal class DeviceHealthChannelAdapter : EventChannel.StreamHandler {
         eventChannel.setStreamHandler(this)
     }
 
-    fun handleMethodCall(call: MethodCall, result: MethodChannel.Result): Boolean =
+    override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) =
         when (call.method) {
-            "deviceHealth.getSnapshot" -> {
-                result.success(service.snapshot().toChannelMap())
-                true
-            }
+            "deviceHealth.getSnapshot" -> result.success(service.snapshot().toChannelMap())
 
-            "deviceHealth.getMemorySnapshot" -> {
+            "deviceHealth.getMemorySnapshot" ->
                 result.success(service.memorySnapshot().toMemoryChannelMap())
-                true
-            }
 
-            else -> false
+            else -> result.notImplemented()
         }
 
     override fun onListen(arguments: Any?, events: EventChannel.EventSink) {

@@ -6,37 +6,34 @@ import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 
-internal class DeviceTrashChannelAdapter {
+internal class DeviceTrashChannelAdapter : MethodChannel.MethodCallHandler {
     private lateinit var service: DeviceTrashService
 
     fun attach(binding: FlutterPlugin.FlutterPluginBinding) {
         service = DeviceTrashService(binding.applicationContext)
     }
 
-    fun handleMethodCall(call: MethodCall, result: MethodChannel.Result): Boolean =
+    override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) =
         when (call.method) {
-            "deviceTrash.getFiles" -> {
-                service.getFiles { filesResult ->
-                    filesResult.fold(
-                        onSuccess = { files -> result.success(files.map { it.toChannelMap() }) },
-                        onFailure = { error ->
-                            result.error(
-                                when (error) {
-                                    is UnsupportedOperationException ->
-                                        "device_trash_unsupported"
+            "deviceTrash.getFiles" -> service.getFiles { filesResult ->
+                filesResult.fold(
+                    onSuccess = { files -> result.success(files.map { it.toChannelMap() }) },
+                    onFailure = { error ->
+                        result.error(
+                            when (error) {
+                                is UnsupportedOperationException ->
+                                    "device_trash_unsupported"
 
-                                    else -> "device_trash_query_failed"
-                                },
-                                error.message,
-                                null,
-                            )
-                        },
-                    )
-                }
-                true
+                                else -> "device_trash_query_failed"
+                            },
+                            error.message,
+                            null,
+                        )
+                    },
+                )
             }
 
-            else -> false
+            else -> result.notImplemented()
         }
 
     fun detach() {
