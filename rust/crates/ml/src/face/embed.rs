@@ -1,4 +1,4 @@
-use crate::ml::{
+use crate::{
     error::{MlError, MlResult},
     models::Model,
     onnx,

@@ -6,7 +6,7 @@ use ort::{
     value::{Tensor, TensorElementType, TensorRef, ValueType},
 };
 
-use crate::ml::error::{MlError, MlResult};
+use crate::error::{MlError, MlResult};
 
 use super::{SessionRunError, SessionRunResult, golden_test};
 

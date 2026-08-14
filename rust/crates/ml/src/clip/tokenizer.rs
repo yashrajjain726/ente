@@ -9,7 +9,7 @@ use once_cell::sync::Lazy;
 use plsfix::fix_text;
 use regex::Regex;
 
-use crate::ml::error::{MlError, MlResult};
+use crate::error::{MlError, MlResult};
 
 use super::CLIP_TEXT_TOKEN_COUNT;
 

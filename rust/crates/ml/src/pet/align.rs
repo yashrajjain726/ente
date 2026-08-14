@@ -1,4 +1,4 @@
-use crate::ml::{
+use crate::{
     error::MlResult,
     types::{DecodedImage, PetAlignmentResult, PetFaceDetection, PetFaceResult, to_face_id},
 };

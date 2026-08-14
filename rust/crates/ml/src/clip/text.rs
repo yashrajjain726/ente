@@ -1,4 +1,4 @@
-use crate::ml::{
+use crate::{
     clip::tokenizer,
     error::{MlError, MlResult},
     models::Model,

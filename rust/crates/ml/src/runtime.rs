@@ -5,7 +5,7 @@ use std::{
 
 use once_cell::sync::Lazy;
 
-use crate::ml::{
+use crate::{
     error::{MlError, MlResult},
     models::{Model, ModelPaths},
     onnx,

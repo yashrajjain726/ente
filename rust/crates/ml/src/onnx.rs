@@ -1,7 +1,7 @@
 use ort::session::Session;
 use std::{fmt, path::Path};
 
-use crate::ml::error::{MlError, MlResult};
+use crate::error::{MlError, MlResult};
 
 mod coreml_cache;
 mod golden_test;
