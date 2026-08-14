@@ -301,13 +301,11 @@ Future<void> _runMinimally(
     await Configuration.instance.init(prefs);
     _logger.info("(for debugging) Configuration done $tlog");
 
-    // App LifeCycle
     AppLifecycleService.instance.init(prefs);
     AppLifecycleService.instance.onAppInBackground(
       'init via: WorkManager $tlog',
     );
 
-    // Crypto rel.
     await Computer.shared().turnOn(workersCount: 4);
     CryptoUtil.init();
 
@@ -320,7 +318,6 @@ Future<void> _runMinimally(
     await CollectionsService.instance.init(prefs);
     _logger.info("(for debugging) CollectionsService init done $tlog");
 
-    // Upload & Sync Related
     await FileUploader.instance.init(prefs, true);
     LocalFileUpdateService.instance.init(prefs);
     await LocalSyncService.instance.init(prefs);
@@ -328,13 +325,10 @@ Future<void> _runMinimally(
     await SyncService.instance.init(prefs);
     _isSyncInitialized = true;
 
-    // Misc Services
     await UserService.instance.init();
     SocialNotificationCoordinator.instance.init(prefs);
     await NotificationService.instance.initializeForBackground();
 
-    // Begin Execution
-    // only runs for android
     _logger.info("[BG TASK] update notification");
     updateService.showUpdateNotification().ignore();
     _logger.info("[BG TASK] sync starting");
@@ -344,7 +338,6 @@ Future<void> _runMinimally(
     _logger.info("[BG TASK] locale fetch");
     final locale = await getLocale();
     await initializeDateFormatting(locale?.languageCode ?? "en");
-    // only runs for android
     _logger.info("[BG TASK] home widget sync");
     if (!isLocalGalleryMode &&
         hasGrantedMLConsent &&
@@ -434,7 +427,6 @@ Future<void> _init(
     } else {
       AppLifecycleService.instance.onAppInForeground('init via: $via $tlog');
     }
-    // Start workers asynchronously. No need to wait for them to start
     Computer.shared().turnOn(workersCount: 4).ignore();
     CryptoUtil.init();
 
@@ -708,23 +700,19 @@ Future<void> _scheduleFGSync(String caller) async {
 }
 
 Future<void> _handleBackgroundPush(Object message) async {
-  final bool isRunningInFG = await isForegroundEngineActive(); // hb
+  final bool isRunningInFG = await isForegroundEngineActive();
   final bool isInForeground = AppLifecycleService.instance.isForeground;
   if (isRunningInFG) {
     _logger.info(
       "Background push received when app is alive and runningInFG: $isRunningInFG inForeground: $isInForeground",
     );
     if (PushService.shouldSync(message)) {
-      // FG is active, let it handle the sync
       _logger.info("Foreground is active, skipping background sync from push");
-      // Could optionally trigger a sync event that FG can handle
     }
   } else {
-    // App is dead or FG is not active
     runWithLogs(() async {
       _logger.info("Background push received, no active foreground");
 
-      // Mark BG as active before starting
       final prefs = await SharedPreferences.getInstance();
       await prefs.setInt(
         kLastBGTaskHeartBeatTime,

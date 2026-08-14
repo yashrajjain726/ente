@@ -589,7 +589,6 @@ class PersonService {
     Bus.instance.fire(PeopleChangedEvent());
   }
 
-  // Returns true when remote changes were downloaded or newly applied locally.
   Future<bool> _pullAndApplyRemotePersons({
     bool skipClusterUpdateIfNoChange = true,
   }) async {

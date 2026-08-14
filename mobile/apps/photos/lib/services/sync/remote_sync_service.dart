@@ -132,7 +132,6 @@ class RemoteSyncService {
       await trashSyncService.syncTrash();
       await _collectionsService.movePendingRemovalActionsToUncategorized();
 
-      // Sync social data immediately after the diff, before uploads.
       if (AppLifecycleService.instance.isForeground) {
         _socialSync().ignore();
       } else {
@@ -387,7 +386,6 @@ class RemoteSyncService {
     late final Set<String> newerLocalIDs;
     if (backNewPhotosOnly) {
       final int onlyNewSince = backupPreferenceService.onlyNewSinceEpoch!;
-      // Fetch newer IDs once for all backup folders.
       newerLocalIDs = await _db.getAllLocalIDsNewerThan(onlyNewSince);
       _logger.info("Found ${newerLocalIDs.length} newer files");
     }
@@ -796,10 +794,7 @@ class RemoteSyncService {
         remoteNewFile = 0;
     final int userID = _config.getUserID()!;
     bool needsGalleryReload = false;
-    // this is required when same file is uploaded twice in the same
-    // collection. Without this check, if both remote files are part of same
-    // diff response, then we end up inserting one entry instead of two
-    // as we update the generatedID for remoteFile to local file's genID
+    // A diff can contain two uploads of one local file. Claim its row only once.
     final Set<int> alreadyClaimedLocalFilesGenID = {};
 
     final List<EnteFile> toBeInserted = [];
@@ -859,13 +854,10 @@ class RemoteSyncService {
               .map((e) => e.modificationTime ?? 0)
               .reduce(max);
 
-          /* Note: In case of iOS, we will miss any asset modification in
-            between of two installation. This is done to avoid fetching assets
-            from iCloud when modification time could have changed for number of
-            reasons. To fix this, we need to identify a way to store version
-            for the adjustments or just if the asset has been modified ever.
-            https://stackoverflow.com/a/50093266/546896
-            */
+          // Do not use modification time to detect iOS edits. It can change for
+          // other reasons, and detecting adjustments can fetch the asset from
+          // iCloud. Edits made between installs can therefore be missed.
+          // https://stackoverflow.com/a/50093266/546896
           if (maxModificationTime > remoteFile.modificationTime! &&
               Platform.isAndroid) {
             localButUpdatedOnDevice++;
@@ -975,7 +967,6 @@ class RemoteSyncService {
         !AppLifecycleService.instance.isForeground;
   }
 
-  // Upload newest files first, but defer videos in the background.
   void _sortByTime(List<EnteFile> file) {
     file.sort((first, second) {
       if (!AppLifecycleService.instance.isForeground &&
@@ -988,8 +979,6 @@ class RemoteSyncService {
     });
   }
 
-  // Prefer a local file in each iOS background slot; otherwise use the next
-  // file in line.
   Future<List<EnteFile>> _buildBgUploadQueue(List<EnteFile> files) async {
     const maxChecksPerSlot = kMaximumPermissibleUploadsInThrottledMode;
     const slots = kMaximumPermissibleUploadsInThrottledMode;

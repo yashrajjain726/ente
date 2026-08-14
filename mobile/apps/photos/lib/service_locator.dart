@@ -61,7 +61,6 @@ class ServiceLocator {
   late final BackupSettings backupSettings;
   late final EnteWakeLockService wakeLockService;
 
-  // instance
   ServiceLocator._privateConstructor();
 
   static final ServiceLocator instance = ServiceLocator._privateConstructor();
@@ -122,10 +121,8 @@ BackupSettings get backupSettings => ServiceLocator.instance.backupSettings;
 EnteWakeLockService get wakeLockService =>
     ServiceLocator.instance.wakeLockService;
 
-/// Whether the app is currently showing the no-account local gallery experience.
-///
-/// This does not mean the device is offline. It means the active gallery mode is
-/// local-device focused rather than Ente-account focused.
+// True when showing local-device photos instead of an Ente account. Network
+// access may still be used.
 bool get isLocalGalleryMode => localSettings.isLocalGalleryMode;
 
 bool get hasGrantedMLConsent {
@@ -321,7 +318,6 @@ InstallSourceService get installSourceService {
   return _installSourceService!;
 }
 
-// Gateways
 PushGateway? _pushGateway;
 PushGateway get pushGateway {
   _pushGateway ??= PushGateway(ServiceLocator.instance.enteDio);

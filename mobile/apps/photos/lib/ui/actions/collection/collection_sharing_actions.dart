@@ -553,23 +553,9 @@ class CollectionActions {
         actionResult!.action == ButtonAction.first;
   }
 
-  /*
-  _moveFilesFromCurrentCollection removes the file from the current
-  collection. Based on the file and collection ownership, files will be
-  either moved to different collection (Case A). or will just get removed
-  from current collection (Case B).
-  -------------------------------
-  Case A: Files and collection belong to the same user. Such files
-  will be moved to a collection which belongs to the user and removed from
-  the current collection as part of move operation.
-  Note: Even files are present in the
-  destination collection, we need to make move API call on the server
-  so that the files are removed from current collection and are actually
-  moved to a collection owned by the user.
-  -------------------------------
-  Case B: Owner of files and collections are different. In such cases,
-  we will just remove (not move) the files from the given collection.
-  */
+  // Moving an owned file must call the move API even if it is already in
+  // another owned collection, because move also removes it from this one.
+  // Files owned by someone else can only be removed from this collection.
   Future<void> moveFilesFromCurrentCollection(
     BuildContext? context,
     Collection collection,
@@ -605,8 +591,6 @@ class CollectionActions {
         split.ownedByOtherUsers,
       );
     } else if (!isCollectionOwner && split.ownedByCurrentUser.isNotEmpty) {
-      // collection is not owned by the user, just remove files owned
-      // by current user and return
       await collectionsService.removeFromCollection(
         collection.id,
         split.ownedByCurrentUser,
@@ -649,9 +633,7 @@ class CollectionActions {
       }
     }
 
-    // Find and map the files from current collection to to entries in other
-    // collections. This mapping is done to avoid moving all the files to
-    // uncategorized during remove from album.
+    // Preserve another album membership instead of moving to Uncategorized.
     for (MapEntry<int, List<EnteFile>> entry in collectionToFilesMap.entries) {
       if (!_isAutoMoveCandidate(collection.id, entry.key, currentUserID)) {
         continue;
@@ -707,8 +689,6 @@ class CollectionActions {
         in destCollectionToFilesMap.entries) {
       if (collection.type == CollectionType.uncategorized &&
           entry.key == collection.id) {
-        // skip moving files to uncategorized collection from uncategorized
-        // this flow is triggered while cleaning up uncategerized collection
         logger.info(
           'skipping moving ${entry.value.length} files to uncategorized collection',
         );

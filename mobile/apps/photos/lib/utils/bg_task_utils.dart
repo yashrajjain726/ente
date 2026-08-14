@@ -103,7 +103,6 @@ class BgTaskUtils {
       );
       $.info("WorkManager configured");
 
-      // Check if task is scheduled (Android only)
       if (Platform.isAndroid) {
         final isScheduled = await workmanager.Workmanager()
             .isScheduledByUniqueName(backgroundTaskIdentifier);

@@ -376,7 +376,7 @@ class _InlineTextDetectionState extends State<InlineTextDetection> {
 
   void _handleLongPressAt(Offset globalPosition) {
     if (!_isEligible) return;
-    if (_overlayActive) return; // Already active, let overlay handle it
+    if (_overlayActive) return;
     if (!_isGlobalPointEligibleForOcrGesture(globalPosition)) return;
     if (_isPreparingOnDemand) return;
     setState(() {

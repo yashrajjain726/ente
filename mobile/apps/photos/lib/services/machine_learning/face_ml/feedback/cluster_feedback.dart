@@ -2415,7 +2415,7 @@ List<(String, double, String)> _calcSuggestionsMean(Map<String, dynamic> args) {
         ),
       );
     }
-    suggestClusterIds.sort((a, b) => a.$2.compareTo(b.$2)); // sort by distance
+    suggestClusterIds.sort((a, b) => a.$2.compareTo(b.$2));
 
     dev.log(
       "Already found ${suggestClusterIds.length} good suggestions using mean",

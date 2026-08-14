@@ -50,22 +50,6 @@ const _memoryCaptionActionBarGap = 4.0;
 const _memoryCaptionLineHeight = 16.0;
 const _memoryCaptionScrimTopPadding = 12.0;
 
-//There are two states of variables that FullScreenMemory depends on:
-//1. The list of memories
-//2. The current index of the page view
-
-//1
-//Only when items are deleted will list of memories change and this requires the
-//whole screen to be rebuild. So the InheritedWidget is updated using the Updater
-//widget which will then lead to a rebuild of all widgets that call
-//InheritedWidget.of(context).
-
-//2
-//There are widgets that doesn't come inside the PageView that needs to rebuild
-//with new state when page index is changed. So the index is stored in a
-//ValueNotifier inside the InheritedWidget and the widgets that need to change
-//are wrapped in a ValueListenableBuilder.
-
 //TODO: Use better naming convention. "Memory" should be a whole memory and
 //parts of the memory should be called "items".
 int? _clampedMemoryIndex(int index, int length) {
@@ -77,6 +61,8 @@ bool _isValidMemoryIndex(int index, int length) {
   return index >= 0 && index < length;
 }
 
+// Deleting a memory changes the shared list and rebuilds the screen. Page
+// changes use a ValueNotifier so widgets outside the PageView also rebuild.
 class FullScreenMemoryDataUpdater extends StatefulWidget {
   final List<Memory> memories;
   final int initialIndex;
@@ -319,8 +305,7 @@ class FullScreenMemoryData extends InheritedWidget {
 
   @override
   bool updateShouldNotify(FullScreenMemoryData oldWidget) {
-    // Checking oldWidget.memories.length != memories.length here doesn't work
-    //because the old widget and new widget reference the same memories list.
+    // Lengths cannot detect changes because both widgets share the memory list.
     return true;
   }
 }

@@ -169,7 +169,6 @@ ParsedExifDateTime _getStandardExifDateTimeInDeviceTimezone(
     final photoUtcDate = result.add(
       Duration(hours: -offsetHours, minutes: -offsetMinutes),
     );
-    // Convert the UTC time to the device's local time
     final deviceLocalTime = photoUtcDate.toLocal();
     return ParsedExifDateTime(
       deviceLocalTime,

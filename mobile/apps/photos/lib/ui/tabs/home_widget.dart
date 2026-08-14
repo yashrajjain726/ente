@@ -247,9 +247,7 @@ class _HomeWidgetState extends State<HomeWidget> {
     ) async {
       if (mounted && event.status == SyncStatus.completedFirstGalleryImport) {
         Duration delayInRefresh = const Duration(milliseconds: 0);
-        // Loading page will redirect to BackupFolderSelectionPage.
-        // To avoid showing folder hook in middle during routing,
-        // delay state refresh for home page
+        // Let navigation to BackupFolderSelectionPage finish before rebuilding.
         if (!permissionService.hasGrantedLimitedPermissions()) {
           delayInRefresh = const Duration(milliseconds: 250);
         }
@@ -864,7 +862,6 @@ class _HomeWidgetState extends State<HomeWidget> {
           key: _scaffoldKey,
           drawerScrimColor: getEnteColorScheme(context).strokeFainter,
           drawerEnableOpenDragGesture: false,
-          //using a hack instead of enabling this as enabling this will create other problems
           drawer: enableDrawer
               ? ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 430),
@@ -1005,9 +1002,7 @@ class _HomeWidgetState extends State<HomeWidget> {
     if (_sharedFiles != null &&
         _sharedFiles!.isNotEmpty &&
         _shouldRenderCreateCollectionSheet) {
-      //The gallery is getting rebuilt for some reason when the keyboard is up.
-      //So to stop showing multiple CreateCollectionSheets, this flag
-      //needs to be set to false the first time it is rendered.
+      // Clear this before opening so rebuilds cannot open duplicate sheets.
       _shouldRenderCreateCollectionSheet = false;
       ReceiveSharingIntent.instance.reset();
       Future.delayed(const Duration(milliseconds: 10), () {

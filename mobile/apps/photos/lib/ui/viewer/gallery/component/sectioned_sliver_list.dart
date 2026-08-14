@@ -162,7 +162,6 @@ class _RenderSliverKnownExtentBoxAdaptor extends RenderSliverMultiBoxAdaptor {
         index: firstIndex,
         layoutOffset: indexToLayoutOffset(firstIndex),
       )) {
-        // There are either no children, or we are past the end of all our children.
         double max;
         if (firstIndex <= 0) {
           max = 0.0;
@@ -217,7 +216,6 @@ class _RenderSliverKnownExtentBoxAdaptor extends RenderSliverMultiBoxAdaptor {
           after: trailingChildWithLayout,
         );
         if (child == null) {
-          // We have run out of children.
           final layout = sectionAtIndex(index) ?? sectionLayouts.last;
           estimatedMaxScrollOffset = layout.maxOffset;
           break;
