@@ -19,7 +19,6 @@ import 'package:photos/ui/components/dialog_widget.dart';
 import 'package:photos/ui/components/models/button_type.dart';
 import "package:photos/utils/email_util.dart";
 
-// Legacy wrapper around showDialogWidget.
 Future<ButtonResult?> showInfoDialog(
   BuildContext context, {
   String title = "",
@@ -44,7 +43,6 @@ Future<ButtonResult?> showInfoDialog(
   );
 }
 
-// Legacy wrapper around showDialogWidget.
 Future<ButtonResult?> showErrorDialog(
   BuildContext context,
   String title,
@@ -69,7 +67,6 @@ Future<ButtonResult?> showErrorDialog(
   );
 }
 
-// Legacy wrapper around showDialogWidget.
 Future<ButtonResult?> showErrorDialogForException({
   required BuildContext context,
   required Exception exception,
@@ -169,7 +166,6 @@ String parseErrorForUI(
   return genericError;
 }
 
-// Legacy wrapper around showDialogWidget.
 Future<ButtonResult?> showGenericErrorDialog({
   required BuildContext context,
   bool isDismissible = true,
@@ -243,7 +239,6 @@ Future<void> showGenericErrorBottomSheet({
   );
 }
 
-// Legacy wrapper around showDialogWidget.
 Future<ButtonResult?> showChoiceDialog(
   BuildContext context, {
   required String title,

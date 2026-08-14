@@ -131,7 +131,7 @@ class _LocalBackupExperienceState extends State<LocalBackupExperience> {
 
   Future<bool> _startEnableFlow() async {
     final hasPassword = await _ensurePasswordConfigured(disableOnCancel: true);
-    // Re-enabling needs an existing password but does not prompt for it again.
+    // Re-enabling skips password re-entry when one is already stored.
     if (!hasPassword) {
       return false;
     }

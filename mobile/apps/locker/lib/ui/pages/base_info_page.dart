@@ -300,6 +300,7 @@ abstract class BaseInfoPageState<T extends InfoData, W extends BaseInfoPage<T>>
   Future<void> _updateExistingFile(InfoItem infoItem) async {
     if (widget.existingFile == null) return;
 
+    // updateInfoFile syncs internally.
     final success = await InfoFileService.instance.updateInfoFile(
       existingFile: widget.existingFile!,
       updatedInfoItem: infoItem,

@@ -85,7 +85,7 @@ Future<bool?> _handleFirstImportFlow(BuildContext context) async {
     return null;
   }
 
-  // Start local import directly; SyncService can race it by also calling syncAll.
+  // Start only the local import; SyncService also runs syncAll.
   _logger.info("Triggering local sync for first import from backup flow");
   unawaited(LocalSyncService.instance.sync());
 

@@ -84,6 +84,10 @@ EncryptionResult chachaEncryptData(Map<String, dynamic> args) {
   );
 }
 
+// chachaEncryptFileV2 does chucked encryption similar to chachaEncryptFile.
+// This implementation is refactored to simplify the logic to make it easier to
+// maintain and reason about.
+// Rolling out this version 2 in phases to ensure stability
 Future<FileEncryptResult> chachaEncryptFileV2(Map<String, dynamic> args) async {
   final encryptionStartTime = DateTime.now().millisecondsSinceEpoch;
   final logger = Logger("chachaEncryptFileV2");
@@ -865,8 +869,7 @@ class CryptoUtil {
     throw UnsupportedError("Cannot perform this operation on this device");
   }
 
-  // Used only for shared-link passwords, after the access token and collection
-  // key.
+  // Shared-link passwords add a layer over the access token and collection key.
   static Future<DerivedKeyResult> deriveInteractiveKey(
     Uint8List password,
     Uint8List salt,
