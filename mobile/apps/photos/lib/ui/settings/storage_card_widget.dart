@@ -61,7 +61,7 @@ class _StorageCardWidgetState extends State<StorageCardWidget> {
 
     if (inheritedUserDetails == null) {
       _logger.severe((InheritedUserDetails).toString() + 'is null');
-      throw Error();
+      return const SizedBox.shrink();
     } else {
       return GestureDetector(
         behavior: HitTestBehavior.translucent,
@@ -105,16 +105,24 @@ class _StorageCardWidgetState extends State<StorageCardWidget> {
             colors: [Color(0xFF212121), Color(0xFF434343)],
           ),
         ),
-        child: Stack(
-          children: [
-            Positioned.fill(
-              child: CustomPaint(painter: _DotsPainter(), size: Size.infinite),
-            ),
-            userDetails is UserDetails
-                ? _userDetails(userDetails)
-                : const Center(child: EnteLoadingWidget(color: strokeBaseDark)),
-          ],
-        ),
+        child: userDetails != null
+            ? Stack(
+                children: [
+                  Positioned.fill(
+                    child: CustomPaint(
+                      painter: _DotsPainter(),
+                      size: Size.infinite,
+                    ),
+                  ),
+                  _userDetails(userDetails),
+                ],
+              )
+            : const SizedBox(
+                height: 130,
+                child: Stack(
+                  children: [EnteLoadingWidget(color: strokeBaseDark)],
+                ),
+              ),
       ),
     );
   }
