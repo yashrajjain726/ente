@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 
 use ente_assets::{Asset, AssetFile, AssetStore};
 
-use super::runtime::ModelPaths;
+use super::models::{self, Model, ModelPaths};
 
 const MODELS: &str = "models";
 
@@ -22,40 +22,13 @@ const RETIRED_LEGACY_MODEL_FILES: &[&str] = &[
     "mobilefacenet_opset15.onnx",
 ];
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Model {
-    FaceDetection,
-    FaceEmbedding,
-    ClipImage,
-    ClipText,
-    PetFaceDetection,
-    PetFaceEmbeddingDog,
-    PetFaceEmbeddingCat,
-    PetBodyDetection,
-    PetBodyEmbeddingDog,
-    PetBodyEmbeddingCat,
-}
-
-const ALL_MODELS: [Model; 10] = [
-    Model::FaceDetection,
-    Model::FaceEmbedding,
-    Model::ClipImage,
-    Model::ClipText,
-    Model::PetFaceDetection,
-    Model::PetFaceEmbeddingDog,
-    Model::PetFaceEmbeddingCat,
-    Model::PetBodyDetection,
-    Model::PetBodyEmbeddingDog,
-    Model::PetBodyEmbeddingCat,
-];
-
 pub struct ClipTextPaths {
     pub model: PathBuf,
     pub vocab: PathBuf,
 }
 
-pub fn model_asset(model: Model) -> Asset {
-    let spec = model.spec();
+fn model_asset(model: Model) -> Asset {
+    let spec = model_asset_spec(model);
     Asset::files(
         model_key(spec.key),
         spec.files
@@ -70,25 +43,10 @@ pub fn model_asset(model: Model) -> Asset {
     .expect("valid Photos model catalog")
 }
 
-pub fn indexing_models(run_faces: bool, run_clip: bool, run_pets: bool) -> Vec<Model> {
-    let mut models = Vec::new();
-    if run_faces {
-        models.extend([Model::FaceDetection, Model::FaceEmbedding]);
-    }
-    if run_clip {
-        models.push(Model::ClipImage);
-    }
-    if run_pets {
-        models.extend([
-            Model::PetFaceDetection,
-            Model::PetFaceEmbeddingDog,
-            Model::PetFaceEmbeddingCat,
-            Model::PetBodyDetection,
-            Model::PetBodyEmbeddingDog,
-            Model::PetBodyEmbeddingCat,
-        ]);
-    }
-    models
+pub fn indexing_assets(run_faces: bool, run_clip: bool, run_pets: bool) -> Vec<Asset> {
+    models::selected_indexing_models(run_faces, run_clip, run_pets)
+        .map(model_asset)
+        .collect()
 }
 
 pub fn indexing_model_paths(
@@ -97,23 +55,16 @@ pub fn indexing_model_paths(
     run_clip: bool,
     run_pets: bool,
 ) -> ModelPaths {
-    ModelPaths {
-        face_detection: model_path_if(store, Model::FaceDetection, run_faces),
-        face_embedding: model_path_if(store, Model::FaceEmbedding, run_faces),
-        clip_image: model_path_if(store, Model::ClipImage, run_clip),
-        clip_text: String::new(),
-        pet_face_detection: model_path_if(store, Model::PetFaceDetection, run_pets),
-        pet_face_embedding_dog: model_path_if(store, Model::PetFaceEmbeddingDog, run_pets),
-        pet_face_embedding_cat: model_path_if(store, Model::PetFaceEmbeddingCat, run_pets),
-        pet_body_detection: model_path_if(store, Model::PetBodyDetection, run_pets),
-        pet_body_embedding_dog: model_path_if(store, Model::PetBodyEmbeddingDog, run_pets),
-        pet_body_embedding_cat: model_path_if(store, Model::PetBodyEmbeddingCat, run_pets),
+    let mut model_paths = ModelPaths::default();
+    for model in models::selected_indexing_models(run_faces, run_clip, run_pets) {
+        *model_paths.get_mut(model) = model_path(store, model);
     }
+    model_paths
 }
 
 pub fn clip_text_paths(store: &AssetStore) -> ClipTextPaths {
-    let asset = model_asset(Model::ClipText);
-    let files = Model::ClipText.spec().files;
+    let asset = clip_text_asset();
+    let files = model_asset_spec(Model::ClipText).files;
     ClipTextPaths {
         model: store
             .file_path(&asset, files[0].name)
@@ -124,12 +75,19 @@ pub fn clip_text_paths(store: &AssetStore) -> ClipTextPaths {
     }
 }
 
+pub fn clip_text_asset() -> Asset {
+    model_asset(Model::ClipText)
+}
+
 pub fn migrate_desktop_models(store: &AssetStore, legacy_dir: &Path) -> Vec<String> {
     let mut warnings = Vec::new();
     if legacy_dir.exists() {
-        for model in ALL_MODELS {
+        for model in Model::ALL {
             if let Err(error) = migrate_desktop_model(store, legacy_dir, model) {
-                warnings.push(format!("Failed to migrate {}: {error}", model.spec().key));
+                warnings.push(format!(
+                    "Failed to migrate {}: {error}",
+                    model_asset_spec(model).key
+                ));
             }
         }
         for name in RETIRED_LEGACY_MODEL_FILES {
@@ -150,118 +108,113 @@ pub fn migrate_desktop_models(store: &AssetStore, legacy_dir: &Path) -> Vec<Stri
     warnings
 }
 
-impl Model {
-    fn spec(self) -> ModelSpec {
-        match self {
-            Self::FaceDetection => ModelSpec {
-                key: "yolov5s_face_640_640_static_b1",
-                files: &[ModelFileSpec {
-                    name: "yolov5s_face_640_640_static_b1.onnx",
-                    size: 32_355_091,
-                    sha256: "e047647409403d52696035ecd445792173e50d7fbdcccac97b958a585db9aa3d",
-                }],
-            },
-            Self::FaceEmbedding => ModelSpec {
-                key: "mobilefacenet_portable_static_b1",
-                files: &[ModelFileSpec {
-                    name: "mobilefacenet_portable_static_b1.onnx",
-                    size: 5_278_803,
-                    sha256: "0763fc33f54e138476194da95987e133b3e976075a6b1d3e1b2caedb251b1a36",
-                }],
-            },
-            Self::ClipImage => ModelSpec {
-                key: "mobileclip_s2_image_gelu_opset20",
-                files: &[ModelFileSpec {
-                    name: "mobileclip_s2_image_gelu_opset20.onnx",
-                    size: 143_057_352,
-                    sha256: "205a430af825e501c5138e5bb9abea942482a7a4fd4a680e98e47cf0830dce7e",
-                }],
-            },
-            Self::ClipText => ModelSpec {
-                key: "mobileclip_s2_text_opset18_quant",
-                files: &[
-                    ModelFileSpec {
-                        name: "mobileclip_s2_text_opset18_quant.onnx",
-                        size: 67_144_712,
-                        sha256: "d92f33dfcff83077fc2e0d3414250710efbb51795dfd89767bdbefb5fdc47322",
-                    },
-                    ModelFileSpec {
-                        name: "bpe_simple_vocab_16e6.txt",
-                        size: 3_194_984,
-                        sha256: "67603cfda2e032ad77b5f8808af37789d590db664b26df8705d2bf8b3c553fc8",
-                    },
-                ],
-            },
-            Self::PetFaceDetection => ModelSpec {
-                key: "yolov5s_pet_face_fp16_V2",
-                files: &[ModelFileSpec {
-                    name: "yolov5s_pet_face_fp16_V2.onnx",
-                    size: 14_758_020,
-                    sha256: "7876d97992eeb5f3a9f3b35eff5e0e133012928172a8b005093108d8c3ad2d1c",
-                }],
-            },
-            Self::PetFaceEmbeddingDog => ModelSpec {
-                key: "dog_face_embedding128",
-                files: &[ModelFileSpec {
-                    name: "dog_face_embedding128.onnx",
-                    size: 4_141_071,
-                    sha256: "fb04d781eb1f7adf6ce3432dc0c5873f16cc051b5c98c14c754afb39e2b92462",
-                }],
-            },
-            Self::PetFaceEmbeddingCat => ModelSpec {
-                key: "cat_face_embedding128",
-                files: &[ModelFileSpec {
-                    name: "cat_face_embedding128.onnx",
-                    size: 4_141_071,
-                    sha256: "32b10694a27f6404d2beaddbd64f07ad555f72dccb12ee60a7afe5dcf6aad6cd",
-                }],
-            },
-            Self::PetBodyDetection => ModelSpec {
-                key: "yolov5s_object_fp16",
-                files: &[ModelFileSpec {
-                    name: "yolov5s_object_fp16.onnx",
-                    size: 14_987_107,
-                    sha256: "113f0c18632eb2c4f6deebcd40eb01c676492e9b43923c2d336e1b4012fce9ef",
-                }],
-            },
-            Self::PetBodyEmbeddingDog => ModelSpec {
-                key: "dog_body_embedding192",
-                files: &[ModelFileSpec {
-                    name: "dog_body_embedding192.onnx",
-                    size: 4_569_361,
-                    sha256: "1d85aa20358137e30f11c2d0baa9a2248b9997928d501fe15365d1fc57522770",
-                }],
-            },
-            Self::PetBodyEmbeddingCat => ModelSpec {
-                key: "cat_body_embedding192",
-                files: &[ModelFileSpec {
-                    name: "cat_body_embedding192.onnx",
-                    size: 4_569_361,
-                    sha256: "62fb5891e61be69a96510d8ec56e7525a9541b0283e54574d27c86c9b4a26ddf",
-                }],
-            },
-        }
+fn model_asset_spec(model: Model) -> ModelAssetSpec {
+    match model {
+        Model::FaceDetection => ModelAssetSpec {
+            key: "yolov5s_face_640_640_static_b1",
+            files: &[ModelAssetFile {
+                name: "yolov5s_face_640_640_static_b1.onnx",
+                size: 32_355_091,
+                sha256: "e047647409403d52696035ecd445792173e50d7fbdcccac97b958a585db9aa3d",
+            }],
+        },
+        Model::FaceEmbedding => ModelAssetSpec {
+            key: "mobilefacenet_portable_static_b1",
+            files: &[ModelAssetFile {
+                name: "mobilefacenet_portable_static_b1.onnx",
+                size: 5_278_803,
+                sha256: "0763fc33f54e138476194da95987e133b3e976075a6b1d3e1b2caedb251b1a36",
+            }],
+        },
+        Model::ClipImage => ModelAssetSpec {
+            key: "mobileclip_s2_image_gelu_opset20",
+            files: &[ModelAssetFile {
+                name: "mobileclip_s2_image_gelu_opset20.onnx",
+                size: 143_057_352,
+                sha256: "205a430af825e501c5138e5bb9abea942482a7a4fd4a680e98e47cf0830dce7e",
+            }],
+        },
+        Model::ClipText => ModelAssetSpec {
+            key: "mobileclip_s2_text_opset18_quant",
+            files: &[
+                ModelAssetFile {
+                    name: "mobileclip_s2_text_opset18_quant.onnx",
+                    size: 67_144_712,
+                    sha256: "d92f33dfcff83077fc2e0d3414250710efbb51795dfd89767bdbefb5fdc47322",
+                },
+                ModelAssetFile {
+                    name: "bpe_simple_vocab_16e6.txt",
+                    size: 3_194_984,
+                    sha256: "67603cfda2e032ad77b5f8808af37789d590db664b26df8705d2bf8b3c553fc8",
+                },
+            ],
+        },
+        Model::PetFaceDetection => ModelAssetSpec {
+            key: "yolov5s_pet_face_fp16_V2",
+            files: &[ModelAssetFile {
+                name: "yolov5s_pet_face_fp16_V2.onnx",
+                size: 14_758_020,
+                sha256: "7876d97992eeb5f3a9f3b35eff5e0e133012928172a8b005093108d8c3ad2d1c",
+            }],
+        },
+        Model::PetFaceEmbeddingDog => ModelAssetSpec {
+            key: "dog_face_embedding128",
+            files: &[ModelAssetFile {
+                name: "dog_face_embedding128.onnx",
+                size: 4_141_071,
+                sha256: "fb04d781eb1f7adf6ce3432dc0c5873f16cc051b5c98c14c754afb39e2b92462",
+            }],
+        },
+        Model::PetFaceEmbeddingCat => ModelAssetSpec {
+            key: "cat_face_embedding128",
+            files: &[ModelAssetFile {
+                name: "cat_face_embedding128.onnx",
+                size: 4_141_071,
+                sha256: "32b10694a27f6404d2beaddbd64f07ad555f72dccb12ee60a7afe5dcf6aad6cd",
+            }],
+        },
+        Model::PetBodyDetection => ModelAssetSpec {
+            key: "yolov5s_object_fp16",
+            files: &[ModelAssetFile {
+                name: "yolov5s_object_fp16.onnx",
+                size: 14_987_107,
+                sha256: "113f0c18632eb2c4f6deebcd40eb01c676492e9b43923c2d336e1b4012fce9ef",
+            }],
+        },
+        Model::PetBodyEmbeddingDog => ModelAssetSpec {
+            key: "dog_body_embedding192",
+            files: &[ModelAssetFile {
+                name: "dog_body_embedding192.onnx",
+                size: 4_569_361,
+                sha256: "1d85aa20358137e30f11c2d0baa9a2248b9997928d501fe15365d1fc57522770",
+            }],
+        },
+        Model::PetBodyEmbeddingCat => ModelAssetSpec {
+            key: "cat_body_embedding192",
+            files: &[ModelAssetFile {
+                name: "cat_body_embedding192.onnx",
+                size: 4_569_361,
+                sha256: "62fb5891e61be69a96510d8ec56e7525a9541b0283e54574d27c86c9b4a26ddf",
+            }],
+        },
     }
 }
 
-struct ModelSpec {
+struct ModelAssetSpec {
     key: &'static str,
-    files: &'static [ModelFileSpec],
+    files: &'static [ModelAssetFile],
 }
 
-struct ModelFileSpec {
+struct ModelAssetFile {
     name: &'static str,
     size: u64,
     sha256: &'static str,
 }
 
-fn model_path_if(store: &AssetStore, model: Model, enabled: bool) -> String {
-    if !enabled {
-        return String::new();
-    }
+fn model_path(store: &AssetStore, model: Model) -> String {
     let asset = model_asset(model);
     store
-        .file_path(&asset, model.spec().files[0].name)
+        .file_path(&asset, model_asset_spec(model).files[0].name)
         .expect("model file")
         .to_string_lossy()
         .into_owned()
@@ -276,7 +229,7 @@ fn migrate_desktop_model(
     legacy_dir: &Path,
     model: Model,
 ) -> Result<(), String> {
-    let spec = model.spec();
+    let spec = model_asset_spec(model);
     let asset = model_asset(model);
     let legacy_files = spec
         .files
@@ -332,7 +285,7 @@ mod tests {
     fn catalog_keys_are_unique_and_prefix_free() {
         let root = Path::new("assets");
         let store = AssetStore::new(root);
-        let paths = ALL_MODELS
+        let paths = Model::ALL
             .map(|model| store.asset_dir(&model_asset(model)))
             .to_vec();
         for (index, path) in paths.iter().enumerate() {
@@ -348,7 +301,11 @@ mod tests {
     #[test]
     fn retired_keys_are_not_in_the_catalog() {
         for key in RETIRED_MODEL_KEYS {
-            assert!(ALL_MODELS.iter().all(|model| model.spec().key != *key));
+            assert!(
+                Model::ALL
+                    .iter()
+                    .all(|model| model_asset_spec(*model).key != *key)
+            );
         }
     }
 
@@ -361,9 +318,9 @@ mod tests {
         for model in lock["models"].as_object().unwrap().values() {
             let name = model["file_name"].as_str().unwrap();
             let sha256 = model["sha256"].as_str().unwrap();
-            let catalog_file = ALL_MODELS
+            let catalog_file = Model::ALL
                 .iter()
-                .flat_map(|model| model.spec().files)
+                .flat_map(|model| model_asset_spec(*model).files)
                 .find(|file| file.name == name)
                 .unwrap_or_else(|| panic!("{name} is missing from the Photos model catalog"));
             assert_eq!(catalog_file.sha256, sha256, "{name}");
@@ -375,7 +332,7 @@ mod tests {
         let temp = TempDir::new().unwrap();
         let legacy = temp.path().join("models");
         fs::create_dir(&legacy).unwrap();
-        create_legacy_file(&legacy, &Model::FaceEmbedding.spec().files[0]);
+        create_legacy_file(&legacy, &model_asset_spec(Model::FaceEmbedding).files[0]);
         fs::write(legacy.join(RETIRED_LEGACY_MODEL_FILES[0]), b"retired").unwrap();
         let store = AssetStore::new(temp.path().join("assets"));
 
@@ -384,10 +341,10 @@ mod tests {
         let asset = model_asset(Model::FaceEmbedding);
         assert!(store.is_downloaded(&asset));
         assert_eq!(
-            fs::metadata(model_path_if(&store, Model::FaceEmbedding, true))
+            fs::metadata(model_path(&store, Model::FaceEmbedding))
                 .unwrap()
                 .len(),
-            Model::FaceEmbedding.spec().files[0].size
+            model_asset_spec(Model::FaceEmbedding).files[0].size
         );
         assert!(!legacy.join(RETIRED_LEGACY_MODEL_FILES[0]).exists());
     }
@@ -397,9 +354,9 @@ mod tests {
         let temp = TempDir::new().unwrap();
         let legacy = temp.path().join("models");
         fs::create_dir(&legacy).unwrap();
-        create_legacy_file(&legacy, &Model::ClipText.spec().files[0]);
+        create_legacy_file(&legacy, &model_asset_spec(Model::ClipText).files[0]);
         fs::write(
-            legacy.join(Model::FaceDetection.spec().files[0].name),
+            legacy.join(model_asset_spec(Model::FaceDetection).files[0].name),
             b"truncated",
         )
         .unwrap();
@@ -412,7 +369,7 @@ mod tests {
         assert!(!legacy.exists());
     }
 
-    fn create_legacy_file(directory: &Path, file: &ModelFileSpec) {
+    fn create_legacy_file(directory: &Path, file: &ModelAssetFile) {
         let handle = fs::File::create(directory.join(file.name)).unwrap();
         handle.set_len(file.size).unwrap();
     }

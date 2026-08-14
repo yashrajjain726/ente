@@ -250,8 +250,7 @@ extension CustomColorScheme on ColorScheme {
       ? const Color.fromRGBO(0, 0, 0, 1)
       : const Color.fromRGBO(48, 48, 48, 1);
 
-  Color get dynamicFABTextColor =>
-      const Color.fromRGBO(255, 255, 255, 1); //same for both themes
+  Color get dynamicFABTextColor => const Color.fromRGBO(255, 255, 255, 1);
 
   // todo: use brightness == Brightness.light for changing color for dark/light theme
   ButtonStyle? get optionalActionButtonStyle => buildElevatedButtonThemeData(

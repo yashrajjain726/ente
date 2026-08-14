@@ -111,7 +111,6 @@ class _HomeWidgetState extends State<HomeWidget> {
   final ValueNotifier<bool> _christmasPullReleasedNotifier =
       ValueNotifier<bool>(false);
 
-  // for receiving media files
   // ignore: unused_field
   StreamSubscription? _intentDataStreamSubscription;
   List<SharedMediaFile>? _sharedFiles;
@@ -210,7 +209,6 @@ class _HomeWidgetState extends State<HomeWidget> {
     ) {
       _startWithoutAccount = false;
       setState(() {});
-      // fetch user flags on login
       if (!isLocalGalleryMode) {
         flagService.flags;
       }
@@ -284,10 +282,8 @@ class _HomeWidgetState extends State<HomeWidget> {
       });
     });
 
-    // Initialize deep link subscription for public albums on both iOS and Android
     _initDeepLinkSubscriptionForPublicAlbums();
 
-    // For sharing images coming from outside the app
     _initMediaShareSubscription();
     _scheduleChangeLogCheck(delay: const Duration(seconds: 1));
 
@@ -389,7 +385,6 @@ class _HomeWidgetState extends State<HomeWidget> {
         return;
       }
 
-      // Check for action=join parameter to show join dialog
       final shouldShowJoinDialog =
           uri.queryParameters['action'] == 'join' &&
           Configuration.instance.isLoggedIn();
@@ -572,7 +567,6 @@ class _HomeWidgetState extends State<HomeWidget> {
   }
 
   void _initMediaShareSubscription() {
-    // For sharing images/public links coming from outside the app while the app is in the memory
     _intentDataStreamSubscription = ReceiveSharingIntent.instance
         .getMediaStream()
         .listen(
@@ -583,7 +577,6 @@ class _HomeWidgetState extends State<HomeWidget> {
             _logger.severe("getIntentDataStream error: $err");
           },
         );
-    // For sharing images/public links coming from outside the app while the app is closed
     ReceiveSharingIntent.instance.getInitialMedia().then((
       List<SharedMediaFile> value,
     ) {
@@ -596,7 +589,6 @@ class _HomeWidgetState extends State<HomeWidget> {
       return;
     }
 
-    // Check if this is a public album link
     if (_isPublicAlbumUrl(value[0].path)) {
       final uri = Uri.parse(value[0].path);
       unawaited(_handlePublicAlbumLink(uri, "sharedIntent.getMediaStream"));
@@ -669,7 +661,6 @@ class _HomeWidgetState extends State<HomeWidget> {
     if (!mounted) {
       return;
     }
-    // Check if this is a public album link
     if (value.isNotEmpty && _isPublicAlbumUrl(value[0].path)) {
       final uri = Uri.parse(value[0].path);
       unawaited(_handlePublicAlbumLink(uri, "sharedIntent.getInitialMedia"));
@@ -751,11 +742,6 @@ class _HomeWidgetState extends State<HomeWidget> {
   Future<void> _initDeepLinkSubscriptionForPublicAlbums() async {
     final appLinks = AppLinks();
 
-    // Handle public album deep links:
-    // - iOS: Universal Links (https://albums.ente.io/... or
-    //   https://albums.ente.com/...)
-    // - Android: App Links (https://albums...) or custom scheme
-    //   (ente://albums...)
     try {
       final initialUri = await appLinks.getInitialLink();
       if (initialUri != null) {
@@ -935,8 +921,7 @@ class _HomeWidgetState extends State<HomeWidget> {
             ],
           ),
 
-          ///To fix the status bar not adapting it's color when switching
-          ///screens the have different appbar colours.
+          // Keep an AppBar so the status bar color follows the current screen.
           appBar: isOnOnlineGrantPermissionScreen
               ? null
               : PreferredSize(
@@ -1170,12 +1155,9 @@ class _HomeWidgetState extends State<HomeWidget> {
   }
 
   Future<bool> _initDeepLinks() async {
-    // Platform messages may fail, so we use a try/catch PlatformException.
     final appLinks = AppLinks();
     try {
       final initialLink = await appLinks.getInitialLink();
-      // Parse the link and warn the user, if it is not correct,
-      // but keep in mind it could be `null`.
       if (initialLink != null) {
         _logger.info("Initial link received: host ${initialLink.host}");
         if (!mounted) return false;
@@ -1185,12 +1167,9 @@ class _HomeWidgetState extends State<HomeWidget> {
         _logger.info("No initial link received.");
       }
     } on PlatformException {
-      // Handle exception by warning the user their action did not succeed
-      // return?
       _logger.severe("PlatformException thrown while getting initial link");
     }
 
-    // Attach a listener to the stream
     _authDeepLinkSubscription = appLinks.uriLinkStream.listen(
       (link) {
         _logger.info("Link received: host ${link.host}");
@@ -1239,7 +1218,6 @@ class _HomeWidgetState extends State<HomeWidget> {
         context: context,
         builder: (context) => const ChangeLogPage(),
       );
-      // Do not show change dialog again
       await updateService.hideChangeLog();
       if (!mounted) {
         return;

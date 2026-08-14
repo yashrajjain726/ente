@@ -68,7 +68,6 @@ class _JumpToDateGalleryState extends State<JumpToDateGallery> {
       }
     });
 
-    // Load files asynchronously
     _loadFiles();
   }
 

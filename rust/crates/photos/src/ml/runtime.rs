@@ -4,79 +4,45 @@ use std::{
 };
 
 use once_cell::sync::Lazy;
-use ort::session::Session;
 
 use crate::ml::{
     error::{MlError, MlResult},
+    models::{Model, ModelPaths},
     onnx,
 };
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct ModelPaths {
-    pub face_detection: String,
-    pub face_embedding: String,
-    pub clip_image: String,
-    pub clip_text: String,
-    pub pet_face_detection: String,
-    pub pet_face_embedding_dog: String,
-    pub pet_face_embedding_cat: String,
-    pub pet_body_detection: String,
-    pub pet_body_embedding_dog: String,
-    pub pet_body_embedding_cat: String,
-}
 
 #[derive(Debug)]
 struct ModelSlotState {
     path: String,
-    fallback_execution_mode: Option<onnx::ExecutionMode>,
-    execution_provider: Option<onnx::ExecutionProvider>,
-    pin_count: usize,
-    session: Option<Session>,
+    onnx_session: onnx::OnnxSession,
+}
+
+#[cfg(test)]
+#[derive(Debug, PartialEq, Eq)]
+struct ModelSlotSnapshot {
+    path: String,
+    session_loaded: bool,
 }
 
 #[derive(Debug)]
 struct ModelSlot {
-    default_execution_mode: onnx::ExecutionMode,
-    coreml_cache_namespace: &'static str,
+    model: Model,
     state: Mutex<ModelSlotState>,
-}
-
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub(crate) struct UsedProviders {
-    pub(crate) coreml: bool,
-    pub(crate) webgpu: bool,
-}
-
-impl UsedProviders {
-    fn record(&mut self, provider: onnx::ExecutionProvider) {
-        match provider {
-            onnx::ExecutionProvider::CoreMl => self.coreml = true,
-            onnx::ExecutionProvider::WebGpu => self.webgpu = true,
-            onnx::ExecutionProvider::Xnnpack | onnx::ExecutionProvider::Cpu => {}
-        }
-    }
 }
 
 pub(crate) struct MlRuntimeView<'a> {
     runtime: &'a MlRuntime,
     model_paths: &'a ModelPaths,
-    used_providers: Cell<UsedProviders>,
+    provider_usage: Cell<onnx::ProviderUsage>,
 }
 
 impl ModelSlot {
-    fn new(
-        default_execution_mode: onnx::ExecutionMode,
-        coreml_cache_namespace: &'static str,
-    ) -> Self {
+    fn new(model: Model) -> Self {
         Self {
-            default_execution_mode,
-            coreml_cache_namespace,
+            model,
             state: Mutex::new(ModelSlotState {
                 path: String::new(),
-                fallback_execution_mode: None,
-                execution_provider: None,
-                pin_count: 0,
-                session: None,
+                onnx_session: onnx::OnnxSession::new(default_execution_mode(model)),
             }),
         }
     }
@@ -85,6 +51,15 @@ impl ModelSlot {
         match self.state.lock() {
             Ok(guard) => guard,
             Err(poisoned) => poisoned.into_inner(),
+        }
+    }
+
+    #[cfg(test)]
+    fn snapshot(&self) -> ModelSlotSnapshot {
+        let state = self.lock_state();
+        ModelSlotSnapshot {
+            path: state.path.clone(),
+            session_loaded: state.onnx_session.is_loaded(),
         }
     }
 
@@ -104,89 +79,26 @@ impl ModelSlot {
         }
 
         Self::set_config_locked(&mut state, path);
-        state.pin_count = 1;
     }
 
     fn release_residency(&self) {
         let mut state = self.lock_state();
-        if state.pin_count > 0 {
-            state.pin_count -= 1;
-        }
-        if state.pin_count == 0 {
-            Self::clear_transient_runtime_state_locked(&mut state);
-        }
-    }
-
-    fn advance_provider_fallback_locked(&self, state: &mut ModelSlotState) -> bool {
-        let current_mode = state
-            .fallback_execution_mode
-            .unwrap_or(self.default_execution_mode);
-        let Some(fallback_mode) = current_mode.fallback() else {
-            return false;
-        };
-
-        state.fallback_execution_mode = Some(fallback_mode);
-        state.execution_provider = None;
-        state.session = None;
-        true
+        state.onnx_session.clear();
     }
 
     fn run<T>(
         &self,
         path: &str,
-        error_msg: &str,
-        mut operation: impl FnMut(&mut Session) -> MlResult<T>,
-    ) -> MlResult<(T, onnx::ExecutionProvider)> {
+        operation: impl FnMut(&mut onnx::SessionHandle) -> onnx::SessionRunResult<T>,
+    ) -> MlResult<(T, onnx::ProviderUsage)> {
         if path.trim().is_empty() {
-            return Err(MlError::InvalidRequest(error_msg.to_string()));
+            return Err(MlError::InvalidRequest(self.model.missing_path_error()));
         }
 
-        loop {
-            let mut state = self.lock_state();
-            Self::set_config_locked(&mut state, path);
-            if let Err(error) = self.ensure_loaded_locked(&mut state, error_msg) {
-                if self.retry_after_provider_failure_locked(&mut state, &error) {
-                    continue;
-                }
-                return Err(error);
-            }
-
-            let execution_provider = state
-                .execution_provider
-                .expect("a loaded session must record its execution provider");
-            let result = operation(
-                state
-                    .session
-                    .as_mut()
-                    .expect("session must be loaded before model execution"),
-            );
-            match result {
-                Ok(value) => return Ok((value, execution_provider)),
-                Err(error) => {
-                    if self.retry_after_provider_failure_locked(&mut state, &error) {
-                        continue;
-                    }
-                    return Err(error);
-                }
-            }
-        }
-    }
-
-    fn retry_after_provider_failure_locked(
-        &self,
-        state: &mut ModelSlotState,
-        error: &MlError,
-    ) -> bool {
-        if !should_retry_execution_provider_runtime(error)
-            || !self.advance_provider_fallback_locked(state)
-        {
-            return false;
-        }
-
-        log::warn!(
-            "execution provider failed, retrying model with the next provider fallback: {error}"
-        );
-        true
+        let mut state = self.lock_state();
+        Self::set_config_locked(&mut state, path);
+        let ModelSlotState { path, onnx_session } = &mut *state;
+        onnx_session.run(path, self.model.namespace(), operation)
     }
 
     fn set_config_locked(state: &mut ModelSlotState, path: &str) {
@@ -194,296 +106,89 @@ impl ModelSlot {
             return;
         }
         state.path = path.to_string();
-        state.fallback_execution_mode = None;
-        state.execution_provider = None;
-        state.session = None;
-    }
-
-    fn clear_transient_runtime_state_locked(state: &mut ModelSlotState) {
-        state.fallback_execution_mode = None;
-        state.execution_provider = None;
-        state.session = None;
+        state.onnx_session.clear();
     }
 
     fn reset_slot_locked(state: &mut ModelSlotState) {
         state.path.clear();
-        state.pin_count = 0;
-        Self::clear_transient_runtime_state_locked(state);
-    }
-
-    fn effective_execution_mode(&self, state: &ModelSlotState) -> onnx::ExecutionMode {
-        state
-            .fallback_execution_mode
-            .unwrap_or(self.default_execution_mode)
-    }
-
-    fn ensure_loaded_locked(&self, state: &mut ModelSlotState, error_msg: &str) -> MlResult<()> {
-        if state.path.trim().is_empty() {
-            return Err(MlError::InvalidRequest(error_msg.to_string()));
-        }
-        if state.session.is_some() {
-            return Ok(());
-        }
-
-        let execution_mode = self.effective_execution_mode(state);
-        let model_name = state.path.rsplit('/').next().unwrap_or(&state.path);
-        log::info!("loading {model_name} with {execution_mode:?} execution");
-        let t = std::time::Instant::now();
-        let (session, execution_provider) =
-            onnx::build_session(&state.path, execution_mode, self.coreml_cache_namespace)?;
-        log::info!("loaded {model_name} in {:?}", t.elapsed());
-        state.execution_provider = Some(execution_provider);
-        state.session = Some(session);
-        Ok(())
+        state.onnx_session.clear();
     }
 }
 
 #[derive(Debug)]
 struct MlRuntime {
-    face_detection: ModelSlot,
-    face_embedding: ModelSlot,
-    clip_image: ModelSlot,
-    clip_text: ModelSlot,
-    pet_face_detection: ModelSlot,
-    pet_face_embedding_dog: ModelSlot,
-    pet_face_embedding_cat: ModelSlot,
-    pet_body_detection: ModelSlot,
-    pet_body_embedding_dog: ModelSlot,
-    pet_body_embedding_cat: ModelSlot,
+    slots: [ModelSlot; Model::COUNT],
 }
 
 static GLOBAL_RUNTIME: Lazy<MlRuntime> = Lazy::new(MlRuntime::new);
 
 impl MlRuntime {
     fn new() -> Self {
-        let platform_default = onnx::ExecutionMode::PlatformDefault;
-        let cpu_only = onnx::ExecutionMode::CpuOnly;
-
         Self {
-            face_detection: ModelSlot::new(platform_default, "face-detection"),
-            face_embedding: ModelSlot::new(platform_default, "face-embedding"),
-            clip_image: ModelSlot::new(platform_default, "clip-image"),
-            // The quantized CLIP text graph is heavily partitioned by both
-            // CoreML and WebGPU, making their mixed CPU/GPU execution slower
-            // than running the complete model on CPU.
-            clip_text: ModelSlot::new(cpu_only, "clip-text"),
-            // Pet models stay CPU-only due to device-specific FP16 failures.
-            pet_face_detection: ModelSlot::new(cpu_only, "pet-face-detection"),
-            pet_face_embedding_dog: ModelSlot::new(cpu_only, "pet-face-embedding-dog"),
-            pet_face_embedding_cat: ModelSlot::new(cpu_only, "pet-face-embedding-cat"),
-            pet_body_detection: ModelSlot::new(cpu_only, "pet-body-detection"),
-            pet_body_embedding_dog: ModelSlot::new(cpu_only, "pet-body-embedding-dog"),
-            pet_body_embedding_cat: ModelSlot::new(cpu_only, "pet-body-embedding-cat"),
+            slots: Model::ALL.map(ModelSlot::new),
         }
     }
 
+    fn slot(&self, model: Model) -> &ModelSlot {
+        &self.slots[model.index()]
+    }
+
     fn configure_requested_models(&self, model_paths: &ModelPaths) {
-        self.face_detection
-            .configure_if_requested(&model_paths.face_detection);
-        self.face_embedding
-            .configure_if_requested(&model_paths.face_embedding);
-        self.clip_image
-            .configure_if_requested(&model_paths.clip_image);
-        self.clip_text
-            .configure_if_requested(&model_paths.clip_text);
-        self.pet_face_detection
-            .configure_if_requested(&model_paths.pet_face_detection);
-        self.pet_face_embedding_dog
-            .configure_if_requested(&model_paths.pet_face_embedding_dog);
-        self.pet_face_embedding_cat
-            .configure_if_requested(&model_paths.pet_face_embedding_cat);
-        self.pet_body_detection
-            .configure_if_requested(&model_paths.pet_body_detection);
-        self.pet_body_embedding_dog
-            .configure_if_requested(&model_paths.pet_body_embedding_dog);
-        self.pet_body_embedding_cat
-            .configure_if_requested(&model_paths.pet_body_embedding_cat);
+        for model in Model::ALL {
+            self.slot(model)
+                .configure_if_requested(model_paths.get(model));
+        }
     }
 
     fn prepare_indexing_models(&self, model_paths: &ModelPaths) {
-        self.face_detection
-            .sync_indexing_residency(&model_paths.face_detection);
-        self.face_embedding
-            .sync_indexing_residency(&model_paths.face_embedding);
-        self.clip_image
-            .sync_indexing_residency(&model_paths.clip_image);
-        self.pet_face_detection
-            .sync_indexing_residency(&model_paths.pet_face_detection);
-        self.pet_face_embedding_dog
-            .sync_indexing_residency(&model_paths.pet_face_embedding_dog);
-        self.pet_face_embedding_cat
-            .sync_indexing_residency(&model_paths.pet_face_embedding_cat);
-        self.pet_body_detection
-            .sync_indexing_residency(&model_paths.pet_body_detection);
-        self.pet_body_embedding_dog
-            .sync_indexing_residency(&model_paths.pet_body_embedding_dog);
-        self.pet_body_embedding_cat
-            .sync_indexing_residency(&model_paths.pet_body_embedding_cat);
+        for model in Model::INDEXING {
+            self.slot(model)
+                .sync_indexing_residency(model_paths.get(model));
+        }
     }
 
     fn release_indexing_models(&self) {
-        self.face_detection.release_residency();
-        self.face_embedding.release_residency();
-        self.clip_image.release_residency();
-        self.pet_face_detection.release_residency();
-        self.pet_face_embedding_dog.release_residency();
-        self.pet_face_embedding_cat.release_residency();
-        self.pet_body_detection.release_residency();
-        self.pet_body_embedding_dog.release_residency();
-        self.pet_body_embedding_cat.release_residency();
-    }
-
-    fn view<'a>(&'a self, model_paths: &'a ModelPaths) -> MlRuntimeView<'a> {
-        MlRuntimeView {
-            runtime: self,
-            model_paths,
-            used_providers: Cell::new(UsedProviders::default()),
+        for model in Model::INDEXING {
+            self.slot(model).release_residency();
         }
     }
 }
 
 impl<'a> MlRuntimeView<'a> {
-    pub(crate) fn used_providers(&self) -> UsedProviders {
-        self.used_providers.get()
+    pub(crate) fn provider_usage(&self) -> onnx::ProviderUsage {
+        self.provider_usage.get()
     }
 
-    fn run_tracked<T>(
+    pub(crate) fn run<T>(
         &self,
-        slot: &ModelSlot,
-        path: &str,
-        error_msg: &str,
-        operation: impl FnMut(&mut Session) -> MlResult<T>,
+        model: Model,
+        operation: impl FnMut(&mut onnx::SessionHandle) -> onnx::SessionRunResult<T>,
     ) -> MlResult<T> {
-        let (value, execution_provider) = slot.run(path, error_msg, operation)?;
-        let mut used = self.used_providers.get();
-        used.record(execution_provider);
-        self.used_providers.set(used);
+        let (value, provider_usage) = self
+            .runtime
+            .slot(model)
+            .run(self.model_paths.get(model), operation)?;
+        self.provider_usage
+            .set(self.provider_usage.get().merge(provider_usage));
         Ok(value)
-    }
-
-    pub(crate) fn with_face_detection_session<T>(
-        &self,
-        operation: impl FnMut(&mut Session) -> MlResult<T>,
-    ) -> MlResult<T> {
-        self.run_tracked(
-            &self.runtime.face_detection,
-            &self.model_paths.face_detection,
-            "missing model path: faceDetectionModelPath is required when runFaces is true",
-            operation,
-        )
-    }
-
-    pub(crate) fn with_face_embedding_session<T>(
-        &self,
-        operation: impl FnMut(&mut Session) -> MlResult<T>,
-    ) -> MlResult<T> {
-        self.run_tracked(
-            &self.runtime.face_embedding,
-            &self.model_paths.face_embedding,
-            "missing model path: faceEmbeddingModelPath is required when runFaces is true",
-            operation,
-        )
-    }
-
-    pub(crate) fn with_clip_image_session<T>(
-        &self,
-        operation: impl FnMut(&mut Session) -> MlResult<T>,
-    ) -> MlResult<T> {
-        self.run_tracked(
-            &self.runtime.clip_image,
-            &self.model_paths.clip_image,
-            "missing model path: clipImageModelPath is required when runClip is true",
-            operation,
-        )
-    }
-
-    pub(crate) fn with_clip_text_session<T>(
-        &self,
-        operation: impl FnMut(&mut Session) -> MlResult<T>,
-    ) -> MlResult<T> {
-        self.run_tracked(
-            &self.runtime.clip_text,
-            &self.model_paths.clip_text,
-            "missing model path: clipTextModelPath is required when running clip text",
-            operation,
-        )
-    }
-
-    pub(crate) fn with_pet_face_detection_session<T>(
-        &self,
-        operation: impl FnMut(&mut Session) -> MlResult<T>,
-    ) -> MlResult<T> {
-        self.run_tracked(
-            &self.runtime.pet_face_detection,
-            &self.model_paths.pet_face_detection,
-            "missing model path: petFaceDetectionModelPath is required when runPets is true",
-            operation,
-        )
-    }
-
-    pub(crate) fn with_pet_face_embedding_dog_session<T>(
-        &self,
-        operation: impl FnMut(&mut Session) -> MlResult<T>,
-    ) -> MlResult<T> {
-        self.run_tracked(
-            &self.runtime.pet_face_embedding_dog,
-            &self.model_paths.pet_face_embedding_dog,
-            "missing model path: petFaceEmbeddingDogModelPath is required",
-            operation,
-        )
-    }
-
-    pub(crate) fn with_pet_face_embedding_cat_session<T>(
-        &self,
-        operation: impl FnMut(&mut Session) -> MlResult<T>,
-    ) -> MlResult<T> {
-        self.run_tracked(
-            &self.runtime.pet_face_embedding_cat,
-            &self.model_paths.pet_face_embedding_cat,
-            "missing model path: petFaceEmbeddingCatModelPath is required",
-            operation,
-        )
-    }
-
-    pub(crate) fn with_pet_body_detection_session<T>(
-        &self,
-        operation: impl FnMut(&mut Session) -> MlResult<T>,
-    ) -> MlResult<T> {
-        self.run_tracked(
-            &self.runtime.pet_body_detection,
-            &self.model_paths.pet_body_detection,
-            "missing model path: petBodyDetectionModelPath is required when runPets is true",
-            operation,
-        )
-    }
-
-    pub(crate) fn with_pet_body_embedding_dog_session<T>(
-        &self,
-        operation: impl FnMut(&mut Session) -> MlResult<T>,
-    ) -> MlResult<T> {
-        self.run_tracked(
-            &self.runtime.pet_body_embedding_dog,
-            &self.model_paths.pet_body_embedding_dog,
-            "missing model path: petBodyEmbeddingDogModelPath is required",
-            operation,
-        )
-    }
-
-    pub(crate) fn with_pet_body_embedding_cat_session<T>(
-        &self,
-        operation: impl FnMut(&mut Session) -> MlResult<T>,
-    ) -> MlResult<T> {
-        self.run_tracked(
-            &self.runtime.pet_body_embedding_cat,
-            &self.model_paths.pet_body_embedding_cat,
-            "missing model path: petBodyEmbeddingCatModelPath is required",
-            operation,
-        )
     }
 }
 
-pub(crate) fn ensure_runtime(model_paths: &ModelPaths) {
-    GLOBAL_RUNTIME.configure_requested_models(model_paths);
+fn default_execution_mode(model: Model) -> onnx::ExecutionMode {
+    match model {
+        Model::FaceDetection | Model::FaceEmbedding | Model::ClipImage => {
+            onnx::ExecutionMode::PlatformDefault
+        }
+        // Accelerators heavily partition the quantized CLIP text graph.
+        Model::ClipText => onnx::ExecutionMode::CpuOnly,
+        // Pet models have device-specific FP16 failures.
+        Model::PetFaceDetection
+        | Model::PetFaceEmbeddingDog
+        | Model::PetFaceEmbeddingCat
+        | Model::PetBodyDetection
+        | Model::PetBodyEmbeddingDog
+        | Model::PetBodyEmbeddingCat => onnx::ExecutionMode::CpuOnly,
+    }
 }
 
 pub(crate) fn prepare_runtime(model_paths: &ModelPaths) {
@@ -494,9 +199,13 @@ pub(crate) fn with_runtime<R>(
     model_paths: &ModelPaths,
     func: impl FnOnce(&MlRuntimeView<'_>) -> MlResult<R>,
 ) -> MlResult<R> {
-    ensure_runtime(model_paths);
+    GLOBAL_RUNTIME.configure_requested_models(model_paths);
 
-    let runtime_view = GLOBAL_RUNTIME.view(model_paths);
+    let runtime_view = MlRuntimeView {
+        runtime: &GLOBAL_RUNTIME,
+        model_paths,
+        provider_usage: Cell::new(onnx::ProviderUsage::default()),
+    };
     func(&runtime_view)
 }
 
@@ -504,52 +213,9 @@ pub(crate) fn release_runtime() {
     GLOBAL_RUNTIME.release_indexing_models();
 }
 
-fn should_retry_execution_provider_runtime(error: &MlError) -> bool {
-    cfg!(any(
-        target_os = "ios",
-        target_os = "android",
-        target_os = "linux",
-        target_os = "macos",
-        target_os = "windows"
-    )) && is_execution_provider_failure(error)
-}
-
-fn is_execution_provider_failure(error: &MlError) -> bool {
-    let MlError::Ort(message) = error else {
-        return false;
-    };
-    let normalized = message.to_ascii_lowercase();
-    normalized.contains("executionprovider")
-        || normalized.contains("unknown allocation device")
-        || normalized.contains("xnnpackexecutionprovider")
-        || normalized.contains("coremlexecutionprovider")
-        || normalized.contains("webgpu")
-        || normalized.contains("wgpu")
-        || normalized.contains("dawn")
-        || normalized.contains("vulkan")
-        || normalized.contains("vk_error")
-        || normalized.contains("non-finite")
-        || normalized.contains("ep error")
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    fn empty_paths() -> ModelPaths {
-        ModelPaths {
-            face_detection: String::new(),
-            face_embedding: String::new(),
-            clip_image: String::new(),
-            clip_text: String::new(),
-            pet_face_detection: String::new(),
-            pet_face_embedding_dog: String::new(),
-            pet_face_embedding_cat: String::new(),
-            pet_body_detection: String::new(),
-            pet_body_embedding_dog: String::new(),
-            pet_body_embedding_cat: String::new(),
-        }
-    }
 
     #[test]
     fn configure_requested_models_preserves_unrequested_slots() {
@@ -557,232 +223,120 @@ mod tests {
 
         runtime.configure_requested_models(&ModelPaths {
             clip_text: "clip_text.onnx".to_string(),
-            ..empty_paths()
+            ..ModelPaths::default()
         });
 
         runtime.configure_requested_models(&ModelPaths {
             face_detection: "face.onnx".to_string(),
-            ..empty_paths()
+            ..ModelPaths::default()
         });
 
-        let clip_text = runtime.clip_text.lock_state();
-        assert_eq!(clip_text.path, "clip_text.onnx");
-    }
-
-    #[test]
-    fn provider_fallback_advances_only_the_selected_model_slot() {
-        let runtime = MlRuntime::new();
-        let model_paths = ModelPaths {
-            face_detection: "face.onnx".to_string(),
-            clip_image: "clip.onnx".to_string(),
-            ..empty_paths()
-        };
-        runtime.configure_requested_models(&model_paths);
-
-        {
-            let mut face_detection = runtime.face_detection.lock_state();
-            assert!(
-                runtime
-                    .face_detection
-                    .advance_provider_fallback_locked(&mut face_detection)
-            );
-        }
-
-        let face_detection = runtime.face_detection.lock_state();
         assert_eq!(
-            face_detection.fallback_execution_mode,
-            onnx::ExecutionMode::PlatformDefault.fallback()
+            runtime.slot(Model::ClipText).snapshot().path,
+            "clip_text.onnx"
         );
-        let clip_image = runtime.clip_image.lock_state();
-        assert_eq!(clip_image.fallback_execution_mode, None);
+        assert_eq!(
+            runtime.slot(Model::FaceDetection).snapshot().path,
+            "face.onnx"
+        );
     }
 
     #[test]
     fn runtime_accepts_single_use_operation() {
         let value = String::from("once");
 
-        let result = with_runtime(&empty_paths(), move |_| Ok(value));
+        let result = with_runtime(&ModelPaths::default(), move |_| Ok(value));
 
         assert_eq!(result.unwrap(), "once");
     }
 
     #[test]
-    fn release_indexing_models_keeps_clip_text_state() {
+    fn release_indexing_models_preserves_clip_text_configuration() {
         let runtime = MlRuntime::new();
+        let model_paths = ModelPaths {
+            face_detection: "face.onnx".to_string(),
+            clip_text: "clip_text.onnx".to_string(),
+            ..ModelPaths::default()
+        };
 
-        {
-            let mut clip_text = runtime.clip_text.lock_state();
-            clip_text.path = "clip_text.onnx".to_string();
-            clip_text.pin_count = 0;
-            clip_text.fallback_execution_mode = Some(onnx::ExecutionMode::CpuOnly);
-        }
-        {
-            let mut face_detection = runtime.face_detection.lock_state();
-            face_detection.path = "face.onnx".to_string();
-            face_detection.pin_count = 1;
-            face_detection.fallback_execution_mode = Some(onnx::ExecutionMode::CpuOnly);
-        }
-
+        runtime.configure_requested_models(&model_paths);
         runtime.release_indexing_models();
 
-        let clip_text = runtime.clip_text.lock_state();
-        assert_eq!(clip_text.path, "clip_text.onnx");
-        assert_eq!(clip_text.pin_count, 0);
         assert_eq!(
-            clip_text.fallback_execution_mode,
-            Some(onnx::ExecutionMode::CpuOnly)
+            runtime.slot(Model::ClipText).snapshot(),
+            ModelSlotSnapshot {
+                path: "clip_text.onnx".to_string(),
+                session_loaded: false,
+            }
         );
-
-        let face_detection = runtime.face_detection.lock_state();
-        assert_eq!(face_detection.pin_count, 0);
-        assert_eq!(face_detection.fallback_execution_mode, None);
+        assert_eq!(
+            runtime.slot(Model::FaceDetection).snapshot(),
+            ModelSlotSnapshot {
+                path: "face.onnx".to_string(),
+                session_loaded: false,
+            }
+        );
     }
 
     #[test]
-    fn prepare_indexing_models_pins_without_loading_sessions() {
+    fn prepare_indexing_models_configures_without_loading_sessions() {
         let runtime = MlRuntime::new();
 
         runtime.prepare_indexing_models(&ModelPaths {
             face_detection: "face.onnx".to_string(),
             face_embedding: "embed.onnx".to_string(),
             clip_image: "clip.onnx".to_string(),
-            ..empty_paths()
+            ..ModelPaths::default()
         });
 
-        let face_detection = runtime.face_detection.lock_state();
-        assert_eq!(face_detection.pin_count, 1);
-        assert!(face_detection.session.is_none());
-
-        let face_embedding = runtime.face_embedding.lock_state();
-        assert_eq!(face_embedding.pin_count, 1);
-        assert!(face_embedding.session.is_none());
-
-        let clip_image = runtime.clip_image.lock_state();
-        assert_eq!(clip_image.pin_count, 1);
-        assert!(clip_image.session.is_none());
-    }
-
-    #[test]
-    fn sync_indexing_residency_clears_disabled_slots() {
-        let slot = ModelSlot::new(onnx::ExecutionMode::PlatformDefault, "test-model");
-
-        {
-            let mut state = slot.lock_state();
-            state.path = "pet.onnx".to_string();
-            state.pin_count = 1;
-            state.fallback_execution_mode = Some(onnx::ExecutionMode::CpuOnly);
-        }
-
-        slot.sync_indexing_residency("");
-
-        let state = slot.lock_state();
-        assert!(state.path.is_empty());
-        assert_eq!(state.pin_count, 0);
-        assert_eq!(state.fallback_execution_mode, None);
-        assert!(state.session.is_none());
-    }
-
-    #[test]
-    fn release_residency_resets_transient_cpu_fallback_for_any_slot() {
-        let slot = ModelSlot::new(onnx::ExecutionMode::PlatformDefault, "test-model");
-
-        {
-            let mut state = slot.lock_state();
-            state.path = "clip_text.onnx".to_string();
-            state.pin_count = 1;
-            state.fallback_execution_mode = Some(onnx::ExecutionMode::CpuOnly);
-        }
-
-        slot.release_residency();
-
-        let state = slot.lock_state();
-        assert_eq!(state.pin_count, 0);
-        assert_eq!(state.fallback_execution_mode, None);
-        assert!(state.session.is_none());
-    }
-
-    #[test]
-    fn execution_provider_fallback_order_matches_platform_policy() {
-        #[cfg(target_os = "android")]
-        {
-            assert_eq!(
-                onnx::ExecutionMode::PlatformDefault.fallback(),
-                Some(onnx::ExecutionMode::Xnnpack)
-            );
-            assert_eq!(
-                onnx::ExecutionMode::Xnnpack.fallback(),
-                Some(onnx::ExecutionMode::CpuOnly)
-            );
-        }
-        #[cfg(not(target_os = "android"))]
         assert_eq!(
-            onnx::ExecutionMode::PlatformDefault.fallback(),
-            Some(onnx::ExecutionMode::CpuOnly)
+            runtime.slot(Model::FaceDetection).snapshot(),
+            unloaded_snapshot("face.onnx")
         );
-        assert_eq!(onnx::ExecutionMode::CpuOnly.fallback(), None);
+        assert_eq!(
+            runtime.slot(Model::FaceEmbedding).snapshot(),
+            unloaded_snapshot("embed.onnx")
+        );
+        assert_eq!(
+            runtime.slot(Model::ClipImage).snapshot(),
+            unloaded_snapshot("clip.onnx")
+        );
     }
 
     #[test]
-    fn model_slot_provider_fallback_is_bounded() {
-        let slot = ModelSlot::new(onnx::ExecutionMode::PlatformDefault, "test-model");
-        let mut state = slot.lock_state();
-        let mut advances = 0;
+    fn disabling_an_indexing_model_resets_its_slot() {
+        let runtime = MlRuntime::new();
+        runtime.prepare_indexing_models(&ModelPaths {
+            clip_image: "clip.onnx".to_string(),
+            ..ModelPaths::default()
+        });
 
-        while slot.advance_provider_fallback_locked(&mut state) {
-            advances += 1;
-            assert!(advances <= 2);
-        }
+        runtime.prepare_indexing_models(&ModelPaths::default());
 
-        #[cfg(target_os = "android")]
-        assert_eq!(advances, 2);
-        #[cfg(not(target_os = "android"))]
-        assert_eq!(advances, 1);
+        assert_eq!(
+            runtime.slot(Model::ClipImage).snapshot(),
+            unloaded_snapshot("")
+        );
     }
 
     #[test]
     fn model_execution_modes_match_platform_policy() {
-        let runtime = MlRuntime::new();
-        let expected_pet_mode = onnx::ExecutionMode::CpuOnly;
+        let accelerated = [Model::FaceDetection, Model::FaceEmbedding, Model::ClipImage];
 
-        assert_eq!(
-            runtime.face_detection.default_execution_mode,
-            onnx::ExecutionMode::PlatformDefault
-        );
-        assert_eq!(
-            runtime.face_embedding.default_execution_mode,
-            onnx::ExecutionMode::PlatformDefault
-        );
-        assert_eq!(
-            runtime.clip_image.default_execution_mode,
-            onnx::ExecutionMode::PlatformDefault
-        );
-        assert_eq!(
-            runtime.clip_text.default_execution_mode,
-            onnx::ExecutionMode::CpuOnly
-        );
-        assert_eq!(
-            runtime.pet_face_detection.default_execution_mode,
-            expected_pet_mode
-        );
-        assert_eq!(
-            runtime.pet_face_embedding_dog.default_execution_mode,
-            expected_pet_mode
-        );
-        assert_eq!(
-            runtime.pet_face_embedding_cat.default_execution_mode,
-            expected_pet_mode
-        );
-        assert_eq!(
-            runtime.pet_body_detection.default_execution_mode,
-            expected_pet_mode
-        );
-        assert_eq!(
-            runtime.pet_body_embedding_dog.default_execution_mode,
-            expected_pet_mode
-        );
-        assert_eq!(
-            runtime.pet_body_embedding_cat.default_execution_mode,
-            expected_pet_mode
-        );
+        for model in Model::ALL {
+            let expected = if accelerated.contains(&model) {
+                onnx::ExecutionMode::PlatformDefault
+            } else {
+                onnx::ExecutionMode::CpuOnly
+            };
+            assert_eq!(default_execution_mode(model), expected, "{model:?}");
+        }
+    }
+
+    fn unloaded_snapshot(path: &str) -> ModelSlotSnapshot {
+        ModelSlotSnapshot {
+            path: path.to_string(),
+            session_loaded: false,
+        }
     }
 }

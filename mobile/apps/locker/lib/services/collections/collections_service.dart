@@ -287,7 +287,6 @@ class CollectionService {
     }
   }
 
-  /// Removes orphaned files that exist in files but have no collection mappings.
   Future<void> cleanupOrphanedFiles() async {
     try {
       await _db.cleanupOrphanedFiles();
@@ -298,9 +297,6 @@ class CollectionService {
     }
   }
 
-  /// Adds a file to a collection. By default this triggers a full sync to
-  /// update local state. Set [runSync] to false to delay syncing (useful when
-  /// adding the same file to multiple collections during an upload).
   Future<void> addToCollection(
     Collection collection,
     EnteFile file, {
@@ -538,13 +534,7 @@ class CollectionService {
     }
   }
 
-  /// Trash an empty collection directly without moving files.
-  /// The server will verify that the collection is actually empty before
-  /// deleting. If keepFiles is set as False and the collection is not empty,
-  /// then the files in the collection will be moved to trash.
-  ///
-  /// [isBulkDelete] - During bulk deletion, this event is not fired to avoid
-  /// quick refresh of the collection gallery
+  // The server rejects this path unless the collection is empty.
   Future<void> trashEmptyCollection(
     Collection collection, {
     bool isBulkDelete = false,
@@ -555,6 +545,7 @@ class CollectionService {
         keepFiles: true,
         skipEventFiring: isBulkDelete,
       );
+      // Bulk deletion syncs once after the loop.
       if (!isBulkDelete) {
         await sync();
         await TrashService.instance.syncTrash();
@@ -793,8 +784,6 @@ class CollectionService {
     return createCollection("Documents", type: CollectionType.folder);
   }
 
-  /// Returns one random collection name that doesn't already exist
-  /// If all names are used, returns "Documents"
   Future<String> getRandomUnusedCollectionName() async {
     try {
       final existingCollections = await getCollections();
@@ -868,13 +857,6 @@ class CollectionService {
         .toList();
   }
 
-  /// Returns Contacts(Users) that are relevant to the account owner.
-  /// Note: "User" refers to the account owner in the points below.
-  /// This includes:
-  /// 	- Collaborators and viewers of collections owned by user
-  ///   - Owners of collections shared to user.
-  ///   - All collaborators of collections in which user is a collaborator or
-  ///     a viewer.
   List<UserSuggestion> getRelevantContacts() {
     final int ownerID = Configuration.instance.getUserID()!;
     final String ownerEmail = Configuration.instance.getEmail()!;

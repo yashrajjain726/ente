@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:logging/logging.dart';
 
-/// Used to store the display settings of a code.
 class CodeDisplay {
   final bool pinned;
   final bool trashed;
@@ -81,9 +80,6 @@ class CodeDisplay {
     );
   }
 
-  /// Converts the [CodeDisplay] to a json object.
-  /// When [safeParsing] is true, the json will be parsed safely.
-  /// If we fail to parse the json, we will return an empty [CodeDisplay].
   static CodeDisplay? fromUri(Uri uri, {bool safeParsing = false}) {
     if (!uri.queryParameters.containsKey("codeDisplay")) return null;
     final String codeDisplay = uri.queryParameters['codeDisplay']!.replaceAll(

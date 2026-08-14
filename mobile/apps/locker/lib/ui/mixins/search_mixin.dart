@@ -210,7 +210,6 @@ mixin SearchMixin<T extends StatefulWidget> on State<T> {
     return words.any((word) => word.startsWith(lowerQuery));
   }
 
-  /// Handle keyboard shortcuts
   bool handleKeyEvent(KeyEvent event) {
     if (event is KeyDownEvent) {
       // Clear search or close search on ESC
@@ -245,7 +244,6 @@ mixin SearchMixin<T extends StatefulWidget> on State<T> {
 
   void updateSearchQuery(String query) => _onSearchChanged(query);
 
-  /// Programmatically activate search with a specific query
   void activateSearchWithQuery(String query) {
     setState(() {
       _isSearchActive = true;
@@ -261,7 +259,6 @@ mixin SearchMixin<T extends StatefulWidget> on State<T> {
     });
   }
 
-  /// Programmatically dismiss the search UI and reset state
   void dismissSearch() {
     if (_isSearchActive) {
       _deactivateSearch();

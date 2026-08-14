@@ -1,7 +1,3 @@
-//
-//  EnteMemoryWidget.swift
-//  EnteMemoryWidget
-
 import SwiftUI
 import UIKit
 import WidgetKit

@@ -115,7 +115,6 @@ class _AlbumSelectionActionWidgetState
     }
 
     if (widget.sectionType == UISectionType.archivedCollections) {
-      // For archived albums: show unarchive and delete
       items.add(
         SelectionActionButton(
           labelText: context.strings.unarchive,
@@ -132,7 +131,6 @@ class _AlbumSelectionActionWidgetState
         ),
       );
     } else if (widget.sectionType == UISectionType.hiddenCollections) {
-      // For hidden albums: show unhide and delete
       items.add(
         SelectionActionButton(
           labelText: context.strings.unhide,
@@ -159,8 +157,6 @@ class _AlbumSelectionActionWidgetState
     }
 
     if (widget.sectionType == UISectionType.incomingCollections) {
-      // Pin/Unpin options for incoming collections (uses sharee metadata)
-      // Behind feature flag
       if (flagService.enableShareePin) {
         final hasShareePinnedAlbum = widget.selectedAlbums.albums.any(
           (album) => album.hasShareePinned(),
@@ -188,7 +184,6 @@ class _AlbumSelectionActionWidgetState
         );
       }
 
-      // Hide option for incoming collections (uses sharee metadata)
       items.add(
         SelectionActionButton(
           labelText: context.strings.hide,
@@ -363,7 +358,6 @@ class _AlbumSelectionActionWidgetState
       return;
     }
 
-    // Determine if we're hiding or unhiding based on first collection
     final isUnhiding = collections.first.isHidden();
     if (!await prepareSharedAlbumsForHiding(
       context,
@@ -436,7 +430,6 @@ class _AlbumSelectionActionWidgetState
       return;
     }
 
-    // Determine if we're archiving or unarchiving based on first collection
     final isUnarchiving =
         widget.sectionType == UISectionType.incomingCollections
         ? collections.first.hasShareeArchived()

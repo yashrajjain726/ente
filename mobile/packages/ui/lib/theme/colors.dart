@@ -1,29 +1,6 @@
 import "package:ente_ui/theme/theme_config.dart";
 import 'package:flutter/material.dart';
 
-/// This color scheme provides all the colors needed for a modern Flutter app,
-/// including background, text, fill, stroke, and accent colors for both light
-/// and dark themes.
-///
-/// Apps can easily customize the primary colors using the factory constructors:
-///
-/// ```dart
-/// // Create a light theme with custom primary colors
-/// final customLightScheme = EnteColorScheme.light(
-///   primary700: Color(0xFF1976D2),
-///   primary500: Color(0xFF2196F3),
-///   primary400: Color(0xFF42A5F5),
-///   primary300: Color(0xFF64B5F6),
-/// );
-///
-/// // Create a dark theme with custom primary colors
-/// final customDarkScheme = EnteColorScheme.dark(
-///   primary700: Color(0xFF1976D2),
-///   primary500: Color(0xFF2196F3),
-///   primary400: Color(0xFF42A5F5),
-///   primary300: Color(0xFF64B5F6),
-/// );
-/// ```
 class EnteColorScheme extends ThemeExtension<EnteColorScheme> {
   factory EnteColorScheme.fromApp(
     EnteApp app, {
@@ -247,7 +224,6 @@ class EnteColorScheme extends ThemeExtension<EnteColorScheme> {
     this.golden500 = _golden500,
   });
 
-  /// Factory constructor for light theme with customizable primary colors
   factory EnteColorScheme.light({
     Color? primary700,
     Color? primary500,
@@ -301,7 +277,6 @@ class EnteColorScheme extends ThemeExtension<EnteColorScheme> {
     );
   }
 
-  /// Factory constructor for dark theme with customizable primary colors
   factory EnteColorScheme.dark({
     Color? primary700,
     Color? primary500,
@@ -551,7 +526,6 @@ class EnteColorScheme extends ThemeExtension<EnteColorScheme> {
     );
   }
 
-  /// Helper method to lerp between two color lists
   List<Color> _lerpColorList(List<Color> a, List<Color> b, double t) {
     if (a.length != b.length) {
       return t < 0.5 ? a : b;
@@ -813,28 +787,7 @@ const Color _defaultCodeCardBackgroundColor = Color.fromRGBO(246, 246, 246, 1);
 const Color _golden700 = Color(0xFFFDB816);
 const Color _golden500 = Color(0xFFFFC336);
 
-/// Utility class to help apps create custom color schemes with their brand colors.
-///
-/// This class provides convenient methods to generate complete color schemes
-/// from a base primary color, automatically calculating the different shades
-/// and variations needed for the app.
 class ColorSchemeBuilder {
-  /// Creates light and dark color schemes from a single primary color.
-  ///
-  /// The primary color is used as the base (primary500), and other shades
-  /// are automatically calculated:
-  /// - primary700: Darker shade for emphasis
-  /// - primary400: Lighter shade for secondary elements
-  /// - primary300: Lightest shade for subtle accents
-  ///
-  /// Example:
-  /// ```dart
-  /// final schemes = ColorSchemeBuilder.fromPrimaryColor(
-  ///   Color(0xFF2196F3), // Material Blue
-  /// );
-  /// final lightScheme = schemes.light;
-  /// final darkScheme = schemes.dark;
-  /// ```
   static ({EnteColorScheme light, EnteColorScheme dark}) fromPrimaryColor(
     Color primaryColor,
   ) {
@@ -878,19 +831,6 @@ class ColorSchemeBuilder {
     return (light: lightScheme, dark: darkScheme);
   }
 
-  /// Creates light and dark color schemes with fully custom primary colors.
-  ///
-  /// Use this method when you need complete control over all primary color shades.
-  ///
-  /// Example:
-  /// ```dart
-  /// final schemes = ColorSchemeBuilder.fromCustomColors(
-  ///   primary700: Color(0xFF1565C0),
-  ///   primary500: Color(0xFF2196F3),
-  ///   primary400: Color(0xFF42A5F5),
-  ///   primary300: Color(0xFF90CAF9),
-  /// );
-  /// ```
   static ({EnteColorScheme light, EnteColorScheme dark}) fromCustomColors({
     required Color primary700,
     required Color primary500,

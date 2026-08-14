@@ -1,178 +1,248 @@
-use ort::{
-    ep::{CPU, ExecutionProviderDispatch},
-    session::{Session, builder::GraphOptimizationLevel},
-    value::{Tensor, TensorElementType, TensorRef, ValueType},
-};
-use std::{
-    cell::OnceCell,
-    path::{Path, PathBuf},
-};
-
-use half::prelude::{HalfFloatSliceExt, HalfFloatVecExt};
-
-#[cfg(target_os = "android")]
-use ort::ep::XNNPACK;
-#[cfg(any(target_os = "ios", target_os = "macos"))]
-use ort::ep::{
-    CoreML,
-    coreml::{ComputeUnits, ModelFormat, SpecializationStrategy},
-};
-#[cfg(any(target_os = "android", target_os = "linux", target_os = "windows"))]
-use ort::ep::{
-    WebGPU,
-    webgpu::{DawnBackendType, PreferredLayout},
-};
-#[cfg(target_os = "android")]
-use std::num::NonZeroUsize;
+use ort::session::Session;
+use std::{fmt, path::Path};
 
 use crate::ml::error::{MlError, MlResult};
-use crate::ml::golden;
-#[cfg(any(target_os = "android", target_os = "linux", target_os = "windows"))]
-use crate::ml::webgpu;
 
-#[cfg(any(target_os = "ios", target_os = "macos", test))]
-const COREML_CACHE_SCHEMA: &str = "ort-1_28-mlprogram-all-default-v1";
-const COREML_CACHE_COMPLETE_MARKER: &str = ".ente-cache-complete";
-// The name ONNX Runtime's CoreML EP gives the compiled model it stores
-// inside each generated MLProgram package directory in the cache
-// (`model.mm` `CompileOrReadCachedModel`).
-const COREML_CACHE_COMPILED_MODEL: &str = "compiled_model.mlmodelc";
-// The weight blob file name inside an ORT-generated `.mlpackage`
-// (`model_builder.cc` writes `@model_path/weights/weight.bin`).
-const COREML_PACKAGE_WEIGHT_BLOB: &str = "weight.bin";
-#[cfg(any(target_os = "ios", target_os = "macos"))]
-const ENABLE_PERSISTENT_COREML_CACHE: bool = true;
+mod coreml_cache;
+mod golden_test;
+pub use golden_test::tooling as golden_tooling;
+mod providers;
+mod tensor;
+mod webgpu;
 
-pub(crate) struct PreparedF32Input {
-    f32_data: Vec<f32>,
-    f16_data: OnceCell<Vec<half::f16>>,
+pub(crate) fn set_webgpu_enabled(enabled: bool) {
+    webgpu::set_enabled(enabled);
 }
 
-#[derive(Clone, Copy)]
-pub(crate) enum BorrowedFloatTensor<'a> {
-    F32(&'a [f32]),
-    F16(&'a [half::f16]),
+pub(crate) use ort::session::Session as SessionHandle;
+pub(crate) use providers::ExecutionMode;
+use tensor::run_golden_tensor;
+pub(crate) use tensor::{
+    BorrowedFloatTensor, FloatTensorData, PreparedF32Input, run_f32, run_i32_f32,
+    with_prepared_float_output,
+};
+
+use providers::{ExecutionProvider, ProviderPlan};
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(crate) struct ProviderUsage {
+    pub(crate) coreml: bool,
+    pub(crate) webgpu: bool,
 }
 
-pub(crate) trait FloatTensorData: Copy {
-    fn len(self) -> usize;
-    fn value(self, index: usize) -> f32;
-}
-
-impl FloatTensorData for &[f32] {
-    fn len(self) -> usize {
-        <[f32]>::len(self)
-    }
-
-    #[inline]
-    fn value(self, index: usize) -> f32 {
-        self[index]
-    }
-}
-
-impl FloatTensorData for &[half::f16] {
-    fn len(self) -> usize {
-        <[half::f16]>::len(self)
-    }
-
-    #[inline]
-    fn value(self, index: usize) -> f32 {
-        self[index].to_f32()
-    }
-}
-
-impl PreparedF32Input {
-    pub(crate) fn new(data: Vec<f32>) -> Self {
+impl ProviderUsage {
+    fn from_provider(provider: ExecutionProvider) -> Self {
         Self {
-            f32_data: data,
-            f16_data: OnceCell::new(),
+            coreml: provider == ExecutionProvider::CoreMl,
+            webgpu: provider == ExecutionProvider::WebGpu,
         }
     }
 
-    fn f16_data(&self) -> &[half::f16] {
-        self.f16_data
-            .get_or_init(|| Vec::<half::f16>::from_f32_slice(&self.f32_data))
-    }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum ExecutionMode {
-    PlatformDefault,
-    #[cfg(target_os = "android")]
-    Xnnpack,
-    CpuOnly,
-}
-
-// Identifies the successful attempt's preferred provider, not its registered
-// fallback providers, for result attribution.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-#[allow(dead_code)] // Accelerated variants are constructed only on their target OS.
-pub(crate) enum ExecutionProvider {
-    CoreMl,
-    WebGpu,
-    Xnnpack,
-    Cpu,
-}
-
-impl ExecutionMode {
-    pub(crate) fn fallback(self) -> Option<Self> {
-        match self {
-            #[cfg(target_os = "android")]
-            Self::PlatformDefault => Some(Self::Xnnpack),
-            #[cfg(not(target_os = "android"))]
-            Self::PlatformDefault => Some(Self::CpuOnly),
-            #[cfg(target_os = "android")]
-            Self::Xnnpack => Some(Self::CpuOnly),
-            Self::CpuOnly => None,
+    pub(crate) fn merge(self, other: Self) -> Self {
+        Self {
+            coreml: self.coreml || other.coreml,
+            webgpu: self.webgpu || other.webgpu,
         }
     }
 }
 
-pub(crate) fn build_session(
-    model_path: &str,
+#[derive(Debug)]
+pub(crate) struct OnnxSession {
     mode: ExecutionMode,
-    coreml_cache_namespace: &str,
-) -> MlResult<(Session, ExecutionProvider)> {
-    let attempts = provider_attempts(mode, model_path, coreml_cache_namespace);
+    provider_plan: Option<ProviderPlan>,
+    session: Option<Session>,
+}
 
-    let mut errors = Vec::new();
-    for attempt in attempts {
-        let execution_provider = attempt.execution_provider;
-        if attempt.uses_webgpu {
+impl OnnxSession {
+    pub(crate) fn new(mode: ExecutionMode) -> Self {
+        Self {
+            mode,
+            provider_plan: None,
+            session: None,
+        }
+    }
+
+    pub(crate) fn clear(&mut self) {
+        self.provider_plan = None;
+        self.session = None;
+    }
+
+    #[cfg(test)]
+    pub(crate) fn is_loaded(&self) -> bool {
+        self.session.is_some()
+    }
+
+    pub(crate) fn run<T>(
+        &mut self,
+        model_path: &str,
+        model_namespace: &str,
+        mut operation: impl FnMut(&mut Session) -> SessionRunResult<T>,
+    ) -> MlResult<(T, ProviderUsage)> {
+        loop {
+            self.ensure_loaded(model_path, model_namespace)?;
+
+            let execution_provider = self
+                .provider_plan
+                .as_ref()
+                .and_then(ProviderPlan::selected_provider)
+                .expect("loaded session must have a selected execution provider");
+            let session = self
+                .session
+                .as_mut()
+                .expect("session must be loaded before model execution");
+            match operation(session) {
+                Ok(value) => {
+                    return Ok((value, ProviderUsage::from_provider(execution_provider)));
+                }
+                Err(error) => {
+                    if self.retry_after_provider_failure(&error) {
+                        continue;
+                    }
+                    return Err(error.into_ml_error());
+                }
+            }
+        }
+    }
+
+    fn ensure_loaded(&mut self, model_path: &str, model_namespace: &str) -> MlResult<()> {
+        if self.session.is_some() {
+            return Ok(());
+        }
+
+        let provider_plan = self
+            .provider_plan
+            .get_or_insert_with(|| ProviderPlan::new(self.mode, model_path));
+        let model_name = model_file_label(model_path);
+        log::info!("loading {model_name} with {:?} execution", self.mode);
+        let started_at = std::time::Instant::now();
+        let session = build_next_session(model_path, provider_plan, model_namespace)?;
+        let execution_provider = provider_plan
+            .selected_provider()
+            .expect("successful session build must select an execution provider");
+        log::info!(
+            "loaded {model_name} with {execution_provider:?} in {:?}",
+            started_at.elapsed()
+        );
+        self.session = Some(session);
+        Ok(())
+    }
+
+    fn retry_after_provider_failure(&mut self, error: &SessionRunError) -> bool {
+        if !error.is_retryable()
+            || !self
+                .provider_plan
+                .as_ref()
+                .is_some_and(ProviderPlan::has_fallback)
+        {
+            return false;
+        }
+
+        self.session = None;
+        log::warn!(
+            "execution provider failed, retrying model with the next provider fallback: {error}"
+        );
+        true
+    }
+}
+
+#[derive(Debug)]
+pub(crate) enum SessionRunError {
+    Retryable(MlError),
+    Terminal(MlError),
+}
+
+pub(crate) type SessionRunResult<T> = Result<T, SessionRunError>;
+
+impl SessionRunError {
+    fn retryable(error: MlError) -> Self {
+        Self::Retryable(error)
+    }
+
+    fn is_retryable(&self) -> bool {
+        matches!(self, Self::Retryable(_))
+    }
+
+    fn into_ml_error(self) -> MlError {
+        match self {
+            Self::Retryable(error) | Self::Terminal(error) => error,
+        }
+    }
+}
+
+impl fmt::Display for SessionRunError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Retryable(error) | Self::Terminal(error) => error.fmt(formatter),
+        }
+    }
+}
+
+impl From<MlError> for SessionRunError {
+    fn from(error: MlError) -> Self {
+        Self::Terminal(error)
+    }
+}
+
+impl From<SessionRunError> for MlError {
+    fn from(error: SessionRunError) -> Self {
+        error.into_ml_error()
+    }
+}
+
+impl<R> From<ort::Error<R>> for SessionRunError {
+    fn from(error: ort::Error<R>) -> Self {
+        let error = MlError::Ort(error.to_string());
+        if is_execution_provider_run_failure(&error) {
+            Self::Retryable(error)
+        } else {
+            Self::Terminal(error)
+        }
+    }
+}
+
+fn build_next_session(
+    model_path: &str,
+    plan: &mut ProviderPlan,
+    model_namespace: &str,
+) -> MlResult<Session> {
+    let result = providers::run_provider_plan(plan, |execution_provider| {
+        let attempt = providers::provider_attempt(execution_provider, model_path, model_namespace);
+        if attempt.uses_webgpu() {
             #[cfg(any(target_os = "android", target_os = "linux", target_os = "windows"))]
             {
-                match build_webgpu_session_with_canary(model_path, coreml_cache_namespace, attempt)
-                {
-                    Ok(session) => return Ok((session, execution_provider)),
-                    Err(error) => errors.push(format!("{error}")),
-                }
-                continue;
+                return build_webgpu_session_with_canary(model_path, model_namespace, attempt)
+                    .map_err(|error| format!("{error}"));
             }
             #[cfg(not(any(target_os = "android", target_os = "linux", target_os = "windows")))]
             unreachable!("WebGPU provider attempts are not constructed on this platform");
         }
 
-        let coreml_cache_dir = attempt.coreml_cache_dir.clone();
+        let coreml_cache_dir = attempt.coreml_cache_dir().map(Path::to_path_buf);
         match build_and_validate_session(model_path, attempt) {
             Ok(session) => {
                 if let Some(cache_dir) = coreml_cache_dir {
-                    finalize_coreml_cache(&cache_dir, model_path);
+                    coreml_cache::finalize(&cache_dir, model_path);
                 }
-                return Ok((session, execution_provider));
+                Ok(session)
             }
             Err(error) => {
                 if let Some(cache_dir) = coreml_cache_dir
-                    && let Err(cleanup_error) = invalidate_coreml_cache(&cache_dir)
+                    && let Err(cleanup_error) = coreml_cache::invalidate(&cache_dir)
                 {
                     log::warn!(
                         "failed to invalidate CoreML cache for '{}' after session construction failed: {cleanup_error}",
                         model_file_label(model_path)
                     );
                 }
-                errors.push(format!("{error}"));
+                Err(format!("{error}"))
             }
         }
-    }
+    });
+
+    let errors = match result {
+        Ok(session) => return Ok(session),
+        Err(errors) => errors,
+    };
 
     if has_protobuf_parse_failure(&errors) {
         return Err(MlError::CorruptModel(model_path.to_string()));
@@ -184,10 +254,35 @@ pub(crate) fn build_session(
     )))
 }
 
+fn build_cpu_session(model_path: &str) -> MlResult<Session> {
+    let mut plan = ProviderPlan::new(ExecutionMode::CpuOnly, model_path);
+    build_next_session(model_path, &mut plan, "golden-tooling")
+}
+
+fn is_execution_provider_run_failure(error: &MlError) -> bool {
+    let MlError::Ort(message) = error else {
+        return false;
+    };
+    let normalized = message.to_ascii_lowercase();
+    normalized.contains("executionprovider")
+        || normalized.contains("unknown allocation device")
+        || normalized.contains("xnnpackexecutionprovider")
+        || normalized.contains("coremlexecutionprovider")
+        || normalized.contains("webgpu")
+        || normalized.contains("wgpu")
+        || normalized.contains("dawn")
+        || normalized.contains("vulkan")
+        || normalized.contains("vk_error")
+        || normalized.contains("ep error")
+}
+
 // A CoreML self-test failure is treated as construction failure so the caller
 // invalidates the possibly corrupt persistent cache. WebGPU validation stays
 // inside its crash-canary window instead.
-fn build_and_validate_session(model_path: &str, attempt: ProviderAttempt) -> MlResult<Session> {
+fn build_and_validate_session(
+    model_path: &str,
+    attempt: providers::ProviderAttempt,
+) -> MlResult<Session> {
     #[cfg(any(
         target_os = "android",
         target_os = "ios",
@@ -195,10 +290,10 @@ fn build_and_validate_session(model_path: &str, attempt: ProviderAttempt) -> MlR
         target_os = "macos",
         target_os = "windows"
     ))]
-    let execution_provider = attempt.execution_provider;
+    let execution_provider = attempt.execution_provider();
 
     #[cfg_attr(not(any(target_os = "ios", target_os = "macos")), allow(unused_mut))]
-    let mut session = match build_session_with_providers(model_path, attempt) {
+    let mut session = match providers::build_session(model_path, attempt) {
         Ok(session) => session,
         Err(error) => {
             #[cfg(any(
@@ -232,7 +327,7 @@ fn build_and_validate_session(model_path: &str, attempt: ProviderAttempt) -> MlR
 fn build_webgpu_session_with_canary(
     model_path: &str,
     model_namespace: &str,
-    attempt: ProviderAttempt,
+    attempt: providers::ProviderAttempt,
 ) -> MlResult<Session> {
     // Fail closed: without a durable failure record, a crash during the
     // attempt would go unnoticed and the crash loop protection would be lost.
@@ -271,7 +366,7 @@ fn build_webgpu_session_with_canary(
             }
         }
     }
-    let mut session = match build_session_with_providers(model_path, attempt) {
+    let mut session = match providers::build_session(model_path, attempt) {
         Ok(session) => session,
         Err(error) => {
             record_provider_attempt_failure(
@@ -345,12 +440,12 @@ fn run_session_self_test(
     provider_label: &str,
 ) -> MlResult<()> {
     let model_file = model_file_label(model_path);
-    let Some(entry) = golden::lookup(model_path) else {
+    let Some(entry) = golden_test::lookup(model_path) else {
         return Err(MlError::Ort(format!(
             "golden self-test entry missing for '{model_file}'"
         )));
     };
-    let golden_input = golden::prepare_input(entry).map_err(|reason| {
+    let golden_input = golden_test::prepare_input(entry).map_err(|reason| {
         MlError::Ort(format!(
             "golden self-test input invalid for '{model_file}': {reason}"
         ))
@@ -367,10 +462,10 @@ fn run_session_self_test(
                 "{provider_label} zero-input warm-up inference failed for '{model_file}': \
                  {error}; falling back to the next execution provider"
             );
-            return Err(error);
+            return Err(error.into());
         }
     };
-    if let Err(reason) = golden::validate_output(entry, &zero_output) {
+    if let Err(reason) = golden_test::validate_output(entry, &zero_output) {
         log::error!(
             "{provider_label} zero-input warm-up failed for '{model_file}': {reason}; \
              falling back to the next execution provider"
@@ -391,10 +486,10 @@ fn run_session_self_test(
                 "{provider_label} golden self-test inference failed for '{model_file}': \
                  {error}; falling back to the next execution provider"
             );
-            return Err(error);
+            return Err(error.into());
         }
     };
-    match golden::compare_output(entry, &golden_output) {
+    match golden_test::compare_output(entry, &golden_output) {
         Ok(distance) => {
             log::info!(
                 "{provider_label} golden self-test for '{model_file}' passed \
@@ -422,46 +517,6 @@ fn model_file_label(model_path: &str) -> &str {
         .unwrap_or(model_path)
 }
 
-// Shared with the generator so its inference path stays identical to devices.
-pub(crate) fn run_golden_tensor(
-    session: &mut Session,
-    input_shape: &[i64],
-    input: &golden::PreparedGoldenInput,
-) -> MlResult<Vec<f32>> {
-    let outputs = match input {
-        golden::PreparedGoldenInput::F32(data) => {
-            if session_expects_f16(session) {
-                let input_tensor = Tensor::<half::f16>::from_array((
-                    input_shape,
-                    Vec::<half::f16>::from_f32_slice(data),
-                ))?;
-                session.run(ort::inputs![input_tensor])?
-            } else {
-                let input_tensor =
-                    TensorRef::<f32>::from_array_view((input_shape, data.as_slice()))?;
-                session.run(ort::inputs![input_tensor])?
-            }
-        }
-        golden::PreparedGoldenInput::I32(data) => {
-            let input_tensor = TensorRef::<i32>::from_array_view((input_shape, data.as_slice()))?;
-            session.run(ort::inputs![input_tensor])?
-        }
-    };
-
-    if outputs.len() == 0 {
-        return Err(MlError::Ort("missing first output tensor".to_string()));
-    }
-    let output = &outputs[0];
-    if let Ok((_, tensor_data)) = output.try_extract_tensor::<f32>() {
-        Ok(tensor_data.to_vec())
-    } else {
-        let (_, tensor_data) = output.try_extract_tensor::<half::f16>()?;
-        let mut data = vec![0.0; tensor_data.len()];
-        tensor_data.convert_to_f32_slice(&mut data);
-        Ok(data)
-    }
-}
-
 fn has_protobuf_parse_failure(errors: &[String]) -> bool {
     errors.iter().any(|error| {
         error
@@ -470,608 +525,36 @@ fn has_protobuf_parse_failure(errors: &[String]) -> bool {
     })
 }
 
-struct ProviderAttempt {
-    providers: Vec<ExecutionProviderDispatch>,
-    disable_intra_op_spinning: bool,
-    coreml_cache_dir: Option<PathBuf>,
-    uses_webgpu: bool,
-    execution_provider: ExecutionProvider,
-}
-
-impl ProviderAttempt {
-    fn cpu_only() -> Self {
-        Self {
-            providers: vec![CPU::default().with_arena_allocator(true).build()],
-            disable_intra_op_spinning: false,
-            coreml_cache_dir: None,
-            uses_webgpu: false,
-            execution_provider: ExecutionProvider::Cpu,
-        }
-    }
-}
-
-fn provider_attempts(
-    mode: ExecutionMode,
-    model_path: &str,
-    coreml_cache_namespace: &str,
-) -> Vec<ProviderAttempt> {
-    match mode {
-        ExecutionMode::PlatformDefault => {
-            platform_default_attempts(model_path, coreml_cache_namespace)
-        }
-        #[cfg(target_os = "android")]
-        ExecutionMode::Xnnpack => vec![xnnpack_attempt(), ProviderAttempt::cpu_only()],
-        ExecutionMode::CpuOnly => vec![ProviderAttempt::cpu_only()],
-    }
-}
-
-#[cfg(any(target_os = "ios", target_os = "macos"))]
-fn platform_default_attempts(
-    model_path: &str,
-    coreml_cache_namespace: &str,
-) -> Vec<ProviderAttempt> {
-    let mut attempts = Vec::new();
-    if golden_entry_required(model_path, "CoreML") {
-        let (coreml_provider, coreml_cache_dir) =
-            coreml_provider(model_path, coreml_cache_namespace);
-        attempts.push(ProviderAttempt {
-            providers: vec![
-                coreml_provider,
-                CPU::default().with_arena_allocator(true).build(),
-            ],
-            disable_intra_op_spinning: false,
-            coreml_cache_dir,
-            uses_webgpu: false,
-            execution_provider: ExecutionProvider::CoreMl,
-        });
-    }
-    attempts.push(ProviderAttempt::cpu_only());
-    attempts
-}
-
-#[cfg(any(target_os = "ios", target_os = "macos"))]
-fn coreml_provider(
-    model_path: &str,
-    cache_namespace: &str,
-) -> (ExecutionProviderDispatch, Option<PathBuf>) {
-    let mut provider = CoreML::default()
-        .with_model_format(ModelFormat::MLProgram)
-        .with_compute_units(ComputeUnits::All)
-        .with_specialization_strategy(SpecializationStrategy::Default);
-
-    let mut prepared_cache_dir = None;
-    if ENABLE_PERSISTENT_COREML_CACHE {
-        match prepare_coreml_cache_directory(model_path, cache_namespace) {
-            Ok(cache_dir) => {
-                provider = provider.with_model_cache_dir(cache_dir.to_string_lossy());
-                prepared_cache_dir = Some(cache_dir);
-            }
-            Err(error) => {
-                log::warn!(
-                    "failed to prepare persistent CoreML cache for '{}'; continuing without it: {error}",
-                    model_file_label(model_path)
-                );
-            }
-        }
-    } else {
-        remove_persistent_coreml_cache(model_path);
-    }
-
-    (provider.build().error_on_failure(), prepared_cache_dir)
-}
-
-// Disabling the feature must also reclaim caches created by earlier releases.
-#[cfg(any(target_os = "ios", target_os = "macos"))]
-fn remove_persistent_coreml_cache(model_path: &str) {
-    let Some(coreml_root) = coreml_cache_root(Path::new(model_path))
-        .parent()
-        .map(Path::to_path_buf)
-    else {
-        return;
-    };
-    match std::fs::remove_dir_all(&coreml_root) {
-        Ok(()) => log::info!("removed persistent CoreML cache (feature disabled)"),
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
-        Err(error) => log::warn!("failed to remove disabled persistent CoreML cache: {error}"),
-    }
-}
-
-#[cfg(target_os = "android")]
-fn platform_default_attempts(
-    model_path: &str,
-    _coreml_cache_namespace: &str,
-) -> Vec<ProviderAttempt> {
-    let mut attempts = Vec::new();
-    if webgpu::attempt_permitted(model_path) && golden_entry_required(model_path, "WebGPU") {
-        attempts.push(ProviderAttempt {
-            // EP priority follows registration order. Unsupported WebGPU nodes
-            // fall through to XNNPACK and then CPU in the same session.
-            providers: vec![
-                webgpu_provider(),
-                xnnpack_provider().fail_silently(),
-                CPU::default().with_arena_allocator(true).build(),
-            ],
-            disable_intra_op_spinning: true,
-            coreml_cache_dir: None,
-            uses_webgpu: true,
-            execution_provider: ExecutionProvider::WebGpu,
-        });
-    }
-    attempts.push(xnnpack_attempt());
-    attempts.push(ProviderAttempt::cpu_only());
-    attempts
-}
-
-#[cfg(any(target_os = "linux", target_os = "windows"))]
-fn platform_default_attempts(
-    model_path: &str,
-    _coreml_cache_namespace: &str,
-) -> Vec<ProviderAttempt> {
-    let mut attempts = Vec::new();
-    if webgpu::attempt_permitted(model_path) && golden_entry_required(model_path, "WebGPU") {
-        attempts.push(ProviderAttempt {
-            providers: vec![
-                webgpu_provider(),
-                CPU::default().with_arena_allocator(true).build(),
-            ],
-            disable_intra_op_spinning: true,
-            coreml_cache_dir: None,
-            uses_webgpu: true,
-            execution_provider: ExecutionProvider::WebGpu,
-        });
-    }
-    attempts.push(ProviderAttempt::cpu_only());
-    attempts
-}
-
-// Missing goldens fail closed, usually indicating they were not regenerated
-// after an update.
-#[cfg(any(
-    target_os = "android",
-    target_os = "ios",
-    target_os = "linux",
-    target_os = "macos",
-    target_os = "windows"
-))]
-fn golden_entry_required(model_path: &str, provider_label: &str) -> bool {
-    if golden::lookup(model_path).is_some() {
-        return true;
-    }
-    log::error!(
-        "no golden self-test entry for '{}'; {provider_label} disabled for this model",
-        model_file_label(model_path)
-    );
-    false
-}
-
-#[cfg(any(target_os = "android", target_os = "linux", target_os = "windows"))]
-fn webgpu_provider() -> ExecutionProviderDispatch {
-    let provider = WebGPU::default().with_preferred_layout(PreferredLayout::NCHW);
-    #[cfg(any(target_os = "android", target_os = "linux"))]
-    let provider = provider.with_dawn_backend_type(DawnBackendType::Vulkan);
-    #[cfg(target_os = "windows")]
-    let provider = provider.with_dawn_backend_type(DawnBackendType::D3D12);
-    provider.build().error_on_failure()
-}
-
-#[cfg(not(any(
-    target_os = "ios",
-    target_os = "android",
-    target_os = "linux",
-    target_os = "macos",
-    target_os = "windows"
-)))]
-fn platform_default_attempts(
-    _model_path: &str,
-    _coreml_cache_namespace: &str,
-) -> Vec<ProviderAttempt> {
-    vec![ProviderAttempt::cpu_only()]
-}
-
-#[cfg(any(target_os = "ios", target_os = "macos"))]
-fn prepare_coreml_cache_directory(
-    model_path: &str,
-    cache_namespace: &str,
-) -> std::io::Result<PathBuf> {
-    let model_path = Path::new(model_path);
-    let schema_root = coreml_cache_root(model_path);
-
-    if let Some(coreml_root) = schema_root.parent() {
-        match prune_stale_coreml_schema_directories(coreml_root, COREML_CACHE_SCHEMA) {
-            Ok(removed) => {
-                for schema in removed {
-                    log::info!("removed stale CoreML cache schema '{schema}'");
-                }
-            }
-            Err(error) => log::warn!("failed to prune stale CoreML cache schemas: {error}"),
-        }
-    }
-
-    let model_cache_root = schema_root.join(sanitize_cache_component(cache_namespace));
-    std::fs::create_dir_all(&model_cache_root)?;
-
-    let cache_key = coreml_model_cache_key(model_path)?;
-    prune_superseded_coreml_cache_directories(&model_cache_root, &cache_key)?;
-
-    let cache_dir = model_cache_root.join(cache_key);
-    prepare_coreml_cache_entry(&cache_dir)?;
-    Ok(cache_dir)
-}
-
-// Rebuild unmarked entries so ORT cannot reuse a package interrupted mid-build.
-#[cfg(any(target_os = "ios", target_os = "macos", test))]
-fn prepare_coreml_cache_entry(cache_dir: &Path) -> std::io::Result<()> {
-    if cache_dir.exists() && !coreml_cache_complete_marker(cache_dir).is_file() {
-        std::fs::remove_dir_all(cache_dir)?;
-    }
-    std::fs::create_dir_all(cache_dir)
-}
-
-// Trim before marking complete so a crash mid-trim forces a clean rebuild.
-// Trim failures only waste disk space and therefore do not fail the load.
-fn finalize_coreml_cache(cache_dir: &Path, model_path: &str) {
-    match trim_coreml_cache_weights(cache_dir) {
-        Ok(0) => {}
-        Ok(reclaimed) => log::info!(
-            "primed CoreML cache for '{}': trimmed {} MiB of generated package weights",
-            model_file_label(model_path),
-            reclaimed / (1024 * 1024)
-        ),
-        Err(error) => log::warn!(
-            "failed to trim CoreML cache weights for '{}': {error}",
-            model_file_label(model_path)
-        ),
-    }
-
-    if let Err(error) = mark_coreml_cache_complete(cache_dir) {
-        log::warn!(
-            "failed to mark CoreML cache complete for '{}': {error}",
-            model_file_label(model_path)
-        );
-    }
-}
-
-// On a warm cache hit ONNX Runtime 1.28 only checks that the generated
-// package directory and loads `compiled_model.mlmodelc`, making the package's
-// own weights redundant. Uncompiled packages remain intact; incompatible
-// future runtimes will fail construction and trigger cache invalidation.
-fn trim_coreml_cache_weights(cache_dir: &Path) -> std::io::Result<u64> {
-    let mut reclaimed = 0;
-    // ORT 1.28 stores the compiled MLProgram inside
-    // <cache_dir>/<model_hash>/<partition>/model/compiled_model.mlmodelc.
-    for model_hash_entry in std::fs::read_dir(cache_dir)? {
-        let model_hash_entry = model_hash_entry?;
-        if !model_hash_entry.file_type()?.is_dir() {
-            continue;
-        }
-        for partition_entry in std::fs::read_dir(model_hash_entry.path())? {
-            let partition_entry = partition_entry?;
-            if !partition_entry.file_type()?.is_dir() {
-                continue;
-            }
-            let package_dir = partition_entry.path().join("model");
-            if !package_dir.is_dir() || !package_dir.join(COREML_CACHE_COMPILED_MODEL).exists() {
-                continue;
-            }
-            reclaimed += truncate_weight_blobs(&package_dir)?;
-        }
-    }
-    Ok(reclaimed)
-}
-
-// Truncates `weight.bin` files under `dir`, never descending into
-// `.mlmodelc` bundles: the compiled model keeps its own `weights/weight.bin`
-// copy, and that one is exactly what warm loads read, so it must survive.
-fn truncate_weight_blobs(dir: &Path) -> std::io::Result<u64> {
-    let mut reclaimed = 0;
-    for entry in std::fs::read_dir(dir)? {
-        let entry = entry?;
-        let file_type = entry.file_type()?;
-        if file_type.is_dir() {
-            if entry.path().extension() == Some(std::ffi::OsStr::new("mlmodelc")) {
-                continue;
-            }
-            reclaimed += truncate_weight_blobs(&entry.path())?;
-        } else if file_type.is_file() && entry.file_name() == COREML_PACKAGE_WEIGHT_BLOB {
-            let size = entry.metadata()?.len();
-            if size > 0 {
-                std::fs::write(entry.path(), [])?;
-                reclaimed += size;
-            }
-        }
-    }
-    Ok(reclaimed)
-}
-
-fn mark_coreml_cache_complete(cache_dir: &Path) -> std::io::Result<()> {
-    std::fs::write(coreml_cache_complete_marker(cache_dir), [])
-}
-
-fn invalidate_coreml_cache(cache_dir: &Path) -> std::io::Result<()> {
-    match std::fs::remove_dir_all(cache_dir) {
-        Ok(()) => Ok(()),
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
-        Err(error) => Err(error),
-    }
-}
-
-fn coreml_cache_complete_marker(cache_dir: &Path) -> PathBuf {
-    cache_dir.join(COREML_CACHE_COMPLETE_MARKER)
-}
-
-// Use Library/Caches for eviction and backup exclusion, or temp for unusual
-// layouts.
-#[cfg(any(target_os = "ios", target_os = "macos", test))]
-fn coreml_cache_root(model_path: &Path) -> PathBuf {
-    let cache_base = model_path
-        .ancestors()
-        .find(|ancestor| ancestor.file_name().is_some_and(|name| name == "Library"))
-        .map(|library| library.join("Caches"))
-        .unwrap_or_else(std::env::temp_dir);
-
-    cache_base
-        .join("ente")
-        .join("ml")
-        .join("coreml")
-        .join(COREML_CACHE_SCHEMA)
-}
-
-// Include the filename and file metadata in the directory name because ONNX
-// Runtime's internal CoreML cache key does not necessarily change when only
-// model weights change.
-#[cfg(any(target_os = "ios", target_os = "macos", test))]
-fn coreml_model_cache_key(model_path: &Path) -> std::io::Result<String> {
-    use std::time::UNIX_EPOCH;
-
-    let metadata = std::fs::metadata(model_path)?;
-    let modified = metadata
-        .modified()?
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default();
-    Ok(format!(
-        "{}-{}-{}-{}",
-        sanitize_cache_component(
-            model_path
-                .file_name()
-                .and_then(|name| name.to_str())
-                .unwrap_or("model")
-        ),
-        metadata.len(),
-        modified.as_secs(),
-        modified.subsec_nanos()
-    ))
-}
-
-#[cfg(any(target_os = "ios", target_os = "macos", test))]
-fn sanitize_cache_component(value: &str) -> String {
-    value
-        .chars()
-        .map(|character| {
-            if character.is_ascii_alphanumeric() || matches!(character, '-' | '_' | '.') {
-                character
-            } else {
-                '_'
-            }
-        })
-        .collect()
-}
-
-// Schema bumps must not orphan the previous version's large cache trees.
-#[cfg(any(target_os = "ios", target_os = "macos", test))]
-fn prune_stale_coreml_schema_directories(
-    coreml_root: &Path,
-    current_schema: &str,
-) -> std::io::Result<Vec<String>> {
-    let mut removed = Vec::new();
-    let entries = match std::fs::read_dir(coreml_root) {
-        Ok(entries) => entries,
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(removed),
-        Err(error) => return Err(error),
-    };
-    for entry in entries {
-        let entry = entry?;
-        if entry.file_name() == current_schema || !entry.file_type()?.is_dir() {
-            continue;
-        }
-        std::fs::remove_dir_all(entry.path())?;
-        removed.push(entry.file_name().to_string_lossy().into_owned());
-    }
-    Ok(removed)
-}
-
-#[cfg(any(target_os = "ios", target_os = "macos", test))]
-fn prune_superseded_coreml_cache_directories(
-    model_cache_root: &Path,
-    current_cache_key: &str,
-) -> std::io::Result<()> {
-    for entry in std::fs::read_dir(model_cache_root)? {
-        let entry = entry?;
-        if entry.file_name() == current_cache_key || !entry.file_type()?.is_dir() {
-            continue;
-        }
-        std::fs::remove_dir_all(entry.path())?;
-    }
-    Ok(())
-}
-
-#[cfg(target_os = "android")]
-fn xnnpack_provider() -> ExecutionProviderDispatch {
-    XNNPACK::default()
-        .with_intra_op_num_threads(NonZeroUsize::new(4).expect("four is non-zero"))
-        .build()
-        .error_on_failure()
-}
-
-#[cfg(target_os = "android")]
-fn xnnpack_attempt() -> ProviderAttempt {
-    ProviderAttempt {
-        providers: vec![
-            xnnpack_provider(),
-            CPU::default().with_arena_allocator(true).build(),
-        ],
-        disable_intra_op_spinning: true,
-        coreml_cache_dir: None,
-        uses_webgpu: false,
-        execution_provider: ExecutionProvider::Xnnpack,
-    }
-}
-
-fn build_session_with_providers(model_path: &str, attempt: ProviderAttempt) -> MlResult<Session> {
-    let mut builder = Session::builder()?
-        .with_optimization_level(GraphOptimizationLevel::All)?
-        .with_intra_threads(1)?
-        .with_inter_threads(1)?;
-
-    if attempt.disable_intra_op_spinning {
-        builder = builder.with_intra_op_spinning(false)?;
-    }
-    builder = builder.with_execution_providers(attempt.providers)?;
-
-    let session = builder.commit_from_file(model_path)?;
-    Ok(session)
-}
-
-// Guard against execution providers that return NaN or infinity instead of
-// failing. The error message matches `is_execution_provider_failure` so the
-// runtime advances to the next execution provider fallback.
-fn ensure_finite_f32(data: &[f32]) -> MlResult<()> {
-    if data.iter().copied().all(f32::is_finite) {
-        return Ok(());
-    }
-    Err(MlError::Ort(
-        "model produced non-finite output values".to_string(),
-    ))
-}
-
-fn ensure_finite_f16(data: &[half::f16]) -> MlResult<()> {
-    if data.iter().all(|value| value.is_finite()) {
-        return Ok(());
-    }
-    Err(MlError::Ort(
-        "model produced non-finite output values".to_string(),
-    ))
-}
-
-fn session_expects_f16(session: &Session) -> bool {
-    session
-        .inputs()
-        .first()
-        .and_then(|i| match i.dtype() {
-            ValueType::Tensor { ty, .. } => Some(*ty == TensorElementType::Float16),
-            _ => None,
-        })
-        .unwrap_or(false)
-}
-
-pub(crate) fn run_f32<const N: usize>(
-    session: &mut Session,
-    input: &PreparedF32Input,
-    input_shape: [i64; N],
-) -> MlResult<(Vec<i64>, Vec<f32>)> {
-    let outputs = if session_expects_f16(session) {
-        let input_tensor =
-            TensorRef::<half::f16>::from_array_view((input_shape, input.f16_data()))?;
-        session.run(ort::inputs![input_tensor])?
-    } else {
-        let input_tensor =
-            TensorRef::<f32>::from_array_view((input_shape, input.f32_data.as_slice()))?;
-        session.run(ort::inputs![input_tensor])?
-    };
-
-    if outputs.len() == 0 {
-        return Err(MlError::Ort("missing first output tensor".to_string()));
-    }
-    let output = &outputs[0];
-
-    if let Ok((tensor_shape, tensor_data)) = output.try_extract_tensor::<f32>() {
-        let shape = tensor_shape.iter().copied().collect::<Vec<_>>();
-        let data = tensor_data.to_vec();
-        ensure_finite_f32(&data)?;
-        Ok((shape, data))
-    } else {
-        let (tensor_shape, tensor_data) = output.try_extract_tensor::<half::f16>()?;
-        let shape = tensor_shape.iter().copied().collect::<Vec<_>>();
-        let mut data = vec![0.0; tensor_data.len()];
-        tensor_data.convert_to_f32_slice(&mut data);
-        ensure_finite_f32(&data)?;
-        Ok((shape, data))
-    }
-}
-
-pub(crate) fn with_prepared_float_output<const N: usize, T>(
-    session: &mut Session,
-    input: &PreparedF32Input,
-    input_shape: [i64; N],
-    consume: impl FnOnce(&[i64], BorrowedFloatTensor<'_>) -> MlResult<T>,
-) -> MlResult<T> {
-    let outputs = if session_expects_f16(session) {
-        let input_tensor =
-            TensorRef::<half::f16>::from_array_view((input_shape, input.f16_data()))?;
-        session.run(ort::inputs![input_tensor])?
-    } else {
-        let input_tensor =
-            TensorRef::<f32>::from_array_view((input_shape, input.f32_data.as_slice()))?;
-        session.run(ort::inputs![input_tensor])?
-    };
-
-    if outputs.len() == 0 {
-        return Err(MlError::Ort("missing first output tensor".to_string()));
-    }
-    let output = &outputs[0];
-    if let Ok((tensor_shape, tensor_data)) = output.try_extract_tensor::<f32>() {
-        ensure_finite_f32(tensor_data)?;
-        consume(tensor_shape, BorrowedFloatTensor::F32(tensor_data))
-    } else {
-        let (tensor_shape, tensor_data) = output.try_extract_tensor::<half::f16>()?;
-        ensure_finite_f16(tensor_data)?;
-        consume(tensor_shape, BorrowedFloatTensor::F16(tensor_data))
-    }
-}
-
-pub(crate) fn run_i32_f32<const N: usize>(
-    session: &mut Session,
-    input: &[i32],
-    input_shape: [i64; N],
-) -> MlResult<(Vec<i64>, Vec<f32>)> {
-    let input_tensor = TensorRef::<i32>::from_array_view((input_shape, input))?;
-    let outputs = session.run(ort::inputs![input_tensor])?;
-    if outputs.len() == 0 {
-        return Err(MlError::Ort("missing first output tensor".to_string()));
-    }
-    let output = &outputs[0];
-    let (tensor_shape, tensor_data) = output.try_extract_tensor::<f32>()?;
-    let shape = tensor_shape.iter().copied().collect::<Vec<_>>();
-    let data = tensor_data.to_vec();
-    ensure_finite_f32(&data)?;
-    Ok((shape, data))
-}
-
 #[cfg(test)]
 mod tests {
-    use std::{io::Write, path::Path};
-
     use super::{
-        ExecutionProvider, coreml_cache_root, coreml_model_cache_key, ensure_finite_f16,
-        ensure_finite_f32, has_protobuf_parse_failure, invalidate_coreml_cache,
-        mark_coreml_cache_complete, prepare_coreml_cache_entry, provider_attempt_failure_message,
-        prune_stale_coreml_schema_directories, prune_superseded_coreml_cache_directories,
-        sanitize_cache_component, trim_coreml_cache_weights,
+        ExecutionProvider, SessionRunError, has_protobuf_parse_failure,
+        is_execution_provider_run_failure, provider_attempt_failure_message,
     };
 
     #[test]
-    fn accepts_finite_model_outputs() {
-        assert!(ensure_finite_f32(&[0.0, -1.5, f32::MAX]).is_ok());
-        assert!(ensure_finite_f16(&[half::f16::from_f32(0.25)]).is_ok());
+    fn provider_failure_detection_is_limited_to_ort_execution_errors() {
+        assert!(is_execution_provider_run_failure(&super::MlError::Ort(
+            "WebGPU EP error: VK_ERROR_DEVICE_LOST".to_string()
+        )));
+        assert!(!is_execution_provider_run_failure(&super::MlError::Ort(
+            "invalid tensor shape".to_string()
+        )));
+        assert!(!is_execution_provider_run_failure(
+            &super::MlError::Postprocess("WebGPU".to_string())
+        ));
     }
 
     #[test]
-    fn rejects_non_finite_model_outputs() {
-        for bad in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY] {
-            let error = ensure_finite_f32(&[1.0, bad]).unwrap_err();
-            assert!(error.to_string().contains("non-finite"));
-        }
-        let error = ensure_finite_f16(&[half::f16::NAN]).unwrap_err();
-        assert!(error.to_string().contains("non-finite"));
+    fn typed_run_errors_control_retryability() {
+        let retryable =
+            SessionRunError::retryable(super::MlError::Ort("non-finite output".to_string()));
+        assert!(retryable.is_retryable());
+
+        let terminal = SessionRunError::from(super::MlError::Ort(
+            "WebGPU text from a typed terminal error".to_string(),
+        ));
+        assert!(!terminal.is_retryable());
     }
 
     #[test]
@@ -1118,187 +601,5 @@ mod tests {
             )
             .is_none()
         );
-    }
-
-    #[test]
-    fn places_coreml_cache_in_library_caches() {
-        let model = Path::new(
-            "/var/mobile/Containers/Data/Application/APP/Library/Application Support/assets/model.onnx",
-        );
-
-        assert_eq!(
-            coreml_cache_root(model),
-            Path::new(
-                "/var/mobile/Containers/Data/Application/APP/Library/Caches/ente/ml/coreml/ort-1_28-mlprogram-all-default-v1"
-            )
-        );
-    }
-
-    #[test]
-    fn coreml_cache_key_changes_when_model_file_changes() {
-        let mut model = tempfile::NamedTempFile::new().unwrap();
-        model.write_all(b"first").unwrap();
-        model.flush().unwrap();
-        let first_key = coreml_model_cache_key(model.path()).unwrap();
-
-        model.write_all(b" version").unwrap();
-        model.flush().unwrap();
-        let second_key = coreml_model_cache_key(model.path()).unwrap();
-
-        assert_ne!(first_key, second_key);
-    }
-
-    #[test]
-    fn sanitizes_coreml_cache_component() {
-        assert_eq!(
-            sanitize_cache_component("model name.onnx"),
-            "model_name.onnx"
-        );
-    }
-
-    #[test]
-    fn prunes_only_superseded_directories_for_one_model() {
-        let root = tempfile::tempdir().unwrap();
-        let old_cache = root.path().join("old");
-        let current_cache = root.path().join("current");
-        std::fs::create_dir(&old_cache).unwrap();
-        std::fs::create_dir(&current_cache).unwrap();
-        std::fs::write(root.path().join("marker"), b"keep").unwrap();
-
-        prune_superseded_coreml_cache_directories(root.path(), "current").unwrap();
-
-        assert!(!old_cache.exists());
-        assert!(current_cache.exists());
-        assert!(root.path().join("marker").exists());
-    }
-
-    #[test]
-    fn prunes_stale_schema_directories_keeping_current_and_files() {
-        let coreml_root = tempfile::tempdir().unwrap();
-        let stale = coreml_root.path().join("ort-1_27-mlprogram-all-default-v1");
-        let current = coreml_root.path().join("ort-1_28-mlprogram-all-default-v1");
-        std::fs::create_dir(&stale).unwrap();
-        std::fs::write(stale.join("cached"), b"stale").unwrap();
-        std::fs::create_dir(&current).unwrap();
-        std::fs::write(coreml_root.path().join("stray-file"), b"keep").unwrap();
-
-        let removed = prune_stale_coreml_schema_directories(
-            coreml_root.path(),
-            "ort-1_28-mlprogram-all-default-v1",
-        )
-        .unwrap();
-
-        assert_eq!(removed, vec!["ort-1_27-mlprogram-all-default-v1"]);
-        assert!(!stale.exists());
-        assert!(current.exists());
-        assert!(coreml_root.path().join("stray-file").exists());
-    }
-
-    #[test]
-    fn schema_pruning_treats_a_missing_root_as_empty() {
-        let parent = tempfile::tempdir().unwrap();
-        let removed =
-            prune_stale_coreml_schema_directories(&parent.path().join("missing"), "current")
-                .unwrap();
-        assert!(removed.is_empty());
-    }
-
-    fn write_cache_partition(
-        cache_dir: &Path,
-        partition: &str,
-        compiled: bool,
-    ) -> std::path::PathBuf {
-        let package_dir = cache_dir.join("modelhash").join(partition).join("model");
-        let weights_dir = package_dir
-            .join("Data")
-            .join("com.microsoft.OnnxRuntime")
-            .join("weights");
-        std::fs::create_dir_all(&weights_dir).unwrap();
-        let weight_blob = weights_dir.join("weight.bin");
-        std::fs::write(&weight_blob, b"weights").unwrap();
-        std::fs::write(package_dir.join("Manifest.json"), b"manifest").unwrap();
-        if compiled {
-            let compiled_weights_dir = package_dir.join("compiled_model.mlmodelc").join("weights");
-            std::fs::create_dir_all(&compiled_weights_dir).unwrap();
-            std::fs::write(compiled_weights_dir.join("weight.bin"), b"compiled-weights").unwrap();
-        }
-        weight_blob
-    }
-
-    #[test]
-    fn trims_package_weights_only_where_a_compiled_model_exists() {
-        let cache_dir = tempfile::tempdir().unwrap();
-        let compiled_blob = write_cache_partition(cache_dir.path(), "0_static_mlprogram", true);
-        let uncompiled_blob = write_cache_partition(cache_dir.path(), "1_static_mlprogram", false);
-        mark_coreml_cache_complete(cache_dir.path()).unwrap();
-
-        let reclaimed = trim_coreml_cache_weights(cache_dir.path()).unwrap();
-
-        assert_eq!(reclaimed, b"weights".len() as u64);
-        assert!(compiled_blob.exists());
-        assert_eq!(std::fs::metadata(&compiled_blob).unwrap().len(), 0);
-        let package_dir = compiled_blob.ancestors().nth(4).unwrap();
-        assert!(package_dir.ends_with("model"));
-        assert!(package_dir.is_dir());
-        assert_eq!(
-            std::fs::read(
-                package_dir
-                    .join("compiled_model.mlmodelc")
-                    .join("weights")
-                    .join("weight.bin")
-            )
-            .unwrap(),
-            b"compiled-weights".to_vec()
-        );
-        assert_eq!(std::fs::read(uncompiled_blob).unwrap(), b"weights".to_vec());
-    }
-
-    #[test]
-    fn trimming_an_already_trimmed_cache_reclaims_nothing() {
-        let cache_dir = tempfile::tempdir().unwrap();
-        write_cache_partition(cache_dir.path(), "0_static_mlprogram", true);
-
-        assert!(trim_coreml_cache_weights(cache_dir.path()).unwrap() > 0);
-        assert_eq!(trim_coreml_cache_weights(cache_dir.path()).unwrap(), 0);
-    }
-
-    #[test]
-    fn replaces_an_incomplete_coreml_cache_entry() {
-        let root = tempfile::tempdir().unwrap();
-        let cache_dir = root.path().join("current");
-        std::fs::create_dir(&cache_dir).unwrap();
-        let partial_artifact = cache_dir.join("partial.mlmodelc");
-        std::fs::write(&partial_artifact, b"partial").unwrap();
-
-        prepare_coreml_cache_entry(&cache_dir).unwrap();
-
-        assert!(cache_dir.is_dir());
-        assert!(!partial_artifact.exists());
-    }
-
-    #[test]
-    fn preserves_a_completed_coreml_cache_entry() {
-        let root = tempfile::tempdir().unwrap();
-        let cache_dir = root.path().join("current");
-        std::fs::create_dir(&cache_dir).unwrap();
-        let artifact = cache_dir.join("model.mlmodelc");
-        std::fs::write(&artifact, b"complete").unwrap();
-        mark_coreml_cache_complete(&cache_dir).unwrap();
-
-        prepare_coreml_cache_entry(&cache_dir).unwrap();
-
-        assert!(artifact.exists());
-    }
-
-    #[test]
-    fn invalidates_a_failed_coreml_cache_entry() {
-        let root = tempfile::tempdir().unwrap();
-        let cache_dir = root.path().join("current");
-        std::fs::create_dir(&cache_dir).unwrap();
-
-        invalidate_coreml_cache(&cache_dir).unwrap();
-
-        assert!(!cache_dir.exists());
-        invalidate_coreml_cache(&cache_dir).unwrap();
     }
 }

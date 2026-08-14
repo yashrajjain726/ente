@@ -142,8 +142,6 @@ GalleryImportResult parseQrImportPayload(String qrCodeData) {
   return GalleryImportResult.code(Code.fromOTPAuthUrl(qrCodeData));
 }
 
-/// Prompts the user to pick an image and tries to extract auth codes from it.
-/// Returns the parsed QR import result when successful, otherwise null.
 Future<GalleryImportResult?> pickCodeFromImage(
   BuildContext context, {
   Logger? logger,

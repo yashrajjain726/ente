@@ -532,7 +532,6 @@ class LockerDB extends EnteBaseDatabase {
     return files;
   }
 
-  /// Removes orphaned files that exist in files but have no collection mappings.
   Future<void> cleanupOrphanedFiles() async {
     final orphanedFiles = await _db.rawQuery('''
       SELECT f.uploaded_file_id

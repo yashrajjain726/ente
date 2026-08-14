@@ -12,7 +12,6 @@ import ArchiveOutlinedIcon from "@mui/icons-material/ArchiveOutlined";
 import CheckIcon from "@mui/icons-material/Check";
 import DeleteOutlinedIcon from "@mui/icons-material/DeleteOutlined";
 import EditIcon from "@mui/icons-material/Edit";
-import ImageOutlinedIcon from "@mui/icons-material/ImageOutlined";
 import LinkIcon from "@mui/icons-material/Link";
 import LogoutIcon from "@mui/icons-material/Logout";
 import MapOutlinedIcon from "@mui/icons-material/MapOutlined";
@@ -32,7 +31,6 @@ import {
     OverflowMenu,
     OverflowMenuOption,
 } from "ente-base/components/OverflowMenu";
-import { SingleInputDialog } from "ente-base/components/SingleInputDialog";
 import { useModalVisibility } from "ente-base/components/utils/modal";
 import { useBaseContext } from "ente-base/context";
 import type { AddSaveGroup } from "ente-gallery/components/utils/save-groups";
@@ -55,7 +53,6 @@ import {
     findDefaultHiddenCollectionIDs,
     isHiddenCollection,
     leaveSharedCollection,
-    renameCollection,
     updateCollectionOrder,
     updateCollectionSortOrder,
     updateCollectionVisibility,
@@ -85,17 +82,20 @@ export interface CollectionHeaderProps {
     onCollectionShare: () => void;
     onCollectionManageLink: () => void;
     onCollectionCast: () => void;
-    canSetAlbumCover: boolean;
-    onSetAlbumCover: () => void;
+    onEditAlbumDetails: () => void;
     hasActiveFileSelection: boolean;
     onAddSaveGroup: AddSaveGroup;
     onShowMap: () => void;
+    onDescriptionHeightChange?: (height: number) => void;
 }
 
 export const CollectionHeader: React.FC<CollectionHeaderProps> = (props) => {
-    const { collectionSummary } = props;
+    const { activeCollection, collectionSummary, onDescriptionHeightChange } =
+        props;
 
     const { name, type, attributes, fileCount } = collectionSummary;
+    const description =
+        activeCollection?.pubMagicMetadata?.data.caption?.trim();
 
     const EndIcon = () => {
         if (attributes.has("archived")) return <ArchiveOutlinedIcon />;
@@ -116,8 +116,11 @@ export const CollectionHeader: React.FC<CollectionHeaderProps> = (props) => {
             <SpacedRow>
                 <GalleryItemsSummary
                     name={name}
+                    description={description}
+                    descriptionMaxWidth={480}
                     fileCount={fileCount}
                     endIcon={<EndIcon />}
+                    onDescriptionHeightChange={onDescriptionHeightChange}
                 />
                 {shouldShowOptions(type) && (
                     <CollectionHeaderOptions {...props} />
@@ -138,8 +141,7 @@ const CollectionHeaderOptions: React.FC<CollectionHeaderProps> = ({
     onCollectionShare,
     onCollectionManageLink,
     onCollectionCast,
-    canSetAlbumCover,
-    onSetAlbumCover,
+    onEditAlbumDetails,
     hasActiveFileSelection,
     onAddSaveGroup,
     isActiveCollectionDownloadInProgress,
@@ -151,8 +153,6 @@ const CollectionHeaderOptions: React.FC<CollectionHeaderProps> = ({
     const overflowMenuIconRef = useRef<SVGSVGElement | null>(null);
 
     const { show: showSortOrderMenu, props: sortOrderMenuVisibilityProps } =
-        useModalVisibility();
-    const { show: showAlbumNameInput, props: albumNameInputVisibilityProps } =
         useModalVisibility();
 
     const { type: collectionSummaryType, fileCount } = collectionSummary;
@@ -176,17 +176,6 @@ const CollectionHeaderOptions: React.FC<CollectionHeaderProps> = ({
             return (): void => void wrapped();
         },
         [showLoadingBar, hideLoadingBar, onGenericError, onRemotePull],
-    );
-
-    const handleRenameCollection = useCallback(
-        async (newName: string) => {
-            if (!activeCollection) return;
-            if (activeCollection.name !== newName) {
-                await renameCollection(activeCollection, newName);
-                void onRemotePull({ silent: true });
-            }
-        },
-        [activeCollection, onRemotePull],
     );
 
     const hasAlbumFiles = fileCount > 0;
@@ -582,20 +571,13 @@ const CollectionHeaderOptions: React.FC<CollectionHeaderProps> = ({
                 break;
             }
             menuOptions = [
-                <OverflowMenuOption
-                    key="rename"
-                    onClick={showAlbumNameInput}
-                    startIcon={<EditIcon />}
-                >
-                    {t("rename_album")}
-                </OverflowMenuOption>,
-                canSetAlbumCover && (
+                activeCollection && (
                     <OverflowMenuOption
-                        key="set-cover"
-                        onClick={onSetAlbumCover}
-                        startIcon={<ImageOutlinedIcon />}
+                        key="edit-details"
+                        onClick={onEditAlbumDetails}
+                        startIcon={<EditIcon />}
                     >
-                        {t("set_cover")}
+                        {t("edit_details")}
                     </OverflowMenuOption>
                 ),
                 <OverflowMenuOption
@@ -730,15 +712,6 @@ const CollectionHeaderOptions: React.FC<CollectionHeaderProps> = ({
                 sortAsc={activeCollection?.pubMagicMetadata?.data.asc ?? false}
                 onAscClick={changeSortOrderAsc}
                 onDescClick={changeSortOrderDesc}
-            />
-            <SingleInputDialog
-                {...albumNameInputVisibilityProps}
-                title={t("rename_album")}
-                label={t("album_name")}
-                initialValue={activeCollection?.name}
-                submitButtonColor="primary"
-                submitButtonTitle={t("rename")}
-                onSubmit={handleRenameCollection}
             />
         </Box>
     );

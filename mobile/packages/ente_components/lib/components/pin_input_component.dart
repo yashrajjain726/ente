@@ -6,15 +6,8 @@ import 'package:ente_components/theme/theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-/// A fixed-length numeric input rendered as individual code boxes.
-///
-/// The caller owns [controller]; the component manages its focus internally.
-/// Set [useNativeKeyboard] to false when a caller-managed keypad updates the
-/// controller directly.
-///
-/// Figma:
-/// https://www.figma.com/design/BuBNPPytxlVnqfmCUW0mgz/Ente-Visual-Design?node-id=2275-11846&m=dev
-/// https://www.figma.com/design/BuBNPPytxlVnqfmCUW0mgz/Ente-Visual-Design?node-id=7634-53618&m=dev
+// Figma: https://www.figma.com/design/BuBNPPytxlVnqfmCUW0mgz/Ente-Visual-Design?node-id=2275-11846&m=dev
+// Figma: https://www.figma.com/design/BuBNPPytxlVnqfmCUW0mgz/Ente-Visual-Design?node-id=7634-53618&m=dev
 class PinInputComponent extends StatefulWidget {
   const PinInputComponent({
     super.key,
@@ -37,6 +30,7 @@ class PinInputComponent extends StatefulWidget {
   final int length;
   final TextEditingController controller;
   final bool autofocus;
+  // When false, the caller must update the controller from its own keypad.
   final bool useNativeKeyboard;
   final bool closeKeyboardWhenCompleted;
   final bool obscureText;
@@ -351,7 +345,7 @@ class _PinInputBox extends StatelessWidget {
     }
     if (obscureText && obscuringCharacter == '•') {
       return Container(
-        key: ValueKey(character),
+        key: ValueKey(obscuringCharacter),
         width: 8,
         height: 8,
         decoration: BoxDecoration(color: color, shape: BoxShape.circle),
@@ -359,7 +353,7 @@ class _PinInputBox extends StatelessWidget {
     }
     return Text(
       obscureText ? obscuringCharacter : character!,
-      key: ValueKey(character),
+      key: ValueKey(obscureText ? obscuringCharacter : character),
       style: TextStyles.h1.copyWith(color: color),
     );
   }

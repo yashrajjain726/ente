@@ -354,7 +354,6 @@ class _FullScreenMemoryState extends State<FullScreenMemory> {
   // AnimatedSwitcher doesn't animate its initial child, so we wrap it
   // in an AnimatedOpacity that ramps 0→1 after the first frame.
   double _firstPhotoOpacity = 0;
-  // Photo crossfade durations for auto vs manual advance.
   static const _autoCrossfadeDuration = Duration(milliseconds: 600);
   static const _manualCrossfadeDuration = Duration(milliseconds: 200);
   // How long to hold the incoming photo's Ken Burns still. Intentionally
@@ -370,7 +369,6 @@ class _FullScreenMemoryState extends State<FullScreenMemory> {
   bool _isMediaZoomed = false;
   final _socialControlsVisible = ValueNotifier<bool>(false);
 
-  /// Used to check if any pointer is on the screen.
   final hasPointerOnScreenNotifier = ValueNotifier<bool>(false);
   bool hasFinalFileLoaded = false;
   bool isAtFirstOrLastFile = false;
@@ -433,11 +431,6 @@ class _FullScreenMemoryState extends State<FullScreenMemory> {
     super.dispose();
   }
 
-  /// Used to check if user has touched the screen and then to pause animation
-  /// and once the pointer is removed from the screen, it resumes the animation
-  /// It also resets the zoom of the photo view to default for better user
-  /// experience after finger(s) is removed from the screen after zooming in by
-  /// pinching.
   void _hasPointerListener() {
     if (hasPointerOnScreenNotifier.value) {
       _toggleAnimation(pause: true);

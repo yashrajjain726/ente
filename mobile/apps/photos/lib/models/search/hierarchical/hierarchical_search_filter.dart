@@ -28,8 +28,6 @@ abstract class HierarchicalSearchFilter {
 
   HierarchicalSearchFilter({required this.filterTypeName, matchedUploadedIDs})
     : matchedUploadedIDs = matchedUploadedIDs ?? {},
-      //Check to ensure that when a new filter extends HierarchicalSearchFilter,
-      //it's filterTypeName is added to FilterTypeNames enum.
       assert(
         FilterTypeNames.values
             .map((e) => e.toString().split(".").last)
@@ -40,9 +38,6 @@ abstract class HierarchicalSearchFilter {
   String name();
   SearchFilterIcon? icon();
 
-  /// Will be [kmostRelevantFilter] if the filter is a Top-level filter. For
-  /// example, when searching for an album 'A' and opening it, when
-  /// hierarchical search starts, the album 'A' will be the top level filter.
   int relevance();
   bool isMatch(EnteFile file);
   bool isSameFilter(HierarchicalSearchFilter other);

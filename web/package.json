@@ -14,7 +14,7 @@
         "build:albums": "npm run build:wasm && npm exec --workspace albums -- next build --webpack",
         "build:auth": "npm run build:wasm && npm exec --workspace auth -- next build --webpack",
         "build:cast": "npm run build:wasm && npm run build:cast-wasm && npm exec --workspace cast -- next build --webpack",
-        "build:cast-wasm": "npm run build --workspace ente-cast-wasm -- --no-pack",
+        "build:cast-wasm": "npm run build --workspace ente-cast-wasm",
         "build:embed": "npm run build:wasm && npm exec --workspace embed -- next build --webpack",
         "build:ensu": "npm run build:wasm && npm exec --workspace ensu -- next build --webpack",
         "build:legacy": "npm run build:wasm && npm exec --workspace legacy -- next build --webpack",

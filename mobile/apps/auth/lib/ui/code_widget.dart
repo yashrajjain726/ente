@@ -616,7 +616,6 @@ class _CodeWidgetState extends State<CodeWidget> {
     return entries;
   }
 
-  /// Adds menu items for non-trashed codes (share, QR, tag, notes, pin).
   void _addNonTrashedMenuItems(
     List<ContextMenuEntry> entries,
     StringsLocalizations l10n,
@@ -675,7 +674,6 @@ class _CodeWidgetState extends State<CodeWidget> {
     }
   }
 
-  /// Adds edit menu item for non-trashed codes or restore for trashed codes.
   void _addEditOrRestoreMenuItem(
     List<ContextMenuEntry> entries,
     StringsLocalizations l10n,
@@ -699,7 +697,6 @@ class _CodeWidgetState extends State<CodeWidget> {
     }
   }
 
-  /// Adds delete (forever) or trash menu item based on code state.
   void _addDeleteOrTrashMenuItem(
     List<ContextMenuEntry> entries,
     StringsLocalizations l10n,
@@ -744,7 +741,6 @@ class _CodeWidgetState extends State<CodeWidget> {
     return entries.isEmpty ? null : entries;
   }
 
-  /// Adds menu items for multi-selected trashed codes (restore, delete).
   void _addTrashedMultiSelectMenuItems(
     List<ContextMenuEntry> entries,
     StringsLocalizations l10n,
@@ -765,7 +761,6 @@ class _CodeWidgetState extends State<CodeWidget> {
     );
   }
 
-  /// Adds pin/unpin menu items based on selection pin state.
   void _addPinMenuItems(
     List<ContextMenuEntry> entries,
     StringsLocalizations l10n,
@@ -803,7 +798,6 @@ class _CodeWidgetState extends State<CodeWidget> {
     }
   }
 
-  /// Adds tag and trash menu items for multi-selection.
   void _addTagAndTrashMenuItems(
     List<ContextMenuEntry> entries,
     StringsLocalizations l10n,

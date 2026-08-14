@@ -95,7 +95,6 @@ class FileUploader {
     return completer.future;
   }
 
-  /// Special upload method for info files that contain only metadata
   Future<EnteFile> uploadInfoFile(
     EnteFile infoFile,
     Collection collection,
@@ -800,7 +799,6 @@ class FileUploader {
     }
   }
 
-  /// Upload method specifically for info files that don't require file content or thumbnails
   Future<EnteFile> _uploadInfoFileMetadata(
     EnteFile file,
     int collectionID,
