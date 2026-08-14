@@ -57,14 +57,9 @@ internal class DeviceTrashService(context: Context) {
             Bundle().apply {
                 putString(
                     ContentResolver.QUERY_ARG_SQL_SELECTION,
-                    "${MediaStore.Files.FileColumns.MEDIA_TYPE} IN (?, ?)",
-                )
-                putStringArray(
-                    ContentResolver.QUERY_ARG_SQL_SELECTION_ARGS,
-                    arrayOf(
-                        MediaStore.Files.FileColumns.MEDIA_TYPE_IMAGE.toString(),
-                        MediaStore.Files.FileColumns.MEDIA_TYPE_VIDEO.toString(),
-                    ),
+                    "${MediaStore.Files.FileColumns.MEDIA_TYPE} IN " +
+                        "(${MediaStore.Files.FileColumns.MEDIA_TYPE_IMAGE}, " +
+                        "${MediaStore.Files.FileColumns.MEDIA_TYPE_VIDEO})",
                 )
                 putString(
                     ContentResolver.QUERY_ARG_SQL_SORT_ORDER,
