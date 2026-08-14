@@ -1,4 +1,4 @@
-import { ensureSavedKeyAttributes } from "ente-accounts-rs/services/user";
+import { ensureSavedKeyAttributes } from "ente-accounts/services/user";
 import { boxSealOpenBytes, decryptBox } from "ente-base/crypto";
 import type { KeyPair } from "ente-base/crypto/types";
 import { authenticatedRequestHeaders, ensureOk } from "ente-base/http";
