@@ -131,7 +131,7 @@ class _LocalBackupExperienceState extends State<LocalBackupExperience> {
 
   Future<bool> _startEnableFlow() async {
     final hasPassword = await _ensurePasswordConfigured(disableOnCancel: true);
-    // We only require a password to exist; re-enabling skips re-entry if already set.
+    // Re-enabling needs an existing password but does not prompt for it again.
     if (!hasPassword) {
       return false;
     }
@@ -180,7 +180,7 @@ class _LocalBackupExperienceState extends State<LocalBackupExperience> {
         return;
       }
 
-      // On iOS/macOS, check if we have a bookmark - if not, we need to re-pick
+      // A saved path is unusable on iOS/macOS without its security bookmark.
       if (Platform.isIOS || Platform.isMacOS) {
         final prefs = await SharedPreferences.getInstance();
         final bookmark = prefs.getString(_iosBookmarkKey);
@@ -261,8 +261,6 @@ class _LocalBackupExperienceState extends State<LocalBackupExperience> {
       return true;
     }
 
-    // On iOS/macOS, just check if we have a path configured.
-    // Directory creation happens in the backup service with proper scoped access.
     var resolvedPath = _backupPath;
     if (resolvedPath == null || resolvedPath.isEmpty) {
       final saved = await _pickAndSaveBackupLocation(
@@ -274,8 +272,7 @@ class _LocalBackupExperienceState extends State<LocalBackupExperience> {
       }
       resolvedPath = _backupPath;
     }
-    // On iOS/macOS, don't try to create directory here - it requires scoped access
-    // which is handled by the backup service.
+    // The backup service creates iOS/macOS directories with scoped access.
     if (!Platform.isIOS &&
         !Platform.isMacOS &&
         resolvedPath != null &&

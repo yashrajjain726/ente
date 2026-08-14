@@ -649,9 +649,6 @@ class CollectionService {
         in destCollectionToFilesMap.entries) {
       if (collection.type == CollectionType.uncategorized &&
           entry.key == collection.id) {
-        // skip moving files to uncategorized collection from uncategorized
-        // this flow is triggered while cleaning up uncategerized collection
-
         _logger.info(
           'skipping moving ${entry.value.length} files to uncategorized collection',
         );

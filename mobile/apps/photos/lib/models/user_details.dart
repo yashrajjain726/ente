@@ -111,7 +111,6 @@ class UserDetails {
     return null;
   }
 
-  // This is the total storage for which user has paid for.
   int getPlanPlusAddonStorage() {
     return (isPartOfFamily() ? familyData!.storage : subscription.storage) +
         bonusData!.totalAddOnBonus();
@@ -239,7 +238,6 @@ class ProfileData {
 class FamilyData {
   final List<FamilyMember>? members;
 
-  // Storage available based on the family plan
   final int storage;
   final int expiryTime;
   final int adminBonus;

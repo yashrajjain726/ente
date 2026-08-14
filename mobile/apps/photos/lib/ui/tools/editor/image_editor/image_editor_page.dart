@@ -114,8 +114,7 @@ class _ImageEditorPageState extends State<ImageEditorPage> {
           "_edited_" +
           DateTime.now().microsecondsSinceEpoch.toString() +
           ".JPEG";
-      //Disabling notifications for assets changing to insert the file into
-      //files db before triggering a sync.
+      // Insert into FilesDB before asset-change notifications resume.
       await PhotoManager.stopChangeNotify();
       hasStoppedChangeNotify = true;
       final AssetEntity newAsset = await (PhotoManager.editor.saveImage(

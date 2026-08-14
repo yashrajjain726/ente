@@ -1,8 +1,5 @@
 enum UploadStrategy {
-  // uploader will only try to upload the file in a collection if the file is
-  // not already uploaded
   ifMissing,
-  // alwaysUpload will always try to upload or add the file to given collection
   always,
   other,
 }

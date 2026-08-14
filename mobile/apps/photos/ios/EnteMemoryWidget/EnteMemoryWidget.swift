@@ -32,7 +32,6 @@ struct Provider: TimelineProvider {
     func getTimeline(in _: Context, completion: @escaping (Timeline<Entry>) -> Void) {
         var entries: [FileEntry] = []
 
-        // Generate a timeline consisting of five entries an hour apart, starting from the current date.
         let currentDate = Calendar.current.nextDate(
             after: Date(), matching: DateComponents(second: 0), matchingPolicy: .nextTime,
             direction: .backward
@@ -75,9 +74,6 @@ struct Provider: TimelineProvider {
         completion(timeline)
     }
 
-    //    func relevances() async -> WidgetRelevances<Void> {
-    //        // Generate a list containing the contexts this widget is relevant in.
-    //    }
 }
 
 struct FileEntry: TimelineEntry {

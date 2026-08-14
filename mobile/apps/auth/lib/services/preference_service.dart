@@ -147,7 +147,6 @@ class PreferenceService {
     }
   }
 
-  // localEpochOffsetInMilliSecond returns the local epoch offset in milliseconds.
   // This is used to adjust the time for TOTP calculations when device local time is not in sync with actual time.
   int timeOffsetInMilliSeconds() {
     return _prefs.getInt(kLocalTimeOffsetKey) ?? 0;

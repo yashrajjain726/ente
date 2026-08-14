@@ -1145,10 +1145,8 @@ class _HomePageState extends State<HomePage> {
   void _applyFilteringAndRefresh() {
     if (_searchText.isNotEmpty && _showSearchBox && _allCodes != null) {
       final String val = _searchText.toLowerCase();
-      // Prioritize issuer match above account for better UX while searching
-      // for a specific TOTP for email providers. Searching for "emailProvider" like (gmail, proton) should
-      // show the email provider first instead of other accounts where protonmail
-      // is the account name.
+      // Show issuer matches first so searches for an email provider rank its
+      // codes above accounts whose names happen to match.
       final List<Code> issuerMatch = [];
       final List<Code> accountMatch = [];
       final List<Code> noteMatch = [];

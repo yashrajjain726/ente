@@ -13,7 +13,6 @@ enum GalleryType {
   trash,
   deleteSuggestions,
   localFolder,
-  // indicator for gallery view of collections shared with the user
   sharedCollection,
   ownedCollection,
   searchResults,

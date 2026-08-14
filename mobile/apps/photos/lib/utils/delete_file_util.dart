@@ -103,7 +103,6 @@ Future<List<EnteFile>> deleteFilesFromEverywhere(
   final List<EnteFile> deletedFiles = [];
   for (final file in files) {
     if (file.localID != null) {
-      // Handle only files deleted, moved to trash, or already missing.
       if (removedIDs.contains(file.localID) ||
           alreadyDeletedIDs.contains(file.localID)) {
         deletedFiles.add(file);
@@ -253,7 +252,6 @@ Future<List<EnteFile>> deleteFilesOnDeviceOnly(
   final List<EnteFile> deletedFiles = [];
   final List<int> uploadedFileIDsToClear = [];
   for (final file in files) {
-    // Handle only files deleted, moved to trash, or already missing.
     if (removedIDs.contains(file.localID) ||
         alreadyDeletedIDs.contains(file.localID)) {
       deletedFiles.add(file);
@@ -324,8 +322,7 @@ Future<bool> deleteFromTrash(BuildContext context, List<EnteFile> files) async {
                     source: "deleteFromTrash",
                   ),
                 );
-                //the FilesUpdateEvent is not reloading trash on permanently removing
-                //files, so need to fire ForceReloadTrashPageEvent
+                // FilesUpdatedEvent does not reload Trash here.
                 Bus.instance.fire(ForceReloadTrashPageEvent());
               } catch (e, s) {
                 _logger.info("failed to delete from trash", e, s);

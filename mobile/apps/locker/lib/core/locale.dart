@@ -1,7 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-// list of locales which are enabled for locker app.
 // Add more language to the list only when at least 90% of the strings are
 // translated in the corresponding language.
 const List<Locale> appSupportedLocales = <Locale>[

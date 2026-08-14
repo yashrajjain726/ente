@@ -170,8 +170,7 @@ class ProgressDialog {
             );
           },
         );
-        // Delaying the function for 200 milliseconds
-        // [Default transitionDuration of DialogRoute]
+        // Wait for DialogRoute's default transition.
         await Future.delayed(const Duration(milliseconds: 200));
         if (_showLogs) debugPrint('ProgressDialog shown');
         _isShowing = true;

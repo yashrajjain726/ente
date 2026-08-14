@@ -59,7 +59,6 @@ class LocalAuthEntity {
       'header': header,
       'createdAt': createdAt,
       'updatedAt': updatedAt,
-      // sqlite doesn't support bool type. map true to 1 and false to 0
       'shouldSync': shouldSync ? 1 : 0,
     };
   }

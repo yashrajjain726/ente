@@ -133,7 +133,6 @@ class _CodeWidgetState extends State<CodeWidget> {
       _isInitialized = true;
     }
     final l10n = context.strings;
-    // Cache the localized error label for use in timer callbacks
     _errorText = l10n.error;
 
     Widget getCardContents(
@@ -1123,7 +1122,6 @@ class _CodeWidgetState extends State<CodeWidget> {
     try {
       return getOTP(widget.code);
     } catch (e) {
-      // Avoid accessing BuildContext from async timer callbacks
       return _errorText;
     }
   }
@@ -1133,7 +1131,6 @@ class _CodeWidgetState extends State<CodeWidget> {
       assert(widget.code.type.isTOTPCompatible);
       return getNextTotp(widget.code);
     } catch (e) {
-      // Avoid accessing BuildContext from async timer callbacks
       return _errorText;
     }
   }

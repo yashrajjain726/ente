@@ -55,8 +55,7 @@ Future<int?> _processAndOTPFile(
 ) async {
   List<dynamic> entries;
 
-  // Try to detect if file is encrypted or plain text
-  // Plain text files are valid JSON arrays, encrypted files are binary
+  // Valid JSON arrays are plain text; binary files need decryption.
   final Uint8List fileBytes = await readPickedImportFileAsBytes(path);
 
   try {

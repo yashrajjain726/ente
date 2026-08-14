@@ -147,8 +147,6 @@ _getThumbnailFromServerRequest(EnteFile file) async {
       acquiredPendingRequestRef: false,
     );
   }
-  // Check if there's already in flight request for fetching thumbnail from the
-  // server
   final existing = _uploadIDToDownloadItem[file.uploadedFileID];
   if (existing == null) {
     final item = _ThumbnailDownload(

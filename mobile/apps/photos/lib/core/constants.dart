@@ -50,7 +50,7 @@ const kFamilyUrl = 'https://family.ente.io';
 
 const int intMaxValue = 9223372036854775807;
 
-//Screen width of iPhone 14 pro max in points is taken as maximum
+// Cap layouts at the 430-point width of an iPhone 14 Pro Max.
 const double restrictedMaxWidth = 430;
 
 const double mobileSmallThreshold = 336;

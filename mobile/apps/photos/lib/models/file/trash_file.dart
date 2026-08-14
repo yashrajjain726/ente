@@ -20,7 +20,6 @@ class EnteTrashFile extends TrashFile {
     required this.updateAt,
   }) : super.from();
 
-  // time when file was put in the trash for first time
   late int createdAt;
 
   // for non-deleted trash items, updateAt is usually equal to the latest time

@@ -176,12 +176,9 @@ class Code {
       if (path.startsWith("/")) {
         path = path.substring(1, path.length);
       }
-      // Parse account name from documented auth URI
-      // otpauth://totp/ACCOUNT?secret=SUPERSECRET&issuer=SERVICE
       if (uri.queryParameters.containsKey("issuer") && !path.contains(":")) {
         return path;
       }
-      // handle case where issuer name contains colon
       if (path.startsWith('$issuer:')) {
         return path.substring(issuer.length + 1);
       }
@@ -270,9 +267,7 @@ class Code {
       } else if (algorithm == "sha512" || "algorithm.sha512" == algorithm) {
         return Algorithm.sha512;
       }
-    } catch (e) {
-      // nothing
-    }
+    } catch (e) {}
     return Algorithm.sha1;
   }
 

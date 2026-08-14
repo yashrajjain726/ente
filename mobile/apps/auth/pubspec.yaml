@@ -147,12 +147,10 @@ dev_dependencies:
   qr: 3.0.2
   shared_preferences_platform_interface: 2.4.2
 
-# The following section is specific to Flutter.
 flutter:
   uses-material-design: true
   generate: true
 
-  # https://docs:flutter:dev/development/ui/assets-and-images:
   assets:
     - assets/
     - assets/icons/
@@ -179,7 +177,6 @@ flutter:
       fonts:
         - asset: fonts/Montserrat-Bold.ttf
 
-# run "dart run flutter_launcher_icons" to generate icons
 flutter_launcher_icons:
   image_path: "assets/generation-icons/icon-light.png"
 
@@ -214,23 +211,8 @@ flutter_native_splash:
   ios: true
   web: false
   android_12:
-    # The image parameter sets the splash screen icon image.  If this parameter is not specified,
-    # the app's launcher icon will be used instead.
-    # Please note that the splash screen will be clipped to a circle on the center of the screen.
-    # App icon with an icon background: This should be 960×960 pixels, and fit within a circle
-    # 640 pixels in diameter.
-    # App icon without an icon background: This should be 1152×1152 pixels, and fit within a circle
-    # 768 pixels in diameter.
     image: "assets/generation-icons/splash-icon-ios-padded.png"
-
-    # Splash screen background color.
     color: "#A75CFF"
-
-    # App icon background color.
     icon_background_color: "#A75CFF"
-
-    # The image_dark, color_dark, icon_background_color_dark, and branding_dark set values that
-    # apply when the device is in dark mode. If they are not specified, the app will use the
-    # parameters from above.
     color_dark: "#A75CFF"
     icon_background_color_dark: "#A75CFF"

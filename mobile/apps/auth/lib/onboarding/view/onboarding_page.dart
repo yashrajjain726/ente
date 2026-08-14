@@ -311,7 +311,6 @@ class _OnboardingPageState extends State<OnboardingPage> {
       return;
     }
 
-    // Check if user is manually scrolling
     // userScrollDirection is idle during programmatic scrolling (animateToPage)
     // but becomes forward/reverse when user manually drags
     if (_pageController.position.userScrollDirection != ScrollDirection.idle) {

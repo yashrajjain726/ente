@@ -58,7 +58,6 @@ class InfoFileService {
 
       final Map<String, dynamic> metadataUpdates = {infoKey: infoData};
 
-      // Update title if it's different from current display name
       // Use displayName (which considers editedName) instead of title (original name)
       final updatedTitle = getInfoFileTitle(updatedInfoItem);
       if (existingFile.displayName != updatedTitle) {
