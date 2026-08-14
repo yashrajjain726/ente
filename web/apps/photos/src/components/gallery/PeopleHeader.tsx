@@ -375,7 +375,7 @@ const AddPersonDialog: React.FC<AddPersonDialogProps> = ({
                         fullWidth
                         type="search"
                         size="small"
-                        placeholder={t("search_people")}
+                        placeholder={`${t("search_people")}...`}
                         value={searchTerm}
                         onChange={(event) => setSearchTerm(event.target.value)}
                         autoFocus
