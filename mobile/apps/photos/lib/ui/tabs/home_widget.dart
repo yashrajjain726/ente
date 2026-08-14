@@ -1024,9 +1024,15 @@ class _HomeWidgetState extends State<HomeWidget> {
       children: [
         Builder(
           builder: (context) {
-            return ValueListenableBuilder(
-              valueListenable: _swipeToSelectInProgressNotifier,
-              builder: (context, inProgress, child) {
+            return ListenableBuilder(
+              listenable: Listenable.merge([
+                _swipeToSelectInProgressNotifier,
+                _selectedAlbums,
+              ]),
+              builder: (context, child) {
+                final isPageScrollLocked =
+                    _swipeToSelectInProgressNotifier.value ||
+                    _selectedAlbums.albums.isNotEmpty;
                 return ValueListenableBuilder<int>(
                   valueListenable: _selectedTabIndexNotifier,
                   builder: (context, selectedTabIndex, _) {
@@ -1038,7 +1044,7 @@ class _HomeWidgetState extends State<HomeWidget> {
                       },
                       controller: _pageController,
                       openDrawer: Scaffold.of(context).openDrawer,
-                      physics: inProgress
+                      physics: isPageScrollLocked
                           ? const NeverScrollableScrollPhysics()
                           : const BouncingScrollPhysics(),
                       children: [
