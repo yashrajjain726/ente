@@ -43,6 +43,8 @@ import 'package:photos/services/favorites_service.dart';
 import "package:photos/services/home_widget_service.dart";
 import 'package:photos/services/ignored_files_service.dart';
 import "package:photos/services/machine_learning/face_ml/person/person_service.dart";
+import "package:photos/services/machine_learning/ml_run_control.dart";
+import "package:photos/services/machine_learning/ml_service.dart";
 import "package:photos/services/machine_learning/similar_images_service.dart";
 import "package:photos/services/memory_share_service.dart";
 import "package:photos/services/notification_service.dart";
@@ -189,6 +191,7 @@ class Configuration implements LockScreenHost, AccountDeletionHost {
   @override
   Future<void> logout({bool autoLogout = false}) async {
     _logger.info("Logging out, autoLogout: $autoLogout");
+    MLService.instance.stopActiveRun(MlStopReason.logout);
     if (!autoLogout) {
       if (flagService.stopStreamProcess) {
         VideoPreviewService.instance.stop('logout');
