@@ -464,6 +464,7 @@
     "link_edit_disabled_for_free_accounts": "",
     "sharing_user_does_not_exist": "Δεν βρέθηκε χρήστης με αυτή τη διεύθυνση ηλ. ταχυδρομείου",
     "search": "Αναζήτηση",
+    "people_search_hint": "",
     "search_results": "Αποτελέσματα αναζήτησης",
     "no_results": "Δε βρέθηκαν αποτελέσματα",
     "no_photos_found_here": "",

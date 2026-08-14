@@ -464,6 +464,7 @@
     "link_edit_disabled_for_free_accounts": "您需要付費訂閱才能更改此連結設定",
     "sharing_user_does_not_exist": "找不到使用該電子郵件的使用者",
     "search": "搜尋",
+    "people_search_hint": "",
     "search_results": "搜尋結果",
     "no_results": "找不到結果",
     "no_photos_found_here": "這裡找不到相片",

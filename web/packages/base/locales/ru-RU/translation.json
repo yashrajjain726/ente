@@ -464,6 +464,7 @@
     "link_edit_disabled_for_free_accounts": "Вам нужна платная подписка, чтобы изменить эту ссылку",
     "sharing_user_does_not_exist": "Пользователь с такой электронной почтой не найден",
     "search": "Поиск",
+    "people_search_hint": "",
     "search_results": "Результаты поиска",
     "no_results": "Ничего не найдено",
     "no_photos_found_here": "Фото здесь не найдены",
