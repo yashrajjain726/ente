@@ -7,7 +7,7 @@ set -euo pipefail
 
 : "${SRCROOT:?}" "${TARGET_TEMP_DIR:?}" "${PLATFORM_NAME:?}" "${ARCHS:?}"
 
-REPO_ROOT=$(cd "$SRCROOT/../../../../.." && pwd)
+REPO_ROOT=$(cd "$SRCROOT/../../.." && pwd)
 GENERATED_DIR="$SRCROOT/Ensu/Generated"
 OUT_DIR="$TARGET_TEMP_DIR/ensu_rust"
 TARGET_DIR="$REPO_ROOT/rust/target"

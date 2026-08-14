@@ -2,7 +2,7 @@
 
 Source code for the Ensu Android app.
 
-To know more about Ente, see [our main README](../../../../../README.md) or visit [ente.com](https://ente.com).
+To know more about Ente, see [our main README](../../../README.md) or visit [ente.com](https://ente.com).
 
 ## Building from source
 
@@ -35,12 +35,12 @@ That's it. Apart from the `cargo codegen`, this is a normal Android project. Gra
 >
 > If you'd rather not open Android Studio, this section is for you.
 >
-> To skip the Android Studio install entirely, see [photos/docs/android-cli.md](../../../../apps/photos/docs/android-cli.md).
+> To skip the Android Studio install entirely, see [photos/docs/android-cli.md](../../../mobile/apps/photos/docs/android-cli.md).
 
 Build and install a debug APK on a connected device or emulator:
 
 ```sh
-cd mobile/native/android/apps/ensu
+cd android/apps/ensu
 ./gradlew :app:installDebug
 adb shell am start -n io.ente.ensu.debug/io.ente.ensu.MainActivity
 ```

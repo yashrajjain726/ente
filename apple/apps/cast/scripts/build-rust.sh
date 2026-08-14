@@ -4,7 +4,7 @@ set -eu
 # This script is invoked from Xcode's "Run Script" build phase.
 # It builds the cast UniFFI static lib for the current tvOS target.
 
-REPO_ROOT=$(cd "$SRCROOT/../../../../.." && pwd)
+REPO_ROOT=$(cd "$SRCROOT/../../.." && pwd)
 GENERATED_DIR="$SRCROOT/Cast/Generated"
 OUT_DIR="$TARGET_TEMP_DIR/cast_rust"
 LIB=libcast.a

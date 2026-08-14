@@ -151,7 +151,7 @@ jobs:
               working-directory: rust
 
             - name: Build Ensu
-              working-directory: mobile/native/android/apps/ensu
+              working-directory: android/apps/ensu
               run: ./gradlew :app:assembleDebug
 
     ensu-ios:
@@ -171,7 +171,7 @@ jobs:
               working-directory: rust
 
             - name: Build Ensu
-              working-directory: mobile/native/apple/apps/ensu
+              working-directory: apple/apps/ensu
               run: xcodebuild build-for-testing -scheme Ensu -destination 'platform=iOS Simulator,name=iPhone 17'
 
     go-server:
