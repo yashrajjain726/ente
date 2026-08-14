@@ -366,7 +366,9 @@ const AddPersonDialog: React.FC<AddPersonDialogProps> = ({
             >
                 <Stack sx={{ gap: 1.5, padding: "10px 8px 6px 24px" }}>
                     <SpacedRow>
-                        <Typography variant="h3">{t("add_name")}</Typography>
+                        <DialogTitle variant="h3" sx={{ p: 0 }}>
+                            {t("add_name")}
+                        </DialogTitle>
                         <DialogCloseIconButton onClose={handleClose} />
                     </SpacedRow>
                     <TextField
