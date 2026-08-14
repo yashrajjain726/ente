@@ -1,0 +1,1 @@
+- Improved machine learning sync speed and Magic Search reliability after interrupted processing.
