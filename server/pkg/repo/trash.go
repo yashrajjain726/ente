@@ -125,6 +125,9 @@ func (t *TrashRepository) TrashFiles(ctx context.Context, userID int64, trash en
 		return stacktrace.Propagate(err, "")
 	}
 	defer tx.Rollback()
+	if err := lockFiles(ctx, tx, userID, fileIDs); err != nil {
+		return stacktrace.Propagate(err, "")
+	}
 	rows, err := tx.QueryContext(ctx, `SELECT DISTINCT collection_id FROM 
 			collection_files WHERE file_id = ANY($1) AND is_deleted = $2`, pq.Array(fileIDs), false)
 	if err != nil {
@@ -259,7 +262,15 @@ func (t *TrashRepository) GetFilesInTrashState(ctx context.Context, userID int64
 }
 
 func (t *TrashRepository) GetFilesInTrashOrDeleted(ctx context.Context, userID int64, fileIDs []int64) ([]int64, error) {
-	rows, err := t.DB.QueryContext(ctx, `SELECT file_id FROM trash
+	return t.getFilesInTrashOrDeleted(ctx, t.DB, userID, fileIDs)
+}
+
+type trashQueryer interface {
+	QueryContext(context.Context, string, ...any) (*sql.Rows, error)
+}
+
+func (t *TrashRepository) getFilesInTrashOrDeleted(ctx context.Context, queryer trashQueryer, userID int64, fileIDs []int64) ([]int64, error) {
+	rows, err := queryer.QueryContext(ctx, `SELECT file_id FROM trash
 			WHERE user_id = $1 AND file_id = ANY ($2)
 			AND is_restored = FALSE`, userID, pq.Array(fileIDs))
 	if err != nil {
