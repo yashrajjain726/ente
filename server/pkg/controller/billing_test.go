@@ -42,9 +42,15 @@ func TestShouldSkipVerifiedSubscriptionReplacement(t *testing.T) {
 			verified: paid(ente.AppStore, "apple", now-appStoreGrace+1),
 		},
 		{
-			name:     "accepts active Play purchase with a new token",
-			current:  paid(ente.PlayStore, "old-token", now+45),
-			verified: paid(ente.PlayStore, "new-token", now+30),
+			name:     "rejects older Play purchase with a different token",
+			current:  paid(ente.PlayStore, "new-token", now+45),
+			verified: paid(ente.PlayStore, "old-token", now+30),
+			want:     true,
+		},
+		{
+			name:     "accepts newer Play purchase with a different token",
+			current:  paid(ente.PlayStore, "old-token", now+30),
+			verified: paid(ente.PlayStore, "new-token", now+45),
 		},
 		{
 			name:     "rejects older version of the same subscription",
@@ -59,6 +65,15 @@ func TestShouldSkipVerifiedSubscriptionReplacement(t *testing.T) {
 			},
 			verified: ente.Subscription{
 				ProductID: "new", PaymentProvider: ente.AppStore, OriginalTransactionID: "apple", ExpiryTime: now + 30,
+			},
+		},
+		{
+			name: "accepts Play Store product change with earlier expiry",
+			current: ente.Subscription{
+				ProductID: "old", PaymentProvider: ente.PlayStore, OriginalTransactionID: "old-token", ExpiryTime: now + 45,
+			},
+			verified: ente.Subscription{
+				ProductID: "new", PaymentProvider: ente.PlayStore, OriginalTransactionID: "new-token", ExpiryTime: now + 30,
 			},
 		},
 	}

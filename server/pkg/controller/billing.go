@@ -286,11 +286,13 @@ func (c *BillingController) VerifySubscription(
 
 func shouldSkipVerifiedSubscriptionReplacement(currentSubscription ente.Subscription, verifiedSubscription ente.Subscription, now int64) bool {
 	effectiveExpiry := verifiedSubscription.ExpiryTime + billing.ProviderToExpiryGracePeriodMap[verifiedSubscription.PaymentProvider]
+	isSameSubscription := currentSubscription.PaymentProvider == verifiedSubscription.PaymentProvider &&
+		currentSubscription.ProductID == verifiedSubscription.ProductID &&
+		(verifiedSubscription.PaymentProvider == ente.PlayStore ||
+			currentSubscription.OriginalTransactionID == verifiedSubscription.OriginalTransactionID)
 	return effectiveExpiry < now ||
 		(currentSubscription.ProductID != ente.FreePlanProductID &&
-			currentSubscription.PaymentProvider == verifiedSubscription.PaymentProvider &&
-			currentSubscription.OriginalTransactionID == verifiedSubscription.OriginalTransactionID &&
-			currentSubscription.ProductID == verifiedSubscription.ProductID &&
+			isSameSubscription &&
 			verifiedSubscription.ExpiryTime < currentSubscription.ExpiryTime)
 }
 
