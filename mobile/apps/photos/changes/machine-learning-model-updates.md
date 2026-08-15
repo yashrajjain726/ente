@@ -1,1 +1,1 @@
-- Improved reliability when updating on-device machine learning models.
+- Fix ML model download cleanup bug

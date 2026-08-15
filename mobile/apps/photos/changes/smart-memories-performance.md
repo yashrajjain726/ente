@@ -1,1 +1,1 @@
-- Improved Smart Memories generation performance.
+- Improved Smart Memories generation performance by only moving ML data to isolate once

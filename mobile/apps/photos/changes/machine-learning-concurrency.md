@@ -1,1 +1,1 @@
-- Improved on-device machine learning reliability when foreground and background processing overlap.
+- Proper foreground vs background lock for ML processing
