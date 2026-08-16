@@ -964,7 +964,10 @@
       "title": "GMX"
     },
     {
-      "title": "GoDaddy"
+      "title": "GoDaddy",
+      "altNames": [
+        "GoDaddy"
+      ]
     },
     {
       "title": "GommeHD.net",
@@ -2401,7 +2404,10 @@
       "hex": "00305d"
     },
     {
-      "title": "TunnelBear"
+      "title": "TunnelBear",
+      "altNames": [
+        "TunnelBear"
+      ]
     },
     {
       "title": "Tuta",
