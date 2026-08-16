@@ -701,6 +701,20 @@
       "title": "DocuSeal"
     },
     {
+      "title": "DocuSign",
+      "slug": "docusign",
+      "altNames": [
+        "DocuSign (NA1)",
+        "DocuSign (NA2)",
+        "DocuSign (NA3)",
+        "DocuSign (NA4)",
+        "DocuSign (EU)",
+        "DocuSign (AU)",
+        "DocuSign (CA)",
+        "DocuSign (JP1)"
+      ]
+    },
+    {
       "title": "Dominos",
       "slug": "dominos",
       "altNames": [
