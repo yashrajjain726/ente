@@ -2235,7 +2235,6 @@ class MLDataDB with SqlDbBase implements IMLDataDB<int> {
             _logger.info("All embeddings migrated, breaking out of while loop");
             break;
           }
-          // Allow some time for any GC to finish
           _logger.info("Waiting for 100ms out of precaution, for GC to finish");
           await Future.delayed(const Duration(milliseconds: 100));
         }

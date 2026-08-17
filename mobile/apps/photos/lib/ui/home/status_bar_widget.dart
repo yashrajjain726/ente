@@ -272,7 +272,7 @@ class _SyncStatusWidgetState extends State<SyncStatusWidget> {
             kSleepDuration.inMicroseconds);
     if (_event == null ||
         isNotOutdatedEvent ||
-        //sync error cases are handled in StatusBarWidget
+        // StatusBarWidget handles sync errors.
         _event!.status == SyncStatus.error) {
       return const SizedBox.shrink();
     }

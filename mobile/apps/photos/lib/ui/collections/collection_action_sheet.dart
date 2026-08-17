@@ -429,8 +429,7 @@ class _CollectionActionSheetState extends State<CollectionActionSheet> {
     } else {
       final List<Collection>
       collections = CollectionsService.instance.getCollectionsForUI(
-        // in collections where user is a collaborator, only addTo and remove
-        // action can to be performed
+        // Collaborators can only add or remove files.
         includeCollab: widget.actionType == CollectionActionType.addFiles,
         includeUncategorized: true,
       );
