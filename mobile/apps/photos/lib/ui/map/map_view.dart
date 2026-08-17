@@ -203,10 +203,22 @@ class _MapViewState extends State<MapView> {
   List<Marker> _buildMarkers() {
     return List<Marker>.generate(widget.imageMarkers.length, (index) {
       final imageMarker = widget.imageMarkers[index];
+      final clusterBounds = imageMarker.clusterBounds;
       return mapMarker(
         imageMarker,
         ValueKey(index),
         markerSize: widget.markerSize,
+        onTap: clusterBounds == null
+            ? null
+            : () {
+                widget.controller.fitCamera(
+                  CameraFit.bounds(
+                    bounds: clusterBounds,
+                    padding: const EdgeInsets.all(80),
+                    maxZoom: widget.maxZoom,
+                  ),
+                );
+              },
       );
     });
   }

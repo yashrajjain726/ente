@@ -218,6 +218,7 @@ class _MapScreenState extends State<MapScreen> {
               latitude: group.latitude,
               longitude: group.longitude,
               imageCount: group.imageCount,
+              clusterBounds: group.imageCount > 1 ? group.bounds : null,
             ),
           )
           .toList(growable: false);

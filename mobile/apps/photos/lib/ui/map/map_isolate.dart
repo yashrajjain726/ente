@@ -20,13 +20,24 @@ class MapMarkerGroup {
   final double latitude;
   final double longitude;
   final int imageCount;
+  final double north;
+  final double south;
+  final double east;
+  final double west;
 
   const MapMarkerGroup({
     required this.imageIndex,
     required this.latitude,
     required this.longitude,
     required this.imageCount,
+    required this.north,
+    required this.south,
+    required this.east,
+    required this.west,
   });
+
+  LatLngBounds get bounds =>
+      LatLngBounds.unsafe(north: north, south: south, east: east, west: west);
 }
 
 class _ProjectedMarkerGroup {
@@ -36,6 +47,10 @@ class _ProjectedMarkerGroup {
   final double x;
   final double y;
   int imageCount = 1;
+  double north;
+  double south;
+  double east;
+  double west;
 
   _ProjectedMarkerGroup({
     required this.imageIndex,
@@ -43,14 +58,29 @@ class _ProjectedMarkerGroup {
     required this.longitude,
     required this.x,
     required this.y,
-  });
+  }) : north = latitude,
+       south = latitude,
+       east = longitude,
+       west = longitude;
 
   MapMarkerGroup toMarkerGroup() => MapMarkerGroup(
     imageIndex: imageIndex,
     latitude: latitude,
     longitude: longitude,
     imageCount: imageCount,
+    north: north,
+    south: south,
+    east: east,
+    west: west,
   );
+
+  void add(MapPoint point) {
+    imageCount++;
+    north = max(north, point.latitude);
+    south = min(south, point.latitude);
+    east = max(east, point.longitude);
+    west = min(west, point.longitude);
+  }
 }
 
 class _ProjectedMapPoint {
@@ -188,7 +218,7 @@ void mapWorker(MapWorkerInit init) {
       }
 
       if (closestGroup != null) {
-        closestGroup.imageCount++;
+        closestGroup.add(point);
         return;
       }
 
