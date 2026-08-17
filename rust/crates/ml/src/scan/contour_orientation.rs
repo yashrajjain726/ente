@@ -27,7 +27,6 @@ pub(crate) fn find_quad_from_contour_orientation(contour: &[Point]) -> Option<Ve
 
     let angles = compute_smoothed_angles(contour, SMOOTH_WINDOW);
 
-    // Open polyline: n-1 terms.
     let perimeter: f64 = contour
         .windows(2)
         .map(|w| (w[1].x - w[0].x).hypot(w[1].y - w[0].y))
@@ -84,7 +83,6 @@ fn angle_mean(a: f64, b: f64) -> f64 {
     y.atan2(x)
 }
 
-/// Total least squares direction from the second-moment matrix.
 fn fit_line(points: &[Point]) -> Line {
     let cx = average(points.iter().map(|p| p.x));
     let cy = average(points.iter().map(|p| p.y));
@@ -210,7 +208,6 @@ fn compute_smoothed_angles(contour: &[Point], window: i32) -> Vec<f64> {
     let mut sx = 0.0;
     let mut sy = 0.0;
     for k in -window..=window {
-        // n >= 20 and window == 5, so `k + n` is always positive.
         let idx = ((k + ni) % ni) as usize;
         sx += cos_a[idx];
         sy += sin_a[idx];
@@ -257,7 +254,6 @@ fn merge_segments(segments: &[ContourSegment], angle_threshold: f64) -> Vec<Cont
     merged
 }
 
-/// Both sorts are stable, which decides ties.
 fn select_dominant_segments(
     segments: &[ContourSegment],
     max_count: usize,

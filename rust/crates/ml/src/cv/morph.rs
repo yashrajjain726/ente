@@ -32,7 +32,6 @@ fn morph(src: &ImageU8, kernel: &ImageU8, erode: bool) -> OpResult<ImageU8> {
     }
 
     let mut out = vec![0u8; w * h];
-    // Tap-major keeps the min/max folds vectorizable.
     let row = |y: usize, dst: &mut [u8]| {
         let base = y * pw;
         dst.copy_from_slice(&padded[base + offsets[0]..base + offsets[0] + w]);

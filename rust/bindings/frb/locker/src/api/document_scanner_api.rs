@@ -44,8 +44,7 @@ pub struct RustScanOptions {
 
 #[derive(Clone, Debug)]
 pub struct RustReprocessOptions {
-    /// Same coordinate space as `RustScanResult.quad`: the decoded source
-    /// image.
+    /// Same space as `RustScanResult.quad`: the decoded source image.
     pub quad: RustQuad,
     /// Must be a multiple of 90.
     pub rotation_degrees: i32,
@@ -56,9 +55,7 @@ pub struct RustReprocessOptions {
 
 #[derive(Clone, Debug)]
 pub struct RustScanResult {
-    /// In decoded-source coordinates (EXIF applied, before
-    /// `rotation_degrees`); `None` when nothing was detected and the whole
-    /// frame was returned.
+    /// Decoded-source coordinates (EXIF applied, before `rotation_degrees`); `None` when nothing was detected.
     pub quad: Option<RustQuad>,
     pub color_mode: RustColorMode,
     pub output_width: u32,
@@ -76,7 +73,6 @@ pub enum RustScanErrorKind {
     ModelLoad,
     Codec,
     Pipeline,
-    /// A panic caught at the FFI boundary.
     Internal,
 }
 
@@ -86,15 +82,12 @@ pub struct RustScanError {
     pub message: String,
 }
 
-/// `Send + Sync`: one session serves both the live preview stream and
-/// capture processing.
 #[frb(opaque)]
 pub struct ScannerSession {
     inner: scan::ScannerSession,
 }
 
 impl ScannerSession {
-    /// Downloads the model into the asset store at `assets_dir` on first use.
     pub async fn create(assets_dir: String) -> Result<ScannerSession, RustScanError> {
         let store = AssetStore::new(assets_dir);
         let model_path = scan::ensure_segmentation_model(&store)
@@ -109,10 +102,7 @@ impl ScannerSession {
         })
     }
 
-    /// Takes an iOS BGRA8888 frame with `row_stride` bytes per row, so Dart
-    /// passes the camera buffer through unchanged. The returned quad is in
-    /// mask space (256x256), already rotated by `rotation_degrees`: rotate
-    /// the overlay quad, not the frame.
+    /// The returned quad is in mask space (256x256), already rotated by `rotation_degrees`.
     pub fn live_detect_bgra(
         &self,
         bgra: Vec<u8>,
@@ -130,9 +120,7 @@ impl ScannerSession {
         }))
     }
 
-    /// Accepts both planar I420 (`uv_pixel_stride == 1`) and interleaved
-    /// NV21/NV12 (`uv_pixel_stride == 2`) YUV_420_888 planes. Quad semantics
-    /// as in [`Self::live_detect_bgra`].
+    /// Quad semantics as in [`Self::live_detect_bgra`].
     pub fn live_detect_yuv420(
         &self,
         y: Vec<u8>,
@@ -166,7 +154,6 @@ impl ScannerSession {
         }))
     }
 
-    /// No inference runs.
     pub fn reprocess(
         &self,
         source_bytes: Vec<u8>,

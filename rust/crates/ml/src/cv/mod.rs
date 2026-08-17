@@ -106,8 +106,6 @@ pub(crate) fn saturate_u8_f64(v: f64) -> u8 {
     v.round_ties_even().clamp(0.0, 255.0) as u8
 }
 
-/// Mirrors an out-of-range coordinate back into `[0, len)` without repeating
-/// the edge pixel.
 pub(crate) fn reflect101(mut p: i64, len: i32) -> i64 {
     let len = len as i64;
     if p >= 0 && p < len {

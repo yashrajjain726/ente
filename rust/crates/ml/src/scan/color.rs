@@ -16,7 +16,6 @@ const PROPORTION_THRESHOLD: f64 = 0.0003;
 const LUMINANCE_MIN: f64 = 40.0;
 const LUMINANCE_MAX: f64 = 180.0;
 
-/// `quad` is in original-image coordinates.
 pub(crate) fn auto_color_mode(img: &ImageU8, mask: &Mask, quad: &Quad) -> OpResult<ColorMode> {
     let resized_img = resize_for_max_pixels(img, 1024.0 * 768.0)?;
     let work_size = resized_img.size();

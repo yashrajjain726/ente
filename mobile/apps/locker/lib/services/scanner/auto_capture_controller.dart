@@ -2,25 +2,15 @@ import 'package:locker/services/scanner/scanner_models.dart';
 
 enum AutoCaptureState { searching, arming, cooldown }
 
-/// Time-based state machine for hands-free capture, fed once per analyzed
-/// frame. A stabilizer-approved quad that keeps passing the gates for
-/// [armHold] fires a capture, after which the frame must stay quad-free for
-/// [clearHold] (with no capture processing pending) before re-arming, so a
-/// document left in view is captured exactly once.
 class AutoCaptureController {
-  /// How long an eligible quad must be held before firing.
   static const armHold = Duration(milliseconds: 1200);
 
-  /// Ineligible time tolerated while arming before progress resets.
   static const armGrace = Duration(milliseconds: 250);
 
-  /// How long the frame must stay quad-free after a capture to re-arm.
   static const clearHold = Duration(milliseconds: 700);
 
-  /// Cap on per-frame elapsed time, so stalls don't jump the timers.
   static const maxFrameGap = Duration(milliseconds: 200);
 
-  /// Minimum quad area as a fraction of the mask area.
   static const minAreaFraction = 0.15;
 
   AutoCaptureState _state = AutoCaptureState.searching;
@@ -31,11 +21,8 @@ class AutoCaptureController {
 
   AutoCaptureState get state => _state;
 
-  /// Arming progress in [0, 1]; 0 outside [AutoCaptureState.arming].
   double get progress => _progress;
 
-  /// Advances the machine with the stabilizer output for one frame. Returns
-  /// true when the hold completed and a capture should fire now.
   bool onFrame(ScanQuad? stableQuad, {required bool captureBusy}) {
     final now = DateTime.now();
     final last = _lastFrameAt;
@@ -84,8 +71,6 @@ class AutoCaptureController {
     }
   }
 
-  /// Disarms until the document leaves the frame. Called for every capture,
-  /// manual or automatic, so a document still in view is not re-captured.
   void notifyCaptureStarted() {
     _state = AutoCaptureState.cooldown;
     _progress = 0;

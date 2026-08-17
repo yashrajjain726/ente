@@ -9,8 +9,6 @@ import 'package:logging/logging.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
-/// Rust-backed implementation: ONNX segmentation for detection, perspective
-/// extraction and enhancement in the native pipeline.
 class RustDocumentScannerService implements DocumentScannerService {
   static const int _maxPixels = 4000000;
 
@@ -42,8 +40,6 @@ class RustDocumentScannerService implements DocumentScannerService {
         p.join(tmp.path, 'document_scan'),
       ).create(recursive: true);
       final support = await getApplicationSupportDirectory();
-      // The Rust side downloads the model into this store on first use and
-      // reuses the verified copy afterwards.
       _session = await ScannerSession.create(
         assetsDir: p.join(support.path, 'assets'),
       );
@@ -248,7 +244,6 @@ class RustDocumentScannerService implements DocumentScannerService {
     Offset(quad.bottomLeft.x, quad.bottomLeft.y),
   ]);
 
-  /// Source pixel space -> 256 mask space.
   static ScanQuad _maskQuadFromSource(RustQuad quad, int width, int height) {
     final sx = ScanQuad.maskSide / width;
     final sy = ScanQuad.maskSide / height;
@@ -261,7 +256,6 @@ class RustDocumentScannerService implements DocumentScannerService {
     ]);
   }
 
-  /// 256 mask space -> source pixel space.
   static RustQuad _sourceQuadFromMask(ScanQuad quad, int width, int height) {
     final sx = width / ScanQuad.maskSide;
     final sy = height / ScanQuad.maskSide;

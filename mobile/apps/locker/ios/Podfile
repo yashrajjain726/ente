@@ -31,9 +31,7 @@ target 'Runner' do
   use_frameworks!
   use_modular_headers!
 
-  # Ente's custom prebuilt ONNX Runtime static libraries (download + SHA-256
-  # verification handled by CocoaPods). Consumed by the ente_locker_frb
-  # build phase, which points the Rust `ort` crate at the platform slice.
+  # Prebuilt ONNX Runtime static libraries, consumed by the ente_locker_frb build phase.
   pod 'EnteOnnxRuntime', :podspec => '../../../../apple/packages/EnteOnnxRuntime/EnteOnnxRuntime.podspec'
 
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))

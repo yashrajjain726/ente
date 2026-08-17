@@ -10,8 +10,6 @@ import 'package:logging/logging.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
-/// State of one scan session: the ordered page list, the capture-processing
-/// queue and the temp artifacts. Disposed when the scanner flow is left.
 class ScanSessionController extends ChangeNotifier {
   ScanSessionController({DocumentScannerService? service})
     : _service = service ?? documentScannerService;
@@ -32,15 +30,12 @@ class ScanSessionController extends ChangeNotifier {
   int get pageCount => _pages.length;
   bool get isProcessing => _pendingCount > 0;
 
-  /// PDF filename including the extension, once initialized.
   String? get fileName => _fileName;
 
   void ensureFileName(String fileName) {
     _fileName ??= fileName;
   }
 
-  /// Renames the PDF to [baseName] (extension re-appended). Empty or
-  /// separator-only input keeps the current name.
   void renameFile(String baseName) {
     var cleaned = baseName.replaceAll(RegExp(r'[/\\]'), '').trim();
     if (cleaned.toLowerCase().endsWith(_pdfExtension)) {
@@ -55,7 +50,6 @@ class ScanSessionController extends ChangeNotifier {
 
   ScannedPage? get lastPage => _pages.isEmpty ? null : _pages.last;
 
-  /// Returns and clears the most recent processing error, if any.
   Object? takeLastError() {
     final error = _lastError;
     _lastError = null;
@@ -97,8 +91,6 @@ class ScanSessionController extends ChangeNotifier {
   ) =>
       _service.detectLiveBgra(bytes, rowStride, width, height, rotationDegrees);
 
-  /// Enqueues a capture; processing is sequential so page order follows
-  /// capture order.
   void addCapture(Uint8List capturedJpeg) {
     _pendingCount++;
     notifyListeners();
@@ -120,7 +112,6 @@ class ScanSessionController extends ChangeNotifier {
     });
   }
 
-  /// Completes when every enqueued capture has been processed.
   Future<void> waitForPending() async {
     while (_pendingCount > 0) {
       await _queue;
@@ -156,7 +147,6 @@ class ScanSessionController extends ChangeNotifier {
     );
   }
 
-  /// Moves a page; indices follow ReorderableListView's onReorder convention.
   void reorderPage(int oldIndex, int newIndex) {
     if (oldIndex < 0 || oldIndex >= _pages.length) return;
     if (newIndex > oldIndex) newIndex -= 1;
@@ -175,8 +165,6 @@ class ScanSessionController extends ChangeNotifier {
     await _service.disposePage(page);
   }
 
-  /// Assembles all pages, in order, into a PDF named [fileName] in the temp
-  /// dir.
   Future<File> buildPdf() async {
     final fileName = _fileName;
     if (fileName == null) {
@@ -201,7 +189,6 @@ class ScanSessionController extends ChangeNotifier {
     return file;
   }
 
-  /// Long edge scaled to A4 height, then constrained to standard formats.
   static ({double widthMm, double heightMm}) _pageSizeMm(Uint8List jpeg) {
     final info = JpegInfo.parse(jpeg);
     const a4HeightMm = 297.0;

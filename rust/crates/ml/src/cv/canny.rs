@@ -79,7 +79,6 @@ pub(crate) fn canny(src: &ImageU8, threshold1: f64, threshold2: f64) -> OpResult
         }
     }
 
-    // The one-pixel `NO` frame keeps the unguarded hysteresis flood inside.
     let step = w + 2;
     let mut mag = vec![0i32; step * (h + 2)];
     for y in 0..h {

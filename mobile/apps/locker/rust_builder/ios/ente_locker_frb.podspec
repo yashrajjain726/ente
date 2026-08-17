@@ -22,18 +22,13 @@ A new Flutter FFI plugin project.
   s.dependency 'Flutter'
   s.platform = :ios, '15.1'
 
-  # Flutter.framework does not contain an i386 slice, and ONNX Runtime 1.28
-  # does not publish an x86_64 iOS Simulator binary.
+  # Flutter.framework has no i386 slice; ONNX Runtime 1.28 has no x86_64 simulator binary.
   s.user_target_xcconfig = { 'EXCLUDED_ARCHS[sdk=iphonesimulator*]' => 'i386 x86_64' }
   s.swift_version = '5.0'
 
   s.script_phase = {
     :name => 'Build Rust library',
-    # Point the Rust `ort` crate at the custom prebuilt ONNX Runtime static
-    # archive for the active platform (downloaded and SHA-256 verified by
-    # CocoaPods as the EnteOnnxRuntime pod), then run the Cargokit build.
-    # The build_pod.sh arguments are the relative path to the `rust` folder
-    # and the name of the Rust library.
+    # ORT_LIB_PATH points the Rust `ort` crate at the EnteOnnxRuntime pod's static archive.
     :script => <<-SCRIPT,
       set -e
       case "$PLATFORM_NAME" in
@@ -51,17 +46,13 @@ A new Flutter FFI plugin project.
     SCRIPT
     :execution_position => :before_compile,
     :input_files => ['${BUILT_PRODUCTS_DIR}/cargokit_phony'],
-    # Let Xcode know that the static library linked below is created by this
-    # build step.
+    # Let Xcode know the static library linked below is created by this build step.
     :output_files => ["${BUILT_PRODUCTS_DIR}/libente_locker_frb.a"],
   }
   s.pod_target_xcconfig = {
     'DEFINES_MODULE' => 'YES',
-    # ONNX Runtime 1.28 supports only the ARM64 iOS Simulator slice.
     'EXCLUDED_ARCHS[sdk=iphonesimulator*]' => 'i386 x86_64',
-    # Root the primary Flutter Rust Bridge dispatcher so the linker pulls in
-    # the bridge and its transitive FFI exports without force-loading ONNX
-    # Runtime's duplicate protobuf objects.
+    # Roots the FRB dispatcher instead of -force_load to avoid ONNX Runtime's duplicate protobuf objects.
     'OTHER_LDFLAGS' => [
       '$(inherited)',
       '${BUILT_PRODUCTS_DIR}/libente_locker_frb.a',

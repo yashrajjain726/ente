@@ -19,8 +19,6 @@ import 'package:logging/logging.dart';
 
 enum _CameraStatus { starting, ready, permissionDenied, error }
 
-/// Camera screen of the document scanner. Pops with `true` when the scan was
-/// saved, otherwise the caller treats the flow as cancelled.
 class ScannerCapturePage extends StatefulWidget {
   const ScannerCapturePage({super.key, required this.onUploadFiles});
 
@@ -117,8 +115,6 @@ class _ScannerCapturePageState extends State<ScannerCapturePage>
       );
       final controller = CameraController(
         back,
-        // Lower presets cap still-capture resolution at preview-like sizes;
-        // `max` is required for full-resolution captures.
         ResolutionPreset.max,
         enableAudio: false,
         imageFormatGroup: Platform.isIOS
@@ -162,8 +158,6 @@ class _ScannerCapturePageState extends State<ScannerCapturePage>
     await camera.dispose();
   }
 
-  // One analysis frame in flight at a time; newer frames are dropped until
-  // the current one finishes.
   void _onFrame(CameraImage image) {
     if (_analysisInFlight || _takingPicture || !_session.isServiceReady) {
       return;
@@ -213,7 +207,6 @@ class _ScannerCapturePageState extends State<ScannerCapturePage>
         }
       }
     } catch (_) {
-      // Dropped frames are fine; the next one will do.
     } finally {
       _analysisInFlight = false;
     }
@@ -490,7 +483,6 @@ class _ShutterButton extends StatelessWidget {
 
   final bool enabled;
 
-  /// Auto-capture arming progress in [0, 1]; drawn as an arc over the ring.
   final double armingProgress;
   final Color armingColor;
   final Future<void> Function() onTap;
@@ -554,7 +546,6 @@ class _ArmingArcPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     if (progress <= 0 || size.isEmpty) return;
     canvas.drawArc(
-      // Centered on the button's 4px ring, which is inset in the same box.
       Rect.fromCircle(
         center: size.center(Offset.zero),
         radius: size.shortestSide / 2 - 2,
@@ -575,8 +566,6 @@ class _ArmingArcPainter extends CustomPainter {
       oldDelegate.progress != progress || oldDelegate.color != color;
 }
 
-/// Auto/manual capture-mode toggle: pill with the auto-camera glyph and the
-/// current mode's label, filled with the accent color while auto is on.
 class _AutoToggle extends StatelessWidget {
   const _AutoToggle({required this.active, required this.onTap});
 
@@ -625,8 +614,6 @@ class _AutoToggle extends StatelessWidget {
   }
 }
 
-/// Prominent "done capturing" button: filled accent circle with a checkmark
-/// and a page-count badge. Animates in when the first page arrives.
 class _DoneButton extends StatelessWidget {
   const _DoneButton({
     required this.session,

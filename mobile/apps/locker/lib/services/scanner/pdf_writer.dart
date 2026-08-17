@@ -1,10 +1,6 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
-/// Minimal PDF writer: one page per JPEG, each embedded verbatim as a
-/// DCTDecode image XObject. Only the JPEG's SOF header is parsed (for
-/// dimensions and color space); the compressed bytes are never touched.
-
 class JpegInfo {
   const JpegInfo({
     required this.width,
@@ -33,7 +29,6 @@ class JpegInfo {
         continue;
       }
       final marker = bytes[offset + 1];
-      // Standalone markers carry no length.
       if (marker == 0xD8 ||
           marker == 0x01 ||
           (marker >= 0xD0 && marker <= 0xD7)) {
@@ -75,8 +70,6 @@ class PdfPageSpec {
   final double heightMm;
 }
 
-/// Shrinks a sheet until it fits inside A4's long edge and Letter's short
-/// edge; never enlarges.
 ({double widthMm, double heightMm}) constrainToMaxFormat(
   double widthMm,
   double heightMm,
@@ -105,8 +98,6 @@ class PdfWriter {
     void raw(List<int> bytes) => out.add(bytes);
     void text(String value) => raw(latin1.encode(value));
 
-    // Objects: 1 catalog, 2 page tree, 3 info, then page/contents/image per
-    // page.
     int pageObj(int index) => 4 + index * 3;
     int contentObj(int index) => pageObj(index) + 1;
     int imageObj(int index) => pageObj(index) + 2;

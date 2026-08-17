@@ -1,5 +1,3 @@
-//! Aspect-ratio estimation from the quad's vanishing points.
-
 use super::geometry::{Point, Quad, norm};
 
 #[derive(Clone, Copy, Debug)]
@@ -158,7 +156,6 @@ mod tests {
 
     #[test]
     fn estimate_real_dimensions_falls_back_for_weak_perspective() {
-        // f exceeds max(w,h)*1.2, so the fallback applies.
         let quad = Quad {
             top_left: Point::new(100.0, 100.0),
             top_right: Point::new(900.0, 100.0),

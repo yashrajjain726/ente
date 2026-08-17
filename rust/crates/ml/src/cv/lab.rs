@@ -1,5 +1,3 @@
-//! 8-bit BGR <-> Lab, as fixed-point dot products over precomputed tables.
-//!
 //! L, a and b are all scaled onto 0..255 (a and b biased by 128); the
 //! pipeline's chroma and luminance thresholds are calibrated in these units.
 
@@ -20,7 +18,6 @@ const MIN_AB_VALUE: i32 = -8145;
 const AB_TO_XZ_LEN: usize = (LAB_BASE as usize) * 9 / 4;
 const LAB2RGB_SHIFT: i32 = LAB_SHIFT + (BASE_SHIFT - INV_GAMMA_SHIFT);
 
-// sRGB <-> XYZ (D65), rows normalized by the white point during table build.
 const SRGB2XYZ_D65: [f64; 9] = [
     0.412453, 0.35758, 0.180423, 0.212671, 0.71516, 0.072169, 0.019334, 0.119193, 0.950227,
 ];
@@ -76,9 +73,7 @@ struct LabTabs {
     srgb_inv_gamma: Box<[u16]>,
     lab_to_yf: [u16; 512],
     ab_to_xz: Box<[i32]>,
-    /// Ordered so a BGR pixel is consumed in storage order.
     fwd_coeffs: [i32; 9],
-    /// Rows are R, G, B.
     inv_coeffs: [i32; 9],
 }
 
@@ -128,7 +123,6 @@ fn build_tabs() -> LabTabs {
         lab_to_yf[i as usize * 2 + 1] = ify as u16;
     }
 
-    // Integer division truncates toward zero; `i` starts negative.
     let mut ab_to_xz = vec![0i32; AB_TO_XZ_LEN];
     let bias = LAB_BASE * 16 / 116 * 108 / 841;
     for (k, out) in ab_to_xz.iter_mut().enumerate() {

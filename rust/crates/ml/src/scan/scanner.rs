@@ -29,16 +29,12 @@ pub enum ScanError {
 pub struct ScanOptions {
     pub color_mode_override: Option<ColorMode>,
     pub max_pixels: Option<u32>,
-    /// Must be a multiple of 90.
     pub rotation_degrees: i32,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ReprocessOptions {
-    /// Same coordinate space as [`ScanResult::quad`]: the decoded source
-    /// image.
     pub quad: Quad,
-    /// Must be a multiple of 90.
     pub rotation_degrees: i32,
     pub color_mode: ColorMode,
     pub max_pixels: Option<u32>,
@@ -47,17 +43,12 @@ pub struct ReprocessOptions {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ScanResult {
-    /// In decoded-source coordinates (EXIF applied, before
-    /// `rotation_degrees`); `None` when nothing was detected and the whole
-    /// frame was returned.
     pub quad: Option<Quad>,
     pub color_mode: ColorMode,
     pub output_width: u32,
     pub output_height: u32,
-    /// The size [`ScanResult::quad`] is relative to.
     pub source_width: u32,
     pub source_height: u32,
-    /// JPEG-encoded.
     pub processed_image: Vec<u8>,
 }
 
@@ -66,8 +57,6 @@ pub struct ScannerSession {
 }
 
 impl ScannerSession {
-    /// The caller is expected to have verified the model file against
-    /// [`SEGMENTATION_MODEL_SHA256`](super::SEGMENTATION_MODEL_SHA256).
     pub fn new(model_path: &str) -> Result<Self, ScanError> {
         let start = std::time::Instant::now();
         let result = Self::load(model_path);
@@ -101,9 +90,6 @@ impl ScannerSession {
         Ok(Mask::from_probmap(&probmap, MASK_SIDE, MASK_SIDE))
     }
 
-    /// The returned quad is in mask space (256x256), already rotated by
-    /// `rotation_degrees`: the caller rotates the overlay quad, not the
-    /// frame.
     pub fn live_detect_rgba(
         &self,
         rgba: &[u8],
@@ -116,7 +102,6 @@ impl ScannerSession {
         self.live_detect(&bgr, rotation_degrees)
     }
 
-    /// Quad semantics as in [`Self::live_detect_rgba`].
     pub fn live_detect_yuv420(
         &self,
         y: &[u8],
@@ -196,7 +181,6 @@ impl ScannerSession {
         finish(Some(quad), color_mode, &bgr, &page, DEFAULT_JPEG_QUALITY)
     }
 
-    /// No inference runs.
     pub fn reprocess(
         &self,
         source_bytes: &[u8],

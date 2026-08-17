@@ -1,6 +1,3 @@
-//! Scalar multiply and the weighted sum deliberately promote to f64; the
-//! rest stays in f32.
-
 use rayon::prelude::*;
 
 use crate::cv::OpResult;

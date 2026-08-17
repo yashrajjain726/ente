@@ -13,13 +13,11 @@ use crate::cv::image::{ImageRef, ImageU8};
 pub const MASK_SIDE: i32 = 256;
 
 pub(crate) struct Segmenter {
-    // `Session::run` needs `&mut self`.
     session: Mutex<Session>,
 }
 
 impl Segmenter {
-    /// CPU-only on purpose: the model is tiny and the thresholded downstream
-    /// pipeline needs deterministic output across devices.
+    /// CPU-only on purpose: downstream thresholds need deterministic output across devices.
     pub(crate) fn new(model_path: &str) -> Result<Self, ScanError> {
         let build = || -> Result<Session, ort::Error> {
             Session::builder()?
@@ -76,7 +74,6 @@ impl Segmenter {
         };
         let data = run()?;
 
-        // The model outputs probabilities directly; no sigmoid.
         Ok(data
             .iter()
             .map(|&v| (v.clamp(0.0, 1.0) * 255.0).round_ties_even() as u8)

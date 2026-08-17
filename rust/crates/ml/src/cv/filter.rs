@@ -3,7 +3,6 @@ use crate::cv::image::{ImageF32, ImageU8};
 
 use super::reflect101;
 
-/// Taps sum to 256 (8 fractional bits).
 fn gaussian_taps(n: i32) -> OpResult<&'static [u32]> {
     Ok(match n {
         1 => &[256],
@@ -28,7 +27,6 @@ pub(crate) fn gaussian_blur_u8(src: &ImageU8, ksize: i32) -> OpResult<ImageU8> {
     let (w, h) = (src.width as usize, src.height as usize);
     let (ax, ay) = ((kw / 2) as i64, (kh / 2) as i64);
 
-    // Horizontal pass into u16 (taps sum to 256), vertical into u32.
     let mut hsum = vec![0u16; w * h];
     for y in 0..h {
         let row = &src.data[y * w..(y + 1) * w];

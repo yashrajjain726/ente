@@ -16,8 +16,6 @@ pub(crate) fn rotate_u8(src: &ImageU8, degrees: i32) -> OpResult<ImageU8> {
     };
 
     let mut data = vec![0u8; src.data.len()];
-    // A per-pixel `copy_from_slice` is a `memcpy` call per pixel; the common
-    // channel counts are spelled out instead.
     let move_px = |dst: &mut [u8], d: usize, s: usize| match cn {
         1 => dst[d] = src.data[s],
         3 => {

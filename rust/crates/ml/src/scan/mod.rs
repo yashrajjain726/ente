@@ -22,8 +22,6 @@ use std::path::PathBuf;
 use ente_assets::download::CancellationToken;
 use ente_assets::{Asset, AssetFile, AssetStore};
 
-/// Downloads are verified against this before the path reaches
-/// [`ScannerSession::new`].
 pub const SEGMENTATION_MODEL_SHA256: &str =
     "36b8eeadd42592af496bf2e125a6aad9bebcbca1bda2ac19fa22e108574217a3";
 

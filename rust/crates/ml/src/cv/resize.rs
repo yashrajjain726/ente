@@ -1,5 +1,4 @@
-//! The `Interpolation` algs sample without low-pass filtering; downstream
-//! calibration depends on that.
+//! Sampling without low-pass filtering; downstream calibration depends on that.
 
 use fast_image_resize::{
     FilterType, PixelType, ResizeAlg, ResizeOptions, Resizer,

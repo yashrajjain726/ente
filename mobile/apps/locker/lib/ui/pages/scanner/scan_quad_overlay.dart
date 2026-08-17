@@ -3,9 +3,6 @@ import 'package:flutter/scheduler.dart' show Ticker;
 import 'package:locker/services/scanner/scan_geometry.dart';
 import 'package:locker/services/scanner/scanner_models.dart';
 
-/// Draws the stabilized detection quad over the preview, easing towards each
-/// new target a little every frame. [quad] is in mask space and is stretched
-/// onto this widget's box, which must exactly cover the preview frame.
 class ScanQuadOverlay extends StatefulWidget {
   const ScanQuadOverlay({super.key, required this.quad, required this.color});
 

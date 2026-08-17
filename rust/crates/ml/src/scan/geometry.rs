@@ -71,8 +71,6 @@ impl Quad {
         ]
     }
 
-    /// A negative `iterations` falls into the identity branch (truncating
-    /// `%`).
     pub(crate) fn rotate90(&self, iterations: i32, image_size: ImageSize) -> Quad {
         let rotate = |p: Point| -> Point {
             match iterations % 4 {
@@ -138,7 +136,6 @@ mod tests {
 
     #[test]
     fn create_quad_orders_corners_by_angle_from_centroid() {
-        // With y down, atan2 ascending starts at the top-left.
         let vertices = vec![
             Point::new(100.0, 100.0),
             Point::new(0.0, 100.0),

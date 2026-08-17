@@ -16,7 +16,6 @@ pub(crate) fn size_trunc(width: f64, height: f64) -> (i32, i32) {
     (width as i32, height as i32)
 }
 
-/// The returned quad is in mask coordinates.
 pub(crate) fn detect_document_quad(
     mask: &Mask,
     original_size: ImageSize,
@@ -75,8 +74,7 @@ fn find_quad_from_orientation_with_adaptive_threshold(
     Ok(best_quad)
 }
 
-/// Deliberately no upper bound: corners past the mask edge are legitimate
-/// for edge-touching documents.
+/// Deliberately no upper bound: edge-touching documents put corners past the mask edge.
 pub(crate) fn is_valid_quad(quad: &[Point]) -> bool {
     quad.iter().all(|p| p.x >= 0.0 && p.y >= 0.0)
 }

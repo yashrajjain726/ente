@@ -1,6 +1,3 @@
-//! Point `ENTE_DOC_SEGMENTATION_MODEL` at the model file; without it every
-//! test skips.
-
 use std::io::Cursor;
 
 use ente_ml::scan::{ColorMode, PlaneLayout, Quad, ReprocessOptions, ScanOptions, ScannerSession};
@@ -114,8 +111,6 @@ fn live_detect_rgba_and_yuv_agree_on_a_grayscale_frame() {
     let mut rgba = Vec::with_capacity((width * height * 4) as usize);
     let mut y_plane = Vec::with_capacity((width * height) as usize);
     for px in doc.pixels() {
-        // value = 1.164 * (y - 16), chroma neutral, so the limited-range YUV
-        // round trip is exact.
         let y = 16 + (px.0[0] as i32 * 219 / 255) as u8;
         let value = (((y as i32 - 16) * 1164 + 500) / 1000).clamp(0, 255) as u8;
         rgba.extend_from_slice(&[value, value, value, 255]);

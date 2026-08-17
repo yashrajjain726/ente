@@ -1,5 +1,3 @@
-//! Row-major, channel-interleaved, fully packed (no row padding).
-
 use super::OpResult;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -140,7 +138,6 @@ impl Image {
     }
 }
 
-/// `area` is the shoelace area.
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct Contour {
     pub points: Vec<(i32, i32)>,

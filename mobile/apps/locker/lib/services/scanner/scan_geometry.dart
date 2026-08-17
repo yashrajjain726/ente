@@ -16,8 +16,6 @@ double maxCornerDistance(ScanQuad a, ScanQuad b) {
   return worst;
 }
 
-/// Orders four corners clockwise by angle around their centroid; the first
-/// corner after sorting is the top-left role.
 ScanQuad orderClockwise(List<Offset> corners) {
   assert(corners.length == 4);
   final cx = corners.map((c) => c.dx).reduce((a, b) => a + b) / 4;
@@ -31,8 +29,6 @@ ScanQuad orderClockwise(List<Offset> corners) {
   return ScanQuad(sorted);
 }
 
-/// The rectangle content of aspect ratio [aspect] occupies inside [container]
-/// under BoxFit.contain.
 Rect fittedRect(Size container, double aspect) {
   final containerAspect = container.width / container.height;
   final Size display = aspect > containerAspect
@@ -46,8 +42,6 @@ Rect fittedRect(Size container, double aspect) {
   );
 }
 
-/// A quad is surfaced only once [requiredStableFrames] consecutive detections
-/// agree to within [maxCornerDrift] in mask space.
 class QuadStabilizer {
   static const double maxCornerDrift = 20.0;
   static const int requiredStableFrames = 3;

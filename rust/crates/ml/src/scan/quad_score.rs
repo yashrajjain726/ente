@@ -8,8 +8,6 @@ pub(crate) fn make_polygon_mask(width: i32, height: i32, polygon: &[Point]) -> O
     cv::fill_poly(width, height, &pts, 1.0)
 }
 
-/// `probmap` values are 0..255 (the binarized mask as f32), not normalized
-/// probabilities.
 pub(crate) fn score_quad_against_probmap(
     quad: &[Point],
     probmap: &ImageF32,

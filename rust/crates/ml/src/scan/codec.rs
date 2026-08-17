@@ -4,7 +4,6 @@ use ente_image::image_compression::{EncodedImageFormat, encode_rgb};
 use super::scanner::ScanError;
 use crate::cv::image::ImageU8;
 
-/// EXIF orientation comes pre-applied by the decoder.
 pub(crate) fn decode_bgr(bytes: &[u8]) -> Result<ImageU8, ScanError> {
     let decoded = decode_image_from_bytes(bytes)
         .map_err(|err| ScanError::Codec(format!("failed to decode image: {err}")))?;

@@ -13,9 +13,6 @@ import 'package:locker/ui/components/text_input_sheet.dart';
 import 'package:locker/ui/pages/scanner/scanner_crop_page.dart';
 import 'package:share_plus/share_plus.dart';
 
-/// Review of the scanned pages. Pops with `true` after a successful save so
-/// the capture page can close the flow; popping otherwise returns to the
-/// camera for more pages.
 class ScannerReviewPage extends StatefulWidget {
   const ScannerReviewPage({
     super.key,
@@ -148,8 +145,6 @@ class _ScannerReviewPageState extends State<ScannerReviewPage> {
     );
   }
 
-  /// Reorders and keeps the currently viewed page in view at its new
-  /// position.
   void _onReorder(int oldIndex, int newIndex) {
     final pages = widget.session.pages;
     if (pages.isEmpty) return;
@@ -170,7 +165,6 @@ class _ScannerReviewPageState extends State<ScannerReviewPage> {
     return '${text.substring(0, half)}…${text.substring(text.length - half)}';
   }
 
-  /// Filename styled as an editable field so renaming is discoverable.
   Widget _buildFileNameField(ColorTokens colors) {
     final fileName = widget.session.fileName ?? '';
     return Tooltip(

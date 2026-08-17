@@ -16,11 +16,6 @@ const SHADOW_KERNEL_FRAC: f64 = 1.0 / 16.0;
 const SHADOW_MAX_GAIN: f32 = 2.8;
 const SHADOW_PAPER_PERCENTILE: f64 = 0.90;
 
-/// Flat-field illumination correction on a luminance channel: estimate the
-/// background map (closing + blur at map scale), then divide toward the
-/// paper level. Below `paper / SHADOW_MAX_GAIN` the gain ramps back to 1:
-/// regions that much darker than paper are content (photos, figures), not
-/// cast shadows, and must not be brightened.
 fn remove_shadows(channel: &ImageU8) -> OpResult<ImageU8> {
     let (width, height) = channel.size();
     let long_edge = width.max(height) as f64;
@@ -78,7 +73,6 @@ fn multi_scale_retinex_on_l(bgr: &ImageU8) -> OpResult<ImageU8> {
     let l_float = cv::add_f32_scalar(&l_float_raw, 1.0)?;
 
     let scale_factor = 2.0;
-    // `max_dim_small` deliberately uses the untruncated sizes.
     let small_w = l_float.width as f64 / scale_factor;
     let small_h = l_float.height as f64 / scale_factor;
     let (small_cols, small_rows) = size_trunc(small_w, small_h);
@@ -153,8 +147,6 @@ fn multi_scale_retinex_on_l(bgr: &ImageU8) -> OpResult<ImageU8> {
     cv::lab_to_bgr(&merged)
 }
 
-/// Values outside [0,256) are not counted, but the denominator stays the
-/// full pixel count.
 pub(crate) fn percentile_l(l: &ImageF32, p: f64) -> OpResult<f64> {
     let hist = cv::hist_256_f32(l)?;
     let total = l.pixels() as f64;
@@ -186,13 +178,11 @@ fn enhance_grayscale_image(img: &ImageU8) -> OpResult<ImageU8> {
     let img_float = cv::add_f32_scalar(&img_float_raw, 1.0)?;
     let log_img = cv::log_f32(&img_float)?;
 
-    // Unlike the color path, no odd-kernel forcing.
     let kernel_sizes = [max_dim / 6.0, max_dim / 50.0];
     let weight = 1.0 / kernel_sizes.len() as f64;
     let mut retinex = ImageF32::zeros(gray.width, gray.height, 1)?;
 
     for kernel_size in kernel_sizes {
-        // Unlike the color path, blurs the linear image and logs afterwards.
         let (kw, kh) = size_trunc(kernel_size, kernel_size);
         let blur_raw = cv::box_filter_f32(&img_float, kw, kh)?;
         let blur = cv::add_f32_scalar(&blur_raw, 1.0)?;
@@ -218,7 +208,6 @@ fn enhance_grayscale_image(img: &ImageU8) -> OpResult<ImageU8> {
 
     let result8u = cv::f32_to_u8(&clamped)?;
 
-    // The mode over [180,255] estimates the background level.
     let hist = cv::hist_256_u8(&result8u)?;
     let mut mode_val = 220usize;
     let mut mode_count = 0.0f64;
@@ -230,7 +219,6 @@ fn enhance_grayscale_image(img: &ImageU8) -> OpResult<ImageU8> {
     }
 
     let stretched8u = if mode_val >= 254 {
-        // Retinex over-amplified; normalize the original grayscale instead.
         let gray_f = cv::u8_to_f32(&gray)?;
         let g_low = cv::percentile_f32(&gray_f, 0.01)? as f64;
         let g_high = cv::percentile_f32(&gray_f, 0.99)? as f64;

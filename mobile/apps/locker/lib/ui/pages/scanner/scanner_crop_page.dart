@@ -9,8 +9,6 @@ import 'package:locker/services/scanner/scan_geometry.dart';
 import 'package:locker/services/scanner/scan_session_controller.dart';
 import 'package:locker/services/scanner/scanner_models.dart';
 
-/// Manual corner adjustment on the source capture. Saving re-renders the
-/// page; cancelling discards the edit.
 class ScannerCropPage extends StatefulWidget {
   const ScannerCropPage({
     super.key,

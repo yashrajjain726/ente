@@ -1,5 +1,3 @@
-//! YUV_420_888 camera planes -> packed BGR.
-//!
 //! Reproduces libyuv's limited-range BT.601 fixed-point arithmetic — not the
 //! textbook full-range matrix — because that is what Android camera stacks
 //! apply when converting frames to RGBA, so YUV and RGBA frames yield the
@@ -7,7 +5,6 @@
 
 use crate::cv::image::ImageU8;
 
-// Q6 fixed-point BT.601 limited-range coefficients.
 const YG: i32 = 18997; // round(1.164 * 64 * 256 * 256 / 257)
 const YGB: i32 = -1160; // 1.164 * 64 * -16 + 64 * 0.5 (rounding bias folded in)
 const UB: i32 = -128; // max(-128, round(-2.018 * 64)): clamped to fit a signed byte
@@ -15,7 +12,6 @@ const UG: i32 = 25; // round(0.391 * 64)
 const VG: i32 = 52; // round(0.813 * 64)
 const VR: i32 = -102; // round(-1.596 * 64)
 
-// Bias terms; fold in the -128 U/V offset.
 const BB: i32 = UB * 128 + YGB;
 const BG: i32 = UG * 128 + VG * 128 + YGB;
 const BR: i32 = VR * 128 + YGB;
@@ -31,7 +27,6 @@ fn clamp_u8(value: i32) -> u8 {
 #[inline]
 pub(crate) fn yuv_to_bgr(y: u8, u: u8, v: u8) -> (u8, u8, u8) {
     let (y, u, v) = (y as i32, u as i32, v as i32);
-    // 0x0101 replicates 8 bits to 16, keeping the luma multiply in 32 bits.
     let y1 = ((y as u32 * 0x0101 * YG as u32) >> 16) as i32;
     let b = clamp_u8((-(u * UB) + y1 + BB) >> 6);
     let g = clamp_u8((-(u * UG + v * VG) + y1 + BG) >> 6);
@@ -156,8 +151,6 @@ pub(crate) fn rgba_to_bgr(rgba: &[u8], width: i32, height: i32) -> Result<ImageU
 mod tests {
     use super::*;
 
-    /// `ub` is a parameter: libyuv's effective blue coefficient (-2.0, from
-    /// the `UB` clamp) differs from the documented -2.018.
     fn reference_yuv_to_bgr(y: u8, u: u8, v: u8, ub: f64) -> (u8, u8, u8) {
         let yf = (y as f64 - 16.0) * 1.164;
         let uf = u as f64 - 128.0;
@@ -212,7 +205,6 @@ mod tests {
         assert_eq!(yuv_to_bgr(235, 128, 128), (255, 255, 255));
         assert_eq!(yuv_to_bgr(0, 128, 128), (0, 0, 0));
         assert_eq!(yuv_to_bgr(255, 128, 128), (255, 255, 255));
-        // Y=126 is the mid point of the limited range 16..235.
         let (b, g, r) = yuv_to_bgr(126, 128, 128);
         assert_eq!((b, g, r), (128, 128, 128));
     }
@@ -309,8 +301,6 @@ mod tests {
         )
         .expect("planar conversion");
 
-        // Android exposes NV21 as two plane views one byte apart into one
-        // interleaved buffer, both with pixel stride 2.
         let cw = ceil_half(width);
         let ch = ceil_half(height);
         let mut vu = vec![0u8; (cw * ch * 2) as usize];

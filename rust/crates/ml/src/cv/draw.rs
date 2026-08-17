@@ -18,7 +18,6 @@ pub(crate) fn fill_poly(
     let mut canvas = GrayImage::new(width as u32, height as u32);
     let color = Luma([saturate_u8_f64(value)]);
 
-    // imageproc wants an open path with distinct first/last points.
     let mut pts: Vec<Point<i32>> = Vec::with_capacity(polygon.len());
     for &(x, y) in polygon {
         if pts.last() != Some(&Point::new(x, y)) {
