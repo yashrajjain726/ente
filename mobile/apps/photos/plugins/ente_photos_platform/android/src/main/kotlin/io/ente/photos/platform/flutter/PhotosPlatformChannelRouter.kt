@@ -4,7 +4,7 @@ import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 
-internal class PhotosPlatformChannelAdapter : MethodChannel.MethodCallHandler {
+internal class PhotosPlatformChannelRouter : MethodChannel.MethodCallHandler {
     private val healthAdapter = DeviceHealthChannelAdapter()
     private val trashAdapter = DeviceTrashChannelAdapter()
     private lateinit var methodChannel: MethodChannel
