@@ -4,7 +4,7 @@ use ente_core::http::{self, Api, ApiConfig, Auth, Http, RetryProfile};
 use ente_core::urls::PRODUCTION_API_ORIGIN;
 use std::sync::RwLock;
 
-pub(crate) const USER_AGENT: &str = concat!("ente-cli/", env!("CARGO_PKG_VERSION"));
+pub(crate) const USER_AGENT: &str = concat!("ente-rs/", env!("CARGO_PKG_VERSION"));
 const FILES_ORIGIN: &str = "https://files.ente.com";
 const THUMBNAILS_ORIGIN: &str = "https://thumbnails.ente.com";
 

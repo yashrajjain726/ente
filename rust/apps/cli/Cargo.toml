@@ -1,5 +1,5 @@
 [package]
-name = "ente-cli"
+name = "ente-rs"
 version = "0.0.1"
 edition = "2024"
 description = "Command-line interface for Ente"

@@ -1284,6 +1284,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0c9ea0ac24bc397ab3c98583a3c9ba74fa56b09a4449bbe172b9b1ddb016027a"
 
 [[package]]
+name = "codegen"
+version = "0.0.0"
+dependencies = [
+ "camino",
+ "flutter_rust_bridge_codegen",
+ "uniffi_bindgen",
+]
+
+[[package]]
 name = "codespan-reporting"
 version = "0.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2428,47 +2437,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ente-cli"
-version = "0.0.1"
-dependencies = [
- "chrono",
- "clap",
- "dialoguer",
- "dirs 5.0.1",
- "ente-accounts",
- "ente-core",
- "ente-paste",
- "ente-test-support",
- "env_logger 0.11.10",
- "futures",
- "indicatif",
- "log",
- "mockito",
- "open",
- "rusqlite",
- "serde",
- "serde_json",
- "sha2 0.11.0",
- "srp",
- "thiserror 2.0.18",
- "tokio",
- "url",
- "urlencoding",
- "uuid",
- "zeroize",
- "zip 2.4.2",
-]
-
-[[package]]
-name = "ente-codegen"
-version = "0.0.0"
-dependencies = [
- "camino",
- "flutter_rust_bridge_codegen",
- "uniffi_bindgen",
-]
-
-[[package]]
 name = "ente-contacts"
 version = "0.0.0"
 dependencies = [
@@ -2694,6 +2662,38 @@ dependencies = [
  "napi-build",
  "napi-derive",
  "ort",
+]
+
+[[package]]
+name = "ente-rs"
+version = "0.0.1"
+dependencies = [
+ "chrono",
+ "clap",
+ "dialoguer",
+ "dirs 5.0.1",
+ "ente-accounts",
+ "ente-core",
+ "ente-paste",
+ "ente-test-support",
+ "env_logger 0.11.10",
+ "futures",
+ "indicatif",
+ "log",
+ "mockito",
+ "open",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "sha2 0.11.0",
+ "srp",
+ "thiserror 2.0.18",
+ "tokio",
+ "url",
+ "urlencoding",
+ "uuid",
+ "zeroize",
+ "zip 2.4.2",
 ]
 
 [[package]]

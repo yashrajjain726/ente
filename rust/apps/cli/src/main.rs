@@ -1,5 +1,5 @@
 use clap::Parser;
-use ente_cli::{
+use ente_rs::{
     Result,
     cli::{Cli, Commands},
     commands,
@@ -17,7 +17,7 @@ async fn main() {
 async fn run() -> Result<()> {
     env_logger::init();
 
-    let config_dir = ente_cli::utils::get_cli_config_dir()?;
+    let config_dir = ente_rs::utils::get_cli_config_dir()?;
     let db_path = config_dir.join("ente.db");
     let storage = Storage::new(&db_path)?;
 
@@ -25,13 +25,13 @@ async fn run() -> Result<()> {
 
     match cli.command {
         Commands::Version => {
-            println!("ente-cli version {}", ente_cli::cli::version::VERSION);
+            println!("ente-rs version {}", ente_rs::cli::version::VERSION);
         }
         Commands::Account(account_cmd) => {
             commands::account::handle_account_command(account_cmd, &storage).await?;
         }
         Commands::Export(export_cmd) => {
-            use ente_cli::models::filter::ExportFilter;
+            use ente_rs::models::filter::ExportFilter;
 
             let filter = ExportFilter {
                 include_shared: export_cmd.shared,
