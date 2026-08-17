@@ -1,5 +1,5 @@
 [package]
-name = "ente-log-uniffi"
+name = "ente-uniffi-log"
 edition = "2024"
 
 [dependencies]

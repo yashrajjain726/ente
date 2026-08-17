@@ -1,1 +1,1 @@
-export const loadWasmCore = () => import("./pkg/ente_core_wasm");
+export const loadWasmCore = () => import("./pkg/ente_wasm_core");

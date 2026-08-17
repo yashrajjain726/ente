@@ -1,5 +1,5 @@
 [package]
-name = "ente-log-wasm"
+name = "ente-wasm-log"
 edition = "2024"
 
 [dependencies]

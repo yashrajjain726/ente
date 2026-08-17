@@ -1,7 +1,7 @@
 use ente_cast::ReceiverCredentials;
 use wasm_bindgen::prelude::*;
 
-use ente_log_wasm as _;
+use ente_wasm_log as _;
 
 #[wasm_bindgen]
 pub struct CastReceiver {

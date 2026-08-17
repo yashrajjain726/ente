@@ -1,1 +1,1 @@
-ente_log_frb::setup!(crate::frb_generated::StreamSink);
+ente_frb_log::setup!(crate::frb_generated::StreamSink);

@@ -37,15 +37,15 @@ ente-cast = { path = "crates/cast" }
 ente-contacts = { path = "crates/contacts" }
 ente-core = { path = "crates/core" }
 ente-ensu = { path = "crates/ensu" }
-ente-log-frb = { path = "bindings/frb/log" }
+ente-frb-log = { path = "bindings/frb/log" }
 ente-image = { path = "crates/image" }
 ente-ml = { path = "crates/ml" }
 ente-paste = { path = "crates/paste" }
 ente-photos = { path = "crates/photos" }
 ente-space = { path = "crates/space" }
 ente-test-support = { path = "crates/test-support" }
-ente-log-uniffi = { path = "bindings/uniffi/log" }
-ente-log-wasm = { path = "bindings/wasm/log" }
+ente-uniffi-log = { path = "bindings/uniffi/log" }
+ente-wasm-log = { path = "bindings/wasm/log" }
 flutter_rust_bridge = "=2.12.0"
 flutter_rust_bridge_codegen = "=2.12.0"
 log = "0.4.29"
