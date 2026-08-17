@@ -1014,18 +1014,15 @@ class CollectionsService {
 
   Future<void> trashEmptyCollection(
     Collection collection, {
-    //  during bulk deletion, this event is not fired to avoid quick refresh
-    //  of the collection gallery
+    // Avoid rapid gallery refreshes during bulk deletion.
     bool isBulkDelete = false,
   }) async {
     try {
       if (!isBulkDelete) {
         await _turnOffDeviceFolderSync(collection);
       }
-      // While trashing empty albums, we must pass keepFiles flag as True.
-      // The server will verify that the collection is actually empty before
-      // deleting the files. If keepFiles is set as False and the collection
-      // is not empty, then the files in the collections will be moved to trash.
+      // keepFiles makes the server reject deletion unless the album is empty;
+      // false would trash any files still in it.
       await collectionsGateway.deleteCollection(
         collectionID: collection.id,
         keepFiles: true,
@@ -1220,8 +1217,7 @@ class CollectionsService {
 
   Future<void> rename(Collection collection, String newName) async {
     try {
-      // Note: when collection created to sharing few files is renamed
-      // convert that collection to a regular collection type.
+      // Renaming a quick-share album makes it a regular album.
       if (collection.isQuickLinkCollection()) {
         await updateMagicMetadata(collection, {"subType": 0});
       }
@@ -1281,8 +1277,7 @@ class CollectionsService {
         utf8.encode(jsonEncode(jsonToUpdate)),
         key,
       );
-      // for required field, the json validator on golang doesn't treat 0 as valid
-      // value. Instead of changing version to ptr, decided to start version with 1.
+      // Go's required-field validation rejects version 0.
       final int currentVersion = max(collection.mMdVersion, 1);
       final params = UpdateMagicMetadataRequest(
         id: collection.id,
@@ -1333,8 +1328,7 @@ class CollectionsService {
         utf8.encode(jsonEncode(jsonToUpdate)),
         key,
       );
-      // for required field, the json validator on golang doesn't treat 0 as valid
-      // value. Instead of changing version to ptr, decided to start version with 1.
+      // Go's required-field validation rejects version 0.
       final int currentVersion = max(collection.mMbPubVersion, 1);
       final params = UpdateMagicMetadataRequest(
         id: collection.id,
@@ -1389,8 +1383,7 @@ class CollectionsService {
         utf8.encode(jsonEncode(jsonToUpdate)),
         key,
       );
-      // for required field, the json validator on golang doesn't treat 0 as valid
-      // value. Instead of changing version to ptr, decided to start version with 1.
+      // Go's required-field validation rejects version 0.
       final int currentVersion = max(collection.sharedMmdVersion, 1);
       final params = UpdateMagicMetadataRequest(
         id: collection.id,

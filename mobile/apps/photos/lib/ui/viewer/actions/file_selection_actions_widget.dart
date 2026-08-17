@@ -1,5 +1,5 @@
 import "dart:async";
-
+import "dart:io";
 import "package:ente_icons/ente_icons.dart";
 import "package:ente_pure_utils/ente_pure_utils.dart";
 import "package:ente_strings/ente_strings.dart";
@@ -207,6 +207,19 @@ class _FileSelectionActionsWidgetState
         ),
       );
     } else {
+      if (widget.type != GalleryType.sharedPublicCollection) {
+        items.add(
+          SelectionActionButton(
+            labelText: context.strings.share,
+            hugeIcon: Platform.isIOS
+                ? HugeIcons.strokeRoundedShare03
+                : HugeIcons.strokeRoundedShare08,
+            key: shareButtonKey,
+            onTap: _shareSelectedFiles,
+          ),
+        );
+      }
+
       if (widget.type.showCreateLink()) {
         if (_cachedCollectionForSharedLink != null && anyUploadedFiles) {
           items.add(
@@ -227,36 +240,6 @@ class _FileSelectionActionsWidgetState
             ),
           );
         }
-      }
-      if (widget.type == GalleryType.peopleTag && widget.person != null) {
-        items.add(
-          SelectionActionButton(
-            hugeIcon: HugeIcons.strokeRoundedUserRemove01,
-            labelText: context.strings.notPersonLabel(
-              name: widget.person!.data.name,
-            ),
-            onTap: _onNotpersonClicked,
-          ),
-        );
-        if (ownedFilesCount == 1) {
-          items.add(
-            SelectionActionButton(
-              hugeIcon: HugeIcons.strokeRoundedImage01,
-              labelText: context.strings.useAsCover,
-              onTap: anyUploadedFiles ? _setPersonCover : null,
-            ),
-          );
-        }
-      }
-
-      if (widget.type == GalleryType.cluster && widget.clusterID != null) {
-        items.add(
-          SelectionActionButton(
-            labelText: context.strings.notThisPerson,
-            hugeIcon: HugeIcons.strokeRoundedUserRemove01,
-            onTap: _onRemoveFromClusterClicked,
-          ),
-        );
       }
 
       final showUploadIcon =
@@ -313,18 +296,6 @@ class _FileSelectionActionsWidgetState
         );
       }
 
-      if (widget.type.showDeleteOption()) {
-        items.add(
-          SelectionActionButton(
-            hugeIcon: HugeIcons.strokeRoundedDelete01,
-            labelText: context.strings.delete,
-            onTap: anyOwnedFiles ? _onDeleteClick : null,
-            shouldShow: allOwnedFiles,
-            isCritical: true,
-          ),
-        );
-      }
-
       if (widget.type.showRemoveFromAlbum()) {
         items.add(
           SelectionActionButton(
@@ -332,6 +303,16 @@ class _FileSelectionActionsWidgetState
             labelText: context.strings.removeFromAlbum,
             onTap: removeCount > 0 ? _removeFilesFromAlbum : null,
             shouldShow: removeCount > 0,
+          ),
+        );
+      }
+
+      if (widget.type.showRemoveFromHiddenAlbum()) {
+        items.add(
+          SelectionActionButton(
+            hugeIcon: HugeIcons.strokeRoundedRemove01,
+            labelText: context.strings.removeFromAlbum,
+            onTap: _removeFilesFromHiddenAlbum,
           ),
         );
       }
@@ -346,12 +327,45 @@ class _FileSelectionActionsWidgetState
         );
       }
 
-      if (widget.type.showRemoveFromHiddenAlbum()) {
+      if (widget.type.showDeleteOption()) {
         items.add(
           SelectionActionButton(
-            hugeIcon: HugeIcons.strokeRoundedRemove01,
-            labelText: context.strings.removeFromAlbum,
-            onTap: _removeFilesFromHiddenAlbum,
+            hugeIcon: HugeIcons.strokeRoundedDelete01,
+            labelText: context.strings.delete,
+            onTap: anyOwnedFiles ? _onDeleteClick : null,
+            shouldShow: allOwnedFiles,
+            isCritical: true,
+          ),
+        );
+      }
+
+      if (widget.type.showRestoreOption()) {
+        items.add(
+          SelectionActionButton(
+            hugeIcon: HugeIcons.strokeRoundedRestoreBin,
+            labelText: context.strings.restore,
+            onTap: _restore,
+          ),
+        );
+      }
+
+      if (widget.type.showPermanentlyDeleteOption()) {
+        items.add(
+          SelectionActionButton(
+            hugeIcon: HugeIcons.strokeRoundedDelete01,
+            labelText: context.strings.permanentlyDelete,
+            onTap: _permanentlyDelete,
+            isCritical: true,
+          ),
+        );
+      }
+
+      if (showDownloadOption) {
+        items.add(
+          SelectionActionButton(
+            labelText: context.strings.download,
+            hugeIcon: HugeIcons.strokeRoundedDownload01,
+            onTap: () => _download(widget.selectedFiles.files.toList()),
           ),
         );
       }
@@ -375,13 +389,6 @@ class _FileSelectionActionsWidgetState
           ),
         );
       }
-      items.add(
-        SelectionActionButton(
-          hugeIcon: HugeIcons.strokeRoundedIncognito,
-          labelText: context.strings.guestView,
-          onTap: _onGuestViewClick,
-        ),
-      );
 
       if (flagService.manualTagFileToPerson &&
           widget.type.showAddToPersonOption()) {
@@ -394,6 +401,38 @@ class _FileSelectionActionsWidgetState
           ),
         );
       }
+
+      if (widget.type == GalleryType.peopleTag && widget.person != null) {
+        items.add(
+          SelectionActionButton(
+            hugeIcon: HugeIcons.strokeRoundedUserRemove01,
+            labelText: context.strings.notPersonLabel(
+              name: widget.person!.data.name,
+            ),
+            onTap: _onNotpersonClicked,
+          ),
+        );
+        if (ownedFilesCount == 1) {
+          items.add(
+            SelectionActionButton(
+              hugeIcon: HugeIcons.strokeRoundedImage01,
+              labelText: context.strings.useAsCover,
+              onTap: anyUploadedFiles ? _setPersonCover : null,
+            ),
+          );
+        }
+      }
+
+      if (widget.type == GalleryType.cluster && widget.clusterID != null) {
+        items.add(
+          SelectionActionButton(
+            labelText: context.strings.notThisPerson,
+            hugeIcon: HugeIcons.strokeRoundedUserRemove01,
+            onTap: _onRemoveFromClusterClicked,
+          ),
+        );
+      }
+
       if (widget.type != GalleryType.sharedPublicCollection) {
         items.add(
           SelectionActionButton(
@@ -424,6 +463,7 @@ class _FileSelectionActionsWidgetState
           ),
         );
       }
+
       if (widget.type.showArchiveOption()) {
         items.add(
           SelectionActionButton(
@@ -440,27 +480,6 @@ class _FileSelectionActionsWidgetState
             labelText: context.strings.unarchive,
             onTap: _onUnArchiveClick,
             shouldShow: ownedFilesCount > 0,
-          ),
-        );
-      }
-
-      if (widget.type.showRestoreOption()) {
-        items.add(
-          SelectionActionButton(
-            hugeIcon: HugeIcons.strokeRoundedRestoreBin,
-            labelText: context.strings.restore,
-            onTap: _restore,
-          ),
-        );
-      }
-
-      if (widget.type.showPermanentlyDeleteOption()) {
-        items.add(
-          SelectionActionButton(
-            hugeIcon: HugeIcons.strokeRoundedDelete01,
-            labelText: context.strings.permanentlyDelete,
-            onTap: _permanentlyDelete,
-            isCritical: true,
           ),
         );
       }
@@ -499,25 +518,13 @@ class _FileSelectionActionsWidgetState
         );
       }
 
-      if (showDownloadOption) {
-        items.add(
-          SelectionActionButton(
-            labelText: context.strings.download,
-            hugeIcon: HugeIcons.strokeRoundedDownload01,
-            onTap: () => _download(widget.selectedFiles.files.toList()),
-          ),
-        );
-      }
-      if (widget.type != GalleryType.sharedPublicCollection) {
-        items.add(
-          SelectionActionButton(
-            labelText: context.strings.share,
-            hugeIcon: HugeIcons.strokeRoundedShare03,
-            key: shareButtonKey,
-            onTap: _shareSelectedFiles,
-          ),
-        );
-      }
+      items.add(
+        SelectionActionButton(
+          hugeIcon: HugeIcons.strokeRoundedIncognito,
+          labelText: context.strings.guestView,
+          onTap: _onGuestViewClick,
+        ),
+      );
     }
 
     if (items.isNotEmpty) {

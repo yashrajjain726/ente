@@ -241,8 +241,7 @@ Future<Uint8List?> _getThumbnailForUpload(
   }
 }
 
-// check if the assetType is still the same. This can happen for livePhotos
-// if the user turns off the video using native photos app
+// iOS Photos can turn a Live Photo into a regular image after import.
 void _assertFileType(AssetEntity asset, EnteFile file) {
   final assetType = fileTypeFromAsset(asset);
   if (assetType == file.fileType) {

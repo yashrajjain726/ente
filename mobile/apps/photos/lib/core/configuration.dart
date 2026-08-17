@@ -43,6 +43,8 @@ import 'package:photos/services/favorites_service.dart';
 import "package:photos/services/home_widget_service.dart";
 import 'package:photos/services/ignored_files_service.dart';
 import "package:photos/services/machine_learning/face_ml/person/person_service.dart";
+import "package:photos/services/machine_learning/ml_run_control.dart";
+import "package:photos/services/machine_learning/ml_service.dart";
 import "package:photos/services/machine_learning/similar_images_service.dart";
 import "package:photos/services/memory_share_service.dart";
 import "package:photos/services/notification_service.dart";
@@ -94,7 +96,9 @@ class Configuration implements LockScreenHost, AccountDeletionHost {
       );
       _documentsDirectory = (await getApplicationDocumentsDirectory()).path;
       final appSupportDirectory = await getApplicationSupportDirectory();
-      // Exclude Documents (SQLite, thumbnails, decrypted media) and Application Support (ML models) from backups since they’re server-derivable or must remain within the device’s E2EE boundary.
+      // Exclude Documents (SQLite, thumbnails, decrypted media) and Application
+      // Support (ML models) from backups. They are server-derivable or must
+      // remain within the device's E2EE boundary.
       await excludeFromBackup(_documentsDirectory);
       await excludeFromBackup(appSupportDirectory.path);
       _tempDocumentsDirPath = _documentsDirectory + "/temp/";
@@ -189,6 +193,7 @@ class Configuration implements LockScreenHost, AccountDeletionHost {
   @override
   Future<void> logout({bool autoLogout = false}) async {
     _logger.info("Logging out, autoLogout: $autoLogout");
+    MLService.instance.stopActiveRun(MlStopReason.logout);
     if (!autoLogout) {
       if (flagService.stopStreamProcess) {
         VideoPreviewService.instance.stop('logout');
