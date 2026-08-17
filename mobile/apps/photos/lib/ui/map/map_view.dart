@@ -3,12 +3,9 @@ import "dart:io" show Platform;
 import "package:ente_pure_utils/ente_pure_utils.dart";
 import "package:flutter/material.dart";
 import "package:flutter_map/flutter_map.dart";
-import "package:flutter_map_marker_cluster/flutter_map_marker_cluster.dart";
 import "package:latlong2/latlong.dart";
 import "package:photos/ui/map/image_marker.dart";
 import "package:photos/ui/map/map_button.dart";
-import "package:photos/ui/map/map_gallery_tile.dart";
-import "package:photos/ui/map/map_gallery_tile_badge.dart";
 import "package:photos/ui/map/map_marker.dart";
 import "package:photos/ui/map/tile/layers.dart";
 import "package:url_launcher/url_launcher.dart";
@@ -84,14 +81,14 @@ class _MapViewState extends State<MapView> {
   @override
   void initState() {
     super.initState();
-    _markers = _buildMakers();
+    _markers = _buildMarkers();
   }
 
   @override
   void didUpdateWidget(MapView oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (!identical(oldWidget.imageMarkers, widget.imageMarkers)) {
-      _markers = _buildMakers();
+      _markers = _buildMarkers();
     }
   }
 
@@ -134,44 +131,7 @@ class _MapViewState extends State<MapView> {
           ),
           children: [
             const OSMTileLayer(),
-            MarkerClusterLayerWidget(
-              options: MarkerClusterLayerOptions(
-                alignment: Alignment.topCenter,
-                maxClusterRadius: 100,
-                showPolygon: false,
-                spiderfyCluster: false,
-                size: widget.markerSize,
-                padding: const EdgeInsets.all(80),
-                markers: _markers,
-                onClusterTap: (_) {
-                  onChange(
-                    widget.controller.camera.visibleBounds,
-                    widget.controller.camera.zoom,
-                  );
-                },
-                builder: (context, List<Marker> markers) {
-                  final valueKey = markers.first.key as ValueKey;
-                  final index = valueKey.value as int;
-
-                  final imageCount = markers.fold<int>(0, (count, marker) {
-                    final markerIndex = (marker.key! as ValueKey<int>).value;
-                    return count + widget.imageMarkers[markerIndex].imageCount;
-                  });
-                  final clusterKey = 'map-badge-$index-len-$imageCount';
-
-                  return Stack(
-                    key: ValueKey(clusterKey),
-                    children: [
-                      MapGalleryTile(
-                        key: Key(markers.first.key.toString()),
-                        imageMarker: widget.imageMarkers[index],
-                      ),
-                      MapGalleryTileBadge(size: imageCount),
-                    ],
-                  );
-                },
-              ),
-            ),
+            MarkerLayer(markers: _markers),
             Padding(
               padding: EdgeInsets.only(
                 bottom: widget.bottomSheetDraggableAreaHeight,
@@ -247,7 +207,7 @@ class _MapViewState extends State<MapView> {
     );
   }
 
-  List<Marker> _buildMakers() {
+  List<Marker> _buildMarkers() {
     return List<Marker>.generate(widget.imageMarkers.length, (index) {
       final imageMarker = widget.imageMarkers[index];
       return mapMarker(

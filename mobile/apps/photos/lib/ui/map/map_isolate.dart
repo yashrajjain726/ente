@@ -28,15 +28,30 @@ class MapMarkerGroup {
     required this.longitude,
     required this.imageCount,
   });
+}
 
-  MapMarkerGroup withIncrementedCount() {
-    return MapMarkerGroup(
-      imageIndex: imageIndex,
-      latitude: latitude,
-      longitude: longitude,
-      imageCount: imageCount + 1,
-    );
-  }
+class _ProjectedMarkerGroup {
+  final int imageIndex;
+  final double latitude;
+  final double longitude;
+  final double x;
+  final double y;
+  int imageCount = 1;
+
+  _ProjectedMarkerGroup({
+    required this.imageIndex,
+    required this.latitude,
+    required this.longitude,
+    required this.x,
+    required this.y,
+  });
+
+  MapMarkerGroup toMarkerGroup() => MapMarkerGroup(
+    imageIndex: imageIndex,
+    latitude: latitude,
+    longitude: longitude,
+    imageCount: imageCount,
+  );
 }
 
 class MapWorkerInit {
@@ -70,7 +85,7 @@ class MapViewportResult {
   });
 }
 
-const double _markerBucketSizePixels = 64;
+const double _minimumMarkerDistancePixels = 100;
 const double _webMercatorTileSize = 256;
 const double _mercatorLatitudeLimit = 85.05112878;
 
@@ -83,8 +98,9 @@ void mapWorker(MapWorkerInit init) {
     }
 
     final visibleIndexes = <int>[];
-    final groups = <(int, int), MapMarkerGroup>{};
-    final scale = _webMercatorTileSize * pow(2, message.zoom);
+    final groupsByCell = <(int, int), List<_ProjectedMarkerGroup>>{};
+    final groups = <_ProjectedMarkerGroup>[];
+    final scale = _webMercatorTileSize * pow(2, message.zoom).toDouble();
 
     for (final point in init.points) {
       final latLng = LatLng(point.latitude, point.longitude);
@@ -101,26 +117,60 @@ void mapWorker(MapWorkerInit init) {
       final x = (point.longitude + 180) / 360 * scale;
       final y =
           (0.5 - log((1 + sinLatitude) / (1 - sinLatitude)) / (4 * pi)) * scale;
-      final key = (
-        (x / _markerBucketSizePixels).floor(),
-        (y / _markerBucketSizePixels).floor(),
+      final cell = (
+        (x / _minimumMarkerDistancePixels).floor(),
+        (y / _minimumMarkerDistancePixels).floor(),
       );
-      final group = groups[key];
-      groups[key] = group == null
-          ? MapMarkerGroup(
-              imageIndex: point.imageIndex,
-              latitude: point.latitude,
-              longitude: point.longitude,
-              imageCount: 1,
-            )
-          : group.withIncrementedCount();
+      _ProjectedMarkerGroup? closestGroup;
+      var closestDistanceSquared = double.infinity;
+
+      for (var xOffset = -1; xOffset <= 1; xOffset++) {
+        for (var yOffset = -1; yOffset <= 1; yOffset++) {
+          final nearbyGroups =
+              groupsByCell[(cell.$1 + xOffset, cell.$2 + yOffset)];
+          if (nearbyGroups == null) {
+            continue;
+          }
+
+          for (final group in nearbyGroups) {
+            final xDistance = x - group.x;
+            final yDistance = y - group.y;
+            final distanceSquared =
+                xDistance * xDistance + yDistance * yDistance;
+            if (distanceSquared <=
+                    _minimumMarkerDistancePixels *
+                        _minimumMarkerDistancePixels &&
+                distanceSquared < closestDistanceSquared) {
+              closestGroup = group;
+              closestDistanceSquared = distanceSquared;
+            }
+          }
+        }
+      }
+
+      if (closestGroup != null) {
+        closestGroup.imageCount++;
+        continue;
+      }
+
+      final group = _ProjectedMarkerGroup(
+        imageIndex: point.imageIndex,
+        latitude: point.latitude,
+        longitude: point.longitude,
+        x: x,
+        y: y,
+      );
+      groups.add(group);
+      groupsByCell.putIfAbsent(cell, () => []).add(group);
     }
 
     init.sendPort.send(
       MapViewportResult(
         id: message.id,
         visibleImageIndexes: visibleIndexes,
-        markerGroups: groups.values.toList(growable: false),
+        markerGroups: groups
+            .map((group) => group.toMarkerGroup())
+            .toList(growable: false),
       ),
     );
   });

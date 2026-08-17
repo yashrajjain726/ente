@@ -137,11 +137,10 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   Future<void> _startMapWorker(List<MapPoint> mapPoints) async {
-    _mapWorkerReceivePort = ReceivePort();
+    final receivePort = ReceivePort();
     final sendPortCompleter = Completer<SendPort>();
-    _mapWorkerSubscription = _mapWorkerReceivePort!.listen((message) {
+    final subscription = receivePort.listen((message) {
       if (message is SendPort) {
-        _mapWorkerSendPort = message;
         if (!sendPortCompleter.isCompleted) {
           sendPortCompleter.complete(message);
         }
@@ -149,14 +148,23 @@ class _MapScreenState extends State<MapScreen> {
         _applyViewportResult(message);
       }
     });
-    _mapWorkerIsolate = await Isolate.spawn(
+    final isolate = await Isolate.spawn(
       mapWorker,
-      MapWorkerInit(
-        points: mapPoints,
-        sendPort: _mapWorkerReceivePort!.sendPort,
-      ),
+      MapWorkerInit(points: mapPoints, sendPort: receivePort.sendPort),
     );
-    await sendPortCompleter.future;
+    final sendPort = await sendPortCompleter.future;
+
+    if (!mounted) {
+      await subscription.cancel();
+      receivePort.close();
+      isolate.kill();
+      return;
+    }
+
+    _mapWorkerReceivePort = receivePort;
+    _mapWorkerSubscription = subscription;
+    _mapWorkerSendPort = sendPort;
+    _mapWorkerIsolate = isolate;
   }
 
   void _requestViewport(LatLngBounds bounds, double zoom) {
