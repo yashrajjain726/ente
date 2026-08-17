@@ -71,6 +71,7 @@ import "package:photos/utils/people_sort_util.dart";
 class SearchService {
   Future<List<EnteFile>>? _cachedFilesFuture;
   Future<List<EnteFile>>? _cachedFilesForSearch;
+  Future<List<EnteFile>>? _cachedFilesWithLocationForSearch;
   Future<List<EnteFile>>? _cachedFilesForHierarchicalSearch;
   Future<List<EnteFile>>? _cachedFilesForGenericGallery;
   Future<List<EnteFile>>? _cachedFilesForOfflineGallery;
@@ -93,6 +94,7 @@ class SearchService {
           // Invalidate only; reload on demand.
           _cachedFilesFuture = null;
           _cachedFilesForSearch = null;
+          _cachedFilesWithLocationForSearch = null;
           _cachedFilesForHierarchicalSearch = null;
           _cachedFilesForGenericGallery = null;
           _cachedFilesForOfflineGallery = null;
@@ -295,6 +297,13 @@ class SearchService {
     return _cachedFilesForSearch!;
   }
 
+  Future<List<EnteFile>> getFilesWithLocationForSearch() {
+    return _cachedFilesWithLocationForSearch ??= getAllFilesForSearch().then(
+      (files) =>
+          files.where((file) => file.hasLocation).toList(growable: false),
+    );
+  }
+
   Future<bool> hasAnyFilesForSearch() async {
     if (_cachedFilesFuture != null && _cachedFilesForSearch != null) {
       return (await _cachedFilesForSearch!).isNotEmpty;
@@ -434,6 +443,7 @@ class SearchService {
   void clearCache() {
     _cachedFilesFuture = null;
     _cachedFilesForSearch = null;
+    _cachedFilesWithLocationForSearch = null;
     _cachedFilesForHierarchicalSearch = null;
     _cachedFilesForGenericGallery = null;
     _cachedFilesForOfflineGallery = null;
@@ -993,21 +1003,20 @@ class SearchService {
         result[tag] = [];
       }
     }
-    final allFiles = await getAllFilesForSearch();
-    for (EnteFile file in allFiles) {
-      if (file.hasLocation) {
-        for (LocalEntity<LocationTag> tag in result.keys) {
-          if (isFileInsideLocationTag(
-            tag.item.centerPoint,
-            file.location!,
-            tag.item.radius,
-          )) {
-            result[tag]!.add(file);
-          }
+    final filesWithLocation = await getFilesWithLocationForSearch();
+    for (final file in filesWithLocation) {
+      for (final tag in result.keys) {
+        if (isFileInsideLocationTag(
+          tag.item.centerPoint,
+          file.location!,
+          tag.item.radius,
+        )) {
+          result[tag]!.add(file);
         }
       }
     }
     if (showNoLocation) {
+      final allFiles = await getAllFilesForSearch();
       final noLocationFiles = allFiles.where((file) {
         return file.isOwner && !file.hasLocation;
       }).toList();
@@ -1030,10 +1039,7 @@ class SearchService {
     }
     if (showNoLocationTag) {
       _logger.info("finding photos with no location tag");
-      final noLocationTagFiles = allFiles.where((file) {
-        if (!file.hasLocation) {
-          return false;
-        }
+      final noLocationTagFiles = filesWithLocation.where((file) {
         for (LocalEntity<LocationTag> tag in locationTagEntities) {
           if (isFileInsideLocationTag(
             tag.item.centerPoint,
@@ -1094,7 +1100,10 @@ class SearchService {
     if (allCitiesSearch) {
       query = '';
     }
-    final results = await locationService.getFilesInCity(allFiles, query);
+    final results = await locationService.getFilesInCity(
+      filesWithLocation,
+      query,
+    );
     final List<City> sortedByResultCount = results.keys.toList()
       ..sort((a, b) => results[b]!.length.compareTo(results[a]!.length));
     for (final city in sortedByResultCount) {
@@ -1555,7 +1564,7 @@ class SearchService {
       final Map<LocalEntity<LocationTag>, List<EnteFile>> tagToItemsMap = {};
       final List<GenericSearchResult> tagSearchResults = [];
       final locationTagEntities = (await locationService.getLocationTags());
-      final allFiles = await getAllFilesForSearch();
+      final filesWithLocation = await getFilesWithLocationForSearch();
       final List<EnteFile> filesWithNoLocTag = [];
 
       for (int i = 0; i < locationTagEntities.length; i++) {
@@ -1563,22 +1572,20 @@ class SearchService {
         tagToItemsMap[locationTagEntities.elementAt(i)] = [];
       }
 
-      for (EnteFile file in allFiles) {
-        if (file.hasLocation) {
-          bool hasLocationTag = false;
-          for (LocalEntity<LocationTag> tag in tagToItemsMap.keys) {
-            if (isFileInsideLocationTag(
-              tag.item.centerPoint,
-              file.location!,
-              tag.item.radius,
-            )) {
-              hasLocationTag = true;
-              tagToItemsMap[tag]!.add(file);
-            }
+      for (final file in filesWithLocation) {
+        bool hasLocationTag = false;
+        for (final tag in tagToItemsMap.keys) {
+          if (isFileInsideLocationTag(
+            tag.item.centerPoint,
+            file.location!,
+            tag.item.radius,
+          )) {
+            hasLocationTag = true;
+            tagToItemsMap[tag]!.add(file);
           }
-          if (!hasLocationTag) {
-            filesWithNoLocTag.add(file);
-          }
+        }
+        if (!hasLocationTag) {
+          filesWithNoLocTag.add(file);
         }
       }
 

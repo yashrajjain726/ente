@@ -27,7 +27,7 @@ Future<void> openSearchMap(BuildContext context) async {
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (context) => MapScreen(
-          filesFutureFn: SearchService.instance.getAllFilesForSearch,
+          filesFutureFn: SearchService.instance.getFilesWithLocationForSearch,
         ),
       ),
     ),
