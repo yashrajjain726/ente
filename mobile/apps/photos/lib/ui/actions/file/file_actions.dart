@@ -37,6 +37,7 @@ Future<void> showSingleFileDeleteSheet(
       if (!context.mounted) return;
       await showDeleteConfirmationSheet(
         context,
+        files: [file],
         count: 1,
         isLocal: isLocal,
         isRemote: false,
@@ -70,6 +71,7 @@ Future<void> showSingleFileDeleteSheet(
   }
   final didDelete = await showDeleteConfirmationSheet(
     context,
+    files: [file],
     isLocal: isLocal,
     isRemote: isRemote,
     count: 1,

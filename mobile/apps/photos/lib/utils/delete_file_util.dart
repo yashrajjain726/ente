@@ -926,6 +926,7 @@ Future<void> showDeleteSheet(
       didDelete =
           await showDeleteConfirmationSheet(
             context,
+            files: localGalleryDeletableFiles,
             count: localGalleryDeletableFiles.length,
             isLocal: true,
             isRemote: false,
@@ -971,6 +972,7 @@ Future<void> showDeleteSheet(
   var didDeleteLocalFiles = false;
   final actionResult = await showDeleteConfirmationSheet(
     context,
+    files: deletableFiles,
     isLocal: hasLocalFiles,
     isRemote: hasRemoteFiles,
     count: deletableFiles.length,
@@ -1107,6 +1109,7 @@ class _MoreOptionsButtonState extends State<_MoreOptionsButton> {
 
 Future<bool?> showDeleteConfirmationSheet(
   BuildContext context, {
+  required List<EnteFile> files,
   required bool isLocal,
   required bool isRemote,
   required int count,
@@ -1115,10 +1118,11 @@ Future<bool?> showDeleteConfirmationSheet(
   required Future<bool> Function() onDeleteFromBoth,
 }) async {
   final isTrashAction =
-      Platform.isIOS ||
-      (Platform.isAndroid &&
-          flagService.internalUser &&
-          !await isAndroidSDKVersionLowerThan(android11SDKINT));
+      files.every((file) => !file.isSharedMediaToAppSandbox) &&
+      (Platform.isIOS ||
+          (Platform.isAndroid &&
+              flagService.internalUser &&
+              !await isAndroidSDKVersionLowerThan(android11SDKINT)));
   if (!context.mounted) return null;
   return showBottomSheetComponent<bool>(
     context: context,
