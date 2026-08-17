@@ -17,6 +17,7 @@ class FileWidget extends StatelessWidget {
   final BoxDecoration? backgroundDecoration;
   final bool? autoPlay;
   final bool? isFromMemories;
+  final bool? isAudioMutedOverride;
   final Function({required int memoryDuration})? onFinalFileLoad;
   final ValueChanged<File>? onFinalImageLoaded;
   final ValueNotifier<QrCodeDetectionResult?>? qrDetectionsNotifier;
@@ -30,6 +31,7 @@ class FileWidget extends StatelessWidget {
     required this.tagPrefix,
     this.backgroundDecoration,
     this.isFromMemories = false,
+    this.isAudioMutedOverride,
     this.onFinalFileLoad,
     this.onFinalImageLoaded,
     this.qrDetectionsNotifier,
@@ -75,6 +77,7 @@ class FileWidget extends StatelessWidget {
         shouldDisableScroll: shouldDisableScroll,
         onFinalFileLoad: onFinalFileLoad,
         isFromMemories: isFromMemories ?? false,
+        isAudioMutedOverride: isAudioMutedOverride,
         key: key ?? ValueKey(fileKey),
       );
     } else {

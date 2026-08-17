@@ -28,6 +28,7 @@ class VideoWidget extends StatefulWidget {
   final Function(bool)? shouldDisableScroll;
   final Function({required int memoryDuration})? onFinalFileLoad;
   final bool isFromMemories;
+  final bool? isAudioMutedOverride;
 
   const VideoWidget(
     this.file, {
@@ -36,6 +37,7 @@ class VideoWidget extends StatefulWidget {
     this.shouldDisableScroll,
     this.onFinalFileLoad,
     this.isFromMemories = false,
+    this.isAudioMutedOverride,
     super.key,
   });
 
@@ -175,6 +177,7 @@ class _VideoWidgetState extends State<VideoWidget> {
         playlistData: playlistData,
         selectedPreview: playPreview,
         isFromMemories: widget.isFromMemories,
+        isAudioMutedOverride: widget.isAudioMutedOverride,
         onStreamChange: () {
           setState(() {
             selectPreviewForPlay = !selectPreviewForPlay;
@@ -200,6 +203,7 @@ class _VideoWidgetState extends State<VideoWidget> {
       preview: playlistData?.preview,
       selectedPreview: playPreview,
       isFromMemories: widget.isFromMemories,
+      isAudioMutedOverride: widget.isAudioMutedOverride,
       onStreamChange: () {
         setState(() {
           selectPreviewForPlay = !selectPreviewForPlay;

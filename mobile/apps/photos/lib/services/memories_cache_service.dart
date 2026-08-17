@@ -19,6 +19,7 @@ import "package:photos/events/memory_seen_event.dart";
 import "package:photos/events/sync_status_update_event.dart";
 import "package:photos/locale.dart";
 import "package:photos/models/file/file.dart";
+import "package:photos/models/file/file_type.dart";
 import "package:photos/models/memories/memories_cache.dart";
 import "package:photos/models/memories/memory.dart";
 import "package:photos/models/memories/people_memory.dart";
@@ -37,6 +38,7 @@ import "package:photos/services/sync/local_sync_service.dart";
 import "package:photos/theme/colors.dart";
 import "package:photos/ui/home/memories/all_memories_page.dart";
 import "package:photos/ui/home/memories/full_screen_memory.dart";
+import "package:photos/ui/home/memories/memory_music_session.dart";
 import "package:photos/ui/viewer/file/detail_page.dart";
 import "package:photos/ui/viewer/people/people_page.dart";
 import "package:photos/utils/cache_util.dart";
@@ -1387,16 +1389,34 @@ class MemoriesCacheService {
       );
       return;
     }
+    final selectedPersonMemory = personMemory;
     if (context != null && !context.mounted) return;
     await _routeToPage(
-      FullScreenMemoryDataUpdater(
-        initialIndex: 0,
-        memories: personMemory.memories,
-        child: Container(
-          color: backgroundColorDark,
-          width: double.infinity,
-          height: double.infinity,
-          child: FullScreenMemory(personMemory.title, 0),
+      MemoryMusicSession(
+        memories: <SmartMemory>[selectedPersonMemory],
+        initialMemoryID: selectedPersonMemory.id,
+        initialItemIsVideo:
+            selectedPersonMemory.memories.first.file.fileType == FileType.video,
+        builder: (context, musicController) => FullScreenMemoryDataUpdater(
+          initialIndex: 0,
+          memories: selectedPersonMemory.memories,
+          child: Container(
+            color: backgroundColorDark,
+            width: double.infinity,
+            height: double.infinity,
+            child: FullScreenMemory(
+              selectedPersonMemory.title,
+              0,
+              onCurrentItemChanged: (file) {
+                unawaited(
+                  musicController.setCurrentItem(
+                    memoryID: selectedPersonMemory.id,
+                    isVideo: file.fileType == FileType.video,
+                  ),
+                );
+              },
+            ),
+          ),
         ),
       ),
       context: context,

@@ -31,6 +31,7 @@ import "package:photos/services/smart_memories_service.dart";
 import "package:photos/ui/actions/file/file_actions.dart";
 import "package:photos/ui/collections/collection_action_sheet.dart";
 import "package:photos/ui/home/memories/custom_listener.dart";
+import "package:photos/ui/home/memories/memory_music_session.dart";
 import "package:photos/ui/home/memories/memory_progress_indicator.dart";
 import "package:photos/ui/home/memories/memory_share_sheet.dart";
 import "package:photos/ui/home/memories/memory_video_prefetcher.dart";
@@ -328,12 +329,14 @@ class FullScreenMemoryData extends InheritedWidget {
 class FullScreenMemory extends StatefulWidget {
   final String title;
   final int initialIndex;
+  final ValueChanged<EnteFile>? onCurrentItemChanged;
   final VoidCallback? onNextMemory;
   final VoidCallback? onPreviousMemory;
 
   const FullScreenMemory(
     this.title,
     this.initialIndex, {
+    this.onCurrentItemChanged,
     this.onNextMemory,
     this.onPreviousMemory,
     super.key,
@@ -369,6 +372,8 @@ class _FullScreenMemoryState extends State<FullScreenMemory> {
   bool get _isAnimationPaused => _isViewerPaused || _isPlaybackPaused;
   bool _isMediaZoomed = false;
   final _socialControlsVisible = ValueNotifier<bool>(false);
+  FullScreenMemoryData? _memoryData;
+  ValueNotifier<int>? _itemIndexNotifier;
 
   /// Used to check if any pointer is on the screen.
   final hasPointerOnScreenNotifier = ValueNotifier<bool>(false);
@@ -425,12 +430,48 @@ class _FullScreenMemoryState extends State<FullScreenMemory> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final memoryData = FullScreenMemoryData.of(context);
+    final previousMemoryData = _memoryData;
+    _memoryData = memoryData;
+    final nextNotifier = memoryData?.indexNotifier;
+    if (identical(nextNotifier, _itemIndexNotifier)) {
+      if (!identical(previousMemoryData, memoryData)) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _reportCurrentItem();
+        });
+      }
+      return;
+    }
+    _itemIndexNotifier?.removeListener(_reportCurrentItem);
+    _itemIndexNotifier = nextNotifier;
+    _itemIndexNotifier?.addListener(_reportCurrentItem);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _reportCurrentItem();
+    });
+  }
+
+  @override
   void dispose() {
+    _itemIndexNotifier?.removeListener(_reportCurrentItem);
     hasPointerOnScreenNotifier.removeListener(_hasPointerListener);
     _detailSheetEventSubscription.cancel();
     _captionUpdatedSubscription.cancel();
     _socialControlsVisible.dispose();
     super.dispose();
+  }
+
+  void _reportCurrentItem() {
+    if (!mounted) return;
+    final inheritedData = _memoryData;
+    if (inheritedData == null) return;
+    final index = _clampedMemoryIndex(
+      inheritedData.indexNotifier.value,
+      inheritedData.memories.length,
+    );
+    if (index == null) return;
+    widget.onCurrentItemChanged?.call(inheritedData.memories[index].file);
   }
 
   /// Used to check if user has touched the screen and then to pause animation
@@ -629,6 +670,9 @@ class _FullScreenMemoryState extends State<FullScreenMemory> {
 
   void _pauseViewer() {
     if (!mounted) return;
+    unawaited(
+      MemoryMusicScope.of(context, listen: false).setViewerActionPaused(true),
+    );
     _toggleAnimation(pause: true);
     Bus.instance.fire(PauseVideoEvent());
   }
@@ -637,11 +681,15 @@ class _FullScreenMemoryState extends State<FullScreenMemory> {
     if (!mounted) return;
     Bus.instance.fire(ResumeVideoEvent());
     _toggleAnimation(pause: false);
+    unawaited(
+      MemoryMusicScope.of(context, listen: false).setViewerActionPaused(false),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final inheritedData = FullScreenMemoryData.of(context);
+    final memoryMusicController = MemoryMusicScope.of(context);
     if (inheritedData == null || inheritedData.memories.isEmpty) {
       return const SizedBox.shrink();
     }
@@ -739,6 +787,7 @@ class _FullScreenMemoryState extends State<FullScreenMemory> {
                             color: Colors.transparent,
                           ),
                           isFromMemories: true,
+                          isAudioMutedOverride: memoryMusicController.isMuted,
                           shouldDisableScroll: (isZoomed) {
                             _isMediaZoomed = isZoomed;
                           },
@@ -999,6 +1048,39 @@ class _MemoryActionButton extends StatelessWidget {
   }
 }
 
+class _MemoryMusicMuteButton extends StatelessWidget {
+  const _MemoryMusicMuteButton();
+
+  @override
+  Widget build(BuildContext context) {
+    final controller = MemoryMusicScope.of(context);
+    final isMuted = controller.isMuted;
+    return SizedBox.square(
+      dimension: 48,
+      child: IconButton(
+        tooltip: isMuted
+            ? pendingTranslation("Unmute audio")
+            : pendingTranslation("Mute audio"),
+        padding: const EdgeInsets.all(8),
+        style: IconButton.styleFrom(
+          minimumSize: const Size.square(48),
+          maximumSize: const Size.square(48),
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          overlayColor: Colors.white.withValues(alpha: 0.08),
+        ),
+        onPressed: () => unawaited(controller.toggleMuted()),
+        icon: HugeIcon(
+          icon: isMuted
+              ? HugeIcons.strokeRoundedVolumeOff
+              : HugeIcons.strokeRoundedVolumeHigh,
+          color: Colors.white,
+          size: 24,
+        ),
+      ),
+    );
+  }
+}
+
 class _MemoryTopOverlay extends StatelessWidget {
   final String title;
   final VoidCallback onClose;
@@ -1140,6 +1222,8 @@ class _MemoryTopOverlay extends StatelessWidget {
                             ),
                           ),
                         ),
+                        const SizedBox(width: 8),
+                        const _MemoryMusicMuteButton(),
                         if (showFavorite) ...[
                           const SizedBox(width: 8),
                           FavoriteWidget(

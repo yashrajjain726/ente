@@ -312,6 +312,7 @@ flutter:
   assets:
     - assets/
     - assets/rituals/
+    - assets/memory-music/
     - assets/rewind_badges/
     - assets/video-editor/
     - assets/image-editor/
