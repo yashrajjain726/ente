@@ -4,7 +4,6 @@ import 'package:ente_components/ente_components.dart';
 import 'package:ente_strings/ente_strings.dart';
 import 'package:flutter/material.dart';
 import 'package:hugeicons/hugeicons.dart';
-import 'package:locker/services/scanner/pdf_writer.dart';
 import 'package:locker/services/scanner/scan_geometry.dart';
 import 'package:locker/services/scanner/scan_session_controller.dart';
 import 'package:locker/services/scanner/scanner_models.dart';
@@ -45,16 +44,9 @@ class _ScannerCropPageState extends State<ScannerCropPage> {
     }
     final bytes = await page.sourceJpeg.readAsBytes();
     if (!mounted) return;
-    double aspect;
-    try {
-      final info = JpegInfo.parse(bytes);
-      aspect = info.width / info.height;
-    } on FormatException {
-      aspect = page.width / page.height;
-    }
     setState(() {
       _sourceBytes = bytes;
-      _aspect = aspect;
+      _aspect = page.sourceWidth / page.sourceHeight;
       _corners = [
         for (final c in page.quad.corners)
           Offset(c.dx / ScanQuad.maskSide, c.dy / ScanQuad.maskSide),

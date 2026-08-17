@@ -187,7 +187,9 @@ class _ScannerCapturePageState extends State<ScannerCapturePage>
 
   Future<void> _analyze(CameraImage image) async {
     try {
-      final rotation = _camera?.description.sensorOrientation ?? 0;
+      final rotation = Platform.isIOS
+          ? 0
+          : _camera?.description.sensorOrientation ?? 0;
       ScanQuad? raw;
       if (image.planes.length >= 3) {
         raw = await _session.detectLiveYuv(

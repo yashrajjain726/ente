@@ -16,7 +16,6 @@ class RustDocumentScannerService implements DocumentScannerService {
   Directory? _dir;
   ScannerSession? _session;
   Future<void>? _initialization;
-  final Map<String, ({int width, int height})> _sourceDims = {};
   int _counter = 0;
   DateTime _lastLiveLog = DateTime.fromMillisecondsSinceEpoch(0);
 
@@ -153,10 +152,6 @@ class RustDocumentScannerService implements DocumentScannerService {
       final processed = File(p.join(_root.path, '${id}_r0.jpg'));
       await source.writeAsBytes(capturedJpeg, flush: true);
       await processed.writeAsBytes(result.processedImage, flush: true);
-      _sourceDims[id] = (
-        width: result.sourceWidth,
-        height: result.sourceHeight,
-      );
       final quad = result.quad;
       return ScannedPage(
         id: id,
@@ -171,6 +166,8 @@ class RustDocumentScannerService implements DocumentScannerService {
               ),
         rotationDegrees: 0,
         resolvedColorMode: _colorModeFromRust(result.colorMode),
+        sourceWidth: result.sourceWidth,
+        sourceHeight: result.sourceHeight,
         width: result.outputWidth,
         height: result.outputHeight,
       );
@@ -187,15 +184,15 @@ class RustDocumentScannerService implements DocumentScannerService {
     int? rotationDegrees,
   }) async {
     try {
-      final dims = _sourceDims[page.id];
-      if (dims == null) {
-        throw StateError('Unknown page ${page.id}');
-      }
       final sourceBytes = await page.sourceJpeg.readAsBytes();
       final result = await _readySession.reprocess(
         sourceBytes: sourceBytes,
         options: RustReprocessOptions(
-          quad: _sourceQuadFromMask(quad ?? page.quad, dims.width, dims.height),
+          quad: _sourceQuadFromMask(
+            quad ?? page.quad,
+            page.sourceWidth,
+            page.sourceHeight,
+          ),
           rotationDegrees: rotationDegrees ?? page.rotationDegrees,
           colorMode: _colorModeToRust(page.resolvedColorMode),
           maxPixels: _maxPixels,
@@ -223,7 +220,6 @@ class RustDocumentScannerService implements DocumentScannerService {
 
   @override
   Future<void> disposePage(ScannedPage page) async {
-    _sourceDims.remove(page.id);
     await _deleteIfExists(page.sourceJpeg);
     await _deleteIfExists(page.processedJpeg);
   }
@@ -233,7 +229,6 @@ class RustDocumentScannerService implements DocumentScannerService {
     _session?.dispose();
     _session = null;
     _initialization = null;
-    _sourceDims.clear();
     _dir = null;
   }
 

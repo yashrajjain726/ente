@@ -26,6 +26,8 @@ class ScannedPage {
     required this.quad,
     required this.rotationDegrees,
     required this.resolvedColorMode,
+    required this.sourceWidth,
+    required this.sourceHeight,
     required this.width,
     required this.height,
   });
@@ -41,6 +43,9 @@ class ScannedPage {
   final int rotationDegrees;
 
   final ScanColorMode resolvedColorMode;
+
+  final int sourceWidth;
+  final int sourceHeight;
 
   final int width;
   final int height;
@@ -59,6 +64,8 @@ class ScannedPage {
     quad: quad ?? this.quad,
     rotationDegrees: rotationDegrees ?? this.rotationDegrees,
     resolvedColorMode: resolvedColorMode ?? this.resolvedColorMode,
+    sourceWidth: sourceWidth,
+    sourceHeight: sourceHeight,
     width: width ?? this.width,
     height: height ?? this.height,
   );
