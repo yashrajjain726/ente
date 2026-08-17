@@ -39,7 +39,7 @@ Future<bool> _launchCoordinates(double latitude, double longitude) async {
 
 class MapView extends StatefulWidget {
   final List<ImageMarker> imageMarkers;
-  final Function updateVisibleImages;
+  final void Function(LatLngBounds bounds, double zoom) updateVisibleImages;
   final MapController controller;
   final LatLng center;
   final double minZoom;
@@ -87,9 +87,17 @@ class _MapViewState extends State<MapView> {
     _markers = _buildMakers();
   }
 
-  void onChange(LatLngBounds bounds) {
+  @override
+  void didUpdateWidget(MapView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.imageMarkers, widget.imageMarkers)) {
+      _markers = _buildMakers();
+    }
+  }
+
+  void onChange(LatLngBounds bounds, double zoom) {
     _debouncer.run(() async {
-      widget.updateVisibleImages(bounds);
+      widget.updateVisibleImages(bounds, zoom);
     });
   }
 
@@ -121,7 +129,7 @@ class _MapViewState extends State<MapView> {
               ),
             ),
             onPositionChanged: (position, hasGesture) {
-              onChange(position.visibleBounds);
+              onChange(position.visibleBounds, position.zoom);
             },
           ),
           children: [
@@ -136,13 +144,20 @@ class _MapViewState extends State<MapView> {
                 padding: const EdgeInsets.all(80),
                 markers: _markers,
                 onClusterTap: (_) {
-                  onChange(widget.controller.camera.visibleBounds);
+                  onChange(
+                    widget.controller.camera.visibleBounds,
+                    widget.controller.camera.zoom,
+                  );
                 },
                 builder: (context, List<Marker> markers) {
                   final valueKey = markers.first.key as ValueKey;
                   final index = valueKey.value as int;
 
-                  final clusterKey = 'map-badge-$index-len-${markers.length}';
+                  final imageCount = markers.fold<int>(0, (count, marker) {
+                    final markerIndex = (marker.key! as ValueKey<int>).value;
+                    return count + widget.imageMarkers[markerIndex].imageCount;
+                  });
+                  final clusterKey = 'map-badge-$index-len-$imageCount';
 
                   return Stack(
                     key: ValueKey(clusterKey),
@@ -151,7 +166,7 @@ class _MapViewState extends State<MapView> {
                         key: Key(markers.first.key.toString()),
                         imageMarker: widget.imageMarkers[index],
                       ),
-                      MapGalleryTileBadge(size: markers.length),
+                      MapGalleryTileBadge(size: imageCount),
                     ],
                   );
                 },

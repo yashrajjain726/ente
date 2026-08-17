@@ -208,7 +208,7 @@ class _InfoMapState extends State<InfoMap> {
                       key: ValueKey(_hasEnabledMap),
                       children: [
                         MapView(
-                          updateVisibleImages: () {},
+                          updateVisibleImages: (_, _) {},
                           imageMarkers: [
                             ImageMarker(
                               imageFile: widget.file,
@@ -253,7 +253,7 @@ class _InfoMapState extends State<InfoMap> {
                                 clipBehavior: Clip.none,
                                 children: [
                                   MapView(
-                                    updateVisibleImages: () {},
+                                    updateVisibleImages: (_, _) {},
                                     imageMarkers: const [],
                                     controller: _mapController,
                                     center: const LatLng(13.041599, 77.594566),
@@ -343,7 +343,8 @@ class _InfoMapState extends State<InfoMap> {
           .push(
             MaterialPageRoute(
               builder: (context) => MapScreen(
-                filesFutureFn: SearchService.instance.getAllFilesForSearch,
+                filesFutureFn:
+                    SearchService.instance.getAllFilesWithLocationForSearch,
                 center: LatLng(_fileLat, _fileLng),
                 initialZoom: 16,
               ),

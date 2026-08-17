@@ -1,7 +1,6 @@
 import "dart:async";
 import "dart:isolate";
 
-import "package:collection/collection.dart";
 import "package:computer/computer.dart";
 import "package:ente_strings/ente_strings.dart";
 import "package:ente_ui/components/loading_widget.dart";
@@ -47,13 +46,15 @@ class _MapScreenState extends State<MapScreen> {
   bool hasLocationData = true;
   double maxZoom = 18.0;
   double minZoom = 2.8;
-  int debounceDuration = 500;
   late LatLng center;
   final Logger _logger = Logger("_MapScreenState");
-  StreamSubscription? _mapMoveSubscription;
-  Isolate? isolate;
+  ReceivePort? _mapWorkerReceivePort;
+  StreamSubscription? _mapWorkerSubscription;
+  SendPort? _mapWorkerSendPort;
+  Isolate? _mapWorkerIsolate;
   static const bottomSheetDraggableAreaHeight = 32.0;
-  List<EnteFile>? prevMessage;
+  List<int>? _previousVisibleIndexes;
+  int _viewportRequestID = 0;
 
   @override
   void initState() {
@@ -63,16 +64,18 @@ class _MapScreenState extends State<MapScreen> {
 
   @override
   void dispose() {
+    unawaited(_mapWorkerSubscription?.cancel());
+    _mapWorkerReceivePort?.close();
+    _mapWorkerIsolate?.kill();
+    unawaited(visibleImages.close());
     super.dispose();
-    visibleImages.close();
-    _mapMoveSubscription?.cancel();
   }
 
   Future<void> initialize() async {
     try {
       center = widget.center ?? const LatLng(46.7286, 4.8614);
       allImages = await widget.filesFutureFn();
-      unawaited(processFiles(allImages));
+      await processFiles(allImages);
     } catch (e, s) {
       _logger.severe("Error initializing map screen", e, s);
     }
@@ -80,14 +83,14 @@ class _MapScreenState extends State<MapScreen> {
 
   Future<void> processFiles(List<EnteFile> files) async {
     final result = await Computer.shared().compute(
-      _findRecentFileAndGenerateTempMarkers,
+      _findRecentImageAndMapPoints,
       param: {"files": files, "center": widget.center},
     );
 
-    final EnteFile? mostRecentFile = result.$1;
-    final List<ImageMarker> tempMarkers = result.$2;
+    final int? mostRecentImageIndex = result.$1;
+    final List<MapPoint> mapPoints = result.$2;
 
-    if (tempMarkers.isEmpty) {
+    if (mapPoints.isEmpty) {
       if (!mounted) return;
       showShortToast(context, context.strings.noImagesWithLocation);
       if (!visibleImages.isClosed) {
@@ -98,7 +101,7 @@ class _MapScreenState extends State<MapScreen> {
       }
       setState(() {
         hasLocationData = false;
-        imageMarkers = tempMarkers;
+        imageMarkers = [];
         isLoading = false;
       });
       return;
@@ -107,8 +110,8 @@ class _MapScreenState extends State<MapScreen> {
     center =
         widget.center ??
         LatLng(
-          mostRecentFile!.location!.latitude!,
-          mostRecentFile.location!.longitude!,
+          allImages[mostRecentImageIndex!].location!.latitude!,
+          allImages[mostRecentImageIndex].location!.longitude!,
         );
 
     if (kDebugMode) {
@@ -117,62 +120,102 @@ class _MapScreenState extends State<MapScreen> {
       );
     }
 
+    await _startMapWorker(mapPoints);
+    if (!mounted) return;
     setState(() {
       hasLocationData = true;
-      imageMarkers = tempMarkers;
     });
 
-    mapController.move(center, widget.initialZoom);
-
-    Timer(Duration(milliseconds: debounceDuration), () {
-      if (!mounted) {
-        return;
-      }
-      calculateVisibleMarkers(mapController.camera.visibleBounds);
-      setState(() {
-        isLoading = false;
-      });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      mapController.move(center, widget.initialZoom);
+      _requestViewport(
+        mapController.camera.visibleBounds,
+        mapController.camera.zoom,
+      );
     });
   }
 
-  void calculateVisibleMarkers(LatLngBounds bounds) async {
-    final ReceivePort receivePort = ReceivePort();
-    isolate = await Isolate.spawn<MapIsolate>(
-      _calculateMarkersIsolate,
-      MapIsolate(
-        bounds: bounds,
-        imageMarkers: imageMarkers,
-        sendPort: receivePort.sendPort,
+  Future<void> _startMapWorker(List<MapPoint> mapPoints) async {
+    _mapWorkerReceivePort = ReceivePort();
+    final sendPortCompleter = Completer<SendPort>();
+    _mapWorkerSubscription = _mapWorkerReceivePort!.listen((message) {
+      if (message is SendPort) {
+        _mapWorkerSendPort = message;
+        if (!sendPortCompleter.isCompleted) {
+          sendPortCompleter.complete(message);
+        }
+      } else if (message is MapViewportResult) {
+        _applyViewportResult(message);
+      }
+    });
+    _mapWorkerIsolate = await Isolate.spawn(
+      mapWorker,
+      MapWorkerInit(
+        points: mapPoints,
+        sendPort: _mapWorkerReceivePort!.sendPort,
       ),
     );
+    await sendPortCompleter.future;
+  }
 
-    _mapMoveSubscription = receivePort.listen((dynamic message) async {
-      if (message is List<EnteFile>) {
-        if (!message.equals(prevMessage ?? [])) {
-          if (visibleImages.isClosed) {
-            return;
-          }
-          visibleImages.sink.add(message);
-        }
+  void _requestViewport(LatLngBounds bounds, double zoom) {
+    final sendPort = _mapWorkerSendPort;
+    if (sendPort == null) return;
+    sendPort.send(
+      MapViewportRequest(id: ++_viewportRequestID, bounds: bounds, zoom: zoom),
+    );
+  }
 
-        prevMessage = message;
-      } else {
-        await _mapMoveSubscription?.cancel();
-        isolate?.kill();
+  void _applyViewportResult(MapViewportResult result) {
+    if (!mounted || result.id != _viewportRequestID) return;
+
+    final visibleIndexes = result.visibleImageIndexes;
+    if (!_sameIndexes(visibleIndexes, _previousVisibleIndexes)) {
+      _previousVisibleIndexes = visibleIndexes;
+      if (!visibleImages.isClosed) {
+        visibleImages.add(
+          visibleIndexes
+              .map((index) => allImages[index])
+              .toList(growable: false),
+        );
       }
+    }
+
+    setState(() {
+      imageMarkers = result.markerGroups
+          .map(
+            (group) => ImageMarker(
+              imageFile: allImages[group.imageIndex],
+              latitude: group.latitude,
+              longitude: group.longitude,
+              imageCount: group.imageCount,
+            ),
+          )
+          .toList(growable: false);
+      isLoading = false;
     });
   }
 
-  static (EnteFile?, List<ImageMarker>) _findRecentFileAndGenerateTempMarkers(
+  bool _sameIndexes(List<int> current, List<int>? previous) {
+    if (previous == null || current.length != previous.length) return false;
+    for (var i = 0; i < current.length; i++) {
+      if (current[i] != previous[i]) return false;
+    }
+    return true;
+  }
+
+  static (int?, List<MapPoint>) _findRecentImageAndMapPoints(
     Map<String, dynamic> args,
   ) {
     final Logger logger = Logger("_MapScreenState");
     final files = args["files"] as List<EnteFile>;
     final center = args["center"] as LatLng?;
-    final List<ImageMarker> tempMarkers = [];
-    EnteFile? mostRecentFile;
+    final List<MapPoint> mapPoints = [];
+    int? mostRecentImageIndex;
 
-    for (var file in files) {
+    for (var index = 0; index < files.length; index++) {
+      final file = files[index];
       if (file.hasLocation) {
         if (!Location.isValidRange(
           latitude: file.location!.latitude!,
@@ -185,45 +228,27 @@ class _MapScreenState extends State<MapScreen> {
         }
 
         if (center == null) {
-          if (mostRecentFile == null) {
-            mostRecentFile = file;
+          if (mostRecentImageIndex == null) {
+            mostRecentImageIndex = index;
           } else {
+            final mostRecentFile = files[mostRecentImageIndex];
             if ((mostRecentFile.creationTime ?? 0) < (file.creationTime ?? 0)) {
-              mostRecentFile = file;
+              mostRecentImageIndex = index;
             }
           }
         }
 
-        tempMarkers.add(
-          ImageMarker(
+        mapPoints.add(
+          MapPoint(
+            imageIndex: index,
             latitude: file.location!.latitude!,
             longitude: file.location!.longitude!,
-            imageFile: file,
           ),
         );
       }
     }
 
-    return (mostRecentFile, tempMarkers);
-  }
-
-  @pragma('vm:entry-point')
-  static void _calculateMarkersIsolate(MapIsolate message) async {
-    final bounds = message.bounds;
-    final imageMarkers = message.imageMarkers;
-    final SendPort sendPort = message.sendPort;
-    try {
-      final List<EnteFile> visibleFiles = [];
-      for (var imageMarker in imageMarkers) {
-        final point = LatLng(imageMarker.latitude, imageMarker.longitude);
-        if (bounds.contains(point)) {
-          visibleFiles.add(imageMarker.imageFile);
-        }
-      }
-      sendPort.send(visibleFiles);
-    } catch (e) {
-      sendPort.send(e.toString());
-    }
+    return (mostRecentImageIndex, mapPoints);
   }
 
   @override
@@ -249,12 +274,9 @@ class _MapScreenState extends State<MapScreen> {
                         bottomSheetDraggableAreaHeight -
                         bottomUnsafeArea,
                     child: MapView(
-                      key: ValueKey(
-                        'image-marker-count-${imageMarkers.length}',
-                      ),
                       controller: mapController,
                       imageMarkers: imageMarkers,
-                      updateVisibleImages: calculateVisibleMarkers,
+                      updateVisibleImages: _requestViewport,
                       center: center,
                       initialZoom: widget.initialZoom,
                       minZoom: minZoom,
