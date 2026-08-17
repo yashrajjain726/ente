@@ -61,7 +61,7 @@ class _FamilyPlanPageState extends State<FamilyPlanPage> {
 
   late UserDetails _userDetails = widget.initialUserDetails;
   late final LibrarySharingService _librarySharingService =
-      LibrarySharingService();
+      librarySharingService;
   final Map<int, contacts.ContactRecord?> _contactsByUserId = {};
   final Map<int, Uint8List?> _profilePictureBytesByUserId = {};
   Map<int, int> _sharedAlbumCountsByUserId = const {};
