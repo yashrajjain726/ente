@@ -427,12 +427,12 @@ class _CollectionActionSheetState extends State<CollectionActionSheet> {
       });
       return recentlyCreated + hidden;
     } else {
-      final List<Collection>
-      collections = CollectionsService.instance.getCollectionsForUI(
-        // Collaborators can only add or remove files.
-        includeCollab: widget.actionType == CollectionActionType.addFiles,
-        includeUncategorized: true,
-      );
+      final List<Collection> collections = CollectionsService.instance
+          .getCollectionsForUI(
+            // Collaborators can only add or remove files.
+            includeCollab: widget.actionType == CollectionActionType.addFiles,
+            includeUncategorized: true,
+          );
       collections.sort((first, second) {
         return compareAsciiLowerCaseNatural(
           first.displayName,

@@ -226,7 +226,9 @@ abstract class BaseInfoPageState<T extends InfoData, W extends BaseInfoPage<T>>
         _initialSelectedCollectionIds = Set<int>.of(initialSelection);
         _hasLoadedCollectionSelection = true;
       });
-    } catch (e) {}
+    } catch (e) {
+      // Leave collection selection unavailable.
+    }
   }
 
   void _onToggleCollection(int collectionId) {

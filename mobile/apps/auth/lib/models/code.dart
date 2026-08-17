@@ -264,7 +264,9 @@ class Code {
       } else if (algorithm == "sha512" || "algorithm.sha512" == algorithm) {
         return Algorithm.sha512;
       }
-    } catch (e) {}
+    } catch (e) {
+      // Fall back to SHA-1.
+    }
     return Algorithm.sha1;
   }
 
