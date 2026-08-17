@@ -2,7 +2,6 @@ import "dart:isolate";
 import "dart:math";
 
 import "package:flutter_map/flutter_map.dart";
-import "package:latlong2/latlong.dart";
 
 class MapPoint {
   final int imageIndex;
@@ -54,6 +53,18 @@ class _ProjectedMarkerGroup {
   );
 }
 
+class _ProjectedMapPoint {
+  final MapPoint point;
+  final double x;
+  final double y;
+
+  const _ProjectedMapPoint({
+    required this.point,
+    required this.x,
+    required this.y,
+  });
+}
+
 class MapWorkerInit {
   final List<MapPoint> points;
   final SendPort sendPort;
@@ -65,11 +76,19 @@ class MapViewportRequest {
   final int id;
   final LatLngBounds bounds;
   final double zoom;
+  final double markerMinX;
+  final double markerMinY;
+  final double markerMaxX;
+  final double markerMaxY;
 
   const MapViewportRequest({
     required this.id,
     required this.bounds,
     required this.zoom,
+    required this.markerMinX,
+    required this.markerMinY,
+    required this.markerMaxX,
+    required this.markerMaxY,
   });
 }
 
@@ -98,17 +117,22 @@ void mapWorker(MapWorkerInit init) {
     }
 
     final visibleIndexes = <int>[];
+    final visiblePoints = <_ProjectedMapPoint>[];
+    final bufferedPoints = <_ProjectedMapPoint>[];
     final groupsByCell = <(int, int), List<_ProjectedMarkerGroup>>{};
     final groups = <_ProjectedMarkerGroup>[];
     final scale = _webMercatorTileSize * pow(2, message.zoom).toDouble();
 
     for (final point in init.points) {
-      final latLng = LatLng(point.latitude, point.longitude);
-      if (!message.bounds.contains(latLng)) {
-        continue;
+      final isVisible =
+          point.longitude >= message.bounds.west &&
+          point.longitude <= message.bounds.east &&
+          point.latitude >= message.bounds.south &&
+          point.latitude <= message.bounds.north;
+      if (isVisible) {
+        visibleIndexes.add(point.imageIndex);
       }
 
-      visibleIndexes.add(point.imageIndex);
       final latitude = point.latitude.clamp(
         -_mercatorLatitudeLimit,
         _mercatorLatitudeLimit,
@@ -117,6 +141,21 @@ void mapWorker(MapWorkerInit init) {
       final x = (point.longitude + 180) / 360 * scale;
       final y =
           (0.5 - log((1 + sinLatitude) / (1 - sinLatitude)) / (4 * pi)) * scale;
+      if (x < message.markerMinX ||
+          x > message.markerMaxX ||
+          y < message.markerMinY ||
+          y > message.markerMaxY) {
+        continue;
+      }
+
+      final projectedPoint = _ProjectedMapPoint(point: point, x: x, y: y);
+      (isVisible ? visiblePoints : bufferedPoints).add(projectedPoint);
+    }
+
+    void addToMarkerGroup(_ProjectedMapPoint projectedPoint) {
+      final point = projectedPoint.point;
+      final x = projectedPoint.x;
+      final y = projectedPoint.y;
       final cell = (
         (x / _minimumMarkerDistancePixels).floor(),
         (y / _minimumMarkerDistancePixels).floor(),
@@ -150,7 +189,7 @@ void mapWorker(MapWorkerInit init) {
 
       if (closestGroup != null) {
         closestGroup.imageCount++;
-        continue;
+        return;
       }
 
       final group = _ProjectedMarkerGroup(
@@ -162,6 +201,13 @@ void mapWorker(MapWorkerInit init) {
       );
       groups.add(group);
       groupsByCell.putIfAbsent(cell, () => []).add(group);
+    }
+
+    for (final point in visiblePoints) {
+      addToMarkerGroup(point);
+    }
+    for (final point in bufferedPoints) {
+      addToMarkerGroup(point);
     }
 
     init.sendPort.send(

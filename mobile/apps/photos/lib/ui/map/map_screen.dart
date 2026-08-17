@@ -56,6 +56,7 @@ class _MapScreenState extends State<MapScreen> {
   static const bottomSheetDraggableAreaHeight = 32.0;
   List<int>? _previousVisibleIndexes;
   int _viewportRequestID = 0;
+  static const _markerViewportPaddingPixels = 256.0;
 
   @override
   void initState() {
@@ -129,10 +130,7 @@ class _MapScreenState extends State<MapScreen> {
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      _requestViewport(
-        mapController.camera.visibleBounds,
-        mapController.camera.zoom,
-      );
+      _requestViewport(mapController.camera);
     });
   }
 
@@ -167,11 +165,20 @@ class _MapScreenState extends State<MapScreen> {
     _mapWorkerIsolate = isolate;
   }
 
-  void _requestViewport(LatLngBounds bounds, double zoom) {
+  void _requestViewport(MapCamera camera) {
     final sendPort = _mapWorkerSendPort;
     if (sendPort == null) return;
+    final pixelBounds = camera.pixelBounds;
     sendPort.send(
-      MapViewportRequest(id: ++_viewportRequestID, bounds: bounds, zoom: zoom),
+      MapViewportRequest(
+        id: ++_viewportRequestID,
+        bounds: camera.visibleBounds,
+        zoom: camera.zoom,
+        markerMinX: pixelBounds.left - _markerViewportPaddingPixels,
+        markerMinY: pixelBounds.top - _markerViewportPaddingPixels,
+        markerMaxX: pixelBounds.right + _markerViewportPaddingPixels,
+        markerMaxY: pixelBounds.bottom + _markerViewportPaddingPixels,
+      ),
     );
   }
 
@@ -372,7 +379,7 @@ class _MapScreenState extends State<MapScreen> {
                         : MapView(
                             controller: mapController,
                             imageMarkers: imageMarkers,
-                            updateVisibleImages: _requestViewport,
+                            updateViewport: _requestViewport,
                             center: initialCenter,
                             initialZoom: widget.initialZoom,
                             minZoom: minZoom,

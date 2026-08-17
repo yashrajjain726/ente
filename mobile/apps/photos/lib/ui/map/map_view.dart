@@ -36,7 +36,7 @@ Future<bool> _launchCoordinates(double latitude, double longitude) async {
 
 class MapView extends StatefulWidget {
   final List<ImageMarker> imageMarkers;
-  final void Function(LatLngBounds bounds, double zoom) updateVisibleImages;
+  final void Function(MapCamera camera) updateViewport;
   final MapController controller;
   final LatLng center;
   final double minZoom;
@@ -52,7 +52,7 @@ class MapView extends StatefulWidget {
 
   const MapView({
     super.key,
-    required this.updateVisibleImages,
+    required this.updateViewport,
     required this.imageMarkers,
     required this.controller,
     required this.center,
@@ -92,9 +92,9 @@ class _MapViewState extends State<MapView> {
     }
   }
 
-  void onChange(LatLngBounds bounds, double zoom) {
+  void onChange(MapCamera camera) {
     _debouncer.run(() async {
-      widget.updateVisibleImages(bounds, zoom);
+      widget.updateViewport(camera);
     });
   }
 
@@ -126,7 +126,7 @@ class _MapViewState extends State<MapView> {
               ),
             ),
             onPositionChanged: (position, hasGesture) {
-              onChange(position.visibleBounds, position.zoom);
+              onChange(position);
             },
           ),
           children: [
