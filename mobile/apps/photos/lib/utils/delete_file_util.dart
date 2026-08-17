@@ -292,8 +292,10 @@ Future<List<EnteFile>> deleteFilesOnDeviceOnly(
   return deletedFiles;
 }
 
-Future<bool> deleteFromTrash(BuildContext context, List<EnteFile> files) async {
-  final trashFiles = files.map((file) => file as EnteTrashFile).toList();
+Future<bool> deleteFromEnteTrash(
+  BuildContext context,
+  List<EnteTrashFile> trashFiles,
+) async {
   bool didDeletionStart = false;
   final actionResult = await showBottomSheetComponent<ButtonResult>(
     context: context,
