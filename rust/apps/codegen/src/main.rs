@@ -29,7 +29,6 @@ enum NativeTarget {
 #[derive(Clone, Copy)]
 enum FrbTarget {
     All,
-    Shared,
     Photos,
     Locker,
 }
@@ -59,7 +58,6 @@ fn run() -> Result<(), DynError> {
         Some("frb") => {
             let target = match args.next().as_deref() {
                 None => FrbTarget::All,
-                Some("shared") => FrbTarget::Shared,
                 Some("photos") => FrbTarget::Photos,
                 Some("locker") => FrbTarget::Locker,
                 _ => return Err(usage_error()),
@@ -80,7 +78,7 @@ fn run() -> Result<(), DynError> {
 }
 
 fn usage_error() -> DynError {
-    "usage: cargo codegen <native [ensu|cast]|frb [shared|photos|locker]|napi>".into()
+    "usage: cargo codegen <native [ensu|cast]|frb [photos|locker]|napi>".into()
 }
 
 fn generate_native(target: NativeTarget) -> Result<(), DynError> {
@@ -166,9 +164,6 @@ fn generate_frb(target: FrbTarget) -> Result<(), DynError> {
         .parent()
         .ok_or("failed to resolve repo root from rust/apps/codegen")?;
 
-    if matches!(target, FrbTarget::All | FrbTarget::Shared) {
-        generate_frb_package(&repo_root.join("mobile/packages/rust"))?;
-    }
     if matches!(target, FrbTarget::All | FrbTarget::Photos) {
         generate_frb_package(&repo_root.join("mobile/apps/photos"))?;
     }
@@ -302,14 +297,9 @@ fn format_frb_bindings(target: FrbTarget) -> Result<(), DynError> {
         FrbTarget::All => {
             command
                 .arg("-p")
-                .arg("ente_rust")
-                .arg("-p")
                 .arg("ente_photos_rust")
                 .arg("-p")
                 .arg("ente_locker_rust");
-        }
-        FrbTarget::Shared => {
-            command.arg("-p").arg("ente_rust");
         }
         FrbTarget::Photos => {
             command.arg("-p").arg("ente_photos_rust");

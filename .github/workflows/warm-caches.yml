@@ -85,7 +85,7 @@ jobs:
 
             - run: cargo clippy -p ente_photos_rust --features flutter --all-targets --locked
 
-            - run: cargo clippy -p ente_rust --features flutter --all-targets --locked
+            - run: cargo clippy -p ente_locker_rust --features flutter --all-targets --locked
 
     rust-wasm:
         # For web-lint.yml's WASM builds.

@@ -16,7 +16,6 @@ import 'package:ente_lock_screen/ui/app_lock.dart';
 import 'package:ente_lock_screen/ui/lock_screen.dart';
 import 'package:ente_logging/logging.dart';
 import 'package:ente_network/network.dart';
-import 'package:ente_rust/ente_rust.dart';
 import "package:ente_strings/ente_strings.dart";
 import "package:ente_ui/theme/theme_config.dart";
 import "package:flutter/material.dart";
@@ -34,10 +33,11 @@ import 'package:locker/services/files/download/service_locator.dart';
 import 'package:locker/services/files/links/links_client.dart';
 import 'package:locker/services/files/links/links_service.dart';
 import 'package:locker/services/files/offline/offline_files_service.dart';
+import 'package:locker/services/frb_legacy_kit_rust_api.dart';
 import 'package:locker/services/local_settings.dart';
 import 'package:locker/services/trash/trash_service.dart';
 import 'package:locker/services/update_service.dart';
-import 'package:locker/src/rust/api/log.dart' as locker_rust_log;
+import 'package:locker/src/rust/api/log.dart';
 import 'package:locker/src/rust/frb_generated.dart';
 import 'package:locker/ui/pages/home_page.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -49,7 +49,6 @@ final _logger = Logger("main");
 bool _isRustInitialized = false;
 Future<void>? _rustInitFuture;
 late final LogSinkGuard _rustLogSinkGuard;
-late final locker_rust_log.LogSinkGuard _lockerRustLogSinkGuard;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -118,7 +117,7 @@ Future<void> _ensureRustInitialized() async {
     await inFlightInit;
     return;
   }
-  final initFuture = Future.wait([EnteLockerRust.init(), EnteRust.init()]);
+  final initFuture = EnteLockerRust.init();
   _rustInitFuture = initFuture;
   try {
     await initFuture;
@@ -133,24 +132,16 @@ void _attachRustLogStream() {
   final logger = Logger("rust");
   _rustLogSinkGuard = LogSinkGuard();
   _rustLogSinkGuard.attachLogStream().listen((entry) {
-    _logRustEntry(logger, entry.level.name, entry.target, entry.message);
+    final message = "[${entry.target}] ${entry.message}";
+    switch (entry.level) {
+      case LogLevel.error:
+        logger.severe(message);
+      case LogLevel.warn:
+        logger.warning(message);
+      case LogLevel.info:
+        logger.info(message);
+    }
   });
-  _lockerRustLogSinkGuard = locker_rust_log.LogSinkGuard();
-  _lockerRustLogSinkGuard.attachLogStream().listen((entry) {
-    _logRustEntry(logger, entry.level.name, entry.target, entry.message);
-  });
-}
-
-void _logRustEntry(Logger logger, String level, String target, String body) {
-  final message = "[$target] $body";
-  switch (level) {
-    case "error":
-      logger.severe(message);
-    case "warn":
-      logger.warning(message);
-    case "info":
-      logger.info(message);
-  }
 }
 
 ThemeMode _themeMode(AdaptiveThemeMode? savedThemeMode) {
@@ -238,6 +229,7 @@ Future<void> _init(bool bool, {String? via}) async {
     await LegacyKitService.instance.init(
       config: Configuration.instance,
       sessionProvider: LockerContactsDisplayService.buildSession,
+      rustApi: const FrbLegacyKitRustApi(),
     );
     unawaited(
       Future.delayed(
