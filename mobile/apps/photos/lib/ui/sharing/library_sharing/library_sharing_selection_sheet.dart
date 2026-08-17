@@ -69,7 +69,7 @@ class LibrarySharingSelectionSheet extends StatelessWidget {
     return Semantics(
       container: true,
       explicitChildNodes: true,
-      label: context.strings.librarySharingAlbumSelectionControls,
+      label: 'Album selection controls',
       expanded: isExpanded,
       onExpand: isExpanded ? null : () => onChanged(true),
       onCollapse: isExpanded ? () => onChanged(false) : null,
