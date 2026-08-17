@@ -2006,10 +2006,7 @@ class FilesDB with SqlDbBase {
     }
 
     final results = await db.getAll(query, args);
-    final List<EnteFile> files = await Computer.shared().compute(
-      convertToFilesForIsolate,
-      param: {"result": results},
-    );
+    final files = convertToFiles(results);
     final List<EnteFile> filteredFiles = await applyDBFilters(
       files,
       filterOptions,

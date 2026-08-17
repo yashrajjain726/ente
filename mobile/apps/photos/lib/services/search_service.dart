@@ -295,20 +295,6 @@ class SearchService {
     return _cachedFilesForSearch!;
   }
 
-  Future<List<EnteFile>> getAllFilesWithLocationForSearch() async {
-    final result = await FilesDB.instance
-        .fetchAllUploadedAndSharedFilesWithLocation(
-          galleryLoadStartTime,
-          galleryLoadEndTime,
-          asc: false,
-          filterOptions: DBFilterOptions(
-            ignoredCollectionIDs: ignoreCollections(),
-            dedupeUploadID: true,
-          ),
-        );
-    return result.files;
-  }
-
   Future<bool> hasAnyFilesForSearch() async {
     if (_cachedFilesFuture != null && _cachedFilesForSearch != null) {
       return (await _cachedFilesForSearch!).isNotEmpty;
