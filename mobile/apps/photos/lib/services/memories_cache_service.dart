@@ -1395,10 +1395,7 @@ class MemoriesCacheService {
     await _routeToPage(
       MemoryMusicSession(
         memoryIDs: <String>[selectedPersonMemory.id],
-        initialMemoryID: selectedPersonMemory.id,
-        initialItemIsVideo:
-            selectedPersonMemory.memories.first.file.fileType == FileType.video,
-        builder: (context, musicController) => FullScreenMemoryDataUpdater(
+        builder: (musicController) => FullScreenMemoryDataUpdater(
           initialIndex: 0,
           memories: selectedPersonMemory.memories,
           child: Container(
@@ -1411,9 +1408,9 @@ class MemoriesCacheService {
               isActive: true,
               onCurrentItemChanged: (file) {
                 unawaited(
-                  musicController.setCurrentItem(
-                    memoryID: selectedPersonMemory.id,
-                    isVideo: file.fileType == FileType.video,
+                  musicController.activateMemory(
+                    selectedPersonMemory.id,
+                    currentItemIsVideo: file.fileType == FileType.video,
                   ),
                 );
               },

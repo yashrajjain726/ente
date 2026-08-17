@@ -34,7 +34,6 @@ class _AllMemoriesPageState extends State<AllMemoriesPage>
   late final List<SmartMemory> _memories;
   late final int _initialPageIndex;
   late int _activePageIndex;
-  final Map<String, FileType> _currentItemTypes = <String, FileType>{};
 
   @override
   void initState() {
@@ -56,15 +55,9 @@ class _AllMemoriesPageState extends State<AllMemoriesPage>
 
   @override
   Widget build(BuildContext context) {
-    final initialMemory = _memories[_initialPageIndex];
-    final initialItemIndex = _initialItemIndexForPage(_initialPageIndex);
     return MemoryMusicSession(
       memoryIDs: _memories.map((memory) => memory.id).toList(),
-      initialMemoryID: initialMemory.id,
-      initialItemIsVideo:
-          initialMemory.memories[initialItemIndex].file.fileType ==
-          FileType.video,
-      builder: (context, musicController) => Container(
+      builder: (musicController) => Container(
         width: double.infinity,
         height: double.infinity,
         color: backgroundColorDark,
@@ -76,19 +69,6 @@ class _AllMemoriesPageState extends State<AllMemoriesPage>
           onPageChanged: (index) {
             Bus.instance.fire(PauseVideoEvent());
             setState(() => _activePageIndex = index);
-            final smartMemory = _memories[index];
-            final currentItemType =
-                _currentItemTypes[smartMemory.id] ??
-                smartMemory
-                    .memories[_initialItemIndexForPage(index)]
-                    .file
-                    .fileType;
-            unawaited(
-              musicController.activateMemory(
-                smartMemory.id,
-                currentItemIsVideo: currentItemType == FileType.video,
-              ),
-            );
           },
           itemBuilder: (context, index) {
             final smartMemory = _memories[index];
@@ -101,11 +81,10 @@ class _AllMemoriesPageState extends State<AllMemoriesPage>
                 initialMemoryIndex,
                 isActive: index == _activePageIndex,
                 onCurrentItemChanged: (file) {
-                  _currentItemTypes[smartMemory.id] = file.fileType;
                   unawaited(
-                    musicController.setCurrentItem(
-                      memoryID: smartMemory.id,
-                      isVideo: file.fileType == FileType.video,
+                    musicController.activateMemory(
+                      smartMemory.id,
+                      currentItemIsVideo: file.fileType == FileType.video,
                     ),
                   );
                 },

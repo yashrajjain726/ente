@@ -45,30 +45,26 @@ void main() {
   test("video items pause music and photos resume it", () async {
     await controller.activateMemory("memory-1", currentItemIsVideo: false);
 
-    await controller.setCurrentItem(memoryID: "memory-1", isVideo: true);
+    await controller.activateMemory("memory-1", currentItemIsVideo: true);
     expect(player.playing, isFalse);
 
-    await controller.setCurrentItem(memoryID: "memory-1", isVideo: false);
-    expect(player.playing, isTrue);
-  });
+    await controller.activateMemory("memory-1", currentItemIsVideo: true);
+    expect(player.playing, isFalse);
 
-  test("item reports from inactive memories are ignored", () async {
     await controller.activateMemory("memory-1", currentItemIsVideo: false);
-
-    await controller.setCurrentItem(memoryID: "memory-2", isVideo: true);
-
     expect(player.playing, isTrue);
+    expect(player.loadAttempts, 1);
   });
 
   test("mute persists and changes volume without pausing", () async {
     await controller.activateMemory("memory-1", currentItemIsVideo: false);
 
-    await controller.setMuted(true);
+    await controller.toggleMuted();
     expect(player.playing, isTrue);
     expect(player.volume, 0.0);
     expect(persistedMuteValues, <bool>[true]);
 
-    await controller.setMuted(false);
+    await controller.toggleMuted();
     expect(player.playing, isTrue);
     expect(player.volume, 1.0);
     expect(persistedMuteValues, <bool>[true, false]);

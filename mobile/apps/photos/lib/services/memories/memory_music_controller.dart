@@ -45,11 +45,14 @@ class MemoryMusicController extends ChangeNotifier {
 
     final sameMemory = _activeMemoryID == memoryID;
     _activeMemoryID = memoryID;
-    _setPauseReason(_MemoryMusicPauseReason.videoItem, currentItemIsVideo);
+    final itemPauseChanged = _setPauseReason(
+      _MemoryMusicPauseReason.videoItem,
+      currentItemIsVideo,
+    );
     if (sameMemory &&
         (_status == _MemoryMusicPlaybackStatus.ready ||
             _status == _MemoryMusicPlaybackStatus.loading)) {
-      await _synchronizePlayback();
+      if (itemPauseChanged) await _synchronizePlayback();
       return;
     }
 
@@ -85,27 +88,18 @@ class MemoryMusicController extends ChangeNotifier {
     }
   }
 
-  Future<void> setCurrentItem({
-    required String memoryID,
-    required bool isVideo,
-  }) async {
-    if (_isDisposed || memoryID != _activeMemoryID) return;
-    if (_setPauseReason(_MemoryMusicPauseReason.videoItem, isVideo)) {
-      await _synchronizePlayback();
-    }
-  }
-
-  Future<void> setMuted(bool value) async {
-    if (_isDisposed || _isMuted == value) return;
-    _isMuted = value;
+  Future<void> toggleMuted() async {
+    if (_isDisposed) return;
+    final isMuted = !_isMuted;
+    _isMuted = isMuted;
     notifyListeners();
     try {
-      await _player.setVolume(value ? 0.0 : 1.0);
+      await _player.setVolume(isMuted ? 0.0 : 1.0);
     } catch (error, stackTrace) {
       _logger.fine("Failed to update memories music volume", error, stackTrace);
     }
     try {
-      await _persistMuted(value);
+      await _persistMuted(isMuted);
     } catch (error, stackTrace) {
       _logger.warning(
         "Failed to persist memories audio mute state",
@@ -114,8 +108,6 @@ class MemoryMusicController extends ChangeNotifier {
       );
     }
   }
-
-  Future<void> toggleMuted() => setMuted(!_isMuted);
 
   Future<void> setAppActive(bool isActive) async {
     if (_setPauseReason(_MemoryMusicPauseReason.appBackground, !isActive)) {
@@ -185,7 +177,6 @@ class MemoryMusicController extends ChangeNotifier {
   @override
   void dispose() {
     _isDisposed = true;
-    _loadGeneration++;
     unawaited(_player.dispose());
     super.dispose();
   }

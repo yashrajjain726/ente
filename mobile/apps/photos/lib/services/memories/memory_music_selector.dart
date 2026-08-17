@@ -20,7 +20,7 @@ Map<String, MemoryMusicTrack> assignMemoryMusicTracks({
     assignments[memoryID] = track;
     previousTrackID = track.id;
   }
-  return Map.unmodifiable(assignments);
+  return assignments;
 }
 
 int _stableTrackIndex(String memoryID, int trackCount) {

@@ -8,15 +8,10 @@ import "package:photos/services/memories/memory_music_selector.dart";
 
 class MemoryMusicSession extends StatefulWidget {
   final List<String> memoryIDs;
-  final String initialMemoryID;
-  final bool initialItemIsVideo;
-  final Widget Function(BuildContext context, MemoryMusicController controller)
-  builder;
+  final Widget Function(MemoryMusicController controller) builder;
 
   const MemoryMusicSession({
     required this.memoryIDs,
-    required this.initialMemoryID,
-    required this.initialItemIsVideo,
     required this.builder,
     super.key,
   });
@@ -42,12 +37,6 @@ class _MemoryMusicSessionState extends State<MemoryMusicSession>
       initiallyMuted: localSettings.isMemoriesAudioMuted(),
       persistMuted: localSettings.setMemoriesAudioMuted,
     );
-    unawaited(
-      _controller.activateMemory(
-        widget.initialMemoryID,
-        currentItemIsVideo: widget.initialItemIsVideo,
-      ),
-    );
   }
 
   @override
@@ -66,9 +55,7 @@ class _MemoryMusicSessionState extends State<MemoryMusicSession>
   Widget build(BuildContext context) {
     return MemoryMusicScope(
       controller: _controller,
-      child: Builder(
-        builder: (context) => widget.builder(context, _controller),
-      ),
+      child: widget.builder(_controller),
     );
   }
 }
