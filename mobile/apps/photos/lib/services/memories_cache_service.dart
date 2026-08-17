@@ -1407,6 +1407,7 @@ class MemoriesCacheService {
             child: FullScreenMemory(
               selectedPersonMemory.title,
               0,
+              isActive: true,
               onCurrentItemChanged: (file) {
                 unawaited(
                   musicController.setCurrentItem(

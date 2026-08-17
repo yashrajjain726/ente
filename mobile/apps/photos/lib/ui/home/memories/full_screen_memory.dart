@@ -329,6 +329,7 @@ class FullScreenMemoryData extends InheritedWidget {
 class FullScreenMemory extends StatefulWidget {
   final String title;
   final int initialIndex;
+  final bool isActive;
   final ValueChanged<EnteFile>? onCurrentItemChanged;
   final VoidCallback? onNextMemory;
   final VoidCallback? onPreviousMemory;
@@ -336,6 +337,7 @@ class FullScreenMemory extends StatefulWidget {
   const FullScreenMemory(
     this.title,
     this.initialIndex, {
+    required this.isActive,
     this.onCurrentItemChanged,
     this.onNextMemory,
     this.onPreviousMemory,
@@ -369,7 +371,8 @@ class _FullScreenMemoryState extends State<FullScreenMemory> {
   Object? _kenBurnsStartToken;
   bool _isViewerPaused = false;
   bool _isPlaybackPaused = false;
-  bool get _isAnimationPaused => _isViewerPaused || _isPlaybackPaused;
+  bool get _isAnimationPaused =>
+      !widget.isActive || _isViewerPaused || _isPlaybackPaused;
   bool _isMediaZoomed = false;
   final _socialControlsVisible = ValueNotifier<bool>(false);
   FullScreenMemoryData? _memoryData;
@@ -453,6 +456,14 @@ class _FullScreenMemoryState extends State<FullScreenMemory> {
   }
 
   @override
+  void didUpdateWidget(covariant FullScreenMemory oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.isActive == widget.isActive) return;
+    _syncAnimationState();
+    if (widget.isActive) _reportCurrentItem();
+  }
+
+  @override
   void dispose() {
     _itemIndexNotifier?.removeListener(_reportCurrentItem);
     hasPointerOnScreenNotifier.removeListener(_hasPointerListener);
@@ -471,7 +482,8 @@ class _FullScreenMemoryState extends State<FullScreenMemory> {
       inheritedData.memories.length,
     );
     if (index == null) return;
-    widget.onCurrentItemChanged?.call(inheritedData.memories[index].file);
+    final file = inheritedData.memories[index].file;
+    if (widget.isActive) widget.onCurrentItemChanged?.call(file);
   }
 
   /// Used to check if user has touched the screen and then to pause animation
@@ -596,6 +608,7 @@ class _FullScreenMemoryState extends State<FullScreenMemory> {
   }
 
   void _goToNext(FullScreenMemoryData inheritedData) {
+    if (!widget.isActive) return;
     if (inheritedData.memories.isEmpty) return;
     _isMediaZoomed = false;
     hasFinalFileLoaded = false;
@@ -617,6 +630,7 @@ class _FullScreenMemoryState extends State<FullScreenMemory> {
   }
 
   void _goToPrevious(FullScreenMemoryData inheritedData) {
+    if (!widget.isActive) return;
     if (inheritedData.memories.isEmpty) return;
     _isMediaZoomed = false;
     hasFinalFileLoaded = false;
@@ -640,6 +654,14 @@ class _FullScreenMemoryState extends State<FullScreenMemory> {
 
   void _onPageChange(FullScreenMemoryData inheritedData, int index) {
     if (!_isValidMemoryIndex(index, inheritedData.memories.length)) return;
+    final currentIndex = _clampedMemoryIndex(
+      inheritedData.indexNotifier.value,
+      inheritedData.memories.length,
+    );
+    if (currentIndex != null &&
+        inheritedData.memories[currentIndex].file.fileType == FileType.video) {
+      Bus.instance.fire(PauseVideoEvent());
+    }
     _isMediaZoomed = false;
     isAtFirstOrLastFile = false;
     unawaited(
@@ -781,6 +803,10 @@ class _FullScreenMemoryState extends State<FullScreenMemory> {
                         isVideo: isVideo,
                         child: FileWidget(
                           currentFile,
+                          isActive: widget.isActive,
+                          itemIndex: safeIndex,
+                          activeItemIndexListenable:
+                              inheritedData.indexNotifier,
                           autoPlay: false,
                           tagPrefix: "memories",
                           backgroundDecoration: const BoxDecoration(

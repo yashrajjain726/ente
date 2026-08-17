@@ -88,6 +88,16 @@ void main() {
     expect(player.loadedAssets.last, "assets/track-2.mp3");
     expect(player.position, Duration.zero);
   });
+
+  test("a failed track load can be retried", () async {
+    player.failNextLoad = true;
+
+    await controller.activateMemory("memory-1", currentItemIsVideo: false);
+    await controller.activateMemory("memory-1", currentItemIsVideo: false);
+
+    expect(player.loadAttempts, 2);
+    expect(player.playing, isTrue);
+  });
 }
 
 class _FakeMemoryMusicPlayer implements MemoryMusicPlayer {
@@ -96,12 +106,19 @@ class _FakeMemoryMusicPlayer implements MemoryMusicPlayer {
   bool playing = false;
   double volume = 1.0;
   Duration position = Duration.zero;
+  bool failNextLoad = false;
+  int loadAttempts = 0;
 
   @override
   Future<void> configureAudioSession() async {}
 
   @override
   Future<void> loadAsset(String assetPath) async {
+    loadAttempts++;
+    if (failNextLoad) {
+      failNextLoad = false;
+      throw StateError("load failed");
+    }
     loadedAssets.add(assetPath);
     position = Duration.zero;
   }

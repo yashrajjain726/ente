@@ -1,6 +1,8 @@
 import "dart:async";
 
 import 'package:flutter/material.dart';
+import "package:photos/core/event_bus.dart";
+import "package:photos/events/pause_video_event.dart";
 import "package:photos/models/file/file_type.dart";
 import "package:photos/models/memories/smart_memory.dart";
 import "package:photos/theme/colors.dart";
@@ -29,11 +31,13 @@ class AllMemoriesPage extends StatefulWidget {
 class _AllMemoriesPageState extends State<AllMemoriesPage>
     with SingleTickerProviderStateMixin {
   late PageController pageController;
+  late int _activePageIndex;
   final Map<String, FileType> _currentItemTypes = <String, FileType>{};
 
   @override
   void initState() {
     super.initState();
+    _activePageIndex = widget.initialPageIndex;
     pageController = PageController(initialPage: widget.initialPageIndex);
   }
 
@@ -64,6 +68,8 @@ class _AllMemoriesPageState extends State<AllMemoriesPage>
           hitTestBehavior: HitTestBehavior.translucent,
           itemCount: widget.allMemories.length,
           onPageChanged: (index) {
+            Bus.instance.fire(PauseVideoEvent());
+            setState(() => _activePageIndex = index);
             final smartMemory = widget.allMemories[index];
             final currentItemType =
                 _currentItemTypes[smartMemory.id] ??
@@ -87,6 +93,7 @@ class _AllMemoriesPageState extends State<AllMemoriesPage>
               child: FullScreenMemory(
                 smartMemory.title,
                 initialMemoryIndex,
+                isActive: index == _activePageIndex,
                 onCurrentItemChanged: (file) {
                   _currentItemTypes[smartMemory.id] = file.fileType;
                   unawaited(

@@ -5,7 +5,7 @@ import "package:logging/logging.dart";
 import "package:photos/services/memories/memory_music_catalog.dart";
 import "package:photos/services/memories/memory_music_source_loader.dart";
 
-enum _MemoryMusicPlaybackStatus { idle, loading, ready, failed }
+enum _MemoryMusicPlaybackStatus { idle, loading, ready }
 
 enum _MemoryMusicPauseReason { appBackground, viewerAction, videoItem }
 
@@ -80,7 +80,7 @@ class MemoryMusicController extends ChangeNotifier {
       await _synchronizePlayback();
     } catch (error, stackTrace) {
       if (!_isCurrentLoad(generation)) return;
-      _status = _MemoryMusicPlaybackStatus.failed;
+      _status = _MemoryMusicPlaybackStatus.idle;
       _logger.warning(
         "Failed to load memory music track ${track.id}",
         error,

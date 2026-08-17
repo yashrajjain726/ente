@@ -36,6 +36,7 @@ class VideoWidgetMediaKit extends StatefulWidget {
   final FullScreenRequestCallback? playbackCallback;
   final Function(bool)? shouldDisableScroll;
   final bool isFromMemories;
+  final bool isActive;
   final bool? isAudioMutedOverride;
   final void Function() onStreamChange;
   final File? preview;
@@ -48,6 +49,7 @@ class VideoWidgetMediaKit extends StatefulWidget {
     this.playbackCallback,
     this.shouldDisableScroll,
     this.isFromMemories = false,
+    required this.isActive,
     this.isAudioMutedOverride,
     required this.onStreamChange,
     this.preview,
@@ -98,7 +100,7 @@ class _VideoWidgetMediaKitState extends State<VideoWidgetMediaKit>
     resumeVideoSubscription = Bus.instance.on<ResumeVideoEvent>().listen((
       event,
     ) {
-      player.play();
+      if (widget.isActive) player.play();
     });
     if (!widget.isFromMemories) {
       _muteSubscription = Bus.instance.on<VideoMuteChangedEvent>().listen((
@@ -146,6 +148,9 @@ class _VideoWidgetMediaKitState extends State<VideoWidgetMediaKit>
   @override
   void didUpdateWidget(covariant VideoWidgetMediaKit oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.isActive != widget.isActive) {
+      widget.isActive ? player.play() : player.pause();
+    }
     if (oldWidget.isAudioMutedOverride != widget.isAudioMutedOverride) {
       _applyVolume();
     }
@@ -352,7 +357,7 @@ class _VideoWidgetMediaKitState extends State<VideoWidgetMediaKit>
           controller = VideoController(player);
         }
         _applyVolume();
-        player.open(Media(url), play: _isAppInFG);
+        player.open(Media(url), play: _isAppInFG && widget.isActive);
       });
       int duration = controller!.player.state.duration.inSeconds;
       if (duration == 0) {
