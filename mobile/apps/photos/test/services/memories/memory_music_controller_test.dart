@@ -2,7 +2,7 @@ import "package:flutter_test/flutter_test.dart";
 import "package:photos/models/memories/memory_music_track.dart";
 import "package:photos/services/memories/memory_music_catalog.dart";
 import "package:photos/services/memories/memory_music_controller.dart";
-import "package:photos/services/memories/memory_music_source_loader.dart";
+import "package:photos/services/memories/memory_music_player.dart";
 
 void main() {
   late _FakeMemoryMusicPlayer player;
@@ -113,13 +113,16 @@ class _FakeMemoryMusicPlayer implements MemoryMusicPlayer {
   Future<void> configureAudioSession() async {}
 
   @override
-  Future<void> loadAsset(String assetPath) async {
+  Future<void> load(MemoryMusicSource source) async {
     loadAttempts++;
     if (failNextLoad) {
       failNextLoad = false;
       throw StateError("load failed");
     }
-    loadedAssets.add(assetPath);
+    switch (source) {
+      case AssetMemoryMusicSource(:final assetPath):
+        loadedAssets.add(assetPath);
+    }
     position = Duration.zero;
   }
 

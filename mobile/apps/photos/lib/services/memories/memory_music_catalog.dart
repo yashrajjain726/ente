@@ -2,12 +2,12 @@ import "package:photos/models/memories/memory_music_track.dart";
 
 class MemoryMusicCatalog {
   final List<MemoryMusicTrack> tracks;
-  late final Map<String, MemoryMusicTrack> _tracksByID;
+  final Map<String, MemoryMusicTrack> _tracksByID =
+      <String, MemoryMusicTrack>{};
 
-  MemoryMusicCatalog(Iterable<MemoryMusicTrack> tracks)
-    : tracks = List.unmodifiable(tracks) {
-    _tracksByID = <String, MemoryMusicTrack>{};
-    for (final track in this.tracks) {
+  MemoryMusicCatalog(Iterable<MemoryMusicTrack> inputTracks)
+    : tracks = List.unmodifiable(inputTracks) {
+    for (final track in tracks) {
       if (track.id.isEmpty) {
         throw ArgumentError.value(track.id, "track.id", "Must not be empty");
       }

@@ -1319,7 +1319,7 @@ class MemoriesCacheService {
     bool found = false;
     memoryLoop:
     for (final memory in allMemories) {
-      if (memory.type == MemoryType.onThisDay) {
+      if (memory.type == MemoryType.onThisDay && memory.memories.isNotEmpty) {
         found = true;
         break memoryLoop;
       }
@@ -1352,7 +1352,8 @@ class MemoriesCacheService {
     for (final memory in allMemories) {
       if (memory is PeopleMemory &&
           (memory.isBirthday ?? false) &&
-          memory.personID == personID) {
+          memory.personID == personID &&
+          memory.memories.isNotEmpty) {
         personMemories.add(memory);
       }
     }

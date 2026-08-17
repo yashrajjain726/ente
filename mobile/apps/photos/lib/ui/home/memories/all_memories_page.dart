@@ -31,14 +31,21 @@ class AllMemoriesPage extends StatefulWidget {
 class _AllMemoriesPageState extends State<AllMemoriesPage>
     with SingleTickerProviderStateMixin {
   late PageController pageController;
+  late final List<SmartMemory> _memories;
+  late final int _initialPageIndex;
   late int _activePageIndex;
   final Map<String, FileType> _currentItemTypes = <String, FileType>{};
 
   @override
   void initState() {
     super.initState();
-    _activePageIndex = widget.initialPageIndex;
-    pageController = PageController(initialPage: widget.initialPageIndex);
+    final initialMemory = widget.allMemories[widget.initialPageIndex];
+    _memories = widget.allMemories
+        .where((memory) => memory.memories.isNotEmpty)
+        .toList();
+    _initialPageIndex = _memories.indexOf(initialMemory);
+    _activePageIndex = _initialPageIndex;
+    pageController = PageController(initialPage: _initialPageIndex);
   }
 
   @override
@@ -49,11 +56,10 @@ class _AllMemoriesPageState extends State<AllMemoriesPage>
 
   @override
   Widget build(BuildContext context) {
-    final initialPageIndex = widget.initialPageIndex;
-    final initialMemory = widget.allMemories[initialPageIndex];
-    final initialItemIndex = _initialItemIndexForPage(initialPageIndex);
+    final initialMemory = _memories[_initialPageIndex];
+    final initialItemIndex = _initialItemIndexForPage(_initialPageIndex);
     return MemoryMusicSession(
-      memories: widget.allMemories,
+      memories: _memories,
       initialMemoryID: initialMemory.id,
       initialItemIsVideo:
           initialMemory.memories[initialItemIndex].file.fileType ==
@@ -66,11 +72,11 @@ class _AllMemoriesPageState extends State<AllMemoriesPage>
           controller: pageController,
           physics: const BouncingScrollPhysics(),
           hitTestBehavior: HitTestBehavior.translucent,
-          itemCount: widget.allMemories.length,
+          itemCount: _memories.length,
           onPageChanged: (index) {
             Bus.instance.fire(PauseVideoEvent());
             setState(() => _activePageIndex = index);
-            final smartMemory = widget.allMemories[index];
+            final smartMemory = _memories[index];
             final currentItemType =
                 _currentItemTypes[smartMemory.id] ??
                 smartMemory
@@ -85,7 +91,7 @@ class _AllMemoriesPageState extends State<AllMemoriesPage>
             );
           },
           itemBuilder: (context, index) {
-            final smartMemory = widget.allMemories[index];
+            final smartMemory = _memories[index];
             final initialMemoryIndex = _initialItemIndexForPage(index);
             return FullScreenMemoryDataUpdater(
               initialIndex: initialMemoryIndex,
@@ -103,7 +109,7 @@ class _AllMemoriesPageState extends State<AllMemoriesPage>
                     ),
                   );
                 },
-                onNextMemory: index < widget.allMemories.length - 1
+                onNextMemory: index < _memories.length - 1
                     ? () => pageController.nextPage(
                         duration: const Duration(milliseconds: 675),
                         curve: Curves.easeOutQuart,
@@ -124,9 +130,8 @@ class _AllMemoriesPageState extends State<AllMemoriesPage>
   }
 
   int _initialItemIndexForPage(int pageIndex) {
-    final memories = widget.allMemories[pageIndex].memories;
-    return widget.isFromWidgetOrNotifications &&
-            pageIndex == widget.initialPageIndex
+    final memories = _memories[pageIndex].memories;
+    return widget.isFromWidgetOrNotifications && pageIndex == _initialPageIndex
         ? widget.inititalFileIndex
         : getNextMemoryIndex(memories);
   }

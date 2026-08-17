@@ -3,7 +3,7 @@ import "dart:async";
 import "package:flutter/foundation.dart";
 import "package:logging/logging.dart";
 import "package:photos/services/memories/memory_music_catalog.dart";
-import "package:photos/services/memories/memory_music_source_loader.dart";
+import "package:photos/services/memories/memory_music_player.dart";
 
 enum _MemoryMusicPlaybackStatus { idle, loading, ready }
 
@@ -71,7 +71,7 @@ class MemoryMusicController extends ChangeNotifier {
       if (!_isCurrentLoad(generation)) return;
       await _player.stop();
       if (!_isCurrentLoad(generation)) return;
-      await const MemoryMusicSourceLoader().load(_player, track.source);
+      await _player.load(track.source);
       if (!_isCurrentLoad(generation)) return;
       await _player.setLooping();
       await _player.setVolume(_isMuted ? 0.0 : 1.0);

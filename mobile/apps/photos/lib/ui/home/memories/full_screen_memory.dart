@@ -44,7 +44,7 @@ import "package:photos/ui/viewer/gallery/jump_to_date_gallery.dart";
 import "package:photos/utils/dialog_util.dart";
 import "package:photos/utils/share_util.dart";
 
-const _socialRightInset = 24.0;
+const _memoryOverlayHorizontalInset = 24.0;
 const _socialToActionBarGap = 38.0;
 const _memoryCaptionHorizontalInset = 16.0;
 const _memoryCaptionActionBarGap = 4.0;
@@ -851,6 +851,16 @@ class _FullScreenMemoryState extends State<FullScreenMemory> {
             _MemoryViewerScrimsAndCaption(
               socialControlsVisible: _socialControlsVisible,
             ),
+            Positioned(
+              left:
+                  MediaQuery.paddingOf(context).left +
+                  _memoryOverlayHorizontalInset,
+              bottom:
+                  MediaQuery.paddingOf(context).bottom +
+                  kMemoryBottomActionBarHeight +
+                  _socialToActionBarGap,
+              child: const _MemoryMusicMuteButton(),
+            ),
             ValueListenableBuilder<int>(
               valueListenable: inheritedData.indexNotifier,
               builder: (context, index, _) {
@@ -861,7 +871,7 @@ class _FullScreenMemoryState extends State<FullScreenMemory> {
                 if (safeIndex == null) return const SizedBox.shrink();
                 final padding = MediaQuery.paddingOf(context);
                 return Positioned(
-                  right: padding.right + _socialRightInset,
+                  right: padding.right + _memoryOverlayHorizontalInset,
                   bottom:
                       padding.bottom +
                       kMemoryBottomActionBarHeight +
@@ -1081,26 +1091,34 @@ class _MemoryMusicMuteButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final controller = MemoryMusicScope.of(context);
     final isMuted = controller.isMuted;
-    return SizedBox.square(
-      dimension: 48,
-      child: IconButton(
-        tooltip: isMuted
-            ? pendingTranslation("Unmute audio")
-            : pendingTranslation("Mute audio"),
-        padding: const EdgeInsets.all(8),
-        style: IconButton.styleFrom(
-          minimumSize: const Size.square(48),
-          maximumSize: const Size.square(48),
-          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-          overlayColor: Colors.white.withValues(alpha: 0.08),
-        ),
-        onPressed: () => unawaited(controller.toggleMuted()),
-        icon: HugeIcon(
-          icon: isMuted
-              ? HugeIcons.strokeRoundedVolumeOff
-              : HugeIcons.strokeRoundedVolumeHigh,
-          color: Colors.white,
-          size: 24,
+    return SizedBox(
+      width: 47,
+      height: 34,
+      child: Center(
+        child: SizedBox.square(
+          dimension: 34,
+          child: IconButton(
+            tooltip: isMuted
+                ? pendingTranslation("Unmute audio")
+                : pendingTranslation("Mute audio"),
+            padding: const EdgeInsets.all(8),
+            style: IconButton.styleFrom(
+              backgroundColor: const Color(0x66000000),
+              shape: const CircleBorder(),
+              minimumSize: const Size.square(34),
+              maximumSize: const Size.square(34),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              overlayColor: Colors.white.withValues(alpha: 0.08),
+            ),
+            onPressed: () => unawaited(controller.toggleMuted()),
+            icon: HugeIcon(
+              icon: isMuted
+                  ? HugeIcons.strokeRoundedVolumeOff
+                  : HugeIcons.strokeRoundedVolumeHigh,
+              color: Colors.white,
+              size: 18,
+            ),
+          ),
         ),
       ),
     );
@@ -1248,8 +1266,6 @@ class _MemoryTopOverlay extends StatelessWidget {
                             ),
                           ),
                         ),
-                        const SizedBox(width: 8),
-                        const _MemoryMusicMuteButton(),
                         if (showFavorite) ...[
                           const SizedBox(width: 8),
                           FavoriteWidget(
