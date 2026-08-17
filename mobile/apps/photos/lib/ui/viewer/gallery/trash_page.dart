@@ -1,7 +1,9 @@
+import "dart:async";
 import "dart:io";
 
 import "package:collection/collection.dart";
 import "package:ente_components/ente_components.dart";
+import "package:ente_lock_screen/local_authentication_service.dart";
 import "package:ente_photos_platform/ente_photos_platform.dart"
     show DeviceTrashClient;
 import "package:ente_pure_utils/ente_pure_utils.dart";
@@ -31,11 +33,19 @@ import "package:photos/ui/viewer/gallery/state/selection_state.dart";
 import "package:photos/utils/delete_file_util.dart";
 import "package:photos/utils/device_info.dart";
 
-Future<void> showTrashPage(BuildContext context) async {
+Future<void> showTrashPage(
+  BuildContext context, {
+  Function? beforeRouteToPage,
+}) async {
+  final l10n = context.strings;
+  final hasAuthenticated = await LocalAuthenticationService.instance
+      .requestLocalAuthentication(context, l10n.authToViewTrashedFiles);
+  if (!hasAuthenticated) return;
   final isDeviceTrashSupported =
       flagService.internalUser &&
       Platform.isAndroid &&
       !await isAndroidSDKVersionLowerThan(android11SDKINT);
+  await beforeRouteToPage?.call();
   if (!context.mounted) return;
   await routeToPage(context, _TrashPage(isDeviceTrashSupported));
 }
