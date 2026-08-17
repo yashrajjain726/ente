@@ -49,6 +49,14 @@ class _ScannerCapturePageState extends State<ScannerCapturePage>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _session.addListener(_onSessionChanged);
+    unawaited(_initialize());
+  }
+
+  Future<void> _initialize() async {
+    await SystemChrome.setPreferredOrientations(const [
+      DeviceOrientation.portraitUp,
+    ]);
+    if (!mounted) return;
     unawaited(_initScanner());
     unawaited(_startCamera());
   }
@@ -69,6 +77,9 @@ class _ScannerCapturePageState extends State<ScannerCapturePage>
     _session.removeListener(_onSessionChanged);
     unawaited(_camera?.dispose());
     unawaited(_session.disposeSession());
+    unawaited(
+      SystemChrome.setPreferredOrientations(const <DeviceOrientation>[]),
+    );
     super.dispose();
   }
 
@@ -122,16 +133,24 @@ class _ScannerCapturePageState extends State<ScannerCapturePage>
             : ImageFormatGroup.yuv420,
       );
       await controller.initialize();
-      if (!mounted) {
-        await controller.dispose();
-        return;
+      var retainedController = false;
+      try {
+        if (!mounted) return;
+        await controller.lockCaptureOrientation(DeviceOrientation.portraitUp);
+        if (!mounted) return;
+        await controller.startImageStream(_onFrame);
+        if (!mounted) return;
+        _torchOn = false;
+        setState(() {
+          _camera = controller;
+          _status = _CameraStatus.ready;
+        });
+        retainedController = true;
+      } finally {
+        if (!retainedController) {
+          await controller.dispose();
+        }
       }
-      await controller.startImageStream(_onFrame);
-      _torchOn = false;
-      setState(() {
-        _camera = controller;
-        _status = _CameraStatus.ready;
-      });
     } on CameraException catch (e) {
       _logger.warning('Camera unavailable: ${e.code}', e);
       if (!mounted) return;

@@ -33,6 +33,7 @@ class _ScannerReviewPageState extends State<ScannerReviewPage> {
 
   late final PageController _pageController;
   int _index = 0;
+  bool _operationInFlight = false;
 
   @override
   void initState() {
@@ -82,7 +83,17 @@ class _ScannerReviewPageState extends State<ScannerReviewPage> {
     return widget.session.buildPdf();
   }
 
-  Future<void> _saveToEnte() async {
+  Future<void> _runExclusive(Future<void> Function() operation) async {
+    if (_operationInFlight) return;
+    setState(() => _operationInFlight = true);
+    try {
+      await operation();
+    } finally {
+      if (mounted) setState(() => _operationInFlight = false);
+    }
+  }
+
+  Future<void> _saveToEnte() => _runExclusive(() async {
     final pdf = await _buildPdf();
     if (!mounted) return;
     final didUpload = await widget.onUploadFiles([pdf]);
@@ -91,12 +102,12 @@ class _ScannerReviewPageState extends State<ScannerReviewPage> {
       showShortToast(context, context.strings.scanSaved);
       Navigator.of(context).pop(true);
     }
-  }
+  });
 
-  Future<void> _share() async {
+  Future<void> _share() => _runExclusive(() async {
     final pdf = await _buildPdf();
     await SharePlus.instance.share(ShareParams(files: [XFile(pdf.path)]));
-  }
+  });
 
   Future<void> _rename() async {
     final l10n = context.strings;
@@ -114,7 +125,7 @@ class _ScannerReviewPageState extends State<ScannerReviewPage> {
     );
   }
 
-  Future<void> _adjustCrop() async {
+  Future<void> _adjustCrop() => _runExclusive(() async {
     final page = _currentPage;
     if (page == null) return;
     await Navigator.of(context).push(
@@ -123,19 +134,19 @@ class _ScannerReviewPageState extends State<ScannerReviewPage> {
             ScannerCropPage(session: widget.session, pageId: page.id),
       ),
     );
-  }
+  });
 
-  Future<void> _rotate() async {
+  Future<void> _rotate() => _runExclusive(() async {
     final page = _currentPage;
     if (page == null) return;
     await widget.session.rotatePageClockwise(page.id);
-  }
+  });
 
-  Future<void> _delete() async {
+  Future<void> _delete() => _runExclusive(() async {
     final page = _currentPage;
     if (page == null) return;
     await widget.session.deletePage(page.id);
-  }
+  });
 
   void _jumpToPage(int index) {
     _pageController.animateToPage(
@@ -263,142 +274,151 @@ class _ScannerReviewPageState extends State<ScannerReviewPage> {
     return Scaffold(
       backgroundColor: colors.backgroundBase,
       body: SafeArea(
-        child: ListenableBuilder(
-          listenable: widget.session,
-          builder: (context, _) {
-            final pages = widget.session.pages;
-            final pageCount = pages.length;
-            final current = pageCount == 0 ? 0 : _index.clamp(0, pageCount - 1);
-            return Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: Spacing.lg,
-                    vertical: Spacing.sm,
-                  ),
-                  child: Row(
-                    children: [
-                      IconButtonComponent(
-                        icon: HugeIcon(
-                          icon: HugeIcons.strokeRoundedArrowLeft01,
-                          color: colors.textBase,
+        child: AbsorbPointer(
+          absorbing: _operationInFlight,
+          child: ListenableBuilder(
+            listenable: widget.session,
+            builder: (context, _) {
+              final pages = widget.session.pages;
+              final pageCount = pages.length;
+              final current = pageCount == 0
+                  ? 0
+                  : _index.clamp(0, pageCount - 1);
+              return Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: Spacing.lg,
+                      vertical: Spacing.sm,
+                    ),
+                    child: Row(
+                      children: [
+                        IconButtonComponent(
+                          icon: HugeIcon(
+                            icon: HugeIcons.strokeRoundedArrowLeft01,
+                            color: colors.textBase,
+                          ),
+                          variant: IconButtonComponentVariant.unfilled,
+                          onTap: () => Navigator.of(context).pop(false),
+                          tooltip: l10n.addPage,
                         ),
-                        variant: IconButtonComponentVariant.unfilled,
-                        onTap: () => Navigator.of(context).pop(false),
-                        tooltip: l10n.addPage,
-                      ),
-                      Expanded(
-                        child: Center(child: _buildFileNameField(colors)),
-                      ),
-                      IconButtonComponent(
-                        icon: HugeIcon(
-                          icon: HugeIcons.strokeRoundedCameraAdd01,
-                          color: colors.textBase,
+                        Expanded(
+                          child: Center(child: _buildFileNameField(colors)),
                         ),
-                        variant: IconButtonComponentVariant.unfilled,
-                        onTap: () => Navigator.of(context).pop(false),
-                        tooltip: l10n.addPage,
-                      ),
-                    ],
+                        IconButtonComponent(
+                          icon: HugeIcon(
+                            icon: HugeIcons.strokeRoundedCameraAdd01,
+                            color: colors.textBase,
+                          ),
+                          variant: IconButtonComponentVariant.unfilled,
+                          onTap: () => Navigator.of(context).pop(false),
+                          tooltip: l10n.addPage,
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-                Expanded(
-                  child: pageCount == 0
-                      ? const Center(child: CircularProgressIndicator())
-                      : PageView.builder(
-                          controller: _pageController,
-                          itemCount: pageCount,
-                          onPageChanged: (index) =>
-                              setState(() => _index = index),
-                          itemBuilder: (context, index) {
-                            final page = pages[index];
-                            return Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: Spacing.lg,
-                                vertical: Spacing.sm,
-                              ),
-                              child: Center(
-                                child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(Radii.sm),
-                                  child: Image.file(
-                                    page.processedJpeg,
-                                    key: ValueKey(page.processedJpeg.path),
-                                    fit: BoxFit.contain,
+                  Expanded(
+                    child: pageCount == 0
+                        ? const Center(child: CircularProgressIndicator())
+                        : PageView.builder(
+                            controller: _pageController,
+                            itemCount: pageCount,
+                            onPageChanged: (index) =>
+                                setState(() => _index = index),
+                            itemBuilder: (context, index) {
+                              final page = pages[index];
+                              return Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: Spacing.lg,
+                                  vertical: Spacing.sm,
+                                ),
+                                child: Center(
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(
+                                      Radii.sm,
+                                    ),
+                                    child: Image.file(
+                                      page.processedJpeg,
+                                      key: ValueKey(page.processedJpeg.path),
+                                      fit: BoxFit.contain,
+                                    ),
                                   ),
                                 ),
-                              ),
-                            );
-                          },
-                        ),
-                ),
-                if (pageCount > 0)
-                  Text(
-                    l10n.scanPageOfTotal(
-                      current: current + 1,
-                      total: pageCount,
-                    ),
-                    style: TextStyles.mini.copyWith(color: colors.textLighter),
+                              );
+                            },
+                          ),
                   ),
-                const SizedBox(height: Spacing.sm),
-                if (pageCount > 1) ...[
-                  _buildThumbnailStrip(pages, current, colors),
+                  if (pageCount > 0)
+                    Text(
+                      l10n.scanPageOfTotal(
+                        current: current + 1,
+                        total: pageCount,
+                      ),
+                      style: TextStyles.mini.copyWith(
+                        color: colors.textLighter,
+                      ),
+                    ),
                   const SizedBox(height: Spacing.sm),
-                ],
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    IconButtonComponent(
-                      icon: HugeIcon(
-                        icon: HugeIcons.strokeRoundedCrop,
-                        color: colors.textBase,
-                      ),
-                      onTap: pageCount == 0 ? null : _adjustCrop,
-                      tooltip: l10n.adjustCrop,
-                    ),
-                    const SizedBox(width: Spacing.lg),
-                    IconButtonComponent(
-                      icon: HugeIcon(
-                        icon: HugeIcons.strokeRoundedRotateClockwise,
-                        color: colors.textBase,
-                      ),
-                      onTap: pageCount == 0 ? null : _rotate,
-                      tooltip: l10n.rotate,
-                    ),
-                    const SizedBox(width: Spacing.lg),
-                    IconButtonComponent(
-                      icon: HugeIcon(
-                        icon: HugeIcons.strokeRoundedDelete02,
-                        color: colors.warning,
-                      ),
-                      onTap: pageCount == 0 ? null : _delete,
-                      tooltip: l10n.delete,
-                    ),
+                  if (pageCount > 1) ...[
+                    _buildThumbnailStrip(pages, current, colors),
+                    const SizedBox(height: Spacing.sm),
                   ],
-                ),
-                Padding(
-                  padding: const EdgeInsets.all(Spacing.xl),
-                  child: Column(
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      ButtonComponent(
-                        label: l10n.saveToEnte,
-                        onTap: pageCount == 0 && !widget.session.isProcessing
-                            ? null
-                            : _saveToEnte,
+                      IconButtonComponent(
+                        icon: HugeIcon(
+                          icon: HugeIcons.strokeRoundedCrop,
+                          color: colors.textBase,
+                        ),
+                        onTap: pageCount == 0 ? null : _adjustCrop,
+                        tooltip: l10n.adjustCrop,
                       ),
-                      const SizedBox(height: Spacing.md),
-                      ButtonComponent(
-                        label: l10n.share,
-                        variant: ButtonComponentVariant.secondary,
-                        onTap: pageCount == 0 && !widget.session.isProcessing
-                            ? null
-                            : _share,
+                      const SizedBox(width: Spacing.lg),
+                      IconButtonComponent(
+                        icon: HugeIcon(
+                          icon: HugeIcons.strokeRoundedRotateClockwise,
+                          color: colors.textBase,
+                        ),
+                        onTap: pageCount == 0 ? null : _rotate,
+                        tooltip: l10n.rotate,
+                      ),
+                      const SizedBox(width: Spacing.lg),
+                      IconButtonComponent(
+                        icon: HugeIcon(
+                          icon: HugeIcons.strokeRoundedDelete02,
+                          color: colors.warning,
+                        ),
+                        onTap: pageCount == 0 ? null : _delete,
+                        tooltip: l10n.delete,
                       ),
                     ],
                   ),
-                ),
-              ],
-            );
-          },
+                  Padding(
+                    padding: const EdgeInsets.all(Spacing.xl),
+                    child: Column(
+                      children: [
+                        ButtonComponent(
+                          label: l10n.saveToEnte,
+                          onTap: pageCount == 0 && !widget.session.isProcessing
+                              ? null
+                              : _saveToEnte,
+                        ),
+                        const SizedBox(height: Spacing.md),
+                        ButtonComponent(
+                          label: l10n.share,
+                          variant: ButtonComponentVariant.secondary,
+                          onTap: pageCount == 0 && !widget.session.isProcessing
+                              ? null
+                              : _share,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
         ),
       ),
     );
