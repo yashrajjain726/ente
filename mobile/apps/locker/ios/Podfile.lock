@@ -37,9 +37,9 @@ PODS:
   - DKPhotoGallery/Resource (0.0.19):
     - SDWebImage
     - SwiftyGif
-  - ente_mail (0.0.1):
+  - ente_locker_frb (0.0.1):
     - Flutter
-  - ente_rust (0.0.1):
+  - ente_mail (0.0.1):
     - Flutter
   - ente_screen_cover (0.0.1):
     - Flutter
@@ -95,8 +95,8 @@ DEPENDENCIES:
   - app_links (from `.symlinks/plugins/app_links/ios`)
   - cupertino_http (from `.symlinks/plugins/cupertino_http/darwin`)
   - device_info_plus (from `.symlinks/plugins/device_info_plus/ios`)
+  - ente_locker_frb (from `.symlinks/plugins/ente_locker_frb/ios`)
   - ente_mail (from `.symlinks/plugins/ente_mail/ios`)
-  - ente_rust (from `.symlinks/plugins/ente_rust/ios`)
   - ente_screen_cover (from `.symlinks/plugins/ente_screen_cover/ios`)
   - file_picker (from `.symlinks/plugins/file_picker/ios`)
   - file_saver (from `.symlinks/plugins/file_saver/ios`)
@@ -132,10 +132,10 @@ EXTERNAL SOURCES:
     :path: ".symlinks/plugins/cupertino_http/darwin"
   device_info_plus:
     :path: ".symlinks/plugins/device_info_plus/ios"
+  ente_locker_frb:
+    :path: ".symlinks/plugins/ente_locker_frb/ios"
   ente_mail:
     :path: ".symlinks/plugins/ente_mail/ios"
-  ente_rust:
-    :path: ".symlinks/plugins/ente_rust/ios"
   ente_screen_cover:
     :path: ".symlinks/plugins/ente_screen_cover/ios"
   file_picker:
@@ -181,8 +181,8 @@ SPEC CHECKSUMS:
   device_info_plus: 21fcca2080fbcd348be798aa36c3e5ed849eefbe
   DKImagePickerController: 946cec48c7873164274ecc4624d19e3da4c1ef3c
   DKPhotoGallery: b3834fecb755ee09a593d7c9e389d8b5d6deed60
+  ente_locker_frb: 493a1f7828e127b606d65a484e4fa9171d8c76ec
   ente_mail: 90753dd584f49ee092759a32d4143ca51db69641
-  ente_rust: d0197ebd5460e8f67576579452b073d698404abe
   ente_screen_cover: 6792566774f1c83939f9c1d03ed0a1f1ded45ae4
   file_picker: a0560bc09d61de87f12d246fc47d2119e6ef37be
   file_saver: 6cdbcddd690cb02b0c1a0c225b37cd805c2bf8b6
@@ -206,6 +206,6 @@ SPEC CHECKSUMS:
   ua_client_hints: 92fe0d139619b73ec9fcb46cc7e079a26178f586
   url_launcher_ios: 7a95fa5b60cc718a708b8f2966718e93db0cef1b
 
-PODFILE CHECKSUM: f405a866efb775526053f85ff6c8b6994039d457
+PODFILE CHECKSUM: 1ea06a574e0473671dee0ea3e6eb43a416f8b3d4
 
 COCOAPODS: 1.17.0

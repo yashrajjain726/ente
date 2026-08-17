@@ -29,8 +29,8 @@ enum NativeTarget {
 #[derive(Clone, Copy)]
 enum FrbTarget {
     All,
-    Shared,
     Photos,
+    Locker,
 }
 
 fn main() {
@@ -58,8 +58,8 @@ fn run() -> Result<(), DynError> {
         Some("frb") => {
             let target = match args.next().as_deref() {
                 None => FrbTarget::All,
-                Some("shared") => FrbTarget::Shared,
                 Some("photos") => FrbTarget::Photos,
+                Some("locker") => FrbTarget::Locker,
                 _ => return Err(usage_error()),
             };
             if args.next().is_some() {
@@ -78,7 +78,7 @@ fn run() -> Result<(), DynError> {
 }
 
 fn usage_error() -> DynError {
-    "usage: cargo codegen <native [ensu|cast]|frb [shared|photos]|napi>".into()
+    "usage: cargo codegen <native [ensu|cast]|frb [photos|locker]|napi>".into()
 }
 
 fn generate_native(target: NativeTarget) -> Result<(), DynError> {
@@ -164,11 +164,11 @@ fn generate_frb(target: FrbTarget) -> Result<(), DynError> {
         .parent()
         .ok_or("failed to resolve repo root from rust/apps/codegen")?;
 
-    if matches!(target, FrbTarget::All | FrbTarget::Shared) {
-        generate_frb_package(&repo_root.join("mobile/packages/rust"))?;
-    }
     if matches!(target, FrbTarget::All | FrbTarget::Photos) {
         generate_frb_package(&repo_root.join("mobile/apps/photos"))?;
+    }
+    if matches!(target, FrbTarget::All | FrbTarget::Locker) {
+        generate_frb_package(&repo_root.join("mobile/apps/locker"))?;
     }
     format_frb_bindings(target)
 }
@@ -297,15 +297,15 @@ fn format_frb_bindings(target: FrbTarget) -> Result<(), DynError> {
         FrbTarget::All => {
             command
                 .arg("-p")
-                .arg("ente_rust")
+                .arg("ente_photos_rust")
                 .arg("-p")
-                .arg("ente_photos_rust");
-        }
-        FrbTarget::Shared => {
-            command.arg("-p").arg("ente_rust");
+                .arg("ente-locker-frb");
         }
         FrbTarget::Photos => {
             command.arg("-p").arg("ente_photos_rust");
+        }
+        FrbTarget::Locker => {
+            command.arg("-p").arg("ente-locker-frb");
         }
     }
     command.current_dir(rust_root);

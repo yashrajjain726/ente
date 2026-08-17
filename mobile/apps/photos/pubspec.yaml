@@ -68,8 +68,6 @@ dependencies:
     path: ../../packages/ente_qr
   ente_qr_ui:
     path: ../../packages/qr
-  ente_rust:
-    path: ../../packages/rust
   ente_screen_brightness:
     path: ../../packages/ente_screen_brightness
   ente_strings:

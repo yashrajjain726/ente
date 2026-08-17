@@ -2510,6 +2510,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "ente-locker-frb"
+version = "0.0.0"
+dependencies = [
+ "ente-accounts",
+ "ente-contacts",
+ "ente-core",
+ "ente-frb-log",
+ "flutter_rust_bridge",
+]
+
+[[package]]
 name = "ente-ml"
 version = "0.0.0"
 dependencies = [
@@ -2697,22 +2708,14 @@ dependencies = [
 name = "ente_photos_rust"
 version = "0.0.0"
 dependencies = [
+ "ente-accounts",
  "ente-cast",
+ "ente-contacts",
+ "ente-core",
  "ente-frb-log",
  "ente-image",
  "ente-ml",
  "ente-photos",
- "flutter_rust_bridge",
-]
-
-[[package]]
-name = "ente_rust"
-version = "0.0.0"
-dependencies = [
- "ente-accounts",
- "ente-contacts",
- "ente-core",
- "ente-frb-log",
  "flutter_rust_bridge",
 ]
 
