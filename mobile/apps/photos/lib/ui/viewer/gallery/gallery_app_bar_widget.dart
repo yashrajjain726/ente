@@ -52,7 +52,6 @@ import "package:photos/ui/viewer/gallery/hooks/edit_album_details_sheet.dart";
 import "package:photos/ui/viewer/gallery/state/inherited_search_filter_data.dart";
 import "package:photos/ui/viewer/hierarchicial_search/app_bar_filter_chips.dart";
 import "package:photos/ui/viewer/location/edit_location_sheet.dart";
-import 'package:photos/utils/delete_file_util.dart';
 import 'package:photos/utils/dialog_util.dart';
 import 'package:photos/utils/magic_util.dart';
 
@@ -178,7 +177,6 @@ enum AlbumPopupAction {
   downloadAlbum,
   sortByMostRecent,
   sortByMostRelevant,
-  emptyTrash,
   editLocation,
   deleteLocation,
   galleryGuestView,
@@ -670,8 +668,6 @@ class _GalleryAppBarWidgetState extends State<GalleryAppBarWidget> {
             await onCleanUncategorizedClick(context);
           } else if (value == AlbumPopupAction.downloadAlbum) {
             await _downloadPublicAlbumToGallery(widget.files!);
-          } else if (value == AlbumPopupAction.emptyTrash) {
-            await emptyTrash(context);
           } else if (value == AlbumPopupAction.editLocation) {
             editLocation();
           } else if (value == AlbumPopupAction.deleteLocation) {

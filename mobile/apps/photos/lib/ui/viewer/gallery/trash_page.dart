@@ -7,6 +7,7 @@ import "package:ente_photos_platform/ente_photos_platform.dart"
 import "package:ente_pure_utils/ente_pure_utils.dart";
 import "package:ente_strings/extensions.dart";
 import 'package:flutter/material.dart';
+import "package:hugeicons/hugeicons.dart";
 import "package:photo_manager/photo_manager.dart";
 import "package:photos/core/constants.dart";
 import "package:photos/core/event_bus.dart";
@@ -27,6 +28,7 @@ import "package:photos/ui/viewer/gallery/gallery_app_bar_widget.dart";
 import "package:photos/ui/viewer/gallery/state/gallery_boundaries_provider.dart";
 import "package:photos/ui/viewer/gallery/state/gallery_files_inherited_widget.dart";
 import "package:photos/ui/viewer/gallery/state/selection_state.dart";
+import "package:photos/utils/delete_file_util.dart";
 import "package:photos/utils/device_info.dart";
 
 Future<void> showTrashPage(BuildContext context) async {
@@ -49,6 +51,7 @@ class _TrashPage extends StatefulWidget {
 
 class _TrashPageState extends State<_TrashPage> {
   bool _isOnEnteTrash = !isLocalGalleryMode;
+  bool _hasTrashFiles = false;
   final _selectedFiles = SelectedFiles();
 
   @override
@@ -69,6 +72,7 @@ class _TrashPageState extends State<_TrashPage> {
                       setState(() {
                         _selectedFiles.clearAll();
                         _isOnEnteTrash = true;
+                        _hasTrashFiles = false;
                       });
                     }
                   },
@@ -81,6 +85,7 @@ class _TrashPageState extends State<_TrashPage> {
                       setState(() {
                         _selectedFiles.clearAll();
                         _isOnEnteTrash = false;
+                        _hasTrashFiles = false;
                       });
                     }
                   },
@@ -140,6 +145,27 @@ class _TrashPageState extends State<_TrashPage> {
               ],
             ),
           ),
+          floatingActionButton: ListenableBuilder(
+            listenable: _selectedFiles,
+            builder: (context, _) {
+              if (_selectedFiles.files.isNotEmpty || !_hasTrashFiles) {
+                return const SizedBox.shrink();
+              }
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: FABComponent(
+                  label: l10n.deleteAll,
+                  icon: const HugeIcon(icon: HugeIcons.strokeRoundedDelete02),
+                  onTap: () =>
+                      showConfirmDeleteAllTrashSheet(context, _isOnEnteTrash),
+                ),
+              );
+            },
+          ),
+          floatingActionButtonLocation:
+              FloatingActionButtonLocation.centerFloat,
+          floatingActionButtonAnimator:
+              FloatingActionButtonAnimator.noAnimation,
         ),
       ),
     );
@@ -151,30 +177,40 @@ class _TrashPageState extends State<_TrashPage> {
     int? limit,
     bool? asc,
   }) async {
-    if (_isOnEnteTrash) {
-      return await TrashDB.instance.getTrashedFiles(
+    final isOnEnteTrash = _isOnEnteTrash;
+    late final FileLoadResult result;
+    if (isOnEnteTrash) {
+      result = await TrashDB.instance.getTrashedFiles(
         creationStartTime,
         creationEndTime,
         limit: limit,
         asc: asc,
       );
-    }
-    final deviceTrash = await DeviceTrashClient.instance.getFiles();
-    final deviceTrashAssets = await Future.wait(
-      deviceTrash.map((t) => AssetEntity.fromId(t.localID.toString())),
-    );
-    final List<EnteFile> files = [];
-    for (var i = 0; i < deviceTrash.length; i++) {
-      final trash = deviceTrash[i];
-      final asset = deviceTrashAssets[i];
-      if (asset == null) continue;
-      files.add(
-        DeviceTrashFile.from(
-          fileFromAsset(trash.deviceFolder, asset),
-          deleteBy: trash.deleteBy,
-        ),
+    } else {
+      final deviceTrash = await DeviceTrashClient.instance.getFiles();
+      final deviceTrashAssets = await Future.wait(
+        deviceTrash.map((t) => AssetEntity.fromId(t.localID.toString())),
       );
+      final List<EnteFile> files = [];
+      for (var i = 0; i < deviceTrash.length; i++) {
+        final trash = deviceTrash[i];
+        final asset = deviceTrashAssets[i];
+        if (asset == null) continue;
+        files.add(
+          DeviceTrashFile.from(
+            fileFromAsset(trash.deviceFolder, asset),
+            deleteBy: trash.deleteBy,
+          ),
+        );
+      }
+      result = FileLoadResult(files, false);
     }
-    return FileLoadResult(files, false);
+    if (mounted && _isOnEnteTrash == isOnEnteTrash) {
+      final hasTrashFiles = result.files.isNotEmpty;
+      if (_hasTrashFiles != hasTrashFiles) {
+        setState(() => _hasTrashFiles = hasTrashFiles);
+      }
+    }
+    return result;
   }
 }

@@ -56,7 +56,7 @@ class FlagService {
   bool get largeBackupStandby => internalUser;
 
   bool get librarySharing =>
-      internalUser && _isServerFlagEnabled(_librarySharingFlag);
+      internalUser || _isServerFlagEnabled(_librarySharingFlag);
 
   bool get webGPUEnabled => true;
 
