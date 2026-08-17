@@ -106,12 +106,14 @@ Future<void> showAlbumsManageSheet(BuildContext context) {
               label: strings.trash,
               icon: HugeIcons.strokeRoundedDelete01,
               iconColor: const Color(0xFFE3505A),
-              onTap: () async {
-                if (sheetContext.mounted) {
-                  Navigator.of(sheetContext).pop();
-                }
-                await showTrashPage(context);
-              },
+              onTap: () => showTrashPage(
+                context,
+                beforeRouteToPage: () {
+                  if (sheetContext.mounted) {
+                    Navigator.of(sheetContext).pop();
+                  }
+                },
+              ),
             ),
           ],
         ),
