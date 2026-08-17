@@ -9,6 +9,7 @@ import 'package:photos/models/metadata/common_keys.dart';
 import 'package:photos/models/user_details.dart';
 import 'package:photos/services/account/user_service.dart';
 import 'package:photos/services/collections_service.dart';
+import 'package:photos/services/entity_service.dart';
 import 'package:photos/services/library_sharing_service.dart';
 import 'package:photos/services/library_sharing_store.dart';
 
@@ -225,7 +226,9 @@ class _Fixture {
       service.isAutomaticSharingEnabled(librarySharingTestRecipient.userID);
 }
 
-class _MemoryLibrarySharingStore implements LibrarySharingStore {
+class _MemoryLibrarySharingStore extends LibrarySharingEntityStore {
+  _MemoryLibrarySharingStore() : super(_MockEntityService());
+
   LibrarySharingConfig? _config;
   bool disableOnNextWrite = false;
 
@@ -256,6 +259,8 @@ class _MemoryLibrarySharingStore implements LibrarySharingStore {
     return config;
   }
 }
+
+class _MockEntityService extends Mock implements EntityService {}
 
 class _FakeCollectionsService extends Mock implements CollectionsService {
   _FakeCollectionsService(this.albums, this.blockedIDs, this.shareError);

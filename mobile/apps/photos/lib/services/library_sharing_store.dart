@@ -89,20 +89,7 @@ class LibrarySharingConfig {
   }
 }
 
-abstract interface class LibrarySharingStore {
-  Future<void> sync();
-
-  Future<LibrarySharingConfig?> read(int ownerUserID, int recipientUserID);
-
-  Future<List<LibrarySharingConfig>> readAll(int ownerUserID);
-
-  Future<LibrarySharingConfig> write(
-    int ownerUserID,
-    LibrarySharingConfig config,
-  );
-}
-
-class LibrarySharingEntityStore implements LibrarySharingStore {
+class LibrarySharingEntityStore {
   LibrarySharingEntityStore(this._entityService);
 
   static const _type = EntityType.libraryShare;
@@ -111,14 +98,12 @@ class LibrarySharingEntityStore implements LibrarySharingStore {
   final EntityService _entityService;
   final _logger = Logger('LibrarySharingEntityStore');
 
-  @override
   Future<void> sync() async {
     if (await _entityService.syncEntity(_type) < 0) {
       throw StateError('Could not sync library sharing state');
     }
   }
 
-  @override
   Future<LibrarySharingConfig?> read(
     int ownerUserID,
     int recipientUserID,
@@ -130,7 +115,6 @@ class LibrarySharingEntityStore implements LibrarySharingStore {
     return entity == null ? null : _decode(entity, ownerUserID);
   }
 
-  @override
   Future<List<LibrarySharingConfig>> readAll(int ownerUserID) async {
     final configs = <LibrarySharingConfig>[];
     for (final entity in await _entityService.getEntities(_type)) {
@@ -150,7 +134,6 @@ class LibrarySharingEntityStore implements LibrarySharingStore {
     return configs;
   }
 
-  @override
   Future<LibrarySharingConfig> write(
     int ownerUserID,
     LibrarySharingConfig config,

@@ -85,7 +85,7 @@ class LibrarySharingService implements LibrarySharingRepository {
     CollectionsService? collectionsService,
     UserService? userService,
     Configuration? configuration,
-    required LibrarySharingStore store,
+    required LibrarySharingEntityStore store,
   }) : _collectionsService = collectionsService ?? CollectionsService.instance,
        _userService = userService ?? UserService.instance,
        _configuration = configuration ?? Configuration.instance,
@@ -94,7 +94,7 @@ class LibrarySharingService implements LibrarySharingRepository {
   final CollectionsService _collectionsService;
   final UserService _userService;
   final Configuration _configuration;
-  final LibrarySharingStore _store;
+  final LibrarySharingEntityStore _store;
   final _logger = Logger('LibrarySharingService');
   final _operationLock = Lock();
 
