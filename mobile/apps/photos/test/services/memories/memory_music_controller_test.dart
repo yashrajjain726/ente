@@ -1,6 +1,5 @@
 import "package:flutter_test/flutter_test.dart";
 import "package:photos/models/memories/memory_music_track.dart";
-import "package:photos/services/memories/memory_music_catalog.dart";
 import "package:photos/services/memories/memory_music_controller.dart";
 import "package:photos/services/memories/memory_music_player.dart";
 
@@ -13,13 +12,15 @@ void main() {
     player = _FakeMemoryMusicPlayer();
     persistedMuteValues = <bool>[];
     controller = MemoryMusicController(
-      catalog: MemoryMusicCatalog(const <MemoryMusicTrack>[
-        MemoryMusicTrack(id: "track-1", assetPath: "assets/track-1.mp3"),
-        MemoryMusicTrack(id: "track-2", assetPath: "assets/track-2.mp3"),
-      ]),
-      assignments: const <String, String>{
-        "memory-1": "track-1",
-        "memory-2": "track-2",
+      assignments: const <String, MemoryMusicTrack>{
+        "memory-1": MemoryMusicTrack(
+          id: "track-1",
+          assetPath: "assets/track-1.mp3",
+        ),
+        "memory-2": MemoryMusicTrack(
+          id: "track-2",
+          assetPath: "assets/track-2.mp3",
+        ),
       },
       initiallyMuted: false,
       persistMuted: (value) async => persistedMuteValues.add(value),

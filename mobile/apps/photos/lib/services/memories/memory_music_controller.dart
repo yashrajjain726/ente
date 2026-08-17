@@ -2,7 +2,7 @@ import "dart:async";
 
 import "package:flutter/foundation.dart";
 import "package:logging/logging.dart";
-import "package:photos/services/memories/memory_music_catalog.dart";
+import "package:photos/models/memories/memory_music_track.dart";
 import "package:photos/services/memories/memory_music_player.dart";
 
 enum _MemoryMusicPlaybackStatus { idle, loading, ready }
@@ -10,8 +10,7 @@ enum _MemoryMusicPlaybackStatus { idle, loading, ready }
 enum _MemoryMusicPauseReason { appBackground, viewerAction, videoItem }
 
 class MemoryMusicController extends ChangeNotifier {
-  final MemoryMusicCatalog _catalog;
-  final Map<String, String> _assignments;
+  final Map<String, MemoryMusicTrack> _assignments;
   final MemoryMusicPlayer _player;
   final Future<void> Function(bool isMuted) _persistMuted;
   final Logger _logger = Logger("MemoryMusicController");
@@ -27,13 +26,11 @@ class MemoryMusicController extends ChangeNotifier {
   int _loadGeneration = 0;
 
   MemoryMusicController({
-    required MemoryMusicCatalog catalog,
-    required Map<String, String> assignments,
+    required Map<String, MemoryMusicTrack> assignments,
     required bool initiallyMuted,
     required Future<void> Function(bool isMuted) persistMuted,
     MemoryMusicPlayer? player,
-  }) : _catalog = catalog,
-       _assignments = assignments,
+  }) : _assignments = assignments,
        _isMuted = initiallyMuted,
        _persistMuted = persistMuted,
        _player = player ?? JustAudioMemoryMusicPlayer();
@@ -56,8 +53,7 @@ class MemoryMusicController extends ChangeNotifier {
       return;
     }
 
-    final trackID = _assignments[memoryID];
-    final track = trackID == null ? null : _catalog.trackForID(trackID);
+    final track = _assignments[memoryID];
     final generation = ++_loadGeneration;
     if (track == null) {
       _status = _MemoryMusicPlaybackStatus.idle;

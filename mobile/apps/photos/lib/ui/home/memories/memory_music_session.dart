@@ -1,21 +1,20 @@
 import "dart:async";
 
 import "package:flutter/material.dart";
-import "package:photos/models/memories/smart_memory.dart";
 import "package:photos/service_locator.dart";
-import "package:photos/services/memories/memory_music_catalog.dart";
+import "package:photos/services/memories/bundled_memory_music_tracks.dart";
 import "package:photos/services/memories/memory_music_controller.dart";
 import "package:photos/services/memories/memory_music_selector.dart";
 
 class MemoryMusicSession extends StatefulWidget {
-  final List<SmartMemory> memories;
+  final List<String> memoryIDs;
   final String initialMemoryID;
   final bool initialItemIsVideo;
   final Widget Function(BuildContext context, MemoryMusicController controller)
   builder;
 
   const MemoryMusicSession({
-    required this.memories,
+    required this.memoryIDs,
     required this.initialMemoryID,
     required this.initialItemIsVideo,
     required this.builder,
@@ -34,13 +33,11 @@ class _MemoryMusicSessionState extends State<MemoryMusicSession>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    final catalog = MemoryMusicCatalog.bundled;
     final assignments = assignMemoryMusicTracks(
-      memoryIDs: widget.memories.map((memory) => memory.id),
-      tracks: catalog.tracks,
+      memoryIDs: widget.memoryIDs,
+      tracks: bundledMemoryMusicTracks,
     );
     _controller = MemoryMusicController(
-      catalog: catalog,
       assignments: assignments,
       initiallyMuted: localSettings.isMemoriesAudioMuted(),
       persistMuted: localSettings.setMemoriesAudioMuted,

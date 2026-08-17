@@ -26,7 +26,7 @@ void main() {
       tracks: tracks,
     );
     final assignedTracks = memoryIDs
-        .map((memoryID) => assignments[memoryID])
+        .map((memoryID) => assignments[memoryID]!.id)
         .toList();
 
     for (var index = 1; index < assignedTracks.length; index++) {
@@ -34,7 +34,7 @@ void main() {
     }
   });
 
-  test("one-track catalog reuses its only track", () {
+  test("one-track list reuses its only track", () {
     final assignments = assignMemoryMusicTracks(
       memoryIDs: memoryIDs,
       tracks: const <MemoryMusicTrack>[
@@ -42,10 +42,13 @@ void main() {
       ],
     );
 
-    expect(assignments.values, everyElement("track-1"));
+    expect(
+      assignments.values.map((track) => track.id),
+      everyElement("track-1"),
+    );
   });
 
-  test("empty catalog produces no assignments", () {
+  test("empty track list produces no assignments", () {
     expect(
       assignMemoryMusicTracks(
         memoryIDs: memoryIDs,

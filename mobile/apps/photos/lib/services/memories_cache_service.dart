@@ -1394,7 +1394,7 @@ class MemoriesCacheService {
     if (context != null && !context.mounted) return;
     await _routeToPage(
       MemoryMusicSession(
-        memories: <SmartMemory>[selectedPersonMemory],
+        memoryIDs: <String>[selectedPersonMemory.id],
         initialMemoryID: selectedPersonMemory.id,
         initialItemIsVideo:
             selectedPersonMemory.memories.first.file.fileType == FileType.video,

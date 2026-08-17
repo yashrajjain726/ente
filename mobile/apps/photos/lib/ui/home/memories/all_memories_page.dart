@@ -59,7 +59,7 @@ class _AllMemoriesPageState extends State<AllMemoriesPage>
     final initialMemory = _memories[_initialPageIndex];
     final initialItemIndex = _initialItemIndexForPage(_initialPageIndex);
     return MemoryMusicSession(
-      memories: _memories,
+      memoryIDs: _memories.map((memory) => memory.id).toList(),
       initialMemoryID: initialMemory.id,
       initialItemIsVideo:
           initialMemory.memories[initialItemIndex].file.fileType ==
