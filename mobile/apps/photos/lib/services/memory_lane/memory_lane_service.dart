@@ -29,7 +29,7 @@ typedef _TimelineComputationResult = ({
 });
 
 class MemoryLaneService {
-  MemoryLaneService._internal();
+  MemoryLaneService._internal() : _enabledForSession = hasGrantedMLConsent;
 
   static final MemoryLaneService instance = MemoryLaneService._internal();
 
@@ -64,13 +64,15 @@ class MemoryLaneService {
   final Map<String, _PendingRecomputeRequest> _pendingRequests = {};
   final Set<String> _cropReadinessInFlight = {};
 
+  bool _enabledForSession;
   bool _initialized = false;
 
   StreamSubscription<PeopleChangedEvent>? _peopleChangedSubscription;
   StreamSubscription<MLConsentChangedEvent>? _mlConsentChangedSubscription;
   Timer? _startupBackfillTimer;
 
-  bool get isFeatureEnabled => flagService.facesTimeline && hasGrantedMLConsent;
+  bool get isFeatureEnabled =>
+      _enabledForSession && flagService.facesTimeline && hasGrantedMLConsent;
 
   Future<void> init() async {
     if (_initialized) return;
@@ -95,11 +97,8 @@ class MemoryLaneService {
   }
 
   void _handleMlConsentChange(MLConsentChangedEvent event) {
-    if (event.enabled && isFeatureEnabled) {
-      _scheduleStartupBackfill();
-      unawaited(queueFullRecompute(trigger: "ml_enabled"));
-      return;
-    }
+    if (event.enabled) return;
+    _enabledForSession = false;
     _startupBackfillTimer?.cancel();
     _startupBackfillTimer = null;
   }
