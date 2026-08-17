@@ -211,7 +211,16 @@ func (c *BillingController) VerifySubscription(
 	}
 	isUpgradingFromFreePlan := currentSubscription.ProductID == ente.FreePlanProductID
 	if shouldSkipVerifiedSubscriptionReplacement(currentSubscription, newSubscription, time.Microseconds()) {
-		log.Info("Outdated or expired purchase reported")
+		log.WithFields(log.Fields{
+			"user_id":                      userID,
+			"stored_payment_provider":      currentSubscription.PaymentProvider,
+			"stored_product_id":            currentSubscription.ProductID,
+			"stored_expiry_time":           currentSubscription.ExpiryTime,
+			"verified_payment_provider":    newSubscription.PaymentProvider,
+			"verified_product_id":          newSubscription.ProductID,
+			"verified_expiry_time":         newSubscription.ExpiryTime,
+			"same_original_transaction_id": currentSubscription.OriginalTransactionID == newSubscription.OriginalTransactionID,
+		}).Info("Skipping verified subscription replacement")
 		return currentSubscription, nil
 	}
 	if newSubscription.Storage < currentSubscription.Storage {
