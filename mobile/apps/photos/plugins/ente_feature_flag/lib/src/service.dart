@@ -22,7 +22,6 @@ class FlagService {
 
   final SharedPreferences _prefs;
   final Dio _enteDio;
-  final _flagsUpdatedController = StreamController<RemoteFlags>.broadcast();
 
   FlagService(this._prefs, this._enteDio) {
     Future.delayed(const Duration(seconds: 5), () {
@@ -31,8 +30,6 @@ class FlagService {
   }
 
   RemoteFlags? _flags;
-
-  Stream<RemoteFlags> get flagsUpdated => _flagsUpdatedController.stream;
 
   RemoteFlags get flags {
     try {
@@ -175,7 +172,6 @@ class FlagService {
       final remoteFlags = RemoteFlags.fromMap(response.data);
       await _prefs.setString("remote_flags", remoteFlags.toJson());
       _flags = remoteFlags;
-      _flagsUpdatedController.add(remoteFlags);
     } catch (e) {
       debugPrint("Failed to sync feature flags $e");
     } finally {
@@ -201,7 +197,6 @@ class FlagService {
 
   void _updateFlags(RemoteFlags flags) {
     _flags = flags;
-    _flagsUpdatedController.add(flags);
     _prefs.setString("remote_flags", flags.toJson());
     _fetch().ignore();
   }
