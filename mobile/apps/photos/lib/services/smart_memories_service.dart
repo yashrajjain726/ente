@@ -68,6 +68,7 @@ typedef _PreparedMemoriesData = ({
   List<PersonEntity> persons,
   Map<String, String> faceIDsToPersonID,
   Map<int, EmbeddingVector> fileIDToImageEmbedding,
+  TripMemoriesAnalysis tripAnalysis,
 });
 
 class SmartMemoriesService {
@@ -353,8 +354,10 @@ class SmartMemoriesService {
         : Configuration.instance.getEmail();
     _logger.info('currentUserEmail: $currentUserEmail $timeLogger');
 
-    final cities = await locationService.getCities();
-    _logger.info('cities has ${cities.length} entries $timeLogger');
+    final citySearchIndex = await locationService.getCitySearchIndex();
+    _logger.info(
+      'cities has ${citySearchIndex.cities.length} entries $timeLogger',
+    );
 
     final Map<int, List<FaceWithoutEmbedding>> fileIdToFaces = mlEnabled
         ? await mlDataDB.getFileIDsToFacesWithoutEmbedding()
@@ -420,7 +423,7 @@ class SmartMemoriesService {
       seenTimes: seenTimes,
       persons: persons,
       currentUserEmail: currentUserEmail,
-      cities: cities,
+      citySearchIndex: citySearchIndex,
       fileIdToFaces: fileIdToFaces,
       clusterIdToFaceCount: unnamedClusterData.clusterIdToFaceCount,
       clusterIdToFaceIDs: unnamedClusterData.clusterIdToFaceIDs,
@@ -848,10 +851,18 @@ class SmartMemoriesService {
     for (final embedding in computationContext.allImageEmbeddings) {
       fileIDToImageEmbedding[embedding.fileID] = embedding;
     }
+    final tripAnalysis = TripMemoriesCalculatorV2.analyze(
+      computationContext.allFileIdsToFile.values,
+      computationContext.allFileIdsToFile,
+      isLocalGalleryMode: computationContext.isLocalGalleryMode,
+      seenTimes: computationContext.seenTimes,
+      citySearchIndex: computationContext.citySearchIndex,
+    );
     return (
       persons: persons,
       faceIDsToPersonID: faceIDsToPersonID,
       fileIDToImageEmbedding: fileIDToImageEmbedding,
+      tripAnalysis: tripAnalysis,
     );
   }
 
@@ -896,7 +907,8 @@ class SmartMemoriesService {
       final Map<int, int> seenTimes = computationContext.seenTimes;
       final List<PersonEntity> persons = preparedData.persons;
       final String? currentUserEmail = computationContext.currentUserEmail;
-      final List<City> cities = computationContext.cities;
+      final CitySearchIndex citySearchIndex =
+          computationContext.citySearchIndex;
       final Map<int, List<FaceWithoutEmbedding>> fileIdToFaces =
           computationContext.fileIdToFaces;
       final Map<String, int> clusterIdToFaceCount =
@@ -978,8 +990,8 @@ class SmartMemoriesService {
         dev.log('ML disabled, skipping people memories $t');
       }
 
-      final (tripMemories, bases) = await _getTripsResults(
-        tripSourceFiles: fullSourceFiles,
+      final (tripMemories, bases) = await _surfaceTrips(
+        tripAnalysis: preparedData.tripAnalysis,
         allFileIdsToFile: allFileIdsToFile,
         currentTime: now,
         shownTrips: oldCache.tripsShownLogs,
@@ -992,7 +1004,7 @@ class SmartMemoriesService {
         faceIDsToPersonID: faceIDsToPersonID,
         fileIDToImageEmbedding: fileIDToImageEmbedding,
         clipPositiveTextVector: clipPositiveTextVector,
-        cities: cities,
+        citySearchIndex: citySearchIndex,
       );
       _markUsedMemories(
         usedMemoryFileIds,
@@ -1245,8 +1257,8 @@ class SmartMemoriesService {
     );
   }
 
-  static Future<(List<TripMemory>, List<BaseLocation>)> _getTripsResults({
-    required Iterable<EnteFile> tripSourceFiles,
+  static Future<(List<TripMemory>, List<BaseLocation>)> _surfaceTrips({
+    required TripMemoriesAnalysis tripAnalysis,
     required Map<int, EnteFile> allFileIdsToFile,
     required DateTime currentTime,
     required List<TripsShownLog> shownTrips,
@@ -1259,10 +1271,10 @@ class SmartMemoriesService {
     required Map<String, String> faceIDsToPersonID,
     required Map<int, EmbeddingVector> fileIDToImageEmbedding,
     required Vector clipPositiveTextVector,
-    required List<City> cities,
+    required CitySearchIndex citySearchIndex,
   }) async {
-    return TripMemoriesCalculatorV2.compute(
-      tripSourceFiles,
+    return TripMemoriesCalculatorV2.surface(
+      tripAnalysis,
       allFileIdsToFile,
       currentTime,
       shownTrips,
@@ -1275,7 +1287,7 @@ class SmartMemoriesService {
       faceIDsToPersonID: faceIDsToPersonID,
       fileIDToImageEmbedding: fileIDToImageEmbedding,
       clipPositiveTextVector: clipPositiveTextVector,
-      cities: cities,
+      citySearchIndex: citySearchIndex,
     );
   }
 
@@ -1414,11 +1426,11 @@ class SmartMemoriesService {
 
   static String? _tryFindLocationName(
     List<Memory> memories,
-    List<City> cities, {
+    CitySearchIndex citySearchIndex, {
     bool base = false,
     Set<String> excludedCountryNames = const {},
   }) {
-    final locationContext = _getLocationNameContext(memories, cities);
+    final locationContext = _getLocationNameContext(memories, citySearchIndex);
     if (locationContext == null) return null;
 
     final files = locationContext.files;
@@ -1437,8 +1449,11 @@ class SmartMemoriesService {
     return null;
   }
 
-  static String? _tryFindCountryName(List<Memory> memories, List<City> cities) {
-    final locationContext = _getLocationNameContext(memories, cities);
+  static String? _tryFindCountryName(
+    List<Memory> memories,
+    CitySearchIndex citySearchIndex,
+  ) {
+    final locationContext = _getLocationNameContext(memories, citySearchIndex);
     return locationContext?.biggestPlace.country;
   }
 
@@ -1447,13 +1462,12 @@ class SmartMemoriesService {
     Map<City, List<EnteFile>> results,
     City biggestPlace,
   })?
-  _getLocationNameContext(List<Memory> memories, List<City> cities) {
+  _getLocationNameContext(
+    List<Memory> memories,
+    CitySearchIndex citySearchIndex,
+  ) {
     final files = Memory.filesFromMemories(memories);
-    final results = getCityResults({
-      "query": '',
-      "cities": cities,
-      "files": files,
-    });
+    final results = getCityResults(citySearchIndex.searchArgs(files));
     final List<City> sortedByResultCount = results.keys.toList()
       ..sort((a, b) => results[b]!.length.compareTo(results[a]!.length));
     if (sortedByResultCount.isEmpty) return null;

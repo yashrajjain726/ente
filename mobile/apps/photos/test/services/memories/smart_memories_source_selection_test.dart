@@ -54,6 +54,22 @@ void main() {
         final allFileIdsToFile = {
           for (final file in fullSourceFiles) file.uploadedFileID!: file,
         };
+        final citySearchIndex = CitySearchIndex(
+          cities: [
+            City.fromMap({
+              "city": "Paris",
+              "country": "France",
+              "lat": tripLocation.latitude,
+              "lng": tripLocation.longitude,
+            }),
+          ],
+          nodes: const [
+            [0, -1, -1, 0],
+          ],
+          root: 0,
+          maxLatDelta: 1,
+          maxLngDelta: 1,
+        );
 
         final (fullTrips, _) = await TripMemoriesCalculatorV2.compute(
           fullSourceFiles,
@@ -69,7 +85,7 @@ void main() {
           faceIDsToPersonID: const <String, String>{},
           fileIDToImageEmbedding: const <int, EmbeddingVector>{},
           clipPositiveTextVector: _positiveTextVector,
-          cities: const <City>[],
+          citySearchIndex: citySearchIndex,
         );
 
         final (remainingTrips, _) = await TripMemoriesCalculatorV2.compute(
@@ -86,11 +102,12 @@ void main() {
           faceIDsToPersonID: const <String, String>{},
           fileIDToImageEmbedding: const <int, EmbeddingVector>{},
           clipPositiveTextVector: _positiveTextVector,
-          cities: const <City>[],
+          citySearchIndex: citySearchIndex,
         );
 
         expect(fullTrips, hasLength(1));
         expect(fullTrips.first.memories, hasLength(10));
+        expect(fullTrips.first.locationName, "Paris");
         expect(remainingTrips, isEmpty);
       },
     );
