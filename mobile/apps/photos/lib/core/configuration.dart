@@ -96,7 +96,9 @@ class Configuration implements LockScreenHost, AccountDeletionHost {
       );
       _documentsDirectory = (await getApplicationDocumentsDirectory()).path;
       final appSupportDirectory = await getApplicationSupportDirectory();
-      // Exclude Documents (SQLite, thumbnails, decrypted media) and Application Support (ML models) from backups since they’re server-derivable or must remain within the device’s E2EE boundary.
+      // Exclude Documents (SQLite, thumbnails, decrypted media) and Application
+      // Support (ML models) from backups. They are server-derivable or must
+      // remain within the device's E2EE boundary.
       await excludeFromBackup(_documentsDirectory);
       await excludeFromBackup(appSupportDirectory.path);
       _tempDocumentsDirPath = _documentsDirectory + "/temp/";
