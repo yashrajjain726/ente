@@ -44,7 +44,7 @@ dependencies:
     path: ../../packages/legacy
   ente_lock_screen:
     path: ../../packages/lock_screen
-  ente_locker_rust:
+  ente_locker_frb:
     path: rust_builder
   ente_logging:
     path: ../../packages/logging

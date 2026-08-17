@@ -1,5 +1,5 @@
 [package]
-name = "ente_locker_rust"
+name = "ente-locker-frb"
 edition = "2024"
 
 [lib]

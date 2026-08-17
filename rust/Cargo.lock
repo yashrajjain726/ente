@@ -2510,6 +2510,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "ente-locker-frb"
+version = "0.0.0"
+dependencies = [
+ "ente-accounts",
+ "ente-contacts",
+ "ente-core",
+ "ente-frb-log",
+ "flutter_rust_bridge",
+]
+
+[[package]]
 name = "ente-ml"
 version = "0.0.0"
 dependencies = [
@@ -2678,17 +2689,6 @@ dependencies = [
  "log",
  "wasm-bindgen",
  "web-sys",
-]
-
-[[package]]
-name = "ente_locker_rust"
-version = "0.0.0"
-dependencies = [
- "ente-accounts",
- "ente-contacts",
- "ente-core",
- "ente-frb-log",
- "flutter_rust_bridge",
 ]
 
 [[package]]

@@ -84,7 +84,7 @@ jobs:
             - run: cargo clippy -p ente_photos_rust --features flutter --all-targets --locked
               working-directory: rust
 
-            - run: cargo clippy -p ente_locker_rust --features flutter --all-targets --locked
+            - run: cargo clippy -p ente-locker-frb --features flutter --all-targets --locked
               working-directory: rust
 
             - run: flutter pub get --enforce-lockfile

@@ -299,13 +299,13 @@ fn format_frb_bindings(target: FrbTarget) -> Result<(), DynError> {
                 .arg("-p")
                 .arg("ente_photos_rust")
                 .arg("-p")
-                .arg("ente_locker_rust");
+                .arg("ente-locker-frb");
         }
         FrbTarget::Photos => {
             command.arg("-p").arg("ente_photos_rust");
         }
         FrbTarget::Locker => {
-            command.arg("-p").arg("ente_locker_rust");
+            command.arg("-p").arg("ente-locker-frb");
         }
     }
     command.current_dir(rust_root);
