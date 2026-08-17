@@ -90,7 +90,7 @@ class MemoryLaneService {
   Future<void> dispose() async {
     await _peopleChangedSubscription?.cancel();
     await _mlConsentChangedSubscription?.cancel();
-    _cancelPendingWork();
+    _startupBackfillTimer?.cancel();
     readyPersonIds.dispose();
   }
 
@@ -100,16 +100,8 @@ class MemoryLaneService {
       unawaited(queueFullRecompute(trigger: "ml_enabled"));
       return;
     }
-    _cancelPendingWork();
-  }
-
-  void _cancelPendingWork() {
     _startupBackfillTimer?.cancel();
     _startupBackfillTimer = null;
-    _pendingRequests.clear();
-    _cropReadinessInFlight.clear();
-    _precomputeQueue.clear();
-    _cropReadinessQueue.clear();
   }
 
   Future<void> queueFullRecompute({
@@ -130,9 +122,6 @@ class MemoryLaneService {
     }
     final persons = await PersonService.instance.getPersons();
     for (final person in persons) {
-      if (!isFeatureEnabled) {
-        return;
-      }
       if (person.data.isIgnored) {
         await _handleIgnoredPerson(person.remoteID);
         continue;
@@ -183,9 +172,6 @@ class MemoryLaneService {
         })
         .catchError((error, stackTrace) {
           _pendingRequests.remove(personId);
-          if (!isFeatureEnabled) {
-            return;
-          }
           _logger.warning(
             "Memory Lane recompute task failed to enqueue for $personId",
             error,
@@ -289,7 +275,7 @@ class MemoryLaneService {
   }
 
   void _queueTimelineCropReadiness(String personId, {required String trigger}) {
-    if (!isFeatureEnabled || _cropReadinessInFlight.contains(personId)) {
+    if (_cropReadinessInFlight.contains(personId)) {
       return;
     }
     _cropReadinessInFlight.add(personId);
@@ -303,9 +289,6 @@ class MemoryLaneService {
         })
         .catchError((error, stackTrace) {
           _cropReadinessInFlight.remove(personId);
-          if (!isFeatureEnabled) {
-            return;
-          }
           _logger.warning(
             "Memory Lane crop readiness task failed for $personId",
             error,
@@ -368,9 +351,6 @@ class MemoryLaneService {
       timeline.entries,
       filesById,
     );
-    if (!isFeatureEnabled) {
-      return;
-    }
     await _refreshReadyPersonIds();
     if (cropsReady) {
       Bus.instance.fire(
@@ -688,9 +668,6 @@ class MemoryLaneService {
 
     try {
       final result = await _computeTimeline(person, nowMicros);
-      if (!isFeatureEnabled) {
-        return;
-      }
       await _cacheService.upsertTimeline(result.timeline);
       await _cacheService.upsertComputeLogEntry(
         MemoryLaneComputeLogEntry(
@@ -717,9 +694,6 @@ class MemoryLaneService {
         result.timeline.entries,
         result.filesById,
       );
-      if (!isFeatureEnabled) {
-        return;
-      }
       await _refreshReadyPersonIds();
       if (cropsReady) {
         Bus.instance.fire(
@@ -925,9 +899,6 @@ class MemoryLaneService {
     }
 
     for (final entry in entriesByFile.entries) {
-      if (!isFeatureEnabled) {
-        return false;
-      }
       final file = fileMap[entry.key];
       if (file == null) {
         allCropsReady = false;
@@ -960,9 +931,6 @@ class MemoryLaneService {
       }
       if (selectedFaces.isEmpty) {
         continue;
-      }
-      if (!isFeatureEnabled) {
-        return false;
       }
       try {
         final cropMap = await getCachedFaceCrops(
@@ -1019,9 +987,6 @@ class MemoryLaneService {
       final stopwatch = Stopwatch()..start();
       int warmed = 0;
       for (final entry in entries) {
-        if (!isFeatureEnabled) {
-          return;
-        }
         final file = filesById[entry.fileId];
         if (file == null) {
           continue;
@@ -1036,9 +1001,6 @@ class MemoryLaneService {
         );
         if (face == null) {
           continue;
-        }
-        if (!isFeatureEnabled) {
-          return;
         }
         try {
           await getCachedFaceCrops(
