@@ -173,7 +173,7 @@ func (m *CollectionLinkMiddleware) Authenticate(urlSanitizer func(_ *gin.Context
 }
 
 func capFreeUserDeviceLimit(deviceLimit int) int {
-	if deviceLimit == 0 || deviceLimit > public2.FreeUserDeviceLimit {
+	if deviceLimit <= 0 || deviceLimit > public2.FreeUserDeviceLimit {
 		return public2.FreeUserDeviceLimit
 	}
 	return deviceLimit

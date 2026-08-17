@@ -475,6 +475,9 @@ func (c *CollectionController) UpdateShareeMagicMetadata(ctx *gin.Context, req e
 
 func (c *CollectionController) ShareURL(ctx *gin.Context, userID int64, req ente.CreatePublicAccessTokenRequest) (
 	ente.PublicURL, error) {
+	if err := req.Validate(); err != nil {
+		return ente.PublicURL{}, stacktrace.Propagate(err, "")
+	}
 	collection, err := c.CollectionRepo.Get(req.CollectionID)
 	if err != nil {
 		return ente.PublicURL{}, stacktrace.Propagate(err, "")

@@ -28,6 +28,7 @@ func TestCapFreeUserDeviceLimit(t *testing.T) {
 		deviceLimit int
 		want        int
 	}{
+		{name: "invalid negative limit", deviceLimit: -1, want: 10},
 		{name: "unlimited", deviceLimit: 0, want: 10},
 		{name: "legacy free limit", deviceLimit: 5, want: 5},
 		{name: "current free limit", deviceLimit: 10, want: 10},
