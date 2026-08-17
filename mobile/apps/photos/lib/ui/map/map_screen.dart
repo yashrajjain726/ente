@@ -1,5 +1,6 @@
 import "dart:async";
 import "dart:isolate";
+import "dart:math";
 
 import "package:computer/computer.dart";
 import "package:ente_strings/ente_strings.dart";
@@ -46,7 +47,7 @@ class _MapScreenState extends State<MapScreen> {
   bool hasLocationData = true;
   double maxZoom = 18.0;
   double minZoom = 2.8;
-  late LatLng center;
+  LatLng? center;
   final Logger _logger = Logger("_MapScreenState");
   ReceivePort? _mapWorkerReceivePort;
   StreamSubscription? _mapWorkerSubscription;
@@ -73,7 +74,7 @@ class _MapScreenState extends State<MapScreen> {
 
   Future<void> initialize() async {
     try {
-      center = widget.center ?? const LatLng(46.7286, 4.8614);
+      center = widget.center;
       allImages = await widget.filesFutureFn();
       await processFiles(allImages);
     } catch (e, s) {
@@ -87,7 +88,7 @@ class _MapScreenState extends State<MapScreen> {
       param: {"files": files, "center": widget.center},
     );
 
-    final int? mostRecentImageIndex = result.$1;
+    final int? initialCenterImageIndex = result.$1;
     final List<MapPoint> mapPoints = result.$2;
 
     if (mapPoints.isEmpty) {
@@ -110,8 +111,8 @@ class _MapScreenState extends State<MapScreen> {
     center =
         widget.center ??
         LatLng(
-          allImages[mostRecentImageIndex!].location!.latitude!,
-          allImages[mostRecentImageIndex].location!.longitude!,
+          allImages[initialCenterImageIndex!].location!.latitude!,
+          allImages[initialCenterImageIndex].location!.longitude!,
         );
 
     if (kDebugMode) {
@@ -128,7 +129,6 @@ class _MapScreenState extends State<MapScreen> {
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      mapController.move(center, widget.initialZoom);
       _requestViewport(
         mapController.camera.visibleBounds,
         mapController.camera.zoom,
@@ -220,7 +220,7 @@ class _MapScreenState extends State<MapScreen> {
     final files = args["files"] as List<EnteFile>;
     final center = args["center"] as LatLng?;
     final List<MapPoint> mapPoints = [];
-    int? mostRecentImageIndex;
+    final recentImageIndexes = <int>[];
 
     for (var index = 0; index < files.length; index++) {
       final file = files[index];
@@ -236,14 +236,7 @@ class _MapScreenState extends State<MapScreen> {
         }
 
         if (center == null) {
-          if (mostRecentImageIndex == null) {
-            mostRecentImageIndex = index;
-          } else {
-            final mostRecentFile = files[mostRecentImageIndex];
-            if ((mostRecentFile.creationTime ?? 0) < (file.creationTime ?? 0)) {
-              mostRecentImageIndex = index;
-            }
-          }
+          _insertRecentImageIndex(files, recentImageIndexes, index);
         }
 
         mapPoints.add(
@@ -256,13 +249,106 @@ class _MapScreenState extends State<MapScreen> {
       }
     }
 
-    return (mostRecentImageIndex, mapPoints);
+    return (
+      center == null
+          ? _findInitialCenterImageIndex(files, recentImageIndexes)
+          : null,
+      mapPoints,
+    );
+  }
+
+  static void _insertRecentImageIndex(
+    List<EnteFile> files,
+    List<int> recentImageIndexes,
+    int imageIndex,
+  ) {
+    const sampleSize = 10;
+    final creationTime = files[imageIndex].creationTime ?? 0;
+    final insertAt = recentImageIndexes.indexWhere(
+      (index) => (files[index].creationTime ?? 0) < creationTime,
+    );
+    if (insertAt < 0) {
+      if (recentImageIndexes.length < sampleSize) {
+        recentImageIndexes.add(imageIndex);
+      }
+    } else {
+      recentImageIndexes.insert(insertAt, imageIndex);
+      if (recentImageIndexes.length > sampleSize) {
+        recentImageIndexes.removeLast();
+      }
+    }
+  }
+
+  static int? _findInitialCenterImageIndex(
+    List<EnteFile> files,
+    List<int> recentImageIndexes,
+  ) {
+    if (recentImageIndexes.isEmpty) return null;
+
+    const clusterRadiusInKm = 50.0;
+    var clusterSeed = recentImageIndexes.first;
+    var largestClusterSize = 0;
+
+    for (final candidate in recentImageIndexes) {
+      var clusterSize = 0;
+      for (final other in recentImageIndexes) {
+        if (_distanceInKm(files[candidate], files[other]) <=
+            clusterRadiusInKm) {
+          clusterSize++;
+        }
+      }
+      if (clusterSize > largestClusterSize) {
+        clusterSeed = candidate;
+        largestClusterSize = clusterSize;
+      }
+    }
+
+    final cluster = recentImageIndexes
+        .where(
+          (index) =>
+              _distanceInKm(files[clusterSeed], files[index]) <=
+              clusterRadiusInKm,
+        )
+        .toList(growable: false);
+    var medoid = cluster.first;
+    var shortestTotalDistance = double.infinity;
+    for (final candidate in cluster) {
+      var totalDistance = 0.0;
+      for (final other in cluster) {
+        totalDistance += _distanceInKm(files[candidate], files[other]);
+      }
+      if (totalDistance < shortestTotalDistance) {
+        medoid = candidate;
+        shortestTotalDistance = totalDistance;
+      }
+    }
+    return medoid;
+  }
+
+  static double _distanceInKm(EnteFile first, EnteFile second) {
+    const earthRadiusInKm = 6371.0;
+    final firstLatitude = first.location!.latitude! * pi / 180;
+    final secondLatitude = second.location!.latitude! * pi / 180;
+    final latitudeDelta = secondLatitude - firstLatitude;
+    final longitudeDelta =
+        (second.location!.longitude! - first.location!.longitude!) * pi / 180;
+    final haversine =
+        sin(latitudeDelta / 2) * sin(latitudeDelta / 2) +
+        cos(firstLatitude) *
+            cos(secondLatitude) *
+            sin(longitudeDelta / 2) *
+            sin(longitudeDelta / 2);
+    final normalizedHaversine = haversine.clamp(0.0, 1.0);
+    return earthRadiusInKm *
+        2 *
+        atan2(sqrt(normalizedHaversine), sqrt(1 - normalizedHaversine));
   }
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = getEnteColorScheme(context);
     final bottomUnsafeArea = MediaQuery.of(context).padding.bottom;
+    final initialCenter = center;
     return Container(
       color: colorScheme.backgroundColour,
       child: Theme(
@@ -281,24 +367,31 @@ class _MapScreenState extends State<MapScreen> {
                         constrains.maxHeight * 0.75 +
                         bottomSheetDraggableAreaHeight -
                         bottomUnsafeArea,
-                    child: MapView(
-                      controller: mapController,
-                      imageMarkers: imageMarkers,
-                      updateVisibleImages: _requestViewport,
-                      center: center,
-                      initialZoom: widget.initialZoom,
-                      minZoom: minZoom,
-                      maxZoom: maxZoom,
-                      bottomSheetDraggableAreaHeight:
-                          bottomSheetDraggableAreaHeight,
-                    ),
+                    child: initialCenter == null
+                        ? const SizedBox.shrink()
+                        : MapView(
+                            controller: mapController,
+                            imageMarkers: imageMarkers,
+                            updateVisibleImages: _requestViewport,
+                            center: initialCenter,
+                            initialZoom: widget.initialZoom,
+                            minZoom: minZoom,
+                            maxZoom: maxZoom,
+                            bottomSheetDraggableAreaHeight:
+                                bottomSheetDraggableAreaHeight,
+                          ),
                   );
                 },
               ),
               isLoading
-                  ? EnteLoadingWidget(
-                      size: 28,
-                      color: getEnteColorScheme(context).primary700,
+                  ? Positioned.fill(
+                      child: ColoredBox(
+                        color: colorScheme.backgroundColour,
+                        child: EnteLoadingWidget(
+                          size: 28,
+                          color: colorScheme.primary700,
+                        ),
+                      ),
                     )
                   : const SizedBox.shrink(),
             ],
