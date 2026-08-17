@@ -92,7 +92,7 @@ class _MemoryLanePageState extends State<MemoryLanePage>
   int _currentCaptionValue = 0;
   _CaptionType _currentCaptionType = _CaptionType.yearsAgo;
   int _maxCaptionDigits = 1;
-  bool get _featureEnabled => flagService.facesTimeline;
+  bool get _featureEnabled => MemoryLaneService.instance.isFeatureEnabled;
   bool get _showShareAction =>
       _featureEnabled &&
       flagService.enableMemoryShareLink &&

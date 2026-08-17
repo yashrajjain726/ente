@@ -417,10 +417,8 @@ class _GalleryAppBarWidgetState extends State<GalleryAppBarWidget> {
     }
   }
 
-  // todo: In the new design, clicking on free up space will directly open
-  // the free up space page and show loading indicator while calculating
-  // the space which can be claimed up. This code duplication should be removed
-  // whenever we move to the new design for free up space.
+  // TODO: Remove this duplicate flow when the new design opens the
+  // free-up-space page directly and calculates there.
   Future<dynamic> _deleteBackedUpFiles(BuildContext context) async {
     final dialog = createProgressDialog(context, context.strings.calculating);
     await dialog.show();

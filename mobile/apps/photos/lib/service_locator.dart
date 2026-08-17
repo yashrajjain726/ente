@@ -4,7 +4,9 @@ import "package:ente_feature_flag/ente_feature_flag.dart";
 import "package:ente_install_source/ente_install_source.dart";
 import "package:package_info_plus/package_info_plus.dart";
 import "package:photos/core/configuration.dart";
+import "package:photos/core/event_bus.dart";
 import "package:photos/core/network/endpoint_config.dart";
+import "package:photos/events/ml_consent_changed_event.dart";
 import "package:photos/gateways/billing/billing_gateway.dart";
 import "package:photos/gateways/cast/cast_gateway.dart";
 import "package:photos/gateways/collections/collection_files_gateway.dart";
@@ -135,9 +137,10 @@ bool get hasGrantedMLConsent {
 Future<void> setMLConsent(bool enabled) async {
   if (isLocalGalleryMode) {
     await localSettings.setLocalGalleryMLConsent(enabled);
-    return;
+  } else {
+    await flagService.setMLConsent(enabled);
   }
-  await flagService.setMLConsent(enabled);
+  Bus.instance.fire(MLConsentChangedEvent(enabled));
 }
 
 bool get mapEnabled {

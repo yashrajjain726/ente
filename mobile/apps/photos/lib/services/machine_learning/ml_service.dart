@@ -547,9 +547,6 @@ class MLService {
     }
   }
 
-  /// Requests a durable stop of all acquiring or active ML runs. Active runs
-  /// drain already-started work and do not begin further stages; a new run may
-  /// start later through the normal triggers.
   void stopActiveRun(MlStopReason reason) {
     for (final control in _runControls.toList(growable: false)) {
       control.requestStop(reason);
