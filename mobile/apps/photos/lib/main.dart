@@ -504,8 +504,15 @@ Future<void> _init(
     await SyncService.instance.init(preferences);
     _isSyncInitialized = true;
     _logger.info("SyncService init done $tlog");
-    if (!isBackground && flagService.librarySharing) {
-      unawaited(librarySharingService.init());
+    if (!isBackground) {
+      if (flagService.librarySharing) {
+        unawaited(librarySharingService.init());
+      } else {
+        flagService.flagsUpdated
+            .firstWhere((_) => flagService.librarySharing)
+            .then((_) => librarySharingService.init())
+            .ignore();
+      }
     }
 
     if (!isBackground && flagService.internalUser) {
