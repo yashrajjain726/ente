@@ -1,5 +1,5 @@
 [alias]
-codegen = ["run", "-p", "codegen", "--"]
+codegen = ["run", "-p", "ente-codegen", "--"]
 
 [env]
 # Some targets, like armv7 Android, have no enabled target features, so Cargo

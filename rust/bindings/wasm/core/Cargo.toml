@@ -1,5 +1,5 @@
 [package]
-name = "ente-wasm-core"
+name = "ente-core-wasm"
 edition = "2024"
 
 [lib]
@@ -7,5 +7,5 @@ crate-type = ["cdylib"]
 
 [dependencies]
 ente-core = { workspace = true }
-ente-wasm-log.workspace = true
+ente-log-wasm.workspace = true
 wasm-bindgen.workspace = true

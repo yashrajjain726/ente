@@ -1,5 +1,5 @@
 [package]
-name = "ente-frb-log"
+name = "ente-log-frb"
 edition = "2024"
 
 [dependencies]

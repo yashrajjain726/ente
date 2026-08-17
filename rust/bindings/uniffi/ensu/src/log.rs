@@ -1,1 +1,1 @@
-ente_uniffi_log::setup!();
+ente_log_uniffi::setup!();

@@ -17,7 +17,7 @@ pub struct Cli {
 impl Cli {
     pub fn new(config_dir: PathBuf) -> Self {
         Self {
-            bin: PathBuf::from(env!("CARGO_BIN_EXE_ente-rs")),
+            bin: PathBuf::from(env!("CARGO_BIN_EXE_ente-cli")),
             config_dir,
         }
     }
@@ -50,7 +50,7 @@ impl Cli {
         child
             .stdin
             .take()
-            .expect("ente-rs stdin should be piped")
+            .expect("ente-cli stdin should be piped")
             .write_all(stdin.as_bytes())?;
 
         Ok(child.wait_with_output()?)
@@ -72,7 +72,7 @@ fn output_stdout(args: &[&str], output: Output) -> TestResult<String> {
         Ok(String::from_utf8(output.stdout)?)
     } else {
         Err(format!(
-            "ente-rs {} failed\nstatus: {}\nstdout:\n{}\nstderr:\n{}",
+            "ente-cli {} failed\nstatus: {}\nstdout:\n{}\nstderr:\n{}",
             args.join(" "),
             output.status,
             String::from_utf8_lossy(&output.stdout),

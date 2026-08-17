@@ -1284,15 +1284,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0c9ea0ac24bc397ab3c98583a3c9ba74fa56b09a4449bbe172b9b1ddb016027a"
 
 [[package]]
-name = "codegen"
-version = "0.0.0"
-dependencies = [
- "camino",
- "flutter_rust_bridge_codegen",
- "uniffi_bindgen",
-]
-
-[[package]]
 name = "codespan-reporting"
 version = "0.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2422,7 +2413,7 @@ version = "0.0.0"
 dependencies = [
  "ente-cast",
  "ente-core",
- "ente-uniffi-log",
+ "ente-log-uniffi",
  "thiserror 2.0.18",
  "uniffi",
 ]
@@ -2432,8 +2423,49 @@ name = "ente-cast-wasm"
 version = "0.0.0"
 dependencies = [
  "ente-cast",
- "ente-wasm-log",
+ "ente-log-wasm",
  "wasm-bindgen",
+]
+
+[[package]]
+name = "ente-cli"
+version = "0.0.1"
+dependencies = [
+ "chrono",
+ "clap",
+ "dialoguer",
+ "dirs 5.0.1",
+ "ente-accounts",
+ "ente-core",
+ "ente-paste",
+ "ente-test-support",
+ "env_logger 0.11.10",
+ "futures",
+ "indicatif",
+ "log",
+ "mockito",
+ "open",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "sha2 0.11.0",
+ "srp",
+ "thiserror 2.0.18",
+ "tokio",
+ "url",
+ "urlencoding",
+ "uuid",
+ "zeroize",
+ "zip 2.4.2",
+]
+
+[[package]]
+name = "ente-codegen"
+version = "0.0.0"
+dependencies = [
+ "camino",
+ "flutter_rust_bridge_codegen",
+ "uniffi_bindgen",
 ]
 
 [[package]]
@@ -2488,6 +2520,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "ente-core-wasm"
+version = "0.0.0"
+dependencies = [
+ "ente-core",
+ "ente-log-wasm",
+ "wasm-bindgen",
+]
+
+[[package]]
 name = "ente-ensu"
 version = "0.0.0"
 dependencies = [
@@ -2520,18 +2561,10 @@ version = "0.0.0"
 dependencies = [
  "ente-assets",
  "ente-ensu",
- "ente-uniffi-log",
+ "ente-log-uniffi",
  "thiserror 2.0.18",
  "uniffi",
  "uuid",
-]
-
-[[package]]
-name = "ente-frb-log"
-version = "0.0.0"
-dependencies = [
- "flutter_rust_bridge",
- "log",
 ]
 
 [[package]]
@@ -2555,8 +2588,33 @@ dependencies = [
  "ente-accounts",
  "ente-contacts",
  "ente-core",
- "ente-frb-log",
+ "ente-log-frb",
  "flutter_rust_bridge",
+]
+
+[[package]]
+name = "ente-log-frb"
+version = "0.0.0"
+dependencies = [
+ "flutter_rust_bridge",
+ "log",
+]
+
+[[package]]
+name = "ente-log-uniffi"
+version = "0.0.0"
+dependencies = [
+ "log",
+]
+
+[[package]]
+name = "ente-log-wasm"
+version = "0.0.0"
+dependencies = [
+ "js-sys",
+ "log",
+ "wasm-bindgen",
+ "web-sys",
 ]
 
 [[package]]
@@ -2611,35 +2669,31 @@ dependencies = [
 ]
 
 [[package]]
-name = "ente-rs"
-version = "0.0.1"
+name = "ente-photos-frb"
+version = "0.0.0"
 dependencies = [
- "chrono",
- "clap",
- "dialoguer",
- "dirs 5.0.1",
  "ente-accounts",
+ "ente-cast",
+ "ente-contacts",
  "ente-core",
- "ente-paste",
- "ente-test-support",
- "env_logger 0.11.10",
- "futures",
- "indicatif",
+ "ente-image",
+ "ente-log-frb",
+ "ente-ml",
+ "ente-photos",
+ "flutter_rust_bridge",
+]
+
+[[package]]
+name = "ente-photos-napi"
+version = "0.0.0"
+dependencies = [
+ "ente-assets",
+ "ente-ml",
  "log",
- "mockito",
- "open",
- "rusqlite",
- "serde",
- "serde_json",
- "sha2 0.11.0",
- "srp",
- "thiserror 2.0.18",
- "tokio",
- "url",
- "urlencoding",
- "uuid",
- "zeroize",
- "zip 2.4.2",
+ "napi",
+ "napi-build",
+ "napi-derive",
+ "ort",
 ]
 
 [[package]]
@@ -2668,8 +2722,8 @@ name = "ente-space-wasm"
 version = "0.0.0"
 dependencies = [
  "ente-core",
+ "ente-log-wasm",
  "ente-space",
- "ente-wasm-log",
  "log",
  "serde",
  "serde-wasm-bindgen",
@@ -2689,73 +2743,19 @@ dependencies = [
 ]
 
 [[package]]
-name = "ente-uniffi-log"
-version = "0.0.0"
-dependencies = [
- "log",
-]
-
-[[package]]
 name = "ente-wasm"
 version = "0.0.0"
 dependencies = [
  "ente-accounts",
  "ente-contacts",
  "ente-core",
- "ente-wasm-log",
+ "ente-log-wasm",
  "js-sys",
  "md-5 0.11.0",
  "serde",
  "serde-wasm-bindgen",
  "wasm-bindgen",
  "wasm-bindgen-futures",
-]
-
-[[package]]
-name = "ente-wasm-core"
-version = "0.0.0"
-dependencies = [
- "ente-core",
- "ente-wasm-log",
- "wasm-bindgen",
-]
-
-[[package]]
-name = "ente-wasm-log"
-version = "0.0.0"
-dependencies = [
- "js-sys",
- "log",
- "wasm-bindgen",
- "web-sys",
-]
-
-[[package]]
-name = "ente_photos_napi"
-version = "0.0.0"
-dependencies = [
- "ente-assets",
- "ente-ml",
- "log",
- "napi",
- "napi-build",
- "napi-derive",
- "ort",
-]
-
-[[package]]
-name = "ente_photos_rust"
-version = "0.0.0"
-dependencies = [
- "ente-accounts",
- "ente-cast",
- "ente-contacts",
- "ente-core",
- "ente-frb-log",
- "ente-image",
- "ente-ml",
- "ente-photos",
- "flutter_rust_bridge",
 ]
 
 [[package]]

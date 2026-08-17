@@ -1,3 +1,3 @@
-use ente_wasm_log as _;
+use ente_log_wasm as _;
 
 mod crypto;

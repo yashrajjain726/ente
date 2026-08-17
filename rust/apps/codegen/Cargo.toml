@@ -1,5 +1,5 @@
 [package]
-name = "codegen"
+name = "ente-codegen"
 edition = "2024"
 
 [dependencies]
