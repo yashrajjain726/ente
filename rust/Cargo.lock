@@ -2681,6 +2681,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "ente_locker_rust"
+version = "0.0.0"
+dependencies = [
+ "ente-frb-log",
+ "flutter_rust_bridge",
+]
+
+[[package]]
 name = "ente_photos_napi"
 version = "0.0.0"
 dependencies = [

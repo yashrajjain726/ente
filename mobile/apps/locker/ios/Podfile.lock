@@ -37,6 +37,8 @@ PODS:
   - DKPhotoGallery/Resource (0.0.19):
     - SDWebImage
     - SwiftyGif
+  - ente_locker_rust (0.0.1):
+    - Flutter
   - ente_mail (0.0.1):
     - Flutter
   - ente_rust (0.0.1):
@@ -95,6 +97,7 @@ DEPENDENCIES:
   - app_links (from `.symlinks/plugins/app_links/ios`)
   - cupertino_http (from `.symlinks/plugins/cupertino_http/darwin`)
   - device_info_plus (from `.symlinks/plugins/device_info_plus/ios`)
+  - ente_locker_rust (from `.symlinks/plugins/ente_locker_rust/ios`)
   - ente_mail (from `.symlinks/plugins/ente_mail/ios`)
   - ente_rust (from `.symlinks/plugins/ente_rust/ios`)
   - ente_screen_cover (from `.symlinks/plugins/ente_screen_cover/ios`)
@@ -132,6 +135,8 @@ EXTERNAL SOURCES:
     :path: ".symlinks/plugins/cupertino_http/darwin"
   device_info_plus:
     :path: ".symlinks/plugins/device_info_plus/ios"
+  ente_locker_rust:
+    :path: ".symlinks/plugins/ente_locker_rust/ios"
   ente_mail:
     :path: ".symlinks/plugins/ente_mail/ios"
   ente_rust:
@@ -181,6 +186,7 @@ SPEC CHECKSUMS:
   device_info_plus: 21fcca2080fbcd348be798aa36c3e5ed849eefbe
   DKImagePickerController: 946cec48c7873164274ecc4624d19e3da4c1ef3c
   DKPhotoGallery: b3834fecb755ee09a593d7c9e389d8b5d6deed60
+  ente_locker_rust: a299b4450d8ed041499171ddb182a42107719e74
   ente_mail: 90753dd584f49ee092759a32d4143ca51db69641
   ente_rust: d0197ebd5460e8f67576579452b073d698404abe
   ente_screen_cover: 6792566774f1c83939f9c1d03ed0a1f1ded45ae4
@@ -206,6 +212,6 @@ SPEC CHECKSUMS:
   ua_client_hints: 92fe0d139619b73ec9fcb46cc7e079a26178f586
   url_launcher_ios: 7a95fa5b60cc718a708b8f2966718e93db0cef1b
 
-PODFILE CHECKSUM: d2d3220ea22664a259778d9e314054751db31361
+PODFILE CHECKSUM: 5705e3b102f97037a25602dd270df9935079a3ca
 
 COCOAPODS: 1.17.0
