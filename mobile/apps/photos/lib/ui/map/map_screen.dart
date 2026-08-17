@@ -3,6 +3,7 @@ import "dart:isolate";
 import "dart:math";
 
 import "package:computer/computer.dart";
+import "package:ente_pure_utils/ente_pure_utils.dart";
 import "package:ente_strings/ente_strings.dart";
 import "package:ente_ui/components/loading_widget.dart";
 import "package:flutter/foundation.dart";
@@ -56,6 +57,10 @@ class _MapScreenState extends State<MapScreen> {
   static const bottomSheetDraggableAreaHeight = 32.0;
   List<int>? _previousVisibleIndexes;
   int _viewportRequestID = 0;
+  final _viewportDebouncer = Debouncer(
+    const Duration(milliseconds: 300),
+    executionInterval: const Duration(milliseconds: 750),
+  );
   static const _markerViewportPaddingPixels = 256.0;
 
   @override
@@ -66,6 +71,7 @@ class _MapScreenState extends State<MapScreen> {
 
   @override
   void dispose() {
+    _viewportDebouncer.cancelDebounceTimer();
     unawaited(_mapWorkerSubscription?.cancel());
     _mapWorkerReceivePort?.close();
     _mapWorkerIsolate?.kill();
@@ -130,7 +136,7 @@ class _MapScreenState extends State<MapScreen> {
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      _requestViewport(mapController.camera);
+      _sendViewportRequest(mapController.camera, ++_viewportRequestID);
     });
   }
 
@@ -165,13 +171,20 @@ class _MapScreenState extends State<MapScreen> {
     _mapWorkerIsolate = isolate;
   }
 
-  void _requestViewport(MapCamera camera) {
+  void _updateViewport(MapCamera camera) {
+    final requestID = ++_viewportRequestID;
+    _viewportDebouncer.run(() async {
+      _sendViewportRequest(camera, requestID);
+    });
+  }
+
+  void _sendViewportRequest(MapCamera camera, int requestID) {
     final sendPort = _mapWorkerSendPort;
     if (sendPort == null) return;
     final pixelBounds = camera.pixelBounds;
     sendPort.send(
       MapViewportRequest(
-        id: ++_viewportRequestID,
+        id: requestID,
         bounds: camera.visibleBounds,
         zoom: camera.zoom,
         markerMinX: pixelBounds.left - _markerViewportPaddingPixels,
@@ -379,7 +392,7 @@ class _MapScreenState extends State<MapScreen> {
                         : MapView(
                             controller: mapController,
                             imageMarkers: imageMarkers,
-                            updateViewport: _requestViewport,
+                            updateViewport: _updateViewport,
                             center: initialCenter,
                             initialZoom: widget.initialZoom,
                             minZoom: minZoom,
