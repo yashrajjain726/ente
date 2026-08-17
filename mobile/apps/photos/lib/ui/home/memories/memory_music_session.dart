@@ -35,7 +35,7 @@ class _MemoryMusicSessionState extends State<MemoryMusicSession>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     final catalog = MemoryMusicCatalog.bundled;
-    final assignments = const MemoryMusicSelector().assignTracks(
+    final assignments = assignMemoryMusicTracks(
       memoryIDs: widget.memories.map((memory) => memory.id),
       tracks: catalog.tracks,
     );

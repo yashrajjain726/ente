@@ -17,18 +17,20 @@ void main() {
       source: AssetMemoryMusicSource("assets/track-3.mp3"),
     ),
   ];
-  const selector = MemoryMusicSelector();
   const memoryIDs = <String>["memory-a", "memory-b", "memory-c", "memory-d"];
 
   test("assignments are deterministic", () {
-    final first = selector.assignTracks(memoryIDs: memoryIDs, tracks: tracks);
-    final second = selector.assignTracks(memoryIDs: memoryIDs, tracks: tracks);
+    final first = assignMemoryMusicTracks(memoryIDs: memoryIDs, tracks: tracks);
+    final second = assignMemoryMusicTracks(
+      memoryIDs: memoryIDs,
+      tracks: tracks,
+    );
 
     expect(second, first);
   });
 
   test("adjacent memories do not receive the same track", () {
-    final assignments = selector.assignTracks(
+    final assignments = assignMemoryMusicTracks(
       memoryIDs: memoryIDs,
       tracks: tracks,
     );
@@ -42,7 +44,7 @@ void main() {
   });
 
   test("one-track catalog reuses its only track", () {
-    final assignments = selector.assignTracks(
+    final assignments = assignMemoryMusicTracks(
       memoryIDs: memoryIDs,
       tracks: const <MemoryMusicTrack>[
         MemoryMusicTrack(
@@ -57,7 +59,7 @@ void main() {
 
   test("empty catalog produces no assignments", () {
     expect(
-      selector.assignTracks(
+      assignMemoryMusicTracks(
         memoryIDs: memoryIDs,
         tracks: const <MemoryMusicTrack>[],
       ),
