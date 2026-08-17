@@ -6,7 +6,7 @@ void main() {
   test("catalog looks up tracks by their stable IDs", () {
     const track = MemoryMusicTrack(
       id: "track-1",
-      source: AssetMemoryMusicSource("assets/track-1.mp3"),
+      assetPath: "assets/track-1.mp3",
     );
     final catalog = MemoryMusicCatalog(const <MemoryMusicTrack>[track]);
 
@@ -17,14 +17,8 @@ void main() {
   test("catalog rejects duplicate track IDs", () {
     expect(
       () => MemoryMusicCatalog(const <MemoryMusicTrack>[
-        MemoryMusicTrack(
-          id: "duplicate",
-          source: AssetMemoryMusicSource("assets/track-1.mp3"),
-        ),
-        MemoryMusicTrack(
-          id: "duplicate",
-          source: AssetMemoryMusicSource("assets/track-2.mp3"),
-        ),
+        MemoryMusicTrack(id: "duplicate", assetPath: "assets/track-1.mp3"),
+        MemoryMusicTrack(id: "duplicate", assetPath: "assets/track-2.mp3"),
       ]),
       throwsArgumentError,
     );

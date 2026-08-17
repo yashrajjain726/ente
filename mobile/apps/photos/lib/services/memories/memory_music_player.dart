@@ -1,11 +1,10 @@
 import "package:audio_session/audio_session.dart";
 import "package:just_audio/just_audio.dart";
-import "package:photos/models/memories/memory_music_track.dart";
 
 abstract interface class MemoryMusicPlayer {
   Future<void> configureAudioSession();
 
-  Future<void> load(MemoryMusicSource source);
+  Future<void> loadAsset(String assetPath);
 
   Future<void> setLooping();
 
@@ -32,11 +31,8 @@ class JustAudioMemoryMusicPlayer implements MemoryMusicPlayer {
   }
 
   @override
-  Future<void> load(MemoryMusicSource source) async {
-    switch (source) {
-      case AssetMemoryMusicSource(:final assetPath):
-        await _player.setAsset(assetPath, preload: true);
-    }
+  Future<void> loadAsset(String assetPath) async {
+    await _player.setAsset(assetPath, preload: true);
   }
 
   @override

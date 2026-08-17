@@ -28,25 +28,19 @@ class MemoryMusicCatalog {
       MemoryMusicCatalog(const <MemoryMusicTrack>[
         MemoryMusicTrack(
           id: "puddles-instrumental-segment-1",
-          source: AssetMemoryMusicSource(
-            "assets/memory-music/puddles-instrumental-01.mp3",
-          ),
+          assetPath: "assets/memory-music/puddles-instrumental-01.mp3",
           title: "Puddles (Zero 7 Remix)",
           artist: "Not for Radio",
         ),
         MemoryMusicTrack(
           id: "puddles-instrumental-segment-2",
-          source: AssetMemoryMusicSource(
-            "assets/memory-music/puddles-instrumental-02.mp3",
-          ),
+          assetPath: "assets/memory-music/puddles-instrumental-02.mp3",
           title: "Puddles (Zero 7 Remix)",
           artist: "Not for Radio",
         ),
         MemoryMusicTrack(
           id: "puddles-instrumental-segment-3",
-          source: AssetMemoryMusicSource(
-            "assets/memory-music/puddles-instrumental-03.mp3",
-          ),
+          assetPath: "assets/memory-music/puddles-instrumental-03.mp3",
           title: "Puddles (Zero 7 Remix)",
           artist: "Not for Radio",
         ),

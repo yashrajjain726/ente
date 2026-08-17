@@ -14,14 +14,8 @@ void main() {
     persistedMuteValues = <bool>[];
     controller = MemoryMusicController(
       catalog: MemoryMusicCatalog(const <MemoryMusicTrack>[
-        MemoryMusicTrack(
-          id: "track-1",
-          source: AssetMemoryMusicSource("assets/track-1.mp3"),
-        ),
-        MemoryMusicTrack(
-          id: "track-2",
-          source: AssetMemoryMusicSource("assets/track-2.mp3"),
-        ),
+        MemoryMusicTrack(id: "track-1", assetPath: "assets/track-1.mp3"),
+        MemoryMusicTrack(id: "track-2", assetPath: "assets/track-2.mp3"),
       ]),
       assignments: const <String, String>{
         "memory-1": "track-1",
@@ -113,16 +107,13 @@ class _FakeMemoryMusicPlayer implements MemoryMusicPlayer {
   Future<void> configureAudioSession() async {}
 
   @override
-  Future<void> load(MemoryMusicSource source) async {
+  Future<void> loadAsset(String assetPath) async {
     loadAttempts++;
     if (failNextLoad) {
       failNextLoad = false;
       throw StateError("load failed");
     }
-    switch (source) {
-      case AssetMemoryMusicSource(:final assetPath):
-        loadedAssets.add(assetPath);
-    }
+    loadedAssets.add(assetPath);
     position = Duration.zero;
   }
 

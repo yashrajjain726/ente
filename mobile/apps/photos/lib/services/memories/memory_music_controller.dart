@@ -71,7 +71,7 @@ class MemoryMusicController extends ChangeNotifier {
       if (!_isCurrentLoad(generation)) return;
       await _player.stop();
       if (!_isCurrentLoad(generation)) return;
-      await _player.load(track.source);
+      await _player.loadAsset(track.assetPath);
       if (!_isCurrentLoad(generation)) return;
       await _player.setLooping();
       await _player.setVolume(_isMuted ? 0.0 : 1.0);
