@@ -2162,6 +2162,172 @@
       }
     }
   },
+  "librarySharingAlbumSelectionControls": "Album selection controls",
+  "@librarySharingAlbumSelectionControls": {
+    "description": "Accessibility label for the controls used to select albums for Library Sharing."
+  },
+  "librarySharingAllCurrentAlbumsShared": "All your current albums are shared",
+  "@librarySharingAllCurrentAlbumsShared": {
+    "description": "Empty-state title shown when every current album is already shared with the selected person."
+  },
+  "librarySharingBannerDescription": "Share all your albums",
+  "@librarySharingBannerDescription": {
+    "description": "Subtitle for the Library Sharing automatic-sharing toggle."
+  },
+  "librarySharingEnableDescription": "Your existing albums and any albums you create in the future will be automatically shared with {recipient}.",
+  "@librarySharingEnableDescription": {
+    "description": "Explains what happens when Library Sharing is enabled for a person.",
+    "placeholders": {
+      "recipient": {
+        "type": "String",
+        "example": "Alex"
+      }
+    }
+  },
+  "librarySharingEnableTitle": "Enable library sharing?",
+  "@librarySharingEnableTitle": {
+    "description": "Confirmation title shown before enabling Library Sharing."
+  },
+  "librarySharingFailedAlbumCount": "{count, plural, one{Could not update {count} album.} other{Could not update {count} albums.}}",
+  "@librarySharingFailedAlbumCount": {
+    "description": "Number of albums that could not be updated by a Library Sharing operation.",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "3"
+      }
+    }
+  },
+  "librarySharingFailedDescription": "Could not update the selected albums.",
+  "@librarySharingFailedDescription": {
+    "description": "Fallback error message when a Library Sharing operation fails."
+  },
+  "librarySharingFailedTitle": "Sharing failed",
+  "@librarySharingFailedTitle": {
+    "description": "Error title shown when a Library Sharing operation fails."
+  },
+  "librarySharingHiddenAlbumsDescription": "Hidden albums will not be shared. You can stop sharing any album at any time.",
+  "@librarySharingHiddenAlbumsDescription": {
+    "description": "Explains exclusions from automatic Library Sharing."
+  },
+  "librarySharingMemberSubtitle": "{count, plural, =0{No albums shared • {storageUsage}} one{{count} album shared • {storageUsage}} other{{count} albums shared • {storageUsage}}}",
+  "@librarySharingMemberSubtitle": {
+    "description": "Family member subtitle combining the number of shared albums and storage usage.",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "3"
+      },
+      "storageUsage": {
+        "type": "String",
+        "example": "2 GB"
+      }
+    }
+  },
+  "librarySharingMixed": "Mixed",
+  "@librarySharingMixed": {
+    "description": "Role label shown when selected albums have different Library Sharing roles."
+  },
+  "librarySharingNoAlbumsToShare": "No albums to share yet",
+  "@librarySharingNoAlbumsToShare": {
+    "description": "Empty-state title shown when there are no albums eligible for Library Sharing."
+  },
+  "librarySharingPreviouslyUnsharedDescription": "{count, plural, one{Sharing was stopped for this album earlier, so it wasn't shared again.} other{Sharing was stopped for these albums earlier, so they weren't shared again.}}",
+  "@librarySharingPreviouslyUnsharedDescription": {
+    "description": "Explains why albums that were manually unshared were not shared automatically again.",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "3"
+      }
+    }
+  },
+  "librarySharingPreviouslyUnsharedTitle": "{count, plural, one{{count} album wasn't shared} other{{count} albums weren't shared}}",
+  "@librarySharingPreviouslyUnsharedTitle": {
+    "description": "Title shown when previously unshared albums are excluded from automatic Library Sharing.",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "3"
+      }
+    }
+  },
+  "librarySharingRetryFailedAlbums": "Retry failed albums",
+  "@librarySharingRetryFailedAlbums": {
+    "description": "Action to retry albums that failed during a Library Sharing operation."
+  },
+  "librarySharingRole": "Role",
+  "@librarySharingRole": {
+    "description": "Label for a person's access role on a shared album."
+  },
+  "librarySharingRoles": "Roles",
+  "@librarySharingRoles": {
+    "description": "Title for editing access roles across multiple shared albums."
+  },
+  "librarySharingShareAlbumCount": "{count, plural, one{Share {count} album} other{Share {count} albums}}",
+  "@librarySharingShareAlbumCount": {
+    "description": "Action to share the selected number of albums.",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "3"
+      }
+    }
+  },
+  "librarySharingShareAlbums": "Share albums",
+  "@librarySharingShareAlbums": {
+    "description": "Action to select albums to share with a person."
+  },
+  "librarySharingSharedAlbumCount": "{count, plural, =0{No albums shared} one{{count} album shared} other{{count} albums shared}}",
+  "@librarySharingSharedAlbumCount": {
+    "description": "Number of albums currently shared with a family member.",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "3"
+      }
+    }
+  },
+  "librarySharingShareWith": "Share with",
+  "@librarySharingShareWith": {
+    "description": "Page eyebrow shown while selecting albums to share with a person."
+  },
+  "librarySharingSharingWith": "Sharing with",
+  "@librarySharingSharingWith": {
+    "description": "Page eyebrow shown while viewing albums shared with a person."
+  },
+  "librarySharingStopSharing": "Stop sharing",
+  "@librarySharingStopSharing": {
+    "description": "Action to stop sharing selected albums with a person."
+  },
+  "librarySharingStopSharingDescription": "{count, plural, one{They'll lose this album, and any photos they added leave with them. You can share again later.} other{They'll lose these albums, and any photos they added leave with them. You can share again later.}}",
+  "@librarySharingStopSharingDescription": {
+    "description": "Explains what happens when selected albums are no longer shared with a person.",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "3"
+      }
+    }
+  },
+  "librarySharingStopSharingTitle": "{count, plural, one{Stop sharing {count} album?} other{Stop sharing {count} albums?}}",
+  "@librarySharingStopSharingTitle": {
+    "description": "Confirmation title before selected albums are no longer shared with a person.",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "3"
+      }
+    }
+  },
+  "librarySharingTitle": "Library sharing",
+  "@librarySharingTitle": {
+    "description": "Title for the feature that automatically shares a person's current and future albums."
+  },
+  "librarySharingUpdateRoles": "Update roles",
+  "@librarySharingUpdateRoles": {
+    "description": "Action to apply access role changes to selected shared albums."
+  },
   "limit": "Limit",
   "linkCopiedToClipboard": "Link copied to clipboard",
   "linkDeletedSuccessfully": "Link deleted successfully",
