@@ -65,13 +65,13 @@ class ArtifactProvider {
       final artifactNames = <String>{
         ...getArtifactNames(
           target: target,
-          libraryName: environment.crateInfo.packageName,
+          libraryName: environment.crateInfo.libName,
           aritifactType: AritifactType.dylib,
           remote: false,
         ),
         ...getArtifactNames(
           target: target,
-          libraryName: environment.crateInfo.packageName,
+          libraryName: environment.crateInfo.libName,
           aritifactType: AritifactType.staticlib,
           remote: false,
         ),
@@ -123,7 +123,7 @@ class ArtifactProvider {
     for (final target in targets) {
       final requiredArtifacts = getArtifactNames(
         target: target,
-        libraryName: environment.crateInfo.packageName,
+        libraryName: environment.crateInfo.libName,
         remote: true,
       );
       final artifactsForTarget = <Artifact>[];

@@ -36,7 +36,7 @@ class VerifyBinaries {
 
         final artifacts = getArtifactNames(
           target: target,
-          libraryName: crateInfo.packageName,
+          libraryName: crateInfo.libName,
           remote: true,
         );
 

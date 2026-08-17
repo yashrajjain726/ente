@@ -27,6 +27,10 @@ class CrateInfo {
 
   final String packageName;
 
+  /// Name of the default lib target, as derived by cargo from the package
+  /// name (dashes replaced with underscores). Determines artifact file names.
+  String get libName => packageName.replaceAll('-', '_');
+
   static CrateInfo parseManifest(String manifest, {final String? fileName}) {
     final toml = TomlDocument.parse(manifest);
     final package = toml.toMap()['package'];
