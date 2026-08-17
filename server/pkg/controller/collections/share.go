@@ -517,7 +517,7 @@ func (c *CollectionController) UpdateShareURL(
 	err := c.BillingCtrl.HasActiveSelfOrFamilySubscription(userID, true)
 	if err != nil {
 		if errors.Is(err, ente.ErrSharingDisabledForFreeAccounts) {
-			if req.DeviceLimit != nil && *req.DeviceLimit != public.FreeUserDeviceLimit {
+			if req.DeviceLimit != nil && !public.IsAllowedFreeUserDeviceLimit(*req.DeviceLimit) {
 				return nil, stacktrace.Propagate(&ente.ErrLinkEditNotAllowed, "")
 			}
 		} else {

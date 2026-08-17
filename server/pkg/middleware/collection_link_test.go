@@ -22,6 +22,23 @@ func TestShouldCheckCollectionLinkDeviceLimit(t *testing.T) {
 	require.False(t, shouldCheckCollectionLinkDeviceLimit("/public-collection/verify-password"))
 }
 
+func TestCapFreeUserDeviceLimit(t *testing.T) {
+	for _, test := range []struct {
+		name        string
+		deviceLimit int
+		want        int
+	}{
+		{name: "unlimited", deviceLimit: 0, want: 10},
+		{name: "legacy free limit", deviceLimit: 5, want: 5},
+		{name: "current free limit", deviceLimit: 10, want: 10},
+		{name: "paid limit", deviceLimit: 25, want: 10},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			require.Equal(t, test.want, capFreeUserDeviceLimit(test.deviceLimit))
+		})
+	}
+}
+
 func TestCollectionLinkCacheIsScopedToOrigin(t *testing.T) {
 	const (
 		accessToken = "access-token"
