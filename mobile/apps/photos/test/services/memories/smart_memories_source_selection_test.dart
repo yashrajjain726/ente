@@ -156,6 +156,62 @@ void main() {
     );
 
     test(
+      "Filler memories preserve year-boundary and leap-day matching",
+      () async {
+        final yearBoundaryMemories =
+            await TimeMemoriesCalculator.computeFillerMemories(
+              [
+                _file(id: 1, createdAt: DateTime.utc(2025, 12, 31)),
+                _file(id: 2, createdAt: DateTime.utc(2025, 1, 1)),
+                _file(id: 3, createdAt: DateTime.utc(2025, 1, 3)),
+              ],
+              DateTime.utc(2026, 12, 31),
+              seenTimes: const <int, int>{},
+            );
+
+        expect(
+          yearBoundaryMemories
+              .singleWhere((memory) => memory.yearsAgo == 1)
+              .memories
+              .map((memory) => memory.file.uploadedFileID),
+          [1],
+        );
+        expect(
+          yearBoundaryMemories
+              .singleWhere((memory) => memory.yearsAgo == 2)
+              .memories
+              .map((memory) => memory.file.uploadedFileID),
+          [2],
+        );
+        expect(
+          yearBoundaryMemories
+              .expand((memory) => memory.memories)
+              .map((memory) => memory.file.uploadedFileID),
+          isNot(contains(3)),
+        );
+
+        final leapDayMemories =
+            await TimeMemoriesCalculator.computeFillerMemories(
+              [_file(id: 4, createdAt: DateTime.utc(2024, 2, 29))],
+              DateTime.utc(2025, 3, 1),
+              seenTimes: const <int, int>{},
+            );
+        expect(leapDayMemories.single.yearsAgo, 1);
+        expect(leapDayMemories.single.memories.single.file.uploadedFileID, 4);
+      },
+    );
+
+    test("memory week numbers retain seven-day buckets", () {
+      expect(TimeMemoriesCalculator.getWeekNumber(DateTime.utc(2024, 1, 1)), 1);
+      expect(TimeMemoriesCalculator.getWeekNumber(DateTime.utc(2024, 1, 7)), 1);
+      expect(TimeMemoriesCalculator.getWeekNumber(DateTime.utc(2024, 1, 8)), 2);
+      expect(
+        TimeMemoriesCalculator.getWeekNumber(DateTime.utc(2024, 12, 31)),
+        53,
+      );
+    });
+
+    test(
       "ClipMemoriesCalculator surfaces a memory from the full source set",
       () async {
         final currentTime = DateTime.utc(2026, 4, 10);
