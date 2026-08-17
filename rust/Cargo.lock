@@ -2539,6 +2539,7 @@ dependencies = [
  "once_cell",
  "ort",
  "plsfix",
+ "rayon",
  "regex",
  "serde",
  "serde_json",
