@@ -1,6 +1,5 @@
 import "dart:async";
 
-import "package:ente_components/theme/icon_sizes.dart";
 import "package:ente_components/theme/motion.dart";
 import "package:ente_components/theme/text_styles.dart";
 import "package:ente_components/theme/theme.dart";
@@ -95,10 +94,7 @@ class _FABComponentState extends State<FABComponent> {
                 children: [
                   if (widget.icon != null)
                     IconTheme.merge(
-                      data: IconThemeData(
-                        color: foregroundColor,
-                        size: IconSizes.small,
-                      ),
+                      data: IconThemeData(color: foregroundColor),
                       child: widget.icon!,
                     ),
                   if (widget.label != null)
