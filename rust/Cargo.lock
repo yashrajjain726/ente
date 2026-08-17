@@ -2514,9 +2514,11 @@ name = "ente-locker-frb"
 version = "0.0.0"
 dependencies = [
  "ente-accounts",
+ "ente-assets",
  "ente-contacts",
  "ente-core",
  "ente-frb-log",
+ "ente-ml",
  "flutter_rust_bridge",
 ]
 
