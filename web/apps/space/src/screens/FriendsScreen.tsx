@@ -786,7 +786,10 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
                         type="button"
                         aria-label="Invite friends"
                         disabled={!profileLink}
-                        onClick={() => openSpaceShareLinkDialog("invite")}
+                        onClick={() =>
+                            profileLink &&
+                            openSpaceShareLinkDialog(profileLink, "invite")
+                        }
                         sx={{
                             alignItems: "center",
                             bgcolor: "transparent",
