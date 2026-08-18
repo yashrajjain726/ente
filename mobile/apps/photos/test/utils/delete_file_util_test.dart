@@ -702,7 +702,7 @@ void _expectVisibleButtonsInOrder(WidgetTester tester, List<String> labels) {
 }
 
 void _expectDeleteWarningIllustration([
-  String assetName = 'assets/warning-grey.png',
+  String assetName = 'assets/warning-red.png',
 ]) {
   expect(
     find.byWidgetPredicate(
