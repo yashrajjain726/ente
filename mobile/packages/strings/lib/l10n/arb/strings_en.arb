@@ -3393,6 +3393,14 @@
     "description": "Display text for an action which triggers a restore of item from trash",
     "type": "text"
   },
+  "restoredItems": "{count, plural, one{Restored item} other{Restored {count} items}}",
+  "@restoredItems": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "restoreToAlbum": "Restore to album",
   "restoringFiles": "Restoring files...",
   "restoringItems": "Restoring...",
