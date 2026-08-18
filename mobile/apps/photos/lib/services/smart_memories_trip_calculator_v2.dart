@@ -187,8 +187,10 @@ class TripMemoriesCalculatorV2 {
       );
     }
 
+    final filesWithLocation = allFiles.where((f) => f.hasLocation).toList()
+      ..sort((a, b) => a.creationTime!.compareTo(b.creationTime!));
     final baseLocations = _detectBaseLocations(
-      allFiles,
+      filesWithLocation,
       isLocalGalleryMode: isLocalGalleryMode,
     );
     final baseCountriesToExclude = _baseCountriesToExcludeFromTripTitles(
@@ -197,9 +199,6 @@ class TripMemoriesCalculatorV2 {
       citySearchIndex,
       seenTimes,
     );
-
-    final filesWithLocation = allFiles.where((f) => f.hasLocation).toList()
-      ..sort((a, b) => a.creationTime!.compareTo(b.creationTime!));
 
     if (filesWithLocation.isEmpty) {
       return TripMemoriesAnalysis(
@@ -335,12 +334,9 @@ class TripMemoriesCalculatorV2 {
   }
 
   static List<BaseLocation> _detectBaseLocations(
-    Iterable<EnteFile> allFiles, {
+    List<EnteFile> filesWithLocation, {
     required bool isLocalGalleryMode,
   }) {
-    final filesWithLocation =
-        allFiles.where((file) => file.hasLocation).toList()
-          ..sort((a, b) => a.creationTime!.compareTo(b.creationTime!));
     final smallRadiusClusters = _mergeNearbyLocationClusters(
       _clusterByLocation(filesWithLocation, radius: baseRadius),
       radius: _baseMergeRadius,
@@ -965,7 +961,7 @@ class TripMemoriesCalculatorV2 {
         excludedCountryNames: baseCountriesToExclude,
       );
       final photoSelection = await SmartMemoriesService._bestSelection(
-        trip.memories,
+        List<Memory>.of(trip.memories),
         isLocalGalleryMode: isLocalGalleryMode,
         mlEnabled: mlEnabled,
         fileIdToFaces: fileIdToFaces,
@@ -1114,7 +1110,7 @@ class TripMemoriesCalculatorV2 {
         excludedCountryNames: baseCountriesToExclude,
       );
       final photoSelection = await SmartMemoriesService._bestSelection(
-        trip.memories,
+        List<Memory>.of(trip.memories),
         isLocalGalleryMode: isLocalGalleryMode,
         mlEnabled: mlEnabled,
         fileIdToFaces: fileIdToFaces,

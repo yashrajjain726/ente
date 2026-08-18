@@ -936,12 +936,8 @@ class SmartMemoriesService {
 
       final List<SmartMemory> memories = [];
 
-      final onThisDayFiles = _collectAvailableFiles(
-        allFileIdsToFile,
-        usedMemoryFileIds,
-      );
       final onThisDayMemories = await _getOnThisDayResults(
-        onThisDayFiles,
+        fullSourceFiles,
         now,
         seenTimes: seenTimes,
         collectionIDsToExclude: collectionIDsToExclude,
@@ -1116,12 +1112,8 @@ class SmartMemoriesService {
 
     final List<SmartMemory> memories = [];
 
-    final onThisDayFiles = _collectAvailableFiles(
-      allFileIdsToFile,
-      usedMemoryFileIds,
-    );
     final onThisDayMemories = await _getOnThisDayResults(
-      onThisDayFiles,
+      allFileIdsToFile.values,
       now,
       seenTimes: seenTimes,
       collectionIDsToExclude: collectionIDsToExclude,
