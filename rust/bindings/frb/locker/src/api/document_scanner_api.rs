@@ -2,6 +2,7 @@ use std::any::Any;
 use std::panic::{AssertUnwindSafe, catch_unwind};
 
 use ente_assets::AssetStore;
+use ente_ml::indexing::set_ml_execution_config;
 use ente_ml::scan;
 use flutter_rust_bridge::frb;
 
@@ -35,14 +36,6 @@ pub struct RustPlaneLayout {
 }
 
 #[derive(Clone, Debug)]
-pub struct RustScanOptions {
-    pub color_mode_override: Option<RustColorMode>,
-    pub max_pixels: Option<u32>,
-    /// Must be a multiple of 90.
-    pub rotation_degrees: i32,
-}
-
-#[derive(Clone, Debug)]
 pub struct RustReprocessOptions {
     /// Same space as `RustScanResult.quad`: the decoded source image.
     pub quad: RustQuad,
@@ -50,7 +43,6 @@ pub struct RustReprocessOptions {
     pub rotation_degrees: i32,
     pub color_mode: RustColorMode,
     pub max_pixels: Option<u32>,
-    pub jpeg_quality: Option<u8>,
 }
 
 #[derive(Clone, Debug)]
@@ -92,6 +84,7 @@ impl ScannerSession {
         let store = AssetStore::new(assets_dir);
         let model_path = scan::ensure_segmentation_model(&store).await?;
         catch_panic(|| {
+            set_ml_execution_config(true);
             let inner = scan::ScannerSession::new(&model_path.to_string_lossy())?;
             Ok(ScannerSession { inner })
         })
@@ -142,12 +135,10 @@ impl ScannerSession {
     pub fn process_capture(
         &self,
         image_bytes: Vec<u8>,
-        options: RustScanOptions,
+        max_pixels: Option<u32>,
     ) -> Result<RustScanResult, RustScanError> {
         catch_panic(|| {
-            let result = self
-                .inner
-                .process_capture(&image_bytes, &to_scan_options(&options))?;
+            let result = self.inner.process_capture(&image_bytes, max_pixels)?;
             Ok(to_api_scan_result(result))
         })
     }
@@ -207,21 +198,12 @@ fn to_plane_layout(layout: RustPlaneLayout) -> scan::PlaneLayout {
     }
 }
 
-fn to_scan_options(options: &RustScanOptions) -> scan::ScanOptions {
-    scan::ScanOptions {
-        color_mode_override: options.color_mode_override.map(to_color_mode),
-        max_pixels: options.max_pixels,
-        rotation_degrees: options.rotation_degrees,
-    }
-}
-
 fn to_reprocess_options(options: &RustReprocessOptions) -> scan::ReprocessOptions {
     scan::ReprocessOptions {
         quad: to_quad(options.quad),
         rotation_degrees: options.rotation_degrees,
         color_mode: to_color_mode(options.color_mode),
         max_pixels: options.max_pixels,
-        jpeg_quality: options.jpeg_quality,
     }
 }
 

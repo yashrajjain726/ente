@@ -45,6 +45,12 @@ use crate::error::MlResult;
 const ENABLE_PERSISTENT_COREML_CACHE: bool = true;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum GoldenSelfTest {
+    Required,
+    Skipped,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum ExecutionMode {
     PlatformDefault,
     CpuOnly,
@@ -69,9 +75,9 @@ pub(super) struct ProviderPlan {
 }
 
 impl ProviderPlan {
-    pub(super) fn new(mode: ExecutionMode, model_path: &str) -> Self {
+    pub(super) fn new(mode: ExecutionMode, model_path: &str, golden: GoldenSelfTest) -> Self {
         let providers = match mode {
-            ExecutionMode::PlatformDefault => platform_default_providers(model_path),
+            ExecutionMode::PlatformDefault => platform_default_providers(model_path, golden),
             ExecutionMode::CpuOnly => vec![ExecutionProvider::Cpu],
         };
         Self::from_providers(providers)
@@ -215,9 +221,9 @@ pub(super) fn build_session(model_path: &str, attempt: ProviderAttempt) -> MlRes
 }
 
 #[cfg(any(target_os = "ios", target_os = "macos"))]
-fn platform_default_providers(model_path: &str) -> Vec<ExecutionProvider> {
+fn platform_default_providers(model_path: &str, golden: GoldenSelfTest) -> Vec<ExecutionProvider> {
     let mut providers = Vec::new();
-    if golden_entry_required(model_path, "CoreML") {
+    if accelerated_provider_allowed(model_path, "CoreML", golden) {
         providers.push(ExecutionProvider::CoreMl);
     }
     providers.push(ExecutionProvider::Cpu);
@@ -225,9 +231,11 @@ fn platform_default_providers(model_path: &str) -> Vec<ExecutionProvider> {
 }
 
 #[cfg(target_os = "android")]
-fn platform_default_providers(model_path: &str) -> Vec<ExecutionProvider> {
+fn platform_default_providers(model_path: &str, golden: GoldenSelfTest) -> Vec<ExecutionProvider> {
     let mut providers = Vec::new();
-    if webgpu::attempt_permitted(model_path) && golden_entry_required(model_path, "WebGPU") {
+    if webgpu::attempt_permitted(model_path)
+        && accelerated_provider_allowed(model_path, "WebGPU", golden)
+    {
         providers.push(ExecutionProvider::WebGpu);
     }
     providers.push(ExecutionProvider::Xnnpack);
@@ -236,9 +244,11 @@ fn platform_default_providers(model_path: &str) -> Vec<ExecutionProvider> {
 }
 
 #[cfg(any(target_os = "linux", target_os = "windows"))]
-fn platform_default_providers(model_path: &str) -> Vec<ExecutionProvider> {
+fn platform_default_providers(model_path: &str, golden: GoldenSelfTest) -> Vec<ExecutionProvider> {
     let mut providers = Vec::new();
-    if webgpu::attempt_permitted(model_path) && golden_entry_required(model_path, "WebGPU") {
+    if webgpu::attempt_permitted(model_path)
+        && accelerated_provider_allowed(model_path, "WebGPU", golden)
+    {
         providers.push(ExecutionProvider::WebGpu);
     }
     providers.push(ExecutionProvider::Cpu);
@@ -252,7 +262,10 @@ fn platform_default_providers(model_path: &str) -> Vec<ExecutionProvider> {
     target_os = "macos",
     target_os = "windows"
 )))]
-fn platform_default_providers(_model_path: &str) -> Vec<ExecutionProvider> {
+fn platform_default_providers(
+    _model_path: &str,
+    _golden: GoldenSelfTest,
+) -> Vec<ExecutionProvider> {
     vec![ExecutionProvider::Cpu]
 }
 
@@ -265,8 +278,12 @@ fn platform_default_providers(_model_path: &str) -> Vec<ExecutionProvider> {
     target_os = "macos",
     target_os = "windows"
 ))]
-fn golden_entry_required(model_path: &str, provider_label: &str) -> bool {
-    if golden_test::lookup(model_path).is_some() {
+fn accelerated_provider_allowed(
+    model_path: &str,
+    provider_label: &str,
+    golden: GoldenSelfTest,
+) -> bool {
+    if golden == GoldenSelfTest::Skipped || golden_test::lookup(model_path).is_some() {
         return true;
     }
     log::error!(
@@ -358,7 +375,9 @@ fn xnnpack_attempt() -> ProviderAttempt {
 
 #[cfg(test)]
 mod tests {
-    use super::{ExecutionMode, ExecutionProvider, ProviderPlan, run_provider_plan};
+    use super::{
+        ExecutionMode, ExecutionProvider, GoldenSelfTest, ProviderPlan, run_provider_plan,
+    };
 
     #[test]
     fn construction_falls_through_and_selects_the_successful_provider() {
@@ -428,7 +447,11 @@ mod tests {
 
     #[test]
     fn exhausted_cpu_is_retained_as_the_only_construction_retry() {
-        let mut plan = ProviderPlan::new(ExecutionMode::CpuOnly, "model.onnx");
+        let mut plan = ProviderPlan::new(
+            ExecutionMode::CpuOnly,
+            "model.onnx",
+            GoldenSelfTest::Required,
+        );
         let mut attempts = 0;
 
         let first = run_provider_plan::<(), _>(&mut plan, |provider| {
