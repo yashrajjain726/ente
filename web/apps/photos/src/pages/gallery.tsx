@@ -1017,6 +1017,7 @@ const Page: React.FC = () => {
                     });
                     setOpenCollectionSelector(false);
                     setPostCreateAlbumOp(undefined);
+                    postCreateAlbumHidden.current = false;
                     return;
                 }
 
@@ -1026,9 +1027,9 @@ const Page: React.FC = () => {
                     );
                     return undefined;
                 });
+                postCreateAlbumHidden.current = false;
             } finally {
                 pendingSingleFileAdd.current = undefined;
-                postCreateAlbumHidden.current = false;
             }
         },
         [createOnSelectForCollectionOp, remotePull],
@@ -2116,6 +2117,7 @@ const Page: React.FC = () => {
                 onClose={() => {
                     // Do not leak a cancelled add into the next album creation.
                     pendingSingleFileAdd.current = undefined;
+                    postCreateAlbumHidden.current = false;
                     albumNameInputVisibilityProps.onClose();
                 }}
                 onSubmit={handleAlbumNameSubmit}
