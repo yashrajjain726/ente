@@ -8,6 +8,7 @@ enum WakeLockFor {
   handlingMediaKitEdgeCase,
   rewindViewer,
   largeBackupStandbyScreen,
+  albumSlideshow,
 }
 
 // Temporary callers must not override the across-session setting.
