@@ -314,7 +314,7 @@ class GalleryGroups {
     if (groupType.showGroupHeader()) {
       var start = 0;
       for (final end in _timeGroupEndIndexes()) {
-        _createNewGroup(allFiles.sublist(start, end), yearsInGroups);
+        _createNewGroup(_copyFilesInRange(start, end), yearsInGroups);
         start = end;
       }
     } else {
@@ -324,7 +324,7 @@ class GalleryGroups {
         final end = (i + 10 * crossAxisCount < allFiles.length)
             ? i + 10 * crossAxisCount
             : allFiles.length;
-        final subGroup = allFiles.sublist(i, end);
+        final subGroup = _copyFilesInRange(i, end);
         _createNewGroup(subGroup, yearsInGroups);
       }
     }
@@ -333,6 +333,12 @@ class GalleryGroups {
       "Built ${_groupIds.length} groups for group type ${groupType.name} in ${stopwatch.elapsedMilliseconds} ms",
     );
     stopwatch.stop();
+  }
+
+  List<EnteFile> _copyFilesInRange(int start, int end) {
+    // sublist preserves a covariant source list's runtime element type, which
+    // can reject DummyFile placeholders added by _createNewGroup.
+    return List<EnteFile>.from(allFiles.getRange(start, end));
   }
 
   List<int> _timeGroupEndIndexes() {
