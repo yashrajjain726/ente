@@ -32,6 +32,7 @@ pub(crate) use morph::{morphology_close, morphology_erode, morphology_open};
 pub(crate) use resize::{Interp, resize_f32, resize_u8};
 pub(crate) use stats::{
     hist_256_f32, hist_256_u8, mean_f32, mean_u8c3_masked, min_max_loc_f32, percentile_f32,
+    percentile_pair_f32,
 };
 pub(crate) use structuring::ellipse_kernel;
 pub(crate) use transform::rotate_u8;

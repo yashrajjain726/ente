@@ -188,8 +188,8 @@ fn enhance_grayscale_image(img: &ImageU8) -> OpResult<ImageU8> {
 
     retinex.map_mut(f32::exp);
 
-    let p_low = cv::percentile_f32(&retinex, 0.004)? as f64;
-    let p_high = cv::percentile_f32(&retinex, 0.99)? as f64;
+    let (p_low, p_high) = cv::percentile_pair_f32(&retinex, 0.004, 0.99)?;
+    let (p_low, p_high) = (p_low as f64, p_high as f64);
     let scale = if p_high > p_low {
         255.0 / (p_high - p_low)
     } else {
@@ -208,8 +208,8 @@ fn enhance_grayscale_image(img: &ImageU8) -> OpResult<ImageU8> {
     }
 
     let stretched8u = if mode_val >= 254 {
-        let g_low = cv::percentile_f32(&gray_f, 0.01)? as f64;
-        let g_high = cv::percentile_f32(&gray_f, 0.99)? as f64;
+        let (g_low, g_high) = cv::percentile_pair_f32(&gray_f, 0.01, 0.99)?;
+        let (g_low, g_high) = (g_low as f64, g_high as f64);
         let scale = 255.0 / (g_high - g_low + 1e-6);
         gray_f.map_to_u8(|v| clamp_255(((v - g_low as f32) as f64 * scale) as f32))
     } else {
