@@ -2614,6 +2614,34 @@ dependencies = [
 ]
 
 [[package]]
+name = "ente-photos-frb"
+version = "0.0.0"
+dependencies = [
+ "ente-accounts",
+ "ente-cast",
+ "ente-contacts",
+ "ente-core",
+ "ente-frb-log",
+ "ente-image",
+ "ente-ml",
+ "ente-photos",
+ "flutter_rust_bridge",
+]
+
+[[package]]
+name = "ente-photos-napi"
+version = "0.0.0"
+dependencies = [
+ "ente-assets",
+ "ente-ml",
+ "log",
+ "napi",
+ "napi-build",
+ "napi-derive",
+ "ort",
+]
+
+[[package]]
 name = "ente-rs"
 version = "0.0.1"
 dependencies = [
@@ -2731,34 +2759,6 @@ dependencies = [
  "log",
  "wasm-bindgen",
  "web-sys",
-]
-
-[[package]]
-name = "ente_photos_napi"
-version = "0.0.0"
-dependencies = [
- "ente-assets",
- "ente-ml",
- "log",
- "napi",
- "napi-build",
- "napi-derive",
- "ort",
-]
-
-[[package]]
-name = "ente_photos_rust"
-version = "0.0.0"
-dependencies = [
- "ente-accounts",
- "ente-cast",
- "ente-contacts",
- "ente-core",
- "ente-frb-log",
- "ente-image",
- "ente-ml",
- "ente-photos",
- "flutter_rust_bridge",
 ]
 
 [[package]]
