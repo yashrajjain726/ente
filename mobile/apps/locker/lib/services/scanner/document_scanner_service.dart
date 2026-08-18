@@ -141,10 +141,7 @@ class DocumentScannerService {
     try {
       final result = await _readySession.processCapture(
         imageBytes: capturedJpeg,
-        options: const RustScanOptions(
-          maxPixels: _maxPixels,
-          rotationDegrees: 0,
-        ),
+        maxPixels: _maxPixels,
       );
       final id = '${DateTime.now().microsecondsSinceEpoch}_${_counter++}';
       final source = File(p.join(_root.path, '${id}_src.jpg'));
@@ -256,7 +253,7 @@ class DocumentScannerService {
 
   static RustColorMode _colorModeToRust(ScanColorMode mode) => switch (mode) {
     ScanColorMode.grayscale => RustColorMode.grayscale,
-    ScanColorMode.color || ScanColorMode.auto => RustColorMode.color,
+    ScanColorMode.color => RustColorMode.color,
   };
 
   static Future<void> _deleteIfExists(File file) async {

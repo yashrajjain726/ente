@@ -7,7 +7,6 @@ use super::geometry::{ImageSize, Quad};
 use super::mask::Mask;
 use super::segmentation::{MASK_SIDE, Segmenter};
 use super::yuv::{PlaneLayout, bgra_to_bgr, rgba_to_bgr, yuv420_to_bgr};
-use crate::cv;
 use crate::cv::image::ImageU8;
 
 const DEFAULT_MAX_PIXELS: u32 = 2_000_000;
@@ -25,20 +24,12 @@ pub enum ScanError {
     Pipeline(String),
 }
 
-#[derive(Debug, Clone, Default, PartialEq)]
-pub struct ScanOptions {
-    pub color_mode_override: Option<ColorMode>,
-    pub max_pixels: Option<u32>,
-    pub rotation_degrees: i32,
-}
-
 #[derive(Debug, Clone, PartialEq)]
 pub struct ReprocessOptions {
     pub quad: Quad,
     pub rotation_degrees: i32,
     pub color_mode: ColorMode,
     pub max_pixels: Option<u32>,
-    pub jpeg_quality: Option<u8>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -139,10 +130,10 @@ impl ScannerSession {
     pub fn process_capture(
         &self,
         image_bytes: &[u8],
-        options: &ScanOptions,
+        max_pixels: Option<u32>,
     ) -> Result<ScanResult, ScanError> {
         let start = std::time::Instant::now();
-        let result = self.process_capture_inner(image_bytes, options);
+        let result = self.process_capture_inner(image_bytes, max_pixels);
         match &result {
             Ok(scan) => log::info!(
                 "capture: {}x{} -> {}x{} {:?}, quad {}, {}ms",
@@ -162,10 +153,10 @@ impl ScannerSession {
     fn process_capture_inner(
         &self,
         image_bytes: &[u8],
-        options: &ScanOptions,
+        max_pixels: Option<u32>,
     ) -> Result<ScanResult, ScanError> {
         let bgr = codec::decode_bgr(image_bytes)?;
-        let max_pixels = options.max_pixels.unwrap_or(DEFAULT_MAX_PIXELS) as f64;
+        let max_pixels = max_pixels.unwrap_or(DEFAULT_MAX_PIXELS) as f64;
 
         let mask = self.segment(&bgr)?;
         let original_size = ImageSize::new(bgr.width as f64, bgr.height as f64);
@@ -173,23 +164,14 @@ impl ScannerSession {
             detect_document_quad(&mask, original_size, false).map_err(ScanError::Pipeline)?;
 
         let Some(quad_in_mask) = quad_in_mask else {
-            let resized = resize_for_max_pixels(&bgr, max_pixels).map_err(ScanError::Pipeline)?;
-            let page =
-                cv::rotate_u8(&resized, options.rotation_degrees).map_err(ScanError::Pipeline)?;
+            let page = resize_for_max_pixels(&bgr, max_pixels).map_err(ScanError::Pipeline)?;
             return finish(None, ColorMode::Color, &bgr, &page, DEFAULT_JPEG_QUALITY);
         };
 
         let quad = quad_to_image(&quad_in_mask, &mask, bgr.size());
-        let auto = auto_color_mode(&bgr, &mask, &quad).map_err(ScanError::Pipeline)?;
-        let color_mode = options.color_mode_override.unwrap_or(auto);
-        let page = extract_document(
-            &bgr,
-            &quad,
-            options.rotation_degrees,
-            color_mode,
-            max_pixels,
-        )
-        .map_err(ScanError::Pipeline)?;
+        let color_mode = auto_color_mode(&bgr, &mask, &quad).map_err(ScanError::Pipeline)?;
+        let page = extract_document(&bgr, &quad, 0, color_mode, max_pixels)
+            .map_err(ScanError::Pipeline)?;
 
         finish(Some(quad), color_mode, &bgr, &page, DEFAULT_JPEG_QUALITY)
     }
@@ -233,7 +215,7 @@ impl ScannerSession {
             options.color_mode,
             &bgr,
             &page,
-            options.jpeg_quality.unwrap_or(DEFAULT_JPEG_QUALITY),
+            DEFAULT_JPEG_QUALITY,
         )
     }
 }

@@ -1,7 +1,7 @@
 import 'dart:io';
 import 'dart:ui';
 
-enum ScanColorMode { auto, color, grayscale }
+enum ScanColorMode { color, grayscale }
 
 class ScanQuad {
   const ScanQuad(this.corners);
