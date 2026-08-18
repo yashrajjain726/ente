@@ -77,7 +77,8 @@ Select any photo you want to use as the cover for your album.
 
 - Click the album you want to change
 - Click the overflow menu (three dots) in the top right corner
-- Click **Set cover**
+- Click **Edit details**
+- Click the green pencil icon on the bottom right of the photo
 - Select the image you want to use as the album cover
 - Click **Confirm**
 
