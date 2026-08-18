@@ -10,10 +10,6 @@ fn sum_channel0(src: &ImageF32) -> f64 {
     }
 }
 
-pub(crate) fn sum_f32(src: &ImageF32) -> OpResult<f64> {
-    Ok(sum_channel0(src))
-}
-
 pub(crate) fn mean_f32(src: &ImageF32) -> OpResult<f64> {
     Ok(sum_channel0(src) / src.pixels() as f64)
 }

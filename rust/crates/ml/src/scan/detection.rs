@@ -52,7 +52,7 @@ fn find_quad_from_orientation_with_adaptive_threshold(
     let probmap_smooth = cv::gaussian_blur_u8(prob_image, 3)?;
 
     let kernel = cv::ellipse_kernel(5)?;
-    let prob_float = cv::u8_to_f32(prob_image)?;
+    let prob_float = prob_image.to_f32();
     let mut best_quad: Option<Vec<Point>> = None;
     let mut best_score = 0.0f64;
 

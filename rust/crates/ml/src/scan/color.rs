@@ -31,8 +31,13 @@ pub(crate) fn auto_color_mode(img: &ImageU8, mask: &Mask, quad: &Quad) -> OpResu
 
     let chroma = chroma(a, b)?;
 
-    let color_mask_f = cv::threshold_binary_f32(&chroma, CHROMA_THRESHOLD, 255.0)?;
-    let color_mask = cv::f32_to_u8(&color_mask_f)?;
+    let color_mask = chroma.map_to_u8(|v| {
+        if v > CHROMA_THRESHOLD as f32 {
+            255.0
+        } else {
+            0.0
+        }
+    });
 
     let luminance_mask = cv::in_range_u8(luminance, LUMINANCE_MIN, LUMINANCE_MAX)?;
 
@@ -53,12 +58,19 @@ pub(crate) fn auto_color_mode(img: &ImageU8, mask: &Mask, quad: &Quad) -> OpResu
     })
 }
 
+/// Distance from the neutral axis in Lab's biased 0..255 encoding.
 fn chroma(a: &ImageU8, b: &ImageU8) -> OpResult<ImageF32> {
-    let a_float = cv::u8_to_f32(a)?;
-    let b_float = cv::u8_to_f32(b)?;
-    let a_shifted = cv::subtract_f32_scalar(&a_float, 128.0)?;
-    let b_shifted = cv::subtract_f32_scalar(&b_float, 128.0)?;
-    cv::magnitude_f32(&a_shifted, &b_shifted)
+    let data = a
+        .data
+        .iter()
+        .zip(b.data.iter())
+        .map(|(&a, &b)| {
+            let a = a as f32 - 128.0;
+            let b = b as f32 - 128.0;
+            (a * a + b * b).sqrt()
+        })
+        .collect();
+    ImageF32::new(a.width, a.height, 1, data)
 }
 
 fn erode_border(mask: &ImageU8, quad: &Quad) -> OpResult<ImageU8> {
@@ -121,18 +133,16 @@ pub(crate) fn apply_gray_world_to_document(img: &ImageU8, doc_mask: &ImageU8) ->
     let mean_r = if mean[2] < eps { eps } else { mean[2] };
 
     let mean_gray = (mean_b + mean_g + mean_r) / 3.0;
-    let scales = [
-        mean_gray / mean_b,
-        mean_gray / mean_g,
-        mean_gray / mean_r,
-        0.0,
-    ];
+    let scales = [mean_gray / mean_b, mean_gray / mean_g, mean_gray / mean_r];
 
-    let img_f = cv::u8_to_f32(img)?;
-    let scaled_f = cv::multiply_f32_scalar(&img_f, scales)?;
-    let scaled8 = cv::f32_to_u8(&scaled_f)?;
+    let mut scaled = img.clone();
+    for pixel in scaled.data.chunks_exact_mut(3) {
+        for (channel, scale) in pixel.iter_mut().zip(scales) {
+            *channel = cv::saturate_u8_f32((*channel as f64 * scale) as f32);
+        }
+    }
 
-    cv::copy_to_masked(&scaled8, img, doc_mask)
+    cv::copy_to_masked(&scaled, img, doc_mask)
 }
 
 pub(crate) fn quad_to_image(quad: &Quad, mask: &Mask, image_size: (i32, i32)) -> Quad {
