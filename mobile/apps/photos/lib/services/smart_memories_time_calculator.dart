@@ -351,7 +351,7 @@ class TimeMemoriesCalculator {
     DateTime currentTime,
   ) {
     return fileIndex.filesForCalendar(
-      monthDays: _historicalDayCandidates(currentTime),
+      monthDays: historicalDayCandidates(currentTime),
     );
   }
 
@@ -387,20 +387,32 @@ class TimeMemoriesCalculator {
     ]);
   }
 
-  static Set<int> _historicalDayCandidates(DateTime currentTime) {
+  @visibleForTesting
+  static Set<int> historicalDayCandidates(DateTime currentTime) {
     final candidates = <int>{};
-    for (var offset = 0; offset <= kMemoriesUpdateFrequency.inDays; offset++) {
-      final targetDate = DateTime(
-        currentTime.year,
-        currentTime.month,
-        currentTime.day + offset,
-      );
+    final windowEnd = currentTime.add(kMemoriesUpdateFrequency);
+    var targetDate = DateTime.utc(
+      currentTime.year,
+      currentTime.month,
+      currentTime.day,
+    );
+    final endDate = DateTime.utc(
+      windowEnd.year,
+      windowEnd.month,
+      windowEnd.day,
+    );
+    while (!targetDate.isAfter(endDate)) {
       candidates.add(targetDate.month * 100 + targetDate.day);
       if (!_isLeapYear(targetDate.year) &&
           targetDate.month == DateTime.march &&
           targetDate.day == 1) {
         candidates.add(DateTime.february * 100 + 29);
       }
+      targetDate = DateTime.utc(
+        targetDate.year,
+        targetDate.month,
+        targetDate.day + 1,
+      );
     }
     return candidates;
   }
@@ -500,7 +512,7 @@ class TimeMemoriesCalculator {
     final cutOffTime = currentTime.subtract(
       const Duration(days: 364) - kMemoriesUpdateFrequency,
     );
-    final historicalDayCandidates = _historicalDayCandidates(currentTime);
+    final historicalCandidates = historicalDayCandidates(currentTime);
 
     final Map<int, List<Memory>> yearsAgoToMemories = {};
     for (final file in allFiles) {
@@ -508,9 +520,7 @@ class TimeMemoriesCalculator {
         continue;
       }
       final fileDate = DateTime.fromMicrosecondsSinceEpoch(file.creationTime!);
-      if (!historicalDayCandidates.contains(
-        fileDate.month * 100 + fileDate.day,
-      )) {
+      if (!historicalCandidates.contains(fileDate.month * 100 + fileDate.day)) {
         continue;
       }
       final dayMatch = _historicalDateMatch(fileDate, currentTime);
@@ -568,7 +578,7 @@ class TimeMemoriesCalculator {
     final cutOffTime = startPoint.subtract(
       const Duration(days: 363) - kMemoriesUpdateFrequency,
     );
-    final historicalDayCandidates = _historicalDayCandidates(startPoint);
+    final historicalCandidates = historicalDayCandidates(startPoint);
 
     final Map<int, List<Memory>> daysToMemories = {};
     final Map<int, Set<int>> daysToYears = {};
@@ -579,9 +589,7 @@ class TimeMemoriesCalculator {
         continue;
       }
       final fileDate = DateTime.fromMicrosecondsSinceEpoch(file.creationTime!);
-      if (!historicalDayCandidates.contains(
-        fileDate.month * 100 + fileDate.day,
-      )) {
+      if (!historicalCandidates.contains(fileDate.month * 100 + fileDate.day)) {
         continue;
       }
       final dayMatch = _historicalDateMatch(fileDate, startPoint);

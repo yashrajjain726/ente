@@ -5,7 +5,7 @@ import "dart:math" show Random, max, min;
 import "package:computer/computer.dart";
 import "package:ente_pure_utils/ente_pure_utils.dart";
 import "package:ente_strings/ente_strings.dart";
-import "package:flutter/foundation.dart" show kDebugMode;
+import "package:flutter/foundation.dart" show kDebugMode, visibleForTesting;
 import "package:flutter/material.dart";
 import "package:intl/intl.dart";
 import "package:logging/logging.dart";

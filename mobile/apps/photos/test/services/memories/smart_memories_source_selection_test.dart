@@ -6,11 +6,14 @@ import "package:photos/models/location/location.dart";
 import "package:photos/models/memories/clip_memory.dart";
 import "package:photos/models/memories/filler_memory.dart";
 import "package:photos/models/memories/memories_cache.dart";
+import "package:photos/models/memories/smart_memory_constants.dart";
 import "package:photos/models/memories/time_memory.dart";
 import "package:photos/models/ml/face/face_with_embedding.dart";
 import "package:photos/models/ml/vector.dart";
 import "package:photos/services/location_service.dart";
 import "package:photos/services/smart_memories_service.dart";
+import "package:timezone/data/latest.dart" as tzdata;
+import "package:timezone/timezone.dart" as timezone;
 
 EnteFile _file({
   required int id,
@@ -266,6 +269,21 @@ void main() {
         );
       },
     );
+
+    test("historical prefilter covers a DST-expanded date window", () {
+      tzdata.initializeTimeZones();
+      final location = timezone.getLocation("America/New_York");
+      final currentTime = timezone.TZDateTime(location, 2026, 3, 7, 23, 30);
+
+      expect(
+        currentTime.add(kMemoriesUpdateFrequency),
+        timezone.TZDateTime(location, 2026, 3, 11, 0, 30),
+      );
+      expect(
+        TimeMemoriesCalculator.historicalDayCandidates(currentTime),
+        contains(311),
+      );
+    });
 
     test("memory week numbers retain seven-day buckets", () {
       expect(TimeMemoriesCalculator.getWeekNumber(DateTime.utc(2024, 1, 1)), 1);
