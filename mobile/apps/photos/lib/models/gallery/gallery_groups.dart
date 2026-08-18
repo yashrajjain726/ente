@@ -336,8 +336,8 @@ class GalleryGroups {
   }
 
   List<EnteFile> _copyFilesInRange(int start, int end) {
-    // sublist preserves a covariant source list's runtime element type, which
-    // can reject DummyFile placeholders added by _createNewGroup.
+    // Create a real List<EnteFile> so _createNewGroup can add DummyFiles.
+    // A sublist of List<EnteTrashFile>, for example, only accepts EnteTrashFile.
     return List<EnteFile>.from(allFiles.getRange(start, end));
   }
 
