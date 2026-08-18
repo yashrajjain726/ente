@@ -33,7 +33,7 @@ pub(crate) fn detect_document_quad(
 
     if vertices.is_none() && !is_live_analysis {
         // Fallback: min-area rectangle of the biggest contour.
-        if let Some(biggest) = biggest_contour(&mask.binary_image()?)? {
+        if let Some(biggest) = biggest_contour(&refine_mask(&mask.binary_image()?)?)? {
             vertices = min_area_rect(&biggest.points, mask.width, mask.height);
         }
     }
@@ -60,7 +60,7 @@ fn find_quad_from_orientation_with_adaptive_threshold(
         let bin = cv::threshold_binary_u8(&probmap_smooth, thr * 255.0, 255.0)?;
         let closed = cv::morphology_close(&bin, &kernel)?;
 
-        if let Some(quad) = find_quad_from_orientation(&closed, original_size)?
+        if let Some(quad) = find_quad_from_orientation(&closed, original_size, &kernel)?
             && is_valid_quad(&quad)
         {
             let score = score_quad_against_probmap(&quad, &prob_float, 0.02)?;
@@ -80,15 +80,17 @@ pub(crate) fn is_valid_quad(quad: &[Point]) -> bool {
 }
 
 fn find_quad_from_orientation(
-    mask_image: &ImageU8,
+    closed: &ImageU8,
     original_size: ImageSize,
+    kernel: &ImageU8,
 ) -> OpResult<Option<Vec<Point>>> {
-    let Some(contour) = biggest_contour(mask_image)? else {
+    let opened = cv::morphology_open(closed, kernel)?;
+    let Some(contour) = biggest_contour(&opened)? else {
         return Ok(None);
     };
 
-    let scale_x = original_size.width / mask_image.width as f64;
-    let scale_y = original_size.height / mask_image.height as f64;
+    let scale_x = original_size.width / opened.width as f64;
+    let scale_y = original_size.height / opened.height as f64;
 
     let scaled: Vec<Point> = contour
         .points
@@ -128,9 +130,8 @@ pub(crate) fn min_area_rect(points: &[(i32, i32)], width: i32, height: i32) -> O
     )
 }
 
-pub(crate) fn biggest_contour(image: &ImageU8) -> OpResult<Option<Contour>> {
-    let refined = refine_mask(image)?;
-    let blurred = cv::gaussian_blur_u8(&refined, 5)?;
+pub(crate) fn biggest_contour(refined: &ImageU8) -> OpResult<Option<Contour>> {
+    let blurred = cv::gaussian_blur_u8(refined, 5)?;
     let edges = cv::canny(&blurred, 75.0, 200.0)?;
     let contours = cv::find_contours(&edges)?;
 
