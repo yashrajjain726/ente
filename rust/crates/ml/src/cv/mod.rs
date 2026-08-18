@@ -16,8 +16,6 @@ mod warp;
 
 use rayon::prelude::*;
 
-use self::image::{Image, ImageRef};
-
 pub(crate) type OpResult<T> = Result<T, String>;
 
 pub(crate) use bilateral::bilateral_filter_u8;
@@ -31,26 +29,13 @@ pub(crate) use masking::{
     bitwise_and_u8, copy_to_masked, count_non_zero, in_range_u8, threshold_binary_u8,
 };
 pub(crate) use morph::{morphology_close, morphology_erode, morphology_open};
+pub(crate) use resize::{Interp, resize_f32, resize_u8};
 pub(crate) use stats::{
     hist_256_f32, hist_256_u8, mean_f32, mean_u8c3_masked, min_max_loc_f32, percentile_f32,
 };
 pub(crate) use structuring::ellipse_kernel;
 pub(crate) use transform::rotate_u8;
 pub(crate) use warp::warp_perspective;
-
-use resize::Interp;
-
-pub(crate) fn resize_bilinear(src: ImageRef<'_>, width: i32, height: i32) -> OpResult<Image> {
-    resize::resize(src, width, height, Interp::Bilinear)
-}
-
-pub(crate) fn resize_area(src: ImageRef<'_>, width: i32, height: i32) -> OpResult<Image> {
-    resize::resize(src, width, height, Interp::Area)
-}
-
-pub(crate) fn resize_bicubic(src: ImageRef<'_>, width: i32, height: i32) -> OpResult<Image> {
-    resize::resize(src, width, height, Interp::Bicubic)
-}
 
 const PARALLEL_MIN_PIXELS: usize = 65_536;
 const PIXELS_PER_CHUNK: usize = 65_536;

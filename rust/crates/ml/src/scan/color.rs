@@ -3,7 +3,7 @@ use super::detection::resize_for_max_pixels;
 use super::geometry::{Quad, norm};
 use super::mask::Mask;
 use crate::cv;
-use crate::cv::image::{ImageF32, ImageRef, ImageU8};
+use crate::cv::image::{ImageF32, ImageU8};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ColorMode {
@@ -96,8 +96,7 @@ fn document_mask(
     work_size: (i32, i32),
 ) -> OpResult<ImageU8> {
     let mask_image = mask.binary_image()?;
-    let resized_mask =
-        cv::resize_area(ImageRef::U8(&mask_image), work_size.0, work_size.1)?.into_u8()?;
+    let resized_mask = cv::resize_u8(&mask_image, work_size.0, work_size.1, cv::Interp::Area)?;
 
     let resized_quad = quad.scaled_to(
         orig_size.0 as f64,

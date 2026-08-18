@@ -8,7 +8,7 @@ use ort::value::TensorRef;
 use super::OpResult;
 use super::scanner::ScanError;
 use crate::cv;
-use crate::cv::image::{ImageRef, ImageU8};
+use crate::cv::image::ImageU8;
 
 pub const MASK_SIDE: i32 = 256;
 
@@ -49,7 +49,7 @@ impl Segmenter {
         // Resize first: the channel swap is per-pixel, so doing it after the
         // downscale costs 256x256 instead of a full-resolution pass, and it
         // folds into the tensor fill below.
-        let resized = cv::resize_bilinear(ImageRef::U8(bgr), MASK_SIDE, MASK_SIDE)?.into_u8()?;
+        let resized = cv::resize_u8(bgr, MASK_SIDE, MASK_SIDE, cv::Interp::Bilinear)?;
 
         let mut input = vec![0.0f32; resized.data.len()];
         for (out, px) in input.chunks_exact_mut(3).zip(resized.data.chunks_exact(3)) {

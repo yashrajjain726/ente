@@ -7,7 +7,7 @@ use super::perspective::estimate_real_dimensions;
 use super::postprocess::enhance_captured_image;
 use super::quad_score::score_quad_against_probmap;
 use crate::cv;
-use crate::cv::image::{Contour, ImageRef, ImageU8};
+use crate::cv::image::{Contour, ImageU8};
 
 const THRESHOLDS: [f64; 7] = [0.5, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95];
 const LIVE_THRESHOLDS: [f64; 1] = [0.9];
@@ -160,7 +160,7 @@ pub(crate) fn resize_for_max_pixels(img: &ImageU8, max_pixels: f64) -> OpResult<
     }
     let scale = (max_pixels / orig_pixels as f64).sqrt();
     let (width, height) = size_trunc(img.width as f64 * scale, img.height as f64 * scale);
-    cv::resize_area(ImageRef::U8(img), width, height)?.into_u8()
+    cv::resize_u8(img, width, height, cv::Interp::Area)
 }
 
 pub(crate) fn extract_document(

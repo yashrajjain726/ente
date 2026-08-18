@@ -2,7 +2,7 @@ use super::OpResult;
 use super::color::ColorMode;
 use super::detection::size_trunc;
 use crate::cv;
-use crate::cv::image::{ImageF32, ImageRef, ImageU8};
+use crate::cv::image::{ImageF32, ImageU8};
 
 pub(crate) fn enhance_captured_image(img: &ImageU8, color_mode: ColorMode) -> OpResult<ImageU8> {
     match color_mode {
@@ -32,7 +32,7 @@ fn remove_shadows(channel: &ImageU8) -> OpResult<ImageU8> {
     } else {
         (width, height)
     };
-    let small = cv::resize_area(ImageRef::U8(channel), map_w, map_h)?.into_u8()?;
+    let small = cv::resize_u8(channel, map_w, map_h, cv::Interp::Area)?;
 
     let k = ((map_w.max(map_h) as f64 * SHADOW_KERNEL_FRAC) as i32).max(3) | 1;
     let kernel = cv::ellipse_kernel(k)?;
@@ -45,7 +45,7 @@ fn remove_shadows(channel: &ImageU8) -> OpResult<ImageU8> {
     if paper < 1.0 {
         return Ok(channel.clone());
     }
-    let map = cv::resize_bilinear(ImageRef::F32(&map_small), width, height)?.into_f32()?;
+    let map = cv::resize_f32(&map_small, width, height, cv::Interp::Bilinear)?;
 
     let knee = paper / SHADOW_MAX_GAIN;
     let mut out = ImageU8::zeros(width, height, 1)?;
@@ -84,7 +84,7 @@ fn multi_scale_retinex_on_l(bgr: &ImageU8) -> OpResult<ImageU8> {
     let small_h = l_float.height as f64 / scale_factor;
     let (small_cols, small_rows) = size_trunc(small_w, small_h);
 
-    let l_small = cv::resize_area(ImageRef::F32(&l_float), small_cols, small_rows)?.into_f32()?;
+    let l_small = cv::resize_f32(&l_float, small_cols, small_rows, cv::Interp::Area)?;
     let log_l_small = l_small.map(f32::ln);
 
     let max_dim_small = small_w.max(small_h);
@@ -111,9 +111,12 @@ fn multi_scale_retinex_on_l(bgr: &ImageU8) -> OpResult<ImageU8> {
     let inv_range = if range > 1e-6 { 1.0 / range } else { 1.0 };
     retinex_small.map_mut(|v| ((v - min_val as f32) as f64 * inv_range) as f32);
 
-    let retinex_norm =
-        cv::resize_bicubic(ImageRef::F32(&retinex_small), l_float.width, l_float.height)?
-            .into_f32()?;
+    let retinex_norm = cv::resize_f32(
+        &retinex_small,
+        l_float.width,
+        l_float.height,
+        cv::Interp::Bicubic,
+    )?;
 
     let mean_l = cv::mean_f32(&l_original_float)?;
     let amplitude = 60.0;
