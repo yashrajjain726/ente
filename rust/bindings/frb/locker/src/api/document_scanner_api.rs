@@ -90,12 +90,7 @@ pub struct ScannerSession {
 impl ScannerSession {
     pub async fn create(assets_dir: String) -> Result<ScannerSession, RustScanError> {
         let store = AssetStore::new(assets_dir);
-        let model_path = scan::ensure_segmentation_model(&store)
-            .await
-            .map_err(|error| RustScanError {
-                kind: RustScanErrorKind::ModelLoad,
-                message: error.to_string(),
-            })?;
+        let model_path = scan::ensure_segmentation_model(&store).await?;
         catch_panic(|| {
             let inner = scan::ScannerSession::new(&model_path.to_string_lossy())?;
             Ok(ScannerSession { inner })
@@ -111,7 +106,7 @@ impl ScannerSession {
         height: u32,
         rotation_degrees: i32,
     ) -> Result<Option<RustQuad>, RustScanError> {
-        catch_panic(AssertUnwindSafe(|| {
+        catch_panic(|| {
             let row_stride = u32::try_from(row_stride).map_err(|_| RustScanError {
                 kind: RustScanErrorKind::InvalidInput,
                 message: format!("negative row stride {row_stride}"),
@@ -120,7 +115,7 @@ impl ScannerSession {
                 self.inner
                     .live_detect_bgra(&bgra, row_stride, width, height, rotation_degrees)?;
             Ok(quad.map(to_api_quad))
-        }))
+        })
     }
 
     /// Quad semantics as in [`Self::live_detect_bgra`].
@@ -132,7 +127,7 @@ impl ScannerSession {
         layout: RustPlaneLayout,
         rotation_degrees: i32,
     ) -> Result<Option<RustQuad>, RustScanError> {
-        catch_panic(AssertUnwindSafe(|| {
+        catch_panic(|| {
             let quad = self.inner.live_detect_yuv420(
                 &y,
                 &u,
@@ -141,7 +136,7 @@ impl ScannerSession {
                 rotation_degrees,
             )?;
             Ok(quad.map(to_api_quad))
-        }))
+        })
     }
 
     pub fn process_capture(
@@ -149,12 +144,12 @@ impl ScannerSession {
         image_bytes: Vec<u8>,
         options: RustScanOptions,
     ) -> Result<RustScanResult, RustScanError> {
-        catch_panic(AssertUnwindSafe(|| {
+        catch_panic(|| {
             let result = self
                 .inner
                 .process_capture(&image_bytes, &to_scan_options(&options))?;
             Ok(to_api_scan_result(result))
-        }))
+        })
     }
 
     pub fn reprocess(
@@ -162,12 +157,12 @@ impl ScannerSession {
         source_bytes: Vec<u8>,
         options: RustReprocessOptions,
     ) -> Result<RustScanResult, RustScanError> {
-        catch_panic(AssertUnwindSafe(|| {
+        catch_panic(|| {
             let result = self
                 .inner
                 .reprocess(&source_bytes, &to_reprocess_options(&options))?;
             Ok(to_api_scan_result(result))
-        }))
+        })
     }
 }
 

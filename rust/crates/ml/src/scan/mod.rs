@@ -29,7 +29,7 @@ pub const SEGMENTATION_MODEL_SHA256: &str =
 const SEGMENTATION_MODEL_URL: &str = "https://entedevassets.priem.dev/document_segmentation.onnx";
 const SEGMENTATION_MODEL_FILE: &str = "document_segmentation.onnx";
 
-fn segmentation_model_asset() -> Asset {
+fn segmentation_model_asset() -> Result<Asset, ScanError> {
     Asset::file(
         vec!["models".to_string(), "document_segmentation".to_string()],
         AssetFile {
@@ -38,13 +38,11 @@ fn segmentation_model_asset() -> Asset {
             sha256: SEGMENTATION_MODEL_SHA256.to_string(),
         },
     )
-    .expect("valid segmentation model asset")
+    .map_err(|error| ScanError::ModelLoad(error.to_string()))
 }
 
-pub async fn ensure_segmentation_model(
-    store: &AssetStore,
-) -> Result<PathBuf, ente_assets::download::Error> {
-    let asset = segmentation_model_asset();
+pub async fn ensure_segmentation_model(store: &AssetStore) -> Result<PathBuf, ScanError> {
+    let asset = segmentation_model_asset()?;
     if store.is_downloaded(&asset) {
         log::info!("segmentation model: using cached copy");
     } else {
@@ -56,15 +54,16 @@ pub async fn ensure_segmentation_model(
                 |_| {},
                 CancellationToken::default(),
             )
-            .await?;
+            .await
+            .map_err(|error| ScanError::ModelLoad(error.to_string()))?;
         log::info!(
             "segmentation model: downloaded in {}ms",
             start.elapsed().as_millis()
         );
     }
-    Ok(store
+    store
         .file_path(&asset, SEGMENTATION_MODEL_FILE)
-        .expect("segmentation model file"))
+        .ok_or_else(|| ScanError::ModelLoad(format!("asset declares no {SEGMENTATION_MODEL_FILE}")))
 }
 
 pub(crate) use crate::cv::OpResult;
