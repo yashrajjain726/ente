@@ -86,6 +86,5 @@ class AutoCaptureController {
     _lastFrameAt = null;
   }
 
-  static double _areaFraction(ScanQuad quad) =>
-      quadArea(quad.corners) / (ScanQuad.maskSide * ScanQuad.maskSide);
+  static double _areaFraction(ScanQuad quad) => quadArea(quad.corners);
 }

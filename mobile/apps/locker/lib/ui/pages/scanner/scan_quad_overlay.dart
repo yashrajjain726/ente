@@ -8,7 +8,7 @@ class ScanQuadOverlay extends StatefulWidget {
 
   static const double _smoothing = 0.15;
 
-  static const double _settled = 0.05;
+  static const double _settled = 0.05 / 256;
 
   final ScanQuad? quad;
   final Color color;
@@ -74,10 +74,7 @@ class _QuadPainter extends CustomPainter {
     if (source == null || size.isEmpty) return;
     final points = [
       for (final c in source.corners)
-        Offset(
-          c.dx / ScanQuad.maskSide * size.width,
-          c.dy / ScanQuad.maskSide * size.height,
-        ),
+        Offset(c.dx * size.width, c.dy * size.height),
     ];
     final path = Path()..addPolygon(points, true);
     canvas.drawPath(

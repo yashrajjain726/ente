@@ -49,10 +49,7 @@ class _ScannerCropPageState extends State<ScannerCropPage> {
     setState(() {
       _sourceBytes = bytes;
       _aspect = page.sourceWidth / page.sourceHeight;
-      _corners = [
-        for (final c in page.quad.corners)
-          Offset(c.dx / ScanQuad.maskSide, c.dy / ScanQuad.maskSide),
-      ];
+      _corners = [...page.quad.corners];
     });
   }
 
@@ -63,16 +60,11 @@ class _ScannerCropPageState extends State<ScannerCropPage> {
     return null;
   }
 
-  ScanQuad get _orderedQuad => orderClockwise([
-    for (final c in _corners)
-      Offset(c.dx * ScanQuad.maskSide, c.dy * ScanQuad.maskSide),
-  ]);
+  ScanQuad get _orderedQuad => orderClockwise(_corners);
 
   bool get _canSave =>
       _corners.length == 4 &&
-      quadArea(_orderedQuad.corners) /
-              (ScanQuad.maskSide * ScanQuad.maskSide) >=
-          _minAreaFraction;
+      quadArea(_orderedQuad.corners) >= _minAreaFraction;
 
   Future<void> _save() async {
     final navigator = Navigator.of(context);

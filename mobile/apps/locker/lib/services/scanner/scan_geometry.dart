@@ -53,7 +53,7 @@ Rect fittedRect(Size container, double aspect) {
 }
 
 class QuadStabilizer {
-  static const double maxCornerDrift = 20.0;
+  static const double maxCornerDrift = 20.0 / 256;
   static const int requiredStableFrames = 3;
 
   int _stableCount = 0;
