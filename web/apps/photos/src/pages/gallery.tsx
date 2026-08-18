@@ -111,6 +111,7 @@ import {
     addToFavoritesCollection,
     canAddFilesToCollection,
     createAlbum,
+    createHiddenAlbum,
     createPublicURL,
     createQuickLinkCollection,
     removeFromCollection,
@@ -257,6 +258,9 @@ const Page: React.FC = () => {
     const [, setPostCreateAlbumOp] = useState<CollectionOp | undefined>(
         undefined,
     );
+    // Albums created for an "add" that originated in the hidden section must
+    // themselves be hidden, otherwise the added files would become visible.
+    const postCreateAlbumHidden = useRef(false);
     const [pendingSidebarAction, setPendingSidebarAction] = useState<
         SidebarActionID | undefined
     >(undefined);
@@ -981,15 +985,19 @@ const Page: React.FC = () => {
     const createOnCreateForCollectionOp = useCallback(
         (op: CollectionOp) => {
             setPostCreateAlbumOp(op);
+            postCreateAlbumHidden.current =
+                op == "add" && barMode == "hidden-albums";
             return showAlbumNameInput;
         },
-        [showAlbumNameInput],
+        [showAlbumNameInput, barMode],
     );
 
     const handleAlbumNameSubmit = useCallback(
         async (name: string) => {
             try {
-                const collection = await createAlbum(name);
+                const collection = postCreateAlbumHidden.current
+                    ? await createHiddenAlbum(name)
+                    : await createAlbum(name);
 
                 if (pendingSingleFileAdd.current) {
                     await performCollectionOp(
@@ -1022,6 +1030,7 @@ const Page: React.FC = () => {
                 });
             } finally {
                 pendingSingleFileAdd.current = undefined;
+                postCreateAlbumHidden.current = false;
             }
         },
         [createOnSelectForCollectionOp, remotePull],
@@ -1598,6 +1607,7 @@ const Page: React.FC = () => {
                     handleOpenCollectionSelector({
                         action: "add",
                         sourceCollectionSummaryID: activeCollectionSummary?.id,
+                        showHiddenCollections: barMode == "hidden-albums",
                         onCreateCollection:
                             createOnCreateForCollectionOp("add"),
                         onSelectCollection:
@@ -1701,6 +1711,7 @@ const Page: React.FC = () => {
             showEditLocation,
             activeCollectionSummary,
             activeCollection,
+            barMode,
             selectedCount,
             selectedOwnCount,
         ],
@@ -1749,6 +1760,7 @@ const Page: React.FC = () => {
 
             const handleCreate = () => {
                 setPostCreateAlbumOp("add");
+                postCreateAlbumHidden.current = false;
                 showAlbumNameInput();
             };
 
