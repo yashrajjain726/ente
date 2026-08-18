@@ -9,7 +9,6 @@ import "package:ente_photos_platform/ente_photos_platform.dart"
 import "package:ente_pure_utils/ente_pure_utils.dart";
 import "package:ente_strings/extensions.dart";
 import 'package:flutter/material.dart';
-import "package:hugeicons/hugeicons.dart";
 import "package:photo_manager/photo_manager.dart";
 import "package:photos/core/constants.dart";
 import "package:photos/core/event_bus.dart";
@@ -165,7 +164,7 @@ class _TrashPageState extends State<_TrashPage> {
                 padding: const EdgeInsets.only(bottom: 4),
                 child: FABComponent(
                   label: l10n.deleteAll,
-                  icon: const HugeIcon(icon: HugeIcons.strokeRoundedDelete02),
+                  variant: FABComponentVariant.destructive,
                   onTap: () =>
                       showConfirmDeleteAllTrashSheet(context, _isOnEnteTrash),
                 ),
