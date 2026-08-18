@@ -258,8 +258,6 @@ const Page: React.FC = () => {
     const [, setPostCreateAlbumOp] = useState<CollectionOp | undefined>(
         undefined,
     );
-    // Albums created for an "add" that originated in the hidden section must
-    // themselves be hidden, otherwise the added files would become visible.
     const postCreateAlbumHidden = useRef(false);
     const [pendingSidebarAction, setPendingSidebarAction] = useState<
         SidebarActionID | undefined
