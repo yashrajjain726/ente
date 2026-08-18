@@ -21,7 +21,7 @@ pub(crate) fn detect_document_quad(
     original_size: ImageSize,
     is_live_analysis: bool,
 ) -> OpResult<Option<Quad>> {
-    let mask_image = mask.to_image()?;
+    let prob_image = mask.prob_image()?;
     let thresholds: &[f64] = if is_live_analysis {
         &LIVE_THRESHOLDS
     } else {
@@ -29,11 +29,11 @@ pub(crate) fn detect_document_quad(
     };
 
     let mut vertices =
-        find_quad_from_orientation_with_adaptive_threshold(&mask_image, original_size, thresholds)?;
+        find_quad_from_orientation_with_adaptive_threshold(&prob_image, original_size, thresholds)?;
 
     if vertices.is_none() && !is_live_analysis {
         // Fallback: min-area rectangle of the biggest contour.
-        if let Some(biggest) = biggest_contour(&mask_image)? {
+        if let Some(biggest) = biggest_contour(&mask.binary_image()?)? {
             vertices = min_area_rect(&biggest.points, mask.width, mask.height);
         }
     }
@@ -45,14 +45,14 @@ pub(crate) fn detect_document_quad(
 }
 
 fn find_quad_from_orientation_with_adaptive_threshold(
-    mask_image: &ImageU8,
+    prob_image: &ImageU8,
     original_size: ImageSize,
     thresholds: &[f64],
 ) -> OpResult<Option<Vec<Point>>> {
-    let probmap_smooth = cv::gaussian_blur_u8(mask_image, 3)?;
+    let probmap_smooth = cv::gaussian_blur_u8(prob_image, 3)?;
 
     let kernel = cv::ellipse_kernel(5)?;
-    let prob_float = cv::u8_to_f32(mask_image)?;
+    let prob_float = cv::u8_to_f32(prob_image)?;
     let mut best_quad: Option<Vec<Point>> = None;
     let mut best_score = 0.0f64;
 

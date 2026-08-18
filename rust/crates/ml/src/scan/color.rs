@@ -83,7 +83,7 @@ fn document_mask(
     orig_size: (i32, i32),
     work_size: (i32, i32),
 ) -> OpResult<ImageU8> {
-    let mask_image = mask.to_image()?;
+    let mask_image = mask.binary_image()?;
     let resized_mask =
         cv::resize_area(ImageRef::U8(&mask_image), work_size.0, work_size.1)?.into_u8()?;
 

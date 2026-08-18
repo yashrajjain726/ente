@@ -87,7 +87,7 @@ impl ScannerSession {
             .segmenter
             .probability_map_u8(bgr)
             .map_err(ScanError::Pipeline)?;
-        Ok(Mask::from_probmap(&probmap, MASK_SIDE, MASK_SIDE))
+        Ok(Mask::from_probmap(probmap, MASK_SIDE, MASK_SIDE))
     }
 
     pub fn live_detect_rgba(
