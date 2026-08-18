@@ -3395,11 +3395,9 @@
   },
   "restoredItems": "{count, plural, one{Restored item} other{Restored {count} items}}",
   "@restoredItems": {
-    "description": "Success message after restoring items",
     "placeholders": {
       "count": {
-        "type": "int",
-        "example": "3"
+        "type": "int"
       }
     }
   },
