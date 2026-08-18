@@ -1,9 +1,6 @@
 use rayon::prelude::*;
 
-use super::{OpResult, saturate_u8_f32};
-
-/// Elementwise work below this many samples is not worth splitting across threads.
-const PARALLEL_MIN_ELEMS: usize = 200_000;
+use super::{OpResult, PARALLEL_MIN_ELEMS, saturate_u8_f32};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct ImageU8 {

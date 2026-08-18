@@ -37,7 +37,9 @@ pub(crate) use structuring::ellipse_kernel;
 pub(crate) use transform::rotate_u8;
 pub(crate) use warp::warp_perspective;
 
-const PARALLEL_MIN_PIXELS: usize = 65_536;
+/// One answer for every elementwise op: below this many samples, threading
+/// costs more than it saves.
+pub(crate) const PARALLEL_MIN_ELEMS: usize = 200_000;
 const PIXELS_PER_CHUNK: usize = 65_536;
 
 pub(crate) fn pointwise<T: Sync, U: Send>(
@@ -47,7 +49,7 @@ pub(crate) fn pointwise<T: Sync, U: Send>(
     src_stride: usize,
     f: impl Fn(&mut [U], &[T]) + Send + Sync,
 ) {
-    if out.len() / out_stride.max(1) < PARALLEL_MIN_PIXELS {
+    if out.len() < PARALLEL_MIN_ELEMS {
         f(out, src);
         return;
     }
@@ -65,7 +67,7 @@ pub(crate) fn pointwise3<T: Sync, V: Sync, U: Send>(
     b_stride: usize,
     f: impl Fn(&mut [U], &[T], &[V]) + Send + Sync,
 ) {
-    if out.len() / out_stride.max(1) < PARALLEL_MIN_PIXELS {
+    if out.len() < PARALLEL_MIN_ELEMS {
         f(out, a, b);
         return;
     }
