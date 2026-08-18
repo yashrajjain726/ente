@@ -17,13 +17,15 @@ import (
 func TestValidatePQPublicKey(t *testing.T) {
 	valid := base64.StdEncoding.EncodeToString(make([]byte, pqPublicKeyBytes))
 	invalidBase64 := strings.Repeat("!", len(valid))
+	nonCanonicalBase64 := valid[:len(valid)-3] + "B=="
 	wrongLength := base64.StdEncoding.EncodeToString(make([]byte, pqPublicKeyBytes-1))
 
 	for name, key := range map[string]*string{
-		"omitted":        nil,
-		"valid":          &valid,
-		"invalid base64": &invalidBase64,
-		"wrong length":   &wrongLength,
+		"omitted":              nil,
+		"valid":                &valid,
+		"invalid base64":       &invalidBase64,
+		"non-canonical base64": &nonCanonicalBase64,
+		"wrong length":         &wrongLength,
 	} {
 		t.Run(name, func(t *testing.T) {
 			err := validatePQPublicKey(key)
@@ -35,6 +37,16 @@ func TestValidatePQPublicKey(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestInsertCastDataRejectsOversizedPayload(t *testing.T) {
+	controller := &Controller{}
+
+	_, err := controller.InsertCastData(&gin.Context{}, &entity.CastRequest{
+		EncPayload: strings.Repeat("a", maxEncryptedPayloadBytes+1),
+	})
+
+	require.ErrorIs(t, err, ente.ErrBadRequest)
 }
 
 func TestRegisterDeviceRejectsOversizedUserAgent(t *testing.T) {

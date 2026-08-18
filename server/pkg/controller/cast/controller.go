@@ -24,6 +24,7 @@ type Controller struct {
 
 const (
 	maxRegisterDeviceUserAgentBytes = 1000
+	maxEncryptedPayloadBytes        = 2 * 1024
 	pqPublicKeyBytes                = 1216
 )
 
@@ -64,7 +65,7 @@ func validatePQPublicKey(publicKey *string) error {
 	if len(*publicKey) != base64.StdEncoding.EncodedLen(pqPublicKeyBytes) {
 		return stacktrace.Propagate(ente.ErrBadRequest, "invalid pqPublicKey length")
 	}
-	decoded, err := base64.StdEncoding.DecodeString(*publicKey)
+	decoded, err := base64.StdEncoding.Strict().DecodeString(*publicKey)
 	if err != nil || len(decoded) != pqPublicKeyBytes {
 		return stacktrace.Propagate(ente.ErrBadRequest, "invalid pqPublicKey")
 	}
@@ -99,6 +100,9 @@ func (c *Controller) GetEncCastData(ctx context.Context, deviceCode string) (*st
 }
 
 func (c *Controller) InsertCastData(ctx *gin.Context, request *cast.CastRequest) (uuid.UUID, error) {
+	if len(request.EncPayload) > maxEncryptedPayloadBytes {
+		return uuid.Nil, stacktrace.Propagate(ente.ErrBadRequest, "encrypted payload too large")
+	}
 	userID := auth.GetUserID(ctx.Request.Header)
 	devices, err := c.CastRepo.GetAllDevices(ctx, userID)
 	if err != nil {
