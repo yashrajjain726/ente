@@ -16,6 +16,16 @@ double maxCornerDistance(ScanQuad a, ScanQuad b) {
   return worst;
 }
 
+double quadArea(List<Offset> corners) {
+  var doubled = 0.0;
+  for (var i = 0; i < corners.length; i++) {
+    final a = corners[i];
+    final b = corners[(i + 1) % corners.length];
+    doubled += a.dx * b.dy - b.dx * a.dy;
+  }
+  return doubled.abs() / 2;
+}
+
 ScanQuad orderClockwise(List<Offset> corners) {
   assert(corners.length == 4);
   final cx = corners.map((c) => c.dx).reduce((a, b) => a + b) / 4;

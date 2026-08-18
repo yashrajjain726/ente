@@ -183,8 +183,8 @@ fn enhance_grayscale_image(img: &ImageU8) -> OpResult<ImageU8> {
     let mut retinex = ImageF32::zeros(gray.width, gray.height, 1)?;
 
     for kernel_size in kernel_sizes {
-        let (kw, kh) = size_trunc(kernel_size, kernel_size);
-        let blur_raw = cv::box_filter_f32(&img_float, kw, kh)?;
+        let k = (kernel_size as i32).max(3) | 1;
+        let blur_raw = cv::box_filter_f32(&img_float, k, k)?;
         let blur = cv::add_f32_scalar(&blur_raw, 1.0)?;
         let log_blur = cv::log_f32(&blur)?;
         let diff = cv::subtract_f32(&log_img, &log_blur)?;
