@@ -46,9 +46,6 @@ impl Segmenter {
                 bgr.channels
             ));
         }
-        // Resize first: the channel swap is per-pixel, so doing it after the
-        // downscale costs 256x256 instead of a full-resolution pass, and it
-        // folds into the tensor fill below.
         let resized = cv::resize_u8(bgr, MASK_SIDE, MASK_SIDE, cv::Interp::Bilinear)?;
 
         let mut input = vec![0.0f32; resized.data.len()];

@@ -127,8 +127,6 @@ pub(crate) fn yuv420_to_bgr(
     ImageU8::new(width, height, 3, out)
 }
 
-/// Camera frames arrive strided; convert straight to BGR so the live path
-/// materialises one full-resolution buffer instead of three.
 pub(crate) fn bgra_to_bgr(
     bgra: &[u8],
     row_stride: i32,

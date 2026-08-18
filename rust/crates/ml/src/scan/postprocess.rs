@@ -11,8 +11,6 @@ pub(crate) fn enhance_captured_image(img: &ImageU8, color_mode: ColorMode) -> Op
     }
 }
 
-/// The min-then-max scalar pair the enhancement chains used to end with,
-/// including its NaN behaviour (NaN clamps to 255, not to 0).
 fn clamp_255(v: f32) -> f32 {
     let v = if v < 255.0 { v } else { 255.0 };
     if v > 0.0 { v } else { 0.0 }
@@ -209,8 +207,6 @@ fn enhance_grayscale_image(img: &ImageU8) -> OpResult<ImageU8> {
         }
     }
 
-    // A mode pinned at white means the retinex pass blew out the page; fall
-    // back to a plain percentile stretch of the original grey.
     let stretched8u = if mode_val >= 254 {
         let g_low = cv::percentile_f32(&gray_f, 0.01)? as f64;
         let g_high = cv::percentile_f32(&gray_f, 0.99)? as f64;

@@ -2,9 +2,6 @@ use super::OpResult;
 use crate::cv;
 use crate::cv::image::ImageU8;
 
-/// The segmentation probabilities, kept at full precision: the detection
-/// threshold sweep and the quad scoring both need the model's confidence, not
-/// just its argmax.
 pub(crate) struct Mask {
     pub width: i32,
     pub height: i32,

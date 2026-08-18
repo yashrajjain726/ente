@@ -58,7 +58,6 @@ pub(crate) fn auto_color_mode(img: &ImageU8, mask: &Mask, quad: &Quad) -> OpResu
     })
 }
 
-/// Distance from the neutral axis in Lab's biased 0..255 encoding.
 fn chroma(a: &ImageU8, b: &ImageU8) -> OpResult<ImageF32> {
     let data = a
         .data

@@ -25,8 +25,6 @@ class ScannerCropPage extends StatefulWidget {
 class _ScannerCropPageState extends State<ScannerCropPage> {
   static const double _handleRadius = 22;
 
-  /// A crop smaller than this cannot be a document, and the pipeline cannot
-  /// produce a usable page from it.
   static const double _minAreaFraction = 0.01;
 
   Uint8List? _sourceBytes;

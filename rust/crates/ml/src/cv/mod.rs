@@ -37,8 +37,6 @@ pub(crate) use structuring::ellipse_kernel;
 pub(crate) use transform::rotate_u8;
 pub(crate) use warp::warp_perspective;
 
-/// One answer for every elementwise op: below this many samples, threading
-/// costs more than it saves.
 pub(crate) const PARALLEL_MIN_ELEMS: usize = 200_000;
 const PIXELS_PER_CHUNK: usize = 65_536;
 

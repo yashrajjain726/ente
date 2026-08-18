@@ -8,9 +8,6 @@ class ScanQuadOverlay extends StatefulWidget {
 
   static const double _smoothing = 0.15;
 
-  /// The lerp only approaches its target, so without a floor the ticker
-  /// repaints forever. A twentieth of a mask pixel is far below one screen
-  /// pixel.
   static const double _settled = 0.05;
 
   final ScanQuad? quad;

@@ -77,7 +77,6 @@ impl ImageU8 {
     }
 }
 
-/// Elementwise map, parallel once the buffer is large enough to pay for it.
 fn map_vec<T: Copy + Sync, U: Send>(src: &[T], f: impl Fn(T) -> U + Send + Sync) -> Vec<U> {
     if src.len() >= PARALLEL_MIN_ELEMS {
         src.par_iter().map(|&v| f(v)).collect()
@@ -166,7 +165,6 @@ impl ImageF32 {
         }
     }
 
-    /// Fused map-and-quantise: skips the intermediate float image.
     pub(crate) fn map_to_u8(&self, f: impl Fn(f32) -> f32 + Send + Sync) -> ImageU8 {
         ImageU8 {
             width: self.width,
