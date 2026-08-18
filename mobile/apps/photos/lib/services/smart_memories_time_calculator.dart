@@ -7,6 +7,7 @@ class TimeMemoriesCalculator {
     Iterable<EnteFile> allFiles,
     DateTime currentTime, {
     Iterable<EnteFile>? recentSourceFiles,
+    int? totalAvailableFileCount,
     required bool isLocalGalleryMode,
     required bool mlEnabled,
     required Map<int, int> seenTimes,
@@ -20,8 +21,8 @@ class TimeMemoriesCalculator {
     final availableFiles = allFiles is List<EnteFile>
         ? allFiles
         : allFiles.toList();
-    if (availableFiles.isEmpty) return [];
     final recentCandidates = recentSourceFiles ?? availableFiles;
+    if (availableFiles.isEmpty && recentCandidates.isEmpty) return [];
 
     final startOfCurrentWeek = _startOfWeek(currentTime);
     final startOfPreviousWeek = startOfCurrentWeek.subtract(
@@ -73,7 +74,8 @@ class TimeMemoriesCalculator {
     final currentMonth = currentTime.month;
     final currentYear = currentTime.year;
     final cutOffTime = currentTime.subtract(const Duration(days: 365));
-    final averageDailyPhotos = availableFiles.length / 365;
+    final averageDailyPhotos =
+        (totalAvailableFileCount ?? availableFiles.length) / 365;
     final significantDayThreshold = averageDailyPhotos * 0.25;
     final significantWeekThreshold = averageDailyPhotos * 0.40;
 
@@ -342,6 +344,47 @@ class TimeMemoriesCalculator {
       }
     }
     return showDates;
+  }
+
+  static List<EnteFile> _filesForHistoricalWindow(
+    MemoryFileIndex fileIndex,
+    DateTime currentTime,
+  ) {
+    return fileIndex.filesForCalendar(
+      monthDays: _historicalDayCandidates(currentTime),
+    );
+  }
+
+  static List<EnteFile> _filesForTimeMemories(
+    MemoryFileIndex fileIndex,
+    DateTime currentTime,
+  ) {
+    return fileIndex.filesForCalendar(
+      monthDays: _timeMemoryShowDates(currentTime).keys.toSet(),
+      month: currentTime.month,
+      week: getWeekNumber(currentTime),
+    );
+  }
+
+  static List<EnteFile> _filesForRecentTimeMemories(
+    MemoryFileIndex fileIndex,
+    DateTime currentTime,
+  ) {
+    final startOfCurrentWeek = _startOfWeek(currentTime);
+    final startOfCurrentMonth = _startOfMonth(currentTime);
+    return fileIndex.filesInDateRanges([
+      (
+        start: startOfCurrentWeek.subtract(const Duration(days: 7)),
+        end: startOfCurrentWeek,
+      ),
+      (
+        start: DateTime(
+          startOfCurrentMonth.year,
+          startOfCurrentMonth.month - 1,
+        ),
+        end: startOfCurrentMonth,
+      ),
+    ]);
   }
 
   static Set<int> _historicalDayCandidates(DateTime currentTime) {

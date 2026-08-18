@@ -45,6 +45,7 @@ import "package:photos/services/memories/photo_selector.dart";
 import "package:photos/services/search_service.dart";
 
 part "smart_memories_clip_calculator.dart";
+part "memories/memory_file_index.dart";
 part "smart_memories_people_calculator.dart";
 part "smart_memories_time_calculator.dart";
 part "smart_memories_trip_calculator_v2.dart";
@@ -68,6 +69,7 @@ typedef _PreparedMemoriesData = ({
   List<PersonEntity> persons,
   Map<String, String> faceIDsToPersonID,
   Map<int, EmbeddingVector> fileIDToImageEmbedding,
+  MemoryFileIndex fileIndex,
   TripMemoriesAnalysis tripAnalysis,
 });
 
@@ -851,8 +853,11 @@ class SmartMemoriesService {
     for (final embedding in computationContext.allImageEmbeddings) {
       fileIDToImageEmbedding[embedding.fileID] = embedding;
     }
-    final tripAnalysis = TripMemoriesCalculatorV2.analyze(
+    final fileIndex = MemoryFileIndex(
       computationContext.allFileIdsToFile.values,
+    );
+    final tripAnalysis = TripMemoriesCalculatorV2.analyze(
+      fileIndex.files,
       computationContext.allFileIdsToFile,
       isLocalGalleryMode: computationContext.isLocalGalleryMode,
       seenTimes: computationContext.seenTimes,
@@ -862,6 +867,7 @@ class SmartMemoriesService {
       persons: persons,
       faceIDsToPersonID: faceIDsToPersonID,
       fileIDToImageEmbedding: fileIDToImageEmbedding,
+      fileIndex: fileIndex,
       tripAnalysis: tripAnalysis,
     );
   }
@@ -932,12 +938,13 @@ class SmartMemoriesService {
       // Some memory types need every file, so track used files by ID instead of
       // removing them from the source map.
       final fullSourceFiles = allFileIdsToFile.values;
+      final fileIndex = preparedData.fileIndex;
       final usedMemoryFileIds = <int>{};
 
       final List<SmartMemory> memories = [];
 
       final onThisDayMemories = await _getOnThisDayResults(
-        fullSourceFiles,
+        TimeMemoriesCalculator._filesForHistoricalWindow(fileIndex, now),
         now,
         seenTimes: seenTimes,
         collectionIDsToExclude: collectionIDsToExclude,
@@ -1038,14 +1045,22 @@ class SmartMemoriesService {
         dev.log('ML disabled, skipping clip memories $t');
       }
 
-      final timeFiles = _collectAvailableFiles(
-        allFileIdsToFile,
+      final timeFiles = _collectAvailableCandidates(
+        TimeMemoriesCalculator._filesForTimeMemories(fileIndex, now),
         usedMemoryFileIds,
+        isLocalGalleryMode: isLocalGalleryMode,
       );
       final timeMemories = await _onThisDayOrWeekResults(
         timeFiles,
         now,
-        recentSourceFiles: fullSourceFiles,
+        recentSourceFiles: TimeMemoriesCalculator._filesForRecentTimeMemories(
+          fileIndex,
+          now,
+        ),
+        totalAvailableFileCount: _remainingFilesCount(
+          allFileIdsToFile,
+          usedMemoryFileIds,
+        ),
         isLocalGalleryMode: isLocalGalleryMode,
         mlEnabled: mlEnabled,
         seenTimes: seenTimes,
@@ -1065,9 +1080,10 @@ class SmartMemoriesService {
         "${_remainingFilesCount(allFileIdsToFile, usedMemoryFileIds)} $t",
       );
 
-      final fillerFiles = _collectAvailableFiles(
-        allFileIdsToFile,
+      final fillerFiles = _collectAvailableCandidates(
+        TimeMemoriesCalculator._filesForHistoricalWindow(fileIndex, now),
         usedMemoryFileIds,
+        isLocalGalleryMode: isLocalGalleryMode,
       );
       final fillerMemories = await _getFillerResults(
         fillerFiles,
@@ -1098,6 +1114,7 @@ class SmartMemoriesService {
       useLocalIntIds: isLocalGalleryMode,
       requireLocalId: isLocalGalleryMode,
     );
+    final fileIndex = MemoryFileIndex(allFileIdsToFile.values);
     final usedMemoryFileIds = <int>{};
     final seenTimes = await _memoriesDB.getSeenTimes();
     final collectionIDsToExclude = await getCollectionIDsToExclude();
@@ -1113,7 +1130,7 @@ class SmartMemoriesService {
     final List<SmartMemory> memories = [];
 
     final onThisDayMemories = await _getOnThisDayResults(
-      allFileIdsToFile.values,
+      TimeMemoriesCalculator._filesForHistoricalWindow(fileIndex, now),
       now,
       seenTimes: seenTimes,
       collectionIDsToExclude: collectionIDsToExclude,
@@ -1127,9 +1144,10 @@ class SmartMemoriesService {
       ], isLocalGalleryMode: isLocalGalleryMode);
     }
 
-    final fillerFiles = _collectAvailableFiles(
-      allFileIdsToFile,
+    final fillerFiles = _collectAvailableCandidates(
+      TimeMemoriesCalculator._filesForHistoricalWindow(fileIndex, now),
       usedMemoryFileIds,
+      isLocalGalleryMode: isLocalGalleryMode,
     );
     final fillerMemories = await _getFillerResults(
       fillerFiles,
@@ -1150,16 +1168,21 @@ class SmartMemoriesService {
     return memories;
   }
 
-  static List<EnteFile> _collectAvailableFiles(
-    Map<int, EnteFile> allFileIdsToFile,
-    Set<int> usedMemoryFileIds,
-  ) {
+  static List<EnteFile> _collectAvailableCandidates(
+    Iterable<EnteFile> candidates,
+    Set<int> usedMemoryFileIds, {
+    required bool isLocalGalleryMode,
+  }) {
     final availableFiles = <EnteFile>[];
-    for (final entry in allFileIdsToFile.entries) {
-      if (usedMemoryFileIds.contains(entry.key)) {
+    for (final file in candidates) {
+      final fileID = _memoryFileId(
+        file,
+        isLocalGalleryMode: isLocalGalleryMode,
+      );
+      if (fileID != null && usedMemoryFileIds.contains(fileID)) {
         continue;
       }
-      availableFiles.add(entry.value);
+      availableFiles.add(file);
     }
     return availableFiles;
   }
@@ -1287,6 +1310,7 @@ class SmartMemoriesService {
     Iterable<EnteFile> allFiles,
     DateTime currentTime, {
     required Iterable<EnteFile> recentSourceFiles,
+    required int totalAvailableFileCount,
     required bool isLocalGalleryMode,
     required bool mlEnabled,
     required Map<int, int> seenTimes,
@@ -1299,6 +1323,7 @@ class SmartMemoriesService {
       allFiles,
       currentTime,
       recentSourceFiles: recentSourceFiles,
+      totalAvailableFileCount: totalAvailableFileCount,
       isLocalGalleryMode: isLocalGalleryMode,
       mlEnabled: mlEnabled,
       seenTimes: seenTimes,

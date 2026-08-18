@@ -4,6 +4,7 @@ import "package:photos/models/file/file.dart";
 import "package:photos/models/file/file_type.dart";
 import "package:photos/models/location/location.dart";
 import "package:photos/models/memories/clip_memory.dart";
+import "package:photos/models/memories/filler_memory.dart";
 import "package:photos/models/memories/memories_cache.dart";
 import "package:photos/models/memories/time_memory.dart";
 import "package:photos/models/ml/face/face_with_embedding.dart";
@@ -113,7 +114,7 @@ void main() {
     );
 
     test(
-      "TimeMemoriesCalculator uses the full recent source for last week",
+      "TimeMemoriesCalculator uses the recent source without historical candidates",
       () async {
         final currentTime = DateTime.utc(2026, 4, 10);
         final fullRecentSource = <EnteFile>[
@@ -124,10 +125,8 @@ void main() {
                 createdAt: DateTime.utc(2026, 4, 1 + dayOffset, 9 + photoIndex),
               ),
         ];
-        final depletedRemainingFiles = fullRecentSource.take(6).toList();
-
         final memories = await TimeMemoriesCalculator.computeTimeMemories(
-          depletedRemainingFiles,
+          const <EnteFile>[],
           currentTime,
           recentSourceFiles: fullRecentSource,
           isLocalGalleryMode: false,
@@ -152,6 +151,56 @@ void main() {
 
         expect(lastWeekMemory.memories, hasLength(10));
         expect(distinctDays.length, greaterThanOrEqualTo(4));
+      },
+    );
+
+    test("MemoryFileIndex merges ranges and preserves descending order", () {
+      final index = MemoryFileIndex([
+        _file(id: 2, createdAt: DateTime(2024, 1, 2)),
+        _file(id: 4, createdAt: DateTime(2024, 1, 4)),
+        _file(id: 1, createdAt: DateTime(2024, 1, 1)),
+        _file(id: 3, createdAt: DateTime(2024, 1, 3)),
+      ]);
+
+      final files = index.filesInDateRanges([
+        (start: DateTime(2024, 1, 1), end: DateTime(2024, 1, 3)),
+        (start: DateTime(2024, 1, 2), end: DateTime(2024, 1, 4)),
+      ]);
+
+      expect(files.map((file) => file.uploadedFileID), [3, 2, 1]);
+    });
+
+    test(
+      "MemoryFileIndex is a broad prefilter for exact date windows",
+      () async {
+        final currentTime = DateTime(2026, 8, 18, 12);
+        final source = [
+          _file(id: 1, createdAt: DateTime(2025, 8, 18, 10)),
+          _file(id: 2, createdAt: DateTime(2025, 8, 18, 14)),
+          _file(id: 3, createdAt: DateTime(2025, 8, 21, 11)),
+          _file(id: 4, createdAt: DateTime(2025, 9, 1)),
+        ];
+        final indexedCandidates = MemoryFileIndex(
+          source,
+        ).filesForCalendar(monthDays: const {818, 819, 820, 821});
+
+        final fullResult = await TimeMemoriesCalculator.computeFillerMemories(
+          source,
+          currentTime,
+          seenTimes: const <int, int>{},
+        );
+        final indexedResult =
+            await TimeMemoriesCalculator.computeFillerMemories(
+              indexedCandidates,
+              currentTime,
+              seenTimes: const <int, int>{},
+            );
+
+        Iterable<int?> selectedIDs(List<FillerMemory> memories) => memories
+            .expand((memory) => memory.memories)
+            .map((memory) => memory.file.uploadedFileID);
+        expect(selectedIDs(indexedResult), selectedIDs(fullResult));
+        expect(selectedIDs(indexedResult), [2, 3]);
       },
     );
 
