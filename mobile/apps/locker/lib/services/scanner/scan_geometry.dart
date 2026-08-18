@@ -26,6 +26,24 @@ double quadArea(List<Offset> corners) {
   return doubled.abs() / 2;
 }
 
+bool isUsableQuad(List<Offset> corners, {required double minAreaFraction}) {
+  if (corners.length != 4) return false;
+  final area = quadArea(corners);
+  if (area < minAreaFraction) return false;
+  final minCross = area * 0.02;
+  var winding = 0.0;
+  for (var i = 0; i < 4; i++) {
+    final a = corners[i];
+    final b = corners[(i + 1) % 4];
+    final c = corners[(i + 2) % 4];
+    final cross = (b.dx - a.dx) * (c.dy - b.dy) - (b.dy - a.dy) * (c.dx - b.dx);
+    if (cross.abs() < minCross) return false;
+    if (winding != 0 && cross.sign != winding) return false;
+    winding = cross.sign;
+  }
+  return true;
+}
+
 ScanQuad orderClockwise(List<Offset> corners) {
   assert(corners.length == 4);
   final cx = corners.map((c) => c.dx).reduce((a, b) => a + b) / 4;

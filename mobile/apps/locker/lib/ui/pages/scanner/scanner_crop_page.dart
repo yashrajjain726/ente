@@ -64,7 +64,7 @@ class _ScannerCropPageState extends State<ScannerCropPage> {
 
   bool get _canSave =>
       _corners.length == 4 &&
-      quadArea(_orderedQuad.corners) >= _minAreaFraction;
+      isUsableQuad(_orderedQuad.corners, minAreaFraction: _minAreaFraction);
 
   Future<void> _save() async {
     final navigator = Navigator.of(context);
